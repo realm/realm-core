@@ -182,7 +182,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\Table.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\testcolumn.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\testtable.cpp"
 				>
 			</File>
 		</Filter>
@@ -193,6 +201,10 @@
 			>
 			<File
 				RelativePath=".\Column.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Table.h"
 				>
 			</File>
 		</Filter>
