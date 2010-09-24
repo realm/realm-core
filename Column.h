@@ -1,3 +1,6 @@
+#ifndef __TDB_COLUMN__
+#define __TDB_COLUMN__
+
 #include "stdint.h"
 
 class Column {
@@ -57,3 +60,5 @@ private:
 	Getter m_getter;
 	Setter m_setter;
 };
+
+#endif //__TDB_COLUMN__
