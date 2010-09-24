@@ -181,6 +181,10 @@
 				RelativePath=".\main.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\testcolumn.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
