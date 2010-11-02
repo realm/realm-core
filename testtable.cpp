@@ -14,19 +14,35 @@ TEST(Table1) {
 	CHECK_EQUAL(10, table.Get(1, ndx));
 }
 
-TEST(Table2) {
-	MyTable table;
+enum Days {
+	Mon,
+	Tue,
+	Wed,
+	Thu,
+	Fri,
+	Sat,
+	Sun
+};
 
-	MyTable::Cursor r = table.Add();
+TDB_TABLE_4(TestTable,
+			Int,        first,
+			Int,        second,
+			Bool,       third,
+			Enum<Days>, fourth)
+
+TEST(Table2) {
+	TestTable table;
+
+	TestTable::Cursor r = table.Add();
 	r.first = 0;
 	r.second = 10;
-	r.third = 300;
-	r.fourth = true;
+	r.third = true;
+	r.fourth = Wed;
 
 	CHECK_EQUAL(0, r.first);
 	CHECK_EQUAL(10, r.second);
-	CHECK_EQUAL(300, r.third);
-	CHECK_EQUAL(true, r.fourth);
+	CHECK_EQUAL(true, r.third);
+	CHECK_EQUAL(Wed, r.fourth);
 }
 
 TEST(Table3) {

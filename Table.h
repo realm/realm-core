@@ -60,9 +60,40 @@ public:
 	void operator=(bool value) {Set(value ? 1 : 0);}
 };
 
+template<class T> class AccessorEnum : public Accessor {
+public:
+	operator T() const {return (T)Get();}
+	void operator=(T value) {Set((int)value);}
+};
 
-
-
+#define TDB_TABLE_4(TableName, CType1, CName1, CType2, CName2, CType3, CName3, CType4, CName4) \
+class TableName : public Table { \
+public: \
+	TableName() : Table(#TableName) { \
+		RegisterColumn( #CName1 ); \
+		RegisterColumn( #CName2 ); \
+		RegisterColumn( #CName3 ); \
+		RegisterColumn( #CName4 ); \
+	}; \
+\
+	class Cursor : public CursorBase { \
+	public: \
+		Cursor(TableName& table, size_t ndx) : CursorBase(table, ndx) { \
+			CName1.Create(this, 0); \
+			CName2.Create(this, 1); \
+			CName3.Create(this, 2); \
+			CName4.Create(this, 3); \
+		} \
+		Accessor##CType1 CName1; \
+		Accessor##CType2 CName2; \
+		Accessor##CType3 CName3; \
+		Accessor##CType4 CName4; \
+	}; \
+ \
+	Cursor Add() {return Cursor(*this, AddRow());} \
+	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \
+	Cursor operator[](size_t ndx) {return Cursor(*this, ndx);} \
+};
 
 class MyTable : public Table {
 public:
