@@ -19,7 +19,8 @@ void Table::RegisterColumn(const char* name) {
 }
 
 size_t Table::AddRow() {
-	for (size_t i = 0; i < m_columns.Size(); ++i) {
+	const size_t len = m_columns.Size();
+	for (size_t i = 0; i < len; ++i) {
 		Column* column = (Column*)m_columns.Get(i);
 		column->Add(0);
 	}
