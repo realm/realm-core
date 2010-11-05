@@ -18,6 +18,10 @@ void Table::RegisterColumn(const char* name) {
 	m_columns.Add((int)newColumn);
 }
 
+Column* Table::GetColumn(size_t ndx) {
+	return (Column*)m_columns.Get(ndx);
+}
+
 size_t Table::AddRow() {
 	const size_t len = m_columns.Size();
 	for (size_t i = 0; i < len; ++i) {

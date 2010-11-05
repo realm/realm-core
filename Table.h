@@ -17,6 +17,7 @@ public:
 	void Set(size_t column_id, size_t ndx, int value);
 
 	void RegisterColumn(const char* name);
+	Column* GetColumn(size_t ndx);
 
 private:
 	const char* m_name;
@@ -66,6 +67,29 @@ public:
 	void operator=(T value) {Set((int)value);}
 };
 
+class ColumnProxy {
+public:
+	ColumnProxy() {}
+	void Create(Column* column) {m_column = column;}
+protected:
+	Column* m_column;
+};
+
+class ColumnProxyInt : public ColumnProxy {
+public:
+	size_t Find(int value) const {return m_column->Find(value);}
+};
+
+class ColumnProxyBool : public ColumnProxy {
+public:
+	size_t Find(bool value) const {return m_column->Find(value ? 1 : 0);}
+};
+
+template<class T> class ColumnProxyEnum : public ColumnProxy {
+public:
+	size_t Find(T value) const {return m_column->Find((int)value);}
+};
+
 #define TDB_TABLE_4(TableName, CType1, CName1, CType2, CName2, CType3, CName3, CType4, CName4) \
 class TableName : public Table { \
 public: \
@@ -74,6 +98,11 @@ public: \
 		RegisterColumn( #CName2 ); \
 		RegisterColumn( #CName3 ); \
 		RegisterColumn( #CName4 ); \
+		\
+		CName1.Create(GetColumn(0)); \
+		CName2.Create(GetColumn(1)); \
+		CName3.Create(GetColumn(2)); \
+		CName4.Create(GetColumn(3)); \
 	}; \
 \
 	class Cursor : public CursorBase { \
@@ -93,6 +122,11 @@ public: \
 	Cursor Add() {return Cursor(*this, AddRow());} \
 	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \
 	Cursor operator[](size_t ndx) {return Cursor(*this, ndx);} \
+\
+	ColumnProxy##CType1 CName1; \
+	ColumnProxy##CType2 CName2; \
+	ColumnProxy##CType3 CName3; \
+	ColumnProxy##CType4 CName4; \
 };
 
 class MyTable : public Table {

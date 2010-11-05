@@ -46,13 +46,23 @@ TEST(Table2) {
 }
 
 TEST(Table3) {
-	MyTable table;
+	TestTable table;
 
-	table.Add(0, 10, 300, true);
+	for (size_t i = 0; i < 100; ++i) {
+		TestTable::Cursor r = table.Add();
+		r.first = 0;
+		r.second = 10;
+		r.third = true;
+		r.fourth = Wed;
+	}
 
-	CHECK_EQUAL(0, table[0].first);
-	CHECK_EQUAL(10, table[0].second);
-	CHECK_EQUAL(300, table[0].third);
-	CHECK_EQUAL(true, table[0].fourth);
+	CHECK_EQUAL(0, table.first.Find(0));
+	CHECK_EQUAL(-1, table.first.Find(1));
+	CHECK_EQUAL(0, table.second.Find(10));
+	CHECK_EQUAL(-1, table.second.Find(100));
+	CHECK_EQUAL(0, table.third.Find(true));
+	CHECK_EQUAL(-1, table.third.Find(false));
+	CHECK_EQUAL(0, table.fourth.Find(Wed));
+	CHECK_EQUAL(-1, table.fourth.Find(Mon));
 }
 
