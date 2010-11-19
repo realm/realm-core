@@ -187,6 +187,55 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 			++p;
 		}
 	}
+	else if (m_width == 2) {
+		// Create a pattern to match 32bits at a time
+		uint32_t v = (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+		v = (v << 2) | (uint32_t)value;
+
+		const int32_t* p = (const int32_t*)m_data;
+		const size_t end32 = m_len / 16;
+		const int32_t* const e = (const int32_t*)m_data + end32;
+
+		while (p < e) {
+			// Check 32bits at a time for match
+			const uint32_t v2 = *p ^ v; // zero matching bit segments
+			const bool hasNoZeroByte = (v2 & 0x03) && (v2 & 0x0C) && (v2 & 0x30) && (v2 & 0xC0) &&
+									   (v2 & 0x0300) && (v2 & 0x0C00) && (v2 & 0x3000) && (v2 & 0xC000) &&
+									   (v2 & 0x030000) && (v2 & 0x0C0000) && (v2 & 0x300000) && (v2 & 0xC00000) &&
+									   (v2 & 0x03000000) && (v2 & 0x0C000000) && (v2 & 0x30000000) && (v2 & 0xC0000000);
+			
+			// Only do detailed search if we know there is a match
+			if (!hasNoZeroByte) {
+				size_t s = (p - (const int32_t*)m_data) * 16;
+				for (size_t i = s; i < end; ++i) {
+					const int64_t v = (this->*m_getter)(i);
+					if (v == value) return i;
+				}
+			}
+			++p;
+		}
+
+		// Manually check the rest
+		for (size_t i = end32*16; i < end; ++i) {
+			const size_t offset = i >> 2;
+			const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
+			if (v == value) return i;
+		}
+	}
 	else {
 		// Naive search
 		for (size_t i = start; i < end; ++i) {
