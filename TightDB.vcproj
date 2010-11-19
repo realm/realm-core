@@ -207,6 +207,10 @@
 				RelativePath=".\Table.h"
 				>
 			</File>
+			<File
+				RelativePath=".\tightdb.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"
