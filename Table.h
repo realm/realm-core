@@ -98,6 +98,16 @@ public:
 	size_t Find(T value) const {return m_column->Find((int)value);}
 };
 
+template<class T> class TypeEnum {
+public:
+	TypeEnum(T v) : m_value(v) {};
+	operator T() const {return m_value;}
+private:
+	const T m_value;
+};
+#define TypeInt int
+#define TypeBool bool
+
 #define TDB_TABLE_4(TableName, CType1, CName1, CType2, CName2, CType3, CName3, CType4, CName4) \
 class TableName : public Table { \
 public: \
