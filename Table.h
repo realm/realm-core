@@ -10,16 +10,21 @@ public:
 	Table(const char* name);
 	~Table();
 
+	bool IsEmpty() const {return m_size == 0;}
+	size_t GetSize() const {return m_size;}
+
 	size_t AddRow();
 	void Clear();
 	void DeleteRow(size_t ndx);
+	void PopBack() {if (!IsEmpty()) DeleteRow(m_size-1);}
+
 	int Get(size_t column_id, size_t ndx) const;
 	void Set(size_t column_id, size_t ndx, int value);
 
 	void RegisterColumn(const char* name);
 	Column* GetColumn(size_t ndx);
 
-private:
+protected:
 	const char* m_name;
 	size_t m_size;
 	Column m_columnNames;
@@ -29,6 +34,7 @@ private:
 class CursorBase {
 public:
 	CursorBase(Table& table, size_t ndx) : m_table(table), m_index(ndx) {};
+	CursorBase(const CursorBase& v) : m_table(v.m_table), m_index(v.m_index) {};
 
 protected:
 	Table& m_table;
@@ -53,12 +59,14 @@ class AccessorInt : public Accessor {
 public:
 	operator int() const {return Get();}
 	void operator=(int value) {Set(value);}
+	void operator+=(int value) {Set(Get()+value);}
 };
 
 class AccessorBool : public Accessor {
 public:
 	operator bool() const {return (Get() != 0);}
 	void operator=(bool value) {Set(value ? 1 : 0);}
+	void Flip() {Set(Get() != 0 ? 0 : 1);}
 };
 
 template<class T> class AccessorEnum : public Accessor {
