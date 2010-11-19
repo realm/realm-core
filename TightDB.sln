@@ -5,6 +5,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TightDB", "TightDB.vcproj",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTest++", "UnitTest++\UnitTest++.vsnet2005.vcproj", "{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XTest1", "XTest1\XTest1.vcproj", "{4CB13C81-C9A1-444F-BA8A-57C45D14B66A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XTest2", "XTest2\XTest2.vcproj", "{863D3FD3-CC66-4B0F-8C25-135856F4F2AA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -19,6 +23,14 @@ Global
 		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Debug|Win32.Build.0 = Debug|Win32
 		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Release|Win32.ActiveCfg = Release|Win32
 		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Release|Win32.Build.0 = Release|Win32
+		{4CB13C81-C9A1-444F-BA8A-57C45D14B66A}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4CB13C81-C9A1-444F-BA8A-57C45D14B66A}.Debug|Win32.Build.0 = Debug|Win32
+		{4CB13C81-C9A1-444F-BA8A-57C45D14B66A}.Release|Win32.ActiveCfg = Release|Win32
+		{4CB13C81-C9A1-444F-BA8A-57C45D14B66A}.Release|Win32.Build.0 = Release|Win32
+		{863D3FD3-CC66-4B0F-8C25-135856F4F2AA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{863D3FD3-CC66-4B0F-8C25-135856F4F2AA}.Debug|Win32.Build.0 = Debug|Win32
+		{863D3FD3-CC66-4B0F-8C25-135856F4F2AA}.Release|Win32.ActiveCfg = Release|Win32
+		{863D3FD3-CC66-4B0F-8C25-135856F4F2AA}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
