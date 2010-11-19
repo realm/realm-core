@@ -1,4 +1,4 @@
-#include "Table.h"
+#include "tightdb.h"
 #include <UnitTest++.h>
 
 TEST(Table1) {
@@ -33,11 +33,7 @@ TDB_TABLE_4(TestTable,
 TEST(Table2) {
 	TestTable table;
 
-	TestTable::Cursor r = table.Add();
-	r.first = 0;
-	r.second = 10;
-	r.third = true;
-	r.fourth = Wed;
+	TestTable::Cursor r = table.Add(0, 10, true, Wed);
 
 	CHECK_EQUAL(0, r.first);
 	CHECK_EQUAL(10, r.second);
@@ -49,11 +45,7 @@ TEST(Table3) {
 	TestTable table;
 
 	for (size_t i = 0; i < 100; ++i) {
-		TestTable::Cursor r = table.Add();
-		r.first = 0;
-		r.second = 10;
-		r.third = true;
-		r.fourth = Wed;
+		table.Add(0, 10, true, Wed);
 	}
 
 	CHECK_EQUAL(0, table.first.Find(0));
@@ -64,5 +56,18 @@ TEST(Table3) {
 	CHECK_EQUAL(-1, table.third.Find(false));
 	CHECK_EQUAL(0, table.fourth.Find(Wed));
 	CHECK_EQUAL(-1, table.fourth.Find(Mon));
+}
+
+TDB_TABLE_2(TestTableEnum,
+			Enum<Days>, first,
+			Int, second)
+
+TEST(Table4) {
+	TestTableEnum table;
+
+	TestTableEnum::Cursor r = table.Add(Mon, 120);
+
+	CHECK_EQUAL(Mon, r.first);
+	CHECK_EQUAL(120, r.second);
 }
 
