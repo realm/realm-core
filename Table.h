@@ -108,43 +108,4 @@ private:
 #define TypeInt int
 #define TypeBool bool
 
-class MyTable : public Table {
-public:
-	MyTable() : Table("MyTable") {
-		RegisterColumn("first");
-		RegisterColumn("second");
-		RegisterColumn("third");
-		RegisterColumn("fourth");
-	};
-
-	class Cursor : public CursorBase {
-	public:
-		Cursor(MyTable& table, size_t ndx) : CursorBase(table, ndx) {
-			first.Create(this, 0);
-			second.Create(this, 1);
-			third.Create(this, 2);
-			fourth.Create(this, 3);
-		};
-
-		// Accessors
-		AccessorInt first;
-		AccessorInt second;
-		AccessorInt third;
-		AccessorBool fourth;
-	};
-
-	Cursor Add(int first, int second, int third, bool fourth) {
-		Cursor r = Add();
-		r.first = first;
-		r.second = second;
-		r.third = third;
-		r.fourth = fourth;
-		return r;
-	}
-
-	Cursor Add() {return Cursor(*this, AddRow());}
-	Cursor Get(size_t ndx) {return Cursor(*this, ndx);}
-	Cursor operator[](size_t ndx) {return Cursor(*this, ndx);}
-};
-
 #endif //__TDB_TABLE__
