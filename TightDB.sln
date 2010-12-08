@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XTest1", "XTest1\XTest1.vcp
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XTest2", "XTest2\XTest2.vcproj", "{863D3FD3-CC66-4B0F-8C25-135856F4F2AA}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XTest3", "XTest3\XTest3.vcproj", "{BA0BBC4F-D368-46DE-9884-6E6300CC4766}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -31,6 +33,10 @@ Global
 		{863D3FD3-CC66-4B0F-8C25-135856F4F2AA}.Debug|Win32.Build.0 = Debug|Win32
 		{863D3FD3-CC66-4B0F-8C25-135856F4F2AA}.Release|Win32.ActiveCfg = Release|Win32
 		{863D3FD3-CC66-4B0F-8C25-135856F4F2AA}.Release|Win32.Build.0 = Release|Win32
+		{BA0BBC4F-D368-46DE-9884-6E6300CC4766}.Debug|Win32.ActiveCfg = Debug|Win32
+		{BA0BBC4F-D368-46DE-9884-6E6300CC4766}.Debug|Win32.Build.0 = Debug|Win32
+		{BA0BBC4F-D368-46DE-9884-6E6300CC4766}.Release|Win32.ActiveCfg = Release|Win32
+		{BA0BBC4F-D368-46DE-9884-6E6300CC4766}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
