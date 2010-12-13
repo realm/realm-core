@@ -48,6 +48,7 @@ TEST(Table3) {
 		table.Add(0, 10, true, Wed);
 	}
 
+	// Test column searching
 	CHECK_EQUAL(0, table.first.Find(0));
 	CHECK_EQUAL(-1, table.first.Find(1));
 	CHECK_EQUAL(0, table.second.Find(10));
@@ -56,6 +57,11 @@ TEST(Table3) {
 	CHECK_EQUAL(-1, table.third.Find(false));
 	CHECK_EQUAL(0, table.fourth.Find(Wed));
 	CHECK_EQUAL(-1, table.fourth.Find(Mon));
+
+	// Test column incrementing
+	table.first += 3;
+	CHECK_EQUAL(3, table[0].first);
+	CHECK_EQUAL(3, table[99].first);
 }
 
 TDB_TABLE_2(TestTableEnum,

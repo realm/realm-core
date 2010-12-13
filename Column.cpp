@@ -135,6 +135,18 @@ void Column::Delete(size_t ndx) {
 	--m_len;
 }
 
+bool Column::Increment64(int64_t value, size_t start, size_t end) {
+	if (end == -1) end = m_len;
+	assert(start < m_len);
+	assert(end >= start && end <= m_len);
+
+	// Increment range
+	for (size_t i = start; i < end; ++i) {
+		Set64(i, Get64(i) + value);
+	}
+	return true;
+}
+
 size_t Column::Find(int64_t value, size_t start, size_t end) const {
 	if (IsEmpty()) return -1;
 	if (end == -1) end = m_len;

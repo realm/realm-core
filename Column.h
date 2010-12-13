@@ -25,6 +25,8 @@ public:
 	void Delete(size_t ndx);
 	//void Resize(size_t len);
 	bool Reserve(size_t len, size_t width=8);
+
+	bool Increment64(int64_t value, size_t start=0, size_t end=-1);
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
 
 private:

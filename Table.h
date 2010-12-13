@@ -86,6 +86,7 @@ protected:
 class ColumnProxyInt : public ColumnProxy {
 public:
 	size_t Find(int value) const {return m_column->Find(value);}
+	int operator+=(int value) {m_column->Increment64(value); return 0;}
 };
 
 class ColumnProxyBool : public ColumnProxy {
