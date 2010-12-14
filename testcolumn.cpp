@@ -299,3 +299,14 @@ TEST_FIXTURE(db_setup, Find9) {
 	size_t res = c.Find(4294967296);
 	CHECK_EQUAL(res, 8);
 }
+
+TEST_FIXTURE(db_setup, HeaderParse) {
+	Column column(c.GetRef(), (Column*)NULL, 0);
+	const bool isEqual = (c == column);
+	CHECK(isEqual);
+}
+
+TEST_FIXTURE(db_setup, Destroy) {
+	// clean up (ALWAYS PUT THIS LAST)
+	c.Destroy();
+}

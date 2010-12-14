@@ -2,17 +2,98 @@
 #include <stdlib.h>
 #include <assert.h>
 
-Column::Column() : m_data(0), m_len(0), m_capacity(0), m_width(0) {
+Column::Column()
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(NULL), m_parentNdx(0) {
 	SetWidth(0);
 }
 
+Column::Column(bool hasRefs, Column* parent, size_t pndx)
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(hasRefs), m_parent(parent), m_parentNdx(pndx) {
+	Alloc(0, 0);
+	SetWidth(0);
+}
+
+Column::Column(void* ref, Column* parent, size_t pndx)
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx) {
+	Create(ref);
+}
+
+Column::Column(void* ref, const Column* parent, size_t pndx)
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(const_cast<Column*>(parent)), m_parentNdx(pndx) {
+	Create(ref);
+}
+
+Column& Column::operator=(const Column& column) {
+	m_parent = column.m_parent;
+	m_parentNdx = column.m_parentNdx;
+	Create(column.GetRef());
+	return *this;
+}
+
+bool Column::operator==(const Column& column) const {
+	if (m_data != column.m_data) return false;
+	if (m_isNode != column.m_isNode) return false;
+	if (m_hasRefs != column.m_hasRefs) return false;
+	if (m_width != column.m_width) return false;
+	if (m_len != column.m_len) return false;
+	if (m_capacity != column.m_capacity) return false;
+
+	return true;
+}
+
 Column::~Column() {
-	free(m_data);
+}
+
+void Column::Create(void* ref) {
+	assert(ref);
+	uint8_t* const header = (uint8_t*)ref;
+
+	// parse the 8byte header
+	m_isNode   = (header[0] & 0x80) != 0;
+	m_hasRefs  = (header[0] & 0x40) != 0;
+	m_width    = (1 << (header[0] & 0x07)) >> 1; // 0, 1, 2, 4, 8, 16, 32, 64
+	m_len      = (header[1] << 16) + (header[2] << 8) + header[3];
+	m_capacity = (header[4] << 16) + (header[5] << 8) + header[6];
+
+	m_data = header + 8;
+
+	SetWidth(m_width);
+}
+
+void Column::SetParent(Column* parent, size_t pndx) {
+	m_parent = parent;
+	m_parentNdx = pndx;
+}
+
+Column Column::GetSubColumn(size_t ndx) {
+	assert(ndx < m_len);
+	assert(m_hasRefs);
+
+	return Column((void*)Get64(ndx), this, ndx);
+}
+
+const Column Column::GetSubColumn(size_t ndx) const {
+	assert(ndx < m_len);
+	assert(m_hasRefs);
+
+	return Column((void*)Get64(ndx), this, ndx);
+}
+
+void Column::Destroy() {
+	if (m_hasRefs) {
+		for (size_t i = 0; i < Size(); ++i) {
+			Column sub((void*)Get64(i), this, i);
+			sub.Destroy();
+		}
+	}
+	
+	void* ref = m_data-8;
+	free(ref);
 }
 
 static unsigned int fBitsNeeded(int64_t v) {
 	if ((v >> 4) == 0) {
-		static int8_t bits[] =  {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+		static const int8_t bits[] =  {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
 		return bits[(int8_t)v];
 	}
 
@@ -46,7 +127,7 @@ bool Column::Set64(size_t ndx, int64_t value) {
 		SetWidth(width);
 
 		// Expand the old values
-		int k = m_len;
+		int k = (int)m_len;
 		while (--k >= 0) {
 			const int64_t v = (this->*oldGetter)(k);
 			(this->*m_setter)(k, v);
@@ -82,7 +163,7 @@ bool Column::Insert64(size_t ndx, int64_t value) {
 	// Move values below insertion (may expand)
 	// TODO: if byte sized and no expansion, use memmove
 	if (doExpand || m_width < 8) {
-		int k = m_len;
+		int k = (int)m_len;
 		while (--k >= (int)ndx) {
 			const int64_t v = (this->*getter)(k);
 			(this->*m_setter)(k+1, v);
@@ -102,14 +183,17 @@ bool Column::Insert64(size_t ndx, int64_t value) {
 
 	// Expand values above insertion
 	if (doExpand) {
-		int k = ndx;
+		int k = (int)ndx;
 		while (--k >= 0) {
 			const int64_t v = (this->*getter)(k);
 			(this->*m_setter)(k, v);
 		}
 	}
 
+	// Update length
+	// (no need to do it in header as it has been done by Alloc)
 	++m_len;
+
 	return true;
 }
 
@@ -133,6 +217,12 @@ void Column::Delete(size_t ndx) {
 	}
 
 	--m_len;
+
+	// Update length (also in header)
+	uint8_t* header = (uint8_t*)(m_data-8);
+	header[1] = ((m_len >> 16) & 0x000000FF);
+	header[2] = (m_len >> 8) & 0x000000FF;
+	header[3] = m_len & 0x000000FF;
 }
 
 bool Column::Increment64(int64_t value, size_t start, size_t end) {
@@ -348,38 +438,61 @@ bool Column::Reserve(size_t count, size_t width) {
 }
 
 bool Column::Alloc(size_t count, size_t width) {
-	if (width == 0) return true;
-
 	// Calculate size in bytes
-	size_t len = 0;
-	if (width == 1) {
-		len = count >> 3;
+	size_t len = 8; // always need room for header
+	switch (width) {
+	case 0:
+		break;
+	case 1:
+		len += count >> 3;
 		if (count & 0x07) ++len;
-	}
-	else if (width == 2) {
-		len = count >> 2;
+		break;
+	case 2:
+		len += count >> 2;
 		if (count & 0x03) ++len;
-	}
-	else if (width == 4) {
-		len = count >> 1;
+		break;
+	case 4:
+		len += count >> 1;
 		if (count & 0x01) ++len;
-	}
-	else {
+		break;
+	default:
 		assert(width == 8 || width == 16 || width == 32 || width == 64);
-		len = count * (width >> 3);
+		len += count * (width >> 3);
 	}
 
 	if (len > m_capacity) {
 		// Allocate the space
 		unsigned char* data = NULL;
-		if (m_data) data = (unsigned char*)realloc(m_data, len);
+		if (m_data) data = (unsigned char*)realloc(m_data-8, len);
 		else data = (unsigned char*)malloc(len);
 
 		if (!data) return false;
 
-		m_data = data;
+		m_data = data+8;
 		m_capacity = len;
+
+		// Update ref in parent
+		if (m_parent) m_parent->Set64(m_parentNdx, (int)data);
 	}
+
+	// Pack width in 3 bits (log2)
+	unsigned int w = 0;
+	unsigned int b = (unsigned int)width;
+	while (b) {++w; b >>= 1;}
+	assert(0 <= w && w < 8);
+
+	// Update 8-byte header
+	// isNode 1 bit, hasRefs 1 bit, 3 bits unused, width 3 bits, len 3 bytes, capacity 3 bytes
+	uint8_t* const header = (uint8_t*)(m_data-8);
+	header[0] = m_isNode << 7;
+	header[0] += m_hasRefs << 6;
+	header[0] += (uint8_t)w;
+	header[1] = (count >> 16) & 0x000000FF;
+	header[2] = (count >> 8) & 0x000000FF;
+	header[3] = count & 0x000000FF;
+	header[4] = (m_capacity >> 16) & 0x000000FF;
+	header[5] = (m_capacity >> 8) & 0x000000FF;
+	header[6] = m_capacity & 0x000000FF;
 
 	return true;
 }

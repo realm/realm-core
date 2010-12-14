@@ -10,8 +10,8 @@ public: \
 		RegisterColumn( #CName1 ); \
 		RegisterColumn( #CName2 ); \
 		\
-		CName1.Create(GetColumn(0)); \
-		CName2.Create(GetColumn(1)); \
+		CName1.Create(this, 0); \
+		CName2.Create(this, 1); \
 	}; \
 \
 	class Cursor : public CursorBase { \
@@ -54,10 +54,10 @@ public: \
 		RegisterColumn( #CName3 ); \
 		RegisterColumn( #CName4 ); \
 		\
-		CName1.Create(GetColumn(0)); \
-		CName2.Create(GetColumn(1)); \
-		CName3.Create(GetColumn(2)); \
-		CName4.Create(GetColumn(3)); \
+		CName1.Create(this, 0); \
+		CName2.Create(this, 1); \
+		CName3.Create(this, 2); \
+		CName4.Create(this, 3); \
 	}; \
 \
 	class Cursor : public CursorBase { \

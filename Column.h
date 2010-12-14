@@ -6,7 +6,17 @@
 class Column {
 public:
 	Column();
+	Column(bool hasRefs, Column* parent=NULL, size_t pndx=0);
+	Column(void* ref, Column* parent=NULL, size_t pndx=0);
+	Column(void* ref, const Column* parent=NULL, size_t pndx=0);
+	Column(const Column& column);
 	~Column();
+
+	Column& operator=(const Column& column);
+	bool operator==(const Column& column) const;
+
+	void Create(void* ref);
+	void SetParent(Column* column, size_t pndx);
 
 	size_t Size() const {return m_len;};
 	bool IsEmpty() const {return m_len == 0;};
@@ -28,6 +38,11 @@ public:
 
 	bool Increment64(int64_t value, size_t start=0, size_t end=-1);
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
+
+	Column GetSubColumn(size_t ndx);
+	const Column GetSubColumn(size_t ndx) const;
+	void* GetRef() const {return m_data-8;};
+	void Destroy();
 
 private:
 	typedef int64_t(Column::*Getter)(size_t) const;
@@ -61,6 +76,10 @@ private:
 	size_t m_width;
 	Getter m_getter;
 	Setter m_setter;
+	bool m_isNode;
+	bool m_hasRefs;
+	Column* m_parent;
+	size_t m_parentNdx;
 };
 
 #endif //__TDB_COLUMN__

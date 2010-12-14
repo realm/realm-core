@@ -22,7 +22,7 @@ public:
 	void Set(size_t column_id, size_t ndx, int value);
 
 	void RegisterColumn(const char* name);
-	Column* GetColumn(size_t ndx);
+	Column GetColumn(size_t ndx);
 
 protected:
 	const char* m_name;
@@ -78,25 +78,26 @@ public:
 class ColumnProxy {
 public:
 	ColumnProxy() {}
-	void Create(Column* column) {m_column = column;}
+	void Create(Table* table, size_t column) {m_table = table; m_column = column;}
 protected:
-	Column* m_column;
+	Table* m_table;
+	size_t m_column;
 };
 
 class ColumnProxyInt : public ColumnProxy {
 public:
-	size_t Find(int value) const {return m_column->Find(value);}
-	int operator+=(int value) {m_column->Increment64(value); return 0;}
+	size_t Find(int value) const {return m_table->GetColumn(m_column).Find(value);}
+	int operator+=(int value) {m_table->GetColumn(m_column).Increment64(value); return 0;}
 };
 
 class ColumnProxyBool : public ColumnProxy {
 public:
-	size_t Find(bool value) const {return m_column->Find(value ? 1 : 0);}
+	size_t Find(bool value) const {return m_table->GetColumn(m_column).Find(value ? 1 : 0);}
 };
 
 template<class T> class ColumnProxyEnum : public ColumnProxy {
 public:
-	size_t Find(T value) const {return m_column->Find((int)value);}
+	size_t Find(T value) const {return m_table->GetColumn(m_column).Find((int)value);}
 };
 
 template<class T> class TypeEnum {
