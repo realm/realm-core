@@ -2,24 +2,42 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#define MAX_LIST_SIZE 3
+
 Column::Column()
 : m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(NULL), m_parentNdx(0) {
 	SetWidth(0);
 }
 
-Column::Column(bool hasRefs, Column* parent, size_t pndx)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(hasRefs), m_parent(parent), m_parentNdx(pndx) {
+Column::Column(ColumnType type, Column* parent, size_t pndx)
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx) {
+	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
+	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
+
 	Alloc(0, 0);
 	SetWidth(0);
+
+	// Add subcolumns for nodes
+	if (m_isNode) {
+		const Column offsets(COLUMN_NORMAL);
+		const Column refs(COLUMN_HASREFS);
+		ListAdd((int)offsets.GetRef());
+		ListAdd((int)refs.GetRef());
+	}
+}
+
+Column::Column(void* ref)
+: m_parent(NULL), m_parentNdx(0) {
+	Create(ref);
 }
 
 Column::Column(void* ref, Column* parent, size_t pndx)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx) {
+: m_parent(parent), m_parentNdx(pndx) {
 	Create(ref);
 }
 
 Column::Column(void* ref, const Column* parent, size_t pndx)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(const_cast<Column*>(parent)), m_parentNdx(pndx) {
+: m_parent(const_cast<Column*>(parent)), m_parentNdx(pndx) {
 	Create(ref);
 }
 
@@ -60,6 +78,22 @@ void Column::Create(void* ref) {
 	SetWidth(m_width);
 }
 
+bool Column::IsEmpty() const {
+	if (!IsNode()) return m_len == 0;
+	else {
+		const Column offsets = GetSubColumn(0);
+		return offsets.IsEmpty();
+	}
+}
+
+size_t Column::Size() const {
+	if (!IsNode()) return m_len;
+	else {
+		const Column offsets = GetSubColumn(0);
+		return offsets.IsEmpty() ? 0 : (size_t)offsets.ListBack();
+	}
+}
+
 void Column::SetParent(Column* parent, size_t pndx) {
 	m_parent = parent;
 	m_parentNdx = pndx;
@@ -69,26 +103,40 @@ Column Column::GetSubColumn(size_t ndx) {
 	assert(ndx < m_len);
 	assert(m_hasRefs);
 
-	return Column((void*)Get64(ndx), this, ndx);
+	return Column((void*)ListGet(ndx), this, ndx);
 }
 
 const Column Column::GetSubColumn(size_t ndx) const {
 	assert(ndx < m_len);
 	assert(m_hasRefs);
 
-	return Column((void*)Get64(ndx), this, ndx);
+	return Column((void*)ListGet(ndx), this, ndx);
 }
 
 void Column::Destroy() {
 	if (m_hasRefs) {
-		for (size_t i = 0; i < Size(); ++i) {
-			Column sub((void*)Get64(i), this, i);
+		for (size_t i = 0; i < ListSize(); ++i) {
+			Column sub((void*)ListGet(i), this, i);
 			sub.Destroy();
 		}
 	}
 	
 	void* ref = m_data-8;
 	free(ref);
+	m_data = NULL;
+}
+
+void Column::Clear() {
+	if (IsNode()) {
+		Destroy();
+		m_isNode = false;
+		m_hasRefs = false;
+		m_capacity = 0;
+		Alloc(0,0);
+	}
+	
+	m_len = 0;
+	SetWidth(0);
 }
 
 static unsigned int fBitsNeeded(int64_t v) {
@@ -105,18 +153,57 @@ static unsigned int fBitsNeeded(int64_t v) {
 	return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
 }
 
-void Column::Clear() {
-	m_len = 0;
-	SetWidth(0);
+int64_t Column::Get64(size_t ndx) const {
+	if (IsNode()) {
+		// Get subnode table
+		const Column offsets = GetSubColumn(0);
+		const Column refs = GetSubColumn(1);
+
+		// Find the subnode containing the item
+		const size_t node_ndx = offsets.ListFindPos(ndx);
+
+		// Calc index in subnode
+		const size_t offset = node_ndx ? (size_t)offsets.ListGet(node_ndx-1) : 0;
+		const size_t local_ndx = ndx - offset;
+
+		// Get item
+		const Column target = refs.GetSubColumn(node_ndx);
+		return target.Get64(local_ndx);
+	}
+	else return ListGet(ndx);
 }
 
-int64_t Column::Get64(size_t ndx) const {
+int64_t Column::ListGet(size_t ndx) const {
 	assert(ndx < m_len);
-
 	return (this->*m_getter)(ndx);
 }
 
+int64_t Column::ListBack() const {
+	assert(m_len);
+	return (this->*m_getter)(m_len-1);
+}
+
 bool Column::Set64(size_t ndx, int64_t value) {
+	if (IsNode()) {
+		// Get subnode table
+		const Column offsets = GetSubColumn(0);
+		Column refs = GetSubColumn(1);
+
+		// Find the subnode containing the item
+		const size_t node_ndx = offsets.ListFindPos(ndx);
+
+		// Calc index in subnode
+		const size_t offset = node_ndx ? (size_t)offsets.ListGet(node_ndx-1) : 0;
+		const size_t local_ndx = ndx - offset;
+
+		// Set item
+		Column target = refs.GetSubColumn(node_ndx);
+		return target.Set64(local_ndx, value);
+	}
+	else return ListSet(ndx, value);
+}
+
+bool Column::ListSet(size_t ndx, int64_t value) {
 	assert(ndx < m_len);
 
 	// Make room for the new value
@@ -141,10 +228,152 @@ bool Column::Set64(size_t ndx, int64_t value) {
 }
 
 bool Column::Add64(int64_t value) {
-	return Insert64(m_len, value);
+	return Insert64(Size(), value);
 }
 
 bool Column::Insert64(size_t ndx, int64_t value) {
+	assert(ndx <= Size());
+
+	const NodeChange nc = DoInsert(ndx, value);
+	switch (nc.type) {
+	case NodeChange::ERROR:
+		return false; // allocation error
+	case NodeChange::NONE:
+		break;
+	case NodeChange::INSERT_BEFORE:
+		{
+			Column newNode(COLUMN_NODE);
+			newNode.NodeAdd(nc.ref1);
+			newNode.NodeAdd(GetRef());
+			UpdateRef(newNode.GetRef());
+			break;
+		}
+	case NodeChange::INSERT_AFTER:
+		{
+			Column newNode(COLUMN_NODE);
+			newNode.NodeAdd(GetRef());
+			newNode.NodeAdd(nc.ref1);
+			UpdateRef(newNode.GetRef());
+			break;
+		}
+	case NodeChange::SPLIT:
+		{
+			Column newNode(COLUMN_NODE);
+			newNode.NodeAdd(nc.ref1);
+			newNode.NodeAdd(nc.ref2);
+			UpdateRef(newNode.GetRef());
+			break;
+		}
+	default:
+		assert(false);
+		return false;
+	}
+
+	Verify();
+	return true;
+}
+
+Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
+	if (IsNode()) {
+		// Get subnode table
+		Column offsets = GetSubColumn(0);
+		Column refs = GetSubColumn(1);
+
+		// Find the subnode containing the item
+		size_t node_ndx = offsets.ListFindPos(ndx);
+		if (node_ndx == -1) {
+			// node can never be empty, so try to fit in last item
+			node_ndx = offsets.ListSize()-1;
+		}
+
+		// Calc index in subnode
+		const size_t offset = node_ndx ? (size_t)offsets.ListGet(node_ndx-1) : 0;
+		const size_t local_ndx = ndx - offset;
+
+		// Get sublist
+		Column target = refs.GetSubColumn(node_ndx);
+
+		// Insert item
+		const NodeChange nc = target.DoInsert(local_ndx, value);
+		if (nc.type ==  NodeChange::ERROR) return NodeChange(NodeChange::ERROR); // allocation error
+		else if (nc.type ==  NodeChange::NONE) {
+			offsets.ListIncrement(1, node_ndx);  // update offsets
+			return NodeChange(NodeChange::NONE); // no new nodes
+		}
+
+		if (nc.type == NodeChange::INSERT_AFTER) ++node_ndx;
+
+		// If there is room, just update node directly
+		if (offsets.ListSize() < MAX_LIST_SIZE) {
+			if (nc.type == NodeChange::SPLIT) return NodeInsertSplit(node_ndx, nc.ref2);
+			else return NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+		}
+
+		// Else create new node
+		Column newNode(COLUMN_NODE);
+		newNode.NodeAdd(nc.ref1);
+
+		switch (node_ndx) {
+		case 0:	            // insert before
+			return NodeChange(NodeChange::INSERT_BEFORE, newNode.GetRef());
+		case MAX_LIST_SIZE:	// insert below
+			return NodeChange(NodeChange::INSERT_AFTER, newNode.GetRef());
+		default:            // split
+			// Move items below split to new node
+			const size_t len = refs.ListSize();
+			for (size_t i = node_ndx; i < len; ++i) {
+				newNode.NodeAdd((void*)refs.ListGet(i));
+			}
+			offsets.ListResize(node_ndx);
+			refs.ListResize(node_ndx);
+			return NodeChange(NodeChange::SPLIT, GetRef(), newNode.GetRef());
+		}
+	}
+	else {
+		// Is there room in the list?
+		// lists with refs are internal cannot be split
+		if (m_hasRefs || m_len < MAX_LIST_SIZE) {
+			return ListInsert(ndx, value);
+		}
+
+		// Create new list for item
+		Column newList;
+		if (!newList.ListAdd(value)) return NodeChange(NodeChange::ERROR);
+		
+		switch (ndx) {
+		case 0:	            // insert before
+			return NodeChange(NodeChange::INSERT_BEFORE, newList.GetRef());
+		case MAX_LIST_SIZE:	// insert below
+			return NodeChange(NodeChange::INSERT_AFTER, newList.GetRef());
+		default:            // split
+			// Move items below split to new list
+			for (size_t i = ndx; i < m_len; ++i) {
+				newList.ListAdd(ListGet(i));
+			}
+			ListResize(ndx);
+
+			return NodeChange(NodeChange::SPLIT, GetRef(), newList.GetRef());
+		}
+	}
+}
+
+size_t Column::ListFindPos(int64_t value) const {
+	// Simple optimization
+	// Most often items are inserted at the end
+	if (m_len == 0 || value >= ListBack()) return -1;
+
+	// Naive search
+	//TODO: binary search
+	const size_t len = m_len;
+	for (size_t i = 0; i < len; ++i) {
+		const int64_t v = (this->*m_getter)(i);
+		if (value < v) return i;
+	}
+
+	return -1; // not found
+}
+
+bool Column::ListInsert(size_t ndx, int64_t value) {
 	assert(ndx <= m_len);
 
 	Getter getter = m_getter;
@@ -197,7 +426,144 @@ bool Column::Insert64(size_t ndx, int64_t value) {
 	return true;
 }
 
+void Column::UpdateRef(void* ref) {
+	Create(ref);
+
+	// Update ref in parent
+	if (m_parent) m_parent->ListSet(m_parentNdx, (int)ref);
+}
+
+size_t GetRefSize(void* ref) {
+	// parse the length part of 8byte header
+	const uint8_t* const header = (uint8_t*)ref;
+	return (header[1] << 16) + (header[2] << 8) + header[3];
+}
+
+void SetRefSize(void* ref, size_t len) {
+	uint8_t* const header = (uint8_t*)(ref);
+	header[1] = ((len >> 16) & 0x000000FF);
+	header[2] = (len >> 8) & 0x000000FF;
+	header[3] = len & 0x000000FF;
+}
+
+bool Column::NodeInsert(size_t ndx, void* ref) {
+	assert(ref);
+	assert(IsNode());
+	
+	Column offsets = GetSubColumn(0);
+	Column refs = GetSubColumn(1);
+	assert(ndx <= offsets.ListSize());
+
+	const Column col(ref);
+	const size_t refSize = col.Size();
+	const int64_t newOffset = (ndx ? offsets.ListGet(ndx-1) : 0) + refSize;
+
+	if (!offsets.ListInsert(ndx, newOffset)) return false;
+	if (ndx+1 < offsets.ListSize()) {
+		if (!offsets.ListIncrement(refSize, ndx+1)) return false;
+	}
+	return refs.ListInsert(ndx, (int)ref);
+}
+
+bool Column::NodeAdd(void* ref) {
+	assert(ref);
+	assert(IsNode());
+
+	Column offsets = GetSubColumn(0);
+	Column refs = GetSubColumn(1);
+	const Column col(ref);
+
+	const int64_t newOffset = (offsets.IsEmpty() ? 0 : offsets.ListBack()) + col.Size();
+	if (!offsets.ListAdd(newOffset)) return false;
+	return refs.ListAdd((int)ref);
+}
+
+bool Column::NodeUpdateOffsets(size_t ndx) {
+	assert(IsNode());
+
+	Column offsets = GetSubColumn(0);
+	Column refs = GetSubColumn(1);
+	assert(ndx < offsets.ListSize());
+
+	const int64_t newSize = GetRefSize((void*)refs.ListGet(ndx));
+	const int64_t oldSize = offsets.ListGet(ndx) - (ndx ? offsets.ListGet(ndx-1) : 0);
+	const int64_t diff = newSize - oldSize;
+	
+	return offsets.ListIncrement(diff, ndx);
+}
+
+bool Column::NodeInsertSplit(size_t ndx, void* newRef) {
+	assert(IsNode());
+	assert(newRef);
+
+	Column offsets = GetSubColumn(0);
+	Column refs = GetSubColumn(1);
+	assert(ndx < offsets.ListSize());
+
+	// Update original size
+	const int64_t offset = ndx ? offsets.ListGet(ndx-1) : 0;
+	const int64_t newSize = GetRefSize((void*)refs.ListGet(ndx));
+	const int64_t oldSize = offsets.ListGet(ndx) - offset;
+	const int64_t diff = newSize - oldSize;
+	const int64_t newOffset = offset + newSize;
+	offsets.ListSet(ndx, newOffset);
+
+	// Insert new ref
+	const int64_t refSize = GetRefSize(newRef);
+	offsets.ListInsert(ndx+1, newOffset + refSize);
+	refs.ListInsert(ndx+1, (int)newRef);
+
+	// Update lower offsets
+	const int64_t newDiff = diff + refSize;
+	return offsets.ListIncrement(newDiff, ndx+2);
+}
+
+bool Column::ListAdd(int64_t value) {
+	return ListInsert(m_len, value);
+}
+
+void Column::ListResize(size_t count) {
+	assert(count <= m_len);
+
+	// Update length (also in header)
+	m_len = count;
+	SetRefSize(m_data-8, m_len);
+}
+
 void Column::Delete(size_t ndx) {
+	assert(ndx < Size());
+
+	if (!IsNode()) ListDelete(ndx);
+	else {
+		// Get subnode table
+		Column offsets = GetSubColumn(0);
+		Column refs = GetSubColumn(1);
+
+		// Find the subnode containing the item
+		const size_t node_ndx = offsets.ListFindPos(ndx);
+		assert(node_ndx != -1);
+
+		// Calc index in subnode
+		const size_t offset = node_ndx ? (size_t)offsets.ListGet(node_ndx-1) : 0;
+		const size_t local_ndx = ndx - offset;
+
+		// Get sublist
+		Column target = refs.GetSubColumn(node_ndx);
+		target.Delete(local_ndx);
+
+		// Remove ref in node
+		if (target.IsEmpty()) {
+			offsets.ListDelete(node_ndx);
+			refs.ListDelete(node_ndx);
+			target.Destroy();
+		}
+
+		// Update lower offsets
+		if (node_ndx < offsets.Size()) offsets.ListIncrement(-1, node_ndx);
+	}
+}
+
+void Column::ListDelete(size_t ndx) {
 	assert(ndx < m_len);
 
 	// Move values below deletion up
@@ -216,28 +582,58 @@ void Column::Delete(size_t ndx) {
 		memmove(dst, src, count);
 	}
 
-	--m_len;
-
 	// Update length (also in header)
-	uint8_t* header = (uint8_t*)(m_data-8);
-	header[1] = ((m_len >> 16) & 0x000000FF);
-	header[2] = (m_len >> 8) & 0x000000FF;
-	header[3] = m_len & 0x000000FF;
+	--m_len;
+	SetRefSize(m_data-8, m_len);
 }
 
 bool Column::Increment64(int64_t value, size_t start, size_t end) {
+	if (!IsNode()) return ListIncrement(value, start, end);
+	else {
+		//TODO: partial incr
+		Column refs = GetSubColumn(1);
+		for (size_t i = 0; i < refs.Size(); ++i) {
+			Column col = refs.GetSubColumn(i);
+			if (!col.Increment64(value)) return false;
+		}
+		return true;
+	}
+}
+
+bool Column::ListIncrement(int64_t value, size_t start, size_t end) {
 	if (end == -1) end = m_len;
 	assert(start < m_len);
 	assert(end >= start && end <= m_len);
 
 	// Increment range
 	for (size_t i = start; i < end; ++i) {
-		Set64(i, Get64(i) + value);
+		ListSet(i, ListGet(i) + value);
 	}
 	return true;
 }
 
 size_t Column::Find(int64_t value, size_t start, size_t end) const {
+	if (!IsNode()) return ListFind(value, start, end);
+	else {
+		// Get subnode table
+		Column offsets = GetSubColumn(0);
+		Column refs = GetSubColumn(1);
+
+		//TODO: partial searches
+		for (size_t i = 0; i < refs.Size(); ++i) {
+			const Column col = refs.GetSubColumn(i);
+			const size_t ndx = col.Find(value);
+			if (ndx != -1) {
+				const size_t offset = i ? (size_t)offsets.ListGet(i-1) : 0;
+				return offset + ndx;
+			}
+		}
+
+		return -1; // not found
+	}
+}
+
+size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
 	if (IsEmpty()) return -1;
 	if (end == -1) end = m_len;
 	if (start == end) return -1;
@@ -472,7 +868,7 @@ bool Column::Alloc(size_t count, size_t width) {
 		m_capacity = len;
 
 		// Update ref in parent
-		if (m_parent) m_parent->Set64(m_parentNdx, (int)data);
+		if (m_parent) m_parent->ListSet(m_parentNdx, (int)data);
 	}
 
 	// Pack width in 3 bits (log2)
@@ -535,4 +931,57 @@ void Column::SetWidth(size_t width) {
 	}
 
 	m_width = width;
+}
+
+#include "stdio.h"
+
+void Column::Print() const {
+	if (IsNode()) {
+		printf("Node: %x\n", GetRef());
+		
+		const Column offsets = GetSubColumn(0);
+		const Column refs = GetSubColumn(1);
+
+		for (size_t i = 0; i < refs.ListSize(); ++i) {
+			printf(" %d: %d %x\n", i, (int)offsets.ListGet(i), (int)refs.ListGet(i));
+		}
+		for (size_t i = 0; i < refs.ListSize(); ++i) {
+			const Column col = refs.GetSubColumn(i);
+			col.Print();
+		}
+	}
+	else {
+		printf("%x: (%d) ", GetRef(), ListSize());
+		for (size_t i = 0; i < ListSize(); ++i) {
+			if (i) printf(", ");
+			printf("%d", (int)ListGet(i));
+		}
+		printf("\n");
+	}
+}
+
+void Column::Verify() const {
+#ifdef _DEBUG
+	if (IsNode()) {
+		assert(ListSize() == 2);
+		assert(m_hasRefs);
+
+		const Column offsets = GetSubColumn(0);
+		const Column refs = GetSubColumn(1);
+
+		size_t off = 0;
+		for (size_t i = 0; i < refs.ListSize(); ++i) {
+			const Column col = refs.GetSubColumn(i);
+			col.Verify();
+
+			off += col.Size();
+			if (offsets.ListGet(i) != off) {
+				assert(false);
+			}
+		}
+	}
+	else {
+		assert(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
+	}
+#endif //_DEBUG
 }

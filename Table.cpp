@@ -1,7 +1,7 @@
 #include "Table.h"
 #include <assert.h>
 
-Table::Table(const char* name) : m_name(name), m_size(0), m_columns(true), m_columnNames(false) {
+Table::Table(const char* name) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS), m_columnNames(COLUMN_NORMAL) {
 }
 
 Table::~Table() {
@@ -10,7 +10,7 @@ Table::~Table() {
 }
 
 void Table::RegisterColumn(const char* name) {
-	Column newColumn(false);
+	Column newColumn(COLUMN_NORMAL);
 	
 	m_columnNames.Add((int)name);
 	m_columns.Add((int)newColumn.GetRef());
