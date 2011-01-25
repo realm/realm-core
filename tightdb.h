@@ -20,6 +20,10 @@ public: \
 			CName1.Create(this, 0); \
 			CName2.Create(this, 1); \
 		} \
+		Cursor(const TableName& table, size_t ndx) : CursorBase(const_cast<TableName&>(table), ndx) { \
+			CName1.Create(this, 0); \
+			CName2.Create(this, 1); \
+		} \
 		Cursor(const Cursor& v) : CursorBase(v) { \
 			CName1.Create(this, 0); \
 			CName2.Create(this, 1); \
@@ -38,6 +42,7 @@ public: \
 	Cursor Add() {return Cursor(*this, AddRow());} \
 	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \
 	Cursor operator[](size_t ndx) {return Cursor(*this, ndx);} \
+	const Cursor operator[](size_t ndx) const {return Cursor(*this, ndx);} \
 	Cursor operator[](int ndx) {return Cursor(*this, (ndx < 0) ? GetSize() - ndx : ndx);} \
 	Cursor Back() {return Cursor(*this, m_size-1);} \
 \
