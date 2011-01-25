@@ -66,7 +66,9 @@ class AccessorInt : public Accessor {
 public:
 	operator int() const {return Get();}
 	void operator=(int value) {Set(value);}
+	void operator=(unsigned int value) {Set(value);}
 	void operator+=(int value) {Set(Get()+value);}
+	void operator+=(unsigned int value) {Set(Get()+value);}
 };
 
 class AccessorBool : public Accessor {
