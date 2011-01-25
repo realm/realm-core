@@ -22,13 +22,20 @@ public:
 	void Set(size_t column_id, size_t ndx, int value);
 
 	void RegisterColumn(const char* name);
-	Column GetColumn(size_t ndx);
+	Column& GetColumn(size_t ndx);
+	const Column& GetColumn(size_t ndx) const;
 
 protected:
 	const char* m_name;
 	size_t m_size;
-	Column m_columnNames;
+	
+	// On-disk format
+	Column m_spec;
 	Column m_columns;
+	Column m_columnNames;
+
+	// Cached columns
+	Column m_cols;
 };
 
 class CursorBase {
