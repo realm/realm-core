@@ -28,10 +28,10 @@ public: \
 		Accessor##CType2 CName2; \
 	}; \
 \
-	Cursor Add(Type##CType1 v1, Type##CType2 v2) { \
+	Cursor Add(Type##CType1 CName1, Type##CType2 CName2) { \
 		Cursor r = Add(); \
-		r.CName1 = v1; \
-		r.CName2 = v2; \
+		r.CName1 = CName1; \
+		r.CName2 = CName2; \
 		return r; \
 	} \
 \
