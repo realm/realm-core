@@ -1,6 +1,7 @@
 #include "Column.h"
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 
 #define MAX_LIST_SIZE 3
 
@@ -9,7 +10,7 @@ Column::Column()
 	SetWidth(0);
 }
 
-Column::Column(ColumnType type, Column* parent, size_t pndx)
+Column::Column(ColumnDef type, Column* parent, size_t pndx)
 : m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx) {
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
@@ -39,6 +40,10 @@ Column::Column(void* ref, Column* parent, size_t pndx)
 Column::Column(void* ref, const Column* parent, size_t pndx)
 : m_parent(const_cast<Column*>(parent)), m_parentNdx(pndx) {
 	Create(ref);
+}
+
+Column::Column(const Column& column) : m_parent(column.m_parent), m_parentNdx(column.m_parentNdx) {
+	Create(column.GetRef());
 }
 
 Column& Column::operator=(const Column& column) {
@@ -745,7 +750,7 @@ size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
 	return -1; // not found
 }
 
-int64_t Column::Get_0b(size_t ndx) const {
+int64_t Column::Get_0b(size_t) const {
 	return 0;
 }
 
@@ -984,4 +989,95 @@ void Column::Verify() const {
 		assert(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
 	}
 #endif //_DEBUG
+}
+
+StringColumn::StringColumn(Column& refs, Column& lengths) : m_refs(refs), m_lengths(lengths) {
+}
+
+StringColumn::~StringColumn() {
+}
+
+void* StringColumn::Alloc(const char* value, size_t len) {
+	assert(len); // empty strings are not allocated, but marked with zero-ref
+
+	char* const data = (char*)malloc(len+1); // room for trailing zero-byte
+	if (!data) return NULL; // alloc failed
+
+	memmove(data, value, len);
+	data[len] = '\0';
+
+	return data;
+}
+
+void StringColumn::Free(size_t ndx) {
+	assert(ndx < m_refs.Size());
+
+	void* data = (void*)m_refs.Get(ndx);
+	if (!data) return;
+
+	free(data);
+}
+
+const char* StringColumn::Get(size_t ndx) const {
+	assert(ndx < m_refs.Size());
+
+	return (const char*)m_refs.Get(ndx);
+}
+
+bool StringColumn::Set(size_t ndx, const char* value) {
+	return Set(ndx, value, strlen(value));
+}
+
+bool StringColumn::Set(size_t ndx, const char* value, size_t len) {
+	assert(ndx < m_refs.Size());
+
+	// Empty strings are just marked with zero-ref
+	if (len == 0) {
+		Free(ndx);
+		m_refs.Set(ndx, 0);
+		m_lengths.Set(ndx, 0);
+		return true;
+	}
+
+	void* ref = Alloc(value, len);
+	if (!ref) return false;
+	Free(ndx);
+
+	m_refs.Set(ndx, (int)ref);
+	m_lengths.Set(ndx, len);
+	return true;
+}
+
+bool StringColumn::Add() {
+	return Insert(Size(), "", 0);
+}
+
+bool StringColumn::Insert(size_t ndx, const char* value, size_t len) {
+	assert(ndx <= m_refs.Size());
+
+	// Empty strings are just marked with zero-ref
+	if (len == 0) {
+		m_refs.Insert(ndx, 0);
+		m_lengths.Insert(ndx, 0);
+		return true;
+	}
+
+	void* ref = Alloc(value, len);
+	if (!ref) return false;
+
+	m_refs.Insert(ndx, (int)ref);
+	m_lengths.Insert(ndx, len);
+	return true;
+}
+
+void StringColumn::Clear() {
+	m_refs.Clear();
+	m_lengths.Clear();
+}
+
+void StringColumn::Delete(size_t ndx) {
+	assert(ndx < m_refs.Size());
+
+	m_refs.Delete(ndx);
+	m_lengths.Delete(ndx);
 }

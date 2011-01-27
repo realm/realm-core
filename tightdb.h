@@ -7,8 +7,8 @@
 class TableName : public Table { \
 public: \
 	TableName() : Table(#TableName) { \
-		RegisterColumn( #CName1 ); \
-		RegisterColumn( #CName2 ); \
+		RegisterColumn(Accessor##CType1::type, #CName1); \
+		RegisterColumn(Accessor##CType2::type, #CName2); \
 		\
 		CName1.Create(this, 0); \
 		CName2.Create(this, 1); \
@@ -54,10 +54,10 @@ public: \
 class TableName : public Table { \
 public: \
 	TableName() : Table(#TableName) { \
-		RegisterColumn( #CName1 ); \
-		RegisterColumn( #CName2 ); \
-		RegisterColumn( #CName3 ); \
-		RegisterColumn( #CName4 ); \
+		RegisterColumn(Accessor##CType1::type,  #CName1 ); \
+		RegisterColumn(Accessor##CType2::type,  #CName2 ); \
+		RegisterColumn(Accessor##CType3::type,  #CName3 ); \
+		RegisterColumn(Accessor##CType4::type,  #CName4 ); \
 		\
 		CName1.Create(this, 0); \
 		CName2.Create(this, 1); \

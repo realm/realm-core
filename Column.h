@@ -3,21 +3,35 @@
 
 #include "stdint.h"
 
-enum ColumnType {
+enum ColumnDef {
 	COLUMN_NORMAL,
 	COLUMN_NODE,
 	COLUMN_HASREFS
 };
 
-class Column {
+class ColumnBase {
+public:
+	virtual ~ColumnBase() {};
+
+	virtual bool IsIntColumn() const {return false;}
+	virtual bool IsStringColumn() const {return false;}
+
+	virtual bool Add() = 0;
+	virtual void Clear() = 0;
+	virtual void Delete(size_t ndx) = 0;
+};
+
+class Column : public ColumnBase {
 public:
 	Column();
-	Column(ColumnType type, Column* parent=NULL, size_t pndx=0);
+	Column(ColumnDef type, Column* parent=NULL, size_t pndx=0);
 	Column(void* ref);
 	Column(void* ref, Column* parent, size_t pndx);
 	Column(void* ref, const Column* parent, size_t pndx);
 	Column(const Column& column);
 	~Column();
+
+	bool IsIntColumn() const {return true;}
 
 	Column& operator=(const Column& column);
 	bool operator==(const Column& column) const;
@@ -31,6 +45,7 @@ public:
 	int Get(size_t ndx) const {return (int)Get64(ndx);}
 	bool Set(size_t ndx, int value) {return Set64(ndx, value);}
 	bool Insert(size_t ndx, int value) {return Insert64(ndx, value);}
+	bool Add() {return Add64(0);}
 	bool Add(int value) {return Add64(value);}
 	
 	int64_t Get64(size_t ndx) const;
@@ -127,6 +142,32 @@ private:
 	size_t m_width;
 	bool m_isNode;
 	bool m_hasRefs;
+};
+
+class StringColumn : public ColumnBase {
+public:
+	StringColumn(Column& refs, Column& lenghts);
+	~StringColumn();
+
+	bool IsStringColumn() const {return true;}
+
+	size_t Size() const {return m_refs.Size();}
+
+	bool Add();
+	const char* Get(size_t ndx) const;
+	bool Set(size_t ndx, const char* value);
+	bool Set(size_t ndx, const char* value, size_t len);
+	bool Insert(size_t ndx, const char* value, size_t len);
+
+	void Clear();
+	void Delete(size_t ndx);
+
+private:
+	void* Alloc(const char* value, size_t len);
+	void Free(size_t ndx);
+
+	Column m_refs;
+	Column m_lengths;
 };
 
 #endif //__TDB_COLUMN__

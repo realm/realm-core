@@ -3,8 +3,8 @@
 
 TEST(Table1) {
 	Table table("table1");
-	table.RegisterColumn("first");
-	table.RegisterColumn("second");
+	table.RegisterColumn(COLUMN_TYPE_INT, "first");
+	table.RegisterColumn(COLUMN_TYPE_INT, "second");
 
 	const size_t ndx = table.AddRow();
 	table.Set(0, ndx, 0);
@@ -66,14 +66,14 @@ TEST(Table3) {
 
 TDB_TABLE_2(TestTableEnum,
 			Enum<Days>, first,
-			Int, second)
+			String, second)
 
 TEST(Table4) {
 	TestTableEnum table;
 
-	TestTableEnum::Cursor r = table.Add(Mon, 120);
+	TestTableEnum::Cursor r = table.Add(Mon, "Hello");
 
 	CHECK_EQUAL(Mon, r.first);
-	CHECK_EQUAL(120, r.second);
+	CHECK_EQUAL("Hello", (const char*)r.second);
 }
 

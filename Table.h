@@ -2,8 +2,15 @@
 #define __TDB_TABLE__
 
 #include "Column.h"
+#include "string.h"
 
 class Accessor;
+
+enum ColumnType {
+	COLUMN_TYPE_INT,
+	COLUMN_TYPE_BOOL,
+	COLUMN_TYPE_STRING
+};
 
 class Table {
 public:
@@ -18,14 +25,25 @@ public:
 	void DeleteRow(size_t ndx);
 	void PopBack() {if (!IsEmpty()) DeleteRow(m_size-1);}
 
+	// Adaptive ints
 	int Get(size_t column_id, size_t ndx) const;
 	void Set(size_t column_id, size_t ndx, int value);
 
-	void RegisterColumn(const char* name);
+	// Strings
+	const char* GetString(size_t column_id, size_t ndx) const;
+	void SetString(size_t column_id, size_t ndx, const char* value);
+
+	void RegisterColumn(ColumnType type, const char* name);
+
 	Column& GetColumn(size_t ndx);
 	const Column& GetColumn(size_t ndx) const;
+	StringColumn& GetColumnString(size_t ndx);
+	const StringColumn& GetColumnString(size_t ndx) const;
 
 protected:
+	ColumnBase& GetColumnBase(size_t ndx);
+	const ColumnBase& GetColumnBase(size_t ndx) const;
+
 	const char* m_name;
 	size_t m_size;
 	
@@ -53,10 +71,14 @@ class Accessor {
 public:
 	Accessor() {};
 	void Create(CursorBase* cursor, size_t column_ndx) {m_cursor = cursor; m_column = column_ndx;}
+	static const ColumnType type;
 
 protected:
 	int Get() const {return m_cursor->m_table.Get(m_column, m_cursor->m_index);}
 	void Set(int value) {m_cursor->m_table.Set(m_column, m_cursor->m_index, value);}
+
+	const char* GetString() const {return m_cursor->m_table.GetString(m_column, m_cursor->m_index);}
+	void SetString(const char* value) {m_cursor->m_table.SetString(m_column, m_cursor->m_index, value);}
 
 	CursorBase* m_cursor;
 	size_t m_column;
@@ -76,6 +98,7 @@ public:
 	operator bool() const {return (Get() != 0);}
 	void operator=(bool value) {Set(value ? 1 : 0);}
 	void Flip() {Set(Get() != 0 ? 0 : 1);}
+	static const ColumnType type;
 };
 
 template<class T> class AccessorEnum : public Accessor {
@@ -84,10 +107,22 @@ public:
 	void operator=(T value) {Set((int)value);}
 };
 
+class AccessorString : public Accessor {
+public:
+	operator const char*() const {return GetString();}
+	void operator=(const char* value) {SetString(value);}
+	bool operator==(const char* value) {return (strcmp(GetString(), value) == 0);}
+	static const ColumnType type;
+};
+
+
 class ColumnProxy {
 public:
 	ColumnProxy() {}
-	void Create(Table* table, size_t column) {m_table = table; m_column = column;}
+	void Create(Table* table, size_t column) {
+		m_table = table;
+		m_column = column;
+	}
 protected:
 	Table* m_table;
 	size_t m_column;
@@ -109,6 +144,10 @@ public:
 	size_t Find(T value) const {return m_table->GetColumn(m_column).Find((int)value);}
 };
 
+class ColumnProxyString : public ColumnProxy {
+public:
+};
+
 template<class T> class TypeEnum {
 public:
 	TypeEnum(T v) : m_value(v) {};
@@ -118,5 +157,13 @@ private:
 };
 #define TypeInt int
 #define TypeBool bool
+#define TypeString const char*
+
+// Make all enum types return int type
+template<typename T> struct COLUMN_TYPE_Enum {
+public:
+	COLUMN_TYPE_Enum() {};
+	operator ColumnType() const {return COLUMN_TYPE_Int;}
+};
 
 #endif //__TDB_TABLE__
