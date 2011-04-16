@@ -183,15 +183,19 @@ bool AdaptiveStringColumn::Alloc(size_t count, size_t width) {
 	const size_t len = 8 + (count * width); // always need room for header
 	
 	if (len > m_capacity) {
+		// Try to expand with 50% to avoid to many reallocs
+		size_t new_capacity = m_capacity + m_capacity / 2;
+		if (new_capacity < len) new_capacity = len; 
+
 		// Allocate the space
 		unsigned char* data = NULL;
-		if (m_data) data = (unsigned char*)realloc(m_data-8, len);
-		else data = (unsigned char*)malloc(len);
+		if (m_data) data = (unsigned char*)realloc(m_data-8, new_capacity);
+		else data = (unsigned char*)malloc(new_capacity);
 
 		if (!data) return false;
 
 		m_data = data+8;
-		m_capacity = len;
+		m_capacity = new_capacity;
 
 		// Update ref in parent
 		UpdateParent((int)data);

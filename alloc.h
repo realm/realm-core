@@ -13,8 +13,8 @@ struct MemRef {
 
 class Allocator {
 public:
-	void* Alloc(size_t size) {return malloc(size);}
-	void* ReAlloc(void* p, size_t size) {return realloc(p, size);}
+	MemRef Alloc(size_t size) {void* p = malloc(size); return MemRef(p,(size_t)p);}
+	MemRef ReAlloc(void* p, size_t size) {void* p2 = realloc(p, size); return MemRef(p2,(size_t)p2);}
 	void Free(void* p) {return free(p);}
 	void* Translate(size_t ref) const {return (void*)ref;}
 };
@@ -25,7 +25,7 @@ public:
 	~SlabAlloc();
 
 	MemRef Alloc(size_t size);
-	MemRef ReAlloc(size_t ref, void* p, size_t size);
+	MemRef ReAlloc(size_t ref, void* p, size_t size, bool doCopy);
 	void Free(size_t ref, void* p);
 	void* Translate(size_t ref) const;
 

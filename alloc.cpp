@@ -72,21 +72,23 @@ void SlabAlloc::Free(size_t ref, void* p) {
 	// Consolidate freelist
 }
 
-MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size) {
+MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size, bool doCopy=true) {
 	//TODO: Check if we can extend current space
 
 	// Allocate new space
 	const MemRef space = Alloc(size);
 	if (!space.pointer) return space;
 
-	// Get size of old segment
-	const size_t oldsize = GetSizeFromHeader(p);
+	if (doCopy) {
+		// Get size of old segment
+		const size_t oldsize = GetSizeFromHeader(p);
 
-	// Copy existing segment
-	memcpy(space.pointer, p, oldsize);
+		// Copy existing segment
+		memcpy(space.pointer, p, oldsize);
 
-	// Add old segment to freelist
-	Free(ref, p);
+		// Add old segment to freelist
+		Free(ref, p);
+	}
 
 	return space;
 }
