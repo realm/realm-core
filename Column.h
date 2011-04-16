@@ -69,7 +69,7 @@ public:
 	void Print() const;
 	void Verify() const;
 
-private:
+protected:
 	// List functions
 	size_t ListSize() const {return m_len;}
 	bool ListInsert(size_t ndx, int64_t value);
@@ -89,6 +89,7 @@ private:
 	bool NodeAdd(void* ref);
 	bool NodeUpdateOffsets(size_t ndx);
 	bool NodeInsertSplit(size_t ndx, void* newRef);
+	void UpdateParent(int newRef) {if (m_parent) m_parent->ListSet(m_parentNdx, newRef);}
 	
 	struct NodeChange {
 		void* ref1;
@@ -162,12 +163,37 @@ public:
 	void Clear();
 	void Delete(size_t ndx);
 
+	size_t Find(const char* value) const;
+	size_t Find(const char* value, size_t len) const;
+
 private:
 	void* Alloc(const char* value, size_t len);
 	void Free(size_t ndx);
 
 	Column m_refs;
 	Column m_lengths;
+};
+
+class AdaptiveStringColumn : public Column {
+public:
+	AdaptiveStringColumn();
+	~AdaptiveStringColumn();
+
+	bool IsStringColumn() const {return true;}
+
+	const char* Get(size_t ndx) const;
+	bool Add();
+	bool Add(const char* value);
+	bool Set(size_t ndx, const char* value);
+	bool Set(size_t ndx, const char* value, size_t len);
+	bool Insert(size_t ndx, const char* value, size_t len);
+	void Delete(size_t ndx);
+
+	size_t Find(const char* value) const;
+	size_t Find(const char* value, size_t len) const;
+
+private:
+	bool Alloc(size_t count, size_t width);
 };
 
 #endif //__TDB_COLUMN__

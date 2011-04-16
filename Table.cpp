@@ -36,7 +36,7 @@ void Table::RegisterColumn(ColumnType type, const char* name) {
 		break;
 	case COLUMN_TYPE_STRING:
 		{
-			Column refs(COLUMN_NORMAL);
+			/*Column refs(COLUMN_NORMAL);
 			Column lengths(COLUMN_NORMAL);
 			
 			m_columnNames.Add((int)name);
@@ -48,6 +48,15 @@ void Table::RegisterColumn(ColumnType type, const char* name) {
 			lengths.SetParent(&m_columns, pos+1);
 
 			StringColumn* newColumn = new StringColumn(refs, lengths);
+			m_cols.Add((int)newColumn);*/
+
+			AdaptiveStringColumn* newColumn = new AdaptiveStringColumn();
+			
+			m_columnNames.Add((int)name);
+
+			m_columns.Add((int)newColumn->GetRef());
+			newColumn->SetParent(&m_columns, m_columns.Size()-1);
+
 			m_cols.Add((int)newColumn);
 		}
 		break;
@@ -78,16 +87,16 @@ const Column& Table::GetColumn(size_t ndx) const {
 	return static_cast<const Column&>(column);
 }
 
-StringColumn& Table::GetColumnString(size_t ndx) {
+AdaptiveStringColumn& Table::GetColumnString(size_t ndx) {
 	ColumnBase& column = GetColumnBase(ndx);
 	assert(column.IsStringColumn());
-	return static_cast<StringColumn&>(column);
+	return static_cast<AdaptiveStringColumn&>(column);
 }
 
-const StringColumn& Table::GetColumnString(size_t ndx) const {
+const AdaptiveStringColumn& Table::GetColumnString(size_t ndx) const {
 	const ColumnBase& column = GetColumnBase(ndx);
 	assert(column.IsStringColumn());
-	return static_cast<const StringColumn&>(column);
+	return static_cast<const AdaptiveStringColumn&>(column);
 }
 
 size_t Table::AddRow() {
@@ -139,7 +148,7 @@ const char* Table::GetString(size_t column_id, size_t ndx) const {
 	assert(column_id < m_columns.Size());
 	assert(ndx < m_size);
 
-	const StringColumn& column = GetColumnString(column_id);
+	const AdaptiveStringColumn& column = GetColumnString(column_id);
 	return column.Get(ndx);
 }
 
@@ -147,6 +156,6 @@ void Table::SetString(size_t column_id, size_t ndx, const char* value) {
 	assert(column_id < m_cols.Size());
 	assert(ndx < m_size);
 
-	StringColumn& column = GetColumnString(column_id);
+	AdaptiveStringColumn& column = GetColumnString(column_id);
 	column.Set(ndx, value);
 }

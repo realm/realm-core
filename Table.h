@@ -37,8 +37,8 @@ public:
 
 	Column& GetColumn(size_t ndx);
 	const Column& GetColumn(size_t ndx) const;
-	StringColumn& GetColumnString(size_t ndx);
-	const StringColumn& GetColumnString(size_t ndx) const;
+	AdaptiveStringColumn& GetColumnString(size_t ndx);
+	const AdaptiveStringColumn& GetColumnString(size_t ndx) const;
 
 protected:
 	ColumnBase& GetColumnBase(size_t ndx);
@@ -146,6 +146,7 @@ public:
 
 class ColumnProxyString : public ColumnProxy {
 public:
+	size_t Find(const char* value) const {return m_table->GetColumnString(m_column).Find(value);}
 };
 
 template<class T> class TypeEnum {

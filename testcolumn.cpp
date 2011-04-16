@@ -300,6 +300,20 @@ TEST_FIXTURE(db_setup, Find9) {
 	CHECK_EQUAL(res, 8);
 }
 
+#define PARTIAL_COUNT 100
+TEST_FIXTURE(db_setup, PartialFind1) {
+	c.Clear();
+
+	for (size_t i = 0; i < PARTIAL_COUNT; ++i) {
+		c.Add(i);
+	}
+
+	CHECK_EQUAL(-1, c.Find(PARTIAL_COUNT+1, 0, PARTIAL_COUNT));
+	CHECK_EQUAL(-1, c.Find(0, 1, PARTIAL_COUNT));
+	CHECK_EQUAL(PARTIAL_COUNT-1, c.Find(PARTIAL_COUNT-1, PARTIAL_COUNT-1, PARTIAL_COUNT));
+}
+
+
 TEST_FIXTURE(db_setup, HeaderParse) {
 	Column column(c.GetRef(), (Column*)NULL, 0);
 	const bool isEqual = (c == column);
@@ -310,3 +324,248 @@ TEST_FIXTURE(db_setup, Destroy) {
 	// clean up (ALWAYS PUT THIS LAST)
 	c.Destroy();
 }
+
+struct db_setup_string {
+	static AdaptiveStringColumn c;
+};
+
+AdaptiveStringColumn db_setup_string::c;
+
+TEST_FIXTURE(db_setup_string, StringAdd0) {
+	c.Add();
+	CHECK_EQUAL("", c.Get(0));
+	CHECK_EQUAL(1, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringAdd1) {
+	c.Add("a");
+	CHECK_EQUAL("",  c.Get(0));
+	CHECK_EQUAL("a", c.Get(1));
+	CHECK_EQUAL(2, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringAdd2) {
+	c.Add("bb");
+	CHECK_EQUAL("",   c.Get(0));
+	CHECK_EQUAL("a",  c.Get(1));
+	CHECK_EQUAL("bb", c.Get(2));
+	CHECK_EQUAL(3, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringAdd3) {
+	c.Add("ccc");
+	CHECK_EQUAL("",    c.Get(0));
+	CHECK_EQUAL("a",   c.Get(1));
+	CHECK_EQUAL("bb",  c.Get(2));
+	CHECK_EQUAL("ccc", c.Get(3));
+	CHECK_EQUAL(4, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringAdd4) {
+	c.Add("dddd");
+	CHECK_EQUAL("",     c.Get(0));
+	CHECK_EQUAL("a",    c.Get(1));
+	CHECK_EQUAL("bb",   c.Get(2));
+	CHECK_EQUAL("ccc",  c.Get(3));
+	CHECK_EQUAL("dddd", c.Get(4));
+	CHECK_EQUAL(5, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringAdd8) {
+	c.Add("eeeeeeee");
+	CHECK_EQUAL("",     c.Get(0));
+	CHECK_EQUAL("a",    c.Get(1));
+	CHECK_EQUAL("bb",   c.Get(2));
+	CHECK_EQUAL("ccc",  c.Get(3));
+	CHECK_EQUAL("dddd", c.Get(4));
+	CHECK_EQUAL("eeeeeeee", c.Get(5));
+	CHECK_EQUAL(6, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringAdd16) {
+	c.Add("ffffffffffffffff");
+	CHECK_EQUAL("",     c.Get(0));
+	CHECK_EQUAL("a",    c.Get(1));
+	CHECK_EQUAL("bb",   c.Get(2));
+	CHECK_EQUAL("ccc",  c.Get(3));
+	CHECK_EQUAL("dddd", c.Get(4));
+	CHECK_EQUAL("eeeeeeee", c.Get(5));
+	CHECK_EQUAL("ffffffffffffffff", c.Get(6));
+	CHECK_EQUAL(7, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringAdd32) {
+	c.Add("gggggggggggggggggggggggggggggggg");
+
+	CHECK_EQUAL("",     c.Get(0));
+	CHECK_EQUAL("a",    c.Get(1));
+	CHECK_EQUAL("bb",   c.Get(2));
+	CHECK_EQUAL("ccc",  c.Get(3));
+	CHECK_EQUAL("dddd", c.Get(4));
+	CHECK_EQUAL("eeeeeeee", c.Get(5));
+	CHECK_EQUAL("ffffffffffffffff", c.Get(6));
+	CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(7));
+	CHECK_EQUAL(8, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringSet1) {
+	c.Set(0, "ccc");
+	c.Set(1, "bb");
+	c.Set(2, "a");
+	c.Set(3, "");
+
+	CHECK_EQUAL("ccc",  c.Get(0));
+	CHECK_EQUAL("bb",   c.Get(1));
+	CHECK_EQUAL("a",    c.Get(2));
+	CHECK_EQUAL("",     c.Get(3));
+	CHECK_EQUAL("dddd", c.Get(4));
+	CHECK_EQUAL("eeeeeeee", c.Get(5));
+	CHECK_EQUAL("ffffffffffffffff", c.Get(6));
+	CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(7));
+	CHECK_EQUAL(8, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringInsert1) {
+	// Insert in middle
+	c.Insert(4, "xx", 2);
+
+	CHECK_EQUAL("ccc",  c.Get(0));
+	CHECK_EQUAL("bb",   c.Get(1));
+	CHECK_EQUAL("a",    c.Get(2));
+	CHECK_EQUAL("",     c.Get(3));
+	CHECK_EQUAL("xx",   c.Get(4));
+	CHECK_EQUAL("dddd", c.Get(5));
+	CHECK_EQUAL("eeeeeeee", c.Get(6));
+	CHECK_EQUAL("ffffffffffffffff", c.Get(7));
+	CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(8));
+	CHECK_EQUAL(9, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringDelete1) {
+	// Delete from end
+	c.Delete(8);
+
+	CHECK_EQUAL("ccc",  c.Get(0));
+	CHECK_EQUAL("bb",   c.Get(1));
+	CHECK_EQUAL("a",    c.Get(2));
+	CHECK_EQUAL("",     c.Get(3));
+	CHECK_EQUAL("xx",   c.Get(4));
+	CHECK_EQUAL("dddd", c.Get(5));
+	CHECK_EQUAL("eeeeeeee", c.Get(6));
+	CHECK_EQUAL("ffffffffffffffff", c.Get(7));
+	CHECK_EQUAL(8, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringDelete2) {
+	// Delete from top
+	c.Delete(0);
+
+	CHECK_EQUAL("bb",   c.Get(0));
+	CHECK_EQUAL("a",    c.Get(1));
+	CHECK_EQUAL("",     c.Get(2));
+	CHECK_EQUAL("xx",   c.Get(3));
+	CHECK_EQUAL("dddd", c.Get(4));
+	CHECK_EQUAL("eeeeeeee", c.Get(5));
+	CHECK_EQUAL("ffffffffffffffff", c.Get(6));
+	CHECK_EQUAL(7, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringDelete3) {
+	// Delete from middle
+	c.Delete(3);
+
+	CHECK_EQUAL("bb",   c.Get(0));
+	CHECK_EQUAL("a",    c.Get(1));
+	CHECK_EQUAL("",     c.Get(2));
+	CHECK_EQUAL("dddd", c.Get(3));
+	CHECK_EQUAL("eeeeeeee", c.Get(4));
+	CHECK_EQUAL("ffffffffffffffff", c.Get(5));
+	CHECK_EQUAL(6, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringInsert2) {
+	// Create new list
+	c.Clear();
+	c.Add("a");
+	c.Add("b");
+	c.Add("c");
+	c.Add("d");
+
+	// Insert in top with expansion
+	c.Insert(0, "xxxxx", 5);
+
+	CHECK_EQUAL("xxxxx", c.Get(0));
+	CHECK_EQUAL("a",     c.Get(1));
+	CHECK_EQUAL("b",     c.Get(2));
+	CHECK_EQUAL("c",     c.Get(3));
+	CHECK_EQUAL("d",     c.Get(4));
+	CHECK_EQUAL(5, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringInsert3) {
+	// Insert in middle with expansion
+	c.Insert(3, "xxxxxxxxxx", 10);
+
+	CHECK_EQUAL("xxxxx", c.Get(0));
+	CHECK_EQUAL("a",     c.Get(1));
+	CHECK_EQUAL("b",     c.Get(2));
+	CHECK_EQUAL("xxxxxxxxxx", c.Get(3));
+	CHECK_EQUAL("c",     c.Get(4));
+	CHECK_EQUAL("d",     c.Get(5));
+	CHECK_EQUAL(6, c.Size());
+}
+
+TEST_FIXTURE(db_setup_string, StringFind1) {
+	// Create new list
+	c.Clear();
+	c.Add("a");
+	c.Add("b");
+	c.Add("c");
+	c.Add("d");
+
+	// Search for last item (4 bytes width)
+	const size_t r = c.Find("d");
+
+	CHECK_EQUAL(3, r);
+}
+
+TEST_FIXTURE(db_setup_string, StringFind2) {
+	// Expand to 8 bytes width
+	c.Add("eeeeee");
+
+	// Search for last item
+	const size_t r = c.Find("eeeeee");
+
+	CHECK_EQUAL(4, r);
+}
+
+TEST_FIXTURE(db_setup_string, StringFind3) {
+	// Expand to 16 bytes width
+	c.Add("ffffffffffff");
+
+	// Search for last item
+	const size_t r = c.Find("ffffffffffff");
+
+	CHECK_EQUAL(5, r);
+}
+
+TEST_FIXTURE(db_setup_string, StringFind4) {
+	// Expand to 32 bytes width
+	c.Add("gggggggggggggggggggggggg");
+
+	// Search for last item 
+	const size_t r = c.Find("gggggggggggggggggggggggg");
+
+	CHECK_EQUAL(6, r);
+}
+
+TEST_FIXTURE(db_setup_string, StringFind5) {
+	// Expand to 64 bytes width
+	c.Add("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
+
+	// Search for last item 
+	const size_t r = c.Find("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
+
+	CHECK_EQUAL(7, r);
+}
+

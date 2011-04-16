@@ -75,5 +75,9 @@ TEST(Table4) {
 
 	CHECK_EQUAL(Mon, r.first);
 	CHECK_EQUAL("Hello", (const char*)r.second);
+
+	// Test string column searching
+	CHECK_EQUAL(0, table.second.Find("Hello"));
+	CHECK_EQUAL(-1, table.second.Find("Foo"));
 }
 

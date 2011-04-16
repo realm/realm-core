@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <string.h>
 
-#define MAX_LIST_SIZE 3
+#define MAX_LIST_SIZE 1000
 
 Column::Column()
 : m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(NULL), m_parentNdx(0) {
@@ -395,7 +395,6 @@ bool Column::ListInsert(size_t ndx, int64_t value) {
 	}
 
 	// Move values below insertion (may expand)
-	// TODO: if byte sized and no expansion, use memmove
 	if (doExpand || m_width < 8) {
 		int k = (int)m_len;
 		while (--k >= (int)ndx) {
@@ -618,19 +617,54 @@ bool Column::ListIncrement(int64_t value, size_t start, size_t end) {
 }
 
 size_t Column::Find(int64_t value, size_t start, size_t end) const {
+	assert(start <= Size());
+	assert(end == -1 || end <= Size());
+	if (IsEmpty()) return -1;
+
 	if (!IsNode()) return ListFind(value, start, end);
 	else {
 		// Get subnode table
 		Column offsets = GetSubColumn(0);
 		Column refs = GetSubColumn(1);
+		const size_t count = refs.ListSize();
 
-		//TODO: partial searches
-		for (size_t i = 0; i < refs.Size(); ++i) {
-			const Column col = refs.GetSubColumn(i);
-			const size_t ndx = col.Find(value);
-			if (ndx != -1) {
-				const size_t offset = i ? (size_t)offsets.ListGet(i-1) : 0;
-				return offset + ndx;
+		if (start == 0 && end == -1) {
+			for (size_t i = 0; i < count; ++i) {
+				const Column col = refs.GetSubColumn(i);
+				const size_t ndx = col.Find(value);
+				if (ndx != -1) {
+					const size_t offset = i ? (size_t)offsets.ListGet(i-1) : 0;
+					return offset + ndx;
+				}
+			}
+		}
+		else {
+			// partial search
+			size_t i = offsets.ListFindPos(start);
+			size_t offset = i ? (size_t)offsets.ListGet(i-1) : 0;
+			size_t s = start - offset;
+			size_t e = (end == -1 || end >= offsets.ListGet(i)) ? -1 : end - offset;
+
+			for (;;) {
+				const Column col = refs.GetSubColumn(i);
+
+				const size_t ndx = col.Find(value, s, e);
+				if (ndx != -1) {
+					const size_t offset = i ? (size_t)offsets.ListGet(i-1) : 0;
+					return offset + ndx;
+				}
+
+				++i;
+				if (i >= count) break;
+
+				s = 0;
+				if (end != -1) {
+					if (end >= offsets.ListGet(i)) e = -1;
+					else {
+						offset = (size_t)offsets.ListGet(i-1);
+						e = end - offset;
+					}
+				}
 			}
 		}
 
@@ -651,7 +685,7 @@ size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
 	if (width > m_width) return -1;
 
 	// Do optimized search based on column width
-	if (m_width == 0) {
+	/*if (m_width == 0) {
 		return start; // value can only be zero
 	}
 	else if (m_width == 8) {
@@ -739,13 +773,13 @@ size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
 			if (v == value) return i;
 		}
 	}
-	else {
+	else {*/
 		// Naive search
 		for (size_t i = start; i < end; ++i) {
 			const int64_t v = (this->*m_getter)(i);
 			if (v == value) return i;
 		}
-	}
+	//}
 
 	return -1; // not found
 }
@@ -1080,4 +1114,34 @@ void StringColumn::Delete(size_t ndx) {
 
 	m_refs.Delete(ndx);
 	m_lengths.Delete(ndx);
+}
+
+size_t StringColumn::Find(const char* value) const {
+	return Find(value, strlen(value));
+}
+
+size_t StringColumn::Find(const char* value, size_t len) const {
+	size_t pos = 0;
+
+	// special case for zero-length strings
+	if (len == 0) {
+		return m_lengths.Find(0, pos);
+	}
+	
+	const size_t count = m_refs.Size();
+	while (pos < count) {
+		// Find next string with matching length
+		pos = m_lengths.Find(len, pos);
+		if (pos == -1) return -1;
+
+		// We do a quick manual check of first byte before
+		// calling expensive memcmp
+		const char* const v = Get(pos);
+		if (v[0] == value[0]) {
+			if (memcmp(value, v, len) == 0) return pos;
+		}
+		++pos;
+	}
+
+	return -1;
 }
