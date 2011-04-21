@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <stdio.h> // debug
 
 AdaptiveStringColumn::AdaptiveStringColumn() {
 }
@@ -242,7 +243,7 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 		int32_t v = 0;
 		memcpy(&v, value, len);
 
-		const int32_t* t = (int32_t*)m_data;
+		const int32_t* const t = (int32_t*)m_data;
 		for (size_t i = 0; i < m_len; ++i) {
 			if (v == t[i]) return i;
 		}
@@ -251,7 +252,7 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 		int64_t v = 0;
 		memcpy(&v, value, len);
 
-		const int64_t* t = (int64_t*)m_data;
+		const int64_t* const t = (int64_t*)m_data;
 		for (size_t i = 0; i < m_len; ++i) {
 			if (v == t[i]) return i;
 		}
@@ -260,7 +261,7 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 		int64_t v[2] = {0,0};
 		memcpy(&v, value, len);
 
-		const int64_t* t = (int64_t*)m_data;
+		const int64_t* const t = (int64_t*)m_data;
 		const size_t end = m_len * 2;
 		for (size_t i = 0; i < end; i += 2) {
 			if (v[0] == t[i] && v[1] == t[i+1]) return i/2;
@@ -270,7 +271,7 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 		int64_t v[4] = {0,0,0,0};
 		memcpy(&v, value, len);
 
-		const int64_t* t = (int64_t*)m_data;
+		const int64_t* const t = (int64_t*)m_data;
 		const size_t end = m_len * 4;
 		for (size_t i = 0; i < end; i += 4) {
 			if (v[0] == t[i] && v[1] == t[i+1] && v[2] == t[i+2] && v[3] == t[i+3]) return i/4;
@@ -280,7 +281,7 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 		int64_t v[8] = {0,0,0,0,0,0,0,0};
 		memcpy(&v, value, len);
 
-		const int64_t* t = (int64_t*)m_data;
+		const int64_t* const t = (int64_t*)m_data;
 		const size_t end = m_len * 8;
 		for (size_t i = 0; i < end; i += 8) {
 			if (v[0] == t[i] && v[1] == t[i+1] && v[2] == t[i+2] && v[3] == t[i+3] &&
@@ -290,4 +291,30 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 	else assert(false);
 		
 	return -1;
+}
+
+void AdaptiveStringColumn::Stats() const {
+	size_t total = 0;
+	size_t longest = 0;
+
+	for (size_t i = 0; i < m_len; ++i) {
+		const char* str = Get(i);
+		const size_t len = strlen(str)+1;
+
+		total += len;
+		if (len > longest) longest = len;
+	}
+
+	const size_t size = m_len * m_width;
+	const size_t zeroes = size - total;
+	const size_t zavg = zeroes / m_len;
+
+	printf("Count: %d\n", m_len);
+	printf("Width: %d\n", m_width);
+	printf("Total: %d\n", size);
+	printf("Capacity: %d\n\n", m_capacity);
+	printf("Bytes string: %d\n", total);
+	printf("     longest: %d\n", longest);
+	printf("Bytes zeroes: %d\n", zeroes);
+	printf("         avg: %d\n", zavg);
 }

@@ -192,6 +192,8 @@ public:
 	size_t Find(const char* value) const;
 	size_t Find(const char* value, size_t len) const;
 
+	void Stats() const;
+
 private:
 	bool Alloc(size_t count, size_t width);
 };
