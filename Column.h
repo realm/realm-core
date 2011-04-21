@@ -3,6 +3,9 @@
 
 #include "stdint.h"
 
+// Pre-definitions
+class Column;
+
 enum ColumnDef {
 	COLUMN_NORMAL,
 	COLUMN_NODE,
@@ -19,6 +22,12 @@ public:
 	virtual bool Add() = 0;
 	virtual void Clear() = 0;
 	virtual void Delete(size_t ndx) = 0;
+
+	// Indexing
+	virtual bool HasIndex() const = 0;
+	virtual Column& GetIndex() = 0;
+	virtual void BuildIndex(Column& index) = 0;
+	virtual void ClearIndex() = 0;
 };
 
 class Column : public ColumnBase {
@@ -60,6 +69,13 @@ public:
 
 	bool Increment64(int64_t value, size_t start=0, size_t end=-1);
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
+
+	// Index
+	bool HasIndex() const;
+	Column& GetIndex();
+	void BuildIndex(Column& index);
+	void ClearIndex();
+	size_t FindWithIndex(const Column& index, int64_t value) const;
 
 	Column GetSubColumn(size_t ndx);
 	const Column GetSubColumn(size_t ndx) const;
@@ -136,6 +152,7 @@ protected:
 	Getter m_getter;
 	Setter m_setter;
 	unsigned char* m_data;
+	Column* m_index;
 	Column* m_parent;
 	size_t m_parentNdx;
 	size_t m_len;

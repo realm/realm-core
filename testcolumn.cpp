@@ -191,6 +191,22 @@ TEST_FIXTURE(db_setup, Insert3) {
 	CHECK_EQUAL(c.Get(6), 65536);
 }
 
+TEST_FIXTURE(db_setup, Index1) {
+	// Create index
+	Column index;
+	c.BuildIndex(index);
+
+	CHECK_EQUAL(0, c.FindWithIndex(index, 256));
+	CHECK_EQUAL(1, c.FindWithIndex(index, 0));
+	CHECK_EQUAL(2, c.FindWithIndex(index, 1));
+	CHECK_EQUAL(3, c.FindWithIndex(index, 16));
+	CHECK_EQUAL(4, c.FindWithIndex(index, 2));
+	CHECK_EQUAL(5, c.FindWithIndex(index, 3));
+	CHECK_EQUAL(6, c.FindWithIndex(index, 65536));
+	
+	c.ClearIndex();
+}
+
 TEST_FIXTURE(db_setup, Delete1) {
 	// Delete from middle
 	c.Delete(3);

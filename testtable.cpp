@@ -81,3 +81,17 @@ TEST(Table4) {
 	CHECK_EQUAL(-1, table.second.Find("Foo"));
 }
 
+TEST(Table5) {
+	TestTable table;
+
+	for (int i = 1000; i >= 0; --i) {
+		table.Add(0, i, true, Wed);
+	}
+
+	// Create a new index on second column
+	table.SetIndex(1);
+
+	CHECK_EQUAL(0, table.second.Find(1000));
+	CHECK_EQUAL(1000, table.second.Find(0));
+	CHECK_EQUAL(-1, table.second.Find(1001));
+}

@@ -65,6 +65,29 @@ void Table::RegisterColumn(ColumnType type, const char* name) {
 	}
 }
 
+bool Table::HasIndex(size_t column_id) const {
+	assert(column_id < m_cols.Size());
+	const ColumnBase& col = GetColumnBase(column_id);
+	return col.HasIndex();
+}
+
+void Table::SetIndex(size_t column_id) {
+	assert(column_id < m_cols.Size());
+	if (HasIndex(column_id)) return;
+
+	ColumnBase& col = GetColumnBase(column_id);
+	
+	if (col.IsIntColumn()) {
+		Column& c = static_cast<Column&>(col);
+		Column* index = new Column();
+		c.BuildIndex(*index);
+		m_columns.Add((int)index->GetRef());
+	}
+	else {
+		assert(false);
+	}
+}
+
 ColumnBase& Table::GetColumnBase(size_t ndx) {
 	assert(ndx < m_cols.Size());
 	return *(ColumnBase* const)m_cols.Get(ndx);
