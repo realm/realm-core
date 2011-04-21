@@ -185,7 +185,7 @@ bool AdaptiveStringColumn::Alloc(size_t count, size_t width) {
 	
 	if (len > m_capacity) {
 		// Try to expand with 50% to avoid to many reallocs
-		size_t new_capacity = m_capacity + m_capacity / 2;
+		size_t new_capacity = m_capacity ? m_capacity + m_capacity / 2 : 128;
 		if (new_capacity < len) new_capacity = len; 
 
 		// Allocate the space
