@@ -3,7 +3,25 @@
 
 #include "Table.h"
 
+#define TDB_QUERY(QueryName, TableName) \
+class QueryName : public TableName##Query { \
+public: \
+QueryName()
+
+#define TDB_QUERY_OPT(QueryName, TableName) \
+class QueryName : public TableName##Query { \
+public: \
+QueryName
+
+#define TDB_QUERY_END }; \
+
+
 #define TDB_TABLE_2(TableName, CType1, CName1, CType2, CName2) \
+class TableName##Query { \
+protected: \
+	QueryAccessor##CType1 CName1; \
+	QueryAccessor##CType2 CName2; \
+}; \
 class TableName : public Table { \
 public: \
 	TableName() : Table(#TableName) { \
@@ -46,11 +64,25 @@ public: \
 	Cursor operator[](int ndx) {return Cursor(*this, (ndx < 0) ? GetSize() - ndx : ndx);} \
 	Cursor Back() {return Cursor(*this, m_size-1);} \
 \
+	size_t Find(const TableName##Query& query) const {return -1;} \
+	TableName FindAll(const TableName##Query& query) const {return TableName();} \
+	TableName Sort() const {return TableName();} \
+	TableName Range(int start, int end) const {return TableName();} \
+	TableName Limit(size_t v) const {return TableName();} \
+\
 	ColumnProxy##CType1 CName1; \
 	ColumnProxy##CType2 CName2; \
 };
 
+
 #define TDB_TABLE_4(TableName, CType1, CName1, CType2, CName2, CType3, CName3, CType4, CName4) \
+class TableName##Query { \
+protected: \
+	QueryAccessor##CType1 CName1; \
+	QueryAccessor##CType2 CName2; \
+	QueryAccessor##CType3 CName3; \
+	QueryAccessor##CType4 CName4; \
+}; \
 class TableName : public Table { \
 public: \
 	TableName() : Table(#TableName) { \
@@ -97,6 +129,12 @@ public: \
 	Cursor Add() {return Cursor(*this, AddRow());} \
 	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \
 	Cursor operator[](size_t ndx) {return Cursor(*this, ndx);} \
+\
+	size_t Find(const TableName##Query& query) const {return -1;} \
+	TableName FindAll(const TableName##Query& query) const {return TableName();} \
+	TableName Sort() const {return TableName();} \
+	TableName Range(int start, int end) const {return TableName();} \
+	TableName Limit(size_t v) const {return TableName();} \
 \
 	ColumnProxy##CType1 CName1; \
 	ColumnProxy##CType2 CName2; \

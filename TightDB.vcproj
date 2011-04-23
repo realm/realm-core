@@ -196,6 +196,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\testcolumn.cpp"
 				>
 			</File>

@@ -95,3 +95,20 @@ TEST(Table5) {
 	CHECK_EQUAL(1000, table.second.Find(0));
 	CHECK_EQUAL(-1, table.second.Find(1001));
 }
+
+TEST(Table6) {
+	TestTableEnum table;
+
+	TDB_QUERY(TestQuery, TestTableEnum) {
+		first.between(Mon, Thu);
+		second == "Hello" || (second == "Hey" && first == Mon);
+	}};
+
+	TDB_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
+		first.between(a, b);
+		second == str || second.MatchRegEx(".*");
+	}};
+
+	TestTableEnum result = table.FindAll(TestQuery2(Mon, Tue, "Hello")).Sort().Limit(10);
+	size_t result2 = table.Range(10, 200).Find(TestQuery());
+}
