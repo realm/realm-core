@@ -369,19 +369,19 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 }
 
 size_t Column::ListFindPos(int64_t value) const {
-	// Simple optimization
-	// Most often items are inserted at the end
-	if (m_len == 0 || value >= ListBack()) return -1;
+	int low = -1;
+	int high = m_len;
 
-	// Naive search
-	//TODO: binary search
-	const size_t len = m_len;
-	for (size_t i = 0; i < len; ++i) {
-		const int64_t v = (this->*m_getter)(i);
-		if (value < v) return i;
+	// Binary search based on: http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+	while (high - low > 1) {
+		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+		const int64_t v = (this->*m_getter)(probe);
+
+		if (v > value) high = probe;
+		else           low = probe;
 	}
-
-	return -1; // not found
+	if (high == m_len) return -1;
+	else return high;
 }
 
 bool Column::ListInsert(size_t ndx, int64_t value) {
