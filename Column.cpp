@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdio.h> // debug output
 
-#define MAX_LIST_SIZE 1000000
+#define MAX_LIST_SIZE 1000
 
 Column::Column()
 : m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_index(NULL), m_parent(NULL), m_parentNdx(0) {
@@ -700,13 +700,33 @@ size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
 		return start; // value can only be zero
 	}
 	else if (m_width == 8) {
-		const int8_t v = (int8_t)value;
-		const int8_t* p = (const int8_t*)m_data + start;
-		const int8_t* const e = (const int8_t*)m_data + end;
+		// TODO: Handle partial searches
+
+		// Create a pattern to match 64bits at a time
+		const int64_t v = ~0ULL/0xFF * value;
+
+		const int64_t* p = (const int64_t*)m_data + start;
+		const size_t end64 = m_len / 8;
+		const int64_t* const e = (const int64_t*)m_data + end64;
+	
+		// Check 64bits at a time for match
 		while (p < e) {
-			if (*p == v) return p - (const int8_t*)m_data;
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2 & 0x8080808080808080ULL;
+			if (hasZeroByte) break;
 			++p;
 		}
+		
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int64_t*)m_data) * 8;
+		const int8_t* d = (const int8_t*)m_data;
+
+		// Manually check the rest
+		while (i < end) {
+			if (value == d[i]) return i;
+			++i;
+		}
+		 
 	}
 	else if (m_width == 16) {
 		const int16_t v = (int16_t)value;
@@ -767,21 +787,20 @@ size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
 									   (v2 & 0x03000000) && (v2 & 0x0C000000) && (v2 & 0x30000000) && (v2 & 0xC0000000);
 			
 			// Only do detailed search if we know there is a match
-			if (!hasNoZeroByte) {
-				size_t s = (p - (const int32_t*)m_data) * 16;
-				for (size_t i = s; i < end; ++i) {
-					const int64_t v = (this->*m_getter)(i);
-					if (v == value) return i;
-				}
-			}
+			if (!hasNoZeroByte) break;
+
 			++p;
 		}
 
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int32_t*)m_data) * 16;
+
 		// Manually check the rest
-		for (size_t i = end32*16; i < end; ++i) {
+		while (i < end) {
 			const size_t offset = i >> 2;
 			const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
 			if (v == value) return i;
+			++i;
 		}
 	}
 	else {
