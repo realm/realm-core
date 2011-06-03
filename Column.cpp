@@ -145,15 +145,20 @@ void Column::Clear() {
 	SetWidth(0);
 }
 
-static unsigned int fBitsNeeded(int64_t v) {
+/**
+ * Takes a 64bit value and return the minimum number of bits needed to fit the value.
+ * For alignment this is rounded up to nearest log2.
+ * Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
+ */
+static unsigned int BitWidth(int64_t v) {
 	if ((v >> 4) == 0) {
-		static const int8_t bits[] =  {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+		static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
 		return bits[(int8_t)v];
 	}
 
-	// first flip all bits if bit 31 is set
+	// first flip all bits if bit 63 is set
 	if (v < 0) v = ~v;
-	// ... bit 31 is now always zero
+	// ... bit 63 is now always zero
 
 	// then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
 	return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
@@ -213,7 +218,7 @@ bool Column::ListSet(size_t ndx, int64_t value) {
 	assert(ndx < m_len);
 
 	// Make room for the new value
-	const size_t width = fBitsNeeded(value);
+	const size_t width = BitWidth(value);
 	if (width > m_width) {
 		Getter oldGetter = m_getter;
 		if (!Alloc(m_len, width)) return false;
@@ -385,7 +390,7 @@ bool Column::ListInsert(size_t ndx, int64_t value) {
 	Getter getter = m_getter;
 
 	// Make room for the new value
-	const size_t width = fBitsNeeded(value);
+	const size_t width = BitWidth(value);
 	const bool doExpand = (width > m_width);
 	if (doExpand) {
 		if (!Alloc(m_len+1, width)) return false;
@@ -687,7 +692,7 @@ size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
 
 	// If the value is wider than the column
 	// then we know it can't be there
-	const size_t width = fBitsNeeded(value);
+	const size_t width = BitWidth(value);
 	if (width > m_width) return -1;
 
 	// Do optimized search based on column width
@@ -861,7 +866,7 @@ void Column::BuildIndex(Column& index) {
 	// Make sure the index has room for all the refs
 	index.Clear();
 	const size_t len = Size();
-	const size_t width = fBitsNeeded(Size());
+	const size_t width = BitWidth(Size());
 	index.Reserve(len, width);
 
 	// Fill it up with unsorted refs

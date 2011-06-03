@@ -82,6 +82,8 @@ public:
 	void* GetRef() const {return m_data-8;};
 	void Destroy();
 
+	// Debug
+	size_t GetBitWidth() const {return m_width;}
 	void Print() const;
 	void Verify() const;
 
