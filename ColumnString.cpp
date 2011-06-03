@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdio.h> // debug
 
-AdaptiveStringColumn::AdaptiveStringColumn() {
+AdaptiveStringColumn::AdaptiveStringColumn() : Column(COLUMN_NORMAL) {
 }
 
 AdaptiveStringColumn::~AdaptiveStringColumn() {

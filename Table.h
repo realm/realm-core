@@ -15,7 +15,10 @@ enum ColumnType {
 class Table {
 public:
 	Table(const char* name);
+	Table(const Table& t);
 	~Table();
+
+	Table& operator=(const Table& t);
 
 	bool IsEmpty() const {return m_size == 0;}
 	size_t GetSize() const {return m_size;}
@@ -169,7 +172,7 @@ private:
 template<typename T> struct COLUMN_TYPE_Enum {
 public:
 	COLUMN_TYPE_Enum() {};
-	operator ColumnType() const {return COLUMN_TYPE_Int;}
+	operator ColumnType() const {return COLUMN_TYPE_INT;}
 };
 
 class QueryItem {

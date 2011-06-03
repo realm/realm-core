@@ -8,6 +8,17 @@ const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
 Table::Table(const char* name) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS), m_columnNames(COLUMN_NORMAL) {
 }
 
+Table::Table(const Table&) {
+	//TODO: copy-constructor (ref-counting?)
+	assert(false);
+}
+
+Table& Table::operator=(const Table&) {
+	//TODO: assignment operator (ref-counting?)
+	assert(false);
+	return *this;
+}
+
 Table::~Table() {
 	m_columns.Destroy();
 	m_columnNames.Destroy();
