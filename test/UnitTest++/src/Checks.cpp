@@ -2,7 +2,6 @@
 #include <cstring>
 
 namespace UnitTest {
-
 void CheckEqual(TestResults& results, int expected, size_t actual, TestDetails const& details)
 {
 	CheckEqual(results, expected, (int)actual, details);

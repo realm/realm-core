@@ -26,11 +26,9 @@ void CheckEqual(TestResults& results, Expected const& expected, Actual const& ac
         results.OnTestFailure(details, stream.GetText());
     }
 }
-
 void CheckEqual(TestResults& results, int expected, size_t actual, TestDetails const& details);
 
 void CheckEqual(TestResults& results, size_t expected, int actual, TestDetails const& details);
-
 
 void CheckEqual(TestResults& results, char const* expected, char const* actual, TestDetails const& details);
 
