@@ -75,7 +75,7 @@ public:
 	Column& GetIndex();
 	void BuildIndex(Column& index);
 	void ClearIndex();
-	size_t FindWithIndex(const Column& index, int64_t value) const;
+	size_t FindWithIndex(int64_t value) const;
 
 	Column GetSubColumn(size_t ndx);
 	const Column GetSubColumn(size_t ndx) const;
@@ -155,6 +155,7 @@ protected:
 	Setter m_setter;
 	unsigned char* m_data;
 	Column* m_index;
+	Column* m_index_refs;
 	Column* m_parent;
 	size_t m_parentNdx;
 	size_t m_len;

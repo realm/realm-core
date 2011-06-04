@@ -629,7 +629,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 
 	// Use index if possible
 	if (m_index && start == 0 && end == -1) {
-		return FindWithIndex(*m_index, value);
+		return FindWithIndex(value);
 	}
 
 	if (!IsNode()) return ListFind(value, start, end);
@@ -814,8 +814,10 @@ size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
 	return (size_t)-1; // not found
 }
 
-size_t Column::FindWithIndex(const Column& index, int64_t target) const {
-	assert(index.Size() == Size());
+size_t Column::FindWithIndex(int64_t target) const {
+	assert(m_index);
+	assert(m_index->Size() == Size());
+	assert(m_index_refs);
 
 	int low = -1;
 	int high = Size();
@@ -824,20 +826,19 @@ size_t Column::FindWithIndex(const Column& index, int64_t target) const {
 	// based on: http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
 	while (high - low > 1) {
 		const int probe = ((unsigned int)low + (unsigned int)high) >> 1;
-		const size_t ndx = (size_t)index.Get64(probe);
+		const int64_t v = m_index->Get64(probe);
 
-		if (Get64(ndx) > target)
+		if (v > target)
 			high = probe;
 		else
 			low = probe;
 	}
-	if (low == -1) return -1;
+	if (low == -1) return (size_t)-1;
 
-	const size_t ndx = (size_t)index.Get64(low);
-	if (Get64(ndx) != target)
-		return -1;
+	if (m_index->Get64(low) != target)
+		return (size_t)-1;
 	else
-		return ndx;
+		return (size_t)m_index_refs->Get64(low);
 }
 
 void SortIndex(Column& index, const Column& target, size_t lo, size_t hi) {
