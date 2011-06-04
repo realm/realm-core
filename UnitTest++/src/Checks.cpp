@@ -3,6 +3,16 @@
 
 namespace UnitTest {
 
+void CheckEqual(TestResults& results, int expected, size_t actual, TestDetails const& details)
+{
+	CheckEqual(results, expected, (int)actual, details);
+}
+
+void CheckEqual(TestResults& results, size_t expected, int actual, TestDetails const& details)
+{
+	CheckEqual(results, (int)expected, actual, details);
+}
+
 namespace {
 
 void CheckStringsEqual(TestResults& results, char const* expected, char const* actual, 
