@@ -1,8 +1,8 @@
 #ifndef __TDB_TABLE__
 #define __TDB_TABLE__
 
+#include <cstring> // strcmp()
 #include "Column.h"
-#include "string.h"
 
 class Accessor;
 

@@ -37,12 +37,12 @@ void Table::RegisterColumn(ColumnType type, const char* name) {
 		{
 			Column* newColumn = new Column(COLUMN_NORMAL);
 			
-			m_columnNames.Add((int)name);
+			m_columnNames.Add((intptr_t)name);
 
-			m_columns.Add((int)newColumn->GetRef());
+			m_columns.Add((intptr_t)newColumn->GetRef());
 			newColumn->SetParent(&m_columns, m_columns.Size()-1);
 
-			m_cols.Add((int)newColumn);
+			m_cols.Add((intptr_t)newColumn);
 		}
 		break;
 	case COLUMN_TYPE_STRING:
@@ -63,12 +63,12 @@ void Table::RegisterColumn(ColumnType type, const char* name) {
 
 			AdaptiveStringColumn* newColumn = new AdaptiveStringColumn();
 			
-			m_columnNames.Add((int)name);
+			m_columnNames.Add((intptr_t)name);
 
-			m_columns.Add((int)newColumn->GetRef());
+			m_columns.Add((intptr_t)newColumn->GetRef());
 			newColumn->SetParent(&m_columns, m_columns.Size()-1);
 
-			m_cols.Add((int)newColumn);
+			m_cols.Add((intptr_t)newColumn);
 		}
 		break;
 	default:
@@ -92,7 +92,7 @@ void Table::SetIndex(size_t column_id) {
 		Column& c = static_cast<Column&>(col);
 		Column* index = new Column();
 		c.BuildIndex(*index);
-		m_columns.Add((int)index->GetRef());
+		m_columns.Add((intptr_t)index->GetRef());
 	}
 	else {
 		assert(false);

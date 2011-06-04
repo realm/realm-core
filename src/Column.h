@@ -1,7 +1,13 @@
 #ifndef __TDB_COLUMN__
 #define __TDB_COLUMN__
 
-#include "stdint.h"
+#ifdef _MSC_VER
+#include "win32/stdint.h"
+#else
+#include <cstdint> // unint8_t etc
+#endif
+//#include <climits> // size_t
+#include <cstdlib> // size_t
 
 // Pre-definitions
 class Column;

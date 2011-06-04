@@ -1,8 +1,16 @@
+#include <cstdlib>
+#include <cassert>
+#include <cstring>
+#include <cstdio> // debug output
+#include <climits> // size_t
+
+#ifdef _MSC_VER
+#include "win32/stdint.h"
+#else
+#include <cstdint> // unint8_t etc
+#endif
+
 #include "Column.h"
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
-#include <stdio.h> // debug output
 
 #define MAX_LIST_SIZE 1000
 
@@ -23,8 +31,8 @@ Column::Column(ColumnDef type, Column* parent, size_t pndx)
 	if (m_isNode) {
 		const Column offsets(COLUMN_NORMAL);
 		const Column refs(COLUMN_HASREFS);
-		ListAdd((int)offsets.GetRef());
-		ListAdd((int)refs.GetRef());
+		ListAdd((intptr_t)offsets.GetRef());
+		ListAdd((intptr_t)refs.GetRef());
 	}
 }
 
@@ -440,7 +448,7 @@ void Column::UpdateRef(void* ref) {
 	Create(ref);
 
 	// Update ref in parent
-	if (m_parent) m_parent->ListSet(m_parentNdx, (int)ref);
+	if (m_parent) m_parent->ListSet(m_parentNdx, (intptr_t)ref);
 }
 
 size_t GetRefSize(void* ref) {
@@ -472,7 +480,7 @@ bool Column::NodeInsert(size_t ndx, void* ref) {
 	if (ndx+1 < offsets.ListSize()) {
 		if (!offsets.ListIncrement(refSize, ndx+1)) return false;
 	}
-	return refs.ListInsert(ndx, (int)ref);
+	return refs.ListInsert(ndx, (intptr_t)ref);
 }
 
 bool Column::NodeAdd(void* ref) {
@@ -485,7 +493,7 @@ bool Column::NodeAdd(void* ref) {
 
 	const int64_t newOffset = (offsets.IsEmpty() ? 0 : offsets.ListBack()) + col.Size();
 	if (!offsets.ListAdd(newOffset)) return false;
-	return refs.ListAdd((int)ref);
+	return refs.ListAdd((intptr_t)ref);
 }
 
 bool Column::NodeUpdateOffsets(size_t ndx) {
@@ -521,7 +529,7 @@ bool Column::NodeInsertSplit(size_t ndx, void* newRef) {
 	// Insert new ref
 	const int64_t refSize = GetRefSize(newRef);
 	offsets.ListInsert(ndx+1, newOffset + refSize);
-	refs.ListInsert(ndx+1, (int)newRef);
+	refs.ListInsert(ndx+1, (intptr_t)newRef);
 
 	// Update lower offsets
 	const int64_t newDiff = diff + refSize;
@@ -788,7 +796,6 @@ size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
 			
 			// Only do detailed search if we know there is a match
 			if (!hasNoZeroByte) break;
-
 			++p;
 		}
 
@@ -1036,7 +1043,7 @@ bool Column::Alloc(size_t count, size_t width) {
 		m_capacity = new_capacity;
 
 		// Update ref in parent
-		if (m_parent) m_parent->ListSet(m_parentNdx, (int)data);
+		if (m_parent) m_parent->ListSet(m_parentNdx, (uintptr_t)data);
 	}
 
 	// Pack width in 3 bits (log2)
@@ -1206,7 +1213,7 @@ bool StringColumn::Set(size_t ndx, const char* value, size_t len) {
 	if (!ref) return false;
 	Free(ndx);
 
-	m_refs.Set(ndx, (int)ref);
+	m_refs.Set(ndx, (intptr_t)ref);
 	m_lengths.Set(ndx, len);
 	return true;
 }
@@ -1228,7 +1235,7 @@ bool StringColumn::Insert(size_t ndx, const char* value, size_t len) {
 	void* ref = Alloc(value, len);
 	if (!ref) return false;
 
-	m_refs.Insert(ndx, (int)ref);
+	m_refs.Insert(ndx, (intptr_t)ref);
 	m_lengths.Insert(ndx, len);
 	return true;
 }

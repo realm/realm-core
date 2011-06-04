@@ -112,5 +112,4 @@ TEST(Table6) {
 	TestTableEnum result = table.FindAll(TestQuery2(Mon, Tue, "Hello")).Sort().Limit(10);
 	size_t result2 = table.Range(10, 200).Find(TestQuery());
 	CHECK_EQUAL((size_t)-1, result2);
-
 }
