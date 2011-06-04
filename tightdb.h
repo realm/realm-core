@@ -64,11 +64,11 @@ public: \
 	Cursor operator[](int ndx) {return Cursor(*this, (ndx < 0) ? GetSize() - ndx : ndx);} \
 	Cursor Back() {return Cursor(*this, m_size-1);} \
 \
-	size_t Find(const TableName##Query& query) const {return -1;} \
-	TableName FindAll(const TableName##Query& query) const {return TableName();} \
+	size_t Find(const TableName##Query&) const {return (size_t)-1;} \
+	TableName FindAll(const TableName##Query&) const {return TableName();} \
 	TableName Sort() const {return TableName();} \
-	TableName Range(int start, int end) const {return TableName();} \
-	TableName Limit(size_t v) const {return TableName();} \
+	TableName Range(int, int) const {return TableName();} \
+	TableName Limit(size_t) const {return TableName();} \
 \
 	ColumnProxy##CType1 CName1; \
 	ColumnProxy##CType2 CName2; \
@@ -130,11 +130,11 @@ public: \
 	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \
 	Cursor operator[](size_t ndx) {return Cursor(*this, ndx);} \
 \
-	size_t Find(const TableName##Query& query) const {return -1;} \
-	TableName FindAll(const TableName##Query& query) const {return TableName();} \
+	size_t Find(const TableName##Query&) const {return (size_t)-1;} \
+	TableName FindAll(const TableName##Query&) const {return TableName();} \
 	TableName Sort() const {return TableName();} \
-	TableName Range(int start, int end) const {return TableName();} \
-	TableName Limit(size_t v) const {return TableName();} \
+	TableName Range(int, int) const {return TableName();} \
+	TableName Limit(size_t) const {return TableName();} \
 \
 	ColumnProxy##CType1 CName1; \
 	ColumnProxy##CType2 CName2; \

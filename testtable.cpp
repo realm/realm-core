@@ -49,14 +49,14 @@ TEST(Table3) {
 	}
 
 	// Test column searching
-	CHECK_EQUAL(0, table.first.Find(0));
-	CHECK_EQUAL(-1, table.first.Find(1));
-	CHECK_EQUAL(0, table.second.Find(10));
-	CHECK_EQUAL(-1, table.second.Find(100));
-	CHECK_EQUAL(0, table.third.Find(true));
-	CHECK_EQUAL(-1, table.third.Find(false));
-	CHECK_EQUAL(0, table.fourth.Find(Wed));
-	CHECK_EQUAL(-1, table.fourth.Find(Mon));
+	CHECK_EQUAL((size_t)0, table.first.Find(0));
+	CHECK_EQUAL((size_t)-1, table.first.Find(1));
+	CHECK_EQUAL((size_t)0, table.second.Find(10));
+	CHECK_EQUAL((size_t)-1, table.second.Find(100));
+	CHECK_EQUAL((size_t)0, table.third.Find(true));
+	CHECK_EQUAL((size_t)-1, table.third.Find(false));
+	CHECK_EQUAL((size_t)0, table.fourth.Find(Wed));
+	CHECK_EQUAL((size_t)-1, table.fourth.Find(Mon));
 
 	// Test column incrementing
 	table.first += 3;
@@ -77,8 +77,8 @@ TEST(Table4) {
 	CHECK_EQUAL("Hello", (const char*)r.second);
 
 	// Test string column searching
-	CHECK_EQUAL(0, table.second.Find("Hello"));
-	CHECK_EQUAL(-1, table.second.Find("Foo"));
+	CHECK_EQUAL((size_t)0, table.second.Find("Hello"));
+	CHECK_EQUAL((size_t)-1, table.second.Find("Foo"));
 }
 
 TEST(Table5) {
@@ -91,9 +91,9 @@ TEST(Table5) {
 	// Create a new index on second column
 	table.SetIndex(1);
 
-	CHECK_EQUAL(0, table.second.Find(1000));
-	CHECK_EQUAL(1000, table.second.Find(0));
-	CHECK_EQUAL(-1, table.second.Find(1001));
+	CHECK_EQUAL((size_t)0, table.second.Find(1000));
+	CHECK_EQUAL((size_t)1000, table.second.Find(0));
+	CHECK_EQUAL((size_t)-1, table.second.Find(1001));
 }
 
 TEST(Table6) {
@@ -111,4 +111,6 @@ TEST(Table6) {
 
 	TestTableEnum result = table.FindAll(TestQuery2(Mon, Tue, "Hello")).Sort().Limit(10);
 	size_t result2 = table.Range(10, 200).Find(TestQuery());
+	CHECK_EQUAL((size_t)-1, result2);
+
 }

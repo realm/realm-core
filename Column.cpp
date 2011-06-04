@@ -380,7 +380,7 @@ size_t Column::ListFindPos(int64_t value) const {
 		if (v > value) high = probe;
 		else           low = probe;
 	}
-	if (high == m_len) return -1;
+	if (high == (int)m_len) return (size_t)-1;
 	else return high;
 }
 
@@ -625,7 +625,7 @@ bool Column::ListIncrement(int64_t value, size_t start, size_t end) {
 size_t Column::Find(int64_t value, size_t start, size_t end) const {
 	assert(start <= Size());
 	assert(end == -1 || end <= Size());
-	if (IsEmpty()) return -1;
+	if (IsEmpty()) return (size_t)-1;
 
 	// Use index if possible
 	if (m_index && start == 0 && end == -1) {
@@ -670,7 +670,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 
 				s = 0;
 				if (end != -1) {
-					if (end >= offsets.ListGet(i)) e = -1;
+					if (end >= (size_t)offsets.ListGet(i)) e = (size_t)-1;
 					else {
 						offset = (size_t)offsets.ListGet(i-1);
 						e = end - offset;
@@ -679,21 +679,21 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 			}
 		}
 
-		return -1; // not found
+		return (size_t)-1; // not found
 	}
 }
 
 size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
-	if (IsEmpty()) return -1;
+	if (IsEmpty()) return (size_t)-1;
 	if (end == -1) end = m_len;
-	if (start == end) return -1;
+	if (start == end) return (size_t)-1;
 
 	assert(start < m_len && end <= m_len && start < end);
 
 	// If the value is wider than the column
 	// then we know it can't be there
 	const size_t width = BitWidth(value);
-	if (width > m_width) return -1;
+	if (width > m_width) return (size_t)-1;
 
 	// Do optimized search based on column width
 	if (m_width == 0) {
@@ -811,7 +811,7 @@ size_t Column::ListFind(int64_t value, size_t start, size_t end) const {
 		}
 	}
 
-	return -1; // not found
+	return (size_t)-1; // not found
 }
 
 size_t Column::FindWithIndex(const Column& index, int64_t target) const {
@@ -879,25 +879,33 @@ Column& Column::GetIndex() {
 
 void Column::ClearIndex() {
 	m_index = NULL;
+	m_index_refs = NULL;
 }
 
-void Column::BuildIndex(Column& index) {
+void Column::BuildIndex(Column& index_refs) {
 	// Make sure the index has room for all the refs
-	index.Clear();
+	index_refs.Clear();
 	const size_t len = Size();
 	const size_t width = BitWidth(Size());
-	index.Reserve(len, width);
+	index_refs.Reserve(len, width);
 
 	// Fill it up with unsorted refs
 	for (size_t i = 0; i < len; ++i) {
-		index.Add64(i);
+		index_refs.Add64(i);
 	}
 
 	// Sort the index
-	SortIndex(index, *this, 0, len-1);
+	SortIndex(index_refs, *this, 0, len-1);
+
+	// Create the actual index
+	Column* ndx = new Column();
+	for (size_t i = 0; i < len; ++i) {
+		ndx->Add64(Get64((size_t)index_refs.Get64(i)));
+	}
 
 	// Keep ref to index
-	m_index = &index;
+	m_index = ndx;
+	m_index_refs = &index_refs;
 }
 
 int64_t Column::Get_0b(size_t) const {
@@ -1252,7 +1260,7 @@ size_t StringColumn::Find(const char* value, size_t len) const {
 	while (pos < count) {
 		// Find next string with matching length
 		pos = m_lengths.Find(len, pos);
-		if (pos == -1) return -1;
+		if (pos == -1) return (size_t)-1;
 
 		// We do a quick manual check of first byte before
 		// calling expensive memcmp
@@ -1263,5 +1271,5 @@ size_t StringColumn::Find(const char* value, size_t len) const {
 		++pos;
 	}
 
-	return -1;
+	return (size_t)-1;
 }

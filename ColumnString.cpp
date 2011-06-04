@@ -52,7 +52,7 @@ bool AdaptiveStringColumn::Set(size_t ndx, const char* value, size_t len) {
 		// Expand the old values
 		int k = (int)m_len;
 		while (--k >= 0) {
-			const char* v = (const char*)m_data + (k * oldwidth);
+			//const char* v = (const char*)m_data + (k * oldwidth);
 
 			// Move the value
 			char* data = (char*)m_data + (ndx * m_width);
@@ -233,8 +233,8 @@ size_t AdaptiveStringColumn::Find(const char* value) const {
 size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 	assert(value);
 
-	if (m_len == 0) return -1; // empty list
-	if (len >= m_width) return -1; // A string can never be wider than the column width
+	if (m_len == 0) return (size_t)-1; // empty list
+	if (len >= m_width) return (size_t)-1; // A string can never be wider than the column width
 
 	if (m_width == 0) {
 		return 0; 
@@ -290,7 +290,7 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 	}
 	else assert(false);
 		
-	return -1;
+	return (size_t)-1;
 }
 
 void AdaptiveStringColumn::Stats() const {

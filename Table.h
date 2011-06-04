@@ -67,6 +67,7 @@ class CursorBase {
 public:
 	CursorBase(Table& table, size_t ndx) : m_table(table), m_index(ndx) {};
 	CursorBase(const CursorBase& v) : m_table(v.m_table), m_index(v.m_index) {};
+	CursorBase& operator=(const CursorBase& v) {m_table = v.m_table; m_index = v.m_index;}
 
 protected:
 	Table& m_table;
@@ -161,6 +162,7 @@ template<class T> class TypeEnum {
 public:
 	TypeEnum(T v) : m_value(v) {};
 	operator T() const {return m_value;}
+	TypeEnum<T>& operator=(const TypeEnum<T>& v) {m_value = v.m_value;}
 private:
 	const T m_value;
 };
@@ -183,40 +185,40 @@ public:
 
 class QueryAccessorBool {
 public:
-	QueryItem operator==(int value) {return QueryItem();}
-	QueryItem operator!=(int value) {return QueryItem();}
+	QueryItem operator==(int) {return QueryItem();}
+	QueryItem operator!=(int) {return QueryItem();}
 };
 
 class QueryAccessorInt {
 public:
-	QueryItem operator==(int value) {return QueryItem();}
-	QueryItem operator!=(int value) {return QueryItem();}
-	QueryItem operator<(int value) {return QueryItem();}
-	QueryItem operator>(int value) {return QueryItem();}
-	QueryItem operator<=(int value) {return QueryItem();}
-	QueryItem operator>=(int value) {return QueryItem();}
-	QueryItem Between(int a, int b) {return QueryItem();}
+	QueryItem operator==(int) {return QueryItem();}
+	QueryItem operator!=(int) {return QueryItem();}
+	QueryItem operator<(int) {return QueryItem();}
+	QueryItem operator>(int) {return QueryItem();}
+	QueryItem operator<=(int) {return QueryItem();}
+	QueryItem operator>=(int) {return QueryItem();}
+	QueryItem Between(int, int) {return QueryItem();}
 };
 
 class QueryAccessorString {
 public:
-	QueryItem operator==(const char* value) {return QueryItem();}
-	QueryItem operator!=(const char* value) {return QueryItem();}
-	QueryItem Contains(const char* value) {return QueryItem();}
-	QueryItem StartsWith(const char* value) {return QueryItem();}
-	QueryItem EndsWith(const char* value) {return QueryItem();}
-	QueryItem MatchRegEx(const char* regex) {return QueryItem();}
+	QueryItem operator==(const char*) {return QueryItem();}
+	QueryItem operator!=(const char*) {return QueryItem();}
+	QueryItem Contains(const char*) {return QueryItem();}
+	QueryItem StartsWith(const char*) {return QueryItem();}
+	QueryItem EndsWith(const char*) {return QueryItem();}
+	QueryItem MatchRegEx(const char*) {return QueryItem();}
 };
 
 template<class T> class QueryAccessorEnum {
 public:
-	QueryItem operator==(T value) {return QueryItem();}
-	QueryItem operator!=(T value) {return QueryItem();}
-	QueryItem operator<(T value) {return QueryItem();}
-	QueryItem operator>(T value) {return QueryItem();}
-	QueryItem operator<=(T value) {return QueryItem();}
-	QueryItem operator>=(T value) {return QueryItem();}
-	QueryItem between(T a, T b) {return QueryItem();}
+	QueryItem operator==(T) {return QueryItem();}
+	QueryItem operator!=(T) {return QueryItem();}
+	QueryItem operator<(T) {return QueryItem();}
+	QueryItem operator>(T) {return QueryItem();}
+	QueryItem operator<=(T) {return QueryItem();}
+	QueryItem operator>=(T) {return QueryItem();}
+	QueryItem between(T, T) {return QueryItem();}
 };
 
 #endif //__TDB_TABLE__
