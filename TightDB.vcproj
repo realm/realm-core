@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;UnitTest++\src&quot;"
+				AdditionalIncludeDirectories="&quot;test\UnitTest++\src&quot;;&quot;UnitTest++\src&quot;;src"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -116,7 +116,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;UnitTest++\src&quot;"
+				AdditionalIncludeDirectories="&quot;UnitTest++\src&quot;&quot;..\src&quot;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -176,35 +176,35 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\alloc.cpp"
+				RelativePath=".\src\alloc.cpp--"
 				>
 			</File>
 			<File
-				RelativePath=".\Column.cpp"
+				RelativePath=".\src\Column.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\ColumnString.cpp"
+				RelativePath=".\src\ColumnString.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\main.cpp"
+				RelativePath=".\test\main.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\Table.cpp"
+				RelativePath=".\src\Table.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\test.cpp"
+				RelativePath=".\test\test.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\testcolumn.cpp"
+				RelativePath=".\test\testcolumn.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\testtable.cpp"
+				RelativePath=".\test\testtable.cpp"
 				>
 			</File>
 		</Filter>
