@@ -52,6 +52,7 @@ void test() {
 
 	// Run query with modifiers (single result)
 	size_t result2 = table.Range(10, 200).Find(TestQuery(12));
+	if (result2 != -1) printf("found match at %d\n", result2);
 	
 	// Run query with modifiers (all results)
 	TestTable result = table.FindAll(TestQuery(2)).Sort().Limit(10);
