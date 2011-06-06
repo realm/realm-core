@@ -116,7 +116,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;UnitTest++\src&quot;&quot;..\src&quot;"
+				AdditionalIncludeDirectories="&quot;test\UnitTest++\src&quot;;&quot;UnitTest++\src&quot;;src"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -176,10 +176,6 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\src\alloc.cpp--"
-				>
-			</File>
-			<File
 				RelativePath=".\src\Column.cpp"
 				>
 			</File>
@@ -213,10 +209,6 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
-			<File
-				RelativePath=".\alloc.h"
-				>
-			</File>
 			<File
 				RelativePath=".\Column.h"
 				>
