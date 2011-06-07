@@ -378,15 +378,15 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 
 size_t Column::ListFindPos(int64_t value) const {
 	int low = -1;
-	int high = m_len;
+	int high = (int)m_len;
 
 	// Binary search based on: http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
 	while (high - low > 1) {
 		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
 		const int64_t v = (this->*m_getter)(probe);
 
-		if (v > value) high = probe;
-		else           low = probe;
+		if (v > value) high = (int)probe;
+		else           low = (int)probe;
 	}
 	if (high == (int)m_len) return (size_t)-1;
 	else return high;
@@ -662,7 +662,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 			size_t i = offsets.ListFindPos(start);
 			size_t offset = i ? (size_t)offsets.ListGet(i-1) : 0;
 			size_t s = start - offset;
-			size_t e = (end == -1 || end >= offsets.ListGet(i)) ? -1 : end - offset;
+			size_t e = (end == -1 || (int)end >= offsets.ListGet(i)) ? -1 : end - offset;
 
 			for (;;) {
 				const Column col = refs.GetSubColumn(i);
@@ -827,7 +827,7 @@ size_t Column::FindWithIndex(int64_t target) const {
 	assert(m_index_refs);
 
 	int low = -1;
-	int high = Size();
+	int high = (int)Size();
 
 	// Binary search through index
 	// based on: http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
@@ -851,8 +851,8 @@ size_t Column::FindWithIndex(int64_t target) const {
 void SortIndex(Column& index, const Column& target, size_t lo, size_t hi) {
 	// Quicksort based on
 	// http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
-	int i = lo;
-	int j = hi;
+	int i = (int)lo;
+	int j = (int)hi;
 
 	// comparison element x
 	const size_t ndx = (lo + hi)/2;
@@ -1150,7 +1150,7 @@ void Column::Verify() const {
 			col.Verify();
 
 			off += col.Size();
-			if (offsets.ListGet(i) != off) {
+			if (offsets.ListGet(i) != (int)off) {
 				assert(false);
 			}
 		}

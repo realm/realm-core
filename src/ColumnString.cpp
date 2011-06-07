@@ -200,7 +200,7 @@ bool AdaptiveStringColumn::Alloc(size_t count, size_t width) {
 		m_capacity = new_capacity;
 
 		// Update ref in parent
-		UpdateParent((uintptr_t)data);
+		UpdateParent((intptr_t)data);
 	}
 
 	// Pack width in 3 bits (log2)

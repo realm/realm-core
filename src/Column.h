@@ -59,14 +59,22 @@ public:
 
 	int Get(size_t ndx) const {return (int)Get64(ndx);}
 	bool Set(size_t ndx, int value) {return Set64(ndx, value);}
+	bool Set(size_t ndx, size_t value) {return Set64(ndx, value);}
+	bool Set(size_t ndx, intptr_t value) {return Set64(ndx, value);}
 	bool Insert(size_t ndx, int value) {return Insert64(ndx, value);}
+	bool Insert(size_t ndx, size_t value) {return Insert64(ndx, value);}
+	bool Insert(size_t ndx, intptr_t value) {return Insert64(ndx, value);}
 	bool Add() {return Add64(0);}
 	bool Add(int value) {return Add64(value);}
+	bool Add(size_t value) {return Add64(value);}
+	bool Add(intptr_t value) {return Add64(value);}
 	
 	int64_t Get64(size_t ndx) const;
 	bool Set64(size_t ndx, int64_t value);
 	bool Insert64(size_t ndx, int64_t value);
 	bool Add64(int64_t value);
+
+	intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get64(ndx);}
 	
 	void Clear();
 	void Delete(size_t ndx);
@@ -113,7 +121,7 @@ protected:
 	bool NodeAdd(void* ref);
 	bool NodeUpdateOffsets(size_t ndx);
 	bool NodeInsertSplit(size_t ndx, void* newRef);
-	void UpdateParent(int newRef) {if (m_parent) m_parent->ListSet(m_parentNdx, newRef);}
+	void UpdateParent(intptr_t newRef) {if (m_parent) m_parent->ListSet(m_parentNdx, newRef);}
 	
 	struct NodeChange {
 		void* ref1;
