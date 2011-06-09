@@ -5,7 +5,6 @@
 # $^  The names of all the prerequisite files (space separated)
 # $*  The stem (the bit which matches the % wildcard in the rule definition.
 #
-# g++ -std=c++0x *.cpp -I./UnitTest++/src -L./UnitTest++/ -l UnitTest++ -o main
 
 # Compiler and flags
 #CXXFLAGS  = -Wall -Weffc++ -Wextra -std=c++0x
@@ -15,7 +14,7 @@ CXXINC    = -I../UnitTest++/src -I../../src
 CXX       = g++ $(CXXFLAGS)
 
 # Files
-EXECUTABLE = test-stl_vector
+EXECUTABLE = test-stl
 
 HEADERS    = $(wildcard ../../src/*.h)
 SOURCES    = $(wildcard ../../src/*.cpp)
@@ -30,14 +29,6 @@ SURFIXES   = %.cpp %.h
 OBJECTS    = $(SOURCES:.o=.cpp) $(HEADERS:.o=.h) \
              $(TEST_SRC:.o=.cpp) $(TEST_H:.o=.h)
 
-# Linking
-$(EXECUTABLE): $(OBJECTS)
-	@$(CXX) $(OBJECTS) $(CXXLIBS) $(CXXINC) -o $@
-
-# Compilation
-%.o: $(SURFIXES)
-	@$(CXX) -c $^
-
 # Targets
 all: CXXFLAGS += -DNDEBUG -O3
 all: $(EXECUTABLE)
@@ -51,3 +42,11 @@ debug: $(EXECUTABLE)
 
 clean:
 	@rm -f core *.o $(EXECUTABLE)
+
+# Linking
+$(EXECUTABLE): $(OBJECTS)
+	@$(CXX) $(OBJECTS) $(CXXLIBS) $(CXXINC) -o $@
+
+# Compilation
+%.o: $(SURFIXES)
+	@$(CXX) -c $^

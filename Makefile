@@ -36,8 +36,12 @@ shared: $(LIB_SHARED)
 	@rm -f $(OBJ_SHARED)
 
 test: all
-	@make -C test
+	@(cd test && make)
 	@(cd test && ./run_tests.sh)
+
+debug: CXXFLAGS += -DDEBUG -g3 -ggdb
+debug: all
+	@(cd test && make debug)
 
 clean:
 	@rm -f core *.o *.so *.1 *.a

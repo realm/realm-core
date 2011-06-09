@@ -1,4 +1,8 @@
 *.ncb
 *.suo
 *.vcproj.*.user
-Debug
+*.d
+*.o
+*.a
+tightdb-tests
+TestUnitTest++
