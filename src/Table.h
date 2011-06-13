@@ -55,12 +55,12 @@ protected:
 	size_t m_size;
 	
 	// On-disk format
-	Column m_spec;
-	Column m_columns;
-	Column m_columnNames;
+	Array m_spec;
+	Array m_columns;
+	Array m_columnNames;
 
 	// Cached columns
-	Column m_cols;
+	Array m_cols;
 };
 
 class CursorBase {
@@ -155,7 +155,7 @@ public:
 class ColumnProxyString : public ColumnProxy {
 public:
 	size_t Find(const char* value) const {return m_table->GetColumnString(m_column).Find(value);}
-	void Stats() const {m_table->GetColumnString(m_column).Stats();}
+	//void Stats() const {m_table->GetColumnString(m_column).Stats();}
 };
 
 template<class T> class TypeEnum {

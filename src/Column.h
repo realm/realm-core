@@ -1,6 +1,8 @@
 #ifndef __TDB_COLUMN__
 #define __TDB_COLUMN__
 
+#include "Array.h"
+
 #ifdef _MSC_VER
 #include "win32/stdint.h"
 #else
@@ -11,12 +13,6 @@
 
 // Pre-definitions
 class Column;
-
-enum ColumnDef {
-	COLUMN_NORMAL,
-	COLUMN_NODE,
-	COLUMN_HASREFS
-};
 
 class ColumnBase {
 public:
@@ -39,12 +35,14 @@ public:
 class Column : public ColumnBase {
 public:
 	Column();
-	Column(ColumnDef type, Column* parent=NULL, size_t pndx=0);
+	Column(ColumnDef type, Array* parent=NULL, size_t pndx=0);
 	Column(void* ref);
-	Column(void* ref, Column* parent, size_t pndx);
-	Column(void* ref, const Column* parent, size_t pndx);
+	Column(void* ref, Array* parent, size_t pndx);
+	Column(void* ref, const Array* parent, size_t pndx);
 	Column(const Column& column);
 	~Column();
+
+	void Destroy() {m_array.Destroy();}
 
 	bool IsIntColumn() const {return true;}
 
@@ -52,7 +50,7 @@ public:
 	bool operator==(const Column& column) const;
 
 	void Create(void* ref);
-	void SetParent(Column* column, size_t pndx);
+	void SetParent(Array* parent, size_t pndx);
 
 	size_t Size() const;
 	bool IsEmpty() const;
@@ -85,43 +83,27 @@ public:
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
 
 	// Index
-	bool HasIndex() const;
+	bool HasIndex() const {return false;}
 	Column& GetIndex();
 	void BuildIndex(Column& index);
 	void ClearIndex();
 	size_t FindWithIndex(int64_t value) const;
 
-	Column GetSubColumn(size_t ndx);
-	const Column GetSubColumn(size_t ndx) const;
-	void* GetRef() const {return m_data-8;};
-	void Destroy();
+	void* GetRef() const {return m_array.GetRef();}
 
 	// Debug
-	size_t GetBitWidth() const {return m_width;}
+#ifdef _DEBUG
 	void Print() const;
 	void Verify() const;
+#endif //_DEBUG
 
 protected:
-	// List functions
-	size_t ListSize() const {return m_len;}
-	bool ListInsert(size_t ndx, int64_t value);
-	bool ListAdd(int64_t value);
-	bool ListSet(size_t ndx, int64_t value);
-	int64_t ListGet(size_t ndx) const;
-	int64_t ListBack() const;
-	void ListResize(size_t count);
-	void ListDelete(size_t ndx);
-	size_t ListFindPos(int64_t value) const;
-	bool ListIncrement(int64_t value, size_t start=0, size_t end=-1);
-	size_t ListFind(int64_t value, size_t start=0, size_t end=-1) const;
-
 	// Node functions
-	bool IsNode() const {return m_isNode;}
+	bool IsNode() const {return m_array.IsNode();}
 	bool NodeInsert(size_t ndx, void* ref);
 	bool NodeAdd(void* ref);
 	bool NodeUpdateOffsets(size_t ndx);
 	bool NodeInsertSplit(size_t ndx, void* newRef);
-	void UpdateParent(intptr_t newRef) {if (m_parent) m_parent->ListSet(m_parentNdx, newRef);}
 	
 	struct NodeChange {
 		void* ref1;
@@ -138,47 +120,15 @@ protected:
 	};
 
 	// BTree function
-	void UpdateRef(void* ref);
+	//void UpdateRef(void* ref);
 	NodeChange DoInsert(size_t ndx, int64_t value);
-	
-	// Getters and Setters for adaptive-packed lists
-	typedef int64_t(Column::*Getter)(size_t) const;
-    typedef void(Column::*Setter)(size_t, int64_t);
-	int64_t Get_0b(size_t ndx) const;
-	int64_t Get_1b(size_t ndx) const;
-	int64_t Get_2b(size_t ndx) const;
-	int64_t Get_4b(size_t ndx) const;
-	int64_t Get_8b(size_t ndx) const;
-	int64_t Get_16b(size_t ndx) const;
-	int64_t Get_32b(size_t ndx) const;
-	int64_t Get_64b(size_t ndx) const;
-	void Set_0b(size_t ndx, int64_t value);
-	void Set_1b(size_t ndx, int64_t value);
-	void Set_2b(size_t ndx, int64_t value);
-	void Set_4b(size_t ndx, int64_t value);
-	void Set_8b(size_t ndx, int64_t value);
-	void Set_16b(size_t ndx, int64_t value);
-	void Set_32b(size_t ndx, int64_t value);
-	void Set_64b(size_t ndx, int64_t value);
-
-	bool Alloc(size_t count, size_t width);
-	void SetWidth(size_t width);
 
 	// Member variables
-	Getter m_getter;
-	Setter m_setter;
-	unsigned char* m_data;
-	Column* m_index;
-	Column* m_index_refs;
-	Column* m_parent;
-	size_t m_parentNdx;
-	size_t m_len;
-	size_t m_capacity;
-	size_t m_width;
-	bool m_isNode;
-	bool m_hasRefs;
+	Array m_array;
+	//Column* m_index;
+	//Column* m_index_refs;
 };
-
+/*
 class StringColumn : public ColumnBase {
 public:
 	StringColumn(Column& refs, Column& lenghts);
@@ -207,6 +157,9 @@ private:
 	Column m_refs;
 	Column m_lengths;
 };
+*/
+
+#include "ArrayString.h"
 
 class AdaptiveStringColumn : public Column {
 public:
@@ -215,6 +168,8 @@ public:
 
 	bool IsStringColumn() const {return true;}
 
+	size_t Size() const {return m_array.Size();}
+
 	const char* Get(size_t ndx) const;
 	bool Add();
 	bool Add(const char* value);
@@ -222,14 +177,13 @@ public:
 	bool Set(size_t ndx, const char* value, size_t len);
 	bool Insert(size_t ndx, const char* value, size_t len);
 	void Delete(size_t ndx);
+	void Clear() {m_array.Clear();}
 
 	size_t Find(const char* value) const;
 	size_t Find(const char* value, size_t len) const;
 
-	void Stats() const;
-
 private:
-	bool Alloc(size_t count, size_t width);
+	ArrayString m_array;
 };
 
 #endif //__TDB_COLUMN__

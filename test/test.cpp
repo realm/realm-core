@@ -12,7 +12,7 @@ enum Days {
 };
 
 // Define new table with 4 columns
-TDB_TABLE_4(TestTable,
+TDB_TABLE_4(MyTable,
 //      Type:       Name:
 		Bool,       active,
 		Int,        count,
@@ -21,13 +21,13 @@ TDB_TABLE_4(TestTable,
 
 void test() {
 	// Create a new table instance
-	TestTable table;
+	MyTable table;
 
 	// Add a row of data
 	table.Add(true, 47, Tue, "Hello");
 
 	// Add a row and set data individually
-	TestTable::Cursor r = table.Add();
+	MyTable::Cursor r = table.Add();
 	r.active  = false;
 	r.count   = 15;
 	r.weekday = Wed;
@@ -44,7 +44,7 @@ void test() {
 	if (res == -1) printf("not found");
 
 	// Create advanced query
-	TDB_QUERY_OPT(TestQuery, TestTable) (int v) {
+	TDB_QUERY_OPT(TestQuery, MyTable) (int v) {
 		count <= v;
 		desc == "Hello" || 
 			(desc == "Hey" && weekday.between(Mon, Thu));
@@ -55,5 +55,5 @@ void test() {
 	if (result2 != -1) printf("found match at %d\n", result2);
 	
 	// Run query with modifiers (all results)
-	TestTable result = table.FindAll(TestQuery(2)).Sort().Limit(10);
+	MyTable result = table.FindAll(TestQuery(2)).Sort().Limit(10);
 }

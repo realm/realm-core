@@ -331,6 +331,14 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\src\Array.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\ArrayString.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\src\Column.cpp"
 				>
 			</File>
@@ -364,6 +372,14 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<File
+				RelativePath=".\src\Array.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\ArrayString.h"
+				>
+			</File>
 			<File
 				RelativePath=".\src\Column.h"
 				>

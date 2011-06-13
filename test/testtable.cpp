@@ -89,7 +89,7 @@ TEST(Table5) {
 	}
 
 	// Create a new index on second column
-	table.SetIndex(1);
+	//table.SetIndex(1);
 
 	CHECK_EQUAL((size_t)0, table.second.Find(1000));
 	CHECK_EQUAL((size_t)1000, table.second.Find(0));
