@@ -5,7 +5,6 @@
 # $^  The names of all the prerequisite files (space separated)
 # $*  The stem (the bit which matches the % wildcard in the rule definition.
 #
-# g++ -std=c++0x *.cpp -I./UnitTest++/src -L./UnitTest++/ -l UnitTest++ -o main
 
 # Compiler and flags
 #CXXFLAGS  = -Wall -Weffc++ -Wextra -std=c++0x
@@ -25,25 +24,31 @@ SURFIXES   = %.cpp %.h
 OBJECTS    = $(SOURCES:.o=.cpp) $(HEADERS:.o=.h) \
              $(TEST_SRC:.o=.cpp) $(TEST_H:.o=.h)
 
-# Linking
-$(EXECUTABLE): $(OBJECTS)
-	@$(CXX) $(OBJECTS) $(CXXLIBS) $(CXXINC) -o $@
-
-# Compilation
-%.o: $(SURFIXES)
-	@$(CXX) -c $^
-
 # Targets
 all: CXXFLAGS += -DNDEBUG -O3
 all: $(EXECUTABLE)
+	@make -C test-tightdb
+	@make -C test-stl
 
 test: all
-	@make -C test-tightdb
-	@make -C test-stl_vector
 	@./run_tests.sh
 
 debug: CXXFLAGS += -DDEBUG -g3 -ggdb
 debug: $(EXECUTABLE)
 
 clean:
+	@(cd UnitTest++ && make clean)
+	@(cd test-stl && make clean)
+	@(cd test-tightdb && make clean)
+	@(cd test-sqlite3 && make clean)
 	@rm -f core *.o $(EXECUTABLE)
+
+# Linking
+$(EXECUTABLE): $(OBJECTS)
+	@make -C UnitTest++ > /dev/null
+	@$(CXX) $(OBJECTS) $(CXXLIBS) $(CXXINC) -o $@
+
+# Compilation
+%.o: $(SURFIXES)
+	@$(CXX) -c $^
+

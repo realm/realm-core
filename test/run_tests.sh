@@ -7,4 +7,4 @@ echo ".:: TightDB ::."
 test-tightdb/test-tightdb
 echo ""
 echo ".:: STL Vector ::."
-test-stl_vector/test-stl_vector
+test-stl/test-stl

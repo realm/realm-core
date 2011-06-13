@@ -303,7 +303,63 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	if (m_width == 0) {
 		return start; // value can only be zero
 	}
-	else if (m_width == 8) {
+	else if (m_width == 2) {
+		// Create a pattern to match 64bits at a time
+		const int64_t v = ~0ULL/0x3 * value;
+
+		const int64_t* p = (const int64_t*)m_data + start;
+		const size_t end64 = m_len / 32;
+		const int64_t* const e = (const int64_t*)m_data + end64;
+
+		// Check 64bits at a time for match
+		while (p < e) {
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			const bool hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2 
+																	 & 0xAAAAAAAAAAAAAAAAUL;
+			if (hasZeroByte) break;
+			++p;
+		}
+
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int64_t*)m_data) * 32;
+
+		// Manually check the rest
+		while (i < end) {
+			const size_t offset = i >> 2;
+			const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
+			if (v == value) return i;
+			++i;
+		}
+	}
+	else if (m_width == 4) {
+		// Create a pattern to match 64bits at a time
+		const int64_t v = ~0ULL/0xF * value;
+
+		const int64_t* p = (const int64_t*)m_data + start;
+		const size_t end64 = m_len / 16;
+		const int64_t* const e = (const int64_t*)m_data + end64;
+
+		// Check 64bits at a time for match
+		while (p < e) {
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			const bool hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 
+																	 & 0x8888888888888888UL;
+			if (hasZeroByte) break;
+			++p;
+		}
+
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int64_t*)m_data) * 16;
+
+		// Manually check the rest
+		while (i < end) {
+			const size_t offset = i >> 1;
+			const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
+			if (v == value) return i;
+			++i;
+		}
+	}
+  else if (m_width == 8) {
 		// TODO: Handle partial searches
 
 		// Create a pattern to match 64bits at a time
@@ -312,15 +368,16 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		const int64_t* p = (const int64_t*)m_data + start;
 		const size_t end64 = m_len / 8;
 		const int64_t* const e = (const int64_t*)m_data + end64;
-	
+
 		// Check 64bits at a time for match
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2 & 0x8080808080808080ULL;
+			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2
+																			 & 0x8080808080808080ULL;
 			if (hasZeroByte) break;
 			++p;
 		}
-		
+
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 8;
 		const int8_t* d = (const int8_t*)m_data;
@@ -330,24 +387,59 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 			if (value == d[i]) return i;
 			++i;
 		}
-		 
 	}
 	else if (m_width == 16) {
-		const int16_t v = (int16_t)value;
-		const int16_t* p = (const int16_t*)m_data + start;
-		const int16_t* const e = (const int16_t*)m_data + end;
+		// Create a pattern to match 64bits at a time
+		const int64_t v = ~0ULL/0xFFFF * value;
+
+		const int64_t* p = (const int64_t*)m_data + start;
+		const size_t end64 = m_len / 4;
+		const int64_t* const e = (const int64_t*)m_data + end64;
+
+		// Check 64bits at a time for match
 		while (p < e) {
-			if (*p == v) return p - (const int16_t*)m_data;
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			const uint64_t hasZeroByte = (v2 - 0x0001000100010001UL) & ~v2
+																			 & 0x8000800080008000UL;
+			if (hasZeroByte) break;
 			++p;
+		}
+		
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int64_t*)m_data) * 4;
+		const int16_t* d = (const int16_t*)m_data;
+
+		// Manually check the rest
+		while (i < end) {
+			if (value == d[i]) return i;
+			++i;
 		}
 	}
 	else if (m_width == 32) {
-		const int32_t v = (int32_t)value;
-		const int32_t* p = (const int32_t*)m_data + start;
-		const int32_t* const e = (const int32_t*)m_data + end;
+		// Create a pattern to match 64bits at a time
+		const int64_t v = ~0ULL/0xFFFFFFFF * value;
+
+		const int64_t* p = (const int64_t*)m_data + start;
+		const size_t end64 = m_len / 2;
+		const int64_t* const e = (const int64_t*)m_data + end64;
+
+		// Check 64bits at a time for match
 		while (p < e) {
-			if (*p == v) return p - (const int32_t*)m_data;
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2
+																			 & 0x8000800080000000UL;
+			if (hasZeroByte) break;
 			++p;
+		}
+		
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int64_t*)m_data) * 2;
+		const int32_t* d = (const int32_t*)m_data;
+
+		// Manually check the rest
+		while (i < end) {
+			if (value == d[i]) return i;
+			++i;
 		}
 	}
 	else if (m_width == 64) {
@@ -357,53 +449,6 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		while (p < e) {
 			if (*p == v) return p - (const int64_t*)m_data;
 			++p;
-		}
-	}
-	else if (m_width == 2) {
-		// Create a pattern to match 32bits at a time
-		uint32_t v = (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-		v = (v << 2) | (uint32_t)value;
-
-		const int32_t* p = (const int32_t*)m_data;
-		const size_t end32 = m_len / 16;
-		const int32_t* const e = (const int32_t*)m_data + end32;
-
-		while (p < e) {
-			// Check 32bits at a time for match
-			const uint32_t v2 = *p ^ v; // zero matching bit segments
-			const bool hasNoZeroByte = (v2 & 0x03) && (v2 & 0x0C) && (v2 & 0x30) && (v2 & 0xC0) &&
-									   (v2 & 0x0300) && (v2 & 0x0C00) && (v2 & 0x3000) && (v2 & 0xC000) &&
-									   (v2 & 0x030000) && (v2 & 0x0C0000) && (v2 & 0x300000) && (v2 & 0xC00000) &&
-									   (v2 & 0x03000000) && (v2 & 0x0C000000) && (v2 & 0x30000000) && (v2 & 0xC0000000);
-			
-			// Only do detailed search if we know there is a match
-			if (!hasNoZeroByte) break;
-			++p;
-		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int32_t*)m_data) * 16;
-
-		// Manually check the rest
-		while (i < end) {
-			const size_t offset = i >> 2;
-			const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
-			if (v == value) return i;
-			++i;
 		}
 	}
 	else {
