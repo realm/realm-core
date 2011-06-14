@@ -359,6 +359,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test\testarray.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test\testarraystring.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test\testcolumn.cpp"
 				>
 			</File>
