@@ -25,6 +25,7 @@ public:
 
 	bool operator==(const Array& a) const;
 
+	void SetType(ColumnDef type);
 	void SetParent(Array* parent, size_t pndx);
 	void UpdateRef(void* ref);
 

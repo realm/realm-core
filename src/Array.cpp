@@ -48,6 +48,12 @@ void Array::Create(void* ref) {
 	SetWidth(m_width);
 }
 
+void Array::SetType(ColumnDef type) {
+	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
+	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
+	else m_isNode = m_hasRefs = false;
+}
+
 bool Array::operator==(const Array& a) const {
 	return m_data == a.m_data;
 }
@@ -100,7 +106,10 @@ Array Array::GetSubArray(size_t ndx) {
 	assert(ndx < m_len);
 	assert(m_hasRefs);
 
-	return Array((void*)Get(ndx), this, ndx);
+	void* ref = (void*)Get(ndx);
+	assert(ref);
+
+	return Array(ref, this, ndx);
 }
 
 const Array Array::GetSubArray(size_t ndx) const {

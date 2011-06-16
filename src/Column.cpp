@@ -100,6 +100,7 @@ const Column Column::GetSubColumn(size_t ndx) const {
 
 void Column::Clear() {
 	m_array.Clear();
+	if (m_array.IsNode()) m_array.SetType(COLUMN_NORMAL);
 }
 
 int64_t Column::Get64(size_t ndx) const {
@@ -116,8 +117,8 @@ int64_t Column::Get64(size_t ndx) const {
 		const size_t local_ndx = ndx - offset;
 
 		// Get item
-		const Array target = refs.GetSubArray(node_ndx);
-		return target.Get(local_ndx);
+		const Column target = GetColumnFromRef(refs, node_ndx);
+		return target.Get64(local_ndx);
 	}
 	else return m_array.Get(ndx);
 }
@@ -136,10 +137,16 @@ bool Column::Set64(size_t ndx, int64_t value) {
 		const size_t local_ndx = ndx - offset;
 
 		// Set item
-		Array target = refs.GetSubArray(node_ndx);
-		return target.Set(local_ndx, value);
+		Column target = GetColumnFromRef(refs, node_ndx);
+		if (!target.Set64(local_ndx, value)) return false;
 	}
-	else return m_array.Set(ndx, value);
+	else if (!m_array.Set(ndx, value)) return false;
+
+#ifdef _DEBUG
+	Verify();
+#endif //DEBUG
+
+	return true;
 }
 
 bool Column::Add64(int64_t value) {
@@ -184,7 +191,10 @@ bool Column::Insert64(size_t ndx, int64_t value) {
 		return false;
 	}
 
+#ifdef _DEBUG
 	Verify();
+#endif //DEBUG
+
 	return true;
 }
 
@@ -591,10 +601,17 @@ void Column::Verify() const {
 
 		const Array offsets = m_array.GetSubArray(0);
 		const Array refs = m_array.GetSubArray(1);
+		offsets.Verify();
+		refs.Verify();
+		assert(refs.HasRefs());
+		assert(offsets.Size() == refs.Size());
 
 		size_t off = 0;
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			const Column col((void*)refs.Get(i));
+			void* ref = (void*)refs.Get(i);
+			assert(ref);
+
+			const Column col(ref);
 			col.Verify();
 
 			off += col.Size();
@@ -606,125 +623,3 @@ void Column::Verify() const {
 	else m_array.Verify();
 }
 #endif //_DEBUG
-/*
-StringColumn::StringColumn(Column& refs, Column& lengths) : m_refs(refs), m_lengths(lengths) {
-}
-
-StringColumn::~StringColumn() {
-}
-
-void* StringColumn::Alloc(const char* value, size_t len) {
-	assert(len); // empty strings are not allocated, but marked with zero-ref
-
-	char* const data = (char*)malloc(len+1); // room for trailing zero-byte
-	if (!data) return NULL; // alloc failed
-
-	memmove(data, value, len);
-	data[len] = '\0';
-
-	return data;
-}
-
-void StringColumn::Free(size_t ndx) {
-	assert(ndx < m_refs.Size());
-
-	void* data = (void*)m_refs.Get(ndx);
-	if (!data) return;
-
-	free(data);
-}
-
-const char* StringColumn::Get(size_t ndx) const {
-	assert(ndx < m_refs.Size());
-
-	return (const char*)m_refs.Get(ndx);
-}
-
-bool StringColumn::Set(size_t ndx, const char* value) {
-	return Set(ndx, value, strlen(value));
-}
-
-bool StringColumn::Set(size_t ndx, const char* value, size_t len) {
-	assert(ndx < m_refs.Size());
-
-	// Empty strings are just marked with zero-ref
-	if (len == 0) {
-		Free(ndx);
-		m_refs.Set(ndx, 0);
-		m_lengths.Set(ndx, 0);
-		return true;
-	}
-
-	void* ref = Alloc(value, len);
-	if (!ref) return false;
-	Free(ndx);
-
-	m_refs.Set(ndx, (intptr_t)ref);
-	m_lengths.Set(ndx, len);
-	return true;
-}
-
-bool StringColumn::Add() {
-	return Insert(Size(), "", 0);
-}
-
-bool StringColumn::Insert(size_t ndx, const char* value, size_t len) {
-	assert(ndx <= m_refs.Size());
-
-	// Empty strings are just marked with zero-ref
-	if (len == 0) {
-		m_refs.Insert(ndx, 0);
-		m_lengths.Insert(ndx, 0);
-		return true;
-	}
-
-	void* ref = Alloc(value, len);
-	if (!ref) return false;
-
-	m_refs.Insert(ndx, (intptr_t)ref);
-	m_lengths.Insert(ndx, len);
-	return true;
-}
-
-void StringColumn::Clear() {
-	m_refs.Clear();
-	m_lengths.Clear();
-}
-
-void StringColumn::Delete(size_t ndx) {
-	assert(ndx < m_refs.Size());
-
-	m_refs.Delete(ndx);
-	m_lengths.Delete(ndx);
-}
-
-size_t StringColumn::Find(const char* value) const {
-	return Find(value, strlen(value));
-}
-
-size_t StringColumn::Find(const char* value, size_t len) const {
-	size_t pos = 0;
-
-	// special case for zero-length strings
-	if (len == 0) {
-		return m_lengths.Find(0, pos);
-	}
-	
-	const size_t count = m_refs.Size();
-	while (pos < count) {
-		// Find next string with matching length
-		pos = m_lengths.Find(len, pos);
-		if (pos == -1) return (size_t)-1;
-
-		// We do a quick manual check of first byte before
-		// calling expensive memcmp
-		const char* const v = Get(pos);
-		if (v[0] == value[0]) {
-			if (memcmp(value, v, len) == 0) return pos;
-		}
-		++pos;
-	}
-
-	return (size_t)-1;
-}
-*/
