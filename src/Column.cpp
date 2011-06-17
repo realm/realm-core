@@ -11,13 +11,14 @@
 #endif
 
 #include "Column.h"
+#include "Index.h"
 
 #define MAX_LIST_SIZE 1000
 
-Column::Column() {
+Column::Column() : m_index(NULL) {
 }
 
-Column::Column(ColumnDef type, Array* parent, size_t pndx) : m_array(type, parent, pndx) {
+Column::Column(ColumnDef type, Array* parent, size_t pndx) : m_array(type, parent, pndx),  m_index(NULL) {
 	// Add subcolumns for nodes
 	if (IsNode()) {
 		const Array offsets(COLUMN_NORMAL);
@@ -27,20 +28,21 @@ Column::Column(ColumnDef type, Array* parent, size_t pndx) : m_array(type, paren
 	}
 }
 
-Column::Column(void* ref) : m_array(ref) {
+Column::Column(void* ref) : m_array(ref), m_index(NULL) {
 }
 
-Column::Column(void* ref, Array* parent, size_t pndx) : m_array(ref, parent, pndx) {
+Column::Column(void* ref, Array* parent, size_t pndx) : m_array(ref, parent, pndx), m_index(NULL) {
 }
 
-Column::Column(void* ref, const Array* parent, size_t pndx): m_array(ref, parent, pndx) {
+Column::Column(void* ref, const Array* parent, size_t pndx): m_array(ref, parent, pndx), m_index(NULL) {
 }
 
-Column::Column(const Column& column) : m_array(column.m_array) {
+Column::Column(const Column& column) : m_array(column.m_array), m_index(NULL) {
 }
 
 Column& Column::operator=(const Column& column) {
 	m_array = column.m_array;
+	m_index = column.m_index;
 	return *this;
 }
 
@@ -474,100 +476,24 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 }
 
 size_t Column::FindWithIndex(int64_t target) const {
-/*	assert(m_index);
+	assert(m_index);
 	assert(m_index->Size() == Size());
-	assert(m_index_refs);
-
-	int low = -1;
-	int high = (int)Size();
-
-	// Binary search through index
-	// based on: http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-	while (high - low > 1) {
-		const int probe = ((unsigned int)low + (unsigned int)high) >> 1;
-		const int64_t v = m_index->Get64(probe);
-
-		if (v > target)
-			high = probe;
-		else
-			low = probe;
-	}
-	if (low == -1) return (size_t)-1;
-
-	if (m_index->Get64(low) != target)
-		return (size_t)-1;
-	else
-		return (size_t)m_index_refs->Get64(low);*/
-	return -1;
+	
+	return m_index->Find(target);
 }
 
-void SortIndex(Column& index, const Column& target, size_t lo, size_t hi) {
-/*	// Quicksort based on
-	// http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
-	int i = (int)lo;
-	int j = (int)hi;
-
-	// comparison element x
-	const size_t ndx = (lo + hi)/2;
-	const size_t ref = (size_t)index.Get64(ndx);
-	const int64_t x = target.Get64(ref);
-
-	// partition
-	do {
-		while (target.Get64((size_t)index.Get64(i)) < x) i++;
-		while (target.Get64((size_t)index.Get64(j)) > x) j--;
-		if (i <= j) {
-			const int64_t h = index.Get64(i);
-			index.Set64(i, index.Get64(j));
-			index.Set64(j, h);
-			i++; j--;
-		}
-	} while (i <= j);
-
-	//  recursion
-	if ((int)lo < j) SortIndex(index, target, lo, j);
-	if (i < (int)hi) SortIndex(index, target, i, hi);*/
-}
-
-/*bool Column::HasIndex() const {
-	return m_index != NULL;
-}*/
-
-Column& Column::GetIndex() {
-	//assert(m_index);
-	//return *m_index;
-	return *this;
+Index& Column::GetIndex() {
+	assert(m_index);
+	return *m_index;
 }
 
 void Column::ClearIndex() {
-	//m_index = NULL;
-	//m_index_refs = NULL;
+	m_index = NULL;
 }
 
-void Column::BuildIndex(Column& index_refs) {
-/*	// Make sure the index has room for all the refs
-	index_refs.Clear();
-	const size_t len = Size();
-	const size_t width = BitWidth(Size());
-	index_refs.Reserve(len, width);
-
-	// Fill it up with unsorted refs
-	for (size_t i = 0; i < len; ++i) {
-		index_refs.Add64(i);
-	}
-
-	// Sort the index
-	SortIndex(index_refs, *this, 0, len-1);
-
-	// Create the actual index
-	Column* ndx = new Column();
-	for (size_t i = 0; i < len; ++i) {
-		ndx->Add64(Get64((size_t)index_refs.Get64(i)));
-	}
-
-	// Keep ref to index
-	m_index = ndx;
-	m_index_refs = &index_refs;*/
+void Column::BuildIndex(Index& index) {
+	index.BuildIndex(*this);
+	m_index = &index; // Keep ref to index
 }
 
 

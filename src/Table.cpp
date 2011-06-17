@@ -1,5 +1,6 @@
 #include "Table.h"
 #include <assert.h>
+#include "Index.h"
 
 const ColumnType Accessor::type = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type = COLUMN_TYPE_BOOL;
@@ -90,7 +91,7 @@ void Table::SetIndex(size_t column_id) {
 	
 	if (col.IsIntColumn()) {
 		Column& c = static_cast<Column&>(col);
-		Column* index = new Column();
+		Index* index = new Index();
 		c.BuildIndex(*index);
 		m_columns.Add((intptr_t)index->GetRef());
 	}

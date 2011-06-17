@@ -280,17 +280,35 @@ bool Array::Increment(int64_t value, size_t start, size_t end) {
 	return true;
 }
 
-size_t Array::FindPos(int64_t value) const {
+size_t Array::FindPos(int64_t target) const {
 	int low = -1;
 	int high = (int)m_len;
 
 	// Binary search based on: http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+	// Finds position of largest value SMALLER than the target (for lookups in nodes)
 	while (high - low > 1) {
 		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
 		const int64_t v = (this->*m_getter)(probe);
 
-		if (v > value) high = (int)probe;
-		else           low = (int)probe;
+		if (v > target) high = (int)probe;
+		else            low = (int)probe;
+	}
+	if (high == (int)m_len) return (size_t)-1;
+	else return high;
+}
+
+size_t Array::FindPos2(int64_t target) const {
+	int low = -1;
+	int high = (int)m_len;
+
+	// Binary search based on: http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+	// Finds position of closest value BIGGER OR EQUAL to the target (for lookups in indexes)
+	while (high - low > 1) {
+		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+		const int64_t v = (this->*m_getter)(probe);
+
+		if (v < target) low = (int)probe;
+		else            high = (int)probe;
 	}
 	if (high == (int)m_len) return (size_t)-1;
 	else return high;

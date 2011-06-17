@@ -144,7 +144,7 @@ int main() {
 	{
 		timer.Start();
 
-		for (size_t i = 0; i < 1000; ++i) {
+		for (size_t i = 0; i < 100000; ++i) {
 			const size_t n = rand() % 1000;
 			multimap<int, TestTable>::const_iterator p = mapTable.find(n);
 			if (p->second.fourth == Fri) { // to avoid above find being optimized away

@@ -13,6 +13,7 @@
 
 // Pre-definitions
 class Column;
+class Index;
 
 class ColumnBase {
 public:
@@ -27,8 +28,8 @@ public:
 
 	// Indexing
 	virtual bool HasIndex() const = 0;
-	virtual Column& GetIndex() = 0;
-	virtual void BuildIndex(Column& index) = 0;
+	virtual Index& GetIndex() = 0;
+	virtual void BuildIndex(Index& index) = 0;
 	virtual void ClearIndex() = 0;
 };
 
@@ -83,9 +84,9 @@ public:
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
 
 	// Index
-	bool HasIndex() const {return false;}
-	Column& GetIndex();
-	void BuildIndex(Column& index);
+	bool HasIndex() const {return m_index != NULL;}
+	Index& GetIndex();
+	void BuildIndex(Index& index);
 	void ClearIndex();
 	size_t FindWithIndex(int64_t value) const;
 
@@ -125,8 +126,7 @@ protected:
 
 	// Member variables
 	Array m_array;
-	//Column* m_index;
-	//Column* m_index_refs;
+	Index* m_index;
 };
 /*
 class StringColumn : public ColumnBase {
