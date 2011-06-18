@@ -124,7 +124,8 @@ const Array Array::GetSubArray(size_t ndx) const {
 void Array::Destroy() {
 	if (m_hasRefs) {
 		for (size_t i = 0; i < Size(); ++i) {
-			Array sub((void*)Get(i), this, i);
+			void* ref = (void*)Get(i);
+			Array sub(ref, this, i);
 			sub.Destroy();
 		}
 	}

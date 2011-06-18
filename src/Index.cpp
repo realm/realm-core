@@ -6,7 +6,7 @@
 Index::Index() : Column(COLUMN_HASREFS) {
 	// Add subcolumns for leafs
 	const Array values(COLUMN_NORMAL);
-	const Array refs(COLUMN_HASREFS);
+	const Array refs(COLUMN_NORMAL); // we do not own these refs (to column positions), so no COLUMN_HASREF
 	m_array.Add((intptr_t)values.GetRef());
 	m_array.Add((intptr_t)refs.GetRef());
 }
@@ -29,6 +29,10 @@ void Index::BuildIndex(const Column& src) {
 	for (size_t i = 0; i < src.Size(); ++i) {
 		Insert64(i, src.Get64(i));
 	}
+
+#ifdef _DEBUG
+	Verify();
+#endif //_DEBUG
 }
 
 bool Index::Insert64(size_t ndx, int64_t value) {
@@ -66,10 +70,6 @@ bool Index::Insert64(size_t ndx, int64_t value) {
 		assert(false);
 		return false;
 	}
-
-#ifdef _DEBUG
-	Verify();
-#endif //_DEBUG
 
 	return true;
 }
@@ -286,3 +286,38 @@ void SortIndex(Column& index, const Column& target, size_t lo, size_t hi) {
 }
 
 */
+
+#ifdef _DEBUG
+
+void Index::Verify() const {
+	assert(m_array.Size() == 2);
+	assert(m_array.HasRefs());
+
+	const Array offsets = m_array.GetSubArray(0);
+	const Array refs = m_array.GetSubArray(1);
+	offsets.Verify();
+	refs.Verify();
+	assert(offsets.Size() == refs.Size());
+	
+	if (m_array.IsNode()) {
+		assert(refs.HasRefs());
+
+		// Make sure that all offsets matches biggest value in ref
+		for (size_t i = 0; i < refs.Size(); ++i) {
+			void* ref = (void*)refs.Get(i);
+			assert(ref);
+
+			const Index col(ref);
+			col.Verify();
+
+			if (offsets.Get(i) != col.MaxValue()) {
+				assert(false);
+			}
+		}
+	}
+	else {
+		assert(!refs.HasRefs());
+	}
+}
+
+#endif //_DEBUG
