@@ -359,210 +359,210 @@ TEST_FIXTURE(db_setup_array, Array_Destroy) {
  */
 
 TEST(findallint0){
-  Array a;
-  Column r;
+	Array a;
+	Column r;
 
-  const int value = 0;
-  const int vReps = 5;
+	const int value = 0;
+	const int vReps = 5;
 
-  for(size_t i = 0; i < vReps; i++){
-    a.Add(0);
-  }
+	for(size_t i = 0; i < vReps; i++){
+		a.Add(0);
+	}
 
-  a.FindAll(r, value);
-  CHECK_EQUAL(vReps, r.Size());
+	a.FindAll(r, value);
+	CHECK_EQUAL(vReps, r.Size());
 
-  size_t i = 0;
-  size_t j = 0;
-  while(i < a.Size()){
-    if(a.Get(i) == value)
-      CHECK_EQUAL(i, r.Get(j++));
-    i += 1;
-  }
+	size_t i = 0;
+	size_t j = 0;
+	while(i < a.Size()){
+		if(a.Get(i) == value)
+			CHECK_EQUAL(i, r.Get(j++));
+		i += 1;
+	}
 }
 
 TEST(findallint1){
-  Array a;
-  Column r;
+	Array a;
+	Column r;
 
-  const int value = 1;
-  const int vReps = 5;
+	const int value = 1;
+	const int vReps = 5;
 
-  for(size_t i = 0; i < vReps; i++){
-    a.Add(0);
-    a.Add(0);
-    a.Add(1);
-    a.Add(0);
-  }
+	for(size_t i = 0; i < vReps; i++){
+		a.Add(0);
+		a.Add(0);
+		a.Add(1);
+		a.Add(0);
+	}
 
-  a.FindAll(r, value);
-  CHECK_EQUAL(vReps, r.Size());
+	a.FindAll(r, value);
+	CHECK_EQUAL(vReps, r.Size());
 
-  size_t i = 0;
-  size_t j = 0;
-  while(i < a.Size()){
-    if(a.Get(i) == value)
-      CHECK_EQUAL(i, r.Get(j++));
-    i += 1;
-  }
+	size_t i = 0;
+	size_t j = 0;
+	while(i < a.Size()){
+		if(a.Get(i) == value)
+			CHECK_EQUAL(i, r.Get(j++));
+		i += 1;
+	}
 }
 
 TEST(findallint2){
-  Array a;
-  Column r;
+	Array a;
+	Column r;
 
-  const int value = 3;
-  const int vReps = 5;
+	const int value = 3;
+	const int vReps = 5;
 
-  for(size_t i = 0; i < vReps; i++){
-    a.Add(0);
-    a.Add(1);
-    a.Add(2);
-    a.Add(3);
-  }
+	for(size_t i = 0; i < vReps; i++){
+		a.Add(0);
+		a.Add(1);
+		a.Add(2);
+		a.Add(3);
+	}
 
-  a.FindAll(r, value);
-  CHECK_EQUAL(vReps, r.Size());
+	a.FindAll(r, value);
+	CHECK_EQUAL(vReps, r.Size());
 
-  size_t i = 0;
-  size_t j = 0;
-  while(i < a.Size()){
-    if(a.Get(i) == value)
-      CHECK_EQUAL(i, r.Get(j++));
-    i += 1;
-  }
+	size_t i = 0;
+	size_t j = 0;
+	while(i < a.Size()){
+		if(a.Get(i) == value)
+			CHECK_EQUAL(i, r.Get(j++));
+		i += 1;
+	}
 }
 
 TEST(findallint3){
-  Array a;
-  Column r;
+	Array a;
+	Column r;
 
-  const int value = 10;
-  const int vReps = 5;
+	const int value = 10;
+	const int vReps = 5;
 
-  for(size_t i = 0; i < vReps; i++){
-    a.Add(10);
-    a.Add(11);
-    a.Add(12);
-    a.Add(13);
-  }
+	for(size_t i = 0; i < vReps; i++){
+		a.Add(10);
+		a.Add(11);
+		a.Add(12);
+		a.Add(13);
+	}
 
-  a.FindAll(r, value);
-  CHECK_EQUAL(vReps, r.Size());
+	a.FindAll(r, value);
+	CHECK_EQUAL(vReps, r.Size());
 
-  size_t i = 0;
-  size_t j = 0;
-  while(i < a.Size()){
-    if(a.Get(i) == value)
-      CHECK_EQUAL(i, r.Get(j++));
-    i += 1;
-  }
+	size_t i = 0;
+	size_t j = 0;
+	while(i < a.Size()){
+		if(a.Get(i) == value)
+			CHECK_EQUAL(i, r.Get(j++));
+		i += 1;
+	}
 }
 
 TEST(findallint4){
-  Array a;
-  Column r;
+	Array a;
+	Column r;
 
-  const int value = 20;
-  const int vReps = 5;
+	const int value = 20;
+	const int vReps = 5;
 
-  for(size_t i = 0; i < vReps; i++){
-    // 8 bitwidth
-    a.Add(20);
-    a.Add(21);
-    a.Add(22);
-    a.Add(23);
-  }
+	for(size_t i = 0; i < vReps; i++){
+		// 8 bitwidth
+		a.Add(20);
+		a.Add(21);
+		a.Add(22);
+		a.Add(23);
+	}
 
-  a.FindAll(r, value);
-  CHECK_EQUAL(vReps, r.Size());
+	a.FindAll(r, value);
+	CHECK_EQUAL(vReps, r.Size());
 
-  size_t i = 0;
-  size_t j = 0;
-  while(i < a.Size()){
-    if(a.Get(i) == value)
-      CHECK_EQUAL(i, r.Get(j++));
-    i += 1;
-  }
+	size_t i = 0;
+	size_t j = 0;
+	while(i < a.Size()){
+		if(a.Get(i) == value)
+			CHECK_EQUAL(i, r.Get(j++));
+		i += 1;
+	}
 }
 
 TEST(findallint5){
-  Array a;
-  Column r;
+	Array a;
+	Column r;
 
-  const int value = 303;
-  const int vReps = 5;
+	const int value = 303;
+	const int vReps = 5;
 
-  for(size_t i = 0; i < vReps; i++){
-    // 16 bitwidth
-    a.Add(300);
-    a.Add(301);
-    a.Add(302);
-    a.Add(303);
-  }
+	for(size_t i = 0; i < vReps; i++){
+		// 16 bitwidth
+		a.Add(300);
+		a.Add(301);
+		a.Add(302);
+		a.Add(303);
+	}
 
-  a.FindAll(r, value);
-  CHECK_EQUAL(vReps, r.Size());
+	a.FindAll(r, value);
+	CHECK_EQUAL(vReps, r.Size());
 
-  size_t i = 0;
-  size_t j = 0;
-  while(i < a.Size()){
-    if(a.Get(i) == value)
-      CHECK_EQUAL(i, r.Get(j++));
-    i += 1;
-  }
+	size_t i = 0;
+	size_t j = 0;
+	while(i < a.Size()){
+		if(a.Get(i) == value)
+			CHECK_EQUAL(i, r.Get(j++));
+		i += 1;
+	}
 }
 
 TEST(findallint6){
-  Array a;
-  Column r;
+	Array a;
+	Column r;
 
-  const int value = 70000;
-  const int vReps = 5;
+	const int value = 70000;
+	const int vReps = 5;
 
-  for(size_t i = 0; i < vReps; i++){
-    // 32 bitwidth
-    a.Add(70000);
-    a.Add(70001);
-    a.Add(70002);
-    a.Add(70003);
-  }
+	for(size_t i = 0; i < vReps; i++){
+		// 32 bitwidth
+		a.Add(70000);
+		a.Add(70001);
+		a.Add(70002);
+		a.Add(70003);
+	}
 
-  a.FindAll(r, value);
-  CHECK_EQUAL(vReps, r.Size());
+	a.FindAll(r, value);
+	CHECK_EQUAL(vReps, r.Size());
 
-  size_t i = 0;
-  size_t j = 0;
-  while(i < a.Size()){
-    if(a.Get(i) == value)
-      CHECK_EQUAL(i, r.Get(j++));
-    i += 1;
-  }
+	size_t i = 0;
+	size_t j = 0;
+	while(i < a.Size()){
+		if(a.Get(i) == value)
+			CHECK_EQUAL(i, r.Get(j++));
+		i += 1;
+	}
 }
 
 TEST(findallint7){
-  Array a;
-  Column r;
+	Array a;
+	Column r;
 
-  const int64_t value = 4300000003ULL;
-  const int vReps = 5;
+	const int64_t value = 4300000003ULL;
+	const int vReps = 5;
 
-  for(size_t i = 0; i < vReps; i++){
-    // 64 bitwidth
-    a.Add(4300000000ULL);
-    a.Add(4300000001ULL);
-    a.Add(4300000002ULL);
-    a.Add(4300000003ULL);
-  }
+	for(size_t i = 0; i < vReps; i++){
+		// 64 bitwidth
+		a.Add(4300000000ULL);
+		a.Add(4300000001ULL);
+		a.Add(4300000002ULL);
+		a.Add(4300000003ULL);
+	}
 
-  a.FindAll(r, value);
-  CHECK_EQUAL(vReps, r.Size());
+	a.FindAll(r, value);
+	CHECK_EQUAL(vReps, r.Size());
 
-  size_t i = 0;
-  size_t j = 0;
-  while(i < a.Size()){
-    if(a.Get(i) == value)
-      CHECK_EQUAL(i, r.Get(j++));
-    i += 1;
-  }
+	size_t i = 0;
+	size_t j = 0;
+	while(i < a.Size()){
+		if(a.Get(i) == value)
+			CHECK_EQUAL(i, r.Get(j++));
+		i += 1;
+	}
 }

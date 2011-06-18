@@ -365,51 +365,51 @@ TEST_FIXTURE(db_setup, Destroy) {
  */
 
 TEST(findallintmin){
-  Column c;
-  Column r;
+	Column c;
+	Column r;
 
-  const int value = 0;
-  const int vReps = 5;
+	const int value = 0;
+	const int vReps = 5;
 
-  for(size_t i = 0; i < vReps; i++){
-    c.Add(0);
-  }
+	for(size_t i = 0; i < vReps; i++){
+		c.Add(0);
+	}
 
-  c.FindAll(r, value);
-  CHECK_EQUAL(vReps, r.Size());
+	c.FindAll(r, value);
+	CHECK_EQUAL(vReps, r.Size());
 
-  size_t i = 0;
-  size_t j = 0;
-  while(i < c.Size()){
-    if(c.Get(i) == value)
-      CHECK_EQUAL(i, r.Get(j++));
-    i += 1;
-  }
+	size_t i = 0;
+	size_t j = 0;
+	while(i < c.Size()){
+		if(c.Get(i) == value)
+			CHECK_EQUAL(i, r.Get(j++));
+		i += 1;
+	}
 }
 
 TEST(findallintMax){
-  Column c;
-  Column r;
+	Column c;
+	Column r;
 
-  const int64_t value = 4300000003ULL;
-  const int vReps = 5;
+	const int64_t value = 4300000003ULL;
+	const int vReps = 5;
 
-  for(size_t i = 0; i < vReps; i++){
-    // 64 bitwidth
-    c.Add64(4300000000ULL);
-    c.Add64(4300000001ULL);
-    c.Add64(4300000002ULL);
-    c.Add64(4300000003ULL);
-  }
+	for(size_t i = 0; i < vReps; i++){
+		// 64 bitwidth
+		c.Add64(4300000000ULL);
+		c.Add64(4300000001ULL);
+		c.Add64(4300000002ULL);
+		c.Add64(4300000003ULL);
+	}
 
-  c.FindAll(r, value);
-  CHECK_EQUAL(vReps, r.Size());
+	c.FindAll(r, value);
+	CHECK_EQUAL(vReps, r.Size());
 
-  size_t i = 0;
-  size_t j = 0;
-  while(i < c.Size()){
-    if(c.Get(i) == value)
-      CHECK_EQUAL(i, r.Get(j++));
-    i += 1;
-  }
+	size_t i = 0;
+	size_t j = 0;
+	while(i < c.Size()){
+		if(c.Get(i) == value)
+			CHECK_EQUAL(i, r.Get(j++));
+		i += 1;
+	}
 }

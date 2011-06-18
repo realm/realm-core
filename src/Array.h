@@ -49,7 +49,7 @@ public:
 	size_t FindPos2(int64_t value) const;
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
 	size_t FindAll(Column& result, int64_t value,
-                     size_t start=0, size_t end=-1) const;
+				   size_t start=0, size_t end=-1) const;
 
 	void Resize(size_t count);
 
@@ -72,7 +72,7 @@ protected:
 
 	// Getters and Setters for adaptive-packed arrays
 	typedef int64_t(Array::*Getter)(size_t) const;
-    typedef void(Array::*Setter)(size_t, int64_t);
+	typedef void(Array::*Setter)(size_t, int64_t);
 	int64_t Get_0b(size_t ndx) const;
 	int64_t Get_1b(size_t ndx) const;
 	int64_t Get_2b(size_t ndx) const;

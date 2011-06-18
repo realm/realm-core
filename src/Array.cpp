@@ -68,7 +68,8 @@ void Array::UpdateRef(void* ref) {
 }
 
 /**
- * Takes a 64bit value and return the minimum number of bits needed to fit the value.
+ * Takes a 64bit value and return the minimum number of bits needed to fit the
+ * value.
  * For alignment this is rounded up to nearest log2.
  * Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
  */
@@ -129,7 +130,7 @@ void Array::Destroy() {
 			sub.Destroy();
 		}
 	}
-	
+
 	void* ref = m_data-8;
 	free(ref);
 	m_data = NULL;
@@ -287,8 +288,10 @@ size_t Array::FindPos(int64_t target) const {
 	int low = -1;
 	int high = (int)m_len;
 
-	// Binary search based on: http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-	// Finds position of largest value SMALLER than the target (for lookups in nodes)
+	// Binary search based on:
+	// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+	// Finds position of largest value SMALLER than the target (for lookups in
+	// nodes)
 	while (high - low > 1) {
 		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
 		const int64_t v = (this->*m_getter)(probe);
@@ -304,8 +307,10 @@ size_t Array::FindPos2(int64_t target) const {
 	int low = -1;
 	int high = (int)m_len;
 
-	// Binary search based on: http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-	// Finds position of closest value BIGGER OR EQUAL to the target (for lookups in indexes)
+	// Binary search based on:
+	// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+	// Finds position of closest value BIGGER OR EQUAL to the target (for
+	// lookups in indexes)
 	while (high - low > 1) {
 		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
 		const int64_t v = (this->*m_getter)(probe);
@@ -345,7 +350,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			const uint64_t hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2
-																	 & 0xAAAAAAAAAAAAAAAAUL;
+											 & 0xAAAAAAAAAAAAAAAAUL;
 			if (hasZeroByte) break;
 			++p;
 		}
@@ -373,7 +378,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			const uint64_t hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 
-																	 & 0x8888888888888888UL;
+											 & 0x8888888888888888UL;
 			if (hasZeroByte) break;
 			++p;
 		}
@@ -403,7 +408,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2
-																			 & 0x8080808080808080ULL;
+											 & 0x8080808080808080ULL;
 			if (hasZeroByte) break;
 			++p;
 		}
@@ -430,7 +435,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			const uint64_t hasZeroByte = (v2 - 0x0001000100010001UL) & ~v2
-																			 & 0x8000800080008000UL;
+											 & 0x8000800080008000UL;
 			if (hasZeroByte) break;
 			++p;
 		}
@@ -457,7 +462,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2
-																			 & 0x8000800080000000UL;
+											 & 0x8000800080000000UL;
 			if (hasZeroByte) break;
 			++p;
 		}
@@ -493,7 +498,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 }
 
 size_t Array::FindAll(Column& result, int64_t value,
-                      size_t start, size_t end) const {
+					  size_t start, size_t end) const {
 	if (IsEmpty()) return (size_t)-1;
 	if (end == -1) end = m_len;
 	if (start == end) return (size_t)-1;
@@ -507,9 +512,9 @@ size_t Array::FindAll(Column& result, int64_t value,
 
 	// Do optimized search based on column width
 	if (m_width == 0) {
-    for(size_t i = start; i < end; i++){
-      result.Add(i); // All values can only be zero.
-    }
+		for(size_t i = start; i < end; i++){
+			result.Add(i); // All values can only be zero.
+		}
 	}
 	else if (m_width == 2) {
 		// Create a pattern to match 64bits at a time
@@ -523,21 +528,21 @@ size_t Array::FindAll(Column& result, int64_t value,
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			const bool hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2 
-																	 & 0xAAAAAAAAAAAAAAAAUL;
+										 & 0xAAAAAAAAAAAAAAAAUL;
 			if (hasZeroByte){
-        // Element number at start of block
-        size_t i = (p - (const int64_t*)m_data) * 32;
-        // Last element of block
-        size_t j = i + 32;
+				// Element number at start of block
+				size_t i = (p - (const int64_t*)m_data) * 32;
+				// Last element of block
+				size_t j = i + 32;
 
-        // check block
-        while (i < j) {
-          const size_t offset = i >> 2;
-          const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
-          if (v == value) result.Add(i);
-          ++i;
-        }
-      }
+				// check block
+				while (i < j) {
+					const size_t offset = i >> 2;
+					const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
+					if (v == value) result.Add(i);
+					++i;
+				}
+			}
 			++p;
 		}
 
@@ -564,21 +569,21 @@ size_t Array::FindAll(Column& result, int64_t value,
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			const bool hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 
-																	 & 0x8888888888888888UL;
+										 & 0x8888888888888888UL;
 			if (hasZeroByte){
-        // Element number at start of block
-        size_t i = (p - (const int64_t*)m_data) * 16;
-        // Last element of block
-        size_t j = i + 16;
+				// Element number at start of block
+				size_t i = (p - (const int64_t*)m_data) * 16;
+				// Last element of block
+				size_t j = i + 16;
 
-        // check block
-        while (i < j) {
-          const size_t offset = i >> 1;
-          const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
-          if (v == value) result.Add(i);
-          ++i;
-        }
-      }
+				// check block
+				while (i < j) {
+					const size_t offset = i >> 1;
+					const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
+					if (v == value) result.Add(i);
+					++i;
+				}
+			}
 			++p;
 		}
 
@@ -593,7 +598,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 			++i;
 		}
 	}
-  else if (m_width == 8) {
+	else if (m_width == 8) {
 		// TODO: Handle partial searches
 
 		// Create a pattern to match 64bits at a time
@@ -607,22 +612,22 @@ size_t Array::FindAll(Column& result, int64_t value,
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2
-																			 & 0x8080808080808080ULL;
+											 & 0x8080808080808080ULL;
 			if (hasZeroByte){
-        // Element number at start of block
-        size_t i = (p - (const int64_t*)m_data) * 8;
-        // Last element of block
-        size_t j = i + 8;
-        // Data pointer
-        const int8_t* d = (const int8_t*)m_data;
+				// Element number at start of block
+				size_t i = (p - (const int64_t*)m_data) * 8;
+				// Last element of block
+				size_t j = i + 8;
+				// Data pointer
+				const int8_t* d = (const int8_t*)m_data;
 
-        // check block
-        while (i < j) {
-          if (value == d[i]) result.Add(i);
-          ++i;
-        }
-      }
-      ++p;
+				// check block
+				while (i < j) {
+					if (value == d[i]) result.Add(i);
+					++i;
+				}
+			}
+			++p;
 		}
 
 		// Position of last chunk (may be partial)
@@ -647,24 +652,24 @@ size_t Array::FindAll(Column& result, int64_t value,
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			const uint64_t hasZeroByte = (v2 - 0x0001000100010001UL) & ~v2
-																			 & 0x8000800080008000UL;
+											 & 0x8000800080008000UL;
 			if (hasZeroByte){
-        // Element number at start of block
-        size_t i = (p - (const int64_t*)m_data) * 4;
-        // Last element of block
-        size_t j = i + 4;
-        // Data pointer
-        const int16_t* d = (const int16_t*)m_data;
+				// Element number at start of block
+				size_t i = (p - (const int64_t*)m_data) * 4;
+				// Last element of block
+				size_t j = i + 4;
+				// Data pointer
+				const int16_t* d = (const int16_t*)m_data;
 
-        // check block
-        while (i < j) {
-          if (value == d[i]) result.Add(i);
-          ++i;
-        }
-      }
+				// check block
+				while (i < j) {
+					if (value == d[i]) result.Add(i);
+					++i;
+				}
+			}
 			++p;
 		}
-		
+
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 4;
 		const int16_t* d = (const int16_t*)m_data;
@@ -687,24 +692,24 @@ size_t Array::FindAll(Column& result, int64_t value,
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2
-																			 & 0x8000800080000000UL;
+											 & 0x8000800080000000UL;
 			if (hasZeroByte){
-        // Element number at start of block
-        size_t i = (p - (const int64_t*)m_data) * 2;
-        // Last element of block
-        size_t j = i + 2;
-        // Data pointer
-        const int32_t* d = (const int32_t*)m_data;
+				// Element number at start of block
+				size_t i = (p - (const int64_t*)m_data) * 2;
+				// Last element of block
+				size_t j = i + 2;
+				// Data pointer
+				const int32_t* d = (const int32_t*)m_data;
 
-        // check block
-        while (i < j) {
-          if (value == d[i]) result.Add(i);
-          ++i;
-        }
-      }
+				// check block
+				while (i < j) {
+					if (value == d[i]) result.Add(i);
+					++i;
+				}
+			}
 			++p;
 		}
-		
+
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 2;
 		const int32_t* d = (const int32_t*)m_data;
@@ -785,7 +790,8 @@ bool Array::Alloc(size_t count, size_t width) {
 	assert(0 <= w && w < 8);
 
 	// Update 8-byte header
-	// isNode 1 bit, hasRefs 1 bit, 3 bits unused, width 3 bits, len 3 bytes, capacity 3 bytes
+	// isNode 1 bit, hasRefs 1 bit, 3 bits unused, width 3 bits, len 3 bytes,
+	// capacity 3 bytes
 	uint8_t* const header = (uint8_t*)(m_data-8);
 	header[0] = m_isNode << 7;
 	header[0] += m_hasRefs << 6;

@@ -476,7 +476,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 }
 
 size_t Column::FindAll(Column& result, int64_t value,
-                       size_t start, size_t end) const {
+					   size_t start, size_t end) const {
 	assert(start <= Size());
 	assert(end == -1 || end <= Size());
 	if (IsEmpty()) return (size_t)-1;
@@ -500,8 +500,7 @@ size_t Column::FindAll(Column& result, int64_t value,
 				const size_t ndx = col.Find(value);
 				if (ndx != -1) {
 					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
-					//return offset + ndx;
-          result.Add(offset+ndx);
+					result.Add(offset+ndx);
 				}
 			}
 		}
@@ -518,8 +517,7 @@ size_t Column::FindAll(Column& result, int64_t value,
 				const size_t ndx = col.Find(value, s, e);
 				if (ndx != -1) {
 					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
-					//return offset + ndx;
-          result.Add(offset+ndx);
+					result.Add(offset+ndx);
 				}
 
 				++i;
