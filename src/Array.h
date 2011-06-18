@@ -8,6 +8,7 @@
 #endif
 //#include <climits> // size_t
 #include <cstdlib> // size_t
+#include <cstring> // memmove
 
 enum ColumnDef {
 	COLUMN_NORMAL,
