@@ -16,6 +16,10 @@ public:
 
 	size_t Find(int64_t value);
 
+#ifdef _DEBUG
+	void Verify() const;
+#endif //_DEBUG
+
 protected:
 	// B-Tree functions
 	NodeChange DoInsert(size_t ndx, int64_t value);
