@@ -4,5 +4,7 @@
 *.d
 *.o
 *.a
+*.swp
+cscope.*
 tightdb-tests
 TestUnitTest++
