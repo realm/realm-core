@@ -10,6 +10,9 @@
 #include <cstdlib> // size_t
 #include <cstring> // memmove
 
+// Pre-definitions
+class Column;
+
 enum ColumnDef {
 	COLUMN_NORMAL,
 	COLUMN_NODE,
@@ -45,6 +48,8 @@ public:
 	size_t FindPos(int64_t value) const;
 	size_t FindPos2(int64_t value) const;
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
+	size_t FindAll(Column& result, int64_t value,
+                     size_t start=0, size_t end=-1) const;
 
 	void Resize(size_t count);
 

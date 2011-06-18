@@ -475,6 +475,72 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 	}
 }
 
+size_t Column::FindAll(Column& result, int64_t value,
+                       size_t start, size_t end) const {
+	assert(start <= Size());
+	assert(end == -1 || end <= Size());
+	if (IsEmpty()) return (size_t)-1;
+
+	// Use index if possible
+	/*if (m_index && start == 0 && end == -1) {
+		return FindAllWithIndex(value);
+	}*/
+
+	//if (!IsNode()) return ListFindAll(result, value, start, end);
+	if (!IsNode()) return m_array.FindAll(result, value, start, end);
+	else {
+		// Get subnode table
+		const Array offsets = m_array.GetSubArray(0);
+		const Array refs = m_array.GetSubArray(1);
+		const size_t count = refs.Size();
+
+		if (start == 0 && end == -1) {
+			for (size_t i = 0; i < count; ++i) {
+				const Column col((void*)refs.Get(i));
+				const size_t ndx = col.Find(value);
+				if (ndx != -1) {
+					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
+					//return offset + ndx;
+          result.Add(offset+ndx);
+				}
+			}
+		}
+		else {
+			// partial search
+			size_t i = offsets.FindPos(start);
+			size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
+			size_t s = start - offset;
+			size_t e = (end == -1 || (int)end >= offsets.Get(i)) ? -1 : end - offset;
+
+			for (;;) {
+				const Column col((void*)refs.Get(i));
+
+				const size_t ndx = col.Find(value, s, e);
+				if (ndx != -1) {
+					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
+					//return offset + ndx;
+          result.Add(offset+ndx);
+				}
+
+				++i;
+				if (i >= count) break;
+
+				s = 0;
+				if (end != -1) {
+					if (end >= (size_t)offsets.Get(i)) e = (size_t)-1;
+					else {
+						offset = (size_t)offsets.Get(i-1);
+						e = end - offset;
+					}
+				}
+			}
+		}
+
+		return (size_t)-1; // not found
+	}
+}
+
+
 size_t Column::FindWithIndex(int64_t target) const {
 	assert(m_index);
 	assert(m_index->Size() == Size());

@@ -3,6 +3,8 @@
 
 #define MAX_LIST_SIZE 1000
 
+#include "Column.h"
+
 Array::Array()
 : m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(NULL), m_parentNdx(0) {
 	SetWidth(0);
@@ -483,6 +485,249 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		for (size_t i = start; i < end; ++i) {
 			const int64_t v = (this->*m_getter)(i);
 			if (v == value) return i;
+		}
+	}
+
+	return (size_t)-1; // not found
+}
+
+size_t Array::FindAll(Column& result, int64_t value,
+                      size_t start, size_t end) const {
+	if (IsEmpty()) return (size_t)-1;
+	if (end == -1) end = m_len;
+	if (start == end) return (size_t)-1;
+
+	assert(start < m_len && end <= m_len && start < end);
+
+	// If the value is wider than the column
+	// then we know it can't be there
+	const size_t width = BitWidth(value);
+	if (width > m_width) return (size_t)-1;
+
+	// Do optimized search based on column width
+	if (m_width == 0) {
+    for(size_t i = start; i < end; i++){
+      result.Add(i); // All values can only be zero.
+    }
+	}
+	else if (m_width == 2) {
+		// Create a pattern to match 64bits at a time
+		const int64_t v = ~0ULL/0x3 * value;
+
+		const int64_t* p = (const int64_t*)m_data + start;
+		const size_t end64 = m_len / 32;
+		const int64_t* const e = (const int64_t*)m_data + end64;
+
+		// Check 64bits at a time for match
+		while (p < e) {
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			const bool hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2 
+																	 & 0xAAAAAAAAAAAAAAAAUL;
+			if (hasZeroByte){
+        // Element number at start of block
+        size_t i = (p - (const int64_t*)m_data) * 32;
+        // Last element of block
+        size_t j = i + 32;
+
+        // check block
+        while (i < j) {
+          const size_t offset = i >> 2;
+          const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
+          if (v == value) result.Add(i);
+          ++i;
+        }
+      }
+			++p;
+		}
+
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int64_t*)m_data) * 32;
+
+		// Manually check the rest
+		while (i < end) {
+			const size_t offset = i >> 2;
+			const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
+			if (v == value) result.Add(i);
+			++i;
+		}
+	}
+	else if (m_width == 4) {
+		// Create a pattern to match 64bits at a time
+		const int64_t v = ~0ULL/0xF * value;
+
+		const int64_t* p = (const int64_t*)m_data + start;
+		const size_t end64 = m_len / 16;
+		const int64_t* const e = (const int64_t*)m_data + end64;
+
+		// Check 64bits at a time for match
+		while (p < e) {
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			const bool hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 
+																	 & 0x8888888888888888UL;
+			if (hasZeroByte){
+        // Element number at start of block
+        size_t i = (p - (const int64_t*)m_data) * 16;
+        // Last element of block
+        size_t j = i + 16;
+
+        // check block
+        while (i < j) {
+          const size_t offset = i >> 1;
+          const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
+          if (v == value) result.Add(i);
+          ++i;
+        }
+      }
+			++p;
+		}
+
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int64_t*)m_data) * 16;
+
+		// Manually check the rest
+		while (i < end) {
+			const size_t offset = i >> 1;
+			const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
+			if (v == value) result.Add(i);
+			++i;
+		}
+	}
+  else if (m_width == 8) {
+		// TODO: Handle partial searches
+
+		// Create a pattern to match 64bits at a time
+		const int64_t v = ~0ULL/0xFF * value;
+
+		const int64_t* p = (const int64_t*)m_data + start;
+		const size_t end64 = m_len / 8;
+		const int64_t* const e = (const int64_t*)m_data + end64;
+
+		// Check 64bits at a time for match
+		while (p < e) {
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2
+																			 & 0x8080808080808080ULL;
+			if (hasZeroByte){
+        // Element number at start of block
+        size_t i = (p - (const int64_t*)m_data) * 8;
+        // Last element of block
+        size_t j = i + 8;
+        // Data pointer
+        const int8_t* d = (const int8_t*)m_data;
+
+        // check block
+        while (i < j) {
+          if (value == d[i]) result.Add(i);
+          ++i;
+        }
+      }
+      ++p;
+		}
+
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int64_t*)m_data) * 8;
+		const int8_t* d = (const int8_t*)m_data;
+
+		// Manually check the rest
+		while (i < end) {
+			if (value == d[i]) result.Add(i);
+			++i;
+		}
+	}
+	else if (m_width == 16) {
+		// Create a pattern to match 64bits at a time
+		const int64_t v = ~0ULL/0xFFFF * value;
+
+		const int64_t* p = (const int64_t*)m_data + start;
+		const size_t end64 = m_len / 4;
+		const int64_t* const e = (const int64_t*)m_data + end64;
+
+		// Check 64bits at a time for match
+		while (p < e) {
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			const uint64_t hasZeroByte = (v2 - 0x0001000100010001UL) & ~v2
+																			 & 0x8000800080008000UL;
+			if (hasZeroByte){
+        // Element number at start of block
+        size_t i = (p - (const int64_t*)m_data) * 4;
+        // Last element of block
+        size_t j = i + 4;
+        // Data pointer
+        const int16_t* d = (const int16_t*)m_data;
+
+        // check block
+        while (i < j) {
+          if (value == d[i]) result.Add(i);
+          ++i;
+        }
+      }
+			++p;
+		}
+		
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int64_t*)m_data) * 4;
+		const int16_t* d = (const int16_t*)m_data;
+
+		// Manually check the rest
+		while (i < end) {
+			if (value == d[i]) result.Add(i);
+			++i;
+		}
+	}
+	else if (m_width == 32) {
+		// Create a pattern to match 64bits at a time
+		const int64_t v = ~0ULL/0xFFFFFFFF * value;
+
+		const int64_t* p = (const int64_t*)m_data + start;
+		const size_t end64 = m_len / 2;
+		const int64_t* const e = (const int64_t*)m_data + end64;
+
+		// Check 64bits at a time for match
+		while (p < e) {
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2
+																			 & 0x8000800080000000UL;
+			if (hasZeroByte){
+        // Element number at start of block
+        size_t i = (p - (const int64_t*)m_data) * 2;
+        // Last element of block
+        size_t j = i + 2;
+        // Data pointer
+        const int32_t* d = (const int32_t*)m_data;
+
+        // check block
+        while (i < j) {
+          if (value == d[i]) result.Add(i);
+          ++i;
+        }
+      }
+			++p;
+		}
+		
+		// Position of last chunk (may be partial)
+		size_t i = (p - (const int64_t*)m_data) * 2;
+		const int32_t* d = (const int32_t*)m_data;
+
+		// Manually check the rest
+		while (i < end) {
+			if (value == d[i]) result.Add(i);
+			++i;
+		}
+	}
+	else if (m_width == 64) {
+		const int64_t v = (int64_t)value;
+		const int64_t* p = (const int64_t*)m_data + start;
+		const int64_t* const e = (const int64_t*)m_data + end;
+		while (p < e) {
+			if (*p == v) result.Add(p - (const int64_t*)m_data);
+			++p;
+		}
+	}
+	else {
+		// Naive search
+		for (size_t i = start; i < end; ++i) {
+			const int64_t v = (this->*m_getter)(i);
+			if (v == value) result.Add(i);
 		}
 	}
 
