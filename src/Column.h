@@ -113,14 +113,14 @@ protected:
 		void* ref1;
 		void* ref2;
 		enum ChangeType {
-			ERROR,
-			NONE,
-			INSERT_BEFORE,
-			INSERT_AFTER,
-			SPLIT
+			CT_ERROR,
+			CT_NONE,
+			CT_INSERT_BEFORE,
+			CT_INSERT_AFTER,
+			CT_SPLIT
 		} type;
 		NodeChange(ChangeType t, void* r1=0, void* r2=0) : ref1(r1), ref2(r2), type(t) {}
-		NodeChange(bool success) : ref1(NULL), ref2(NULL), type(success ? NONE : ERROR) {}
+		NodeChange(bool success) : ref1(NULL), ref2(NULL), type(success ? CT_NONE : CT_ERROR) {}
 	};
 
 	// BTree function

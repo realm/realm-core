@@ -160,11 +160,11 @@ bool Column::Insert64(size_t ndx, int64_t value) {
 
 	const NodeChange nc = DoInsert(ndx, value);
 	switch (nc.type) {
-	case NodeChange::ERROR:
+	case NodeChange::CT_ERROR:
 		return false; // allocation error
-	case NodeChange::NONE:
+	case NodeChange::CT_NONE:
 		break;
-	case NodeChange::INSERT_BEFORE:
+	case NodeChange::CT_INSERT_BEFORE:
 		{
 			Column newNode(COLUMN_NODE);
 			newNode.NodeAdd(nc.ref1);
@@ -172,7 +172,7 @@ bool Column::Insert64(size_t ndx, int64_t value) {
 			m_array.UpdateRef(newNode.GetRef());
 			break;
 		}
-	case NodeChange::INSERT_AFTER:
+	case NodeChange::CT_INSERT_AFTER:
 		{
 			Column newNode(COLUMN_NODE);
 			newNode.NodeAdd(GetRef());
@@ -180,7 +180,7 @@ bool Column::Insert64(size_t ndx, int64_t value) {
 			m_array.UpdateRef(newNode.GetRef());
 			break;
 		}
-	case NodeChange::SPLIT:
+	case NodeChange::CT_SPLIT:
 		{
 			Column newNode(COLUMN_NODE);
 			newNode.NodeAdd(nc.ref1);
@@ -222,17 +222,17 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 
 		// Insert item
 		const NodeChange nc = target.DoInsert(local_ndx, value);
-		if (nc.type ==  NodeChange::ERROR) return NodeChange(NodeChange::ERROR); // allocation error
-		else if (nc.type ==  NodeChange::NONE) {
+		if (nc.type ==  NodeChange::CT_ERROR) return NodeChange(NodeChange::CT_ERROR); // allocation error
+		else if (nc.type ==  NodeChange::CT_NONE) {
 			offsets.Increment(1, node_ndx);  // update offsets
-			return NodeChange(NodeChange::NONE); // no new nodes
+			return NodeChange(NodeChange::CT_NONE); // no new nodes
 		}
 
-		if (nc.type == NodeChange::INSERT_AFTER) ++node_ndx;
+		if (nc.type == NodeChange::CT_INSERT_AFTER) ++node_ndx;
 
 		// If there is room, just update node directly
 		if (offsets.Size() < MAX_LIST_SIZE) {
-			if (nc.type == NodeChange::SPLIT) return NodeInsertSplit(node_ndx, nc.ref2);
+			if (nc.type == NodeChange::CT_SPLIT) return NodeInsertSplit(node_ndx, nc.ref2);
 			else return NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
 		}
 
@@ -242,9 +242,9 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 
 		switch (node_ndx) {
 		case 0:	            // insert before
-			return NodeChange(NodeChange::INSERT_BEFORE, newNode.GetRef());
+			return NodeChange(NodeChange::CT_INSERT_BEFORE, newNode.GetRef());
 		case MAX_LIST_SIZE:	// insert below
-			return NodeChange(NodeChange::INSERT_AFTER, newNode.GetRef());
+			return NodeChange(NodeChange::CT_INSERT_AFTER, newNode.GetRef());
 		default:            // split
 			// Move items below split to new node
 			const size_t len = refs.Size();
@@ -253,7 +253,7 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 			}
 			offsets.Resize(node_ndx);
 			refs.Resize(node_ndx);
-			return NodeChange(NodeChange::SPLIT, GetRef(), newNode.GetRef());
+			return NodeChange(NodeChange::CT_SPLIT, GetRef(), newNode.GetRef());
 		}
 	}
 	else {
@@ -264,13 +264,13 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 
 		// Create new list for item
 		Array newList;
-		if (!newList.Add(value)) return NodeChange(NodeChange::ERROR);
+		if (!newList.Add(value)) return NodeChange(NodeChange::CT_ERROR);
 		
 		switch (ndx) {
 		case 0:	            // insert before
-			return NodeChange(NodeChange::INSERT_BEFORE, newList.GetRef());
+			return NodeChange(NodeChange::CT_INSERT_BEFORE, newList.GetRef());
 		case MAX_LIST_SIZE:	// insert below
-			return NodeChange(NodeChange::INSERT_AFTER, newList.GetRef());
+			return NodeChange(NodeChange::CT_INSERT_AFTER, newList.GetRef());
 		default:            // split
 			// Move items below split to new list
 			for (size_t i = ndx; i < m_array.Size(); ++i) {
@@ -278,7 +278,7 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 			}
 			m_array.Resize(ndx);
 
-			return NodeChange(NodeChange::SPLIT, GetRef(), newList.GetRef());
+			return NodeChange(NodeChange::CT_SPLIT, GetRef(), newList.GetRef());
 		}
 	}
 }

@@ -527,7 +527,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 		// Check 64bits at a time for match
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const bool hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2 
+			const uint64_t hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2 
 										 & 0xAAAAAAAAAAAAAAAAUL;
 			if (hasZeroByte){
 				// Element number at start of block
@@ -568,7 +568,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 		// Check 64bits at a time for match
 		while (p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const bool hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 
+			const uint64_t hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 
 										 & 0x8888888888888888UL;
 			if (hasZeroByte){
 				// Element number at start of block
