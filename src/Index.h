@@ -16,6 +16,7 @@ public:
 
 	bool Insert(size_t ndx, int64_t value, bool isLast=false);
 	void Delete(size_t ndx, int64_t value, bool isLast=false);
+	void Set(size_t ndx, int64_t oldValue, int64_t newValue);
 
 	size_t Find(int64_t value);
 

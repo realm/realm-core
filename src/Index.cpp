@@ -45,6 +45,11 @@ static Index GetIndexFromRef(Array& parent, size_t ndx) {
 	return Index((void*)parent.Get(ndx), &parent, ndx);
 }
 
+void Index::Set(size_t ndx, int64_t oldValue, int64_t newValue) {
+	Delete(ndx, oldValue, true); // set isLast to avoid updating refs
+	Insert(ndx, newValue, true); // set isLast to avoid updating refs
+}
+
 void Index::Delete(size_t ndx, int64_t value, bool isLast) {
 	DoDelete(ndx, value);
 
