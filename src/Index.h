@@ -14,8 +14,8 @@ public:
 
 	void BuildIndex(const Column& c);
 
-	bool Insert64(size_t ndx, int64_t value);
-	void Delete(size_t ndx, int64_t value);
+	bool Insert(size_t ndx, int64_t value, bool isLast=false);
+	void Delete(size_t ndx, int64_t value, bool isLast=false);
 
 	size_t Find(int64_t value);
 

@@ -31,7 +31,7 @@ void Index::BuildIndex(const Column& src) {
 	// Brute-force build-up
 	// TODO: sort and merge
 	for (size_t i = 0; i < src.Size(); ++i) {
-		Insert64(i, src.Get64(i));
+		Insert(i, src.Get64(i), true);
 	}
 
 #ifdef _DEBUG
@@ -45,7 +45,7 @@ static Index GetIndexFromRef(Array& parent, size_t ndx) {
 	return Index((void*)parent.Get(ndx), &parent, ndx);
 }
 
-void Index::Delete(size_t ndx, int64_t value) {
+void Index::Delete(size_t ndx, int64_t value, bool isLast) {
 	DoDelete(ndx, value);
 
 	// Collapse top nodes with single item
@@ -60,8 +60,8 @@ void Index::Delete(size_t ndx, int64_t value) {
 		m_array.UpdateRef(ref);
 	}
 
-	//TODO: Only update if ndx != column.size()
-	UpdateRefs(ndx, -1);
+	// If it is last item in column, we don't have to update refs
+	if (!isLast) UpdateRefs(ndx, -1);
 }
 
 bool Index::DoDelete(size_t ndx, int64_t value) {
@@ -105,7 +105,10 @@ bool Index::DoDelete(size_t ndx, int64_t value) {
 	return false;
 }
 
-bool Index::Insert64(size_t ndx, int64_t value) {
+bool Index::Insert(size_t ndx, int64_t value, bool isLast) {
+	// If it is last item in column, we don't have to update refs
+	if (!isLast) UpdateRefs(ndx, 1);
+
 	const NodeChange nc = DoInsert(ndx, value);
 	switch (nc.type) {
 	case NodeChange::CT_ERROR:
