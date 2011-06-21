@@ -87,12 +87,6 @@ static unsigned int BitWidth(int64_t v) {
 	return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
 }
 
-static size_t GetRefSize(void* ref) {
-	// parse the length part of 8byte header
-	const uint8_t* const header = (uint8_t*)ref;
-	return (header[1] << 16) + (header[2] << 8) + header[3];
-}
-
 static void SetRefSize(void* ref, size_t len) {
 	uint8_t* const header = (uint8_t*)(ref);
 	header[1] = ((len >> 16) & 0x000000FF);
