@@ -42,8 +42,10 @@ public:
 	int64_t Get(size_t ndx) const;
 	int64_t Back() const;
 	void Delete(size_t ndx);
-	bool Increment(int64_t value, size_t start=0, size_t end=-1);
 	void Clear();
+
+	bool Increment(int64_t value, size_t start=0, size_t end=-1);
+	bool IncrementIf(int64_t limit, int64_t value);
 
 	size_t FindPos(int64_t value) const;
 	size_t FindPos2(int64_t value) const;

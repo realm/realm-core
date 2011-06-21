@@ -278,6 +278,15 @@ bool Array::Increment(int64_t value, size_t start, size_t end) {
 	return true;
 }
 
+bool Array::IncrementIf(int64_t limit, int64_t value) {
+	// Update (incr or decrement) values bigger or equal to the limit
+	for (size_t i = 0; i < m_len; ++i) {
+		const int64_t v = Get(i);
+		if (v >= limit) Set(i, v + value);
+	}
+	return true;
+}
+
 size_t Array::FindPos(int64_t target) const {
 	int low = -1;
 	int high = (int)m_len;

@@ -20,6 +20,10 @@ Index::Index(void* ref) : Column(ref) {
 Index::Index(void* ref, Array* parent, size_t pndx) : Column(ref, parent, pndx) {
 }
 
+bool Index::IsEmpty() const {
+	const Array offsets = m_array.GetSubArray(0);
+	return offsets.IsEmpty();
+}
 
 void Index::BuildIndex(const Column& src) {
 	//assert(IsEmpty());
@@ -33,6 +37,72 @@ void Index::BuildIndex(const Column& src) {
 #ifdef _DEBUG
 	Verify();
 #endif //_DEBUG
+}
+
+static Index GetIndexFromRef(Array& parent, size_t ndx) {
+	assert(parent.HasRefs());
+	assert(ndx < parent.Size());
+	return Index((void*)parent.Get(ndx), &parent, ndx);
+}
+
+void Index::Delete(size_t ndx, int64_t value) {
+	DoDelete(ndx, value);
+
+	// Collapse top nodes with single item
+	while (IsNode()) {
+		Array refs = m_array.GetSubArray(1);
+		assert(refs.Size() != 0); // node cannot be empty
+		if (refs.Size() > 1) break;
+
+		void* ref = (void*)refs.Get(0);
+		refs.Delete(0); // avoid deleting subtree
+		m_array.Destroy();
+		m_array.UpdateRef(ref);
+	}
+
+	//TODO: Only update if ndx != column.size()
+	UpdateRefs(ndx, -1);
+}
+
+bool Index::DoDelete(size_t ndx, int64_t value) {
+	Array values = m_array.GetSubArray(0);
+	Array refs = m_array.GetSubArray(1);
+
+	size_t pos = values.FindPos2(value);
+	assert(pos != (size_t)-1);
+
+	// There may be several nodes with the same values,
+	// so we have to find the one with the matching ref
+	if (m_array.IsNode()) {
+		do {
+			Index node = GetIndexFromRef(refs, pos);
+			if (node.DoDelete(ndx, value)) {
+				// Update the ref
+				if (node.IsEmpty()) {
+					refs.Delete(pos);
+					node.Destroy();
+				}
+				else {
+					const int64_t maxval = node.MaxValue();
+					if (maxval != values.Get(pos)) values.Set(pos, maxval);
+				}
+				return true;
+			}
+			else ++pos;
+		} while (pos < refs.Size());
+		assert(false); // we should never reach here
+	}
+	else {
+		do {
+			if (refs.Get(pos) == (int)ndx) {
+				values.Delete(pos);
+				refs.Delete(pos);
+				return true;
+			}
+			else ++pos;
+		} while (pos < refs.Size());
+	}
+	return false;
 }
 
 bool Index::Insert64(size_t ndx, int64_t value) {
@@ -72,12 +142,6 @@ bool Index::Insert64(size_t ndx, int64_t value) {
 	}
 
 	return true;
-}
-
-static Index GetIndexFromRef(Array& parent, size_t ndx) {
-	assert(parent.HasRefs());
-	assert(ndx < parent.Size());
-	return Index((void*)parent.Get(ndx), &parent, ndx);
 }
 
 bool Index::LeafInsert(size_t ref, int64_t value) {
@@ -223,9 +287,29 @@ size_t Index::Find(int64_t value) {
 		const size_t pos = values.FindPos2(value);
 
 		if (pos == -1) return (size_t)-1;
-		else if (!m_array.IsNode()) return refs.Get(pos);
+		else if (!m_array.IsNode()) {
+			if (values.Get(pos) == value) return refs.Get(pos);
+			else return (size_t)-1;
+		}
 		
 		ref = (void*)refs.Get(pos);
+	}
+}
+
+void Index::UpdateRefs(size_t pos, int diff) {
+	assert(diff == 1 || diff == -1); // only used by insert and delete
+
+	Array refs = m_array.GetSubArray(1);
+
+	if (m_array.IsNode()) {
+		for (size_t i = 0; i < refs.Size(); ++i) {
+			void* ref = (void*)refs.Get(i);
+			Index ndx(ref);
+			ndx.UpdateRefs(pos, diff);
+		}
+	}
+	else {
+		refs.IncrementIf(pos, diff);
 	}
 }
 
