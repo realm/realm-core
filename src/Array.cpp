@@ -743,6 +743,46 @@ size_t Array::FindAll(Column& result, int64_t value,
 	return (size_t)-1; // not found
 }
 
+void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset) const {
+	// Only implemented for 64bit values
+	if (m_width != 64) {
+		assert(false);
+		return;
+	}
+
+	const uint64_t* p = (const uint64_t*)m_data;
+	const uint64_t* const e = (const uint64_t*)m_data + m_len;
+
+	const uint64_t m1  = 0x5555555555555555; //binary: 0101...
+	const uint64_t m2  = 0x3333333333333333; //binary: 00110011..
+	const uint64_t m4  = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
+	const uint64_t h01 = 0x0101010101010101;
+
+	while (p < e) {
+		uint64_t x = *p ^ value;
+
+		// population count
+#if defined(WIN32) && defined(SSE42)
+		x = _mm_popcnt_u64(x); // msvc sse4.2 intrinsic
+#elif defined(GCC)
+		x = __builtin_popcountll(x); // gcc intrinsic
+#else
+		x -= (x >> 1) & m1;
+		x = (x & m2) + ((x >> 2) & m2);
+		x = (x + (x >> 4)) & m4;
+		x = (x * h01)>>56;
+#endif
+
+		if (x < maxdist) {
+			const size_t pos = p - (const uint64_t*)m_data;
+			result.Add64(offset + pos);
+		}
+
+		++p;
+	}
+}
+
+
 
 bool Array::Alloc(size_t count, size_t width) {
 	// Calculate size in bytes

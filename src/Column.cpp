@@ -538,6 +538,24 @@ size_t Column::FindAll(Column& result, int64_t value,
 	}
 }
 
+void Column::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset) const {
+	if (!IsNode()) {
+		m_array.FindAllHamming(result, value, maxdist, offset);
+	}
+	else {
+		// Get subnode table
+		const Array offsets = m_array.GetSubArray(0);
+		const Array refs = m_array.GetSubArray(1);
+		const size_t count = refs.Size();
+
+		for (size_t i = 0; i < count; ++i) {
+			const Column col((void*)refs.Get(i));
+			col.FindAllHamming(result, value, maxdist, offset);
+			offset += offsets.Get(i);
+		}
+	}
+}
+
 
 size_t Column::FindWithIndex(int64_t target) const {
 	assert(m_index);

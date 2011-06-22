@@ -413,3 +413,20 @@ TEST(findallintMax){
 		i += 1;
 	}
 }
+
+TEST(Column_FindHamming) {
+	Column col;
+	for (size_t i = 0; i < 10; ++i) {
+		col.Add64(0x5555555555555555);
+		col.Add64(0x3333333333333333);
+	}
+
+	Column res;
+	col.FindAllHamming(res, 0x3333333333333332, 2);
+
+	CHECK_EQUAL(10, res.Size()); // Half should match
+
+	// Clean up
+	col.Destroy();
+	res.Destroy();
+}
