@@ -753,9 +753,10 @@ void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_
 	const uint64_t* p = (const uint64_t*)m_data;
 	const uint64_t* const e = (const uint64_t*)m_data + m_len;
 
-	const uint64_t m1  = 0x5555555555555555; //binary: 0101...
-	const uint64_t m2  = 0x3333333333333333; //binary: 00110011..
-	const uint64_t m4  = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
+	// static values needed for population count
+	const uint64_t m1  = 0x5555555555555555;
+	const uint64_t m2  = 0x3333333333333333;
+	const uint64_t m4  = 0x0f0f0f0f0f0f0f0f;
 	const uint64_t h01 = 0x0101010101010101;
 
 	while (p < e) {
