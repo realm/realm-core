@@ -87,12 +87,6 @@ static unsigned int BitWidth(int64_t v) {
 	return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
 }
 
-static size_t GetRefSize(void* ref) {
-	// parse the length part of 8byte header
-	const uint8_t* const header = (uint8_t*)ref;
-	return (header[1] << 16) + (header[2] << 8) + header[3];
-}
-
 static void SetRefSize(void* ref, size_t len) {
 	uint8_t* const header = (uint8_t*)(ref);
 	header[1] = ((len >> 16) & 0x000000FF);
@@ -280,6 +274,15 @@ bool Array::Increment(int64_t value, size_t start, size_t end) {
 	// Increment range
 	for (size_t i = start; i < end; ++i) {
 		Set(i, Get(i) + value);
+	}
+	return true;
+}
+
+bool Array::IncrementIf(int64_t limit, int64_t value) {
+	// Update (incr or decrement) values bigger or equal to the limit
+	for (size_t i = 0; i < m_len; ++i) {
+		const int64_t v = Get(i);
+		if (v >= limit) Set(i, v + value);
 	}
 	return true;
 }
@@ -730,6 +733,47 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 		}
 	}
 }
+
+void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset) const {
+	// Only implemented for 64bit values
+	if (m_width != 64) {
+		assert(false);
+		return;
+	}
+
+	const uint64_t* p = (const uint64_t*)m_data;
+	const uint64_t* const e = (const uint64_t*)m_data + m_len;
+
+	// static values needed for population count
+	const uint64_t m1  = 0x5555555555555555;
+	const uint64_t m2  = 0x3333333333333333;
+	const uint64_t m4  = 0x0f0f0f0f0f0f0f0f;
+	const uint64_t h01 = 0x0101010101010101;
+
+	while (p < e) {
+		uint64_t x = *p ^ value;
+
+		// population count
+#if defined(WIN32) && defined(SSE42)
+		x = _mm_popcnt_u64(x); // msvc sse4.2 intrinsic
+#elif defined(GCC)
+		x = __builtin_popcountll(x); // gcc intrinsic
+#else
+		x -= (x >> 1) & m1;
+		x = (x & m2) + ((x >> 2) & m2);
+		x = (x + (x >> 4)) & m4;
+		x = (x * h01)>>56;
+#endif
+
+		if (x < maxdist) {
+			const size_t pos = p - (const uint64_t*)m_data;
+			result.Add64(offset + pos);
+		}
+
+		++p;
+	}
+}
+
 
 
 bool Array::Alloc(size_t count, size_t width) {

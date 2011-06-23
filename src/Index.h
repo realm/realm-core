@@ -10,9 +10,13 @@ public:
 	Index(void* ref);
 	Index(void* ref, Array* parent, size_t pndx);
 
+	bool IsEmpty() const;
+
 	void BuildIndex(const Column& c);
 
-	bool Insert64(size_t ndx, int64_t value);
+	bool Insert(size_t ndx, int64_t value, bool isLast=false);
+	void Delete(size_t ndx, int64_t value, bool isLast=false);
+	void Set(size_t ndx, int64_t oldValue, int64_t newValue);
 
 	size_t Find(int64_t value);
 
@@ -23,9 +27,12 @@ public:
 protected:
 	// B-Tree functions
 	NodeChange DoInsert(size_t ndx, int64_t value);
+	bool DoDelete(size_t ndx, int64_t value);
 
 	// Node functions
 	bool NodeAdd(void* ref);
+
+	void UpdateRefs(size_t pos, int diff);
 
 	bool LeafInsert(size_t ref, int64_t value);
 

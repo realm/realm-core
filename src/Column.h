@@ -84,6 +84,7 @@ public:
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
 	void FindAll(Column& result, int64_t value, size_t offset=0,
 				 size_t start=0, size_t end=-1) const;
+	void FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 
 
 	// Index
