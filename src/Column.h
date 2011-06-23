@@ -82,8 +82,8 @@ public:
 
 	bool Increment64(int64_t value, size_t start=0, size_t end=-1);
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
-	size_t FindAll(Column& result, int64_t value,
-				   size_t start=0, size_t end=-1) const;
+	void FindAll(Column& result, int64_t value, size_t offset=0,
+				 size_t start=0, size_t end=-1) const;
 
 
 	// Index

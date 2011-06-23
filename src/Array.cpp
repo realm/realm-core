@@ -497,23 +497,16 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	return (size_t)-1; // not found
 }
 
-size_t Array::FindAll(Column& result, int64_t value,
-					  size_t start, size_t end) const {
-	if (IsEmpty()) return (size_t)-1;
+void Array::FindAll(Column& result, int64_t value, size_t colOffset,
+					size_t start, size_t end) const {
 	if (end == -1) end = m_len;
-	if (start == end) return (size_t)-1;
 
 	assert(start < m_len && end <= m_len && start < end);
-
-	// If the value is wider than the column
-	// then we know it can't be there
-	const size_t width = BitWidth(value);
-	if (width > m_width) return (size_t)-1;
 
 	// Do optimized search based on column width
 	if (m_width == 0) {
 		for(size_t i = start; i < end; i++){
-			result.Add(i); // All values can only be zero.
+			result.Add(i + colOffset); // All values can only be zero.
 		}
 	}
 	else if (m_width == 2) {
@@ -539,7 +532,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 				while (i < j) {
 					const size_t offset = i >> 2;
 					const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
-					if (v == value) result.Add(i);
+					if (v == value) result.Add(i + colOffset);
 					++i;
 				}
 			}
@@ -553,7 +546,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 		while (i < end) {
 			const size_t offset = i >> 2;
 			const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
-			if (v == value) result.Add(i);
+			if (v == value) result.Add(i + colOffset);
 			++i;
 		}
 	}
@@ -580,7 +573,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 				while (i < j) {
 					const size_t offset = i >> 1;
 					const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
-					if (v == value) result.Add(i);
+					if (v == value) result.Add(i + colOffset);
 					++i;
 				}
 			}
@@ -594,7 +587,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 		while (i < end) {
 			const size_t offset = i >> 1;
 			const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
-			if (v == value) result.Add(i);
+			if (v == value) result.Add(i + colOffset);
 			++i;
 		}
 	}
@@ -623,7 +616,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 
 				// check block
 				while (i < j) {
-					if (value == d[i]) result.Add(i);
+					if (value == d[i]) result.Add(i + colOffset);
 					++i;
 				}
 			}
@@ -636,7 +629,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == d[i]) result.Add(i);
+			if (value == d[i]) result.Add(i + colOffset);
 			++i;
 		}
 	}
@@ -663,7 +656,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 
 				// check block
 				while (i < j) {
-					if (value == d[i]) result.Add(i);
+					if (value == d[i]) result.Add(i + colOffset);
 					++i;
 				}
 			}
@@ -676,7 +669,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == d[i]) result.Add(i);
+			if (value == d[i]) result.Add(i + colOffset);
 			++i;
 		}
 	}
@@ -703,7 +696,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 
 				// check block
 				while (i < j) {
-					if (value == d[i]) result.Add(i);
+					if (value == d[i]) result.Add(i + colOffset);
 					++i;
 				}
 			}
@@ -716,7 +709,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == d[i]) result.Add(i);
+			if (value == d[i]) result.Add(i + colOffset);
 			++i;
 		}
 	}
@@ -725,7 +718,7 @@ size_t Array::FindAll(Column& result, int64_t value,
 		const int64_t* p = (const int64_t*)m_data + start;
 		const int64_t* const e = (const int64_t*)m_data + end;
 		while (p < e) {
-			if (*p == v) result.Add(p - (const int64_t*)m_data);
+			if (*p == v) result.Add((p - (const int64_t*)m_data) + colOffset);
 			++p;
 		}
 	}
@@ -733,11 +726,9 @@ size_t Array::FindAll(Column& result, int64_t value,
 		// Naive search
 		for (size_t i = start; i < end; ++i) {
 			const int64_t v = (this->*m_getter)(i);
-			if (v == value) result.Add(i);
+			if (v == value) result.Add(i + colOffset);
 		}
 	}
-
-	return (size_t)-1; // not found
 }
 
 
