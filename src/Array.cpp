@@ -502,9 +502,16 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 
 void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 					size_t start, size_t end) const {
+	if (IsEmpty()) return;
 	if (end == -1) end = m_len;
+	if (start == end) return;
 
 	assert(start < m_len && end <= m_len && start < end);
+
+	// If the value is wider than the column
+	// then we know it can't be there
+	const size_t width = BitWidth(value);
+	if (width > m_width) return;
 
 	// Do optimized search based on column width
 	if (m_width == 0) {
