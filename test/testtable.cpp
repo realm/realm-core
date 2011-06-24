@@ -113,3 +113,27 @@ TEST(Table6) {
 	size_t result2 = table.Range(10, 200).Find(TestQuery());
 	CHECK_EQUAL((size_t)-1, result2);
 }
+
+TEST(Table_FindAll_Int) {
+	TestTable table;
+
+	table.Add(0, 10, true, Wed);
+	table.Add(0, 20, true, Wed);
+	table.Add(0, 10, true, Wed);
+	table.Add(0, 20, true, Wed);
+	table.Add(0, 10, true, Wed);
+	table.Add(0, 20, true, Wed);
+	table.Add(0, 10, true, Wed);
+	table.Add(0, 20, true, Wed);
+	table.Add(0, 10, true, Wed);
+	table.Add(0, 20, true, Wed);
+
+	const TableView v = table.second.FindAll(20);
+
+	CHECK_EQUAL(5, v.GetSize());
+	CHECK_EQUAL(1, v.GetRef(0));
+	CHECK_EQUAL(3, v.GetRef(1));
+	CHECK_EQUAL(5, v.GetRef(2));
+	CHECK_EQUAL(7, v.GetRef(3));
+	CHECK_EQUAL(9, v.GetRef(4));
+}

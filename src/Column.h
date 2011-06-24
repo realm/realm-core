@@ -50,7 +50,6 @@ public:
 	Column& operator=(const Column& column);
 	bool operator==(const Column& column) const;
 
-	void Create(void* ref);
 	void SetParent(Array* parent, size_t pndx);
 
 	size_t Size() const;

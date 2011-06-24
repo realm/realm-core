@@ -5,6 +5,7 @@
 #include "Column.h"
 
 class Accessor;
+class TableView;
 
 enum ColumnType {
 	COLUMN_TYPE_INT,
@@ -43,6 +44,9 @@ public:
 	AdaptiveStringColumn& GetColumnString(size_t ndx);
 	const AdaptiveStringColumn& GetColumnString(size_t ndx) const;
 
+	// Searching
+	TableView FindAll(size_t column_id, int64_t value);
+
 	// Indexing
 	bool HasIndex(size_t column_id) const;
 	void SetIndex(size_t column_ud);
@@ -62,6 +66,34 @@ protected:
 	// Cached columns
 	Array m_cols;
 };
+
+class TableView {
+public:
+	TableView(Table& source);
+	TableView(const TableView& v);
+
+	Column& GetRefColumn() {return m_refs;}
+	size_t GetRef(size_t ndx) const {return m_refs.Get(ndx);}
+
+	bool IsEmpty() const {return m_refs.IsEmpty();}
+	size_t GetSize() const {return m_refs.Size();}
+
+	// Adaptive ints
+	int Get(size_t column_id, size_t ndx) const;
+	void Set(size_t column_id, size_t ndx, int value);
+
+	// Strings
+	const char* GetString(size_t column_id, size_t ndx) const;
+	void SetString(size_t column_id, size_t ndx, const char* value);
+
+private:
+	// Don't allow copying
+	TableView& operator=(const TableView&) {return *this;}
+
+	Table& m_table;
+	Column m_refs;
+};
+
 
 class CursorBase {
 public:
@@ -139,6 +171,7 @@ protected:
 class ColumnProxyInt : public ColumnProxy {
 public:
 	size_t Find(int value) const {return m_table->GetColumn(m_column).Find(value);}
+	TableView FindAll(int value) {return m_table->FindAll(m_column, value);}
 	int operator+=(int value) {m_table->GetColumn(m_column).Increment64(value); return 0;}
 };
 

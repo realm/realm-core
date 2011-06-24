@@ -359,6 +359,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\TableView.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test\test.cpp"
 				>
 			</File>

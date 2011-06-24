@@ -34,6 +34,14 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx)
 	SetWidth(0);
 }
 
+// Copy-constructor
+// Note that this array now own the ref. Should only be used when
+// the source array goes away right after (like return values from functions)
+Array::Array(const Array& src) {
+	void* ref = src.GetRef();
+	Create(ref);
+}
+
 void Array::Create(void* ref) {
 	assert(ref);
 	uint8_t* const header = (uint8_t*)ref;

@@ -194,3 +194,14 @@ void Table::SetString(size_t column_id, size_t ndx, const char* value) {
 	AdaptiveStringColumn& column = GetColumnString(column_id);
 	column.Set(ndx, value);
 }
+
+TableView Table::FindAll(size_t column_id, int64_t value) {
+	assert(column_id < m_columns.Size());
+
+	const Column& column = GetColumn(column_id);
+
+	TableView view(*this);
+	column.FindAll(view.GetRefColumn(), value);
+
+	return view;
+}
