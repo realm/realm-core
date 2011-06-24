@@ -6,5 +6,6 @@
 *.a
 *.swp
 cscope.*
+tags
 tightdb-tests
 TestUnitTest++
