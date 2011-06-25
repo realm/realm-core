@@ -32,6 +32,8 @@ public:
 	// Adaptive ints
 	int Get(size_t column_id, size_t ndx) const;
 	void Set(size_t column_id, size_t ndx, int value);
+	int64_t Get64(size_t column_id, size_t ndx) const;
+	void Set64(size_t column_id, size_t ndx, int64_t value);
 
 	// Strings
 	const char* GetString(size_t column_id, size_t ndx) const;
@@ -116,6 +118,8 @@ public:
 protected:
 	int Get() const {return m_cursor->m_table.Get(m_column, m_cursor->m_index);}
 	void Set(int value) {m_cursor->m_table.Set(m_column, m_cursor->m_index, value);}
+	int64_t Get64() const {return m_cursor->m_table.Get64(m_column, m_cursor->m_index);}
+	void Set64(int64_t value) {m_cursor->m_table.Set64(m_column, m_cursor->m_index, value);}
 
 	const char* GetString() const {return m_cursor->m_table.GetString(m_column, m_cursor->m_index);}
 	void SetString(const char* value) {m_cursor->m_table.SetString(m_column, m_cursor->m_index, value);}
@@ -126,9 +130,12 @@ protected:
 
 class AccessorInt : public Accessor {
 public:
-	operator int() const {return Get();}
+	//operator int() const {return Get();}
+	operator int64_t() const {return Get64();}
 	void operator=(int value) {Set(value);}
 	void operator=(unsigned int value) {Set(value);}
+	void operator=(int64_t value) {Set64(value);}
+	void operator=(uint64_t value) {Set64(value);}
 	void operator+=(int value) {Set(Get()+value);}
 	void operator+=(unsigned int value) {Set(Get()+value);}
 };

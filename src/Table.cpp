@@ -179,6 +179,22 @@ void Table::Set(size_t column_id, size_t ndx, int value) {
 	column.Set(ndx, value);
 }
 
+int64_t Table::Get64(size_t column_id, size_t ndx) const {
+	assert(column_id < m_cols.Size());
+	assert(ndx < m_size);
+
+	const Column& column = GetColumn(column_id);
+	return column.Get64(ndx);
+}
+
+void Table::Set64(size_t column_id, size_t ndx, int64_t value) {
+	assert(column_id < m_cols.Size());
+	assert(ndx < m_size);
+
+	Column& column = GetColumn(column_id);
+	column.Set64(ndx, value);
+}
+
 const char* Table::GetString(size_t column_id, size_t ndx) const {
 	assert(column_id < m_columns.Size());
 	assert(ndx < m_size);
