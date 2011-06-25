@@ -359,7 +359,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\TableView.cpp"
+				RelativePath=".\src\TableView.cpp"
 				>
 			</File>
 			<File
