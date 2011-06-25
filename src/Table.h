@@ -48,6 +48,7 @@ public:
 
 	// Searching
 	TableView FindAll(size_t column_id, int64_t value);
+	TableView FindAllHamming(size_t column_id, uint64_t value, size_t max);
 
 	// Indexing
 	bool HasIndex(size_t column_id) const;
@@ -179,6 +180,7 @@ class ColumnProxyInt : public ColumnProxy {
 public:
 	size_t Find(int value) const {return m_table->GetColumn(m_column).Find(value);}
 	TableView FindAll(int value) {return m_table->FindAll(m_column, value);}
+	TableView FindAllHamming(uint64_t value, size_t max) {return m_table->FindAllHamming(m_column, value, max);}
 	int operator+=(int value) {m_table->GetColumn(m_column).Increment64(value); return 0;}
 };
 
