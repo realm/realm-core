@@ -18,7 +18,8 @@ public:
 	void Delete(size_t ndx, int64_t value, bool isLast=false);
 	void Set(size_t ndx, int64_t oldValue, int64_t newValue);
 
-	size_t Find(int64_t value);
+	size_t Find(int64_t value) const;
+	bool FindAll(Column& result, int64_t value) const;
 
 #ifdef _DEBUG
 	void Verify() const;
@@ -37,6 +38,7 @@ protected:
 	bool LeafInsert(size_t ref, int64_t value);
 
 	int64_t MaxValue() const;
+	size_t MaxRef() const;
 };
 
 #endif //__TDB_INDEX__

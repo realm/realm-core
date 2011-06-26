@@ -45,6 +45,12 @@ static Index GetIndexFromRef(Array& parent, size_t ndx) {
 	return Index((void*)parent.Get(ndx), &parent, ndx);
 }
 
+static const Index GetIndexFromRef(const Array& parent, size_t ndx) {
+	assert(parent.HasRefs());
+	assert(ndx < parent.Size());
+	return Index((void*)parent.Get(ndx));
+}
+
 void Index::Set(size_t ndx, int64_t oldValue, int64_t newValue) {
 	Delete(ndx, oldValue, true); // set isLast to avoid updating refs
 	Insert(ndx, newValue, true); // set isLast to avoid updating refs
@@ -285,7 +291,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
 	}
 }
 
-size_t Index::Find(int64_t value) {
+size_t Index::Find(int64_t value) const {
 	void* ref = GetRef();
 	for (;;) {
 		const Array node(ref);
@@ -304,6 +310,34 @@ size_t Index::Find(int64_t value) {
 	}
 }
 
+bool Index::FindAll(Column& result, int64_t value) const {
+	const Array values = m_array.GetSubArray(0);
+	const Array refs = m_array.GetSubArray(1);
+
+	size_t pos = values.FindPos2(value);
+	assert(pos != (size_t)-1);
+
+	// There may be several nodes with the same values,
+	if (m_array.IsNode()) {
+		do {
+			const Index node = GetIndexFromRef(refs, pos);
+			if (!node.FindAll(result, value)) return false;
+			++pos;
+		} while (pos < refs.Size());
+	}
+	else {
+		do {
+			if (values.Get(pos) == value) {
+				result.Add64(refs.Get(pos));
+				++pos;
+			}
+			else return false; // no more matches
+		} while (pos < refs.Size());
+	}
+
+	return true; // may be more matches in next node
+}
+
 void Index::UpdateRefs(size_t pos, int diff) {
 	assert(diff == 1 || diff == -1); // only used by insert and delete
 
@@ -320,64 +354,6 @@ void Index::UpdateRefs(size_t pos, int diff) {
 		refs.IncrementIf(pos, diff);
 	}
 }
-
-/*
-void Column::BuildIndex(Column& index_refs) {
-	// Make sure the index has room for all the refs
-	index_refs.Clear();
-	const size_t len = Size();
-	const size_t width = BitWidth(Size());
-	index_refs.Reserve(len, width);
-
-	// Fill it up with unsorted refs
-	for (size_t i = 0; i < len; ++i) {
-		index_refs.Add64(i);
-	}
-
-	// Sort the index
-	SortIndex(index_refs, *this, 0, len-1);
-
-	// Create the actual index
-	Column* ndx = new Column();
-	for (size_t i = 0; i < len; ++i) {
-		ndx->Add64(Get64((size_t)index_refs.Get64(i)));
-	}
-
-	// Keep ref to index
-	m_index = ndx;
-	m_index_refs = &index_refs;
-}
-
-
-void SortIndex(Column& index, const Column& target, size_t lo, size_t hi) {
-	// Quicksort based on
-	// http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
-	int i = (int)lo;
-	int j = (int)hi;
-
-	// comparison element x
-	const size_t ndx = (lo + hi)/2;
-	const size_t ref = (size_t)index.Get64(ndx);
-	const int64_t x = target.Get64(ref);
-
-	// partition
-	do {
-		while (target.Get64((size_t)index.Get64(i)) < x) i++;
-		while (target.Get64((size_t)index.Get64(j)) > x) j--;
-		if (i <= j) {
-			const int64_t h = index.Get64(i);
-			index.Set64(i, index.Get64(j));
-			index.Set64(j, h);
-			i++; j--;
-		}
-	} while (i <= j);
-
-	//  recursion
-	if ((int)lo < j) SortIndex(index, target, lo, j);
-	if (i < (int)hi) SortIndex(index, target, i, hi);
-}
-
-*/
 
 #ifdef _DEBUG
 
