@@ -980,6 +980,37 @@ void Array::Set_64b(size_t ndx, int64_t value) {
 	*(int64_t*)(m_data + offset) = value;
 }
 
+void Array::Sort() {
+	DoSort(0, m_len-1);
+}
+
+void Array::DoSort(size_t lo, size_t hi) {
+	// Quicksort based on
+	// http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
+	int i = (int)lo;
+	int j = (int)hi;
+
+	// comparison element x
+	const size_t ndx = (lo + hi)/2;
+	const int64_t x = (size_t)Get(ndx);
+
+	// partition
+	do {
+		while (Get(i) < x) i++;
+		while (Get(j) > x) j--;
+		if (i <= j) {
+			const int64_t h = Get(i);
+			Set(i, Get(j));
+			Set(j, h);
+			i++; j--;
+		}
+	} while (i <= j);
+
+	//  recursion
+	if ((int)lo < j) DoSort(lo, j);
+	if (i < (int)hi) DoSort(i, hi);
+}
+
 #ifdef _DEBUG
 #include "stdio.h"
 
