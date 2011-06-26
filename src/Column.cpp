@@ -493,7 +493,7 @@ void Column::FindAll(Column& result, int64_t value, size_t offset,
 		for (size_t i = 0; i < count; ++i) {
 			const Column col((void*)refs.Get(i));
 			const size_t localOffset = i ? (size_t)offsets.Get(i-1) : 0;
-			col.FindAll(result, value, localOffset);
+			col.FindAll(result, value, (localOffset+offset));
 		}
 	}
 }
