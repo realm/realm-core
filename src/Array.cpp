@@ -37,7 +37,7 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx)
 // Copy-constructor
 // Note that this array now own the ref. Should only be used when
 // the source array goes away right after (like return values from functions)
-Array::Array(const Array& src) {
+Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_parentNdx) {
 	void* ref = src.GetRef();
 	Create(ref);
 }
