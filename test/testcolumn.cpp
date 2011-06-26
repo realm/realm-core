@@ -360,6 +360,34 @@ TEST_FIXTURE(db_setup, Destroy) {
 	c.Destroy();
 }
 
+TEST(Column_Sort) {
+	// Create Column with random values
+	Column a;
+	a.Add(25);
+	a.Add(12);
+	a.Add(50);
+	a.Add(3);
+	a.Add(34);
+	a.Add(0);
+	a.Add(17);
+	a.Add(51);
+	a.Add(2);
+	a.Add(40);
+
+	a.Sort();
+
+	CHECK_EQUAL(0, a.Get(0));
+	CHECK_EQUAL(2, a.Get(1));
+	CHECK_EQUAL(3, a.Get(2));
+	CHECK_EQUAL(12, a.Get(3));
+	CHECK_EQUAL(17, a.Get(4));
+	CHECK_EQUAL(25, a.Get(5));
+	CHECK_EQUAL(34, a.Get(6));
+	CHECK_EQUAL(40, a.Get(7));
+	CHECK_EQUAL(50, a.Get(8));
+	CHECK_EQUAL(51, a.Get(9));
+}
+
 /** FindAll() int tests spread out over bitwidth
  *
  */

@@ -100,6 +100,8 @@ public:
 
 	void* GetRef() const {return m_array.GetRef();}
 
+	void Sort();
+
 	// Debug
 #ifdef _DEBUG
 	void Print() const;
@@ -127,6 +129,8 @@ protected:
 		NodeChange(ChangeType t, void* r1=0, void* r2=0) : ref1(r1), ref2(r2), type(t) {}
 		NodeChange(bool success) : ref1(NULL), ref2(NULL), type(success ? CT_NONE : CT_ERROR) {}
 	};
+
+	void DoSort(size_t lo, size_t hi);
 
 	// BTree function
 	//void UpdateRef(void* ref);

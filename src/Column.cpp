@@ -536,6 +536,40 @@ void Column::BuildIndex(Index& index) {
 	m_index = &index; // Keep ref to index
 }
 
+void Column::Sort() {
+	DoSort(0, Size()-1);
+}
+
+void Column::DoSort(size_t lo, size_t hi) {
+	//TODO: This is pretty slow. A better stategy will be to
+	//      sort each leaf/array on it's own and then merge
+
+	// Quicksort based on
+	// http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
+	int i = (int)lo;
+	int j = (int)hi;
+
+	// comparison element x
+	const size_t ndx = (lo + hi)/2;
+	const int64_t x = (size_t)Get64(ndx);
+
+	// partition
+	do {
+		while (Get64(i) < x) i++;
+		while (Get64(j) > x) j--;
+		if (i <= j) {
+			const int64_t h = Get64(i);
+			Set64(i, Get64(j));
+			Set64(j, h);
+			i++; j--;
+		}
+	} while (i <= j);
+
+	//  recursion
+	if ((int)lo < j) DoSort(lo, j);
+	if (i < (int)hi) DoSort(i, hi);
+}
+
 
 #ifdef _DEBUG
 #include "stdio.h"
