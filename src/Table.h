@@ -35,9 +35,17 @@ public:
 	int64_t Get64(size_t column_id, size_t ndx) const;
 	void Set64(size_t column_id, size_t ndx, int64_t value);
 
+	void InsertInt(size_t column_id, size_t ndx, int value);
+	void InsertInt(size_t column_id, size_t ndx, int64_t value);
+	void InsertBool(size_t column_id, size_t ndx, bool value) {InsertInt(column_id, ndx, value ? 1 :0);}
+	template<class T> void InsertEnum(size_t column_id, size_t ndx, T value) {
+		InsertInt(column_id, ndx, (int)value);
+	}
+
 	// Strings
 	const char* GetString(size_t column_id, size_t ndx) const;
 	void SetString(size_t column_id, size_t ndx, const char* value);
+	void InsertString(size_t column_id, size_t ndx, const char* value);
 
 	void RegisterColumn(ColumnType type, const char* name);
 

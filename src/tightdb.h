@@ -50,18 +50,18 @@ public: \
 		Accessor##CType2 CName2; \
 	}; \
 \
-	Cursor Add(Type##CType1 CName1, Type##CType2 CName2) { \
-		Cursor r = Add(); \
-		r.CName1 = CName1; \
-		r.CName2 = CName2; \
-		return r; \
+	void Add(Type##CType1 CName1, Type##CType2 CName2) { \
+		const size_t ndx = GetSize(); \
+		Insert##CType1 (0, ndx, CName1); \
+		Insert##CType2 (1, ndx, CName2); \
+		++m_size; \
 	} \
 \
 	Cursor Add() {return Cursor(*this, AddRow());} \
 	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \
 	Cursor operator[](size_t ndx) {return Cursor(*this, ndx);} \
 	const Cursor operator[](size_t ndx) const {return Cursor(*this, ndx);} \
-	Cursor operator[](int ndx) {return Cursor(*this, (ndx < 0) ? GetSize() - ndx : ndx);} \
+	Cursor operator[](int ndx) {return Cursor(*this, (ndx < 0) ? GetSize() + ndx : ndx);} \
 	Cursor Back() {return Cursor(*this, m_size-1);} \
 \
 	size_t Find(const TableName##Query&) const {return (size_t)-1;} \
@@ -117,18 +117,19 @@ public: \
 		Accessor##CType4 CName4; \
 	}; \
 \
-	Cursor Add(Type##CType1 v1, Type##CType2 v2,Type##CType3 v3, Type##CType4 v4) { \
-		Cursor r = Add(); \
-		r.CName1 = v1; \
-		r.CName2 = v2; \
-		r.CName3 = v3; \
-		r.CName4 = v4; \
-		return r; \
+	void Add(Type##CType1 v1, Type##CType2 v2,Type##CType3 v3, Type##CType4 v4) { \
+		const size_t ndx = GetSize(); \
+		Insert##CType1 (0, ndx, v1); \
+		Insert##CType2 (1, ndx, v2); \
+		Insert##CType3 (2, ndx, v3); \
+		Insert##CType4 (3, ndx, v4); \
+		++m_size; \
 	} \
 \
 	Cursor Add() {return Cursor(*this, AddRow());} \
 	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \
 	Cursor operator[](size_t ndx) {return Cursor(*this, ndx);} \
+	Cursor operator[](int ndx) {return Cursor(*this, (ndx < 0) ? GetSize() + ndx : ndx);} \
 \
 	size_t Find(const TableName##Query&) const {return (size_t)-1;} \
 	TableName FindAll(const TableName##Query&) const {return TableName();} \

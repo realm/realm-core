@@ -195,6 +195,22 @@ void Table::Set64(size_t column_id, size_t ndx, int64_t value) {
 	column.Set64(ndx, value);
 }
 
+void Table::InsertInt(size_t column_id, size_t ndx, int value) {
+	assert(column_id < m_cols.Size());
+	assert(ndx <= m_size);
+
+	Column& column = GetColumn(column_id);
+	column.Insert(ndx, value);
+}
+
+void Table::InsertInt(size_t column_id, size_t ndx, int64_t value) {
+	assert(column_id < m_cols.Size());
+	assert(ndx <= m_size);
+
+	Column& column = GetColumn(column_id);
+	column.Insert64(ndx, value);
+}
+
 const char* Table::GetString(size_t column_id, size_t ndx) const {
 	assert(column_id < m_columns.Size());
 	assert(ndx < m_size);
@@ -209,6 +225,14 @@ void Table::SetString(size_t column_id, size_t ndx, const char* value) {
 
 	AdaptiveStringColumn& column = GetColumnString(column_id);
 	column.Set(ndx, value);
+}
+
+void Table::InsertString(size_t column_id, size_t ndx, const char* value) {
+	assert(column_id < m_cols.Size());
+	assert(ndx <= m_size);
+
+	AdaptiveStringColumn& column = GetColumnString(column_id);
+	column.Insert(ndx, value, sizeof(value));
 }
 
 TableView Table::FindAll(size_t column_id, int64_t value) {

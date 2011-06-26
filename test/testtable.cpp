@@ -33,7 +33,8 @@ TDB_TABLE_4(TestTable,
 TEST(Table2) {
 	TestTable table;
 
-	TestTable::Cursor r = table.Add(0, 10, true, Wed);
+	table.Add(0, 10, true, Wed);
+	const TestTable::Cursor r = table[-1]; // last item
 
 	CHECK_EQUAL(0, r.first);
 	CHECK_EQUAL(10, r.second);
@@ -71,7 +72,8 @@ TDB_TABLE_2(TestTableEnum,
 TEST(Table4) {
 	TestTableEnum table;
 
-	TestTableEnum::Cursor r = table.Add(Mon, "Hello");
+	table.Add(Mon, "Hello");
+	const TestTableEnum::Cursor r = table[-1]; // last item
 
 	CHECK_EQUAL(Mon, r.first);
 	CHECK_EQUAL("Hello", (const char*)r.second);
