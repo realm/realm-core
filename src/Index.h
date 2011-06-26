@@ -20,6 +20,7 @@ public:
 
 	size_t Find(int64_t value) const;
 	bool FindAll(Column& result, int64_t value) const;
+	bool FindAllRange(Column& result, int64_t start, int64_t end) const;
 
 #ifdef _DEBUG
 	void Verify() const;

@@ -338,6 +338,35 @@ bool Index::FindAll(Column& result, int64_t value) const {
 	return true; // may be more matches in next node
 }
 
+bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const {
+	const Array values = m_array.GetSubArray(0);
+	const Array refs = m_array.GetSubArray(1);
+
+	size_t pos = values.FindPos2(start);
+	assert(pos != (size_t)-1);
+
+	// There may be several nodes with the same values,
+	if (m_array.IsNode()) {
+		do {
+			const Index node = GetIndexFromRef(refs, pos);
+			if (!node.FindAllRange(result, start, end)) return false;
+			++pos;
+		} while (pos < refs.Size());
+	}
+	else {
+		do {
+			const int64_t v = values[pos];
+			if (v >= start && v < end) {
+				result.Add64(refs.Get(pos));
+				++pos;
+			}
+			else return false; // no more matches
+		} while (pos < refs.Size());
+	}
+
+	return true; // may be more matches in next node
+}
+
 void Index::UpdateRefs(size_t pos, int diff) {
 	assert(diff == 1 || diff == -1); // only used by insert and delete
 

@@ -46,12 +46,48 @@ TEST(Index_FindAll) {
 
 	CHECK_EQUAL(3, result.Size());
 
-	// we need the results sorted to verify
+	// we need the refs sorted to verify
 	result.Sort();
 
 	CHECK_EQUAL(2, result.Get(0));
 	CHECK_EQUAL(5, result.Get(1));
 	CHECK_EQUAL(7, result.Get(2));
+
+	// Clean up
+	result.Destroy();
+	col.Destroy();
+	ndx.Destroy();
+}
+
+TEST(Index_FindAllRange) {
+	// Create a column with random values
+	Column col;
+	col.Add(3);
+	col.Add(100);
+	col.Add(10);
+	col.Add(45);
+	col.Add(0);
+	col.Add(10);
+	col.Add(18);
+	col.Add(10);
+
+	// Create a new index on column
+	Index ndx;
+	ndx.BuildIndex(col);
+
+	Column result;
+	ndx.FindAllRange(result, 10, 50);
+
+	CHECK_EQUAL(5, result.Size());
+
+	// we need the refs sorted to verify
+	result.Sort();
+
+	CHECK_EQUAL(2, result.Get(0)); // 10
+	CHECK_EQUAL(3, result.Get(1)); // 45
+	CHECK_EQUAL(5, result.Get(2)); // 10
+	CHECK_EQUAL(6, result.Get(3)); // 10
+	CHECK_EQUAL(7, result.Get(4)); // 18
 
 	// Clean up
 	result.Destroy();
