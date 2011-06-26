@@ -423,7 +423,7 @@ TEST(Column_FindAll_IntMax){
 	size_t i = 0;
 	size_t j = 0;
 	while(i < c.Size()){
-		if(c.Get(i) == value)
+		if(c.Get64(i) == value)
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
