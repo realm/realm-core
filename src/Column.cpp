@@ -509,7 +509,7 @@ void Column::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size
 		for (size_t i = 0; i < count; ++i) {
 			const Column col((void*)refs.Get(i));
 			col.FindAllHamming(result, value, maxdist, offset);
-			offset += offsets.Get(i);
+			offset += (size_t)offsets.Get(i);
 		}
 	}
 }

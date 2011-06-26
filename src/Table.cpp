@@ -232,7 +232,7 @@ void Table::InsertString(size_t column_id, size_t ndx, const char* value) {
 	assert(ndx <= m_size);
 
 	AdaptiveStringColumn& column = GetColumnString(column_id);
-	column.Insert(ndx, value, sizeof(value));
+	column.Insert(ndx, value, strlen(value));
 }
 
 TableView Table::FindAll(size_t column_id, int64_t value) {

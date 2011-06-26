@@ -296,7 +296,7 @@ size_t Index::Find(int64_t value) {
 
 		if (pos == -1) return (size_t)-1;
 		else if (!m_array.IsNode()) {
-			if (values.Get(pos) == value) return refs.Get(pos);
+			if (values.Get(pos) == value) return (size_t)refs.Get(pos);
 			else return (size_t)-1;
 		}
 		

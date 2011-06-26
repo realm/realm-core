@@ -55,18 +55,23 @@ public:
 	size_t Size() const;
 	bool IsEmpty() const;
 
+	// Overloads for setting values (should catch most integer types)
 	int Get(size_t ndx) const {return (int)Get64(ndx);}
-	bool Set(size_t ndx, int value) {return Set64(ndx, value);}
-	bool Set(size_t ndx, size_t value) {return Set64(ndx, value);}
-	bool Set(size_t ndx, intptr_t value) {return Set64(ndx, value);}
-	bool Insert(size_t ndx, int value) {return Insert64(ndx, value);}
-	bool Insert(size_t ndx, size_t value) {return Insert64(ndx, value);}
-	bool Insert(size_t ndx, intptr_t value) {return Insert64(ndx, value);}
+	bool Set(size_t ndx, int32_t value) {return Set64(ndx, value);}
+	bool Set(size_t ndx, uint32_t value) {return Set64(ndx, value);}
+	bool Set(size_t ndx, int64_t value) {return Set64(ndx, value);}
+	bool Set(size_t ndx, uint64_t value) {return Set64(ndx, value);}
+	bool Insert(size_t ndx, int32_t value) {return Insert64(ndx, value);}
+	bool Insert(size_t ndx, uint32_t value) {return Insert64(ndx, value);}
+	bool Insert(size_t ndx, int64_t value) {return Insert64(ndx, value);}
+	bool Insert(size_t ndx, uint64_t value) {return Insert64(ndx, value);}
 	bool Add() {return Add64(0);}
-	bool Add(int value) {return Add64(value);}
-	bool Add(size_t value) {return Add64(value);}
-	bool Add(intptr_t value) {return Add64(value);}
+	bool Add(int32_t value) {return Add64(value);}
+	bool Add(uint32_t value) {return Add64(value);}
+	bool Add(int64_t value) {return Add64(value);}
+	bool Add(uint64_t value) {return Add64(value);}
 	
+	// At the core all integers are 64bit
 	int64_t Get64(size_t ndx) const;
 	bool Set64(size_t ndx, int64_t value);
 	bool Insert64(size_t ndx, int64_t value);
