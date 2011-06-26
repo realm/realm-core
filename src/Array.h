@@ -41,6 +41,7 @@ public:
 	bool Add(int64_t value);
 	bool Set(size_t ndx, int64_t value);
 	int64_t Get(size_t ndx) const;
+	int64_t operator[](size_t ndx) const {return Get(ndx);}
 	int64_t Back() const;
 	void Delete(size_t ndx);
 	void Clear();
