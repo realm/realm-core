@@ -1,7 +1,9 @@
 #include "Index.h"
 #include <cassert>
 
+#ifndef MAX_LIST_SIZE
 #define MAX_LIST_SIZE 1000
+#endif
 
 Index::Index() : Column(COLUMN_HASREFS) {
 	// Add subcolumns for leafs

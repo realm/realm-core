@@ -13,7 +13,9 @@
 #include "Column.h"
 #include "Index.h"
 
+#ifndef MAX_LIST_SIZE
 #define MAX_LIST_SIZE 1000
+#endif
 
 Column::Column() : m_index(NULL) {
 }
