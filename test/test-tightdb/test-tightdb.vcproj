@@ -357,6 +357,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\src\TableView.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test-tightdb.cpp"
 				>
 			</File>
