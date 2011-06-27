@@ -43,7 +43,7 @@ public:
 	Column(const Column& column);
 	~Column();
 
-	void Destroy() {m_array.Destroy();}
+	void Destroy();
 
 	bool IsIntColumn() const {return true;}
 

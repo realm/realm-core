@@ -53,6 +53,12 @@ bool Column::operator==(const Column& column) const {
 }
 
 Column::~Column() {
+	delete m_index; // does not destroy index!
+}
+
+void Column::Destroy() {
+	ClearIndex();
+	m_array.Destroy();
 }
 
 
@@ -530,7 +536,11 @@ Index& Column::GetIndex() {
 }
 
 void Column::ClearIndex() {
-	m_index = NULL;
+	if (m_index) {
+		m_index->Destroy();
+		delete m_index;
+		m_index = NULL;
+	}
 }
 
 void Column::BuildIndex(Index& index) {
