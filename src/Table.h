@@ -47,7 +47,7 @@ public:
 	void SetString(size_t column_id, size_t ndx, const char* value);
 	void InsertString(size_t column_id, size_t ndx, const char* value);
 
-	void RegisterColumn(ColumnType type, const char* name);
+	size_t RegisterColumn(ColumnType type, const char* name);
 
 	Column& GetColumn(size_t ndx);
 	const Column& GetColumn(size_t ndx) const;

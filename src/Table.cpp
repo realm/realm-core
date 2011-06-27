@@ -31,7 +31,9 @@ Table::~Table() {
 	}
 }
 
-void Table::RegisterColumn(ColumnType type, const char* name) {
+size_t Table::RegisterColumn(ColumnType type, const char* name) {
+	const size_t column_ndx = m_cols.Size();
+
 	switch (type) {
 	case COLUMN_TYPE_INT:
 	case COLUMN_TYPE_BOOL:
@@ -75,6 +77,8 @@ void Table::RegisterColumn(ColumnType type, const char* name) {
 	default:
 		assert(false);
 	}
+
+	return column_ndx;
 }
 
 bool Table::HasIndex(size_t column_id) const {
