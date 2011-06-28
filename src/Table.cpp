@@ -257,6 +257,14 @@ void Table::InsertString(size_t column_id, size_t ndx, const char* value) {
 	column.Insert(ndx, value, strlen(value));
 }
 
+void Table::InsertDone() {
+	++m_size;
+
+#ifdef _DEBUG
+	Verify();
+#endif //_DEBUG
+}
+
 TableView Table::FindAll(size_t column_id, int64_t value) {
 	assert(column_id < m_columns.Size());
 

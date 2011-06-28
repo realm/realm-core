@@ -54,7 +54,7 @@ public: \
 		const size_t ndx = GetSize(); \
 		Insert##CType1 (0, ndx, CName1); \
 		Insert##CType2 (1, ndx, CName2); \
-		++m_size; \
+		InsertDone(); \
 	} \
 \
 	Cursor Add() {return Cursor(*this, AddRow());} \
@@ -123,7 +123,7 @@ public: \
 		Insert##CType2 (1, ndx, v2); \
 		Insert##CType3 (2, ndx, v3); \
 		Insert##CType4 (3, ndx, v4); \
-		++m_size; \
+		InsertDone(); \
 	} \
 \
 	Cursor Add() {return Cursor(*this, AddRow());} \
