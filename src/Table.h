@@ -67,6 +67,11 @@ public:
 	bool HasIndex(size_t column_id) const;
 	void SetIndex(size_t column_ud);
 
+	// Debug
+#ifdef _DEBUG
+	void Verify() const;
+#endif //_DEBUG
+
 protected:
 	ColumnBase& GetColumnBase(size_t ndx);
 	const ColumnBase& GetColumnBase(size_t ndx) const;

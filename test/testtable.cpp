@@ -17,6 +17,10 @@ TEST(Table1) {
 
 	CHECK_EQUAL(0, table.Get(0, ndx));
 	CHECK_EQUAL(10, table.Get(1, ndx));
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
 }
 
 enum Days {
@@ -45,6 +49,10 @@ TEST(Table2) {
 	CHECK_EQUAL(10, r.second);
 	CHECK_EQUAL(true, r.third);
 	CHECK_EQUAL(Wed, r.fourth);
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
 }
 
 TEST(Table3) {
@@ -68,6 +76,10 @@ TEST(Table3) {
 	table.first += 3;
 	CHECK_EQUAL(3, table[0].first);
 	CHECK_EQUAL(3, table[99].first);
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
 }
 
 TDB_TABLE_2(TestTableEnum,
@@ -86,6 +98,10 @@ TEST(Table4) {
 	// Test string column searching
 	CHECK_EQUAL((size_t)0, table.second.Find("Hello"));
 	CHECK_EQUAL((size_t)-1, table.second.Find("Foo"));
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
 }
 
 TEST(Table5) {
@@ -101,6 +117,10 @@ TEST(Table5) {
 	CHECK_EQUAL((size_t)0, table.second.Find(1000));
 	CHECK_EQUAL((size_t)1000, table.second.Find(0));
 	CHECK_EQUAL((size_t)-1, table.second.Find(1001));
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
 }
 
 TEST(Table6) {
@@ -119,6 +139,10 @@ TEST(Table6) {
 	TestTableEnum result = table.FindAll(TestQuery2(Mon, Tue, "Hello")).Sort().Limit(10);
 	size_t result2 = table.Range(10, 200).Find(TestQuery());
 	CHECK_EQUAL((size_t)-1, result2);
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
 }
 
 TEST(Table_FindAll_Int) {
@@ -143,4 +167,8 @@ TEST(Table_FindAll_Int) {
 	CHECK_EQUAL(5, v.GetRef(2));
 	CHECK_EQUAL(7, v.GetRef(3));
 	CHECK_EQUAL(9, v.GetRef(4));
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
 }

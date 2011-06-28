@@ -278,3 +278,35 @@ TableView Table::FindAllHamming(size_t column_id, uint64_t value, size_t max) {
 
 	return view;
 }
+
+#ifdef _DEBUG
+void Table::Verify() const {
+	const size_t column_count = GetColumnCount();
+	assert(column_count == m_cols.Size());
+	assert(column_count == m_columnNames.Size());
+	assert(column_count == m_spec.Size());
+
+	for (size_t i = 0; i < column_count; ++i) {
+		const ColumnType type = GetColumnType(i);
+		switch (type) {
+		case COLUMN_TYPE_INT:
+		case COLUMN_TYPE_BOOL:
+			{
+				const Column& column = GetColumn(i);
+				assert(column.Size() == m_size);
+				column.Verify();
+			}
+			break;
+		case COLUMN_TYPE_STRING:
+			{
+				const AdaptiveStringColumn& column = GetColumnString(i);
+				assert(column.Size() == m_size);
+				column.Verify();
+			}
+			break;
+		default:
+			assert(false);
+		}
+	}
+}
+#endif //_DEBUG
