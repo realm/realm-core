@@ -19,6 +19,11 @@ public:
 	Table(const Table& t);
 	~Table();
 
+	// Column meta info
+	size_t GetColumnCount() const;
+	const char* GetColumnName(size_t ndx) const;
+	ColumnType GetColumnType(size_t ndx) const;
+
 	Table& operator=(const Table& t);
 
 	bool IsEmpty() const {return m_size == 0;}

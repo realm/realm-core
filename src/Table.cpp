@@ -33,6 +33,20 @@ Table::~Table() {
 	m_cols.Destroy();
 }
 
+size_t Table::GetColumnCount() const {
+	return m_cols.Size();
+}
+
+const char* Table::GetColumnName(size_t ndx) const {
+	assert(ndx < GetColumnCount());
+	return (const char*)m_columnNames.Get(ndx);
+}
+
+ColumnType Table::GetColumnType(size_t ndx) const {
+	assert(ndx < GetColumnCount());
+	return (ColumnType)m_spec.Get(ndx);
+}
+
 size_t Table::RegisterColumn(ColumnType type, const char* name) {
 	const size_t column_ndx = m_cols.Size();
 
@@ -43,6 +57,7 @@ size_t Table::RegisterColumn(ColumnType type, const char* name) {
 			Column* newColumn = new Column(COLUMN_NORMAL);
 			
 			m_columnNames.Add((intptr_t)name);
+			m_spec.Add(type);
 
 			m_columns.Add((intptr_t)newColumn->GetRef());
 			newColumn->SetParent(&m_columns, m_columns.Size()-1);
@@ -69,6 +84,7 @@ size_t Table::RegisterColumn(ColumnType type, const char* name) {
 			AdaptiveStringColumn* newColumn = new AdaptiveStringColumn();
 			
 			m_columnNames.Add((intptr_t)name);
+			m_spec.Add(type);
 
 			m_columns.Add((intptr_t)newColumn->GetRef());
 			newColumn->SetParent(&m_columns, m_columns.Size()-1);

@@ -6,6 +6,11 @@ TEST(Table1) {
 	table.RegisterColumn(COLUMN_TYPE_INT, "first");
 	table.RegisterColumn(COLUMN_TYPE_INT, "second");
 
+	CHECK_EQUAL(COLUMN_TYPE_INT, table.GetColumnType(0));
+	CHECK_EQUAL(COLUMN_TYPE_INT, table.GetColumnType(1));
+	CHECK_EQUAL("first", table.GetColumnName(0));
+	CHECK_EQUAL("second", table.GetColumnName(1));
+
 	const size_t ndx = table.AddRow();
 	table.Set(0, ndx, 0);
 	table.Set(1, ndx, 10);
