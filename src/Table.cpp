@@ -6,7 +6,7 @@ const ColumnType Accessor::type = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type = COLUMN_TYPE_BOOL;
 const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
 
-Table::Table(const char* name) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS), m_columnNames(COLUMN_NORMAL) {
+Table::Table(const char* name) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS) {
 }
 
 Table::Table(const Table&) {
@@ -39,7 +39,7 @@ size_t Table::GetColumnCount() const {
 
 const char* Table::GetColumnName(size_t ndx) const {
 	assert(ndx < GetColumnCount());
-	return (const char*)m_columnNames.Get(ndx);
+	return m_columnNames.Get(ndx);
 }
 
 ColumnType Table::GetColumnType(size_t ndx) const {
@@ -56,7 +56,7 @@ size_t Table::RegisterColumn(ColumnType type, const char* name) {
 		{
 			Column* newColumn = new Column(COLUMN_NORMAL);
 			
-			m_columnNames.Add((intptr_t)name);
+			m_columnNames.Add(name);
 			m_spec.Add(type);
 
 			m_columns.Add((intptr_t)newColumn->GetRef());
@@ -83,7 +83,7 @@ size_t Table::RegisterColumn(ColumnType type, const char* name) {
 
 			AdaptiveStringColumn* newColumn = new AdaptiveStringColumn();
 			
-			m_columnNames.Add((intptr_t)name);
+			m_columnNames.Add(name);
 			m_spec.Add(type);
 
 			m_columns.Add((intptr_t)newColumn->GetRef());
