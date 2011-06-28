@@ -40,7 +40,7 @@ public:
 	int64_t Get64(size_t column_id, size_t ndx) const;
 	void Set64(size_t column_id, size_t ndx, int64_t value);
 
-	// NOTE: Low-level insert functions. Always insert in all rows at once
+	// NOTE: Low-level insert functions. Always insert in all columns at once
 	// and call InsertDone after to avoid table getting un-balanced.
 	void InsertInt(size_t column_id, size_t ndx, int value);
 	void InsertInt(size_t column_id, size_t ndx, int64_t value);
