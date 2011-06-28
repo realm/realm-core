@@ -48,3 +48,11 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 	assert(value);
 	return m_array.Find(value, len);
 }
+
+#ifdef _DEBUG
+
+void AdaptiveStringColumn::ToDot(FILE* f, bool) const {
+	m_array.ToDot(f);
+}
+
+#endif //_DEBUG

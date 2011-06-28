@@ -74,6 +74,7 @@ public:
 	// Debug
 #ifdef _DEBUG
 	void Verify() const;
+	void ToDot(const char* filename) const;
 #endif //_DEBUG
 
 protected:

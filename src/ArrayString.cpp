@@ -294,6 +294,9 @@ size_t ArrayString::Find(const char* value, size_t len) const {
 	return (size_t)-1;
 }
 
+#ifdef _DEBUG
+#include "stdio.h"
+
 void ArrayString::Stats() const {
 	size_t total = 0;
 	size_t longest = 0;
@@ -319,3 +322,19 @@ void ArrayString::Stats() const {
 	printf("Bytes zeroes: %d\n", zeroes);
 	printf("         avg: %d\n", zavg);
 }
+
+void ArrayString::ToDot(FILE* f) const {
+	void* ref = GetRef();
+
+	fprintf(f, "n%x [label=\"", ref);
+
+	for (size_t i = 0; i < m_len; ++i) {
+		if (i > 0) fprintf(f, " | ");
+
+		fprintf(f, "%s", Get(i));
+	}
+	
+	fprintf(f, "\"];\n");
+}
+
+#endif //_DEBUG

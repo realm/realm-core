@@ -288,6 +288,8 @@ TableView Table::FindAllHamming(size_t column_id, uint64_t value, size_t max) {
 }
 
 #ifdef _DEBUG
+#include "stdio.h"
+
 void Table::Verify() const {
 	const size_t column_count = GetColumnCount();
 	assert(column_count == m_cols.Size());
@@ -317,4 +319,70 @@ void Table::Verify() const {
 		}
 	}
 }
+
+void Table::ToDot(const char* filename) const {
+	FILE* f = NULL;
+	if (fopen_s(&f, filename, "w") !=0) return;
+
+	fprintf(f, "digraph G {\n");
+	fprintf(f, "node [shape=record];\n");
+
+	// Table header
+	fprintf(f, "table [label=\"{");
+	const size_t column_count = GetColumnCount();
+	for (size_t i = 0; i < column_count; ++i) {
+		if (i > 0) fprintf(f, "} | {");
+		fprintf(f, "%s | ", m_columnNames.Get(i));
+	
+		const ColumnType type = GetColumnType(i);
+		switch (type) {
+		case COLUMN_TYPE_INT:
+			fprintf(f, "Int"); break;
+		case COLUMN_TYPE_BOOL:
+			fprintf(f, "Bool"); break;
+		case COLUMN_TYPE_STRING:
+			fprintf(f, "String"); break;
+		default:
+			assert(false);
+		}
+
+		fprintf(f, "| <%d>", i);
+	}
+	fprintf(f, "}\"];\n");
+
+	// Refs
+	for (size_t i = 0; i < column_count; ++i) {
+		const ColumnBase& column = GetColumnBase(i);
+		void* ref = column.GetRef();
+		fprintf(f, "table:%d -> n%x\n", i, ref);
+	}
+
+
+	// Columns
+	for (size_t i = 0; i < column_count; ++i) {
+		const ColumnType type = GetColumnType(i);
+		switch (type) {
+		case COLUMN_TYPE_INT:
+		case COLUMN_TYPE_BOOL:
+			{
+				const Column& column = GetColumn(i);
+				column.ToDot(f);
+			}
+			break;
+		case COLUMN_TYPE_STRING:
+			{
+				const AdaptiveStringColumn& column = GetColumnString(i);
+				column.ToDot(f);
+			}
+			break;
+		default:
+			assert(false);
+		}
+	}
+
+	fprintf(f, "}\n");
+
+	fclose(f);
+}
+
 #endif //_DEBUG

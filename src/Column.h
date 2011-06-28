@@ -31,6 +31,8 @@ public:
 	virtual Index& GetIndex() = 0;
 	virtual void BuildIndex(Index& index) = 0;
 	virtual void ClearIndex() = 0;
+
+	virtual void* GetRef() const = 0;
 };
 
 class Column : public ColumnBase {
@@ -106,6 +108,7 @@ public:
 #ifdef _DEBUG
 	void Print() const;
 	void Verify() const;
+	void ToDot(FILE* f, bool isTop=true) const;
 #endif //_DEBUG
 
 protected:
@@ -193,6 +196,10 @@ public:
 
 	size_t Find(const char* value) const;
 	size_t Find(const char* value, size_t len) const;
+
+#ifdef _DEBUG
+	void ToDot(FILE* f, bool isTop=true) const;
+#endif //_DEBUG
 
 private:
 	ArrayString m_array;

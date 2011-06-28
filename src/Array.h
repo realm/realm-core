@@ -72,6 +72,7 @@ public:
 #ifdef _DEBUG
 	void Print() const;
 	void Verify() const;
+	void ToDot(FILE* f, bool horizontal=false) const;
 #endif //_DEBUG
 
 protected:

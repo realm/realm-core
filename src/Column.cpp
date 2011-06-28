@@ -634,4 +634,38 @@ void Column::Verify() const {
 	}
 	else m_array.Verify();
 }
+
+void Column::ToDot(FILE* f, bool isTop) const {
+	void* ref = m_array.GetRef();
+	if (isTop) fprintf(f, "subgraph cluster_%d {\ncolor=black;\nstyle=dashed;\n", ref);
+
+	if (m_array.IsNode()) {
+		const Array offsets = m_array.GetSubArray(0);
+		const Array refs = m_array.GetSubArray(1);
+
+		fprintf(f, "n%x [label=\"", ref);
+		for (size_t i = 0; i < offsets.Size(); ++i) {
+			if (i > 0) fprintf(f, " | ");
+			fprintf(f, "{%lld", offsets.Get(i));
+			fprintf(f, " | <%d>}", i);
+		}
+		fprintf(f, "\"];\n");
+
+		for (size_t i = 0; i < refs.Size(); ++i) {
+			void* r = (void*)refs.Get(i);
+			fprintf(f, "n%x:%d -> n%x\n", ref, i, r);
+		}
+
+		// Sub-columns
+		for (size_t i = 0; i < refs.Size(); ++i) {
+			void* r = (void*)refs.Get(i);
+			const Column col(r);
+			col.ToDot(f, false);
+		}
+	}
+	else m_array.ToDot(f, false);
+
+	if (isTop) fprintf(f, "}\n\n");
+}
+
 #endif //_DEBUG

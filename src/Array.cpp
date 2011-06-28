@@ -1,8 +1,6 @@
 #include "Array.h"
 #include <cassert>
 
-#define MAX_LIST_SIZE 1000
-
 #include "Column.h"
 
 Array::Array()
@@ -1028,4 +1026,29 @@ void Array::Print() const {
 void Array::Verify() const {
 	assert(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
 }
+
+void Array::ToDot(FILE* f, bool) const{
+	void* ref = GetRef();
+
+	fprintf(f, "n%x [label=\"", ref);
+
+	//if (!horizontal) fprintf(f, "{");
+	for (size_t i = 0; i < m_len; ++i) {
+		if (i > 0) fprintf(f, " | ");
+
+		if (m_hasRefs) fprintf(f, "<%d>",i);
+		else fprintf(f, "%lld", Get(i));
+	}
+	//if (!horizontal) fprintf(f, "}");
+	
+	fprintf(f, "\"];\n");
+
+	if (m_hasRefs) {
+		for (size_t i = 0; i < m_len; ++i) {
+			fprintf(f, "n%x:%d -> n%x\n", ref, i, Get(i));
+		}
+	}
+	fprintf(f, "\n");
+}
+
 #endif //_DEBUG

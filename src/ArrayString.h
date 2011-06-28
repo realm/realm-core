@@ -19,7 +19,10 @@ public:
 	size_t Find(const char* value) const;
 	size_t Find(const char* value, size_t len) const;
 
+#ifdef _DEBUG
 	void Stats() const;
+	void ToDot(FILE* f) const;
+#endif //_DEBUG
 
 private:
 	bool Alloc(size_t count, size_t width);
