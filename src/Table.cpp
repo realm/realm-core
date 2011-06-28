@@ -21,6 +21,7 @@ Table& Table::operator=(const Table&) {
 }
 
 Table::~Table() {
+	m_spec.Destroy();
 	m_columns.Destroy();
 	m_columnNames.Destroy();
 
@@ -29,6 +30,7 @@ Table::~Table() {
 		ColumnBase* const column = (ColumnBase* const)m_cols.Get(i);
 		delete(column);
 	}
+	m_cols.Destroy();
 }
 
 size_t Table::RegisterColumn(ColumnType type, const char* name) {

@@ -125,6 +125,8 @@ const Array Array::GetSubArray(size_t ndx) const {
 }
 
 void Array::Destroy() {
+	if (!m_data) return;
+
 	if (m_hasRefs) {
 		for (size_t i = 0; i < Size(); ++i) {
 			void* ref = (void*)Get(i);
