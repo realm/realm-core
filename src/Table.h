@@ -107,6 +107,8 @@ public:
 	// Adaptive ints
 	int Get(size_t column_id, size_t ndx) const;
 	void Set(size_t column_id, size_t ndx, int value);
+	int64_t Get64(size_t column_id, size_t ndx) const;
+	void Set64(size_t column_id, size_t ndx, int64_t value);
 
 	// Strings
 	const char* GetString(size_t column_id, size_t ndx) const;
