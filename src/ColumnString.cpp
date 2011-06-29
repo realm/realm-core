@@ -5,7 +5,7 @@
 
 #include "Column.h"
 
-AdaptiveStringColumn::AdaptiveStringColumn() : Column(COLUMN_NORMAL) {
+AdaptiveStringColumn::AdaptiveStringColumn() {
 }
 
 AdaptiveStringColumn::~AdaptiveStringColumn() {

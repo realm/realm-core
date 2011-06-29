@@ -28,7 +28,7 @@ public:
 
 	// Indexing
 	virtual bool HasIndex() const = 0;
-	virtual Index& GetIndex() = 0;
+	//virtual Index& GetIndex() = 0;
 	virtual void BuildIndex(Index& index) = 0;
 	virtual void ClearIndex() = 0;
 
@@ -176,7 +176,7 @@ private:
 
 #include "ArrayString.h"
 
-class AdaptiveStringColumn : public Column {
+class AdaptiveStringColumn : public ColumnBase {
 public:
 	AdaptiveStringColumn();
 	~AdaptiveStringColumn();
@@ -197,7 +197,18 @@ public:
 	size_t Find(const char* value) const;
 	size_t Find(const char* value, size_t len) const;
 
+	// Index
+	bool HasIndex() const {return false;}
+	void BuildIndex(Index&) {}
+	void ClearIndex() {}
+	size_t FindWithIndex(int64_t) const {return (size_t)-1;}
+
+	void* GetRef() const {return m_array.GetRef();}
+	void SetParent(Array* parent, size_t pndx) {m_array.SetParent(parent, pndx);}
+
+
 #ifdef _DEBUG
+	void Verify() const {};
 	void ToDot(FILE* f, bool isTop=true) const;
 #endif //_DEBUG
 
