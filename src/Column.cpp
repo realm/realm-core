@@ -17,7 +17,7 @@
 #define MAX_LIST_SIZE 1000
 #endif
 
-Column::Column() : m_index(NULL) {
+Column::Column() : m_array(COLUMN_NORMAL), m_index(NULL) {
 }
 
 Column::Column(ColumnDef type, Array* parent, size_t pndx) : m_array(type, parent, pndx),  m_index(NULL) {

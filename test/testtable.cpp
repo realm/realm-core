@@ -159,6 +159,11 @@ TEST(Table_FindAll_Int) {
 	table.Add(0, 10, true, Wed);
 	table.Add(0, 20, true, Wed);
 
+	// Search for a value that does not exits
+	const TableView v0 = table.second.FindAll(5);
+	CHECK_EQUAL(0, v0.GetSize());
+
+	// Search for a value with several matches
 	const TableView v = table.second.FindAll(20);
 
 	CHECK_EQUAL(5, v.GetSize());
