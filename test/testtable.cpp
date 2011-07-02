@@ -104,15 +104,37 @@ TEST(Table4) {
 #endif //_DEBUG
 }
 
-TEST(Table5) {
+TEST(Table_Delete) {
+	TestTable table;
+
+	for (int i = 0; i < 10; ++i) {
+		table.Add(0, i, true, Wed);
+	}
+
+	table.DeleteRow(0);
+	table.DeleteRow(4);
+	table.DeleteRow(7);
+
+	CHECK_EQUAL(1, table[0].second);
+	CHECK_EQUAL(2, table[1].second);
+	CHECK_EQUAL(3, table[2].second);
+	CHECK_EQUAL(4, table[3].second);
+	CHECK_EQUAL(6, table[4].second);
+	CHECK_EQUAL(7, table[5].second);
+	CHECK_EQUAL(8, table[6].second);
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
+}
+
+
+TEST(Table_Find_Int) {
 	TestTable table;
 
 	for (int i = 1000; i >= 0; --i) {
 		table.Add(0, i, true, Wed);
 	}
-
-	// Create a new index on second column
-	//table.SetIndex(1);
 
 	CHECK_EQUAL((size_t)0, table.second.Find(1000));
 	CHECK_EQUAL((size_t)1000, table.second.Find(0));

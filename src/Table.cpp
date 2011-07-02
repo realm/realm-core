@@ -183,6 +183,7 @@ void Table::DeleteRow(size_t ndx) {
 		ColumnBase& column = GetColumnBase(i);
 		column.Delete(ndx);
 	}
+	--m_size;
 }
 
 int Table::Get(size_t column_id, size_t ndx) const {
