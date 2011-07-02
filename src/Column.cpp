@@ -134,6 +134,8 @@ int64_t Column::Get64(size_t ndx) const {
 }
 
 bool Column::Set64(size_t ndx, int64_t value) {
+	const int64_t oldVal = m_index ? Get64(ndx) : 0; // cache oldval for index
+
 	if (IsNode()) {
 		// Get subnode table
 		const Array offsets = m_array.GetSubArray(0);
@@ -151,6 +153,9 @@ bool Column::Set64(size_t ndx, int64_t value) {
 		if (!target.Set64(local_ndx, value)) return false;
 	}
 	else if (!m_array.Set(ndx, value)) return false;
+
+	// Update index
+	if (m_index) m_index->Set(ndx, oldVal, value);
 
 #ifdef _DEBUG
 	Verify();
@@ -199,6 +204,12 @@ bool Column::Insert64(size_t ndx, int64_t value) {
 	default:
 		assert(false);
 		return false;
+	}
+
+	// Update index
+	if (m_index) {
+		const bool isLast = (ndx+1 == Size());
+		m_index->Insert(ndx, value, isLast);
 	}
 
 #ifdef _DEBUG
@@ -379,6 +390,8 @@ bool Column::NodeInsertSplit(size_t ndx, void* newRef) {
 void Column::Delete(size_t ndx) {
 	assert(ndx < Size());
 
+	const int64_t oldVal = m_index ? Get64(ndx) : 0; // cache oldval for index
+
 	if (!IsNode()) m_array.Delete(ndx);
 	else {
 		// Get subnode table
@@ -406,6 +419,12 @@ void Column::Delete(size_t ndx) {
 
 		// Update lower offsets
 		if (node_ndx < offsets.Size()) offsets.Increment(-1, node_ndx);
+	}
+
+	// Update index
+	if (m_index) {
+		const bool isLast = (ndx == Size());
+		m_index->Delete(ndx, oldVal, isLast);
 	}
 }
 

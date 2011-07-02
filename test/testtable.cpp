@@ -199,3 +199,86 @@ TEST(Table_FindAll_Int) {
 	table.Verify();
 #endif //_DEBUG
 }
+
+TEST(Table_Index_Int) {
+	TestTable table;
+
+	table.Add(0,  1, true, Wed);
+	table.Add(0, 15, true, Wed);
+	table.Add(0, 10, true, Wed);
+	table.Add(0, 20, true, Wed);
+	table.Add(0, 11, true, Wed);
+	table.Add(0, 45, true, Wed);
+	table.Add(0, 10, true, Wed);
+	table.Add(0,  0, true, Wed);
+	table.Add(0, 30, true, Wed);
+	table.Add(0,  9, true, Wed);
+
+	// Create index for column two
+	table.SetIndex(1);
+
+	// Search for a value that does not exits
+	const size_t r1 = table.second.Find(2);
+	CHECK_EQUAL(-1, r1);
+
+	// Find existing values
+	CHECK_EQUAL(0, table.second.Find(1));
+	CHECK_EQUAL(1, table.second.Find(15));
+	CHECK_EQUAL(2, table.second.Find(10));
+	CHECK_EQUAL(3, table.second.Find(20));
+	CHECK_EQUAL(4, table.second.Find(11));
+	CHECK_EQUAL(5, table.second.Find(45)); 
+	//CHECK_EQUAL(6, table.second.Find(10)); // only finds first match
+	CHECK_EQUAL(7, table.second.Find(0));
+	CHECK_EQUAL(8, table.second.Find(30));
+	CHECK_EQUAL(9, table.second.Find(9));
+
+	// Change some values
+	table[2].second = 13;
+	table[9].second = 100;
+
+	CHECK_EQUAL(0, table.second.Find(1));
+	CHECK_EQUAL(1, table.second.Find(15));
+	CHECK_EQUAL(2, table.second.Find(13));
+	CHECK_EQUAL(3, table.second.Find(20));
+	CHECK_EQUAL(4, table.second.Find(11));
+	CHECK_EQUAL(5, table.second.Find(45)); 
+	CHECK_EQUAL(6, table.second.Find(10));
+	CHECK_EQUAL(7, table.second.Find(0));
+	CHECK_EQUAL(8, table.second.Find(30));
+	CHECK_EQUAL(9, table.second.Find(100));
+
+	// Insert values
+	table.Add(0, 29, true, Wed);
+	//TODO: More than add
+
+	CHECK_EQUAL(0, table.second.Find(1));
+	CHECK_EQUAL(1, table.second.Find(15));
+	CHECK_EQUAL(2, table.second.Find(13));
+	CHECK_EQUAL(3, table.second.Find(20));
+	CHECK_EQUAL(4, table.second.Find(11));
+	CHECK_EQUAL(5, table.second.Find(45)); 
+	CHECK_EQUAL(6, table.second.Find(10));
+	CHECK_EQUAL(7, table.second.Find(0));
+	CHECK_EQUAL(8, table.second.Find(30));
+	CHECK_EQUAL(9, table.second.Find(100));
+	CHECK_EQUAL(10, table.second.Find(29));
+
+	// Delete some values
+	table.DeleteRow(0);
+	table.DeleteRow(5);
+	table.DeleteRow(8);
+
+	CHECK_EQUAL(0, table.second.Find(15));
+	CHECK_EQUAL(1, table.second.Find(13));
+	CHECK_EQUAL(2, table.second.Find(20));
+	CHECK_EQUAL(3, table.second.Find(11));
+	CHECK_EQUAL(4, table.second.Find(45)); 
+	CHECK_EQUAL(5, table.second.Find(0));
+	CHECK_EQUAL(6, table.second.Find(30));
+	CHECK_EQUAL(7, table.second.Find(100));
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
+}
