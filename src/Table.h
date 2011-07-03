@@ -39,6 +39,8 @@ public:
 	void Set(size_t column_id, size_t ndx, int value);
 	int64_t Get64(size_t column_id, size_t ndx) const;
 	void Set64(size_t column_id, size_t ndx, int64_t value);
+	bool GetBool(size_t column_id, size_t ndx) const;
+	void SetBool(size_t column_id, size_t ndx, bool value);
 
 	// NOTE: Low-level insert functions. Always insert in all columns at once
 	// and call InsertDone after to avoid table getting un-balanced.
@@ -146,6 +148,9 @@ protected:
 	void Set(int value) {m_cursor->m_table.Set(m_column, m_cursor->m_index, value);}
 	int64_t Get64() const {return m_cursor->m_table.Get64(m_column, m_cursor->m_index);}
 	void Set64(int64_t value) {m_cursor->m_table.Set64(m_column, m_cursor->m_index, value);}
+	bool GetBool() const {return m_cursor->m_table.GetBool(m_column, m_cursor->m_index);}
+	void SetBool(bool value) {m_cursor->m_table.SetBool(m_column, m_cursor->m_index, value);}
+
 
 	const char* GetString() const {return m_cursor->m_table.GetString(m_column, m_cursor->m_index);}
 	void SetString(const char* value) {m_cursor->m_table.SetString(m_column, m_cursor->m_index, value);}
@@ -170,8 +175,8 @@ public:
 
 class AccessorBool : public Accessor {
 public:
-	operator bool() const {return (Get() != 0);}
-	void operator=(bool value) {Set(value ? 1 : 0);}
+	operator bool() const {return GetBool();}
+	void operator=(bool value) {SetBool(value);}
 	void Flip() {Set(Get() != 0 ? 0 : 1);}
 	static const ColumnType type;
 };

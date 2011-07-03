@@ -218,6 +218,24 @@ void Table::Set64(size_t column_id, size_t ndx, int64_t value) {
 	column.Set64(ndx, value);
 }
 
+bool Table::GetBool(size_t column_id, size_t ndx) const {
+	assert(column_id < m_cols.Size());
+	assert(GetColumnType(column_id) == COLUMN_TYPE_BOOL);
+	assert(ndx < m_size);
+
+	const Column& column = GetColumn(column_id);
+	return column.Get64(ndx) != 0;
+}
+
+void Table::SetBool(size_t column_id, size_t ndx, bool value) {
+	assert(column_id < m_cols.Size());
+	assert(GetColumnType(column_id) == COLUMN_TYPE_BOOL);
+	assert(ndx < m_size);
+
+	Column& column = GetColumn(column_id);
+	column.Set64(ndx, value ? 1 : 0);
+}
+
 void Table::InsertInt(size_t column_id, size_t ndx, int value) {
 	assert(column_id < m_cols.Size());
 	assert(ndx <= m_size);
