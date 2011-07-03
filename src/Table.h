@@ -158,12 +158,14 @@ class AccessorInt : public Accessor {
 public:
 	//operator int() const {return Get();}
 	operator int64_t() const {return Get64();}
-	void operator=(int value) {Set(value);}
-	void operator=(unsigned int value) {Set(value);}
+	void operator=(int32_t value) {Set(value);}
+	void operator=(uint32_t value) {Set(value);}
 	void operator=(int64_t value) {Set64(value);}
 	void operator=(uint64_t value) {Set64(value);}
-	void operator+=(int value) {Set(Get()+value);}
-	void operator+=(unsigned int value) {Set(Get()+value);}
+	void operator+=(int32_t value) {Set(Get()+value);}
+	void operator+=(uint32_t value) {Set(Get()+value);}
+	void operator+=(int64_t value) {Set64(Get64()+value);}
+	void operator+=(uint64_t value) {Set64(Get64()+value);}
 };
 
 class AccessorBool : public Accessor {
@@ -203,7 +205,10 @@ protected:
 
 class ColumnProxyInt : public ColumnProxy {
 public:
-	size_t Find(int value) const {return m_table->GetColumn(m_column).Find(value);}
+	size_t Find(int32_t value) const {return m_table->GetColumn(m_column).Find(value);}
+	size_t Find(uint32_t value) const {return m_table->GetColumn(m_column).Find(value);}
+	size_t Find(int64_t value) const {return m_table->GetColumn(m_column).Find(value);}
+	size_t Find(uint64_t value) const {return m_table->GetColumn(m_column).Find(value);}
 	TableView FindAll(int value) {return m_table->FindAll(m_column, value);}
 	TableView FindAllHamming(uint64_t value, size_t max) {return m_table->FindAllHamming(m_column, value, max);}
 	int operator+=(int value) {m_table->GetColumn(m_column).Increment64(value); return 0;}
@@ -233,7 +238,7 @@ public:
 private:
 	const T m_value;
 };
-#define TypeInt int
+#define TypeInt int64_t
 #define TypeBool bool
 #define TypeString const char*
 
