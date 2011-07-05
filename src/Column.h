@@ -49,7 +49,6 @@ public:
 
 	bool IsIntColumn() const {return true;}
 
-	Column& operator=(const Column& column);
 	bool operator==(const Column& column) const;
 
 	void SetParent(Array* parent, size_t pndx);
@@ -110,6 +109,9 @@ public:
 	void Verify() const;
 	void ToDot(FILE* f, bool isTop=true) const;
 #endif //_DEBUG
+
+private:
+	Column& operator=(const Column&) {return *this;} // not allowed
 
 protected:
 	// Node functions

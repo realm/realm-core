@@ -73,6 +73,9 @@ public:
 	void ToDot(FILE* f, bool horizontal=false) const;
 #endif //_DEBUG
 
+private:
+	Array& operator=(const Array&) {return *this;} // not allowed
+
 protected:
 	void Create(void* ref);
 

@@ -42,12 +42,6 @@ Column::Column(void* ref, const Array* parent, size_t pndx): m_array(ref, parent
 Column::Column(const Column& column) : m_array(column.m_array), m_index(NULL) {
 }
 
-Column& Column::operator=(const Column& column) {
-	m_array = column.m_array;
-	m_index = column.m_index;
-	return *this;
-}
-
 bool Column::operator==(const Column& column) const {
 	return m_array == column.m_array;
 }
