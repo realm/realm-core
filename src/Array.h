@@ -21,11 +21,9 @@ enum ColumnDef {
 
 class Array {
 public:
-	Array();
-	Array(void* ref);
-	Array(void* ref, Array* parent, size_t pndx);
+	Array(void* ref, Array* parent=NULL, size_t pndx=0);
 	Array(void* ref, const Array* parent, size_t pndx);
-	Array(ColumnDef type, Array* parent=NULL, size_t pndx=0);
+	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0);
 	Array(const Array& a);
 
 	bool operator==(const Array& a) const;

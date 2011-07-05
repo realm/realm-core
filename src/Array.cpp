@@ -3,16 +3,6 @@
 
 #include "Column.h"
 
-Array::Array()
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(NULL), m_parentNdx(0) {
-	SetWidth(0);
-}
-
-Array::Array(void* ref)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(NULL), m_parentNdx(0) {
-	Create(ref);
-}
-
 Array::Array(void* ref, Array* parent, size_t pndx)
 : m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx) {
 	Create(ref);
