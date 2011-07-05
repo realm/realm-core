@@ -17,9 +17,6 @@
 #define MAX_LIST_SIZE 1000
 #endif
 
-Column::Column() : m_array(COLUMN_NORMAL), m_index(NULL) {
-}
-
 Column::Column(ColumnDef type, Array* parent, size_t pndx) : m_array(type, parent, pndx),  m_index(NULL) {
 	// Add subcolumns for nodes
 	if (IsNode()) {
@@ -28,9 +25,6 @@ Column::Column(ColumnDef type, Array* parent, size_t pndx) : m_array(type, paren
 		m_array.Add((intptr_t)offsets.GetRef());
 		m_array.Add((intptr_t)refs.GetRef());
 	}
-}
-
-Column::Column(void* ref) : m_array(ref), m_index(NULL) {
 }
 
 Column::Column(void* ref, Array* parent, size_t pndx) : m_array(ref, parent, pndx), m_index(NULL) {

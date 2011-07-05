@@ -37,10 +37,8 @@ public:
 
 class Column : public ColumnBase {
 public:
-	Column();
-	Column(ColumnDef type, Array* parent=NULL, size_t pndx=0);
-	Column(void* ref);
-	Column(void* ref, Array* parent, size_t pndx);
+	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0);
+	Column(void* ref, Array* parent=NULL, size_t pndx=0);
 	Column(void* ref, const Array* parent, size_t pndx);
 	Column(const Column& column);
 	~Column();
