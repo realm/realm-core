@@ -190,17 +190,18 @@ bool ArrayString::Alloc(size_t count, size_t width) {
 		if (new_capacity < len) new_capacity = len; 
 
 		// Allocate the space
-		unsigned char* data = NULL;
-		if (m_data) data = (unsigned char*)realloc(m_data-8, new_capacity);
-		else data = (unsigned char*)malloc(new_capacity);
+		MemRef mref;
+		if (m_data) mref = m_alloc.ReAlloc(m_data-8, new_capacity);
+		else mref = m_alloc.Alloc(new_capacity);
 
-		if (!data) return false;
+		if (!mref.pointer) return false;
 
-		m_data = data+8;
+		m_ref = mref.ref;
+		m_data = (unsigned char*)mref.pointer + 8;
 		m_capacity = new_capacity;
 
 		// Update ref in parent
-		if (m_parent) m_parent->Set(m_parentNdx, (uintptr_t)data);
+		if (m_parent) m_parent->Set(m_parentNdx, mref.ref);
 	}
 
 	// Pack width in 3 bits (log2)
@@ -324,7 +325,7 @@ void ArrayString::Stats() const {
 }
 
 void ArrayString::ToDot(FILE* f) const {
-	void* ref = GetRef();
+	const size_t ref = GetRef();
 
 	fprintf(f, "n%x [label=\"", ref);
 

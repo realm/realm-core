@@ -17,20 +17,20 @@
 #define MAX_LIST_SIZE 1000
 #endif
 
-Column::Column(ColumnDef type, Array* parent, size_t pndx) : m_array(type, parent, pndx),  m_index(NULL) {
+Column::Column(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc) : m_array(type, parent, pndx, alloc),  m_index(NULL) {
 	// Add subcolumns for nodes
 	if (IsNode()) {
-		const Array offsets(COLUMN_NORMAL);
-		const Array refs(COLUMN_HASREFS);
+		const Array offsets(COLUMN_NORMAL, NULL, 0, m_array.GetAllocator());
+		const Array refs(COLUMN_HASREFS, NULL, 0, m_array.GetAllocator());
 		m_array.Add((intptr_t)offsets.GetRef());
 		m_array.Add((intptr_t)refs.GetRef());
 	}
 }
 
-Column::Column(void* ref, Array* parent, size_t pndx) : m_array(ref, parent, pndx), m_index(NULL) {
+Column::Column(size_t ref, Array* parent, size_t pndx, Allocator& alloc) : m_array(ref, parent, pndx, alloc), m_index(NULL) {
 }
 
-Column::Column(void* ref, const Array* parent, size_t pndx): m_array(ref, parent, pndx), m_index(NULL) {
+Column::Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc): m_array(ref, parent, pndx, alloc), m_index(NULL) {
 }
 
 Column::Column(const Column& column) : m_array(column.m_array), m_index(NULL) {
@@ -73,13 +73,13 @@ void Column::SetParent(Array* parent, size_t pndx) {
 static Column GetColumnFromRef(Array& parent, size_t ndx) {
 	assert(parent.HasRefs());
 	assert(ndx < parent.Size());
-	return Column((void*)parent.Get(ndx), &parent, ndx);
+	return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
 }
 
 static const Column GetColumnFromRef(const Array& parent, size_t ndx) {
 	assert(parent.HasRefs());
 	assert(ndx < parent.Size());
-	return Column((void*)parent.Get(ndx), &parent, ndx);
+	return Column((size_t)parent.Get(ndx), &parent, ndx);
 }
 
 /*Column Column::GetSubColumn(size_t ndx) {
@@ -256,7 +256,7 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 			// Move items below split to new node
 			const size_t len = refs.Size();
 			for (size_t i = node_ndx; i < len; ++i) {
-				newNode.NodeAdd((void*)refs.Get(i));
+				newNode.NodeAdd((size_t)refs.Get(i));
 			}
 			offsets.Resize(node_ndx);
 			refs.Resize(node_ndx);
@@ -290,9 +290,9 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 	}
 }
 
-size_t GetRefSize(void* ref) {
+size_t Column::GetRefSize(size_t ref) const {
 	// parse the length part of 8byte header
-	const uint8_t* const header = (uint8_t*)ref;
+	const uint8_t* const header = (uint8_t*)m_array.GetAllocator().Translate(ref);
 	return (header[1] << 16) + (header[2] << 8) + header[3];
 }
 
@@ -303,7 +303,7 @@ void SetRefSize(void* ref, size_t len) {
 	header[3] = len & 0x000000FF;
 }
 
-bool Column::NodeInsert(size_t ndx, void* ref) {
+bool Column::NodeInsert(size_t ndx, size_t ref) {
 	assert(ref);
 	assert(IsNode());
 	
@@ -322,7 +322,7 @@ bool Column::NodeInsert(size_t ndx, void* ref) {
 	return refs.Insert(ndx, (intptr_t)ref);
 }
 
-bool Column::NodeAdd(void* ref) {
+bool Column::NodeAdd(size_t ref) {
 	assert(ref);
 	assert(IsNode());
 
@@ -342,14 +342,14 @@ bool Column::NodeUpdateOffsets(size_t ndx) {
 	Array refs = m_array.GetSubArray(1);
 	assert(ndx < offsets.Size());
 
-	const int64_t newSize = GetRefSize((void*)refs.Get(ndx));
+	const int64_t newSize = GetRefSize((size_t)refs.Get(ndx));
 	const int64_t oldSize = offsets.Get(ndx) - (ndx ? offsets.Get(ndx-1) : 0);
 	const int64_t diff = newSize - oldSize;
 	
 	return offsets.Increment(diff, ndx);
 }
 
-bool Column::NodeInsertSplit(size_t ndx, void* newRef) {
+bool Column::NodeInsertSplit(size_t ndx, size_t newRef) {
 	assert(IsNode());
 	assert(newRef);
 
@@ -359,7 +359,7 @@ bool Column::NodeInsertSplit(size_t ndx, void* newRef) {
 
 	// Update original size
 	const int64_t offset = ndx ? offsets.Get(ndx-1) : 0;
-	const int64_t newSize = GetRefSize((void*)refs.Get(ndx));
+	const int64_t newSize = GetRefSize((size_t)refs.Get(ndx));
 	const int64_t oldSize = offsets.Get(ndx) - offset;
 	const int64_t diff = newSize - oldSize;
 	const int64_t newOffset = offset + newSize;
@@ -448,7 +448,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 
 		if (start == 0 && end == -1) {
 			for (size_t i = 0; i < count; ++i) {
-				const Column col((void*)refs.Get(i));
+				const Column col((size_t)refs.Get(i));
 				const size_t ndx = col.Find(value);
 				if (ndx != -1) {
 					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
@@ -464,7 +464,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 			size_t e = (end == -1 || (int)end >= offsets.Get(i)) ? -1 : end - offset;
 
 			for (;;) {
-				const Column col((void*)refs.Get(i));
+				const Column col((size_t)refs.Get(i));
 
 				const size_t ndx = col.Find(value, s, e);
 				if (ndx != -1) {
@@ -504,7 +504,7 @@ void Column::FindAll(Column& result, int64_t value, size_t offset,
 		const size_t count = refs.Size();
 
 		for (size_t i = 0; i < count; ++i) {
-			const Column col((void*)refs.Get(i));
+			const Column col((size_t)refs.Get(i));
 			const size_t localOffset = i ? (size_t)offsets.Get(i-1) : 0;
 			col.FindAll(result, value, (localOffset+offset));
 		}
@@ -522,7 +522,7 @@ void Column::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size
 		const size_t count = refs.Size();
 
 		for (size_t i = 0; i < count; ++i) {
-			const Column col((void*)refs.Get(i));
+			const Column col((size_t)refs.Get(i));
 			col.FindAllHamming(result, value, maxdist, offset);
 			offset += (size_t)offsets.Get(i);
 		}
@@ -604,7 +604,7 @@ void Column::Print() const {
 			printf(" %d: %d %x\n", i, (int)offsets.Get(i), (int)refs.Get(i));
 		}
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			const Column col((void*)refs.Get(i));
+			const Column col((size_t)refs.Get(i));
 			col.Print();
 		}
 	}
@@ -627,7 +627,7 @@ void Column::Verify() const {
 
 		size_t off = 0;
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			void* ref = (void*)refs.Get(i);
+			const size_t ref = (size_t)refs.Get(i);
 			assert(ref);
 
 			const Column col(ref);
@@ -643,7 +643,7 @@ void Column::Verify() const {
 }
 
 void Column::ToDot(FILE* f, bool isTop) const {
-	void* ref = m_array.GetRef();
+	const size_t ref = m_array.GetRef();
 	if (isTop) fprintf(f, "subgraph cluster_%d {\ncolor=black;\nstyle=dashed;\n", ref);
 
 	if (m_array.IsNode()) {
@@ -665,7 +665,7 @@ void Column::ToDot(FILE* f, bool isTop) const {
 
 		// Sub-columns
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			void* r = (void*)refs.Get(i);
+			const size_t r = (size_t)refs.Get(i);
 			const Column col(r);
 			col.ToDot(f, false);
 		}

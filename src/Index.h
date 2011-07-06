@@ -7,8 +7,8 @@ class Index : public Column {
 public:
 	Index();
 	Index(ColumnDef type, Array* parent=NULL, size_t pndx=0);
-	Index(void* ref);
-	Index(void* ref, Array* parent, size_t pndx);
+	Index(size_t ref);
+	Index(size_t ref, Array* parent, size_t pndx);
 
 	bool IsEmpty() const;
 
@@ -32,7 +32,7 @@ protected:
 	bool DoDelete(size_t ndx, int64_t value);
 
 	// Node functions
-	bool NodeAdd(void* ref);
+	bool NodeAdd(size_t ref);
 
 	void UpdateRefs(size_t pos, int diff);
 

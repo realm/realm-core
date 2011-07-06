@@ -16,10 +16,10 @@ Index::Index() : Column(COLUMN_HASREFS) {
 Index::Index(ColumnDef type, Array* parent, size_t pndx) : Column(type, parent, pndx) {
 }
 
-Index::Index(void* ref) : Column(ref) {
+Index::Index(size_t ref) : Column(ref) {
 }
 
-Index::Index(void* ref, Array* parent, size_t pndx) : Column(ref, parent, pndx) {
+Index::Index(size_t ref, Array* parent, size_t pndx) : Column(ref, parent, pndx) {
 }
 
 bool Index::IsEmpty() const {
@@ -44,13 +44,13 @@ void Index::BuildIndex(const Column& src) {
 static Index GetIndexFromRef(Array& parent, size_t ndx) {
 	assert(parent.HasRefs());
 	assert(ndx < parent.Size());
-	return Index((void*)parent.Get(ndx), &parent, ndx);
+	return Index((size_t)parent.Get(ndx), &parent, ndx);
 }
 
 static const Index GetIndexFromRef(const Array& parent, size_t ndx) {
 	assert(parent.HasRefs());
 	assert(ndx < parent.Size());
-	return Index((void*)parent.Get(ndx));
+	return Index((size_t)parent.Get(ndx));
 }
 
 void Index::Set(size_t ndx, int64_t oldValue, int64_t newValue) {
@@ -67,7 +67,7 @@ void Index::Delete(size_t ndx, int64_t value, bool isLast) {
 		assert(refs.Size() != 0); // node cannot be empty
 		if (refs.Size() > 1) break;
 
-		void* ref = (void*)refs.Get(0);
+		const size_t ref = (size_t)refs.Get(0);
 		refs.Delete(0); // avoid deleting subtree
 		m_array.Destroy();
 		m_array.UpdateRef(ref);
@@ -181,7 +181,8 @@ bool Index::LeafInsert(size_t ref, int64_t value) {
 	return true;
 }
 
-bool Index::NodeAdd(void* ref) {assert(ref);
+bool Index::NodeAdd(size_t ref) {
+	assert(ref);
 	assert(IsNode());
 
 	const Index col(ref);
@@ -195,11 +196,11 @@ bool Index::NodeAdd(void* ref) {assert(ref);
 
 	if (ins_pos == -1) {
 		offsets.Add(maxval);
-		refs.Add((intptr_t)ref);
+		refs.Add(ref);
 	}
 	else {
 		offsets.Insert(ins_pos, maxval);
-		refs.Insert(ins_pos, (intptr_t)ref);
+		refs.Insert(ins_pos, ref);
 	}
 
 	return true;
@@ -259,7 +260,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
 			// Move items below split to new node
 			const size_t len = refs.Size();
 			for (size_t i = node_ndx; i < len; ++i) {
-				newNode.NodeAdd((void*)refs.Get(i));
+				newNode.NodeAdd((size_t)refs.Get(i));
 			}
 			offsets.Resize(node_ndx);
 			refs.Resize(node_ndx);
@@ -294,7 +295,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
 }
 
 size_t Index::Find(int64_t value) const {
-	void* ref = GetRef();
+	size_t ref = GetRef();
 	for (;;) {
 		const Array node(ref);
 		const Array values = node.GetSubArray(0);
@@ -308,7 +309,7 @@ size_t Index::Find(int64_t value) const {
 			else return (size_t)-1;
 		}
 		
-		ref = (void*)refs.Get(pos);
+		ref = (size_t)refs.Get(pos);
 	}
 }
 
@@ -376,7 +377,7 @@ void Index::UpdateRefs(size_t pos, int diff) {
 
 	if (m_array.IsNode()) {
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			void* ref = (void*)refs.Get(i);
+			const size_t ref = (size_t)refs.Get(i);
 			Index ndx(ref);
 			ndx.UpdateRefs(pos, diff);
 		}
@@ -403,7 +404,7 @@ void Index::Verify() const {
 
 		// Make sure that all offsets matches biggest value in ref
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			void* ref = (void*)refs.Get(i);
+			const size_t ref = (size_t)refs.Get(i);
 			assert(ref);
 
 			const Index col(ref);

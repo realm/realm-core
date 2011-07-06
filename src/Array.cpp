@@ -3,18 +3,18 @@
 
 #include "Column.h"
 
-Array::Array(void* ref, Array* parent, size_t pndx)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx) {
+Array::Array(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc) {
 	Create(ref);
 }
 
-Array::Array(void* ref, const Array* parent, size_t pndx)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(const_cast<Array*>(parent)), m_parentNdx(pndx) {
+Array::Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc)
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(const_cast<Array*>(parent)), m_parentNdx(pndx), m_alloc(alloc) {
 	Create(ref);
 }
 
-Array::Array(ColumnDef type, Array* parent, size_t pndx)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx) {
+Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc) {
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 
@@ -25,14 +25,14 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx)
 // Copy-constructor
 // Note that this array now own the ref. Should only be used when
 // the source array goes away right after (like return values from functions)
-Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_parentNdx) {
-	void* ref = src.GetRef();
+Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc) {
+	const size_t ref = src.GetRef();
 	Create(ref);
 }
 
-void Array::Create(void* ref) {
+void Array::Create(size_t ref) {
 	assert(ref);
-	uint8_t* const header = (uint8_t*)ref;
+	uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
 
 	// parse the 8byte header
 	m_isNode   = (header[0] & 0x80) != 0;
@@ -41,6 +41,7 @@ void Array::Create(void* ref) {
 	m_len      = (header[1] << 16) + (header[2] << 8) + header[3];
 	m_capacity = (header[4] << 16) + (header[5] << 8) + header[6];
 
+	m_ref = ref;
 	m_data = header + 8;
 
 	SetWidth(m_width);
@@ -56,11 +57,11 @@ bool Array::operator==(const Array& a) const {
 	return m_data == a.m_data;
 }
 
-void Array::UpdateRef(void* ref) {
+void Array::UpdateRef(size_t ref) {
 	Create(ref);
 
 	// Update ref in parent
-	if (m_parent) m_parent->Set(m_parentNdx, (intptr_t)ref);
+	if (m_parent) m_parent->Set(m_parentNdx, ref);
 }
 
 /**
@@ -99,17 +100,17 @@ Array Array::GetSubArray(size_t ndx) {
 	assert(ndx < m_len);
 	assert(m_hasRefs);
 
-	void* ref = (void*)Get(ndx);
+	const size_t ref = (size_t)Get(ndx);
 	assert(ref);
 
-	return Array(ref, this, ndx);
+	return Array(ref, this, ndx, m_alloc);
 }
 
 const Array Array::GetSubArray(size_t ndx) const {
 	assert(ndx < m_len);
 	assert(m_hasRefs);
 
-	return Array((void*)Get(ndx), this, ndx);
+	return Array((size_t)Get(ndx), this, ndx, m_alloc);
 }
 
 void Array::Destroy() {
@@ -117,14 +118,14 @@ void Array::Destroy() {
 
 	if (m_hasRefs) {
 		for (size_t i = 0; i < Size(); ++i) {
-			void* ref = (void*)Get(i);
+			const size_t ref = (size_t)Get(i);
 			Array sub(ref, this, i);
 			sub.Destroy();
 		}
 	}
 
 	void* ref = m_data-8;
-	free(ref);
+	m_alloc.Free(ref);
 	m_data = NULL;
 }
 
@@ -132,7 +133,7 @@ void Array::Clear() {
 	// Make sure we don't have any dangling references
 	if (m_hasRefs) {
 		for (size_t i = 0; i < Size(); ++i) {
-			Array sub((void*)Get(i), this, i);
+			Array sub((size_t)Get(i), this, i);
 			sub.Destroy();
 		}
 	}
@@ -810,17 +811,18 @@ bool Array::Alloc(size_t count, size_t width) {
 		if (new_capacity < len) new_capacity = len; 
 
 		// Allocate the space
-		unsigned char* data = NULL;
-		if (m_data) data = (unsigned char*)realloc(m_data-8, new_capacity);
-		else data = (unsigned char*)malloc(new_capacity);
+		MemRef mref;
+		if (m_data) mref = m_alloc.ReAlloc(m_data-8, new_capacity);
+		else mref = m_alloc.Alloc(new_capacity);
 
-		if (!data) return false;
+		if (!mref.pointer) return false;
 
-		m_data = data+8;
+		m_ref = mref.ref;
+		m_data = (unsigned char*)mref.pointer + 8;
 		m_capacity = new_capacity;
 
 		// Update ref in parent
-		if (m_parent) m_parent->Set(m_parentNdx, (uintptr_t)data);
+		if (m_parent) m_parent->Set(m_parentNdx, mref.ref); //TODO: ref
 	}
 
 	// Pack width in 3 bits (log2)
@@ -1018,7 +1020,7 @@ void Array::Verify() const {
 }
 
 void Array::ToDot(FILE* f, bool) const{
-	void* ref = GetRef();
+	const size_t ref = GetRef();
 
 	fprintf(f, "n%x [label=\"", ref);
 

@@ -1,4 +1,4 @@
-#include "alloc.h"
+#include "AllocSlab.h"
 #include <assert.h>
 
 SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(0) {}
@@ -16,14 +16,14 @@ MemRef SlabAlloc::Alloc(size_t size) {
 	for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
 		FreeSpace::Cursor r = m_freeSpace[i];
 		if (r.size >= (int)size) {
-			const size_t location = r.ref;
-			const size_t rest = r.size - size;
+			const size_t location = (size_t)r.ref;
+			const size_t rest = (size_t)r.size - size;
 
 			// Update free list
 			if (rest == 0) m_freeSpace.DeleteRow(i);
 			else {
 				r.size = rest;
-				r.ref += size;
+				r.ref += (unsigned int)size;
 			}
 
 			return MemRef(Translate(location), location);

@@ -9,6 +9,7 @@
 //#include <climits> // size_t
 #include <cstdlib> // size_t
 #include <cstring> // memmove
+#include "alloc.h"
 
 // Pre-definitions
 class Column;
@@ -21,16 +22,16 @@ enum ColumnDef {
 
 class Array {
 public:
-	Array(void* ref, Array* parent=NULL, size_t pndx=0);
-	Array(void* ref, const Array* parent, size_t pndx);
-	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0);
+	Array(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
+	Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
+	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
 	Array(const Array& a);
 
 	bool operator==(const Array& a) const;
 
 	void SetType(ColumnDef type);
 	void SetParent(Array* parent, size_t pndx);
-	void UpdateRef(void* ref);
+	void UpdateRef(size_t ref);
 
 	size_t Size() const {return m_len;}
 	bool IsEmpty() const {return m_len == 0;}
@@ -62,8 +63,10 @@ public:
 	bool HasRefs() const {return m_hasRefs;}
 	Array GetSubArray(size_t ndx);
 	const Array GetSubArray(size_t ndx) const;
-	void* GetRef() const {return m_data-8;};
+	size_t GetRef() const {return m_ref;};
 	void Destroy();
+
+	Allocator& GetAllocator() const {return m_alloc;}
 
 	// Debug
 	size_t GetBitWidth() const {return m_width;}
@@ -77,7 +80,7 @@ private:
 	Array& operator=(const Array&) {return *this;} // not allowed
 
 protected:
-	void Create(void* ref);
+	void Create(size_t ref);
 
 	void DoSort(size_t lo, size_t hi);
 
@@ -107,6 +110,7 @@ protected:
 	// Member variables
 	Getter m_getter;
 	Setter m_setter;
+	size_t m_ref;
 	unsigned char* m_data;
 	Array* m_parent;
 	size_t m_parentNdx;
@@ -115,6 +119,7 @@ protected:
 	size_t m_width;
 	bool m_isNode;
 	bool m_hasRefs;
+	Allocator& m_alloc;
 };
 
 #endif //__TDB_ARRAY__

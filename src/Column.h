@@ -32,14 +32,14 @@ public:
 	virtual void BuildIndex(Index& index) = 0;
 	virtual void ClearIndex() = 0;
 
-	virtual void* GetRef() const = 0;
+	virtual size_t GetRef() const = 0;
 };
 
 class Column : public ColumnBase {
 public:
-	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0);
-	Column(void* ref, Array* parent=NULL, size_t pndx=0);
-	Column(void* ref, const Array* parent, size_t pndx);
+	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
+	Column(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
+	Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
 	Column(const Column& column);
 	~Column();
 
@@ -97,7 +97,7 @@ public:
 	void ClearIndex();
 	size_t FindWithIndex(int64_t value) const;
 
-	void* GetRef() const {return m_array.GetRef();}
+	size_t GetRef() const {return m_array.GetRef();}
 
 	void Sort();
 
@@ -114,14 +114,14 @@ private:
 protected:
 	// Node functions
 	bool IsNode() const {return m_array.IsNode();}
-	bool NodeInsert(size_t ndx, void* ref);
-	bool NodeAdd(void* ref);
+	bool NodeInsert(size_t ndx, size_t ref);
+	bool NodeAdd(size_t ref);
 	bool NodeUpdateOffsets(size_t ndx);
-	bool NodeInsertSplit(size_t ndx, void* newRef);
+	bool NodeInsertSplit(size_t ndx, size_t newRef);
 	
 	struct NodeChange {
-		void* ref1;
-		void* ref2;
+		size_t ref1;
+		size_t ref2;
 		enum ChangeType {
 			CT_ERROR,
 			CT_NONE,
@@ -129,9 +129,11 @@ protected:
 			CT_INSERT_AFTER,
 			CT_SPLIT
 		} type;
-		NodeChange(ChangeType t, void* r1=0, void* r2=0) : ref1(r1), ref2(r2), type(t) {}
-		NodeChange(bool success) : ref1(NULL), ref2(NULL), type(success ? CT_NONE : CT_ERROR) {}
+		NodeChange(ChangeType t, size_t r1=0, size_t r2=0) : ref1(r1), ref2(r2), type(t) {}
+		NodeChange(bool success) : ref1(0), ref2(0), type(success ? CT_NONE : CT_ERROR) {}
 	};
+
+	size_t GetRefSize(size_t ref) const;
 
 	void DoSort(size_t lo, size_t hi);
 
@@ -203,7 +205,7 @@ public:
 	void ClearIndex() {}
 	size_t FindWithIndex(int64_t) const {return (size_t)-1;}
 
-	void* GetRef() const {return m_array.GetRef();}
+	size_t GetRef() const {return m_array.GetRef();}
 	void SetParent(Array* parent, size_t pndx) {m_array.SetParent(parent, pndx);}
 
 

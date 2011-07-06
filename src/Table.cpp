@@ -6,10 +6,10 @@ const ColumnType Accessor::type = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type = COLUMN_TYPE_BOOL;
 const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
 
-Table::Table(const char* name) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS) {
+Table::Table(const char* name, Allocator& alloc) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS), m_alloc(alloc) {
 }
 
-Table::Table(const Table&) {
+Table::Table(const Table& t) : m_alloc(t.m_alloc) {
 	//TODO: copy-constructor (ref-counting?)
 	assert(false);
 }
@@ -372,7 +372,7 @@ void Table::ToDot(const char* filename) const {
 	// Refs
 	for (size_t i = 0; i < column_count; ++i) {
 		const ColumnBase& column = GetColumnBase(i);
-		void* ref = column.GetRef();
+		const size_t ref = column.GetRef();
 		fprintf(f, "table:%d -> n%x\n", i, ref);
 	}
 

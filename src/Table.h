@@ -3,6 +3,7 @@
 
 #include <cstring> // strcmp()
 #include "Column.h"
+#include "alloc.h"
 
 class Accessor;
 class TableView;
@@ -15,7 +16,7 @@ enum ColumnType {
 
 class Table {
 public:
-	Table(const char* name);
+	Table(const char* name, Allocator& alloc=DefaultAllocator);
 	Table(const Table& t);
 	~Table();
 
@@ -93,6 +94,7 @@ protected:
 
 	// Cached columns
 	Array m_cols;
+	Allocator& m_alloc;
 };
 
 class TableView {
