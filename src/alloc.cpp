@@ -44,7 +44,7 @@ MemRef SlabAlloc::Alloc(size_t size) {
 	// Add to slab table
 	Slabs::Cursor s = m_slabs.Add();
 	s.offset = slabsBack + newsize;
-	s.pointer = (int)slab;
+	s.pointer = (intptr_t)slab;
 
 	// Update free list
 	const size_t rest = newsize - size;
@@ -52,7 +52,7 @@ MemRef SlabAlloc::Alloc(size_t size) {
 	f.ref = slabsBack + newsize;
 	f.size = rest;
 
-	return MemRef((void*)slab, slabsBack);
+	return MemRef(slab, slabsBack);
 }
 
 // Support function
