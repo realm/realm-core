@@ -404,4 +404,63 @@ void Table::ToDot(const char* filename) const {
 	fclose(f);
 }
 
+void Table::Print() const {
+
+	// Table header
+	printf("Table \"%s\" len(%d)\n    ", m_name, m_size);
+	const size_t column_count = GetColumnCount();
+	for (size_t i = 0; i < column_count; ++i) {
+		printf("%-10s ", m_columnNames.Get(i));
+	}
+
+	// Types
+	printf("\n    ");
+	for (size_t i = 0; i < column_count; ++i) {
+		const ColumnType type = GetColumnType(i);
+		switch (type) {
+		case COLUMN_TYPE_INT:
+			printf("Int        "); break;
+		case COLUMN_TYPE_BOOL:
+			printf("Bool       "); break;
+		case COLUMN_TYPE_STRING:
+			printf("String     "); break;
+		default:
+			assert(false);
+		}
+	}
+	printf("\n");
+
+	// Columns
+	for (size_t i = 0; i < m_size; ++i) {
+		printf("%3d ", i);
+		for (size_t n = 0; n < column_count; ++n) {
+			const ColumnType type = GetColumnType(n);
+			switch (type) {
+			case COLUMN_TYPE_INT:
+				{
+					const Column& column = GetColumn(n);
+					printf("%10d ", column.Get(i));
+				}
+				break;
+			case COLUMN_TYPE_BOOL:
+				{
+					const Column& column = GetColumn(n);
+					printf(column.Get(i) == 0 ? "     false " : "      true ");
+				}
+				break;
+			case COLUMN_TYPE_STRING:
+				{
+					const AdaptiveStringColumn& column = GetColumnString(n);
+					printf("%10s ", column.Get(i));
+				}
+				break;
+			default:
+				assert(false);
+			}
+		}
+		printf("\n");
+	}
+	printf("\n");
+}
+
 #endif //_DEBUG

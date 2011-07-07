@@ -78,6 +78,7 @@ public:
 #ifdef _DEBUG
 	void Verify() const;
 	void ToDot(const char* filename) const;
+	void Print() const;
 #endif //_DEBUG
 
 protected:
@@ -163,7 +164,6 @@ protected:
 
 class AccessorInt : public Accessor {
 public:
-	//operator int() const {return Get();}
 	operator int64_t() const {return Get64();}
 	void operator=(int32_t value) {Set(value);}
 	void operator=(uint32_t value) {Set(value);}
