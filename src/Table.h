@@ -216,6 +216,7 @@ public:
 	size_t Find(uint32_t value) const {return m_table->GetColumn(m_column).Find(value);}
 	size_t Find(int64_t value) const {return m_table->GetColumn(m_column).Find(value);}
 	size_t Find(uint64_t value) const {return m_table->GetColumn(m_column).Find(value);}
+	size_t FindPos(int64_t value) const {return m_table->GetColumn(m_column).FindPos(value);}
 	TableView FindAll(int value) {return m_table->FindAll(m_column, value);}
 	TableView FindAllHamming(uint64_t value, size_t max) {return m_table->FindAllHamming(m_column, value, max);}
 	int operator+=(int value) {m_table->GetColumn(m_column).Increment64(value); return 0;}

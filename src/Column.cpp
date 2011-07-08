@@ -529,6 +529,31 @@ void Column::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size
 	}
 }
 
+size_t Column::FindPos(int64_t target) const {
+	// NOTE: Binary search only works if the column is sorted
+
+	if (!IsNode()) {
+		return m_array.FindPos(target);
+	}
+
+	const int len = (int)Size();
+	int low = -1;
+	int high = len;
+
+	// Binary search based on:
+	// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+	// Finds position of largest value SMALLER than the target
+	while (high - low > 1) {
+		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+		const int64_t v = Get(probe);
+
+		if (v > target) high = (int)probe;
+		else            low = (int)probe;
+	}
+	if (high == len) return (size_t)-1;
+	else return high;
+}
+
 
 size_t Column::FindWithIndex(int64_t target) const {
 	assert(m_index);
