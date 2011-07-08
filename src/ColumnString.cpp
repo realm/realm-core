@@ -5,7 +5,7 @@
 
 #include "Column.h"
 
-AdaptiveStringColumn::AdaptiveStringColumn() {
+AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) : m_array(alloc) {
 }
 
 AdaptiveStringColumn::~AdaptiveStringColumn() {

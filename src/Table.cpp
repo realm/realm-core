@@ -6,7 +6,7 @@ const ColumnType Accessor::type = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type = COLUMN_TYPE_BOOL;
 const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
 
-Table::Table(const char* name, Allocator& alloc) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS), m_alloc(alloc) {
+Table::Table(const char* name, Allocator& alloc) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_alloc(alloc) {
 }
 
 Table::Table(const Table& t) : m_alloc(t.m_alloc) {
@@ -54,7 +54,7 @@ size_t Table::RegisterColumn(ColumnType type, const char* name) {
 	case COLUMN_TYPE_INT:
 	case COLUMN_TYPE_BOOL:
 		{
-			Column* newColumn = new Column(COLUMN_NORMAL);
+			Column* newColumn = new Column(COLUMN_NORMAL, m_alloc);
 			
 			m_columnNames.Add(name);
 			m_spec.Add(type);
@@ -81,7 +81,7 @@ size_t Table::RegisterColumn(ColumnType type, const char* name) {
 			StringColumn* newColumn = new StringColumn(refs, lengths);
 			m_cols.Add((int)newColumn);*/
 
-			AdaptiveStringColumn* newColumn = new AdaptiveStringColumn();
+			AdaptiveStringColumn* newColumn = new AdaptiveStringColumn(m_alloc);
 			
 			m_columnNames.Add(name);
 			m_spec.Add(type);
@@ -337,6 +337,8 @@ void Table::Verify() const {
 			assert(false);
 		}
 	}
+
+	m_alloc.Verify();
 }
 
 void Table::ToDot(const char* filename) const {

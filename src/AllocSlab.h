@@ -19,6 +19,11 @@ public:
 	void Free(size_t ref, void* p);
 	void* Translate(size_t ref) const;
 
+#ifdef _DEBUG
+	void Verify() const;
+	bool IsAllFree() const;
+#endif //_DEBUG
+
 private:
 	// Define internal tables
 	TDB_TABLE_2(Slabs,

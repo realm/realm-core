@@ -5,7 +5,7 @@
 
 #include "ArrayString.h"
 
-ArrayString::ArrayString() : Array(COLUMN_NORMAL) {
+ArrayString::ArrayString(Allocator& alloc) : Array(COLUMN_NORMAL, NULL, 0, alloc) {
 }
 
 ArrayString::~ArrayString() {

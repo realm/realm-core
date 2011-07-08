@@ -24,7 +24,7 @@ protected: \
 }; \
 class TableName : public Table { \
 public: \
-	TableName() : Table(#TableName) { \
+	TableName(Allocator& alloc=DefaultAllocator) : Table(#TableName, alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 		\
@@ -85,7 +85,7 @@ protected: \
 }; \
 class TableName : public Table { \
 public: \
-	TableName() : Table(#TableName) { \
+	TableName(Allocator& alloc=DefaultAllocator) : Table(#TableName, alloc) { \
 		RegisterColumn(Accessor##CType1::type,  #CName1 ); \
 		RegisterColumn(Accessor##CType2::type,  #CName2 ); \
 		RegisterColumn(Accessor##CType3::type,  #CName3 ); \

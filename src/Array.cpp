@@ -119,13 +119,13 @@ void Array::Destroy() {
 	if (m_hasRefs) {
 		for (size_t i = 0; i < Size(); ++i) {
 			const size_t ref = (size_t)Get(i);
-			Array sub(ref, this, i);
+			Array sub(ref, this, i, m_alloc);
 			sub.Destroy();
 		}
 	}
 
 	void* ref = m_data-8;
-	m_alloc.Free(ref);
+	m_alloc.Free(m_ref, ref);
 	m_data = NULL;
 }
 

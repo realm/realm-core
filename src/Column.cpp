@@ -17,14 +17,16 @@
 #define MAX_LIST_SIZE 1000
 #endif
 
+Column::Column(Allocator& alloc) : m_array(COLUMN_NORMAL, NULL, 0, alloc),  m_index(NULL) {
+	Create();
+}
+
+Column::Column(ColumnDef type, Allocator& alloc) : m_array(type, NULL, 0, alloc),  m_index(NULL) {
+	Create();
+}
+
 Column::Column(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc) : m_array(type, parent, pndx, alloc),  m_index(NULL) {
-	// Add subcolumns for nodes
-	if (IsNode()) {
-		const Array offsets(COLUMN_NORMAL, NULL, 0, m_array.GetAllocator());
-		const Array refs(COLUMN_HASREFS, NULL, 0, m_array.GetAllocator());
-		m_array.Add((intptr_t)offsets.GetRef());
-		m_array.Add((intptr_t)refs.GetRef());
-	}
+	Create();
 }
 
 Column::Column(size_t ref, Array* parent, size_t pndx, Allocator& alloc) : m_array(ref, parent, pndx, alloc), m_index(NULL) {
@@ -34,6 +36,16 @@ Column::Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc): 
 }
 
 Column::Column(const Column& column) : m_array(column.m_array), m_index(NULL) {
+}
+
+void Column::Create() {
+	// Add subcolumns for nodes
+	if (IsNode()) {
+		const Array offsets(COLUMN_NORMAL, NULL, 0, m_array.GetAllocator());
+		const Array refs(COLUMN_HASREFS, NULL, 0, m_array.GetAllocator());
+		m_array.Add((intptr_t)offsets.GetRef());
+		m_array.Add((intptr_t)refs.GetRef());
+	}
 }
 
 bool Column::operator==(const Column& column) const {

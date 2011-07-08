@@ -37,6 +37,8 @@ public:
 
 class Column : public ColumnBase {
 public:
+	Column(Allocator& alloc);
+	Column(ColumnDef type, Allocator& alloc);
 	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
 	Column(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
 	Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
@@ -112,6 +114,8 @@ private:
 	Column& operator=(const Column&) {return *this;} // not allowed
 
 protected:
+	void Create();
+
 	// Node functions
 	bool IsNode() const {return m_array.IsNode();}
 	bool NodeInsert(size_t ndx, size_t ref);
@@ -180,7 +184,7 @@ private:
 
 class AdaptiveStringColumn : public ColumnBase {
 public:
-	AdaptiveStringColumn();
+	AdaptiveStringColumn(Allocator& alloc=DefaultAllocator);
 	~AdaptiveStringColumn();
 
 	bool IsStringColumn() const {return true;}

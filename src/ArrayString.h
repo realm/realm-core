@@ -5,7 +5,7 @@
 
 class ArrayString : public Array {
 public:
-	ArrayString();
+	ArrayString(Allocator& alloc=DefaultAllocator);
 	~ArrayString();
 	
 	const char* Get(size_t ndx) const;

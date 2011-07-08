@@ -18,10 +18,14 @@ struct MemRef {
 
 class Allocator {
 public:
-	MemRef Alloc(size_t size) {void* p = malloc(size); return MemRef(p,(size_t)p);}
-	MemRef ReAlloc(void* p, size_t size) {void* p2 = realloc(p, size); return MemRef(p2,(size_t)p2);}
-	void Free(void* p) {return free(p);}
-	void* Translate(size_t ref) const {return (void*)ref;}
+	virtual MemRef Alloc(size_t size) {void* p = malloc(size); return MemRef(p,(size_t)p);}
+	virtual MemRef ReAlloc(void* p, size_t size) {void* p2 = realloc(p, size); return MemRef(p2,(size_t)p2);}
+	virtual void Free(size_t, void* p) {return free(p);}
+	virtual void* Translate(size_t ref) const {return (void*)ref;}
+
+#ifdef _DEBUG
+	virtual void Verify() const {};
+#endif //_DEBUG
 };
 
 static Allocator DefaultAllocator;

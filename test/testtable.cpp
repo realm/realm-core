@@ -282,3 +282,34 @@ TEST(Table_Index_Int) {
 	table.Verify();
 #endif //_DEBUG
 }
+
+#include "AllocSlab.h"
+TEST(Table_SlabAlloc) {
+	SlabAlloc alloc;
+	TestTable table(alloc);
+
+	table.Add(0, 10, true, Wed);
+	const TestTable::Cursor r = table[-1]; // last item
+
+	CHECK_EQUAL(0, r.first);
+	CHECK_EQUAL(10, r.second);
+	CHECK_EQUAL(true, r.third);
+	CHECK_EQUAL(Wed, r.fourth);
+
+	// Add some more rows
+	table.Add(1, 10, true, Wed);
+	table.Add(2, 20, true, Wed);
+	table.Add(3, 10, true, Wed);
+	table.Add(4, 20, true, Wed);
+	table.Add(5, 10, true, Wed);
+
+	// Delete some rows
+	table.DeleteRow(2);
+	table.DeleteRow(4);
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
+}
+
+
