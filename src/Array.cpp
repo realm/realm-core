@@ -34,7 +34,7 @@ void Array::Create(size_t ref) {
 	assert(ref);
 	uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
 
-	// parse the 8byte header
+	// Parse the 8byte header
 	m_isNode   = (header[0] & 0x80) != 0;
 	m_hasRefs  = (header[0] & 0x40) != 0;
 	m_width    = (1 << (header[0] & 0x07)) >> 1; // 0, 1, 2, 4, 8, 16, 32, 64
@@ -76,11 +76,10 @@ static unsigned int BitWidth(int64_t v) {
 		return bits[(int8_t)v];
 	}
 
-	// first flip all bits if bit 63 is set
+	// First flip all bits if bit 63 is set (will now always be zero)
 	if (v < 0) v = ~v;
-	// ... bit 63 is now always zero
 
-	// then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
+	// Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
 	return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
 }
 
