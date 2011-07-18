@@ -5,6 +5,7 @@
 const ColumnType Accessor::type = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type = COLUMN_TYPE_BOOL;
 const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
+const ColumnType AccessorDate::type = COLUMN_TYPE_DATE;
 
 Table::Table(const char* name, Allocator& alloc) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_alloc(alloc) {
 }
@@ -240,6 +241,24 @@ void Table::SetBool(size_t column_id, size_t ndx, bool value) {
 	column.Set64(ndx, value ? 1 : 0);
 }
 
+time_t Table::GetDate(size_t column_id, size_t ndx) const {
+	assert(column_id < m_cols.Size());
+	assert(GetColumnType(column_id) == COLUMN_TYPE_DATE);
+	assert(ndx < m_size);
+
+	const Column& column = GetColumn(column_id);
+	return (time_t)column.Get64(ndx) != 0;
+}
+
+void Table::SetDate(size_t column_id, size_t ndx, time_t value) {
+	assert(column_id < m_cols.Size());
+	assert(GetColumnType(column_id) == COLUMN_TYPE_DATE);
+	assert(ndx < m_size);
+
+	Column& column = GetColumn(column_id);
+	column.Set64(ndx, (int64_t)value);
+}
+
 void Table::InsertInt(size_t column_id, size_t ndx, int value) {
 	assert(column_id < m_cols.Size());
 	assert(ndx <= m_size);
@@ -296,7 +315,7 @@ size_t Table::Find(size_t column_id, int64_t value) const {
 	return column.Find(value);
 }
 
-size_t Table::Find(size_t column_id, bool value) const {
+size_t Table::FindBool(size_t column_id, bool value) const {
 	assert(column_id < m_columns.Size());
 	assert(GetColumnType(column_id) == COLUMN_TYPE_BOOL);
 	const Column& column = GetColumn(column_id);
@@ -304,7 +323,15 @@ size_t Table::Find(size_t column_id, bool value) const {
 	return column.Find(value ? 1 : 0);
 }
 
-size_t Table::Find(size_t column_id, const char* value) const {
+size_t Table::FindDate(size_t column_id, time_t value) const {
+	assert(column_id < m_columns.Size());
+	assert(GetColumnType(column_id) == COLUMN_TYPE_DATE);
+	const Column& column = GetColumn(column_id);
+
+	return column.Find((int64_t)value);
+}
+
+size_t Table::FindString(size_t column_id, const char* value) const {
 	assert(column_id < m_columns.Size());
 	assert(GetColumnType(column_id) == COLUMN_TYPE_STRING);
 	const AdaptiveStringColumn& column = GetColumnString(column_id);

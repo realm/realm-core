@@ -11,7 +11,8 @@ class TableView;
 enum ColumnType {
 	COLUMN_TYPE_INT,
 	COLUMN_TYPE_BOOL,
-	COLUMN_TYPE_STRING
+	COLUMN_TYPE_STRING,
+	COLUMN_TYPE_DATE
 };
 
 class Table {
@@ -43,12 +44,15 @@ public:
 	void Set64(size_t column_id, size_t ndx, int64_t value);
 	bool GetBool(size_t column_id, size_t ndx) const;
 	void SetBool(size_t column_id, size_t ndx, bool value);
+	time_t GetDate(size_t column_id, size_t ndx) const;
+	void SetDate(size_t column_id, size_t ndx, time_t value);
 
 	// NOTE: Low-level insert functions. Always insert in all columns at once
 	// and call InsertDone after to avoid table getting un-balanced.
 	void InsertInt(size_t column_id, size_t ndx, int value);
 	void InsertInt(size_t column_id, size_t ndx, int64_t value);
 	void InsertBool(size_t column_id, size_t ndx, bool value) {InsertInt(column_id, ndx, value ? 1 :0);}
+	void InsertDate(size_t column_id, size_t ndx, time_t value) {InsertInt(column_id, ndx, (int64_t)value);}
 	template<class T> void InsertEnum(size_t column_id, size_t ndx, T value) {
 		InsertInt(column_id, ndx, (int)value);
 	}
@@ -69,8 +73,9 @@ public:
 
 	// Searching
 	size_t Find(size_t column_id, int64_t value) const;
-	size_t Find(size_t column_id, bool value) const;
-	size_t Find(size_t column_id, const char* value) const;
+	size_t FindBool(size_t column_id, bool value) const;
+	size_t FindString(size_t column_id, const char* value) const;
+	size_t FindDate(size_t column_id, time_t value) const;
 	TableView FindAll(size_t column_id, int64_t value);
 	TableView FindAllHamming(size_t column_id, uint64_t value, size_t max);
 
@@ -157,7 +162,8 @@ protected:
 	void Set64(int64_t value) {m_cursor->m_table.Set64(m_column, m_cursor->m_index, value);}
 	bool GetBool() const {return m_cursor->m_table.GetBool(m_column, m_cursor->m_index);}
 	void SetBool(bool value) {m_cursor->m_table.SetBool(m_column, m_cursor->m_index, value);}
-
+	time_t GetDate() const {return m_cursor->m_table.GetDate(m_column, m_cursor->m_index);}
+	void SetDate(time_t value) {m_cursor->m_table.SetDate(m_column, m_cursor->m_index, value);}
 
 	const char* GetString() const {return m_cursor->m_table.GetString(m_column, m_cursor->m_index);}
 	void SetString(const char* value) {m_cursor->m_table.SetString(m_column, m_cursor->m_index, value);}
@@ -201,6 +207,12 @@ public:
 	static const ColumnType type;
 };
 
+class AccessorDate : public Accessor {
+public:
+	operator time_t() const {return GetDate();}
+	void operator=(time_t value) {SetDate(value);}
+	static const ColumnType type;
+};
 
 class ColumnProxy {
 public:
@@ -228,7 +240,12 @@ public:
 
 class ColumnProxyBool : public ColumnProxy {
 public:
-	size_t Find(bool value) const {return m_table->Find(m_column, value);}
+	size_t Find(bool value) const {return m_table->FindBool(m_column, value);}
+};
+
+class ColumnProxyDate : public ColumnProxy {
+public:
+	size_t Find(time_t value) const {return m_table->FindDate(m_column, value);}
 };
 
 template<class T> class ColumnProxyEnum : public ColumnProxy {
@@ -238,7 +255,7 @@ public:
 
 class ColumnProxyString : public ColumnProxy {
 public:
-	size_t Find(const char* value) const {return m_table->Find(m_column, value);}
+	size_t Find(const char* value) const {return m_table->FindString(m_column, value);}
 	//void Stats() const {m_table->GetColumnString(m_column).Stats();}
 };
 
