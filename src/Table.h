@@ -2,6 +2,7 @@
 #define __TDB_TABLE__
 
 #include <cstring> // strcmp()
+#include <time.h>
 #include "Column.h"
 #include "alloc.h"
 
