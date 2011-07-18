@@ -68,6 +68,9 @@ public:
 	const AdaptiveStringColumn& GetColumnString(size_t ndx) const;
 
 	// Searching
+	size_t Find(size_t column_id, int64_t value) const;
+	size_t Find(size_t column_id, bool value) const;
+	size_t Find(size_t column_id, const char* value) const;
 	TableView FindAll(size_t column_id, int64_t value);
 	TableView FindAllHamming(size_t column_id, uint64_t value, size_t max);
 
@@ -213,10 +216,10 @@ protected:
 
 class ColumnProxyInt : public ColumnProxy {
 public:
-	size_t Find(int32_t value) const {return m_table->GetColumn(m_column).Find(value);}
-	size_t Find(uint32_t value) const {return m_table->GetColumn(m_column).Find(value);}
-	size_t Find(int64_t value) const {return m_table->GetColumn(m_column).Find(value);}
-	size_t Find(uint64_t value) const {return m_table->GetColumn(m_column).Find(value);}
+	size_t Find(int32_t value) const {return m_table->Find(m_column, (int64_t)value);}
+	size_t Find(uint32_t value) const {return m_table->Find(m_column, (int64_t)value);}
+	size_t Find(int64_t value) const {return m_table->Find(m_column, value);}
+	size_t Find(uint64_t value) const {return m_table->Find(m_column, (int64_t)value);}
 	size_t FindPos(int64_t value) const {return m_table->GetColumn(m_column).FindPos(value);}
 	TableView FindAll(int value) {return m_table->FindAll(m_column, value);}
 	TableView FindAllHamming(uint64_t value, size_t max) {return m_table->FindAllHamming(m_column, value, max);}
@@ -225,17 +228,17 @@ public:
 
 class ColumnProxyBool : public ColumnProxy {
 public:
-	size_t Find(bool value) const {return m_table->GetColumn(m_column).Find(value ? 1 : 0);}
+	size_t Find(bool value) const {return m_table->Find(m_column, value);}
 };
 
 template<class T> class ColumnProxyEnum : public ColumnProxy {
 public:
-	size_t Find(T value) const {return m_table->GetColumn(m_column).Find((int)value);}
+	size_t Find(T value) const {return m_table->Find(m_column, (int64_t)value);}
 };
 
 class ColumnProxyString : public ColumnProxy {
 public:
-	size_t Find(const char* value) const {return m_table->GetColumnString(m_column).Find(value);}
+	size_t Find(const char* value) const {return m_table->Find(m_column, value);}
 	//void Stats() const {m_table->GetColumnString(m_column).Stats();}
 };
 

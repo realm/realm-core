@@ -288,6 +288,30 @@ void Table::InsertDone() {
 #endif //_DEBUG
 }
 
+size_t Table::Find(size_t column_id, int64_t value) const {
+	assert(column_id < m_columns.Size());
+	assert(GetColumnType(column_id) == COLUMN_TYPE_INT);
+	const Column& column = GetColumn(column_id);
+
+	return column.Find(value);
+}
+
+size_t Table::Find(size_t column_id, bool value) const {
+	assert(column_id < m_columns.Size());
+	assert(GetColumnType(column_id) == COLUMN_TYPE_BOOL);
+	const Column& column = GetColumn(column_id);
+
+	return column.Find(value ? 1 : 0);
+}
+
+size_t Table::Find(size_t column_id, const char* value) const {
+	assert(column_id < m_columns.Size());
+	assert(GetColumnType(column_id) == COLUMN_TYPE_STRING);
+	const AdaptiveStringColumn& column = GetColumnString(column_id);
+
+	return column.Find(value);
+}
+
 TableView Table::FindAll(size_t column_id, int64_t value) {
 	assert(column_id < m_columns.Size());
 
