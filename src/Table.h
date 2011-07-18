@@ -23,6 +23,7 @@ public:
 	// Column meta info
 	size_t GetColumnCount() const;
 	const char* GetColumnName(size_t ndx) const;
+	size_t GetColumnIndex(const char* name) const;
 	ColumnType GetColumnType(size_t ndx) const;
 
 	Table& operator=(const Table& t);

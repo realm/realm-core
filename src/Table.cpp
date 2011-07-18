@@ -42,6 +42,10 @@ const char* Table::GetColumnName(size_t ndx) const {
 	return m_columnNames.Get(ndx);
 }
 
+size_t Table::GetColumnIndex(const char* name) const {
+	return m_columnNames.Find(name);
+}
+
 ColumnType Table::GetColumnType(size_t ndx) const {
 	assert(ndx < GetColumnCount());
 	return (ColumnType)m_spec.Get(ndx);
