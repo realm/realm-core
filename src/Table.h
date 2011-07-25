@@ -82,7 +82,7 @@ public:
 
 	// Indexing
 	bool HasIndex(size_t column_id) const;
-	void SetIndex(size_t column_ud);
+	void SetIndex(size_t column_id);
 
 	// Debug
 #ifdef _DEBUG
@@ -95,7 +95,7 @@ protected:
 	ColumnBase& GetColumnBase(size_t ndx);
 	const ColumnBase& GetColumnBase(size_t ndx) const;
 
-	const char* m_name;
+	const char* m_name; // Placeholder (unstable)
 	size_t m_size;
 	
 	// On-disk format
