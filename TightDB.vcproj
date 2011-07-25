@@ -351,6 +351,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\ctightdb.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\src\Index.cpp"
 				>
 			</File>
@@ -414,6 +418,14 @@
 			</File>
 			<File
 				RelativePath=".\src\Column.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\ColumnType.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\ctightdb.h"
 				>
 			</File>
 			<File
