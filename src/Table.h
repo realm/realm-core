@@ -113,20 +113,25 @@ public:
 	TableView(Table& source);
 	TableView(const TableView& v);
 
+	Table& GetParent() {return m_table;}
 	Column& GetRefColumn() {return m_refs;}
 	size_t GetRef(size_t ndx) const {return m_refs.Get(ndx);}
 
 	bool IsEmpty() const {return m_refs.IsEmpty();}
 	size_t GetSize() const {return m_refs.Size();}
 
-	// Adaptive ints
+	// Getting values
 	int Get(size_t column_id, size_t ndx) const;
-	void Set(size_t column_id, size_t ndx, int value);
 	int64_t Get64(size_t column_id, size_t ndx) const;
-	void Set64(size_t column_id, size_t ndx, int64_t value);
-
-	// Strings
+	bool GetBool(size_t column_id, size_t ndx) const;
+	time_t GetDate(size_t column_id, size_t ndx) const;
 	const char* GetString(size_t column_id, size_t ndx) const;
+
+	// Setting values
+	void Set(size_t column_id, size_t ndx, int value);
+	void Set64(size_t column_id, size_t ndx, int64_t value);
+	void SetBool(size_t column_id, size_t ndx, bool value);
+	void SetDate(size_t column_id, size_t ndx, time_t value);
 	void SetString(size_t column_id, size_t ndx, const char* value);
 
 private:
