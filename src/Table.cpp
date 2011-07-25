@@ -339,26 +339,22 @@ size_t Table::FindString(size_t column_id, const char* value) const {
 	return column.Find(value);
 }
 
-TableView Table::FindAll(size_t column_id, int64_t value) {
+void Table::FindAll(TableView& tv, size_t column_id, int64_t value) {
 	assert(column_id < m_columns.Size());
+	assert(&tv.GetParent() == this);
 
 	const Column& column = GetColumn(column_id);
 
-	TableView view(*this);
-	column.FindAll(view.GetRefColumn(), value);
-
-	return view;
+	column.FindAll(tv.GetRefColumn(), value);
 }
 
-TableView Table::FindAllHamming(size_t column_id, uint64_t value, size_t max) {
+void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max) {
 	assert(column_id < m_columns.Size());
+	assert(&tv.GetParent() == this);
 
 	const Column& column = GetColumn(column_id);
 
-	TableView view(*this);
-	column.FindAllHamming(view.GetRefColumn(), value, max);
-
-	return view;
+	column.FindAllHamming(tv.GetRefColumn(), value, max);
 }
 
 #ifdef _DEBUG

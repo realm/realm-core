@@ -71,8 +71,8 @@ public:
 	size_t FindBool(size_t column_id, bool value) const;
 	size_t FindString(size_t column_id, const char* value) const;
 	size_t FindDate(size_t column_id, time_t value) const;
-	TableView FindAll(size_t column_id, int64_t value);
-	TableView FindAllHamming(size_t column_id, uint64_t value, size_t max);
+	void FindAll(TableView& tv, size_t column_id, int64_t value);
+	void FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max);
 
 	// Indexing
 	bool HasIndex(size_t column_id) const;
@@ -228,8 +228,8 @@ public:
 	size_t Find(int64_t value) const {return m_table->Find(m_column, value);}
 	size_t Find(uint64_t value) const {return m_table->Find(m_column, (int64_t)value);}
 	size_t FindPos(int64_t value) const {return m_table->GetColumn(m_column).FindPos(value);}
-	TableView FindAll(int value) {return m_table->FindAll(m_column, value);}
-	TableView FindAllHamming(uint64_t value, size_t max) {return m_table->FindAllHamming(m_column, value, max);}
+	TableView FindAll(int value) {TableView tv(*m_table); m_table->FindAll(tv, m_column, value); return tv;}
+	TableView FindAllHamming(uint64_t value, size_t max) {TableView tv(*m_table); m_table->FindAllHamming(tv, m_column, value, max); return tv;}
 	int operator+=(int value) {m_table->GetColumn(m_column).Increment64(value); return 0;}
 };
 
