@@ -5,16 +5,10 @@
 #include <time.h>
 #include "Column.h"
 #include "alloc.h"
+#include "ColumnType.h"
 
 class Accessor;
 class TableView;
-
-enum ColumnType {
-	COLUMN_TYPE_INT,
-	COLUMN_TYPE_BOOL,
-	COLUMN_TYPE_STRING,
-	COLUMN_TYPE_DATE
-};
 
 class Table {
 public:
@@ -113,25 +107,20 @@ public:
 	TableView(Table& source);
 	TableView(const TableView& v);
 
-	Table& GetParent() {return m_table;}
 	Column& GetRefColumn() {return m_refs;}
 	size_t GetRef(size_t ndx) const {return m_refs.Get(ndx);}
 
 	bool IsEmpty() const {return m_refs.IsEmpty();}
 	size_t GetSize() const {return m_refs.Size();}
 
-	// Getting values
+	// Adaptive ints
 	int Get(size_t column_id, size_t ndx) const;
-	int64_t Get64(size_t column_id, size_t ndx) const;
-	bool GetBool(size_t column_id, size_t ndx) const;
-	time_t GetDate(size_t column_id, size_t ndx) const;
-	const char* GetString(size_t column_id, size_t ndx) const;
-
-	// Setting values
 	void Set(size_t column_id, size_t ndx, int value);
+	int64_t Get64(size_t column_id, size_t ndx) const;
 	void Set64(size_t column_id, size_t ndx, int64_t value);
-	void SetBool(size_t column_id, size_t ndx, bool value);
-	void SetDate(size_t column_id, size_t ndx, time_t value);
+
+	// Strings
+	const char* GetString(size_t column_id, size_t ndx) const;
 	void SetString(size_t column_id, size_t ndx, const char* value);
 
 private:
