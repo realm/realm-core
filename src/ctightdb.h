@@ -42,8 +42,11 @@ extern "C" {
 	void table_set_date(Table* t, size_t column_id, size_t ndx, time_t value);
 	void table_set_string(Table* t, size_t column_id, size_t ndx, const char* value);
 
-	/* Inserting values
-	** NOTE: Low-level insert functions. Always insert in all columns at once
+	/* Inserting values */
+	void table_add(Table* t, ...);
+	void table_insert(Table* t, size_t ndx, ...);
+
+	/* NOTE: Low-level insert functions. Always insert in all columns at once
 	** and call table_insert_done after to avoid table getting un-balanced. */
 	void table_insert_int(Table* t, size_t column_id, size_t ndx, int value);
 	void table_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value);

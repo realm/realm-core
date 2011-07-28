@@ -1,4 +1,6 @@
 #include "Table.h"
+#include <cstdarg>
+#include <assert.h>
 
 extern "C" {
 
@@ -84,6 +86,67 @@ void table_set_date(Table* t, size_t column_id, size_t ndx, time_t value) {
 
 void table_set_string(Table* t, size_t column_id, size_t ndx, const char* value) {
 	t->SetString(column_id, ndx, value);
+}
+
+void table_insert_impl(Table* t, size_t ndx, va_list ap) {
+	assert(ndx <= t->GetSize());
+
+	const size_t count = t->GetColumnCount();
+	for (size_t i = 0; i < count; ++i) {
+		const ColumnType type = t->GetColumnType(i);
+		switch (type) {
+		case COLUMN_TYPE_INT:
+			{
+				// int values should always be cast to 64bit in args
+				const int64_t v = va_arg(ap, int64_t);
+				t->InsertInt(i, ndx, v);
+			}
+			break;
+		case COLUMN_TYPE_BOOL:
+			{
+				const bool v = va_arg(ap, bool);
+				t->InsertBool(i, ndx, v);
+			}
+			break;
+		case COLUMN_TYPE_DATE:
+			{
+				const time_t v = va_arg(ap, time_t);
+				t->InsertDate(i, ndx, v);
+			}
+			break;
+		case COLUMN_TYPE_STRING:
+			{
+				const char* v = va_arg(ap, const char*);
+				t->InsertString(i, ndx, v);
+			}
+			break;
+		default:
+			assert(false);
+		}
+	}
+
+	t->InsertDone();
+}
+
+void table_add(Table* t,  ...) {
+	// initialize varable length arg list
+	va_list ap;
+	va_start(ap, t);
+
+	const size_t ndx = t->GetSize();
+	table_insert_impl(t, ndx, ap);
+
+	va_end(ap);
+}
+
+void table_insert(Table* t, size_t ndx, ...) {
+	// initialize varable length arg list
+	va_list ap;
+	va_start(ap, ndx);
+
+	table_insert_impl(t, ndx, ap);
+
+	va_end(ap);
 }
 
 void table_insert_int(Table* t, size_t column_id, size_t ndx, int value) {
