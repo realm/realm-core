@@ -104,7 +104,7 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap) {
 			break;
 		case COLUMN_TYPE_BOOL:
 			{
-				const bool v = va_arg(ap, bool);
+				const int v = va_arg(ap, int);
 				t->InsertBool(i, ndx, v);
 			}
 			break;
