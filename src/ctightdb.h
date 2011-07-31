@@ -1,11 +1,20 @@
 #ifndef __TDB_CTABLE__
 #define __TDB_CTABLE__
 
+#include <inttypes.h>
+#include <time.h>
+
 #include "ColumnType.h"
 
+#ifdef __cplusplus
 extern "C" {
-	struct Table;
-	struct TableView;
+#else
+#include <stdbool.h>
+#endif
+
+typedef enum ColumnType ColumnType;
+typedef struct Table Table;
+typedef struct TableView TableView;
 
 	/*** Table ************************************/
 
@@ -93,6 +102,8 @@ extern "C" {
 	void tableview_set_date(TableView* t, size_t column_id, size_t ndx, time_t value);
 	void tableview_set_string(TableView* t, size_t column_id, size_t ndx, const char* value);
 
-} /*extern "C"*/
+#ifdef __cplusplus
+} //extern "C"
+#endif
 
 #endif /*__TDB_CTABLE__*/
