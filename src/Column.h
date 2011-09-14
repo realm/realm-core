@@ -67,10 +67,10 @@ public:
 	bool Insert(size_t ndx, int64_t value) {return Insert64(ndx, value);}
 	bool Insert(size_t ndx, uint64_t value) {return Insert64(ndx, value);}
 	bool Add() {return Add64(0);}
-	bool Add(int32_t value) {return Add64(value);}
-	bool Add(uint32_t value) {return Add64(value);}
+	//bool Add(int32_t value) {return Add64(value);}
+	//bool Add(uint32_t value) {return Add64(value);}
 	bool Add(int64_t value) {return Add64(value);}
-	bool Add(uint64_t value) {return Add64(value);}
+	//bool Add(uint64_t value) {return Add64(value);}
 	
 	// At the core all integers are 64bit
 	int64_t Get64(size_t ndx) const;

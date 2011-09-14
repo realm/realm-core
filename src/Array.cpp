@@ -938,7 +938,7 @@ void Array::Set_1b(size_t ndx, int64_t value) {
 
 void Array::Set_2b(size_t ndx, int64_t value) {
 	const size_t offset = ndx >> 2;
-	const int n = (ndx & 3) << 1;
+	const uint8_t n = (ndx & 3) << 1;
 
 	uint8_t* p = &m_data[offset];
 	*p = (*p &~ (0x03 << n)) | (((uint8_t)value & 0x03) << n);
@@ -946,7 +946,7 @@ void Array::Set_2b(size_t ndx, int64_t value) {
 
 void Array::Set_4b(size_t ndx, int64_t value) {
 	const size_t offset = ndx >> 1;
-	const int n = (ndx & 1) << 2;
+	const uint8_t n = (ndx & 1) << 2;
 
 	uint8_t* p = &m_data[offset];
 	*p = (*p &~ (0x0F << n)) | (((uint8_t)value & 0x0F) << n);
