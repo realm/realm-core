@@ -141,7 +141,7 @@ class CursorBase {
 public:
 	CursorBase(Table& table, size_t ndx) : m_table(table), m_index(ndx) {};
 	CursorBase(const CursorBase& v) : m_table(v.m_table), m_index(v.m_index) {};
-	CursorBase& operator=(const CursorBase& v) {m_table = v.m_table; m_index = v.m_index;}
+	CursorBase& operator=(const CursorBase& v) {m_table = v.m_table; m_index = v.m_index; return *this;}
 
 protected:
 	Table& m_table;
