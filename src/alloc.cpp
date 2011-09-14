@@ -1,6 +1,9 @@
 #include "AllocSlab.h"
 #include <assert.h>
 
+// Pre-declare local functions
+size_t GetSizeFromHeader(void* p);
+
 SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(10) {}
 
 SlabAlloc::~SlabAlloc() {

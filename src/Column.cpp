@@ -17,6 +17,9 @@
 #define MAX_LIST_SIZE 1000
 #endif
 
+// Pre-declare local functions
+void SetRefSize(void* ref, size_t len);
+
 Column::Column(Allocator& alloc) : m_array(COLUMN_NORMAL, NULL, 0, alloc),  m_index(NULL) {
 	Create();
 }

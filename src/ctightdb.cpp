@@ -3,6 +3,9 @@
 #include <cstdarg>
 #include <assert.h>
 
+// Pre-declare local functions
+void table_insert_impl(Table* t, size_t ndx, va_list ap);
+
 extern "C" {
 
 Table* table_new(const char* name) {
