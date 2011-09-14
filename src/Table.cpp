@@ -418,7 +418,7 @@ void Table::ToDot(const char* filename) const {
 			assert(false);
 		}
 
-		fprintf(f, "| <%d>", i);
+		fprintf(f, "| <%zu>", i);
 	}
 	fprintf(f, "}\"];\n");
 
@@ -426,7 +426,7 @@ void Table::ToDot(const char* filename) const {
 	for (size_t i = 0; i < column_count; ++i) {
 		const ColumnBase& column = GetColumnBase(i);
 		const size_t ref = column.GetRef();
-		fprintf(f, "table:%d -> n%x\n", i, ref);
+		fprintf(f, "table:%zu -> n%zx\n", i, ref);
 	}
 
 
@@ -460,7 +460,7 @@ void Table::ToDot(const char* filename) const {
 void Table::Print() const {
 
 	// Table header
-	printf("Table \"%s\" len(%d)\n    ", m_name, m_size);
+	printf("Table \"%s\" len(%zu)\n    ", m_name, m_size);
 	const size_t column_count = GetColumnCount();
 	for (size_t i = 0; i < column_count; ++i) {
 		printf("%-10s ", m_columnNames.Get(i));
@@ -485,7 +485,7 @@ void Table::Print() const {
 
 	// Columns
 	for (size_t i = 0; i < m_size; ++i) {
-		printf("%3d ", i);
+		printf("%3zu ", i);
 		for (size_t n = 0; n < column_count; ++n) {
 			const ColumnType type = GetColumnType(n);
 			switch (type) {

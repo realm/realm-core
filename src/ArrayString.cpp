@@ -314,20 +314,20 @@ void ArrayString::Stats() const {
 	const size_t zeroes = size - total;
 	const size_t zavg = zeroes / m_len;
 
-	printf("Count: %d\n", m_len);
-	printf("Width: %d\n", m_width);
-	printf("Total: %d\n", size);
-	printf("Capacity: %d\n\n", m_capacity);
-	printf("Bytes string: %d\n", total);
-	printf("     longest: %d\n", longest);
-	printf("Bytes zeroes: %d\n", zeroes);
-	printf("         avg: %d\n", zavg);
+	printf("Count: %zu\n", m_len);
+	printf("Width: %zu\n", m_width);
+	printf("Total: %zu\n", size);
+	printf("Capacity: %zu\n\n", m_capacity);
+	printf("Bytes string: %zu\n", total);
+	printf("     longest: %zu\n", longest);
+	printf("Bytes zeroes: %zu\n", zeroes);
+	printf("         avg: %zu\n", zavg);
 }
 
 void ArrayString::ToDot(FILE* f) const {
 	const size_t ref = GetRef();
 
-	fprintf(f, "n%x [label=\"", ref);
+	fprintf(f, "n%zx [label=\"", ref);
 
 	for (size_t i = 0; i < m_len; ++i) {
 		if (i > 0) fprintf(f, " | ");

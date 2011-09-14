@@ -635,13 +635,13 @@ void Column::DoSort(size_t lo, size_t hi) {
 
 void Column::Print() const {
 	if (IsNode()) {
-		printf("Node: %x\n", m_array.GetRef());
+		printf("Node: %zx\n", m_array.GetRef());
 		
 		const Array offsets = m_array.GetSubArray(0);
 		const Array refs = m_array.GetSubArray(1);
 
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			printf(" %d: %d %x\n", i, (int)offsets.Get(i), (int)refs.Get(i));
+			printf(" %zu: %d %x\n", i, (int)offsets.Get(i), (int)refs.Get(i));
 		}
 		for (size_t i = 0; i < refs.Size(); ++i) {
 			const Column col((size_t)refs.Get(i));
@@ -684,23 +684,23 @@ void Column::Verify() const {
 
 void Column::ToDot(FILE* f, bool isTop) const {
 	const size_t ref = m_array.GetRef();
-	if (isTop) fprintf(f, "subgraph cluster_%d {\ncolor=black;\nstyle=dashed;\n", ref);
+	if (isTop) fprintf(f, "subgraph cluster_%zu {\ncolor=black;\nstyle=dashed;\n", ref);
 
 	if (m_array.IsNode()) {
 		const Array offsets = m_array.GetSubArray(0);
 		const Array refs = m_array.GetSubArray(1);
 
-		fprintf(f, "n%x [label=\"", ref);
+		fprintf(f, "n%zx [label=\"", ref);
 		for (size_t i = 0; i < offsets.Size(); ++i) {
 			if (i > 0) fprintf(f, " | ");
 			fprintf(f, "{%lld", offsets.Get(i));
-			fprintf(f, " | <%d>}", i);
+			fprintf(f, " | <%zu>}", i);
 		}
 		fprintf(f, "\"];\n");
 
 		for (size_t i = 0; i < refs.Size(); ++i) {
 			void* r = (void*)refs.Get(i);
-			fprintf(f, "n%x:%d -> n%x\n", ref, i, r);
+			fprintf(f, "n%zx:%zu -> n%p\n", ref, i, r);
 		}
 
 		// Sub-columns
