@@ -393,8 +393,8 @@ void Table::Verify() const {
 }
 
 void Table::ToDot(const char* filename) const {
-	FILE* f = NULL;
-	if (fopen_s(&f, filename, "w") !=0) return;
+	FILE* f = fopen(filename, "w");
+	if (!f) return;
 
 	fprintf(f, "digraph G {\n");
 	fprintf(f, "node [shape=record];\n");
