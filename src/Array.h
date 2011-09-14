@@ -4,15 +4,20 @@
 #ifdef _MSC_VER
 #include "win32/stdint.h"
 #else
-#include <cstdint> // unint8_t etc
+#include <stdint.h> // unint8_t etc
 #endif
 //#include <climits> // size_t
 #include <cstdlib> // size_t
 #include <cstring> // memmove
 #include "alloc.h"
 
+#ifdef _DEBUG
+#include <stdio.h>
+#endif
+
 // Pre-definitions
 class Column;
+
 
 enum ColumnDef {
 	COLUMN_NORMAL,

@@ -1,3 +1,4 @@
+#include "ctightdb.h"
 #include "Table.h"
 #include <cstdarg>
 #include <assert.h>

@@ -2,6 +2,9 @@
 #define __TDB_CTABLE__
 
 #include "ColumnType.h"
+#include <stdint.h>
+#include <cstdlib> // size_t
+
 
 extern "C" {
 	struct Table;
