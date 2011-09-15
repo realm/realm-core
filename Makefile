@@ -9,31 +9,33 @@
 # Compiler and flags
 #CXXFLAGS  = -Wall -Weffc++ -Wextra -std=c++0x
 CXXFLAGS  = -std=c++0x
-CXXLIBS   =
-CXXINC    =
-CXX       = g++ $(CXXFLAGS)
+CXXLIBS   = -L./src
+CXXINC    = -I./src
+CXX       = g++
+CXXCMD    = $(CXX) $(CXXFLAGS) $(CXXINC) 
 
 # Files
-LIB_SHARED = libtightdb.so.1
-LIB_STATIC = libtightdb.a
+#LIB_SHARED = libtightdb.so.1
+LIB_SHARED = libtightdb.a
+#LIB_STATIC = libtightdb.a
 
-HEADERS    = src/tightdb.h
-#SOURCES    = $(wildcard src/*.cpp)
-OBJECT     = tightdb.o
-OBJ_SHARED = tightdb-shared.o
+SOURCES    = $(wildcard src/*.cpp)
+OBJECTS    = $(SOURCES:.cpp=.o)
+OBJ_SHARED = $(SOURCES:.cpp=.so)
 
 # Targets
 all: static
+all: shared
 
 static: CXXFLAGS += -DNDEBUG -O3
 static: $(LIB_STATIC)
 	@echo "Created static library: $(LIB_STATIC)" 
-	@rm -f $(OBJECT)
+#	@rm -f $(OBJECTS)
 
 shared: CXXFLAGS += -DNDEBUG -O3
 shared: $(LIB_SHARED)
 	@echo "Created shared library: $(LIB_SHARED)"
-	@rm -f $(OBJ_SHARED)
+#	@rm -f $(OBJ_SHARED)
 
 test: all
 	@(cd test && make)
@@ -45,20 +47,21 @@ debug: all
 
 clean:
 	@rm -f core *.o *.so *.1 *.a
+	@rm -f core src/*.o src/*.so src/*.1 src/*.a
 	@(cd test && make clean)
 
 # Compiling
-$(OBJECT): $(HEADERS)
-	@$(CXX) -c $(HEADERS) -o $@
+%.o: %.cpp
+	@$(CXXCMD) -o $@ -c $<
 
-$(OBJ_SHARED): $(HEADERS)
-	$(CXX) -fPIC -c $(HEADERS) -o $@
+%.so: %.cpp
+	@$(CXXCMD) -fPIC -fno-strict-aliasing -o $@ -c $<
 
 # Archive static object
-$(LIB_STATIC): $(OBJECT)
+$(LIB_STATIC): $(OBJECTS)
 	@ar crs $(LIB_STATIC) $^
 
 # Linking
 $(LIB_SHARED): $(OBJ_SHARED)
-	$(CXX) -shared -fPIC -Wl,-soname,$(LIB_SHARED) $(OBJ_SHARED) -o $(LIB_SHARED)
-
+#	@$(CXXCMD) -shared -fPIC -rdynamic -Wl,-export-dynamic,-soname,$@ $^ -o $@
+	@$(CXXCMD) -shared -fPIC -rdynamic -Wl,-export-dynamic $^ -o $@
