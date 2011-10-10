@@ -11,12 +11,12 @@
 
 class SlabAlloc : public Allocator {
 public:
-	SlabAlloc();
+	SlabAlloc() : m_shared(NULL), m_baseline(10) {}
 	~SlabAlloc();
 
 	MemRef Alloc(size_t size);
-	MemRef ReAlloc(size_t ref, void* p, size_t size, bool doCopy);
-	void Free(size_t ref, void* p);
+	MemRef ReAlloc(size_t ref, MemRef::Header* header, size_t size, bool doCopy);
+	void Free(size_t ref, MemRef::Header* header);
 	void* Translate(size_t ref) const;
 
 #ifdef _DEBUG

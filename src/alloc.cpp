@@ -1,11 +1,6 @@
 #include "AllocSlab.h"
 #include <assert.h>
 
-// Pre-declare local functions
-size_t GetSizeFromHeader(void* p);
-
-SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(10) {}
-
 SlabAlloc::~SlabAlloc() {
 #ifdef _DEBUG
 	assert(IsAllFree());
@@ -63,16 +58,9 @@ MemRef SlabAlloc::Alloc(size_t size) {
 	return MemRef(slab, slabsBack);
 }
 
-// Support function
-size_t GetSizeFromHeader(void* p) {
-	// parse the capacity part of 8byte header
-	const uint8_t* const header = (uint8_t*)p;
-	return (header[4] << 16) + (header[5] << 8) + header[6];
-}
-
-void SlabAlloc::Free(size_t ref, void* p) {
+void SlabAlloc::Free(size_t ref, MemRef::Header* header) {
 	// Get size from segment
-	const size_t size = GetSizeFromHeader(p);
+	const size_t size = header->count;
 	const size_t refEnd = ref + size;
 	bool isMerged = false;
 
@@ -92,7 +80,7 @@ void SlabAlloc::Free(size_t ref, void* p) {
 		const size_t count = m_freeSpace.GetSize();
 		for (size_t i = 0; i < count; ++i) {
 			FreeSpace::Cursor c = m_freeSpace[i];
-			const size_t end = c.ref + c.size;
+			const size_t end = (size_t)(c.ref + c.size);
 			if (ref == end) {
 				if (isMerged) {
 					c.size += m_freeSpace[n].size;
@@ -109,7 +97,7 @@ void SlabAlloc::Free(size_t ref, void* p) {
 	if (!isMerged) m_freeSpace.Add(ref, size);
 }
 
-MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size, bool doCopy=true) {
+MemRef SlabAlloc::ReAlloc(size_t ref, MemRef::Header* header, size_t size, bool doCopy=true) {
 	//TODO: Check if we can extend current space
 
 	// Allocate new space
@@ -118,13 +106,13 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size, bool doCopy=true) {
 
 	if (doCopy) {
 		// Get size of old segment
-		const size_t oldsize = GetSizeFromHeader(p);
+		const size_t oldsize = header->count;
 
 		// Copy existing segment
-		memcpy(space.pointer, p, oldsize);
+		memcpy(space.pointer, header, oldsize);
 
 		// Add old segment to freelist
-		Free(ref, p);
+		Free(ref, header);
 	}
 
 	return space;
@@ -150,13 +138,13 @@ bool SlabAlloc::IsAllFree() const {
 	size_t ref = m_baseline;
 	for (size_t i = 0; i < m_slabs.GetSize(); ++i) {
 		const Slabs::Cursor c = m_slabs[i];
-		const size_t size = c.offset - ref;
+		const size_t size = (size_t)(c.offset - ref);
 
 		const size_t r = m_freeSpace.ref.Find(ref);
 		if (r == (size_t)-1) return false;
 		if (size != (size_t)m_freeSpace[r].size) return false;
 
-		ref = c.offset;
+		ref = (size_t)c.offset;
 	}
 	return true;
 }
@@ -165,13 +153,13 @@ void SlabAlloc::Verify() const {
 	// Make sure that all free blocks fit within a slab
 	for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
 		const FreeSpace::Cursor c = m_freeSpace[i];
-		const size_t ref = c.ref;
+		const size_t ref = (size_t)c.ref;
 
 		const size_t ndx = m_slabs.offset.FindPos(ref);
 		assert(ndx != -1);
 
-		const size_t slab_end = m_slabs[ndx].offset;
-		const size_t free_end = ref + c.size;
+		const size_t slab_end = (size_t)m_slabs[ndx].offset;
+		const size_t free_end = (size_t)(ref + c.size);
 
 		assert(free_end <= slab_end);
 	}

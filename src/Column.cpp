@@ -17,9 +17,6 @@
 #define MAX_LIST_SIZE 1000
 #endif
 
-// Pre-declare local functions
-void SetRefSize(void* ref, size_t len);
-
 Column::Column(Allocator& alloc) : m_array(COLUMN_NORMAL, NULL, 0, alloc),  m_index(NULL) {
 	Create();
 }
@@ -306,16 +303,8 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 }
 
 size_t Column::GetRefSize(size_t ref) const {
-	// parse the length part of 8byte header
-	const uint8_t* const header = (uint8_t*)m_array.GetAllocator().Translate(ref);
-	return (header[1] << 16) + (header[2] << 8) + header[3];
-}
-
-void SetRefSize(void* ref, size_t len) {
-	uint8_t* const header = (uint8_t*)(ref);
-	header[1] = ((len >> 16) & 0x000000FF);
-	header[2] = (len >> 8) & 0x000000FF;
-	header[3] = len & 0x000000FF;
+    MemRef::Header* const header = (MemRef::Header*)m_array.GetAllocator().Translate(ref);
+    return header->count;
 }
 
 bool Column::NodeInsert(size_t ndx, size_t ref) {

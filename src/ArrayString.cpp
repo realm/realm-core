@@ -182,7 +182,7 @@ bool ArrayString::Alloc(size_t count, size_t width) {
 	if (width < m_width) width = m_width; // width can only expand
 
 	// Calculate size in bytes
-	const size_t len = 8 + (count * width); // always need room for header
+	const size_t len = MEMREF_HEADER_SIZE + (count * width); // always need room for header
 	
 	if (len > m_capacity) {
 		// Try to expand with 50% to avoid to many reallocs
@@ -191,7 +191,7 @@ bool ArrayString::Alloc(size_t count, size_t width) {
 
 		// Allocate the space
 		MemRef mref;
-		if (m_data) mref = m_alloc.ReAlloc(m_data-8, new_capacity);
+		if (m_data) mref = m_alloc.ReAlloc(MEMREF_GET_HEADER(m_data), new_capacity);
 		else mref = m_alloc.Alloc(new_capacity);
 
 		if (!mref.pointer) return false;
@@ -212,16 +212,12 @@ bool ArrayString::Alloc(size_t count, size_t width) {
 
 	// Update 8-byte header
 	// isNode 1 bit, hasRefs 1 bit, 3 bits unused, width 3 bits, len 3 bytes, capacity 3 bytes
-	uint8_t* const header = (uint8_t*)(m_data-8);
-	header[0] = m_isNode << 7;
-	header[0] += m_hasRefs << 6;
-	header[0] += (uint8_t)w;
-	header[1] = (count >> 16) & 0x000000FF;
-	header[2] = (count >> 8) & 0x000000FF;
-	header[3] = count & 0x000000FF;
-	header[4] = (m_capacity >> 16) & 0x000000FF;
-	header[5] = (m_capacity >> 8) & 0x000000FF;
-	header[6] = m_capacity & 0x000000FF;
+    MemRef::Header* const header = MEMREF_GET_HEADER(m_data);
+    header->isNode   = m_isNode;
+    header->hasRefs  = m_hasRefs;
+    header->width    = w;
+    header->count    = count;
+    header->capacity = m_capacity;
 
 	m_width = width;
 	return true;

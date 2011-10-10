@@ -16,8 +16,8 @@ extern "C" {
 #endif
 
 typedef enum ColumnType ColumnType;
-typedef struct Table Table;
-typedef struct TableView TableView;
+typedef class Table Table;
+typedef class TableView TableView;
 
 	/*** Table ************************************/
 
