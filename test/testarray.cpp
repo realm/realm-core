@@ -8,6 +8,18 @@ struct db_setup_array {
 
 Array db_setup_array::c;
 
+TEST(bitwidth) {
+	Array a;
+	a.Add(1);
+	a.Add(2);
+	a.Add(3);
+	a.Add(-128);
+	CHECK_EQUAL(a.Get(0), 1);
+	CHECK_EQUAL(a.Get(1), 2);
+	CHECK_EQUAL(a.Get(2), 3);
+	CHECK_EQUAL(8, a.GetBitWidth());
+}
+
 TEST_FIXTURE(db_setup_array, Array_Add0) {
 	c.Add(0);
 	CHECK_EQUAL(c.Get(0), 0);
