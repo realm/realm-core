@@ -43,8 +43,8 @@ TEST(Group_Serialize) {
 	Group db("table_test.tbl");
 	TestTable t = db.GetTable<TestTable>();
 
-	CHECK_EQUAL(t.GetColumnCount(), 4);
-	CHECK_EQUAL(t.GetSize(), 10);
+	CHECK_EQUAL(4, t.GetColumnCount());
+	CHECK_EQUAL(10, t.GetSize());
 
 	for (size_t i = 0; i < t.GetSize(); ++i) {
 		CHECK_EQUAL(t[i].first, 0);
@@ -52,16 +52,16 @@ TEST(Group_Serialize) {
 		CHECK_EQUAL(t[i].fourth, Wed);
 	}
 
-	CHECK_EQUAL(t[0].second,  1);
-	CHECK_EQUAL(t[1].second, 15);
-	CHECK_EQUAL(t[2].second, 10);
-	CHECK_EQUAL(t[3].second, 20);
-	CHECK_EQUAL(t[4].second, 11);
-	CHECK_EQUAL(t[5].second, 45);
-	CHECK_EQUAL(t[6].second, 10);
-	CHECK_EQUAL(t[7].second,  0);
-	CHECK_EQUAL(t[8].second, 30);
-	CHECK_EQUAL(t[9].second,  9);
+	CHECK_EQUAL( 1, t[0].second);
+	CHECK_EQUAL(15, t[1].second);
+	CHECK_EQUAL(10, t[2].second);
+	CHECK_EQUAL(20, t[3].second);
+	CHECK_EQUAL(11, t[4].second);
+	CHECK_EQUAL(45, t[5].second);
+	CHECK_EQUAL(10, t[6].second);
+	CHECK_EQUAL( 0, t[7].second);
+	CHECK_EQUAL(30, t[8].second);
+	CHECK_EQUAL( 9, t[9].second);
 }
 
 #endif
