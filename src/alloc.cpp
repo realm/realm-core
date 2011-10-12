@@ -1,6 +1,17 @@
 #include "AllocSlab.h"
 #include <assert.h>
 
+// Memory Mapping includes
+#ifdef _MSC_VER
+//TODO: win include
+#else
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#endif
+
+
 // Pre-declare local functions
 size_t GetSizeFromHeader(void* p);
 
@@ -15,6 +26,15 @@ SlabAlloc::~SlabAlloc() {
 	for (size_t i = 0; i < m_slabs.GetSize(); ++i) {
 		void* p = (void*)(intptr_t)m_slabs[i].pointer;
 		free(p);
+	}
+
+	// Release any shared memory
+	if (m_shared) {
+#ifdef _MSC_VER
+#else
+		munmap(m_shared, m_baseline);
+		close(m_fd);
+#endif
 	}
 }
 
@@ -71,6 +91,8 @@ size_t GetSizeFromHeader(void* p) {
 }
 
 void SlabAlloc::Free(size_t ref, void* p) {
+	if (IsReadOnly(ref)) return;
+
 	// Get size from segment
 	const size_t size = GetSizeFromHeader(p);
 	const size_t refEnd = ref + size;
@@ -139,6 +161,52 @@ void* SlabAlloc::Translate(size_t ref) const {
 		const size_t offset = ndx ? m_slabs[ndx-1].offset : m_baseline;
 		return (char*)(intptr_t)m_slabs[ndx].pointer + (ref - offset);
 	}
+}
+
+bool SlabAlloc::IsReadOnly(size_t ref) const {
+	return ref < m_baseline;
+}
+
+bool SlabAlloc::SetShared(const char* path) {
+#ifdef _MSC_VER
+#else
+	// Open file
+	m_fd = open(path, O_RDONLY);
+	if (m_fd < 0) return false;
+
+	// Get size
+	struct stat statbuf;
+	if (fstat(m_fd, &statbuf) < 0) {
+		close(m_fd);
+		return false;
+	}
+
+	// Verify that data is 64bit aligned
+	if ((statbuf.st_size & 0x7) != 0) return false;
+
+	// Map to memory (read only)
+	void* p = mmap(0, statbuf.st_size, PROT_READ, MAP_SHARED, m_fd, 0);
+	if (p == (void*)-1) {
+		close(m_fd);
+		return false;
+	}
+
+	//TODO: Verify the data structures
+
+	m_shared = (char*)p;
+	m_baseline = statbuf.st_size;
+#endif
+
+	return true;
+}
+
+size_t SlabAlloc::GetTopRef() const {
+	assert(m_shared && m_baseline > 0);
+
+	const size_t ref = *(uint64_t*)m_shared;
+	assert(ref < m_baseline);
+
+	return ref;
 }
 
 #ifdef _DEBUG

@@ -10,6 +10,7 @@
 #include <cstdlib> // size_t
 #include <cstring> // memmove
 #include "alloc.h"
+#include <iostream>
 
 #ifdef _DEBUG
 #include <stdio.h>
@@ -30,6 +31,7 @@ public:
 	Array(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
 	Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
 	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
+	Array(Allocator& alloc);
 	Array(const Array& a);
 
 	bool operator==(const Array& a) const;
@@ -72,6 +74,9 @@ public:
 	void Destroy();
 
 	Allocator& GetAllocator() const {return m_alloc;}
+
+	// Serialization
+	size_t Write(std::ostream& target) const;
 
 	// Debug
 	size_t GetBitWidth() const {return m_width;}

@@ -629,6 +629,42 @@ void Column::DoSort(size_t lo, size_t hi) {
 	if (i < (int)hi) DoSort(i, hi);
 }
 
+size_t Column::Write(std::ostream& out, size_t& pos) const {
+	if (IsNode()) {
+		// First write out all sub-arrays
+		const Array refs = m_array.GetSubArray(1);
+		Array newRefs;
+		for (size_t i = 0; i < refs.Size(); ++i) {
+			const Column col((size_t)refs.Get(i));
+			const size_t sub_pos = col.Write(out, pos);
+			newRefs.Add(sub_pos);
+		}
+
+		// Write (new) refs
+		const size_t refs_pos = pos;
+		pos += newRefs.Write(out);
+
+		// Write offsets
+		const size_t offsets_pos = pos;
+		const Array offsets = m_array.GetSubArray(0);
+		pos += offsets.Write(out);
+
+		// Write new array with node info
+		const size_t node_pos = pos;
+		Array node(COLUMN_NODE);
+		node.Add(offsets_pos);
+		node.Add(refs_pos);
+		pos += node.Write(out);
+
+		return node_pos;
+	}
+	else {
+		const size_t array_pos = pos;
+		pos += m_array.Write(out);
+		return array_pos;
+	}
+}
+
 
 #ifdef _DEBUG
 #include "stdio.h"

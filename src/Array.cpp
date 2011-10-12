@@ -3,6 +3,9 @@
 
 #include "Column.h"
 
+// Pre-declare local functions
+size_t CalcByteLen(size_t count, size_t width);
+
 Array::Array(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
 : m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc) {
 	Create(ref);
@@ -20,6 +23,10 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 
 	Alloc(0, 0);
 	SetWidth(0);
+}
+
+// Creates new array (but invalid, call UpdateRef to init)
+Array::Array(Allocator& alloc) : m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
 }
 
 // Copy-constructor
@@ -779,10 +786,7 @@ void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_
 	}
 }
 
-
-
-bool Array::Alloc(size_t count, size_t width) {
-	// Calculate size in bytes
+size_t CalcByteLen(size_t count, size_t width) {
 	size_t len = 8; // always need room for header
 	switch (width) {
 	case 0:
@@ -803,6 +807,12 @@ bool Array::Alloc(size_t count, size_t width) {
 		assert(width == 8 || width == 16 || width == 32 || width == 64);
 		len += count * (width >> 3);
 	}
+	return len;
+}
+
+bool Array::Alloc(size_t count, size_t width) {
+	// Calculate size in bytes
+	const size_t len = CalcByteLen(count, width);
 
 	if (len > m_capacity) {
 		// Try to expand with 50% to avoid to many reallocs
@@ -1001,6 +1011,29 @@ void Array::DoSort(size_t lo, size_t hi) {
 	if ((int)lo < j) DoSort(lo, j);
 	if (i < (int)hi) DoSort(i, hi);
 }
+
+size_t Array::Write(std::ostream& out) const {
+	// Calculate who many bytes the array takes up
+	const size_t len = CalcByteLen(m_len, m_width);
+
+	// Write header first
+	// TODO: replace capacity with checksum
+	out.write((const char*)m_data-8, 8);
+
+	// Write array
+	const size_t arrayByteLen = len - 8;
+	if (arrayByteLen) out.write((const char*)m_data, arrayByteLen);
+
+	// Pad so next block will be 64bit aligned
+	const char pad[8] = {0,0,0,0,0,0,0,0};
+	const size_t rest = (~len & 0x7)+1; // CHECK
+	if (rest < 8) {
+		out.write(pad, rest);
+		return len + rest;
+	}
+	else return len; // Return number of bytes written
+}
+
 
 #ifdef _DEBUG
 #include "stdio.h"

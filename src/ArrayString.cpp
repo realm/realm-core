@@ -5,8 +5,16 @@
 
 #include "ArrayString.h"
 
-ArrayString::ArrayString(Allocator& alloc) : Array(COLUMN_NORMAL, NULL, 0, alloc) {
+ArrayString::ArrayString(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
 }
+
+ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc) {
+}
+
+// Creates new array (but invalid, call UpdateRef to init)
+ArrayString::ArrayString(Allocator& alloc) : Array(alloc) {
+}
+
 
 ArrayString::~ArrayString() {
 }
@@ -293,6 +301,29 @@ size_t ArrayString::Find(const char* value, size_t len) const {
 	else assert(false);
 		
 	return (size_t)-1;
+}
+
+size_t ArrayString::Write(std::ostream& out) const {
+	// Calculate who many bytes the array takes up
+	const size_t len = 8 + (m_len * m_width);
+
+	// Write header first
+	// TODO: replace capacity with checksum
+	out.write((const char*)m_data-8, 8);
+
+	// Write array
+	const size_t arrayByteLen = len - 8;
+	if (arrayByteLen) out.write((const char*)m_data, arrayByteLen);
+
+	// Pad so next block will be 64bit aligned
+	const char pad[8] = {0,0,0,0,0,0,0,0};
+	const size_t rest = (~len & 0x7)+1; // CHECK
+
+	if (rest < 8) {
+		out.write(pad, rest);
+		return len + rest;
+	}
+	else return len; // Return number of bytes written
 }
 
 #ifdef _DEBUG

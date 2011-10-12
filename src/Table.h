@@ -13,6 +13,7 @@ class TableView;
 class Table {
 public:
 	Table(const char* name, Allocator& alloc=DefaultAllocator);
+	Table(Allocator& alloc, size_t ref, const char* name);
 	Table(const Table& t);
 	~Table();
 
@@ -77,6 +78,11 @@ public:
 	// Indexing
 	bool HasIndex(size_t column_id) const;
 	void SetIndex(size_t column_id);
+
+	// Serialization
+	void Write(const char* path) const;
+	void Write(std::ostream& out) const;
+	static Table LoadFromFile(const char* path);
 
 	// Debug
 #ifdef _DEBUG

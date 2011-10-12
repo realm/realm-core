@@ -31,6 +31,7 @@ public: \
 		CName1.Create(this, 0); \
 		CName2.Create(this, 1); \
 	}; \
+	TableName(Allocator& alloc, size_t ref, const char* name) : Table(alloc, ref, name) {}; \
 \
 	class Cursor : public CursorBase { \
 	public: \
@@ -96,6 +97,7 @@ public: \
 		CName3.Create(this, 2); \
 		CName4.Create(this, 3); \
 	}; \
+	TableName(Allocator& alloc, size_t ref, const char* name) : Table(alloc, ref, name) {}; \
 \
 	class Cursor : public CursorBase { \
 	public: \

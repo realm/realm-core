@@ -19,6 +19,10 @@ public:
 	void Free(size_t ref, void* p);
 	void* Translate(size_t ref) const;
 
+	bool IsReadOnly(size_t ref) const;
+	bool SetShared(const char* path);
+	size_t GetTopRef() const;
+
 #ifdef _DEBUG
 	void Verify() const;
 	bool IsAllFree() const;
@@ -34,10 +38,14 @@ private:
 				Int, size)
 
 	// Member variables
-	int64_t* m_shared;
+	char* m_shared;
 	size_t m_baseline;
 	Slabs m_slabs;
 	FreeSpace m_freeSpace;
+
+#ifndef _MSC_VER
+	int m_fd;
+#endif
 };
 
 #endif //__TDB_ALLOC_SLAB__

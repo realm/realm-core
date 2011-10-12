@@ -1,13 +1,64 @@
 #include "Table.h"
 #include <assert.h>
 #include "Index.h"
+#include <iostream>
+#include <fstream>
+#include "AllocSlab.h"
 
 const ColumnType Accessor::type = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type = COLUMN_TYPE_BOOL;
 const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
 const ColumnType AccessorDate::type = COLUMN_TYPE_DATE;
 
-Table::Table(const char* name, Allocator& alloc) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_alloc(alloc) {
+Table::Table(const char* name, Allocator& alloc)
+: m_name(name), m_size(0), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_alloc(alloc)
+{
+}
+
+Table::Table(Allocator& alloc, size_t ref, const char* name) : m_name(name), m_size(0), m_spec(alloc), m_columnNames(alloc), m_columns(alloc), m_alloc(alloc) {
+    // Load from allocated memory
+    Array tableTop(ref, (Array*)NULL, 0, m_alloc);
+    assert(tableTop.Size() == 3);
+
+    m_spec.UpdateRef(tableTop.Get(0));
+    m_columnNames.UpdateRef(tableTop.Get(1));
+    m_columns.UpdateRef(tableTop.Get(2));
+
+    // Cache columns
+    size_t size = -1;
+    for (size_t i = 0; i < m_spec.Size(); ++i) {
+        const ColumnType type = (ColumnType)m_spec.Get(i);
+        const size_t ref = m_columns.Get(i);
+
+        switch (type) {
+            case COLUMN_TYPE_INT:
+            case COLUMN_TYPE_BOOL:
+                {
+                    Column* newColumn = new Column(ref, &m_columns, i, m_alloc);
+                    m_cols.Add((intptr_t)newColumn);
+
+                    if (size == -1) size = newColumn->Size();
+                    else assert(size == newColumn->Size());
+                }
+                break;
+
+            case COLUMN_TYPE_STRING:
+                {
+                    AdaptiveStringColumn* newColumn = new AdaptiveStringColumn(ref, &m_columns, i, m_alloc);
+                    m_cols.Add((intptr_t)newColumn);
+
+                    if (size == -1) size = newColumn->Size();
+                    else assert(size == newColumn->Size());
+                }
+                break;
+
+            default:
+                assert(false);
+                break;
+        }
+    }
+
+    if (size != -1) m_size = size;
 }
 
 Table::Table(const Table& t) : m_alloc(t.m_alloc) {
@@ -355,6 +406,65 @@ void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size
 	const Column& column = GetColumn(column_id);
 
 	column.FindAllHamming(tv.GetRefColumn(), value, max);
+}
+
+void Table::Write(const char* path) const {
+    std::ofstream out(path, std::ios_base::out|std::ios_base::binary);
+    Write(out);
+    out.close();
+}
+
+void Table::Write(std::ostream &out) const {
+    // Space for ref to top array
+    out.write("\0\0\0\0\0\0\0\0", 8);
+    size_t pos = 8;
+
+    // Spec
+    const size_t specPos = pos;
+    pos += m_spec.Write(out);
+
+    // Names
+    const size_t namesPos = pos;
+    pos += m_columnNames.Write(out);
+
+    // Columns
+    Array columns;
+    const size_t column_count = GetColumnCount();
+	for (size_t i = 0; i < column_count; ++i) {
+		const ColumnType type = GetColumnType(i);
+		switch (type) {
+        case COLUMN_TYPE_INT:
+        case COLUMN_TYPE_BOOL:
+            {
+                const Column& column = GetColumn(i);
+                const size_t cpos = column.Write(out, pos);
+                columns.Add(cpos);
+            }
+            break;
+        case COLUMN_TYPE_STRING:
+            {
+                const AdaptiveStringColumn& column = GetColumnString(i);
+                const size_t cpos = column.Write(out, pos);
+                columns.Add(cpos);
+            }
+            break;
+        default: assert(false);
+		}
+	}
+    const size_t columnsPos = pos;
+    pos += columns.Write(out);
+
+    // Table array
+    Array top;
+    top.Add(specPos);
+    top.Add(namesPos);
+    top.Add(columnsPos);
+    const uint64_t topPos = pos; // sized for top ref
+    pos += top.Write(out);
+
+    // top ref
+    out.seekp(0);
+    out.write((const char*)&topPos, 8);
 }
 
 #ifdef _DEBUG

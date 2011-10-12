@@ -5,7 +5,11 @@
 
 #include "Column.h"
 
-AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) : m_array(alloc) {
+AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) : m_array(NULL, 0, alloc) {
+}
+
+AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
+: m_array(ref, parent, pndx, alloc) {
 }
 
 AdaptiveStringColumn::~AdaptiveStringColumn() {
@@ -47,6 +51,13 @@ size_t AdaptiveStringColumn::Find(const char* value) const {
 size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 	assert(value);
 	return m_array.Find(value, len);
+}
+
+
+size_t AdaptiveStringColumn::Write(std::ostream& out, size_t& pos) const {
+	const size_t arrayPos = pos;
+	pos += m_array.Write(out);
+	return arrayPos;
 }
 
 #ifdef _DEBUG
