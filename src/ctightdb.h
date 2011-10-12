@@ -1,11 +1,16 @@
 #ifndef __TDB_CTABLE__
 #define __TDB_CTABLE__
 
+#ifdef _MSC_VER
+#include "win32/stdint.h"
+#else
 #include <inttypes.h>
+#include <stdint.h>
+#endif
+
 #include <time.h>
 
 #include "ColumnType.h"
-#include <stdint.h>
 #include <cstdlib> // size_t
 
 
