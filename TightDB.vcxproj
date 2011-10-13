@@ -187,9 +187,11 @@
     <ClCompile Include="src\Table.cpp" />
     <ClCompile Include="src\TableView.cpp" />
     <ClCompile Include="test\test.cpp" />
+    <ClCompile Include="test\testalloc.cpp" />
     <ClCompile Include="test\testarray.cpp" />
     <ClCompile Include="test\testarraystring.cpp" />
     <ClCompile Include="test\testcolumn.cpp" />
+    <ClCompile Include="test\testgroup.cpp" />
     <ClCompile Include="test\testindex.cpp" />
     <ClCompile Include="test\testtable.cpp" />
   </ItemGroup>
