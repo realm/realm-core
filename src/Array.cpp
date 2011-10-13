@@ -147,10 +147,18 @@ void Array::Clear() {
 	// Truncate size to zero (but keep capacity)
 	m_len = 0;
 	SetWidth(0);
+
+	// Check if we need to copy before modifying
+	// we can do this here because the commands above only
+	// modify class internal metadata
+	CopyOnWrite();
 }
 
 void Array::Delete(size_t ndx) {
 	assert(ndx < m_len);
+
+	// Check if we need to copy before modifying
+	CopyOnWrite();
 
 	// Move values below deletion up
 	if (m_width < 8) {
@@ -186,6 +194,9 @@ int64_t Array::Back() const {
 bool Array::Set(size_t ndx, int64_t value) {
 	assert(ndx < m_len);
 
+	// Check if we need to copy before modifying
+	if (!CopyOnWrite()) return false;
+
 	// Make room for the new value
 	const size_t width = BitWidth(value);
 	if (width > m_width) {
@@ -209,6 +220,9 @@ bool Array::Set(size_t ndx, int64_t value) {
 
 bool Array::Insert(size_t ndx, int64_t value) {
 	assert(ndx <= m_len);
+
+	// Check if we need to copy before modifying
+	if (!CopyOnWrite()) return false;
 
 	Getter getter = m_getter;
 
@@ -808,6 +822,36 @@ size_t CalcByteLen(size_t count, size_t width) {
 		len += count * (width >> 3);
 	}
 	return len;
+}
+
+bool Array::CopyOnWrite() {
+	if (!m_alloc.IsReadOnly(m_ref)) return true;
+
+	// Calculate size in bytes (plus a bit of extra room for expansion)
+	size_t len = CalcByteLen(m_len, m_width);
+	const size_t rest = (~len & 0x7)+1;
+	if (rest < 8) len += rest; // 64bit blocks
+	const size_t new_len = len + 64;
+
+	// Create new copy of array
+	const MemRef mref = m_alloc.Alloc(new_len);
+	memcpy(mref.pointer, m_data-8, len);
+
+	// Update capacity in header
+	uint8_t* const header = (uint8_t*)(mref.pointer);
+	header[4] = (new_len >> 16) & 0x000000FF;
+	header[5] = (new_len >> 8) & 0x000000FF;
+	header[6] = new_len & 0x000000FF;
+
+	// Update internal data
+	m_ref = mref.ref;
+	m_data = (unsigned char*)mref.pointer + 8;
+	m_capacity = new_len;
+
+	// Update ref in parent
+	if (m_parent) m_parent->Set(m_parentNdx, mref.ref);
+
+	return true;
 }
 
 bool Array::Alloc(size_t count, size_t width) {

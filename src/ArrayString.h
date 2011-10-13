@@ -30,6 +30,7 @@ public:
 
 private:
 	bool Alloc(size_t count, size_t width);
+	bool CopyOnWrite();
 };
 
 #endif //__TDB_ARRAY__

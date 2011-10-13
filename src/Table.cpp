@@ -17,7 +17,7 @@ Table::Table(const char* name, Allocator& alloc)
 
 Table::Table(Allocator& alloc, size_t ref, const char* name) : m_name(name), m_size(0), m_spec(alloc), m_columnNames(alloc), m_columns(alloc), m_alloc(alloc) {
     // Load from allocated memory
-    Array tableTop(ref, (Array*)NULL, 0, m_alloc);
+    const Array tableTop(ref, (Array*)NULL, 0, m_alloc);
     assert(tableTop.Size() == 3);
 
     m_spec.UpdateRef(tableTop.Get(0));
@@ -428,7 +428,7 @@ void Table::Write(std::ostream &out) const {
     pos += m_columnNames.Write(out);
 
     // Columns
-    Array columns;
+    Array columns(COLUMN_HASREFS);
     const size_t column_count = GetColumnCount();
 	for (size_t i = 0; i < column_count; ++i) {
 		const ColumnType type = GetColumnType(i);

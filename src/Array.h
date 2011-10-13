@@ -116,6 +116,7 @@ protected:
 
 	void SetWidth(size_t width);
 	bool Alloc(size_t count, size_t width);
+	bool CopyOnWrite();
 
 	// Member variables
 	Getter m_getter;

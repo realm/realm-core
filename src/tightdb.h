@@ -127,6 +127,13 @@ public: \
 		Insert##CType4 (3, ndx, v4); \
 		InsertDone(); \
 	} \
+	void Insert(size_t ndx, Type##CType1 v1, Type##CType2 v2,Type##CType3 v3, Type##CType4 v4) { \
+		Insert##CType1 (0, ndx, v1); \
+		Insert##CType2 (1, ndx, v2); \
+		Insert##CType3 (2, ndx, v3); \
+		Insert##CType4 (3, ndx, v4); \
+		InsertDone(); \
+	} \
 \
 	Cursor Add() {return Cursor(*this, AddRow());} \
 	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \

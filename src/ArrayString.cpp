@@ -38,6 +38,9 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 	assert(value);
 	assert(len < 64); // otherwise we have to use another column type
 
+	// Check if we need to copy before modifying
+	if (!CopyOnWrite()) return false;
+
 	// Special case for lists of zero-length strings
 	if (len == 0 && m_width == 0) {
 		m_len += 1;
@@ -97,11 +100,8 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 	assert(value);
 	assert(len < 64); // otherwise we have to use another column type
 
-	// Special case for lists of zero-length strings
-	if (len == 0 && m_width == 0) {
-		m_len += 1;
-		return true;
-	}
+	// Check if we need to copy before modifying
+	if (!CopyOnWrite()) return false;
 
 	// Calc min column width (incl trailing zero-byte)
 	size_t width = 0;
@@ -173,6 +173,9 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 void ArrayString::Delete(size_t ndx) {
 	assert(ndx < m_len);
 
+	// Check if we need to copy before modifying
+	CopyOnWrite();
+
 	--m_len;
 
 	// move data under deletion up
@@ -184,6 +187,35 @@ void ArrayString::Delete(size_t ndx) {
 	}
 }
 
+bool ArrayString::CopyOnWrite() {
+	if (!m_alloc.IsReadOnly(m_ref)) return true;
+
+	// Calculate size in bytes (plus a bit of extra room for expansion)
+	size_t len = 8 + (m_len * m_width);
+	const size_t rest = (~len & 0x7)+1;
+	if (rest < 8) len += rest; // 64bit blocks
+	const size_t new_len = len + 64;
+
+	// Create new copy of array
+	const MemRef mref = m_alloc.Alloc(new_len);
+	memcpy(mref.pointer, m_data-8, len);
+
+	// Update capacity in header
+	uint8_t* const header = (uint8_t*)(mref.pointer);
+	header[4] = (new_len >> 16) & 0x000000FF;
+	header[5] = (new_len >> 8) & 0x000000FF;
+	header[6] = new_len & 0x000000FF;
+
+	// Update internal data
+	m_ref = mref.ref;
+	m_data = (unsigned char*)mref.pointer + 8;
+	m_capacity = new_len;
+
+	// Update ref in parent
+	if (m_parent) m_parent->Set(m_parentNdx, mref.ref);
+
+	return true;
+}
 
 bool ArrayString::Alloc(size_t count, size_t width) {
 	assert(width <= 64);
@@ -304,7 +336,7 @@ size_t ArrayString::Find(const char* value, size_t len) const {
 }
 
 size_t ArrayString::Write(std::ostream& out) const {
-	// Calculate who many bytes the array takes up
+	// Calculate how many bytes the array takes up
 	const size_t len = 8 + (m_len * m_width);
 
 	// Write header first

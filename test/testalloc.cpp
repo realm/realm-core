@@ -25,9 +25,9 @@ TEST(Alloc1) {
 	SetCapacity(mr3.pointer, 256);
 
 	// Are pointers 64bit aligned
-	CHECK_EQUAL(0, (intptr_t)mr1.pointer & 0x3);
-	CHECK_EQUAL(0, (intptr_t)mr2.pointer & 0x3);
-	CHECK_EQUAL(0, (intptr_t)mr3.pointer & 0x3);
+	CHECK_EQUAL(0, (intptr_t)mr1.pointer & 0x7);
+	CHECK_EQUAL(0, (intptr_t)mr2.pointer & 0x7);
+	CHECK_EQUAL(0, (intptr_t)mr3.pointer & 0x7);
 
 	// Do refs translate correctly
 	CHECK_EQUAL(mr1.pointer, alloc.Translate(mr1.ref));

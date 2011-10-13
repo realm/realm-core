@@ -19,7 +19,11 @@ SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(8) {}
 
 SlabAlloc::~SlabAlloc() {
 #ifdef _DEBUG
-	assert(IsAllFree());
+	if (!IsAllFree()) {
+		m_slabs.Print();
+		m_freeSpace.Print();
+		assert(false);
+	}
 #endif //_DEBUG
 
 	// Release all allocated memory
@@ -39,7 +43,7 @@ SlabAlloc::~SlabAlloc() {
 }
 
 MemRef SlabAlloc::Alloc(size_t size) {
-	assert((size & 0x3) == 0); // only allow sizes that are multibles of 8
+	assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
 	// Do we have a free space we can reuse?
 	for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
@@ -134,7 +138,7 @@ void SlabAlloc::Free(size_t ref, void* p) {
 }
 
 MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size, bool doCopy=true) {
-	assert((size & 0x3) == 0); // only allow sizes that are multibles of 8
+	assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
 	//TODO: Check if we can extend current space
 

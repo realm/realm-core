@@ -7,6 +7,17 @@ struct db_setup_string {
 
 ArrayString db_setup_string::c;
 
+TEST(ArrayStringMultiEmpty) {
+	ArrayString c;
+	c.Add("");
+	c.Add("");
+	c.Add("");
+	c.Add("");
+	c.Add("");
+	c.Add("");
+	CHECK_EQUAL(6, c.Size());
+}
+
 TEST_FIXTURE(db_setup_string, ArrayArrayStringAdd0) {
 	c.Add();
 	CHECK_EQUAL("", c.Get(0));

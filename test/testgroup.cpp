@@ -12,8 +12,8 @@ enum Days {
 	Sun
 };
 
-TDB_TABLE_4(TestTable,
-			Int,        first,
+TDB_TABLE_4(TestTableGroup,
+			String,     first,
 			Int,        second,
 			Bool,       third,
 			Enum<Days>, fourth)
@@ -22,17 +22,17 @@ TDB_TABLE_4(TestTable,
 #ifndef _MSC_VER
 
 TEST(Group_Serialize) {
-	TestTable table;
-	table.Add(0,  1, true, Wed);
-	table.Add(0, 15, true, Wed);
-	table.Add(0, 10, true, Wed);
-	table.Add(0, 20, true, Wed);
-	table.Add(0, 11, true, Wed);
-	table.Add(0, 45, true, Wed);
-	table.Add(0, 10, true, Wed);
-	table.Add(0,  0, true, Wed);
-	table.Add(0, 30, true, Wed);
-	table.Add(0,  9, true, Wed);
+	TestTableGroup table;
+	table.Add("",  1, true, Wed);
+	table.Add("", 15, true, Wed);
+	table.Add("", 10, true, Wed);
+	table.Add("", 20, true, Wed);
+	table.Add("", 11, true, Wed);
+	table.Add("", 45, true, Wed);
+	table.Add("", 10, true, Wed);
+	table.Add("",  0, true, Wed);
+	table.Add("", 30, true, Wed);
+	table.Add("",  9, true, Wed);
 
 	// Delete old file if there
 	remove("table_test.tbl");
@@ -40,18 +40,19 @@ TEST(Group_Serialize) {
 	// Serialize to disk
 	table.Write("table_test.tbl");
 
+	// Load the table
 	Group db("table_test.tbl");
-	TestTable t = db.GetTable<TestTable>();
+	TestTableGroup t = db.GetTable<TestTableGroup>();
 
 	CHECK_EQUAL(4, t.GetColumnCount());
 	CHECK_EQUAL(10, t.GetSize());
 
+	// Verify that original values are there
 	for (size_t i = 0; i < t.GetSize(); ++i) {
-		CHECK_EQUAL(t[i].first, 0);
-		CHECK_EQUAL(t[i].third, true);
-		CHECK_EQUAL(t[i].fourth, Wed);
+		CHECK_EQUAL("", (const char*)t[i].first);
+		CHECK_EQUAL(true, t[i].third);
+		CHECK_EQUAL(Wed, t[i].fourth);
 	}
-
 	CHECK_EQUAL( 1, t[0].second);
 	CHECK_EQUAL(15, t[1].second);
 	CHECK_EQUAL(10, t[2].second);
@@ -62,6 +63,19 @@ TEST(Group_Serialize) {
 	CHECK_EQUAL( 0, t[7].second);
 	CHECK_EQUAL(30, t[8].second);
 	CHECK_EQUAL( 9, t[9].second);
+
+	// Modify the backed table
+	t[0].first = "test";
+	t.Insert(5, "hello", 100, false, Mon);
+	t.DeleteRow(1);
+
+	CHECK_EQUAL("test", (const char*)t[0].first);
+	CHECK_EQUAL("", (const char*)t[1].first);
+
+	CHECK_EQUAL("hello", (const char*)t[4].first);
+	CHECK_EQUAL(100, t[4].second);
+	CHECK_EQUAL(false, t[4].third);
+	CHECK_EQUAL(Mon, t[4].fourth);
 }
 
 #endif
