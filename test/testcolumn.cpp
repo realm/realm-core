@@ -1,9 +1,16 @@
 #include "Column.h"
 #include <UnitTest++.h>
+#include <vector>
+#include <algorithm>
+#include "testsettings.h"
 
 struct db_setup {
 	static Column c;
 };
+
+// Pre-declare local functions
+uint64_t rand2(void);
+bool vector_eq_column(const std::vector<int64_t>& v, const Column& a);
 
 Column db_setup::c;
 
@@ -445,3 +452,80 @@ TEST(Column_FindHamming) {
 	col.Destroy();
 	res.Destroy();
 }
+
+
+/*
+TEST(Column_prepend_many)
+{	
+	// Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
+	Column a;
+	std::vector<signed long long> v;
+
+	for(int items = 0; items < 2000; items++)
+	{
+		a.Clear();
+		for(int j = 0; j < items + 1; j++)
+		{
+			a.Insert(0, j);
+		}
+		a.Insert(items, 444);
+	}	
+}
+
+
+TEST(Column_monkey1)
+{	
+	const uint64_t DURATION = UNITTEST_DURATION*1000;
+	const uint64_t SEED = 123;
+
+	Column a;
+	std::vector<int64_t> v;
+	int trend = 5;
+ 
+	srand(SEED);
+	uint64_t nums_per_bitwidth = DURATION;
+	size_t current_bitwidth = 0;
+
+	for(current_bitwidth = 3; current_bitwidth < 31; current_bitwidth++) {
+		while(rand2() % nums_per_bitwidth != 0) {
+			const bool b = vector_eq_column(v, a);
+			CHECK_EQUAL(true, b);
+
+			if(!(rand2() % (DURATION / 10)))
+				trend = rand2() % 10;
+
+			if(rand2() % 10 > trend) {
+				uint64_t l = rand2();
+				const uint64_t mask = ((1ULL << current_bitwidth) - 1ULL);
+				l = l & mask;
+				size_t pos = rand2() % (a.Size() + 1);
+
+				a.Insert(pos, (int)l);
+				v.insert(v.begin() + pos, (int)l);
+
+			}
+			else {
+				if(a.Size() > 0) {
+					size_t i = rand2() % a.Size();
+					a.Delete(i);
+					v.erase(v.begin() + i);
+				}
+			}
+		}
+	}	
+}	
+
+*/
+
+
+// Support function for monkey test
+
+bool vector_eq_column(const std::vector<int64_t>& v, const Column& a) {
+	if (a.Size() != v.size()) return false;
+
+	for(size_t t = 0; t < v.size(); ++t) {
+		if (v[t] != a.Get(t)) return false;
+	}
+	return true;
+}
+
