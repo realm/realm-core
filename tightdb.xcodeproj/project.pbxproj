@@ -27,6 +27,7 @@
 		368063321445977300283774 /* Group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063311445977300283774 /* Group.cpp */; };
 		368063351445979100283774 /* Group.h in Headers */ = {isa = PBXBuildFile; fileRef = 368063341445979100283774 /* Group.h */; };
 		368063381445AF9B00283774 /* testgroup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063361445AD9200283774 /* testgroup.cpp */; };
+		3680633A1446D12B00283774 /* testalloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063391446D12A00283774 /* testalloc.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -296,6 +297,7 @@
 		368063311445977300283774 /* Group.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Group.cpp; sourceTree = "<group>"; };
 		368063341445979100283774 /* Group.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Group.h; sourceTree = "<group>"; };
 		368063361445AD9200283774 /* testgroup.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testgroup.cpp; sourceTree = "<group>"; };
+		368063391446D12A00283774 /* testalloc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testalloc.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -376,6 +378,7 @@
 				3647E00814209CE600D56FD7 /* test-stl */,
 				3647E00E14209CE600D56FD7 /* test-tightdb */,
 				3647E04914209CE600D56FD7 /* test.cpp */,
+				368063391446D12A00283774 /* testalloc.cpp */,
 				3647E04A14209CE600D56FD7 /* testarray.cpp */,
 				3647E04B14209CE600D56FD7 /* testarraystring.cpp */,
 				3647E04C14209CE600D56FD7 /* testcolumn.cpp */,
@@ -880,6 +883,7 @@
 				3647E1121420E69400D56FD7 /* testtable.cpp in Sources */,
 				3647E10D1420E66B00D56FD7 /* main.cpp in Sources */,
 				368063381445AF9B00283774 /* testgroup.cpp in Sources */,
+				3680633A1446D12B00283774 /* testalloc.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
