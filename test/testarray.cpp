@@ -622,7 +622,7 @@ TEST(findallint7){
 // Support functions for monkey test
 
 uint64_t rand2(void) {
-	const uint64_t i = (uint64_t)rand() << 32 | (int64_t)rand();
+	const uint64_t i = (int64_t)rand() | (uint64_t)rand() << 8 | (uint64_t)rand() << 2*8 | (uint64_t)rand() << 3*8 | (uint64_t)rand() << 4*8 | (uint64_t)rand() << 5*8 | (uint64_t)rand() << 6*8 | (uint64_t)rand() << 7*8;
 	return i;
 }
 
