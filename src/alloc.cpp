@@ -137,7 +137,7 @@ void SlabAlloc::Free(size_t ref, void* p) {
 	if (!isMerged) m_freeSpace.Add(ref, size);
 }
 
-MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size, bool doCopy=true) {
+MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size) {
 	assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
 	//TODO: Check if we can extend current space
@@ -146,7 +146,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size, bool doCopy=true) {
 	const MemRef space = Alloc(size);
 	if (!space.pointer) return space;
 
-	if (doCopy) {
+	/*if (doCopy)*/ {  //TODO: allow realloc without copying
 		// Get size of old segment
 		const size_t oldsize = GetSizeFromHeader(p);
 

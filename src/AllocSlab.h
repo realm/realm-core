@@ -15,7 +15,7 @@ public:
 	~SlabAlloc();
 
 	MemRef Alloc(size_t size);
-	MemRef ReAlloc(size_t ref, void* p, size_t size, bool doCopy);
+	MemRef ReAlloc(size_t ref, void* p, size_t size);
 	void Free(size_t ref, void* p);
 	void* Translate(size_t ref) const;
 

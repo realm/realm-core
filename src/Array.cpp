@@ -800,7 +800,7 @@ void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_
 	}
 }
 
-size_t CalcByteLen(size_t count, size_t width) {
+size_t Array::CalcByteLen(size_t count, size_t width) const {
 	size_t len = 8; // always need room for header
 	switch (width) {
 	case 0:
@@ -859,13 +859,17 @@ bool Array::Alloc(size_t count, size_t width) {
 	const size_t len = CalcByteLen(count, width);
 
 	if (len > m_capacity) {
-		// Try to expand with 50% to avoid to many reallocs
-		size_t new_capacity = m_capacity ? m_capacity + m_capacity / 2 : 128;
-		if (new_capacity < len) new_capacity = len; 
+		// Double to avoid too many reallocs
+		size_t new_capacity = m_capacity ? m_capacity * 2 : 128;
+		if (new_capacity < len) {
+			const size_t rest = (~len & 0x7)+1;
+			new_capacity = len;
+			if (rest < 8) new_capacity += rest; // 64bit align
+		}
 
 		// Allocate the space
 		MemRef mref;
-		if (m_data) mref = m_alloc.ReAlloc(m_data-8, new_capacity);
+		if (m_data) mref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
 		else mref = m_alloc.Alloc(new_capacity);
 
 		if (!mref.pointer) return false;

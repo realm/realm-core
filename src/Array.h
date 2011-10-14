@@ -114,6 +114,8 @@ protected:
 	void Set_32b(size_t ndx, int64_t value);
 	void Set_64b(size_t ndx, int64_t value);
 
+	virtual size_t CalcByteLen(size_t count, size_t width) const;
+
 	void SetWidth(size_t width);
 	bool Alloc(size_t count, size_t width);
 	bool CopyOnWrite();

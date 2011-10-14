@@ -29,8 +29,7 @@ public:
 #endif //_DEBUG
 
 private:
-	bool Alloc(size_t count, size_t width);
-	bool CopyOnWrite();
+	virtual size_t CalcByteLen(size_t count, size_t width) const;
 };
 
 #endif //__TDB_ARRAY__

@@ -19,7 +19,7 @@ struct MemRef {
 class Allocator {
 public:
 	virtual MemRef Alloc(size_t size) {void* p = malloc(size); return MemRef(p,(size_t)p);}
-	virtual MemRef ReAlloc(void* p, size_t size) {void* p2 = realloc(p, size); return MemRef(p2,(size_t)p2);}
+	virtual MemRef ReAlloc(size_t /*ref*/, void* p, size_t size) {void* p2 = realloc(p, size); return MemRef(p2,(size_t)p2);}
 	virtual void Free(size_t, void* p) {return free(p);}
 
 	virtual void* Translate(size_t ref) const {return (void*)ref;}
