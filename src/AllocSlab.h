@@ -11,7 +11,7 @@
 
 class SlabAlloc : public Allocator {
 public:
-	SlabAlloc() : m_shared(NULL), m_baseline(10) {}
+	SlabAlloc();
 	~SlabAlloc();
 
 	MemRef Alloc(size_t size);

@@ -13,6 +13,7 @@
 
 #ifdef _DEBUG
 #include <stdio.h>
+#include <assert.h>
 #endif
 
 // Pre-definitions
@@ -38,14 +39,25 @@ public:
 	void SetParent(Array* parent, size_t pndx);
 	void UpdateRef(size_t ref);
 
-	size_t Size() const {return m_len;}
-	bool IsEmpty() const {return m_len == 0;}
+	size_t Size() const {
+#ifdef _DEBUG
+        assert(MEMREF_GET_HEADER(m_data)->length == m_len);
+#endif
+        return m_len;
+    }
+
+    bool IsEmpty() const {return m_len == 0;}
 
 	bool Insert(size_t ndx, int64_t value);
-	bool Add(int64_t value);
+	
+    inline bool Add(int64_t value) {
+        return Insert(m_len, value);
+    }
+
 	bool Set(size_t ndx, int64_t value);
 	int64_t Get(size_t ndx) const;
-	int64_t operator[](size_t ndx) const {return Get(ndx);}
+	
+    int64_t operator[](size_t ndx) const {return Get(ndx);}
 	int64_t Back() const;
 	void Delete(size_t ndx);
 	void Clear();

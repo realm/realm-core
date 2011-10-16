@@ -23,7 +23,7 @@ struct MemRef {
         uint32_t unused1  : 3;
         uint32_t hasRefs  : 1;
         uint32_t isNode   : 1;
-        uint32_t count    : 24;
+        uint32_t length   : 24;
         uint32_t capacity : 24;
         uint32_t unused2  : 8;
     };

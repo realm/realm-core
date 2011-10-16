@@ -1,6 +1,14 @@
 #include "AllocSlab.h"
 #include <assert.h>
 
+#define ALLOC_SLAB_SIZE     256
+#define ALLOC_SLAB_BASELINE 10
+
+// MP: This class is not ready for review
+
+SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(ALLOC_SLAB_BASELINE) {
+}
+
 SlabAlloc::~SlabAlloc() {
 #ifdef _DEBUG
 	assert(IsAllFree());
@@ -34,7 +42,7 @@ MemRef SlabAlloc::Alloc(size_t size) {
 	}
 
 	// Else, allocate new slab
-	const size_t multible = 256 * ((size / 256) + 1);
+	const size_t multible = ALLOC_SLAB_SIZE * ((size / ALLOC_SLAB_SIZE) + 1);
 	const size_t slabsBack = m_slabs.IsEmpty() ? m_baseline : m_slabs.Back().offset;
 	const size_t doubleLast = m_slabs.IsEmpty() ? 0 :
 		                                          (slabsBack - (m_slabs.GetSize() == 1) ? (size_t)0 : m_slabs[-2].offset) * 2;
@@ -60,7 +68,7 @@ MemRef SlabAlloc::Alloc(size_t size) {
 
 void SlabAlloc::Free(size_t ref, MemRef::Header* header) {
 	// Get size from segment
-	const size_t size = header->count;
+	const size_t size = header->capacity;
 	const size_t refEnd = ref + size;
 	bool isMerged = false;
 
@@ -98,7 +106,8 @@ void SlabAlloc::Free(size_t ref, MemRef::Header* header) {
 }
 
 MemRef SlabAlloc::ReAlloc(size_t ref, MemRef::Header* header, size_t size, bool doCopy=true) {
-	//TODO: Check if we can extend current space
+	//TODO: Check if we can extend current space 
+    //MP: Not reviewed (not unit tested)
 
 	// Allocate new space
 	const MemRef space = Alloc(size);
@@ -106,7 +115,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, MemRef::Header* header, size_t size, bool 
 
 	if (doCopy) {
 		// Get size of old segment
-		const size_t oldsize = header->count;
+		const size_t oldsize = header->length;
 
 		// Copy existing segment
 		memcpy(space.pointer, header, oldsize);
@@ -119,6 +128,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, MemRef::Header* header, size_t size, bool 
 }
 
 void* SlabAlloc::Translate(size_t ref) const {
+    //MP: Not reviewed - m_baseline arbitrary and m_shared is undefined
 	if (ref < m_baseline) return m_shared + ref;
 	else {
 		const size_t ndx = m_slabs.offset.FindPos(ref);

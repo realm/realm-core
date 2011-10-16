@@ -37,7 +37,7 @@ void Array::Create(size_t ref) {
     m_isNode   = header->isNode;
     m_hasRefs  = header->hasRefs;
     m_width    = 1 << (header->width) >> 1; // 0, 1, 2, 4, 8, 16, 32, 64
-    m_len      = header->count;
+    m_len      = header->length;
     m_capacity = header->capacity;
 
     m_ref = ref;
@@ -130,6 +130,7 @@ void Array::Clear() {
 
     // Truncate size to zero (but keep capacity)
     m_len = 0;
+    MEMREF_GET_HEADER(m_data)->length = m_len;
     SetWidth(0);
 }
 
@@ -146,15 +147,15 @@ void Array::Delete(size_t ndx) {
     else if (ndx < m_len-1) {
         // when byte sized, use memmove
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        unsigned char* dst = m_data + (ndx * w);
-        unsigned char* src = dst + w;
+        uint8_t* dst = m_data + (ndx * w);
+        uint8_t* src = dst + w;
         const size_t count = (m_len - ndx - 1) * w;
         memmove(dst, src, count);
     }
 
     // Update length (also in header)
     --m_len;
-    MEMREF_GET_HEADER(m_data)->count = m_len;
+    MEMREF_GET_HEADER(m_data)->length = m_len;
 }
 
 int64_t Array::Get(size_t ndx) const {
@@ -206,33 +207,36 @@ bool Array::Insert(size_t ndx, int64_t value) {
     else {
         if (!Alloc(m_len+1, m_width)) return false;
     }
+    
+    // Load setter to local stack variable (saves 1 instruction in move-loop)
+    Setter setter = m_setter; 
 
     // Move values below insertion (may expand)
     if (doExpand || m_width < 8) {
         int k = (int)m_len;
         while (--k >= (int)ndx) {
             const int64_t v = (this->*getter)(k);
-            (this->*m_setter)(k+1, v);
+            (this->*setter)(k+1, v);
         }
     }
     else if (ndx != m_len) {
         // when byte sized and no expansion, use memmove
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        unsigned char* src = m_data + (ndx * w);
-        unsigned char* dst = src + w;
+        uint8_t* src = m_data + (ndx * w);
+        uint8_t* dst = src + w;
         const size_t count = (m_len - ndx) * w;
         memmove(dst, src, count);
     }
 
     // Insert the new value
-    (this->*m_setter)(ndx, value);
+    (this->*setter)(ndx, value);
 
     // Expand values above insertion
     if (doExpand) {
         int k = (int)ndx;
         while (--k >= 0) {
             const int64_t v = (this->*getter)(k);
-            (this->*m_setter)(k, v);
+            (this->*setter)(k, v);
         }
     }
 
@@ -243,16 +247,12 @@ bool Array::Insert(size_t ndx, int64_t value) {
     return true;
 }
 
-bool Array::Add(int64_t value) {
-    return Insert(m_len, value);
-}
-
 void Array::Resize(size_t count) {
     assert(count <= m_len);
 
     // Update length (also in header)
     m_len = count;
-    MEMREF_GET_HEADER(m_data)->count = m_len;
+    MEMREF_GET_HEADER(m_data)->length = m_len;
 }
 
 bool Array::Increment(int64_t value, size_t start, size_t end) {
@@ -332,7 +332,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
     }
     else if (m_width == 2) {
         // Create a pattern to match 64bits at a time
-        const int64_t v = ~0ULL/0x3 * value;
+        const int64_t v = (~0ULL/0x3) * value;
 
         const int64_t* p = (const int64_t*)m_data + start;
         const size_t end64 = m_len / 32;
@@ -360,7 +360,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
     }
     else if (m_width == 4) {
         // Create a pattern to match 64bits at a time
-        const int64_t v = ~0ULL/0xF * value;
+        const int64_t v = (~0ULL/0xF) * value;
 
         const int64_t* p = (const int64_t*)m_data + start;
         const size_t end64 = m_len / 16;
@@ -390,7 +390,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
         // TODO: Handle partial searches
 
         // Create a pattern to match 64bits at a time
-        const int64_t v = ~0ULL/0xFF * value;
+        const int64_t v = (~0ULL/0xFF) * value;
 
         const int64_t* p = (const int64_t*)m_data + start;
         const size_t end64 = m_len / 8;
@@ -417,7 +417,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
     }
     else if (m_width == 16) {
         // Create a pattern to match 64bits at a time
-        const int64_t v = ~0ULL/0xFFFF * value;
+        const int64_t v = (~0ULL/0xFFFF) * value;
 
         const int64_t* p = (const int64_t*)m_data + start;
         const size_t end64 = m_len / 4;
@@ -444,7 +444,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
     }
     else if (m_width == 32) {
         // Create a pattern to match 64bits at a time
-        const int64_t v = ~0ULL/0xFFFFFFFF * value;
+        const int64_t v = (~0ULL/0xFFFFFFFF) * value;
 
         const int64_t* p = (const int64_t*)m_data + start;
         const size_t end64 = m_len / 2;
@@ -479,7 +479,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
         }
     }
     else {
-        // Naive search
+        // Naive search (MP: For one bit searches - could be optimized)
         for (size_t i = start; i < end; ++i) {
             const int64_t v = (this->*m_getter)(i);
             if (v == value) return i;
@@ -510,7 +510,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
     }
     else if (m_width == 2) {
         // Create a pattern to match 64bits at a time
-        const int64_t v = ~0ULL/0x3 * value;
+        const int64_t v = (~0ULL/0x3) * value;
 
         const int64_t* p = (const int64_t*)m_data + start;
         const size_t end64 = m_len / 32;
@@ -551,7 +551,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
     }
     else if (m_width == 4) {
         // Create a pattern to match 64bits at a time
-        const int64_t v = ~0ULL/0xF * value;
+        const int64_t v = (~0ULL/0xF) * value;
 
         const int64_t* p = (const int64_t*)m_data + start;
         const size_t end64 = m_len / 16;
@@ -594,7 +594,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
         // TODO: Handle partial searches
 
         // Create a pattern to match 64bits at a time
-        const int64_t v = ~0ULL/0xFF * value;
+        const int64_t v = (~0ULL/0xFF) * value;
 
         const int64_t* p = (const int64_t*)m_data + start;
         const size_t end64 = m_len / 8;
@@ -634,7 +634,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
     }
     else if (m_width == 16) {
         // Create a pattern to match 64bits at a time
-        const int64_t v = ~0ULL/0xFFFF * value;
+        const int64_t v = (~0ULL/0xFFFF) * value;
 
         const int64_t* p = (const int64_t*)m_data + start;
         const size_t end64 = m_len / 4;
@@ -674,7 +674,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
     }
     else if (m_width == 32) {
         // Create a pattern to match 64bits at a time
-        const int64_t v = ~0ULL/0xFFFFFFFF * value;
+        const int64_t v = (~0ULL/0xFFFFFFFF) * value;
 
         const int64_t* p = (const int64_t*)m_data + start;
         const size_t end64 = m_len / 2;
@@ -722,7 +722,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
         }
     }
     else {
-        // Naive search
+        // Naive search (MP: For one bit searches - could be optimized)
         for (size_t i = start; i < end; ++i) {
             const int64_t v = (this->*m_getter)(i);
             if (v == value) result.Add(i + colOffset);
@@ -770,8 +770,6 @@ void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_
     }
 }
 
-
-
 bool Array::Alloc(size_t count, size_t width) {
     // Calculate size in bytes
     size_t len = MEMREF_HEADER_SIZE; // always need room for header
@@ -808,7 +806,7 @@ bool Array::Alloc(size_t count, size_t width) {
         if (!mref.pointer) return false;
 
         m_ref = mref.ref;
-        m_data = (unsigned char*)mref.pointer + MEMREF_HEADER_SIZE;
+        m_data = (uint8_t*)mref.pointer + MEMREF_HEADER_SIZE;
         m_capacity = new_capacity;
 
         // Update ref in parent
@@ -828,7 +826,7 @@ bool Array::Alloc(size_t count, size_t width) {
     header->isNode   = m_isNode;
     header->hasRefs  = m_hasRefs;
     header->width    = w;
-    header->count    = count;
+    header->length   = count;
     header->capacity = m_capacity;
 
     return true;
@@ -972,13 +970,16 @@ void Array::DoSort(size_t lo, size_t hi) {
     const size_t ndx = (lo + hi)/2;
     const int64_t x = (size_t)Get(ndx);
 
+    // use local getter in loop
+    Getter get = m_getter;
+
     // partition
     do {
-        while (Get(i) < x) i++;
-        while (Get(j) > x) j--;
+        while ((this->*get)(i) < x) i++;
+        while ((this->*get)(j) > x) j--;
         if (i <= j) {
-            const int64_t h = Get(i);
-            Set(i, Get(j));
+            const int64_t h = (this->*get)(i);
+            Set(i, (this->*get)(j));
             Set(j, h);
             i++; j--;
         }

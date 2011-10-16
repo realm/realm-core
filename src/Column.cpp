@@ -304,7 +304,7 @@ Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 
 size_t Column::GetRefSize(size_t ref) const {
     MemRef::Header* const header = (MemRef::Header*)m_array.GetAllocator().Translate(ref);
-    return header->count;
+    return header->length;
 }
 
 bool Column::NodeInsert(size_t ndx, size_t ref) {

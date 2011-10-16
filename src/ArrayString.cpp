@@ -5,6 +5,8 @@
 
 #include "ArrayString.h"
 
+// MP: What about wide strings (Unicode)?
+
 ArrayString::ArrayString(Allocator& alloc) : Array(COLUMN_NORMAL, NULL, 0, alloc) {
 }
 
@@ -53,25 +55,19 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 		// Expand the old values
 		int k = (int)m_len;
 		while (--k >= 0) {
-			//const char* v = (const char*)m_data + (k * oldwidth);
+            const char* v = (const char*)m_data + (k * oldwidth);
 
-			// Move the value
-			char* data = (char*)m_data + (ndx * m_width);
-			char* const end = data + m_width;
-			memmove(data, value, oldwidth);
-			for (data += oldwidth; data < end; ++data) {
-				*data = '\0'; // pad with zeroes
-			}
+            // Move the value
+			char* data = (char*)m_data + (k * m_width);
+			memmove(data, v, oldwidth);
+            memset (data + oldwidth, '\0', (size_t)(m_width - oldwidth)); // pad with zeroes
 		}
 	}
 
 	// Set the value
 	char* data = (char*)m_data + (ndx * m_width);
-	char* const end = data + m_width;
 	memmove(data, value, len);
-	for (data += len; data < end; ++data) {
-		*data = '\0'; // pad with zeroes
-	}
+    memset (data + len, '\0', (size_t)(m_width - len)); // pad with zeroes
 
 	return true;
 }
@@ -92,6 +88,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 	// Special case for lists of zero-length strings
 	if (len == 0 && m_width == 0) {
 		m_len += 1;
+        MEMREF_GET_HEADER(m_data)->length = m_len;
 		return true;
 	}
 
@@ -119,11 +116,8 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
 			// Move the value
 			char* data = (char*)m_data + ((k+1) * m_width);
-			char* const end = data + m_width;
 			memmove(data, v, oldwidth);
-			for (data += oldwidth; data < end; ++data) {
-				*data = '\0'; // pad with zeroes
-			}
+            memset (data + oldwidth, '\0', (size_t)(m_width - oldwidth)); // pad with zeroes
 		}
 	}
 	else if (ndx != m_len) {
@@ -136,11 +130,8 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
 	// Set the value
 	char* data = (char*)m_data + (ndx * m_width);
-	char* const end = data + m_width;
 	memmove(data, value, len);
-	for (data += len; data < end; ++data) {
-		*data = '\0'; // pad with zeroes
-	}
+    memset (data + len, '\0', (size_t)(m_width - len)); // pad with zeroes
 
 	// Expand values above insertion
 	if (doExpand) {
@@ -150,11 +141,8 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
 			// Move the value
 			char* data = (char*)m_data + (k * m_width);
-			char* const end = data + m_width;
 			memmove(data, v, oldwidth);
-			for (data += oldwidth; data < end; ++data) {
-				*data = '\0'; // pad with zeroes
-			}
+            memset (data + oldwidth, '\0', (size_t)(m_width - oldwidth)); // pad with zeroes
 		}
 	}
 
@@ -165,7 +153,9 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 void ArrayString::Delete(size_t ndx) {
 	assert(ndx < m_len);
 
-	--m_len;
+    // Update length (also in header)
+    --m_len;
+    MEMREF_GET_HEADER(m_data)->length = m_len;
 
 	// move data under deletion up
 	if (ndx < m_len) {
@@ -216,7 +206,7 @@ bool ArrayString::Alloc(size_t count, size_t width) {
     header->isNode   = m_isNode;
     header->hasRefs  = m_hasRefs;
     header->width    = w;
-    header->count    = count;
+    header->length   = count;
     header->capacity = m_capacity;
 
 	m_width = width;
