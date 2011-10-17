@@ -53,6 +53,7 @@ bool Column::operator==(const Column& column) const {
 }
 
 Column::~Column() {
+    // MP: Shouldn't arrays and index be destroyed here? We could leek if object goes out of scope and destroy is not called
 	delete m_index; // does not destroy index!
 }
 
@@ -109,13 +110,19 @@ const Column Column::GetSubColumn(size_t ndx) const {
 }*/
 
 void Column::Clear() {
-	m_array.Clear();
-	if (m_array.IsNode()) m_array.SetType(COLUMN_NORMAL);
+    if (m_array.IsNode()) {
+        m_array.GetSubArray(0).Clear();
+        m_array.GetSubArray(1).Clear();
+    }
+    else {
+	    m_array.Clear();
+    }
 }
 
 int64_t Column::Get64(size_t ndx) const {
 	if (IsNode()) {
-		// Get subnode table
+		// Get subnode table 
+        // MP: Should be refactored to Column class holding 'offset' and 'refs' arrays as members
 		const Array offsets = m_array.GetSubArray(0);
 		const Array refs = m_array.GetSubArray(1);
 
@@ -138,8 +145,9 @@ bool Column::Set64(size_t ndx, int64_t value) {
 
 	if (IsNode()) {
 		// Get subnode table
+        // MP: Should be refactored to Column class holding 'offset' and 'refs' arrays as members
 		const Array offsets = m_array.GetSubArray(0);
-		Array refs = m_array.GetSubArray(1);
+		const Array refs = m_array.GetSubArray(1);
 
 		// Find the subnode containing the item
 		const size_t node_ndx = offsets.FindPos(ndx);
@@ -162,10 +170,6 @@ bool Column::Set64(size_t ndx, int64_t value) {
 #endif //DEBUG
 
 	return true;
-}
-
-bool Column::Add64(int64_t value) {
-	return Insert64(Size(), value);
 }
 
 bool Column::Insert64(size_t ndx, int64_t value) {
@@ -222,6 +226,7 @@ bool Column::Insert64(size_t ndx, int64_t value) {
 Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 	if (IsNode()) {
 		// Get subnode table
+        // MP: Should be refactored to Column class holding 'offset' and 'refs' arrays as members
 		Array offsets = m_array.GetSubArray(0);
 		Array refs = m_array.GetSubArray(1);
 
@@ -311,6 +316,7 @@ bool Column::NodeInsert(size_t ndx, size_t ref) {
 	assert(ref);
 	assert(IsNode());
 	
+    // MP: Should be refactored to Column class holding 'offset' and 'refs' arrays as members
 	Array offsets = m_array.GetSubArray(0);
 	Array refs = m_array.GetSubArray(1);
 	assert(ndx <= offsets.Size());
@@ -330,6 +336,7 @@ bool Column::NodeAdd(size_t ref) {
 	assert(ref);
 	assert(IsNode());
 
+    // MP: Should be refactored to Column class holding 'offset' and 'refs' arrays as members
 	Array offsets = m_array.GetSubArray(0);
 	Array refs = m_array.GetSubArray(1);
 	const Column col(ref);
@@ -342,6 +349,7 @@ bool Column::NodeAdd(size_t ref) {
 bool Column::NodeUpdateOffsets(size_t ndx) {
 	assert(IsNode());
 
+    // MP: Should be refactored to Column class holding 'offset' and 'refs' arrays as members
 	Array offsets = m_array.GetSubArray(0);
 	Array refs = m_array.GetSubArray(1);
 	assert(ndx < offsets.Size());
@@ -357,6 +365,7 @@ bool Column::NodeInsertSplit(size_t ndx, size_t newRef) {
 	assert(IsNode());
 	assert(newRef);
 
+    // MP: Should be refactored to Column class holding 'offset' and 'refs' arrays as members
 	Array offsets = m_array.GetSubArray(0);
 	Array refs = m_array.GetSubArray(1);
 	assert(ndx < offsets.Size());
@@ -387,6 +396,7 @@ void Column::Delete(size_t ndx) {
 	if (!IsNode()) m_array.Delete(ndx);
 	else {
 		// Get subnode table
+        // MP: Should be refactored to Column class holding 'offset' and 'refs' arrays as members
 		Array offsets = m_array.GetSubArray(0);
 		Array refs = m_array.GetSubArray(1);
 

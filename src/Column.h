@@ -75,8 +75,11 @@ public:
 	// At the core all integers are 64bit
 	int64_t Get64(size_t ndx) const;
 	bool Set64(size_t ndx, int64_t value);
-	bool Insert64(size_t ndx, int64_t value);
-	bool Add64(int64_t value);
+    bool Insert64(size_t ndx, int64_t value);
+
+    inline bool Add64(int64_t value) {
+	    return Insert64(Size(), value);
+    }
 
 	intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get64(ndx);}
 	

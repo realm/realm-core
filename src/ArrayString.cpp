@@ -176,7 +176,7 @@ bool ArrayString::Alloc(size_t count, size_t width) {
 	
 	if (len > m_capacity) {
 		// Try to expand with 50% to avoid to many reallocs
-		size_t new_capacity = m_capacity ? m_capacity + m_capacity / 2 : 128;
+		size_t new_capacity = m_capacity ? (m_capacity + (m_capacity / 2)) : 128;
 		if (new_capacity < len) new_capacity = len; 
 
 		// Allocate the space
@@ -187,7 +187,7 @@ bool ArrayString::Alloc(size_t count, size_t width) {
 		if (!mref.pointer) return false;
 
 		m_ref = mref.ref;
-		m_data = (unsigned char*)mref.pointer + 8;
+		m_data = (unsigned char*)mref.pointer + MEMREF_HEADER_SIZE;
 		m_capacity = new_capacity;
 
 		// Update ref in parent
