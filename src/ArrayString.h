@@ -24,6 +24,7 @@ public:
 	size_t Write(std::ostream& out) const;
 
 #ifdef _DEBUG
+	bool Compare(const ArrayString& c) const;
 	void Stats() const;
 	void ToDot(FILE* f) const;
 #endif //_DEBUG

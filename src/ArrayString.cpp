@@ -283,6 +283,16 @@ size_t ArrayString::Write(std::ostream& out) const {
 #ifdef _DEBUG
 #include "stdio.h"
 
+bool ArrayString::Compare(const ArrayString& c) const {
+	if (c.Size() != Size()) return false;
+
+	for (size_t i = 0; i < Size(); ++i) {
+		if (strcmp(Get(i), c.Get(i)) != 0) return false;
+	}
+
+	return true;
+}
+
 void ArrayString::Stats() const {
 	size_t total = 0;
 	size_t longest = 0;

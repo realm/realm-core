@@ -470,6 +470,39 @@ void Table::Write(std::ostream &out) const {
 #ifdef _DEBUG
 #include "stdio.h"
 
+bool Table::Compare(const Table& c) const {
+    if (!m_spec.Compare(c.m_spec)) return false;
+    if (!m_columnNames.Compare(c.m_columnNames)) return false;
+
+    const size_t column_count = GetColumnCount();
+    if (column_count != c.GetColumnCount()) return false;
+
+    for (size_t i = 0; i < column_count; ++i) {
+		const ColumnType type = GetColumnType(i);
+
+        switch (type) {
+            case COLUMN_TYPE_INT:
+            case COLUMN_TYPE_BOOL:
+                {
+                    const Column& column1 = GetColumn(i);
+                    const Column& column2 = c.GetColumn(i);
+                    if (!column1.Compare(column2)) return false;
+                }
+                break;
+            case COLUMN_TYPE_STRING:
+                {
+                    const AdaptiveStringColumn& column1 = GetColumnString(i);
+                    const AdaptiveStringColumn& column2 = c.GetColumnString(i);
+                    if (!column1.Compare(column2)) return false;
+                }
+                break;
+            default:
+                assert(false);
+		}
+    }
+    return true;
+}
+
 void Table::Verify() const {
 	const size_t column_count = GetColumnCount();
 	assert(column_count == m_cols.Size());

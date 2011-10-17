@@ -1086,6 +1086,16 @@ size_t Array::Write(std::ostream& out) const {
 #ifdef _DEBUG
 #include "stdio.h"
 
+bool Array::Compare(const Array& c) const {
+	if (c.Size() != Size()) return false;
+
+	for (size_t i = 0; i < Size(); ++i) {
+		if (Get(i) != c.Get(i)) return false;
+	}
+
+	return true;
+}
+
 void Array::Print() const {
 	printf("%zx: (%zu) ", GetRef(), Size());
 	for (size_t i = 0; i < Size(); ++i) {

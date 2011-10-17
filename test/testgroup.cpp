@@ -48,34 +48,18 @@ TEST(Group_Serialize) {
 	CHECK_EQUAL(10, t.GetSize());
 
 	// Verify that original values are there
-	for (size_t i = 0; i < t.GetSize(); ++i) {
-		CHECK_EQUAL("", (const char*)t[i].first);
-		CHECK_EQUAL(true, t[i].third);
-		CHECK_EQUAL(Wed, t[i].fourth);
-	}
-	CHECK_EQUAL( 1, t[0].second);
-	CHECK_EQUAL(15, t[1].second);
-	CHECK_EQUAL(10, t[2].second);
-	CHECK_EQUAL(20, t[3].second);
-	CHECK_EQUAL(11, t[4].second);
-	CHECK_EQUAL(45, t[5].second);
-	CHECK_EQUAL(10, t[6].second);
-	CHECK_EQUAL( 0, t[7].second);
-	CHECK_EQUAL(30, t[8].second);
-	CHECK_EQUAL( 9, t[9].second);
+	CHECK(table.Compare(t));
 
-	// Modify the backed table
+	// Modify both tables
+	table[0].first = "test";
 	t[0].first = "test";
+	table.Insert(5, "hello", 100, false, Mon);
 	t.Insert(5, "hello", 100, false, Mon);
+	table.DeleteRow(1);
 	t.DeleteRow(1);
 
-	CHECK_EQUAL("test", (const char*)t[0].first);
-	CHECK_EQUAL("", (const char*)t[1].first);
-
-	CHECK_EQUAL("hello", (const char*)t[4].first);
-	CHECK_EQUAL(100, t[4].second);
-	CHECK_EQUAL(false, t[4].third);
-	CHECK_EQUAL(Mon, t[4].fourth);
+	// Verify that both changed correctly
+	CHECK(table.Compare(t));
 }
 
 #endif

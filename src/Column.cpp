@@ -669,6 +669,16 @@ size_t Column::Write(std::ostream& out, size_t& pos) const {
 #ifdef _DEBUG
 #include "stdio.h"
 
+bool Column::Compare(const Column& c) const {
+	if (c.Size() != Size()) return false;
+
+	for (size_t i = 0; i < Size(); ++i) {
+		if (Get64(i) != c.Get64(i)) return false;
+	}
+
+	return true;
+}
+
 void Column::Print() const {
 	if (IsNode()) {
 		printf("Node: %zx\n", m_array.GetRef());

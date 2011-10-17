@@ -108,6 +108,7 @@ public:
 
 	// Debug
 #ifdef _DEBUG
+	bool Compare(const Column& c) const;
 	void Print() const;
 	void Verify() const;
 	void ToDot(FILE* f, bool isTop=true) const;
@@ -220,6 +221,7 @@ public:
 	size_t Write(std::ostream& out, size_t& pos) const;
 
 #ifdef _DEBUG
+	bool Compare(const AdaptiveStringColumn& c) const;
 	void Verify() const {};
 	void ToDot(FILE* f, bool isTop=true) const;
 #endif //_DEBUG

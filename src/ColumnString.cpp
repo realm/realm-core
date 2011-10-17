@@ -61,6 +61,19 @@ size_t AdaptiveStringColumn::Write(std::ostream& out, size_t& pos) const {
 }
 
 #ifdef _DEBUG
+#include <cstring> // strcmp()
+
+bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const {
+	if (c.Size() != Size()) return false;
+
+	for (size_t i = 0; i < Size(); ++i) {
+		const char* s1 = Get(i);
+		const char* s2 = c.Get(i);
+		if (strcmp(s1, s2) != 0) return false;
+	}
+
+	return true;
+}
 
 void AdaptiveStringColumn::ToDot(FILE* f, bool) const {
 	m_array.ToDot(f);

@@ -86,6 +86,7 @@ public:
 
 	// Debug
 #ifdef _DEBUG
+	bool Compare(const Table& c) const;
 	void Verify() const;
 	void ToDot(const char* filename) const;
 	void Print() const;

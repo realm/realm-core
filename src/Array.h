@@ -81,6 +81,7 @@ public:
 	// Debug
 	size_t GetBitWidth() const {return m_width;}
 #ifdef _DEBUG
+	bool Compare(const Array& c) const;
 	void Print() const;
 	void Verify() const;
 	void ToDot(FILE* f, bool horizontal=false) const;
