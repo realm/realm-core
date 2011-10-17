@@ -60,12 +60,12 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 		// Expand the old values
 		int k = (int)m_len;
 		while (--k >= 0) {
-			//const char* v = (const char*)m_data + (k * oldwidth);
+			const char* v = (const char*)m_data + (k * oldwidth);
 
 			// Move the value
-			char* data = (char*)m_data + (ndx * m_width);
+			char* data = (char*)m_data + (k * m_width);
 			char* const end = data + m_width;
-			memmove(data, value, oldwidth);
+			memmove(data, v, oldwidth);
 			for (data += oldwidth; data < end; ++data) {
 				*data = '\0'; // pad with zeroes
 			}

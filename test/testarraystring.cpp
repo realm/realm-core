@@ -7,8 +7,7 @@ struct db_setup_string {
 
 ArrayString db_setup_string::c;
 
-TEST(ArrayStringMultiEmpty) {
-	ArrayString c;
+TEST_FIXTURE(db_setup_string, ArrayStringMultiEmpty) {
 	c.Add("");
 	c.Add("");
 	c.Add("");
@@ -16,9 +15,41 @@ TEST(ArrayStringMultiEmpty) {
 	c.Add("");
 	c.Add("");
 	CHECK_EQUAL(6, c.Size());
+
+	CHECK_EQUAL("", c.Get(0));
+	CHECK_EQUAL("", c.Get(1));
+	CHECK_EQUAL("", c.Get(2));
+	CHECK_EQUAL("", c.Get(3));
+	CHECK_EQUAL("", c.Get(4));
+	CHECK_EQUAL("", c.Get(5));
+}
+
+TEST_FIXTURE(db_setup_string, ArrayStringSetExpand4) {
+	c.Set(0, "hey");
+
+	CHECK_EQUAL(6, c.Size());
+	CHECK_EQUAL("hey", c.Get(0));
+	CHECK_EQUAL("", c.Get(1));
+	CHECK_EQUAL("", c.Get(2));
+	CHECK_EQUAL("", c.Get(3));
+	CHECK_EQUAL("", c.Get(4));
+	CHECK_EQUAL("", c.Get(5));
+}
+
+TEST_FIXTURE(db_setup_string, ArrayStringSetExpand8) {
+	c.Set(1, "test");
+
+	CHECK_EQUAL(6, c.Size());
+	CHECK_EQUAL("hey", c.Get(0));
+	CHECK_EQUAL("test", c.Get(1));
+	CHECK_EQUAL("", c.Get(2));
+	CHECK_EQUAL("", c.Get(3));
+	CHECK_EQUAL("", c.Get(4));
+	CHECK_EQUAL("", c.Get(5));
 }
 
 TEST_FIXTURE(db_setup_string, ArrayArrayStringAdd0) {
+	c.Clear();
 	c.Add();
 	CHECK_EQUAL("", c.Get(0));
 	CHECK_EQUAL(1, c.Size());
