@@ -22,7 +22,8 @@ TDB_TABLE_4(TestTableGroup,
 #ifndef _MSC_VER
 
 TEST(Group_Serialize) {
-	TestTableGroup table;
+	Group toDisk;
+	TestTableGroup& table = toDisk.GetTable<TestTableGroup>("test");
 	table.Add("",  1, true, Wed);
 	table.Add("", 15, true, Wed);
 	table.Add("", 10, true, Wed);
@@ -38,11 +39,11 @@ TEST(Group_Serialize) {
 	remove("table_test.tbl");
 
 	// Serialize to disk
-	table.Write("table_test.tbl");
+	toDisk.Write("table_test.tbl");
 
 	// Load the table
-	Group db("table_test.tbl");
-	TestTableGroup t = db.GetTable<TestTableGroup>();
+	Group fromDisk("table_test.tbl");
+	TestTableGroup& t = fromDisk.GetTable<TestTableGroup>("test");
 
 	CHECK_EQUAL(4, t.GetColumnCount());
 	CHECK_EQUAL(10, t.GetSize());

@@ -9,11 +9,11 @@
 
 class Accessor;
 class TableView;
+class Group;
 
 class Table {
 public:
 	Table(Allocator& alloc=DefaultAllocator);
-	Table(Allocator& alloc, size_t ref, const char* name);
 	Table(const Table& t);
 	~Table();
 
@@ -79,11 +79,6 @@ public:
 	bool HasIndex(size_t column_id) const;
 	void SetIndex(size_t column_id);
 
-	// Serialization
-	void Write(const char* path) const;
-	void Write(std::ostream& out) const;
-	static Table LoadFromFile(const char* path);
-
 	// Debug
 #ifdef _DEBUG
 	bool Compare(const Table& c) const;
@@ -93,6 +88,18 @@ public:
 #endif //_DEBUG
 
 protected:
+	friend class Group;
+
+	// Construct from ref
+	Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx);
+	void SetParent(Array* parent, size_t pndx);
+	size_t GetRef() const;
+	void Invalidate() {m_top.Invalidate();}
+
+	// Serialization
+	size_t Write(std::ostream& out, size_t& pos) const;
+	static Table LoadFromFile(const char* path);
+
 	ColumnBase& GetColumnBase(size_t ndx);
 	const ColumnBase& GetColumnBase(size_t ndx) const;
 
@@ -100,6 +107,7 @@ protected:
 	size_t m_size;
 	
 	// On-disk format
+	Array m_top;
 	Array m_spec;
 	Array m_columns;
 	ArrayString m_columnNames;

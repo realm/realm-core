@@ -40,6 +40,9 @@ public:
 	void SetParent(Array* parent, size_t pndx);
 	void UpdateRef(size_t ref);
 
+	bool IsValid() const {return m_data != NULL;}
+	void Invalidate() {m_data = NULL;}
+
 	size_t Size() const {return m_len;}
 	bool IsEmpty() const {return m_len == 0;}
 

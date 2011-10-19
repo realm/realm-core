@@ -68,7 +68,7 @@
 		3647DEF714209C1200D56FD7 /* ctightdb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ctightdb.h; sourceTree = "<group>"; };
 		3647DEF814209C1200D56FD7 /* Index.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Index.cpp; sourceTree = "<group>"; };
 		3647DEF914209C1200D56FD7 /* Index.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Index.h; sourceTree = "<group>"; };
-		3647DEFA14209C1200D56FD7 /* Table.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Table.cpp; sourceTree = "<group>"; usesTabs = 0; };
+		3647DEFA14209C1200D56FD7 /* Table.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Table.cpp; sourceTree = "<group>"; usesTabs = 1; };
 		3647DEFB14209C1200D56FD7 /* Table.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Table.h; sourceTree = "<group>"; };
 		3647DEFC14209C1200D56FD7 /* TableView.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TableView.cpp; sourceTree = "<group>"; };
 		3647DEFD14209C1200D56FD7 /* tightdb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = tightdb.h; sourceTree = "<group>"; };

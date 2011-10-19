@@ -11,18 +11,30 @@ const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
 const ColumnType AccessorDate::type = COLUMN_TYPE_DATE;
 
 Table::Table(Allocator& alloc)
-: m_size(0), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_alloc(alloc)
+: m_size(0),  m_top(COLUMN_HASREFS, NULL, 0, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_alloc(alloc)
 {
+    m_top.Add(m_spec.GetRef());
+    m_top.Add(m_columnNames.GetRef());
+    m_top.Add(m_columns.GetRef());
+
+    m_spec.SetParent(&m_top, 0);
+    m_columnNames.SetParent(&m_top, 1);
+    m_columns.SetParent(&m_top, 2);
 }
 
-Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(0), m_spec(alloc), m_columnNames(alloc), m_columns(alloc), m_alloc(alloc)
+Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(0), m_top(alloc), m_spec(alloc), m_columnNames(alloc), m_columns(alloc), m_alloc(alloc)
+{
     // Load from allocated memory
-    const Array tableTop(ref, (Array*)NULL, 0, m_alloc);
-    assert(tableTop.Size() == 3);
+    m_top.UpdateRef(ref);
+    m_top.SetParent(parent, pndx);
+    assert(m_top.Size() == 3);
 
-    m_spec.UpdateRef(tableTop.Get(0));
-    m_columnNames.UpdateRef(tableTop.Get(1));
-    m_columns.UpdateRef(tableTop.Get(2));
+    m_spec.UpdateRef(m_top.Get(0));
+    m_spec.SetParent(&m_top, 0);
+    m_columnNames.UpdateRef(m_top.Get(1));
+    m_columnNames.SetParent(&m_top, 1);
+    m_columns.UpdateRef(m_top.Get(2));
+    m_columns.SetParent(&m_top, 2);
 
     // Cache columns
     size_t size = -1;
@@ -73,9 +85,9 @@ Table& Table::operator=(const Table&) {
 }
 
 Table::~Table() {
-	m_spec.Destroy();
-	m_columns.Destroy();
-	m_columnNames.Destroy();
+	// Destroying m_top will also destroy
+	// m_spec, m_columns and m_columnNames
+	m_top.Destroy();
 
 	// free cached columns
 	for (size_t i = 0; i < m_cols.Size(); ++i) {
@@ -83,6 +95,14 @@ Table::~Table() {
 		delete(column);
 	}
 	m_cols.Destroy();
+}
+
+void Table::SetParent(Array* parent, size_t pndx) {
+    m_top.SetParent(parent, pndx);
+}
+
+size_t Table::GetRef() const {
+    return m_top.GetRef();
 }
 
 size_t Table::GetColumnCount() const {
@@ -408,17 +428,7 @@ void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size
 	column.FindAllHamming(tv.GetRefColumn(), value, max);
 }
 
-void Table::Write(const char* path) const {
-    std::ofstream out(path, std::ios_base::out|std::ios_base::binary);
-    Write(out);
-    out.close();
-}
-
-void Table::Write(std::ostream &out) const {
-    // Space for ref to top array
-    out.write("\0\0\0\0\0\0\0\0", 8);
-    size_t pos = 8;
-
+size_t Table::Write(std::ostream &out, size_t& pos) const {
     // Spec
     const size_t specPos = pos;
     pos += m_spec.Write(out);
@@ -455,16 +465,20 @@ void Table::Write(std::ostream &out) const {
     pos += columns.Write(out);
 
     // Table array
-    Array top;
+    Array top(COLUMN_HASREFS);
     top.Add(specPos);
     top.Add(namesPos);
     top.Add(columnsPos);
     const uint64_t topPos = pos; // sized for top ref
     pos += top.Write(out);
 
-    // top ref
-    out.seekp(0);
-    out.write((const char*)&topPos, 8);
+    // Clean-up
+	columns.SetType(COLUMN_NORMAL); // avoid recursive del
+	top.SetType(COLUMN_NORMAL);
+	columns.Destroy();
+	top.Destroy();
+
+    return topPos;
 }
 
 #ifdef _DEBUG
@@ -603,7 +617,7 @@ void Table::ToDot(const char* filename) const {
 void Table::Print() const {
 
 	// Table header
-	printf("Table \"%s\" len(%zu)\n    ", m_name, m_size);
+	printf("Table: len(%zu)\n    ", m_size);
 	const size_t column_count = GetColumnCount();
 	for (size_t i = 0; i < column_count; ++i) {
 		printf("%-10s ", m_columnNames.Get(i));

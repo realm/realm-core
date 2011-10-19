@@ -656,6 +656,12 @@ size_t Column::Write(std::ostream& out, size_t& pos) const {
 		node.Add(refs_pos);
 		pos += node.Write(out);
 
+		// Clean-up
+		newRefs.SetType(COLUMN_NORMAL); // avoid recursive del
+		node.SetType(COLUMN_NORMAL);
+		newRefs.Destroy();
+		node.Destroy();
+
 		return node_pos;
 	}
 	else {

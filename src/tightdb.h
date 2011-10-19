@@ -31,8 +31,6 @@ public: \
 		CName1.Create(this, 0); \
 		CName2.Create(this, 1); \
 	}; \
-	TableName(Allocator& alloc, size_t ref, const char* name) : Table(alloc, ref, name) {}; \
-\
 	class Cursor : public CursorBase { \
 	public: \
 		Cursor(TableName& table, size_t ndx) : CursorBase(table, ndx) { \
@@ -73,6 +71,10 @@ public: \
 \
 	ColumnProxy##CType1 CName1; \
 	ColumnProxy##CType2 CName2; \
+protected: \
+	friend class Group; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : Table(alloc, ref, parent, pndx) {}; \
+\
 };
 
 
@@ -97,8 +99,6 @@ public: \
 		CName3.Create(this, 2); \
 		CName4.Create(this, 3); \
 	}; \
-	TableName(Allocator& alloc, size_t ref, const char* name) : Table(alloc, ref, name) {}; \
-\
 	class Cursor : public CursorBase { \
 	public: \
 		Cursor(TableName& table, size_t ndx) : CursorBase(table, ndx) { \
@@ -150,6 +150,10 @@ public: \
 	ColumnProxy##CType2 CName2; \
 	ColumnProxy##CType3 CName3; \
 	ColumnProxy##CType4 CName4; \
+protected: \
+friend class Group; \
+TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : Table(alloc, ref, parent, pndx) {}; \
+\
 };
 
 #endif //__TIGHTDB_H__

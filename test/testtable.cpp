@@ -312,24 +312,5 @@ TEST(Table_SlabAlloc) {
 #endif //_DEBUG
 }
 
-TEST(Table_Serialize) {
-	TestTable table;
-	table.Add(0,  1, true, Wed);
-	table.Add(0, 15, true, Wed);
-	table.Add(0, 10, true, Wed);
-	table.Add(0, 20, true, Wed);
-	table.Add(0, 11, true, Wed);
-	table.Add(0, 45, true, Wed);
-	table.Add(0, 10, true, Wed);
-	table.Add(0,  0, true, Wed);
-	table.Add(0, 30, true, Wed);
-	table.Add(0,  9, true, Wed);
-
-	// Delete old file if there
-	remove("table_test.tbl");
-
-	// Serialize to disk
-	table.Write("table_test.tbl");
-}
 
 
