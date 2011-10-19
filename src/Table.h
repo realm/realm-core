@@ -12,7 +12,7 @@ class TableView;
 
 class Table {
 public:
-	Table(const char* name, Allocator& alloc=DefaultAllocator);
+	Table(Allocator& alloc=DefaultAllocator);
 	Table(Allocator& alloc, size_t ref, const char* name);
 	Table(const Table& t);
 	~Table();
@@ -96,7 +96,7 @@ protected:
 	ColumnBase& GetColumnBase(size_t ndx);
 	const ColumnBase& GetColumnBase(size_t ndx) const;
 
-	const char* m_name; // Placeholder (unstable)
+	// Member variables
 	size_t m_size;
 	
 	// On-disk format

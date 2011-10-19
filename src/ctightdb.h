@@ -27,7 +27,7 @@ typedef struct TableView TableView;
 	/*** Table ************************************/
 
 	/* Creating and deleting tables */
-	Table* table_new(const char* name);
+	Table* table_new();
 	void table_delete(Table* t);
 
 	/* Working with columns */

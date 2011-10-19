@@ -10,12 +10,12 @@ const ColumnType AccessorBool::type = COLUMN_TYPE_BOOL;
 const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
 const ColumnType AccessorDate::type = COLUMN_TYPE_DATE;
 
-Table::Table(const char* name, Allocator& alloc)
-: m_name(name), m_size(0), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_alloc(alloc)
+Table::Table(Allocator& alloc)
+: m_size(0), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_alloc(alloc)
 {
 }
 
-Table::Table(Allocator& alloc, size_t ref, const char* name) : m_name(name), m_size(0), m_spec(alloc), m_columnNames(alloc), m_columns(alloc), m_alloc(alloc) {
+Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(0), m_spec(alloc), m_columnNames(alloc), m_columns(alloc), m_alloc(alloc)
     // Load from allocated memory
     const Array tableTop(ref, (Array*)NULL, 0, m_alloc);
     assert(tableTop.Size() == 3);
