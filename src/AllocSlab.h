@@ -24,6 +24,7 @@ public:
 	size_t GetTopRef() const;
 
 #ifdef _DEBUG
+	void EnableDebug(bool enable) {m_debugOut = enable;}
 	void Verify() const;
 	bool IsAllFree() const;
 #endif //_DEBUG
@@ -46,6 +47,10 @@ private:
 #ifndef _MSC_VER
 	int m_fd;
 #endif
+
+#ifdef _DEBUG
+	bool m_debugOut;
+#endif //_DEBUG
 };
 
 #endif //__TDB_ALLOC_SLAB__

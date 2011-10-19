@@ -11,11 +11,19 @@
 #include <sys/mman.h>
 #endif
 
+#ifdef _DEBUG
+#include <stdio.h>
+#endif //_DEBUG
+
 
 // Pre-declare local functions
 size_t GetSizeFromHeader(void* p);
 
-SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(8) {}
+SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(8) {
+#ifdef _DEBUG
+	m_debugOut = false;
+#endif //_DEBUG
+}
 
 SlabAlloc::~SlabAlloc() {
 #ifdef _DEBUG
@@ -59,6 +67,12 @@ MemRef SlabAlloc::Alloc(size_t size) {
 				r.ref += (unsigned int)size;
 			}
 
+#ifdef _DEBUG
+			if (m_debugOut) {
+				printf("Alloc ref: %lu size: %lu\n", location, size);
+			}
+#endif //_DEBUG
+
 			void* pointer = Translate(location);
 			return MemRef(pointer, location);
 		}
@@ -86,6 +100,12 @@ MemRef SlabAlloc::Alloc(size_t size) {
 	f.ref = slabsBack + size;
 	f.size = rest;
 
+#ifdef _DEBUG
+	if (m_debugOut) {
+		printf("Alloc ref: %lu size: %lu\n", slabsBack, size);
+	}
+#endif //_DEBUG
+
 	return MemRef(slab, slabsBack);
 }
 
@@ -103,6 +123,12 @@ void SlabAlloc::Free(size_t ref, void* p) {
 	const size_t size = GetSizeFromHeader(p);
 	const size_t refEnd = ref + size;
 	bool isMerged = false;
+
+#ifdef _DEBUG
+	if (m_debugOut) {
+		printf("Free ref: %lu size: %lu\n", ref, size);
+	}
+#endif //_DEBUG
 
 	// Check if we can merge with start of free block
 	size_t n = m_freeSpace.ref.Find(refEnd);
@@ -146,7 +172,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size) {
 	const MemRef space = Alloc(size);
 	if (!space.pointer) return space;
 
-	/*if (doCopy)*/ {  //TODO: allow realloc without copying
+	/*if (doCopy) {*/  //TODO: allow realloc without copying
 		// Get size of old segment
 		const size_t oldsize = GetSizeFromHeader(p);
 
@@ -155,7 +181,13 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size) {
 
 		// Add old segment to freelist
 		Free(ref, p);
+	//}
+
+#ifdef _DEBUG
+	if (m_debugOut) {
+		printf("ReAlloc origref: %lu oldsize: %lu newref: %lu newsize: %lu\n", ref, oldsize, space.ref, size);
 	}
+#endif //_DEBUG
 
 	return space;
 }
