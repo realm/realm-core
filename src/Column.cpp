@@ -420,8 +420,14 @@ void Column::Delete(size_t ndx) {
 			target.Destroy();
 		}
 
-		// Update lower offsets
-		if (node_ndx < offsets.Size()) offsets.Increment(-1, node_ndx);
+		if (offsets.IsEmpty()) {
+			// All items deleted, we can revert to being array
+			Clear();
+		}
+		else {
+			// Update lower offsets
+			if (node_ndx < offsets.Size()) offsets.Increment(-1, node_ndx);
+		}
 	}
 
 	// Update index

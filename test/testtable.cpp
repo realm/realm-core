@@ -107,7 +107,7 @@ TEST(Table4) {
 TEST(Table_Delete) {
 	TestTable table;
 
-	for (int i = 0; i < 10; ++i) {
+	for (size_t i = 0; i < 10; ++i) {
 		table.Add(0, i, true, Wed);
 	}
 
@@ -122,6 +122,18 @@ TEST(Table_Delete) {
 	CHECK_EQUAL(6, table[4].second);
 	CHECK_EQUAL(7, table[5].second);
 	CHECK_EQUAL(8, table[6].second);
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
+
+	// Delete all items one at a time
+	for (size_t i = 0; i < 7; ++i) {
+		table.DeleteRow(0);
+	}
+
+	CHECK(table.IsEmpty());
+	CHECK_EQUAL(0, table.GetSize());
 
 #ifdef _DEBUG
 	table.Verify();
