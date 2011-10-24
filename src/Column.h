@@ -77,7 +77,7 @@ public:
 	bool Set64(size_t ndx, int64_t value);
     bool Insert64(size_t ndx, int64_t value);
 
-    inline bool Add64(int64_t value) {
+    __inline bool Add64(int64_t value) {
 	    return Insert64(Size(), value);
     }
 
