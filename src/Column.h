@@ -126,6 +126,11 @@ protected:
 	bool NodeAdd(size_t ref);
 	bool NodeUpdateOffsets(size_t ndx);
 	bool NodeInsertSplit(size_t ndx, size_t newRef);
+
+	const Array NodeGetOffsets() const;
+	const Array NodeGetRefs() const;
+	Array NodeGetOffsets();
+	Array NodeGetRefs();
 	
 	struct NodeChange {
 		size_t ref1;

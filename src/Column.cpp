@@ -68,7 +68,7 @@ void Column::Destroy() {
 bool Column::IsEmpty() const {
 	if (!IsNode()) return m_array.IsEmpty();
 	else {
-		const Array offsets = m_array.GetSubArray(0);
+		const Array offsets = NodeGetOffsets();
 		return offsets.IsEmpty();
 	}
 }
@@ -76,7 +76,7 @@ bool Column::IsEmpty() const {
 size_t Column::Size() const {
 	if (!IsNode()) return m_array.Size();
 	else {
-		const Array offsets = m_array.GetSubArray(0);
+		const Array offsets = NodeGetOffsets();
 		return offsets.IsEmpty() ? 0 : (size_t)offsets.Back();
 	}
 }
@@ -119,8 +119,8 @@ void Column::Clear() {
 int64_t Column::Get64(size_t ndx) const {
 	if (IsNode()) {
 		// Get subnode table
-		const Array offsets = m_array.GetSubArray(0);
-		const Array refs = m_array.GetSubArray(1);
+		const Array offsets = NodeGetOffsets();
+		const Array refs = NodeGetRefs();
 
 		// Find the subnode containing the item
 		const size_t node_ndx = offsets.FindPos(ndx);
@@ -141,8 +141,8 @@ bool Column::Set64(size_t ndx, int64_t value) {
 
 	if (IsNode()) {
 		// Get subnode table
-		const Array offsets = m_array.GetSubArray(0);
-		Array refs = m_array.GetSubArray(1);
+		const Array offsets = NodeGetOffsets();
+		Array refs = NodeGetRefs();
 
 		// Find the subnode containing the item
 		const size_t node_ndx = offsets.FindPos(ndx);
@@ -225,8 +225,8 @@ bool Column::Insert64(size_t ndx, int64_t value) {
 Column::NodeChange Column::DoInsert(size_t ndx, int64_t value) {
 	if (IsNode()) {
 		// Get subnode table
-		Array offsets = m_array.GetSubArray(0);
-		Array refs = m_array.GetSubArray(1);
+		Array offsets = NodeGetOffsets();
+		Array refs = NodeGetRefs();
 
 		// Find the subnode containing the item
 		size_t node_ndx = offsets.FindPos(ndx);
@@ -318,12 +318,32 @@ void SetRefSize(void* ref, size_t len) {
 	header[3] = len & 0x000000FF;
 }
 
+Array Column::NodeGetOffsets() {
+	assert(IsNode());
+	return m_array.GetSubArray(0);
+}
+
+const Array Column::NodeGetOffsets() const {
+	assert(IsNode());
+	return m_array.GetSubArray(0);
+}
+
+Array Column::NodeGetRefs() {
+	assert(IsNode());
+	return m_array.GetSubArray(1);
+}
+
+const Array Column::NodeGetRefs() const {
+	assert(IsNode());
+	return m_array.GetSubArray(1);
+}
+
 bool Column::NodeInsert(size_t ndx, size_t ref) {
 	assert(ref);
 	assert(IsNode());
 	
-	Array offsets = m_array.GetSubArray(0);
-	Array refs = m_array.GetSubArray(1);
+	Array offsets = NodeGetOffsets();
+	Array refs = NodeGetRefs();
 	assert(ndx <= offsets.Size());
 
 	const Column col(ref);
@@ -341,8 +361,8 @@ bool Column::NodeAdd(size_t ref) {
 	assert(ref);
 	assert(IsNode());
 
-	Array offsets = m_array.GetSubArray(0);
-	Array refs = m_array.GetSubArray(1);
+	Array offsets = NodeGetOffsets();
+	Array refs = NodeGetRefs();
 	const Column col(ref);
 
 	const int64_t newOffset = (offsets.IsEmpty() ? 0 : offsets.Back()) + col.Size();
@@ -353,8 +373,8 @@ bool Column::NodeAdd(size_t ref) {
 bool Column::NodeUpdateOffsets(size_t ndx) {
 	assert(IsNode());
 
-	Array offsets = m_array.GetSubArray(0);
-	Array refs = m_array.GetSubArray(1);
+	Array offsets = NodeGetOffsets();
+	Array refs = NodeGetRefs();
 	assert(ndx < offsets.Size());
 
 	const int64_t newSize = GetRefSize((size_t)refs.Get(ndx));
@@ -368,8 +388,8 @@ bool Column::NodeInsertSplit(size_t ndx, size_t newRef) {
 	assert(IsNode());
 	assert(newRef);
 
-	Array offsets = m_array.GetSubArray(0);
-	Array refs = m_array.GetSubArray(1);
+	Array offsets = NodeGetOffsets();
+	Array refs = NodeGetRefs();
 	assert(ndx < offsets.Size());
 
 	// Update original size
@@ -398,8 +418,8 @@ void Column::Delete(size_t ndx) {
 	if (!IsNode()) m_array.Delete(ndx);
 	else {
 		// Get subnode table
-		Array offsets = m_array.GetSubArray(0);
-		Array refs = m_array.GetSubArray(1);
+		Array offsets = NodeGetOffsets();
+		Array refs = NodeGetRefs();
 
 		// Find the subnode containing the item
 		const size_t node_ndx = offsets.FindPos(ndx);
@@ -441,7 +461,7 @@ bool Column::Increment64(int64_t value, size_t start, size_t end) {
 	if (!IsNode()) return m_array.Increment(value, start, end);
 	else {
 		//TODO: partial incr
-		Array refs = m_array.GetSubArray(1);
+		Array refs = NodeGetRefs();
 		for (size_t i = 0; i < refs.Size(); ++i) {
 			Column col = GetColumnFromRef(refs, i);
 			if (!col.Increment64(value)) return false;
@@ -463,8 +483,8 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 	if (!IsNode()) return m_array.Find(value, start, end);
 	else {
 		// Get subnode table
-		const Array offsets = m_array.GetSubArray(0);
-		const Array refs = m_array.GetSubArray(1);
+		const Array offsets = NodeGetOffsets();
+		const Array refs = NodeGetRefs();
 		const size_t count = refs.Size();
 
 		if (start == 0 && end == -1) {
@@ -520,8 +540,8 @@ void Column::FindAll(Column& result, int64_t value, size_t offset,
 	if (!IsNode()) return m_array.FindAll(result, value, offset, start, end);
 	else {
 		// Get subnode table
-		const Array offsets = m_array.GetSubArray(0);
-		const Array refs = m_array.GetSubArray(1);
+		const Array offsets = NodeGetOffsets();
+		const Array refs = NodeGetRefs();
 		const size_t count = refs.Size();
 
 		for (size_t i = 0; i < count; ++i) {
@@ -538,8 +558,8 @@ void Column::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size
 	}
 	else {
 		// Get subnode table
-		const Array offsets = m_array.GetSubArray(0);
-		const Array refs = m_array.GetSubArray(1);
+		const Array offsets = NodeGetOffsets();
+		const Array refs = NodeGetRefs();
 		const size_t count = refs.Size();
 
 		for (size_t i = 0; i < count; ++i) {
@@ -638,7 +658,7 @@ void Column::DoSort(size_t lo, size_t hi) {
 size_t Column::Write(std::ostream& out, size_t& pos) const {
 	if (IsNode()) {
 		// First write out all sub-arrays
-		const Array refs = m_array.GetSubArray(1);
+		const Array refs = NodeGetRefs();
 		Array newRefs;
 		for (size_t i = 0; i < refs.Size(); ++i) {
 			const Column col((size_t)refs.Get(i));
@@ -652,7 +672,7 @@ size_t Column::Write(std::ostream& out, size_t& pos) const {
 
 		// Write offsets
 		const size_t offsets_pos = pos;
-		const Array offsets = m_array.GetSubArray(0);
+		const Array offsets = NodeGetOffsets();
 		pos += offsets.Write(out);
 
 		// Write new array with node info
@@ -695,8 +715,8 @@ void Column::Print() const {
 	if (IsNode()) {
 		printf("Node: %zx\n", m_array.GetRef());
 		
-		const Array offsets = m_array.GetSubArray(0);
-		const Array refs = m_array.GetSubArray(1);
+		const Array offsets = NodeGetOffsets();
+		const Array refs = NodeGetRefs();
 
 		for (size_t i = 0; i < refs.Size(); ++i) {
 			printf(" %zu: %d %x\n", i, (int)offsets.Get(i), (int)refs.Get(i));
@@ -716,8 +736,8 @@ void Column::Verify() const {
 		assert(m_array.Size() == 2);
 		//assert(m_hasRefs);
 
-		const Array offsets = m_array.GetSubArray(0);
-		const Array refs = m_array.GetSubArray(1);
+		const Array offsets = NodeGetOffsets();
+		const Array refs = NodeGetRefs();
 		offsets.Verify();
 		refs.Verify();
 		assert(refs.HasRefs());
@@ -745,8 +765,8 @@ void Column::ToDot(FILE* f, bool isTop) const {
 	if (isTop) fprintf(f, "subgraph cluster_%zu {\ncolor=black;\nstyle=dashed;\n", ref);
 
 	if (m_array.IsNode()) {
-		const Array offsets = m_array.GetSubArray(0);
-		const Array refs = m_array.GetSubArray(1);
+		const Array offsets = NodeGetOffsets();
+		const Array refs = NodeGetRefs();
 
 		fprintf(f, "n%zx [label=\"", ref);
 		for (size_t i = 0; i < offsets.Size(); ++i) {
