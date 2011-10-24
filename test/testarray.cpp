@@ -281,6 +281,17 @@ TEST_FIXTURE(db_setup_array, Array_Delete3) {
 	CHECK_EQUAL(c.Get(3), 3);
 }
 
+TEST_FIXTURE(db_setup_array, Array_DeleteAll) {
+	// Delete all items one at a time
+	c.Delete(0);
+	c.Delete(0);
+	c.Delete(0);
+	c.Delete(0);
+
+	CHECK(c.IsEmpty());
+	CHECK_EQUAL(0, c.Size());
+}
+
 TEST_FIXTURE(db_setup_array, Array_Find1) {
 	// Look for a non-existing value
 	size_t res = c.Find(10);

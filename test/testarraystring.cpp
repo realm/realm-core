@@ -201,6 +201,19 @@ TEST_FIXTURE(db_setup_string, ArrayStringDelete3) {
 	CHECK_EQUAL(6, c.Size());
 }
 
+TEST_FIXTURE(db_setup_string, ArrayStringDeleteAll) {
+	// Delete all items one at a time
+	c.Delete(0);
+	c.Delete(0);
+	c.Delete(0);
+	c.Delete(0);
+	c.Delete(0);
+	c.Delete(0);
+
+	CHECK(c.IsEmpty());
+	CHECK_EQUAL(0, c.Size());
+}
+
 TEST_FIXTURE(db_setup_string, ArrayStringInsert2) {
 	// Create new list
 	c.Clear();
