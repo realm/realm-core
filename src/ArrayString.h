@@ -5,9 +5,11 @@
 
 class ArrayString : public Array {
 public:
-	ArrayString(Allocator& alloc=DefaultAllocator);
+	ArrayString(Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
+	ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
+	ArrayString(Allocator& alloc);
 	~ArrayString();
-	
+
 	const char* Get(size_t ndx) const;
 	bool Add();
 	bool Add(const char* value);
@@ -19,13 +21,16 @@ public:
 	size_t Find(const char* value) const;
 	size_t Find(const char* value, size_t len) const;
 
+	size_t Write(std::ostream& out) const;
+
 #ifdef _DEBUG
+	bool Compare(const ArrayString& c) const;
 	void Stats() const;
 	void ToDot(FILE* f) const;
 #endif //_DEBUG
 
 private:
-	bool Alloc(size_t count, size_t width);
+	virtual size_t CalcByteLen(size_t count, size_t width) const;
 };
 
 #endif //__TDB_ARRAY__

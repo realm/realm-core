@@ -106,8 +106,12 @@ public:
 
 	void Sort();
 
+	// Serialization
+	size_t Write(std::ostream& out, size_t& pos) const;
+
 	// Debug
 #ifdef _DEBUG
+	bool Compare(const Column& c) const;
 	void Print() const;
 	void Verify() const;
 	void ToDot(FILE* f, bool isTop=true) const;
@@ -188,6 +192,7 @@ private:
 class AdaptiveStringColumn : public ColumnBase {
 public:
 	AdaptiveStringColumn(Allocator& alloc=DefaultAllocator);
+	AdaptiveStringColumn(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
 	~AdaptiveStringColumn();
 
 	bool IsStringColumn() const {return true;}
@@ -215,8 +220,11 @@ public:
 	size_t GetRef() const {return m_array.GetRef();}
 	void SetParent(Array* parent, size_t pndx) {m_array.SetParent(parent, pndx);}
 
+	// Serialization
+	size_t Write(std::ostream& out, size_t& pos) const;
 
 #ifdef _DEBUG
+	bool Compare(const AdaptiveStringColumn& c) const;
 	void Verify() const {};
 	void ToDot(FILE* f, bool isTop=true) const;
 #endif //_DEBUG

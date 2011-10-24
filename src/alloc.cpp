@@ -1,17 +1,34 @@
 #include "AllocSlab.h"
 #include <assert.h>
 
-#define ALLOC_SLAB_SIZE     256
-#define ALLOC_SLAB_BASELINE 10
+// Memory Mapping includes
+#ifdef _MSC_VER
+//TODO: win include
+#else
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#endif
 
-// MP: This class is not ready for review
+#ifdef _DEBUG
+#include <stdio.h>
+#endif //_DEBUG
 
-SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(ALLOC_SLAB_BASELINE) {
+
+SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(SlabBaseline) {
+#ifdef _DEBUG
+	m_debugOut = false;
+#endif //_DEBUG
 }
 
 SlabAlloc::~SlabAlloc() {
 #ifdef _DEBUG
-	assert(IsAllFree());
+	if (!IsAllFree()) {
+		m_slabs.Print();
+		m_freeSpace.Print();
+		assert(false);
+	}
 #endif //_DEBUG
 
 	// Release all allocated memory
@@ -19,9 +36,20 @@ SlabAlloc::~SlabAlloc() {
 		void* p = (void*)(intptr_t)m_slabs[i].pointer;
 		free(p);
 	}
+
+	// Release any shared memory
+	if (m_shared) {
+#ifdef _MSC_VER
+#else
+		munmap(m_shared, m_baseline);
+		close(m_fd);
+#endif
+	}
 }
 
 MemRef SlabAlloc::Alloc(size_t size) {
+	assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
+
 	// Do we have a free space we can reuse?
 	for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
 		FreeSpace::Cursor r = m_freeSpace[i];
@@ -36,13 +64,19 @@ MemRef SlabAlloc::Alloc(size_t size) {
 				r.ref += (unsigned int)size;
 			}
 
+#ifdef _DEBUG
+			if (m_debugOut) {
+				printf("Alloc ref: %lu size: %lu\n", location, size);
+			}
+#endif //_DEBUG
+
 			void* pointer = Translate(location);
 			return MemRef(pointer, location);
 		}
 	}
 
 	// Else, allocate new slab
-	const size_t multible = ALLOC_SLAB_SIZE * ((size / ALLOC_SLAB_SIZE) + 1);
+	const size_t multible = SlabSize * ((size / SlabSize) + 1);
 	const size_t slabsBack = m_slabs.IsEmpty() ? m_baseline : m_slabs.Back().offset;
 	const size_t doubleLast = m_slabs.IsEmpty() ? 0 :
 		                                          (slabsBack - (m_slabs.GetSize() == 1) ? (size_t)0 : m_slabs[-2].offset) * 2;
@@ -63,14 +97,29 @@ MemRef SlabAlloc::Alloc(size_t size) {
 	f.ref = slabsBack + size;
 	f.size = rest;
 
+#ifdef _DEBUG
+	if (m_debugOut) {
+		printf("Alloc ref: %lu size: %lu\n", slabsBack, size);
+	}
+#endif //_DEBUG
+
 	return MemRef(slab, slabsBack);
 }
 
-void SlabAlloc::Free(size_t ref, MemRef::Header* header) {
+void SlabAlloc::Free(size_t ref, void* p) {
+	if (IsReadOnly(ref)) return;
+
+
 	// Get size from segment
-	const size_t size = header->capacity;
+	const size_t size = Array::GetCapacity(p);
 	const size_t refEnd = ref + size;
 	bool isMerged = false;
+
+#ifdef _DEBUG
+	if (m_debugOut) {
+		printf("Free ref: %lu size: %lu\n", ref, size);
+	}
+#endif //_DEBUG
 
 	// Check if we can merge with start of free block
 	size_t n = m_freeSpace.ref.Find(refEnd);
@@ -105,30 +154,36 @@ void SlabAlloc::Free(size_t ref, MemRef::Header* header) {
 	if (!isMerged) m_freeSpace.Add(ref, size);
 }
 
-MemRef SlabAlloc::ReAlloc(size_t ref, MemRef::Header* header, size_t size, bool doCopy=true) {
-	//TODO: Check if we can extend current space 
-    //MP: Not reviewed (not unit tested)
+MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size) {
+	assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
+
+	//TODO: Check if we can extend current space
 
 	// Allocate new space
 	const MemRef space = Alloc(size);
 	if (!space.pointer) return space;
 
-	if (doCopy) {
+	/*if (doCopy) {*/  //TODO: allow realloc without copying
 		// Get size of old segment
-		const size_t oldsize = header->length;
+		const size_t oldsize = Array::GetCapacity(p);
 
 		// Copy existing segment
-		memcpy(space.pointer, header, oldsize);
+		memcpy(space.pointer, p, oldsize);
 
 		// Add old segment to freelist
-		Free(ref, header);
+		Free(ref, p);
+	//}
+
+#ifdef _DEBUG
+	if (m_debugOut) {
+		printf("ReAlloc origref: %lu oldsize: %lu newref: %lu newsize: %lu\n", ref, oldsize, space.ref, size);
 	}
+#endif //_DEBUG
 
 	return space;
 }
 
 void* SlabAlloc::Translate(size_t ref) const {
-    //MP: Not reviewed - m_baseline arbitrary and m_shared is undefined
 	if (ref < m_baseline) return m_shared + ref;
 	else {
 		const size_t ndx = m_slabs.offset.FindPos(ref);
@@ -137,6 +192,53 @@ void* SlabAlloc::Translate(size_t ref) const {
 		const size_t offset = ndx ? m_slabs[ndx-1].offset : m_baseline;
 		return (char*)(intptr_t)m_slabs[ndx].pointer + (ref - offset);
 	}
+}
+
+bool SlabAlloc::IsReadOnly(size_t ref) const {
+	return ref < m_baseline;
+}
+
+bool SlabAlloc::SetShared(const char* path) {
+#ifdef _MSC_VER
+    (void)path;
+#else
+	// Open file
+	m_fd = open(path, O_RDONLY);
+	if (m_fd < 0) return false;
+
+	// Get size
+	struct stat statbuf;
+	if (fstat(m_fd, &statbuf) < 0) {
+		close(m_fd);
+		return false;
+	}
+
+	// Verify that data is 64bit aligned
+	if ((statbuf.st_size & 0x7) != 0) return false;
+
+	// Map to memory (read only)
+	void* p = mmap(0, statbuf.st_size, PROT_READ, MAP_SHARED, m_fd, 0);
+	if (p == (void*)-1) {
+		close(m_fd);
+		return false;
+	}
+
+	//TODO: Verify the data structures
+
+	m_shared = (char*)p;
+	m_baseline = statbuf.st_size;
+#endif
+
+	return true;
+}
+
+size_t SlabAlloc::GetTopRef() const {
+	assert(m_shared && m_baseline > 0);
+
+	const size_t ref = (size_t)*(uint64_t*)m_shared;
+	assert(ref < m_baseline);
+
+	return ref;
 }
 
 #ifdef _DEBUG

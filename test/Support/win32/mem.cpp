@@ -98,4 +98,5 @@ DWORD CalculateWSPrivate(DWORD processID)
     {
         CloseHandle( hProcess );
     }
+    return 0;
 }

@@ -3,13 +3,11 @@
 #include <cstdarg>
 #include <assert.h>
 
-// Pre-declare local functions
-//
-
 extern "C" {
 
-Table* table_new(const char* name) {
-	return new Table(name);
+
+Table* table_new() {
+	return new Table();
 }
 
 void table_delete(Table* t) {

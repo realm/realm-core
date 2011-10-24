@@ -5,7 +5,11 @@
 
 #include "Column.h"
 
-AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) : m_array(alloc) {
+AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) : m_array(NULL, 0, alloc) {
+}
+
+AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
+: m_array(ref, parent, pndx, alloc) {
 }
 
 AdaptiveStringColumn::~AdaptiveStringColumn() {
@@ -49,7 +53,27 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
 	return m_array.Find(value, len);
 }
 
+
+size_t AdaptiveStringColumn::Write(std::ostream& out, size_t& pos) const {
+	const size_t arrayPos = pos;
+	pos += m_array.Write(out);
+	return arrayPos;
+}
+
 #ifdef _DEBUG
+#include <cstring> // strcmp()
+
+bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const {
+	if (c.Size() != Size()) return false;
+
+	for (size_t i = 0; i < Size(); ++i) {
+		const char* s1 = Get(i);
+		const char* s2 = c.Get(i);
+		if (strcmp(s1, s2) != 0) return false;
+	}
+
+	return true;
+}
 
 void AdaptiveStringColumn::ToDot(FILE* f, bool) const {
 	m_array.ToDot(f);

@@ -1,13 +1,76 @@
 #include "Table.h"
 #include <assert.h>
 #include "Index.h"
+#include <iostream>
+#include <fstream>
+#include "AllocSlab.h"
 
 const ColumnType Accessor::type = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type = COLUMN_TYPE_BOOL;
 const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
 const ColumnType AccessorDate::type = COLUMN_TYPE_DATE;
 
-Table::Table(const char* name, Allocator& alloc) : m_name(name), m_size(0), m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_alloc(alloc) {
+Table::Table(Allocator& alloc)
+: m_size(0),  m_top(COLUMN_HASREFS, NULL, 0, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_alloc(alloc)
+{
+    m_top.Add(m_spec.GetRef());
+    m_top.Add(m_columnNames.GetRef());
+    m_top.Add(m_columns.GetRef());
+
+    m_spec.SetParent(&m_top, 0);
+    m_columnNames.SetParent(&m_top, 1);
+    m_columns.SetParent(&m_top, 2);
+}
+
+Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(0), m_top(alloc), m_spec(alloc), m_columnNames(alloc), m_columns(alloc), m_alloc(alloc)
+{
+    // Load from allocated memory
+    m_top.UpdateRef(ref);
+    m_top.SetParent(parent, pndx);
+    assert(m_top.Size() == 3);
+
+    m_spec.UpdateRef((size_t)m_top.Get(0));
+    m_spec.SetParent(&m_top, 0);
+    m_columnNames.UpdateRef((size_t)m_top.Get(1));
+    m_columnNames.SetParent(&m_top, 1);
+    m_columns.UpdateRef((size_t)m_top.Get(2));
+    m_columns.SetParent(&m_top, 2);
+
+    // Cache columns
+    size_t size = (size_t)-1;
+    for (size_t i = 0; i < m_spec.Size(); ++i) {
+        const ColumnType type = (ColumnType)m_spec.Get(i);
+        const size_t ref = (size_t)m_columns.Get(i);
+
+        switch (type) {
+            case COLUMN_TYPE_INT:
+            case COLUMN_TYPE_BOOL:
+                {
+                    Column* newColumn = new Column(ref, &m_columns, i, m_alloc);
+                    m_cols.Add((intptr_t)newColumn);
+
+                    if (size == -1) size = newColumn->Size();
+                    else assert(size == newColumn->Size());
+                }
+                break;
+
+            case COLUMN_TYPE_STRING:
+                {
+                    AdaptiveStringColumn* newColumn = new AdaptiveStringColumn(ref, &m_columns, i, m_alloc);
+                    m_cols.Add((intptr_t)newColumn);
+
+                    if (size == -1) size = newColumn->Size();
+                    else assert(size == newColumn->Size());
+                }
+                break;
+
+            default:
+                assert(false);
+                break;
+        }
+    }
+
+    if (size != -1) m_size = size;
 }
 
 Table::Table(const Table& t) : m_alloc(t.m_alloc) {
@@ -22,9 +85,9 @@ Table& Table::operator=(const Table&) {
 }
 
 Table::~Table() {
-	m_spec.Destroy();
-	m_columns.Destroy();
-	m_columnNames.Destroy();
+	// Destroying m_top will also destroy
+	// m_spec, m_columns and m_columnNames
+	m_top.Destroy();
 
 	// free cached columns
 	for (size_t i = 0; i < m_cols.Size(); ++i) {
@@ -32,6 +95,14 @@ Table::~Table() {
 		delete(column);
 	}
 	m_cols.Destroy();
+}
+
+void Table::SetParent(Array* parent, size_t pndx) {
+    m_top.SetParent(parent, pndx);
+}
+
+size_t Table::GetRef() const {
+    return m_top.GetRef();
 }
 
 size_t Table::GetColumnCount() const {
@@ -357,8 +428,94 @@ void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size
 	column.FindAllHamming(tv.GetRefColumn(), value, max);
 }
 
+size_t Table::Write(std::ostream &out, size_t& pos) const {
+    // Spec
+    const size_t specPos = pos;
+    pos += m_spec.Write(out);
+
+    // Names
+    const size_t namesPos = pos;
+    pos += m_columnNames.Write(out);
+
+    // Columns
+    Array columns(COLUMN_HASREFS);
+    const size_t column_count = GetColumnCount();
+	for (size_t i = 0; i < column_count; ++i) {
+		const ColumnType type = GetColumnType(i);
+		switch (type) {
+        case COLUMN_TYPE_INT:
+        case COLUMN_TYPE_BOOL:
+            {
+                const Column& column = GetColumn(i);
+                const size_t cpos = column.Write(out, pos);
+                columns.Add(cpos);
+            }
+            break;
+        case COLUMN_TYPE_STRING:
+            {
+                const AdaptiveStringColumn& column = GetColumnString(i);
+                const size_t cpos = column.Write(out, pos);
+                columns.Add(cpos);
+            }
+            break;
+        default: assert(false);
+		}
+	}
+    const size_t columnsPos = pos;
+    pos += columns.Write(out);
+
+    // Table array
+    Array top(COLUMN_HASREFS);
+    top.Add(specPos);
+    top.Add(namesPos);
+    top.Add(columnsPos);
+    const uint64_t topPos = pos; // sized for top ref
+    pos += top.Write(out);
+
+    // Clean-up
+	columns.SetType(COLUMN_NORMAL); // avoid recursive del
+	top.SetType(COLUMN_NORMAL);
+	columns.Destroy();
+	top.Destroy();
+
+    return (size_t)topPos;
+}
+
 #ifdef _DEBUG
 #include "stdio.h"
+
+bool Table::Compare(const Table& c) const {
+    if (!m_spec.Compare(c.m_spec)) return false;
+    if (!m_columnNames.Compare(c.m_columnNames)) return false;
+
+    const size_t column_count = GetColumnCount();
+    if (column_count != c.GetColumnCount()) return false;
+
+    for (size_t i = 0; i < column_count; ++i) {
+		const ColumnType type = GetColumnType(i);
+
+        switch (type) {
+            case COLUMN_TYPE_INT:
+            case COLUMN_TYPE_BOOL:
+                {
+                    const Column& column1 = GetColumn(i);
+                    const Column& column2 = c.GetColumn(i);
+                    if (!column1.Compare(column2)) return false;
+                }
+                break;
+            case COLUMN_TYPE_STRING:
+                {
+                    const AdaptiveStringColumn& column1 = GetColumnString(i);
+                    const AdaptiveStringColumn& column2 = c.GetColumnString(i);
+                    if (!column1.Compare(column2)) return false;
+                }
+                break;
+            default:
+                assert(false);
+		}
+    }
+    return true;
+}
 
 void Table::Verify() const {
 	const size_t column_count = GetColumnCount();
@@ -460,7 +617,7 @@ void Table::ToDot(const char* filename) const {
 void Table::Print() const {
 
 	// Table header
-	printf("Table \"%s\" len(%zu)\n    ", m_name, m_size);
+	printf("Table: len(%zu)\n    ", m_size);
 	const size_t column_count = GetColumnCount();
 	for (size_t i = 0; i < column_count; ++i) {
 		printf("%-10s ", m_columnNames.Get(i));

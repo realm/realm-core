@@ -15,11 +15,16 @@ public:
 	~SlabAlloc();
 
 	MemRef Alloc(size_t size);
-	MemRef ReAlloc(size_t ref, MemRef::Header* header, size_t size, bool doCopy);
-	void Free(size_t ref, MemRef::Header* header);
+	MemRef ReAlloc(size_t ref, void* p, size_t size);
+	void Free(size_t ref, void* p);
 	void* Translate(size_t ref) const;
 
+	bool IsReadOnly(size_t ref) const;
+	bool SetShared(const char* path);
+	size_t GetTopRef() const;
+
 #ifdef _DEBUG
+	void EnableDebug(bool enable) {m_debugOut = enable;}
 	void Verify() const;
 	bool IsAllFree() const;
 #endif //_DEBUG
@@ -34,10 +39,18 @@ private:
 				Int, size)
 
 	// Member variables
-	int64_t* m_shared;
+	char* m_shared;
 	size_t m_baseline;
 	Slabs m_slabs;
 	FreeSpace m_freeSpace;
+
+#ifndef _MSC_VER
+	int m_fd;
+#endif
+
+#ifdef _DEBUG
+	bool m_debugOut;
+#endif //_DEBUG
 };
 
 #endif //__TDB_ALLOC_SLAB__

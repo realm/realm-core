@@ -3,6 +3,9 @@
 
 #include "Column.h"
 
+// Pre-declare local functions
+size_t CalcByteLen(size_t count, size_t width);
+
 Array::Array(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
 : m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc) {
     Create(ref);
@@ -22,6 +25,10 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
     SetWidth(0);
 }
 
+// Creates new array (but invalid, call UpdateRef to init)
+Array::Array(Allocator& alloc) : m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
+}
+
 // Copy-constructor
 // Note that this array now own the ref. Should only be used when
 // the source array goes away right after (like return values from functions)
@@ -31,17 +38,18 @@ Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_paren
 }
 
 void Array::Create(size_t ref) {
-    assert(ref);
+	assert(ref);
+	uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
 
-    MemRef::Header* const header = (MemRef::Header*)m_alloc.Translate(ref);
-    m_isNode   = header->isNode;
-    m_hasRefs  = header->hasRefs;
-    m_width    = 1 << (header->width) >> 1; // 0, 1, 2, 4, 8, 16, 32, 64
-    m_len      = header->length;
-    m_capacity = header->capacity;
+	// Parse the 8byte header
+	m_isNode   = (header[0] & 0x80) != 0;
+	m_hasRefs  = (header[0] & 0x40) != 0;
+	m_width    = (1 << (header[0] & 0x07)) >> 1; // 0, 1, 2, 4, 8, 16, 32, 64
+	m_len      = GetRefSize(header);
+	m_capacity = GetCapacity(header);
 
-    m_ref = ref;
-    m_data = (uint8_t*)header + MEMREF_HEADER_SIZE;
+    m_ref  = ref;
+    m_data = header + HeaderSize;
 
     SetWidth(m_width);
 }
@@ -79,7 +87,7 @@ static unsigned int BitWidth(int64_t v) {
     if (v < 0) v = ~v;
 
     // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
-    return (v >> 31) ? 64 : ((v >> 15) ? 32 : ((v >> 7) ? 16 : 8));
+    return (v >> 31) ? 64 : (v >> 15) ? 32 : (v >> 7) ? 16 : 8;
 }
 
 void Array::SetParent(Array* parent, size_t pndx) {
@@ -115,8 +123,8 @@ void Array::Destroy() {
         }
     }
 
-    m_alloc.Free(m_ref, MEMREF_GET_HEADER(m_data));
-    m_data = NULL;
+	m_alloc.Free(m_ref, m_data-HeaderSize);
+	m_data = NULL;
 }
 
 void Array::Clear() {
@@ -130,32 +138,40 @@ void Array::Clear() {
 
     // Truncate size to zero (but keep capacity)
     m_len = 0;
-    MEMREF_GET_HEADER(m_data)->length = m_len;
+    SetRefSize(m_data-HeaderSize, m_len);
     SetWidth(0);
+
+	// Check if we need to copy before modifying
+	// we can do this here because the commands above only
+	// modify class internal metadata
+	CopyOnWrite();
 }
 
 void Array::Delete(size_t ndx) {
     assert(ndx < m_len);
 
-    // Move values below deletion up
-    if (m_width < 8) {
-        for (size_t i = ndx+1; i < m_len; ++i) {
-            const int64_t v = (this->*m_getter)(i);
-            (this->*m_setter)(i-1, v);
-        }
-    }
-    else if (ndx < m_len-1) {
-        // when byte sized, use memmove
-        const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        uint8_t* dst = m_data + (ndx * w);
-        uint8_t* src = dst + w;
-        const size_t count = (m_len - ndx - 1) * w;
-        memmove(dst, src, count);
-    }
+	// Check if we need to copy before modifying
+	CopyOnWrite();
 
-    // Update length (also in header)
-    --m_len;
-    MEMREF_GET_HEADER(m_data)->length = m_len;
+	// Move values below deletion up
+	if (m_width < 8) {
+		for (size_t i = ndx+1; i < m_len; ++i) {
+			const int64_t v = (this->*m_getter)(i);
+			(this->*m_setter)(i-1, v);
+		}
+	}
+	else if (ndx < m_len-1) {
+		// when byte sized, use memmove
+		const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
+        uint8_t* dst = m_data + (ndx * w);
+		uint8_t* src = dst + w;
+		const size_t count = (m_len - ndx - 1) * w;
+		memmove(dst, src, count);
+	}
+
+	// Update length (also in header)
+	--m_len;
+	SetRefSize(m_data-HeaderSize, m_len);
 }
 
 int64_t Array::Get(size_t ndx) const {
@@ -171,12 +187,15 @@ int64_t Array::Back() const {
 bool Array::Set(size_t ndx, int64_t value) {
     assert(ndx < m_len);
 
-    // Make room for the new value
-    const size_t width = BitWidth(value);
-    if (width > m_width) {
-        Getter oldGetter = m_getter;
-        if (!Alloc(m_len, width)) return false;
-        SetWidth(width);
+	// Check if we need to copy before modifying
+	if (!CopyOnWrite()) return false;
+
+	// Make room for the new value
+	const size_t width = BitWidth(value);
+	if (width > m_width) {
+		Getter oldGetter = m_getter;
+		if (!Alloc(m_len, width)) return false;
+		SetWidth(width);
 
         // Expand the old values
         int k = (int)m_len;
@@ -195,7 +214,10 @@ bool Array::Set(size_t ndx, int64_t value) {
 bool Array::Insert(size_t ndx, int64_t value) {
     assert(ndx <= m_len);
 
-    Getter getter = m_getter;
+	// Check if we need to copy before modifying
+	if (!CopyOnWrite()) return false;
+
+	Getter getter = m_getter;
 
     // Make room for the new value
     const size_t width = BitWidth(value);
@@ -250,9 +272,9 @@ bool Array::Insert(size_t ndx, int64_t value) {
 void Array::Resize(size_t count) {
     assert(count <= m_len);
 
-    // Update length (also in header)
-    m_len = count;
-    MEMREF_GET_HEADER(m_data)->length = m_len;
+	// Update length (also in header)
+	m_len = count;
+	SetRefSize(m_data-HeaderSize, m_len);
 }
 
 bool Array::Increment(int64_t value, size_t start, size_t end) {
@@ -479,7 +501,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
         }
     }
     else {
-        // Naive search (MP: For one bit searches - could be optimized)
+        // Naive search (MP: For one bit searches - should be optimized)
         for (size_t i = start; i < end; ++i) {
             const int64_t v = (this->*m_getter)(i);
             if (v == value) return i;
@@ -722,7 +744,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
         }
     }
     else {
-        // Naive search (MP: For one bit searches - could be optimized)
+        // Naive search (MP: For one bit searches - should be optimized)
         for (size_t i = start; i < end; ++i) {
             const int64_t v = (this->*m_getter)(i);
             if (v == value) result.Add(i + colOffset);
@@ -770,44 +792,83 @@ void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_
     }
 }
 
+size_t Array::CalcByteLen(size_t count, size_t width) const {
+	size_t len = HeaderSize; // always need room for header
+	switch (width) {
+	case 0:
+		break;
+	case 1:
+		len += count >> 3;
+		if (count & 0x07) ++len;
+		break;
+	case 2:
+		len += count >> 2;
+		if (count & 0x03) ++len;
+		break;
+	case 4:
+		len += count >> 1;
+		if (count & 0x01) ++len;
+		break;
+	default:
+		assert(width == 8 || width == 16 || width == 32 || width == 64);
+		len += count * (width >> 3);
+	}
+	return len;
+}
+
+bool Array::CopyOnWrite() {
+	if (!m_alloc.IsReadOnly(m_ref)) return true;
+
+	// Calculate size in bytes (plus a bit of extra room for expansion)
+	size_t len = CalcByteLen(m_len, m_width);
+	const size_t rest = (~len & 0x7)+1;
+	if (rest < 8) len += rest; // 64bit blocks
+	const size_t new_len = len + 64;
+
+	// Create new copy of array
+	const MemRef mref = m_alloc.Alloc(new_len);
+	memcpy(mref.pointer, m_data-8, len);
+
+	// Update capacity in header
+	uint8_t* const header = (uint8_t*)(mref.pointer);
+	header[4] = (new_len >> 16) & 0x000000FF;
+	header[5] = (new_len >> 8) & 0x000000FF;
+	header[6] = new_len & 0x000000FF;
+
+	// Update internal data
+	m_ref = mref.ref;
+	m_data = (unsigned char*)mref.pointer + 8;
+	m_capacity = new_len;
+
+	// Update ref in parent
+	if (m_parent) m_parent->Set(m_parentNdx, mref.ref);
+
+	return true;
+}
+
 bool Array::Alloc(size_t count, size_t width) {
-    // Calculate size in bytes
-    size_t len = MEMREF_HEADER_SIZE; // always need room for header
-    switch (width) {
-    case 0:
-        break;
-    case 1:
-        len += count >> 3;
-        if (count & 0x07) ++len;
-        break;
-    case 2:
-        len += count >> 2;
-        if (count & 0x03) ++len;
-        break;
-    case 4:
-        len += count >> 1;
-        if (count & 0x01) ++len;
-        break;
-    default:
-        assert(width == 8 || width == 16 || width == 32 || width == 64);
-        len += count * (width >> 3);
-    }
+	// Calculate size in bytes
+	const size_t len = CalcByteLen(count, width);
 
-    if (len > m_capacity) {
-        // Try to expand with 50% to avoid to many reallocs
-        size_t new_capacity = m_capacity ? m_capacity + m_capacity / 2 : 128;
-        if (new_capacity < len) new_capacity = len; 
+	if (len > m_capacity) {
+		// Double to avoid too many reallocs
+		size_t new_capacity = m_capacity ? m_capacity * 2 : 128;
+		if (new_capacity < len) {
+			const size_t rest = (~len & 0x7)+1;
+			new_capacity = len;
+			if (rest < 8) new_capacity += rest; // 64bit align
+		}
 
-        // Allocate the space
-        MemRef mref;
-        if (m_data) mref = m_alloc.ReAlloc(MEMREF_GET_HEADER(m_data), new_capacity);
-        else mref = m_alloc.Alloc(new_capacity);
+		// Allocate the space
+		MemRef mref;
+		if (m_data) mref = m_alloc.ReAlloc(m_ref, m_data-HeaderSize, new_capacity);
+		else mref = m_alloc.Alloc(new_capacity);
 
         if (!mref.pointer) return false;
 
-        m_ref = mref.ref;
-        m_data = (uint8_t*)mref.pointer + MEMREF_HEADER_SIZE;
-        m_capacity = new_capacity;
+		m_ref = mref.ref;
+		m_data = (uint8_t*)mref.pointer + HeaderSize;
+		m_capacity = new_capacity;
 
         // Update ref in parent
         if (m_parent) m_parent->Set(m_parentNdx, mref.ref); //TODO: ref
@@ -819,15 +880,19 @@ bool Array::Alloc(size_t count, size_t width) {
     while (b) {++w; b >>= 1;}
     assert(0 <= w && w < 8);
 
-    // Update 8-byte header
-    // isNode 1 bit, hasRefs 1 bit, 3 bits unused, width 3 bits, len 3 bytes,
-    // capacity 3 bytes
-    MemRef::Header* const header = MEMREF_GET_HEADER(m_data);
-    header->isNode   = m_isNode;
-    header->hasRefs  = m_hasRefs;
-    header->width    = w;
-    header->length   = count;
-    header->capacity = m_capacity;
+	// Update 8-byte header
+	// isNode 1 bit, hasRefs 1 bit, 3 bits unused, width 3 bits, len 3 bytes,
+	// capacity 3 bytes
+	uint8_t* const header = (uint8_t*)(m_data-HeaderSize);
+	header[0] = m_isNode << 7;
+	header[0] += m_hasRefs << 6;
+	header[0] += (uint8_t)w;
+	header[1] = (count >> 16) & 0x000000FF;
+	header[2] = (count >> 8) & 0x000000FF;
+	header[3] = count & 0x000000FF;
+	header[4] = (m_capacity >> 16) & 0x000000FF;
+	header[5] = (m_capacity >> 8) & 0x000000FF;
+	header[6] = m_capacity & 0x000000FF;
 
     return true;
 }
@@ -970,7 +1035,7 @@ void Array::DoSort(size_t lo, size_t hi) {
     const size_t ndx = (lo + hi)/2;
     const int64_t x = (size_t)Get(ndx);
 
-    // use local getter in loop
+    // Use local getter in loop
     Getter get = m_getter;
 
     // partition
@@ -990,8 +1055,41 @@ void Array::DoSort(size_t lo, size_t hi) {
     if (i < (int)hi) DoSort(i, hi);
 }
 
+size_t Array::Write(std::ostream& out) const {
+	// Calculate who many bytes the array takes up
+	const size_t len = CalcByteLen(m_len, m_width);
+
+	// Write header first
+	// TODO: replace capacity with checksum
+	out.write((const char*)m_data-8, 8);
+
+	// Write array
+	const size_t arrayByteLen = len - 8;
+	if (arrayByteLen) out.write((const char*)m_data, arrayByteLen);
+
+	// Pad so next block will be 64bit aligned
+	const char pad[8] = {0,0,0,0,0,0,0,0};
+	const size_t rest = (~len & 0x7)+1; // CHECK
+	if (rest < 8) {
+		out.write(pad, rest);
+		return len + rest;
+	}
+	else return len; // Return number of bytes written
+}
+
+
 #ifdef _DEBUG
 #include "stdio.h"
+
+bool Array::Compare(const Array& c) const {
+	if (c.Size() != Size()) return false;
+
+	for (size_t i = 0; i < Size(); ++i) {
+		if (Get(i) != c.Get(i)) return false;
+	}
+
+	return true;
+}
 
 void Array::Print() const {
     printf("%zx: (%zu) ", GetRef(), Size());

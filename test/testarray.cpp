@@ -1,12 +1,20 @@
+
 #include "Array.h"
 #include "Column.h"
 #include <UnitTest++.h>
+#include <vector>
+#include <algorithm>
+#include "testsettings.h"
 
 struct db_setup_array {
 	static Array c;
 };
 
 Array db_setup_array::c;
+
+// Pre-declare local functions
+uint64_t rand2(void);
+bool vector_eq_array(const std::vector<int64_t>& v, const Array& a);
 
 TEST_FIXTURE(db_setup_array, Array_Add0) {
 	c.Add(0);
@@ -113,6 +121,22 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg1) {
 
 	CHECK_EQUAL(c.Size(), 1);
 	CHECK_EQUAL(c.Get(0), -1);
+	CHECK_EQUAL(8, c.GetBitWidth());
+}
+
+TEST(Array_AddNeg1_1) {
+	Array c;
+
+	c.Add(1);
+	c.Add(2);
+	c.Add(3);
+	c.Add(-128);
+
+	CHECK_EQUAL(c.Size(), 4);
+	CHECK_EQUAL(c.Get(0), 1);
+	CHECK_EQUAL(c.Get(1), 2);
+	CHECK_EQUAL(c.Get(2), 3);
+	CHECK_EQUAL(c.Get(3), -128);
 	CHECK_EQUAL(8, c.GetBitWidth());
 }
 
@@ -592,5 +616,62 @@ TEST(findallint7){
 		if(a.Get(i) == value)
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
+	}
+}
+
+// Support functions for monkey test
+
+uint64_t rand2(void) {
+	const uint64_t i = (int64_t)rand() | (uint64_t)rand() << 8 | (uint64_t)rand() << 2*8 | (uint64_t)rand() << 3*8 | (uint64_t)rand() << 4*8 | (uint64_t)rand() << 5*8 | (uint64_t)rand() << 6*8 | (uint64_t)rand() << 7*8;
+	return i;
+}
+
+bool vector_eq_array(const std::vector<int64_t>& v, const Array& a) {
+	if (a.Size() != v.size()) return false;
+
+	for(size_t t = 0; t < v.size(); ++t) {
+		if (v[t] != a.Get(t)) return false;
+	}
+	return true;
+}
+
+TEST(monkeytest1) {
+	const uint64_t DURATION = UNITTEST_DURATION*100;
+	const uint64_t SEED = 123;
+
+	Array a;
+	std::vector<int64_t> v;
+
+	srand(SEED);
+	const uint64_t nums_per_bitwidth = DURATION;
+	size_t current_bitwidth = 0;
+	int trend = 5;
+
+	for(current_bitwidth = 0; current_bitwidth < 65; current_bitwidth++) {
+		//		printf("Input bitwidth around ~%d, a.GetBitWidth()=%d, a.Size()=%d\n", (int)current_bitwidth, (int)a.GetBitWidth(), (int)a.Size());
+
+		while(rand2() % nums_per_bitwidth != 0) {
+			if (!(rand2() % (DURATION / 10)))
+				trend = (int)rand2() % 10;
+
+			if (rand2() % 10 > trend) {
+				uint64_t l = rand2();
+				const uint64_t mask = ((1ULL << current_bitwidth) - 1ULL);
+				l &= mask;
+
+				const size_t pos = rand2() % (a.Size() + 1);
+				a.Insert(pos, l);
+				v.insert(v.begin() + pos, l);
+			}
+			else {
+				if(a.Size() > 0) {
+					const size_t i = rand2() % a.Size();
+					a.Delete(i);
+					v.erase(v.begin() + i);
+				}
+				const bool b = vector_eq_array(v, a);
+				CHECK_EQUAL(true, b);
+			}
+		}
 	}
 }

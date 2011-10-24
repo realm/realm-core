@@ -24,14 +24,13 @@ protected: \
 }; \
 class TableName : public Table { \
 public: \
-	TableName(Allocator& alloc=DefaultAllocator) : Table(#TableName, alloc) { \
+	TableName(Allocator& alloc=DefaultAllocator) : Table(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 		\
 		CName1.Create(this, 0); \
 		CName2.Create(this, 1); \
 	}; \
-\
 	class Cursor : public CursorBase { \
 	public: \
 		Cursor(TableName& table, size_t ndx) : CursorBase(table, ndx) { \
@@ -72,6 +71,10 @@ public: \
 \
 	ColumnProxy##CType1 CName1; \
 	ColumnProxy##CType2 CName2; \
+protected: \
+	friend class Group; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : Table(alloc, ref, parent, pndx) {}; \
+\
 };
 
 
@@ -85,7 +88,7 @@ protected: \
 }; \
 class TableName : public Table { \
 public: \
-	TableName(Allocator& alloc=DefaultAllocator) : Table(#TableName, alloc) { \
+	TableName(Allocator& alloc=DefaultAllocator) : Table(alloc) { \
 		RegisterColumn(Accessor##CType1::type,  #CName1 ); \
 		RegisterColumn(Accessor##CType2::type,  #CName2 ); \
 		RegisterColumn(Accessor##CType3::type,  #CName3 ); \
@@ -96,7 +99,6 @@ public: \
 		CName3.Create(this, 2); \
 		CName4.Create(this, 3); \
 	}; \
-\
 	class Cursor : public CursorBase { \
 	public: \
 		Cursor(TableName& table, size_t ndx) : CursorBase(table, ndx) { \
@@ -125,6 +127,13 @@ public: \
 		Insert##CType4 (3, ndx, v4); \
 		InsertDone(); \
 	} \
+	void Insert(size_t ndx, Type##CType1 v1, Type##CType2 v2,Type##CType3 v3, Type##CType4 v4) { \
+		Insert##CType1 (0, ndx, v1); \
+		Insert##CType2 (1, ndx, v2); \
+		Insert##CType3 (2, ndx, v3); \
+		Insert##CType4 (3, ndx, v4); \
+		InsertDone(); \
+	} \
 \
 	Cursor Add() {return Cursor(*this, AddRow());} \
 	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \
@@ -141,6 +150,10 @@ public: \
 	ColumnProxy##CType2 CName2; \
 	ColumnProxy##CType3 CName3; \
 	ColumnProxy##CType4 CName4; \
+protected: \
+friend class Group; \
+TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : Table(alloc, ref, parent, pndx) {}; \
+\
 };
 
 #endif //__TIGHTDB_H__

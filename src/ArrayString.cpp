@@ -5,10 +5,16 @@
 
 #include "ArrayString.h"
 
-// MP: What about wide strings (Unicode)?
-
-ArrayString::ArrayString(Allocator& alloc) : Array(COLUMN_NORMAL, NULL, 0, alloc) {
+ArrayString::ArrayString(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
 }
+
+ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc) {
+}
+
+// Creates new array (but invalid, call UpdateRef to init)
+ArrayString::ArrayString(Allocator& alloc) : Array(alloc) {
+}
+
 
 ArrayString::~ArrayString() {
 }
@@ -32,15 +38,13 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 	assert(value);
 	assert(len < 64); // otherwise we have to use another column type
 
-	// Special case for lists of zero-length strings
-	if (len == 0 && m_width == 0) {
-		m_len += 1;
-		return true;
-	}
+	// Check if we need to copy before modifying
+	if (!CopyOnWrite()) return false;
 
 	// Calc min column width (incl trailing zero-byte)
 	size_t width = 0;
-	if (len < 4) width = 4;
+	if (len == 0) width = 0;
+	else if (len < 4) width = 4;
 	else if (len < 8) width = 8;
 	else if (len < 16) width = 16;
 	else if (len < 32) width = 32;
@@ -50,7 +54,8 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 	// Make room for the new value
 	if (width > m_width) {
 		const size_t oldwidth = m_width;
-		if (!Alloc(m_len, width)) return false;
+		m_width = width;
+		if (!Alloc(m_len, m_width)) return false;
 
 		// Expand the old values
 		int k = (int)m_len;
@@ -61,6 +66,7 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 			char* data = (char*)m_data + (k * m_width);
 			memmove(data, v, oldwidth);
             memset (data + oldwidth, '\0', (size_t)(m_width - oldwidth)); // pad with zeroes
+
 		}
 	}
 
@@ -85,16 +91,13 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 	assert(value);
 	assert(len < 64); // otherwise we have to use another column type
 
-	// Special case for lists of zero-length strings
-	if (len == 0 && m_width == 0) {
-		m_len += 1;
-        MEMREF_GET_HEADER(m_data)->length = m_len;
-		return true;
-	}
+	// Check if we need to copy before modifying
+	if (!CopyOnWrite()) return false;
 
 	// Calc min column width (incl trailing zero-byte)
 	size_t width = 0;
-	if (len < 4) width = 4;
+	if (len == 0) width = 0;
+	else if (len < 4) width = 4;
 	else if (len < 8) width = 8;
 	else if (len < 16) width = 16;
 	else if (len < 32) width = 32;
@@ -105,7 +108,8 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
 	// Make room for the new value
 	const size_t oldwidth = m_width;
-	if (!Alloc(m_len+1, width)) return false;
+	if (doExpand) m_width = width;
+	if (!Alloc(m_len+1, m_width)) return false;
 
 	// Move values below insertion (may expand)
 	if (doExpand) {
@@ -153,9 +157,11 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 void ArrayString::Delete(size_t ndx) {
 	assert(ndx < m_len);
 
-    // Update length (also in header)
-    --m_len;
-    MEMREF_GET_HEADER(m_data)->length = m_len;
+	// Check if we need to copy before modifying
+	CopyOnWrite();
+
+	--m_len;
+    SetRefSize(m_data-HeaderSize, m_len);
 
 	// move data under deletion up
 	if (ndx < m_len) {
@@ -166,51 +172,8 @@ void ArrayString::Delete(size_t ndx) {
 	}
 }
 
-
-bool ArrayString::Alloc(size_t count, size_t width) {
-	assert(width <= 64);
-	if (width < m_width) width = m_width; // width can only expand
-
-	// Calculate size in bytes
-	const size_t len = MEMREF_HEADER_SIZE + (count * width); // always need room for header
-	
-	if (len > m_capacity) {
-		// Try to expand with 50% to avoid to many reallocs
-		size_t new_capacity = m_capacity ? (m_capacity + (m_capacity / 2)) : 128;
-		if (new_capacity < len) new_capacity = len; 
-
-		// Allocate the space
-		MemRef mref;
-		if (m_data) mref = m_alloc.ReAlloc(MEMREF_GET_HEADER(m_data), new_capacity);
-		else mref = m_alloc.Alloc(new_capacity);
-
-		if (!mref.pointer) return false;
-
-		m_ref = mref.ref;
-		m_data = (unsigned char*)mref.pointer + MEMREF_HEADER_SIZE;
-		m_capacity = new_capacity;
-
-		// Update ref in parent
-		if (m_parent) m_parent->Set(m_parentNdx, mref.ref);
-	}
-
-	// Pack width in 3 bits (log2)
-	unsigned int w = 0;
-	unsigned int b = (unsigned int)width;
-	while (b) {++w; b >>= 1;}
-	assert(0 <= w && w < 8);
-
-	// Update 8-byte header
-	// isNode 1 bit, hasRefs 1 bit, 3 bits unused, width 3 bits, len 3 bytes, capacity 3 bytes
-    MemRef::Header* const header = MEMREF_GET_HEADER(m_data);
-    header->isNode   = m_isNode;
-    header->hasRefs  = m_hasRefs;
-    header->width    = w;
-    header->length   = count;
-    header->capacity = m_capacity;
-
-	m_width = width;
-	return true;
+size_t ArrayString::CalcByteLen(size_t count, size_t width) const {
+	return 8 + (count * width);
 }
 
 size_t ArrayString::Find(const char* value) const {
@@ -281,8 +244,41 @@ size_t ArrayString::Find(const char* value, size_t len) const {
 	return (size_t)-1;
 }
 
+size_t ArrayString::Write(std::ostream& out) const {
+	// Calculate how many bytes the array takes up
+	const size_t len = 8 + (m_len * m_width);
+
+	// Write header first
+	// TODO: replace capacity with checksum
+	out.write((const char*)m_data-8, 8);
+
+	// Write array
+	const size_t arrayByteLen = len - 8;
+	if (arrayByteLen) out.write((const char*)m_data, arrayByteLen);
+
+	// Pad so next block will be 64bit aligned
+	const char pad[8] = {0,0,0,0,0,0,0,0};
+	const size_t rest = (~len & 0x7)+1;
+
+	if (rest < 8) {
+		out.write(pad, rest);
+		return len + rest;
+	}
+	else return len; // Return number of bytes written
+}
+
 #ifdef _DEBUG
 #include "stdio.h"
+
+bool ArrayString::Compare(const ArrayString& c) const {
+	if (c.Size() != Size()) return false;
+
+	for (size_t i = 0; i < Size(); ++i) {
+		if (strcmp(Get(i), c.Get(i)) != 0) return false;
+	}
+
+	return true;
+}
 
 void ArrayString::Stats() const {
 	size_t total = 0;

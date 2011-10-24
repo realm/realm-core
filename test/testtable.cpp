@@ -2,7 +2,7 @@
 #include <UnitTest++.h>
 
 TEST(Table1) {
-	Table table("table1");
+	Table table;
 	table.RegisterColumn(COLUMN_TYPE_INT, "first");
 	table.RegisterColumn(COLUMN_TYPE_INT, "second");
 
@@ -311,5 +311,6 @@ TEST(Table_SlabAlloc) {
 	table.Verify();
 #endif //_DEBUG
 }
+
 
 

@@ -7,8 +7,8 @@
 #
 
 # Compiler and flags
-#CXXFLAGS  = -Wall -Weffc++ -Wextra -std=c++0x
-CXXFLAGS  = -std=c++0x
+CXXFLAGS  = -Wall -Weffc++ -Wextra -std=c++0x
+#CXXFLAGS  = -std=c++0x
 CXXLIBS   = -L./src
 CXXINC    = -I./src
 CXX       = g++
