@@ -247,6 +247,21 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert3) {
 	CHECK_EQUAL(6, c.Size());
 }
 
+TEST_FIXTURE(db_setup_string, ArrayStringSet2) {
+	// Create new list
+	c.Clear();
+	c.Add("aaaa");
+    c.Set(0, "bbbbbbbb");
+
+	CHECK_EQUAL("bbbbbbbb", c.Get(0));
+
+    c.Add("cccc");
+    c.Set(1, "dddddddddddddddd");
+
+    CHECK_EQUAL("bbbbbbbb",         c.Get(0));
+	CHECK_EQUAL("dddddddddddddddd", c.Get(1));
+}
+
 TEST_FIXTURE(db_setup_string, ArrayStringFind1) {
 	// Create new list
 	c.Clear();

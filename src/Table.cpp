@@ -29,18 +29,18 @@ Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(
     m_top.SetParent(parent, pndx);
     assert(m_top.Size() == 3);
 
-    m_spec.UpdateRef(m_top.Get(0));
+    m_spec.UpdateRef((size_t)m_top.Get(0));
     m_spec.SetParent(&m_top, 0);
-    m_columnNames.UpdateRef(m_top.Get(1));
+    m_columnNames.UpdateRef((size_t)m_top.Get(1));
     m_columnNames.SetParent(&m_top, 1);
-    m_columns.UpdateRef(m_top.Get(2));
+    m_columns.UpdateRef((size_t)m_top.Get(2));
     m_columns.SetParent(&m_top, 2);
 
     // Cache columns
-    size_t size = -1;
+    size_t size = (size_t)-1;
     for (size_t i = 0; i < m_spec.Size(); ++i) {
         const ColumnType type = (ColumnType)m_spec.Get(i);
-        const size_t ref = m_columns.Get(i);
+        const size_t ref = (size_t)m_columns.Get(i);
 
         switch (type) {
             case COLUMN_TYPE_INT:
@@ -478,7 +478,7 @@ size_t Table::Write(std::ostream &out, size_t& pos) const {
 	columns.Destroy();
 	top.Destroy();
 
-    return topPos;
+    return (size_t)topPos;
 }
 
 #ifdef _DEBUG

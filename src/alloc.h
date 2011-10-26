@@ -18,6 +18,9 @@ struct MemRef {
 
 class Allocator {
 public:
+    static const int SlabSize     = 256;
+    static const int SlabBaseline = 8;
+
 	virtual MemRef Alloc(size_t size) {void* p = malloc(size); return MemRef(p,(size_t)p);}
 	virtual MemRef ReAlloc(size_t /*ref*/, void* p, size_t size) {void* p2 = realloc(p, size); return MemRef(p2,(size_t)p2);}
 	virtual void Free(size_t, void* p) {return free(p);}

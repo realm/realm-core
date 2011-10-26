@@ -24,8 +24,8 @@ Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableN
 	m_top.UpdateRef(top_ref);
 	assert(m_top.Size() == 2);
 
-	m_tableNames.UpdateRef(m_top.Get(0));
-	m_tables.UpdateRef(m_top.Get(1));
+	m_tableNames.UpdateRef((size_t)m_top.Get(0));
+	m_tables.UpdateRef((size_t)m_top.Get(1));
 	m_tableNames.SetParent(&m_top, 0);
 	m_tables.SetParent(&m_top, 1);
 
@@ -64,7 +64,7 @@ Table& Group::GetTable(const char* name) {
 		// Get table from cache if exists, else create
 		Table* t = (Table*)m_cachedtables.Get(n);
 		if (!t) {
-			const size_t ref = m_tables.Get(n);
+			const size_t ref = (size_t)m_tables.Get(n);
 			t = new Table(m_alloc, ref, &m_tables, n);
 			m_cachedtables.Set(n, (intptr_t)t);
 		}
@@ -89,7 +89,7 @@ void Group::Write(std::ostream &out) {
 		// Instantiate table if not in cache
 		Table* t = (Table*)m_cachedtables.Get(i);
 		if (!t) {
-			const size_t ref = m_tables.Get(i);
+			const size_t ref = (size_t)m_tables.Get(i);
 			t = new Table(m_alloc, ref, &m_tables, i);
 			m_cachedtables.Set(i, (intptr_t)t);
 		}

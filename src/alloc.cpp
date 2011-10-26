@@ -16,10 +16,7 @@
 #endif //_DEBUG
 
 
-// Pre-declare local functions
-size_t GetSizeFromHeader(void* p);
-
-SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(8) {
+SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(SlabBaseline) {
 #ifdef _DEBUG
 	m_debugOut = false;
 #endif //_DEBUG
@@ -79,7 +76,7 @@ MemRef SlabAlloc::Alloc(size_t size) {
 	}
 
 	// Else, allocate new slab
-	const size_t multible = 256 * ((size / 256) + 1);
+	const size_t multible = SlabSize * ((size / SlabSize) + 1);
 	const size_t slabsBack = m_slabs.IsEmpty() ? m_baseline : m_slabs.Back().offset;
 	const size_t doubleLast = m_slabs.IsEmpty() ? 0 :
 		                                          (slabsBack - (m_slabs.GetSize() == 1) ? (size_t)0 : m_slabs[-2].offset) * 2;
@@ -109,18 +106,12 @@ MemRef SlabAlloc::Alloc(size_t size) {
 	return MemRef(slab, slabsBack);
 }
 
-// Support function
-size_t GetSizeFromHeader(void* p) {
-	// parse the capacity part of 8byte header
-	const uint8_t* const header = (uint8_t*)p;
-	return (header[4] << 16) + (header[5] << 8) + header[6];
-}
-
 void SlabAlloc::Free(size_t ref, void* p) {
 	if (IsReadOnly(ref)) return;
 
+
 	// Get size from segment
-	const size_t size = GetSizeFromHeader(p);
+	const size_t size = Array::GetCapacity(p);
 	const size_t refEnd = ref + size;
 	bool isMerged = false;
 
@@ -146,7 +137,7 @@ void SlabAlloc::Free(size_t ref, void* p) {
 		const size_t count = m_freeSpace.GetSize();
 		for (size_t i = 0; i < count; ++i) {
 			FreeSpace::Cursor c = m_freeSpace[i];
-			const size_t end = c.ref + c.size;
+			const size_t end = (size_t)(c.ref + c.size);
 			if (ref == end) {
 				if (isMerged) {
 					c.size += m_freeSpace[n].size;
@@ -174,7 +165,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size) {
 
 	/*if (doCopy) {*/  //TODO: allow realloc without copying
 		// Get size of old segment
-		const size_t oldsize = GetSizeFromHeader(p);
+		const size_t oldsize = Array::GetCapacity(p);
 
 		// Copy existing segment
 		memcpy(space.pointer, p, oldsize);
@@ -209,6 +200,7 @@ bool SlabAlloc::IsReadOnly(size_t ref) const {
 
 bool SlabAlloc::SetShared(const char* path) {
 #ifdef _MSC_VER
+    (void)path;
 #else
 	// Open file
 	m_fd = open(path, O_RDONLY);
@@ -243,7 +235,7 @@ bool SlabAlloc::SetShared(const char* path) {
 size_t SlabAlloc::GetTopRef() const {
 	assert(m_shared && m_baseline > 0);
 
-	const size_t ref = *(uint64_t*)m_shared;
+	const size_t ref = (size_t)*(uint64_t*)m_shared;
 	assert(ref < m_baseline);
 
 	return ref;
@@ -258,13 +250,13 @@ bool SlabAlloc::IsAllFree() const {
 	size_t ref = m_baseline;
 	for (size_t i = 0; i < m_slabs.GetSize(); ++i) {
 		const Slabs::Cursor c = m_slabs[i];
-		const size_t size = c.offset - ref;
+		const size_t size = (size_t)(c.offset - ref);
 
 		const size_t r = m_freeSpace.ref.Find(ref);
 		if (r == (size_t)-1) return false;
 		if (size != (size_t)m_freeSpace[r].size) return false;
 
-		ref = c.offset;
+		ref = (size_t)c.offset;
 	}
 	return true;
 }
@@ -273,13 +265,13 @@ void SlabAlloc::Verify() const {
 	// Make sure that all free blocks fit within a slab
 	for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
 		const FreeSpace::Cursor c = m_freeSpace[i];
-		const size_t ref = c.ref;
+		const size_t ref = (size_t)c.ref;
 
 		const size_t ndx = m_slabs.offset.FindPos(ref);
 		assert(ndx != -1);
 
-		const size_t slab_end = m_slabs[ndx].offset;
-		const size_t free_end = ref + c.size;
+		const size_t slab_end = (size_t)m_slabs[ndx].offset;
+		const size_t free_end = (size_t)(ref + c.size);
 
 		assert(free_end <= slab_end);
 	}

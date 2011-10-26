@@ -43,12 +43,14 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="   --cs-on --cs-condition --cs-hit --cs-full-instrumentation --cs-include-path=&quot;src&quot; --cs-include-path=&quot;test\UnitTest++\src&quot; --cs-include-path=&quot;src\win32&quot;"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;test\UnitTest++\src&quot;;&quot;UnitTest++\src&quot;;src"
+				AdditionalIncludeDirectories="&quot;test\UnitTest++\src&quot;;&quot;UnitTest++\src&quot;;src;src\win32"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
+				StructMemberAlignment="0"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
 				DebugInformationFormat="4"
@@ -64,6 +66,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalOptions="   --cs-on --cs-condition --cs-hit --cs-full-instrumentation --cs-libgen=/MDd"
 				AdditionalDependencies="Debug\UnitTest++.lib"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
@@ -117,6 +120,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="  --cs-on --cs-condition --cs-hit --cs-partial-instrumentation --cs-include-path=&quot;src&quot; --cs-include-path=&quot;test\UnitTest++\src&quot;  --cs-full-instrumentation"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;test\UnitTest++\src&quot;;&quot;UnitTest++\src&quot;;src"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW"
@@ -138,6 +142,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalOptions="  --cs-on --cs-condition --cs-hit --cs-partial-instrumentation --cs-libgen=/MDd  --cs-full-instrumentation"
 				AdditionalDependencies="x64\Debug\UnitTest++.lib"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
@@ -193,7 +198,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;test\UnitTest++\src&quot;;&quot;UnitTest++\src&quot;;src"
+				AdditionalIncludeDirectories="&quot;test\UnitTest++\src&quot;;&quot;UnitTest++\src&quot;;src;src\win32"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"

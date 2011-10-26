@@ -14,6 +14,7 @@
 
 #ifdef _DEBUG
 #include <stdio.h>
+#include <assert.h>
 #endif
 
 // Pre-definitions
@@ -28,6 +29,8 @@ enum ColumnDef {
 
 class Array {
 public:
+	static const int HeaderSize = 8;
+
 	Array(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
 	Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
 	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
@@ -40,17 +43,49 @@ public:
 	void SetParent(Array* parent, size_t pndx);
 	void UpdateRef(size_t ref);
 
+	__inline static size_t GetCapacity(const void* p) {
+		// Parse the capacity part of 8byte header
+		const uint8_t* const header = (uint8_t*)p;
+		return (header[4] << 16) + (header[5] << 8) + header[6];
+	}
+
+	__inline static size_t GetRefSize(const void* p) {
+		// Parse the capacity part of 8byte header
+		const uint8_t* const header = (uint8_t*)p;
+		return (header[1] << 16) + (header[2] << 8) + header[3];
+	}
+
+    __inline static void SetRefSize(void* ref, size_t len) {
+	    uint8_t* const header = (uint8_t*)(ref);
+	    header[1] = ((len >> 16) & 0x000000FF);
+	    header[2] = (len >> 8) & 0x000000FF;
+	    header[3] = len & 0x000000FF;
+    }
+
+
+	size_t Size() const {
+#ifdef _DEBUG
+        assert(GetRefSize(m_data-HeaderSize) == m_len);
+#endif
+        return m_len;
+    }
+
 	bool IsValid() const {return m_data != NULL;}
 	void Invalidate() {m_data = NULL;}
 
-	size_t Size() const {return m_len;}
 	bool IsEmpty() const {return m_len == 0;}
 
+
 	bool Insert(size_t ndx, int64_t value);
-	bool Add(int64_t value);
+	
+    inline bool Add(int64_t value) {
+        return Insert(m_len, value);
+    }
+
 	bool Set(size_t ndx, int64_t value);
 	int64_t Get(size_t ndx) const;
-	int64_t operator[](size_t ndx) const {return Get(ndx);}
+	
+    int64_t operator[](size_t ndx) const {return Get(ndx);}
 	int64_t Back() const;
 	void Delete(size_t ndx);
 	void Clear();
@@ -128,7 +163,7 @@ protected:
 	Getter m_getter;
 	Setter m_setter;
 	size_t m_ref;
-	unsigned char* m_data;
+	uint8_t* m_data;
 	Array* m_parent;
 	size_t m_parentNdx;
 	size_t m_len;
