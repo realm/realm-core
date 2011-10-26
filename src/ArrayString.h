@@ -20,6 +20,8 @@ public:
 
 	size_t Find(const char* value) const;
 	size_t Find(const char* value, size_t len) const;
+	void FindAll(Column& result, const char* value);
+	void FindAll(Column& result, const char* value, size_t len);
 
 	size_t Write(std::ostream& out) const;
 
@@ -31,6 +33,7 @@ public:
 
 private:
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
+	size_t FindFirst(const char* value, size_t len, size_t first, size_t last) const;
 };
 
 #endif //__TDB_ARRAY__
