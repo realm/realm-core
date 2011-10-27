@@ -38,6 +38,8 @@ public:
 
 	void SetType(ColumnDef type);
 	void SetParent(Array* parent, size_t pndx);
+	Array* GetParent() const {return m_parent;}
+	size_t GetParentNdx() const {return m_parentNdx;}
 	void UpdateRef(size_t ref);
 
 	bool IsValid() const {return m_data != NULL;}

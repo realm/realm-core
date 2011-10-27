@@ -28,6 +28,8 @@
 		368063351445979100283774 /* Group.h in Headers */ = {isa = PBXBuildFile; fileRef = 368063341445979100283774 /* Group.h */; };
 		368063381445AF9B00283774 /* testgroup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063361445AD9200283774 /* testgroup.cpp */; };
 		3680633A1446D12B00283774 /* testalloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063391446D12A00283774 /* testalloc.cpp */; };
+		36E60823144F577400CCC3E8 /* Tree.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E60822144F577300CCC3E8 /* Tree.h */; };
+		36E60859145828A000CCC3E8 /* Column_tpl.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E608581458289F00CCC3E8 /* Column_tpl.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -298,6 +300,8 @@
 		368063341445979100283774 /* Group.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Group.h; sourceTree = "<group>"; };
 		368063361445AD9200283774 /* testgroup.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testgroup.cpp; sourceTree = "<group>"; };
 		368063391446D12A00283774 /* testalloc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testalloc.cpp; sourceTree = "<group>"; };
+		36E60822144F577300CCC3E8 /* Tree.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Tree.h; sourceTree = "<group>"; };
+		36E608581458289F00CCC3E8 /* Column_tpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Column_tpl.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -340,8 +344,10 @@
 				3647DEEF14209C1200D56FD7 /* Array.h */,
 				3647DEF014209C1200D56FD7 /* ArrayString.cpp */,
 				3647DEF114209C1200D56FD7 /* ArrayString.h */,
+				36E60822144F577300CCC3E8 /* Tree.h */,
 				3647DEF214209C1200D56FD7 /* Column.cpp */,
 				3647DEF314209C1200D56FD7 /* Column.h */,
+				36E608581458289F00CCC3E8 /* Column_tpl.h */,
 				3647DEF414209C1200D56FD7 /* ColumnString.cpp */,
 				3647DEF514209C1200D56FD7 /* ColumnType.h */,
 				3647DEF614209C1200D56FD7 /* ctightdb.cpp */,
@@ -787,6 +793,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				368063351445979100283774 /* Group.h in Headers */,
+				36E60823144F577400CCC3E8 /* Tree.h in Headers */,
+				36E60859145828A000CCC3E8 /* Column_tpl.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

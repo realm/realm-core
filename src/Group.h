@@ -17,6 +17,10 @@ public:
 	void Write(const char* filepath);
 	void Write(std::ostream &out);
 
+#ifdef _DEBUG
+	void Verify();
+#endif //_DEBUG
+
 private:
 	// Member variables
 	SlabAlloc m_alloc;

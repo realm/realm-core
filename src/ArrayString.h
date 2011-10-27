@@ -15,11 +15,11 @@ public:
 	bool Add(const char* value);
 	bool Set(size_t ndx, const char* value);
 	bool Set(size_t ndx, const char* value, size_t len);
+	bool Insert(size_t ndx, const char* value);
 	bool Insert(size_t ndx, const char* value, size_t len);
 	void Delete(size_t ndx);
 
-	size_t Find(const char* value) const;
-	size_t Find(const char* value, size_t len) const;
+	size_t Find(const char* value, size_t start=0 , size_t end=-1) const;
 
 	size_t Write(std::ostream& out) const;
 

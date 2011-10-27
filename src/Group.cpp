@@ -33,6 +33,10 @@ Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableN
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
 		m_cachedtables.Add(0);
 	}
+
+#ifdef _DEBUG
+	Verify();
+#endif //_DEBUG
 }
 
 Group::~Group() {
@@ -124,3 +128,20 @@ void Group::Write(std::ostream &out) {
 	tables.Destroy();
 	top.Destroy();
 }
+
+#ifdef _DEBUG
+
+void Group::Verify() {
+	for (size_t i = 0; i < m_tables.Size(); ++i) {
+		// Get table from cache if exists, else create
+		Table* t = (Table*)m_cachedtables.Get(i);
+		if (!t) {
+			const size_t ref = m_tables.Get(i);
+			t = new Table(m_alloc, ref, &m_tables, i);
+			m_cachedtables.Set(i, (intptr_t)t);
+		}
+		t->Verify();
+	}
+}
+
+#endif //_DEBUG

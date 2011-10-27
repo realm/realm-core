@@ -55,9 +55,18 @@ void Array::Create(size_t ref) {
 }
 
 void Array::SetType(ColumnDef type) {
+	CopyOnWrite();
+
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 	else m_isNode = m_hasRefs = false;
+
+	// Update Header
+	uint8_t* const header = (uint8_t*)(m_data-8);
+	const uint8_t w = header[0] & 0x7; // preserve width
+	header[0] = m_isNode << 7;
+	header[0] += m_hasRefs << 6;
+	header[0] += w;
 }
 
 bool Array::operator==(const Array& a) const {
@@ -90,8 +99,8 @@ static unsigned int BitWidth(int64_t v) {
 	return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
 }
 
-static void SetRefSize(void* ref, size_t len) {
-	uint8_t* const header = (uint8_t*)(ref);
+static void SetRefSize(void* header_p, size_t len) {
+	uint8_t* const header = (uint8_t*)(header_p);
 	header[1] = ((len >> 16) & 0x000000FF);
 	header[2] = (len >> 8) & 0x000000FF;
 	header[3] = len & 0x000000FF;
@@ -123,7 +132,7 @@ void Array::Destroy() {
 	if (!m_data) return;
 
 	if (m_hasRefs) {
-		for (size_t i = 0; i < Size(); ++i) {
+		for (size_t i = 0; i < m_len; ++i) {
 			const size_t ref = (size_t)Get(i);
 			Array sub(ref, this, i, m_alloc);
 			sub.Destroy();
@@ -136,6 +145,8 @@ void Array::Destroy() {
 }
 
 void Array::Clear() {
+	CopyOnWrite();
+
 	// Make sure we don't have any dangling references
 	if (m_hasRefs) {
 		for (size_t i = 0; i < Size(); ++i) {
@@ -148,10 +159,14 @@ void Array::Clear() {
 	m_len = 0;
 	SetWidth(0);
 
-	// Check if we need to copy before modifying
-	// we can do this here because the commands above only
-	// modify class internal metadata
-	CopyOnWrite();
+	// Update 8-byte header
+	uint8_t* const header = (uint8_t*)(m_data-8);
+	header[0] = m_isNode << 7;
+	header[0] += m_hasRefs << 6;
+	//header[0] += 0; // width
+	header[1] = 0;
+	header[2] = 0;
+	header[3] = 0;
 }
 
 void Array::Delete(size_t ndx) {
@@ -279,6 +294,8 @@ bool Array::Add(int64_t value) {
 
 void Array::Resize(size_t count) {
 	assert(count <= m_len);
+
+	CopyOnWrite();
 
 	// Update length (also in header)
 	m_len = count;
@@ -835,6 +852,7 @@ bool Array::CopyOnWrite() {
 
 	// Create new copy of array
 	const MemRef mref = m_alloc.Alloc(new_len);
+	if (!mref.pointer) return false;
 	memcpy(mref.pointer, m_data-8, len);
 
 	// Update capacity in header

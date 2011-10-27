@@ -22,6 +22,7 @@ Table::Table(Allocator& alloc)
     m_columns.SetParent(&m_top, 2);
 }
 
+
 Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(0), m_top(alloc), m_spec(alloc), m_columnNames(alloc), m_columns(alloc), m_alloc(alloc)
 {
     // Load from allocated memory
@@ -367,7 +368,7 @@ void Table::InsertString(size_t column_id, size_t ndx, const char* value) {
 	assert(ndx <= m_size);
 
 	AdaptiveStringColumn& column = GetColumnString(column_id);
-	column.Insert(ndx, value, strlen(value));
+	column.Insert(ndx, value);
 }
 
 void Table::InsertDone() {

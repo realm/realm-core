@@ -62,6 +62,10 @@ TEST(Group_Serialize1) {
 	table.Add("", 30, true, Wed);
 	table.Add("",  9, true, Wed);
 
+#ifdef _DEBUG
+	toDisk.Verify();
+#endif //_DEBUG
+
 	// Delete old file if there
 	remove("table_test.tbl");
 
@@ -88,6 +92,11 @@ TEST(Group_Serialize1) {
 
 	// Verify that both changed correctly
 	CHECK(table.Compare(t));
+
+#ifdef _DEBUG
+	toDisk.Verify();
+	fromDisk.Verify();
+#endif //_DEBUG
 }
 
 TEST(Group_Serialize2) {
@@ -101,6 +110,10 @@ TEST(Group_Serialize2) {
 	TestTableGroup& table2 = toDisk.GetTable<TestTableGroup>("test2");
 	table2.Add("hey",  0, true, Tue);
 	table2.Add("hello", 3232, false, Sun);
+
+#ifdef _DEBUG
+	toDisk.Verify();
+#endif //_DEBUG
 
 	// Delete old file if there
 	remove("table_test.tbl");
@@ -116,6 +129,11 @@ TEST(Group_Serialize2) {
 	// Verify that original values are there
 	CHECK(table1.Compare(t1));
 	CHECK(table2.Compare(t2));
+
+#ifdef _DEBUG
+	toDisk.Verify();
+	fromDisk.Verify();
+#endif //_DEBUG
 }
 
 

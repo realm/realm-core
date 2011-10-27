@@ -91,6 +91,10 @@ bool ArrayString::Add(const char* value) {
 	return Insert(m_len, value, strlen(value));
 }
 
+bool ArrayString::Insert(size_t ndx, const char* value) {
+	return Insert(ndx, value, strlen(value));
+}
+
 bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 	assert(ndx <= m_len);
 	assert(value);
@@ -189,13 +193,9 @@ size_t ArrayString::CalcByteLen(size_t count, size_t width) const {
 	return 8 + (count * width);
 }
 
-size_t ArrayString::Find(const char* value) const {
+size_t ArrayString::Find(const char* value, size_t, size_t) const {
 	assert(value);
-	return Find(value, strlen(value));
-}
-
-size_t ArrayString::Find(const char* value, size_t len) const {
-	assert(value);
+	const size_t len = strlen(value);
 
 	if (m_len == 0) return (size_t)-1; // empty list
 	if (len >= m_width) return (size_t)-1; // A string can never be wider than the column width

@@ -9,8 +9,8 @@ Index::Index() : Column(COLUMN_HASREFS) {
 	// Add subcolumns for leafs
 	const Array values(COLUMN_NORMAL);
 	const Array refs(COLUMN_NORMAL); // we do not own these refs (to column positions), so no COLUMN_HASREF
-	m_array.Add((intptr_t)values.GetRef());
-	m_array.Add((intptr_t)refs.GetRef());
+	m_array->Add((intptr_t)values.GetRef());
+	m_array->Add((intptr_t)refs.GetRef());
 }
 
 Index::Index(ColumnDef type, Array* parent, size_t pndx) : Column(type, parent, pndx) {
@@ -23,7 +23,7 @@ Index::Index(size_t ref, Array* parent, size_t pndx) : Column(ref, parent, pndx)
 }
 
 bool Index::IsEmpty() const {
-	const Array offsets = m_array.GetSubArray(0);
+	const Array offsets = m_array->GetSubArray(0);
 	return offsets.IsEmpty();
 }
 
@@ -63,14 +63,14 @@ void Index::Delete(size_t ndx, int64_t value, bool isLast) {
 
 	// Collapse top nodes with single item
 	while (IsNode()) {
-		Array refs = m_array.GetSubArray(1);
+		Array refs = m_array->GetSubArray(1);
 		assert(refs.Size() != 0); // node cannot be empty
 		if (refs.Size() > 1) break;
 
 		const size_t ref = (size_t)refs.Get(0);
 		refs.Delete(0); // avoid deleting subtree
-		m_array.Destroy();
-		m_array.UpdateRef(ref);
+		m_array->Destroy();
+		m_array->UpdateRef(ref);
 	}
 
 	// If it is last item in column, we don't have to update refs
@@ -78,15 +78,15 @@ void Index::Delete(size_t ndx, int64_t value, bool isLast) {
 }
 
 bool Index::DoDelete(size_t ndx, int64_t value) {
-	Array values = m_array.GetSubArray(0);
-	Array refs = m_array.GetSubArray(1);
+	Array values = m_array->GetSubArray(0);
+	Array refs = m_array->GetSubArray(1);
 
 	size_t pos = values.FindPos2(value);
 	assert(pos != (size_t)-1);
 
 	// There may be several nodes with the same values,
 	// so we have to find the one with the matching ref
-	if (m_array.IsNode()) {
+	if (m_array->IsNode()) {
 		do {
 			Index node = GetIndexFromRef(refs, pos);
 			if (node.DoDelete(ndx, value)) {
@@ -133,7 +133,7 @@ bool Index::Insert(size_t ndx, int64_t value, bool isLast) {
 			Index newNode(COLUMN_NODE);
 			newNode.NodeAdd(nc.ref1);
 			newNode.NodeAdd(GetRef());
-			m_array.UpdateRef(newNode.GetRef());
+			m_array->UpdateRef(newNode.GetRef());
 			break;
 		}
 	case NodeChange::CT_INSERT_AFTER:
@@ -141,7 +141,7 @@ bool Index::Insert(size_t ndx, int64_t value, bool isLast) {
 			Index newNode(COLUMN_NODE);
 			newNode.NodeAdd(GetRef());
 			newNode.NodeAdd(nc.ref1);
-			m_array.UpdateRef(newNode.GetRef());
+			m_array->UpdateRef(newNode.GetRef());
 			break;
 		}
 	case NodeChange::CT_SPLIT:
@@ -149,7 +149,7 @@ bool Index::Insert(size_t ndx, int64_t value, bool isLast) {
 			Index newNode(COLUMN_NODE);
 			newNode.NodeAdd(nc.ref1);
 			newNode.NodeAdd(nc.ref2);
-			m_array.UpdateRef(newNode.GetRef());
+			m_array->UpdateRef(newNode.GetRef());
 			break;
 		}
 	default:
@@ -164,8 +164,8 @@ bool Index::LeafInsert(size_t ref, int64_t value) {
 	assert(!IsNode());
 
 	// Get subnode table
-	Array values = m_array.GetSubArray(0);
-	Array refs = m_array.GetSubArray(1);
+	Array values = m_array->GetSubArray(0);
+	Array refs = m_array->GetSubArray(1);
 
 	const size_t ins_pos = values.FindPos2(value);
 
@@ -189,8 +189,8 @@ bool Index::NodeAdd(size_t ref) {
 	assert(!col.IsEmpty());
 	const int64_t maxval = col.MaxValue();
 
-	Array offsets = m_array.GetSubArray(0);
-	Array refs = m_array.GetSubArray(1);
+	Array offsets = m_array->GetSubArray(0);
+	Array refs = m_array->GetSubArray(1);
 
 	const size_t ins_pos = offsets.FindPos2(maxval);
 
@@ -207,15 +207,15 @@ bool Index::NodeAdd(size_t ref) {
 }
 
 int64_t Index::MaxValue() const {
-	const Array values = m_array.GetSubArray(0);
+	const Array values = m_array->GetSubArray(0);
 	return values.IsEmpty() ? 0 : values.Back();
 }
 
 Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
 	if (IsNode()) {
 		// Get subnode table
-		Array offsets = m_array.GetSubArray(0);
-		Array refs = m_array.GetSubArray(1);
+		Array offsets = m_array->GetSubArray(0);
+		Array refs = m_array->GetSubArray(1);
 
 		// Find the subnode containing the item
 		size_t node_ndx = offsets.FindPos2(ndx);
@@ -243,7 +243,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
 
 		// If there is room, just update node directly
 		if (offsets.Size() < MAX_LIST_SIZE) {
-			if (nc.type == NodeChange::CT_SPLIT) return NodeInsertSplit(node_ndx, nc.ref2);
+			if (nc.type == NodeChange::CT_SPLIT) return NodeInsertSplit<Column>(node_ndx, nc.ref2);
 			else return NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
 		}
 
@@ -284,10 +284,10 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
 			return NodeChange(NodeChange::CT_INSERT_AFTER, newList.GetRef());
 		default:            // split
 			// Move items below split to new list
-			for (size_t i = ndx; i < m_array.Size(); ++i) {
-				newList.Add(m_array.Get(i));
+			for (size_t i = ndx; i < m_array->Size(); ++i) {
+				newList.Add(m_array->Get(i));
 			}
-			m_array.Resize(ndx);
+			m_array->Resize(ndx);
 
 			return NodeChange(NodeChange::CT_SPLIT, GetRef(), newList.GetRef());
 		}
@@ -304,7 +304,7 @@ size_t Index::Find(int64_t value) const {
 		const size_t pos = values.FindPos2(value);
 
 		if (pos == -1) return (size_t)-1;
-		else if (!m_array.IsNode()) {
+		else if (!m_array->IsNode()) {
 			if (values.Get(pos) == value) return (size_t)refs.Get(pos);
 			else return (size_t)-1;
 		}
@@ -314,14 +314,14 @@ size_t Index::Find(int64_t value) const {
 }
 
 bool Index::FindAll(Column& result, int64_t value) const {
-	const Array values = m_array.GetSubArray(0);
-	const Array refs = m_array.GetSubArray(1);
+	const Array values = m_array->GetSubArray(0);
+	const Array refs = m_array->GetSubArray(1);
 
 	size_t pos = values.FindPos2(value);
 	assert(pos != (size_t)-1);
 
 	// There may be several nodes with the same values,
-	if (m_array.IsNode()) {
+	if (m_array->IsNode()) {
 		do {
 			const Index node = GetIndexFromRef(refs, pos);
 			if (!node.FindAll(result, value)) return false;
@@ -342,14 +342,14 @@ bool Index::FindAll(Column& result, int64_t value) const {
 }
 
 bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const {
-	const Array values = m_array.GetSubArray(0);
-	const Array refs = m_array.GetSubArray(1);
+	const Array values = m_array->GetSubArray(0);
+	const Array refs = m_array->GetSubArray(1);
 
 	size_t pos = values.FindPos2(start);
 	assert(pos != (size_t)-1);
 
 	// There may be several nodes with the same values,
-	if (m_array.IsNode()) {
+	if (m_array->IsNode()) {
 		do {
 			const Index node = GetIndexFromRef(refs, pos);
 			if (!node.FindAllRange(result, start, end)) return false;
@@ -373,9 +373,9 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const {
 void Index::UpdateRefs(size_t pos, int diff) {
 	assert(diff == 1 || diff == -1); // only used by insert and delete
 
-	Array refs = m_array.GetSubArray(1);
+	Array refs = m_array->GetSubArray(1);
 
-	if (m_array.IsNode()) {
+	if (m_array->IsNode()) {
 		for (size_t i = 0; i < refs.Size(); ++i) {
 			const size_t ref = (size_t)refs.Get(i);
 			Index ndx(ref);
@@ -390,16 +390,16 @@ void Index::UpdateRefs(size_t pos, int diff) {
 #ifdef _DEBUG
 
 void Index::Verify() const {
-	assert(m_array.Size() == 2);
-	assert(m_array.HasRefs());
+	assert(m_array->Size() == 2);
+	assert(m_array->HasRefs());
 
-	const Array offsets = m_array.GetSubArray(0);
-	const Array refs = m_array.GetSubArray(1);
+	const Array offsets = m_array->GetSubArray(0);
+	const Array refs = m_array->GetSubArray(1);
 	offsets.Verify();
 	refs.Verify();
 	assert(offsets.Size() == refs.Size());
 	
-	if (m_array.IsNode()) {
+	if (m_array->IsNode()) {
 		assert(refs.HasRefs());
 
 		// Make sure that all offsets matches biggest value in ref

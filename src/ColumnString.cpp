@@ -5,59 +5,112 @@
 
 #include "Column.h"
 
-AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) : m_array(NULL, 0, alloc) {
+// Pre-declare local functions
+bool IsNodeRef(size_t ref, Allocator& alloc);
+
+bool IsNodeRef(size_t ref, Allocator& alloc) {
+	const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
+	const bool isNode = (header[0] & 0x80) != 0;
+	return isNode;
 }
 
-AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
-: m_array(ref, parent, pndx, alloc) {
+AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) {
+	m_array = new ArrayString(NULL, 0, alloc);
+}
+
+AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, Array* parent, size_t pndx, Allocator& alloc) {
+	if (IsNodeRef(ref, alloc)) {
+		m_array = new Array(ref, parent, pndx, alloc);
+	}
+	else {
+		m_array = new ArrayString(ref, parent, pndx, alloc);
+	}
+}
+
+AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) {
+	if (IsNodeRef(ref, alloc)) {
+		m_array = new Array(ref, parent, pndx, alloc);
+	}
+	else {
+		m_array = new ArrayString(ref, parent, pndx, alloc);
+	}
 }
 
 AdaptiveStringColumn::~AdaptiveStringColumn() {
 }
 
+void AdaptiveStringColumn::Destroy() {
+	if (IsNode()) m_array->Destroy();
+	else ((ArrayString*)m_array)->Destroy();
+}
+
+
+void AdaptiveStringColumn::UpdateRef(size_t ref) {
+	assert(IsNodeRef(ref, m_array->GetAllocator())); // Can only be called when creating node
+
+	if (IsNode()) m_array->UpdateRef(ref);
+	else {
+		// Replace the string array with int array for node
+		Array* array = new Array(ref, m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
+		delete m_array;
+		m_array = array;
+	}
+}
+
+bool AdaptiveStringColumn::IsEmpty() const {
+	if (!IsNode()) return ((ArrayString*)m_array)->IsEmpty();
+	else {
+		const Array offsets = NodeGetOffsets();
+		return offsets.IsEmpty();
+	}
+}
+
+size_t AdaptiveStringColumn::Size() const {
+	if (!IsNode()) return ((ArrayString*)m_array)->Size();
+	else {
+		const Array offsets = NodeGetOffsets();
+		return offsets.IsEmpty() ? 0 : (size_t)offsets.Back();
+	}
+}
+
+void AdaptiveStringColumn::Clear() {
+	if (m_array->IsNode()) {
+		// Revert to string array
+		m_array->Destroy();
+		Array* array = new ArrayString(m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
+		delete m_array;
+		m_array = array;
+	}
+	else ((ArrayString*)m_array)->Clear();
+}
+
 const char* AdaptiveStringColumn::Get(size_t ndx) const {
-	return m_array.Get(ndx);
+	return TreeGet<const char*, AdaptiveStringColumn>(ndx);
 }
 
 bool AdaptiveStringColumn::Set(size_t ndx, const char* value) {
-	return Set(ndx, value, strlen(value));
-}
-
-bool AdaptiveStringColumn::Set(size_t ndx, const char* value, size_t len) {
-	return m_array.Set(ndx, value, len);
-}
-
-bool AdaptiveStringColumn::Add() {
-	return m_array.Add();
+	return TreeSet<const char*, AdaptiveStringColumn>(ndx, value);
 }
 
 bool AdaptiveStringColumn::Add(const char* value) {
-	return m_array.Add(value);
+	return Insert(Size(), value);
 }
 
-bool AdaptiveStringColumn::Insert(size_t ndx, const char* value, size_t len) {
-	return m_array.Insert(ndx, value, len);
+bool AdaptiveStringColumn::Insert(size_t ndx, const char* value) {
+	return TreeInsert<const char*, AdaptiveStringColumn>(ndx, value);
 }
 
 void AdaptiveStringColumn::Delete(size_t ndx) {
-	m_array.Delete(ndx);
+	TreeDelete<const char*, AdaptiveStringColumn>(ndx);
 }
 
-size_t AdaptiveStringColumn::Find(const char* value) const {
+size_t AdaptiveStringColumn::Find(const char* value, size_t, size_t) const {
 	assert(value);
-	return Find(value, strlen(value));
+	return TreeFind<const char*, AdaptiveStringColumn>(value, 0, -1);
 }
-
-size_t AdaptiveStringColumn::Find(const char* value, size_t len) const {
-	assert(value);
-	return m_array.Find(value, len);
-}
-
 
 size_t AdaptiveStringColumn::Write(std::ostream& out, size_t& pos) const {
-	const size_t arrayPos = pos;
-	pos += m_array.Write(out);
-	return arrayPos;
+	return TreeWrite<const char*, AdaptiveStringColumn>(out, pos);
 }
 
 #ifdef _DEBUG
@@ -76,7 +129,7 @@ bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const {
 }
 
 void AdaptiveStringColumn::ToDot(FILE* f, bool) const {
-	m_array.ToDot(f);
+	m_array->ToDot(f);
 }
 
 #endif //_DEBUG
