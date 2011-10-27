@@ -4,6 +4,9 @@
 #include <string>
 using namespace std;
 
+// Pre-declare local functions
+string number_name(size_t n);
+
 string number_name(size_t n) {
 	static const char* ones[] = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
 								 "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
@@ -24,7 +27,7 @@ string number_name(size_t n) {
 		txt += tens[n/10];
 		n %= 10;
 	}
-	if (n >= 0) {
+	else {
 		txt += " ";
 		txt += ones[n];
 	}
