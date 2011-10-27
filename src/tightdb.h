@@ -16,6 +16,60 @@ QueryName
 #define TDB_QUERY_END }; \
 
 
+#define TDB_TABLE_1(TableName, CType1, CName1) \
+class TableName##Query { \
+protected: \
+	QueryAccessor##CType1 CName1; \
+}; \
+class TableName : public Table { \
+public: \
+	TableName(Allocator& alloc=DefaultAllocator) : Table(alloc) { \
+		RegisterColumn(Accessor##CType1::type, #CName1); \
+		\
+		CName1.Create(this, 0); \
+	}; \
+	class Cursor : public CursorBase { \
+	public: \
+		Cursor(TableName& table, size_t ndx) : CursorBase(table, ndx) { \
+			CName1.Create(this, 0); \
+		} \
+		Cursor(const TableName& table, size_t ndx) : CursorBase(const_cast<TableName&>(table), ndx) { \
+			CName1.Create(this, 0); \
+		} \
+		Cursor(const Cursor& v) : CursorBase(v) { \
+			CName1.Create(this, 0); \
+		} \
+		Accessor##CType1 CName1; \
+	}; \
+\
+	void Add(Type##CType1 CName1) { \
+		const size_t ndx = GetSize(); \
+		Insert##CType1 (0, ndx, CName1); \
+		InsertDone(); \
+	} \
+\
+	Cursor Add() {return Cursor(*this, AddRow());} \
+	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \
+	Cursor operator[](size_t ndx) {return Cursor(*this, ndx);} \
+	const Cursor operator[](size_t ndx) const {return Cursor(*this, ndx);} \
+	Cursor operator[](int ndx) {return Cursor(*this, (ndx < 0) ? GetSize() + ndx : ndx);} \
+	Cursor Back() {return Cursor(*this, m_size-1);} \
+\
+	size_t Find(const TableName##Query&) const {return (size_t)-1;} \
+	TableName FindAll(const TableName##Query&) const {return TableName();} \
+	TableName Sort() const {return TableName();} \
+	TableName Range(int, int) const {return TableName();} \
+	TableName Limit(size_t) const {return TableName();} \
+\
+	ColumnProxy##CType1 CName1; \
+protected: \
+	friend class Group; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : Table(alloc, ref, parent, pndx) {}; \
+\
+};
+
+
+
 #define TDB_TABLE_2(TableName, CType1, CName1, CType2, CName2) \
 class TableName##Query { \
 protected: \
