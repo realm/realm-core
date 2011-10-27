@@ -35,7 +35,7 @@ int main() {
 	}
 	table.Add(0, "abcde", 100, Wed);
 
-	printf("Memory usage: %d bytes\n", GetMemUsage());
+	printf("Memory usage: %zu bytes\n", GetMemUsage());
 
 	UnitTest::Timer timer;
 
@@ -97,7 +97,7 @@ int main() {
 		printf("Add index: %dms\n", search_time);
 	}
 
-	printf("Memory usage2: %d bytes\n", GetMemUsage());
+	printf("Memory usage2: %zu bytes\n", GetMemUsage());
 
 	// Search with index
 	{
