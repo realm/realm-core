@@ -27,6 +27,7 @@ public:
 	void EnableDebug(bool enable) {m_debugOut = enable;}
 	void Verify() const;
 	bool IsAllFree() const;
+	void Print() const;
 #endif //_DEBUG
 
 private:

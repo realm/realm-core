@@ -19,6 +19,7 @@ public:
 
 #ifdef _DEBUG
 	void Verify();
+	void Print() const;
 #endif //_DEBUG
 
 private:

@@ -144,4 +144,8 @@ void Group::Verify() {
 	}
 }
 
+void Group::Print() const {
+	m_alloc.Print();
+}
+
 #endif //_DEBUG

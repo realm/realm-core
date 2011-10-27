@@ -285,4 +285,17 @@ void SlabAlloc::Verify() const {
 	}
 }
 
+void SlabAlloc::Print() const {
+	const size_t allocated = m_slabs.IsEmpty() ? 0 : m_slabs[m_slabs.GetSize()-1].offset;
+
+	size_t free = 0;
+	for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
+		free += m_freeSpace[i].size;
+	}
+
+	printf("Base: %zu Allocated: %zu\n", m_shared ? m_baseline : 0,  allocated - free);
+}
+
+
+
 #endif //_DEBUG
