@@ -80,8 +80,8 @@ public:
 	void SetIndex(size_t column_id);
 
 	// Debug
-#ifdef _DEBUG
 	bool Compare(const Table& c) const;
+#ifdef _DEBUG
 	void Verify() const;
 	void ToDot(const char* filename) const;
 	void Print() const;
