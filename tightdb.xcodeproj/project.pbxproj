@@ -25,11 +25,12 @@
 		3647E1171420E84200D56FD7 /* liblibtightdb_d.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* liblibtightdb_d.a */; };
 		3647E2501420E87300D56FD7 /* libUnitTest++.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E24F1420E87300D56FD7 /* libUnitTest++.a */; };
 		368063321445977300283774 /* Group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063311445977300283774 /* Group.cpp */; };
-		368063351445979100283774 /* Group.h in Headers */ = {isa = PBXBuildFile; fileRef = 368063341445979100283774 /* Group.h */; };
 		368063381445AF9B00283774 /* testgroup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063361445AD9200283774 /* testgroup.cpp */; };
 		3680633A1446D12B00283774 /* testalloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063391446D12A00283774 /* testalloc.cpp */; };
-		36E60823144F577400CCC3E8 /* Tree.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E60822144F577300CCC3E8 /* Tree.h */; };
-		36E60859145828A000CCC3E8 /* Column_tpl.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E608581458289F00CCC3E8 /* Column_tpl.h */; };
+		36E608681459976700CCC3E8 /* test-tightdb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E02214209CE600D56FD7 /* test-tightdb.cpp */; };
+		36E608691459977000CCC3E8 /* liblibtightdb_d.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* liblibtightdb_d.a */; };
+		36E6086F1459A3EB00CCC3E8 /* mem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6086E1459A3EB00CCC3E8 /* mem.cpp */; };
+		36E6088B1459A63B00CCC3E8 /* libUnitTest++.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E24F1420E87300D56FD7 /* libUnitTest++.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,10 +41,26 @@
 			remoteGlobalIDString = 3647E0E614209E6B00D56FD7;
 			remoteInfo = libtightdb;
 		};
+		36E6086A14599C3300CCC3E8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3611F2FC14209B7000017263 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3647E0E614209E6B00D56FD7;
+			remoteInfo = libtightdb;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		3647E1011420E4D800D56FD7 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		36E6085C1459972100CCC3E8 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = /usr/share/man/man1/;
@@ -300,8 +317,9 @@
 		368063341445979100283774 /* Group.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Group.h; sourceTree = "<group>"; };
 		368063361445AD9200283774 /* testgroup.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testgroup.cpp; sourceTree = "<group>"; };
 		368063391446D12A00283774 /* testalloc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testalloc.cpp; sourceTree = "<group>"; };
-		36E60822144F577300CCC3E8 /* Tree.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Tree.h; sourceTree = "<group>"; };
 		36E608581458289F00CCC3E8 /* Column_tpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Column_tpl.h; sourceTree = "<group>"; };
+		36E6085E1459972100CCC3E8 /* test-tightdb */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "test-tightdb"; sourceTree = BUILT_PRODUCTS_DIR; };
+		36E6086E1459A3EB00CCC3E8 /* mem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mem.cpp; path = mac/mem.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -318,6 +336,15 @@
 			files = (
 				3647E2501420E87300D56FD7 /* libUnitTest++.a in Frameworks */,
 				3647E1171420E84200D56FD7 /* liblibtightdb_d.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		36E6085B1459972100CCC3E8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				36E608691459977000CCC3E8 /* liblibtightdb_d.a in Frameworks */,
+				36E6088B1459A63B00CCC3E8 /* libUnitTest++.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -344,7 +371,6 @@
 				3647DEEF14209C1200D56FD7 /* Array.h */,
 				3647DEF014209C1200D56FD7 /* ArrayString.cpp */,
 				3647DEF114209C1200D56FD7 /* ArrayString.h */,
-				36E60822144F577300CCC3E8 /* Tree.h */,
 				3647DEF214209C1200D56FD7 /* Column.cpp */,
 				3647DEF314209C1200D56FD7 /* Column.h */,
 				36E608581458289F00CCC3E8 /* Column_tpl.h */,
@@ -401,6 +427,7 @@
 			children = (
 				3647DFF714209CE600D56FD7 /* mem.h */,
 				3647DFF814209CE600D56FD7 /* number_names.h */,
+				36E6086D1459A34C00CCC3E8 /* mac */,
 				3647DFF914209CE600D56FD7 /* posix */,
 				3647DFFB14209CE600D56FD7 /* win32 */,
 			);
@@ -781,8 +808,17 @@
 			children = (
 				3647E0E714209E6B00D56FD7 /* liblibtightdb_d.a */,
 				3647E1031420E4D800D56FD7 /* tightdb_test */,
+				36E6085E1459972100CCC3E8 /* test-tightdb */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		36E6086D1459A34C00CCC3E8 /* mac */ = {
+			isa = PBXGroup;
+			children = (
+				36E6086E1459A3EB00CCC3E8 /* mem.cpp */,
+			);
+			name = mac;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -792,9 +828,6 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				368063351445979100283774 /* Group.h in Headers */,
-				36E60823144F577400CCC3E8 /* Tree.h in Headers */,
-				36E60859145828A000CCC3E8 /* Column_tpl.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -818,9 +851,9 @@
 			productReference = 3647E0E714209E6B00D56FD7 /* liblibtightdb_d.a */;
 			productType = "com.apple.product-type.library.static";
 		};
-		3647E1021420E4D800D56FD7 /* tightdb_test */ = {
+		3647E1021420E4D800D56FD7 /* tightdb_unit_tests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3647E10A1420E4D800D56FD7 /* Build configuration list for PBXNativeTarget "tightdb_test" */;
+			buildConfigurationList = 3647E10A1420E4D800D56FD7 /* Build configuration list for PBXNativeTarget "tightdb_unit_tests" */;
 			buildPhases = (
 				3647E0FF1420E4D800D56FD7 /* Sources */,
 				3647E1001420E4D800D56FD7 /* Frameworks */,
@@ -831,9 +864,27 @@
 			dependencies = (
 				3647E2521422197F00D56FD7 /* PBXTargetDependency */,
 			);
-			name = tightdb_test;
+			name = tightdb_unit_tests;
 			productName = tightdb_test;
 			productReference = 3647E1031420E4D800D56FD7 /* tightdb_test */;
+			productType = "com.apple.product-type.tool";
+		};
+		36E6085D1459972100CCC3E8 /* test-tightdb */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 36E608651459972200CCC3E8 /* Build configuration list for PBXNativeTarget "test-tightdb" */;
+			buildPhases = (
+				36E6085A1459972100CCC3E8 /* Sources */,
+				36E6085B1459972100CCC3E8 /* Frameworks */,
+				36E6085C1459972100CCC3E8 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				36E6086B14599C3300CCC3E8 /* PBXTargetDependency */,
+			);
+			name = "test-tightdb";
+			productName = "test-tightdb";
+			productReference = 36E6085E1459972100CCC3E8 /* test-tightdb */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -857,7 +908,8 @@
 			projectRoot = "";
 			targets = (
 				3647E0E614209E6B00D56FD7 /* libtightdb */,
-				3647E1021420E4D800D56FD7 /* tightdb_test */,
+				3647E1021420E4D800D56FD7 /* tightdb_unit_tests */,
+				36E6085D1459972100CCC3E8 /* test-tightdb */,
 			);
 		};
 /* End PBXProject section */
@@ -895,6 +947,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		36E6085A1459972100CCC3E8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				36E608681459976700CCC3E8 /* test-tightdb.cpp in Sources */,
+				36E6086F1459A3EB00CCC3E8 /* mem.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -902,6 +963,11 @@
 			isa = PBXTargetDependency;
 			target = 3647E0E614209E6B00D56FD7 /* libtightdb */;
 			targetProxy = 3647E2511422197F00D56FD7 /* PBXContainerItemProxy */;
+		};
+		36E6086B14599C3300CCC3E8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3647E0E614209E6B00D56FD7 /* libtightdb */;
+			targetProxy = 36E6086A14599C3300CCC3E8 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1037,6 +1103,73 @@
 			};
 			name = Release;
 		};
+		36E608661459972200CCC3E8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"_DEBUG=1",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/src\"",
+					"\"$(SRCROOT)/test/UnitTest++/src\"",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/test/UnitTest++\"",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REZ_SEARCH_PATHS = "$(SRCROOT)/src";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		36E608671459972200CCC3E8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/src\"",
+					"\"$(SRCROOT)/test/UnitTest++/src\"",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/test/UnitTest++\"",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REZ_SEARCH_PATHS = "$(SRCROOT)/src";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1058,7 +1191,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		3647E10A1420E4D800D56FD7 /* Build configuration list for PBXNativeTarget "tightdb_test" */ = {
+		3647E10A1420E4D800D56FD7 /* Build configuration list for PBXNativeTarget "tightdb_unit_tests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3647E10B1420E4D800D56FD7 /* Debug */,
@@ -1066,6 +1199,14 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
+		};
+		36E608651459972200CCC3E8 /* Build configuration list for PBXNativeTarget "test-tightdb" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				36E608661459972200CCC3E8 /* Debug */,
+				36E608671459972200CCC3E8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
 		};
 /* End XCConfigurationList section */
 	};
