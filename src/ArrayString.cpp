@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cstdio> // debug
 
+#include "Column.h"
 #include "ArrayString.h"
 
 ArrayString::ArrayString(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
@@ -193,10 +194,33 @@ size_t ArrayString::CalcByteLen(size_t count, size_t width) const {
 	return 8 + (count * width);
 }
 
-size_t ArrayString::Find(const char* value, size_t, size_t) const {
+size_t ArrayString::Find(const char* value, size_t start, size_t end) const {
 	assert(value);
-	const size_t len = strlen(value);
+	return FindWithLen(value, strlen(value), start, end);
+}
 
+void ArrayString::FindAll(Column& result, const char* value) {
+	assert(value);
+	FindAll(result, value, strlen(value));
+}
+
+void ArrayString::FindAll(Column& result, const char* value, size_t len) {
+	assert(value);
+	size_t first = -1;
+	do {
+		first = FindWithLen(value, len, first + 1, m_len);
+		if(first != -1)
+		result.Add(first);
+	} while (first != -1);
+
+}
+
+size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, size_t end) const {
+	assert(value);
+
+	if (end == -1) end = m_len;
+	if (start == end) return (size_t)-1;
+	assert(start < m_len && end <= m_len && start < end);
 	if (m_len == 0) return (size_t)-1; // empty list
 	if (len >= m_width) return (size_t)-1; // A string can never be wider than the column width
 
@@ -208,7 +232,7 @@ size_t ArrayString::Find(const char* value, size_t, size_t) const {
 		memcpy(&v, value, len);
 
 		const int32_t* const t = (int32_t*)m_data;
-		for (size_t i = 0; i < m_len; ++i) {
+		for (size_t i = start; i < end; ++i) {
 			if (v == t[i]) return i;
 		}
 	}
@@ -217,7 +241,7 @@ size_t ArrayString::Find(const char* value, size_t, size_t) const {
 		memcpy(&v, value, len);
 
 		const int64_t* const t = (int64_t*)m_data;
-		for (size_t i = 0; i < m_len; ++i) {
+		for (size_t i = start; i < end; ++i) {
 			if (v == t[i]) return i;
 		}
 	}
@@ -226,8 +250,8 @@ size_t ArrayString::Find(const char* value, size_t, size_t) const {
 		memcpy(&v, value, len);
 
 		const int64_t* const t = (int64_t*)m_data;
-		const size_t end = m_len * 2;
-		for (size_t i = 0; i < end; i += 2) {
+		const size_t end2 = end * 2;
+		for (size_t i = start; i < end2; i += 2) {
 			if (v[0] == t[i] && v[1] == t[i+1]) return i/2;
 		}
 	}
@@ -236,8 +260,8 @@ size_t ArrayString::Find(const char* value, size_t, size_t) const {
 		memcpy(&v, value, len);
 
 		const int64_t* const t = (int64_t*)m_data;
-		const size_t end = m_len * 4;
-		for (size_t i = 0; i < end; i += 4) {
+		const size_t end2 = end * 4;
+		for (size_t i = start; i < end2; i += 4) {
 			if (v[0] == t[i] && v[1] == t[i+1] && v[2] == t[i+2] && v[3] == t[i+3]) return i/4;
 		}
 	}
@@ -246,8 +270,8 @@ size_t ArrayString::Find(const char* value, size_t, size_t) const {
 		memcpy(&v, value, len);
 
 		const int64_t* const t = (int64_t*)m_data;
-		const size_t end = m_len * 8;
-		for (size_t i = 0; i < end; i += 8) {
+		const size_t end2 = end * 8;
+		for (size_t i = start; i < end2; i += 8) {
 			if (v[0] == t[i] && v[1] == t[i+1] && v[2] == t[i+2] && v[3] == t[i+3] &&
 			    v[4] == t[i+4] && v[5] == t[i+5] && v[6] == t[i+6] && v[7] == t[i+7]) return i/8;
 		}

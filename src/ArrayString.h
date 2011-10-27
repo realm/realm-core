@@ -20,6 +20,8 @@ public:
 	void Delete(size_t ndx);
 
 	size_t Find(const char* value, size_t start=0 , size_t end=-1) const;
+	void FindAll(Column& result, const char* value);
+	void FindAll(Column& result, const char* value, size_t len);
 
 	size_t Write(std::ostream& out) const;
 
@@ -30,6 +32,7 @@ public:
 #endif //_DEBUG
 
 private:
+	size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
 };
 

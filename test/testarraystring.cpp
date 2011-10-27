@@ -1,4 +1,5 @@
 #include "ArrayString.h"
+#include "Column.h"
 #include <UnitTest++.h>
 
 struct db_setup_string {
@@ -298,6 +299,24 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind5) {
 	const size_t r = c.Find("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
 
 	CHECK_EQUAL(7, r);
+}
+
+TEST_FIXTURE(db_setup_string, ArrayStringFindAll) {
+	c.Clear();
+	Column col;
+
+	// first, middle and end
+	c.Add("foobar");
+	c.Add("bar abc");
+	c.Add("foobar");
+	c.Add("baz");
+	c.Add("foobar");
+
+	c.FindAll(col, "foobar");
+	CHECK_EQUAL(3, col.Size());
+	CHECK_EQUAL(0, col.Get(0));
+	CHECK_EQUAL(2, col.Get(1));
+	CHECK_EQUAL(4, col.Get(2));
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDestroy) {
