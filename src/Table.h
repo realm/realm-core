@@ -4,6 +4,7 @@
 #include <cstring> // strcmp()
 #include <time.h>
 #include "Column.h"
+#include "ColumnBinary.h"
 #include "alloc.h"
 #include "ColumnType.h"
 
@@ -53,6 +54,7 @@ public:
 		InsertInt(column_id, ndx, (int)value);
 	}
 	void InsertString(size_t column_id, size_t ndx, const char* value);
+	void InsertBinary(size_t column_id, size_t ndx, const void* value, size_t len);
 	void InsertDone();
 
 
@@ -60,12 +62,18 @@ public:
 	const char* GetString(size_t column_id, size_t ndx) const;
 	void SetString(size_t column_id, size_t ndx, const char* value);
 	
+	// Binary
+	BinaryData GetBinary(size_t column_id, size_t ndx) const;
+	void SetBinary(size_t column_id, size_t ndx, const void* value, size_t len);
+
 	size_t RegisterColumn(ColumnType type, const char* name);
 
 	Column& GetColumn(size_t ndx);
 	const Column& GetColumn(size_t ndx) const;
 	AdaptiveStringColumn& GetColumnString(size_t ndx);
 	const AdaptiveStringColumn& GetColumnString(size_t ndx) const;
+	ColumnBinary& GetColumnBinary(size_t ndx);
+	const ColumnBinary& GetColumnBinary(size_t ndx) const;
 
 	// Searching
 	size_t Find(size_t column_id, int64_t value) const;

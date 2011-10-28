@@ -43,32 +43,33 @@ Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(
         const ColumnType type = (ColumnType)m_spec.Get(i);
         const size_t ref = m_columns.Get(i);
 
-        switch (type) {
+        ColumnBase* newColumn = NULL;
+		size_t colsize;
+		switch (type) {
             case COLUMN_TYPE_INT:
             case COLUMN_TYPE_BOOL:
-                {
-                    Column* newColumn = new Column(ref, &m_columns, i, m_alloc);
-                    m_cols.Add((intptr_t)newColumn);
-
-                    if (size == -1) size = newColumn->Size();
-                    else assert(size == newColumn->Size());
-                }
+			case COLUMN_TYPE_DATE:
+				newColumn = new Column(ref, &m_columns, i, m_alloc);
+				colsize = ((Column*)newColumn)->Size();
                 break;
-
             case COLUMN_TYPE_STRING:
-                {
-                    AdaptiveStringColumn* newColumn = new AdaptiveStringColumn(ref, &m_columns, i, m_alloc);
-                    m_cols.Add((intptr_t)newColumn);
-
-                    if (size == -1) size = newColumn->Size();
-                    else assert(size == newColumn->Size());
-                }
+                newColumn = new AdaptiveStringColumn(ref, &m_columns, i, m_alloc);
+				colsize = ((AdaptiveStringColumn*)newColumn)->Size();
                 break;
-
+			case COLUMN_TYPE_BINARY:
+				newColumn = new ColumnBinary(ref, &m_columns, i, m_alloc);
+				colsize = ((ColumnBinary*)newColumn)->Size();
+                break;
             default:
                 assert(false);
-                break;
         }
+
+		m_cols.Add((intptr_t)newColumn);
+
+		// Set table size
+		// (and verify that all column are same length)
+		if (size == -1) size = colsize;
+		else assert(size == colsize);
     }
 
     if (size != -1) m_size = size;
@@ -127,51 +128,33 @@ ColumnType Table::GetColumnType(size_t ndx) const {
 size_t Table::RegisterColumn(ColumnType type, const char* name) {
 	const size_t column_ndx = m_cols.Size();
 
+	ColumnBase* newColumn = NULL;
+
 	switch (type) {
 	case COLUMN_TYPE_INT:
 	case COLUMN_TYPE_BOOL:
-		{
-			Column* newColumn = new Column(COLUMN_NORMAL, m_alloc);
-			
-			m_columnNames.Add(name);
-			m_spec.Add(type);
-
-			m_columns.Add((intptr_t)newColumn->GetRef());
-			newColumn->SetParent(&m_columns, m_columns.Size()-1);
-
-			m_cols.Add((intptr_t)newColumn);
-		}
+	case COLUMN_TYPE_DATE:
+		newColumn = new Column(COLUMN_NORMAL, m_alloc);
+		m_columns.Add(((Column*)newColumn)->GetRef());
+		((Column*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
 		break;
 	case COLUMN_TYPE_STRING:
-		{
-			/*Column refs(COLUMN_NORMAL);
-			Column lengths(COLUMN_NORMAL);
-			
-			m_columnNames.Add((int)name);
-
-			const size_t pos = m_columns.Size();
-			m_columns.Add((int)refs.GetRef());
-			m_columns.Add((int)lengths.GetRef());
-			refs.SetParent(&m_columns, pos);
-			lengths.SetParent(&m_columns, pos+1);
-
-			StringColumn* newColumn = new StringColumn(refs, lengths);
-			m_cols.Add((int)newColumn);*/
-
-			AdaptiveStringColumn* newColumn = new AdaptiveStringColumn(m_alloc);
-			
-			m_columnNames.Add(name);
-			m_spec.Add(type);
-
-			m_columns.Add((intptr_t)newColumn->GetRef());
-			newColumn->SetParent(&m_columns, m_columns.Size()-1);
-
-			m_cols.Add((intptr_t)newColumn);
-		}
+		newColumn = new AdaptiveStringColumn(m_alloc);
+		m_columns.Add(((AdaptiveStringColumn*)newColumn)->GetRef());
+		((Column*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
+		break;
+	case COLUMN_TYPE_BINARY:
+		newColumn = new ColumnBinary(m_alloc);
+		m_columns.Add(((ColumnBinary*)newColumn)->GetRef());
+		((ColumnBinary*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
 		break;
 	default:
 		assert(false);
 	}
+
+	m_columnNames.Add(name);
+	m_spec.Add(type);
+	m_cols.Add((intptr_t)newColumn);
 
 	return column_ndx;
 }
@@ -231,6 +214,18 @@ const AdaptiveStringColumn& Table::GetColumnString(size_t ndx) const {
 	const ColumnBase& column = GetColumnBase(ndx);
 	assert(column.IsStringColumn());
 	return static_cast<const AdaptiveStringColumn&>(column);
+}
+
+ColumnBinary& Table::GetColumnBinary(size_t ndx) {
+	ColumnBase& column = GetColumnBase(ndx);
+	assert(column.IsBinaryColumn());
+	return static_cast<ColumnBinary&>(column);
+}
+
+const ColumnBinary& Table::GetColumnBinary(size_t ndx) const {
+	const ColumnBase& column = GetColumnBase(ndx);
+	assert(column.IsBinaryColumn());
+	return static_cast<const ColumnBinary&>(column);
 }
 
 size_t Table::AddRow() {
@@ -369,6 +364,30 @@ void Table::InsertString(size_t column_id, size_t ndx, const char* value) {
 
 	AdaptiveStringColumn& column = GetColumnString(column_id);
 	column.Insert(ndx, value);
+}
+
+BinaryData Table::GetBinary(size_t column_id, size_t ndx) const {
+	assert(column_id < m_columns.Size());
+	assert(ndx < m_size);
+
+	const ColumnBinary& column = GetColumnBinary(column_id);
+	return column.Get(ndx);
+}
+
+void Table::SetBinary(size_t column_id, size_t ndx, const void* value, size_t len) {
+	assert(column_id < m_cols.Size());
+	assert(ndx < m_size);
+
+	ColumnBinary& column = GetColumnBinary(column_id);
+	column.Set(ndx, value, len);
+}
+
+void Table::InsertBinary(size_t column_id, size_t ndx, const void* value, size_t len) {
+	assert(column_id < m_cols.Size());
+	assert(ndx <= m_size);
+
+	ColumnBinary& column = GetColumnBinary(column_id);
+	column.Insert(ndx, value, len);
 }
 
 void Table::InsertDone() {
