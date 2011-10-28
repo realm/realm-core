@@ -41,6 +41,9 @@
 		36E6089B145AE53500CCC3E8 /* ArrayBinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6089A145AE53500CCC3E8 /* ArrayBinary.cpp */; };
 		36E6089D145AE54900CCC3E8 /* ArrayBinary.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E6089C145AE54900CCC3E8 /* ArrayBinary.h */; };
 		36E6089F145AE7DD00CCC3E8 /* testearraybinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6089E145AE7DD00CCC3E8 /* testearraybinary.cpp */; };
+		36E608A1145AEE7300CCC3E8 /* ColumnBinary.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E608A0145AEE7200CCC3E8 /* ColumnBinary.h */; };
+		36E608A3145AEE9000CCC3E8 /* ColumnBinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E608A2145AEE9000CCC3E8 /* ColumnBinary.cpp */; };
+		36E608A5145B006E00CCC3E8 /* testcolumnbinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E608A4145B006E00CCC3E8 /* testcolumnbinary.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -340,6 +343,9 @@
 		36E6089A145AE53500CCC3E8 /* ArrayBinary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ArrayBinary.cpp; sourceTree = "<group>"; };
 		36E6089C145AE54900CCC3E8 /* ArrayBinary.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArrayBinary.h; sourceTree = "<group>"; };
 		36E6089E145AE7DD00CCC3E8 /* testearraybinary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testearraybinary.cpp; sourceTree = "<group>"; };
+		36E608A0145AEE7200CCC3E8 /* ColumnBinary.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ColumnBinary.h; sourceTree = "<group>"; };
+		36E608A2145AEE9000CCC3E8 /* ColumnBinary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ColumnBinary.cpp; sourceTree = "<group>"; };
+		36E608A4145B006E00CCC3E8 /* testcolumnbinary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testcolumnbinary.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -401,6 +407,8 @@
 				3647DEF314209C1200D56FD7 /* Column.h */,
 				36E608581458289F00CCC3E8 /* Column_tpl.h */,
 				3647DEF414209C1200D56FD7 /* ColumnString.cpp */,
+				36E608A0145AEE7200CCC3E8 /* ColumnBinary.h */,
+				36E608A2145AEE9000CCC3E8 /* ColumnBinary.cpp */,
 				3647DEF514209C1200D56FD7 /* ColumnType.h */,
 				3647DEF614209C1200D56FD7 /* ctightdb.cpp */,
 				3647DEF714209C1200D56FD7 /* ctightdb.h */,
@@ -444,6 +452,7 @@
 				36E608901459F11200CCC3E8 /* testarrayblob.cpp */,
 				3647E04C14209CE600D56FD7 /* testcolumn.cpp */,
 				36E60898145AB43600CCC3E8 /* testcolumnstring.cpp */,
+				36E608A4145B006E00CCC3E8 /* testcolumnbinary.cpp */,
 				368063361445AD9200283774 /* testgroup.cpp */,
 				3647E04D14209CE600D56FD7 /* testindex.cpp */,
 				3647E04E14209CE600D56FD7 /* testtable.cpp */,
@@ -861,6 +870,7 @@
 				36E6088F1459E5F100CCC3E8 /* ArrayBlob.h in Headers */,
 				36E60895145A891100CCC3E8 /* ArrayStringLong.h in Headers */,
 				36E6089D145AE54900CCC3E8 /* ArrayBinary.h in Headers */,
+				36E608A1145AEE7300CCC3E8 /* ColumnBinary.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -965,6 +975,7 @@
 				36E6088E1459E5DC00CCC3E8 /* ArrayBlob.cpp in Sources */,
 				36E60893145A88F900CCC3E8 /* ArrayStringLong.cpp in Sources */,
 				36E6089B145AE53500CCC3E8 /* ArrayBinary.cpp in Sources */,
+				36E608A3145AEE9000CCC3E8 /* ColumnBinary.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -984,6 +995,7 @@
 				36E60897145A99D800CCC3E8 /* testarraystringlong.cpp in Sources */,
 				36E60899145AB43600CCC3E8 /* testcolumnstring.cpp in Sources */,
 				36E6089F145AE7DD00CCC3E8 /* testearraybinary.cpp in Sources */,
+				36E608A5145B006E00CCC3E8 /* testcolumnbinary.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

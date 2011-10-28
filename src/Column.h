@@ -21,6 +21,7 @@ public:
 
 	virtual bool IsIntColumn() const {return false;}
 	virtual bool IsStringColumn() const {return false;}
+	virtual bool IsBinaryColumn() const {return false;}
 
 	virtual bool Add() = 0;
 	virtual void Clear() = 0;
