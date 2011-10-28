@@ -99,8 +99,8 @@ static unsigned int BitWidth(int64_t v) {
 	return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
 }
 
-static void SetRefSize(void* header_p, size_t len) {
-	uint8_t* const header = (uint8_t*)(header_p);
+void Array::SetRefSize(size_t len) {
+	uint8_t* const header = (uint8_t*)(m_data-8);
 	header[1] = ((len >> 16) & 0x000000FF);
 	header[2] = (len >> 8) & 0x000000FF;
 	header[3] = len & 0x000000FF;
@@ -193,7 +193,7 @@ void Array::Delete(size_t ndx) {
 
 	// Update length (also in header)
 	--m_len;
-	SetRefSize(m_data-8, m_len);
+	SetRefSize(m_len);
 }
 
 int64_t Array::Get(size_t ndx) const {
@@ -299,7 +299,7 @@ void Array::Resize(size_t count) {
 
 	// Update length (also in header)
 	m_len = count;
-	SetRefSize(m_data-8, m_len);
+	SetRefSize(m_len);
 }
 
 bool Array::Increment(int64_t value, size_t start, size_t end) {

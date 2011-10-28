@@ -244,7 +244,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
 		// If there is room, just update node directly
 		if (offsets.Size() < MAX_LIST_SIZE) {
 			if (nc.type == NodeChange::CT_SPLIT) return NodeInsertSplit<Column>(node_ndx, nc.ref2);
-			else return NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+			else return NodeInsert<Column>(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
 		}
 
 		// Else create new node

@@ -122,6 +122,7 @@ protected:
 	void Set_64b(size_t ndx, int64_t value);
 
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
+	void SetRefSize(size_t len);
 
 	void SetWidth(size_t width);
 	bool Alloc(size_t count, size_t width);

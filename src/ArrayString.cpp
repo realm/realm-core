@@ -188,6 +188,9 @@ void ArrayString::Delete(size_t ndx) {
 		const size_t len = (m_len - ndx) * m_width;
 		memmove(dst, src, len);
 	}
+
+	// Update length in header
+	SetRefSize(m_len);
 }
 
 size_t ArrayString::CalcByteLen(size_t count, size_t width) const {

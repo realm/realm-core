@@ -193,42 +193,6 @@ const Array ColumnBase::NodeGetRefs() const {
 	return m_array->GetSubArray(1);
 }
 
-bool ColumnBase::NodeInsert(size_t ndx, size_t ref) {
-	assert(ref);
-	assert(IsNode());
-	
-	Array offsets = NodeGetOffsets();
-	Array refs = NodeGetRefs();
-
-	assert(ndx <= offsets.Size());
-	assert(offsets.Size() < MAX_LIST_SIZE);
-
-	const Column col(ref, (Array*)NULL, 0, m_array->GetAllocator());
-	const size_t refSize = col.Size();
-	const int64_t newOffset = (ndx ? offsets.Get(ndx-1) : 0) + refSize;
-
-	if (!offsets.Insert(ndx, newOffset)) return false;
-	if (ndx+1 < offsets.Size()) {
-		if (!offsets.Increment(refSize, ndx+1)) return false;
-	}
-	return refs.Insert(ndx, ref);
-}
-
-bool ColumnBase::NodeAdd(size_t ref) {
-	assert(ref);
-	assert(IsNode());
-
-	Array offsets = NodeGetOffsets();
-	Array refs = NodeGetRefs();
-	const Column col(ref, (Array*)NULL, 0, m_array->GetAllocator());
-
-	assert(offsets.Size() < MAX_LIST_SIZE);
-
-	const int64_t newOffset = (offsets.IsEmpty() ? 0 : offsets.Back()) + col.Size();
-	if (!offsets.Add(newOffset)) return false;
-	return refs.Add(ref);
-}
-
 bool ColumnBase::NodeUpdateOffsets(size_t ndx) {
 	assert(IsNode());
 

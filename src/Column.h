@@ -68,8 +68,8 @@ protected:
 	const Array NodeGetRefs() const;
 	Array NodeGetOffsets();
 	Array NodeGetRefs();
-	bool NodeInsert(size_t ndx, size_t ref);
-	bool NodeAdd(size_t ref);
+	template<class C> bool NodeInsert(size_t ndx, size_t ref);
+	template<class C> bool NodeAdd(size_t ref);
 	bool NodeUpdateOffsets(size_t ndx);
 	template<class C> bool NodeInsertSplit(size_t ndx, size_t newRef);
 	size_t GetRefSize(size_t ref) const;
