@@ -176,10 +176,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\alloc.cpp" />
     <ClCompile Include="..\..\src\Array.cpp" />
+    <ClCompile Include="..\..\src\ArrayBlob.cpp" />
     <ClCompile Include="..\..\src\ArrayString.cpp" />
+    <ClCompile Include="..\..\src\ArrayStringLong.cpp" />
     <ClCompile Include="..\..\src\Column.cpp" />
     <ClCompile Include="..\..\src\ColumnString.cpp" />
+    <ClCompile Include="..\..\src\ctightdb.cpp" />
+    <ClCompile Include="..\..\src\Group.cpp" />
     <ClCompile Include="..\..\src\Index.cpp" />
     <ClCompile Include="..\Support\win32\mem.cpp" />
     <ClCompile Include="..\..\src\Table.cpp" />
@@ -188,7 +193,18 @@
     <ClCompile Include="..\UnitTest++\src\Win32\TimeHelpers.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\alloc.h" />
+    <ClInclude Include="..\..\src\AllocSlab.h" />
+    <ClInclude Include="..\..\src\Array.h" />
+    <ClInclude Include="..\..\src\ArrayBlob.h" />
+    <ClInclude Include="..\..\src\ArrayString.h" />
+    <ClInclude Include="..\..\src\ArrayStringLong.h" />
     <ClInclude Include="..\..\src\Column.h" />
+    <ClInclude Include="..\..\src\ColumnType.h" />
+    <ClInclude Include="..\..\src\Column_tpl.h" />
+    <ClInclude Include="..\..\src\ctightdb.h" />
+    <ClInclude Include="..\..\src\Group.h" />
+    <ClInclude Include="..\..\src\Index.h" />
     <ClInclude Include="..\Support\mem.h" />
     <ClInclude Include="..\Support\number_names.h" />
     <ClInclude Include="..\..\src\win32\stdint.h" />
