@@ -38,6 +38,9 @@
 		36E60895145A891100CCC3E8 /* ArrayStringLong.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E60894145A891100CCC3E8 /* ArrayStringLong.h */; };
 		36E60897145A99D800CCC3E8 /* testarraystringlong.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E60896145A99D800CCC3E8 /* testarraystringlong.cpp */; };
 		36E60899145AB43600CCC3E8 /* testcolumnstring.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E60898145AB43600CCC3E8 /* testcolumnstring.cpp */; };
+		36E6089B145AE53500CCC3E8 /* ArrayBinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6089A145AE53500CCC3E8 /* ArrayBinary.cpp */; };
+		36E6089D145AE54900CCC3E8 /* ArrayBinary.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E6089C145AE54900CCC3E8 /* ArrayBinary.h */; };
+		36E6089F145AE7DD00CCC3E8 /* testearraybinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6089E145AE7DD00CCC3E8 /* testearraybinary.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -334,6 +337,9 @@
 		36E60894145A891100CCC3E8 /* ArrayStringLong.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArrayStringLong.h; sourceTree = "<group>"; };
 		36E60896145A99D800CCC3E8 /* testarraystringlong.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testarraystringlong.cpp; sourceTree = "<group>"; };
 		36E60898145AB43600CCC3E8 /* testcolumnstring.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testcolumnstring.cpp; sourceTree = "<group>"; };
+		36E6089A145AE53500CCC3E8 /* ArrayBinary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ArrayBinary.cpp; sourceTree = "<group>"; };
+		36E6089C145AE54900CCC3E8 /* ArrayBinary.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArrayBinary.h; sourceTree = "<group>"; };
+		36E6089E145AE7DD00CCC3E8 /* testearraybinary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testearraybinary.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -387,6 +393,8 @@
 				3647DEF114209C1200D56FD7 /* ArrayString.h */,
 				36E60892145A88F800CCC3E8 /* ArrayStringLong.cpp */,
 				36E60894145A891100CCC3E8 /* ArrayStringLong.h */,
+				36E6089A145AE53500CCC3E8 /* ArrayBinary.cpp */,
+				36E6089C145AE54900CCC3E8 /* ArrayBinary.h */,
 				36E6088D1459E5DC00CCC3E8 /* ArrayBlob.cpp */,
 				36E6088C1459E5C000CCC3E8 /* ArrayBlob.h */,
 				3647DEF214209C1200D56FD7 /* Column.cpp */,
@@ -432,6 +440,7 @@
 				3647E04A14209CE600D56FD7 /* testarray.cpp */,
 				3647E04B14209CE600D56FD7 /* testarraystring.cpp */,
 				36E60896145A99D800CCC3E8 /* testarraystringlong.cpp */,
+				36E6089E145AE7DD00CCC3E8 /* testearraybinary.cpp */,
 				36E608901459F11200CCC3E8 /* testarrayblob.cpp */,
 				3647E04C14209CE600D56FD7 /* testcolumn.cpp */,
 				36E60898145AB43600CCC3E8 /* testcolumnstring.cpp */,
@@ -851,6 +860,7 @@
 			files = (
 				36E6088F1459E5F100CCC3E8 /* ArrayBlob.h in Headers */,
 				36E60895145A891100CCC3E8 /* ArrayStringLong.h in Headers */,
+				36E6089D145AE54900CCC3E8 /* ArrayBinary.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -954,6 +964,7 @@
 				368063321445977300283774 /* Group.cpp in Sources */,
 				36E6088E1459E5DC00CCC3E8 /* ArrayBlob.cpp in Sources */,
 				36E60893145A88F900CCC3E8 /* ArrayStringLong.cpp in Sources */,
+				36E6089B145AE53500CCC3E8 /* ArrayBinary.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -972,6 +983,7 @@
 				36E608911459F11200CCC3E8 /* testarrayblob.cpp in Sources */,
 				36E60897145A99D800CCC3E8 /* testarraystringlong.cpp in Sources */,
 				36E60899145AB43600CCC3E8 /* testcolumnstring.cpp in Sources */,
+				36E6089F145AE7DD00CCC3E8 /* testearraybinary.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

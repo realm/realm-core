@@ -169,6 +169,10 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete) {
 	c.Delete(0); // single
 	CHECK_EQUAL("ghij", c.Get(0));
 	CHECK_EQUAL(1, c.Size());
+
+	c.Delete(0); // all
+	CHECK_EQUAL(0, c.Size());
+	CHECK(c.IsEmpty());
 }
 
 TEST_FIXTURE(db_setup_string_long, ArrayStringLong_Destroy) {
