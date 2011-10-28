@@ -179,6 +179,8 @@ TEST(Table6) {
 #endif //_DEBUG
 }
 
+/*
+
 TEST(Table_FindAll_Int) {
 	TestTable table;
 
@@ -294,6 +296,8 @@ TEST(Table_Index_Int) {
 	table.Verify();
 #endif //_DEBUG
 }
+
+*/
 
 #include "AllocSlab.h"
 TEST(Table_SlabAlloc) {
