@@ -5,94 +5,112 @@
 #include "../Support/mem.h"
 #include "../Support/number_names.h"
 
-#define OLD_TEST
+//#define OLD_TEST
 
 #ifndef OLD_TEST
 
-uint64_t rand2() {
-	return (uint64_t)rand()*(uint64_t)rand()*(uint64_t)rand()*(uint64_t)rand()*rand();
+// Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
+uint64_t rand2() { 
+	static int64_t seed = 2862933555777941757ULL; 
+	static int64_t seed2 = 0;
+	seed = (2862933555777941757ULL * seed + 3037000493ULL); 
+	seed2++;
+	return seed * seed2 + seed2; 
 }
 
 TDB_TABLE_1(IntegerTable,
 			Int,        first)
 
+TDB_TABLE_1(StringTable,
+			String,        first)
+
 void main(void) {
 	IntegerTable integers;
 	UnitTest::Timer timer;
-	volatile uint64_t write;
+	volatile uint64_t force;
+	int overhead; // Time of computing 1 rand and 1 modulo and doing a loop (is ~0ms with new rand)
 
 	uint64_t dummy = 0;
-	int ITEMS = 10000;
+	int ITEMS = 50000;
+	int RANGE = 5000;
 
-	integers.Clear();
-	integers.SetIndex(0);
+	for(int index = 0; index < 2; index++)
+	{
+		string indexed;
+		integers.Clear();
+		if(index == 1)
+		{
+			integers.SetIndex(0);
+			indexed = "Indexed ";
+		}
 
-	timer.Start();
-	for (size_t i = 0; i < ITEMS; ++i) {
-		dummy += rand2() + rand2() % (i + 1);
-	}
-	write = dummy;
-	printf("Rand: %d ms\n", timer.GetTimeInMs());
+		timer.Start();
+		for (size_t i = 0; i < ITEMS; ++i) {
+			dummy += rand2() % (i + 1);
+		}
+		force = dummy;
+		overhead = timer.GetTimeInMs();
+	//	printf((indexed + "Rand: %dms\n").c_str(), overhead);
 		
-	timer.Start();
-	for (size_t i = 0; i < ITEMS; ++i) {
-		size_t p = rand2() % (i + 1);
-		integers.Add((int64_t)rand2()); 
+		timer.Start();
+		for (size_t i = 0; i < ITEMS; ++i) {
+			size_t p = rand2() % (i + 1);
+			integers.Add((int64_t)rand2() % RANGE); 
+		}
+		printf((indexed + "Add: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
+
+
+		//integers.Clear();
+		timer.Start();
+		for (size_t i = 0; i < ITEMS; ++i) {
+			size_t p = rand2() % (i + 1);
+		//	integers.InsertInt(0, p, (int64_t)rand2() % RANGE); 
+		}
+		printf((indexed + "Insert: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
+
+		timer.Start();
+		for (size_t i = 0; i < ITEMS; ++i) {
+			size_t p = rand2() % ITEMS;
+			dummy += integers.Get64(0, p);
+		}
+		force = dummy;
+		printf((indexed + "Get: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
+
+
+		timer.Start();
+		for (size_t i = 0; i < ITEMS; ++i) {
+			size_t p = rand2() % ITEMS;
+			integers.Set64(0, p, rand2() % RANGE);
+		}
+		force = dummy;
+		printf((indexed + "Set: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
+
+
+		timer.Start();
+		for (size_t i = 0; i < ITEMS; ++i) {
+			integers.first.Find(rand2() % RANGE);
+		}
+		force = dummy;
+		printf((indexed + "Find: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
+
+
+		timer.Start();
+		for (size_t i = 0; i < ITEMS; ++i) {
+			integers.first.FindAll(rand2() % RANGE);
+		}
+		force = dummy;
+		printf((indexed + "FindAll: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
+
+
+		timer.Start();
+		for (size_t i = 0; i < ITEMS; ++i) {
+			size_t p = rand2() % (ITEMS - i);
+			integers.DeleteRow(p);
+		}
+		printf((indexed + "Delete: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
+
+		printf("\n");
 	}
-	printf("Add: %d ms\n", timer.GetTimeInMs());
-
-
-	integers.Clear();
-	timer.Start();
-	for (size_t i = 0; i < ITEMS; ++i) {
-		size_t p = rand2() % (i + 1);
-		integers.InsertInt(0, p, (int64_t)rand2()); 
-	}
-	printf("Insert: %d ms\n", timer.GetTimeInMs());
-
-
-	timer.Start();
-	for (size_t i = 0; i < ITEMS; ++i) {
-		size_t p = rand2() % ITEMS;
-		dummy += p;
-	}
-	write = dummy;
-	printf("Rand: %d ms\n", timer.GetTimeInMs());
-
-
-	timer.Start();
-	for (size_t i = 0; i < ITEMS; ++i) {
-		size_t p = rand2() % ITEMS;
-		dummy += integers.Get64(0, p);
-	}
-	write = dummy;
-	printf("Get: %d ms\n", timer.GetTimeInMs());
-
-
-	timer.Start();
-	for (size_t i = 0; i < ITEMS; ++i) {
-		size_t p = rand2() % ITEMS;
-		integers.Set64(0, p, rand2());
-	}
-	write = dummy;
-	printf("Set: %d ms\n", timer.GetTimeInMs());
-
-
-	timer.Start();
-	for (size_t i = 0; i < ITEMS; ++i) {
-		integers.first.Find(rand2());
-	}
-	write = dummy;
-	printf("Find: %d ms\n", timer.GetTimeInMs());
-
-
-	timer.Start();
-	for (size_t i = 0; i < ITEMS; ++i) {
-		size_t p = rand2() % (ITEMS - i);
-		integers.DeleteRow(p);
-	}
-	printf("Delete: %d ms\n", timer.GetTimeInMs());
-
 	getchar();
 	exit(-1);
 
