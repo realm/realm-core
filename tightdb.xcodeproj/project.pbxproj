@@ -37,6 +37,7 @@
 		36E60893145A88F900CCC3E8 /* ArrayStringLong.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E60892145A88F800CCC3E8 /* ArrayStringLong.cpp */; };
 		36E60895145A891100CCC3E8 /* ArrayStringLong.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E60894145A891100CCC3E8 /* ArrayStringLong.h */; };
 		36E60897145A99D800CCC3E8 /* testarraystringlong.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E60896145A99D800CCC3E8 /* testarraystringlong.cpp */; };
+		36E60899145AB43600CCC3E8 /* testcolumnstring.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E60898145AB43600CCC3E8 /* testcolumnstring.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -332,6 +333,7 @@
 		36E60892145A88F800CCC3E8 /* ArrayStringLong.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ArrayStringLong.cpp; sourceTree = "<group>"; };
 		36E60894145A891100CCC3E8 /* ArrayStringLong.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArrayStringLong.h; sourceTree = "<group>"; };
 		36E60896145A99D800CCC3E8 /* testarraystringlong.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testarraystringlong.cpp; sourceTree = "<group>"; };
+		36E60898145AB43600CCC3E8 /* testcolumnstring.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testcolumnstring.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -432,6 +434,7 @@
 				36E60896145A99D800CCC3E8 /* testarraystringlong.cpp */,
 				36E608901459F11200CCC3E8 /* testarrayblob.cpp */,
 				3647E04C14209CE600D56FD7 /* testcolumn.cpp */,
+				36E60898145AB43600CCC3E8 /* testcolumnstring.cpp */,
 				368063361445AD9200283774 /* testgroup.cpp */,
 				3647E04D14209CE600D56FD7 /* testindex.cpp */,
 				3647E04E14209CE600D56FD7 /* testtable.cpp */,
@@ -968,6 +971,7 @@
 				3680633A1446D12B00283774 /* testalloc.cpp in Sources */,
 				36E608911459F11200CCC3E8 /* testarrayblob.cpp in Sources */,
 				36E60897145A99D800CCC3E8 /* testarraystringlong.cpp in Sources */,
+				36E60899145AB43600CCC3E8 /* testcolumnstring.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

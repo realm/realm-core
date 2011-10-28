@@ -226,12 +226,15 @@ public:
 protected:
 	friend class ColumnBase;
 	void UpdateRef(size_t ref);
-	const char* LeafGet(size_t ndx) const {return ((ArrayString*)m_array)->Get(ndx);}
-	bool LeafSet(size_t ndx, const char* value) {return ((ArrayString*)m_array)->Set(ndx, value);}
-	bool LeafInsert(size_t ndx, const char* value) {return ((ArrayString*)m_array)->Insert(ndx, value);}
+
+	const char* LeafGet(size_t ndx) const;
+	bool LeafSet(size_t ndx, const char* value);
+	bool LeafInsert(size_t ndx, const char* value);
 	size_t LeafFind(const char* value, size_t start, size_t end) const {return ((ArrayString*)m_array)->Find(value, start, end);}
-	void LeafDelete(size_t ndx) {((ArrayString*)m_array)->Delete(ndx);}
+	void LeafDelete(size_t ndx);
 	size_t LeafWrite(std::ostream& out) const {return ((ArrayString*)m_array)->Write(out);}
+
+	bool IsLongStrings() const {return m_array->HasRefs();} // HasRefs indicates long string array
 };
 
 // Templates
