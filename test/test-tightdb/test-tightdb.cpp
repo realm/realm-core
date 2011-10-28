@@ -5,7 +5,7 @@
 #include "../Support/mem.h"
 #include "../Support/number_names.h"
 
-//#define OLD_TEST
+#define OLD_TEST
 
 #ifndef OLD_TEST
 
