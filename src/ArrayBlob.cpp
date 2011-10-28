@@ -18,15 +18,15 @@ const uint8_t* ArrayBlob::Get(size_t pos) const {
 	return m_data + pos;
 }
 
-void ArrayBlob::Add(const uint8_t* data, size_t len) {
+void ArrayBlob::Add(void* data, size_t len) {
 	Replace(m_len, m_len, data, len);
 }
 
-void ArrayBlob::Insert(size_t pos, const uint8_t* data, size_t len) {
+void ArrayBlob::Insert(size_t pos, void* data, size_t len) {
 	Replace(pos, pos, data, len);
 }
 
-void ArrayBlob::Replace(size_t start, size_t end, const uint8_t* data, size_t len) {
+void ArrayBlob::Replace(size_t start, size_t end, void* data, size_t len) {
 	assert(start <= end);
 	assert(end <= m_len);
 	assert(len == 0 || data);
@@ -56,6 +56,10 @@ void ArrayBlob::Delete(size_t start, size_t end) {
 	Replace(start, end, NULL, 0);
 }
 
+void ArrayBlob::Clear() {
+	Replace(0, m_len, NULL, 0);
+}
+
 size_t ArrayBlob::CalcByteLen(size_t count, size_t) const {
-	return count;
+	return 8 + count; // include room for header
 }

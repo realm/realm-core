@@ -59,6 +59,7 @@ public:
 
 	bool Increment(int64_t value, size_t start=0, size_t end=-1);
 	bool IncrementIf(int64_t limit, int64_t value);
+	void Adjust(size_t start, int64_t diff);
 
 	size_t FindPos(int64_t value) const;
 	size_t FindPos2(int64_t value) const;

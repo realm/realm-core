@@ -323,6 +323,15 @@ bool Array::IncrementIf(int64_t limit, int64_t value) {
 	return true;
 }
 
+void Array::Adjust(size_t start, int64_t diff) {
+	assert(start <= m_len);
+
+	for (size_t i = start; i < m_len; ++i) {
+		const int64_t v = Get(i);
+		Set(i, v + diff);
+	}
+}
+
 size_t Array::FindPos(int64_t target) const {
 	int low = -1;
 	int high = (int)m_len;

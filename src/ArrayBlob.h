@@ -12,12 +12,13 @@ public:
 
 	const uint8_t* Get(size_t pos) const;
 
-	void Add(const uint8_t* data, size_t len);
-	void Insert(size_t pos, const uint8_t* data, size_t len);
-	void Replace(size_t start, size_t end, const uint8_t* data, size_t len);
+	void Add(void* data, size_t len);
+	void Insert(size_t pos, void* data, size_t len);
+	void Replace(size_t start, size_t end, void* data, size_t len);
 	void Delete(size_t start, size_t end);
+	void Clear();
 
-protected:
+private:
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
 };
 

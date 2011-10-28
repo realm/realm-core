@@ -49,8 +49,8 @@ void Column::Create() {
 	if (IsNode()) {
 		const Array offsets(COLUMN_NORMAL, NULL, 0, m_array->GetAllocator());
 		const Array refs(COLUMN_HASREFS, NULL, 0, m_array->GetAllocator());
-		m_array->Add((intptr_t)offsets.GetRef());
-		m_array->Add((intptr_t)refs.GetRef());
+		m_array->Add(offsets.GetRef());
+		m_array->Add(refs.GetRef());
 	}
 }
 
