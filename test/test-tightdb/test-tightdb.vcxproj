@@ -178,10 +178,12 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\alloc.cpp" />
     <ClCompile Include="..\..\src\Array.cpp" />
+    <ClCompile Include="..\..\src\ArrayBinary.cpp" />
     <ClCompile Include="..\..\src\ArrayBlob.cpp" />
     <ClCompile Include="..\..\src\ArrayString.cpp" />
     <ClCompile Include="..\..\src\ArrayStringLong.cpp" />
     <ClCompile Include="..\..\src\Column.cpp" />
+    <ClCompile Include="..\..\src\ColumnBinary.cpp" />
     <ClCompile Include="..\..\src\ColumnString.cpp" />
     <ClCompile Include="..\..\src\ctightdb.cpp" />
     <ClCompile Include="..\..\src\Group.cpp" />
@@ -196,10 +198,12 @@
     <ClInclude Include="..\..\src\alloc.h" />
     <ClInclude Include="..\..\src\AllocSlab.h" />
     <ClInclude Include="..\..\src\Array.h" />
+    <ClInclude Include="..\..\src\ArrayBinary.h" />
     <ClInclude Include="..\..\src\ArrayBlob.h" />
     <ClInclude Include="..\..\src\ArrayString.h" />
     <ClInclude Include="..\..\src\ArrayStringLong.h" />
     <ClInclude Include="..\..\src\Column.h" />
+    <ClInclude Include="..\..\src\ColumnBinary.h" />
     <ClInclude Include="..\..\src\ColumnType.h" />
     <ClInclude Include="..\..\src\Column_tpl.h" />
     <ClInclude Include="..\..\src\ctightdb.h" />

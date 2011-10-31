@@ -1,6 +1,7 @@
 #include "ArrayBinary.h"
 #include "ArrayBlob.h"
 #include <assert.h>
+#include "win32/types.h"
 
 ArrayBinary::ArrayBinary(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_HASREFS, parent, pndx, alloc), m_offsets(COLUMN_NORMAL, NULL, 0, m_alloc), m_blob(NULL, 0, m_alloc) {
 	// Add subarrays for long string
