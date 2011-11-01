@@ -1,6 +1,6 @@
-#include "mem.h"
+#include "../mem.h"
 #include <windows.h>
-#include "psapi.h"
+#include <psapi.h>
 
 // Pre-declarations
 DWORD CalculateWSPrivate(DWORD processID);

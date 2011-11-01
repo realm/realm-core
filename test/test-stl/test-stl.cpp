@@ -6,6 +6,11 @@
 #include <UnitTest++.h>
 #include "../Support/mem.h"
 #include "../Support/number_names.h"
+
+#ifdef _MSC_VER
+#include "../../src/win32/stdint.h"
+#endif
+
 using namespace std;
 
 enum Days {
@@ -50,6 +55,18 @@ public:
 private:
 	const Days m_target;
 };
+
+// Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
+uint64_t rand2() { 
+	return (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand();
+
+
+	static int64_t seed = 2862933555777941757ULL; 
+	static int64_t seed2 = 0;
+	seed = (2862933555777941757ULL * seed + 3037000493ULL); 
+	seed2++;
+	return seed * seed2 + seed2; 
+}
 
 int main() {
 	vector<TestTable> table;
@@ -144,7 +161,7 @@ int main() {
 	{
 		timer.Start();
 
-		for (size_t i = 0; i < 100000; ++i) {
+		for (size_t i = 0; i < 1000; ++i) {
 			const size_t n = rand() % 1000;
 			multimap<int, TestTable>::const_iterator p = mapTable.find(n);
 			if (p->second.fourth == Fri) { // to avoid above find being optimized away
@@ -156,6 +173,6 @@ int main() {
 		printf("Search index: %dms\n", search_time);
 	}
 
-	//getchar(); // wait for key
+	getchar(); // wait for key
 	//return 1;
 }

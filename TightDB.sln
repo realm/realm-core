@@ -13,7 +13,19 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-sqlite3", "test\test-s
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-stl", "test\test-stl\test-stl.vcxproj", "{C485A179-016D-4A21-AA14-1970BA070154}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{088C4E60-A1F6-452B-8950-6A7A7B8CC418}"
+	ProjectSection(SolutionItems) = preProject
+		Local.testsettings = Local.testsettings
+		TightDB.vsmdi = TightDB.vsmdi
+		TraceAndTestImpact.testsettings = TraceAndTestImpact.testsettings
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark", "test\benchmark\benchmark.vcxproj", "{54618B78-8356-44A7-8860-18A455509A86}"
+EndProject
 Global
+	GlobalSection(TestCaseManagementSettings) = postSolution
+		CategoryFile = TightDB.vsmdi
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
 		Debug|x64 = Debug|x64
@@ -61,6 +73,13 @@ Global
 		{C485A179-016D-4A21-AA14-1970BA070154}.Release|Win32.Build.0 = Release|Win32
 		{C485A179-016D-4A21-AA14-1970BA070154}.Release|x64.ActiveCfg = Release|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Release|x64.Build.0 = Release|x64
+		{54618B78-8356-44A7-8860-18A455509A86}.Debug|Win32.ActiveCfg = Debug|Win32
+		{54618B78-8356-44A7-8860-18A455509A86}.Debug|Win32.Build.0 = Debug|Win32
+		{54618B78-8356-44A7-8860-18A455509A86}.Debug|x64.ActiveCfg = Debug|Win32
+		{54618B78-8356-44A7-8860-18A455509A86}.Release|Win32.ActiveCfg = Release|Win32
+		{54618B78-8356-44A7-8860-18A455509A86}.Release|Win32.Build.0 = Release|Win32
+		{54618B78-8356-44A7-8860-18A455509A86}.Release|x64.ActiveCfg = Release|x64
+		{54618B78-8356-44A7-8860-18A455509A86}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -69,5 +88,6 @@ Global
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
 		{9C49632F-A4C9-471E-B643-42472DBF13B9} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
 		{C485A179-016D-4A21-AA14-1970BA070154} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
+		{54618B78-8356-44A7-8860-18A455509A86} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
 	EndGlobalSection
 EndGlobal

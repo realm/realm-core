@@ -9,3 +9,5 @@ cscope.*
 tags
 tightdb-tests
 TestUnitTest++
+
+/test/benchmark/x64
