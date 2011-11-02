@@ -647,7 +647,7 @@ bool vector_eq_array(const std::vector<int64_t>& v, const Array& a) {
 }
 
 TEST(monkeytest1) {
-	const uint64_t DURATION = UNITTEST_DURATION*100;
+	const uint64_t DURATION = UNITTEST_DURATION*1000;
 	const uint64_t SEED = 123;
 
 	Array a;

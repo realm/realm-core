@@ -188,6 +188,7 @@
     <ClCompile Include="src\ctightdb.cpp" />
     <ClCompile Include="src\Group.cpp" />
     <ClCompile Include="src\Index.cpp" />
+    <ClCompile Include="src\utilities.cpp" />
     <ClCompile Include="test\main.cpp" />
     <ClCompile Include="src\Table.cpp" />
     <ClCompile Include="src\TableView.cpp" />
@@ -217,6 +218,7 @@
     <ClInclude Include="src\Index.h" />
     <ClInclude Include="src\Table.h" />
     <ClInclude Include="src\tightdb.h" />
+    <ClInclude Include="src\utilities.h" />
     <ClInclude Include="test\testsettings.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
