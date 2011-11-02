@@ -37,8 +37,6 @@ Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_paren
 	Create(ref);
 }
 
-enum HEADER_FIELD {NODE, REFS, WIDTH, LEN, CAPACITY};
-
 // todo: header = 0 argument can maybe be avoided by rearranging caller's initialization of m_data?
 void Array::set_header(enum HEADER_FIELD f, uint64_t value, void *header = 0)
 {

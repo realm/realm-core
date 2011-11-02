@@ -26,6 +26,8 @@ enum ColumnDef {
 	COLUMN_HASREFS
 };
 
+enum HEADER_FIELD {NODE, REFS, WIDTH, LEN, CAPACITY};
+
 class Array {
 public:
 	Array(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
