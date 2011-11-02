@@ -37,16 +37,65 @@ Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_paren
 	Create(ref);
 }
 
+enum HEADER_FIELD {NODE, REFS, WIDTH, LEN, CAPACITY};
+
+// todo: header = 0 argument can maybe be avoided by rearranging caller's initialization of m_data?
+void Array::set_header(enum HEADER_FIELD f, uint64_t value, void *header = 0)
+{
+	uint8_t *header2 = ((header == 0) ? (m_data - 8) : ((uint8_t *)header));
+
+	if(f == NODE)
+		header2[0] = header2[0] & (~0x80) | ((uint8_t)value << 7);
+	else if(f == REFS)
+		header2[0] = header2[0] & (~0x40) | ((uint8_t)value << 6);
+	else if(f == WIDTH)
+		header2[0] = header2[0] & (~0x7) | (uint8_t)value;
+	else if(f == CAPACITY) {
+		header2[4] = (value >> 16) & 0x000000FF;
+		header2[5] = (value >> 8) & 0x000000FF;
+		header2[6] = value & 0x000000FF;		
+	}
+	else if(f == LEN) {
+		header2[1] = ((value >> 16) & 0x000000FF);
+		header2[2] = (value >> 8) & 0x000000FF;
+		header2[3] = value & 0x000000FF;
+	}		
+}
+
+// todo: header = 0 argument can maybe be avoided by rearranging caller's initialization of m_data?
+uint64_t Array::get_header(enum HEADER_FIELD f, void *header = 0)
+{
+	uint8_t *header2 = ((header == 0) ? (m_data - 8) : ((uint8_t *)header));
+
+	if(f == NODE)
+		return (header2[0] & 0x80) != 0;
+	else if(f == REFS)
+		return (header2[0] & 0x40) != 0;
+	else if(f == WIDTH)
+		return header2[0] & 0x07;
+	else if(f == LEN)
+		return (header2[1] << 16) + (header2[2] << 8) + header2[3];
+	else if(f == CAPACITY)
+		return (header2[4] << 16) + (header2[5] << 8) + header2[6];
+}
+
 void Array::Create(size_t ref) {
 	assert(ref);
 	uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
 
+/*
 	// Parse the 8byte header
 	m_isNode   = (header[0] & 0x80) != 0;
 	m_hasRefs  = (header[0] & 0x40) != 0;
 	m_width    = (1 << (header[0] & 0x07)) >> 1; // 0, 1, 2, 4, 8, 16, 32, 64
 	m_len      = (header[1] << 16) + (header[2] << 8) + header[3];
 	m_capacity = (header[4] << 16) + (header[5] << 8) + header[6];
+*/
+	m_isNode = get_header(NODE, header);
+	m_hasRefs = get_header(REFS, header);
+	m_width = (1 << get_header(WIDTH, header)) >> 1;
+	m_len = get_header(LEN, header);
+	m_capacity = get_header(CAPACITY, header);
 
 	m_ref = ref;
 	m_data = header + 8;
@@ -62,11 +111,15 @@ void Array::SetType(ColumnDef type) {
 	else m_isNode = m_hasRefs = false;
 
 	// Update Header
-	uint8_t* const header = (uint8_t*)(m_data-8);
-	const uint8_t w = header[0] & 0x7; // preserve width
-	header[0] = m_isNode << 7;
-	header[0] += m_hasRefs << 6;
-	header[0] += w;
+
+//	uint8_t* const header = (uint8_t*)(m_data-8);
+//	const uint8_t w = header[0] & 0x7; // preserve width
+//	header[0] = m_isNode << 7;
+//	header[0] += m_hasRefs << 6;
+//	header[0] += w;
+	set_header(REFS, m_hasRefs);
+	set_header(NODE, m_isNode);
+
 }
 
 bool Array::operator==(const Array& a) const {
@@ -100,10 +153,11 @@ static unsigned int BitWidth(int64_t v) {
 }
 
 void Array::SetRefSize(size_t len) {
-	uint8_t* const header = (uint8_t*)(m_data-8);
-	header[1] = ((len >> 16) & 0x000000FF);
-	header[2] = (len >> 8) & 0x000000FF;
-	header[3] = len & 0x000000FF;
+//	uint8_t* const header = (uint8_t*)(m_data-8);
+//	header[1] = ((len >> 16) & 0x000000FF);
+//	header[2] = (len >> 8) & 0x000000FF;
+//	header[3] = len & 0x000000FF;
+	set_header(LEN, len);
 }
 
 void Array::SetParent(Array* parent, size_t pndx) {
@@ -160,13 +214,16 @@ void Array::Clear() {
 	SetWidth(0);
 
 	// Update 8-byte header
-	uint8_t* const header = (uint8_t*)(m_data-8);
-	header[0] = m_isNode << 7;
-	header[0] += m_hasRefs << 6;
+//	uint8_t* const header = (uint8_t*)(m_data-8);
+	set_header(NODE, m_isNode);
+	set_header(NODE, m_hasRefs);
+//	header[0] = m_isNode << 7;
+//	header[0] += m_hasRefs << 6;
 	//header[0] += 0; // width
-	header[1] = 0;
-	header[2] = 0;
-	header[3] = 0;
+//	header[1] = 0;
+//	header[2] = 0;
+//	header[3] = 0;
+	set_header(LEN, 0);
 }
 
 void Array::Delete(size_t ndx) {
@@ -865,15 +922,17 @@ bool Array::CopyOnWrite() {
 	memcpy(mref.pointer, m_data-8, len);
 
 	// Update capacity in header
-	uint8_t* const header = (uint8_t*)(mref.pointer);
-	header[4] = (new_len >> 16) & 0x000000FF;
-	header[5] = (new_len >> 8) & 0x000000FF;
-	header[6] = new_len & 0x000000FF;
-
+//	uint8_t* const header = (uint8_t*)(mref.pointer);
+//	header[4] = (new_len >> 16) & 0x000000FF;
+//	header[5] = (new_len >> 8) & 0x000000FF;
+//	header[6] = new_len & 0x000000FF;
+	
 	// Update internal data
 	m_ref = mref.ref;
 	m_data = (unsigned char*)mref.pointer + 8;
 	m_capacity = new_len;
+
+	set_header(LEN, new_len); // uses m_data to find header, so m_data must be initialized correctly first
 
 	// Update ref in parent
 	if (m_parent) m_parent->Set(m_parentNdx, mref.ref);
@@ -918,6 +977,7 @@ bool Array::Alloc(size_t count, size_t width) {
 	// Update 8-byte header
 	// isNode 1 bit, hasRefs 1 bit, 3 bits unused, width 3 bits, len 3 bytes,
 	// capacity 3 bytes
+/*
 	uint8_t* const header = (uint8_t*)(m_data-8);
 	header[0] = m_isNode << 7;
 	header[0] += m_hasRefs << 6;
@@ -928,6 +988,13 @@ bool Array::Alloc(size_t count, size_t width) {
 	header[4] = (m_capacity >> 16) & 0x000000FF;
 	header[5] = (m_capacity >> 8) & 0x000000FF;
 	header[6] = m_capacity & 0x000000FF;
+*/
+	set_header(NODE, m_isNode);
+	set_header(REFS, m_hasRefs);
+	set_header(WIDTH, w);
+	set_header(LEN, count);
+	set_header(CAPACITY, m_capacity);
+
 
 	return true;
 }

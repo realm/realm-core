@@ -141,6 +141,10 @@ protected:
 	bool m_isNode;
 	bool m_hasRefs;
 	Allocator& m_alloc;
+	
+	void set_header(enum HEADER_FIELD f, uint64_t value, void *header);
+	uint64_t get_header(enum HEADER_FIELD f, void *header);
+
 };
 
 #endif //__TDB_ARRAY__
