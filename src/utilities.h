@@ -1,6 +1,8 @@
 #ifndef UTILITIES_HEADER
 #define UTILITIES_HEADER
 
+#include <cstdlib>
+
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
 	#define WINDOWS
 #endif

@@ -1,6 +1,8 @@
 #ifndef __TDB_COLUMNTYPE__
 #define __TDB_COLUMNTYPE__
 
+#include <cstdlib>
+
 enum ColumnType {
 	COLUMN_TYPE_INT,
 	COLUMN_TYPE_BOOL,

@@ -3,6 +3,11 @@
 
 #include <assert.h>
 
+#include "Array.h"
+#include "Column.h"
+
+#include <cstdlib>
+
 // Has to be define to allow overload from build settings
 #ifndef MAX_LIST_SIZE
 #define MAX_LIST_SIZE 1000
