@@ -91,8 +91,8 @@ void Array::Create(size_t ref) {
 	m_len      = (header[1] << 16) + (header[2] << 8) + header[3];
 	m_capacity = (header[4] << 16) + (header[5] << 8) + header[6];
 */
-	m_isNode = get_header(NODE, header);
-	m_hasRefs = get_header(REFS, header);
+	m_isNode = get_header(NODE, header) != 0; // != 0 to satisfy VC (recommended method from msdn)
+	m_hasRefs = get_header(REFS, header) != 0; 
 	m_width = (1 << get_header(WIDTH, header)) >> 1;
 	m_len = get_header(LEN, header);
 	m_capacity = get_header(CAPACITY, header);

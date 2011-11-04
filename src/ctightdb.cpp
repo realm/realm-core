@@ -109,7 +109,7 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap) {
 		case COLUMN_TYPE_BOOL:
 			{
 				const int v = va_arg(ap, int);
-				t->InsertBool(i, ndx, v);
+				t->InsertBool(i, ndx, v != 0);
 			}
 			break;
 		case COLUMN_TYPE_DATE:
