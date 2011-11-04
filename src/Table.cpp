@@ -38,13 +38,13 @@ Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(
     m_columns.SetParent(&m_top, 2);
 
     // Cache columns
-    size_t size = -1;
+    size_t size = (size_t)-1;
     for (size_t i = 0; i < m_spec.Size(); ++i) {
         const ColumnType type = (ColumnType)m_spec.Get(i);
         const size_t ref = m_columns.Get(i);
 
         ColumnBase* newColumn = NULL;
-		size_t colsize;
+		size_t colsize = (size_t)-1;
 		switch (type) {
             case COLUMN_TYPE_INT:
             case COLUMN_TYPE_BOOL:
@@ -68,11 +68,11 @@ Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(
 
 		// Set table size
 		// (and verify that all column are same length)
-		if (size == -1) size = colsize;
+		if (size == (size_t)-1) size = colsize;
 		else assert(size == colsize);
     }
 
-    if (size != -1) m_size = size;
+    if (size != (size_t)-1) m_size = size;
 }
 
 Table::Table(const Table& t) : m_alloc(t.m_alloc) {

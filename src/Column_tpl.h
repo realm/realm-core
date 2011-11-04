@@ -126,7 +126,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 
 		// Find the subnode containing the item
 		size_t node_ndx = offsets.FindPos(ndx);
-		if (node_ndx == -1) {
+		if (node_ndx == (size_t)-1) {
 			// node can never be empty, so try to fit in last item
 			node_ndx = offsets.Size()-1;
 		}
@@ -290,7 +290,7 @@ template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx) {
 
 		// Find the subnode containing the item
 		const size_t node_ndx = offsets.FindPos(ndx);
-		assert(node_ndx != -1);
+		assert(node_ndx != (size_t)-1);
 
 		// Calc index in subnode
 		const size_t offset = node_ndx ? (size_t)offsets.Get(node_ndx-1) : 0;
@@ -331,11 +331,11 @@ template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start,
 		const Array refs = NodeGetRefs();
 		const size_t count = refs.Size();
 
-		if (start == 0 && end == -1) {
+		if (start == 0 && end == (size_t)-1) {
 			for (size_t i = 0; i < count; ++i) {
 				const C col((size_t)refs.Get(i));
 				const size_t ndx = col.Find(value);
-				if (ndx != -1) {
+				if (ndx != (size_t)-1) {
 					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
 					return offset + ndx;
 				}
@@ -346,13 +346,13 @@ template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start,
 			size_t i = offsets.FindPos(start);
 			size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
 			size_t s = start - offset;
-			size_t e = (end == -1 || (int)end >= offsets.Get(i)) ? -1 : end - offset;
+			size_t e = (end == (size_t)-1 || (int)end >= offsets.Get(i)) ? -1 : end - offset;
 
 			for (;;) {
 				const C col((size_t)refs.Get(i));
 
 				const size_t ndx = col.Find(value, s, e);
-				if (ndx != -1) {
+				if (ndx != (size_t)-1) {
 					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
 					return offset + ndx;
 				}
@@ -361,7 +361,7 @@ template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start,
 				if (i >= count) break;
 
 				s = 0;
-				if (end != -1) {
+				if (end != (size_t)-1) {
 					if (end >= (size_t)offsets.Get(i)) e = (size_t)-1;
 					else {
 						offset = (size_t)offsets.Get(i-1);

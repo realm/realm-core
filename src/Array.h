@@ -59,15 +59,15 @@ public:
 	void Delete(size_t ndx);
 	void Clear();
 
-	bool Increment(int64_t value, size_t start=0, size_t end=-1);
+	bool Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
 	bool IncrementIf(int64_t limit, int64_t value);
 	void Adjust(size_t start, int64_t diff);
 
 	size_t FindPos(int64_t value) const;
 	size_t FindPos2(int64_t value) const;
-	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
+	size_t Find(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
 	void FindAll(Column& result, int64_t value, size_t offset=0,
-				 size_t start=0, size_t end=-1) const;
+				 size_t start=0, size_t end=(size_t)-1) const;
 	void FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 
 	void Sort();
@@ -135,13 +135,13 @@ protected:
 	Setter m_setter;
 	size_t m_ref;
 	unsigned char* m_data;
-	Array* m_parent;
-	size_t m_parentNdx;
 	size_t m_len;
 	size_t m_capacity;
 	size_t m_width;
 	bool m_isNode;
 	bool m_hasRefs;
+	Array* m_parent;
+	size_t m_parentNdx;
 	Allocator& m_alloc;
 	
 	void set_header(enum HEADER_FIELD f, uint64_t value, void *header);

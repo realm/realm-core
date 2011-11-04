@@ -43,11 +43,11 @@ void Array::set_header(enum HEADER_FIELD f, uint64_t value, void *header = 0)
 	uint8_t *header2 = ((header == 0) ? (m_data - 8) : ((uint8_t *)header));
 
 	if(f == NODE)
-		header2[0] = header2[0] & (~0x80) | ((uint8_t)value << 7);
+		header2[0] = (header2[0] & (~0x80)) | ((uint8_t)value << 7);
 	else if(f == REFS)
-		header2[0] = header2[0] & (~0x40) | ((uint8_t)value << 6);
+		header2[0] = (header2[0] & (~0x40)) | ((uint8_t)value << 6);
 	else if(f == WIDTH)
-		header2[0] = header2[0] & (~0x7) | (uint8_t)value;
+		header2[0] = (header2[0] & (~0x7)) | (uint8_t)value;
 	else if(f == CAPACITY) {
 		header2[4] = (value >> 16) & 0x000000FF;
 		header2[5] = (value >> 8) & 0x000000FF;
@@ -75,6 +75,8 @@ uint64_t Array::get_header(enum HEADER_FIELD f, void *header = 0)
 		return (header2[1] << 16) + (header2[2] << 8) + header2[3];
 	else if(f == CAPACITY)
 		return (header2[4] << 16) + (header2[5] << 8) + header2[6];
+	else
+		return -1;
 }
 
 void Array::Create(size_t ref) {
@@ -358,7 +360,7 @@ void Array::Resize(size_t count) {
 }
 
 bool Array::Increment(int64_t value, size_t start, size_t end) {
-	if (end == -1) end = m_len;
+	if (end == (size_t)-1) end = m_len;
 	assert(start < m_len);
 	assert(end >= start && end <= m_len);
 
@@ -427,7 +429,7 @@ size_t Array::FindPos2(int64_t target) const {
 
 size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	if (IsEmpty()) return (size_t)-1;
-	if (end == -1) end = m_len;
+	if (end == (size_t)-1) end = m_len;
 	if (start == end) return (size_t)-1;
 
 	assert(start < m_len && end <= m_len && start < end);
@@ -603,7 +605,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 					size_t start, size_t end) const {
 	if (IsEmpty()) return;
-	if (end == -1) end = m_len;
+	if (end == (size_t)-1) end = m_len;
 	if (start == end) return;
 
 	assert(start < m_len && end <= m_len && start < end);

@@ -169,7 +169,7 @@ bool Index::LeafInsert(size_t ref, int64_t value) {
 
 	const size_t ins_pos = values.FindPos2(value);
 
-	if (ins_pos == -1) {
+	if (ins_pos == (size_t)-1) {
 		values.Add(value);
 		refs.Add(ref);
 	}
@@ -194,7 +194,7 @@ bool Index::NodeAdd(size_t ref) {
 
 	const size_t ins_pos = offsets.FindPos2(maxval);
 
-	if (ins_pos == -1) {
+	if (ins_pos == (size_t)-1) {
 		offsets.Add(maxval);
 		refs.Add(ref);
 	}
@@ -219,7 +219,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
 
 		// Find the subnode containing the item
 		size_t node_ndx = offsets.FindPos2(ndx);
-		if (node_ndx == -1) {
+		if (node_ndx == (size_t)-1) {
 			// node can never be empty, so try to fit in last item
 			node_ndx = offsets.Size()-1;
 		}
@@ -303,7 +303,7 @@ size_t Index::Find(int64_t value) const {
 
 		const size_t pos = values.FindPos2(value);
 
-		if (pos == -1) return (size_t)-1;
+		if (pos == (size_t)-1) return (size_t)-1;
 		else if (!m_array->IsNode()) {
 			if (values.Get(pos) == value) return (size_t)refs.Get(pos);
 			else return (size_t)-1;

@@ -99,11 +99,14 @@ static Column GetColumnFromRef(Array& parent, size_t ndx) {
 	return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
 }
 
+
 static const Column GetColumnFromRef(const Array& parent, size_t ndx) {
 	assert(parent.HasRefs());
 	assert(ndx < parent.Size());
 	return Column((size_t)parent.Get(ndx), &parent, ndx);
 }
+
+
 
 /*Column Column::GetSubColumn(size_t ndx) {
 	assert(ndx < m_len);
@@ -238,7 +241,7 @@ bool Column::Increment64(int64_t value, size_t start, size_t end) {
 
 size_t Column::Find(int64_t value, size_t start, size_t end) const {
 	assert(start <= Size());
-	assert(end == -1 || end <= Size());
+	assert(end == (size_t)-1 || end <= Size());
 	if (IsEmpty()) return (size_t)-1;
 
 	return TreeFind<int64_t, Column>(value, start, end);
@@ -247,7 +250,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 void Column::FindAll(Column& result, int64_t value, size_t offset,
 					 size_t start, size_t end) const {
 	assert(start <= Size());
-	assert(end == -1 || end <= Size());
+	assert(end == (size_t)-1 || end <= Size());
 	if (IsEmpty()) return;
 
 	if (!IsNode()) return m_array->FindAll(result, value, offset, start, end);

@@ -196,7 +196,7 @@ void* SlabAlloc::Translate(size_t ref) const {
 	if (ref < m_baseline) return m_shared + ref;
 	else {
 		const size_t ndx = m_slabs.offset.FindPos(ref);
-		assert(ndx != -1);
+		assert(ndx != (size_t)-1);
 
 		const size_t offset = ndx ? m_slabs[ndx-1].offset : m_baseline;
 		return (char*)(intptr_t)m_slabs[ndx].pointer + (ref - offset);

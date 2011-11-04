@@ -53,7 +53,7 @@ Group::~Group() {
 
 Table& Group::GetTable(const char* name) {
 	const size_t n = m_tableNames.Find(name);
-	if (n == -1) {
+	if (n == (size_t)-1) {
 		// Create new table
 		Table* const t = new Table(m_alloc);
 		t->SetParent(&m_tables, m_tables.Size());

@@ -117,8 +117,8 @@ protected:
 	// On-disk format
 	Array m_top;
 	Array m_spec;
-	Array m_columns;
 	ArrayString m_columnNames;
+	Array m_columns;
 
 	// Cached columns
 	Array m_cols;

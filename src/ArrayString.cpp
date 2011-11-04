@@ -209,19 +209,19 @@ void ArrayString::FindAll(Column& result, const char* value) {
 
 void ArrayString::FindAll(Column& result, const char* value, size_t len) {
 	assert(value);
-	size_t first = -1;
+	size_t first = (size_t)-1;
 	do {
 		first = FindWithLen(value, len, first + 1, m_len);
-		if(first != -1)
+		if(first != (size_t)-1)
 		result.Add(first);
-	} while (first != -1);
+	} while (first != (size_t)-1);
 
 }
 
 size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, size_t end) const {
 	assert(value);
 
-	if (end == -1) end = m_len;
+	if (end == (size_t)-1) end = m_len;
 	if (start == end) return (size_t)-1;
 	assert(start < m_len && end <= m_len && start < end);
 	if (m_len == 0) return (size_t)-1; // empty list
