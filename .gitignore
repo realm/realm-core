@@ -11,3 +11,4 @@ tightdb-tests
 TestUnitTest++
 
 /test/benchmark/x64
+/test/benchmark
