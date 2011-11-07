@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Support\win32\mem.cpp" />
     <ClCompile Include="..\UnitTest++\src\Win32\TimeHelpers.cpp" />
     <ClCompile Include="sqlite3.c" />
     <ClCompile Include="test-sqlite3.cpp" />
@@ -142,6 +143,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalOptions>msvcrt.lib kernel32.lib psapi.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

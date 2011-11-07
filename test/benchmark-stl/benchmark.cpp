@@ -14,6 +14,8 @@
 //using namespace std;
 
 
+
+
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
 uint64_t rand2() { 
 	static int64_t seed = 2862933555777941757ULL; 
@@ -95,7 +97,7 @@ void stl(void) {
 
 	}
 //	printf("avg dist=%llu in ", distance_sum / ITEMS);
-	printf("Find: %dms\n", timer.GetTimeInMs());
+	printf("Linear Find: %dms\n", timer.GetTimeInMs());
 
 
 	timer.Start();
@@ -107,7 +109,7 @@ void stl(void) {
 		}						
 
 	}
-	printf("FindAll: %dms\n", timer.GetTimeInMs());
+	printf("Linear FindAll: %dms\n", timer.GetTimeInMs());
 
 
 	timer.Start();

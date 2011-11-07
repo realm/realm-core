@@ -47,8 +47,6 @@ void tightdb(void) {
 	volatile uint64_t force;
 	int overhead; // Time of computing 1 rand and 1 modulo and doing a loop (is ~0ms with new rand)
 
-
-
 	uint64_t dummy = 0;
 
 	for(int index = 0; index < 2; index++)
@@ -77,8 +75,6 @@ void tightdb(void) {
 		for (size_t i = 0; i < ITEMS; ++i) {
 			size_t p = rand2() % (i + 1);
 			integers.InsertInt(0, p, (int64_t)rand2() % RANGE); 
-			
-
 		}
 		printf((indexed + "Insert: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 
@@ -104,6 +100,8 @@ void tightdb(void) {
 		for (size_t i = 0; i < ITEMS; ++i) {
 			uint64_t f = rand2() % RANGE;
 			integers.first.Find(f);
+
+			// Sanity test to ensure that average distance between matches is the same as in the STL tests
 /*
 			int j;
 			for(j = 0; j < integers.GetSize(); j++)
