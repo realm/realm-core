@@ -465,9 +465,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 
 		// Manually check the rest
 		while (i < end) {
-			const size_t offset = i >> 2;
-			const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
-			if (v == value) return i;
+			if (Get(i) == value) return i;
 			++i;
 		}
 	}
@@ -493,9 +491,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 
 		// Manually check the rest
 		while (i < end) {
-			const size_t offset = i >> 1;
-			const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
-			if (v == value) return i;
+			if (Get(i) == value) return i;
 			++i;
 		}
 	}
@@ -520,11 +516,10 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 8;
-		const int8_t* d = (const int8_t*)m_data;
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == d[i]) return i;
+			if (value == Get(i)) return i;
 			++i;
 		}
 	}
@@ -547,11 +542,10 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 4;
-		const int16_t* d = (const int16_t*)m_data;
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == d[i]) return i;
+			if (value == Get(i)) return i;
 			++i;
 		}
 	}
@@ -574,11 +568,10 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 2;
-		const int32_t* d = (const int32_t*)m_data;
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == d[i]) return i;
+			if (value == Get(i)) return i;
 			++i;
 		}
 	}
@@ -594,7 +587,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	else {
 		// Naive search
 		for (size_t i = start; i < end; ++i) {
-			const int64_t v = (this->*m_getter)(i);
+			const int64_t v = Get(i);
 			if (v == value) return i;
 		}
 	}
@@ -656,9 +649,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 
 		// Manually check the rest
 		while (i < end) {
-			const size_t offset = i >> 2;
-			const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
-			if (v == value) result.Add(i + colOffset);
+			if (Get(i) == value) result.Add(i + colOffset);
 			++i;
 		}
 	}
@@ -697,9 +688,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 
 		// Manually check the rest
 		while (i < end) {
-			const size_t offset = i >> 1;
-			const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
-			if (v == value) result.Add(i + colOffset);
+			if (Get(i) == value) result.Add(i + colOffset);
 			++i;
 		}
 	}
@@ -737,11 +726,9 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 8;
-		const int8_t* d = (const int8_t*)m_data;
-
 		// Manually check the rest
 		while (i < end) {
-			if (value == d[i]) result.Add(i + colOffset);
+			if (value == Get(i)) result.Add(i + colOffset);
 			++i;
 		}
 	}
@@ -777,11 +764,10 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 4;
-		const int16_t* d = (const int16_t*)m_data;
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == d[i]) result.Add(i + colOffset);
+			if (value == Get(i)) result.Add(i + colOffset);
 			++i;
 		}
 	}
@@ -817,11 +803,10 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 2;
-		const int32_t* d = (const int32_t*)m_data;
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == d[i]) result.Add(i + colOffset);
+			if (value == Get(i)) result.Add(i + colOffset);
 			++i;
 		}
 	}

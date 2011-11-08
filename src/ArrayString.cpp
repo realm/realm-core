@@ -24,7 +24,7 @@ size_t round_up(size_t len)
 {
 	size_t width = 0;
 
-#define OPT_BW
+//#define OPT_BW
 	if (len == 0) width = 0;
 #ifdef OPT_BW
 	else if(len < 4)
