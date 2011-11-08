@@ -20,6 +20,36 @@ ArrayString::ArrayString(Allocator& alloc) : Array(alloc) {
 ArrayString::~ArrayString() {
 }
 
+size_t round_up(size_t len)
+{
+	size_t width = 0;
+
+#define OPT_BW
+	if (len == 0) width = 0;
+#ifdef OPT_BW
+	else if(len < 4)
+		width = 4;
+	else
+	{
+		width = len;
+		width--;
+		width |= width >> 1;
+		width |= width >> 2;
+		width++;
+	}
+#else	
+	else if (len < 4) width = 4;
+	else if (len < 8) width = 8;
+	else if (len < 16) width = 16;
+	else if (len < 32) width = 32;
+	else if (len < 64) width = 64;
+	else assert(false);
+#endif
+	return width;
+
+}
+
+
 const char* ArrayString::Get(size_t ndx) const {
 	assert(ndx < m_len);
 
@@ -43,28 +73,7 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 	if (!CopyOnWrite()) return false;
 
 	// Calc min column width (incl trailing zero-byte)
-#define OPT_BW
-	size_t width = 0;
-	if (len == 0) width = 0;
-#ifdef OPT_BW
-	else if(len < 4)
-		width = 4;
-	else
-	{
-		width = len;
-		width--;
-		width |= width >> 1;
-		width |= width >> 2;
-		width++;
-	}
-#else	
-	else if (len < 4) width = 4;
-	else if (len < 8) width = 8;
-	else if (len < 16) width = 16;
-	else if (len < 32) width = 32;
-	else if (len < 64) width = 64;
-	else assert(false);
-#endif
+	size_t width = round_up(len);
 
 	// Make room for the new value
 	if (width > m_width) {
@@ -110,6 +119,8 @@ bool ArrayString::Insert(size_t ndx, const char* value) {
 	return Insert(ndx, value, strlen(value));
 }
 
+
+
 bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 	assert(ndx <= m_len);
 	assert(value);
@@ -119,14 +130,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 	if (!CopyOnWrite()) return false;
 
 	// Calc min column width (incl trailing zero-byte)
-	size_t width = 0;
-	if (len == 0) width = 0;
-	else if (len < 4) width = 4;
-	else if (len < 8) width = 8;
-	else if (len < 16) width = 16;
-	else if (len < 32) width = 32;
-	else if (len < 64) width = 64;
-	else assert(false);
+	size_t width = round_up(len);
 	
 	const bool doExpand = width > m_width;
 
