@@ -43,7 +43,7 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 	if (!CopyOnWrite()) return false;
 
 	// Calc min column width (incl trailing zero-byte)
-//#define OPT_BW
+#define OPT_BW
 	size_t width = 0;
 	if (len == 0) width = 0;
 #ifdef OPT_BW
