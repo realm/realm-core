@@ -195,7 +195,7 @@ void ArrayString::Delete(size_t ndx) {
 	}
 
 	// Update length in header
-	SetRefSize(m_len);
+	set_header_len(m_len);
 }
 
 size_t ArrayString::CalcByteLen(size_t count, size_t width) const {

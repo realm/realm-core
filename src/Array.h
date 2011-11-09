@@ -26,8 +26,6 @@ enum ColumnDef {
 	COLUMN_HASREFS
 };
 
-enum HEADER_FIELD {NODE, REFS, WIDTH, LEN, CAPACITY};
-
 class Array {
 public:
 	Array(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
@@ -124,7 +122,17 @@ protected:
 	void Set_64b(size_t ndx, int64_t value);
 
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
-	void SetRefSize(size_t len);
+
+	void set_header_isnode(bool value, void* header=NULL);
+	void set_header_hasrefs(bool value, void* header=NULL);
+	void set_header_width(size_t value, void* header=NULL);
+	void set_header_len(size_t value, void* header=NULL);
+	void set_header_capacity(size_t value, void* header=NULL);
+	bool get_header_isnode(const void* header=NULL);
+	bool get_header_hasrefs(const void* header=NULL);
+	size_t get_header_width(const void* header=NULL);
+	size_t get_header_len(const void* header=NULL);
+	size_t get_header_capacity(const void* header=NULL);
 
 	void SetWidth(size_t width);
 	bool Alloc(size_t count, size_t width);
@@ -143,10 +151,6 @@ protected:
 	Array* m_parent;
 	size_t m_parentNdx;
 	Allocator& m_alloc;
-	
-	void set_header(enum HEADER_FIELD f, uint64_t value, void *header);
-	uint64_t get_header(enum HEADER_FIELD f, void *header);
-
 };
 
 #endif //__TDB_ARRAY__
