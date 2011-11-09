@@ -103,9 +103,10 @@ void stl(void) {
 	timer.Start();
 	for (size_t i = 0; i < ITEMS; ++i) {
 		std::vector<uint64_t>::iterator it = integers.begin();
+		uint64_t f = rand2() % RANGE;
 		while(it != integers.end())
 		{
-			it = std::find(it + 1, integers.end(), rand2() % RANGE);
+			it = std::find(it + 1, integers.end(), f);
 		}						
 
 	}

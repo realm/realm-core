@@ -5,6 +5,8 @@
 #include <vector>
 #include <algorithm>
 #include "testsettings.h"
+#include <map>
+#include <string>
 
 struct db_setup_array {
 	static Array c;
@@ -14,7 +16,9 @@ Array db_setup_array::c;
 
 // Pre-declare local functions
 uint64_t rand2(void);
-bool vector_eq_array(const std::vector<int64_t>& v, const Array& a);
+template<class T, class U> bool vector_eq_array(const std::vector<T>& v, const U& a);
+template<class T, class U> bool findall_test(std::vector<T>& v, U& a, T val);
+template<class T> std::vector<size_t> findall_vector(std::vector<T>& v, T val);
 
 TEST_FIXTURE(db_setup_array, Array_Add0) {
 	c.Add(0);
@@ -637,7 +641,7 @@ uint64_t rand2(void) {
 	return i;
 }
 
-bool vector_eq_array(const std::vector<int64_t>& v, const Array& a) {
+template<class T, class U> bool vector_eq_array(const std::vector<T>& v, const U& a) {
 	if (a.Size() != v.size()) return false;
 
 	for(size_t t = 0; t < v.size(); ++t) {
@@ -646,8 +650,37 @@ bool vector_eq_array(const std::vector<int64_t>& v, const Array& a) {
 	return true;
 }
 
+template<class T> std::vector<size_t> findall_vector(std::vector<T>& v, T val) {
+	std::vector<int64_t>::iterator it = v.begin();
+	std::vector<size_t> results;
+	while(it != v.end()) {
+		it = std::find(it, v.end(), val);
+		size_t index = std::distance(v.begin(), it);
+		if(index < v.size())
+		{
+			results.push_back(index);
+			it++;
+		}
+	}
+	return results;
+}
+	
+template<class T, class U> bool findall_test(std::vector<T>& v, U& a, T val) {
+	std::vector<size_t> results;
+	results = findall_vector(v, val);
+
+	// sanity test - in the beginning, results.size() == v.size() (all elements are 0), later results.size() < v.size()
+//	if(rand2() % 100 == 0)
+//		printf("%d out of %d\n", (int)results.size(), (int)v.size()); 
+	
+	Column c;
+	a.FindAll(c, val);
+	return vector_eq_array(results, c);
+}
+
+
 TEST(monkeytest1) {
-	const uint64_t DURATION = UNITTEST_DURATION*1000;
+	const uint64_t DURATION = UNITTEST_DURATION*500;
 	const uint64_t SEED = 123;
 
 	Array a;
@@ -656,16 +689,27 @@ TEST(monkeytest1) {
 	srand(SEED);
 	const uint64_t nums_per_bitwidth = DURATION;
 	size_t current_bitwidth = 0;
-	int trend = 5;
+	unsigned int trend = 5;
 
 	for(current_bitwidth = 0; current_bitwidth < 65; current_bitwidth++) {
 		//		printf("Input bitwidth around ~%d, a.GetBitWidth()=%d, a.Size()=%d\n", (int)current_bitwidth, (int)a.GetBitWidth(), (int)a.Size());
 
+		current_bitwidth = current_bitwidth;
+
 		while(rand2() % nums_per_bitwidth != 0) {
 			if (!(rand2() % (DURATION / 10)))
-				trend = (int)rand2() % 10;
+				trend = rand2() % 10;
+
+			// Sanity test
+/*			if(rand2() % 1000 == 0)	{
+				for(int j = 0; j < v.size(); j++)
+					printf("%lld ", v[j]);
+				printf("%d\n", v.size());
+			}*/
+
 
 			if (rand2() % 10 > trend) {
+				// Insert
 				uint64_t l = rand2();
 				const uint64_t mask = ((1ULL << current_bitwidth) - 1ULL);
 				l &= mask;
@@ -674,15 +718,27 @@ TEST(monkeytest1) {
 				a.Insert(pos, l);
 				v.insert(v.begin() + pos, l);
 			}
+
 			else {
+				// Delete
 				if(a.Size() > 0) {
 					const size_t i = rand2() % a.Size();
 					a.Delete(i);
 					v.erase(v.begin() + i);
 				}
-				const bool b = vector_eq_array(v, a);
+			}
+
+			// Verify
+			bool b = vector_eq_array(v, a);
+			CHECK_EQUAL(true, b);
+			if(a.Size() > 0) {
+				b = findall_test(v, a, a.Get(rand2() % a.Size()));
 				CHECK_EQUAL(true, b);
 			}
 		}
 	}
 }
+
+
+
+

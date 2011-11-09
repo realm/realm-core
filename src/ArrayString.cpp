@@ -22,29 +22,36 @@ ArrayString::~ArrayString() {
 
 size_t round_up(size_t len)
 {
-	size_t width = 0;
+#define OPT_BW
 
-//#define OPT_BW
-	if (len == 0) width = 0;
 #ifdef OPT_BW
-	else if(len < 4)
+	size_t width = 0;
+	if (len == 0) 
+		width = 0;
+	else if(len < 3)
 		width = 4;
 	else
 	{
 		width = len;
-		width--;
 		width |= width >> 1;
 		width |= width >> 2;
+		width |= width >> 4;
 		width++;
 	}
 #else	
-	else if (len < 4) width = 4;
-	else if (len < 8) width = 8;
-	else if (len < 16) width = 16;
-	else if (len < 32) width = 32;
-	else if (len < 64) width = 64;
+	size_t width2 = 0;
+	if (len == 0) width2 = 0;
+	else if (len < 4) width2 = 4;
+	else if (len < 8) width2 = 8;
+	else if (len < 16) width2 = 16;
+	else if (len < 32) width2 = 32;
+	else if (len < 64) width2 = 64;
 	else assert(false);
 #endif
+
+//	if(width2 != width)
+//		getchar();
+
 	return width;
 
 }
