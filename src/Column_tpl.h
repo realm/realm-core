@@ -171,7 +171,9 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 		case 0:	            // insert before
 			return NodeChange(NodeChange::CT_INSERT_BEFORE, newNode.GetRef());
 		case MAX_LIST_SIZE:	// insert after
-			return NodeChange(NodeChange::CT_INSERT_AFTER, newNode.GetRef());
+			if (nc.type == NodeChange::CT_SPLIT)
+				return NodeChange(NodeChange::CT_SPLIT, GetRef(), newNode.GetRef());
+			else return NodeChange(NodeChange::CT_INSERT_AFTER, newNode.GetRef());
 		default:            // split
 			// Move items after split to new node
 			const size_t len = refs.Size();
@@ -229,7 +231,6 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref) {
 	const size_t offset = ndx ? offsets.Get(ndx-1) : 0;
 	const size_t newSize = orig_col.Size();
 	const size_t oldSize = offsets.Get(ndx) - offset;
-	const size_t diff = newSize - oldSize;
 	const size_t newOffset = offset + newSize;
 	offsets.Set(ndx, newOffset);
 
@@ -239,8 +240,11 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref) {
 	refs.Insert(ndx+1, new_ref);
 
 	// Update following offsets
-	const size_t newDiff = diff + refSize;
-	return offsets.Increment(newDiff, ndx+2);
+	assert((newSize + refSize) - oldSize == 1); // insert should only add one item
+	if (offsets.Size() > ndx+2)
+		offsets.Increment(1, ndx+2);
+
+	return true;
 }
 
 template<class C> bool ColumnBase::NodeInsert(size_t ndx, size_t ref) {

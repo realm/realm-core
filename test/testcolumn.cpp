@@ -470,23 +470,18 @@ TEST(Column_FindHamming) {
 	res.Destroy();
 }
 
-
-
-TEST(Column_prepend_many)
-{	
+TEST(Column_prepend_many) {
 	// Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
 	Column a;
-	std::vector<signed long long> v;
 
-	for(int items = 0; items < 2000; items++)
-	{
+	for (size_t items = 0; items < 2000; ++items) {
 		a.Clear();
-		for(int j = 0; j < items + 1; j++)
-		{
+		for (int j = 0; j < items + 1; ++j) {
 			a.Insert(0, j);
 		}
 		a.Insert(items, 444);
-	}	
+	}
+	a.Destroy();
 }
 
 
