@@ -634,6 +634,7 @@ TEST(findallint7){
 	}
 }
 
+
 // Support functions for monkey test
 
 uint64_t rand2(void) {
@@ -680,7 +681,7 @@ template<class T, class U> bool findall_test(std::vector<T>& v, U& a, T val) {
 
 
 TEST(monkeytest1) {
-	const uint64_t DURATION = UNITTEST_DURATION*500;
+	const uint64_t DURATION = UNITTEST_DURATION*1000;
 	const uint64_t SEED = 123;
 
 	Array a;
@@ -728,13 +729,18 @@ TEST(monkeytest1) {
 				}
 			}
 
+
 			// Verify
-			bool b = vector_eq_array(v, a);
-			CHECK_EQUAL(true, b);
-			if(a.Size() > 0) {
-				b = findall_test(v, a, a.Get(rand2() % a.Size()));
+			if(rand2() % 100 == 0) {
+				bool b = vector_eq_array(v, a);
 				CHECK_EQUAL(true, b);
+				if(a.Size() > 0) {
+					b = findall_test(v, a, a.Get(rand2() % a.Size()));
+					CHECK_EQUAL(true, b);
+				}
 			}
+
+
 		}
 	}
 }

@@ -101,7 +101,7 @@ public:
 	bool IsEmpty() const;
 
 	// Overloads for setting values (should catch most integer types)
-	int Get(size_t ndx) const {return (int)Get64(ndx);}
+	int64_t Get(size_t ndx) const {return Get64(ndx);}
 	bool Set(size_t ndx, int32_t value) {return Set64(ndx, value);}
 	bool Set(size_t ndx, uint32_t value) {return Set64(ndx, value);}
 	bool Set(size_t ndx, int64_t value) {return Set64(ndx, value);}

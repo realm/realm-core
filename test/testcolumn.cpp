@@ -9,8 +9,13 @@ struct db_setup {
 };
 
 // Pre-declare local functions
-uint64_t rand2(void);
-bool vector_eq_column(const std::vector<int64_t>& v, const Column& a);
+
+// Support functions for monkey test
+
+template<class T, class U> static bool vector_eq_array(const std::vector<T>& v, const U& a);
+template<class T> static std::vector<size_t> findall_vector(std::vector<T>& v, T val);
+template<class T, class U> static bool findall_test(std::vector<T>& v, U& a, T val);
+
 
 Column db_setup::c;
 
@@ -466,7 +471,7 @@ TEST(Column_FindHamming) {
 }
 
 
-/*
+
 TEST(Column_prepend_many)
 {	
 	// Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
@@ -485,54 +490,14 @@ TEST(Column_prepend_many)
 }
 
 
-TEST(Column_monkey1)
-{	
-	const uint64_t DURATION = UNITTEST_DURATION*1000;
-	const uint64_t SEED = 123;
+// Support functions for monkey test
 
-	Column a;
-	std::vector<int64_t> v;
-	int trend = 5;
- 
-	srand(SEED);
-	uint64_t nums_per_bitwidth = DURATION;
-	size_t current_bitwidth = 0;
+static uint64_t rand2(void) {
+	const uint64_t i = (int64_t)rand() | (uint64_t)rand() << 8 | (uint64_t)rand() << 2*8 | (uint64_t)rand() << 3*8 | (uint64_t)rand() << 4*8 | (uint64_t)rand() << 5*8 | (uint64_t)rand() << 6*8 | (uint64_t)rand() << 7*8;
+	return i;
+}
 
-	for(current_bitwidth = 3; current_bitwidth < 31; current_bitwidth++) {
-		while(rand2() % nums_per_bitwidth != 0) {
-			const bool b = vector_eq_column(v, a);
-			CHECK_EQUAL(true, b);
-
-			if(!(rand2() % (DURATION / 10)))
-				trend = rand2() % 10;
-
-			if(rand2() % 10 > trend) {
-				uint64_t l = rand2();
-				const uint64_t mask = ((1ULL << current_bitwidth) - 1ULL);
-				l = l & mask;
-				size_t pos = rand2() % (a.Size() + 1);
-
-				a.Insert(pos, (int)l);
-				v.insert(v.begin() + pos, (int)l);
-
-			}
-			else {
-				if(a.Size() > 0) {
-					size_t i = rand2() % a.Size();
-					a.Delete(i);
-					v.erase(v.begin() + i);
-				}
-			}
-		}
-	}	
-}	
-
-*/
-
-
-// Support function for monkey test
-
-bool vector_eq_column(const std::vector<int64_t>& v, const Column& a) {
+template<class T, class U> static bool vector_eq_array(const std::vector<T>& v, const U& a) {
 	if (a.Size() != v.size()) return false;
 
 	for(size_t t = 0; t < v.size(); ++t) {
@@ -540,4 +505,101 @@ bool vector_eq_column(const std::vector<int64_t>& v, const Column& a) {
 	}
 	return true;
 }
+
+template<class T> static std::vector<size_t> findall_vector(std::vector<T>& v, T val) {
+	std::vector<int64_t>::iterator it = v.begin();
+	std::vector<size_t> results;
+	while(it != v.end()) {
+		it = std::find(it, v.end(), val);
+		size_t index = std::distance(v.begin(), it);
+		if(index < v.size())
+		{
+			results.push_back(index);
+			it++;
+		}
+	}
+	return results;
+}
+	
+template<class T, class U> static bool findall_test(std::vector<T>& v, U& a, T val) {
+	std::vector<size_t> results;
+	results = findall_vector(v, val);
+
+	// sanity test - in the beginning, results.size() == v.size() (all elements are 0), later results.size() < v.size()
+//	if(rand2() % 100 == 0)
+//		printf("%d out of %d\n", (int)results.size(), (int)v.size()); 
+	
+	Column c;
+	a.FindAll(c, val);
+	return vector_eq_array(results, c);
+}
+
+
+TEST(Column_monkeytest1) {
+	const uint64_t DURATION = UNITTEST_DURATION*1000;
+	const uint64_t SEED = 123;
+
+	Column a;
+	std::vector<int64_t> v;
+
+	srand(SEED);
+	const uint64_t nums_per_bitwidth = DURATION;
+	size_t current_bitwidth = 0;
+	unsigned int trend = 5;
+
+	for(current_bitwidth = 0; current_bitwidth < 65; current_bitwidth++) {
+		//		printf("Input bitwidth around ~%d, a.GetBitWidth()=%d, a.Size()=%d\n", (int)current_bitwidth, (int)a.GetBitWidth(), (int)a.Size());
+
+		current_bitwidth = current_bitwidth;
+
+		while(rand2() % nums_per_bitwidth != 0) {
+			if (!(rand2() % (DURATION / 10)))
+				trend = rand2() % 10;
+
+			// Sanity test
+/*			if(rand2() % 1000 == 0)	{
+				for(int j = 0; j < v.size(); j++)
+					printf("%lld ", v[j]);
+				printf("%d\n", v.size());
+			}*/
+
+
+			if (rand2() % 10 > trend) {
+				// Insert
+				uint64_t l = rand2();
+				const uint64_t mask = ((1ULL << current_bitwidth) - 1ULL);
+				l &= mask;
+
+				const size_t pos = rand2() % (a.Size() + 1);
+				a.Insert(pos, l);
+				v.insert(v.begin() + pos, l);
+			}
+
+			else {
+				// Delete
+				if(a.Size() > 0) {
+					const size_t i = rand2() % a.Size();
+					a.Delete(i);
+					v.erase(v.begin() + i);
+				}
+			}
+
+
+			// Verify
+			if(rand2() % 100 == 0) {
+				bool b = vector_eq_array(v, a);
+				CHECK_EQUAL(true, b);
+				if(a.Size() > 0) {
+					b = findall_test(v, a, a.Get(rand2() % a.Size()));
+					CHECK_EQUAL(true, b);
+				}
+			}
+
+
+		}
+	}
+}
+
+
+
 
