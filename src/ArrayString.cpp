@@ -6,6 +6,23 @@
 #include "Column.h"
 #include "ArrayString.h"
 
+// Pre-declare local functions
+size_t round_up(size_t len);
+
+size_t round_up(size_t len) {
+	size_t width = 0;
+	if (len == 0)     width = 0;
+	else if (len < 3) width = 4;
+	else {
+		width = len;
+		width |= width >> 1;
+		width |= width >> 2;
+		width |= width >> 4;
+		++width;
+	}
+	return width;
+}
+
 ArrayString::ArrayString(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
 }
 
@@ -19,43 +36,6 @@ ArrayString::ArrayString(Allocator& alloc) : Array(alloc) {
 
 ArrayString::~ArrayString() {
 }
-
-size_t round_up(size_t len)
-{
-#define OPT_BW
-
-#ifdef OPT_BW
-	size_t width = 0;
-	if (len == 0) 
-		width = 0;
-	else if(len < 3)
-		width = 4;
-	else
-	{
-		width = len;
-		width |= width >> 1;
-		width |= width >> 2;
-		width |= width >> 4;
-		width++;
-	}
-#else	
-	size_t width2 = 0;
-	if (len == 0) width2 = 0;
-	else if (len < 4) width2 = 4;
-	else if (len < 8) width2 = 8;
-	else if (len < 16) width2 = 16;
-	else if (len < 32) width2 = 32;
-	else if (len < 64) width2 = 64;
-	else assert(false);
-#endif
-
-//	if(width2 != width)
-//		getchar();
-
-	return width;
-
-}
-
 
 const char* ArrayString::Get(size_t ndx) const {
 	assert(ndx < m_len);

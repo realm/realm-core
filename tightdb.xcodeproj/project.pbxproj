@@ -84,40 +84,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		360F19F9146AB38700EBB9C6 /* alloc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = alloc.cpp; sourceTree = "<group>"; };
-		360F19FA146AB38700EBB9C6 /* alloc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = alloc.h; sourceTree = "<group>"; };
-		360F19FB146AB38700EBB9C6 /* AllocSlab.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AllocSlab.h; sourceTree = "<group>"; };
-		360F19FC146AB38700EBB9C6 /* Array.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Array.cpp; sourceTree = "<group>"; };
-		360F19FD146AB38700EBB9C6 /* Array.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Array.h; sourceTree = "<group>"; };
-		360F19FE146AB38700EBB9C6 /* ArrayBinary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ArrayBinary.cpp; sourceTree = "<group>"; };
-		360F19FF146AB38700EBB9C6 /* ArrayBinary.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArrayBinary.h; sourceTree = "<group>"; };
-		360F1A00146AB38700EBB9C6 /* ArrayBlob.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ArrayBlob.cpp; sourceTree = "<group>"; };
-		360F1A01146AB38700EBB9C6 /* ArrayBlob.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArrayBlob.h; sourceTree = "<group>"; };
-		360F1A02146AB38700EBB9C6 /* ArrayString.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ArrayString.cpp; sourceTree = "<group>"; };
-		360F1A03146AB38700EBB9C6 /* ArrayString.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArrayString.h; sourceTree = "<group>"; };
-		360F1A04146AB38700EBB9C6 /* ArrayStringLong.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ArrayStringLong.cpp; sourceTree = "<group>"; };
-		360F1A05146AB38700EBB9C6 /* ArrayStringLong.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArrayStringLong.h; sourceTree = "<group>"; };
-		360F1A06146AB38700EBB9C6 /* Column.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Column.cpp; sourceTree = "<group>"; };
-		360F1A07146AB38700EBB9C6 /* Column.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Column.h; sourceTree = "<group>"; };
-		360F1A08146AB38700EBB9C6 /* Column_tpl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Column_tpl.h; sourceTree = "<group>"; };
-		360F1A09146AB38700EBB9C6 /* ColumnBinary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ColumnBinary.cpp; sourceTree = "<group>"; };
-		360F1A0A146AB38700EBB9C6 /* ColumnBinary.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ColumnBinary.h; sourceTree = "<group>"; };
-		360F1A0B146AB38700EBB9C6 /* ColumnString.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ColumnString.cpp; sourceTree = "<group>"; };
-		360F1A0C146AB38700EBB9C6 /* ColumnType.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ColumnType.h; sourceTree = "<group>"; };
-		360F1A0D146AB38700EBB9C6 /* ctightdb.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ctightdb.cpp; sourceTree = "<group>"; };
-		360F1A0E146AB38700EBB9C6 /* ctightdb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ctightdb.h; sourceTree = "<group>"; };
-		360F1A0F146AB38700EBB9C6 /* Group.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Group.cpp; sourceTree = "<group>"; };
-		360F1A10146AB38700EBB9C6 /* Group.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Group.h; sourceTree = "<group>"; };
-		360F1A11146AB38700EBB9C6 /* Index.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Index.cpp; sourceTree = "<group>"; };
-		360F1A12146AB38700EBB9C6 /* Index.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Index.h; sourceTree = "<group>"; };
-		360F1A13146AB38700EBB9C6 /* Table.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Table.cpp; sourceTree = "<group>"; };
-		360F1A14146AB38700EBB9C6 /* Table.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Table.h; sourceTree = "<group>"; };
-		360F1A15146AB38700EBB9C6 /* TableView.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TableView.cpp; sourceTree = "<group>"; };
-		360F1A16146AB38700EBB9C6 /* tightdb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = tightdb.h; sourceTree = "<group>"; };
-		360F1A17146AB38700EBB9C6 /* utilities.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = utilities.cpp; sourceTree = "<group>"; };
-		360F1A18146AB38700EBB9C6 /* utilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utilities.h; sourceTree = "<group>"; };
-		360F1A1A146AB38700EBB9C6 /* stdint.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stdint.h; sourceTree = "<group>"; };
-		360F1A1B146AB38700EBB9C6 /* types.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = types.h; sourceTree = "<group>"; };
 		360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libUnitTest++.a"; path = "test/UnitTest++/libUnitTest++.a"; sourceTree = "<group>"; };
 		3647DEEB14209C1200D56FD7 /* alloc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = alloc.cpp; sourceTree = "<group>"; };
 		3647DEEC14209C1200D56FD7 /* alloc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = alloc.h; sourceTree = "<group>"; };
@@ -284,60 +250,10 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		360F19F8146AB38700EBB9C6 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				360F19F9146AB38700EBB9C6 /* alloc.cpp */,
-				360F19FA146AB38700EBB9C6 /* alloc.h */,
-				360F19FB146AB38700EBB9C6 /* AllocSlab.h */,
-				360F19FC146AB38700EBB9C6 /* Array.cpp */,
-				360F19FD146AB38700EBB9C6 /* Array.h */,
-				360F19FE146AB38700EBB9C6 /* ArrayBinary.cpp */,
-				360F19FF146AB38700EBB9C6 /* ArrayBinary.h */,
-				360F1A00146AB38700EBB9C6 /* ArrayBlob.cpp */,
-				360F1A01146AB38700EBB9C6 /* ArrayBlob.h */,
-				360F1A02146AB38700EBB9C6 /* ArrayString.cpp */,
-				360F1A03146AB38700EBB9C6 /* ArrayString.h */,
-				360F1A04146AB38700EBB9C6 /* ArrayStringLong.cpp */,
-				360F1A05146AB38700EBB9C6 /* ArrayStringLong.h */,
-				360F1A06146AB38700EBB9C6 /* Column.cpp */,
-				360F1A07146AB38700EBB9C6 /* Column.h */,
-				360F1A08146AB38700EBB9C6 /* Column_tpl.h */,
-				360F1A09146AB38700EBB9C6 /* ColumnBinary.cpp */,
-				360F1A0A146AB38700EBB9C6 /* ColumnBinary.h */,
-				360F1A0B146AB38700EBB9C6 /* ColumnString.cpp */,
-				360F1A0C146AB38700EBB9C6 /* ColumnType.h */,
-				360F1A0D146AB38700EBB9C6 /* ctightdb.cpp */,
-				360F1A0E146AB38700EBB9C6 /* ctightdb.h */,
-				360F1A0F146AB38700EBB9C6 /* Group.cpp */,
-				360F1A10146AB38700EBB9C6 /* Group.h */,
-				360F1A11146AB38700EBB9C6 /* Index.cpp */,
-				360F1A12146AB38700EBB9C6 /* Index.h */,
-				360F1A13146AB38700EBB9C6 /* Table.cpp */,
-				360F1A14146AB38700EBB9C6 /* Table.h */,
-				360F1A15146AB38700EBB9C6 /* TableView.cpp */,
-				360F1A16146AB38700EBB9C6 /* tightdb.h */,
-				360F1A17146AB38700EBB9C6 /* utilities.cpp */,
-				360F1A18146AB38700EBB9C6 /* utilities.h */,
-				360F1A19146AB38700EBB9C6 /* win32 */,
-			);
-			path = src;
-			sourceTree = "<group>";
-		};
-		360F1A19146AB38700EBB9C6 /* win32 */ = {
-			isa = PBXGroup;
-			children = (
-				360F1A1A146AB38700EBB9C6 /* stdint.h */,
-				360F1A1B146AB38700EBB9C6 /* types.h */,
-			);
-			path = win32;
-			sourceTree = "<group>";
-		};
 		3611F2FA14209B7000017263 = {
 			isa = PBXGroup;
 			children = (
 				360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */,
-				360F19F8146AB38700EBB9C6 /* src */,
 				3647DFF214209CE600D56FD7 /* test */,
 				3647DEEA14209C1200D56FD7 /* src */,
 				3647E0E814209E6B00D56FD7 /* Products */,
