@@ -217,7 +217,16 @@ void Column::Delete(size_t ndx) {
 
 	TreeDelete<int64_t, Column>(ndx);
 
-	//TODO: Flatten tree if possible
+	// Flatten tree if possible
+	while (IsNode()) {
+		Array refs = NodeGetRefs();
+		if (refs.Size() != 1) break;
+
+		const size_t ref = refs.Get(0);
+		refs.Delete(0); // avoid destroying subtree
+		m_array->Destroy();
+		m_array->UpdateRef(ref);
+	}
 
 	// Update index
 	if (m_index) {
