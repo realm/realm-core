@@ -96,7 +96,7 @@ TEST_FIXTURE(db_setup, Column_Add7) {
 }
 
 TEST_FIXTURE(db_setup, Column_Add8) {
-	c.Add64(4294967296);
+	c.Add(4294967296);
 	CHECK_EQUAL(c.Get(0), 0);
 	CHECK_EQUAL(c.Get(1), 1);
 	CHECK_EQUAL(c.Get(2), 2);
@@ -105,7 +105,7 @@ TEST_FIXTURE(db_setup, Column_Add8) {
 	CHECK_EQUAL(c.Get(5), 16);
 	CHECK_EQUAL(c.Get(6), 256);
 	CHECK_EQUAL(c.Get(7), 65536);
-	CHECK_EQUAL(c.Get64(8), 4294967296);
+	CHECK_EQUAL(c.Get(8), 4294967296);
 	CHECK_EQUAL(c.Size(), 9);
 }
 
@@ -135,13 +135,13 @@ TEST_FIXTURE(db_setup, Column_AddNeg3) {
 }
 
 TEST_FIXTURE(db_setup, Column_AddNeg4) {
-	c.Add64(-4294967296);
+	c.Add(-4294967296);
 
 	CHECK_EQUAL(c.Size(), 4);
 	CHECK_EQUAL(c.Get(0), -1);
 	CHECK_EQUAL(c.Get(1), -256);
 	CHECK_EQUAL(c.Get(2), -65536);
-	CHECK_EQUAL(c.Get64(3), -4294967296);
+	CHECK_EQUAL(c.Get(3), -4294967296);
 }
 
 TEST_FIXTURE(db_setup, Column_Set) {
@@ -339,7 +339,7 @@ TEST_FIXTURE(db_setup, Column_Find8) {
 
 TEST_FIXTURE(db_setup, Column_Find9) {
 	// expand to 64-bit width
-	c.Add64(4294967296);
+	c.Add(4294967296);
 
 	size_t res = c.Find(4294967296);
 	CHECK_EQUAL(10, res);
@@ -435,10 +435,10 @@ TEST(Column_FindAll_IntMax){
 
 	for(size_t i = 0; i < vReps; i++){
 		// 64 bitwidth
-		c.Add64(4300000000ULL);
-		c.Add64(4300000001ULL);
-		c.Add64(4300000002ULL);
-		c.Add64(4300000003ULL);
+		c.Add(4300000000ULL);
+		c.Add(4300000001ULL);
+		c.Add(4300000002ULL);
+		c.Add(4300000003ULL);
 	}
 
 	c.FindAll(r, value);
@@ -447,7 +447,7 @@ TEST(Column_FindAll_IntMax){
 	size_t i = 0;
 	size_t j = 0;
 	while(i < c.Size()){
-		if(c.Get64(i) == value)
+		if(c.Get(i) == value)
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
@@ -456,8 +456,8 @@ TEST(Column_FindAll_IntMax){
 TEST(Column_FindHamming) {
 	Column col;
 	for (size_t i = 0; i < 10; ++i) {
-		col.Add64(0x5555555555555555);
-		col.Add64(0x3333333333333333);
+		col.Add(0x5555555555555555);
+		col.Add(0x3333333333333333);
 	}
 
 	Column res;

@@ -33,7 +33,7 @@ void Index::BuildIndex(const Column& src) {
 	// Brute-force build-up
 	// TODO: sort and merge
 	for (size_t i = 0; i < src.Size(); ++i) {
-		Insert(i, src.Get64(i), true);
+		Insert(i, src.Get(i), true);
 	}
 
 #ifdef _DEBUG
@@ -331,7 +331,7 @@ bool Index::FindAll(Column& result, int64_t value) const {
 	else {
 		do {
 			if (values.Get(pos) == value) {
-				result.Add64(refs.Get(pos));
+				result.Add(refs.Get(pos));
 				++pos;
 			}
 			else return false; // no more matches
@@ -360,7 +360,7 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const {
 		do {
 			const int64_t v = values[pos];
 			if (v >= start && v < end) {
-				result.Add64(refs.Get(pos));
+				result.Add(refs.Get(pos));
 				++pos;
 			}
 			else return false; // no more matches

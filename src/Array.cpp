@@ -849,7 +849,7 @@ void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_
 
 		if (x < maxdist) {
 			const size_t pos = p - (const uint64_t*)m_data;
-			result.Add64(offset + pos);
+			result.Add(offset + pos);
 		}
 
 		++p;

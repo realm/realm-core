@@ -258,7 +258,7 @@ void Table::DeleteRow(size_t ndx) {
 	--m_size;
 }
 
-int Table::Get(size_t column_id, size_t ndx) const {
+int64_t Table::Get(size_t column_id, size_t ndx) const {
 	assert(column_id < m_cols.Size());
 	assert(ndx < m_size);
 
@@ -266,28 +266,12 @@ int Table::Get(size_t column_id, size_t ndx) const {
 	return column.Get(ndx);
 }
 
-void Table::Set(size_t column_id, size_t ndx, int value) {
+void Table::Set(size_t column_id, size_t ndx, int64_t value) {
 	assert(column_id < m_cols.Size());
 	assert(ndx < m_size);
 
 	Column& column = GetColumn(column_id);
 	column.Set(ndx, value);
-}
-
-int64_t Table::Get64(size_t column_id, size_t ndx) const {
-	assert(column_id < m_cols.Size());
-	assert(ndx < m_size);
-
-	const Column& column = GetColumn(column_id);
-	return column.Get64(ndx);
-}
-
-void Table::Set64(size_t column_id, size_t ndx, int64_t value) {
-	assert(column_id < m_cols.Size());
-	assert(ndx < m_size);
-
-	Column& column = GetColumn(column_id);
-	column.Set64(ndx, value);
 }
 
 bool Table::GetBool(size_t column_id, size_t ndx) const {
@@ -296,7 +280,7 @@ bool Table::GetBool(size_t column_id, size_t ndx) const {
 	assert(ndx < m_size);
 
 	const Column& column = GetColumn(column_id);
-	return column.Get64(ndx) != 0;
+	return column.Get(ndx) != 0;
 }
 
 void Table::SetBool(size_t column_id, size_t ndx, bool value) {
@@ -305,7 +289,7 @@ void Table::SetBool(size_t column_id, size_t ndx, bool value) {
 	assert(ndx < m_size);
 
 	Column& column = GetColumn(column_id);
-	column.Set64(ndx, value ? 1 : 0);
+	column.Set(ndx, value ? 1 : 0);
 }
 
 time_t Table::GetDate(size_t column_id, size_t ndx) const {
@@ -314,7 +298,7 @@ time_t Table::GetDate(size_t column_id, size_t ndx) const {
 	assert(ndx < m_size);
 
 	const Column& column = GetColumn(column_id);
-	return (time_t)column.Get64(ndx) != 0;
+	return (time_t)column.Get(ndx) != 0;
 }
 
 void Table::SetDate(size_t column_id, size_t ndx, time_t value) {
@@ -323,15 +307,7 @@ void Table::SetDate(size_t column_id, size_t ndx, time_t value) {
 	assert(ndx < m_size);
 
 	Column& column = GetColumn(column_id);
-	column.Set64(ndx, (int64_t)value);
-}
-
-void Table::InsertInt(size_t column_id, size_t ndx, int value) {
-	assert(column_id < m_cols.Size());
-	assert(ndx <= m_size);
-
-	Column& column = GetColumn(column_id);
-	column.Insert(ndx, value);
+	column.Set(ndx, (int64_t)value);
 }
 
 void Table::InsertInt(size_t column_id, size_t ndx, int64_t value) {
@@ -339,7 +315,7 @@ void Table::InsertInt(size_t column_id, size_t ndx, int64_t value) {
 	assert(ndx <= m_size);
 
 	Column& column = GetColumn(column_id);
-	column.Insert64(ndx, value);
+	column.Insert(ndx, value);
 }
 
 const char* Table::GetString(size_t column_id, size_t ndx) const {
@@ -669,7 +645,7 @@ void Table::Print() const {
 			case COLUMN_TYPE_INT:
 				{
 					const Column& column = GetColumn(n);
-					printf("%10d ", column.Get(i));
+					printf("%10lld ", column.Get(i));
 				}
 				break;
 			case COLUMN_TYPE_BOOL:

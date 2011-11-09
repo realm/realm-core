@@ -7,22 +7,13 @@ TableView::TableView(Table& source) : m_table(source) {
 TableView::TableView(const TableView& v) : m_table(v.m_table), m_refs(v.m_refs) {
 }
 
-int TableView::Get(size_t column_id, size_t ndx) const {
+int64_t TableView::Get(size_t column_id, size_t ndx) const {
 	assert(column_id < m_table.GetColumnCount());
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);
 	assert(ndx < m_refs.Size());
 
 	const size_t real_ndx = m_refs.Get(ndx);
-	return (int)Get64(column_id, real_ndx);
-}
-
-int64_t TableView::Get64(size_t column_id, size_t ndx) const {
-	assert(column_id < m_table.GetColumnCount());
-	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);
-	assert(ndx < m_refs.Size());
-
-	const size_t real_ndx = m_refs.Get(ndx);
-	return m_table.Get64(column_id, real_ndx);
+	return m_table.Get(column_id, real_ndx);
 }
 
 bool TableView::GetBool(size_t column_id, size_t ndx) const {
@@ -52,22 +43,13 @@ const char* TableView::GetString(size_t column_id, size_t ndx) const {
 	return m_table.GetString(column_id, real_ndx);
 }
 
-void TableView::Set(size_t column_id, size_t ndx, int value) {
+void TableView::Set(size_t column_id, size_t ndx, int64_t value) {
 	assert(column_id < m_table.GetColumnCount());
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);
 	assert(ndx < m_refs.Size());
 
 	const size_t real_ndx = m_refs.Get(ndx);
-	m_table.Set64(column_id, real_ndx, value);
-}
-
-void TableView::Set64(size_t column_id, size_t ndx, int64_t value) {
-	assert(column_id < m_table.GetColumnCount());
-	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);
-	assert(ndx < m_refs.Size());
-
-	const size_t real_ndx = m_refs.Get(ndx);
-	m_table.Set64(column_id, real_ndx, value);
+	m_table.Set(column_id, real_ndx, value);
 }
 
 void TableView::SetBool(size_t column_id, size_t ndx, bool value) {

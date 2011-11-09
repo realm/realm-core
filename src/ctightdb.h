@@ -46,15 +46,13 @@ typedef struct TableView TableView;
 	void table_delete_row(Table* t, size_t ndx);
 
 	/* Getting values */
-	int table_get_int(const Table* t, size_t column_id, size_t ndx);
-	int64_t table_get_int64(const Table* t, size_t column_id, size_t ndx);
+	int64_t table_get_int(const Table* t, size_t column_id, size_t ndx);
 	bool table_get_bool(const Table* t, size_t column_id, size_t ndx);
 	time_t table_get_date(const Table* t, size_t column_id, size_t ndx);
 	const char* table_get_string(const Table* t, size_t column_id, size_t ndx);
 
 	/* Setting values */
-	void table_set_int(Table* t, size_t column_id, size_t ndx, int value);
-	void table_set_int64(Table* t, size_t column_id, size_t ndx, int64_t value);
+	void table_set_int(Table* t, size_t column_id, size_t ndx, int64_t value);
 	void table_set_bool(Table* t, size_t column_id, size_t ndx, bool value);
 	void table_set_date(Table* t, size_t column_id, size_t ndx, time_t value);
 	void table_set_string(Table* t, size_t column_id, size_t ndx, const char* value);
@@ -97,15 +95,13 @@ typedef struct TableView TableView;
 	size_t tableview_get_size(const TableView* t);
 
 	/* Getting values */
-	int tableview_get_int(const TableView* t, size_t column_id, size_t ndx);
-	int64_t tableview_get_int64(const TableView* t, size_t column_id, size_t ndx);
+	int64_t tableview_get_int(const TableView* t, size_t column_id, size_t ndx);
 	bool tableview_get_bool(const TableView* t, size_t column_id, size_t ndx);
 	time_t tableview_get_date(const TableView* t, size_t column_id, size_t ndx);
 	const char* tableview_get_string(const TableView* t, size_t column_id, size_t ndx);
 
 	/* Setting values */
-	void tableview_set_int(TableView* t, size_t column_id, size_t ndx, int value);
-	void tableview_set_int64(TableView* t, size_t column_id, size_t ndx, int64_t value);
+	void tableview_set_int(TableView* t, size_t column_id, size_t ndx, int64_t value);
 	void tableview_set_bool(TableView* t, size_t column_id, size_t ndx, bool value);
 	void tableview_set_date(TableView* t, size_t column_id, size_t ndx, time_t value);
 	void tableview_set_string(TableView* t, size_t column_id, size_t ndx, const char* value);

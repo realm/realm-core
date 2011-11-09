@@ -35,10 +35,8 @@ public:
 	void PopBack() {if (!IsEmpty()) DeleteRow(m_size-1);}
 
 	// Adaptive ints
-	int Get(size_t column_id, size_t ndx) const;
-	void Set(size_t column_id, size_t ndx, int value);
-	int64_t Get64(size_t column_id, size_t ndx) const;
-	void Set64(size_t column_id, size_t ndx, int64_t value);
+	int64_t Get(size_t column_id, size_t ndx) const;
+	void Set(size_t column_id, size_t ndx, int64_t value);
 	bool GetBool(size_t column_id, size_t ndx) const;
 	void SetBool(size_t column_id, size_t ndx, bool value);
 	time_t GetDate(size_t column_id, size_t ndx) const;
@@ -46,7 +44,6 @@ public:
 
 	// NOTE: Low-level insert functions. Always insert in all columns at once
 	// and call InsertDone after to avoid table getting un-balanced.
-	void InsertInt(size_t column_id, size_t ndx, int value);
 	void InsertInt(size_t column_id, size_t ndx, int64_t value);
 	void InsertBool(size_t column_id, size_t ndx, bool value) {InsertInt(column_id, ndx, value ? 1 :0);}
 	void InsertDate(size_t column_id, size_t ndx, time_t value) {InsertInt(column_id, ndx, (int64_t)value);}
@@ -138,15 +135,13 @@ public:
 	size_t GetSize() const {return m_refs.Size();}
 
 	// Getting values
-	int Get(size_t column_id, size_t ndx) const;
-	int64_t Get64(size_t column_id, size_t ndx) const;
+	int64_t Get(size_t column_id, size_t ndx) const;
 	bool GetBool(size_t column_id, size_t ndx) const;
 	time_t GetDate(size_t column_id, size_t ndx) const;
 	const char* GetString(size_t column_id, size_t ndx) const;
 
 	// Setting values
-	void Set(size_t column_id, size_t ndx, int value);
-	void Set64(size_t column_id, size_t ndx, int64_t value);
+	void Set(size_t column_id, size_t ndx, int64_t value);
 	void SetBool(size_t column_id, size_t ndx, bool value);
 	void SetDate(size_t column_id, size_t ndx, time_t value);
 	void SetString(size_t column_id, size_t ndx, const char* value);
@@ -179,10 +174,8 @@ public:
 	static const ColumnType type;
 
 protected:
-	int Get() const {return m_cursor->m_table.Get(m_column, m_cursor->m_index);}
-	void Set(int value) {m_cursor->m_table.Set(m_column, m_cursor->m_index, value);}
-	int64_t Get64() const {return m_cursor->m_table.Get64(m_column, m_cursor->m_index);}
-	void Set64(int64_t value) {m_cursor->m_table.Set64(m_column, m_cursor->m_index, value);}
+	int64_t Get() const {return m_cursor->m_table.Get(m_column, m_cursor->m_index);}
+	void Set(int64_t value) {m_cursor->m_table.Set(m_column, m_cursor->m_index, value);}
 	bool GetBool() const {return m_cursor->m_table.GetBool(m_column, m_cursor->m_index);}
 	void SetBool(bool value) {m_cursor->m_table.SetBool(m_column, m_cursor->m_index, value);}
 	time_t GetDate() const {return m_cursor->m_table.GetDate(m_column, m_cursor->m_index);}
@@ -197,15 +190,9 @@ protected:
 
 class AccessorInt : public Accessor {
 public:
-	operator int64_t() const {return Get64();}
-	//void operator=(int32_t value) {Set(value);}
-	//void operator=(uint32_t value) {Set(value);}
-	void operator=(int64_t value) {Set64(value);}
-	//void operator=(uint64_t value) {Set64(value);}
-	//void operator+=(int32_t value) {Set(Get()+value);}
-	//void operator+=(uint32_t value) {Set(Get()+value);}
-	void operator+=(int64_t value) {Set64(Get64()+value);}
-	//void operator+=(uint64_t value) {Set64(Get64()+value);}
+	operator int64_t() const {return Get();}
+	void operator=(int64_t value) {Set(value);}
+	void operator+=(int64_t value) {Set(Get()+value);}
 };
 
 class AccessorBool : public Accessor {
@@ -251,10 +238,7 @@ protected:
 
 class ColumnProxyInt : public ColumnProxy {
 public:
-	//size_t Find(int32_t value) const {return m_table->Find(m_column, (int64_t)value);}
-	//size_t Find(uint32_t value) const {return m_table->Find(m_column, (int64_t)value);}
 	size_t Find(int64_t value) const {return m_table->Find(m_column, value);}
-	//size_t Find(uint64_t value) const {return m_table->Find(m_column, (int64_t)value);}
 	size_t FindPos(int64_t value) const {return m_table->GetColumn(m_column).FindPos(value);}
 
 // todo, fixme: array that m_data points at becomes invalid during function exit in debug mode in VC. Added this workaround, please verify 

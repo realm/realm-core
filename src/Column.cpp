@@ -127,12 +127,12 @@ void Column::Clear() {
 	if (m_array->IsNode()) m_array->SetType(COLUMN_NORMAL);
 }
 
-int64_t Column::Get64(size_t ndx) const {
+int64_t Column::Get(size_t ndx) const {
 	return TreeGet<int64_t, Column>(ndx);
 }
 
-bool Column::Set64(size_t ndx, int64_t value) {
-	const int64_t oldVal = m_index ? Get64(ndx) : 0; // cache oldval for index
+bool Column::Set(size_t ndx, int64_t value) {
+	const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
 
 	const bool res = TreeSet<int64_t, Column>(ndx, value);
 	if (!res) return false;
@@ -147,11 +147,11 @@ bool Column::Set64(size_t ndx, int64_t value) {
 	return true;
 }
 
-bool Column::Add64(int64_t value) {
-	return Insert64(Size(), value);
+bool Column::Add(int64_t value) {
+	return Insert(Size(), value);
 }
 
-bool Column::Insert64(size_t ndx, int64_t value) {
+bool Column::Insert(size_t ndx, int64_t value) {
 	assert(ndx <= Size());
 
 	const bool res = TreeInsert<int64_t, Column>(ndx, value);
@@ -213,7 +213,7 @@ bool ColumnBase::NodeUpdateOffsets(size_t ndx) {
 void Column::Delete(size_t ndx) {
 	assert(ndx < Size());
 
-	const int64_t oldVal = m_index ? Get64(ndx) : 0; // cache oldval for index
+	const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
 
 	TreeDelete<int64_t, Column>(ndx);
 
@@ -352,16 +352,16 @@ void Column::DoSort(size_t lo, size_t hi) {
 
 	// comparison element x
 	const size_t ndx = (lo + hi)/2;
-	const int64_t x = (size_t)Get64(ndx);
+	const int64_t x = Get(ndx);
 
 	// partition
 	do {
-		while (Get64(i) < x) i++;
-		while (Get64(j) > x) j--;
+		while (Get(i) < x) i++;
+		while (Get(j) > x) j--;
 		if (i <= j) {
-			const int64_t h = Get64(i);
-			Set64(i, Get64(j));
-			Set64(j, h);
+			const int64_t h = Get(i);
+			Set(i, Get(j));
+			Set(j, h);
 			i++; j--;
 		}
 	} while (i <= j);
@@ -382,7 +382,7 @@ bool Column::Compare(const Column& c) const {
 	if (c.Size() != Size()) return false;
 
 	for (size_t i = 0; i < Size(); ++i) {
-		if (Get64(i) != c.Get64(i)) return false;
+		if (Get(i) != c.Get(i)) return false;
 	}
 
 	return true;
