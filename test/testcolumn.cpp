@@ -549,7 +549,7 @@ TEST(Column_monkeytest1) {
 
 		while(rand2() % nums_per_bitwidth != 0) {
 			if (!(rand2() % (DURATION / 10)))
-				trend = rand2() % 10;
+				trend = (unsigned int)rand2() % 10;
 
 			// Sanity test
 /*			if(rand2() % 1000 == 0)	{
