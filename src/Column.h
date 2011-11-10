@@ -157,7 +157,7 @@ protected:
 	bool LeafInsert(size_t ndx, int64_t value) {return m_array->Insert(ndx, value);}
 	void LeafDelete(size_t ndx) {m_array->Delete(ndx);}
 	size_t LeafFind(int64_t value, size_t start, size_t end) const {return m_array->Find(value, start, end);}
-	size_t LeafWrite(std::ostream& out) const {return m_array->Write(out);}
+	size_t LeafWrite(std::ostream& out, size_t& pos) const;
 
 	void DoSort(size_t lo, size_t hi);
 
@@ -218,7 +218,7 @@ protected:
 	bool LeafInsert(size_t ndx, const char* value);
 	size_t LeafFind(const char* value, size_t start, size_t end) const {return ((ArrayString*)m_array)->Find(value, start, end);}
 	void LeafDelete(size_t ndx);
-	size_t LeafWrite(std::ostream& out) const {return ((ArrayString*)m_array)->Write(out);}
+	size_t LeafWrite(std::ostream& out, size_t& pos) const;
 
 	bool IsLongStrings() const {return m_array->HasRefs();} // HasRefs indicates long string array
 };

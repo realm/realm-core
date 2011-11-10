@@ -18,6 +18,8 @@ public:
 	void Delete(size_t start, size_t end);
 	void Clear();
 
+	size_t Write(std::ostream& out) const;
+
 private:
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
 };

@@ -239,6 +239,17 @@ void AdaptiveStringColumn::LeafDelete(size_t ndx) {
 	}
 }
 
+size_t AdaptiveStringColumn::LeafWrite(std::ostream& out, size_t& pos) const {
+	if (IsLongStrings()) {
+		return ((ArrayStringLong*)m_array)->Write(out, pos);
+	}
+	else {
+		const size_t leaf_pos = pos;
+		pos += ((ArrayString*)m_array)->Write(out);
+		return leaf_pos;
+	}
+}
+
 #ifdef _DEBUG
 #include <cstring> // strcmp()
 

@@ -137,5 +137,34 @@ TEST(Group_Serialize2) {
 #endif //_DEBUG
 }
 
+TEST(Group_Serialize3) {
+	// Create group with one table (including long strings
+	Group toDisk;
+	TestTableGroup& table = toDisk.GetTable<TestTableGroup>("test");
+	table.Add("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1",  1, true, Wed);
+	table.Add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
+
+#ifdef _DEBUG
+	toDisk.Verify();
+#endif //_DEBUG
+
+	// Delete old file if there
+	remove("table_test.tbl");
+
+	// Serialize to disk
+	toDisk.Write("table_test.tbl");
+
+	// Load the table
+	Group fromDisk("table_test.tbl");
+	TestTableGroup& t = fromDisk.GetTable<TestTableGroup>("test");
+
+	// Verify that original values are there
+	CHECK(table.Compare(t));
+
+#ifdef _DEBUG
+	toDisk.Verify();
+	fromDisk.Verify();
+#endif //_DEBUG}
+}
 
 #endif

@@ -415,9 +415,7 @@ template<typename T, class C> size_t ColumnBase::TreeWrite(std::ostream& out, si
 		return node_pos;
 	}
 	else {
-		const size_t array_pos = pos;
-		pos += static_cast<const C*>(this)->LeafWrite(out);
-		return array_pos;
+		return static_cast<const C*>(this)->LeafWrite(out, pos);
 	}
 }
 
