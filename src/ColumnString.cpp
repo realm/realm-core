@@ -3,7 +3,7 @@
 #include <cstring>
 #include <cstdio> // debug
 
-#include "Column.h"
+#include "ColumnString.h"
 //#include "ArrayString.h"
 #include "ArrayStringLong.h"
 

@@ -1,4 +1,4 @@
-#include "Column.h"
+#include "ColumnString.h"
 #include <UnitTest++.h>
 
 struct db_setup_column_string {

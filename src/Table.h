@@ -4,6 +4,7 @@
 #include <cstring> // strcmp()
 #include <time.h>
 #include "Column.h"
+#include "ColumnString.h"
 #include "ColumnBinary.h"
 #include "alloc.h"
 #include "ColumnType.h"
