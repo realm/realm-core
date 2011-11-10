@@ -230,8 +230,10 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref) {
 	// Update original size
 	const size_t offset = ndx ? offsets.Get(ndx-1) : 0;
 	const size_t newSize = orig_col.Size();
-	const size_t oldSize = offsets.Get(ndx) - offset;
 	const size_t newOffset = offset + newSize;
+#ifdef _DEBUG
+	const size_t oldSize = offsets.Get(ndx) - offset;
+#endif
 	offsets.Set(ndx, newOffset);
 
 	// Insert new ref
