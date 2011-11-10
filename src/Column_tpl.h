@@ -379,7 +379,8 @@ template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start,
 	}
 }
 
-template<typename T, class C> size_t ColumnBase::TreeWrite(std::ostream& out, size_t& pos) const {
+template<typename T, class C, class S>
+size_t ColumnBase::TreeWrite(S& out, size_t& pos) const {
 	if (IsNode()) {
 		// First write out all sub-arrays
 		const Array refs = NodeGetRefs();
@@ -417,6 +418,18 @@ template<typename T, class C> size_t ColumnBase::TreeWrite(std::ostream& out, si
 	else {
 		return static_cast<const C*>(this)->LeafWrite(out, pos);
 	}
+}
+
+template<class S>
+size_t Column::Write(S& out, size_t& pos) const {
+	return TreeWrite<int64_t, Column>(out, pos);
+}
+
+template<class S>
+size_t Column::LeafWrite(S& out, size_t& pos) const {
+	const size_t leaf_pos = pos;
+	pos += m_array->Write(out);
+	return leaf_pos;
 }
 
 #endif //__TDB_COLUMN_TEMPLATES__

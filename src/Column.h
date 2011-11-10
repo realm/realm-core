@@ -61,7 +61,7 @@ protected:
 	template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
 	template<typename T, class C> void TreeDelete(size_t ndx);
 	template<typename T, class C> size_t TreeFind(T value, size_t start, size_t end) const;
-	template<typename T, class C> size_t TreeWrite(std::ostream& out, size_t& pos) const;
+	template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 
 	// Node functions
 	bool IsNode() const {return m_array->IsNode();}
@@ -133,7 +133,7 @@ public:
 	void Sort();
 
 	// Serialization
-	size_t Write(std::ostream& out, size_t& pos) const;
+	template<class S> size_t Write(S& out, size_t& pos) const;
 
 	// Debug
 #ifdef _DEBUG
@@ -157,7 +157,8 @@ protected:
 	bool LeafInsert(size_t ndx, int64_t value) {return m_array->Insert(ndx, value);}
 	void LeafDelete(size_t ndx) {m_array->Delete(ndx);}
 	size_t LeafFind(int64_t value, size_t start, size_t end) const {return m_array->Find(value, start, end);}
-	size_t LeafWrite(std::ostream& out, size_t& pos) const;
+
+	template<class S> size_t LeafWrite(S& out, size_t& pos) const;
 
 	void DoSort(size_t lo, size_t hi);
 

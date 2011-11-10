@@ -23,7 +23,7 @@ public:
 	void FindAll(Column& result, const char* value);
 	void FindAll(Column& result, const char* value, size_t len);
 
-	size_t Write(std::ostream& out) const;
+	template<class S> size_t Write(S& out) const;
 
 #ifdef _DEBUG
 	bool Compare(const ArrayString& c) const;
@@ -35,5 +35,31 @@ private:
 	size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
 };
+
+// Templates
+
+template<class S>
+size_t ArrayString::Write(S& out) const {
+	// Calculate how many bytes the array takes up
+	const size_t len = 8 + (m_len * m_width);
+
+	// Write header first
+	// TODO: replace capacity with checksum
+	out.write((const char*)m_data-8, 8);
+
+	// Write array
+	const size_t arrayByteLen = len - 8;
+	if (arrayByteLen) out.write((const char*)m_data, arrayByteLen);
+
+	// Pad so next block will be 64bit aligned
+	const char pad[8] = {0,0,0,0,0,0,0,0};
+	const size_t rest = (~len & 0x7)+1;
+
+	if (rest < 8) {
+		out.write(pad, rest);
+		return len + rest;
+	}
+	else return len; // Return number of bytes written
+}
 
 #endif //__TDB_ARRAY__

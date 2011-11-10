@@ -103,7 +103,7 @@ protected:
 	void Invalidate() {m_top.Invalidate();}
 
 	// Serialization
-	size_t Write(std::ostream& out, size_t& pos) const;
+	template<class S> size_t Write(S& out, size_t& pos) const;
 	static Table LoadFromFile(const char* path);
 
 	ColumnBase& GetColumnBase(size_t ndx);
@@ -334,5 +334,61 @@ public:
 	QueryItem operator>=(T) {return QueryItem();}
 	QueryItem between(T, T) {return QueryItem();}
 };
+
+// Templates
+
+template<class S>
+size_t Table::Write(S& out, size_t& pos) const {
+    // Spec
+    const size_t specPos = pos;
+    pos += m_spec.Write(out);
+
+    // Names
+    const size_t namesPos = pos;
+    pos += m_columnNames.Write(out);
+
+    // Columns
+    Array columns(COLUMN_HASREFS);
+    const size_t column_count = GetColumnCount();
+	for (size_t i = 0; i < column_count; ++i) {
+		const ColumnType type = GetColumnType(i);
+		switch (type) {
+			case COLUMN_TYPE_INT:
+			case COLUMN_TYPE_BOOL:
+            {
+                const Column& column = GetColumn(i);
+                const size_t cpos = column.Write(out, pos);
+                columns.Add(cpos);
+            }
+				break;
+			case COLUMN_TYPE_STRING:
+            {
+                const AdaptiveStringColumn& column = GetColumnString(i);
+                const size_t cpos = column.Write(out, pos);
+                columns.Add(cpos);
+            }
+				break;
+			default: assert(false);
+		}
+	}
+    const size_t columnsPos = pos;
+    pos += columns.Write(out);
+
+    // Table array
+    Array top(COLUMN_HASREFS);
+    top.Add(specPos);
+    top.Add(namesPos);
+    top.Add(columnsPos);
+    const uint64_t topPos = pos; // sized for top ref
+    pos += top.Write(out);
+
+    // Clean-up
+	columns.SetType(COLUMN_NORMAL); // avoid recursive del
+	top.SetType(COLUMN_NORMAL);
+	columns.Destroy();
+	top.Destroy();
+
+    return topPos;
+}
 
 #endif //__TDB_TABLE__

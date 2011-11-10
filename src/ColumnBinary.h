@@ -3,6 +3,7 @@
 
 #include "Column.h"
 #include "ColumnType.h" // BinaryData
+#include "ArrayBinary.h"
 
 class ColumnBinary : public ColumnBase {
 public:
@@ -38,6 +39,9 @@ public:
 	size_t GetRef() const {return m_array->GetRef();}
 	void SetParent(Array* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 
+	// Serialization
+	template<class S> size_t Write(S& out, size_t& pos) const;
+
 #ifdef _DEBUG
 	void Verify() const {};
 #endif //_DEBUG
@@ -55,8 +59,20 @@ protected:
 	bool LeafSet(size_t ndx, BinaryData value);
 	bool LeafInsert(size_t ndx, BinaryData value);
 	void LeafDelete(size_t ndx);
-	size_t LeafWrite(std::ostream& out, size_t& pos) const;
+	template<class S> size_t LeafWrite(S& out, size_t& pos) const;
 };
+
+// Templates
+
+template<class S>
+size_t ColumnBinary::Write(S& out, size_t& pos) const {
+	return TreeWrite<const char*, ColumnBinary>(out, pos);
+}
+
+template<class S>
+size_t ColumnBinary::LeafWrite(S& out, size_t& pos) const {
+	return ((ArrayBinary*)m_array)->Write(out, pos);
+}
 
 #endif //__TDB_COLUMN_BINARY__
 

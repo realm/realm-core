@@ -4,8 +4,6 @@
 #include <cstdio> // debug
 
 #include "ColumnString.h"
-//#include "ArrayString.h"
-#include "ArrayStringLong.h"
 
 // Pre-declare local functions
 ColumnDef GetTypeFromArray(size_t ref, Allocator& alloc);
@@ -144,10 +142,6 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t, size_t) const {
 	return TreeFind<const char*, AdaptiveStringColumn>(value, 0, -1);
 }
 
-size_t AdaptiveStringColumn::Write(std::ostream& out, size_t& pos) const {
-	return TreeWrite<const char*, AdaptiveStringColumn>(out, pos);
-}
-
 const char* AdaptiveStringColumn::LeafGet(size_t ndx) const {
 	if (IsLongStrings()) {
 		return ((ArrayStringLong*)m_array)->Get(ndx);
@@ -236,17 +230,6 @@ void AdaptiveStringColumn::LeafDelete(size_t ndx) {
 	}
 	else {
 		((ArrayString*)m_array)->Delete(ndx);
-	}
-}
-
-size_t AdaptiveStringColumn::LeafWrite(std::ostream& out, size_t& pos) const {
-	if (IsLongStrings()) {
-		return ((ArrayStringLong*)m_array)->Write(out, pos);
-	}
-	else {
-		const size_t leaf_pos = pos;
-		pos += ((ArrayString*)m_array)->Write(out);
-		return leaf_pos;
 	}
 }
 

@@ -3,6 +3,7 @@
 
 #include "Column.h"
 #include "ArrayString.h"
+#include "ArrayStringLong.h"
 
 class AdaptiveStringColumn : public ColumnBase {
 public:
@@ -38,7 +39,7 @@ public:
 	void SetParent(Array* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 
 	// Serialization
-	size_t Write(std::ostream& out, size_t& pos) const;
+	template<class S> size_t Write(S& out, size_t& pos) const;
 
 #ifdef _DEBUG
 	bool Compare(const AdaptiveStringColumn& c) const;
@@ -55,9 +56,29 @@ protected:
 	bool LeafInsert(size_t ndx, const char* value);
 	size_t LeafFind(const char* value, size_t start, size_t end) const {return ((ArrayString*)m_array)->Find(value, start, end);}
 	void LeafDelete(size_t ndx);
-	size_t LeafWrite(std::ostream& out, size_t& pos) const;
+
+	template<class S> size_t LeafWrite(S& out, size_t& pos) const;
 
 	bool IsLongStrings() const {return m_array->HasRefs();} // HasRefs indicates long string array
 };
+
+// Templates
+
+template<class S>
+size_t AdaptiveStringColumn::Write(S& out, size_t& pos) const {
+	return TreeWrite<const char*, AdaptiveStringColumn>(out, pos);
+}
+
+template<class S>
+size_t AdaptiveStringColumn::LeafWrite(S& out, size_t& pos) const {
+	if (IsLongStrings()) {
+		return ((ArrayStringLong*)m_array)->Write(out, pos);
+	}
+	else {
+		const size_t leaf_pos = pos;
+		pos += ((ArrayString*)m_array)->Write(out);
+		return leaf_pos;
+	}
+}
 
 #endif //__TDB_COLUMN_STRING__

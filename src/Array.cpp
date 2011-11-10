@@ -1101,29 +1101,6 @@ void Array::DoSort(size_t lo, size_t hi) {
 	if (i < (int)hi) DoSort(i, hi);
 }
 
-size_t Array::Write(std::ostream& out) const {
-	// Calculate who many bytes the array takes up
-	const size_t len = CalcByteLen(m_len, m_width);
-
-	// Write header first
-	// TODO: replace capacity with checksum
-	out.write((const char*)m_data-8, 8);
-
-	// Write array
-	const size_t arrayByteLen = len - 8;
-	if (arrayByteLen) out.write((const char*)m_data, arrayByteLen);
-
-	// Pad so next block will be 64bit aligned
-	const char pad[8] = {0,0,0,0,0,0,0,0};
-	const size_t rest = (~len & 0x7)+1; // CHECK
-	if (rest < 8) {
-		out.write(pad, rest);
-		return len + rest;
-	}
-	else return len; // Return number of bytes written
-}
-
-
 #ifdef _DEBUG
 #include "stdio.h"
 

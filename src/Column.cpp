@@ -380,16 +380,6 @@ void Column::DoSort(size_t lo, size_t hi) {
 	if (i < (int)hi) DoSort(i, hi);
 }
 
-size_t Column::Write(std::ostream& out, size_t& pos) const {
-	return TreeWrite<int64_t, Column>(out, pos);
-}
-
-size_t Column::LeafWrite(std::ostream& out, size_t& pos) const {
-	const size_t leaf_pos = pos;
-	pos += m_array->Write(out);
-	return leaf_pos;
-}
-
 #ifdef _DEBUG
 #include "stdio.h"
 

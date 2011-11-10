@@ -1,5 +1,4 @@
 #include "ColumnBinary.h"
-#include "ArrayBinary.h"
 
 // Pre-declare local functions
 bool IsNodeFromRef(size_t ref, Allocator& alloc);
@@ -157,8 +156,4 @@ bool ColumnBinary::LeafInsert(size_t ndx, BinaryData value) {
 
 void ColumnBinary::LeafDelete(size_t ndx) {
 	((ArrayBinary*)m_array)->Delete(ndx);
-}
-
-size_t ColumnBinary::LeafWrite(std::ostream& out, size_t& pos) const {
-	return ((ArrayBinary*)m_array)->Write(out, pos);
 }
