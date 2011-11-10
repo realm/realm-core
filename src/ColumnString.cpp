@@ -158,7 +158,7 @@ bool AdaptiveStringColumn::LeafSet(size_t ndx, const char* value) {
 		((ArrayStringLong*)m_array)->Set(ndx, value, len);
 		return true;
 	}
-	else if (len < 64) {
+	else if (len < 16) {
 		return ((ArrayString*)m_array)->Set(ndx, value);
 	}
 
@@ -194,7 +194,7 @@ bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value) {
 		((ArrayStringLong*)m_array)->Insert(ndx, value, len);
 		return true;
 	}
-	else if (len < 64) {
+	else if (len < 16) {
 		return ((ArrayString*)m_array)->Insert(ndx, value);
 	}
 
