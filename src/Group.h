@@ -8,6 +8,7 @@ class Group {
 public:
 	Group();
 	Group(const char* filename);
+	Group(const char* buffer, size_t len);
 	~Group();
 
 	Table& GetTable(const char* name);
@@ -15,6 +16,7 @@ public:
 
 	// Serialization
 	void Write(const char* filepath);
+	char* WriteToMem(size_t& len);
 
 #ifdef _DEBUG
 	void Verify();
@@ -22,6 +24,7 @@ public:
 #endif //_DEBUG
 
 private:
+	void Create();
 	template<class S> size_t Write(S& out);
 
 	// Member variables

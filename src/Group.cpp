@@ -17,6 +17,18 @@ Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableN
 	// Memory map file
 	m_alloc.SetShared(filename);
 
+	Create();
+}
+
+Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc)
+{
+	// Memory map file
+	m_alloc.SetSharedBuffer(buffer, len);
+
+	Create();
+}
+
+void Group::Create() {
 	// Get ref for table top array
 	const size_t top_ref = m_alloc.GetTopRef();
 
@@ -83,6 +95,40 @@ void Group::Write(const char* filepath) {
 }
 
 
+class MemoryOStream {
+public:
+	MemoryOStream(size_t size) : m_pos(0), m_buffer(NULL) {
+		m_buffer = (char*)malloc(size);
+	}
+
+	bool IsValid() const {return m_buffer != NULL;}
+
+	void write(const char* p, size_t n) {
+		memcpy(m_buffer+m_pos, p, n);
+		m_pos += n;
+	}
+	void seekp(size_t pos) {m_pos = pos;}
+
+	char* ReleaseBuffer() {
+		char* tmp = m_buffer;
+		m_buffer = NULL; // invalidate
+		return tmp;
+	}
+private:
+	size_t m_pos;
+	char* m_buffer;
+};
+
+char* Group::WriteToMem(size_t& len) {
+	// Get max possible size of buffer
+	const size_t max_size = m_alloc.GetTotalSize();
+
+	MemoryOStream out(max_size);
+	if (!out.IsValid()) return NULL; // alloc failed
+
+	len = Write(out);
+	return out.ReleaseBuffer();
+}
 
 #ifdef _DEBUG
 

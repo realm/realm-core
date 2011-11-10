@@ -116,6 +116,7 @@ public: \
 	const Cursor operator[](size_t ndx) const {return Cursor(*this, ndx);} \
 	Cursor operator[](int ndx) {return Cursor(*this, (ndx < 0) ? GetSize() + ndx : ndx);} \
 	Cursor Back() {return Cursor(*this, m_size-1);} \
+	const Cursor Back() const {return Cursor(*this, m_size-1);} \
 \
 	size_t Find(const TableName##Query&) const {return (size_t)-1;} \
 	TableName FindAll(const TableName##Query&) const {return TableName();} \

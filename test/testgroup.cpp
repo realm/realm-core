@@ -166,4 +166,44 @@ TEST(Group_Serialize3) {
 #endif //_DEBUG}
 }
 
+TEST(Group_Serialize_Men) {
+	// Create group with one table
+	Group toMem;
+	TestTableGroup& table = toMem.GetTable<TestTableGroup>("test");
+	table.Add("",  1, true, Wed);
+	table.Add("", 15, true, Wed);
+	table.Add("", 10, true, Wed);
+	table.Add("", 20, true, Wed);
+	table.Add("", 11, true, Wed);
+	table.Add("", 45, true, Wed);
+	table.Add("", 10, true, Wed);
+	table.Add("",  0, true, Wed);
+	table.Add("", 30, true, Wed);
+	table.Add("",  9, true, Wed);
+
+#ifdef _DEBUG
+	toMem.Verify();
+#endif //_DEBUG
+
+	// Serialize to memory (we now own the buffer)
+	size_t len;
+	const char* const buffer = toMem.WriteToMem(len);
+
+	// Load the table
+	Group fromMem(buffer, len);
+	TestTableGroup& t = fromMem.GetTable<TestTableGroup>("test");
+
+	CHECK_EQUAL(4, t.GetColumnCount());
+	CHECK_EQUAL(10, t.GetSize());
+
+	// Verify that original values are there
+	CHECK(table.Compare(t));
+
+#ifdef _DEBUG
+	toMem.Verify();
+	fromMem.Verify();
+#endif //_DEBUG
+}
+
+
 #endif

@@ -14,14 +14,17 @@ public:
 	SlabAlloc();
 	~SlabAlloc();
 
+	bool SetShared(const char* path);
+	void SetSharedBuffer(const char* buffer, size_t len);
+
 	MemRef Alloc(size_t size);
 	MemRef ReAlloc(size_t ref, void* p, size_t size);
 	void Free(size_t ref, void* p);
 	void* Translate(size_t ref) const;
 
 	bool IsReadOnly(size_t ref) const;
-	bool SetShared(const char* path);
 	size_t GetTopRef() const;
+	size_t GetTotalSize() const;
 
 #ifdef _DEBUG
 	void EnableDebug(bool enable) {m_debugOut = enable;}
@@ -41,6 +44,7 @@ private:
 
 	// Member variables
 	char* m_shared;
+	bool m_owned;
 	size_t m_baseline;
 	Slabs m_slabs;
 	FreeSpace m_freeSpace;

@@ -19,7 +19,7 @@
 // Pre-declare local functions
 size_t GetSizeFromHeader(void* p);
 
-SlabAlloc::SlabAlloc() : m_shared(NULL), m_baseline(8) {
+SlabAlloc::SlabAlloc() : m_shared(NULL), m_owned(false), m_baseline(8) {
 #ifdef _DEBUG
 	m_debugOut = false;
 #endif //_DEBUG
@@ -42,10 +42,15 @@ SlabAlloc::~SlabAlloc() {
 
 	// Release any shared memory
 	if (m_shared) {
+		if (m_owned) {
+			free(m_shared);
+		}
 #ifdef _MSC_VER
 #else
-		munmap(m_shared, m_baseline);
-		close(m_fd);
+		else {
+			munmap(m_shared, m_baseline);
+			close(m_fd);
+		}
 #endif
 	}
 }
@@ -207,6 +212,12 @@ bool SlabAlloc::IsReadOnly(size_t ref) const {
 	return ref < m_baseline;
 }
 
+void SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
+	m_shared = (char*)buffer;
+	m_baseline = len;
+	m_owned = true; // we now own the buffer
+}
+
 bool SlabAlloc::SetShared(const char* path) {
 #ifdef _MSC_VER
 #else
@@ -247,6 +258,15 @@ size_t SlabAlloc::GetTopRef() const {
 	assert(ref < m_baseline);
 
 	return ref;
+}
+
+size_t SlabAlloc::GetTotalSize() const {
+	if (m_slabs.IsEmpty()) {
+		return m_baseline;
+	}
+	else {
+		return m_slabs.Back().offset;
+	}
 }
 
 #ifdef _DEBUG
