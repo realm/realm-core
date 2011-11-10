@@ -105,7 +105,7 @@ TEST_FIXTURE(db_setup, Column_Add8) {
 	CHECK_EQUAL(c.Get(5), 16);
 	CHECK_EQUAL(c.Get(6), 256);
 	CHECK_EQUAL(c.Get(7), 65536);
-	CHECK_EQUAL(c.Get64(8), 4294967296);
+	CHECK_EQUAL(c.Get64(8), 4294967296LL);
 	CHECK_EQUAL(c.Size(), 9);
 }
 
@@ -141,7 +141,7 @@ TEST_FIXTURE(db_setup, Column_AddNeg4) {
 	CHECK_EQUAL(c.Get(0), -1);
 	CHECK_EQUAL(c.Get(1), -256);
 	CHECK_EQUAL(c.Get(2), -65536);
-	CHECK_EQUAL(c.Get64(3), -4294967296);
+	CHECK_EQUAL(c.Get64(3), -4294967296LL);
 }
 
 TEST_FIXTURE(db_setup, Column_Set) {
@@ -456,12 +456,12 @@ TEST(Column_FindAll_IntMax){
 TEST(Column_FindHamming) {
 	Column col;
 	for (size_t i = 0; i < 10; ++i) {
-		col.Add64(0x5555555555555555);
-		col.Add64(0x3333333333333333);
+		col.Add64(0x5555555555555555LL);
+		col.Add64(0x3333333333333333LL);
 	}
 
 	Column res;
-	col.FindAllHamming(res, 0x3333333333333332, 2);
+	col.FindAllHamming(res, 0x3333333333333332LL, 2);
 
 	CHECK_EQUAL(10, res.Size()); // Half should match
 
