@@ -22,6 +22,8 @@ public:
 	void Delete(size_t ndx);
 	void Clear();
 
+	size_t Write(std::ostream& out, size_t& pos) const;
+
 private:
 	Array m_offsets;
 	ArrayBlob m_blob;

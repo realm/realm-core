@@ -55,6 +55,7 @@ protected:
 	bool LeafSet(size_t ndx, BinaryData value);
 	bool LeafInsert(size_t ndx, BinaryData value);
 	void LeafDelete(size_t ndx);
+	size_t LeafWrite(std::ostream& out, size_t& pos) const;
 };
 
 #endif //__TDB_COLUMN_BINARY__
