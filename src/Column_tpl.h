@@ -241,8 +241,11 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref) {
 	offsets.Insert(ndx+1, newOffset + refSize);
 	refs.Insert(ndx+1, new_ref);
 
-	// Update following offsets
+#ifdef _DEBUG
 	assert((newSize + refSize) - oldSize == 1); // insert should only add one item
+#endif
+
+	// Update following offsets
 	if (offsets.Size() > ndx+2)
 		offsets.Increment(1, ndx+2);
 
