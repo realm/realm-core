@@ -11,6 +11,7 @@ public:
 	Group(const char* buffer, size_t len);
 	~Group();
 
+	bool HasTable(const char* name) const;
 	Table& GetTable(const char* name);
 	template<class T> T& GetTable(const char* name);
 

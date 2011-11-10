@@ -63,6 +63,11 @@ Group::~Group() {
 	m_top.Destroy();
 }
 
+bool Group::HasTable(const char* name) const {
+	const size_t n = m_tableNames.Find(name);
+	return (n != (size_t)-1);
+}
+
 Table& Group::GetTable(const char* name) {
 	const size_t n = m_tableNames.Find(name);
 	if (n == (size_t)-1) {
