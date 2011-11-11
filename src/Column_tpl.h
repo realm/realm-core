@@ -333,7 +333,9 @@ template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start,
 	 return FindWithIndex(value);
 	 }*/
 
-	if (!IsNode()) return static_cast<const C*>(this)->LeafFind(value, start, end);
+	if (!IsNode()) {
+		return static_cast<const C*>(this)->LeafFind(value, start, end);
+	}
 	else {
 		// Get subnode table
 		const Array offsets = NodeGetOffsets();

@@ -281,6 +281,56 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert3) {
 	CHECK_EQUAL(6, c.Size());
 }
 
+TEST(ColumnStringFind1) {
+	AdaptiveStringColumn c;
+
+	c.Add("a");
+	c.Add("bc");
+	c.Add("def");
+	c.Add("ghij");
+	c.Add("klmop");
+
+	size_t res1 = c.Find("");
+	CHECK_EQUAL((size_t)-1, res1);
+
+	size_t res2 = c.Find("xlmno hiuh iuh uih i huih i biuhui");
+	CHECK_EQUAL((size_t)-1, res2);
+
+	size_t res3 = c.Find("klmop");
+	CHECK_EQUAL(4, res3);
+
+	// Cleanup
+	c.Destroy();
+}
+
+TEST(ColumnStringFind2) {
+	AdaptiveStringColumn c;
+
+	c.Add("a");
+	c.Add("bc");
+	c.Add("def");
+	c.Add("ghij");
+	c.Add("klmop");
+
+	// Add a string longer than 64 bytes to expand to long strings
+	c.Add("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx");
+
+	size_t res1 = c.Find("");
+	CHECK_EQUAL((size_t)-1, res1);
+
+	size_t res2 = c.Find("xlmno hiuh iuh uih i huih i biuhui");
+	CHECK_EQUAL((size_t)-1, res2);
+
+	size_t res3 = c.Find("klmop");
+	CHECK_EQUAL(4, res3);
+
+	size_t res4 = c.Find("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx");
+	CHECK_EQUAL(5, res4);
+
+	// Cleanup
+	c.Destroy();
+}
+
 TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy) {
 	// clean up (ALWAYS PUT THIS LAST)
 	c.Destroy();

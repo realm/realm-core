@@ -224,6 +224,15 @@ bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value) {
 	return true;
 }
 
+size_t AdaptiveStringColumn::LeafFind(const char* value, size_t start, size_t end) const {
+	if (IsLongStrings()) {
+		return ((ArrayStringLong*)m_array)->Find(value, start, end);
+	}
+	else {
+		return ((ArrayString*)m_array)->Find(value, start, end);
+	}
+}
+
 void AdaptiveStringColumn::LeafDelete(size_t ndx) {
 	if (IsLongStrings()) {
 		((ArrayStringLong*)m_array)->Delete(ndx);

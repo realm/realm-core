@@ -175,6 +175,26 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete) {
 	CHECK(c.IsEmpty());
 }
 
+TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind) {
+	c.Clear();
+
+	c.Add("a");
+	c.Add("bc iu");
+	c.Add("def");
+	c.Add("ghij uihi i ih iu huih ui");
+	c.Add("klmno hiuh iuh uih i huih i biuhui");
+
+	size_t res1 = c.Find("");
+	CHECK_EQUAL((size_t)-1, res1);
+
+	size_t res2 = c.Find("xlmno hiuh iuh uih i huih i biuhui");
+	CHECK_EQUAL((size_t)-1, res2);
+
+	size_t res3 = c.Find("ghij uihi i ih iu huih ui");
+	CHECK_EQUAL(3, res3);
+}
+
+
 TEST_FIXTURE(db_setup_string_long, ArrayStringLong_Destroy) {
 	// clean up (ALWAYS PUT THIS LAST)
 	c.Destroy();

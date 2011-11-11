@@ -102,3 +102,29 @@ void ArrayStringLong::Clear() {
 	m_blob.Clear();
 	m_offsets.Clear();
 }
+
+size_t ArrayStringLong::Find(const char* value, size_t start, size_t end) const {
+	assert(value);
+	return FindWithLen(value, strlen(value), start, end);
+}
+
+size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start, size_t end) const {
+	assert(value);
+
+	len += 1; // include trailing null byte
+	const size_t count = m_offsets.Size();
+	size_t offset = 0;
+	for (size_t i = 0; i < count; ++i) {
+		const size_t end = m_offsets.Get(i);
+
+		// Only compare strings if length matches
+		if ((end - offset) == len) {
+			const char* const v = Get(i);
+			if (value[0] == *v && strcmp(value, v) == 0)
+				return i;
+		}
+		offset = end;
+	}
+
+	return (size_t)-1; // not found
+}

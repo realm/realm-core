@@ -54,7 +54,7 @@ protected:
 	const char* LeafGet(size_t ndx) const;
 	bool LeafSet(size_t ndx, const char* value);
 	bool LeafInsert(size_t ndx, const char* value);
-	size_t LeafFind(const char* value, size_t start, size_t end) const {return ((ArrayString*)m_array)->Find(value, start, end);}
+	size_t LeafFind(const char* value, size_t start, size_t end) const;
 	void LeafDelete(size_t ndx);
 
 	template<class S> size_t LeafWrite(S& out, size_t& pos) const;
