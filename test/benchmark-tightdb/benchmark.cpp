@@ -81,7 +81,7 @@ void tightdb(void) {
 		timer.Start();
 		for (size_t i = 0; i < ITEMS; ++i) {
 			size_t p = rand2() % ITEMS;
-			dummy += integers.Get64(0, p);
+			dummy += integers[p].first;
 		}
 		force = dummy;
 		printf((indexed + "Get: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
@@ -90,7 +90,7 @@ void tightdb(void) {
 		timer.Start();
 		for (size_t i = 0; i < ITEMS; ++i) {
 			size_t p = rand2() % ITEMS;
-			integers.Set64(0, p, rand2() % RANGE);
+			integers[p].first = rand2() % RANGE;
 		}
 		force = dummy;
 		printf((indexed + "Set: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
