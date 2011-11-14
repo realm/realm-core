@@ -95,6 +95,7 @@ public:
 
 private:
 	Array& operator=(const Array&) {return *this;} // not allowed
+	void Array::SetBounds(size_t width);
 
 protected:
 	void Create(size_t ref);
@@ -151,6 +152,9 @@ protected:
 	Array* m_parent;
 	size_t m_parentNdx;
 	Allocator& m_alloc;
+
+	int64_t m_lbound;
+	int64_t m_ubound;
 };
 
 // Templates
