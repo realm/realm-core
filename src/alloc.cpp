@@ -3,7 +3,10 @@
 
 // Memory Mapping includes
 #ifdef _MSC_VER
-//TODO: win include
+#include <windows.h>
+#include <stdio.h>
+#include <conio.h>
+#include <stdio.h>
 #else
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -45,13 +48,16 @@ SlabAlloc::~SlabAlloc() {
 		if (m_owned) {
 			free(m_shared);
 		}
-#ifdef _MSC_VER
-#else
 		else {
+#ifdef _MSC_VER
+			UnmapViewOfFile(m_shared);
+			CloseHandle(m_fd);
+			CloseHandle(m_mapfile);
+#else
 			munmap(m_shared, m_baseline);
 			close(m_fd);
-		}
 #endif
+		}
 	}
 }
 
@@ -220,6 +226,26 @@ void SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
 
 bool SlabAlloc::SetShared(const char* path) {
 #ifdef _MSC_VER
+	// Open file
+	m_fd = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, NULL, NULL);
+
+	// Map to memory (read only)
+	const HANDLE hMapFile = CreateFileMapping(m_fd, NULL, PAGE_WRITECOPY, 0, 0, 0);
+	if (hMapFile == NULL || hMapFile == INVALID_HANDLE_VALUE) {
+		return false;
+	}
+	const LPCTSTR pBuf = (LPTSTR) MapViewOfFile(hMapFile, FILE_MAP_COPY, 0, 0, 0);
+	if (pBuf == NULL) {
+		return false;
+	}
+
+	// Get Size
+	LARGE_INTEGER size;
+	GetFileSizeEx(m_fd, &size);
+	m_baseline = size.QuadPart;
+
+	m_shared = (char *)pBuf;
+	m_mapfile = hMapFile;
 #else
 	// Open file
 	m_fd = open(path, O_RDONLY);

@@ -51,6 +51,10 @@ private:
 
 #ifndef _MSC_VER
 	int m_fd;
+#else
+	//TODO: Something in a tightdb header won't let us include windows.h, so we can't use HANDLE
+	void *m_mapfile;
+	void *m_fd;
 #endif
 
 #ifdef _DEBUG
