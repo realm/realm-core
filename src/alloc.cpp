@@ -1,5 +1,3 @@
-#include "AllocSlab.h"
-#include <assert.h>
 
 // Memory Mapping includes
 #ifdef _MSC_VER
@@ -13,6 +11,9 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #endif
+
+#include "AllocSlab.h"
+#include <assert.h>
 
 #ifdef _DEBUG
 #include <stdio.h>
