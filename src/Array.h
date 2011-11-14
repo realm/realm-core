@@ -95,7 +95,7 @@ public:
 
 private:
 	Array& operator=(const Array&) {return *this;} // not allowed
-	void Array::SetBounds(size_t width);
+	void SetBounds(size_t width);
 
 protected:
 	void Create(size_t ref);
