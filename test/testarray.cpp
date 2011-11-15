@@ -142,6 +142,9 @@ TEST(Array_AddNeg1_1) {
 	CHECK_EQUAL(c.Get(2), 3);
 	CHECK_EQUAL(c.Get(3), -128);
 	CHECK_EQUAL(8, c.GetBitWidth());
+
+	// Cleanup
+	c.Destroy();
 }
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg2) {
@@ -419,6 +422,9 @@ TEST(Array_Sort) {
 	CHECK_EQUAL(40, a.Get(7));
 	CHECK_EQUAL(50, a.Get(8));
 	CHECK_EQUAL(51, a.Get(9));
+
+	// Cleanup
+	a.Destroy();
 }
 
 /** FindAll() int tests spread out over bitwidth
@@ -446,6 +452,10 @@ TEST(findallint0){
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
+
+	// Cleanup
+	a.Destroy();
+	r.Destroy();
 }
 
 TEST(findallint1){
@@ -472,6 +482,10 @@ TEST(findallint1){
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
+
+	// Cleanup
+	a.Destroy();
+	r.Destroy();
 }
 
 TEST(findallint2){
@@ -498,6 +512,10 @@ TEST(findallint2){
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
+
+	// Cleanup
+	a.Destroy();
+	r.Destroy();
 }
 
 TEST(findallint3){
@@ -524,6 +542,10 @@ TEST(findallint3){
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
+
+	// Cleanup
+	a.Destroy();
+	r.Destroy();
 }
 
 TEST(findallint4){
@@ -551,6 +573,10 @@ TEST(findallint4){
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
+
+	// Cleanup
+	a.Destroy();
+	r.Destroy();
 }
 
 TEST(findallint5){
@@ -578,6 +604,10 @@ TEST(findallint5){
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
+
+	// Cleanup
+	a.Destroy();
+	r.Destroy();
 }
 
 TEST(findallint6){
@@ -605,6 +635,10 @@ TEST(findallint6){
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
+
+	// Cleanup
+	a.Destroy();
+	r.Destroy();
 }
 
 TEST(findallint7){
@@ -632,6 +666,10 @@ TEST(findallint7){
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
+
+	// Cleanup
+	a.Destroy();
+	r.Destroy();
 }
 
 
@@ -676,7 +714,13 @@ template<class T, class U> bool findall_test(std::vector<T>& v, U& a, T val) {
 	
 	Column c;
 	a.FindAll(c, val);
-	return vector_eq_array(results, c);
+
+	const bool res = vector_eq_array(results, c);
+
+	// Cleanup
+	c.Destroy();
+
+	return res;
 }
 
 
@@ -739,10 +783,11 @@ TEST(monkeytest1) {
 					CHECK_EQUAL(true, b);
 				}
 			}
-
-
 		}
 	}
+
+	// Cleanup
+	a.Destroy();
 }
 
 

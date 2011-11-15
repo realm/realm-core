@@ -7,6 +7,10 @@ TableView::TableView(Table& source) : m_table(source) {
 TableView::TableView(const TableView& v) : m_table(v.m_table), m_refs(v.m_refs) {
 }
 
+TableView::~TableView() {
+	m_refs.Destroy();
+}
+
 int64_t TableView::Get(size_t column_id, size_t ndx) const {
 	assert(column_id < m_table.GetColumnCount());
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);

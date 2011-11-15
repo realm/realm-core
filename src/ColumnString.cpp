@@ -49,6 +49,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, const Array* parent, size
 }
 
 AdaptiveStringColumn::~AdaptiveStringColumn() {
+	delete m_array;
 }
 
 void AdaptiveStringColumn::Destroy() {
@@ -65,10 +66,16 @@ void AdaptiveStringColumn::UpdateRef(size_t ref) {
 
 	if (IsNode()) m_array->UpdateRef(ref);
 	else {
+		Array* parent = m_array->GetParent();
+		size_t pndx   = m_array->GetParentNdx();
+
 		// Replace the string array with int array for node
-		Array* array = new Array(ref, m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
+		Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
 		delete m_array;
 		m_array = array;
+
+		// Update ref in parent
+		if (parent) parent->Set(pndx, m_array->GetRef());
 	}
 }
 

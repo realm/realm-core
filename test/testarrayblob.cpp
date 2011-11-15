@@ -55,4 +55,7 @@ TEST(ArrayBlob) {
 	// Delete all
 	blob.Delete(0, l1 + l3);
 	CHECK(blob.IsEmpty());
+
+	// Cleanup
+	blob.Destroy();
 }

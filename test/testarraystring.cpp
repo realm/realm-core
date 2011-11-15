@@ -317,6 +317,9 @@ TEST_FIXTURE(db_setup_string, ArrayStringFindAll) {
 	CHECK_EQUAL(0, col.Get(0));
 	CHECK_EQUAL(2, col.Get(1));
 	CHECK_EQUAL(4, col.Get(2));
+
+	// Cleanup
+	col.Destroy();
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDestroy) {
