@@ -12,16 +12,19 @@ Group::Group() : m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(COLUMN_HASREF
 	m_tables.SetParent(&m_top, 1);
 }
 
-Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc)
-{
+Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc) {
+	assert(filename);
+
 	// Memory map file
-	m_alloc.SetShared(filename);
+	const bool res = m_alloc.SetShared(filename);
+	assert(res);
 
 	Create();
 }
 
-Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc)
-{
+Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc) {
+	assert(buffer);
+
 	// Memory map file
 	m_alloc.SetSharedBuffer(buffer, len);
 
@@ -94,7 +97,11 @@ Table& Group::GetTable(const char* name) {
 }
 
 void Group::Write(const char* filepath) {
+	assert(filepath);
+
 	std::ofstream out(filepath, std::ios_base::out|std::ios_base::binary);
+	assert(out);
+
 	Write(out);
     out.close();
 }

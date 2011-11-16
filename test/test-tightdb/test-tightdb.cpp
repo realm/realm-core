@@ -5,6 +5,10 @@
 #include "../Support/mem.h"
 #include "../Support/number_names.h"
 
+// Pre-declare local functions
+uint64_t rand2();
+
+
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
 uint64_t rand2() { 
 	static int64_t seed = 2862933555777941757ULL; 

@@ -397,6 +397,9 @@ TEST(Column_Sort) {
 	CHECK_EQUAL(40, a.Get(7));
 	CHECK_EQUAL(50, a.Get(8));
 	CHECK_EQUAL(51, a.Get(9));
+
+	// Cleanup
+	a.Destroy();
 }
 
 /** FindAll() int tests spread out over bitwidth
@@ -424,6 +427,10 @@ TEST(Column_FindAll_IntMin){
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
+
+	// Cleanup
+	c.Destroy();
+	r.Destroy();
 }
 
 TEST(Column_FindAll_IntMax){
@@ -451,6 +458,10 @@ TEST(Column_FindAll_IntMax){
 			CHECK_EQUAL(i, r.Get(j++));
 		i += 1;
 	}
+
+	// Cleanup
+	c.Destroy();
+	r.Destroy();
 }
 
 TEST(Column_FindHamming) {
@@ -526,7 +537,12 @@ template<class T, class U> static bool findall_test(std::vector<T>& v, U& a, T v
 	
 	Column c;
 	a.FindAll(c, val);
-	return vector_eq_array(results, c);
+	const bool res = vector_eq_array(results, c);
+
+	// Cleanup
+	c.Destroy();
+
+	return res;
 }
 
 
@@ -589,10 +605,11 @@ TEST(Column_monkeytest1) {
 					CHECK_EQUAL(true, b);
 				}
 			}
-
-
 		}
 	}
+
+	// Cleanup
+	a.Destroy();
 }
 
 

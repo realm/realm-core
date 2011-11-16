@@ -127,6 +127,7 @@ class TableView {
 public:
 	TableView(Table& source);
 	TableView(const TableView& v);
+	~TableView();
 
 	Table& GetParent() {return m_table;}
 	Column& GetRefColumn() {return m_refs;}
@@ -244,7 +245,7 @@ public:
 
 // todo, fixme: array that m_data points at becomes invalid during function exit in debug mode in VC. Added this workaround, please verify 
 // or fix properly
-	TableView FindAll(int value) {TableView *tv = new TableView(*m_table); m_table->FindAll(*tv, m_column, value); return *tv;}
+	TableView FindAll(int value) {TableView tv(*m_table); m_table->FindAll(tv, m_column, value); return tv;}
 //	TableView FindAll(int value) { TableView tv(*m_table); m_table->FindAll(tv, m_column, value); return tv;}
 
 	TableView FindAllHamming(uint64_t value, size_t max) {TableView tv(*m_table); m_table->FindAllHamming(tv, m_column, value, max); return tv;}

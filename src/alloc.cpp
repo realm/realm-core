@@ -94,7 +94,7 @@ MemRef SlabAlloc::Alloc(size_t size) {
 	const size_t multible = 256 * ((size / 256) + 1);
 	const size_t slabsBack = m_slabs.IsEmpty() ? m_baseline : m_slabs.Back().offset;
 	const size_t doubleLast = m_slabs.IsEmpty() ? 0 :
-		                                          (slabsBack - (m_slabs.GetSize() == 1) ? (size_t)0 : m_slabs[-2].offset) * 2;
+		                                          (slabsBack - ((m_slabs.GetSize() == 1) ? (size_t)0 : m_slabs[-2].offset)) * 2;
 	const size_t newsize = multible > doubleLast ? multible : doubleLast;
 
 	// Allocate memory 
