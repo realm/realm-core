@@ -90,13 +90,14 @@ TEST(Table4) {
 	TestTableEnum table;
 
 	table.Add(Mon, "Hello");
+	table.Add(Mon, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
 	const TestTableEnum::Cursor r = table[-1]; // last item
 
 	CHECK_EQUAL(Mon, r.first);
-	CHECK_EQUAL("Hello", (const char*)r.second);
+	CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello", (const char*)r.second);
 
 	// Test string column searching
-	CHECK_EQUAL((size_t)0, table.second.Find("Hello"));
+	CHECK_EQUAL((size_t)1, table.second.Find("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
 	CHECK_EQUAL((size_t)-1, table.second.Find("Foo"));
 
 #ifdef _DEBUG
