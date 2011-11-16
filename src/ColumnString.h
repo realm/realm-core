@@ -28,6 +28,7 @@ public:
 	void Clear();
 
 	size_t Find(const char* value, size_t start=0 , size_t end=-1) const;
+	void FindAll(Column &result, const char* value, size_t start=0 , size_t end=-1) const;
 
 	// Index
 	bool HasIndex() const {return false;}
@@ -55,6 +56,8 @@ protected:
 	bool LeafSet(size_t ndx, const char* value);
 	bool LeafInsert(size_t ndx, const char* value);
 	size_t LeafFind(const char* value, size_t start, size_t end) const;
+	void LeafFindAll(Column &result, const char* value) const;
+
 	void LeafDelete(size_t ndx);
 
 	template<class S> size_t LeafWrite(S& out, size_t& pos) const;

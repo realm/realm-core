@@ -1,5 +1,6 @@
 #include "ArrayStringLong.h"
 #include "ArrayBlob.h"
+#include "Column.h"
 #include <assert.h>
 #include "win32/types.h" //ssize_t
 
@@ -108,13 +109,24 @@ size_t ArrayStringLong::Find(const char* value, size_t start, size_t end) const 
 	return FindWithLen(value, strlen(value), start, end);
 }
 
+void ArrayStringLong::FindAll(Column &result, const char* value) const {
+	assert(value);
+	size_t first = (size_t)-1;
+	do {
+		size_t len = strlen(value);
+		first = FindWithLen(value, len, first + 1, (size_t)-1);
+		if(first != (size_t)-1)
+		result.Add(first);
+	} while (first != (size_t)-1);
+}
+
 size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start, size_t end) const {
 	assert(value);
 
 	len += 1; // include trailing null byte
 	const size_t count = m_offsets.Size();
 	size_t offset = 0;
-	for (size_t i = 0; i < count; ++i) {
+	for (size_t i = start; i < count && i < end; ++i) {
 		const size_t end = m_offsets.Get(i);
 
 		// Only compare strings if length matches

@@ -149,6 +149,11 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t, size_t) const {
 	return TreeFind<const char*, AdaptiveStringColumn>(value, 0, -1);
 }
 
+void AdaptiveStringColumn::FindAll(Column &result, const char* value, size_t, size_t) const {
+	assert(value);
+	TreeFindAll<const char*, AdaptiveStringColumn>(result, value);
+}
+
 const char* AdaptiveStringColumn::LeafGet(size_t ndx) const {
 	if (IsLongStrings()) {
 		return ((ArrayStringLong*)m_array)->Get(ndx);
@@ -239,6 +244,16 @@ size_t AdaptiveStringColumn::LeafFind(const char* value, size_t start, size_t en
 		return ((ArrayString*)m_array)->Find(value, start, end);
 	}
 }
+
+void AdaptiveStringColumn::LeafFindAll(Column &result, const char* value) const {
+	if (IsLongStrings()) {
+		return ((ArrayStringLong*)m_array)->FindAll(result, value);
+	}
+	else {
+		return ((ArrayString*)m_array)->FindAll(result, value);
+	}
+}
+
 
 void AdaptiveStringColumn::LeafDelete(size_t ndx) {
 	if (IsLongStrings()) {

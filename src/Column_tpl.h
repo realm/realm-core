@@ -386,6 +386,35 @@ template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start,
 	}
 }
 
+
+template<typename T, class C> void ColumnBase::TreeFindAll(Column &result, T value) const {
+// todo, verify that offset is added correctly
+	assert(value);
+	if (!IsNode()) {
+		static_cast<const C*>(this)->LeafFindAll(result, value);
+	}
+	else {
+		// Get subnode table
+		const Array offsets = NodeGetOffsets();
+		const Array refs = NodeGetRefs();
+		const size_t count = refs.Size();
+
+		for (size_t i = 0; i < count; ++i) {
+			const C col((size_t)refs.Get(i));
+			size_t first = (size_t)-1;
+			do {
+				first = col.Find(value, first + 1, (size_t)-1);
+				if(first != (size_t)-1)
+				{
+					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0; 
+					result.Add(first + offset);
+				}
+			} while (first != (size_t)-1);
+		}
+	}
+}
+
+
 template<typename T, class C, class S>
 size_t ColumnBase::TreeWrite(S& out, size_t& pos) const {
 	if (IsNode()) {

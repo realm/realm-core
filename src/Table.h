@@ -245,8 +245,8 @@ public:
 
 // todo, fixme: array that m_data points at becomes invalid during function exit in debug mode in VC. Added this workaround, please verify 
 // or fix properly
-	TableView FindAll(int value) {TableView tv(*m_table); m_table->FindAll(tv, m_column, value); return tv;}
-//	TableView FindAll(int value) { TableView tv(*m_table); m_table->FindAll(tv, m_column, value); return tv;}
+	TableView FindAll(int value) {TableView *tv = new TableView(*m_table); m_table->FindAll(*tv, m_column, value); return *tv;}
+//	TableView FindAll(int value) {TableView tv(*m_table); m_table->FindAll(tv, m_column, value); return tv;}
 
 	TableView FindAllHamming(uint64_t value, size_t max) {TableView tv(*m_table); m_table->FindAllHamming(tv, m_column, value, max); return tv;}
 	int operator+=(int value) {m_table->GetColumn(m_column).Increment64(value); return 0;}

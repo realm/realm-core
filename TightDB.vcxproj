@@ -193,6 +193,7 @@
     <ClCompile Include="src\Table.cpp" />
     <ClCompile Include="src\TableView.cpp" />
     <ClCompile Include="test\test.cpp" />
+    <ClCompile Include="test\TestAdaptiveStringColumn.cpp" />
     <ClCompile Include="test\testalloc.cpp" />
     <ClCompile Include="test\testarray.cpp" />
     <ClCompile Include="test\testarraystring.cpp" />
@@ -211,6 +212,7 @@
     <ClInclude Include="src\ArrayStringLong.h" />
     <ClInclude Include="src\Column.h" />
     <ClInclude Include="src\ColumnBinary.h" />
+    <ClInclude Include="src\ColumnString.h" />
     <ClInclude Include="src\ColumnType.h" />
     <ClInclude Include="src\Column_tpl.h" />
     <ClInclude Include="src\ctightdb.h" />
