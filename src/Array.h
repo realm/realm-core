@@ -38,6 +38,7 @@ public:
 
 	void SetType(ColumnDef type);
 	void SetParent(Array* parent, size_t pndx);
+	void UpdateParentNdx(int diff) {m_parentNdx += diff;}
 	Array* GetParent() const {return m_parent;}
 	size_t GetParentNdx() const {return m_parentNdx;}
 	void UpdateRef(size_t ref);

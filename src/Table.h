@@ -5,6 +5,7 @@
 #include <time.h>
 #include "Column.h"
 #include "ColumnString.h"
+#include "ColumnStringEnum.h"
 #include "ColumnBinary.h"
 #include "alloc.h"
 #include "ColumnType.h"
@@ -72,6 +73,8 @@ public:
 	const AdaptiveStringColumn& GetColumnString(size_t ndx) const;
 	ColumnBinary& GetColumnBinary(size_t ndx);
 	const ColumnBinary& GetColumnBinary(size_t ndx) const;
+	ColumnStringEnum& GetColumnStringEnum(size_t ndx);
+	const ColumnStringEnum& GetColumnStringEnum(size_t ndx) const;
 
 	// Searching
 	size_t Find(size_t column_id, int64_t value) const;
@@ -84,6 +87,9 @@ public:
 	// Indexing
 	bool HasIndex(size_t column_id) const;
 	void SetIndex(size_t column_id);
+
+	// Optimizing
+	void Optimize();
 
 	// Debug
 #ifdef _DEBUG
@@ -108,6 +114,10 @@ protected:
 
 	ColumnBase& GetColumnBase(size_t ndx);
 	const ColumnBase& GetColumnBase(size_t ndx) const;
+
+	// Specification
+	size_t GetColumnRefPos(size_t column_ndx) const;
+	void UpdateColumnRefs(size_t column_ndx, int diff);
 
 	// Member variables
 	size_t m_size;
@@ -367,6 +377,16 @@ size_t Table::Write(S& out, size_t& pos) const {
                 const AdaptiveStringColumn& column = GetColumnString(i);
                 const size_t cpos = column.Write(out, pos);
                 columns.Add(cpos);
+            }
+				break;
+			case COLUMN_TYPE_STRING_ENUM:
+            {
+                const ColumnStringEnum& column = GetColumnStringEnum(i);
+                size_t ref_keys;
+				size_t ref_values;
+				column.Write(out, pos, ref_keys, ref_values);
+                columns.Add(ref_keys);
+				columns.Add(ref_values);
             }
 				break;
 			default: assert(false);

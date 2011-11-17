@@ -205,5 +205,45 @@ TEST(Group_Serialize_Men) {
 #endif //_DEBUG
 }
 
+TEST(Group_Serialize_Optimized) {
+	// Create group with one table
+	Group toMem;
+	TestTableGroup& table = toMem.GetTable<TestTableGroup>("test");
+
+	for (size_t i = 0; i < 5; ++i) {
+		table.Add("abd",     1, true, Mon);
+		table.Add("eftg",    2, true, Tue);
+		table.Add("hijkl",   5, true, Wed);
+		table.Add("mnopqr",  8, true, Thu);
+		table.Add("stuvxyz", 9, true, Fri);
+	}
+
+	table.Optimize();
+
+#ifdef _DEBUG
+	toMem.Verify();
+#endif //_DEBUG
+
+	// Serialize to memory (we now own the buffer)
+	size_t len;
+	const char* const buffer = toMem.WriteToMem(len);
+
+	// Load the table
+	Group fromMem(buffer, len);
+	TestTableGroup& t = fromMem.GetTable<TestTableGroup>("test");
+
+	CHECK_EQUAL(4, t.GetColumnCount());
+
+	// Verify that original values are there
+	CHECK(table.Compare(t));
+
+#ifdef _DEBUG
+	toMem.Verify();
+	fromMem.Verify();
+#endif //_DEBUG
+}
+
+
+
 
 #endif

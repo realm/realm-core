@@ -96,6 +96,7 @@ public:
 	bool operator==(const Column& column) const;
 
 	void SetParent(Array* parent, size_t pndx);
+	void UpdateParentNdx(int diff);
 
 	size_t Size() const;
 	bool IsEmpty() const;

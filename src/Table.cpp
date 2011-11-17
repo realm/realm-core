@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include "AllocSlab.h"
+#include "ColumnStringEnum.h"
 
 const ColumnType Accessor::type = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type = COLUMN_TYPE_BOOL;
@@ -39,27 +40,35 @@ Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(
 
     // Cache columns
     size_t size = (size_t)-1;
+	size_t column_ndx = 0;
     for (size_t i = 0; i < m_spec.Size(); ++i) {
         const ColumnType type = (ColumnType)m_spec.Get(i);
-        const size_t ref = m_columns.Get(i);
+        const size_t ref = m_columns.Get(column_ndx);
 
-        ColumnBase* newColumn = NULL;
+        void* newColumn = NULL;
 		size_t colsize = (size_t)-1;
 		switch (type) {
             case COLUMN_TYPE_INT:
             case COLUMN_TYPE_BOOL:
 			case COLUMN_TYPE_DATE:
-				newColumn = new Column(ref, &m_columns, i, m_alloc);
+				newColumn = new Column(ref, &m_columns, column_ndx, m_alloc);
 				colsize = ((Column*)newColumn)->Size();
                 break;
             case COLUMN_TYPE_STRING:
-                newColumn = new AdaptiveStringColumn(ref, &m_columns, i, m_alloc);
+                newColumn = new AdaptiveStringColumn(ref, &m_columns, column_ndx, m_alloc);
 				colsize = ((AdaptiveStringColumn*)newColumn)->Size();
                 break;
 			case COLUMN_TYPE_BINARY:
-				newColumn = new ColumnBinary(ref, &m_columns, i, m_alloc);
+				newColumn = new ColumnBinary(ref, &m_columns, column_ndx, m_alloc);
 				colsize = ((ColumnBinary*)newColumn)->Size();
                 break;
+			case COLUMN_TYPE_STRING_ENUM:
+			{
+                const size_t ref_values = m_columns.Get(++column_ndx);
+				newColumn = new ColumnStringEnum(ref, ref_values, &m_columns, column_ndx, m_alloc);
+				colsize = ((ColumnStringEnum*)newColumn)->Size();
+                break;
+			}
             default:
                 assert(false);
         }
@@ -70,6 +79,8 @@ Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(
 		// (and verify that all column are same length)
 		if (size == (size_t)-1) size = colsize;
 		else assert(size == colsize);
+
+		++column_ndx;
     }
 
     if (size != (size_t)-1) m_size = size;
@@ -123,6 +134,23 @@ size_t Table::GetColumnIndex(const char* name) const {
 ColumnType Table::GetColumnType(size_t ndx) const {
 	assert(ndx < GetColumnCount());
 	return (ColumnType)m_spec.Get(ndx);
+}
+
+size_t Table::GetColumnRefPos(size_t column_ndx) const {
+	size_t pos = 0;
+	size_t current_column = 0;
+	for (size_t i = 0; i < m_spec.Size(); ++i) {
+		if (current_column == column_ndx) return pos;
+
+		const ColumnType type = (ColumnType)m_spec.Get(i);
+		if (type < COLUMN_TYPE_STRING_ENUM) ++pos;
+		else pos += 2;
+
+		++current_column;
+	}
+
+	assert(false);
+	return -1;
 }
 
 size_t Table::RegisterColumn(ColumnType type, const char* name) {
@@ -214,6 +242,17 @@ const AdaptiveStringColumn& Table::GetColumnString(size_t ndx) const {
 	const ColumnBase& column = GetColumnBase(ndx);
 	assert(column.IsStringColumn());
 	return static_cast<const AdaptiveStringColumn&>(column);
+}
+
+
+ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) {
+	assert(ndx < m_cols.Size());
+	return *(ColumnStringEnum* const)m_cols.Get(ndx);
+}
+
+const ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) const {
+	assert(ndx < m_cols.Size());
+	return *(const ColumnStringEnum* const)m_cols.Get(ndx);
 }
 
 ColumnBinary& Table::GetColumnBinary(size_t ndx) {
@@ -322,24 +361,51 @@ const char* Table::GetString(size_t column_id, size_t ndx) const {
 	assert(column_id < m_columns.Size());
 	assert(ndx < m_size);
 
-	const AdaptiveStringColumn& column = GetColumnString(column_id);
-	return column.Get(ndx);
+	const ColumnType type = GetColumnType(column_id);
+
+	if (type == COLUMN_TYPE_STRING) {
+		const AdaptiveStringColumn& column = GetColumnString(column_id);
+		return column.Get(ndx);
+	}
+	else {
+		assert(type == COLUMN_TYPE_STRING_ENUM);
+		const ColumnStringEnum& column = GetColumnStringEnum(column_id);
+		return column.Get(ndx);
+	}
 }
 
 void Table::SetString(size_t column_id, size_t ndx, const char* value) {
 	assert(column_id < m_cols.Size());
 	assert(ndx < m_size);
 
-	AdaptiveStringColumn& column = GetColumnString(column_id);
-	column.Set(ndx, value);
+	const ColumnType type = GetColumnType(column_id);
+
+	if (type == COLUMN_TYPE_STRING) {
+		AdaptiveStringColumn& column = GetColumnString(column_id);
+		column.Set(ndx, value);
+	}
+	else {
+		assert(type == COLUMN_TYPE_STRING_ENUM);
+		ColumnStringEnum& column = GetColumnStringEnum(column_id);
+		column.Set(ndx, value);
+	}
 }
 
 void Table::InsertString(size_t column_id, size_t ndx, const char* value) {
 	assert(column_id < m_cols.Size());
 	assert(ndx <= m_size);
 
-	AdaptiveStringColumn& column = GetColumnString(column_id);
-	column.Insert(ndx, value);
+	const ColumnType type = GetColumnType(column_id);
+
+	if (type == COLUMN_TYPE_STRING) {
+		AdaptiveStringColumn& column = GetColumnString(column_id);
+		column.Insert(ndx, value);
+	}
+	else {
+		assert(type == COLUMN_TYPE_STRING_ENUM);
+		ColumnStringEnum& column = GetColumnStringEnum(column_id);
+		column.Insert(ndx, value);
+	}
 }
 
 BinaryData Table::GetBinary(size_t column_id, size_t ndx) const {
@@ -424,6 +490,72 @@ void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size
 	column.FindAllHamming(tv.GetRefColumn(), value, max);
 }
 
+void Table::Optimize() {
+	const size_t column_count = GetColumnCount();
+	for (size_t i = 0; i < column_count; ++i) {
+		const ColumnType type = GetColumnType(i);
+
+		if (type == COLUMN_TYPE_STRING) {
+			AdaptiveStringColumn& column = GetColumnString(i);
+
+			size_t ref_keys;
+			size_t ref_values;
+			const bool res = column.AutoEnumerate(ref_keys, ref_values);
+			if (!res) continue;
+
+			// Add to spec and column refs
+			m_spec.Set(i, COLUMN_TYPE_STRING_ENUM);
+			const size_t column_ndx = GetColumnRefPos(i);
+			m_columns.Set(column_ndx, ref_keys);
+			m_columns.Insert(column_ndx+1, ref_values);
+			UpdateColumnRefs(column_ndx+2, 1);
+
+			// Replace cached column
+			ColumnStringEnum* e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, m_alloc);
+			m_cols.Set(i, (intptr_t)e);
+			column.Destroy();
+			delete &column;
+		}
+	}
+}
+
+void Table::UpdateColumnRefs(size_t column_ndx, int diff) {
+	for (size_t i = column_ndx; i < m_cols.Size(); ++i) {
+		const ColumnType type = GetColumnType(i);
+
+		switch (type) {
+		case COLUMN_TYPE_INT:
+		case COLUMN_TYPE_BOOL:
+		case COLUMN_TYPE_DATE:
+			{
+				Column* column = (Column*)m_cols.Get(i);
+				column->UpdateParentNdx(diff);
+			}
+			break;
+		case COLUMN_TYPE_STRING:
+			{
+				AdaptiveStringColumn* column = (AdaptiveStringColumn*)m_cols.Get(i);
+				column->UpdateParentNdx(diff);
+			}
+			break;
+		case COLUMN_TYPE_BINARY:
+			{
+				ColumnBinary* column = (ColumnBinary*)m_cols.Get(i);
+				column->UpdateParentNdx(diff);
+			}
+			break;
+		case COLUMN_TYPE_STRING_ENUM:
+			{
+				ColumnStringEnum* column = (ColumnStringEnum*)m_cols.Get(i);
+				column->UpdateParentNdx(diff);
+			}
+			break;
+		default:
+			assert(false);
+        }
+	}
+}
+
 #ifdef _DEBUG
 #include "stdio.h"
 
@@ -453,6 +585,14 @@ bool Table::Compare(const Table& c) const {
                     if (!column1.Compare(column2)) return false;
                 }
                 break;
+			case COLUMN_TYPE_STRING_ENUM:
+				{
+					const ColumnStringEnum& column1 = GetColumnStringEnum(i);
+					const ColumnStringEnum& column2 = c.GetColumnStringEnum(i);
+					if (!column1.Compare(column2)) return false;
+				}
+                break;
+
             default:
                 assert(false);
 		}
@@ -480,6 +620,13 @@ void Table::Verify() const {
 		case COLUMN_TYPE_STRING:
 			{
 				const AdaptiveStringColumn& column = GetColumnString(i);
+				assert(column.Size() == m_size);
+				column.Verify();
+			}
+			break;
+		case COLUMN_TYPE_STRING_ENUM:
+			{
+				const ColumnStringEnum& column = GetColumnStringEnum(i);
 				assert(column.Size() == m_size);
 				column.Verify();
 			}

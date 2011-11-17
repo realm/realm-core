@@ -249,6 +249,71 @@ void AdaptiveStringColumn::LeafDelete(size_t ndx) {
 	}
 }
 
+bool AdaptiveStringColumn::FindKeyPos(const char* target, size_t& pos) const {
+	const int len = (int)Size();
+	bool found = false;
+	int low = -1;
+	int high = (int)len;
+
+	// Binary search based on:
+	// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+	// Finds position of closest value BIGGER OR EQUAL to the target (for
+	// lookups in indexes)
+	while (high - low > 1) {
+		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+		const char* v = Get(probe);
+
+		const int cmp = strcmp(v, target);
+
+		if (cmp < 0) low  = (int)probe;
+		else {
+			high = (int)probe;
+			if (cmp == 0) found = true;
+		}
+	}
+
+	pos = high;
+	return found;
+}
+
+bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) const {
+	AdaptiveStringColumn keys(m_array->GetAllocator());
+
+	// Generate list of unique values (keys)
+	const size_t count = Size();
+	for (size_t i = 0; i < count; ++i) {
+		const char* v = Get(i);
+
+		// Insert keys in sorted order, ignoring duplicates
+		size_t pos;
+		if (!keys.FindKeyPos(v, pos)) {
+			keys.Insert(pos, v);
+		}
+	}
+
+	// Don't bpther auto enumerating if there are too few duplicates
+	if (keys.Size() > (count / 2)) {
+		keys.Destroy(); // cleanup
+		return false;
+	}
+
+	// Generate enumerated list of entries
+	Column values(m_array->GetAllocator());
+	for (size_t i = 0; i < count; ++i) {
+		const char* v = Get(i);
+
+		size_t pos;
+		const bool res = keys.FindKeyPos(v, pos);
+		assert(res);
+
+		values.Add(pos);
+	}
+
+	ref_keys   = keys.GetRef();
+	ref_values = values.GetRef();
+	return true;
+}
+
 #ifdef _DEBUG
 #include <cstring> // strcmp()
 

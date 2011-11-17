@@ -93,6 +93,10 @@ void Column::SetParent(Array* parent, size_t pndx) {
 	m_array->SetParent(parent, pndx);
 }
 
+void Column::UpdateParentNdx(int diff) {
+	m_array->UpdateParentNdx(diff);
+}
+
 static Column GetColumnFromRef(Array& parent, size_t ndx) {
 	assert(parent.HasRefs());
 	assert(ndx < parent.Size());

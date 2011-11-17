@@ -37,9 +37,13 @@ public:
 
 	size_t GetRef() const {return m_array->GetRef();}
 	void SetParent(Array* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
+	void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
 	// Serialization
 	template<class S> size_t Write(S& out, size_t& pos) const;
+
+	// Optimizing data layout
+	bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
 
 #ifdef _DEBUG
 	bool Compare(const AdaptiveStringColumn& c) const;
@@ -60,6 +64,8 @@ protected:
 	template<class S> size_t LeafWrite(S& out, size_t& pos) const;
 
 	bool IsLongStrings() const {return m_array->HasRefs();} // HasRefs indicates long string array
+
+	bool FindKeyPos(const char* target, size_t& pos) const;
 };
 
 // Templates

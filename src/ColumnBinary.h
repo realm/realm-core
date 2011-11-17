@@ -38,6 +38,7 @@ public:
 
 	size_t GetRef() const {return m_array->GetRef();}
 	void SetParent(Array* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
+	void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
 	// Serialization
 	template<class S> size_t Write(S& out, size_t& pos) const;

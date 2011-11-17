@@ -1,4 +1,5 @@
 #include "ColumnString.h"
+#include "ColumnStringEnum.h"
 #include <UnitTest++.h>
 
 struct db_setup_column_string {
@@ -329,6 +330,38 @@ TEST(ColumnStringFind2) {
 
 	// Cleanup
 	c.Destroy();
+}
+
+TEST(ColumnStringAutoEnumerate) {
+	AdaptiveStringColumn c;
+
+	// Add duplicate values
+	for (size_t i = 0; i < 5; ++i) {
+		c.Add("a");
+		c.Add("bc");
+		c.Add("def");
+		c.Add("ghij");
+		c.Add("klmop");
+	}
+
+	// Create StringEnum
+	size_t keys;
+	size_t values;
+	const bool res = c.AutoEnumerate(keys, values);
+	CHECK(res);
+	ColumnStringEnum e(keys, values);
+
+	// Verify that all entries match source
+	CHECK_EQUAL(c.Size(), e.Size());
+	for (size_t i = 0; i < c.Size(); ++i) {
+		const char* const s1 = c.Get(i);
+		const char* const s2 = e.Get(i);
+		CHECK_EQUAL(s1, s2);
+	}
+
+	// Cleanup
+	c.Destroy();
+	e.Destroy();
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy) {

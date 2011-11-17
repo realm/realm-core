@@ -297,6 +297,52 @@ TEST(Table_Index_Int) {
 #endif //_DEBUG
 }
 
+TDB_TABLE_4(TestTableAE,
+			Int,        first,
+			String,     second,
+			Bool,       third,
+			Enum<Days>, fourth)
+
+TEST(TableAutoEnumeration) {
+	TestTableAE table;
+
+	for (size_t i = 0; i < 5; ++i) {
+		table.Add(1, "abd",     true, Mon);
+		table.Add(2, "eftg",    true, Tue);
+		table.Add(5, "hijkl",   true, Wed);
+		table.Add(8, "mnopqr",  true, Thu);
+		table.Add(9, "stuvxyz", true, Fri);
+	}
+
+	table.Optimize();
+
+	for (size_t i = 0; i < 5; ++i) {
+		const size_t n = i * 5;
+		CHECK_EQUAL(1, table[0+n].first);
+		CHECK_EQUAL(2, table[1+n].first);
+		CHECK_EQUAL(5, table[2+n].first);
+		CHECK_EQUAL(8, table[3+n].first);
+		CHECK_EQUAL(9, table[4+n].first);
+
+		CHECK_EQUAL("abd",     (const char*)table[0+n].second);
+		CHECK_EQUAL("eftg",    (const char*)table[1+n].second);
+		CHECK_EQUAL("hijkl",   (const char*)table[2+n].second);
+		CHECK_EQUAL("mnopqr",  (const char*)table[3+n].second);
+		CHECK_EQUAL("stuvxyz", (const char*)table[4+n].second);
+
+		CHECK_EQUAL(true, table[0+n].third);
+		CHECK_EQUAL(true, table[1+n].third);
+		CHECK_EQUAL(true, table[2+n].third);
+		CHECK_EQUAL(true, table[3+n].third);
+		CHECK_EQUAL(true, table[4+n].third);
+
+		CHECK_EQUAL(Mon, table[0+n].fourth);
+		CHECK_EQUAL(Tue, table[1+n].fourth);
+		CHECK_EQUAL(Wed, table[2+n].fourth);
+		CHECK_EQUAL(Thu, table[3+n].fourth);
+		CHECK_EQUAL(Fri, table[4+n].fourth);
+	}
+}
 
 
 #include "AllocSlab.h"
