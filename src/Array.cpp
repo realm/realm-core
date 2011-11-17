@@ -1151,4 +1151,8 @@ void Array::ToDot(FILE* f, bool) const{
 	fprintf(f, "\n");
 }
 
+MemStats Array::Stats() const {
+	return MemStats(m_capacity, CalcByteLen(m_len, m_width), 1);
+}
+
 #endif //_DEBUG

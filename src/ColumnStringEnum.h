@@ -28,6 +28,7 @@ public:
 #ifdef _DEBUG
 	bool Compare(const ColumnStringEnum& c) const;
 	void Verify() const;
+	MemStats Stats() const;
 #endif // _DEBUG
 
 private:

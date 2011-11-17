@@ -157,6 +157,24 @@ void Group::Verify() {
 	}
 }
 
+MemStats Group::Stats() {
+	MemStats stats;
+
+	for (size_t i = 0; i < m_tables.Size(); ++i) {
+		// Get table from cache if exists, else create
+		Table* t = (Table*)m_cachedtables.Get(i);
+		if (!t) {
+			const size_t ref = m_tables.Get(i);
+			t = new Table(m_alloc, ref, &m_tables, i);
+			m_cachedtables.Set(i, (intptr_t)t);
+		}
+		const MemStats m = t->Stats();
+		stats.Add(m);
+	}
+	return stats;
+}
+
+
 void Group::Print() const {
 	m_alloc.Print();
 }

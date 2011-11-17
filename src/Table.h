@@ -97,6 +97,7 @@ public:
 	void Verify() const;
 	void ToDot(const char* filename) const;
 	void Print() const;
+	MemStats Stats() const;
 #endif //_DEBUG
 
 protected:

@@ -19,6 +19,27 @@
 // Pre-definitions
 class Column;
 
+#ifdef _DEBUG
+class MemStats {
+public:
+	MemStats() : allocated(0), used(0), array_count(0) {}
+	MemStats(size_t allocated, size_t used, size_t array_count)
+	: allocated(allocated), used(used), array_count(array_count) {}
+	MemStats(const MemStats& m) {
+		allocated = m.allocated;
+		used = m.used;
+		array_count = m.array_count;
+	}
+	void Add(const MemStats& m) {
+		allocated += m.allocated;
+		used += m.used;
+		array_count += m.array_count;
+	}
+	size_t allocated;
+	size_t used;
+	size_t array_count;
+};
+#endif
 
 enum ColumnDef {
 	COLUMN_NORMAL,
@@ -92,6 +113,7 @@ public:
 	void Print() const;
 	void Verify() const;
 	void ToDot(FILE* f, bool horizontal=false) const;
+	MemStats Stats() const;
 #endif //_DEBUG
 
 private:

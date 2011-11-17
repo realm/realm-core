@@ -142,6 +142,7 @@ public:
 	void Print() const;
 	void Verify() const;
 	void ToDot(FILE* f, bool isTop=true) const;
+	MemStats Stats() const;
 #endif //_DEBUG
 
 private:

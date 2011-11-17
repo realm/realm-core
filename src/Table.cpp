@@ -763,4 +763,53 @@ void Table::Print() const {
 	printf("\n");
 }
 
+MemStats Table::Stats() const {
+	MemStats stats;
+
+	const size_t column_count = GetColumnCount();
+
+	for (size_t n = 0; n < column_count; ++n) {
+		const ColumnType type = GetColumnType(n);
+		switch (type) {
+		case COLUMN_TYPE_INT:
+			{
+				const Column& column = GetColumn(n);
+				const MemStats m = column.Stats();
+				stats.Add(m);
+			}
+			break;
+		case COLUMN_TYPE_BOOL:
+			{
+				const Column& column = GetColumn(n);
+				const MemStats m = column.Stats();
+				stats.Add(m);
+			}
+			break;
+		case COLUMN_TYPE_STRING:
+			{
+				const AdaptiveStringColumn& column = GetColumnString(n);
+				const MemStats m = column.Stats();
+				stats.Add(m);
+			}
+			break;
+		case COLUMN_TYPE_STRING_ENUM:
+			{
+				const ColumnStringEnum& column = GetColumnStringEnum(n);
+				const MemStats m = column.Stats();
+				stats.Add(m);
+			}
+			break;
+
+		default:
+			assert(false);
+		}
+	}
+
+	stats.Add(m_top.Stats());
+	stats.Add(m_spec.Stats());
+	stats.Add(m_columns.Stats());
+
+	return stats;
+}
+
 #endif //_DEBUG

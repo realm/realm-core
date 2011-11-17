@@ -22,6 +22,7 @@ public:
 #ifdef _DEBUG
 	void Verify();
 	void Print() const;
+	MemStats Stats();
 #endif //_DEBUG
 
 private:

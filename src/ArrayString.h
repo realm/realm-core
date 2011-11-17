@@ -27,7 +27,7 @@ public:
 
 #ifdef _DEBUG
 	bool Compare(const ArrayString& c) const;
-	void Stats() const;
+	void StringStats() const;
 	void ToDot(FILE* f) const;
 #endif //_DEBUG
 

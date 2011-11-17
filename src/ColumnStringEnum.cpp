@@ -92,4 +92,11 @@ void ColumnStringEnum::Verify() const {
 	m_values.Verify();
 }
 
+MemStats ColumnStringEnum::Stats() const {
+	MemStats stats;
+	stats.Add(m_keys.Stats());
+	stats.Add(m_values.Stats());
+	return stats;
+}
+
 #endif //_DEBUG

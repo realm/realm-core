@@ -348,7 +348,7 @@ bool ArrayString::Compare(const ArrayString& c) const {
 	return true;
 }
 
-void ArrayString::Stats() const {
+void ArrayString::StringStats() const {
 	size_t total = 0;
 	size_t longest = 0;
 

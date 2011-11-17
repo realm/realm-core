@@ -49,6 +49,7 @@ public:
 	bool Compare(const AdaptiveStringColumn& c) const;
 	void Verify() const {};
 	void ToDot(FILE* f, bool isTop=true) const;
+	MemStats Stats() const;
 #endif //_DEBUG
 
 protected:
