@@ -262,7 +262,6 @@ void Column::FindAll(Column& result, int64_t value, size_t offset,
 					 size_t start, size_t end) const {
 	assert(start <= Size());
 	assert(end == (size_t)-1 || end <= Size());
-	result.Clear();
 	if (IsEmpty()) return;
 
 	if (!IsNode()) return m_array->FindAll(result, value, offset, start, end);

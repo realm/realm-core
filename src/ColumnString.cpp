@@ -151,6 +151,7 @@ size_t AdaptiveStringColumn::Find(const char* value, size_t, size_t) const {
 
 void AdaptiveStringColumn::FindAll(Column &result, const char* value, size_t, size_t) const {
 	assert(value);
+	result.Clear();
 	TreeFindAll<const char*, AdaptiveStringColumn>(result, value);
 }
 
