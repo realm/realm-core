@@ -547,7 +547,7 @@ template<class T, class U> static bool findall_test(std::vector<T>& v, U& a, T v
 
 
 TEST(Column_monkeytest1) {
-	const uint64_t DURATION = UNITTEST_DURATION*1000;
+	const uint64_t DURATION = UNITTEST_DURATION*200;
 	const uint64_t SEED = 123;
 
 	Column a;

@@ -19,7 +19,7 @@ EXECUTABLE = tightdb-tests
 HEADERS    = $(wildcard ../src/*.h)
 SOURCES    = $(wildcard ../src/*.cpp)
 TEST_H     = $(wildcard *.h)
-TEST_SRC   = $(wildcard *.cpp)
+TEST_SRC   = $(wildcard *.cpp large_tests/*.cpp)
 SURFIXES   = %.cpp %.h
 OBJECTS    = $(SOURCES:.o=.cpp) $(HEADERS:.o=.h) \
              $(TEST_SRC:.o=.cpp) $(TEST_H:.o=.h)
