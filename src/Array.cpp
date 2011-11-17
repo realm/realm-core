@@ -1035,7 +1035,8 @@ void Array::SetWidth(size_t width) {
 	else {
 		assert(false);
 	}
-
+//	printf("%d ", width);
+	SetBounds(width);
 	m_width = width;
 }
 
