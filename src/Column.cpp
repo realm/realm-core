@@ -41,7 +41,8 @@ Column::Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc): 
 }
 
 Column::Column(const Column& column) : m_index(NULL) {
-	m_array = column.m_array;
+	m_array = column.m_array; // we now own array
+	column.m_array = NULL;    // so invalidate source
 }
 
 void Column::Create() {
@@ -69,7 +70,8 @@ Column::~Column() {
 
 void Column::Destroy() {
 	ClearIndex();
-	m_array->Destroy();
+	if(m_array != NULL)
+		m_array->Destroy();
 }
 
 

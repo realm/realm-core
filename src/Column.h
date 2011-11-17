@@ -78,7 +78,7 @@ protected:
 	size_t GetRefSize(size_t ref) const;
 
 	// Member variables
-	Array* m_array;
+	mutable Array* m_array;
 };
 
 class Column : public ColumnBase {
