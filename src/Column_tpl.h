@@ -390,6 +390,7 @@ template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start,
 template<typename T, class C> void ColumnBase::TreeFindAll(Column &result, T value) const {
 // todo, verify that offset is added correctly
 	assert(value);
+	result.Clear();
 	if (!IsNode()) {
 		static_cast<const C*>(this)->LeafFindAll(result, value);
 	}
