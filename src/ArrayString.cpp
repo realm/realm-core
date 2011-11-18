@@ -207,18 +207,14 @@ size_t ArrayString::Find(const char* value, size_t start, size_t end) const {
 	return FindWithLen(value, strlen(value), start, end);
 }
 
-void ArrayString::FindAll(Column& result, const char* value) {
+void ArrayString::FindAll(Column& result, const char* value, size_t add_offset, size_t start, size_t end) {
 	assert(value);
-	FindAll(result, value, strlen(value));
-}
-
-void ArrayString::FindAll(Column& result, const char* value, size_t len) {
-	assert(value);
-	size_t first = (size_t)-1;
+	size_t first = start - 1;
 	do {
-		first = FindWithLen(value, len, first + 1, m_len);
+		size_t len = strlen(value);
+		first = FindWithLen(value, len, first + 1, end);
 		if(first != (size_t)-1)
-		result.Add(first);
+		result.Add(first + add_offset);
 	} while (first != (size_t)-1);
 
 }

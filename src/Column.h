@@ -61,7 +61,7 @@ protected:
 	template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
 	template<typename T, class C> void TreeDelete(size_t ndx);
 	template<typename T, class C> size_t TreeFind(T value, size_t start, size_t end) const;
-	template<typename T, class C> void TreeFindAll(Column &result, T value) const;
+	template<typename T, class C> void TreeFindAll(Column &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
 	template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 
@@ -118,8 +118,7 @@ public:
 
 	bool Increment64(int64_t value, size_t start=0, size_t end=-1);
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
-	void FindAll(Column& result, int64_t value, size_t offset=0,
-				 size_t start=0, size_t end=-1) const;
+	void FindAll(Column& result, int64_t value, size_t offset=0, size_t start=0, size_t end=-1) const;
 	void FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 	size_t FindPos(int64_t value) const;
 
