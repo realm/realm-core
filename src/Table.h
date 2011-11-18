@@ -117,6 +117,7 @@ protected:
 	const ColumnBase& GetColumnBase(size_t ndx) const;
 
 	// Specification
+	ColumnType GetRealColumnType(size_t ndx) const;
 	size_t GetColumnRefPos(size_t column_ndx) const;
 	void UpdateColumnRefs(size_t column_ndx, int diff);
 
@@ -363,7 +364,7 @@ size_t Table::Write(S& out, size_t& pos) const {
     Array columns(COLUMN_HASREFS);
     const size_t column_count = GetColumnCount();
 	for (size_t i = 0; i < column_count; ++i) {
-		const ColumnType type = GetColumnType(i);
+		const ColumnType type = GetRealColumnType(i);
 		switch (type) {
 			case COLUMN_TYPE_INT:
 			case COLUMN_TYPE_BOOL:

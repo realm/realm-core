@@ -64,9 +64,10 @@ Table::Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : m_size(
                 break;
 			case COLUMN_TYPE_STRING_ENUM:
 			{
-                const size_t ref_values = m_columns.Get(++column_ndx);
+                const size_t ref_values = m_columns.Get(column_ndx+1);
 				newColumn = new ColumnStringEnum(ref, ref_values, &m_columns, column_ndx, m_alloc);
 				colsize = ((ColumnStringEnum*)newColumn)->Size();
+				++column_ndx; // advance one extra pos to account for for keys/values pair
                 break;
 			}
             default:
@@ -131,9 +132,18 @@ size_t Table::GetColumnIndex(const char* name) const {
 	return m_columnNames.Find(name);
 }
 
-ColumnType Table::GetColumnType(size_t ndx) const {
+ColumnType Table::GetRealColumnType(size_t ndx) const {
 	assert(ndx < GetColumnCount());
 	return (ColumnType)m_spec.Get(ndx);
+}
+
+ColumnType Table::GetColumnType(size_t ndx) const {
+	assert(ndx < GetColumnCount());
+	const ColumnType type = (ColumnType)m_spec.Get(ndx);
+
+	// Hide internal types
+	if (type == COLUMN_TYPE_STRING_ENUM) return COLUMN_TYPE_STRING;
+	else return type;
 }
 
 size_t Table::GetColumnRefPos(size_t column_ndx) const {
@@ -315,7 +325,7 @@ void Table::Set(size_t column_id, size_t ndx, int64_t value) {
 
 bool Table::GetBool(size_t column_id, size_t ndx) const {
 	assert(column_id < m_cols.Size());
-	assert(GetColumnType(column_id) == COLUMN_TYPE_BOOL);
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
 	assert(ndx < m_size);
 
 	const Column& column = GetColumn(column_id);
@@ -324,7 +334,7 @@ bool Table::GetBool(size_t column_id, size_t ndx) const {
 
 void Table::SetBool(size_t column_id, size_t ndx, bool value) {
 	assert(column_id < m_cols.Size());
-	assert(GetColumnType(column_id) == COLUMN_TYPE_BOOL);
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
 	assert(ndx < m_size);
 
 	Column& column = GetColumn(column_id);
@@ -333,7 +343,7 @@ void Table::SetBool(size_t column_id, size_t ndx, bool value) {
 
 time_t Table::GetDate(size_t column_id, size_t ndx) const {
 	assert(column_id < m_cols.Size());
-	assert(GetColumnType(column_id) == COLUMN_TYPE_DATE);
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
 	assert(ndx < m_size);
 
 	const Column& column = GetColumn(column_id);
@@ -342,7 +352,7 @@ time_t Table::GetDate(size_t column_id, size_t ndx) const {
 
 void Table::SetDate(size_t column_id, size_t ndx, time_t value) {
 	assert(column_id < m_cols.Size());
-	assert(GetColumnType(column_id) == COLUMN_TYPE_DATE);
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
 	assert(ndx < m_size);
 
 	Column& column = GetColumn(column_id);
@@ -361,7 +371,7 @@ const char* Table::GetString(size_t column_id, size_t ndx) const {
 	assert(column_id < m_columns.Size());
 	assert(ndx < m_size);
 
-	const ColumnType type = GetColumnType(column_id);
+	const ColumnType type = GetRealColumnType(column_id);
 
 	if (type == COLUMN_TYPE_STRING) {
 		const AdaptiveStringColumn& column = GetColumnString(column_id);
@@ -378,7 +388,7 @@ void Table::SetString(size_t column_id, size_t ndx, const char* value) {
 	assert(column_id < m_cols.Size());
 	assert(ndx < m_size);
 
-	const ColumnType type = GetColumnType(column_id);
+	const ColumnType type = GetRealColumnType(column_id);
 
 	if (type == COLUMN_TYPE_STRING) {
 		AdaptiveStringColumn& column = GetColumnString(column_id);
@@ -395,7 +405,7 @@ void Table::InsertString(size_t column_id, size_t ndx, const char* value) {
 	assert(column_id < m_cols.Size());
 	assert(ndx <= m_size);
 
-	const ColumnType type = GetColumnType(column_id);
+	const ColumnType type = GetRealColumnType(column_id);
 
 	if (type == COLUMN_TYPE_STRING) {
 		AdaptiveStringColumn& column = GetColumnString(column_id);
@@ -442,7 +452,7 @@ void Table::InsertDone() {
 
 size_t Table::Find(size_t column_id, int64_t value) const {
 	assert(column_id < m_columns.Size());
-	assert(GetColumnType(column_id) == COLUMN_TYPE_INT);
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_INT);
 	const Column& column = GetColumn(column_id);
 
 	return column.Find(value);
@@ -450,7 +460,7 @@ size_t Table::Find(size_t column_id, int64_t value) const {
 
 size_t Table::FindBool(size_t column_id, bool value) const {
 	assert(column_id < m_columns.Size());
-	assert(GetColumnType(column_id) == COLUMN_TYPE_BOOL);
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
 	const Column& column = GetColumn(column_id);
 
 	return column.Find(value ? 1 : 0);
@@ -458,7 +468,7 @@ size_t Table::FindBool(size_t column_id, bool value) const {
 
 size_t Table::FindDate(size_t column_id, time_t value) const {
 	assert(column_id < m_columns.Size());
-	assert(GetColumnType(column_id) == COLUMN_TYPE_DATE);
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
 	const Column& column = GetColumn(column_id);
 
 	return column.Find((int64_t)value);
@@ -493,7 +503,7 @@ void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size
 void Table::Optimize() {
 	const size_t column_count = GetColumnCount();
 	for (size_t i = 0; i < column_count; ++i) {
-		const ColumnType type = GetColumnType(i);
+		const ColumnType type = GetRealColumnType(i);
 
 		if (type == COLUMN_TYPE_STRING) {
 			AdaptiveStringColumn& column = GetColumnString(i);
@@ -521,7 +531,7 @@ void Table::Optimize() {
 
 void Table::UpdateColumnRefs(size_t column_ndx, int diff) {
 	for (size_t i = column_ndx; i < m_cols.Size(); ++i) {
-		const ColumnType type = GetColumnType(i);
+		const ColumnType type = GetRealColumnType(i);
 
 		switch (type) {
 		case COLUMN_TYPE_INT:
@@ -567,7 +577,7 @@ bool Table::Compare(const Table& c) const {
     if (column_count != c.GetColumnCount()) return false;
 
     for (size_t i = 0; i < column_count; ++i) {
-		const ColumnType type = GetColumnType(i);
+		const ColumnType type = GetRealColumnType(i);
 
         switch (type) {
             case COLUMN_TYPE_INT:
@@ -607,7 +617,7 @@ void Table::Verify() const {
 	assert(column_count == m_spec.Size());
 
 	for (size_t i = 0; i < column_count; ++i) {
-		const ColumnType type = GetColumnType(i);
+		const ColumnType type = GetRealColumnType(i);
 		switch (type) {
 		case COLUMN_TYPE_INT:
 		case COLUMN_TYPE_BOOL:
@@ -653,7 +663,7 @@ void Table::ToDot(const char* filename) const {
 		if (i > 0) fprintf(f, "} | {");
 		fprintf(f, "%s | ", m_columnNames.Get(i));
 	
-		const ColumnType type = GetColumnType(i);
+		const ColumnType type = GetRealColumnType(i);
 		switch (type) {
 		case COLUMN_TYPE_INT:
 			fprintf(f, "Int"); break;
@@ -679,7 +689,7 @@ void Table::ToDot(const char* filename) const {
 
 	// Columns
 	for (size_t i = 0; i < column_count; ++i) {
-		const ColumnType type = GetColumnType(i);
+		const ColumnType type = GetRealColumnType(i);
 		switch (type) {
 		case COLUMN_TYPE_INT:
 		case COLUMN_TYPE_BOOL:
@@ -716,7 +726,7 @@ void Table::Print() const {
 	// Types
 	printf("\n    ");
 	for (size_t i = 0; i < column_count; ++i) {
-		const ColumnType type = GetColumnType(i);
+		const ColumnType type = GetRealColumnType(i);
 		switch (type) {
 		case COLUMN_TYPE_INT:
 			printf("Int        "); break;
@@ -734,7 +744,7 @@ void Table::Print() const {
 	for (size_t i = 0; i < m_size; ++i) {
 		printf("%3zu ", i);
 		for (size_t n = 0; n < column_count; ++n) {
-			const ColumnType type = GetColumnType(n);
+			const ColumnType type = GetRealColumnType(n);
 			switch (type) {
 			case COLUMN_TYPE_INT:
 				{
@@ -769,7 +779,7 @@ MemStats Table::Stats() const {
 	const size_t column_count = GetColumnCount();
 
 	for (size_t n = 0; n < column_count; ++n) {
-		const ColumnType type = GetColumnType(n);
+		const ColumnType type = GetRealColumnType(n);
 		switch (type) {
 		case COLUMN_TYPE_INT:
 			{
