@@ -476,10 +476,18 @@ size_t Table::FindDate(size_t column_id, time_t value) const {
 
 size_t Table::FindString(size_t column_id, const char* value) const {
 	assert(column_id < m_columns.Size());
-	assert(GetColumnType(column_id) == COLUMN_TYPE_STRING);
-	const AdaptiveStringColumn& column = GetColumnString(column_id);
 
-	return column.Find(value);
+	const ColumnType type = GetRealColumnType(column_id);
+
+	if (type == COLUMN_TYPE_STRING) {
+		const AdaptiveStringColumn& column = GetColumnString(column_id);
+		return column.Find(value);
+	}
+	else {
+		assert(type == COLUMN_TYPE_STRING_ENUM);
+		const ColumnStringEnum& column = GetColumnStringEnum(column_id);
+		return column.Find(value);
+	}
 }
 
 void Table::FindAll(TableView& tv, size_t column_id, int64_t value) {

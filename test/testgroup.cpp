@@ -237,13 +237,16 @@ TEST(Group_Serialize_Optimized) {
 	// Verify that original values are there
 	CHECK(table.Compare(t));
 
+	// Add a row with a known (but unique) value
+	table.Add("search_target", 9, true, Fri);
+
+	const size_t res = table.first.Find("search_target");
+	CHECK_EQUAL(table.GetSize()-1, res);
+
 #ifdef _DEBUG
 	toMem.Verify();
 	fromMem.Verify();
 #endif //_DEBUG
 }
-
-
-
 
 #endif

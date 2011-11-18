@@ -359,6 +359,14 @@ TEST(ColumnStringAutoEnumerate) {
 		CHECK_EQUAL(s1, s2);
 	}
 
+	// Search for a value that does not exist
+	const size_t res1 = e.Find("nonexist");
+	CHECK_EQUAL((size_t)-1, res1);
+
+	// Search for an existing value
+	const size_t res2 = e.Find("klmop");
+	CHECK_EQUAL(4, res2);
+
 	// Cleanup
 	c.Destroy();
 	e.Destroy();
