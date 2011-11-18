@@ -23,6 +23,7 @@ public:
 	void Verify();
 	void Print() const;
 	MemStats Stats();
+	void EnableMemDiagnostics(bool enable=true) {m_alloc.EnableDebug(enable);}
 #endif //_DEBUG
 
 private:
