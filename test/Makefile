@@ -32,7 +32,7 @@ all: $(EXECUTABLE)
 test: all
 	@./run_tests.sh
 
-debug: CXXFLAGS = CXXFLAGS + -b + -DDEBUG -g3 -ggdb
+debug: CXXFLAGS += -DDEBUG -g3 -ggdb
 debug: $(EXECUTABLE)
 
 gcov: CXXFLAGS += -DDEBUG -g3 -ggdb --coverage
