@@ -16,13 +16,12 @@ CXX       = g++ $(CXXFLAGS)
 # Files
 EXECUTABLE = tightdb-tests
 
-HEADERS    = $(wildcard ../src/*.h)
-SOURCES    = $(wildcard ../src/*.cpp)
-TEST_H     = $(wildcard *.h)
-TEST_SRC   = $(wildcard *.cpp large_tests/*.cpp)
+# HEADERS    = $(abspath $(wildcard ../src/*.h))
+SOURCES    = $(abspath $(wildcard ../src/*.cpp))
+# TEST_H     = $(abspath $(wildcard *.h))
+TEST_SRC   = $(abspath $(wildcard *.cpp large_tests/*.cpp))
 SURFIXES   = %.cpp %.h
-OBJECTS    = $(SOURCES:.o=.cpp) $(HEADERS:.o=.h) \
-             $(TEST_SRC:.o=.cpp) $(TEST_H:.o=.h)
+OBJECTS    = $(SOURCES:.o=.cpp) $(TEST_SRC:.o=.cpp) 
 
 # Targets
 all: CXXFLAGS += -DNDEBUG -O3
@@ -33,8 +32,14 @@ all: $(EXECUTABLE)
 test: all
 	@./run_tests.sh
 
-debug: CXXFLAGS += -DDEBUG -g3 -ggdb
+debug: CXXFLAGS = CXXFLAGS + -b + -DDEBUG -g3 -ggdb
 debug: $(EXECUTABLE)
+
+gcov: CXXFLAGS += -DDEBUG -g3 -ggdb --coverage
+gcov: clean $(EXECUTABLE)
+	@./$(EXECUTABLE)
+	@lcov --directory . --capture --output-file app.info
+	@genhtml --output-directory cov_htmp app.info
 
 clean:
 	@(cd UnitTest++ && make clean)
