@@ -252,22 +252,22 @@ void AdaptiveStringColumn::LeafDelete(size_t ndx) {
 bool AdaptiveStringColumn::FindKeyPos(const char* target, size_t& pos) const {
 	const int len = (int)Size();
 	bool found = false;
-	int low = -1;
-	int high = (int)len;
+	ssize_t low  = -1;
+	ssize_t high = len;
 
 	// Binary search based on:
 	// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
 	// Finds position of closest value BIGGER OR EQUAL to the target (for
 	// lookups in indexes)
 	while (high - low > 1) {
-		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+		const ssize_t probe = ((size_t)low + (size_t)high) >> 1;
 		const char* v = Get(probe);
 
 		const int cmp = strcmp(v, target);
 
-		if (cmp < 0) low  = (int)probe;
+		if (cmp < 0) low  = probe;
 		else {
-			high = (int)probe;
+			high = probe;
 			if (cmp == 0) found = true;
 		}
 	}
