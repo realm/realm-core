@@ -672,6 +672,45 @@ TEST(findallint7){
 	r.Destroy();
 }
 
+void hasZeroByte(int64_t value, size_t reps)
+{
+	Array a;
+	Column r;
+
+	for(size_t i = 0; i < reps - 1; i++){
+		a.Add(value);
+	}
+
+	a.Add(0);
+
+	size_t t = a.Find(0);
+	CHECK_EQUAL(a.Size() - 1, t);
+
+	r.Clear();
+	a.FindAll(r, 0);
+	CHECK_EQUAL(a.Size() - 1, r.Get(0));
+
+	// Cleanup
+	a.Destroy();
+	r.Destroy();
+}
+
+// Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (hasZeroByte) break;' condition)
+TEST(FindhasZeroByte)
+{
+	// we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime > 64
+	size_t n = 73;
+	hasZeroByte(1, n); // width = 1
+	hasZeroByte(3, n); // width = 2
+	hasZeroByte(13, n); // width = 4
+	hasZeroByte(100, n); // 8
+	hasZeroByte(10000, n); // 16
+	hasZeroByte(100000, n); // 32
+	hasZeroByte(8000000000LL, n); // 64
+}
+
+
+
 
 // Support functions for monkey test
 
