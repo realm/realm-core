@@ -19,7 +19,7 @@ TDB_TABLE_4(TestTableGroup,
 			Enum<Days>, fourth)
 
 // Windows version of serialization is not implemented yet
-#ifndef _MSC_VER
+#if 1 //_MSC_VER
 
 TEST(Group_Serialize0) {
 	// Delete old file if there
@@ -79,8 +79,10 @@ TEST(Group_Serialize1) {
 	CHECK_EQUAL(4, t.GetColumnCount());
 	CHECK_EQUAL(10, t.GetSize());
 
+#ifdef _DEBUG
 	// Verify that original values are there
 	CHECK(table.Compare(t));
+#endif
 
 	// Modify both tables
 	table[0].first = "test";
@@ -90,10 +92,9 @@ TEST(Group_Serialize1) {
 	table.DeleteRow(1);
 	t.DeleteRow(1);
 
+#ifdef _DEBUG
 	// Verify that both changed correctly
 	CHECK(table.Compare(t));
-
-#ifdef _DEBUG
 	toDisk.Verify();
 	fromDisk.Verify();
 #endif //_DEBUG
@@ -126,11 +127,10 @@ TEST(Group_Serialize2) {
 	TestTableGroup& t1 = fromDisk.GetTable<TestTableGroup>("test1");
 	TestTableGroup& t2 = fromDisk.GetTable<TestTableGroup>("test2");
 
+#ifdef _DEBUG
 	// Verify that original values are there
 	CHECK(table1.Compare(t1));
 	CHECK(table2.Compare(t2));
-
-#ifdef _DEBUG
 	toDisk.Verify();
 	fromDisk.Verify();
 #endif //_DEBUG
@@ -157,10 +157,10 @@ TEST(Group_Serialize3) {
 	Group fromDisk("table_test.tbl");
 	TestTableGroup& t = fromDisk.GetTable<TestTableGroup>("test");
 
-	// Verify that original values are there
-	CHECK(table.Compare(t));
 
 #ifdef _DEBUG
+	// Verify that original values are there
+	CHECK(table.Compare(t));
 	toDisk.Verify();
 	fromDisk.Verify();
 #endif //_DEBUG}
@@ -196,10 +196,10 @@ TEST(Group_Serialize_Men) {
 	CHECK_EQUAL(4, t.GetColumnCount());
 	CHECK_EQUAL(10, t.GetSize());
 
-	// Verify that original values are there
-	CHECK(table.Compare(t));
 
 #ifdef _DEBUG
+	// Verify that original values are there
+	CHECK(table.Compare(t));
 	toMem.Verify();
 	fromMem.Verify();
 #endif //_DEBUG

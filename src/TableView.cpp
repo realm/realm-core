@@ -16,6 +16,9 @@ int64_t TableView::Get(size_t column_id, size_t ndx) const {
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);
 	assert(ndx < m_refs.Size());
 
+
+	printf("HEJ\n");
+
 	const size_t real_ndx = m_refs.Get(ndx);
 	return m_table.Get(column_id, real_ndx);
 }

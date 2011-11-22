@@ -7,17 +7,17 @@
 size_t CalcByteLen(size_t count, size_t width);
 
 Array::Array(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc) {
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	Create(ref);
 }
 
 Array::Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(const_cast<Array*>(parent)), m_parentNdx(pndx), m_alloc(alloc) {
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(const_cast<Array*>(parent)), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	Create(ref);
 }
 
 Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc) {
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 
@@ -251,6 +251,45 @@ int64_t Array::Back() const {
 	return (this->*m_getter)(m_len-1);
 }
 
+
+
+void Array::SetBounds(size_t width) {
+	if(width == 0) {
+		m_lbound = 0;
+		m_ubound = 0;
+	}
+	else if(width == 1) {
+		m_lbound = 0;
+		m_ubound = 1;
+	}
+	else if(width == 2) {
+		m_lbound = 0;
+		m_ubound = 3;
+	}
+	else if(width == 4) {
+		m_lbound = 0;
+		m_ubound = 15;
+	}
+	else if(width == 8) {
+		m_lbound = -0x80LL;
+		m_ubound =  0x7FLL;
+	}
+	else if(width == 16) {
+		m_lbound = -0x8000LL;
+		m_ubound =  0x7FFFLL;
+	}
+	else if(width == 32) {
+		m_lbound = -0x80000000LL;
+		m_ubound =  0x7FFFFFFFLL;
+	}
+	else if(width == 64) {
+		m_lbound = -0x8000000000000000LL;
+		m_ubound =  0x7FFFFFFFFFFFFFFFLL;
+	}
+}
+
+
+
 bool Array::Set(size_t ndx, int64_t value) {
 	assert(ndx < m_len);
 
@@ -258,8 +297,14 @@ bool Array::Set(size_t ndx, int64_t value) {
 	if (!CopyOnWrite()) return false;
 
 	// Make room for the new value
-	const size_t width = BitWidth(value);
-	if (width > m_width) {
+	size_t width = m_width;
+
+	if(value < m_lbound || value > m_ubound)
+		width = BitWidth(value);
+
+	const bool doExpand = (width > m_width);
+	if (doExpand) {
+
 		Getter oldGetter = m_getter;
 		if (!Alloc(m_len, width)) return false;
 		SetWidth(width);
@@ -279,6 +324,9 @@ bool Array::Set(size_t ndx, int64_t value) {
 }
 
 bool Array::Insert(size_t ndx, int64_t value) {
+
+	// todo, maybe Set() can be used instead of (this->*m_setter), to reduce/simplify this function alot
+
 	assert(ndx <= m_len);
 
 	// Check if we need to copy before modifying
@@ -287,7 +335,11 @@ bool Array::Insert(size_t ndx, int64_t value) {
 	Getter getter = m_getter;
 
 	// Make room for the new value
-	const size_t width = BitWidth(value);
+	size_t width = m_width; 
+
+	if(value < m_lbound || value > m_ubound)
+		width = BitWidth(value);
+	
 	const bool doExpand = (width > m_width);
 	if (doExpand) {
 		if (!Alloc(m_len+1, width)) return false;
@@ -332,6 +384,7 @@ bool Array::Insert(size_t ndx, int64_t value) {
 
 	return true;
 }
+
 
 bool Array::Add(int64_t value) {
 	return Insert(m_len, value);
@@ -982,7 +1035,8 @@ void Array::SetWidth(size_t width) {
 	else {
 		assert(false);
 	}
-
+//	printf("%d ", width);
+	SetBounds(width);
 	m_width = width;
 }
 

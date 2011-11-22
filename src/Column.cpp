@@ -41,7 +41,8 @@ Column::Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc): 
 }
 
 Column::Column(const Column& column) : m_index(NULL) {
-	m_array = column.m_array;
+	m_array = column.m_array; // we now own array
+	column.m_array = NULL;    // so invalidate source
 }
 
 void Column::Create() {
@@ -69,7 +70,8 @@ Column::~Column() {
 
 void Column::Destroy() {
 	ClearIndex();
-	m_array->Destroy();
+	if(m_array != NULL)
+		m_array->Destroy();
 }
 
 
@@ -260,8 +262,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 	return TreeFind<int64_t, Column>(value, start, end);
 }
 
-void Column::FindAll(Column& result, int64_t value, size_t offset,
-					 size_t start, size_t end) const {
+void Column::FindAll(Column& result, int64_t value, size_t offset, size_t start, size_t end) const {
 	assert(start <= Size());
 	assert(end == (size_t)-1 || end <= Size());
 	if (IsEmpty()) return;
