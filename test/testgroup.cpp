@@ -235,7 +235,9 @@ TEST(Group_Serialize_Optimized) {
 	CHECK_EQUAL(4, t.GetColumnCount());
 
 	// Verify that original values are there
+#ifdef _DEBUG
 	CHECK(table.Compare(t));
+#endif
 
 	// Add a row with a known (but unique) value
 	table.Add("search_target", 9, true, Fri);

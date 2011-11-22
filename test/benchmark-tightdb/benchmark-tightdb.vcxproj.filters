@@ -61,6 +61,12 @@
     <ClCompile Include="..\Support\win32\mem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\ColumnStringEnum.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\utilities.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\alloc.h">
@@ -114,5 +120,8 @@
     <ClInclude Include="..\Support\mem.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\ColumnString.h" />
+    <ClInclude Include="..\..\src\ColumnStringEnum.h" />
+    <ClInclude Include="..\..\src\utilities.h" />
   </ItemGroup>
 </Project>
