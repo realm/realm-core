@@ -210,7 +210,7 @@ size_t ArrayString::Find(const char* value, size_t start, size_t end) const {
 void ArrayString::FindAll(Column& result, const char* value, size_t add_offset, size_t start, size_t end) {
 	assert(value);
 	size_t first = start - 1;
-	size_t len = strlen(value);
+	const size_t len = strlen(value);
 	do {
 		first = FindWithLen(value, len, first + 1, end);
 		if(first != (size_t)-1)
