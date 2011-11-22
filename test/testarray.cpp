@@ -19,6 +19,7 @@ uint64_t rand2(void);
 template<class T, class U> bool vector_eq_array(const std::vector<T>& v, const U& a);
 template<class T, class U> bool findall_test(std::vector<T>& v, U& a, T val);
 template<class T> std::vector<size_t> findall_vector(std::vector<T>& v, T val);
+void hasZeroByte(int64_t value, size_t reps);
 
 TEST_FIXTURE(db_setup_array, Array_Add0) {
 	c.Add(0);
