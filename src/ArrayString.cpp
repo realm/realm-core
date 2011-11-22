@@ -209,14 +209,16 @@ size_t ArrayString::Find(const char* value, size_t start, size_t end) const {
 
 void ArrayString::FindAll(Column& result, const char* value, size_t add_offset, size_t start, size_t end) {
 	assert(value);
-	size_t first = start - 1;
-	const size_t len = strlen(value);
-	do {
-		first = FindWithLen(value, len, first + 1, end);
-		if(first != (size_t)-1)
-		result.Add(first + add_offset);
-	} while (first != (size_t)-1);
 
+	const size_t len = strlen(value);
+
+	size_t first = start - 1;
+	for (;;) {
+		first = FindWithLen(value, len, first + 1, end);
+		if (first != (size_t)-1)
+			result.Add(first + add_offset);
+		else break;
+	}
 }
 
 size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, size_t end) const {
@@ -228,107 +230,16 @@ size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, siz
 	if (m_len == 0) return (size_t)-1; // empty list
 	if (len >= m_width) return (size_t)-1; // A string can never be wider than the column width
 
-#define OPTIMIZE_TEST
+	// todo, ensure behaves as expected when m_width = 0
 
-#ifdef OPTIMIZE_TEST
-
-	/*
-	// benchmark that you can place in testarraystring.cpp or whereever
-	c.Add("ynnvnsdsg");
-	c.Add("ujnnljd");
-	c.Add("dfgfgffggg gngs");
-	c.Add("hpgsdppp");
-	c.Add("sufy n");
-	c.Add("psdpppdfgg");
-	printf("finding");
-	for(uint64_t i = 0; i < 200*1000*1000; i++)
-		volatile size_t t = c.Find("psdppp")
-*/
-
-/*
-// performs + instead of * in address generation
-	char v = *value;
-	for (unsigned char *r = m_data + start * m_width; r < m_data + end * m_width; r += m_width) { 
-		if (v == *r) { 
-			if(strncmp(value, (const char *)r, len) == 0) {
-				return (r - m_data) / m_width;
-			}
-		}
-	}
-	return (size_t)-1;
-*/
-
-
-
-// todo, ensure behaves as expected when m_width = 0
-	// 50 - 80% faster in some cases (few short strings, such as column names), same speed in most others, never slower
 	for (size_t i = start; i < end; ++i) {
-		if (value[0] == m_data[i * m_width] && value[len] == m_data[i * m_width + len]) { 
-			if(strncmp(value, (const char *)m_data + i * m_width, len) == 0)
-				return i;
-			}
-		}
-	return (size_t)-1;
-
-#else
-	if (m_width == 0) {
-		return 0; 
-	}
-	else if (m_width == 4) {
-		int32_t v = 0;
-		memcpy(&v, value, len);
-
-		const int32_t* const t = (int32_t*)m_data;
-		for (size_t i = start; i < end; ++i) {
-			if (v == t[i]) return i;
+		if (value[0] == m_data[i * m_width] && value[len] == m_data[i * m_width + len]) {
+			const char* const v = (const char *)m_data + i * m_width;
+			if (strncmp(value, v, len) == 0) return i;
 		}
 	}
-	else if (m_width == 8) {
-		int64_t v = 0;
-		memcpy(&v, value, len);
-
-		const int64_t* const t = (int64_t*)m_data;
-		for (size_t i = start; i < end; ++i) {
-			if (v == t[i]) return i;
-		}
-	}
-	else if (m_width == 16) {
-		int64_t v[2] = {0,0};
-		memcpy(&v, value, len);
-
-		const int64_t* const t = (int64_t*)m_data;
-		const size_t end2 = end * 2;
-		for (size_t i = start; i < end2; i += 2) {
-			if (v[0] == t[i] && v[1] == t[i+1]) return i/2;
-		}
-	}
-	else if (m_width == 32) {
-		int64_t v[4] = {0,0,0,0};
-		memcpy(&v, value, len);
-
-		const int64_t* const t = (int64_t*)m_data;
-		const size_t end2 = end * 4;
-		for (size_t i = start; i < end2; i += 4) {
-			if (v[0] == t[i] && v[1] == t[i+1] && v[2] == t[i+2] && v[3] == t[i+3]) return i/4;
-		}
-	}
-	else if (m_width == 64) {
-		int64_t v[8] = {0,0,0,0,0,0,0,0};
-		memcpy(&v, value, len);
-
-		const int64_t* const t = (int64_t*)m_data;
-		const size_t end2 = end * 8;
-		for (size_t i = start; i < end2; i += 8) {
-			if (v[0] == t[i] && v[1] == t[i+1] && v[2] == t[i+2] && v[3] == t[i+3] &&
-			    v[4] == t[i+4] && v[5] == t[i+5] && v[6] == t[i+6] && v[7] == t[i+7]) return i/8;
-		}
-	}
-	else assert(false);
-		
-	return (size_t)-1;
-
-#endif
-
+	
+	return (size_t)-1; // not found
 }
 
 #ifdef _DEBUG
