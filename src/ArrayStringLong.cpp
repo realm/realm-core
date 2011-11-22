@@ -112,8 +112,8 @@ size_t ArrayStringLong::Find(const char* value, size_t start, size_t end) const 
 void ArrayStringLong::FindAll(Column &result, const char* value, size_t add_offset, size_t start, size_t end) const {
 	assert(value);
 	size_t first = (size_t)-1;
+	const size_t len = strlen(value);
 	do {
-		size_t len = strlen(value);
 		first = FindWithLen(value, len, first + 1, (size_t)-1);
 		if(first != (size_t)-1)
 		result.Add(first + add_offset);
