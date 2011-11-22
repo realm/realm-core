@@ -119,7 +119,7 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
 
 		// Only compare strings if length matches
 		if ((end - offset) == len) {
-			const char* const v = Get(i);
+			const char* const v = (const char*)m_blob.Get(offset);
 			if (value[0] == *v && strcmp(value, v) == 0)
 				return i;
 		}
