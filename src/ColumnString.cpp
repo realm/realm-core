@@ -3,6 +3,10 @@
 #include <cstring>
 #include <cstdio> // debug
 
+#ifdef _MSC_VER
+	#include "win32\types.h"
+#endif
+
 #include "ColumnString.h"
 
 // Pre-declare local functions
