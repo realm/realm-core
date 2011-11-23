@@ -5,7 +5,10 @@
 #include "../testsettings.h"
 #include "verified_integer.h"
 
+#if TEST_DURATION > 0
+
 // Support functions for monkey test
+static uint64_t rand2(int bitwidth);
 
 static uint64_t rand2(int bitwidth = 64) {
 	uint64_t i = (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand();
@@ -16,9 +19,8 @@ static uint64_t rand2(int bitwidth = 64) {
 	return i;
 }
 
-
 TEST(Column_monkeytest2) {
-	const uint64_t ITER_PER_BITWIDTH = 1 * 1000;
+	const uint64_t ITER_PER_BITWIDTH = 16 * 1000 * TEST_DURATION * TEST_DURATION * TEST_DURATION;
 	const uint64_t SEED = 123;
 
 	VerifiedInteger a;
@@ -63,3 +65,5 @@ TEST(Column_monkeytest2) {
 	a.Destroy();
 	res.Destroy();
 }
+
+#endif

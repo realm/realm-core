@@ -6,6 +6,11 @@
 
 #include "verified_string.h"
 
+#if TEST_DURATION > 0
+
+static uint64_t rand2(int bitwidth);
+string randstring(void);
+
 // Support functions for monkey test
 static uint64_t rand2(int bitwidth = 64) {
 	uint64_t i = (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand();
@@ -31,9 +36,8 @@ string randstring(void)
 	return s;
 }
 
-
 TEST(ColumnString_monkeytest2) {
-	const uint64_t ITER = 500 * 1000;
+	const uint64_t ITER = 16 * 5000 * TEST_DURATION * TEST_DURATION * TEST_DURATION;
 	const uint64_t SEED = 123;
 
 	VerifiedString a;
@@ -77,3 +81,4 @@ TEST(ColumnString_monkeytest2) {
 }
 
 
+#endif

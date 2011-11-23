@@ -189,8 +189,10 @@
     <ClCompile Include="src\Group.cpp" />
     <ClCompile Include="src\Index.cpp" />
     <ClCompile Include="src\utilities.cpp" />
-    <ClCompile Include="test\large_tests\test_integers.cpp" />
+    <ClCompile Include="test\large_tests\test_column.cpp" />
     <ClCompile Include="test\large_tests\test_strings.cpp" />
+    <ClCompile Include="test\large_tests\verified_integer.cpp" />
+    <ClCompile Include="test\large_tests\verified_string.cpp" />
     <ClCompile Include="test\main.cpp" />
     <ClCompile Include="src\Table.cpp" />
     <ClCompile Include="src\TableView.cpp" />
@@ -203,6 +205,7 @@
     <ClCompile Include="test\testgroup.cpp" />
     <ClCompile Include="test\testindex.cpp" />
     <ClCompile Include="test\testtable.cpp" />
+    <ClCompile Include="test\testTableView.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\alloc.h" />
@@ -223,12 +226,8 @@
     <ClInclude Include="src\Table.h" />
     <ClInclude Include="src\tightdb.h" />
     <ClInclude Include="src\utilities.h" />
-    <ClInclude Include="test\large_tests\verified_integer.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClInclude>
-    <ClInclude Include="test\large_tests\verified_string.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClInclude>
+    <ClInclude Include="test\large_tests\verified_integer.h" />
+    <ClInclude Include="test\large_tests\verified_string.h" />
     <ClInclude Include="test\testsettings.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

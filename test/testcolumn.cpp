@@ -474,11 +474,13 @@ TEST(Column_FindHamming) {
 	res.Destroy();
 }
 
+#if TEST_DURATION > 0
+
 TEST(Column_prepend_many) {
 	// Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
 	Column a;
 
-	for (size_t items = 0; items < 2000; ++items) {
+	for (size_t items = 0; items < 3000; ++items) {
 		a.Clear();
 		for (int j = 0; j < items + 1; ++j) {
 			a.Insert(0, j);
@@ -488,3 +490,4 @@ TEST(Column_prepend_many) {
 	a.Destroy();
 }
 
+#endif

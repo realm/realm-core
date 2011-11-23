@@ -711,7 +711,7 @@ TEST(FindhasZeroByte)
 
 
 
-
+/*
 // Support functions for monkey test
 
 uint64_t rand2(void) {
@@ -764,7 +764,7 @@ template<class T, class U> bool findall_test(std::vector<T>& v, U& a, T val) {
 
 
 TEST(monkeytest1) {
-	const uint64_t DURATION = UNITTEST_DURATION*1000;
+	const uint64_t DURATION = TEST_DURATION*1000;
 	const uint64_t SEED = 123;
 
 	Array a;
@@ -785,11 +785,11 @@ TEST(monkeytest1) {
 				trend = (unsigned int)rand2() % 10;
 
 			// Sanity test
-/*			if(rand2() % 1000 == 0)	{
-				for(int j = 0; j < v.size(); j++)
-					printf("%lld ", v[j]);
-				printf("%d\n", v.size());
-			}*/
+//			if(rand2() % 1000 == 0)	{
+//				for(int j = 0; j < v.size(); j++)
+//					printf("%lld ", v[j]);
+//				printf("%d\n", v.size());
+//			}
 
 
 			if (rand2() % 10 > trend) {
@@ -832,3 +832,4 @@ TEST(monkeytest1) {
 
 
 
+*/
