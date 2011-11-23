@@ -352,6 +352,24 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2) {
 	col.Destroy();
 }
 
+// Test against a bug where FindWithLen() would fail finding ajacent hits
+TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent) {
+	c.Clear();
+	Column col;
+
+	c.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+	c.Add("baz");
+	c.Add("baz");
+	c.Add("foo");
+
+	c.FindAll(col, "baz");
+
+	CHECK_EQUAL(2, col.Size());
+
+	// Cleanup
+	col.Destroy();
+}
+
 TEST(AdaptiveStringColumnFindAllExpand) {
 
 	AdaptiveStringColumn asc;
