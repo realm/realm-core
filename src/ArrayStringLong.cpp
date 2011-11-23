@@ -125,7 +125,7 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
 
 	len += 1; // include trailing null byte
 	const size_t count = m_offsets.Size();
-	size_t offset = 0;
+	size_t offset = (start == 0 ? 0 : m_offsets.Get(start - 1)); // todo, verify
 	for (size_t i = start; i < count && i < end; ++i) {
 		const size_t end = m_offsets.Get(i);
 
