@@ -66,6 +66,15 @@ Group::~Group() {
 	m_top.Destroy();
 }
 
+size_t Group::GetTableCount() const {
+	return m_tableNames.Size();
+}
+
+const char* Group::GetTableName(size_t table_ndx) const {
+	assert(table_ndx < m_tableNames.Size());
+	return m_tableNames.Get(table_ndx);
+}
+
 bool Group::HasTable(const char* name) const {
 	const size_t n = m_tableNames.Find(name);
 	return (n != (size_t)-1);
