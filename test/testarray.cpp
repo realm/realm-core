@@ -709,7 +709,20 @@ TEST(FindhasZeroByte)
 	hasZeroByte(8000000000LL, n); // 64
 }
 
+// New find test for SSE search, to trigger partial finds (see FindSSE()) before and after the aligned data area
+TEST(FindSSE) {
+	Array a;
+	for(uint64_t i = 0; i < 100; i++) {
+		a.Add(10000);
+	}
 
+	for(uint64_t i = 0; i < 100; i++) {
+		a.Set(i, 123);
+		size_t t = a.Find(123);
+		assert(t == i);
+		a.Set(i, 10000);
+	}
+}
 
 /*
 // Support functions for monkey test

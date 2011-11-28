@@ -11,7 +11,8 @@
 #include <cstring> // memmove
 #include "alloc.h"
 #include <iostream>
-
+#include "utilities.h"
+#include <emmintrin.h>
 #ifdef _DEBUG
 #include <stdio.h>
 #endif
@@ -96,10 +97,11 @@ public:
 private:
 	Array& operator=(const Array&) {return *this;} // not allowed
 	void SetBounds(size_t width);
+	size_t FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const;
+	size_t FindNaive(int64_t value, size_t start, size_t end) const;
 
 protected:
 	void Create(size_t ref);
-
 	void DoSort(size_t lo, size_t hi);
 
 	// Getters and Setters for adaptive-packed arrays

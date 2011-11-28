@@ -188,7 +188,9 @@
     <ClCompile Include="src\ctightdb.cpp" />
     <ClCompile Include="src\Group.cpp" />
     <ClCompile Include="src\Index.cpp" />
-    <ClCompile Include="src\utilities.cpp" />
+    <ClCompile Include="src\utilities.cpp">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
+    </ClCompile>
     <ClCompile Include="test\large_tests\test_column.cpp" />
     <ClCompile Include="test\large_tests\test_strings.cpp" />
     <ClCompile Include="test\large_tests\verified_integer.cpp" />

@@ -34,5 +34,10 @@ typedef struct
 
 unsigned long long checksum(unsigned char *data, size_t len);
 void checksum_rolling(unsigned char *data, size_t len, checksum_t *t);
+void *round_up(void *p, size_t align);
+void *round_down(void *p, size_t align);
+size_t round_up(size_t p, size_t align);
+size_t round_down(size_t p, size_t align);
 
 #endif
+
