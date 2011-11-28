@@ -16,7 +16,9 @@
     SSE4.1: smmintrin.h
     SSE4.2: nmmintrin.h
 */
-#include <emmintrin.h>
+#if defined(X86X64) && defined(BITS64)
+	#include <emmintrin.h>
+#endif
 
 // Pre-declare local functions
 size_t CalcByteLen(size_t count, size_t width);
@@ -484,8 +486,7 @@ size_t Array::FindPos2(int64_t target) const {
 }
 
 size_t Array::Find(int64_t value, size_t start, size_t end) const {
-	//return FindNaive(value, start, end); // enable legacy find
-
+#if defined(X86X64) && defined(BITS64)
 	if(end == -1)
 		end = m_len;
 
@@ -514,6 +515,9 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	// Search remainder with FindNaive()
 	t = FindNaive(value, ((unsigned char *)b - m_data) * 8 / m_width, end);
 	return t;
+#else
+	return FindNaive(value, start, end); // enable legacy find
+#endif
 }
 
 // 'items' is the number of 16-byte SSE chunks. 'bytewidth' is the size of a packed data element.
