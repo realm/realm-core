@@ -12,7 +12,18 @@
 #include "alloc.h"
 #include <iostream>
 #include "utilities.h"
-#include <emmintrin.h>
+/*
+    MMX: mmintrin.h
+    SSE: xmmintrin.h
+    SSE2: emmintrin.h
+    SSE3: pmmintrin.h
+    SSSE3: tmmintrin.h
+    SSE4A: ammintrin.h
+    SSE4.1: smmintrin.h
+    SSE4.2: nmmintrin.h
+*/
+
+#include <nmmintrin.h> // __SSE3__
 #ifdef _DEBUG
 #include <stdio.h>
 #endif
@@ -68,7 +79,7 @@ public:
 	void FindAll(Column& result, int64_t value, size_t offset=0,
 				 size_t start=0, size_t end=(size_t)-1) const;
 	void FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset=0) const;
-
+	int64_t Sum(size_t start = 0, size_t end = -1) const;
 	void Sort();
 
 	void Resize(size_t count);

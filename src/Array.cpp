@@ -6,20 +6,6 @@
 	#include "win32\types.h"
 #endif
 
-/*
-    MMX: mmintrin.h
-    SSE: xmmintrin.h
-    SSE2: emmintrin.h
-    SSE3: pmmintrin.h
-    SSSE3: tmmintrin.h
-    SSE4A: ammintrin.h
-    SSE4.1: smmintrin.h
-    SSE4.2: nmmintrin.h
-*/
-#if defined(X86X64) && defined(BITS64)
-	#include <emmintrin.h>
-#endif
-
 // Pre-declare local functions
 size_t CalcByteLen(size_t count, size_t width);
 
@@ -341,9 +327,7 @@ bool Array::Set(size_t ndx, int64_t value) {
 }
 
 bool Array::Insert(size_t ndx, int64_t value) {
-
 	// todo, maybe Set() can be used instead of (this->*m_setter), to reduce/simplify this function alot
-
 	assert(ndx <= m_len);
 
 	// Check if we need to copy before modifying
@@ -958,6 +942,87 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 		}
 	}
 }
+
+
+
+int64_t Array::Sum(size_t start, size_t end) const {
+	uint64_t sum = 0;
+	
+	if(end == -1)
+		end = Size();
+
+	if(m_width == 0)
+		return 0;
+	else if(m_width == 8) {
+		for(int i = start; i < end; i++)
+			sum += Get_8b(i);
+	}
+	else if(m_width == 16) {
+		for(int i = start; i < end; i++)
+			sum += Get_16b(i);
+	}
+	else if(m_width == 32) {
+		for(int i = start; i < end; i++)
+			sum += Get_32b(i);
+	}
+	else if(m_width == 64) {
+		for(int i = start; i < end; i++)
+			sum += Get_64b(i);
+	}
+	else
+	{
+		uint64_t *next = (uint64_t *)m_data;
+		uint64_t s = 0, i;
+		size_t chunkvals = sizeof(int64_t) * 8 / m_width;
+	
+		// todo, fixme (for all widths): reset sum counter once in a while, else
+		// it overflows for large arrays
+		if(m_width == 1) {
+			for(i = start; i + chunkvals <= end; i += chunkvals) {
+				uint64_t a = next[i / chunkvals];
+				uint64_t b = a >> 1;
+				a = a & 0x5555555555555555;
+				b = b & 0x5555555555555555;
+				s += a;
+				s += b;
+			}
+		}
+
+		if(m_width == 2) {
+			for(i = start; i + chunkvals <= end; i += chunkvals) {
+				uint64_t a = next[i / chunkvals];
+				uint64_t b = a >> 2;
+				a = a & 0x3333333333333333;
+				b = b & 0x3333333333333333;
+				s += a;
+				s += b;
+			}
+		}
+
+		if(m_width == 4) {
+			for(i = start; i + chunkvals <= end; i += chunkvals) {
+				uint64_t a = next[i / chunkvals];
+				uint64_t b = a >> 4;
+				a = a & 0x0f0f0f0f0f0f0f0f;
+				b = b & 0x0f0f0f0f0f0f0f0f;
+				s += a;
+				s += b;
+			}
+		}
+
+		for(size_t j = 0; j < chunkvals; j++) {
+			uint64_t mask = (1 << (m_width * 2)) - 1;
+			sum += s & mask;
+			s >>= m_width * 2;
+		}
+
+		for(; i < end; i++)
+			sum += Get(i);
+	}
+
+	return sum;
+}
+
 
 void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset) const {
 	// Only implemented for 64bit values
