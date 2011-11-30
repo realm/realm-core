@@ -946,11 +946,13 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 
 
 int64_t Array::Sum(size_t start, size_t end) const {
+	if (IsEmpty()) return 0;
+	if (end == (size_t)-1) end = m_len;
+	if (start == end) return 0;
+	assert(start < m_len && end <= m_len && start < end);
+
 	uint64_t sum = 0;
 	
-	if(end == -1)
-		end = Size();
-
 	if(m_width == 0)
 		return 0;
 	else if(m_width == 8) {
@@ -975,16 +977,12 @@ int64_t Array::Sum(size_t start, size_t end) const {
 		uint64_t s = 0, i;
 		size_t chunkvals = sizeof(int64_t) * 8 / m_width;
 	
-		// todo, fixme (for all widths): reset sum counter once in a while, else
-		// it overflows for large arrays
 		if(m_width == 1) {
 			for(i = start; i + chunkvals <= end; i += chunkvals) {
 				uint64_t a = next[i / chunkvals];
-				uint64_t b = a >> 1;
-				a = a & 0x5555555555555555;
-				b = b & 0x5555555555555555;
-				s += a;
-				s += b;
+				for (; a; sum++) {
+					a &= a - 1; // clear the least significant bit set
+				}
 			}
 		}
 
@@ -996,6 +994,14 @@ int64_t Array::Sum(size_t start, size_t end) const {
 				b = b & 0x3333333333333333;
 				s += a;
 				s += b;
+				if((s & 0x8888888888888888) != 0) {
+					for(size_t j = 0; j < chunkvals; j++) {
+						uint64_t mask = (1 << (m_width * 2)) - 1;
+						sum += s & mask;
+						s >>= m_width * 2;
+					}
+					s = 0;
+				}
 			}
 		}
 
@@ -1007,15 +1013,25 @@ int64_t Array::Sum(size_t start, size_t end) const {
 				b = b & 0x0f0f0f0f0f0f0f0f;
 				s += a;
 				s += b;
+				if((s & 0x8080808080808080) != 0) {
+					for(size_t j = 0; j < chunkvals; j++) {
+						uint64_t mask = (1 << (m_width * 2)) - 1;
+						sum += s & mask;
+						s >>= m_width * 2;
+					}
+					s = 0;
+				}
 			}
 		}
 
+		// Sum all sums in 64 bit accumulator
 		for(size_t j = 0; j < chunkvals; j++) {
 			uint64_t mask = (1 << (m_width * 2)) - 1;
 			sum += s & mask;
 			s >>= m_width * 2;
 		}
 
+		// Sum remainding elements 
 		for(; i < end; i++)
 			sum += Get(i);
 	}

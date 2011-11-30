@@ -739,8 +739,8 @@ TEST(Sum1) {
 	uint64_t s1 = 0;
 	Array a;
 	for(int i = 0; i < 64 + 7; i++) {
-		a.Add(i % 1);
-		s1 += i % 1;
+		a.Add(i % 2);
+		s1 += i % 2;
 	}
 	CHECK_EQUAL(s1, a.Sum(0, a.Size()));
 	a.Destroy();
@@ -762,8 +762,8 @@ TEST(Sum4) {
 	uint64_t s1 = 0;
 	Array a;
 	for(int i = 0; i < 64 + 7; i++) {
-		a.Add(i % 15);
-		s1 += i % 15;
+		a.Add(i % 16);
+		s1 += i % 16;
 	}
 	CHECK_EQUAL(s1, a.Sum(0, a.Size()));
 	a.Destroy();
