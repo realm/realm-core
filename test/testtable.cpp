@@ -421,6 +421,19 @@ TEST(Table_Spec) {
 		CHECK_EQUAL(42,     subtable.Get(0, 0));
 		CHECK_EQUAL("test", subtable.GetString(1, 0));
 	}
+
+	// Write the group to disk
+	group.Write("subtables.tightdb");
+
+	// Read back tables
+	Group fromDisk("subtables.tightdb");
+	TopLevelTable& fromDiskTable = fromDisk.GetTable("test");
+
+	const Table subtable2 = fromDiskTable.GetTable(2, 0);
+
+	CHECK_EQUAL(1,      subtable2.GetSize());
+	CHECK_EQUAL(42,     subtable2.Get(0, 0));
+	CHECK_EQUAL("test", subtable2.GetString(1, 0));
 }
 
 

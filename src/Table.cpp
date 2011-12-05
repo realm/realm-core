@@ -312,6 +312,12 @@ Spec Table::GetSpec() {
 	return Spec(alloc, m_specSet.GetRef(), m_specSet.GetParent(), 0);
 }
 
+const Spec Table::GetSpec() const {
+	Allocator& alloc = m_specSet.GetAllocator();
+	return Spec(alloc, m_specSet.GetRef(), NULL, 0);
+}
+
+
 void Table::InstantiateBeforeChange() {
 	// Empty (zero-ref'ed) tables need to be instantiated before first modification
 	if (!m_columns.IsValid()) CreateColumns();
@@ -321,6 +327,7 @@ void Table::CacheColumns() {
 	assert(m_cols.IsEmpty()); // only done on creation
 
 	Allocator& alloc = m_specSet.GetAllocator();
+	const Spec spec = ((const Table*)this)->GetSpec();
 
     // Cache columns
     size_t size = (size_t)-1;
@@ -356,12 +363,11 @@ void Table::CacheColumns() {
 			}
 			case COLUMN_TYPE_TABLE:
 			{
-                /*// Spec and names for subtable are following type_id in spec
-				const size_t ref_spec  = m_spec.Get(++i);
-				const size_t ref_names = m_spec.Get(++i);
+				Spec subspec = spec.GetSpec(i);
+				const size_t ref_specSet = subspec.GetRef();
 
-				newColumn = new ColumnTable(ref, ref_spec, ref_names, &m_columns, column_ndx, m_alloc);
-				colsize = ((ColumnTable*)newColumn)->Size();*/
+				newColumn = new ColumnTable(ref, ref_specSet, &m_columns, column_ndx, alloc);
+				colsize = ((ColumnTable*)newColumn)->Size();
                 break;
 			}
 

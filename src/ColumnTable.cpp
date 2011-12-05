@@ -21,6 +21,15 @@ Table ColumnTable::GetTable(size_t ndx) {
 	return Table(alloc, m_ref_specSet, ref_columns, parent, pndx);
 }
 
+const Table ColumnTable::GetTable(size_t ndx) const {
+	assert(ndx < m_table_refs.Size());
+
+	const size_t ref_columns = m_table_refs.Get(ndx);
+	Allocator& alloc = m_table_refs.GetAllocator();
+
+	return Table(alloc, m_ref_specSet, ref_columns, NULL, 0);
+}
+
 Table* ColumnTable::GetTablePtr(size_t ndx) {
 	assert(ndx < m_table_refs.Size());
 
