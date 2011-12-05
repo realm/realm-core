@@ -13,6 +13,31 @@
 class Accessor;
 class TableView;
 class Group;
+class ColumnTable;
+
+class Spec {
+public:
+	Spec(Allocator& alloc, size_t ref, Array* parent, size_t pndx);
+	Spec(const Spec& s);
+
+	void AddColumn(ColumnType type, const char* name);
+	Spec AddColumnTable(const char* name);
+
+	Spec GetSpec(size_t column_id);
+	const Spec GetSpec(size_t column_id) const;
+
+	size_t GetColumnCount() const;
+	ColumnType GetColumnType(size_t ndx) const;
+
+	size_t GetRef() const {return m_specSet.GetRef();}
+private:
+	void Create(size_t ref, Array* parent, size_t pndx);
+
+	Array m_specSet;
+	Array m_spec;
+	ArrayString m_names;
+	Array m_subSpecs;
+};
 
 class Table {
 public:
@@ -25,8 +50,7 @@ public:
 	const char* GetColumnName(size_t ndx) const;
 	size_t GetColumnIndex(const char* name) const;
 	ColumnType GetColumnType(size_t ndx) const;
-
-	Table& operator=(const Table& t);
+	Spec GetSpec();
 
 	bool IsEmpty() const {return m_size == 0;}
 	size_t GetSize() const {return m_size;}
@@ -56,7 +80,6 @@ public:
 	void InsertBinary(size_t column_id, size_t ndx, const void* value, size_t len);
 	void InsertDone();
 
-
 	// Strings
 	const char* GetString(size_t column_id, size_t ndx) const;
 	void SetString(size_t column_id, size_t ndx, const char* value);
@@ -64,6 +87,12 @@ public:
 	// Binary
 	BinaryData GetBinary(size_t column_id, size_t ndx) const;
 	void SetBinary(size_t column_id, size_t ndx, const void* value, size_t len);
+
+	// Sub-tables
+	Table  GetTable(size_t column_id, size_t ndx);
+	Table* GetTablePtr(size_t column_id, size_t ndx);
+	size_t GetTableSize(size_t column_id, size_t ndx) const;
+	void   InsertTable(size_t column_id, size_t ndx);
 
 	size_t RegisterColumn(ColumnType type, const char* name);
 
@@ -75,6 +104,8 @@ public:
 	const ColumnBinary& GetColumnBinary(size_t ndx) const;
 	ColumnStringEnum& GetColumnStringEnum(size_t ndx);
 	const ColumnStringEnum& GetColumnStringEnum(size_t ndx) const;
+	ColumnTable& GetColumnTable(size_t ndx);
+	const ColumnTable& GetColumnTable(size_t ndx) const;
 
 	// Searching
 	size_t Find(size_t column_id, int64_t value) const;
@@ -102,12 +133,14 @@ public:
 
 protected:
 	friend class Group;
+	friend class ColumnTable;
 
-	// Construct from ref
-	Table(Allocator& alloc, size_t ref, Array* parent, size_t pndx);
-	void SetParent(Array* parent, size_t pndx);
-	size_t GetRef() const;
-	void Invalidate() {m_top.Invalidate();}
+	Table(Allocator& alloc, bool dontInit); // Construct un-initialized
+	Table(Allocator& alloc, size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns); // Construct from ref
+
+	void Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns);
+	void CreateColumns();
+	void CacheColumns();
 
 	// Serialization
 	template<class S> size_t Write(S& out, size_t& pos) const;
@@ -121,18 +154,54 @@ protected:
 	size_t GetColumnRefPos(size_t column_ndx) const;
 	void UpdateColumnRefs(size_t column_ndx, int diff);
 
+	void InstantiateBeforeChange();
+
 	// Member variables
 	size_t m_size;
 	
 	// On-disk format
-	Array m_top;
+	Array m_specSet;
 	Array m_spec;
 	ArrayString m_columnNames;
+	Array m_subSpecs;
 	Array m_columns;
 
 	// Cached columns
 	Array m_cols;
-	Allocator& m_alloc;
+
+private:
+	Table& operator=(const Table& t); // non assignable
+};
+
+class TopLevelTable : public Table {
+public:
+	TopLevelTable(Allocator& alloc=DefaultAllocator);
+	~TopLevelTable();
+
+	void UpdateFromSpec(size_t ref_specSet);
+
+	// Debug
+#ifdef _DEBUG
+	MemStats Stats() const;
+#endif //_DEBUG
+
+protected:
+	friend class Group;
+
+	// Construct from ref
+	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx);
+
+	void SetParent(Array* parent, size_t pndx);
+	size_t GetRef() const;
+
+	void Invalidate() {m_top.Invalidate();}
+
+	// On-disk format
+	Array m_top;
+
+private:
+	TopLevelTable(const TopLevelTable&) {}            // not copyable
+	TopLevelTable& operator=(const TopLevelTable&) {return *this;} // non assignable
 };
 
 class TableView {
@@ -173,12 +242,14 @@ class CursorBase {
 public:
 	CursorBase(Table& table, size_t ndx) : m_table(table), m_index(ndx) {};
 	CursorBase(const CursorBase& v) : m_table(v.m_table), m_index(v.m_index) {};
-	CursorBase& operator=(const CursorBase& v) {m_table = v.m_table; m_index = v.m_index; return *this;}
 
 protected:
 	Table& m_table;
 	size_t m_index;
 	friend class Accessor;
+
+private:
+	CursorBase& operator=(const CursorBase&) {return *this;}  // non assignable
 };
 
 class Accessor {
@@ -360,6 +431,13 @@ size_t Table::Write(S& out, size_t& pos) const {
     const size_t namesPos = pos;
     pos += m_columnNames.Write(out);
 
+	// SpecSet
+	Array specSet(COLUMN_HASREFS);
+	specSet.Add(specPos);
+	specSet.Add(namesPos);
+	const uint64_t specSetPos = pos;
+	pos += specSet.Write(out);
+
     // Columns
     Array columns(COLUMN_HASREFS);
     const size_t column_count = GetColumnCount();
@@ -399,15 +477,16 @@ size_t Table::Write(S& out, size_t& pos) const {
 
     // Table array
     Array top(COLUMN_HASREFS);
-    top.Add(specPos);
-    top.Add(namesPos);
+	top.Add(specSetPos);
     top.Add(columnsPos);
     const uint64_t topPos = pos; // sized for top ref
     pos += top.Write(out);
 
     // Clean-up
+	specSet.SetType(COLUMN_NORMAL); // avoid recursive del
 	columns.SetType(COLUMN_NORMAL); // avoid recursive del
 	top.SetType(COLUMN_NORMAL);
+	specSet.Destroy();
 	columns.Destroy();
 	top.Destroy();
 

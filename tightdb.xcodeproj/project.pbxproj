@@ -31,6 +31,8 @@
 		368063321445977300283774 /* Group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063311445977300283774 /* Group.cpp */; };
 		368063381445AF9B00283774 /* testgroup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063361445AD9200283774 /* testgroup.cpp */; };
 		3680633A1446D12B00283774 /* testalloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063391446D12A00283774 /* testalloc.cpp */; };
+		36E4755914877FA4009FB135 /* ColumnTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E4755814877FA4009FB135 /* ColumnTable.cpp */; };
+		36E4755C14877FB9009FB135 /* ColumnTable.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E4755B14877FB8009FB135 /* ColumnTable.h */; };
 		36E608681459976700CCC3E8 /* test-tightdb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E02214209CE600D56FD7 /* test-tightdb.cpp */; };
 		36E608691459977000CCC3E8 /* liblibtightdb_d.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* liblibtightdb_d.a */; };
 		36E6086F1459A3EB00CCC3E8 /* mem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6086E1459A3EB00CCC3E8 /* mem.cpp */; };
@@ -211,6 +213,8 @@
 		368063341445979100283774 /* Group.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Group.h; sourceTree = "<group>"; };
 		368063361445AD9200283774 /* testgroup.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testgroup.cpp; sourceTree = "<group>"; };
 		368063391446D12A00283774 /* testalloc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testalloc.cpp; sourceTree = "<group>"; };
+		36E4755814877FA4009FB135 /* ColumnTable.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ColumnTable.cpp; sourceTree = "<group>"; };
+		36E4755B14877FB8009FB135 /* ColumnTable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ColumnTable.h; sourceTree = "<group>"; };
 		36E608581458289F00CCC3E8 /* Column_tpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Column_tpl.h; sourceTree = "<group>"; };
 		36E6085E1459972100CCC3E8 /* test-tightdb */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "test-tightdb"; sourceTree = BUILT_PRODUCTS_DIR; };
 		36E6086E1459A3EB00CCC3E8 /* mem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mem.cpp; path = mac/mem.cpp; sourceTree = "<group>"; };
@@ -293,6 +297,8 @@
 				363141F814751E9600ADD5AC /* ColumnStringEnum.cpp */,
 				36E608A0145AEE7200CCC3E8 /* ColumnBinary.h */,
 				36E608A2145AEE9000CCC3E8 /* ColumnBinary.cpp */,
+				36E4755814877FA4009FB135 /* ColumnTable.cpp */,
+				36E4755B14877FB8009FB135 /* ColumnTable.h */,
 				3647DEF514209C1200D56FD7 /* ColumnType.h */,
 				3647DEF614209C1200D56FD7 /* ctightdb.cpp */,
 				3647DEF714209C1200D56FD7 /* ctightdb.h */,
@@ -552,6 +558,7 @@
 				36E608A1145AEE7300CCC3E8 /* ColumnBinary.h in Headers */,
 				360F1A37146BF71500EBB9C6 /* ColumnString.h in Headers */,
 				363141F714751E8000ADD5AC /* ColumnStringEnum.h in Headers */,
+				36E4755C14877FB9009FB135 /* ColumnTable.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -659,6 +666,7 @@
 				36E6089B145AE53500CCC3E8 /* ArrayBinary.cpp in Sources */,
 				36E608A3145AEE9000CCC3E8 /* ColumnBinary.cpp in Sources */,
 				363141F914751E9600ADD5AC /* ColumnStringEnum.cpp in Sources */,
+				36E4755914877FA4009FB135 /* ColumnTable.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -14,7 +14,8 @@ public:
 	size_t GetTableCount() const;
 	const char* GetTableName(size_t table_ndx) const;
 	bool HasTable(const char* name) const;
-	Table& GetTable(const char* name);
+
+	TopLevelTable& GetTable(const char* name);
 	template<class T> T& GetTable(const char* name);
 
 	// Serialization
@@ -77,10 +78,10 @@ size_t Group::Write(S& out) {
 	Array tables(COLUMN_HASREFS);
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
 		// Instantiate table if not in cache
-		Table* t = (Table*)m_cachedtables.Get(i);
+		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
 		if (!t) {
 			const size_t ref = m_tables.Get(i);
-			t = new Table(m_alloc, ref, &m_tables, i);
+			t = new TopLevelTable(m_alloc, ref, &m_tables, i);
 			m_cachedtables.Set(i, (intptr_t)t);
 		}
 

@@ -21,9 +21,9 @@ class TableName##Query { \
 protected: \
 	QueryAccessor##CType1 CName1; \
 }; \
-class TableName : public Table { \
+class TableName : public TopLevelTable { \
 public: \
-	TableName(Allocator& alloc=DefaultAllocator) : Table(alloc) { \
+	TableName(Allocator& alloc=DefaultAllocator) : TopLevelTable(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		\
 		CName1.Create(this, 0); \
@@ -64,8 +64,10 @@ public: \
 	ColumnProxy##CType1 CName1; \
 protected: \
 	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : Table(alloc, ref, parent, pndx) {}; \
-\
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+private:\
+	TableName(const TableName&) {} \
+	TableName& operator=(const TableName&) {return *this;} \
 };
 
 
@@ -76,9 +78,9 @@ protected: \
 	QueryAccessor##CType1 CName1; \
 	QueryAccessor##CType2 CName2; \
 }; \
-class TableName : public Table { \
+class TableName : public TopLevelTable { \
 public: \
-	TableName(Allocator& alloc=DefaultAllocator) : Table(alloc) { \
+	TableName(Allocator& alloc=DefaultAllocator) : TopLevelTable(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 		\
@@ -128,8 +130,10 @@ public: \
 	ColumnProxy##CType2 CName2; \
 protected: \
 	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : Table(alloc, ref, parent, pndx) {}; \
-\
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+private:\
+	TableName(const TableName&) {} \
+	TableName& operator=(const TableName&) {return *this;} \
 };
 
 
@@ -141,9 +145,9 @@ protected: \
 	QueryAccessor##CType3 CName3; \
 	QueryAccessor##CType4 CName4; \
 }; \
-class TableName : public Table { \
+class TableName : public TopLevelTable { \
 public: \
-	TableName(Allocator& alloc=DefaultAllocator) : Table(alloc) { \
+	TableName(Allocator& alloc=DefaultAllocator) : TopLevelTable(alloc) { \
 		RegisterColumn(Accessor##CType1::type,  #CName1 ); \
 		RegisterColumn(Accessor##CType2::type,  #CName2 ); \
 		RegisterColumn(Accessor##CType3::type,  #CName3 ); \
@@ -207,8 +211,10 @@ public: \
 	ColumnProxy##CType4 CName4; \
 protected: \
 friend class Group; \
-TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : Table(alloc, ref, parent, pndx) {}; \
-\
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+private:\
+	TableName(const TableName&) {} \
+	TableName& operator=(const TableName&) {return *this;} \
 };
 
 #endif //__TIGHTDB_H__

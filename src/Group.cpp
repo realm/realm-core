@@ -56,7 +56,7 @@ void Group::Create() {
 
 Group::~Group() {
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
-		Table* const t = (Table*)m_cachedtables.Get(i);
+		TopLevelTable* const t = (TopLevelTable*)m_cachedtables.Get(i);
 		t->Invalidate(); // don't destroy subtree yet
 		delete t;
 	}
@@ -80,11 +80,11 @@ bool Group::HasTable(const char* name) const {
 	return (n != (size_t)-1);
 }
 
-Table& Group::GetTable(const char* name) {
+TopLevelTable& Group::GetTable(const char* name) {
 	const size_t n = m_tableNames.Find(name);
 	if (n == (size_t)-1) {
 		// Create new table
-		Table* const t = new Table(m_alloc);
+		TopLevelTable* const t = new TopLevelTable(m_alloc);
 		t->SetParent(&m_tables, m_tables.Size());
 
 		m_tables.Add(t->GetRef());
@@ -95,10 +95,10 @@ Table& Group::GetTable(const char* name) {
 	}
 	else {
 		// Get table from cache if exists, else create
-		Table* t = (Table*)m_cachedtables.Get(n);
+		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(n);
 		if (!t) {
 			const size_t ref = m_tables.Get(n);
-			t = new Table(m_alloc, ref, &m_tables, n);
+			t = new TopLevelTable(m_alloc, ref, &m_tables, n);
 			m_cachedtables.Set(n, (intptr_t)t);
 		}
 		return *t;
@@ -156,10 +156,10 @@ char* Group::WriteToMem(size_t& len) {
 void Group::Verify() {
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
 		// Get table from cache if exists, else create
-		Table* t = (Table*)m_cachedtables.Get(i);
+		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
 		if (!t) {
 			const size_t ref = m_tables.Get(i);
-			t = new Table(m_alloc, ref, &m_tables, i);
+			t = new TopLevelTable(m_alloc, ref, &m_tables, i);
 			m_cachedtables.Set(i, (intptr_t)t);
 		}
 		t->Verify();
@@ -171,10 +171,10 @@ MemStats Group::Stats() {
 
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
 		// Get table from cache if exists, else create
-		Table* t = (Table*)m_cachedtables.Get(i);
+		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
 		if (!t) {
 			const size_t ref = m_tables.Get(i);
-			t = new Table(m_alloc, ref, &m_tables, i);
+			t = new TopLevelTable(m_alloc, ref, &m_tables, i);
 			m_cachedtables.Set(i, (intptr_t)t);
 		}
 		const MemStats m = t->Stats();

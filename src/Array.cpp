@@ -25,8 +25,9 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 	SetWidth(0);
 }
 
-// Creates new array (but invalid, call UpdateRef to init)
-Array::Array(Allocator& alloc) : m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
+// Creates new array (but invalid, call UpdateRef or SetType to init)
+Array::Array(Allocator& alloc)
+: m_ref(0), m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
 }
 
 // Copy-constructor
@@ -115,15 +116,22 @@ void Array::Create(size_t ref) {
 }
 
 void Array::SetType(ColumnDef type) {
-	CopyOnWrite();
+	if (m_ref) CopyOnWrite();
 
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 	else m_isNode = m_hasRefs = false;
 
-	// Update Header
-	set_header_isnode(m_isNode);
-	set_header_hasrefs(m_hasRefs);
+	if (!m_data) {
+		// Create array
+		Alloc(0, 0);
+		SetWidth(0);
+	}
+	else {
+		// Update Header
+		set_header_isnode(m_isNode);
+		set_header_hasrefs(m_hasRefs);
+	}
 }
 
 bool Array::operator==(const Array& a) const {
@@ -184,6 +192,10 @@ void Array::Destroy() {
 	if (m_hasRefs) {
 		for (size_t i = 0; i < m_len; ++i) {
 			const size_t ref = (size_t)Get(i);
+
+			// null-refs signify empty sub-trees
+			if (ref == 0) continue;
+
 			Array sub(ref, this, i, m_alloc);
 			sub.Destroy();
 		}

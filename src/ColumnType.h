@@ -12,7 +12,8 @@ enum ColumnType {
 	COLUMN_TYPE_BINARY,
 
 	// Double refs
-	COLUMN_TYPE_STRING_ENUM
+	COLUMN_TYPE_STRING_ENUM,
+	COLUMN_TYPE_TABLE
 };
 
 struct BinaryData {

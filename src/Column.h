@@ -111,6 +111,7 @@ public:
 	bool Add(int64_t value);
 
 	intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
+	void GetParentInfo(size_t ndx, Array*& parent, size_t& pndx, size_t offset=0) const;
 	
 	void Clear();
 	void Delete(size_t ndx);
@@ -131,6 +132,7 @@ public:
 	size_t FindWithIndex(int64_t value) const;
 
 	size_t GetRef() const {return m_array->GetRef();}
+	Allocator& GetAllocator() const {return m_array->GetAllocator();}
 
 	void Sort();
 
