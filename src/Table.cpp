@@ -132,6 +132,15 @@ ColumnType Spec::GetColumnType(size_t ndx) const {
 	else return type;
 }
 
+const char* Spec::GetColumnName(size_t ndx) const {
+	assert(ndx < GetColumnCount());
+	return m_names.Get(ndx);
+}
+
+size_t Spec::GetColumnIndex(const char* name) const {
+	return m_names.Find(name);
+}
+
 // -- TopLevelTable ---------------------------------------------------------------------------
 
 TopLevelTable::TopLevelTable(Allocator& alloc) : Table(alloc), m_top(COLUMN_HASREFS, NULL, 0, alloc) {

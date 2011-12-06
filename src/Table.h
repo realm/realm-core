@@ -28,6 +28,8 @@ public:
 
 	size_t GetColumnCount() const;
 	ColumnType GetColumnType(size_t ndx) const;
+	const char* GetColumnName(size_t ndx) const;
+	size_t GetColumnIndex(const char* name) const;
 
 	size_t GetRef() const {return m_specSet.GetRef();}
 
