@@ -100,6 +100,7 @@ public:
 	Table* GetTablePtr(size_t column_id, size_t ndx);
 	size_t GetTableSize(size_t column_id, size_t ndx) const;
 	void   InsertTable(size_t column_id, size_t ndx);
+	void   ClearTable(size_t column_id, size_t ndx);
 
 	size_t RegisterColumn(ColumnType type, const char* name);
 

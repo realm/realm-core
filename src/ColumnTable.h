@@ -21,6 +21,7 @@ public:
 	void Add();
 	void Insert(size_t ndx);
 	void Delete(size_t ndx);
+	void Clear(size_t ndx);
 
 	size_t GetRef() const {return m_table_refs.GetRef();}
 	void SetParent(Array* parent, size_t pndx) {m_table_refs.SetParent(parent, pndx);}

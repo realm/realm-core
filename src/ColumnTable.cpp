@@ -80,3 +80,18 @@ void ColumnTable::Delete(size_t ndx) {
 
 	m_table_refs.Delete(ndx);
 }
+
+void ColumnTable::Clear(size_t ndx) {
+	assert(ndx < m_table_refs.Size());
+
+	const size_t ref_columns = m_table_refs.Get(ndx);
+	if (ref_columns == 0) return; // already empty
+
+	// Delete sub-tree
+	Allocator& alloc = m_table_refs.GetAllocator();
+	Array columns(ref_columns, (Array*)NULL, 0, alloc);
+	columns.Destroy();
+
+	// Mark as empty table
+	m_table_refs.Set(ndx, 0);
+}

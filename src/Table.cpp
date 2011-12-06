@@ -623,6 +623,15 @@ void Table::InsertTable(size_t column_id, size_t ndx) {
 	subtables.Insert(ndx);
 }
 
+void Table::ClearTable(size_t column_id, size_t ndx) {
+	assert(column_id < GetColumnCount());
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
+	assert(ndx <= m_size);
+
+	ColumnTable& subtables = GetColumnTable(column_id);
+	subtables.Clear(ndx);
+}
+
 Table Table::GetTable(size_t column_id, size_t ndx) {
 	assert(column_id < GetColumnCount());
 	assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
