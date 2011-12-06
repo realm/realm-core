@@ -112,6 +112,8 @@ public:
 	bool Add(int64_t value);
 
 	int64_t Sum(size_t start = 0, size_t end = -1);
+	int64_t Max(size_t start = 0, size_t end = -1);
+	int64_t Min(size_t start = 0, size_t end = -1);
 
 	intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
 	
@@ -125,6 +127,7 @@ public:
 	void FindAll(Column& result, int64_t value, size_t offset=0, size_t start=0, size_t end=-1) const;
 	void FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 	size_t FindPos(int64_t value) const;
+	void LeafFindAll(Column &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
 
 	// Index
 	bool HasIndex() const {return m_index != NULL;}

@@ -427,7 +427,8 @@ template<typename T, class C> void ColumnBase::TreeVisitLeafs(size_t start, size
 	if (!IsNode()) {
 		if(end == -1) 
 			end = m_array->Size();
-		call(*m_array, start, end, caller_offset, state);
+		if(m_array->Size() > 0)
+			call(*m_array, start, end, caller_offset, state);
 	}
 	else {
 		const Array offsets = NodeGetOffsets();

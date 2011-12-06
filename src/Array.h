@@ -80,6 +80,9 @@ public:
 				 size_t start=0, size_t end=(size_t)-1) const;
 	void FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 	int64_t Sum(size_t start = 0, size_t end = -1) const;
+	size_t Max(size_t start = 0, size_t end = -1) const;
+	size_t Min(size_t start = 0, size_t end = -1) const;
+
 	void Sort();
 
 	void Resize(size_t count);

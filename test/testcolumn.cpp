@@ -530,6 +530,59 @@ TEST(Column_Sum) {
 
 }
 
+TEST(Column_Max) {
+	Column c;
+	size_t t = c.Max();
+	CHECK_EQUAL(-1, t);
+
+	c.Add(1);
+	t = c.Max();
+	CHECK_EQUAL(0, t);	
+}
+
+
+TEST(Column_Max2) {
+	Column c;
+
+	for(int i = 0; i < 100; i++) {
+		c.Add(10);
+	}
+	c.Set(20, 20);
+	c.Set(50, 11); // Max must select *first* occurence of largest value
+	c.Set(51, 11);
+	c.Set(81, 20);
+
+	size_t t = c.Max(51, 81);
+	CHECK_EQUAL(51, t);
+}
+
+TEST(Column_Min) {
+	Column c;
+	size_t t = c.Min();
+	CHECK_EQUAL(-1, t);
+
+	c.Add(1);
+	t = c.Min();
+	CHECK_EQUAL(0, t);	
+}
+
+
+TEST(Column_Min2) {
+	Column c;
+
+	for(int i = 0; i < 100; i++) {
+		c.Add(10);
+	}
+	c.Set(20, 20);
+	c.Set(50, 9); // Max must select *first* occurence of lowest value
+	c.Set(51, 9);
+	c.Set(81, 20);
+
+	size_t t = c.Min(51, 81);
+	CHECK_EQUAL(51, t);
+}
+
+
 #if TEST_DURATION > 0
 
 TEST(Column_prepend_many) {

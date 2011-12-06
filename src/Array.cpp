@@ -944,6 +944,49 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 }
 
 
+size_t Array::Max(size_t start, size_t end) const
+{
+	if (IsEmpty()) return -1;
+	if (end == (size_t)-1) end = m_len;
+	if (start == end) return -1;
+	assert(start < m_len && end <= m_len && start < end);
+	if(m_width == 0)
+		return -1;
+
+	uint64_t mv = Get(start);
+	size_t mi = start;
+
+	for(int i = start; i < end; i++) {
+		if(Get(i) > mv) {
+			mv = Get(i);
+			mi = i;
+		}
+	}
+	return mi;
+}
+
+
+size_t Array::Min(size_t start, size_t end) const
+{
+	if (IsEmpty()) return -1;
+	if (end == (size_t)-1) end = m_len;
+	if (start == end) return -1;
+	assert(start < m_len && end <= m_len && start < end);
+	if(m_width == 0)
+		return -1;
+
+	uint64_t mv = Get(start);
+	size_t mi = start;
+
+	for(int i = start; i < end; i++) {
+		if(Get(i) < mv) {
+			mv = Get(i);
+			mi = i;
+		}
+	}
+	return mi;
+}
+
 
 int64_t Array::Sum(size_t start, size_t end) const {
 	if (IsEmpty()) return 0;
