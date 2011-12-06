@@ -53,7 +53,7 @@ protected:
 		NodeChange(ChangeType t, size_t r1=0, size_t r2=0) : ref1(r1), ref2(r2), type(t) {}
 		NodeChange(bool success) : ref1(0), ref2(0), type(success ? CT_NONE : CT_ERROR) {}
 	};
-
+	
 	// Tree functions
 	template<typename T, class C> T TreeGet(size_t ndx) const;
 	template<typename T, class C> bool TreeSet(size_t ndx, T value);
@@ -62,6 +62,8 @@ protected:
 	template<typename T, class C> void TreeDelete(size_t ndx);
 	template<typename T, class C> size_t TreeFind(T value, size_t start, size_t end) const;
 	template<typename T, class C> void TreeFindAll(Column &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+
+	template<typename T, class C> int64_t TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, int64_t (*call)(T &arr, size_t start, size_t end, size_t caller_offset, int64_t state), int64_t state) const;
 
 	template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 
@@ -108,6 +110,8 @@ public:
 	bool Insert(size_t ndx, int64_t value);
 	bool Add() {return Add(0);}
 	bool Add(int64_t value);
+
+	int64_t Sum(size_t start = 0, size_t end = -1);
 
 	intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
 	

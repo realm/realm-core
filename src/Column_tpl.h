@@ -421,7 +421,44 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Column &result, T val
 		}
 	}
 }
-	
+
+
+template<typename T, class C> int64_t ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, int64_t (*call)(T &arr, size_t start, size_t end, size_t caller_offset, int64_t state), int64_t state) const {
+	if (!IsNode()) {
+		state = call(*m_array, start, end, caller_offset, state);
+	}
+	else {
+		const Array offsets = NodeGetOffsets();
+		const Array refs = NodeGetRefs();
+		const size_t count = refs.Size();
+		size_t i = offsets.FindPos(start);
+		size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
+		size_t s = start - offset;
+		size_t e = (end == (size_t)-1 || (int)end >= offsets.Get(i)) ? (size_t)-1 : end - offset;
+
+		for (;;) {
+			const C col((size_t)refs.Get(i));
+			size_t add = i ? (size_t)offsets.Get(i-1) : 0;
+			add += caller_offset;
+			state = col.TreeVisitLeafs<T, C>(s, e, add, call, state);
+			++i;
+			if (i >= count) break;
+
+			s = 0;
+			if (end != (size_t)-1) {
+				if (end >= (size_t)offsets.Get(i)) e = (size_t)-1;
+				else {
+					offset = (size_t)offsets.Get(i-1);
+					e = end - offset;
+					if(offset > end)
+						return state;
+				}
+			}
+		}
+	}
+	return state;
+}
+
 
 template<typename T, class C, class S>
 size_t ColumnBase::TreeWrite(S& out, size_t& pos) const {

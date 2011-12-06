@@ -172,6 +172,21 @@ bool Column::Insert(size_t ndx, int64_t value) {
 	return true;
 }
 
+int64_t callme_sum(Array &a, size_t start, size_t end, size_t caller_base, int64_t sum) {
+	(void)caller_base;
+	if(end == -1) 
+		end = a.Size();
+
+	for(int i = start; i < end; i++)
+		sum += a[i];
+
+	return sum;
+}
+
+int64_t Column::Sum(size_t start, size_t end) {
+	return TreeVisitLeafs<Array, Column>(start, end, 0, callme_sum, 0);
+}
+
 size_t ColumnBase::GetRefSize(size_t ref) const {
 	// parse the length part of 8byte header
 	const uint8_t* const header = (uint8_t*)m_array->GetAllocator().Translate(ref);

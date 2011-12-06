@@ -474,6 +474,62 @@ TEST(Column_FindHamming) {
 	res.Destroy();
 }
 
+TEST(Column_Sum) {
+	Column c;
+	int64_t sum = 0;
+
+	// Sum of 0 elements
+	CHECK_EQUAL(0, c.Sum());
+
+	// Sum of 1 elements
+	c.Add(123);
+	CHECK_EQUAL(123, c.Sum());
+	
+	c.Clear();
+
+	for(int i = 0; i < 100; i++) {
+		c.Add(i);
+	}
+
+	// Sum of entire range, using default args
+	sum = 0;
+	for(int i = 0; i < 100; i++) {
+		sum += c.Get(i);
+	}
+	CHECK_EQUAL(sum, c.Sum());
+
+	// Sum of entire range, given explicit range
+	sum = 0;
+	for(int i = 0; i < 100; i++) {
+		sum += c.Get(i);
+	}
+	CHECK_EQUAL(sum, c.Sum(0, 100));
+
+	// Start to N
+	sum = 0;
+	for(int i = 0; i < 63; i++) {
+		sum += c.Get(i);
+	}
+	CHECK_EQUAL(sum, c.Sum(0, 63));
+
+	// N to end
+	sum = 0;
+	for(int i = 47; i < 100; i++) {
+		sum += c.Get(i);
+	}
+	CHECK_EQUAL(sum, c.Sum(47, 100));
+
+	// N to M
+	sum = 0;
+	for(int i = 55; i < 79; i++) {
+		sum += c.Get(i);
+	}
+	CHECK_EQUAL(sum, c.Sum(55, 79));
+
+	c.Destroy();
+
+}
+
 #if TEST_DURATION > 0
 
 TEST(Column_prepend_many) {
