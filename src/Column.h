@@ -63,7 +63,7 @@ protected:
 	template<typename T, class C> size_t TreeFind(T value, size_t start, size_t end) const;
 	template<typename T, class C> void TreeFindAll(Column &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
-	template<typename T, class C> int64_t TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, int64_t (*call)(T &arr, size_t start, size_t end, size_t caller_offset, int64_t state), int64_t state) const;
+	template<typename T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T &arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const;
 
 	template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 

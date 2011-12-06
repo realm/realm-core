@@ -10,7 +10,7 @@
 
 // Has to be define to allow overload from build settings
 #ifndef MAX_LIST_SIZE
-#define MAX_LIST_SIZE 1000
+#define MAX_LIST_SIZE 3
 #endif
 
 template<class T> T GetColumnFromRef(Array& parent, size_t ndx) {
@@ -423,9 +423,11 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Column &result, T val
 }
 
 
-template<typename T, class C> int64_t ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, int64_t (*call)(T &arr, size_t start, size_t end, size_t caller_offset, int64_t state), int64_t state) const {
+template<typename T, class C> void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T &arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const {
 	if (!IsNode()) {
-		state = call(*m_array, start, end, caller_offset, state);
+		if(end == -1) 
+			end = m_array->Size();
+		call(*m_array, start, end, caller_offset, state);
 	}
 	else {
 		const Array offsets = NodeGetOffsets();
@@ -440,7 +442,7 @@ template<typename T, class C> int64_t ColumnBase::TreeVisitLeafs(size_t start, s
 			const C col((size_t)refs.Get(i));
 			size_t add = i ? (size_t)offsets.Get(i-1) : 0;
 			add += caller_offset;
-			state = col.TreeVisitLeafs<T, C>(s, e, add, call, state);
+			col.TreeVisitLeafs<T, C>(s, e, add, call, state);
 			++i;
 			if (i >= count) break;
 
@@ -451,12 +453,12 @@ template<typename T, class C> int64_t ColumnBase::TreeVisitLeafs(size_t start, s
 					offset = (size_t)offsets.Get(i-1);
 					e = end - offset;
 					if(offset > end)
-						return state;
+						return;
 				}
 			}
 		}
 	}
-	return state;
+	return;
 }
 
 
