@@ -578,7 +578,6 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 		const int64_t v = ~0ULL/0x3 * value;
 
 		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const size_t end64 = m_len / 32;
 		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
 
 		// Check 64bits at a time for match
@@ -604,7 +603,6 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 		const int64_t v = ~0ULL/0xF * value;
 
 		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const size_t end64 = m_len / 16;
 		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
 
 		// Check 64bits at a time for match
@@ -632,7 +630,6 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 		const int64_t v = ~0ULL/0xFF * value;
 
 		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const size_t end64 = m_len / 8;
 		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
 
 		// Check 64bits at a time for match
@@ -658,7 +655,6 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 		const int64_t v = ~0ULL/0xFFFF * value;
 
 		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const size_t end64 = m_len / 4;
 		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
 
 		// Check 64bits at a time for match
@@ -970,7 +966,7 @@ size_t Array::Max(size_t start, size_t end) const
 	uint64_t mv = Get(start);
 	size_t mi = start;
 
-	for(int i = start; i < end; i++) {
+	for(size_t i = start; i < end; ++i) {
 		if(Get(i) > mv) {
 			mv = Get(i);
 			mi = i;
@@ -992,7 +988,7 @@ size_t Array::Min(size_t start, size_t end) const
 	uint64_t mv = Get(start);
 	size_t mi = start;
 
-	for(int i = start; i < end; i++) {
+	for(size_t i = start; i < end; ++i) {
 		if(Get(i) < mv) {
 			mv = Get(i);
 			mi = i;
@@ -1010,26 +1006,25 @@ int64_t Array::Sum(size_t start, size_t end) const {
 
 	uint64_t sum = 0;
 	
-	if(m_width == 0)
+	if (m_width == 0)
 		return 0;
-	else if(m_width == 8) {
-		for(int i = start; i < end; i++)
+	else if( m_width == 8) {
+		for (size_t i = start; i < end; ++i)
 			sum += Get_8b(i);
 	}
-	else if(m_width == 16) {
-		for(int i = start; i < end; i++)
+	else if (m_width == 16) {
+		for (size_t i = start; i < end; ++i)
 			sum += Get_16b(i);
 	}
 	else if(m_width == 32) {
-		for(int i = start; i < end; i++)
+		for (size_t i = start; i < end; ++i)
 			sum += Get_32b(i);
 	}
 	else if(m_width == 64) {
-		for(int i = start; i < end; i++)
+		for (size_t i = start; i < end; ++i)
 			sum += Get_64b(i);
 	}
-	else
-	{
+	else {
 		uint64_t *next = (uint64_t *)m_data;
 		uint64_t s = 0, i;
 		size_t chunkvals = sizeof(int64_t) * 8 / m_width;

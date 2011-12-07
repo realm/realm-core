@@ -727,7 +727,6 @@ TEST(FindSSE) {
 
 
 TEST(Sum0) {
-	uint64_t s1 = 0;
 	Array a;
 	for(int i = 0; i < 64 + 7; i++) {
 		a.Add(0);
