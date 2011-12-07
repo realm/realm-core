@@ -372,9 +372,42 @@ TEST(ColumnStringAutoEnumerate) {
 	e.Destroy();
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy) {
-	// clean up (ALWAYS PUT THIS LAST)
-	c.Destroy();
+// Test "Replace string array with long string array" when doing it through LeafSet()
+TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2) {
+	c.Clear();
+	Column col;
+
+	c.Add("foobar");
+	c.Add("bar abc");
+	c.Add("baz");
+
+	c.Set(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+
+	CHECK_EQUAL(c.Size(), c.Size());
+	CHECK_EQUAL("foobar", c.Get(0));
+	CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.Get(1));
+	CHECK_EQUAL("baz", c.Get(2));
+
+	// Cleanup
+	col.Destroy();
+}
+
+// Test against a bug where FindWithLen() would fail finding ajacent hits
+TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent) {
+	c.Clear();
+	Column col;
+
+	c.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+	c.Add("baz");
+	c.Add("baz");
+	c.Add("foo");
+
+	c.FindAll(col, "baz");
+
+	CHECK_EQUAL(2, col.Size());
+
+	// Cleanup
+	col.Destroy();
 }
 
 TEST(AdaptiveStringColumnFindAllExpand) {
@@ -420,6 +453,57 @@ TEST(AdaptiveStringColumnFindAllExpand) {
 
 }
 
+// FindAll using ranges, when expanded ArrayStringLong
+TEST(AdaptiveStringColumnFindAllRangesLong) {
+	AdaptiveStringColumn asc;
+	Column c;
+
+	// 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+	asc.Add("HEJSA"); // 0
+	asc.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+	asc.Add("HEJSA");
+	asc.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+	asc.Add("HEJSA");
+	asc.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+	asc.Add("HEJSA");
+	asc.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+	asc.Add("HEJSA");
+	asc.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+	asc.Add("HEJSA");
+	asc.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+	asc.Add("HEJSA");
+	asc.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+	asc.Add("HEJSA");
+	asc.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+	asc.Add("HEJSA"); // 16
+
+	c.Clear();
+	asc.FindAll(c, "HEJSA", 0, 17);
+	CHECK_EQUAL(9, c.Size());
+	CHECK_EQUAL(0, c.Get(0));
+	CHECK_EQUAL(2, c.Get(1));
+	CHECK_EQUAL(4, c.Get(2));
+	CHECK_EQUAL(6, c.Get(3));
+	CHECK_EQUAL(8, c.Get(4));
+	CHECK_EQUAL(10, c.Get(5));
+	CHECK_EQUAL(12, c.Get(6));
+	CHECK_EQUAL(14, c.Get(7));
+	CHECK_EQUAL(16, c.Get(8));
+
+	c.Clear();
+	asc.FindAll(c, "HEJSA", 1, 16);
+	CHECK_EQUAL(7, c.Size());
+	CHECK_EQUAL(2, c.Get(0));
+	CHECK_EQUAL(4, c.Get(1));
+	CHECK_EQUAL(6, c.Get(2));
+	CHECK_EQUAL(8, c.Get(3));
+	CHECK_EQUAL(10, c.Get(4));
+	CHECK_EQUAL(12, c.Get(5));
+	CHECK_EQUAL(14, c.Get(6));
+
+}
+
+// FindAll using ranges, when not expanded (using ArrayString)
 TEST(AdaptiveStringColumnFindAllRanges) {
 	AdaptiveStringColumn asc;
 	Column c;
@@ -472,3 +556,7 @@ TEST(AdaptiveStringColumnFindAllRanges) {
 	c.Destroy();
 }
 
+TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy) {
+	// clean up (ALWAYS PUT THIS LAST)
+	c.Destroy();
+}

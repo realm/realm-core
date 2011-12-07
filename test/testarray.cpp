@@ -710,9 +710,78 @@ TEST(FindhasZeroByte)
 	hasZeroByte(8000000000LL, n); // 64
 }
 
+// New find test for SSE search, to trigger partial finds (see FindSSE()) before and after the aligned data area
+TEST(FindSSE) {
+	Array a;
+	for(uint64_t i = 0; i < 100; i++) {
+		a.Add(10000);
+	}
+
+	for(uint64_t i = 0; i < 100; i++) {
+		a.Set(i, 123);
+		size_t t = a.Find(123);
+		assert(t == i);
+		a.Set(i, 10000);
+	}
+}
 
 
+TEST(Sum0) {
+	uint64_t s1 = 0;
+	Array a;
+	for(int i = 0; i < 64 + 7; i++) {
+		a.Add(0);
+	}
+	CHECK_EQUAL(0, a.Sum(0, a.Size()));
+	a.Destroy();
+}
 
+TEST(Sum1) {
+	uint64_t s1 = 0;
+	Array a;
+	for(int i = 0; i < 64 + 7; i++) {
+		a.Add(i % 2);
+		s1 += i % 2;
+	}
+	CHECK_EQUAL(s1, a.Sum(0, a.Size()));
+	a.Destroy();
+}
+
+TEST(Sum2) {
+	uint64_t s1 = 0;
+	Array a;
+	for(int i = 0; i < 64 + 7; i++) {
+		a.Add(i % 4);
+		s1 += i % 4;
+	}
+	CHECK_EQUAL(s1, a.Sum(0, a.Size()));
+	a.Destroy();
+}
+
+
+TEST(Sum4) {
+	uint64_t s1 = 0;
+	Array a;
+	for(int i = 0; i < 64 + 7; i++) {
+		a.Add(i % 16);
+		s1 += i % 16;
+	}
+	CHECK_EQUAL(s1, a.Sum(0, a.Size()));
+	a.Destroy();
+}
+
+TEST(Sum16) {
+	uint64_t s1 = 0;
+	Array a;
+	for(int i = 0; i < 128 + 7; i++) {
+		a.Add(i % 30000);
+		s1 += i % 30000;
+	}
+	CHECK_EQUAL(s1, a.Sum(0, a.Size()));
+	a.Destroy();
+}
+
+/*
 // Support functions for monkey test
 
 uint64_t rand2(void) {
@@ -765,7 +834,7 @@ template<class T, class U> bool findall_test(std::vector<T>& v, U& a, T val) {
 
 
 TEST(monkeytest1) {
-	const uint64_t DURATION = UNITTEST_DURATION*1000;
+	const uint64_t DURATION = TEST_DURATION*1000;
 	const uint64_t SEED = 123;
 
 	Array a;
@@ -786,11 +855,11 @@ TEST(monkeytest1) {
 				trend = (unsigned int)rand2() % 10;
 
 			// Sanity test
-/*			if(rand2() % 1000 == 0)	{
-				for(int j = 0; j < v.size(); j++)
-					printf("%lld ", v[j]);
-				printf("%d\n", v.size());
-			}*/
+//			if(rand2() % 1000 == 0)	{
+//				for(int j = 0; j < v.size(); j++)
+//					printf("%lld ", v[j]);
+//				printf("%d\n", v.size());
+//			}
 
 
 			if (rand2() % 10 > trend) {
@@ -833,3 +902,4 @@ TEST(monkeytest1) {
 
 
 
+*/

@@ -16,6 +16,9 @@ CXX       = g++ $(CXXFLAGS)
 # Files
 EXECUTABLE = tightdb-tests
 
+# Note for gcov: You must not pass .h files to g++ or you'll get errors about missing data files.
+# Also, never use relative paths, or you'll get "time stamp" errors
+
 # HEADERS    = $(abspath $(wildcard ../src/*.h))
 SOURCES    = $(abspath $(wildcard ../src/*.cpp))
 # TEST_H     = $(abspath $(wildcard *.h))
@@ -46,7 +49,7 @@ clean:
 	@(cd test-stl && make clean)
 	@(cd test-tightdb && make clean)
 	@(cd test-sqlite3 && make clean)
-	@rm -f core *.o $(EXECUTABLE)
+	@rm -f core *.o *.gcda *.gcno *.gcov $(EXECUTABLE)
 
 # Linking
 $(EXECUTABLE): $(OBJECTS)

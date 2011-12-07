@@ -10,13 +10,6 @@ struct db_setup {
 
 // Pre-declare local functions
 
-// Support functions for monkey test
-
-template<class T, class U> static bool vector_eq_array(const std::vector<T>& v, const U& a);
-template<class T> static std::vector<size_t> findall_vector(std::vector<T>& v, T val);
-template<class T, class U> static bool findall_test(std::vector<T>& v, U& a, T val);
-
-
 Column db_setup::c;
 
 TEST_FIXTURE(db_setup, Column_Add0) {
@@ -481,11 +474,122 @@ TEST(Column_FindHamming) {
 	res.Destroy();
 }
 
+TEST(Column_Sum) {
+	Column c;
+	int64_t sum = 0;
+
+	// Sum of 0 elements
+	CHECK_EQUAL(0, c.Sum());
+
+	// Sum of 1 elements
+	c.Add(123);
+	CHECK_EQUAL(123, c.Sum());
+	
+	c.Clear();
+
+	for(int i = 0; i < 100; i++) {
+		c.Add(i);
+	}
+
+	// Sum of entire range, using default args
+	sum = 0;
+	for(int i = 0; i < 100; i++) {
+		sum += c.Get(i);
+	}
+	CHECK_EQUAL(sum, c.Sum());
+
+	// Sum of entire range, given explicit range
+	sum = 0;
+	for(int i = 0; i < 100; i++) {
+		sum += c.Get(i);
+	}
+	CHECK_EQUAL(sum, c.Sum(0, 100));
+
+	// Start to N
+	sum = 0;
+	for(int i = 0; i < 63; i++) {
+		sum += c.Get(i);
+	}
+	CHECK_EQUAL(sum, c.Sum(0, 63));
+
+	// N to end
+	sum = 0;
+	for(int i = 47; i < 100; i++) {
+		sum += c.Get(i);
+	}
+	CHECK_EQUAL(sum, c.Sum(47, 100));
+
+	// N to M
+	sum = 0;
+	for(int i = 55; i < 79; i++) {
+		sum += c.Get(i);
+	}
+	CHECK_EQUAL(sum, c.Sum(55, 79));
+
+	c.Destroy();
+
+}
+
+TEST(Column_Max) {
+	Column c;
+	size_t t = c.Max();
+	CHECK_EQUAL(-1, t);
+
+	c.Add(1);
+	t = c.Max();
+	CHECK_EQUAL(0, t);	
+}
+
+
+TEST(Column_Max2) {
+	Column c;
+
+	for(int i = 0; i < 100; i++) {
+		c.Add(10);
+	}
+	c.Set(20, 20);
+	c.Set(50, 11); // Max must select *first* occurence of largest value
+	c.Set(51, 11);
+	c.Set(81, 20);
+
+	size_t t = c.Max(51, 81);
+	CHECK_EQUAL(51, t);
+}
+
+TEST(Column_Min) {
+	Column c;
+	size_t t = c.Min();
+	CHECK_EQUAL(-1, t);
+
+	c.Add(1);
+	t = c.Min();
+	CHECK_EQUAL(0, t);	
+}
+
+
+TEST(Column_Min2) {
+	Column c;
+
+	for(int i = 0; i < 100; i++) {
+		c.Add(10);
+	}
+	c.Set(20, 20);
+	c.Set(50, 9); // Max must select *first* occurence of lowest value
+	c.Set(51, 9);
+	c.Set(81, 20);
+
+	size_t t = c.Min(51, 81);
+	CHECK_EQUAL(51, t);
+}
+
+
+#if TEST_DURATION > 0
+
 TEST(Column_prepend_many) {
 	// Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
 	Column a;
 
-	for (size_t items = 0; items < 2000; ++items) {
+	for (size_t items = 0; items < 3000; ++items) {
 		a.Clear();
 		for (int j = 0; j < items + 1; ++j) {
 			a.Insert(0, j);
@@ -495,123 +599,4 @@ TEST(Column_prepend_many) {
 	a.Destroy();
 }
 
-
-// Support functions for monkey test
-
-static uint64_t rand2(void) {
-	const uint64_t i = (int64_t)rand() | (uint64_t)rand() << 8 | (uint64_t)rand() << 2*8 | (uint64_t)rand() << 3*8 | (uint64_t)rand() << 4*8 | (uint64_t)rand() << 5*8 | (uint64_t)rand() << 6*8 | (uint64_t)rand() << 7*8;
-	return i;
-}
-
-template<class T, class U> static bool vector_eq_array(const std::vector<T>& v, const U& a) {
-	if (a.Size() != v.size()) return false;
-
-	for(size_t t = 0; t < v.size(); ++t) {
-		if (v[t] != a.Get(t)) return false;
-	}
-	return true;
-}
-
-template<class T> static std::vector<size_t> findall_vector(std::vector<T>& v, T val) {
-	std::vector<int64_t>::iterator it = v.begin();
-	std::vector<size_t> results;
-	while(it != v.end()) {
-		it = std::find(it, v.end(), val);
-		size_t index = std::distance(v.begin(), it);
-		if(index < v.size())
-		{
-			results.push_back(index);
-			it++;
-		}
-	}
-	return results;
-}
-	
-template<class T, class U> static bool findall_test(std::vector<T>& v, U& a, T val) {
-	std::vector<size_t> results;
-	results = findall_vector(v, val);
-
-	// sanity test - in the beginning, results.size() == v.size() (all elements are 0), later results.size() < v.size()
-//	if(rand2() % 100 == 0)
-//		printf("%d out of %d\n", (int)results.size(), (int)v.size()); 
-	
-	Column c;
-	a.FindAll(c, val);
-	const bool res = vector_eq_array(results, c);
-
-	// Cleanup
-	c.Destroy();
-
-	return res;
-}
-
-
-TEST(Column_monkeytest1) {
-	const uint64_t DURATION = UNITTEST_DURATION*200;
-	const uint64_t SEED = 123;
-
-	Column a;
-	std::vector<int64_t> v;
-
-	srand(SEED);
-	const uint64_t nums_per_bitwidth = DURATION;
-	size_t current_bitwidth = 0;
-	unsigned int trend = 5;
-
-	for(current_bitwidth = 0; current_bitwidth < 65; current_bitwidth++) {
-		//		printf("Input bitwidth around ~%d, a.GetBitWidth()=%d, a.Size()=%d\n", (int)current_bitwidth, (int)a.GetBitWidth(), (int)a.Size());
-
-		current_bitwidth = current_bitwidth;
-
-		while(rand2() % nums_per_bitwidth != 0) {
-			if (!(rand2() % (DURATION / 10)))
-				trend = (unsigned int)rand2() % 10;
-
-			// Sanity test
-/*			if(rand2() % 1000 == 0)	{
-				for(int j = 0; j < v.size(); j++)
-					printf("%lld ", v[j]);
-				printf("%d\n", v.size());
-			}*/
-
-
-			if (rand2() % 10 > trend) {
-				// Insert
-				uint64_t l = rand2();
-				const uint64_t mask = ((1ULL << current_bitwidth) - 1ULL);
-				l &= mask;
-
-				const size_t pos = rand2() % (a.Size() + 1);
-				a.Insert(pos, l);
-				v.insert(v.begin() + pos, l);
-			}
-
-			else {
-				// Delete
-				if(a.Size() > 0) {
-					const size_t i = rand2() % a.Size();
-					a.Delete(i);
-					v.erase(v.begin() + i);
-				}
-			}
-
-
-			// Verify
-			if(rand2() % 100 == 0) {
-				bool b = vector_eq_array(v, a);
-				CHECK_EQUAL(true, b);
-				if(a.Size() > 0) {
-					b = findall_test(v, a, a.Get(rand2() % a.Size()));
-					CHECK_EQUAL(true, b);
-				}
-			}
-		}
-	}
-
-	// Cleanup
-	a.Destroy();
-}
-
-
-
-
+#endif

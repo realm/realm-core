@@ -11,6 +11,21 @@
 #include <cstring> // memmove
 #include "alloc.h"
 #include <iostream>
+#include "utilities.h"
+
+#ifdef USE_SSE
+/*
+    MMX: mmintrin.h
+    SSE: xmmintrin.h
+    SSE2: emmintrin.h
+    SSE3: pmmintrin.h
+    SSSE3: tmmintrin.h
+    SSE4A: ammintrin.h
+    SSE4.1: smmintrin.h
+    SSE4.2: nmmintrin.h
+*/
+#include <nmmintrin.h> // __SSE3__
+#endif //USE_SSE
 
 #ifdef _DEBUG
 #include <stdio.h>
@@ -89,6 +104,9 @@ public:
 	void FindAll(Column& result, int64_t value, size_t offset=0,
 				 size_t start=0, size_t end=(size_t)-1) const;
 	void FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset=0) const;
+	int64_t Sum(size_t start = 0, size_t end = -1) const;
+	size_t Max(size_t start = 0, size_t end = -1) const;
+	size_t Min(size_t start = 0, size_t end = -1) const;
 
 	void Sort();
 
@@ -119,10 +137,13 @@ public:
 private:
 	Array& operator=(const Array&) {return *this;} // not allowed
 	void SetBounds(size_t width);
+#ifdef USE_SSE
+	size_t FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const;
+#endif //USE_SSE
+	size_t FindNaive(int64_t value, size_t start, size_t end) const;
 
 protected:
 	void Create(size_t ref);
-
 	void DoSort(size_t lo, size_t hi);
 
 	// Getters and Setters for adaptive-packed arrays

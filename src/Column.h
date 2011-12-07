@@ -53,7 +53,7 @@ protected:
 		NodeChange(ChangeType t, size_t r1=0, size_t r2=0) : ref1(r1), ref2(r2), type(t) {}
 		NodeChange(bool success) : ref1(0), ref2(0), type(success ? CT_NONE : CT_ERROR) {}
 	};
-
+	
 	// Tree functions
 	template<typename T, class C> T TreeGet(size_t ndx) const;
 	template<typename T, class C> bool TreeSet(size_t ndx, T value);
@@ -62,6 +62,8 @@ protected:
 	template<typename T, class C> void TreeDelete(size_t ndx);
 	template<typename T, class C> size_t TreeFind(T value, size_t start, size_t end) const;
 	template<typename T, class C> void TreeFindAll(Column &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+
+	template<typename T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T &arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const;
 
 	template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 
@@ -110,6 +112,10 @@ public:
 	bool Add() {return Add(0);}
 	bool Add(int64_t value);
 
+	int64_t Sum(size_t start = 0, size_t end = -1);
+	int64_t Max(size_t start = 0, size_t end = -1);
+	int64_t Min(size_t start = 0, size_t end = -1);
+
 	intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
 	void GetParentInfo(size_t ndx, Array*& parent, size_t& pndx, size_t offset=0) const;
 	
@@ -123,6 +129,7 @@ public:
 	void FindAll(Column& result, int64_t value, size_t offset=0, size_t start=0, size_t end=-1) const;
 	void FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 	size_t FindPos(int64_t value) const;
+	void LeafFindAll(Column &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
 
 	// Index
 	bool HasIndex() const {return m_index != NULL;}

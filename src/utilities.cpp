@@ -1,5 +1,34 @@
 #include "utilities.h"
 
+#ifdef _MSC_VER
+	#include "win32\types.h"
+#endif
+
+void *round_up(void *p, size_t align)
+{
+	size_t r = ((size_t)p % align == 0 ? 0 : align - (size_t)p % align);
+	return (char *)p + r;
+}
+
+void *round_down(void *p, size_t align)
+{
+	size_t r = (size_t)p;
+	return (void *)(r & (~(align - 1)));
+}
+
+size_t round_up(size_t p, size_t align)
+{
+	size_t r = ((size_t)p % align == 0 ? 0 : align - (size_t)p % align);
+	return p + r;
+}
+
+size_t round_down(size_t p, size_t align)
+{
+	size_t r = (size_t)p;
+	return r & (~(align - 1));
+}
+
+
 void checksum_init(checksum_t *t)
 {
 	t->remainder = 0;

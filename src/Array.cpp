@@ -1,7 +1,10 @@
 #include "Array.h"
 #include <cassert>
-
 #include "Column.h"
+#include "utilities.h"
+#ifdef _MSC_VER
+	#include "win32\types.h"
+#endif
 
 // Pre-declare local functions
 size_t CalcByteLen(size_t count, size_t width);
@@ -336,9 +339,7 @@ bool Array::Set(size_t ndx, int64_t value) {
 }
 
 bool Array::Insert(size_t ndx, int64_t value) {
-
 	// todo, maybe Set() can be used instead of (this->*m_setter), to reduce/simplify this function alot
-
 	assert(ndx <= m_len);
 
 	// Check if we need to copy before modifying
@@ -481,10 +482,86 @@ size_t Array::FindPos2(int64_t target) const {
 }
 
 size_t Array::Find(int64_t value, size_t start, size_t end) const {
+#ifdef USE_SSE
+	if(end == -1)
+		end = m_len;
+
+	if(end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) 
+		return FindNaive(value, start, end);
+
+	// FindSSE() must start at 16-byte boundary, so search area before that using FindNaive()
+	__m128i *a = (__m128i *)round_up(m_data + start * m_width / 8, sizeof(__m128i));
+	__m128i *b = (__m128i *)round_down(m_data + end * m_width / 8, sizeof(__m128i));
+	size_t t = 0;
+
+	t = FindNaive(value, start, ((unsigned char *)a - m_data) * 8 / m_width);
+	if(t != -1)
+		return t;
+
+	// Search aligned area with SSE
+	if(b > a) {
+		t = FindSSE(value, a, m_width / 8, b - a);
+		if(t != -1) {
+			// FindSSE returns SSE chunk number, so we use FindNative() to find packed position
+			t = FindNaive(value, t * sizeof(__m128i) * 8 / m_width  +  (((unsigned char *)a - m_data) / m_width), end);
+			return t;
+		}
+	}
+
+	// Search remainder with FindNaive()
+	t = FindNaive(value, ((unsigned char *)b - m_data) * 8 / m_width, end);
+	return t;
+#else
+	return FindNaive(value, start, end); // enable legacy find
+#endif
+}
+
+#ifdef USE_SSE
+// 'items' is the number of 16-byte SSE chunks. 'bytewidth' is the size of a packed data element.
+// Return value is SSE chunk number where the element is guaranteed to exist (use FindNative() to
+// find packed position)
+size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const{
+	__m128i search, next, compare = {1};
+	size_t i;
+
+	for(int j = 0; j < sizeof(__m128i) / bytewidth; j++)
+		memcpy((char *)&search + j * bytewidth, &value, bytewidth);
+
+	if(bytewidth == 1) {
+		for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
+			next = _mm_load_si128(&data[i]);
+			compare = _mm_cmpeq_epi8(search, next);
+		}
+	}
+	else if(bytewidth == 2) {
+		for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
+			next = _mm_load_si128(&data[i]);
+			compare = _mm_cmpeq_epi16(search, next);
+		}
+	}
+	else if(bytewidth == 4) {
+		for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
+			next = _mm_load_si128(&data[i]);
+			compare = _mm_cmpeq_epi32(search, next);
+		}
+	}
+
+	// Only supported by SSE 4.1. We use SSE 2 instead which is default in gcc (no -sse41 flag needed) and VC
+/*	else if(bytewidth == 8) {
+		for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
+			next = _mm_load_si128(&data[i]);
+			compare = _mm_cmpeq_epi64(search, next);
+		}
+	}*/
+	return _mm_movemask_epi8(compare) == 0 ? -1 : i - 1;
+}
+#endif //USE_SSE
+
+size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 	if (IsEmpty()) return (size_t)-1;
 	if (end == (size_t)-1) end = m_len;
 	if (start == end) return (size_t)-1;
-
+		
 	assert(start < m_len && end <= m_len && start < end);
 
 	// If the value is wider than the column
@@ -500,9 +577,9 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0x3 * value;
 
-		const int64_t* p = (const int64_t*)m_data + start;
+		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
 		const size_t end64 = m_len / 32;
-		const int64_t* const e = (const int64_t*)m_data + end64;
+		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
 
 		// Check 64bits at a time for match
 		while (p < e) {
@@ -526,9 +603,9 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0xF * value;
 
-		const int64_t* p = (const int64_t*)m_data + start;
+		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
 		const size_t end64 = m_len / 16;
-		const int64_t* const e = (const int64_t*)m_data + end64;
+		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
 
 		// Check 64bits at a time for match
 		while (p < e) {
@@ -554,9 +631,9 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0xFF * value;
 
-		const int64_t* p = (const int64_t*)m_data + start;
+		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
 		const size_t end64 = m_len / 8;
-		const int64_t* const e = (const int64_t*)m_data + end64;
+		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
 
 		// Check 64bits at a time for match
 		while (p < e) {
@@ -580,9 +657,9 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0xFFFF * value;
 
-		const int64_t* p = (const int64_t*)m_data + start;
+		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
 		const size_t end64 = m_len / 4;
-		const int64_t* const e = (const int64_t*)m_data + end64;
+		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
 
 		// Check 64bits at a time for match
 		while (p < e) {
@@ -606,9 +683,8 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0xFFFFFFFF * value;
 
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 2;
-		const int64_t* const e = (const int64_t*)m_data + end64;
+		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
+		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
 
 		// Check 64bits at a time for match
 		while (p < e) {
@@ -630,8 +706,8 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	}
 	else if (m_width == 64) {
 		const int64_t v = (int64_t)value;
-		const int64_t* p = (const int64_t*)m_data + start;
-		const int64_t* const e = (const int64_t*)m_data + end;
+		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
+		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
 		while (p < e) {
 			if (*p == v) return p - (const int64_t*)m_data;
 			++p;
@@ -880,6 +956,146 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 		}
 	}
 }
+
+
+size_t Array::Max(size_t start, size_t end) const
+{
+	if (IsEmpty()) return -1;
+	if (end == (size_t)-1) end = m_len;
+	if (start == end) return -1;
+	assert(start < m_len && end <= m_len && start < end);
+	if(m_width == 0)
+		return -1;
+
+	uint64_t mv = Get(start);
+	size_t mi = start;
+
+	for(int i = start; i < end; i++) {
+		if(Get(i) > mv) {
+			mv = Get(i);
+			mi = i;
+		}
+	}
+	return mi;
+}
+
+
+size_t Array::Min(size_t start, size_t end) const
+{
+	if (IsEmpty()) return -1;
+	if (end == (size_t)-1) end = m_len;
+	if (start == end) return -1;
+	assert(start < m_len && end <= m_len && start < end);
+	if(m_width == 0)
+		return -1;
+
+	uint64_t mv = Get(start);
+	size_t mi = start;
+
+	for(int i = start; i < end; i++) {
+		if(Get(i) < mv) {
+			mv = Get(i);
+			mi = i;
+		}
+	}
+	return mi;
+}
+
+
+int64_t Array::Sum(size_t start, size_t end) const {
+	if (IsEmpty()) return 0;
+	if (end == (size_t)-1) end = m_len;
+	if (start == end) return 0;
+	assert(start < m_len && end <= m_len && start < end);
+
+	uint64_t sum = 0;
+	
+	if(m_width == 0)
+		return 0;
+	else if(m_width == 8) {
+		for(int i = start; i < end; i++)
+			sum += Get_8b(i);
+	}
+	else if(m_width == 16) {
+		for(int i = start; i < end; i++)
+			sum += Get_16b(i);
+	}
+	else if(m_width == 32) {
+		for(int i = start; i < end; i++)
+			sum += Get_32b(i);
+	}
+	else if(m_width == 64) {
+		for(int i = start; i < end; i++)
+			sum += Get_64b(i);
+	}
+	else
+	{
+		uint64_t *next = (uint64_t *)m_data;
+		uint64_t s = 0, i;
+		size_t chunkvals = sizeof(int64_t) * 8 / m_width;
+	
+		if(m_width == 1) {
+			for(i = start; i + chunkvals <= end; i += chunkvals) {
+				uint64_t a = next[i / chunkvals];
+				for (; a; sum++) {
+					a &= a - 1; // clear the least significant bit set
+				}
+			}
+		}
+
+		if(m_width == 2) {
+			for(i = start; i + chunkvals <= end; i += chunkvals) {
+				uint64_t a = next[i / chunkvals];
+				uint64_t b = a >> 2;
+				a = a & 0x3333333333333333;
+				b = b & 0x3333333333333333;
+				s += a;
+				s += b;
+				if((s & 0x8888888888888888) != 0) {
+					for(size_t j = 0; j < chunkvals; j++) {
+						uint64_t mask = (1 << (m_width * 2)) - 1;
+						sum += s & mask;
+						s >>= m_width * 2;
+					}
+					s = 0;
+				}
+			}
+		}
+
+		if(m_width == 4) {
+			for(i = start; i + chunkvals <= end; i += chunkvals) {
+				uint64_t a = next[i / chunkvals];
+				uint64_t b = a >> 4;
+				a = a & 0x0f0f0f0f0f0f0f0f;
+				b = b & 0x0f0f0f0f0f0f0f0f;
+				s += a;
+				s += b;
+				if((s & 0x8080808080808080) != 0) {
+					for(size_t j = 0; j < chunkvals; j++) {
+						uint64_t mask = (1 << (m_width * 2)) - 1;
+						sum += s & mask;
+						s >>= m_width * 2;
+					}
+					s = 0;
+				}
+			}
+		}
+
+		// Sum all sums in 64 bit accumulator
+		for(size_t j = 0; j < chunkvals; j++) {
+			uint64_t mask = (1 << (m_width * 2)) - 1;
+			sum += s & mask;
+			s >>= m_width * 2;
+		}
+
+		// Sum remainding elements 
+		for(; i < end; i++)
+			sum += Get(i);
+	}
+
+	return sum;
+}
+
 
 void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset) const {
 	// Only implemented for 64bit values

@@ -16,6 +16,9 @@
 
 // Pre-declare local functions
 void SetRefSize(void* ref, size_t len);
+bool callme_sum(Array &a, size_t start, size_t end, size_t caller_base, void *state);
+bool callme_min(Array &a, size_t start, size_t end, size_t caller_offset, void *state);
+bool callme_max(Array &a, size_t start, size_t end, size_t caller_offset, void *state);
 
 Column::Column(Allocator& alloc) : m_index(NULL) {
 	m_array = new Array(COLUMN_NORMAL, NULL, 0, alloc);
@@ -199,6 +202,55 @@ bool Column::Insert(size_t ndx, int64_t value) {
 	return true;
 }
 
+bool callme_sum(Array &a, size_t start, size_t end, size_t caller_base, void *state) {
+	int64_t s = a.Sum(start, end);
+	*(int64_t *)state += s;
+	return true;
+}
+
+int64_t Column::Sum(size_t start, size_t end) {
+	int64_t sum = 0;
+	TreeVisitLeafs<Array, Column>(start, end, 0, callme_sum, (void *)&sum);
+	return sum;
+}
+
+bool callme_min(Array &a, size_t start, size_t end, size_t caller_offset, void *state) {
+	std::pair<size_t, int64_t> *p = (std::pair<size_t, int64_t> *)state;
+	size_t i = a.Min(start, end);
+	if(p->first == -1 || (i != -1 && a.Get(i) < p->second)) {	
+		p->first = i + caller_offset;
+		p->second = a.Get(i);
+	}
+	return true;
+}
+
+int64_t Column::Min(size_t start, size_t end) {
+	std::pair<size_t, int64_t> p;
+	p.first = -1;
+	p.second = 0;
+	TreeVisitLeafs<Array, Column>(start, end, 0, callme_min, (void *)&p);
+	return p.first;
+}
+
+bool callme_max(Array &a, size_t start, size_t end, size_t caller_offset, void *state) {
+	std::pair<size_t, int64_t> *p = (std::pair<size_t, int64_t> *)state;
+	size_t i = a.Max(start, end);
+	if(p->first == -1 || (i != -1 && a.Get(i) > p->second)) {	
+		p->first = i + caller_offset;
+		p->second = a.Get(i);
+	}
+	return true;
+}
+
+int64_t Column::Max(size_t start, size_t end) {
+	std::pair<size_t, int64_t> p;
+	p.first = -1;
+	p.second = 0;
+	TreeVisitLeafs<Array, Column>(start, end, 0, callme_max, (void *)&p);
+	return p.first;
+}
+
+
 size_t ColumnBase::GetRefSize(size_t ref) const {
 	// parse the length part of 8byte header
 	const uint8_t* const header = (uint8_t*)m_array->GetAllocator().Translate(ref);
@@ -281,7 +333,6 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 	assert(start <= Size());
 	assert(end == (size_t)-1 || end <= Size());
 	if (IsEmpty()) return (size_t)-1;
-
 	return TreeFind<int64_t, Column>(value, start, end);
 }
 
@@ -289,20 +340,11 @@ void Column::FindAll(Column& result, int64_t value, size_t offset, size_t start,
 	assert(start <= Size());
 	assert(end == (size_t)-1 || end <= Size());
 	if (IsEmpty()) return;
+	TreeFindAll<int64_t, Column>(result, value, 0, start, end);
+}
 
-	if (!IsNode()) return m_array->FindAll(result, value, offset, start, end);
-	else {
-		// Get subnode table
-		const Array offsets = NodeGetOffsets();
-		const Array refs = NodeGetRefs();
-		const size_t count = refs.Size();
-
-		for (size_t i = 0; i < count; ++i) {
-			const Column col((size_t)refs.Get(i));
-			const size_t localOffset = i ? (size_t)offsets.Get(i-1) : 0;
-			col.FindAll(result, value, (localOffset+offset));
-		}
-	}
+void Column::LeafFindAll(Column &result, int64_t value, size_t add_offset, size_t start, size_t end) const {
+	return m_array->FindAll(result, value, add_offset, start, end);
 }
 
 void Column::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset) const {
