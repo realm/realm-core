@@ -10,7 +10,7 @@
 
 // Has to be define to allow overload from build settings
 #ifndef MAX_LIST_SIZE
-#define MAX_LIST_SIZE 3
+#define MAX_LIST_SIZE 1000
 #endif
 
 template<class T> T GetColumnFromRef(Array& parent, size_t ndx) {
