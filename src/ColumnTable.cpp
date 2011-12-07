@@ -27,7 +27,13 @@ const Table ColumnTable::GetTable(size_t ndx) const {
 	const size_t ref_columns = m_table_refs.Get(ndx);
 	Allocator& alloc = m_table_refs.GetAllocator();
 
-	return Table(alloc, m_ref_specSet, ref_columns, NULL, 0);
+	// Even though it is const we still need a parent
+	// so that the table can know it is attached
+	Array* parent = NULL;
+	size_t pndx   = 0;
+	m_table_refs.GetParentInfo(ndx, parent, pndx);
+
+	return Table(alloc, m_ref_specSet, ref_columns, parent, pndx);
 }
 
 Table* ColumnTable::GetTablePtr(size_t ndx) {

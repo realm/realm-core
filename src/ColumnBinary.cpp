@@ -35,6 +35,8 @@ ColumnBinary::ColumnBinary(size_t ref, const Array* parent, size_t pndx, Allocat
 }
 
 ColumnBinary::~ColumnBinary() {
+	if (IsNode()) delete m_array;
+	else delete (ArrayBinary*)m_array;
 }
 
 void ColumnBinary::Destroy() {

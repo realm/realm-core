@@ -149,6 +149,7 @@ protected:
 	void Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns);
 	void CreateColumns();
 	void CacheColumns();
+	void ClearCachedColumns();
 
 	// Serialization
 	template<class S> size_t Write(S& out, size_t& pos) const;

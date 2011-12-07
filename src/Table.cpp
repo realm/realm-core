@@ -166,6 +166,9 @@ TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, si
 }
 
 TopLevelTable::~TopLevelTable() {
+	// free cached columns
+	ClearCachedColumns();
+
 	// Destroying m_top will also destroy specSet and columns
 	m_top.Destroy();
 }
@@ -221,7 +224,7 @@ Table::Table(Allocator& alloc, bool dontInit)
 }
 
 Table::Table(Allocator& alloc, size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns)
-: m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_columns(alloc)
+: m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc), m_columns(alloc)
 {
 	Create(ref_specSet, ref_columns, parent_columns, pndx_columns);
 }
@@ -397,6 +400,24 @@ void Table::CacheColumns() {
     if (size != (size_t)-1) m_size = size;
 }
 
+void Table::ClearCachedColumns() {
+	assert(m_cols.IsValid());
+
+	const size_t count = m_cols.Size();
+	for (size_t i = 0; i < count; ++i) {
+		const ColumnType type = GetRealColumnType(i);
+		if (type == COLUMN_TYPE_STRING_ENUM) {
+			ColumnStringEnum* const column = (ColumnStringEnum* const)m_cols.Get(i);
+			delete(column);
+		}
+		else {
+			ColumnBase* const column = (ColumnBase* const)m_cols.Get(i);
+			delete(column);
+		}
+	}
+	m_cols.Destroy();
+}
+
 Table& Table::operator=(const Table&) {
 	//TODO: assignment operator (ref-counting?)
 	assert(false);
@@ -404,12 +425,18 @@ Table& Table::operator=(const Table&) {
 }
 
 Table::~Table() {
+	// avoid double deletions if already cleared at higher level
+	if (!m_cols.IsValid()) return;
+
 	// free cached columns
-	for (size_t i = 0; i < m_cols.Size(); ++i) {
-		ColumnBase* const column = (ColumnBase* const)m_cols.Get(i);
-		delete(column);
+	ClearCachedColumns();
+
+	// If we are not attached to a group,
+	// we have to do out own clean-up
+	if (m_columns.GetParent() == NULL) {
+		m_specSet.Destroy();
+		m_columns.Destroy();
 	}
-	m_cols.Destroy();
 }
 
 size_t Table::GetColumnCount() const {

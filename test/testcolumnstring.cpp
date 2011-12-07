@@ -467,5 +467,8 @@ TEST(AdaptiveStringColumnFindAllRanges) {
 	CHECK_EQUAL(12, c.Get(5));
 	CHECK_EQUAL(14, c.Get(6));
 
+	// Clean-up
+	asc.Destroy();
+	c.Destroy();
 }
 
