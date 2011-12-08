@@ -112,9 +112,9 @@ public:
 	bool Add() {return Add(0);}
 	bool Add(int64_t value);
 
-	int64_t Sum(size_t start = 0, size_t end = -1);
-	int64_t Max(size_t start = 0, size_t end = -1);
-	int64_t Min(size_t start = 0, size_t end = -1);
+	int64_t Sum(size_t start = 0, size_t end = -1) const;
+	int64_t Max(size_t start = 0, size_t end = -1) const;
+	int64_t Min(size_t start = 0, size_t end = -1) const;
 
 	intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
 	void GetParentInfo(size_t ndx, Array*& parent, size_t& pndx, size_t offset=0) const;

@@ -208,7 +208,7 @@ bool callme_sum(Array &a, size_t start, size_t end, size_t caller_base, void *st
 	return true;
 }
 
-int64_t Column::Sum(size_t start, size_t end) {
+int64_t Column::Sum(size_t start, size_t end) const {
 	int64_t sum = 0;
 	TreeVisitLeafs<Array, Column>(start, end, 0, callme_sum, (void *)&sum);
 	return sum;
@@ -224,7 +224,7 @@ bool callme_min(Array &a, size_t start, size_t end, size_t caller_offset, void *
 	return true;
 }
 
-int64_t Column::Min(size_t start, size_t end) {
+int64_t Column::Min(size_t start, size_t end) const {
 	std::pair<size_t, int64_t> p;
 	p.first = -1;
 	p.second = 0;
@@ -242,7 +242,7 @@ bool callme_max(Array &a, size_t start, size_t end, size_t caller_offset, void *
 	return true;
 }
 
-int64_t Column::Max(size_t start, size_t end) {
+int64_t Column::Max(size_t start, size_t end) const {
 	std::pair<size_t, int64_t> p;
 	p.first = -1;
 	p.second = 0;
