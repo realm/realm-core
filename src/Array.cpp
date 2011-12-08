@@ -954,45 +954,41 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 }
 
 
-size_t Array::Max(size_t start, size_t end) const {
-	if (IsEmpty()) return -1;
+bool Array::Max(int64_t& result, size_t start, size_t end) const {
 	if (end == (size_t)-1) end = m_len;
-	if (start == end) return -1;
+	if (start == end) return false;
 	assert(start < m_len && end <= m_len && start < end);
-	if (m_width == 0) return start; // max value is zero
+	if (m_width == 0) {result = 0; return true;} // max value is zero
 
-	int64_t mv = Get(start);
-	size_t  mi = start;
+	result = Get(start);
 
-	for (size_t i = start; i < end; ++i) {
+	for (size_t i = start+1; i < end; ++i) {
 		const int64_t v = Get(i);
-		if (v > mv) {
-			mv = v;
-			mi = i;
+		if (v > result) {
+			result = v;
 		}
 	}
-	return mi;
+
+	return true;
 }
 
 
-size_t Array::Min(size_t start, size_t end) const {
-	if (IsEmpty()) return -1;
+bool Array::Min(int64_t& result, size_t start, size_t end) const {
 	if (end == (size_t)-1) end = m_len;
-	if (start == end) return -1;
+	if (start == end) return false;
 	assert(start < m_len && end <= m_len && start < end);
-	if (m_width == 0) return start; // min value is zero
+	if (m_width == 0) {result = 0; return true;} // min value is zero
 
-	int64_t mv = Get(start);
-	size_t  mi = start;
+	result = Get(start);
 
-	for (size_t i = start; i < end; ++i) {
+	for (size_t i = start+1; i < end; ++i) {
 		const int64_t v = Get(i);
-		if (v < mv) {
-			mv = v;
-			mi = i;
+		if (v < result) {
+			result = v;
 		}
 	}
-	return mi;
+
+	return true;
 }
 
 

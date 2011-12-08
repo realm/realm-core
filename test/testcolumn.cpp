@@ -533,11 +533,11 @@ TEST(Column_Sum) {
 TEST(Column_Max) {
 	Column c;
 	size_t t = c.Max();
-	CHECK_EQUAL(-1, t);
+	CHECK_EQUAL(0, t); // max on empty range returns zero
 
 	c.Add(1);
 	t = c.Max();
-	CHECK_EQUAL(0, t);
+	CHECK_EQUAL(1, t);
 
 	c.Destroy();
 }
@@ -555,7 +555,7 @@ TEST(Column_Max2) {
 	c.Set(81, 20);
 
 	size_t t = c.Max(51, 81);
-	CHECK_EQUAL(51, t);
+	CHECK_EQUAL(11, t);
 
 	c.Destroy();
 }
@@ -563,11 +563,11 @@ TEST(Column_Max2) {
 TEST(Column_Min) {
 	Column c;
 	size_t t = c.Min();
-	CHECK_EQUAL(-1, t);
+	CHECK_EQUAL(0, t); // min on empty range returns zero
 
 	c.Add(1);
 	t = c.Min();
-	CHECK_EQUAL(0, t);
+	CHECK_EQUAL(1, t);
 
 	c.Destroy();
 }
@@ -585,7 +585,7 @@ TEST(Column_Min2) {
 	c.Set(81, 20);
 
 	size_t t = c.Min(51, 81);
-	CHECK_EQUAL(51, t);
+	CHECK_EQUAL(9, t);
 
 	c.Destroy();
 }

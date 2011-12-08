@@ -214,40 +214,49 @@ int64_t Column::Sum(size_t start, size_t end) const {
 	return sum;
 }
 
+class AggregateState {
+public:
+	AggregateState() : isValid(false), result(0) {}
+	bool    isValid;
+	int64_t result;
+};
+
 bool callme_min(Array &a, size_t start, size_t end, size_t caller_offset, void *state) {
-	std::pair<size_t, int64_t> *p = (std::pair<size_t, int64_t> *)state;
-	size_t i = a.Min(start, end);
-	if(p->first == -1 || (i != -1 && a.Get(i) < p->second)) {	
-		p->first = i + caller_offset;
-		p->second = a.Get(i);
+	AggregateState* p = (AggregateState*)state;
+
+	int64_t res;
+	if (!a.Min(res, start, end)) return true;
+
+	if (!p->isValid || (res < p->result)) {
+		p->result  = res;
+		p->isValid = true;
 	}
 	return true;
 }
 
 int64_t Column::Min(size_t start, size_t end) const {
-	std::pair<size_t, int64_t> p;
-	p.first = -1;
-	p.second = 0;
-	TreeVisitLeafs<Array, Column>(start, end, 0, callme_min, (void *)&p);
-	return p.first;
+	AggregateState state;
+	TreeVisitLeafs<Array, Column>(start, end, 0, callme_min, (void *)&state);
+	return state.result; // will return zero for empty ranges
 }
 
 bool callme_max(Array &a, size_t start, size_t end, size_t caller_offset, void *state) {
-	std::pair<size_t, int64_t> *p = (std::pair<size_t, int64_t> *)state;
-	size_t i = a.Max(start, end);
-	if(p->first == -1 || (i != -1 && a.Get(i) > p->second)) {	
-		p->first = i + caller_offset;
-		p->second = a.Get(i);
+	AggregateState* p = (AggregateState*)state;
+
+	int64_t res;
+	if (!a.Max(res, start, end)) return true;
+
+	if (!p->isValid || (res > p->result)) {
+		p->result  = res;
+		p->isValid = true;
 	}
 	return true;
 }
 
 int64_t Column::Max(size_t start, size_t end) const {
-	std::pair<size_t, int64_t> p;
-	p.first = -1;
-	p.second = 0;
-	TreeVisitLeafs<Array, Column>(start, end, 0, callme_max, (void *)&p);
-	return p.first;
+	AggregateState state;
+	TreeVisitLeafs<Array, Column>(start, end, 0, callme_max, (void *)&state);
+	return state.result; // will return zero for empty ranges
 }
 
 
