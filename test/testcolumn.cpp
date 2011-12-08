@@ -537,7 +537,9 @@ TEST(Column_Max) {
 
 	c.Add(1);
 	t = c.Max();
-	CHECK_EQUAL(0, t);	
+	CHECK_EQUAL(0, t);
+
+	c.Destroy();
 }
 
 
@@ -554,6 +556,8 @@ TEST(Column_Max2) {
 
 	size_t t = c.Max(51, 81);
 	CHECK_EQUAL(51, t);
+
+	c.Destroy();
 }
 
 TEST(Column_Min) {
@@ -563,7 +567,9 @@ TEST(Column_Min) {
 
 	c.Add(1);
 	t = c.Min();
-	CHECK_EQUAL(0, t);	
+	CHECK_EQUAL(0, t);
+
+	c.Destroy();
 }
 
 
@@ -580,6 +586,8 @@ TEST(Column_Min2) {
 
 	size_t t = c.Min(51, 81);
 	CHECK_EQUAL(51, t);
+
+	c.Destroy();
 }
 
 
