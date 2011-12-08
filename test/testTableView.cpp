@@ -5,7 +5,7 @@ TDB_TABLE_1(TestTableInt,
 			Int,        first
 )
 
-/*
+
 TEST(GetSetInteger) {
 	TestTableInt table;
 
@@ -29,14 +29,14 @@ TEST(GetSetInteger) {
 
 	// v.Destroy()
 }
-*/
 
 
+/*
 TDB_TABLE_1(TestTableBool,
 			Bool,        first
 )
 
-/*
+
 TEST(GetSetBool) {
 	TestTableBool table;
 
@@ -62,12 +62,12 @@ TEST(GetSetBool) {
 }
 */
 
-
+/*
 TDB_TABLE_1(TestTableString,
 			String,        first
 )
 
-/*
+
 TEST(GetSetString) {
 	TestTableBool table;
 
@@ -90,5 +90,4 @@ TEST(GetSetString) {
 
 	// v.Destroy()
 }
-
 */
