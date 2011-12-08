@@ -878,6 +878,25 @@ void Table::FindAll(TableView& tv, size_t column_id, int64_t value) {
 	column.FindAll(tv.GetRefColumn(), value);
 }
 
+void Table::FindAllString(TableView& tv, size_t column_id, const char *value) {
+	assert(column_id < m_columns.Size());
+	assert(&tv.GetParent() == this);
+
+	const ColumnType type = GetRealColumnType(column_id);
+
+	if (type == COLUMN_TYPE_STRING) {
+		const AdaptiveStringColumn& column = GetColumnString(column_id);
+		return column.FindAll(tv.GetRefColumn(), value);
+	}
+	else {
+		assert(type == COLUMN_TYPE_STRING_ENUM);
+		const ColumnStringEnum& column = GetColumnStringEnum(column_id);
+		return column.FindAll(tv.GetRefColumn(), value);
+	}
+}
+
+
+
 void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max) {
 	assert(column_id < m_columns.Size());
 	assert(&tv.GetParent() == this);

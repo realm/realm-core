@@ -63,6 +63,12 @@ void ColumnStringEnum::Clear() {
 	m_values.Clear();
 }
 
+void ColumnStringEnum::FindAll(Column &res, const char* value, size_t start, size_t end) const {
+	// todo, fixme, implement
+	return;
+}
+
+
 size_t ColumnStringEnum::Find(const char* value, size_t start, size_t end) const {
 	// Find key
 	const size_t key_ndx = m_keys.Find(value);

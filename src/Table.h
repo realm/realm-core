@@ -122,6 +122,7 @@ public:
 	size_t FindDate(size_t column_id, time_t value) const;
 	void FindAll(TableView& tv, size_t column_id, int64_t value);
 	void FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max);
+	void FindAllString(TableView& tv, size_t column_id, const char *value);
 
 	// Indexing
 	bool HasIndex(size_t column_id) const;
@@ -241,6 +242,19 @@ public:
 	void SetDate(size_t column_id, size_t ndx, time_t value);
 	void SetString(size_t column_id, size_t ndx, const char* value);
 
+	// Finding
+	size_t Find(size_t column_id, int64_t value) const;
+	void FindAll(TableView& tv, size_t column_id, int64_t value);
+	size_t FindString(size_t column_id, const char* value) const;
+	void FindAllString(TableView& tv, size_t column_id, const char *value);
+
+	// Aggregate functions
+	int64_t Sum(size_t column_id) const;
+	size_t Max(size_t column_id) const;
+	size_t Min(size_t column_id) const;
+
+	Table *GetTable(void); // todo, temporary for tests
+
 private:
 	// Don't allow copying
 	TableView& operator=(const TableView&) {return *this;}
@@ -337,12 +351,11 @@ class ColumnProxyInt : public ColumnProxy {
 public:
 	size_t Find(int64_t value) const {return m_table->Find(m_column, value);}
 	size_t FindPos(int64_t value) const {return m_table->GetColumn(m_column).FindPos(value);}
-
 // todo, fixme: array that m_data points at becomes invalid during function exit in debug mode in VC. Added this workaround, please verify 
 // or fix properly
 //	TableView FindAll(int value) {TableView *tv = new TableView(*m_table); m_table->FindAll(*tv, m_column, value); return *tv;}
 	TableView FindAll(int value) {TableView tv(*m_table); m_table->FindAll(tv, m_column, value); return tv;}
-
+	
 	TableView FindAllHamming(uint64_t value, size_t max) {TableView tv(*m_table); m_table->FindAllHamming(tv, m_column, value, max); return tv;}
 	int operator+=(int value) {m_table->GetColumn(m_column).Increment64(value); return 0;}
 };
@@ -365,7 +378,9 @@ public:
 class ColumnProxyString : public ColumnProxy {
 public:
 	size_t Find(const char* value) const {return m_table->FindString(m_column, value);}
+	TableView FindAll(const char *value) {TableView tv(*m_table); m_table->FindAllString(tv, m_column, value); return tv;}
 	//void Stats() const {m_table->GetColumnString(m_column).Stats();}
+
 };
 
 template<class T> class TypeEnum {

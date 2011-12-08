@@ -27,67 +27,178 @@ TEST(GetSetInteger) {
 	v.Set(0, 0, 123);
 	CHECK_EQUAL(123, v.Get(0, 0));
 
-	// v.Destroy()
+	//v.Destroy();
 }
 
 
-/*
-TDB_TABLE_1(TestTableBool,
-			Bool,        first
-)
+TEST(TableViewSum) {
+	TestTableInt table;
 
-
-TEST(GetSetBool) {
-	TestTableBool table;
-
-	table.Add(true);
-	table.Add(false);
-	table.Add(true);
-	table.Add(false);
+	table.Add(2);
+	table.Add(2);
+	table.Add(2);
+	table.Add(2);
+	table.Add(2);
 	
-	// Search for a value with several matches
-	TableView v = table.first.FindAll(false);
+	TableView v = table.first.FindAll(2);
+	CHECK_EQUAL(5, v.GetSize());
 
-	CHECK_EQUAL(2, v.GetSize());
-
-	// Test of Get
-	CHECK_EQUAL(false, v.GetBool(0, 0));
-	CHECK_EQUAL(false, v.GetBool(0, 1));
+	int64_t sum = v.Sum(0);
+	CHECK_EQUAL(10, sum);
 	
-	// Test of Set
-	v.Set(0, 0, true);
-	CHECK_EQUAL(true, v.Get(0, 0));
-
-	// v.Destroy()
+	//v.Destroy();
 }
-*/
 
-/*
+TEST(TableViewSumNegative) {
+	TestTableInt table;
+
+	table.Add(0);
+	table.Add(0);
+	table.Add(0);
+
+	TableView v = table.first.FindAll(0);
+	v.Set(0, 0, 11);
+	v.Set(0, 2, -20);
+	
+	int64_t sum = v.Sum(0);
+	CHECK_EQUAL(-9, sum);
+	
+	//v.Destroy();
+}
+
+TEST(TableViewMax) {
+	TestTableInt table;
+
+	table.Add(0);
+	table.Add(0);
+	table.Add(0);
+
+	TableView v = table.first.FindAll(0);
+	v.Set(0, 0, -1);
+	v.Set(0, 1, 2);
+	v.Set(0, 2, 1);
+	
+	int64_t max = v.Max(0);
+	CHECK_EQUAL(2, max);
+	//v.Destroy();
+}
+
+
+
+TEST(TableViewMax2) {
+	TestTableInt table;
+
+	table.Add(0);
+	table.Add(0);
+	table.Add(0);
+	
+	TableView v = table.first.FindAll(0);
+	v.Set(0, 0, -1);
+	v.Set(0, 1, -2);
+	v.Set(0, 2, -3);
+	
+	int64_t max = v.Max(0);
+	CHECK_EQUAL(-1, max);
+	//v.Destroy();
+}
+
+
+TEST(TableViewMin) {
+	TestTableInt table;
+
+	table.Add(0);
+	table.Add(0);
+	table.Add(0);
+
+	TableView v = table.first.FindAll(0);
+	v.Set(0, 0, -1);
+	v.Set(0, 1, 2);
+	v.Set(0, 2, 1);
+	
+	int64_t min = v.Min(0);
+	CHECK_EQUAL(-1, min);
+	//v.Destroy();
+}
+
+
+TEST(TableViewMin2) {
+	TestTableInt table;
+
+	table.Add(0);
+	table.Add(0);
+	table.Add(0);
+
+	TableView v = table.first.FindAll(0);
+	v.Set(0, 0, -1);
+	v.Set(0, 1, -2);
+	v.Set(0, 2, -3);
+	
+	int64_t min = v.Min(0);
+	CHECK_EQUAL(-3, min);
+	//v.Destroy();
+}
+
+
+
+TEST(TableViewFind) {
+	TestTableInt table;
+
+	table.Add(0);
+	table.Add(0);
+	table.Add(0);
+
+	TableView v = table.first.FindAll(0);
+	v.Set(0, 0, 5);
+	v.Set(0, 1, 4);
+	v.Set(0, 2, 4);
+	
+	size_t r = v.Find(0, 4);
+	CHECK_EQUAL(1, r);
+	//v.Destroy();
+}
+
+
+TEST(TableViewFindAll) {
+	TestTableInt table;
+
+	table.Add(0);
+	table.Add(0);
+	table.Add(0);
+
+	TableView v = table.first.FindAll(0);
+	v.Set(0, 0, 5);
+	v.Set(0, 1, 4); // match
+	v.Set(0, 2, 4); // match
+
+	// todo, add creation to wrapper function in table.h
+	TableView *v2 = new TableView(*v.GetTable());
+	v.FindAll(*v2, 0, 4);
+	CHECK_EQUAL(1, v2->GetRef(0));
+	CHECK_EQUAL(2, v2->GetRef(1));
+	//v.Destroy();
+}
+
 TDB_TABLE_1(TestTableString,
 			String,        first
 )
 
+TEST(TableViewFindAllString) {
+	TestTableString table;
 
-TEST(GetSetString) {
-	TestTableBool table;
-
-	table.Add("foo");
-	table.Add("bar");
-	table.Add("foo");
-	table.Add("bar");
-
-	TableView v = table.first.FindAll("bar");
-
-	CHECK_EQUAL(2, v.GetSize());
-
-	// Test of Get
-	CHECK_EQUAL("bar", v.GetString(0, 0));
-	CHECK_EQUAL("bar", v.GetString(0, 1));
+	table.Add("a");
+	table.Add("a");
+	table.Add("a");
 	
-	// Test of Set
-	v.SetString(0, 0, "bar");
-	CHECK_EQUAL("bar", v.Get(0, 0));
+	TableView v = table.first.FindAll("a");
+	v.SetString(0, 0, "foo");
+	v.SetString(0, 1, "bar"); // match
+	v.SetString(0, 2, "bar"); // match
 
-	// v.Destroy()
+	// todo, add creation to wrapper function in table.h
+	TableView *v2 = new TableView(*v.GetTable());
+	v.FindAllString(*v2, 0, "bar");
+	CHECK_EQUAL(1, v2->GetRef(0));
+	CHECK_EQUAL(2, v2->GetRef(1));
+	//v.Destroy();
 }
-*/
+
