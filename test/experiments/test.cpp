@@ -1,3 +1,4 @@
+/*
 #include <cstdio>
 #include "tightdb.h"
 
@@ -57,3 +58,4 @@ void test() {
 	// Run query with modifiers (all results)
 	MyTable result = table.FindAll(TestQuery(2)).Sort().Limit(10);
 }
+*/

@@ -149,6 +149,7 @@
     <ClCompile Include="..\..\src\ColumnBinary.cpp" />
     <ClCompile Include="..\..\src\ColumnString.cpp" />
     <ClCompile Include="..\..\src\ColumnStringEnum.cpp" />
+    <ClCompile Include="..\..\src\ColumnTable.cpp" />
     <ClCompile Include="..\..\src\ctightdb.cpp" />
     <ClCompile Include="..\..\src\Group.cpp" />
     <ClCompile Include="..\..\src\Index.cpp" />
@@ -171,6 +172,7 @@
     <ClInclude Include="..\..\src\ColumnBinary.h" />
     <ClInclude Include="..\..\src\ColumnString.h" />
     <ClInclude Include="..\..\src\ColumnStringEnum.h" />
+    <ClInclude Include="..\..\src\ColumnTable.h" />
     <ClInclude Include="..\..\src\ColumnType.h" />
     <ClInclude Include="..\..\src\Column_tpl.h" />
     <ClInclude Include="..\..\src\ctightdb.h" />

@@ -64,6 +64,12 @@
     <ClCompile Include="..\..\src\utilities.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\ColumnStringEnum.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\ColumnTable.cpp">
+      <Filter>tightdb</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\alloc.h">
@@ -116,6 +122,12 @@
     </ClInclude>
     <ClInclude Include="..\Support\mem.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\ColumnString.h" />
+    <ClInclude Include="..\..\src\ColumnStringEnum.h" />
+    <ClInclude Include="..\..\src\utilities.h" />
+    <ClInclude Include="..\..\src\ColumnTable.h">
+      <Filter>tightdb</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

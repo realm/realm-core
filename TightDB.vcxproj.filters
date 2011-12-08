@@ -17,7 +17,6 @@
     <ClCompile Include="test\main.cpp" />
     <ClCompile Include="src\Table.cpp" />
     <ClCompile Include="src\TableView.cpp" />
-    <ClCompile Include="test\test.cpp" />
     <ClCompile Include="test\testalloc.cpp" />
     <ClCompile Include="test\testarray.cpp" />
     <ClCompile Include="test\testarraystring.cpp" />
@@ -39,6 +38,8 @@
     <ClCompile Include="test\large_tests\test_column.cpp">
       <Filter>large_tests</Filter>
     </ClCompile>
+    <ClCompile Include="src\ColumnStringEnum.cpp" />
+    <ClCompile Include="src\ColumnTable.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\alloc.h" />
@@ -66,6 +67,8 @@
     <ClInclude Include="test\large_tests\verified_string.h">
       <Filter>large_tests</Filter>
     </ClInclude>
+    <ClInclude Include="src\ColumnStringEnum.h" />
+    <ClInclude Include="src\ColumnTable.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">
