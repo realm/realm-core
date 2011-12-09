@@ -403,7 +403,9 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Column &result, T val
 		size_t e = (end == (size_t)-1 || (int)end >= offsets.Get(i)) ? -1 : end - offset;
 
 		for (;;) {
-			const C col((size_t)refs.Get(i));
+			const size_t ref = refs.Get(i);
+			const C col(ref, (const Array*)NULL, 0, m_array->GetAllocator());
+
 			size_t add = i ? (size_t)offsets.Get(i-1) : 0;
 			add += add_offset;
 			col.TreeFindAll<T, C>(result, value, add, s, e);
@@ -440,7 +442,9 @@ template<typename T, class C> void ColumnBase::TreeVisitLeafs(size_t start, size
 		size_t e = (end == (size_t)-1 || (int)end >= offsets.Get(i)) ? (size_t)-1 : end - offset;
 
 		for (;;) {
-			const C col((size_t)refs.Get(i));
+			const size_t ref = refs.Get(i);
+			const C col(ref, (const Array*)NULL, 0, m_array->GetAllocator());
+
 			size_t add = i ? (size_t)offsets.Get(i-1) : 0;
 			add += caller_offset;
 			col.TreeVisitLeafs<T, C>(s, e, add, call, state);
