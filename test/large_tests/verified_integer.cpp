@@ -44,7 +44,53 @@ int64_t VerifiedInteger::Get(size_t ndx) {
 	return v[ndx];
 }
 
- void VerifiedInteger::Set(size_t ndx, int64_t value) {
+int64_t VerifiedInteger::Sum(size_t start, size_t end) {
+	int64_t sum = 0;
+	if(end == -1)
+		end = v.size();
+
+	for(size_t t = start; t < end; ++t)
+		sum += v[t];
+
+	assert(sum == u.Sum());
+	return sum;
+}
+
+int64_t VerifiedInteger::Max(size_t start, size_t end) {
+	if(end == -1)
+		end = v.size();
+
+	if(end == start)
+		return 0;
+
+	int64_t max = v[start];
+
+	for(size_t t = start + 1; t < end; ++t)
+		if(v[t] > max)
+			max = v[t];
+
+	assert(max == u.Max(start, end));
+	return max;
+}
+
+int64_t VerifiedInteger::Min(size_t start, size_t end) {
+	if(end == -1)
+		end = v.size();
+
+	if(end == start)
+		return 0;
+
+	int64_t min = v[start];
+
+	for(size_t t = start + 1; t < end; ++t)
+		if(v[t] < min)
+			min = v[t];
+
+	assert(min == u.Min(start, end));
+	return min;
+}
+
+void VerifiedInteger::Set(size_t ndx, int64_t value) {
 	v[ndx] = value;
 	u.Set(ndx, value);
 	VerifyNeighbours(ndx);
