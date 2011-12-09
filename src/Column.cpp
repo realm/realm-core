@@ -345,7 +345,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 	return TreeFind<int64_t, Column>(value, start, end);
 }
 
-void Column::FindAll(Column& result, int64_t value, size_t offset, size_t start, size_t end) const {
+void Column::FindAll(Column& result, int64_t value, size_t caller_offset, size_t start, size_t end) const {
 	assert(start <= Size());
 	assert(end == (size_t)-1 || end <= Size());
 	if (IsEmpty()) return;

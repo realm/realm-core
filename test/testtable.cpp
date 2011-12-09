@@ -343,8 +343,35 @@ TEST(TableAutoEnumeration) {
 		CHECK_EQUAL(Thu, table[3+n].fourth);
 		CHECK_EQUAL(Fri, table[4+n].fourth);
 	}
+
+
 }
 
+
+TEST(TableAutoEnumerationFindFindAll) {
+	TestTableAE table;
+
+	for (size_t i = 0; i < 5; ++i) {
+		table.Add(1, "abd",     true, Mon);
+		table.Add(2, "eftg",    true, Tue);
+		table.Add(5, "hijkl",   true, Wed);
+		table.Add(8, "mnopqr",  true, Thu);
+		table.Add(9, "stuvxyz", true, Fri);
+	}
+
+	table.Optimize();
+
+	size_t t = table.second.Find("eftg");
+	CHECK_EQUAL(1, t);
+
+	TableView tv = table.second.FindAll("eftg");
+	CHECK_EQUAL(5, tv.GetSize());
+	CHECK_EQUAL("eftg", tv.GetString(1, 0));
+	CHECK_EQUAL("eftg", tv.GetString(1, 1));
+	CHECK_EQUAL("eftg", tv.GetString(1, 2));
+	CHECK_EQUAL("eftg", tv.GetString(1, 3));
+	CHECK_EQUAL("eftg", tv.GetString(1, 4));
+}
 
 #include "AllocSlab.h"
 TEST(Table_SlabAlloc) {
