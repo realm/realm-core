@@ -506,6 +506,7 @@ size_t Table::Write(S& out, size_t& pos) const {
 		switch (type) {
 			case COLUMN_TYPE_INT:
 			case COLUMN_TYPE_BOOL:
+			case COLUMN_TYPE_DATE:
             {
                 const Column& column = GetColumn(i);
                 const size_t cpos = column.Write(out, pos);
@@ -535,6 +536,13 @@ size_t Table::Write(S& out, size_t& pos) const {
                 const size_t cpos = column.Write(out, pos);
                 columns.Add(cpos);
 			}
+				break;
+			case COLUMN_TYPE_BINARY:
+            {
+                const ColumnBinary& column = GetColumnBinary(i);
+                const size_t cpos = column.Write(out, pos);
+                columns.Add(cpos);
+            }
 				break;
 			default: assert(false);
 		}
