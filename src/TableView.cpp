@@ -74,13 +74,10 @@ size_t TableView::Max(size_t column_id) const {
 	if (m_refs.Size() == 0) return 0;
 
 	int64_t mv = Get(column_id, 0);
-	size_t mi = 0;
-
-	for (size_t i = 0; i < m_refs.Size(); ++i) {
+	for (size_t i = 1; i < m_refs.Size(); ++i) {
 		const int64_t v = Get(column_id, i);
 		if (v > mv) {
 			mv = v;
-			mi = i;
 		}
 	}
 	return mv;
@@ -91,13 +88,10 @@ size_t TableView::Min(size_t column_id) const {
 	if (m_refs.Size() == 0) return 0;
 
 	int64_t mv = Get(column_id, 0);
-	size_t mi = 0;
-
-	for (size_t i = 0; i < m_refs.Size(); ++i) {
+	for (size_t i = 1; i < m_refs.Size(); ++i) {
 		const int64_t v = Get(column_id, i);
 		if (v < mv) {
 			mv = v;
-			mi = i;
 		}
 	}
 	return mv;
