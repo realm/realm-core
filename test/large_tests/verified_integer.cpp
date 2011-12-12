@@ -46,13 +46,17 @@ int64_t VerifiedInteger::Get(size_t ndx) {
 
 int64_t VerifiedInteger::Sum(size_t start, size_t end) {
 	int64_t sum = 0;
+
+	if(start == end)
+		return 0;
+
 	if(end == -1)
 		end = v.size();
 
 	for(size_t t = start; t < end; ++t)
 		sum += v[t];
 
-	assert(sum == u.Sum());
+	assert(sum == u.Sum(start, end));
 	return sum;
 }
 

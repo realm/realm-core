@@ -1030,11 +1030,15 @@ int64_t Array::Sum(size_t start, size_t end) const {
 		const uint64_t h01 = 0x0101010101010101;
 
 		const uint64_t* const next = (const uint64_t*)m_data;
-		size_t i;
+		size_t i = start;
+
+		// Sum manully until 64 bit aligned
+		for(; (i < end) && ((i * m_width) % 64 != 0); i++)
+			sum += Get(i);
 
 		if (m_width == 1) {
 			const size_t chunkvals = 64;
-			for (i = start; i + chunkvals <= end; i += chunkvals) {
+			for (; i + chunkvals <= end; i += chunkvals) {
 				uint64_t a = next[i / chunkvals];
 
 				a -= (a >> 1) & m1;
@@ -1050,7 +1054,7 @@ int64_t Array::Sum(size_t start, size_t end) const {
 		}
 		else if (m_width == 2) {
 			const size_t chunkvals = 32;
-			for (i = start; i + chunkvals <= end; i += chunkvals) {
+			for (; i + chunkvals <= end; i += chunkvals) {
 				uint64_t a = next[i / chunkvals];
 
 				a = (a & m2) + ((a >> 2) & m2);
@@ -1062,7 +1066,7 @@ int64_t Array::Sum(size_t start, size_t end) const {
 		}
 		else if (m_width == 4) {
 			const size_t chunkvals = 16;
-			for (i = start; i + chunkvals <= end; i += chunkvals) {
+			for (; i + chunkvals <= end; i += chunkvals) {
 				uint64_t a = next[i / chunkvals];
 
 				a = (a & m4) + ((a >> 4) & m4);
