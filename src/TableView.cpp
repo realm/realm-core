@@ -69,7 +69,7 @@ int64_t TableView::Sum(size_t column_id) const {
 	return sum;
 }
 
-size_t TableView::Max(size_t column_id) const {
+int64_t TableView::Max(size_t column_id) const {
 	if (IsEmpty()) return 0;
 	if (m_refs.Size() == 0) return 0;
 
@@ -83,7 +83,7 @@ size_t TableView::Max(size_t column_id) const {
 	return mv;
 }
 
-size_t TableView::Min(size_t column_id) const {
+int64_t TableView::Min(size_t column_id) const {
 	if (IsEmpty()) return 0;
 	if (m_refs.Size() == 0) return 0;
 

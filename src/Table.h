@@ -250,8 +250,8 @@ public:
 
 	// Aggregate functions
 	int64_t Sum(size_t column_id) const;
-	size_t Max(size_t column_id) const;
-	size_t Min(size_t column_id) const;
+	int64_t Max(size_t column_id) const;
+	int64_t Min(size_t column_id) const;
 
 	Table *GetTable(void); // todo, temporary for tests
 
