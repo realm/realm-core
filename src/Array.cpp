@@ -1019,62 +1019,57 @@ int64_t Array::Sum(size_t start, size_t end) const {
 			sum += Get_64b(i);
 	}
 	else {
-		uint64_t *next = (uint64_t *)m_data;
-		uint64_t s = 0, i;
-		size_t chunkvals = sizeof(int64_t) * 8 / m_width;
-	
-		if(m_width == 1) {
-			for(i = start; i + chunkvals <= end; i += chunkvals) {
+		// Sum of bitwidths less than a byte (which are always positive)
+		// uses a divide and conquer algorithm that is a variation of popolation count:
+		// http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+
+		// staiic values needed for fast sums
+		const uint64_t m1  = 0x5555555555555555;
+		const uint64_t m2  = 0x3333333333333333;
+		const uint64_t m4  = 0x0f0f0f0f0f0f0f0f;
+		const uint64_t h01 = 0x0101010101010101;
+
+		const uint64_t* const next = (const uint64_t*)m_data;
+		size_t i;
+
+		if (m_width == 1) {
+			const size_t chunkvals = 64;
+			for (i = start; i + chunkvals <= end; i += chunkvals) {
 				uint64_t a = next[i / chunkvals];
-				for (; a; sum++) {
-					a &= a - 1; // clear the least significant bit set
-				}
+
+				a -= (a >> 1) & m1;
+				a = (a & m2) + ((a >> 2) & m2);
+				a = (a + (a >> 4)) & m4;
+				a = (a * h01) >> 56;
+
+				// Could use intrinsic instead:
+				// a = __builtin_popcountll(a); // gcc intrinsic
+
+				sum += a;
 			}
 		}
-
-		if(m_width == 2) {
-			for(i = start; i + chunkvals <= end; i += chunkvals) {
+		else if (m_width == 2) {
+			const size_t chunkvals = 32;
+			for (i = start; i + chunkvals <= end; i += chunkvals) {
 				uint64_t a = next[i / chunkvals];
-				uint64_t b = a >> 2;
-				a = a & 0x3333333333333333;
-				b = b & 0x3333333333333333;
-				s += a;
-				s += b;
-				if((s & 0x8888888888888888) != 0) {
-					for(size_t j = 0; j < chunkvals; j++) {
-						uint64_t mask = (1 << (m_width * 2)) - 1;
-						sum += s & mask;
-						s >>= m_width * 2;
-					}
-					s = 0;
-				}
+
+				a = (a & m2) + ((a >> 2) & m2);
+				a = (a + (a >> 4)) & m4;
+				a = (a * h01) >> 56;
+
+				sum += a;
 			}
 		}
-
-		if(m_width == 4) {
-			for(i = start; i + chunkvals <= end; i += chunkvals) {
+		else if (m_width == 4) {
+			const size_t chunkvals = 16;
+			for (i = start; i + chunkvals <= end; i += chunkvals) {
 				uint64_t a = next[i / chunkvals];
-				uint64_t b = a >> 4;
-				a = a & 0x0f0f0f0f0f0f0f0f;
-				b = b & 0x0f0f0f0f0f0f0f0f;
-				s += a;
-				s += b;
-				if((s & 0x8080808080808080) != 0) {
-					for(size_t j = 0; j < chunkvals; j++) {
-						uint64_t mask = (1 << (m_width * 2)) - 1;
-						sum += s & mask;
-						s >>= m_width * 2;
-					}
-					s = 0;
-				}
-			}
-		}
 
-		// Sum all sums in 64 bit accumulator
-		for(size_t j = 0; j < chunkvals; j++) {
-			uint64_t mask = (1 << (m_width * 2)) - 1;
-			sum += s & mask;
-			s >>= m_width * 2;
+				a = (a & m4) + ((a >> 4) & m4);
+				a = (a * h01) >> 56;
+
+				sum += a;
+			}
 		}
 
 		// Sum remainding elements 
