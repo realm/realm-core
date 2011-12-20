@@ -121,8 +121,9 @@ public:
 	size_t FindString(size_t column_id, const char* value) const;
 	size_t FindDate(size_t column_id, time_t value) const;
 	void FindAll(TableView& tv, size_t column_id, int64_t value);
-	void FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max);
+	void FindAllBool(TableView& tv, size_t column_id, bool value);
 	void FindAllString(TableView& tv, size_t column_id, const char *value);
+	void FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max);
 
 	// Indexing
 	bool HasIndex(size_t column_id) const;
