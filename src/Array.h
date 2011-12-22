@@ -143,6 +143,8 @@ private:
 	size_t FindNaive(int64_t value, size_t start, size_t end) const;
 
 protected:
+	bool AddPositiveLocal(int64_t value);
+
 	void Create(size_t ref);
 	void DoSort(size_t lo, size_t hi);
 

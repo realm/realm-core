@@ -338,8 +338,28 @@ bool Array::Set(size_t ndx, int64_t value) {
 	return true;
 }
 
+// Optimization for the common case of adding
+// positive values to a local array (happens a
+// lot when returning results to TableViews)
+bool Array::AddPositiveLocal(int64_t value) {
+	assert(value >= 0);
+	assert(&m_alloc == &GetDefaultAllocator());
+
+	if (value <= m_ubound) {
+		const size_t bytes = CalcByteLen(m_len+1, m_width);
+
+		if (bytes < m_capacity) {
+			(this->*m_setter)(m_len, value);
+			++m_len;
+			set_header_len(m_len);
+			return true;
+		}
+	}
+
+	return Insert(m_len, value);
+}
+
 bool Array::Insert(size_t ndx, int64_t value) {
-	// todo, maybe Set() can be used instead of (this->*m_setter), to reduce/simplify this function alot
 	assert(ndx <= m_len);
 
 	// Check if we need to copy before modifying
@@ -736,7 +756,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 	// Do optimized search based on column width
 	if (m_width == 0) {
 		for(size_t i = start; i < end; i++){
-			result.Add(i + colOffset); // All values can only be zero.
+			result.AddPositiveLocal(i + colOffset); // All values can only be zero.
 		}
 	}
 	else if (m_width == 2) {
@@ -755,14 +775,13 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 			if (hasZeroByte){
 				// Element number at start of block
 				size_t i = (p - (const int64_t*)m_data) * 32;
-				// Last element of block
-				size_t j = i + 32;
+				const size_t j = i + 32; // Last element of block
 
 				// check block
 				while (i < j) {
 					const size_t offset = i >> 2;
 					const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
-					if (v == value) result.Add(i + colOffset);
+					if (v == value) result.AddPositiveLocal(i + colOffset);
 					++i;
 				}
 			}
@@ -774,7 +793,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 
 		// Manually check the rest
 		while (i < end) {
-			if (Get(i) == value) result.Add(i + colOffset);
+			if (Get(i) == value) result.AddPositiveLocal(i + colOffset);
 			++i;
 		}
 	}
@@ -794,14 +813,13 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 			if (hasZeroByte){
 				// Element number at start of block
 				size_t i = (p - (const int64_t*)m_data) * 16;
-				// Last element of block
-				size_t j = i + 16;
+				const size_t j = i + 16; // Last element of block
 
 				// check block
 				while (i < j) {
 					const size_t offset = i >> 1;
 					const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
-					if (v == value) result.Add(i + colOffset);
+					if (v == value) result.AddPositiveLocal(i + colOffset);
 					++i;
 				}
 			}
@@ -813,7 +831,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 
 		// Manually check the rest
 		while (i < end) {
-			if (Get(i) == value) result.Add(i + colOffset);
+			if (Get(i) == value) result.AddPositiveLocal(i + colOffset);
 			++i;
 		}
 	}
@@ -835,14 +853,12 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 			if (hasZeroByte){
 				// Element number at start of block
 				size_t i = (p - (const int64_t*)m_data) * 8;
-				// Last element of block
-				size_t j = i + 8;
-				// Data pointer
-				const int8_t* d = (const int8_t*)m_data;
+				const size_t j = i + 8; // Last element of block
+				const int8_t* const d = (const int8_t*)m_data; // Data pointer
 
 				// check block
 				while (i < j) {
-					if (value == d[i]) result.Add(i + colOffset);
+					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
 					++i;
 				}
 			}
@@ -853,7 +869,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 		size_t i = (p - (const int64_t*)m_data) * 8;
 		// Manually check the rest
 		while (i < end) {
-			if (value == Get(i)) result.Add(i + colOffset);
+			if (value == Get(i)) result.AddPositiveLocal(i + colOffset);
 			++i;
 		}
 	}
@@ -873,14 +889,12 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 			if (hasZeroByte){
 				// Element number at start of block
 				size_t i = (p - (const int64_t*)m_data) * 4;
-				// Last element of block
-				size_t j = i + 4;
-				// Data pointer
-				const int16_t* d = (const int16_t*)m_data;
+				const size_t j = i + 4; // Last element of block
+				const int16_t* const d = (const int16_t*)m_data; // Data pointer
 
 				// check block
 				while (i < j) {
-					if (value == d[i]) result.Add(i + colOffset);
+					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
 					++i;
 				}
 			}
@@ -892,7 +906,8 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == Get(i)) result.Add(i + colOffset);
+			if (value == Get(i))
+				result.AddPositiveLocal(i + colOffset);
 			++i;
 		}
 	}
@@ -910,16 +925,13 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2
 											 & 0x8000800080000000UL;
 			if (hasZeroByte){
-				// Element number at start of block
-				size_t i = (p - (const int64_t*)m_data) * 2;
-				// Last element of block
-				size_t j = i + 2;
-				// Data pointer
-				const int32_t* d = (const int32_t*)m_data;
+				size_t i = (p - (const int64_t*)m_data) * 2;     // Element number at start of block
+				const size_t j = i + 2;                          // Last element of block
+				const int32_t* const d = (const int32_t*)m_data; // Data pointer
 
 				// check block
 				while (i < j) {
-					if (value == d[i]) result.Add(i + colOffset);
+					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
 					++i;
 				}
 			}
@@ -931,7 +943,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == Get(i)) result.Add(i + colOffset);
+			if (value == Get(i)) result.AddPositiveLocal(i + colOffset);
 			++i;
 		}
 	}
@@ -940,7 +952,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 		const int64_t* p = (const int64_t*)m_data + start;
 		const int64_t* const e = (const int64_t*)m_data + end;
 		while (p < e) {
-			if (*p == v) result.Add((p - (const int64_t*)m_data) + colOffset);
+			if (*p == v) result.AddPositiveLocal((p - (const int64_t*)m_data) + colOffset);
 			++p;
 		}
 	}
@@ -948,7 +960,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 		// Naive search
 		for (size_t i = start; i < end; ++i) {
 			const int64_t v = (this->*m_getter)(i);
-			if (v == value) result.Add(i + colOffset);
+			if (v == value) result.AddPositiveLocal(i + colOffset);
 		}
 	}
 }
@@ -1118,7 +1130,7 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
 
 		if (x < maxdist) {
 			const size_t pos = p - (const uint64_t*)m_data;
-			result.Add(offset + pos);
+			result.AddPositiveLocal(offset + pos);
 		}
 
 		++p;
