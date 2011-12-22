@@ -1126,27 +1126,10 @@ void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_
 }
 
 size_t Array::CalcByteLen(size_t count, size_t width) const {
-	size_t len = 8; // always need room for header
-	switch (width) {
-	case 0:
-		break;
-	case 1:
-		len += count >> 3;
-		if (count & 0x07) ++len;
-		break;
-	case 2:
-		len += count >> 2;
-		if (count & 0x03) ++len;
-		break;
-	case 4:
-		len += count >> 1;
-		if (count & 0x01) ++len;
-		break;
-	default:
-		assert(width == 8 || width == 16 || width == 32 || width == 64);
-		len += count * (width >> 3);
-	}
-	return len;
+	const size_t bits = (count * width);
+	size_t bytes = (bits / 8) + 8; // add room for 8 byte header
+	if (bits & 0x7) ++bytes;       // include partial bytes
+	return bytes;
 }
 
 bool Array::CopyOnWrite() {
