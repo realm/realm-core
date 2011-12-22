@@ -47,7 +47,7 @@ private:
 
 class Table {
 public:
-	Table(Allocator& alloc=DefaultAllocator);
+	Table(Allocator& alloc=GetDefaultAllocator());
 	Table(const Table& t);
 	~Table();
 
@@ -186,7 +186,7 @@ private:
 
 class TopLevelTable : public Table {
 public:
-	TopLevelTable(Allocator& alloc=DefaultAllocator);
+	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
 	~TopLevelTable();
 
 	void UpdateFromSpec(size_t ref_specSet);

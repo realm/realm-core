@@ -5,8 +5,8 @@
 
 class ArrayStringLong : public Array {
 public:
-	ArrayStringLong(Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	ArrayStringLong(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
+	ArrayStringLong(Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ArrayStringLong(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	//ArrayStringLong(Allocator& alloc);
 	~ArrayStringLong();
 

@@ -7,9 +7,9 @@
 
 class AdaptiveStringColumn : public ColumnBase {
 public:
-	AdaptiveStringColumn(Allocator& alloc=DefaultAllocator);
-	AdaptiveStringColumn(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	AdaptiveStringColumn(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
+	AdaptiveStringColumn(Allocator& alloc=GetDefaultAllocator());
+	AdaptiveStringColumn(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	AdaptiveStringColumn(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	~AdaptiveStringColumn();
 
 	void Destroy();

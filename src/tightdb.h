@@ -23,7 +23,7 @@ protected: \
 }; \
 class TableName : public TopLevelTable { \
 public: \
-	TableName(Allocator& alloc=DefaultAllocator) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		\
 		CName1.Create(this, 0); \
@@ -80,7 +80,7 @@ protected: \
 }; \
 class TableName : public TopLevelTable { \
 public: \
-	TableName(Allocator& alloc=DefaultAllocator) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 		\
@@ -147,7 +147,7 @@ protected: \
 }; \
 class TableName : public TopLevelTable { \
 public: \
-	TableName(Allocator& alloc=DefaultAllocator) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
 		RegisterColumn(Accessor##CType1::type,  #CName1 ); \
 		RegisterColumn(Accessor##CType2::type,  #CName2 ); \
 		RegisterColumn(Accessor##CType3::type,  #CName3 ); \

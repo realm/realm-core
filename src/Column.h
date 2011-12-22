@@ -87,9 +87,9 @@ class Column : public ColumnBase {
 public:
 	Column(Allocator& alloc);
 	Column(ColumnDef type, Allocator& alloc);
-	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	Column(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
+	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	Column(const Column& column);
 	~Column();
 

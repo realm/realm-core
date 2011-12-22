@@ -7,9 +7,9 @@
 
 class ColumnBinary : public ColumnBase {
 public:
-	ColumnBinary(Allocator& alloc=DefaultAllocator);
-	ColumnBinary(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	ColumnBinary(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
+	ColumnBinary(Allocator& alloc=GetDefaultAllocator());
+	ColumnBinary(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ColumnBinary(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	~ColumnBinary();
 
 	void Destroy();

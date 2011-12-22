@@ -64,9 +64,9 @@ enum ColumnDef {
 
 class Array {
 public:
-	Array(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
-	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
+	Array(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	Array(Allocator& alloc);
 	Array(const Array& a);
 

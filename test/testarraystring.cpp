@@ -303,7 +303,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind5) {
 
 TEST_FIXTURE(db_setup_string, ArrayStringFindAll) {
 	c.Clear();
-	Column col;
+	Array col;
 
 	// first, middle and end
 	c.Add("foobar");
