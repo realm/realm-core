@@ -225,7 +225,7 @@ public:
 	~TableView();
 
 	Table& GetParent() {return m_table;}
-	Column& GetRefColumn() {return m_refs;}
+	Array& GetRefColumn() {return m_refs;}
 	size_t GetRef(size_t ndx) const {return m_refs.Get(ndx);}
 
 	bool IsEmpty() const {return m_refs.IsEmpty();}
@@ -261,7 +261,7 @@ private:
 	TableView& operator=(const TableView&) {return *this;}
 
 	Table& m_table;
-	Column m_refs;
+	Array m_refs;
 };
 
 

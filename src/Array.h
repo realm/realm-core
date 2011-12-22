@@ -101,9 +101,9 @@ public:
 	size_t FindPos(int64_t value) const;
 	size_t FindPos2(int64_t value) const;
 	size_t Find(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
-	void FindAll(Column& result, int64_t value, size_t offset=0,
+	void FindAll(Array& result, int64_t value, size_t offset=0,
 				 size_t start=0, size_t end=(size_t)-1) const;
-	void FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset=0) const;
+	void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 	int64_t Sum(size_t start = 0, size_t end = -1) const;
 	bool Max(int64_t& result, size_t start = 0, size_t end = -1) const;
 	bool Min(int64_t& result, size_t start = 0, size_t end = -1) const;

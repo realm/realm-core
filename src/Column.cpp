@@ -345,18 +345,18 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 	return TreeFind<int64_t, Column>(value, start, end);
 }
 
-void Column::FindAll(Column& result, int64_t value, size_t caller_offset, size_t start, size_t end) const {
+void Column::FindAll(Array& result, int64_t value, size_t caller_offset, size_t start, size_t end) const {
 	assert(start <= Size());
 	assert(end == (size_t)-1 || end <= Size());
 	if (IsEmpty()) return;
 	TreeFindAll<int64_t, Column>(result, value, 0, start, end);
 }
 
-void Column::LeafFindAll(Column &result, int64_t value, size_t add_offset, size_t start, size_t end) const {
+void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const {
 	return m_array->FindAll(result, value, add_offset, start, end);
 }
 
-void Column::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset) const {
+void Column::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const {
 	if (!IsNode()) {
 		m_array->FindAllHamming(result, value, maxdist, offset);
 	}

@@ -21,7 +21,7 @@ public:
 	void Clear();
 
 	size_t Find(const char* value, size_t start=0, size_t end=-1) const;
-	void FindAll(Column &res, const char* value, size_t start=0, size_t end=-1) const;
+	void FindAll(Array &res, const char* value, size_t start=0, size_t end=-1) const;
 
 	void UpdateParentNdx(int diff);
 

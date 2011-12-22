@@ -388,7 +388,7 @@ template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start,
 
 
 
-template<typename T, class C> void ColumnBase::TreeFindAll(Column &result, T value, size_t add_offset, size_t start, size_t end) const {
+template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const {
 	if (!IsNode()) {
 		return static_cast<const C*>(this)->LeafFindAll(result, value, add_offset, start, end);
 	}

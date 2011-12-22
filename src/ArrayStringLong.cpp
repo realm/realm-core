@@ -109,7 +109,7 @@ size_t ArrayStringLong::Find(const char* value, size_t start, size_t end) const 
 	return FindWithLen(value, strlen(value), start, end);
 }
 
-void ArrayStringLong::FindAll(Column &result, const char* value, size_t add_offset, size_t start, size_t end) const {
+void ArrayStringLong::FindAll(Array &result, const char* value, size_t add_offset, size_t start, size_t end) const {
 	assert(value);
 
 	const size_t len = strlen(value);

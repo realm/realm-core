@@ -720,7 +720,7 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 	return (size_t)-1; // not found
 }
 
-void Array::FindAll(Column& result, int64_t value, size_t colOffset,
+void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 					size_t start, size_t end) const {
 	if (IsEmpty()) return;
 	if (end == (size_t)-1) end = m_len;
@@ -1085,7 +1085,7 @@ int64_t Array::Sum(size_t start, size_t end) const {
 }
 
 
-void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset) const {
+void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const {
 	// Only implemented for 64bit values
 	if (m_width != 64) {
 		assert(false);

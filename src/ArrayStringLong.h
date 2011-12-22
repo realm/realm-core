@@ -24,7 +24,7 @@ public:
 	void Clear();
 
 	size_t Find(const char* value, size_t start=0 , size_t end=-1) const;
-	void FindAll(Column &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+	void FindAll(Array &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
 	template<class S> size_t Write(S& out, size_t& pos) const;
 
