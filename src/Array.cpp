@@ -1180,20 +1180,26 @@ bool Array::Alloc(size_t count, size_t width) {
 
 		if (!mref.pointer) return false;
 
+		const bool isFirst = (m_capacity == 0);
 		m_ref = mref.ref;
 		m_data = (unsigned char*)mref.pointer + 8;
 		m_capacity = new_capacity;
+
+		// Create header
+		if (isFirst) {
+			set_header_isnode(m_isNode);
+			set_header_hasrefs(m_hasRefs);
+			set_header_width(width);
+		}
+		set_header_capacity(new_capacity);
 
 		// Update ref in parent
 		if (m_parent) m_parent->Set(m_parentNdx, mref.ref); //TODO: ref
 	}
 
 	// Update header
-	set_header_isnode(m_isNode);
-	set_header_hasrefs(m_hasRefs);
 	set_header_width(width);
 	set_header_len(count);
-	set_header_capacity(m_capacity);
 
 	return true;
 }
