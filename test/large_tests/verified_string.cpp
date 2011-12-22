@@ -81,7 +81,7 @@ size_t VerifiedString::Find(const char *value) {
 }
 
 // todo/fixme, end ignored
- void VerifiedString::FindAll(Column &c, const char *value, size_t start, size_t end) {
+ void VerifiedString::FindAll(Array &c, const char *value, size_t start, size_t end) {
 	std::vector<string>::iterator ita = v.begin() + start;
 	std::vector<string>::iterator itb = v.begin() + (end == -1 ? v.size() : end);
 	std::vector<size_t> result;

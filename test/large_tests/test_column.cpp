@@ -24,7 +24,7 @@ TEST(Column_monkeytest2) {
 	const uint64_t SEED = 123;
 
 	VerifiedInteger a;
-	Column res;
+	Array res;
 
 	srand(SEED);
 	size_t current_bitwidth = 0;

@@ -41,7 +41,7 @@ TEST(ColumnString_monkeytest2) {
 	const uint64_t SEED = 123;
 
 	VerifiedString a;
-	Column res;
+	Array res;
 
 	srand(SEED);
 	unsigned int trend = 5;

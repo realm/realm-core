@@ -22,7 +22,7 @@ public:
 	void Delete(size_t ndx);
 	void Clear();
 	size_t Find(int64_t value);
-	void FindAll(Column &c, int64_t value, size_t start = 0, size_t end = -1);
+	void FindAll(Array &c, int64_t value, size_t start = 0, size_t end = -1);
 	size_t Size(void);
 	int64_t Sum(size_t start = 0, size_t end = -1);
 	int64_t Max(size_t start = 0, size_t end = -1);
