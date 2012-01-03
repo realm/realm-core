@@ -20,7 +20,7 @@ Array::Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc)
 }
 
 Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+: m_data(NULL), m_len(0), m_capacity(0), m_width(-1), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 
@@ -30,7 +30,7 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
 Array::Array(Allocator& alloc)
-: m_ref(0), m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
+: m_ref(0), m_data(NULL), m_len(0), m_capacity(0), m_width(-1), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
 }
 
 // Copy-constructor
@@ -110,7 +110,10 @@ void Array::Create(size_t ref) {
 	m_hasRefs  = get_header_hasrefs(header);
 	m_width    = get_header_width(header);
 	m_len      = get_header_len(header);
-	m_capacity = get_header_capacity(header);
+	const size_t byte_capacity = get_header_capacity(header);
+
+	// Capacity is how many items there are room for
+	m_capacity = CalcItemCount(byte_capacity, m_width);
 
 	m_ref = ref;
 	m_data = header + 8;
@@ -221,7 +224,8 @@ void Array::Clear() {
 	}
 
 	// Truncate size to zero (but keep capacity)
-	m_len = 0;
+	m_len      = 0;
+	m_capacity = CalcItemCount(get_header_capacity(), 0);
 	SetWidth(0);
 
 	// Update header
@@ -346,9 +350,7 @@ bool Array::AddPositiveLocal(int64_t value) {
 	assert(&m_alloc == &GetDefaultAllocator());
 
 	if (value <= m_ubound) {
-		const size_t bytes = CalcByteLen(m_len+1, m_width);
-
-		if (bytes < m_capacity) {
+		if (m_len < m_capacity) {
 			(this->*m_setter)(m_len, value);
 			++m_len;
 			set_header_len(m_len);
@@ -1144,6 +1146,14 @@ size_t Array::CalcByteLen(size_t count, size_t width) const {
 	return bytes;
 }
 
+size_t Array::CalcItemCount(size_t bytes, size_t width) const {
+	if (width == 0) return (size_t)-1; // zero width gives infinite space
+
+	const size_t bytes_data = bytes - 8; // ignore 8 byte header
+	const size_t total_bits = bytes_data * 8;
+	return total_bits / width;
+}
+
 bool Array::CopyOnWrite() {
 	if (!m_alloc.IsReadOnly(m_ref)) return true;
 
@@ -1161,7 +1171,7 @@ bool Array::CopyOnWrite() {
 	// Update internal data
 	m_ref = mref.ref;
 	m_data = (unsigned char*)mref.pointer + 8;
-	m_capacity = new_len;
+	m_capacity = CalcItemCount(new_len, m_width);
 
 	// Update capacity in header
 	set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
@@ -1173,44 +1183,48 @@ bool Array::CopyOnWrite() {
 }
 
 bool Array::Alloc(size_t count, size_t width) {
-	// Calculate size in bytes
-	const size_t len = CalcByteLen(count, width);
+	if (count > m_capacity || width != m_width) {
+		const size_t len      = CalcByteLen(count, width);              // bytes needed
+		const size_t capacity = m_capacity ? get_header_capacity() : 0; // bytes currently available
+		size_t new_capacity   = capacity;
 
-	if (len > m_capacity) {
-		// Double to avoid too many reallocs
-		size_t new_capacity = m_capacity ? m_capacity * 2 : 128;
-		if (new_capacity < len) {
-			const size_t rest = (~len & 0x7)+1;
-			new_capacity = len;
-			if (rest < 8) new_capacity += rest; // 64bit align
+		if (len > capacity) {
+			// Double to avoid too many reallocs
+			new_capacity = capacity ? capacity * 2 : 128;
+			if (new_capacity < len) {
+				const size_t rest = (~len & 0x7)+1;
+				new_capacity = len;
+				if (rest < 8) new_capacity += rest; // 64bit align
+			}
+
+			// Allocate the space
+			MemRef mref;
+			if (m_data) mref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
+			else mref = m_alloc.Alloc(new_capacity);
+
+			if (!mref.pointer) return false;
+
+			const bool isFirst = (capacity == 0);
+			m_ref = mref.ref;
+			m_data = (unsigned char*)mref.pointer + 8;
+
+			// Create header
+			if (isFirst) {
+				set_header_isnode(m_isNode);
+				set_header_hasrefs(m_hasRefs);
+				set_header_width(width);
+			}
+			set_header_capacity(new_capacity);
+
+			// Update ref in parent
+			if (m_parent) m_parent->Set(m_parentNdx, mref.ref); //TODO: ref
 		}
 
-		// Allocate the space
-		MemRef mref;
-		if (m_data) mref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
-		else mref = m_alloc.Alloc(new_capacity);
-
-		if (!mref.pointer) return false;
-
-		const bool isFirst = (m_capacity == 0);
-		m_ref = mref.ref;
-		m_data = (unsigned char*)mref.pointer + 8;
-		m_capacity = new_capacity;
-
-		// Create header
-		if (isFirst) {
-			set_header_isnode(m_isNode);
-			set_header_hasrefs(m_hasRefs);
-			set_header_width(width);
-		}
-		set_header_capacity(new_capacity);
-
-		// Update ref in parent
-		if (m_parent) m_parent->Set(m_parentNdx, mref.ref); //TODO: ref
+		m_capacity = CalcItemCount(new_capacity, width);
+		set_header_width(width);
 	}
 
 	// Update header
-	set_header_width(width);
 	set_header_len(count);
 
 	return true;

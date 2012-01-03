@@ -65,8 +65,8 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 	// Make room for the new value
 	if (width > m_width) {
 		const size_t oldwidth = m_width;
+		if (!Alloc(m_len, width)) return false;
 		m_width = width;
-		if (!Alloc(m_len, m_width)) return false;
 
 		// Expand the old values
 		int k = (int)m_len;
@@ -123,8 +123,8 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
 	// Make room for the new value
 	const size_t oldwidth = m_width;
+	if (!Alloc(m_len+1, doExpand ? width : m_width)) return false;
 	if (doExpand) m_width = width;
-	if (!Alloc(m_len+1, m_width)) return false;
 
 	// Move values below insertion (may expand)
 	if (doExpand) {
@@ -152,10 +152,12 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
 	// Set the value
 	char* data = (char*)m_data + (ndx * m_width);
+	memcpy(data, value, len);
+
+	// Pad with zeroes
 	char* const end = data + m_width;
-	memmove(data, value, len);
 	for (data += len; data < end; ++data) {
-		*data = '\0'; // pad with zeroes
+		*data = '\0';
 	}
 
 	// Expand values above insertion
@@ -200,6 +202,13 @@ void ArrayString::Delete(size_t ndx) {
 
 size_t ArrayString::CalcByteLen(size_t count, size_t width) const {
 	return 8 + (count * width);
+}
+
+size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const {
+	if (width == 0) return (size_t)-1; // zero-width gives infinite space
+
+	const size_t bytes_without_header = bytes - 8;
+	return bytes_without_header / width;
 }
 
 size_t ArrayString::Find(const char* value, size_t start, size_t end) const {

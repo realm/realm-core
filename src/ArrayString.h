@@ -33,6 +33,7 @@ public:
 private:
 	size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
+	virtual size_t CalcItemCount(size_t bytes, size_t width) const;
 };
 
 // Templates

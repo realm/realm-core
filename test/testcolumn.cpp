@@ -12,6 +12,11 @@ struct db_setup {
 
 Column db_setup::c;
 
+TEST_FIXTURE(db_setup, Column_IsEmpty) {
+	CHECK(c.IsEmpty());
+	CHECK_EQUAL(c.Size(), (size_t)0);
+}
+
 TEST_FIXTURE(db_setup, Column_Add0) {
 	c.Add(0);
 	CHECK_EQUAL(c.Get(0), 0);

@@ -169,6 +169,7 @@ protected:
 	void Set_64b(size_t ndx, int64_t value);
 
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
+	virtual size_t CalcItemCount(size_t bytes, size_t width) const;
 
 	void set_header_isnode(bool value, void* header=NULL);
 	void set_header_hasrefs(bool value, void* header=NULL);
