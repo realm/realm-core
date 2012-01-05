@@ -3,6 +3,10 @@
 
 #include "Table.h"
 
+#include "query\QueryInterface.h"
+
+using namespace std;
+
 #define TDB_QUERY(QueryName, TableName) \
 class QueryName : public TableName##Query { \
 public: \
@@ -16,11 +20,15 @@ QueryName
 #define TDB_QUERY_END }; \
 
 
+
+
 #define TDB_TABLE_1(TableName, CType1, CName1) \
 class TableName##Query { \
 protected: \
 	QueryAccessor##CType1 CName1; \
 }; \
+\
+\
 class TableName : public TopLevelTable { \
 public: \
 	TableName(Allocator& alloc=DefaultAllocator) : TopLevelTable(alloc) { \
@@ -72,12 +80,14 @@ private:\
 
 
 
+
 #define TDB_TABLE_2(TableName, CType1, CName1, CType2, CName2) \
 class TableName##Query { \
 protected: \
 	QueryAccessor##CType1 CName1; \
 	QueryAccessor##CType2 CName2; \
 }; \
+\
 class TableName : public TopLevelTable { \
 public: \
 	TableName(Allocator& alloc=DefaultAllocator) : TopLevelTable(alloc) { \
@@ -87,6 +97,38 @@ public: \
 		CName1.Create(this, 0); \
 		CName2.Create(this, 1); \
 	}; \
+	\
+	\
+class TestQuery : public Query {\
+public:\
+	TestQuery() : CName1(0), CName2(1) {\
+		CName1.SetQuery(this);\
+		CName2.SetQuery(this);\
+	}\
+	class TestQueryQueryAccessorInt : private XQueryAccessorInt {\
+	public:\
+		TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {}\
+		void SetQuery(Query* query) {m_query = query;}\
+		\
+		TestQuery &Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);}\
+		TestQuery &NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);}\
+		TestQuery &Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);}\
+	};\
+	class TestQueryQueryAccessorString : private XQueryAccessorString {\
+	public:\
+		TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {}\
+		void SetQuery(Query* query) {m_query = query;}\
+		\
+		TestQuery &Equal(std::string value) {return (TestQuery &)XQueryAccessorString::Equal(value);}\
+		TestQuery &NotEqual(std::string value) {return (TestQuery &)XQueryAccessorString::NotEqual(value);}\
+	};\
+	TestQueryQueryAccessorInt CName1;\
+	TestQueryQueryAccessorString CName2;\
+};\
+\
+		TestQuery Query; \
+	\
+	\
 	class Cursor : public CursorBase { \
 	public: \
 		Cursor(TableName& table, size_t ndx) : CursorBase(table, ndx) { \
