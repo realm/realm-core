@@ -110,17 +110,18 @@ public:\
 		TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {}\
 		void SetQuery(Query* query) {m_query = query;}\
 		\
-		TestQuery &Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);}\
-		TestQuery &NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);}\
-		TestQuery &Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);}\
+		TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);}\
+		TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);}\
+		TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);}\
+		TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);}\
 	};\
 	class TestQueryQueryAccessorString : private XQueryAccessorString {\
 	public:\
 		TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {}\
 		void SetQuery(Query* query) {m_query = query;}\
 		\
-		TestQuery &Equal(std::string value) {return (TestQuery &)XQueryAccessorString::Equal(value);}\
-		TestQuery &NotEqual(std::string value) {return (TestQuery &)XQueryAccessorString::NotEqual(value);}\
+		TestQuery& Equal(const char *value) {return (TestQuery &)XQueryAccessorString::Equal(value);}\
+		TestQuery& NotEqual(const char *value) {return (TestQuery &)XQueryAccessorString::NotEqual(value);}\
 	};\
 	TestQueryQueryAccessorInt CName1;\
 	TestQueryQueryAccessorString CName2;\

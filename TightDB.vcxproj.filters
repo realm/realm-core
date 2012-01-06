@@ -40,6 +40,7 @@
     </ClCompile>
     <ClCompile Include="src\ColumnStringEnum.cpp" />
     <ClCompile Include="src\ColumnTable.cpp" />
+    <ClCompile Include="src\TestQuery.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\alloc.h" />
@@ -69,10 +70,19 @@
     </ClInclude>
     <ClInclude Include="src\ColumnStringEnum.h" />
     <ClInclude Include="src\ColumnTable.h" />
+    <ClInclude Include="src\query\QueryInterface.h">
+      <Filter>query</Filter>
+    </ClInclude>
+    <ClInclude Include="src\query\QueryEngine.h">
+      <Filter>query</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">
       <UniqueIdentifier>{3e451fa6-2e90-45e6-824f-68fe7042fbcf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="query">
+      <UniqueIdentifier>{775025cf-a8a9-4cb2-a6fa-9e324b3c7f1d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
