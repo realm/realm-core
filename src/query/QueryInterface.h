@@ -48,6 +48,12 @@ public:
 		m_parent_node = p;
 		return *this;
 	};
+	Query& Between(size_t column_id, int64_t from, int64_t to) {
+		ParentNode *p = new NODE<int64_t, Column, GREATEREQUAL>(m_parent_node, from, column_id);
+		p = new NODE<int64_t, Column, LESSEQUAL>(p, to, column_id);
+		m_parent_node = p;
+		return *this;
+	};
 
 	Query() : m_parent_node(0) {}
 
@@ -91,6 +97,7 @@ public:
 	Query& GreaterEqual(int64_t value) {return m_query->GreaterEqual(m_column_id, value);}
 	Query& Less(int64_t value) {return m_query->Less(m_column_id, value);}
 	Query& LessEqual(int64_t value) {return m_query->LessEqual(m_column_id, value);}
+	Query& Between(int64_t from, int64_t to) {return m_query->Between(m_column_id, from, to);}
 protected:
 	Query* m_query;
 	size_t m_column_id;

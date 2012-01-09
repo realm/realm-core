@@ -37,6 +37,26 @@ TEST(TestQueryFindAll2) {
 	CHECK_EQUAL(6, tv2.GetRef(0));
 }
 
+TEST(TestQueryFindAllBetween) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+	ttt.Add(4, "a");
+	ttt.Add(5, "a");
+	ttt.Add(11, "X");
+	ttt.Add(3, "X");
+
+	Query q2 = ttt.Query.first.Between(3, 5);
+	TableView tv2 = q2.FindAll(ttt);
+	CHECK_EQUAL(2, tv2.GetRef(0));
+	CHECK_EQUAL(3, tv2.GetRef(1));
+	CHECK_EQUAL(4, tv2.GetRef(2));
+	CHECK_EQUAL(6, tv2.GetRef(3));
+}
+
+
 TEST(TestQueryFindAll_Range) {
 	TupleTableType ttt;
 

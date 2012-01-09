@@ -114,6 +114,7 @@ public:\
 		TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);}\
 		TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);}\
 		TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);}\
+		TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);}\
 	};\
 	class TestQueryQueryAccessorString : private XQueryAccessorString {\
 	public:\
