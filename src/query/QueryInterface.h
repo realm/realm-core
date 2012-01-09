@@ -3,7 +3,10 @@
 #define Testing_Query_h
 
 #include <string>
+#include <vector>
 #include "QueryEngine.h"
+
+#include <stdio.h>
 
 class Query {
 
@@ -55,6 +58,26 @@ public:
 		return *this;
 	};
 
+	void m_LeftParan(void) {
+		m_Left.push_back(m_parent_node);
+		m_parent_node = 0;
+	};
+
+	void m_Or(void) {
+		m_OrOperator.push_back(m_parent_node);
+		m_parent_node = 0;
+	};
+
+	void m_RightParan(void) {
+		m_Right.push_back(m_parent_node);
+		ParentNode *begin = m_Left[m_Left.size() - 1];
+		ParentNode *o = new OR_NODE(m_OrOperator[m_OrOperator.size() - 1], m_Right[m_Right.size() - 1], begin);
+		m_parent_node = o;
+		m_Right.pop_back();
+		m_OrOperator.pop_back();
+		m_Left.pop_back();
+	};
+
 	Query() : m_parent_node(0) {}
 
 	TableView FindAll(Table& table, size_t start = 0, size_t end = -1) {
@@ -82,10 +105,13 @@ public:
 			return r;
 	}
 
-protected:
+//protected:
 	friend class XQueryAccessorInt;
 	friend class XQueryAccessorString;
 	ParentNode *m_parent_node;
+	std::vector<ParentNode *> m_Left;
+	std::vector<ParentNode *> m_OrOperator;
+	std::vector<ParentNode *> m_Right;
 };
 
 class XQueryAccessorInt {

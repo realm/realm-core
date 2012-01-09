@@ -2,6 +2,7 @@
 #define __TIGHTDB_H__
 
 #include "Table.h"
+#include <vector>
 
 #include "query\QueryInterface.h"
 
@@ -126,6 +127,9 @@ public:\
 	};\
 	TestQueryQueryAccessorInt CName1;\
 	TestQueryQueryAccessorString CName2;\
+	TestQuery& LeftParan(void) {m_LeftParan(); return *this;}; \
+	TestQuery& Or(void) {m_Or(); return *this;}; \
+	TestQuery& RightParan(void) {m_RightParan(); return *this;}; \
 };\
 \
 		TestQuery Query; \
