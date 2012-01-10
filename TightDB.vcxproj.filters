@@ -40,7 +40,7 @@
     </ClCompile>
     <ClCompile Include="src\ColumnStringEnum.cpp" />
     <ClCompile Include="src\ColumnTable.cpp" />
-    <ClCompile Include="src\TestQuery.cpp" />
+    <ClCompile Include="test\TestQuery.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\alloc.h" />

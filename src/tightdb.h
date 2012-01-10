@@ -4,7 +4,7 @@
 #include "Table.h"
 #include <vector>
 
-#include "query\QueryInterface.h"
+#include "query/QueryInterface.h"
 
 using namespace std;
 

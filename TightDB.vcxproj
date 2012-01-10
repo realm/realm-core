@@ -190,7 +190,6 @@
     <ClCompile Include="src\ctightdb.cpp" />
     <ClCompile Include="src\Group.cpp" />
     <ClCompile Include="src\Index.cpp" />
-    <ClCompile Include="src\TestQuery.cpp" />
     <ClCompile Include="src\utilities.cpp">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
     </ClCompile>
@@ -208,6 +207,7 @@
     <ClCompile Include="test\testcolumnstring.cpp" />
     <ClCompile Include="test\testgroup.cpp" />
     <ClCompile Include="test\testindex.cpp" />
+    <ClCompile Include="test\TestQuery.cpp" />
     <ClCompile Include="test\testtable.cpp" />
     <ClCompile Include="test\testTableView.cpp" />
   </ItemGroup>
