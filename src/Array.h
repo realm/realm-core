@@ -80,7 +80,7 @@ public:
 	void UpdateRef(size_t ref);
 
 	bool IsValid() const {return m_data != NULL;}
-	void Invalidate() {m_data = NULL;}
+	void Invalidate() const {m_data = NULL;}
 
 	size_t Size() const {return m_len;}
 	bool IsEmpty() const {return m_len == 0;}
@@ -190,7 +190,7 @@ protected:
 	Getter m_getter;
 	Setter m_setter;
 	size_t m_ref;
-	unsigned char* m_data;
+	mutable unsigned char* m_data;
 	size_t m_len;
 	size_t m_capacity;
 	size_t m_width;

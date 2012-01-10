@@ -39,6 +39,7 @@ Array::Array(Allocator& alloc)
 Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc) {
 	const size_t ref = src.GetRef();
 	Create(ref);
+	src.Invalidate();
 }
 
 // Header format (8 bytes):
