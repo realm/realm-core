@@ -36,22 +36,13 @@ public:
 };
 
 
-template <class T> class Node : public ParentNode {
-public:
-	Node<T>(ParentNode *p, T v, size_t column) : m_child(p), m_value(v), m_column(column) {}
-	ParentNode *m_child;
-protected:
-	size_t m_column;
-	T m_value;
-};
-
-
 template <class T, class C, class F> class NODE : public ParentNode {
 public:
-	size_t m_column;
-	T m_value;
 	ParentNode *m_child;
+	T m_value;
+	size_t m_column;
 
+	NODE<T, C, F>(ParentNode *p, T v, size_t column) : m_child(p), m_value(v), m_column(column) {}
 	size_t Find(size_t start, size_t end, const Table& table) {
 		const C& column = (C&)(table.GetColumnBase(m_column));
 		F function;
@@ -72,7 +63,6 @@ public:
 		return end;
 	}
 
-	NODE<T, C, F>(ParentNode *p, T v, size_t column) : m_child(p), m_value(v), m_column(column) {}
 };
 
 
@@ -101,6 +91,7 @@ public:
 					s = a - 1;
 			}
 		}
+		return end;
 	}
 
 	OR_NODE(ParentNode *p1, ParentNode *p2, ParentNode *c) : m_cond1(p1), m_cond2(p2), m_child(c) {};
