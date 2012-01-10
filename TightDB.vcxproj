@@ -190,6 +190,7 @@
     <ClCompile Include="src\ctightdb.cpp" />
     <ClCompile Include="src\Group.cpp" />
     <ClCompile Include="src\Index.cpp" />
+    <ClCompile Include="src\TestQuery.cpp" />
     <ClCompile Include="src\utilities.cpp">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
     </ClCompile>
@@ -228,6 +229,8 @@
     <ClInclude Include="src\ctightdb.h" />
     <ClInclude Include="src\Group.h" />
     <ClInclude Include="src\Index.h" />
+    <ClInclude Include="src\query\QueryInterface.h" />
+    <ClInclude Include="src\query\QueryEngine.h" />
     <ClInclude Include="src\Table.h" />
     <ClInclude Include="src\tightdb.h" />
     <ClInclude Include="src\utilities.h" />

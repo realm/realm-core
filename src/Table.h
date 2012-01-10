@@ -141,6 +141,9 @@ public:
 	MemStats Stats() const;
 #endif //_DEBUG
 
+	ColumnBase& GetColumnBase(size_t ndx);
+	const ColumnBase& GetColumnBase(size_t ndx) const;
+
 protected:
 	friend class Group;
 	friend class ColumnTable;
@@ -156,9 +159,6 @@ protected:
 	// Serialization
 	template<class S> size_t Write(S& out, size_t& pos) const;
 	static Table LoadFromFile(const char* path);
-
-	ColumnBase& GetColumnBase(size_t ndx);
-	const ColumnBase& GetColumnBase(size_t ndx) const;
 
 	// Specification
 	ColumnType GetRealColumnType(size_t ndx) const;
