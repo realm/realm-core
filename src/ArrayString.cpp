@@ -26,7 +26,11 @@ size_t round_up(size_t len) {
 ArrayString::ArrayString(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
 }
 
-ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc) {
+ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(alloc) {
+	// Manually create array as doing it in initializer list
+	// will not be able to call correct virtual functions
+	Create(ref);
+	SetParent((Array*)parent, pndx);
 }
 
 // Creates new array (but invalid, call UpdateRef to init)
