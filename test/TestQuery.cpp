@@ -25,13 +25,6 @@ TEST(TestQueryFindAll1) {
 	TableView tv2 = q2.FindAll(ttt);
 	CHECK_EQUAL(5, tv2.GetRef(0));
 	CHECK_EQUAL(6, tv2.GetRef(1));
-
-
-/*
-	Query q2 = ttt.Query.second.Equal("a").first.Greater(2).first.NotEqual(4);
-	TableView tv2 = q2.FindAll(ttt);
-	CHECK_EQUAL(4, tv2.GetRef(0));
-*/
 }
 
 TEST(TestQueryFindAll2) {

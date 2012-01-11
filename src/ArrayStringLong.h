@@ -5,8 +5,8 @@
 
 class ArrayStringLong : public Array {
 public:
-	ArrayStringLong(Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	ArrayStringLong(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
+	ArrayStringLong(Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ArrayStringLong(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	//ArrayStringLong(Allocator& alloc);
 	~ArrayStringLong();
 
@@ -24,7 +24,7 @@ public:
 	void Clear();
 
 	size_t Find(const char* value, size_t start=0 , size_t end=-1) const;
-	void FindAll(Column &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+	void FindAll(Array &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
 	template<class S> size_t Write(S& out, size_t& pos) const;
 

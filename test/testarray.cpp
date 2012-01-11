@@ -434,7 +434,7 @@ TEST(Array_Sort) {
 
 TEST(findallint0){
 	Array a;
-	Column r;
+	Array r;
 
 	const int value = 0;
 	const int vReps = 5;
@@ -461,7 +461,7 @@ TEST(findallint0){
 
 TEST(findallint1){
 	Array a;
-	Column r;
+	Array r;
 
 	const int value = 1;
 	const int vReps = 5;
@@ -491,7 +491,7 @@ TEST(findallint1){
 
 TEST(findallint2){
 	Array a;
-	Column r;
+	Array r;
 
 	const int value = 3;
 	const int vReps = 5;
@@ -521,7 +521,7 @@ TEST(findallint2){
 
 TEST(findallint3){
 	Array a;
-	Column r;
+	Array r;
 
 	const int value = 10;
 	const int vReps = 5;
@@ -551,7 +551,7 @@ TEST(findallint3){
 
 TEST(findallint4){
 	Array a;
-	Column r;
+	Array r;
 
 	const int value = 20;
 	const int vReps = 5;
@@ -582,7 +582,7 @@ TEST(findallint4){
 
 TEST(findallint5){
 	Array a;
-	Column r;
+	Array r;
 
 	const int value = 303;
 	const int vReps = 5;
@@ -613,7 +613,7 @@ TEST(findallint5){
 
 TEST(findallint6){
 	Array a;
-	Column r;
+	Array r;
 
 	const int value = 70000;
 	const int vReps = 5;
@@ -644,7 +644,7 @@ TEST(findallint6){
 
 TEST(findallint7){
 	Array a;
-	Column r;
+	Array r;
 
 	const int64_t value = 4300000003ULL;
 	const int vReps = 5;
@@ -676,7 +676,7 @@ TEST(findallint7){
 void hasZeroByte(int64_t value, size_t reps)
 {
 	Array a;
-	Column r;
+	Array r;
 
 	for(size_t i = 0; i < reps - 1; i++){
 		a.Add(value);

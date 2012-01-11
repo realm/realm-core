@@ -47,7 +47,7 @@ private:
 
 class Table {
 public:
-	Table(Allocator& alloc=DefaultAllocator);
+	Table(Allocator& alloc=GetDefaultAllocator());
 	Table(const Table& t);
 	~Table();
 
@@ -121,8 +121,9 @@ public:
 	size_t FindString(size_t column_id, const char* value) const;
 	size_t FindDate(size_t column_id, time_t value) const;
 	void FindAll(TableView& tv, size_t column_id, int64_t value);
-	void FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max);
+	void FindAllBool(TableView& tv, size_t column_id, bool value);
 	void FindAllString(TableView& tv, size_t column_id, const char *value);
+	void FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max);
 
 	// Indexing
 	bool HasIndex(size_t column_id) const;
@@ -185,7 +186,7 @@ private:
 
 class TopLevelTable : public Table {
 public:
-	TopLevelTable(Allocator& alloc=DefaultAllocator);
+	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
 	~TopLevelTable();
 
 	void UpdateFromSpec(size_t ref_specSet);
@@ -224,7 +225,7 @@ public:
 	~TableView();
 
 	Table& GetParent() {return m_table;}
-	Column& GetRefColumn() {return m_refs;}
+	Array& GetRefColumn() {return m_refs;}
 	size_t GetRef(size_t ndx) const {return m_refs.Get(ndx);}
 
 	bool IsEmpty() const {return m_refs.IsEmpty();}
@@ -260,7 +261,7 @@ private:
 	TableView& operator=(const TableView&) {return *this;}
 
 	Table& m_table;
-	Column m_refs;
+	Array m_refs;
 };
 
 

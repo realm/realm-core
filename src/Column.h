@@ -61,7 +61,7 @@ protected:
 	template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
 	template<typename T, class C> void TreeDelete(size_t ndx);
 	template<typename T, class C> size_t TreeFind(T value, size_t start, size_t end) const;
-	template<typename T, class C> void TreeFindAll(Column &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+	template<typename T, class C> void TreeFindAll(Array &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
 	template<typename T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T &arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const;
 
@@ -87,9 +87,9 @@ class Column : public ColumnBase {
 public:
 	Column(Allocator& alloc);
 	Column(ColumnDef type, Allocator& alloc);
-	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	Column(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
+	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	Column(const Column& column);
 	~Column();
 
@@ -126,10 +126,10 @@ public:
 
 	bool Increment64(int64_t value, size_t start=0, size_t end=-1);
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
-	void FindAll(Column& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
-	void FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset=0) const;
+	void FindAll(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
+	void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 	size_t FindPos(int64_t value) const;
-	void LeafFindAll(Column &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
+	void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
 
 	// Index
 	bool HasIndex() const {return m_index != NULL;}

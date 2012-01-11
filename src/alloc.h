@@ -30,6 +30,6 @@ public:
 #endif //_DEBUG
 };
 
-static Allocator DefaultAllocator;
+Allocator& GetDefaultAllocator();
 
 #endif //__TDB_ALLOC__

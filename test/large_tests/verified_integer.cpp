@@ -130,7 +130,7 @@ void VerifiedInteger::Set(size_t ndx, int64_t value) {
 }
 
 // todo/fixme, end ignored
-void VerifiedInteger::FindAll(Column &c, int64_t value, size_t start, size_t end) {
+void VerifiedInteger::FindAll(Array &c, int64_t value, size_t start, size_t end) {
 	std::vector<int64_t>::iterator ita = v.begin() + start;
 	std::vector<int64_t>::iterator itb = end == -1 ? v.end() : v.begin() + (end == -1 ? v.size() : end);;
 	std::vector<size_t> result;

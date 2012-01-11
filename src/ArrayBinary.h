@@ -5,8 +5,8 @@
 
 class ArrayBinary : public Array {
 public:
-	ArrayBinary(Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	ArrayBinary(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
+	ArrayBinary(Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ArrayBinary(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	//ArrayBinary(Allocator& alloc);
 	~ArrayBinary();
 

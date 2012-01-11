@@ -19,6 +19,10 @@
 #include <stdio.h>
 #endif //_DEBUG
 
+Allocator& GetDefaultAllocator() {
+	static Allocator DefaultAllocator;
+	return DefaultAllocator;
+}
 
 // Pre-declare local functions
 size_t GetSizeFromHeader(void* p);

@@ -878,6 +878,15 @@ void Table::FindAll(TableView& tv, size_t column_id, int64_t value) {
 	column.FindAll(tv.GetRefColumn(), value);
 }
 
+void Table::FindAllBool(TableView& tv, size_t column_id, bool value) {
+	assert(column_id < m_columns.Size());
+	assert(&tv.GetParent() == this);
+
+	const Column& column = GetColumn(column_id);
+
+	column.FindAll(tv.GetRefColumn(), value ? 1 :0);
+}
+
 void Table::FindAllString(TableView& tv, size_t column_id, const char *value) {
 	assert(column_id < m_columns.Size());
 	assert(&tv.GetParent() == this);

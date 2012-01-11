@@ -20,7 +20,7 @@ Array::Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc)
 }
 
 Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+: m_data(NULL), m_len(0), m_capacity(0), m_width(-1), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 
@@ -30,7 +30,7 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
 Array::Array(Allocator& alloc)
-: m_ref(0), m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
+: m_ref(0), m_data(NULL), m_len(0), m_capacity(0), m_width(-1), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
 }
 
 // Copy-constructor
@@ -39,6 +39,7 @@ Array::Array(Allocator& alloc)
 Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc) {
 	const size_t ref = src.GetRef();
 	Create(ref);
+	src.Invalidate();
 }
 
 // Header format (8 bytes):
@@ -110,7 +111,10 @@ void Array::Create(size_t ref) {
 	m_hasRefs  = get_header_hasrefs(header);
 	m_width    = get_header_width(header);
 	m_len      = get_header_len(header);
-	m_capacity = get_header_capacity(header);
+	const size_t byte_capacity = get_header_capacity(header);
+
+	// Capacity is how many items there are room for
+	m_capacity = CalcItemCount(byte_capacity, m_width);
 
 	m_ref = ref;
 	m_data = header + 8;
@@ -221,7 +225,8 @@ void Array::Clear() {
 	}
 
 	// Truncate size to zero (but keep capacity)
-	m_len = 0;
+	m_len      = 0;
+	m_capacity = CalcItemCount(get_header_capacity(), 0);
 	SetWidth(0);
 
 	// Update header
@@ -338,8 +343,26 @@ bool Array::Set(size_t ndx, int64_t value) {
 	return true;
 }
 
+// Optimization for the common case of adding
+// positive values to a local array (happens a
+// lot when returning results to TableViews)
+bool Array::AddPositiveLocal(int64_t value) {
+	assert(value >= 0);
+	assert(&m_alloc == &GetDefaultAllocator());
+
+	if (value <= m_ubound) {
+		if (m_len < m_capacity) {
+			(this->*m_setter)(m_len, value);
+			++m_len;
+			set_header_len(m_len);
+			return true;
+		}
+	}
+
+	return Insert(m_len, value);
+}
+
 bool Array::Insert(size_t ndx, int64_t value) {
-	// todo, maybe Set() can be used instead of (this->*m_setter), to reduce/simplify this function alot
 	assert(ndx <= m_len);
 
 	// Check if we need to copy before modifying
@@ -720,7 +743,7 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 	return (size_t)-1; // not found
 }
 
-void Array::FindAll(Column& result, int64_t value, size_t colOffset,
+void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 					size_t start, size_t end) const {
 	if (IsEmpty()) return;
 	if (end == (size_t)-1) end = m_len;
@@ -736,7 +759,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 	// Do optimized search based on column width
 	if (m_width == 0) {
 		for(size_t i = start; i < end; i++){
-			result.Add(i + colOffset); // All values can only be zero.
+			result.AddPositiveLocal(i + colOffset); // All values can only be zero.
 		}
 	}
 	else if (m_width == 2) {
@@ -755,14 +778,13 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 			if (hasZeroByte){
 				// Element number at start of block
 				size_t i = (p - (const int64_t*)m_data) * 32;
-				// Last element of block
-				size_t j = i + 32;
+				const size_t j = i + 32; // Last element of block
 
 				// check block
 				while (i < j) {
 					const size_t offset = i >> 2;
 					const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
-					if (v == value) result.Add(i + colOffset);
+					if (v == value) result.AddPositiveLocal(i + colOffset);
 					++i;
 				}
 			}
@@ -774,7 +796,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 
 		// Manually check the rest
 		while (i < end) {
-			if (Get(i) == value) result.Add(i + colOffset);
+			if (Get(i) == value) result.AddPositiveLocal(i + colOffset);
 			++i;
 		}
 	}
@@ -794,14 +816,13 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 			if (hasZeroByte){
 				// Element number at start of block
 				size_t i = (p - (const int64_t*)m_data) * 16;
-				// Last element of block
-				size_t j = i + 16;
+				const size_t j = i + 16; // Last element of block
 
 				// check block
 				while (i < j) {
 					const size_t offset = i >> 1;
 					const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
-					if (v == value) result.Add(i + colOffset);
+					if (v == value) result.AddPositiveLocal(i + colOffset);
 					++i;
 				}
 			}
@@ -813,7 +834,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 
 		// Manually check the rest
 		while (i < end) {
-			if (Get(i) == value) result.Add(i + colOffset);
+			if (Get(i) == value) result.AddPositiveLocal(i + colOffset);
 			++i;
 		}
 	}
@@ -835,14 +856,12 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 			if (hasZeroByte){
 				// Element number at start of block
 				size_t i = (p - (const int64_t*)m_data) * 8;
-				// Last element of block
-				size_t j = i + 8;
-				// Data pointer
-				const int8_t* d = (const int8_t*)m_data;
+				const size_t j = i + 8; // Last element of block
+				const int8_t* const d = (const int8_t*)m_data; // Data pointer
 
 				// check block
 				while (i < j) {
-					if (value == d[i]) result.Add(i + colOffset);
+					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
 					++i;
 				}
 			}
@@ -853,7 +872,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 		size_t i = (p - (const int64_t*)m_data) * 8;
 		// Manually check the rest
 		while (i < end) {
-			if (value == Get(i)) result.Add(i + colOffset);
+			if (value == Get(i)) result.AddPositiveLocal(i + colOffset);
 			++i;
 		}
 	}
@@ -873,14 +892,12 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 			if (hasZeroByte){
 				// Element number at start of block
 				size_t i = (p - (const int64_t*)m_data) * 4;
-				// Last element of block
-				size_t j = i + 4;
-				// Data pointer
-				const int16_t* d = (const int16_t*)m_data;
+				const size_t j = i + 4; // Last element of block
+				const int16_t* const d = (const int16_t*)m_data; // Data pointer
 
 				// check block
 				while (i < j) {
-					if (value == d[i]) result.Add(i + colOffset);
+					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
 					++i;
 				}
 			}
@@ -892,7 +909,8 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == Get(i)) result.Add(i + colOffset);
+			if (value == Get(i))
+				result.AddPositiveLocal(i + colOffset);
 			++i;
 		}
 	}
@@ -910,16 +928,13 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2
 											 & 0x8000800080000000UL;
 			if (hasZeroByte){
-				// Element number at start of block
-				size_t i = (p - (const int64_t*)m_data) * 2;
-				// Last element of block
-				size_t j = i + 2;
-				// Data pointer
-				const int32_t* d = (const int32_t*)m_data;
+				size_t i = (p - (const int64_t*)m_data) * 2;     // Element number at start of block
+				const size_t j = i + 2;                          // Last element of block
+				const int32_t* const d = (const int32_t*)m_data; // Data pointer
 
 				// check block
 				while (i < j) {
-					if (value == d[i]) result.Add(i + colOffset);
+					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
 					++i;
 				}
 			}
@@ -931,7 +946,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 
 		// Manually check the rest
 		while (i < end) {
-			if (value == Get(i)) result.Add(i + colOffset);
+			if (value == Get(i)) result.AddPositiveLocal(i + colOffset);
 			++i;
 		}
 	}
@@ -940,7 +955,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 		const int64_t* p = (const int64_t*)m_data + start;
 		const int64_t* const e = (const int64_t*)m_data + end;
 		while (p < e) {
-			if (*p == v) result.Add((p - (const int64_t*)m_data) + colOffset);
+			if (*p == v) result.AddPositiveLocal((p - (const int64_t*)m_data) + colOffset);
 			++p;
 		}
 	}
@@ -948,7 +963,7 @@ void Array::FindAll(Column& result, int64_t value, size_t colOffset,
 		// Naive search
 		for (size_t i = start; i < end; ++i) {
 			const int64_t v = (this->*m_getter)(i);
-			if (v == value) result.Add(i + colOffset);
+			if (v == value) result.AddPositiveLocal(i + colOffset);
 		}
 	}
 }
@@ -1085,7 +1100,7 @@ int64_t Array::Sum(size_t start, size_t end) const {
 }
 
 
-void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_t offset) const {
+void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const {
 	// Only implemented for 64bit values
 	if (m_width != 64) {
 		assert(false);
@@ -1118,7 +1133,7 @@ void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_
 
 		if (x < maxdist) {
 			const size_t pos = p - (const uint64_t*)m_data;
-			result.Add(offset + pos);
+			result.AddPositiveLocal(offset + pos);
 		}
 
 		++p;
@@ -1126,27 +1141,18 @@ void Array::FindAllHamming(Column& result, uint64_t value, size_t maxdist, size_
 }
 
 size_t Array::CalcByteLen(size_t count, size_t width) const {
-	size_t len = 8; // always need room for header
-	switch (width) {
-	case 0:
-		break;
-	case 1:
-		len += count >> 3;
-		if (count & 0x07) ++len;
-		break;
-	case 2:
-		len += count >> 2;
-		if (count & 0x03) ++len;
-		break;
-	case 4:
-		len += count >> 1;
-		if (count & 0x01) ++len;
-		break;
-	default:
-		assert(width == 8 || width == 16 || width == 32 || width == 64);
-		len += count * (width >> 3);
-	}
-	return len;
+	const size_t bits = (count * width);
+	size_t bytes = (bits / 8) + 8; // add room for 8 byte header
+	if (bits & 0x7) ++bytes;       // include partial bytes
+	return bytes;
+}
+
+size_t Array::CalcItemCount(size_t bytes, size_t width) const {
+	if (width == 0) return (size_t)-1; // zero width gives infinite space
+
+	const size_t bytes_data = bytes - 8; // ignore 8 byte header
+	const size_t total_bits = bytes_data * 8;
+	return total_bits / width;
 }
 
 bool Array::CopyOnWrite() {
@@ -1166,7 +1172,7 @@ bool Array::CopyOnWrite() {
 	// Update internal data
 	m_ref = mref.ref;
 	m_data = (unsigned char*)mref.pointer + 8;
-	m_capacity = new_len;
+	m_capacity = CalcItemCount(new_len, m_width);
 
 	// Update capacity in header
 	set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
@@ -1178,39 +1184,49 @@ bool Array::CopyOnWrite() {
 }
 
 bool Array::Alloc(size_t count, size_t width) {
-	// Calculate size in bytes
-	const size_t len = CalcByteLen(count, width);
+	if (count > m_capacity || width != m_width) {
+		const size_t len      = CalcByteLen(count, width);              // bytes needed
+		const size_t capacity = m_capacity ? get_header_capacity() : 0; // bytes currently available
+		size_t new_capacity   = capacity;
 
-	if (len > m_capacity) {
-		// Double to avoid too many reallocs
-		size_t new_capacity = m_capacity ? m_capacity * 2 : 128;
-		if (new_capacity < len) {
-			const size_t rest = (~len & 0x7)+1;
-			new_capacity = len;
-			if (rest < 8) new_capacity += rest; // 64bit align
+		if (len > capacity) {
+			// Double to avoid too many reallocs
+			new_capacity = capacity ? capacity * 2 : 128;
+			if (new_capacity < len) {
+				const size_t rest = (~len & 0x7)+1;
+				new_capacity = len;
+				if (rest < 8) new_capacity += rest; // 64bit align
+			}
+
+			// Allocate the space
+			MemRef mref;
+			if (m_data) mref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
+			else mref = m_alloc.Alloc(new_capacity);
+
+			if (!mref.pointer) return false;
+
+			const bool isFirst = (capacity == 0);
+			m_ref = mref.ref;
+			m_data = (unsigned char*)mref.pointer + 8;
+
+			// Create header
+			if (isFirst) {
+				set_header_isnode(m_isNode);
+				set_header_hasrefs(m_hasRefs);
+				set_header_width(width);
+			}
+			set_header_capacity(new_capacity);
+
+			// Update ref in parent
+			if (m_parent) m_parent->Set(m_parentNdx, mref.ref); //TODO: ref
 		}
 
-		// Allocate the space
-		MemRef mref;
-		if (m_data) mref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
-		else mref = m_alloc.Alloc(new_capacity);
-
-		if (!mref.pointer) return false;
-
-		m_ref = mref.ref;
-		m_data = (unsigned char*)mref.pointer + 8;
-		m_capacity = new_capacity;
-
-		// Update ref in parent
-		if (m_parent) m_parent->Set(m_parentNdx, mref.ref); //TODO: ref
+		m_capacity = CalcItemCount(new_capacity, width);
+		set_header_width(width);
 	}
 
 	// Update header
-	set_header_isnode(m_isNode);
-	set_header_hasrefs(m_hasRefs);
-	set_header_width(width);
 	set_header_len(count);
-	set_header_capacity(m_capacity);
 
 	return true;
 }

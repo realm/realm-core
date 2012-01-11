@@ -12,6 +12,11 @@ struct db_setup {
 
 Column db_setup::c;
 
+TEST_FIXTURE(db_setup, Column_IsEmpty) {
+	CHECK(c.IsEmpty());
+	CHECK_EQUAL(c.Size(), (size_t)0);
+}
+
 TEST_FIXTURE(db_setup, Column_Add0) {
 	c.Add(0);
 	CHECK_EQUAL(c.Get(0), 0);
@@ -401,7 +406,7 @@ TEST(Column_Sort) {
 
 TEST(Column_FindAll_IntMin){
 	Column c;
-	Column r;
+	Array r;
 
 	const int value = 0;
 	const int vReps = 5;
@@ -428,7 +433,7 @@ TEST(Column_FindAll_IntMin){
 
 TEST(Column_FindAll_IntMax){
 	Column c;
-	Column r;
+	Array r;
 
 	const int64_t value = 4300000003ULL;
 	const int vReps = 5;
@@ -464,7 +469,7 @@ TEST(Column_FindHamming) {
 		col.Add(0x3333333333333333LL);
 	}
 
-	Column res;
+	Array res;
 	col.FindAllHamming(res, 0x3333333333333332LL, 2);
 
 	CHECK_EQUAL(10, res.Size()); // Half should match

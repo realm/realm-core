@@ -23,7 +23,7 @@ public:
 	void Delete(size_t ndx);
 	void Clear();
 	size_t Find(const char *value);
-	void FindAll(Column &c, const char *value, size_t start = 0, size_t end = -1);
+	void FindAll(Array &c, const char *value, size_t start = 0, size_t end = -1);
 	size_t Size(void);
 	bool Verify(void);
 	bool ConditionalVerify(void);

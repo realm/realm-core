@@ -5,8 +5,8 @@
 
 class ColumnStringEnum {
 public:
-	ColumnStringEnum(size_t ref_keys, size_t ref_values, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	ColumnStringEnum(size_t ref_keys, size_t ref_values, const Array* parent, size_t pndx, Allocator& alloc=DefaultAllocator);
+	ColumnStringEnum(size_t ref_keys, size_t ref_values, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ColumnStringEnum(size_t ref_keys, size_t ref_values, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	~ColumnStringEnum();
 	void Destroy();
 
@@ -21,7 +21,7 @@ public:
 	void Clear();
 
 	size_t Find(const char* value, size_t start=0, size_t end=-1) const;
-	void FindAll(Column &res, const char* value, size_t start=0, size_t end=-1) const;
+	void FindAll(Array &res, const char* value, size_t start=0, size_t end=-1) const;
 
 	void UpdateParentNdx(int diff);
 

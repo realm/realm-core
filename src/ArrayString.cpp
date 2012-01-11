@@ -26,7 +26,11 @@ size_t round_up(size_t len) {
 ArrayString::ArrayString(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
 }
 
-ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc) {
+ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(alloc) {
+	// Manually create array as doing it in initializer list
+	// will not be able to call correct virtual functions
+	Create(ref);
+	SetParent((Array*)parent, pndx);
 }
 
 // Creates new array (but invalid, call UpdateRef to init)
@@ -65,8 +69,8 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 	// Make room for the new value
 	if (width > m_width) {
 		const size_t oldwidth = m_width;
+		if (!Alloc(m_len, width)) return false;
 		m_width = width;
-		if (!Alloc(m_len, m_width)) return false;
 
 		// Expand the old values
 		int k = (int)m_len;
@@ -123,8 +127,8 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
 	// Make room for the new value
 	const size_t oldwidth = m_width;
+	if (!Alloc(m_len+1, doExpand ? width : m_width)) return false;
 	if (doExpand) m_width = width;
-	if (!Alloc(m_len+1, m_width)) return false;
 
 	// Move values below insertion (may expand)
 	if (doExpand) {
@@ -152,10 +156,12 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
 	// Set the value
 	char* data = (char*)m_data + (ndx * m_width);
+	memcpy(data, value, len);
+
+	// Pad with zeroes
 	char* const end = data + m_width;
-	memmove(data, value, len);
 	for (data += len; data < end; ++data) {
-		*data = '\0'; // pad with zeroes
+		*data = '\0';
 	}
 
 	// Expand values above insertion
@@ -202,12 +208,19 @@ size_t ArrayString::CalcByteLen(size_t count, size_t width) const {
 	return 8 + (count * width);
 }
 
+size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const {
+	if (width == 0) return (size_t)-1; // zero-width gives infinite space
+
+	const size_t bytes_without_header = bytes - 8;
+	return bytes_without_header / width;
+}
+
 size_t ArrayString::Find(const char* value, size_t start, size_t end) const {
 	assert(value);
 	return FindWithLen(value, strlen(value), start, end);
 }
 
-void ArrayString::FindAll(Column& result, const char* value, size_t add_offset, size_t start, size_t end) {
+void ArrayString::FindAll(Array& result, const char* value, size_t add_offset, size_t start, size_t end) {
 	assert(value);
 
 	const size_t len = strlen(value);

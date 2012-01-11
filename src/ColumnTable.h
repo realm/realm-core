@@ -7,8 +7,8 @@ class Table;
 
 class ColumnTable {
 public:
-	ColumnTable(size_t ref_specSet, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
-	ColumnTable(size_t ref_column, size_t ref_specSet, Array* parent=NULL, size_t pndx=0, Allocator& alloc=DefaultAllocator);
+	ColumnTable(size_t ref_specSet, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ColumnTable(size_t ref_column, size_t ref_specSet, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 
 	size_t Size() const {return m_table_refs.Size();}
 	bool IsEmpty() const {return m_table_refs.IsEmpty();}

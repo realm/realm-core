@@ -114,7 +114,7 @@ public:
 			return r;
 	}
 
-//protected:
+protected:
 	friend class XQueryAccessorInt;
 	friend class XQueryAccessorString;
 	ParentNode *m_parent_node;

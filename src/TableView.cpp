@@ -1,5 +1,5 @@
 #include "Table.h"
-#include "column.h"
+#include "Column.h"
 #include <assert.h>
 
 TableView::TableView(Table& source) : m_table(source) {

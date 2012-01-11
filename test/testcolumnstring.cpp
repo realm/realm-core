@@ -395,7 +395,7 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2) {
 // Test against a bug where FindWithLen() would fail finding ajacent hits
 TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent) {
 	c.Clear();
-	Column col;
+	Array col;
 
 	c.Add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
 	c.Add("baz");
@@ -413,7 +413,7 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent) {
 TEST(AdaptiveStringColumnFindAllExpand) {
 
 	AdaptiveStringColumn asc;
-	Column c;
+	Array c;
 
 	asc.Add("HEJ");
 	asc.Add("sdfsd");
@@ -456,7 +456,7 @@ TEST(AdaptiveStringColumnFindAllExpand) {
 // FindAll using ranges, when expanded ArrayStringLong
 TEST(AdaptiveStringColumnFindAllRangesLong) {
 	AdaptiveStringColumn asc;
-	Column c;
+	Array c;
 
 	// 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
 	asc.Add("HEJSA"); // 0
@@ -509,7 +509,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong) {
 // FindAll using ranges, when not expanded (using ArrayString)
 TEST(AdaptiveStringColumnFindAllRanges) {
 	AdaptiveStringColumn asc;
-	Column c;
+	Array c;
 
 	// 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
 	asc.Add("HEJSA"); // 0
