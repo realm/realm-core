@@ -71,9 +71,7 @@ template <class F> class STRINGNODE : public NODE<const char *, AdaptiveStringCo
 public:
 	STRINGNODE(ParentNode *p, const char *v, size_t column) : NODE<const char *, AdaptiveStringColumn, F>(p, v, column) {}
 	~STRINGNODE() {
-		void *p;
-		p = (void *)NODE<const char*,AdaptiveStringColumn,F>::m_value;
-		free(p);
+		free((void *)(NODE<const char*,AdaptiveStringColumn,F>::m_value));
 	}
 };
 
