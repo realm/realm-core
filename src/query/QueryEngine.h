@@ -67,6 +67,7 @@ protected:
 	size_t m_column;
 };
 
+
 template <class F> class STRINGNODE : public NODE<const char *, AdaptiveStringColumn, F> {
 public:
 	STRINGNODE(ParentNode *p, const char *v, size_t column) : NODE<const char *, AdaptiveStringColumn, F>(p, v, column) {}

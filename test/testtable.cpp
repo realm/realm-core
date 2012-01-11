@@ -162,12 +162,12 @@ TEST(Table6) {
 	TestTableEnum table;
 
 	TDB_QUERY(TestQuery, TestTableEnum) {
-		first.between(Mon, Thu);
+	//	first.between(Mon, Thu);
 		second == "Hello" || (second == "Hey" && first == Mon);
 	}};
 
 	TDB_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
-		first.between(a, b);
+		//first.between(a, b);
 		second == str || second.MatchRegEx(".*");
 	}};
 
