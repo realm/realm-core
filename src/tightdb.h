@@ -105,6 +105,7 @@ public:\
 	TestQuery() : CName1(0), CName2(1) {\
 		CName1.SetQuery(this);\
 		CName2.SetQuery(this);\
+		m_parent_node = 0; \
 	}\
 	class TestQueryQueryAccessorInt : private XQueryAccessorInt {\
 	public:\
@@ -132,7 +133,7 @@ public:\
 	TestQuery& RightParan(void) {m_RightParan(); return *this;}; \
 };\
 \
-		TestQuery Query; \
+	TestQuery *Query () {return new TestQuery();}; \
 	\
 	\
 	class Cursor : public CursorBase { \

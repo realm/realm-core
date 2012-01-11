@@ -31,6 +31,7 @@ struct GREATEREQUAL {
 
 class ParentNode { 
 public:
+	virtual ~ParentNode() {}
 	virtual size_t Find(size_t start, size_t end, const Table& table) = 0;
 	ParentNode *m_child;
 };
@@ -41,6 +42,11 @@ public:
 	ParentNode *m_child;
 	T m_value;
 	size_t m_column;
+
+	~NODE() {
+		if(m_child != NULL)
+			delete m_child;
+	}
 
 	NODE<T, C, F>(ParentNode *p, T v, size_t column) : m_child(p), m_value(v), m_column(column) {}
 	size_t Find(size_t start, size_t end, const Table& table) {
@@ -71,6 +77,13 @@ public:
 	ParentNode *m_cond1;
 	ParentNode *m_cond2;
 	ParentNode *m_child;
+	
+	~OR_NODE() {
+		delete m_cond1;
+		delete m_cond2;
+		if(m_child != NULL)
+			delete m_child;
+	}
 
 	size_t Find(size_t start, size_t end, const Table& table) {
 		size_t f1, f2;

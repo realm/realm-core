@@ -9,8 +9,15 @@
 #include <stdio.h>
 
 class Query {
-
 public:
+	Query() : m_parent_node(0) {}
+
+	~Query() {
+		if(m_parent_node != NULL)
+			delete m_parent_node;
+		m_parent_node = 0;
+	}
+
 	Query& Equal(size_t column_id, int64_t value) {
 		ParentNode *p = new NODE<int64_t, Column, EQUAL>(m_parent_node, value, column_id);
 		m_parent_node = p;
@@ -77,8 +84,6 @@ public:
 		m_OrOperator.pop_back();
 		m_Left.pop_back();
 	};
-
-	Query() : m_parent_node(0) {}
 
 	TableView FindAll(Table& table, size_t start = 0, size_t end = -1) {
 		TableView tv(table);
