@@ -10,6 +10,12 @@
 
 class Query {
 public:
+
+	Query(Query& copy) {
+		m_parent_node = copy.m_parent_node;
+		copy.m_parent_node = 0;
+	}
+
 	Query() : m_parent_node(0) {}
 
 	~Query() {

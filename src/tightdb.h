@@ -133,7 +133,7 @@ public:\
 	TestQuery& RightParan(void) {m_RightParan(); return *this;}; \
 };\
 \
-	TestQuery *Query () {return new TestQuery();}; \
+	TestQuery Query () {return TestQuery();}; \
 	\
 	\
 	class Cursor : public CursorBase { \
