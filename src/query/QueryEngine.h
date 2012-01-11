@@ -1,5 +1,5 @@
 #include <string>
-#include "table.h"
+#include "Table.h"
 
 
 struct EQUAL { 
