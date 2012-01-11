@@ -49,6 +49,10 @@
 		36E608A1145AEE7300CCC3E8 /* ColumnBinary.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E608A0145AEE7200CCC3E8 /* ColumnBinary.h */; };
 		36E608A3145AEE9000CCC3E8 /* ColumnBinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E608A2145AEE9000CCC3E8 /* ColumnBinary.cpp */; };
 		36E608A5145B006E00CCC3E8 /* testcolumnbinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E608A4145B006E00CCC3E8 /* testcolumnbinary.cpp */; };
+		36FD6F3614BDC61A009E0003 /* TestQuery.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36FD6F3414BDC61A009E0003 /* TestQuery.cpp */; };
+		36FD6F3714BDC61A009E0003 /* testTableView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36FD6F3514BDC61A009E0003 /* testTableView.cpp */; };
+		36FD6F3B14BDC965009E0003 /* QueryEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 36FD6F3914BDC965009E0003 /* QueryEngine.h */; };
+		36FD6F3C14BDC965009E0003 /* QueryInterface.h in Headers */ = {isa = PBXBuildFile; fileRef = 36FD6F3A14BDC965009E0003 /* QueryInterface.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -230,6 +234,10 @@
 		36E608A0145AEE7200CCC3E8 /* ColumnBinary.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ColumnBinary.h; sourceTree = "<group>"; };
 		36E608A2145AEE9000CCC3E8 /* ColumnBinary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ColumnBinary.cpp; sourceTree = "<group>"; };
 		36E608A4145B006E00CCC3E8 /* testcolumnbinary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testcolumnbinary.cpp; sourceTree = "<group>"; };
+		36FD6F3414BDC61A009E0003 /* TestQuery.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TestQuery.cpp; sourceTree = "<group>"; };
+		36FD6F3514BDC61A009E0003 /* testTableView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testTableView.cpp; sourceTree = "<group>"; };
+		36FD6F3914BDC965009E0003 /* QueryEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = QueryEngine.h; path = query/QueryEngine.h; sourceTree = "<group>"; };
+		36FD6F3A14BDC965009E0003 /* QueryInterface.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = QueryInterface.h; path = query/QueryInterface.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -309,6 +317,8 @@
 				3647DEFB14209C1200D56FD7 /* Table.h */,
 				3647DEFC14209C1200D56FD7 /* TableView.cpp */,
 				3647DEFD14209C1200D56FD7 /* tightdb.h */,
+				36FD6F3914BDC965009E0003 /* QueryEngine.h */,
+				36FD6F3A14BDC965009E0003 /* QueryInterface.h */,
 				3647DEFE14209C1200D56FD7 /* win32 */,
 			);
 			path = src;
@@ -344,6 +354,8 @@
 				368063361445AD9200283774 /* testgroup.cpp */,
 				3647E04D14209CE600D56FD7 /* testindex.cpp */,
 				3647E04E14209CE600D56FD7 /* testtable.cpp */,
+				36FD6F3414BDC61A009E0003 /* TestQuery.cpp */,
+				36FD6F3514BDC61A009E0003 /* testTableView.cpp */,
 				3647E04F14209CE600D56FD7 /* UnitTest++ */,
 			);
 			path = test;
@@ -557,6 +569,8 @@
 				360F1A37146BF71500EBB9C6 /* ColumnString.h in Headers */,
 				363141F714751E8000ADD5AC /* ColumnStringEnum.h in Headers */,
 				36E4755C14877FB9009FB135 /* ColumnTable.h in Headers */,
+				36FD6F3B14BDC965009E0003 /* QueryEngine.h in Headers */,
+				36FD6F3C14BDC965009E0003 /* QueryInterface.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -685,6 +699,8 @@
 				36E60899145AB43600CCC3E8 /* testcolumnstring.cpp in Sources */,
 				36E6089F145AE7DD00CCC3E8 /* testearraybinary.cpp in Sources */,
 				36E608A5145B006E00CCC3E8 /* testcolumnbinary.cpp in Sources */,
+				36FD6F3614BDC61A009E0003 /* TestQuery.cpp in Sources */,
+				36FD6F3714BDC61A009E0003 /* testTableView.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

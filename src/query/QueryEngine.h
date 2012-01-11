@@ -37,14 +37,9 @@ public:
 
 
 template <class T, class C, class F> class NODE : public ParentNode {
-private:
-	size_t m_column;
-	ParentNode* m_child;
-protected:
-	T m_value;
 public:
-	~NODE() {if(m_child != NULL) delete m_child; }
-	NODE<T, C, F>(ParentNode *p, T v, size_t column) : m_child(p), m_value(v), m_column(column) {}
+	NODE(ParentNode *p, T v, size_t column) : m_child(p), m_value(v), m_column(column) {}
+	~NODE() {delete m_child; }
 
 	size_t Find(size_t start, size_t end, const Table& table) {
 		const C& column = (C&)(table.GetColumnBase(m_column));
@@ -65,28 +60,28 @@ public:
 		}
 		return end;
 	}
+
+protected:
+	ParentNode* m_child;
+	T m_value;
+	size_t m_column;
 };
 
 template <class F> class STRINGNODE : public NODE<const char *, AdaptiveStringColumn, F> {
 public:
-	STRINGNODE<F>(ParentNode *p, const char *v, size_t column) : NODE(p, v, column) {}
-	~STRINGNODE<F>() {free((void *)m_value);}
+	STRINGNODE(ParentNode *p, const char *v, size_t column) : NODE<const char *, AdaptiveStringColumn, F>(p, v, column) {}
+	~STRINGNODE() {free((void *)NODE<const char*,AdaptiveStringColumn,F>::m_value);}
 };
 
 
 class OR_NODE : public ParentNode {
-private:
-	ParentNode *m_cond1;
-	ParentNode *m_cond2;
-	ParentNode *m_child;
 public:
+	OR_NODE(ParentNode* p1, ParentNode* p2, ParentNode* c) : m_cond1(p1), m_cond2(p2), m_child(c) {};
 	~OR_NODE() {
 		delete m_cond1;
 		delete m_cond2;
-		if(m_child != NULL)
-			delete m_child;
+		delete m_child;
 	}
-	OR_NODE(ParentNode* p1, ParentNode* p2, ParentNode* c) : m_cond1(p1), m_cond2(p2), m_child(c) {};
 
 	size_t Find(size_t start, size_t end, const Table& table) {
 		for (size_t s = start; s < end; ++s) {
@@ -107,4 +102,9 @@ public:
 		}
 		return end;
 	}
+
+protected:
+	ParentNode* m_cond1;
+	ParentNode* m_cond2;
+	ParentNode* m_child;
 };

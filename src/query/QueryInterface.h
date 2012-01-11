@@ -91,6 +91,11 @@ public:
 
 	TableView FindAll(Table& table, size_t start = 0, size_t end = -1) {
 		TableView tv(table);
+		FindAll(table, tv, start, end);
+		return tv;
+	}
+
+	void FindAll(Table& table, TableView& tv, size_t start = 0, size_t end = -1) {
 		size_t r = start - 1;
 		if(end == -1)
 			end = table.GetSize();
@@ -100,7 +105,6 @@ public:
 				break;
 			tv.GetRefColumn().Add(r);
 		}
-		return tv;
 	}
 
 	size_t Find(Table& table, size_t start, size_t end = -1) {
@@ -117,7 +121,8 @@ public:
 protected:
 	friend class XQueryAccessorInt;
 	friend class XQueryAccessorString;
-	ParentNode *m_parent_node;
+
+	ParentNode* m_parent_node;
 	std::vector<ParentNode *> m_Left;
 	std::vector<ParentNode *> m_OrOperator;
 	std::vector<ParentNode *> m_Right;
