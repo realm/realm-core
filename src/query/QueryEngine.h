@@ -43,12 +43,10 @@ public:
 	T m_value;
 	size_t m_column;
 
-	~NODE() {
-		if(m_child != NULL)
-			delete m_child;
-	}
+	~NODE() {if(m_child != NULL) delete m_child; }
 
 	NODE<T, C, F>(ParentNode *p, T v, size_t column) : m_child(p), m_value(v), m_column(column) {}
+
 	size_t Find(size_t start, size_t end, const Table& table) {
 		const C& column = (C&)(table.GetColumnBase(m_column));
 		F function;
@@ -68,7 +66,13 @@ public:
 		}
 		return end;
 	}
+};
 
+
+template <class F> class STRINGNODE : public NODE<const char *, AdaptiveStringColumn, F> {
+public:
+	STRINGNODE<F>(ParentNode *p, const char *v, size_t column) : NODE(p, v, column) {}
+	~STRINGNODE<F>() {free((void *)m_value);}
 };
 
 

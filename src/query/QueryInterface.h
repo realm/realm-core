@@ -49,12 +49,16 @@ public:
 		return *this;
 	};
 	Query& Equal(size_t column_id, const char *value) {
-		ParentNode *p = new NODE<const char *, AdaptiveStringColumn, EQUAL>(m_parent_node, value, column_id);
+		char *copy = (char *)malloc(strlen(value) + 1);
+		memcpy(copy, value, strlen(value) + 1);
+		ParentNode *p = new STRINGNODE<EQUAL>(m_parent_node, (const char *)copy, column_id);
 		m_parent_node = p;
 		return *this;
 	};
 	Query& NotEqual(size_t column_id, const char * value) {
-		ParentNode *p = new NODE<const char *, AdaptiveStringColumn, NOTEQUAL>(m_parent_node, value, column_id);
+		char *copy = (char *)malloc(strlen(value) + 1);
+		memcpy(copy, value, strlen(value) + 1);
+		ParentNode *p = new STRINGNODE<NOTEQUAL>(m_parent_node, (const char *)copy, column_id);
 		m_parent_node = p;
 		return *this;
 	};
