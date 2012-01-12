@@ -1,6 +1,15 @@
 #include <string>
 #include "table.h"
 
+// does v2 contain v1?
+struct CONTAINS { 
+	bool operator()(const char *v1, const char *v2) const { return(strstr(v1, v2) != 0); }
+};
+
+// is v2 a prefix of v1?
+struct BEGINSWITH { 
+	bool operator()(const char *v1, const char *v2) const { return(strstr(v1, v2) == v1); }
+};
 
 struct EQUAL { 
 	bool operator()(const char *v1, const char *v2) const { return strcmp(v1, v2) == 0; }

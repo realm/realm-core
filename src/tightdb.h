@@ -131,6 +131,8 @@ public:\
 		\
 		TestQuery& Equal(const char *value) {return (TestQuery &)XQueryAccessorString::Equal(value);}\
 		TestQuery& NotEqual(const char *value) {return (TestQuery &)XQueryAccessorString::NotEqual(value);}\
+		TestQuery& BeginsWith(const char *value) {return (TestQuery &)XQueryAccessorString::BeginsWith(value);}\
+		TestQuery& Contains(const char *value) {return (TestQuery &)XQueryAccessorString::Contains(value);}\
 	};\
 	class TestQueryQueryAccessorBool : private XQueryAccessorBool {\
 	public:\

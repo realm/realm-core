@@ -138,3 +138,36 @@ TEST(TestQueryFindAll_Bool) {
 	CHECK_EQUAL(3, tv2.GetRef(1));
 }
 
+TEST(TestQueryFindAll_Begins) {
+	TupleTableType ttt;
+
+	ttt.Add(0, "fo");
+	ttt.Add(0, "foo");
+	ttt.Add(0, "foobar");
+
+	Query q1 = ttt.Query().second.BeginsWith("foo");
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(1, tv1.GetRef(0));
+}
+
+TEST(TestQueryFindAll_Contains) {
+	TupleTableType ttt;
+
+	ttt.Add(0, "foo");
+	ttt.Add(0, "foobar");
+	ttt.Add(0, "barfoo");
+	ttt.Add(0, "barfoobaz");
+	ttt.Add(0, "fo");
+	ttt.Add(0, "fobar");
+	ttt.Add(0, "barfo");
+
+	Query q1 = ttt.Query().second.Contains("foo");
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(4, tv1.GetSize());
+	CHECK_EQUAL(0, tv1.GetRef(0));
+	CHECK_EQUAL(1, tv1.GetRef(1));
+	CHECK_EQUAL(2, tv1.GetRef(2));
+	CHECK_EQUAL(3, tv1.GetRef(3));
+}
+
