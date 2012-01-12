@@ -77,6 +77,40 @@ protected:
 };
 
 
+template <class T, class C> class NODE <T, C, EQUAL>: public ParentNode {
+public:
+	NODE(ParentNode *p, T v, size_t column) : m_child(p), m_value(v), m_column(column) {}
+	~NODE() {delete m_child; }
+
+	size_t Find(size_t start, size_t end, const Table& table) {
+		const C& column = (C&)(table.GetColumnBase(m_column));
+		for (size_t s = start; s < end; ++s) {
+			s = column.Find(m_value, s, end);
+			if(s == -1) 
+				s = end;
+
+			if (m_child == 0)
+				return s;
+			else {
+				const size_t a = m_child->Find(s, end, table);
+				if (s == a)
+					return s;
+				else
+					s = a - 1;
+			}
+			
+		}
+		return end;
+	}
+
+protected:
+	ParentNode* m_child;
+	T m_value;
+	size_t m_column;
+};
+
+
+
 template <class F> class STRINGNODE : public NODE<const char *, AdaptiveStringColumn, F> {
 public:
 	STRINGNODE(ParentNode *p, const char *v, size_t column) : NODE<const char *, AdaptiveStringColumn, F>(p, v, column) {}

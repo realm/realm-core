@@ -9,6 +9,41 @@ TDB_TABLE_2(BoolTupleTable,
 	Int, first,
 	Bool, second)
 
+TEST(TestQuerySimple) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+
+	Query q1 = ttt.Query().first.Equal(2);
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(1, tv1.GetRef(0));
+}
+
+TEST(TestQuerySimple2) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+
+	Query q1 = ttt.Query().first.Equal(2);
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(3, tv1.GetSize());
+	CHECK_EQUAL(1, tv1.GetRef(0));
+	CHECK_EQUAL(4, tv1.GetRef(1));
+	CHECK_EQUAL(7, tv1.GetRef(2));
+}
+
+
 TEST(TestQueryFindAll1) {
 	TupleTableType ttt;
 
