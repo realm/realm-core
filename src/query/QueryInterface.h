@@ -94,6 +94,8 @@ public:
 		return *this;
 	};
 
+//	ColumnStringEnum
+
 	void m_LeftParan(void) {
 		m_Left.push_back(m_parent_node);
 		m_parent_node = 0;

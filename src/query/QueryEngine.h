@@ -111,12 +111,43 @@ protected:
 
 
 
-template <class F> class STRINGNODE : public NODE<const char *, AdaptiveStringColumn, F> {
+template <class F> class STRINGNODE : public ParentNode {
 public:
-	STRINGNODE(ParentNode *p, const char *v, size_t column) : NODE<const char *, AdaptiveStringColumn, F>(p, v, column) {}
-	~STRINGNODE() {
-		free((void *)(NODE<const char*,AdaptiveStringColumn,F>::m_value));
+	STRINGNODE(ParentNode *p, const char* v, size_t column) : m_child(p), m_value(v), m_column(column) {}
+	~STRINGNODE() {delete m_child; free((void*)m_value);}
+
+	size_t Find(size_t start, size_t end, const Table& table) {
+		int column_type = table.GetRealColumnType(m_column);
+
+		const F function = {};
+		for (size_t s = start; s < end; ++s) {
+			const char* t;
+
+			// todo, can be optimized by placing outside loop
+			if (column_type == COLUMN_TYPE_STRING)
+				t = table.GetColumnString(m_column).Get(s);
+			else
+				t = table.GetColumnStringEnum(m_column).Get(s);
+
+			if (function(t, m_value)) {
+				if (m_child == 0)
+					return s;
+				else {
+					const size_t a = m_child->Find(s, end, table);
+					if (s == a)
+						return s;
+					else
+						s = a - 1;
+				}
+			}
+		}
+		return end;
 	}
+
+protected:
+	ParentNode* m_child;
+	const char* m_value;
+	size_t m_column;
 };
 
 

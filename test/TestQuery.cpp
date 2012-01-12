@@ -206,3 +206,26 @@ TEST(TestQueryFindAll_Contains) {
 	CHECK_EQUAL(3, tv1.GetRef(3));
 }
 
+TEST(TestQueryEnums) {
+	TupleTableType table;
+
+	for (size_t i = 0; i < 5; ++i) {
+		table.Add(1, "abd");
+		table.Add(2, "eftg");
+		table.Add(5, "hijkl");
+		table.Add(8, "mnopqr");
+		table.Add(9, "stuvxyz");
+	}
+
+	table.Optimize();
+
+	Query q1 = table.Query().second.Equal("eftg");
+	TableView tv1 = q1.FindAll(table);
+
+	CHECK_EQUAL(5, tv1.GetSize());
+	CHECK_EQUAL(1, tv1.GetRef(0));
+	CHECK_EQUAL(6, tv1.GetRef(1));
+	CHECK_EQUAL(11, tv1.GetRef(2));
+	CHECK_EQUAL(16, tv1.GetRef(3));
+	CHECK_EQUAL(21, tv1.GetRef(4));
+}

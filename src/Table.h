@@ -141,8 +141,10 @@ public:
 	MemStats Stats() const;
 #endif //_DEBUG
 
+	// todo, note, these three functions have been protected
 	ColumnBase& GetColumnBase(size_t ndx);
 	const ColumnBase& GetColumnBase(size_t ndx) const;
+	ColumnType GetRealColumnType(size_t ndx) const;
 
 protected:
 	friend class Group;
@@ -161,7 +163,6 @@ protected:
 	static Table LoadFromFile(const char* path);
 
 	// Specification
-	ColumnType GetRealColumnType(size_t ndx) const;
 	size_t GetColumnRefPos(size_t column_ndx) const;
 	void UpdateColumnRefs(size_t column_ndx, int diff);
 
