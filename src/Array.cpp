@@ -614,6 +614,7 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 32;
+		if(i < start) i = start;
 
 		// Manually check the rest
 		while (i < end) {
@@ -639,6 +640,7 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 16;
+		if(i < start) i = start;
 
 		// Manually check the rest
 		while (i < end) {
@@ -666,6 +668,7 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 8;
+		if(i < start) i = start;
 
 		// Manually check the rest
 		while (i < end) {
@@ -691,6 +694,7 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 		
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 4;
+		if(i < start) i = start;
 
 		// Manually check the rest
 		while (i < end) {
@@ -716,6 +720,7 @@ size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
 		
 		// Position of last chunk (may be partial)
 		size_t i = (p - (const int64_t*)m_data) * 2;
+		if(i < start) i = start;
 
 		// Manually check the rest
 		while (i < end) {

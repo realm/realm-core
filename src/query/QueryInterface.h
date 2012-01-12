@@ -10,6 +10,12 @@
 
 class Query {
 public:
+
+	Query(Query& copy) {
+		m_parent_node = copy.m_parent_node;
+		copy.m_parent_node = 0;
+	}
+
 	Query() : m_parent_node(0) {}
 
 	~Query() {
@@ -55,6 +61,20 @@ public:
 		m_parent_node = p;
 		return *this;
 	};
+	Query& BeginsWith(size_t column_id, const char *value) {
+		char *copy = (char *)malloc(strlen(value) + 1);
+		memcpy(copy, value, strlen(value) + 1);
+		ParentNode *p = new STRINGNODE<BEGINSWITH>(m_parent_node, (const char *)copy, column_id);
+		m_parent_node = p;
+		return *this;
+	};
+	Query& Contains(size_t column_id, const char *value) {
+		char *copy = (char *)malloc(strlen(value) + 1);
+		memcpy(copy, value, strlen(value) + 1);
+		ParentNode *p = new STRINGNODE<CONTAINS>(m_parent_node, (const char *)copy, column_id);
+		m_parent_node = p;
+		return *this;
+	};
 	Query& NotEqual(size_t column_id, const char * value) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
@@ -65,6 +85,11 @@ public:
 	Query& Between(size_t column_id, int64_t from, int64_t to) {
 		ParentNode *p = new NODE<int64_t, Column, GREATEREQUAL>(m_parent_node, from, column_id);
 		p = new NODE<int64_t, Column, LESSEQUAL>(p, to, column_id);
+		m_parent_node = p;
+		return *this;
+	};
+	Query& Equal(size_t column_id, bool value) {
+		ParentNode *p = new NODE<bool, Column, EQUAL>(m_parent_node, value, column_id);
 		m_parent_node = p;
 		return *this;
 	};
@@ -147,7 +172,18 @@ class XQueryAccessorString {
 public:
 	XQueryAccessorString(size_t column_id) : m_column_id(column_id) {}
 	Query& Equal(const char *value) {return m_query->Equal(m_column_id, value);}
+	Query& BeginsWith(const char *value) {return m_query->Equal(m_column_id, value);}
+	Query& Contains(const char *value) {return m_query->Contains(m_column_id, value);}
 	Query& NotEqual(const char *value) {return m_query->NotEqual(m_column_id, value);}
+protected:
+	Query* m_query;
+	size_t m_column_id;
+};
+
+class XQueryAccessorBool {
+public:
+	XQueryAccessorBool(size_t column_id) : m_column_id(column_id) {}
+	Query& Equal(bool value) {return m_query->Equal(m_column_id, value);}
 protected:
 	Query* m_query;
 	size_t m_column_id;

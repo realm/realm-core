@@ -118,6 +118,12 @@ public:\
 		TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);}\
 		TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);}\
 	};\
+	\
+	template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt {\
+	public:\
+		TestQueryQueryAccessorEnum<T>(size_t column_id) : TestQueryQueryAccessorInt(column_id) {}\
+	}; \
+		\
 	class TestQueryQueryAccessorString : private XQueryAccessorString {\
 	public:\
 		TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {}\
@@ -125,15 +131,24 @@ public:\
 		\
 		TestQuery& Equal(const char *value) {return (TestQuery &)XQueryAccessorString::Equal(value);}\
 		TestQuery& NotEqual(const char *value) {return (TestQuery &)XQueryAccessorString::NotEqual(value);}\
+		TestQuery& BeginsWith(const char *value) {return (TestQuery &)XQueryAccessorString::BeginsWith(value);}\
+		TestQuery& Contains(const char *value) {return (TestQuery &)XQueryAccessorString::Contains(value);}\
 	};\
-	TestQueryQueryAccessorInt CName1;\
-	TestQueryQueryAccessorString CName2;\
+	class TestQueryQueryAccessorBool : private XQueryAccessorBool {\
+	public:\
+		TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {}\
+		void SetQuery(Query* query) {m_query = query;}\
+		\
+		TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);}\
+	};\
+	TestQueryQueryAccessor##CType1 CName1;\
+	TestQueryQueryAccessor##CType2 CName2;\
 	TestQuery& LeftParan(void) {m_LeftParan(); return *this;}; \
 	TestQuery& Or(void) {m_Or(); return *this;}; \
 	TestQuery& RightParan(void) {m_RightParan(); return *this;}; \
 };\
 \
-	TestQuery *Query () {return new TestQuery();}; \
+	TestQuery Query () {return TestQuery();}; \
 	\
 	\
 	class Cursor : public CursorBase { \

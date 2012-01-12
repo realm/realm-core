@@ -148,9 +148,9 @@ void AdaptiveStringColumn::Delete(size_t ndx) {
 	TreeDelete<const char*, AdaptiveStringColumn>(ndx);
 }
 
-size_t AdaptiveStringColumn::Find(const char* value, size_t, size_t) const {
+size_t AdaptiveStringColumn::Find(const char* value, size_t start, size_t end) const {
 	assert(value);
-	return TreeFind<const char*, AdaptiveStringColumn>(value, 0, -1);
+	return TreeFind<const char*, AdaptiveStringColumn>(value, start, end);
 }
 
 void AdaptiveStringColumn::FindAll(Array &result, const char* value, size_t start, size_t end) const {
