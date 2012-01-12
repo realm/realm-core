@@ -1,5 +1,5 @@
 #include <string>
-#include "table.h"
+#include "Table.h"
 
 // does v2 contain v1?
 struct CONTAINS { 

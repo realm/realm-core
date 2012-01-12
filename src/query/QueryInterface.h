@@ -10,13 +10,11 @@
 
 class Query {
 public:
-
-	Query(Query& copy) {
+	Query() : m_parent_node(0) {}
+	Query(const Query& copy) {
 		m_parent_node = copy.m_parent_node;
 		copy.m_parent_node = 0;
 	}
-
-	Query() : m_parent_node(0) {}
 
 	~Query() {
 		if(m_parent_node != NULL)
@@ -149,7 +147,7 @@ protected:
 	friend class XQueryAccessorInt;
 	friend class XQueryAccessorString;
 
-	ParentNode* m_parent_node;
+	mutable ParentNode* m_parent_node;
 	std::vector<ParentNode *> m_Left;
 	std::vector<ParentNode *> m_OrOperator;
 	std::vector<ParentNode *> m_Right;
