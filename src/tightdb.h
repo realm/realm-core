@@ -132,6 +132,13 @@ public:\
 		TestQuery& Equal(const char *value) {return (TestQuery &)XQueryAccessorString::Equal(value);}\
 		TestQuery& NotEqual(const char *value) {return (TestQuery &)XQueryAccessorString::NotEqual(value);}\
 	};\
+	class TestQueryQueryAccessorBool : private XQueryAccessorBool {\
+	public:\
+		TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {}\
+		void SetQuery(Query* query) {m_query = query;}\
+		\
+		TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);}\
+	};\
 	TestQueryQueryAccessor##CType1 CName1;\
 	TestQueryQueryAccessor##CType2 CName2;\
 	TestQuery& LeftParan(void) {m_LeftParan(); return *this;}; \

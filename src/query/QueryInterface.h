@@ -74,6 +74,11 @@ public:
 		m_parent_node = p;
 		return *this;
 	};
+	Query& Equal(size_t column_id, bool value) {
+		ParentNode *p = new NODE<bool, Column, EQUAL>(m_parent_node, value, column_id);
+		m_parent_node = p;
+		return *this;
+	};
 
 	void m_LeftParan(void) {
 		m_Left.push_back(m_parent_node);
@@ -154,6 +159,15 @@ public:
 	XQueryAccessorString(size_t column_id) : m_column_id(column_id) {}
 	Query& Equal(const char *value) {return m_query->Equal(m_column_id, value);}
 	Query& NotEqual(const char *value) {return m_query->NotEqual(m_column_id, value);}
+protected:
+	Query* m_query;
+	size_t m_column_id;
+};
+
+class XQueryAccessorBool {
+public:
+	XQueryAccessorBool(size_t column_id) : m_column_id(column_id) {}
+	Query& Equal(bool value) {return m_query->Equal(m_column_id, value);}
 protected:
 	Query* m_query;
 	size_t m_column_id;
