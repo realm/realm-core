@@ -105,8 +105,11 @@ public:\
 	TestQuery() : CName1(0), CName2(1) {\
 		CName1.SetQuery(this);\
 		CName2.SetQuery(this);\
-		m_parent_node = 0; \
 	}\
+	TestQuery(const TestQuery& copy) : Query(copy), CName1(0), CName2(1) { \
+		CName1.SetQuery(this);\
+		CName2.SetQuery(this);\
+	} \
 	class TestQueryQueryAccessorInt : private XQueryAccessorInt {\
 	public:\
 		TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {}\
@@ -148,7 +151,7 @@ public:\
 	TestQuery& RightParan(void) {m_RightParan(); return *this;}; \
 };\
 \
-	TestQuery Query () {return TestQuery();}; \
+	TestQuery Query() {return TestQuery();} \
 	\
 	\
 	class Cursor : public CursorBase { \
