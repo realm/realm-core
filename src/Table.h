@@ -244,6 +244,9 @@ public:
 	void SetDate(size_t column_id, size_t ndx, time_t value);
 	void SetString(size_t column_id, size_t ndx, const char* value);
 
+	// Sub-tables
+	Table* GetTablePtr(size_t column_id, size_t ndx);
+
 	// Finding
 	size_t Find(size_t column_id, int64_t value) const;
 	void FindAll(TableView& tv, size_t column_id, int64_t value);

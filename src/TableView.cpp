@@ -133,6 +133,15 @@ const char* TableView::GetString(size_t column_id, size_t ndx) const {
 	return m_table.GetString(column_id, real_ndx);
 }
 
+Table* TableView::GetTablePtr(size_t column_id, size_t ndx) {
+	assert(column_id < m_table.GetColumnCount());
+	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_TABLE);
+	assert(ndx < m_refs.Size());
+
+	const size_t real_ndx = m_refs.Get(ndx);
+	return m_table.GetTablePtr(column_id, real_ndx);
+}
+
 void TableView::Set(size_t column_id, size_t ndx, int64_t value) {
 	assert(column_id < m_table.GetColumnCount());
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);
