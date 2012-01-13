@@ -52,28 +52,28 @@ public:
 		m_parent_node = p;
 		return *this;
 	};
-	Query& Equal(size_t column_id, const char *value) {
+	Query& Equal(size_t column_id, const char *value, bool CaseSensitive) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
 		ParentNode *p = new STRINGNODE<EQUAL>(m_parent_node, (const char *)copy, column_id);
 		m_parent_node = p;
 		return *this;
 	};
-	Query& BeginsWith(size_t column_id, const char *value) {
+	Query& BeginsWith(size_t column_id, const char *value, bool CaseSensitive) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
 		ParentNode *p = new STRINGNODE<BEGINSWITH>(m_parent_node, (const char *)copy, column_id);
 		m_parent_node = p;
 		return *this;
 	};
-	Query& Contains(size_t column_id, const char *value) {
+	Query& Contains(size_t column_id, const char *value, bool CaseSensitive) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
 		ParentNode *p = new STRINGNODE<CONTAINS>(m_parent_node, (const char *)copy, column_id);
 		m_parent_node = p;
 		return *this;
 	};
-	Query& NotEqual(size_t column_id, const char * value) {
+	Query& NotEqual(size_t column_id, const char * value, bool CaseSensitive) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
 		ParentNode *p = new STRINGNODE<NOTEQUAL>(m_parent_node, (const char *)copy, column_id);
@@ -91,8 +91,6 @@ public:
 		m_parent_node = p;
 		return *this;
 	};
-
-//	ColumnStringEnum
 
 	void m_LeftParan(void) {
 		m_Left.push_back(m_parent_node);
@@ -171,10 +169,10 @@ protected:
 class XQueryAccessorString {
 public:
 	XQueryAccessorString(size_t column_id) : m_column_id(column_id) {}
-	Query& Equal(const char *value) {return m_query->Equal(m_column_id, value);}
-	Query& BeginsWith(const char *value) {return m_query->Equal(m_column_id, value);}
-	Query& Contains(const char *value) {return m_query->Contains(m_column_id, value);}
-	Query& NotEqual(const char *value) {return m_query->NotEqual(m_column_id, value);}
+	Query& Equal(const char *value, bool CaseSensitive) {return m_query->Equal(m_column_id, value, CaseSensitive);}
+	Query& BeginsWith(const char *value, bool CaseSensitive) {return m_query->Equal(m_column_id, value, CaseSensitive);}
+	Query& Contains(const char *value, bool CaseSensitive) {return m_query->Contains(m_column_id, value, CaseSensitive);}
+	Query& NotEqual(const char *value, bool CaseSensitive) {return m_query->NotEqual(m_column_id, value, CaseSensitive);}
 protected:
 	Query* m_query;
 	size_t m_column_id;

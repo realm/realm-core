@@ -4,6 +4,17 @@
 	#include "win32\types.h"
 #endif
 
+/*
+		const static std::locale& loc = std::locale(); 
+
+		wchar_t a, w = L'Å';
+
+		a = std::tolower(w, loc);
+		
+		return strcmp(v1, v2) == 0; 
+*/
+
+
 void *round_up(void *p, size_t align)
 {
 	size_t r = ((size_t)p % align == 0 ? 0 : align - (size_t)p % align);

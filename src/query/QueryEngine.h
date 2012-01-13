@@ -1,7 +1,7 @@
 #include <string>
-#include "Table.h"
+#include "table.h"
 
-// does v2 contain v1?
+// does v1 contain v2?
 struct CONTAINS { 
 	bool operator()(const char *v1, const char *v2) const { return(strstr(v1, v2) != 0); }
 };
