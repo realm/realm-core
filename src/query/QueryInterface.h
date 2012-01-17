@@ -116,7 +116,6 @@ public:
 		return *this;
 	};
 
-
 	void m_LeftParan(void) {
 		update.push_back(0);
 		update_override.push_back(0);
@@ -127,17 +126,20 @@ public:
 		ParentNode *o = new OR_NODE(first[first.size()-1]);
 		first[first.size()-1] = o;
 		update[update.size()-1] = &((OR_NODE*)o)->m_cond2;
-		update_override[update_override.size()-1] = &((OR_NODE*)o)->m_cond2;
+		update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
 	};
 
 	void m_RightParan(void) {
-		if(update_override[update_override.size()-2] != 0)
-			*update_override[update_override.size()-2] = first[first.size()-1]; 
-		else if (update[update.size()-2] != 0)
-			 *update[update.size()-2] = first[first.size()-1];
+		if (update[update.size()-2] != 0)
+			*update[update.size()-2] = first[first.size()-1];
 			
 		if(first[first.size()-2] == 0)
 			first[first.size()-2] = first[first.size()-1];
+
+		if(update_override[update_override.size()-1] != 0)
+			update[update.size() - 2] = update_override[update_override.size()-1];
+		else if(update[update.size()-1] != 0)
+			update[update.size() - 2] = update[update.size()-1];
 
 		first.pop_back();
 		update.pop_back();

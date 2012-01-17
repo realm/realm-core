@@ -1,4 +1,5 @@
-﻿#include "utilities.h"
+
+#include "utilities.h"
 #include <string>
 
 #ifdef _MSC_VER
@@ -20,22 +21,23 @@
 
 
 
-int case_strcmp(const char *ucase_needle, const char *lcase_needle, char *needle_utf8_lens, const char *haystack, bool case_sensitive = true) {
-	size_t needle = 0;
+bool case_strstr(const char *ucase_needle, const char *lcase_needle, size_t *char_lens, const char *haystack, bool case_sensitive = true) {
+	size_t needle_ptr;
+	size_t haystack_ptr;
+	size_t matchlen;
 
-	if(haystack[needle] == ucase_needle[needle] || haystack[needle] == ucase_needle[needle]) {
-		
+	for(;;) {
+
+		if(ucase_needle[needle_ptr] == haystack[haystack_ptr + matchlen] || lcase_needle[needle_ptr] == haystack[haystack_ptr + matchlen])
+			matchlen++;
+
 	}
-	else
-		needle = 0;
 
-	while (ucase_needle[needle] != 0)
-
-	return 0;
+	return false;
 }
 
 
-int case_strstr(const char *upper, const char *lower, char *charlens, const char *haystack, bool case_sensitive = true) {
+int case_stcmp(const char *upper, const char *lower, char *charlens, const char *haystack, bool case_sensitive = true) {
 	
 	return 0;
 }

@@ -191,6 +191,26 @@ TEST(TestQueryFindAll_OrParan) {
 }
 
 
+TEST(TestQueryFindAll_OrNested0) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+	ttt.Add(3, "X"); 
+	ttt.Add(4, "a");
+	ttt.Add(5, "a");
+	ttt.Add(11, "X");
+	ttt.Add(8, "Y");
+	
+	// first > 3 && (first == 5 || second == X)
+	Query q1 = ttt.GetQuery().first.Greater(3).LeftParan().first.Equal(5).Or().second.Equal("X").RightParan();
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(2, tv1.GetSize());
+	CHECK_EQUAL(5, tv1.GetRef(0));
+	CHECK_EQUAL(6, tv1.GetRef(1));
+}
+
 TEST(TestQueryFindAll_OrNested) {
 	TupleTableType ttt;
 
@@ -210,6 +230,21 @@ TEST(TestQueryFindAll_OrNested) {
 	CHECK_EQUAL(6, tv1.GetRef(1));
 	CHECK_EQUAL(7, tv1.GetRef(2));
 }
+
+TEST(TestQueryFindAll_OrPHP) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "Joe");
+	ttt.Add(2, "Sara");
+	ttt.Add(3, "Jim");
+
+	// (second == Jim || second == Joe) && first = 1
+	Query q1 = ttt.GetQuery().LeftParan().second.Equal("Jim").Or().second.Equal("Joe").RightParan().first.Equal(1);
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(0, tv1.GetRef(0));
+}
+
+
 
 TEST(TestQueryFindAll_Parans2) {
 	TupleTableType ttt;
