@@ -14,12 +14,12 @@ struct BEGINSWITH {
 // does v1 end with s2?
 struct ENDSWITH { 
 	bool operator()(const char *v1, const char *v2) const { 
-		size_t l1 = strlen(v1);
-		size_t l2 = strlen(v2);
-		if(l1 < l2)
+		const size_t l1 = strlen(v1);
+		const size_t l2 = strlen(v2);
+		if (l1 < l2)
 			return false;
 
-		return(strcmp(v1 + l1 - l2, v2) == 0); 
+		return (strcmp(v1 + l1 - l2, v2) == 0); 
 	}
 };
 

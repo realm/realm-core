@@ -64,35 +64,35 @@ public:
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
-	Query& Equal(size_t column_id, const char *value, bool CaseSensitive=true) {
+	Query& Equal(size_t column_id, const char *value, bool caseSensitive=true) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
 		ParentNode* const p = new STRINGNODE<EQUAL>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
-	Query& BeginsWith(size_t column_id, const char *value, bool CaseSensitive=true) {
+	Query& BeginsWith(size_t column_id, const char *value, bool caseSensitive=true) {
 		char* const copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
 		ParentNode* const p = new STRINGNODE<BEGINSWITH>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
-	Query& EndsWith(size_t column_id, const char *value, bool CaseSensitive=true) {
+	Query& EndsWith(size_t column_id, const char *value, bool caseSensitive=true) {
 		char* const copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
 		ParentNode* const p = new STRINGNODE<ENDSWITH>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
-	Query& Contains(size_t column_id, const char *value, bool CaseSensitive=true) {
+	Query& Contains(size_t column_id, const char *value, bool caseSensitive=true) {
 		char* const copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
 		ParentNode* const p = new STRINGNODE<CONTAINS>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
-	Query& NotEqual(size_t column_id, const char * value, bool CaseSensitive=true) {
+	Query& NotEqual(size_t column_id, const char * value, bool caseSensitive=true) {
 		char* const copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
 		ParentNode* const p = new STRINGNODE<NOTEQUAL>((const char *)copy, column_id);
