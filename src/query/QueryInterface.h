@@ -45,71 +45,73 @@ public:
 	}
 
 	Query& Equal(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, EQUAL>(0, value, column_id);
+		ParentNode *p = new NODE<int64_t, Column, EQUAL>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& NotEqual(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, NOTEQUAL>(0, value, column_id);
+		ParentNode *p = new NODE<int64_t, Column, NOTEQUAL>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Greater(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, GREATER>(0, value, column_id);
+		ParentNode *p = new NODE<int64_t, Column, GREATER>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& GreaterEqual(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, GREATEREQUAL>(0, value, column_id);
+		ParentNode *p = new NODE<int64_t, Column, GREATEREQUAL>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& LessEqual(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, LESSEQUAL>(0, value, column_id);
+		ParentNode *p = new NODE<int64_t, Column, LESSEQUAL>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Less(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, LESS>(0, value, column_id);
+		ParentNode *p = new NODE<int64_t, Column, LESS>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Equal(size_t column_id, const char *value, bool CaseSensitive) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
-		ParentNode *p = new STRINGNODE<EQUAL>(0, (const char *)copy, column_id);
+		ParentNode *p = new STRINGNODE<EQUAL>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& BeginsWith(size_t column_id, const char *value, bool CaseSensitive) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
-		ParentNode *p = new STRINGNODE<BEGINSWITH>(0, (const char *)copy, column_id);
+		ParentNode *p = new STRINGNODE<BEGINSWITH>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Contains(size_t column_id, const char *value, bool CaseSensitive) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
-		ParentNode *p = new STRINGNODE<CONTAINS>(0, (const char *)copy, column_id);
+		ParentNode *p = new STRINGNODE<CONTAINS>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& NotEqual(size_t column_id, const char * value, bool CaseSensitive) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
-		ParentNode *p = new STRINGNODE<NOTEQUAL>(0, (const char *)copy, column_id);
+		ParentNode *p = new STRINGNODE<NOTEQUAL>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Between(size_t column_id, int64_t from, int64_t to) {
-		ParentNode *p = new NODE<int64_t, Column, GREATEREQUAL>(0, from, column_id);
-		p = new NODE<int64_t, Column, LESSEQUAL>(p, to, column_id);
+		ParentNode *p = new NODE<int64_t, Column, GREATEREQUAL>(from, column_id);
+		ParentNode *p2 = p;
+		p = new NODE<int64_t, Column, LESSEQUAL>(to, column_id);
+		p->m_child = p2;
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Equal(size_t column_id, bool value) {
-		ParentNode *p = new NODE<bool, Column, EQUAL>(0, value, column_id);
+		ParentNode *p = new NODE<bool, Column, EQUAL>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
@@ -122,7 +124,7 @@ public:
 	};
 
 	void m_Or(void) {
-		ParentNode *o = new OR_NODE(first[first.size()-1], 0, 0);
+		ParentNode *o = new OR_NODE(first[first.size()-1]);
 		first[first.size()-1] = o;
 		update[update.size()-1] = &((OR_NODE*)o)->m_cond2;
 		update_override[update_override.size()-1] = &((OR_NODE*)o)->m_cond2;

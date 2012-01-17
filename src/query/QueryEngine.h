@@ -48,7 +48,7 @@ public:
 
 template <class T, class C, class F> class NODE : public ParentNode {
 public:
-	NODE(ParentNode *p, T v, size_t column) : m_value(v), m_column(column)  {m_child = p;}
+	NODE(T v, size_t column) : m_value(v), m_column(column)  {m_child = 0;}
 	~NODE() {delete m_child; }
 
 	size_t Find(size_t start, size_t end, const Table& table) {
@@ -79,7 +79,7 @@ protected:
 
 template <class T, class C> class NODE <T, C, EQUAL>: public ParentNode {
 public:
-	NODE(ParentNode *p, T v, size_t column) : m_value(v), m_column(column) {m_child = p;}
+	NODE(T v, size_t column) : m_value(v), m_column(column) {m_child = 0;}
 	~NODE() {delete m_child; }
 
 	size_t Find(size_t start, size_t end, const Table& table) {
@@ -112,7 +112,7 @@ protected:
 
 template <class F> class STRINGNODE : public ParentNode {
 public:
-	STRINGNODE(ParentNode *p, const char* v, size_t column) : m_value(v), m_column(column) {m_child = p;}
+	STRINGNODE(const char* v, size_t column) : m_value(v), m_column(column) {m_child = 0;}
 	~STRINGNODE() {delete m_child; free((void*)m_value);}
 
 	size_t Find(size_t start, size_t end, const Table& table) {
@@ -151,7 +151,7 @@ protected:
 
 class OR_NODE : public ParentNode {
 public:
-	OR_NODE(ParentNode* p1, ParentNode* p2, ParentNode* c) {m_child = c; m_cond1 = p1; m_cond2 = p2;};
+	OR_NODE(ParentNode* p1) {m_child = 0; m_cond1 = p1; m_cond2 = 0;};
 	~OR_NODE() {
 		delete m_cond1;
 		delete m_cond2;
