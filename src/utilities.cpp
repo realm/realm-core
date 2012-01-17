@@ -1,8 +1,44 @@
 #include "utilities.h"
+#include <string>
 
 #ifdef _MSC_VER
 	#include "win32\types.h"
 #endif
+
+
+
+/*
+		const static std::locale& loc = std::locale(); 
+
+		wchar_t a, w = L'Å';
+
+		a = std::tolower(w, loc);
+		
+		return strcmp(v1, v2) == 0; 
+*/
+
+
+
+
+int case_strcmp(const char *ucase_needle, const char *lcase_needle, char *needle_utf8_lens, const char *haystack, bool case_sensitive = true) {
+	size_t needle = 0;
+
+	if(haystack[needle] == ucase_needle[needle] || haystack[needle] == ucase_needle[needle]) {
+		
+	}
+	else
+		needle = 0;
+
+	while (ucase_needle[needle] != 0)
+
+	return 0;
+}
+
+
+int case_strstr(const char *upper, const char *lower, char *charlens, const char *haystack, bool case_sensitive = true) {
+	
+	return 0;
+}
 
 void *round_up(void *p, size_t align)
 {

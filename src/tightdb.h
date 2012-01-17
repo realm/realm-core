@@ -132,10 +132,10 @@ public:\
 		TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {}\
 		void SetQuery(Query* query) {m_query = query;}\
 		\
-		TestQuery& Equal(const char *value) {return (TestQuery &)XQueryAccessorString::Equal(value);}\
-		TestQuery& NotEqual(const char *value) {return (TestQuery &)XQueryAccessorString::NotEqual(value);}\
-		TestQuery& BeginsWith(const char *value) {return (TestQuery &)XQueryAccessorString::BeginsWith(value);}\
-		TestQuery& Contains(const char *value) {return (TestQuery &)XQueryAccessorString::Contains(value);}\
+		TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);}\
+		TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);}\
+		TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);}\
+		TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);}\
 	};\
 	class TestQueryQueryAccessorBool : private XQueryAccessorBool {\
 	public:\

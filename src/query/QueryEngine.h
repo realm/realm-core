@@ -1,7 +1,7 @@
 #include <string>
-#include "Table.h"
+#include "table.h"
 
-// does v2 contain v1?
+// does v1 contain v2?
 struct CONTAINS { 
 	bool operator()(const char *v1, const char *v2) const { return(strstr(v1, v2) != 0); }
 };
@@ -42,12 +42,13 @@ class ParentNode {
 public:
 	virtual ~ParentNode() {}
 	virtual size_t Find(size_t start, size_t end, const Table& table) = 0;
+	ParentNode* m_child;
 };
 
 
 template <class T, class C, class F> class NODE : public ParentNode {
 public:
-	NODE(ParentNode *p, T v, size_t column) : m_child(p), m_value(v), m_column(column) {}
+	NODE(T v, size_t column) : m_value(v), m_column(column)  {m_child = 0;}
 	~NODE() {delete m_child; }
 
 	size_t Find(size_t start, size_t end, const Table& table) {
@@ -71,7 +72,6 @@ public:
 	}
 
 protected:
-	ParentNode* m_child;
 	T m_value;
 	size_t m_column;
 };
@@ -79,7 +79,7 @@ protected:
 
 template <class T, class C> class NODE <T, C, EQUAL>: public ParentNode {
 public:
-	NODE(ParentNode *p, T v, size_t column) : m_child(p), m_value(v), m_column(column) {}
+	NODE(T v, size_t column) : m_value(v), m_column(column) {m_child = 0;}
 	~NODE() {delete m_child; }
 
 	size_t Find(size_t start, size_t end, const Table& table) {
@@ -104,7 +104,6 @@ public:
 	}
 
 protected:
-	ParentNode* m_child;
 	T m_value;
 	size_t m_column;
 };
@@ -113,7 +112,7 @@ protected:
 
 template <class F> class STRINGNODE : public ParentNode {
 public:
-	STRINGNODE(ParentNode *p, const char* v, size_t column) : m_child(p), m_value(v), m_column(column) {}
+	STRINGNODE(const char* v, size_t column) : m_value(v), m_column(column) {m_child = 0;}
 	~STRINGNODE() {delete m_child; free((void*)m_value);}
 
 	size_t Find(size_t start, size_t end, const Table& table) {
@@ -145,7 +144,6 @@ public:
 	}
 
 protected:
-	ParentNode* m_child;
 	const char* m_value;
 	size_t m_column;
 };
@@ -153,7 +151,7 @@ protected:
 
 class OR_NODE : public ParentNode {
 public:
-	OR_NODE(ParentNode* p1, ParentNode* p2, ParentNode* c) : m_cond1(p1), m_cond2(p2), m_child(c) {};
+	OR_NODE(ParentNode* p1) {m_child = 0; m_cond1 = p1; m_cond2 = 0;};
 	~OR_NODE() {
 		delete m_cond1;
 		delete m_cond2;
@@ -163,14 +161,14 @@ public:
 	size_t Find(size_t start, size_t end, const Table& table) {
 		for (size_t s = start; s < end; ++s) {
 			// Todo, redundant searches can occur
-			const size_t f1 = m_cond2->Find(s, end, table);
-			const size_t f2 = m_cond1->Find(s, f1, table);
+			const size_t f1 = m_cond1->Find(s, end, table);
+			const size_t f2 = m_cond2->Find(s, f1, table);
 			s = f1 < f2 ? f1 : f2;
 
 			if (m_child == 0)
 				return s;
 			else {
-				const size_t a = m_child->Find(s, end, table);
+				const size_t a = m_cond2->Find(s, end, table);
 				if (s == a)
 					return s;
 				else
@@ -180,8 +178,6 @@ public:
 		return end;
 	}
 
-protected:
 	ParentNode* m_cond1;
 	ParentNode* m_cond2;
-	ParentNode* m_child;
 };
