@@ -135,6 +135,7 @@ public:\
 		TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);}\
 		TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);}\
 		TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);}\
+		TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);}\
 		TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);}\
 	};\
 	class TestQueryQueryAccessorBool : private XQueryAccessorBool {\

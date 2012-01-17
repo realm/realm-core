@@ -78,6 +78,13 @@ public:
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
+	Query& EndsWith(size_t column_id, const char *value, bool CaseSensitive=true) {
+		char* const copy = (char *)malloc(strlen(value) + 1);
+		memcpy(copy, value, strlen(value) + 1);
+		ParentNode* const p = new STRINGNODE<ENDSWITH>((const char *)copy, column_id);
+		UpdatePointers(p, &p->m_child);
+		return *this;
+	};
 	Query& Contains(size_t column_id, const char *value, bool CaseSensitive=true) {
 		char* const copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
@@ -211,6 +218,7 @@ public:
 	XQueryAccessorString(size_t column_id) : m_column_id(column_id) {}
 	Query& Equal(const char *value, bool CaseSensitive) {return m_query->Equal(m_column_id, value, CaseSensitive);}
 	Query& BeginsWith(const char *value, bool CaseSensitive) {return m_query->Equal(m_column_id, value, CaseSensitive);}
+	Query& EndsWith(const char *value, bool CaseSensitive) {return m_query->EndsWith(m_column_id, value, CaseSensitive);}
 	Query& Contains(const char *value, bool CaseSensitive) {return m_query->Contains(m_column_id, value, CaseSensitive);}
 	Query& NotEqual(const char *value, bool CaseSensitive) {return m_query->NotEqual(m_column_id, value, CaseSensitive);}
 protected:
