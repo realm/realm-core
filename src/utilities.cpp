@@ -1,4 +1,4 @@
-#include "utilities.h"
+﻿#include "utilities.h"
 #include <string>
 
 #ifdef _MSC_VER
@@ -10,7 +10,7 @@
 /*
 		const static std::locale& loc = std::locale(); 
 
-		wchar_t a, w = L'�';
+		wchar_t a, w = L'Å';
 
 		a = std::tolower(w, loc);
 		

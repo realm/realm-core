@@ -51,7 +51,7 @@ TEST(TestQueryCaseSensitivity) {
 
 	ttt.Add(1, "blåbærgrød");
 	ttt.Add(2, "BLÅBÆRGRØD");
-	
+
 	Query q1 = ttt.GetQuery().second.Equal("blåbærgrød", true);
 	TableView tv1 = q1.FindAll(ttt);
 	CHECK_EQUAL(1, tv1.GetSize());
