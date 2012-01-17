@@ -146,9 +146,9 @@ public:\
 	};\
 	TestQueryQueryAccessor##CType1 CName1;\
 	TestQueryQueryAccessor##CType2 CName2;\
-	TestQuery& LeftParan(void) {m_LeftParan(); return *this;}; \
-	TestQuery& Or(void) {m_Or(); return *this;}; \
-	TestQuery& RightParan(void) {m_RightParan(); return *this;}; \
+	TestQuery& LeftParan(void) {Query::LeftParan(); return *this;}; \
+	TestQuery& Or(void) {Query::Or(); return *this;}; \
+	TestQuery& RightParan(void) {Query::RightParan(); return *this;}; \
 };\
 \
 	TestQuery GetQuery() {return TestQuery();} \

@@ -34,105 +34,95 @@ public:
 		delete first[0];
 	}
 
-	void UpdatePointers(ParentNode *p, ParentNode **newnode) {
-		if(first[first.size()-1] == 0)
-			first[first.size()-1] = p;
-
-		if(update[update.size()-1] != 0)
-			*update[update.size()-1] = p;
-		
-		update[update.size()-1] = newnode;
-	}
-
 	Query& Equal(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, EQUAL>(value, column_id);
+		ParentNode* const p = new NODE<int64_t, Column, EQUAL>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& NotEqual(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, NOTEQUAL>(value, column_id);
+		ParentNode* const p = new NODE<int64_t, Column, NOTEQUAL>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Greater(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, GREATER>(value, column_id);
+		ParentNode* const p = new NODE<int64_t, Column, GREATER>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& GreaterEqual(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, GREATEREQUAL>(value, column_id);
+		ParentNode* const p = new NODE<int64_t, Column, GREATEREQUAL>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& LessEqual(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, LESSEQUAL>(value, column_id);
+		ParentNode* const p = new NODE<int64_t, Column, LESSEQUAL>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Less(size_t column_id, int64_t value) {
-		ParentNode *p = new NODE<int64_t, Column, LESS>(value, column_id);
+		ParentNode* const p = new NODE<int64_t, Column, LESS>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Equal(size_t column_id, const char *value, bool CaseSensitive=true) {
 		char *copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
-		ParentNode *p = new STRINGNODE<EQUAL>((const char *)copy, column_id);
+		ParentNode* const p = new STRINGNODE<EQUAL>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& BeginsWith(size_t column_id, const char *value, bool CaseSensitive=true) {
-		char *copy = (char *)malloc(strlen(value) + 1);
+		char* const copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
-		ParentNode *p = new STRINGNODE<BEGINSWITH>((const char *)copy, column_id);
+		ParentNode* const p = new STRINGNODE<BEGINSWITH>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Contains(size_t column_id, const char *value, bool CaseSensitive=true) {
-		char *copy = (char *)malloc(strlen(value) + 1);
+		char* const copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
-		ParentNode *p = new STRINGNODE<CONTAINS>((const char *)copy, column_id);
+		ParentNode* const p = new STRINGNODE<CONTAINS>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& NotEqual(size_t column_id, const char * value, bool CaseSensitive=true) {
-		char *copy = (char *)malloc(strlen(value) + 1);
+		char* const copy = (char *)malloc(strlen(value) + 1);
 		memcpy(copy, value, strlen(value) + 1);
-		ParentNode *p = new STRINGNODE<NOTEQUAL>((const char *)copy, column_id);
+		ParentNode* const p = new STRINGNODE<NOTEQUAL>((const char *)copy, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Between(size_t column_id, int64_t from, int64_t to) {
 		ParentNode *p = new NODE<int64_t, Column, GREATEREQUAL>(from, column_id);
-		ParentNode *p2 = p;
+		ParentNode* const p2 = p;
 		p = new NODE<int64_t, Column, LESSEQUAL>(to, column_id);
 		p->m_child = p2;
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 	Query& Equal(size_t column_id, bool value) {
-		ParentNode *p = new NODE<bool, Column, EQUAL>(value, column_id);
+		ParentNode* const p = new NODE<bool, Column, EQUAL>(value, column_id);
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
 
-	void m_LeftParan(void) {
+	void LeftParan(void) {
 		update.push_back(0);
 		update_override.push_back(0);
 		first.push_back(0);
 	};
 
-	void m_Or(void) {
-		ParentNode *o = new OR_NODE(first[first.size()-1]);
+	void Or(void) {
+		ParentNode* const o = new OR_NODE(first[first.size()-1]);
 		first[first.size()-1] = o;
 		update[update.size()-1] = &((OR_NODE*)o)->m_cond2;
 		update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
 	};
 
-	void m_RightParan(void) {
+	void RightParan(void) {
 		if (update[update.size()-2] != 0)
 			*update[update.size()-2] = first[first.size()-1];
-			
+		
 		if(first[first.size()-2] == 0)
 			first[first.size()-2] = first[first.size()-1];
 
@@ -182,13 +172,21 @@ public:
 			return r;
 	}
 
-
-	mutable std::vector<ParentNode *>first;
-
 protected:
 	friend class XQueryAccessorInt;
 	friend class XQueryAccessorString;
 
+	void UpdatePointers(ParentNode *p, ParentNode **newnode) {
+		if(first[first.size()-1] == 0)
+			first[first.size()-1] = p;
+
+		if(update[update.size()-1] != 0)
+			*update[update.size()-1] = p;
+
+		update[update.size()-1] = newnode;
+	}
+
+	mutable std::vector<ParentNode *>first;
 	std::vector<ParentNode **>update;
 	std::vector<ParentNode **>update_override;
 };
