@@ -1,6 +1,8 @@
 #include "tightdb.h"
 #include <UnitTest++.h>
 
+
+
 TDB_TABLE_2(TupleTableType,
 	Int, first,
 	String, second)
@@ -9,6 +11,7 @@ TDB_TABLE_2(BoolTupleTable,
 	Int, first,
 	Bool, second)
 
+	
 TEST(TestQuerySimple) {
 	TupleTableType ttt;
 
@@ -132,17 +135,61 @@ TEST(TestQueryFindAll_Or) {
 	ttt.Add(1, "a");
 	ttt.Add(2, "a");
 	ttt.Add(3, "X");
+	ttt.Add(4, "a"); 
+	ttt.Add(5, "a");
+	ttt.Add(6, "a");
+	ttt.Add(7, "X");
+
+	// first == 5 || second == X
+	Query q1 = ttt.GetQuery().first.Equal(5).Or().second.Equal("X");
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(3, tv1.GetSize());
+	CHECK_EQUAL(2, tv1.GetRef(0));
+	CHECK_EQUAL(4, tv1.GetRef(1));
+	CHECK_EQUAL(6, tv1.GetRef(2));
+}
+
+
+TEST(TestQueryFindAll_Parans1) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
 	ttt.Add(3, "X"); 
 	ttt.Add(4, "a");
 	ttt.Add(5, "a");
 	ttt.Add(11, "X");
 
-	// first > 3 && (first == 5 || second == X)
-	Query q1 = ttt.GetQuery().first.Greater(3).LeftParan().first.Equal(5).Or().second.Equal("X").RightParan();
+	// first > 3 && (second == X)
+	Query q1 = ttt.GetQuery().first.Greater(3).LeftParan().second.Equal("X").RightParan();
 	TableView tv1 = q1.FindAll(ttt);
-	CHECK_EQUAL(5, tv1.GetRef(0));
-	CHECK_EQUAL(6, tv1.GetRef(1));
+	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(6, tv1.GetRef(0));
 }
+
+
+TEST(TestQueryFindAll_OrParan) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+	ttt.Add(4, "a"); 
+	ttt.Add(5, "a");
+	ttt.Add(6, "a");
+	ttt.Add(7, "X");
+	ttt.Add(2, "X");
+
+	// (first == 5 || second == X && first > 2)
+	Query q1 = ttt.GetQuery().LeftParan().first.Equal(5).Or().second.Equal("X").first.Greater(2).RightParan();
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(3, tv1.GetSize());
+	CHECK_EQUAL(2, tv1.GetRef(0));
+	CHECK_EQUAL(4, tv1.GetRef(1));
+	CHECK_EQUAL(6, tv1.GetRef(2));
+}
+
 
 TEST(TestQueryFindAll_OrNested) {
 	TupleTableType ttt;
@@ -162,6 +209,43 @@ TEST(TestQueryFindAll_OrNested) {
 	CHECK_EQUAL(5, tv1.GetRef(0));
 	CHECK_EQUAL(6, tv1.GetRef(1));
 	CHECK_EQUAL(7, tv1.GetRef(2));
+}
+
+TEST(TestQueryFindAll_Parans2) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+	ttt.Add(3, "X"); 
+	ttt.Add(4, "a");
+	ttt.Add(5, "a");
+	ttt.Add(11, "X");
+
+	// ()((first > 3()) && (()))
+	Query q1 = ttt.GetQuery().LeftParan().RightParan().LeftParan().LeftParan().first.Greater(3).LeftParan().RightParan().RightParan().LeftParan().LeftParan().RightParan().RightParan().RightParan();
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(3, tv1.GetSize());
+	CHECK_EQUAL(4, tv1.GetRef(0));
+	CHECK_EQUAL(5, tv1.GetRef(1));
+	CHECK_EQUAL(6, tv1.GetRef(2));
+}
+
+TEST(TestQueryFindAll_Parans4) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+	ttt.Add(3, "X"); 
+	ttt.Add(4, "a");
+	ttt.Add(5, "a");
+	ttt.Add(11, "X");
+
+	// ()
+	Query q1 = ttt.GetQuery().LeftParan().RightParan();
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(7, tv1.GetSize());
 }
 
 
@@ -240,3 +324,6 @@ TEST(TestQueryEnums) {
 	CHECK_EQUAL(16, tv1.GetRef(3));
 	CHECK_EQUAL(21, tv1.GetRef(4));
 }
+
+
+
