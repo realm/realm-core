@@ -895,12 +895,12 @@ void Table::FindAllString(TableView& tv, size_t column_id, const char *value) {
 
 	if (type == COLUMN_TYPE_STRING) {
 		const AdaptiveStringColumn& column = GetColumnString(column_id);
-		return column.FindAll(tv.GetRefColumn(), value);
+		column.FindAll(tv.GetRefColumn(), value);
 	}
 	else {
 		assert(type == COLUMN_TYPE_STRING_ENUM);
 		const ColumnStringEnum& column = GetColumnStringEnum(column_id);
-		return column.FindAll(tv.GetRefColumn(), value);
+		column.FindAll(tv.GetRefColumn(), value);
 	}
 }
 
