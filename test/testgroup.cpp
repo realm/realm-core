@@ -47,6 +47,12 @@ TEST(Group_Serialize0) {
 	CHECK_EQUAL(Wed,    t[0].fourth);
 }
 
+TEST(Group_Read0) {
+	// Load the group and let it clean up without loading
+	// any tables
+	Group fromDisk("table_test.tbl");
+}
+
 TEST(Group_Serialize1) {
 	// Create group with one table
 	Group toDisk;
@@ -98,6 +104,12 @@ TEST(Group_Serialize1) {
 	toDisk.Verify();
 	fromDisk.Verify();
 #endif //_DEBUG
+}
+
+TEST(Group_Read1) {
+	// Load the group and let it clean up without loading
+	// any tables
+	Group fromDisk("table_test.tbl");
 }
 
 TEST(Group_Serialize2) {
