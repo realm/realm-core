@@ -3,7 +3,7 @@
 #include <iostream>
 #include <fstream>
 
-Group::Group() : m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(COLUMN_HASREFS, NULL, 0, m_alloc), m_tableNames(NULL, 0, m_alloc)
+Group::Group() : m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(COLUMN_HASREFS, NULL, 0, m_alloc), m_tableNames(NULL, 0, m_alloc), m_isValid(true)
 {
 	m_top.Add(m_tableNames.GetRef());
 	m_top.Add(m_tables.GetRef());
@@ -12,17 +12,17 @@ Group::Group() : m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(COLUMN_HASREF
 	m_tables.SetParent(&m_top, 1);
 }
 
-Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc) {
+Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(false) {
 	assert(filename);
 
 	// Memory map file
-	const bool res = m_alloc.SetShared(filename);
-	assert(res);
+	m_isValid = m_alloc.SetShared(filename);
+	assert(m_isValid);
 
-	Create();
+	if (m_isValid) Create();
 }
 
-Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc) {
+Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(true) {
 	assert(buffer);
 
 	// Memory map file

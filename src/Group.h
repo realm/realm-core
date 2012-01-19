@@ -11,6 +11,8 @@ public:
 	Group(const char* buffer, size_t len);
 	~Group();
 
+	bool IsValid() const {return m_isValid;}
+
 	size_t GetTableCount() const;
 	const char* GetTableName(size_t table_ndx) const;
 	bool HasTable(const char* name) const;
@@ -39,6 +41,7 @@ private:
 	Array m_tables;
 	ArrayString m_tableNames;
 	Array m_cachedtables;
+	bool m_isValid;
 };
 
 // Templates
