@@ -22,13 +22,14 @@ Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableN
 	if (m_isValid) Create();
 }
 
-Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(true) {
+Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(false) {
 	assert(buffer);
 
 	// Memory map file
-	m_alloc.SetSharedBuffer(buffer, len);
+	m_isValid = m_alloc.SetSharedBuffer(buffer, len);
+	assert(m_isValid);
 
-	Create();
+	if (m_isValid) Create();
 }
 
 void Group::Create() {
