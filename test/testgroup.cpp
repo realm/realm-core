@@ -21,10 +21,23 @@ TDB_TABLE_4(TestTableGroup,
 // Windows version of serialization is not implemented yet
 #if 1 //_MSC_VER
 
-TEST(Group_Serialize0) {
+TEST(Group_Invalid1) {
 	// Delete old file if there
 	remove("table_test.tbl");
 
+	// Try to open non-existing file
+	Group fromDisk("table_test.tbl");
+	CHECK(!fromDisk.IsValid());
+}
+
+TEST(Group_Invalid2) {
+	// Try to open buffer with invalid data
+	const char* const buffer = "invalid data";
+	Group fromMen(buffer, strlen(buffer));
+	CHECK(!fromMen.IsValid());
+}
+
+TEST(Group_Serialize0) {
 	// Create empty group and serialize to disk
 	Group toDisk;
 	toDisk.Write("table_test.tbl");

@@ -17,7 +17,6 @@ Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableN
 
 	// Memory map file
 	m_isValid = m_alloc.SetShared(filename);
-	assert(m_isValid);
 
 	if (m_isValid) Create();
 }
@@ -27,7 +26,6 @@ Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc)
 
 	// Memory map file
 	m_isValid = m_alloc.SetSharedBuffer(buffer, len);
-	assert(m_isValid);
 
 	if (m_isValid) Create();
 }
