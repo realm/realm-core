@@ -463,5 +463,28 @@ TEST(Table_Spec) {
 	CHECK_EQUAL("test", subtable2.GetString(1, 0));
 }
 
+TEST(Table_Mixed) {
+	Table table;
+	table.RegisterColumn(COLUMN_TYPE_INT, "first");
+	table.RegisterColumn(COLUMN_TYPE_MIXED, "second");
+	
+	CHECK_EQUAL(COLUMN_TYPE_INT, table.GetColumnType(0));
+	CHECK_EQUAL(COLUMN_TYPE_MIXED, table.GetColumnType(1));
+	CHECK_EQUAL("first", table.GetColumnName(0));
+	CHECK_EQUAL("second", table.GetColumnName(1));
+	
+	const size_t ndx = table.AddRow();
+	table.Set(0, ndx, 0);
+	//table.Set(1, ndx, 10);
+	
+	CHECK_EQUAL(0, table.Get(0, ndx));
+	//CHECK_EQUAL(10, table.Get(1, ndx));
+	
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
+}
+
+
 
 

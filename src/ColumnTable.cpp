@@ -47,6 +47,7 @@ Table* ColumnTable::GetTablePtr(size_t ndx) {
 	size_t pndx   = 0;
 	m_table_refs.GetParentInfo(ndx, parent, pndx);
 
+	// Receiver will own pointer and has to delete it when done
 	return new Table(alloc, m_ref_specSet, ref_columns, parent, pndx);
 }
 

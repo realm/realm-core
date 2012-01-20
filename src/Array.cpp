@@ -203,6 +203,11 @@ void Array::Destroy() {
 			// null-refs signify empty sub-trees
 			if (ref == 0) continue;
 
+			// all refs are 64bit aligned, so the lowest bits
+			// cannot be set. If they are it means that it should
+			// not be interpreted as a ref
+			if (ref & 0x1) continue;
+
 			Array sub(ref, this, i, m_alloc);
 			sub.Destroy();
 		}

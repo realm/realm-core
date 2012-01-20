@@ -188,9 +188,12 @@ private:
 class TopLevelTable : public Table {
 public:
 	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
+	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx);
 	~TopLevelTable();
 
 	void UpdateFromSpec(size_t ref_specSet);
+	size_t GetRef() const;
+	void Invalidate() {m_top.Invalidate();}
 
 	// Debug
 #ifdef _DEBUG
@@ -200,13 +203,7 @@ public:
 protected:
 	friend class Group;
 
-	// Construct from ref
-	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx);
-
 	void SetParent(Array* parent, size_t pndx);
-	size_t GetRef() const;
-
-	void Invalidate() {m_top.Invalidate();}
 
 	// Serialization
 	template<class S> size_t Write(S& out, size_t& pos) const;

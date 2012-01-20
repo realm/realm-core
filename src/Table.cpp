@@ -6,6 +6,7 @@
 #include "AllocSlab.h"
 #include "ColumnStringEnum.h"
 #include "ColumnTable.h"
+#include "ColumnMixed.h"
 
 const ColumnType Accessor::type       = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type   = COLUMN_TYPE_BOOL;
@@ -308,6 +309,11 @@ void Table::CreateColumns() {
 				++subtable_count;
 			}
 				break;
+			case COLUMN_TYPE_MIXED:
+				newColumn = new ColumnMixed(alloc);
+				m_columns.Add(((ColumnMixed*)newColumn)->GetRef());
+				((ColumnMixed*)newColumn)->SetParent(&m_columns, ref_pos);
+				break;
 			default:
 				assert(false);
 		}
@@ -382,6 +388,10 @@ void Table::CacheColumns() {
 				colsize = ((ColumnTable*)newColumn)->Size();
                 break;
 			}
+			case COLUMN_TYPE_MIXED:
+				newColumn = new ColumnMixed(ref, &m_columns, column_ndx, alloc);
+				colsize = ((ColumnMixed*)newColumn)->Size();
+                break;
 
             default:
                 assert(false);
@@ -506,6 +516,11 @@ size_t Table::RegisterColumn(ColumnType type, const char* name) {
 		newColumn = new ColumnBinary(alloc);
 		m_columns.Add(((ColumnBinary*)newColumn)->GetRef());
 		((ColumnBinary*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
+		break;
+	case COLUMN_TYPE_MIXED:
+		newColumn = new ColumnMixed(alloc);
+		m_columns.Add(((ColumnMixed*)newColumn)->GetRef());
+		((ColumnMixed*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
 		break;
 	default:
 		assert(false);
@@ -1059,6 +1074,8 @@ void Table::Verify() const {
 			}
 			break;
 		case COLUMN_TYPE_TABLE:
+			break;
+		case COLUMN_TYPE_MIXED:
 			break;
 		default:
 			assert(false);
