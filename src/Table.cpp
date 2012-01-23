@@ -12,6 +12,7 @@ const ColumnType Accessor::type       = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type   = COLUMN_TYPE_BOOL;
 const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
 const ColumnType AccessorDate::type   = COLUMN_TYPE_DATE;
+const ColumnType AccessorMixed::type  = COLUMN_TYPE_MIXED;
 
 // -- Spec ------------------------------------------------------------------------------------
 
@@ -626,6 +627,17 @@ const ColumnTable& Table::GetColumnTable(size_t ndx) const {
 	return *(const ColumnTable* const)m_cols.Get(ndx);
 }
 
+ColumnMixed& Table::GetColumnMixed(size_t ndx) {
+	assert(ndx < GetColumnCount());
+	InstantiateBeforeChange();
+	return *(ColumnMixed* const)m_cols.Get(ndx);
+}
+
+const ColumnMixed& Table::GetColumnMixed(size_t ndx) const {
+	assert(ndx < GetColumnCount());
+	return *(const ColumnMixed* const)m_cols.Get(ndx);
+}
+
 size_t Table::AddRow() {
 	const size_t count = GetColumnCount();
 	for (size_t i = 0; i < count; ++i) {
@@ -834,6 +846,108 @@ void Table::InsertBinary(size_t column_id, size_t ndx, const void* value, size_t
 
 	ColumnBinary& column = GetColumnBinary(column_id);
 	column.Insert(ndx, value, len);
+}
+
+Mixed Table::GetMixed(size_t column_id, size_t ndx) const {
+	assert(column_id < m_columns.Size());
+	assert(ndx < m_size);
+
+	const ColumnMixed& column = GetColumnMixed(column_id);
+	const ColumnType   type   = column.GetType(ndx);
+
+	switch (type) {
+		case COLUMN_TYPE_INT:
+			return Mixed(column.GetInt(ndx));
+		case COLUMN_TYPE_BOOL:
+			return Mixed(column.GetBool(ndx));
+		case COLUMN_TYPE_DATE:
+			return Mixed(column.GetDate(ndx));
+		case COLUMN_TYPE_STRING:
+			return Mixed(column.GetString(ndx));
+		case COLUMN_TYPE_BINARY:
+			return Mixed(column.GetBinary(ndx));
+		case COLUMN_TYPE_TABLE:
+			return Mixed(COLUMN_TYPE_TABLE);
+		default:
+			assert(false);
+			return Mixed((int64_t)0);
+	}
+}
+
+ColumnType Table::GetMixedType(size_t column_id, size_t ndx) const {
+	assert(column_id < m_columns.Size());
+	assert(ndx < m_size);
+
+	const ColumnMixed& column = GetColumnMixed(column_id);
+	return column.GetType(ndx);
+}
+
+void Table::SetMixed(size_t column_id, size_t ndx, Mixed value) {
+	assert(column_id < GetColumnCount());
+	assert(ndx < m_size);
+
+	ColumnMixed& column = GetColumnMixed(column_id);
+	const ColumnType type = value.GetType();
+
+	switch (type) {
+		case COLUMN_TYPE_INT:
+			column.SetInt(ndx, value.GetInt());
+			break;
+		case COLUMN_TYPE_BOOL:
+			column.SetBool(ndx, value.GetBool());
+			break;
+		case COLUMN_TYPE_DATE:
+			column.SetDate(ndx, value.GetDate());
+			break;
+		case COLUMN_TYPE_STRING:
+			column.SetString(ndx, value.GetString());
+			break;
+		case COLUMN_TYPE_BINARY:
+		{
+			const BinaryData b = value.GetBinary();
+			column.SetBinary(ndx, (const char*)b.pointer, b.len);
+			break;
+		}
+		case COLUMN_TYPE_TABLE:
+			column.SetTable(ndx);
+			break;
+		default:
+			assert(false);
+	}
+}
+
+void Table::InsertMixed(size_t column_id, size_t ndx, Mixed value) {
+	assert(column_id < GetColumnCount());
+	assert(ndx <= m_size);
+
+	ColumnMixed& column = GetColumnMixed(column_id);
+	const ColumnType type = value.GetType();
+
+	switch (type) {
+		case COLUMN_TYPE_INT:
+			column.InsertInt(ndx, value.GetInt());
+			break;
+		case COLUMN_TYPE_BOOL:
+			column.InsertBool(ndx, value.GetBool());
+			break;
+		case COLUMN_TYPE_DATE:
+			column.InsertDate(ndx, value.GetDate());
+			break;
+		case COLUMN_TYPE_STRING:
+			column.InsertString(ndx, value.GetString());
+			break;
+		case COLUMN_TYPE_BINARY:
+		{
+			const BinaryData b = value.GetBinary();
+			column.InsertBinary(ndx, (const char*)b.pointer, b.len);
+			break;
+		}
+		case COLUMN_TYPE_TABLE:
+			column.InsertTable(ndx);
+			break;
+		default:
+			assert(false);
+	}
 }
 
 void Table::InsertDone() {

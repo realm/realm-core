@@ -475,16 +475,121 @@ TEST(Table_Mixed) {
 	
 	const size_t ndx = table.AddRow();
 	table.Set(0, ndx, 0);
-	//table.Set(1, ndx, 10);
+	table.SetMixed(1, ndx, true);
 	
-	CHECK_EQUAL(0, table.Get(0, ndx));
-	//CHECK_EQUAL(10, table.Get(1, ndx));
+	CHECK_EQUAL(0, table.Get(0, 0));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(true, table.GetMixed(1, 0).GetBool());
+	
+	table.InsertInt(0, 1, 43);
+	table.InsertMixed(1, 1, (int64_t)12);
+	table.InsertDone();
+	
+	CHECK_EQUAL(0,  table.Get(0, ndx));
+	CHECK_EQUAL(43, table.Get(0, 1));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_INT,  table.GetMixed(1, 1).GetType());
+	CHECK_EQUAL(true, table.GetMixed(1, 0).GetBool());
+	CHECK_EQUAL(12,   table.GetMixed(1, 1).GetInt());
+	
+	table.InsertInt(0, 2, 100);
+	table.InsertMixed(1, 2, "test");
+	table.InsertDone();
+	
+	CHECK_EQUAL(0,  table.Get(0, 0));
+	CHECK_EQUAL(43, table.Get(0, 1));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
+	CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
+	CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
+	CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
+	
+	const time_t date = 324234;
+	table.InsertInt(0, 3, 0);
+	table.InsertMixed(1, 3, date);
+	table.InsertDone();
+	
+	CHECK_EQUAL(0,  table.Get(0, 0));
+	CHECK_EQUAL(43, table.Get(0, 1));
+	CHECK_EQUAL(0,  table.Get(0, 3));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).GetType());
+	CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
+	CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
+	CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
+	CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
+	
+	table.InsertInt(0, 4, 43);
+	table.InsertMixed(1, 4, Mixed("binary", 7));
+	table.InsertDone();
+	
+	CHECK_EQUAL(0,  table.Get(0, 0));
+	CHECK_EQUAL(43, table.Get(0, 1));
+	CHECK_EQUAL(0,  table.Get(0, 3));
+	CHECK_EQUAL(43, table.Get(0, 4));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_BINARY, table.GetMixed(1, 4).GetType());
+	CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
+	CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
+	CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
+	CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
+	CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).GetBinary().pointer);
+	CHECK_EQUAL(7,      table.GetMixed(1, 4).GetBinary().len);
+	
+	table.InsertInt(0, 5, 0);
+	table.InsertMixed(1, 5, Mixed(COLUMN_TYPE_TABLE));
+	table.InsertDone();
+	
+	CHECK_EQUAL(0,  table.Get(0, 0));
+	CHECK_EQUAL(43, table.Get(0, 1));
+	CHECK_EQUAL(0,  table.Get(0, 3));
+	CHECK_EQUAL(43, table.Get(0, 4));
+	CHECK_EQUAL(0,  table.Get(0, 5));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_BINARY, table.GetMixed(1, 4).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_TABLE,  table.GetMixed(1, 5).GetType());
+	CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
+	CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
+	CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
+	CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
+	CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).GetBinary().pointer);
+	CHECK_EQUAL(7,      table.GetMixed(1, 4).GetBinary().len);
 	
 #ifdef _DEBUG
 	table.Verify();
 #endif //_DEBUG
 }
 
+TDB_TABLE_1(TestTableMX,
+			Mixed,  first)
 
 
+TEST(Table_Mixed2) {
+	TestTableMX table;
+	
+	table.Add((int64_t)1);
+	table.Add(true);
+	table.Add((time_t)1234);
+	table.Add("test");
+
+	CHECK_EQUAL(COLUMN_TYPE_INT,    table[0].first.GetType());
+	CHECK_EQUAL(COLUMN_TYPE_BOOL,   table[1].first.GetType());
+	CHECK_EQUAL(COLUMN_TYPE_DATE,   table[2].first.GetType());
+	CHECK_EQUAL(COLUMN_TYPE_STRING, table[3].first.GetType());
+	
+	CHECK_EQUAL(1,            table[0].first.GetInt());
+	CHECK_EQUAL(true,         table[1].first.GetBool());
+	CHECK_EQUAL((time_t)1234, table[2].first.GetDate());
+	CHECK_EQUAL("test",       table[3].first.GetString());
+}
+	
 

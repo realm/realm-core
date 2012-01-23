@@ -14,6 +14,36 @@ class Accessor;
 class TableView;
 class Group;
 class ColumnTable;
+class ColumnMixed;
+
+class Mixed {
+public:
+	explicit Mixed(ColumnType v)  {assert(v = COLUMN_TYPE_TABLE); m_type = COLUMN_TYPE_TABLE;}
+	Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
+	Mixed(time_t v)      {m_type = COLUMN_TYPE_DATE;   m_date = v;}
+	Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
+	Mixed(const char* v) {m_type = COLUMN_TYPE_STRING; m_str  = v;}
+	Mixed(BinaryData v)  {m_type = COLUMN_TYPE_BINARY; m_str = (const char*)v.pointer; m_len = v.len;}
+	Mixed(const char* v, size_t len) {m_type = COLUMN_TYPE_BINARY; m_str = v; m_len = len;}
+
+	ColumnType GetType() const {return m_type;}
+
+	int64_t     GetInt()    const {assert(m_type == COLUMN_TYPE_INT);    return m_int;}
+	bool        GetBool()   const {assert(m_type == COLUMN_TYPE_BOOL);   return m_bool;}
+	time_t      GetDate()   const {assert(m_type == COLUMN_TYPE_DATE);   return m_date;}
+	const char* GetString() const {assert(m_type == COLUMN_TYPE_STRING); return m_str;}
+	BinaryData	GetBinary() const {assert(m_type == COLUMN_TYPE_BINARY); BinaryData b = {m_str, m_len}; return b;}
+
+private:
+	ColumnType m_type;
+	union {
+		int64_t m_int;
+		bool    m_bool;
+		time_t  m_date;
+		const char* m_str;
+	};
+	size_t m_len;
+};
 
 class Spec {
 public:
@@ -102,6 +132,12 @@ public:
 	void   InsertTable(size_t column_id, size_t ndx);
 	void   ClearTable(size_t column_id, size_t ndx);
 
+	// Mixed
+	Mixed GetMixed(size_t column_id, size_t ndx) const;
+	ColumnType GetMixedType(size_t column_id, size_t ndx) const;
+	void InsertMixed(size_t column_id, size_t ndx, Mixed value);
+	void SetMixed(size_t column_id, size_t ndx, Mixed value);
+
 	size_t RegisterColumn(ColumnType type, const char* name);
 
 	Column& GetColumn(size_t ndx);
@@ -114,6 +150,8 @@ public:
 	const ColumnStringEnum& GetColumnStringEnum(size_t ndx) const;
 	ColumnTable& GetColumnTable(size_t ndx);
 	const ColumnTable& GetColumnTable(size_t ndx) const;
+	ColumnMixed& GetColumnMixed(size_t ndx);
+	const ColumnMixed& GetColumnMixed(size_t ndx) const;
 
 	// Searching
 	size_t Find(size_t column_id, int64_t value) const;
@@ -297,6 +335,10 @@ protected:
 	const char* GetString() const {return m_cursor->m_table.GetString(m_column, m_cursor->m_index);}
 	void SetString(const char* value) {m_cursor->m_table.SetString(m_column, m_cursor->m_index, value);}
 
+	Mixed GetMixed() const {return m_cursor->m_table.GetMixed(m_column, m_cursor->m_index);}
+	ColumnType GetMixedType() const {return m_cursor->m_table.GetMixedType(m_column, m_cursor->m_index);}
+	void SetMixed(Mixed value) {m_cursor->m_table.SetMixed(m_column, m_cursor->m_index, value);}
+
 	CursorBase* m_cursor;
 	size_t m_column;
 };
@@ -334,6 +376,20 @@ class AccessorDate : public Accessor {
 public:
 	operator time_t() const {return GetDate();}
 	void operator=(time_t value) {SetDate(value);}
+	static const ColumnType type;
+};
+
+class AccessorMixed : public Accessor {
+public:
+	operator Mixed() const {return GetMixed();}
+	void operator=(Mixed value) {SetMixed(value);}
+	ColumnType GetType() const {return GetMixedType();}
+	Mixed Get() const {return GetMixed();}
+	int64_t GetInt() const {return GetMixed().GetInt();}
+	bool GetBool() const {return GetMixed().GetBool();}
+	time_t GetDate() const {return GetMixed().GetDate();}
+	const char* GetString() const {return GetMixed().GetString();}
+	BinaryData GetBinary() const {return GetMixed().GetBinary();}
 	static const ColumnType type;
 };
 
@@ -385,6 +441,10 @@ public:
 
 };
 
+class ColumnProxyMixed : public ColumnProxy {
+public:
+};
+
 template<class T> class TypeEnum {
 public:
 	TypeEnum(T v) : m_value(v) {};
@@ -396,6 +456,7 @@ private:
 #define TypeInt int64_t
 #define TypeBool bool
 #define TypeString const char*
+#define TypeMixed Mixed
 
 // Make all enum types return int type
 template<typename T> struct COLUMN_TYPE_Enum {
@@ -446,6 +507,10 @@ public:
 	QueryItem operator<=(T) {return QueryItem();}
 	QueryItem operator>=(T) {return QueryItem();}
 	QueryItem between(T, T) {return QueryItem();}
+};
+
+class QueryAccessorMixed {
+public:
 };
 
 // Templates
