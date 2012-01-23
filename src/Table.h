@@ -388,17 +388,17 @@ public:
 
 };
 
-template<class T> class TypeEnum {
+template<class T> class tdbTypeEnum {
 public:
-	TypeEnum(T v) : m_value(v) {};
+	tdbTypeEnum(T v) : m_value(v) {};
 	operator T() const {return m_value;}
-	TypeEnum<T>& operator=(const TypeEnum<T>& v) {m_value = v.m_value;}
+	tdbTypeEnum<T>& operator=(const tdbTypeEnum<T>& v) {m_value = v.m_value;}
 private:
 	const T m_value;
 };
-#define TypeInt int64_t
-#define TypeBool bool
-#define TypeString const char*
+#define tdbTypeInt int64_t
+#define tdbTypeBool bool
+#define tdbTypeString const char*
 
 // Make all enum types return int type
 template<typename T> struct COLUMN_TYPE_Enum {

@@ -51,7 +51,7 @@ public: \
 		Accessor##CType1 CName1; \
 	}; \
 \
-	void Add(Type##CType1 CName1) { \
+	void Add(tdbType##CType1 CName1) { \
 		const size_t ndx = GetSize(); \
 		Insert##CType1 (0, ndx, CName1); \
 		InsertDone(); \
@@ -173,7 +173,7 @@ public:\
 		Accessor##CType2 CName2; \
 	}; \
 \
-	void Add(Type##CType1 CName1, Type##CType2 CName2) { \
+	void Add(tdbType##CType1 CName1, tdbType##CType2 CName2) { \
 		const size_t ndx = GetSize(); \
 		Insert##CType1 (0, ndx, CName1); \
 		Insert##CType2 (1, ndx, CName2); \
@@ -246,7 +246,7 @@ public: \
 		Accessor##CType4 CName4; \
 	}; \
 \
-	void Add(Type##CType1 v1, Type##CType2 v2,Type##CType3 v3, Type##CType4 v4) { \
+	void Add(tdbType##CType1 v1, tdbType##CType2 v2,tdbType##CType3 v3, tdbType##CType4 v4) { \
 		const size_t ndx = GetSize(); \
 		Insert##CType1 (0, ndx, v1); \
 		Insert##CType2 (1, ndx, v2); \
@@ -254,7 +254,7 @@ public: \
 		Insert##CType4 (3, ndx, v4); \
 		InsertDone(); \
 	} \
-	void Insert(size_t ndx, Type##CType1 v1, Type##CType2 v2,Type##CType3 v3, Type##CType4 v4) { \
+	void Insert(size_t ndx, tdbType##CType1 v1, tdbType##CType2 v2,tdbType##CType3 v3, tdbType##CType4 v4) { \
 		Insert##CType1 (0, ndx, v1); \
 		Insert##CType2 (1, ndx, v2); \
 		Insert##CType3 (2, ndx, v3); \
