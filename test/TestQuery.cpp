@@ -1,8 +1,6 @@
 #include "tightdb.h"
 #include <UnitTest++.h>
 
-
-
 TDB_TABLE_2(TupleTableType,
 	Int, first,
 	String, second)
@@ -11,7 +9,7 @@ TDB_TABLE_2(BoolTupleTable,
 	Int, first,
 	Bool, second)
 
-	
+
 TEST(TestQuerySimple) {
 	TupleTableType ttt;
 
@@ -44,18 +42,6 @@ TEST(TestQuerySimple2) {
 	CHECK_EQUAL(1, tv1.GetRef(0));
 	CHECK_EQUAL(4, tv1.GetRef(1));
 	CHECK_EQUAL(7, tv1.GetRef(2));
-}
-
-TEST(TestQueryCaseSensitivity) {
-	TupleTableType ttt;
-
-	ttt.Add(1, "blåbærgrød");
-	ttt.Add(2, "BLÅBÆRGRØD");
-
-	Query q1 = ttt.GetQuery().second.Equal("blåbærgrød", true);
-	TableView tv1 = q1.FindAll(ttt);
-	CHECK_EQUAL(1, tv1.GetSize());
-	CHECK_EQUAL(0, tv1.GetRef(0));
 }
 
 TEST(TestQueryFindAll1) {
@@ -316,6 +302,20 @@ TEST(TestQueryFindAll_Begins) {
 	CHECK_EQUAL(1, tv1.GetRef(0));
 }
 
+TEST(TestQueryFindAll_Ends) {
+	TupleTableType ttt;
+
+	ttt.Add(0, "barfo");
+	ttt.Add(0, "barfoo");
+	ttt.Add(0, "barfoobar");
+
+	Query q1 = ttt.GetQuery().second.EndsWith("foo");
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(1, tv1.GetRef(0));
+}
+
+
 TEST(TestQueryFindAll_Contains) {
 	TupleTableType ttt;
 
@@ -360,5 +360,186 @@ TEST(TestQueryEnums) {
 	CHECK_EQUAL(21, tv1.GetRef(4));
 }
 
+#if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 
+#define uY  "\x0CE\x0AB"              // greek capital letter upsilon with dialytika (U+03AB)
+#define uYd "\x0CE\x0A5\x0CC\x088"    // decomposed form (Y followed by two dots)
+#define uy  "\x0CF\x08B"              // greek small letter upsilon with dialytika (U+03AB)
+#define uyd "\x0cf\x085\x0CC\x088"    // decomposed form (Y followed by two dots)
+
+TEST(TestQueryCaseSensitivity) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "BLAAbaergroed");
+
+	Query q1 = ttt.GetQuery().second.Equal("blaabaerGROED", false);
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(0, tv1.GetRef(0));
+}
+
+TEST(TestQueryUnicode2) {
+	TupleTableType ttt;
+
+	ttt.Add(1, uY);
+	ttt.Add(1, uYd); 
+	ttt.Add(1, uy); 
+	ttt.Add(1, uyd);
+
+	Query q1 = ttt.GetQuery().second.Equal(uY, false);
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(2, tv1.GetSize());
+	CHECK_EQUAL(0, tv1.GetRef(0));
+	CHECK_EQUAL(2, tv1.GetRef(1));
+
+	Query q2 = ttt.GetQuery().second.Equal(uYd, false);
+	TableView tv2 = q2.FindAll(ttt);
+	CHECK_EQUAL(2, tv2.GetSize());
+	CHECK_EQUAL(1, tv2.GetRef(0));
+	CHECK_EQUAL(3, tv2.GetRef(1));
+
+	Query q3 = ttt.GetQuery().second.Equal(uYd, true);
+	TableView tv3 = q3.FindAll(ttt);
+	CHECK_EQUAL(1, tv3.GetSize());
+	CHECK_EQUAL(1, tv3.GetRef(0));
+}
+
+#define uA  "\x0c3\x085"         // danish capital A with ring above (as in BLAABAERGROED)
+#define uAd "\x041\x0cc\x08a"    // decomposed form (A (41) followed by ring)
+#define ua  "\x0c3\x0a5"         // danish lower case a with ring above (as in blaabaergroed)
+#define uad "\x061\x0cc\x08a"    // decomposed form (a (41) followed by ring)
+
+TEST(TestQueryUnicode3) {
+	TupleTableType ttt;
+
+	ttt.Add(1, uA);
+	ttt.Add(1, uAd); 
+	ttt.Add(1, ua);
+	ttt.Add(1, uad);
+
+	Query q1 = ttt.GetQuery().second.Equal(uA, false);
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(2, tv1.GetSize());
+	CHECK_EQUAL(0, tv1.GetRef(0));
+	CHECK_EQUAL(2, tv1.GetRef(1));
+
+	Query q2 = ttt.GetQuery().second.Equal(ua, false);
+	TableView tv2 = q2.FindAll(ttt);
+	CHECK_EQUAL(2, tv2.GetSize());
+	CHECK_EQUAL(0, tv2.GetRef(0));
+	CHECK_EQUAL(2, tv2.GetRef(1));
+
+
+	Query q3 = ttt.GetQuery().second.Equal(uad, false);
+	TableView tv3 = q3.FindAll(ttt);
+	CHECK_EQUAL(2, tv3.GetSize());
+	CHECK_EQUAL(1, tv3.GetRef(0));
+	CHECK_EQUAL(3, tv3.GetRef(1));
+
+	Query q4 = ttt.GetQuery().second.Equal(uad, true);
+	TableView tv4 = q4.FindAll(ttt);
+	CHECK_EQUAL(1, tv4.GetSize());
+	CHECK_EQUAL(3, tv4.GetRef(0));
+}
+
+
+TEST(TestQueryFindAll_BeginsUNICODE) {
+	TupleTableType ttt;
+
+	ttt.Add(0, uad "fo");
+	ttt.Add(0, uad "foo");
+	ttt.Add(0, uad "foobar");
+
+	Query q1 = ttt.GetQuery().second.BeginsWith(uad "foo");
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(1, tv1.GetRef(0));
+}
+
+
+TEST(TestQueryFindAll_EndsUNICODE) {
+	TupleTableType ttt;
+
+	ttt.Add(0, "barfo");
+	ttt.Add(0, "barfoo" uad);
+	ttt.Add(0, "barfoobar");
+
+	Query q1 = ttt.GetQuery().second.EndsWith("foo" uad);
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(1, tv1.GetRef(0));
+
+	Query q2 = ttt.GetQuery().second.EndsWith("foo" uAd, false);
+	TableView tv2 = q2.FindAll(ttt);
+	CHECK_EQUAL(1, tv2.GetSize());
+	CHECK_EQUAL(1, tv2.GetRef(0));
+}
+
+
+TEST(TestQueryFindAll_ContainsUNICODE) {
+	TupleTableType ttt;
+
+	ttt.Add(0, uad "foo");
+	ttt.Add(0, uad "foobar");
+	ttt.Add(0, "bar" uad "foo");
+	ttt.Add(0, uad "bar" uad "foobaz");
+	ttt.Add(0, uad "fo");
+	ttt.Add(0, uad "fobar");
+	ttt.Add(0, uad "barfo");
+
+	Query q1 = ttt.GetQuery().second.Contains(uad "foo");
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(4, tv1.GetSize());
+	CHECK_EQUAL(0, tv1.GetRef(0));
+	CHECK_EQUAL(1, tv1.GetRef(1));
+	CHECK_EQUAL(2, tv1.GetRef(2));
+	CHECK_EQUAL(3, tv1.GetRef(3));
+
+	Query q2 = ttt.GetQuery().second.Contains(uAd "foo", false);
+	TableView tv2 = q1.FindAll(ttt);
+	CHECK_EQUAL(4, tv2.GetSize());
+	CHECK_EQUAL(0, tv2.GetRef(0));
+	CHECK_EQUAL(1, tv2.GetRef(1));
+	CHECK_EQUAL(2, tv2.GetRef(2));
+	CHECK_EQUAL(3, tv2.GetRef(3));
+}
+
+#endif
+
+TEST(TestQuerySyntaxCheck) {
+	TupleTableType ttt;
+	std::string s;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+
+	Query q1 = ttt.GetQuery().first.Equal(2).RightParan();
+	s = q1.Verify();
+	CHECK(s != "");
+
+	Query q2 = ttt.GetQuery().LeftParan().LeftParan().first.Equal(2).RightParan();
+	s = q2.Verify();
+	CHECK(s != "");
+
+	Query q3 = ttt.GetQuery().first.Equal(2).Or();
+	s = q3.Verify();
+	CHECK(s != "");
+
+	Query q4 = ttt.GetQuery().Or().first.Equal(2);
+	s = q4.Verify();
+	CHECK(s != "");
+
+	Query q5 = ttt.GetQuery().first.Equal(2);
+	s = q5.Verify();
+	CHECK(s == "");
+
+	Query q6 = ttt.GetQuery().LeftParan().first.Equal(2);
+	s = q6.Verify();
+	CHECK(s != "");
+
+	Query q7 = ttt.GetQuery().second.Equal("\xa0");
+	s = q7.Verify();
+	CHECK(s != "");
+}
 

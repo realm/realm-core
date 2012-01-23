@@ -4,17 +4,8 @@
 
 #include <string>
 #include <vector>
-#include "QueryEngine.h"
-
+#include "query/QueryEngine.h"
 #include <stdio.h>
-
-/*
-third.Equal(10).LeftParan().first.Equal(3).second.Greater(2).Or().first.Greater(5).RightParan() 
-
-todo, comments about how it works and rename variable names
-
-*/
-
 
 class Query {
 public:
@@ -27,6 +18,7 @@ public:
 		update = copy.update;
 		update_override = copy.update_override;
 		first = copy.first;
+		error_code = copy.error_code;
 		copy.first[0] = 0;
 	}
 
@@ -64,41 +56,7 @@ public:
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
-	Query& Equal(size_t column_id, const char *value, bool caseSensitive=true) {
-		char *copy = (char *)malloc(strlen(value) + 1);
-		memcpy(copy, value, strlen(value) + 1);
-		ParentNode* const p = new STRINGNODE<EQUAL>((const char *)copy, column_id);
-		UpdatePointers(p, &p->m_child);
-		return *this;
-	};
-	Query& BeginsWith(size_t column_id, const char *value, bool caseSensitive=true) {
-		char* const copy = (char *)malloc(strlen(value) + 1);
-		memcpy(copy, value, strlen(value) + 1);
-		ParentNode* const p = new STRINGNODE<BEGINSWITH>((const char *)copy, column_id);
-		UpdatePointers(p, &p->m_child);
-		return *this;
-	};
-	Query& EndsWith(size_t column_id, const char *value, bool caseSensitive=true) {
-		char* const copy = (char *)malloc(strlen(value) + 1);
-		memcpy(copy, value, strlen(value) + 1);
-		ParentNode* const p = new STRINGNODE<ENDSWITH>((const char *)copy, column_id);
-		UpdatePointers(p, &p->m_child);
-		return *this;
-	};
-	Query& Contains(size_t column_id, const char *value, bool caseSensitive=true) {
-		char* const copy = (char *)malloc(strlen(value) + 1);
-		memcpy(copy, value, strlen(value) + 1);
-		ParentNode* const p = new STRINGNODE<CONTAINS>((const char *)copy, column_id);
-		UpdatePointers(p, &p->m_child);
-		return *this;
-	};
-	Query& NotEqual(size_t column_id, const char * value, bool caseSensitive=true) {
-		char* const copy = (char *)malloc(strlen(value) + 1);
-		memcpy(copy, value, strlen(value) + 1);
-		ParentNode* const p = new STRINGNODE<NOTEQUAL>((const char *)copy, column_id);
-		UpdatePointers(p, &p->m_child);
-		return *this;
-	};
+
 	Query& Between(size_t column_id, int64_t from, int64_t to) {
 		ParentNode *p = new NODE<int64_t, Column, GREATEREQUAL>(from, column_id);
 		ParentNode* const p2 = p;
@@ -112,6 +70,56 @@ public:
 		UpdatePointers(p, &p->m_child);
 		return *this;
 	};
+
+
+	// STRINGS
+	Query& Equal(size_t column_id, const char* value, bool caseSensitive=true) {
+		ParentNode* p;
+		if(caseSensitive)
+			p = new STRINGNODE<EQUAL>(value, column_id);
+		else
+			p = new STRINGNODE<EQUAL_INS>(value, column_id);
+		UpdatePointers(p, &p->m_child);
+		return *this;
+	};
+	Query& BeginsWith(size_t column_id, const char* value, bool caseSensitive=true) {
+		ParentNode* p;
+		if(caseSensitive)
+			p = new STRINGNODE<BEGINSWITH>(value, column_id);
+		else
+			p = new STRINGNODE<BEGINSWITH_INS>(value, column_id);
+		UpdatePointers(p, &p->m_child);
+		return *this;
+	};
+	Query& EndsWith(size_t column_id, const char* value, bool caseSensitive=true) {
+		ParentNode* p; 
+		if(caseSensitive)
+			p = new STRINGNODE<ENDSWITH>(value, column_id);
+		else
+			p = new STRINGNODE<ENDSWITH_INS>(value, column_id);
+		UpdatePointers(p, &p->m_child);
+		return *this;
+	};
+	Query& Contains(size_t column_id, const char* value, bool caseSensitive=true) {
+		ParentNode* p; 
+		if(caseSensitive)
+			p = new STRINGNODE<CONTAINS>(value, column_id);
+		else
+			p = new STRINGNODE<CONTAINS_INS>(value, column_id);
+		UpdatePointers(p, &p->m_child);
+		return *this;
+	};
+	Query& NotEqual(size_t column_id, const char* value, bool caseSensitive=true) {
+		ParentNode* p;
+		if(caseSensitive)
+			p = new STRINGNODE<NOTEQUAL>(value, column_id);
+		else
+			p = new STRINGNODE<NOTEQUAL_INS>(value, column_id);
+		UpdatePointers(p, &p->m_child);
+		return *this;
+	};
+
+
 
 	void LeftParan(void) {
 		update.push_back(0);
@@ -127,6 +135,11 @@ public:
 	};
 
 	void RightParan(void) {
+		if(first.size() < 2) {
+			error_code = "Unbalanced blockBegin/blockEnd";
+			return;
+		}
+
 		if (update[update.size()-2] != 0)
 			*update[update.size()-2] = first[first.size()-1];
 		
@@ -179,6 +192,19 @@ public:
 			return r;
 	}
 
+	std::string Verify(void) {
+		if(first.size() == 0)
+			return "";
+
+		if(error_code != "") // errors detected by QueryInterface
+			return error_code;
+
+		if(first[0] == 0)
+			return "Syntax error";
+
+		return first[0]->Verify(); // errors detected by QueryEngine
+	}
+
 protected:
 	friend class XQueryAccessorInt;
 	friend class XQueryAccessorString;
@@ -196,6 +222,9 @@ protected:
 	mutable std::vector<ParentNode *>first;
 	std::vector<ParentNode **>update;
 	std::vector<ParentNode **>update_override;
+
+	private:
+		std::string error_code;
 };
 
 class XQueryAccessorInt {

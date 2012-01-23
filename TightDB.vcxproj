@@ -40,7 +40,6 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -120,6 +119,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>
     <Link>
       <AdditionalDependencies>x64\Debug\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -190,6 +190,7 @@
     <ClCompile Include="src\ctightdb.cpp" />
     <ClCompile Include="src\Group.cpp" />
     <ClCompile Include="src\Index.cpp" />
+    <ClCompile Include="src\utf8.cpp" />
     <ClCompile Include="src\utilities.cpp">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
     </ClCompile>
@@ -197,7 +198,9 @@
     <ClCompile Include="test\large_tests\test_strings.cpp" />
     <ClCompile Include="test\large_tests\verified_integer.cpp" />
     <ClCompile Include="test\large_tests\verified_string.cpp" />
-    <ClCompile Include="test\main.cpp" />
+    <ClCompile Include="test\main.cpp">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</CompileAs>
+    </ClCompile>
     <ClCompile Include="src\Table.cpp" />
     <ClCompile Include="src\TableView.cpp" />
     <ClCompile Include="test\testalloc.cpp" />
@@ -233,6 +236,7 @@
     <ClInclude Include="src\query\QueryEngine.h" />
     <ClInclude Include="src\Table.h" />
     <ClInclude Include="src\tightdb.h" />
+    <ClInclude Include="src\utf8.h" />
     <ClInclude Include="src\utilities.h" />
     <ClInclude Include="test\large_tests\verified_integer.h" />
     <ClInclude Include="test\large_tests\verified_string.h" />
