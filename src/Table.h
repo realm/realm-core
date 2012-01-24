@@ -15,6 +15,7 @@ class TableView;
 class Group;
 class ColumnTable;
 class ColumnMixed;
+class TopLevelTable;
 
 class Mixed {
 public:
@@ -79,7 +80,7 @@ class Table {
 public:
 	Table(Allocator& alloc=GetDefaultAllocator());
 	Table(const Table& t);
-	~Table();
+	virtual ~Table();
 
 	// Column meta info
 	size_t GetColumnCount() const;
@@ -135,6 +136,7 @@ public:
 	// Mixed
 	Mixed GetMixed(size_t column_id, size_t ndx) const;
 	ColumnType GetMixedType(size_t column_id, size_t ndx) const;
+	TopLevelTable GetMixedTable(size_t column_id, size_t ndx);
 	void InsertMixed(size_t column_id, size_t ndx, Mixed value);
 	void SetMixed(size_t column_id, size_t ndx, Mixed value);
 
@@ -227,11 +229,12 @@ class TopLevelTable : public Table {
 public:
 	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
 	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx);
+	TopLevelTable(const TopLevelTable& t);
 	~TopLevelTable();
 
 	void UpdateFromSpec(size_t ref_specSet);
 	size_t GetRef() const;
-	void Invalidate() {m_top.Invalidate();}
+	void SetParent(Array* parent, size_t pndx);
 
 	// Debug
 #ifdef _DEBUG
@@ -241,8 +244,6 @@ public:
 protected:
 	friend class Group;
 
-	void SetParent(Array* parent, size_t pndx);
-
 	// Serialization
 	template<class S> size_t Write(S& out, size_t& pos) const;
 
@@ -250,7 +251,6 @@ protected:
 	Array m_top;
 
 private:
-	TopLevelTable(const TopLevelTable&) {}            // not copyable
 	TopLevelTable& operator=(const TopLevelTable&) {return *this;} // non assignable
 };
 

@@ -564,6 +564,21 @@ TEST(Table_Mixed) {
 	CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).GetBinary().pointer);
 	CHECK_EQUAL(7,      table.GetMixed(1, 4).GetBinary().len);
 	
+	// Get table from mixed column and add schema and some values
+	Table* const subtable = table.GetTablePtr(1, 5);
+	subtable->RegisterColumn(COLUMN_TYPE_STRING, "name");
+	subtable->RegisterColumn(COLUMN_TYPE_INT,    "age");
+	
+	subtable->InsertString(0, 0, "John");
+	subtable->InsertInt(1, 0, 40);
+	delete subtable;
+	
+	// Get same table again and verify values
+	Table* const subtable2 = table.GetTablePtr(1, 5);
+	CHECK_EQUAL(1, subtable2->GetSize());
+	CHECK_EQUAL("John", subtable2->GetString(0, 0));
+	CHECK_EQUAL(40, subtable2->Get(1, 0));
+	
 #ifdef _DEBUG
 	table.Verify();
 #endif //_DEBUG

@@ -167,12 +167,34 @@ TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, si
 	m_specSet.SetParent(&m_top, 0);
 }
 
+TopLevelTable::TopLevelTable(const TopLevelTable& t) {
+	// NOTE: Original should be destroyed right after copy. Do not modify
+	// original after this. It could invalidate the copy (or worse).
+	// TODO: implement ref-counting
+	
+	const size_t ref    = t.m_top.GetRef();
+	Array* const parent = t.m_top.GetParent();
+	const size_t pndx   = t.m_top.GetParentNdx();
+	
+	// Load from allocated memory
+    m_top.UpdateRef(ref);
+    m_top.SetParent(parent, pndx);
+    assert(m_top.Size() == 2);
+	
+	const size_t ref_specSet = m_top.Get(0);
+	const size_t ref_columns = m_top.Get(1);
+	
+	Create(ref_specSet, ref_columns, &m_top, 1);
+	m_specSet.SetParent(&m_top, 0);
+}
+
 TopLevelTable::~TopLevelTable() {
 	// free cached columns
 	ClearCachedColumns();
 
-	// Destroying m_top will also destroy specSet and columns
-	m_top.Destroy();
+	// Clean-up if we are not attached to a parent
+	// (destroying m_top will also destroy specSet and columns)
+	if (!m_top.HasParent()) m_top.Destroy();
 }
 
 void TopLevelTable::UpdateFromSpec(size_t ref_specSet) {
@@ -695,13 +717,32 @@ Table Table::GetTable(size_t column_id, size_t ndx) {
 	return subtables.GetTable(ndx);
 }
 
+TopLevelTable Table::GetMixedTable(size_t column_id, size_t ndx) {
+	assert(column_id < GetColumnCount());
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_MIXED);
+	assert(ndx < m_size);
+	
+	ColumnMixed& subtables = GetColumnMixed(column_id);
+	return subtables.GetTable(ndx);
+}
+
 Table* Table::GetTablePtr(size_t column_id, size_t ndx) {
 	assert(column_id < GetColumnCount());
-	assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
 	assert(ndx < m_size);
-
-	ColumnTable& subtables = GetColumnTable(column_id);
-	return subtables.GetTablePtr(ndx);
+	
+	const ColumnType type = GetRealColumnType(column_id);
+	if (type == COLUMN_TYPE_TABLE) {
+		ColumnTable& subtables = GetColumnTable(column_id);
+		return subtables.GetTablePtr(ndx);
+	}
+	else if (type == COLUMN_TYPE_MIXED) {
+		ColumnMixed& subtables = GetColumnMixed(column_id);
+		return subtables.GetTablePtr(ndx);
+	}
+	else {
+		assert(false);
+		return NULL;
+	}
 }
 
 size_t Table::GetTableSize(size_t column_id, size_t ndx) const {

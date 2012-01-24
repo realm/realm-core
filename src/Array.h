@@ -73,6 +73,7 @@ public:
 	bool operator==(const Array& a) const;
 
 	void SetType(ColumnDef type);
+	bool HasParent() const {return m_parent != NULL;}
 	void SetParent(Array* parent, size_t pndx);
 	void UpdateParentNdx(int diff) {m_parentNdx += diff;}
 	Array* GetParent() const {return m_parent;}

@@ -56,10 +56,7 @@ void Group::Create() {
 Group::~Group() {
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
 		TopLevelTable* const t = (TopLevelTable*)m_cachedtables.Get(i);
-		if (t) {
-			t->Invalidate(); // don't destroy subtree yet
-			delete t;
-		}
+		delete t;
 	}
 	m_cachedtables.Destroy();
 

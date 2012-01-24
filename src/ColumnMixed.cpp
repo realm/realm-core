@@ -150,7 +150,22 @@ BinaryData ColumnMixed::GetBinary(size_t ndx) const {
 	return m_data->Get(ref);
 }
 
-Table* ColumnMixed::GetTablePtr(size_t ndx) {
+TopLevelTable ColumnMixed::GetTable(size_t ndx) {
+	assert(ndx < m_types->Size());
+	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
+	
+	const size_t ref = m_refs->Get(ndx);
+	Allocator& alloc = m_array->GetAllocator();
+	
+	// Get parent info for subtable
+	Array* parent = NULL;
+	size_t pndx   = 0;
+	m_refs->GetParentInfo(ndx, parent, pndx);
+	
+	return TopLevelTable(alloc, ref, parent, pndx);
+}
+
+TopLevelTable* ColumnMixed::GetTablePtr(size_t ndx) {
 	assert(ndx < m_types->Size());
 	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
 	
@@ -238,8 +253,13 @@ void ColumnMixed::InsertTable(size_t ndx) {
 	
 	m_types->Insert(ndx, COLUMN_TYPE_TABLE);
 	m_refs->Insert(ndx, table.GetRef());
-	
-	table.Invalidate(); // don't delete tree
+
+	// Get parent info for subtable
+	Array* parent = NULL;
+	size_t pndx   = 0;
+	m_refs->GetParentInfo(ndx, parent, pndx);
+
+	table.SetParent(parent, pndx); // now the sub-tree won't be deleted
 }
 
 void ColumnMixed::SetInt(size_t ndx, int64_t value) {
@@ -359,7 +379,12 @@ void ColumnMixed::SetTable(size_t ndx) {
 	
 	m_refs->Set(ndx, table.GetRef());
 	
-	table.Invalidate(); // don't delete tree
+	// Get parent info for subtable
+	Array* parent = NULL;
+	size_t pndx   = 0;
+	m_refs->GetParentInfo(ndx, parent, pndx);
+	
+	table.SetParent(parent, pndx); // now the sub-tree won't be deleted
 }
 
 bool ColumnMixed::Add() {

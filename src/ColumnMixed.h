@@ -26,7 +26,9 @@ public:
 	time_t GetDate(size_t ndx) const;
 	const char* GetString(size_t ndx) const;
 	BinaryData GetBinary(size_t ndx) const;
-	Table* GetTablePtr(size_t ndx);
+	
+	TopLevelTable GetTable(size_t ndx);
+	TopLevelTable* GetTablePtr(size_t ndx);
 	
 	void SetInt(size_t ndx, int64_t value);
 	void SetBool(size_t ndx, bool value);
