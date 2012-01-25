@@ -902,7 +902,7 @@ Mixed Table::GetMixed(size_t column_id, size_t ndx) const {
 		case COLUMN_TYPE_BOOL:
 			return Mixed(column.GetBool(ndx));
 		case COLUMN_TYPE_DATE:
-			return Mixed(column.GetDate(ndx));
+			return Mixed(Date(column.GetDate(ndx)));
 		case COLUMN_TYPE_STRING:
 			return Mixed(column.GetString(ndx));
 		case COLUMN_TYPE_BINARY:

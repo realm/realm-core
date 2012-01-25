@@ -505,9 +505,8 @@ TEST(Table_Mixed) {
 	CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
 	CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
 	
-	const time_t date = 324234;
 	table.InsertInt(0, 3, 0);
-	table.InsertMixed(1, 3, date);
+	table.InsertMixed(1, 3, Date(324234));
 	table.InsertDone();
 	
 	CHECK_EQUAL(0,  table.Get(0, 0));
@@ -593,7 +592,7 @@ TEST(Table_Mixed2) {
 	
 	table.Add((int64_t)1);
 	table.Add(true);
-	table.Add((time_t)1234);
+	table.Add(Date(1234));
 	table.Add("test");
 
 	CHECK_EQUAL(COLUMN_TYPE_INT,    table[0].first.GetType());

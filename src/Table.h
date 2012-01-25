@@ -17,11 +17,19 @@ class ColumnTable;
 class ColumnMixed;
 class TopLevelTable;
 
+class Date {
+public:
+	Date(time_t d) : m_date(d) {}
+	time_t GetDate() const {return m_date;}
+private:
+	time_t m_date;
+};
+
 class Mixed {
 public:
 	explicit Mixed(ColumnType v)  {assert(v = COLUMN_TYPE_TABLE); m_type = COLUMN_TYPE_TABLE;}
 	Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
-	Mixed(time_t v)      {m_type = COLUMN_TYPE_DATE;   m_date = v;}
+	Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.GetDate();}
 	Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
 	Mixed(const char* v) {m_type = COLUMN_TYPE_STRING; m_str  = v;}
 	Mixed(BinaryData v)  {m_type = COLUMN_TYPE_BINARY; m_str = (const char*)v.pointer; m_len = v.len;}
