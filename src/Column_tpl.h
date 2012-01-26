@@ -373,9 +373,12 @@ template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start,
 
 				s = 0;
 				if (end != (size_t)-1) {
-					if (end >= (size_t)offsets.Get(i)) e = (size_t)-1;
+					if (end >= (size_t)offsets.Get(i))
+						e = (size_t)-1;
 					else {
 						offset = (size_t)offsets.Get(i-1);
+						if(offset >= end)
+							break;
 						e = end - offset;
 					}
 				}
@@ -417,6 +420,8 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T valu
 				if (end >= (size_t)offsets.Get(i)) e = (size_t)-1;
 				else {
 					offset = (size_t)offsets.Get(i-1);
+					if(offset >= end)
+						return;
 					e = end - offset;
 				}
 			}
@@ -456,9 +461,9 @@ template<typename T, class C> void ColumnBase::TreeVisitLeafs(size_t start, size
 				if (end >= (size_t)offsets.Get(i)) e = (size_t)-1;
 				else {
 					offset = (size_t)offsets.Get(i-1);
-					e = end - offset;
-					if(offset > end)
+					if(offset >= end)
 						return;
+					e = end - offset;
 				}
 			}
 		}
