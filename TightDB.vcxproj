@@ -126,6 +126,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX64</TargetMachine>
+      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -173,6 +174,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX64</TargetMachine>
+      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -194,6 +196,7 @@
     <ClCompile Include="src\utilities.cpp">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
     </ClCompile>
+    <ClCompile Include="src\win32\pthread\pthread.c" />
     <ClCompile Include="test\large_tests\test_column.cpp" />
     <ClCompile Include="test\large_tests\test_strings.cpp" />
     <ClCompile Include="test\large_tests\verified_integer.cpp" />
@@ -238,6 +241,7 @@
     <ClInclude Include="src\tightdb.h" />
     <ClInclude Include="src\utf8.h" />
     <ClInclude Include="src\utilities.h" />
+    <ClInclude Include="src\win32\pthread\pthread.h" />
     <ClInclude Include="test\large_tests\verified_integer.h" />
     <ClInclude Include="test\large_tests\verified_string.h" />
     <ClInclude Include="test\testsettings.h" />

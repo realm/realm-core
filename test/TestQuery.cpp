@@ -1,5 +1,6 @@
 #include "tightdb.h"
 #include <UnitTest++.h>
+#include "../../test/UnitTest++/src/Win32/TimeHelpers.h"
 
 TDB_TABLE_2(TupleTableType,
 	Int, first,
@@ -8,6 +9,36 @@ TDB_TABLE_2(TupleTableType,
 TDB_TABLE_2(BoolTupleTable,
 	Int, first,
 	Bool, second)
+
+
+TEST(TestQueryThreads) {
+	TupleTableType ttt;
+
+	// Spread query search hits in an odd way to test more edge cases
+	// (thread job size is THREAD_CHUNK_SIZE = 10)
+	for(int i = 0; i < 100; i++) {
+		for(int j = 0; j < 10; j++) {
+			ttt.Add(5, "a");
+			ttt.Add(j, "b");
+			ttt.Add(6, "c");
+			ttt.Add(6, "a");
+			ttt.Add(6, "b");
+			ttt.Add(6, "c");
+			ttt.Add(6, "a");
+		}
+	}
+	Query q1 = ttt.GetQuery().first.Equal(2).second.Equal("b");
+
+	// Note, set THREAD_CHUNK_SIZE to 100.000 or more for performance
+	q1.SetThreads(5);
+	TableView tv = q1.FindAll(ttt);
+
+	CHECK_EQUAL(100, tv.GetSize());
+	for(int i = 0; i < 100; i++) {
+		CHECK_EQUAL(i*7*10 + 14 + 1, tv.GetRef(i));
+	}
+
+}
 
 
 TEST(TestQuerySimple) {
