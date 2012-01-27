@@ -44,9 +44,9 @@ Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_paren
 
 // Header format (8 bytes):
 // |--------|--------|--------|--------|--------|--------|--------|--------|
-// |12---333|          length          |         capacity         |reserved|
+// |12-33444|          length          |         capacity         |reserved|
 //
-//  1: isNode  2: hasRefs  3: width (packed in 3 bits)
+//  1: isNode  2: hasRefs  3: multiplier  4: width (packed in 3 bits)
 
 void Array::set_header_isnode(bool value, void* header) {
 	uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
@@ -56,6 +56,16 @@ void Array::set_header_hasrefs(bool value, void* header) {
 	uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
 	header2[0] = (header2[0] & (~0x40)) | ((uint8_t)value << 6);
 }
+
+void Array::set_header_wtype(WidthType value, void* header) {
+	// Indicates how to calculate size in bytes based on width
+	// 0: bits      (width/8) * length
+	// 1: multiply  width * length
+	// 2: ignore    1 * length
+	uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
+	header2[0] = (header2[0] & (~0x18)) | ((uint8_t)value << 3);
+}
+
 void Array::set_header_width(size_t value, void* header) {
 	// Pack width in 3 bits (log2)
 	unsigned int w = 0;
@@ -81,23 +91,27 @@ void Array::set_header_capacity(size_t value, void* header) {
 	header2[6] = value & 0x000000FF;
 }
 
-bool Array::get_header_isnode(const void* header) {
+bool Array::get_header_isnode(const void* header) const {
 	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
 	return (header2[0] & 0x80) != 0;
 }
-bool Array::get_header_hasrefs(const void* header) {
+bool Array::get_header_hasrefs(const void* header) const {
 	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
 	return (header2[0] & 0x40) != 0;
 }
-size_t Array::get_header_width(const void* header) {
+Array::WidthType Array::get_header_wtype(const void* header) const {
+	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
+	return (WidthType)((header2[0] & 0x18) >> 3);
+}
+size_t Array::get_header_width(const void* header) const {
 	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
 	return (1 << (header2[0] & 0x07)) >> 1;
 }
-size_t Array::get_header_len(const void* header) {
+size_t Array::get_header_len(const void* header) const {
 	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
 	return (header2[1] << 16) + (header2[2] << 8) + header2[3];
 }
-size_t Array::get_header_capacity(const void* header) {
+size_t Array::get_header_capacity(const void* header) const {
 	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
 	return (header2[4] << 16) + (header2[5] << 8) + header2[6];
 }
@@ -1223,6 +1237,7 @@ bool Array::Alloc(size_t count, size_t width) {
 			if (isFirst) {
 				set_header_isnode(m_isNode);
 				set_header_hasrefs(m_hasRefs);
+				set_header_wtype(GetWidthType());
 				set_header_width(width);
 			}
 			set_header_capacity(new_capacity);

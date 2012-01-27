@@ -40,9 +40,6 @@ public:
 	void SetParent(Array* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 	void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
-	// Serialization
-	template<class S> size_t Write(S& out, size_t& pos) const;
-
 #ifdef _DEBUG
 	void Verify() const {};
 #endif //_DEBUG
@@ -60,20 +57,7 @@ protected:
 	bool LeafSet(size_t ndx, BinaryData value);
 	bool LeafInsert(size_t ndx, BinaryData value);
 	void LeafDelete(size_t ndx);
-	template<class S> size_t LeafWrite(S& out, size_t& pos) const;
 };
-
-// Templates
-
-template<class S>
-size_t ColumnBinary::Write(S& out, size_t& pos) const {
-	return TreeWrite<const char*, ColumnBinary>(out, pos);
-}
-
-template<class S>
-size_t ColumnBinary::LeafWrite(S& out, size_t& pos) const {
-	return ((ArrayBinary*)m_array)->Write(out, pos);
-}
 
 #endif //__TDB_COLUMN_BINARY__
 

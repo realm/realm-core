@@ -143,9 +143,6 @@ public:
 
 	void Sort();
 
-	// Serialization
-	template<class S> size_t Write(S& out, size_t& pos) const;
-
 	// Debug
 #ifdef _DEBUG
 	bool Compare(const Column& c) const;
@@ -169,8 +166,6 @@ protected:
 	bool LeafInsert(size_t ndx, int64_t value) {return m_array->Insert(ndx, value);}
 	void LeafDelete(size_t ndx) {m_array->Delete(ndx);}
 	size_t LeafFind(int64_t value, size_t start, size_t end) const {return m_array->Find(value, start, end);}
-
-	template<class S> size_t LeafWrite(S& out, size_t& pos) const;
 
 	void DoSort(size_t lo, size_t hi);
 

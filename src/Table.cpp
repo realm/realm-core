@@ -1208,6 +1208,7 @@ void Table::Verify() const {
 		switch (type) {
 		case COLUMN_TYPE_INT:
 		case COLUMN_TYPE_BOOL:
+		case COLUMN_TYPE_DATE:
 			{
 				const Column& column = GetColumn(i);
 				assert(column.Size() == m_size);
@@ -1227,6 +1228,8 @@ void Table::Verify() const {
 				assert(column.Size() == m_size);
 				column.Verify();
 			}
+			break;
+		case COLUMN_TYPE_BINARY:
 			break;
 		case COLUMN_TYPE_TABLE:
 			break;
