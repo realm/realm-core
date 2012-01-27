@@ -243,6 +243,7 @@ bool SlabAlloc::SetShared(const char* path) {
 	// Map to memory (read only)
 	const HANDLE hMapFile = CreateFileMapping(m_fd, NULL, PAGE_WRITECOPY, 0, 0, 0);
 	if (hMapFile == NULL || hMapFile == INVALID_HANDLE_VALUE) {
+		CloseHandle(m_fd);
 		return false;
 	}
 	const LPCTSTR pBuf = (LPTSTR) MapViewOfFile(hMapFile, FILE_MAP_COPY, 0, 0, 0);
