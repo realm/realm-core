@@ -265,18 +265,14 @@ size_t Array::Write(S& out, size_t& pos, bool recurse) const {
 		
 		// TODO: replace capacity with checksum
 		
-		// Write array
+		// Calculate complete size
 		len += 8; // include header in total
-		out.write((const char*)m_data-8, len);
-		
-		// Pad so next block will be 64bit aligned
-		const char pad[8] = {0,0,0,0,0,0,0,0};
 		const size_t rest = (~len & 0x7)+1; // CHECK
-		if (rest < 8) {
-			out.write(pad, rest);
-			pos += len + rest;
-		}
-		else pos += len;
+		if (rest < 8) len += rest; // Add padding for 64bit alignment
+		
+		// Write array
+		out.write((const char*)m_data-8, len);
+		pos += len;
 		
 		return array_pos; // Return position of this array
 	}
