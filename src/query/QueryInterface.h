@@ -14,7 +14,7 @@
 #endif
 
 const int MAX_THREADS = 128;
-const int THREAD_CHUNK_SIZE = 10;
+const int THREAD_CHUNK_SIZE = 100000;
 
 class Query {
 public:
@@ -165,13 +165,13 @@ public:
 		update_override.pop_back();
 	};
 
-	TableView FindAll(Table& table, size_t start = 0, size_t end = -1) {
+	TableView FindAll(Table& table, size_t start = 0, size_t end = -1, size_t limit = -1) {
 		TableView tv(table);
-		FindAll(table, tv, start, end);
+		FindAll(table, tv, start, end, limit);
 		return tv;
 	}
 
-	void FindAll(Table& table, TableView& tv, size_t start = 0, size_t end = -1) {
+	void FindAll(Table& table, TableView& tv, size_t start = 0, size_t end = -1, size_t limit = -1) {
 		size_t r  = start - 1;
 		if(end == -1)
 			end = table.GetSize();
@@ -190,7 +190,7 @@ public:
 			// Use single threading
 			for(;;) {
 				r = first[0]->Find(r + 1, table.GetSize(), table);
-				if(r == table.GetSize())
+				if(r == table.GetSize() || tv.GetSize() == limit)
 					break;
 				tv.GetRefColumn().Add(r);
 			}

@@ -75,6 +75,44 @@ TEST(TestQuerySimple2) {
 	CHECK_EQUAL(7, tv1.GetRef(2));
 }
 
+
+TEST(TestQueryLimit) {
+	TupleTableType ttt;
+	
+	ttt.Add(1, "a");
+	ttt.Add(2, "a"); //
+	ttt.Add(3, "X");
+	ttt.Add(1, "a");
+	ttt.Add(2, "a"); //
+	ttt.Add(3, "X");
+	ttt.Add(1, "a");
+	ttt.Add(2, "a"); //
+	ttt.Add(3, "X");
+	ttt.Add(1, "a");
+	ttt.Add(2, "a"); //
+	ttt.Add(3, "X");
+	ttt.Add(1, "a");
+	ttt.Add(2, "a"); //
+	ttt.Add(3, "X");
+	
+	Query q1 = ttt.GetQuery().first.Equal(2);
+	
+	TableView tv1 = q1.FindAll(ttt, 0, -1, 2);
+	CHECK_EQUAL(2, tv1.GetSize());
+	CHECK_EQUAL(1, tv1.GetRef(0));
+	CHECK_EQUAL(4, tv1.GetRef(1));
+
+	TableView tv2 = q1.FindAll(ttt, tv1.GetRef(tv1.GetSize() - 1) + 1, -1, 2);
+	CHECK_EQUAL(2, tv2.GetSize());
+	CHECK_EQUAL(7, tv2.GetRef(0));
+	CHECK_EQUAL(10, tv2.GetRef(1));
+	
+	TableView tv3 = q1.FindAll(ttt, tv2.GetRef(tv2.GetSize() - 1) + 1, -1, 2);
+	CHECK_EQUAL(1, tv3.GetSize());
+	CHECK_EQUAL(13, tv3.GetRef(0));
+}
+
+
 TEST(TestQueryFindAll1) {
 	TupleTableType ttt;
 
