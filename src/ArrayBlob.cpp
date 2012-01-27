@@ -70,3 +70,7 @@ void ArrayBlob::Clear() {
 size_t ArrayBlob::CalcByteLen(size_t count, size_t) const {
 	return 8 + count; // include room for header
 }
+
+size_t ArrayBlob::CalcItemCount(size_t bytes, size_t) const {
+	return bytes - 8;
+}

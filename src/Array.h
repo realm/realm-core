@@ -69,6 +69,7 @@ public:
 	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	Array(Allocator& alloc);
 	Array(const Array& a);
+	virtual ~Array();
 
 	bool operator==(const Array& a) const;
 
@@ -83,7 +84,7 @@ public:
 	bool IsValid() const {return m_data != NULL;}
 	void Invalidate() const {m_data = NULL;}
 
-	size_t Size() const {return m_len;}
+	virtual size_t Size() const {return m_len;}
 	bool IsEmpty() const {return m_len == 0;}
 
 	bool Insert(size_t ndx, int64_t value);

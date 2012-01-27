@@ -20,6 +20,7 @@ public:
 
 private:
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
+	virtual size_t CalcItemCount(size_t bytes, size_t width) const;
 	virtual WidthType GetWidthType() const {return TDB_IGNORE;}
 };
 

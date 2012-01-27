@@ -42,6 +42,8 @@ Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_paren
 	src.Invalidate();
 }
 
+Array::~Array() {}
+
 // Header format (8 bytes):
 // |--------|--------|--------|--------|--------|--------|--------|--------|
 // |12-33444|          length          |         capacity         |reserved|
