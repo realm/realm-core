@@ -15,7 +15,7 @@ public:
 	~SlabAlloc();
 
 	bool SetShared(const char* path);
-	void SetSharedBuffer(const char* buffer, size_t len);
+	bool SetSharedBuffer(const char* buffer, size_t len);
 
 	MemRef Alloc(size_t size);
 	MemRef ReAlloc(size_t ref, void* p, size_t size);

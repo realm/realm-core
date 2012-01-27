@@ -223,10 +223,16 @@ bool SlabAlloc::IsReadOnly(size_t ref) const {
 	return ref < m_baseline;
 }
 
-void SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
+bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
+	// Verify that the topref points to a location within buffer.
+	// This is currently the only integrity check we make
+	const size_t ref = *(uint64_t*)buffer;
+	if (ref > len) return false;
+
 	m_shared = (char*)buffer;
 	m_baseline = len;
 	m_owned = true; // we now own the buffer
+	return true;
 }
 
 bool SlabAlloc::SetShared(const char* path) {

@@ -6,11 +6,13 @@
 #include "AllocSlab.h"
 #include "ColumnStringEnum.h"
 #include "ColumnTable.h"
+#include "ColumnMixed.h"
 
 const ColumnType Accessor::type       = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type   = COLUMN_TYPE_BOOL;
 const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
 const ColumnType AccessorDate::type   = COLUMN_TYPE_DATE;
+const ColumnType AccessorMixed::type  = COLUMN_TYPE_MIXED;
 
 // -- Spec ------------------------------------------------------------------------------------
 
@@ -165,12 +167,34 @@ TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, si
 	m_specSet.SetParent(&m_top, 0);
 }
 
+TopLevelTable::TopLevelTable(const TopLevelTable& t) {
+	// NOTE: Original should be destroyed right after copy. Do not modify
+	// original after this. It could invalidate the copy (or worse).
+	// TODO: implement ref-counting
+	
+	const size_t ref    = t.m_top.GetRef();
+	Array* const parent = t.m_top.GetParent();
+	const size_t pndx   = t.m_top.GetParentNdx();
+	
+	// Load from allocated memory
+    m_top.UpdateRef(ref);
+    m_top.SetParent(parent, pndx);
+    assert(m_top.Size() == 2);
+	
+	const size_t ref_specSet = m_top.Get(0);
+	const size_t ref_columns = m_top.Get(1);
+	
+	Create(ref_specSet, ref_columns, &m_top, 1);
+	m_specSet.SetParent(&m_top, 0);
+}
+
 TopLevelTable::~TopLevelTable() {
 	// free cached columns
 	ClearCachedColumns();
 
-	// Destroying m_top will also destroy specSet and columns
-	m_top.Destroy();
+	// Clean-up if we are not attached to a parent
+	// (destroying m_top will also destroy specSet and columns)
+	if (!m_top.HasParent()) m_top.Destroy();
 }
 
 void TopLevelTable::UpdateFromSpec(size_t ref_specSet) {
@@ -308,6 +332,11 @@ void Table::CreateColumns() {
 				++subtable_count;
 			}
 				break;
+			case COLUMN_TYPE_MIXED:
+				newColumn = new ColumnMixed(alloc);
+				m_columns.Add(((ColumnMixed*)newColumn)->GetRef());
+				((ColumnMixed*)newColumn)->SetParent(&m_columns, ref_pos);
+				break;
 			default:
 				assert(false);
 		}
@@ -382,6 +411,10 @@ void Table::CacheColumns() {
 				colsize = ((ColumnTable*)newColumn)->Size();
                 break;
 			}
+			case COLUMN_TYPE_MIXED:
+				newColumn = new ColumnMixed(ref, &m_columns, column_ndx, alloc);
+				colsize = ((ColumnMixed*)newColumn)->Size();
+                break;
 
             default:
                 assert(false);
@@ -507,6 +540,11 @@ size_t Table::RegisterColumn(ColumnType type, const char* name) {
 		m_columns.Add(((ColumnBinary*)newColumn)->GetRef());
 		((ColumnBinary*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
 		break;
+	case COLUMN_TYPE_MIXED:
+		newColumn = new ColumnMixed(alloc);
+		m_columns.Add(((ColumnMixed*)newColumn)->GetRef());
+		((ColumnMixed*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
+		break;
 	default:
 		assert(false);
 	}
@@ -611,6 +649,17 @@ const ColumnTable& Table::GetColumnTable(size_t ndx) const {
 	return *(const ColumnTable* const)m_cols.Get(ndx);
 }
 
+ColumnMixed& Table::GetColumnMixed(size_t ndx) {
+	assert(ndx < GetColumnCount());
+	InstantiateBeforeChange();
+	return *(ColumnMixed* const)m_cols.Get(ndx);
+}
+
+const ColumnMixed& Table::GetColumnMixed(size_t ndx) const {
+	assert(ndx < GetColumnCount());
+	return *(const ColumnMixed* const)m_cols.Get(ndx);
+}
+
 size_t Table::AddRow() {
 	const size_t count = GetColumnCount();
 	for (size_t i = 0; i < count; ++i) {
@@ -668,13 +717,32 @@ Table Table::GetTable(size_t column_id, size_t ndx) {
 	return subtables.GetTable(ndx);
 }
 
+TopLevelTable Table::GetMixedTable(size_t column_id, size_t ndx) {
+	assert(column_id < GetColumnCount());
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_MIXED);
+	assert(ndx < m_size);
+	
+	ColumnMixed& subtables = GetColumnMixed(column_id);
+	return subtables.GetTable(ndx);
+}
+
 Table* Table::GetTablePtr(size_t column_id, size_t ndx) {
 	assert(column_id < GetColumnCount());
-	assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
 	assert(ndx < m_size);
-
-	ColumnTable& subtables = GetColumnTable(column_id);
-	return subtables.GetTablePtr(ndx);
+	
+	const ColumnType type = GetRealColumnType(column_id);
+	if (type == COLUMN_TYPE_TABLE) {
+		ColumnTable& subtables = GetColumnTable(column_id);
+		return subtables.GetTablePtr(ndx);
+	}
+	else if (type == COLUMN_TYPE_MIXED) {
+		ColumnMixed& subtables = GetColumnMixed(column_id);
+		return subtables.GetTablePtr(ndx);
+	}
+	else {
+		assert(false);
+		return NULL;
+	}
 }
 
 size_t Table::GetTableSize(size_t column_id, size_t ndx) const {
@@ -821,6 +889,108 @@ void Table::InsertBinary(size_t column_id, size_t ndx, const void* value, size_t
 	column.Insert(ndx, value, len);
 }
 
+Mixed Table::GetMixed(size_t column_id, size_t ndx) const {
+	assert(column_id < m_columns.Size());
+	assert(ndx < m_size);
+
+	const ColumnMixed& column = GetColumnMixed(column_id);
+	const ColumnType   type   = column.GetType(ndx);
+
+	switch (type) {
+		case COLUMN_TYPE_INT:
+			return Mixed(column.GetInt(ndx));
+		case COLUMN_TYPE_BOOL:
+			return Mixed(column.GetBool(ndx));
+		case COLUMN_TYPE_DATE:
+			return Mixed(Date(column.GetDate(ndx)));
+		case COLUMN_TYPE_STRING:
+			return Mixed(column.GetString(ndx));
+		case COLUMN_TYPE_BINARY:
+			return Mixed(column.GetBinary(ndx));
+		case COLUMN_TYPE_TABLE:
+			return Mixed(COLUMN_TYPE_TABLE);
+		default:
+			assert(false);
+			return Mixed((int64_t)0);
+	}
+}
+
+ColumnType Table::GetMixedType(size_t column_id, size_t ndx) const {
+	assert(column_id < m_columns.Size());
+	assert(ndx < m_size);
+
+	const ColumnMixed& column = GetColumnMixed(column_id);
+	return column.GetType(ndx);
+}
+
+void Table::SetMixed(size_t column_id, size_t ndx, Mixed value) {
+	assert(column_id < GetColumnCount());
+	assert(ndx < m_size);
+
+	ColumnMixed& column = GetColumnMixed(column_id);
+	const ColumnType type = value.GetType();
+
+	switch (type) {
+		case COLUMN_TYPE_INT:
+			column.SetInt(ndx, value.GetInt());
+			break;
+		case COLUMN_TYPE_BOOL:
+			column.SetBool(ndx, value.GetBool());
+			break;
+		case COLUMN_TYPE_DATE:
+			column.SetDate(ndx, value.GetDate());
+			break;
+		case COLUMN_TYPE_STRING:
+			column.SetString(ndx, value.GetString());
+			break;
+		case COLUMN_TYPE_BINARY:
+		{
+			const BinaryData b = value.GetBinary();
+			column.SetBinary(ndx, (const char*)b.pointer, b.len);
+			break;
+		}
+		case COLUMN_TYPE_TABLE:
+			column.SetTable(ndx);
+			break;
+		default:
+			assert(false);
+	}
+}
+
+void Table::InsertMixed(size_t column_id, size_t ndx, Mixed value) {
+	assert(column_id < GetColumnCount());
+	assert(ndx <= m_size);
+
+	ColumnMixed& column = GetColumnMixed(column_id);
+	const ColumnType type = value.GetType();
+
+	switch (type) {
+		case COLUMN_TYPE_INT:
+			column.InsertInt(ndx, value.GetInt());
+			break;
+		case COLUMN_TYPE_BOOL:
+			column.InsertBool(ndx, value.GetBool());
+			break;
+		case COLUMN_TYPE_DATE:
+			column.InsertDate(ndx, value.GetDate());
+			break;
+		case COLUMN_TYPE_STRING:
+			column.InsertString(ndx, value.GetString());
+			break;
+		case COLUMN_TYPE_BINARY:
+		{
+			const BinaryData b = value.GetBinary();
+			column.InsertBinary(ndx, (const char*)b.pointer, b.len);
+			break;
+		}
+		case COLUMN_TYPE_TABLE:
+			column.InsertTable(ndx);
+			break;
+		default:
+			assert(false);
+	}
+}
+
 void Table::InsertDone() {
 	++m_size;
 
@@ -895,12 +1065,12 @@ void Table::FindAllString(TableView& tv, size_t column_id, const char *value) {
 
 	if (type == COLUMN_TYPE_STRING) {
 		const AdaptiveStringColumn& column = GetColumnString(column_id);
-		return column.FindAll(tv.GetRefColumn(), value);
+		column.FindAll(tv.GetRefColumn(), value);
 	}
 	else {
 		assert(type == COLUMN_TYPE_STRING_ENUM);
 		const ColumnStringEnum& column = GetColumnStringEnum(column_id);
-		return column.FindAll(tv.GetRefColumn(), value);
+		column.FindAll(tv.GetRefColumn(), value);
 	}
 }
 
@@ -1059,6 +1229,8 @@ void Table::Verify() const {
 			}
 			break;
 		case COLUMN_TYPE_TABLE:
+			break;
+		case COLUMN_TYPE_MIXED:
 			break;
 		default:
 			assert(false);

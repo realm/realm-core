@@ -186,6 +186,7 @@
     <ClCompile Include="src\ArrayStringLong.cpp" />
     <ClCompile Include="src\Column.cpp" />
     <ClCompile Include="src\ColumnBinary.cpp" />
+    <ClCompile Include="src\ColumnMixed.cpp" />
     <ClCompile Include="src\ColumnString.cpp" />
     <ClCompile Include="src\ColumnStringEnum.cpp" />
     <ClCompile Include="src\ColumnTable.cpp" />
@@ -227,6 +228,7 @@
     <ClInclude Include="src\ArrayStringLong.h" />
     <ClInclude Include="src\Column.h" />
     <ClInclude Include="src\ColumnBinary.h" />
+    <ClInclude Include="src\ColumnMixed.h" />
     <ClInclude Include="src\ColumnString.h" />
     <ClInclude Include="src\ColumnStringEnum.h" />
     <ClInclude Include="src\ColumnTable.h" />

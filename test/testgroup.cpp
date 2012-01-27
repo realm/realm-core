@@ -21,16 +21,30 @@ TDB_TABLE_4(TestTableGroup,
 // Windows version of serialization is not implemented yet
 #if 1 //_MSC_VER
 
-TEST(Group_Serialize0) {
+TEST(Group_Invalid1) {
 	// Delete old file if there
 	remove("table_test.tbl");
 
+	// Try to open non-existing file
+	Group fromDisk("table_test.tbl");
+	CHECK(!fromDisk.IsValid());
+}
+
+TEST(Group_Invalid2) {
+	// Try to open buffer with invalid data
+	const char* const buffer = "invalid data";
+	Group fromMen(buffer, strlen(buffer));
+	CHECK(!fromMen.IsValid());
+}
+
+TEST(Group_Serialize0) {
 	// Create empty group and serialize to disk
 	Group toDisk;
 	toDisk.Write("table_test.tbl");
 
 	// Load the group
 	Group fromDisk("table_test.tbl");
+	CHECK(fromDisk.IsValid());
 
 	// Create new table in group
 	TestTableGroup& t = fromDisk.GetTable<TestTableGroup>("test");
@@ -45,6 +59,13 @@ TEST(Group_Serialize0) {
 	CHECK_EQUAL(1,      t[0].second);
 	CHECK_EQUAL(true,   t[0].third);
 	CHECK_EQUAL(Wed,    t[0].fourth);
+}
+
+TEST(Group_Read0) {
+	// Load the group and let it clean up without loading
+	// any tables
+	Group fromDisk("table_test.tbl");
+	CHECK(fromDisk.IsValid());
 }
 
 TEST(Group_Serialize1) {
@@ -74,6 +95,7 @@ TEST(Group_Serialize1) {
 
 	// Load the table
 	Group fromDisk("table_test.tbl");
+	CHECK(fromDisk.IsValid());
 	TestTableGroup& t = fromDisk.GetTable<TestTableGroup>("test");
 
 	CHECK_EQUAL(4, t.GetColumnCount());
@@ -100,6 +122,13 @@ TEST(Group_Serialize1) {
 #endif //_DEBUG
 }
 
+TEST(Group_Read1) {
+	// Load the group and let it clean up without loading
+	// any tables
+	Group fromDisk("table_test.tbl");
+	CHECK(fromDisk.IsValid());
+}
+
 TEST(Group_Serialize2) {
 	// Create group with two tables
 	Group toDisk;
@@ -124,6 +153,7 @@ TEST(Group_Serialize2) {
 
 	// Load the tables
 	Group fromDisk("table_test.tbl");
+	CHECK(fromDisk.IsValid());
 	TestTableGroup& t1 = fromDisk.GetTable<TestTableGroup>("test1");
 	TestTableGroup& t2 = fromDisk.GetTable<TestTableGroup>("test2");
 
@@ -155,6 +185,7 @@ TEST(Group_Serialize3) {
 
 	// Load the table
 	Group fromDisk("table_test.tbl");
+	CHECK(fromDisk.IsValid());
 	TestTableGroup& t = fromDisk.GetTable<TestTableGroup>("test");
 
 
@@ -191,6 +222,7 @@ TEST(Group_Serialize_Men) {
 
 	// Load the table
 	Group fromMem(buffer, len);
+	CHECK(fromMem.IsValid());
 	TestTableGroup& t = fromMem.GetTable<TestTableGroup>("test");
 
 	CHECK_EQUAL(4, t.GetColumnCount());
@@ -230,6 +262,7 @@ TEST(Group_Serialize_Optimized) {
 
 	// Load the table
 	Group fromMem(buffer, len);
+	CHECK(fromMem.IsValid());
 	TestTableGroup& t = fromMem.GetTable<TestTableGroup>("test");
 
 	CHECK_EQUAL(4, t.GetColumnCount());

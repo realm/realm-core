@@ -45,6 +45,7 @@
     <ClCompile Include="src\win32\pthread\pthread.c">
       <Filter>pthreads</Filter>
     </ClCompile>
+    <ClCompile Include="src\ColumnMixed.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\alloc.h" />
@@ -84,6 +85,7 @@
     <ClInclude Include="src\win32\pthread\pthread.h">
       <Filter>pthreads</Filter>
     </ClInclude>
+    <ClInclude Include="src\ColumnMixed.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">

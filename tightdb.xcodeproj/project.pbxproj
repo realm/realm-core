@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3604594D14C96DA2008ACFFD /* ColumnMixed.h in Headers */ = {isa = PBXBuildFile; fileRef = 3604594C14C96DA2008ACFFD /* ColumnMixed.h */; };
+		3604595014C96DBA008ACFFD /* ColumnMixed.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3604594F14C96DBA008ACFFD /* ColumnMixed.cpp */; };
+		3604595214C97A4E008ACFFD /* testcolumnmixed.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3604595114C97A4E008ACFFD /* testcolumnmixed.cpp */; };
 		360F1A1D146AB3AA00EBB9C6 /* libUnitTest++.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */; };
 		360F1A37146BF71500EBB9C6 /* ColumnString.h in Headers */ = {isa = PBXBuildFile; fileRef = 360F1A36146BF71400EBB9C6 /* ColumnString.h */; };
 		3626F56B14A228850097F17B /* libtightdb.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* libtightdb.a */; };
@@ -94,6 +97,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		3604594C14C96DA2008ACFFD /* ColumnMixed.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ColumnMixed.h; sourceTree = "<group>"; };
+		3604594F14C96DBA008ACFFD /* ColumnMixed.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ColumnMixed.cpp; sourceTree = "<group>"; };
+		3604595114C97A4E008ACFFD /* testcolumnmixed.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testcolumnmixed.cpp; sourceTree = "<group>"; };
 		360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libUnitTest++.a"; path = "test/UnitTest++/libUnitTest++.a"; sourceTree = "<group>"; };
 		360F1A36146BF71400EBB9C6 /* ColumnString.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ColumnString.h; sourceTree = "<group>"; };
 		363141F614751E8000ADD5AC /* ColumnStringEnum.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ColumnStringEnum.h; sourceTree = "<group>"; };
@@ -306,6 +312,8 @@
 				36E608A2145AEE9000CCC3E8 /* ColumnBinary.cpp */,
 				36E4755814877FA4009FB135 /* ColumnTable.cpp */,
 				36E4755B14877FB8009FB135 /* ColumnTable.h */,
+				3604594C14C96DA2008ACFFD /* ColumnMixed.h */,
+				3604594F14C96DBA008ACFFD /* ColumnMixed.cpp */,
 				3647DEF514209C1200D56FD7 /* ColumnType.h */,
 				3647DEF614209C1200D56FD7 /* ctightdb.cpp */,
 				3647DEF714209C1200D56FD7 /* ctightdb.h */,
@@ -351,6 +359,7 @@
 				3647E04C14209CE600D56FD7 /* testcolumn.cpp */,
 				36E60898145AB43600CCC3E8 /* testcolumnstring.cpp */,
 				36E608A4145B006E00CCC3E8 /* testcolumnbinary.cpp */,
+				3604595114C97A4E008ACFFD /* testcolumnmixed.cpp */,
 				368063361445AD9200283774 /* testgroup.cpp */,
 				3647E04D14209CE600D56FD7 /* testindex.cpp */,
 				3647E04E14209CE600D56FD7 /* testtable.cpp */,
@@ -571,6 +580,7 @@
 				36E4755C14877FB9009FB135 /* ColumnTable.h in Headers */,
 				36FD6F3B14BDC965009E0003 /* QueryEngine.h in Headers */,
 				36FD6F3C14BDC965009E0003 /* QueryInterface.h in Headers */,
+				3604594D14C96DA2008ACFFD /* ColumnMixed.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -679,6 +689,7 @@
 				36E608A3145AEE9000CCC3E8 /* ColumnBinary.cpp in Sources */,
 				363141F914751E9600ADD5AC /* ColumnStringEnum.cpp in Sources */,
 				36E4755914877FA4009FB135 /* ColumnTable.cpp in Sources */,
+				3604595014C96DBA008ACFFD /* ColumnMixed.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -701,6 +712,7 @@
 				36E608A5145B006E00CCC3E8 /* testcolumnbinary.cpp in Sources */,
 				36FD6F3614BDC61A009E0003 /* TestQuery.cpp in Sources */,
 				36FD6F3714BDC61A009E0003 /* testTableView.cpp in Sources */,
+				3604595214C97A4E008ACFFD /* testcolumnmixed.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
