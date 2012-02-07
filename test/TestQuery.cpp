@@ -11,6 +11,19 @@ TDB_TABLE_2(BoolTupleTable,
 	Bool, second)
 
 
+TEST(TestQuerySimple) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+
+	Query q1 = ttt.GetQuery().first.Equal(2);
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(1, tv1.GetRef(0));
+}
+
 TEST(TestQueryThreads) {
 	TupleTableType ttt;
 
@@ -29,7 +42,7 @@ TEST(TestQueryThreads) {
 	}
 	Query q1 = ttt.GetQuery().first.Equal(2).second.Equal("b");
 
-	// Note, set THREAD_CHUNK_SIZE to 100.000 or more for performance
+	// Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
 	q1.SetThreads(5);
 	TableView tv = q1.FindAll(ttt);
 
@@ -37,22 +50,9 @@ TEST(TestQueryThreads) {
 	for(int i = 0; i < 100; i++) {
 		CHECK_EQUAL(i*7*10 + 14 + 1, tv.GetRef(i));
 	}
-
 }
 
 
-TEST(TestQuerySimple) {
-	TupleTableType ttt;
-
-	ttt.Add(1, "a");
-	ttt.Add(2, "a");
-	ttt.Add(3, "X");
-
-	Query q1 = ttt.GetQuery().first.Equal(2);
-	TableView tv1 = q1.FindAll(ttt);
-	CHECK_EQUAL(1, tv1.GetSize());
-	CHECK_EQUAL(1, tv1.GetRef(0));
-}
 
 TEST(TestQuerySimple2) {
 	TupleTableType ttt;
@@ -607,7 +607,7 @@ TEST(TestQuerySyntaxCheck) {
 	s = q6.Verify();
 	CHECK(s != "");
 
-	Query q7 = ttt.GetQuery().second.Equal("\xa0");
+	Query q7 = ttt.GetQuery().second.Equal("\xa0", false);
 	s = q7.Verify();
 	CHECK(s != "");
 }
