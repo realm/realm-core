@@ -2,6 +2,7 @@
 #include <cassert>
 #include "Column.h"
 #include "utilities.h"
+#include "query/QueryEngine.h"
 #ifdef _MSC_VER
 	#include "win32\types.h"
 #endif
@@ -509,6 +510,8 @@ size_t Array::FindPos2(int64_t target) const {
 	else return high;
 }
 
+
+
 size_t Array::Find(int64_t value, size_t start, size_t end) const {
 #ifdef USE_SSE
 	if(end == -1)
@@ -540,7 +543,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	t = FindNaive(value, ((unsigned char *)b - m_data) * 8 / m_width, end);
 	return t;
 #else
-	return FindNaive(value, start, end); // enable legacy find
+	return CompareEquality(value, start, end, true); //FindNaive(value, start, end); // enable legacy find
 #endif
 }
 
@@ -585,173 +588,146 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 }
 #endif //USE_SSE
 
-size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
-	if (IsEmpty()) return (size_t)-1;
+
+// If gt = true: Find first element which is greater than value
+// If gt = false: Find first element which is smaller than value
+// The correct cases for eq are inlined by the compiler and won't hurt performance
+size_t Array::CompareEquality(int64_t value, size_t start, size_t end, bool eq) const {
 	if (end == (size_t)-1) end = m_len;
-	if (start == end) return (size_t)-1;
-		
-	assert(start < m_len && end <= m_len && start < end);
 
-	// If the value is wider than the column
-	// then we know it can't be there
-	const size_t width = BitWidth(value);
-	if (width > m_width) return (size_t)-1;
+	// Test 4 items with zero latency for cases where match frequency is high, such 
+	// as 2-bit values
+	if(start + 0 < end && (eq ? (Get(start + 0) == value)   :   (Get(start + 0) != value)))
+		return start + 0;
+	if(start + 1 < end && (eq ? (Get(start + 1) == value)   :   (Get(start + 1) != value)))
+		return start + 1;
+	if(start + 2 < end && (eq ? (Get(start + 2) == value)   :   (Get(start + 2) != value)))
+		return start + 2;
+	if(start + 3 < end && (eq ? (Get(start + 3) == value)   :   (Get(start + 3) != value)))
+		return start + 3;
 
-	// Do optimized search based on column width
+	if (IsEmpty()) return -1;
+	if (start >= end) return -1;
+
+	assert(start < m_len && (end <= m_len || end == -1) && start < end);
+
+	start += 4;
+
+	if(start > end)
+		return (size_t)-1;
+
+	// Test 64 items with no latency for cases where the first few 64-bit chunks are likely to
+	// contain one or more matches (because the linear test we use later cannot extract the position)
+	// Also stop at a 64-bit aligned position so we can do aligned chunk reads in later linear test
+	size_t ee = round_up(start, 64) + 64;
+	ee = ee > end ? end : ee;
+	for(; start < ee; start++)
+		if(eq ? (Get(start) == value)  :   (Get(start) != value))
+			return start;
+	
+	if(start > end)
+		return (size_t)-1;
+
+	const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));
+	const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8) / 8) - 1;
+
+	// Matches are rare enough to setup fast linear search for remaining items. We use 
+	// bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
 	if (m_width == 0) {
-		return start; // value can only be zero
+	}
+	else if (m_width == 1) {
+		if(eq) {
+			while(*p == 0)
+				p++;
+		} 
+		else {
+			while(*p == -1)
+				p++;
+		}
 	}
 	else if (m_width == 2) {
-		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0x3 * value;
-
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-
-		// Check 64bits at a time for match
-		while (p < e) {
+		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2
-											 & 0xAAAAAAAAAAAAAAAAUL;
-			if (hasZeroByte) break;
-			++p;
+			const uint64_t hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2 & 0xAAAAAAAAAAAAAAAAUL;
+			if( eq ?   hasZeroByte  :  !hasZeroByte     )
+				p++;
+			else
+				break;
 		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 32;
-		if(i < start) i = start;
-
-		// Manually check the rest
-		while (i < end) {
-			if (Get(i) == value) return i;
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 4) {
-		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0xF * value;
-
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-
-		// Check 64bits at a time for match
-		while (p < e) {
+		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 
-											 & 0x8888888888888888UL;
-			if (hasZeroByte) break;
-			++p;
+			const uint64_t hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 & 0x8888888888888888UL;
+			if( eq ?   hasZeroByte  :  !hasZeroByte     )
+				p++;
+			else
+				break;
 		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 16;
-		if(i < start) i = start;
-
-		// Manually check the rest
-		while (i < end) {
-			if (Get(i) == value) return i;
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
-  else if (m_width == 8) {
-		// TODO: Handle partial searches
-
-		// Create a pattern to match 64bits at a time
+	else if (m_width == 8) {
 		const int64_t v = ~0ULL/0xFF * value;
-
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-
-		// Check 64bits at a time for match
-		while (p < e) {
+		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2
-											 & 0x8080808080808080ULL;
-			if (hasZeroByte) break;
-			++p;
+			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2 & 0x8080808080808080ULL;
+			if( eq ?   hasZeroByte  :  !hasZeroByte     )
+				p++;
+			else
+				break;
 		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 8;
-		if(i < start) i = start;
-
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i)) return i;
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 16) {
-		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0xFFFF * value;
-
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-
-		// Check 64bits at a time for match
-		while (p < e) {
+		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0001000100010001UL) & ~v2
-											 & 0x8000800080008000UL;
-			if (hasZeroByte) break;
-			++p;
+			const uint64_t hasZeroByte = (v2 - 0x0001000100010001UL) & ~v2 & 0x8000800080008000UL;
+			if( eq ?   hasZeroByte  :  !hasZeroByte     )
+				p++;
+			else
+				break;
 		}
-		
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 4;
-		if(i < start) i = start;
-
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i)) return i;
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 32) {
-		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0xFFFFFFFF * value;
-
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-
-		// Check 64bits at a time for match
-		while (p < e) {
+		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2
-											 & 0x8000800080000000UL;
-			if (hasZeroByte) break;
-			++p;
+			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2 & 0x8000800080000000UL;
+			if( eq ?   hasZeroByte  :  !hasZeroByte     )
+				p++;
+			else
+				break;
 		}
-		
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 2;
-		if(i < start) i = start;
-
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i)) return i;
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 64) {
-		const int64_t v = (int64_t)value;
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-		while (p < e) {
-			if (*p == v) return p - (const int64_t*)m_data;
-			++p;
+		while(p < e) {
+			int64_t v = *p;
+			const uint64_t v2 = *p ^ v; // zero matching bit segments
+			if( eq ?   (v == value) : (v != value))
+				p++;
+			else
+				break;
 		}
-	}
-	else {
-		// Naive search
-		for (size_t i = start; i < end; ++i) {
-			const int64_t v = Get(i);
-			if (v == value) return i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 
-	return (size_t)-1; // not found
+	// Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
+	while(start < end)
+		if(eq ? Get(start) == value : Get(start) != value)
+			return start;
+		else
+			start++;
+
+	return (size_t)-1;
+
 }
+
 
 void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 					size_t start, size_t end) const {
@@ -976,6 +952,240 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 			if (v == value) result.AddPositiveLocal(i + colOffset);
 		}
 	}
+}
+
+
+// If gt = true: Find first element which is greater than value
+// If gt = false: Find first element which is smaller than value
+// The correct cases for gt are inlined by the compiler and won't hurt performance
+size_t Array::CompareRelation(int64_t value, size_t start, size_t end, bool gt) const{
+	if (end == (size_t)-1) end = m_len;
+
+	// Test 4 items with zero latency for cases where match frequency is high, such 
+	// as 2-bit values where each second item is greater on average
+	if(start + 0 < end && (gt ? (Get(start + 0) > value)   :   (Get(start + 0) < value)))
+		return start + 0;
+	if(start + 1 < end && (gt ? (Get(start + 1) > value)   :   (Get(start + 1) < value)))
+		return start + 1;
+	if(start + 2 < end && (gt ? (Get(start + 2) > value)   :   (Get(start + 2) < value)))
+		return start + 2;
+	if(start + 3 < end && (gt ? (Get(start + 3) > value)   :   (Get(start + 3) < value)))
+		return start + 3;
+
+	start += 4;
+
+	if(start > end)
+		return (size_t)-1;
+
+	if (IsEmpty()) return -1;
+	if (start >= end) return -1;
+
+	assert(start < m_len && (end <= m_len || end == -1) && start < end);
+
+	// Test 64 items with no latency for cases where the first few 64-bit chunks are likely to
+	// contain one or more matches (because the linear test we use later cannot extract the position)
+	// Also stop at a 64-bit aligned position so we can do aligned chunk reads in later linear test
+	size_t ee = round_up(start, 64) + 64;
+	ee = ee > end ? end : ee;
+	for(; start < ee; start++)
+		if(gt ? (Get(start) > value)  :   (Get(start) < value))
+			return start;
+	
+	if(start > end)
+		return (size_t)-1;
+
+	const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));
+	const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8) / 8) - 1;
+
+	// Matches are rare enough to setup fast linear search for remaining items. We use 
+	// bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
+	if (m_width == 0) {
+	}
+	else if (m_width == 1) {
+		if(gt) {
+			if(value == 1)
+				return (size_t)-1;
+			else
+				while(*p == 0)
+					p++;
+		} else {
+			if(value == 0)
+				return (size_t)-1;
+			else
+				while(*p == -1)
+					p++;
+		}
+	}
+	else if (m_width == 2) {
+		int64_t constant = gt ? (~0ULL / 3 * (3 - value))   :  (   ~0UL / 3 * value );
+		while(p < e) {
+			int64_t v = *p;
+			if( gt ? (!((v + constant | v) & ~0ULL / 3 * 2))   :  ((v - constant) & ~v&~0UL/3*2)      )
+				p++;
+			else
+				break;
+		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+	}
+	else if (m_width == 4) {
+		int64_t constant = gt ? (~0ULL / 15 * (7 - value))  :   (   ~0UL / 15 * value )  ;
+		while(p < e) {
+			int64_t v = *p;
+			if(gt ? (!((v + constant | v) & ~0ULL / 15 * 8)) :     ((v - constant) & ~v&~0UL/15*8)    )
+				p++;
+			else
+				break;
+		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+	}
+	else if (m_width == 8) {
+
+
+/*
+			// 772 ms
+		while(start < end && Get_8b(start) <= value)
+			start++;
+		return 0;		
+*/
+
+/*
+		// 762 ms
+		char *sta = (char *)(m_data + start);
+		char *eee = (char *)(m_data + end);
+
+		while(sta < eee && *sta <= value)
+			sta++;
+		return 0;		
+*/
+
+
+		// 174 ms!!
+
+		// Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
+		if(value <= 127) {
+			int64_t constant = gt ? (~0ULL / 255 * (127 - value))   :   (        ~0UL / 255 * value           );
+			while(p < e) {
+				int64_t v = *p;
+				// Bit hacks also only works for positive items in chunk, so test their sign bits
+				if(v & 0x8080808080808080ULL) {					
+					if (gt ? ((char)(v>>0*8) > value || (char)(v>>1*8) > value || (char)(v>>2*8) > value || (char)(v>>3*8) > value || (char)(v>>4*8) > value || (char)(v>>5*8) > value || (char)(v>>6*8) > value || (char)(v>>7*8) > value)
+					  : 
+					((char)(v>>0*8) < value || (char)(v>>1*8) < value || (char)(v>>2*8) < value || (char)(v>>3*8) < value || (char)(v>>4*8) < value || (char)(v>>5*8) < value || (char)(v>>6*8) < value || (char)(v>>7*8) < value))
+						break;
+				}
+				else if (gt ?  (!((v + constant | v) & ~0ULL / 255 * 128)) : (         (v - constant) & ~v&~0UL/255*128             ))
+					p++;
+				else
+					break;
+			}
+			start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+		} 
+		else {
+			while(start < end && gt ? (Get_8b(start) <= value) : (Get_8b(start) >= value))
+				start++;
+		}
+		
+		
+
+	}
+	else if (m_width == 16) {
+
+	/*	
+		// L2 cache = 383 ms, L1 cache = 403
+		short int *st = (short int *)(m_data + start);
+		short int *en = (short int *)(m_data + end);
+
+		while(st < en && *st <= value)
+			st++;
+		return 0;
+*/
+
+/*
+		// L2 cache = 775 ms
+		while(start < end)
+			if(Get_16b(start) > value)
+				return start;
+			else
+				start++;
+*/
+
+
+		// L2 cache = 300 ms, L1 cache = 304 ms
+		if(value <= 32767) {
+			int64_t constant = gt ? (~0ULL / 65535 * (32767 - value))   :   ( ~0UL / 65535 * value);
+			while(p < e) {
+				int64_t v = *p;
+				if(v & 0x8000800080008000ULL) {					
+					if (gt ? ((int)(v>>0*16) > value || (int)(v>>1*16) > value || (int)(v>>2*16) > value || (int)(v>>3*16) > value || (int)(v>>4*16) > value) :
+						((int)(v>>0*16) < value || (int)(v>>1*16) < value || (int)(v>>2*16) < value || (int)(v>>3*16) < value || (int)(v>>4*16) < value))
+						break;
+				}
+				else if(gt ? (!((v + constant | v) & ~0ULL / 65535 * 32768)) : (!(         (v - constant) & ~v&~0UL/65535*32768        )))
+					p++;
+				else
+					break;
+			}
+			start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+		} 
+		else {
+			while(start < end && gt ? (Get_16b(start) <= value)  :  (false))
+				start++;
+
+			/*
+			uint16_t *a = (uint16_t *)(m_data + start);
+			uint16_t *b = (uint16_t *)(m_data + end);
+			while(a < b && *a <= value)
+				a++;
+			start = a - (uint16_t *)m_data;
+			*/
+		}
+		
+
+	}
+	else if (m_width == 32) {
+		// extra logic in SIMD no longer pays off because we have just 2 elements
+		// Faster than below version
+		while(start < end && gt ? (Get_32b(start) <= value) : (Get_32b(start) >= value) )
+			start++;
+
+/*
+			int32_t *a = (int32_t *)m_data + start;
+			int32_t *b = (int32_t *)m_data + end;
+			while(a < b && *a <= value)
+				a++;
+			start = ((unsigned char *)a - m_data) * 8 / m_width;
+*/
+
+	}
+	else if (m_width == 64) {
+		while(start < end && gt ? (Get_64b(start) <= value) : (Get_64b(start) >= value))
+			start++;
+	}
+
+
+	// Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
+	while(start < end)
+		if(gt ? Get(start) > value : Get(start) < value)
+			return start;
+		else
+			start++;
+
+	return (size_t)-1;
+
+}
+
+template <> size_t Array::Query<EQUAL>(int64_t value, size_t start, size_t end) {
+	return CompareEquality(value, start, end, true);
+}
+template <> size_t Array::Query<NOTEQUAL>(int64_t value, size_t start, size_t end) {
+	return CompareEquality(value, start, end, false);
+}
+template <> size_t Array::Query<GREATER>(int64_t value, size_t start, size_t end) {
+	return CompareRelation(value, start, end, true);
+}
+
+template <> size_t Array::Query<LESS>(int64_t value, size_t start, size_t end) {
+	return CompareRelation(value, start, end, false);
 }
 
 

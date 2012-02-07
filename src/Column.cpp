@@ -3,7 +3,7 @@
 #include <cstring>
 #include <cstdio> // debug output
 #include <climits> // size_t
-
+#include "query/QueryEngine.h"
 #ifdef _MSC_VER
 #include "win32/stdint.h"
 #else
@@ -260,6 +260,8 @@ int64_t Column::Max(size_t start, size_t end) const {
 }
 
 
+
+
 size_t ColumnBase::GetRefSize(size_t ref) const {
 	// parse the length part of 8byte header
 	const uint8_t* const header = (uint8_t*)m_array->GetAllocator().Translate(ref);
@@ -342,7 +344,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 	assert(start <= Size());
 	assert(end == (size_t)-1 || end <= Size());
 	if (IsEmpty()) return (size_t)-1;
-	return TreeFind<int64_t, Column>(value, start, end);
+	return TreeFind<int64_t, Column, EQUAL>(value, start, end);
 }
 
 void Column::FindAll(Array& result, int64_t value, size_t caller_offset, size_t start, size_t end) const {

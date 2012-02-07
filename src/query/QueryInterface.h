@@ -14,7 +14,7 @@
 #endif
 
 const int MAX_THREADS = 128;
-const int THREAD_CHUNK_SIZE = 100000;
+const int THREAD_CHUNK_SIZE = 1000000;
 
 class Query {
 public:
@@ -53,13 +53,19 @@ public:
 		return *this;
 	};
 	Query& GreaterEqual(size_t column_id, int64_t value) {
-		ParentNode* const p = new NODE<int64_t, Column, GREATEREQUAL>(value, column_id);
-		UpdatePointers(p, &p->m_child);
+		if(value > LLONG_MIN) {
+			ParentNode* const p = new NODE<int64_t, Column, GREATER>(value - 1, column_id);
+			UpdatePointers(p, &p->m_child);
+		}
+		// field >= LLONG_MIN has no effect
 		return *this;
 	};
 	Query& LessEqual(size_t column_id, int64_t value) {
-		ParentNode* const p = new NODE<int64_t, Column, LESSEQUAL>(value, column_id);
-		UpdatePointers(p, &p->m_child);
+		if(value < LLONG_MAX) {
+			ParentNode* const p = new NODE<int64_t, Column, LESS>(value + 1, column_id);
+			UpdatePointers(p, &p->m_child);
+		}
+		// field <= LLONG_MAX has no effect
 		return *this;
 	};
 	Query& Less(size_t column_id, int64_t value) {
@@ -69,11 +75,8 @@ public:
 	};
 
 	Query& Between(size_t column_id, int64_t from, int64_t to) {
-		ParentNode *p = new NODE<int64_t, Column, GREATEREQUAL>(from, column_id);
-		ParentNode* const p2 = p;
-		p = new NODE<int64_t, Column, LESSEQUAL>(to, column_id);
-		p->m_child = p2;
-		UpdatePointers(p, &p->m_child);
+		GreaterEqual(column_id, from);
+		LessEqual(column_id, to);
 		return *this;
 	};
 	Query& Equal(size_t column_id, bool value) {

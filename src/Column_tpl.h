@@ -7,6 +7,7 @@
 #include "Column.h"
 
 #include <cstdlib>
+#include "query/conditions.h"
 
 // Has to be define to allow overload from build settings
 #ifndef MAX_LIST_SIZE
@@ -327,14 +328,14 @@ template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx) {
 	}
 }
 
-template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const {
+template<typename T, class C, class F> size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const {
 	// Use index if possible
 	/*if (m_index && start == 0 && end == -1) {
 	 return FindWithIndex(value);
 	 }*/
-
+//	F function;
 	if (!IsNode()) {
-		return static_cast<const C*>(this)->LeafFind(value, start, end);
+		return static_cast<const C*>(this)->LeafFind<F>(value, start, end);
 	}
 	else {
 		// Get subnode table
@@ -388,7 +389,6 @@ template<typename T, class C> size_t ColumnBase::TreeFind(T value, size_t start,
 		return (size_t)-1; // not found
 	}
 }
-
 
 
 template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const {

@@ -102,12 +102,28 @@ public:
 	size_t FindPos(int64_t value) const;
 	size_t FindPos2(int64_t value) const;
 	size_t Find(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
+//	template <class F> size_t Find(F function, size_t start, size_t end) const;
+
+template <class F> size_t Find(F function, int64_t value, size_t start, size_t end) const {
+	const F function = {};
+	if(end == -1)
+		end = m_len;
+
+	for(size_t s = start; s < end; s++) {
+		if(function(value, Get(s)))
+			return s;
+	}
+
+	return -1;
+}
+
 	void FindAll(Array& result, int64_t value, size_t offset=0,
 				 size_t start=0, size_t end=(size_t)-1) const;
 	void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 	int64_t Sum(size_t start = 0, size_t end = -1) const;
 	bool Max(int64_t& result, size_t start = 0, size_t end = -1) const;
 	bool Min(int64_t& result, size_t start = 0, size_t end = -1) const;
+	template <class F> size_t Query(int64_t value, size_t start, size_t end);
 
 	void Sort();
 
@@ -142,7 +158,8 @@ private:
 	size_t FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const;
 #endif //USE_SSE
 	size_t FindNaive(int64_t value, size_t start, size_t end) const;
-
+	size_t CompareEquality(int64_t value, size_t start, size_t end, bool eq) const;
+	size_t CompareRelation(int64_t value, size_t start, size_t end, bool gt) const;
 protected:
 	bool AddPositiveLocal(int64_t value);
 

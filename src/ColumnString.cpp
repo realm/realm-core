@@ -1,8 +1,9 @@
 #include <cstdlib>
 #include <cassert>
+#include <assert.h>
 #include <cstring>
 #include <cstdio> // debug
-
+#include "query/conditions.h"
 #ifdef _MSC_VER
 	#include "win32\types.h"
 #endif
@@ -150,8 +151,9 @@ void AdaptiveStringColumn::Delete(size_t ndx) {
 
 size_t AdaptiveStringColumn::Find(const char* value, size_t start, size_t end) const {
 	assert(value);
-	return TreeFind<const char*, AdaptiveStringColumn>(value, start, end);
+	return TreeFind<const char*, AdaptiveStringColumn, EQUAL>(value, start, end);
 }
+
 
 void AdaptiveStringColumn::FindAll(Array &result, const char* value, size_t start, size_t end) const {
 	assert(value);
@@ -240,13 +242,13 @@ bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value) {
 	return true;
 }
 
-size_t AdaptiveStringColumn::LeafFind(const char* value, size_t start, size_t end) const {
-	if (IsLongStrings()) {
-		return ((ArrayStringLong*)m_array)->Find(value, start, end);
-	}
-	else {
-		return ((ArrayString*)m_array)->Find(value, start, end);
-	}
+template<class F>size_t AdaptiveStringColumn::LeafFind(const char* value, size_t start, size_t end) const {
+		if (IsLongStrings()) {
+			return ((ArrayStringLong*)m_array)->Find(value, start, end);
+		}
+		else {
+			return ((ArrayString*)m_array)->Find(value, start, end);
+		}
 }
 
 void AdaptiveStringColumn::LeafFindAll(Array &result, const char* value, size_t add_offset, size_t start, size_t end) const {

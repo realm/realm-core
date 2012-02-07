@@ -193,6 +193,7 @@
     <ClCompile Include="src\ctightdb.cpp" />
     <ClCompile Include="src\Group.cpp" />
     <ClCompile Include="src\Index.cpp" />
+    <ClCompile Include="src\query\conditions.h" />
     <ClCompile Include="src\utf8.cpp" />
     <ClCompile Include="src\utilities.cpp">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>

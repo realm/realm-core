@@ -10,6 +10,7 @@
 #endif
 //#include <climits> // size_t
 #include <cstdlib> // size_t
+#include <assert.h> 
 
 // Pre-definitions
 class Column;
@@ -39,6 +40,9 @@ public:
 	virtual void Verify() const = 0;
 #endif //_DEBUG
 
+template<class C, class A> A* TreeGetArray(size_t start, size_t *first, size_t *last) const;
+template<typename T, class C, class F> size_t TreeFind(T value, size_t start, size_t end) const;
+
 protected:
 	struct NodeChange {
 		size_t ref1;
@@ -60,10 +64,10 @@ protected:
 	template<typename T, class C> bool TreeInsert(size_t ndx, T value);
 	template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
 	template<typename T, class C> void TreeDelete(size_t ndx);
-	template<typename T, class C> size_t TreeFind(T value, size_t start, size_t end) const;
 	template<typename T, class C> void TreeFindAll(Array &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
 	template<typename T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T &arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const;
+
 
 	template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 
@@ -126,6 +130,7 @@ public:
 
 	bool Increment64(int64_t value, size_t start=0, size_t end=-1);
 	size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
+
 	void FindAll(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
 	void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 	size_t FindPos(int64_t value) const;
@@ -157,7 +162,6 @@ public:
 
 private:
 	Column& operator=(const Column&) {return *this;} // not allowed
-
 protected:
 	friend class ColumnBase;
 	void Create();
@@ -168,7 +172,10 @@ protected:
 	bool LeafSet(size_t ndx, int64_t value) {return m_array->Set(ndx, value);}
 	bool LeafInsert(size_t ndx, int64_t value) {return m_array->Insert(ndx, value);}
 	void LeafDelete(size_t ndx) {m_array->Delete(ndx);}
-	size_t LeafFind(int64_t value, size_t start, size_t end) const {return m_array->Find(value, start, end);}
+
+	template <class F>size_t LeafFind(int64_t value, size_t start, size_t end) const {
+		return m_array->Query<F>(value, start, end);
+	}
 
 	template<class S> size_t LeafWrite(S& out, size_t& pos) const;
 

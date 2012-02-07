@@ -46,6 +46,9 @@
       <Filter>pthreads</Filter>
     </ClCompile>
     <ClCompile Include="src\ColumnMixed.cpp" />
+    <ClCompile Include="src\query\conditions.h">
+      <Filter>query</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\alloc.h" />
