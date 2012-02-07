@@ -25,9 +25,6 @@ public:
 
 	void UpdateParentNdx(int diff);
 
-	// Serialization
-	template<class S> void Write(S& out, size_t& pos, size_t& ref_keys, size_t& ref_values) const;
-
 #ifdef _DEBUG
 	bool Compare(const ColumnStringEnum& c) const;
 	void Verify() const;
@@ -41,13 +38,5 @@ private:
 	AdaptiveStringColumn m_keys;
 	Column m_values;
 };
-
-// Templates
-
-template<class S>
-void ColumnStringEnum::Write(S& out, size_t& pos, size_t& ref_keys, size_t& ref_values) const {
-	ref_keys = m_keys.Write(out, pos);
-	ref_values = m_values.Write(out, pos);
-}
 
 #endif //__TDB_COLUMN_STRING_ENUM__

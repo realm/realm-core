@@ -284,4 +284,37 @@ TEST(Group_Serialize_Optimized) {
 #endif //_DEBUG
 }
 
+TEST(Group_Serialize_All) {
+	// Create group with one table
+	Group toMem;
+	Table& table = toMem.GetTable("test");
+	
+	table.RegisterColumn(COLUMN_TYPE_INT,    "int");
+	table.RegisterColumn(COLUMN_TYPE_BOOL,   "bool");
+	table.RegisterColumn(COLUMN_TYPE_DATE,   "date");
+	table.RegisterColumn(COLUMN_TYPE_STRING, "string");
+	table.RegisterColumn(COLUMN_TYPE_BINARY, "binary");
+	table.RegisterColumn(COLUMN_TYPE_MIXED,  "mixed");
+	
+	table.InsertInt(0, 0, 12);
+	table.InsertBool(1, 0, true);
+	table.InsertDate(2, 0, 12345);
+	table.InsertString(3, 0, "test");
+	table.InsertBinary(4, 0, "binary", 7);
+	table.InsertMixed(5, 0, false);
+	table.InsertDone();
+	
+	// Serialize to memory (we now own the buffer)
+	size_t len;
+	const char* const buffer = toMem.WriteToMem(len);
+	
+	// Load the table
+	Group fromMem(buffer, len);
+	CHECK(fromMem.IsValid());
+	Table& t = fromMem.GetTable("test");
+	
+	CHECK_EQUAL(6, t.GetColumnCount());
+	CHECK_EQUAL(1, t.GetSize());
+}
+
 #endif

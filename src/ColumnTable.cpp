@@ -1,4 +1,5 @@
 #include "ColumnTable.h"
+#include "Table.h"
 
 
 ColumnTable::ColumnTable(size_t ref_specSet, Array* parent, size_t pndx, Allocator& alloc)

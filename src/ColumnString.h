@@ -40,9 +40,6 @@ public:
 	void SetParent(Array* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 	void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
-	// Serialization
-	template<class S> size_t Write(S& out, size_t& pos) const;
-
 	// Optimizing data layout
 	bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
 
@@ -65,30 +62,9 @@ protected:
 
 	void LeafDelete(size_t ndx);
 
-	template<class S> size_t LeafWrite(S& out, size_t& pos) const;
-
 	bool IsLongStrings() const {return m_array->HasRefs();} // HasRefs indicates long string array
 
 	bool FindKeyPos(const char* target, size_t& pos) const;
 };
-
-// Templates
-
-template<class S>
-size_t AdaptiveStringColumn::Write(S& out, size_t& pos) const {
-	return TreeWrite<const char*, AdaptiveStringColumn>(out, pos);
-}
-
-template<class S>
-size_t AdaptiveStringColumn::LeafWrite(S& out, size_t& pos) const {
-	if (IsLongStrings()) {
-		return ((ArrayStringLong*)m_array)->Write(out, pos);
-	}
-	else {
-		const size_t leaf_pos = pos;
-		pos += ((ArrayString*)m_array)->Write(out);
-		return leaf_pos;
-	}
-}
 
 #endif //__TDB_COLUMN_STRING__

@@ -206,10 +206,6 @@ protected:
 	void CacheColumns();
 	void ClearCachedColumns();
 
-	// Serialization
-	template<class S> size_t Write(S& out, size_t& pos) const;
-	static Table LoadFromFile(const char* path);
-
 	// Specification
 	size_t GetColumnRefPos(size_t column_ndx) const;
 	void UpdateColumnRefs(size_t column_ndx, int diff);
@@ -250,11 +246,6 @@ public:
 #endif //_DEBUG
 
 protected:
-	friend class Group;
-
-	// Serialization
-	template<class S> size_t Write(S& out, size_t& pos) const;
-
 	// On-disk format
 	Array m_top;
 
@@ -520,140 +511,5 @@ public:
 class QueryAccessorMixed {
 public:
 };
-
-// Templates
-
-#include "ColumnTable.h"
-
-template<class S>
-size_t Spec::Write(S& out, size_t& pos) const {
-	Array specSet(COLUMN_HASREFS);
-
-	// Spec
-    const size_t specPos = pos;
-    pos += m_spec.Write(out);
-	specSet.Add(specPos);
-
-    // Names
-    const size_t namesPos = pos;
-    pos += m_names.Write(out);
-	specSet.Add(namesPos);
-
-	// Sub-Specs
-	if (m_specSet.Size() == 3) {
-		Allocator& alloc = m_specSet.GetAllocator();
-		Array subSpecs(COLUMN_HASREFS);
-
-		for (size_t i = 0; i < m_subSpecs.Size(); ++i) {
-			const size_t ref = m_subSpecs.Get(i);
-			const Spec spec(alloc, ref, NULL, 0);
-			const size_t subpos = spec.Write(out, pos);
-			subSpecs.Add(subpos);
-		}
-
-		const size_t subspecsPos = pos;
-		pos += subSpecs.Write(out);
-		specSet.Add(subspecsPos);
-
-		// Clean-up
-		subSpecs.SetType(COLUMN_NORMAL); // avoid recursive del
-		subSpecs.Destroy();
-	}
-
-	// SpecSet
-	const size_t specSetPos = pos;
-	pos += specSet.Write(out);
-
-	// Clean-up
-	specSet.SetType(COLUMN_NORMAL); // avoid recursive del
-	specSet.Destroy();
-
-	return specSetPos;
-}
-
-template<class S>
-size_t Table::Write(S& out, size_t& pos) const {
-    // Write Columns
-    Array columns(COLUMN_HASREFS);
-    const size_t column_count = GetColumnCount();
-	for (size_t i = 0; i < column_count; ++i) {
-		const ColumnType type = GetRealColumnType(i);
-		switch (type) {
-			case COLUMN_TYPE_INT:
-			case COLUMN_TYPE_BOOL:
-			case COLUMN_TYPE_DATE:
-            {
-                const Column& column = GetColumn(i);
-                const size_t cpos = column.Write(out, pos);
-                columns.Add(cpos);
-            }
-				break;
-			case COLUMN_TYPE_STRING:
-            {
-                const AdaptiveStringColumn& column = GetColumnString(i);
-                const size_t cpos = column.Write(out, pos);
-                columns.Add(cpos);
-            }
-				break;
-			case COLUMN_TYPE_STRING_ENUM:
-            {
-                const ColumnStringEnum& column = GetColumnStringEnum(i);
-                size_t ref_keys;
-				size_t ref_values;
-				column.Write(out, pos, ref_keys, ref_values);
-                columns.Add(ref_keys);
-				columns.Add(ref_values);
-            }
-				break;
-			case COLUMN_TYPE_TABLE:
-            {
-				const ColumnTable& column = GetColumnTable(i);
-                const size_t cpos = column.Write(out, pos);
-                columns.Add(cpos);
-			}
-				break;
-			case COLUMN_TYPE_BINARY:
-            {
-                const ColumnBinary& column = GetColumnBinary(i);
-                const size_t cpos = column.Write(out, pos);
-                columns.Add(cpos);
-            }
-				break;
-			default: assert(false);
-		}
-	}
-    const size_t columnsPos = pos;
-    pos += columns.Write(out);
-
-	// Clean-up
-	columns.SetType(COLUMN_NORMAL); // avoid recursive del
-	columns.Destroy();
-
-    return columnsPos;
-}
-
-template<class S>
-size_t TopLevelTable::Write(S& out, size_t& pos) const {
-	// Write entire spec tree
-	const Spec spec = GetSpec();
-	const size_t specSetPos = spec.Write(out, pos);
-
-	// Write columns
-	const size_t columnsPos = Table::Write(out, pos);
-
-	// Top-level Table array
-    Array top(COLUMN_HASREFS);
-	top.Add(specSetPos);
-    top.Add(columnsPos);
-    const size_t topPos = pos; // sized for top ref
-    pos += top.Write(out);
-
-    // Clean-up
-	top.SetType(COLUMN_NORMAL); // avoid recursive del
-	top.Destroy();
-
-    return topPos;
-}
-
 
 #endif //__TDB_TABLE__

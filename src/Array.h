@@ -69,6 +69,7 @@ public:
 	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	Array(Allocator& alloc);
 	Array(const Array& a);
+	virtual ~Array();
 
 	bool operator==(const Array& a) const;
 
@@ -83,7 +84,7 @@ public:
 	bool IsValid() const {return m_data != NULL;}
 	void Invalidate() const {m_data = NULL;}
 
-	size_t Size() const {return m_len;}
+	virtual size_t Size() const {return m_len;}
 	bool IsEmpty() const {return m_len == 0;}
 
 	bool Insert(size_t ndx, int64_t value);
@@ -139,7 +140,7 @@ template <class F> size_t Find(F function, int64_t value, size_t start, size_t e
 	Allocator& GetAllocator() const {return m_alloc;}
 
 	// Serialization
-	template<class S> size_t Write(S& target) const;
+	template<class S> size_t Write(S& target, size_t& pos, bool recurse=true) const;
 
 	// Debug
 	size_t GetBitWidth() const {return m_width;}
@@ -186,19 +187,28 @@ protected:
 	void Set_32b(size_t ndx, int64_t value);
 	void Set_64b(size_t ndx, int64_t value);
 
+	enum WidthType {
+		TDB_BITS     = 0,
+		TDB_MULTIPLY = 1,
+		TDB_IGNORE   = 2
+	};
+
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
 	virtual size_t CalcItemCount(size_t bytes, size_t width) const;
+	virtual WidthType GetWidthType() const {return TDB_BITS;}
 
 	void set_header_isnode(bool value, void* header=NULL);
 	void set_header_hasrefs(bool value, void* header=NULL);
+	void set_header_wtype(WidthType value, void* header=NULL);
 	void set_header_width(size_t value, void* header=NULL);
 	void set_header_len(size_t value, void* header=NULL);
 	void set_header_capacity(size_t value, void* header=NULL);
-	bool get_header_isnode(const void* header=NULL);
-	bool get_header_hasrefs(const void* header=NULL);
-	size_t get_header_width(const void* header=NULL);
-	size_t get_header_len(const void* header=NULL);
-	size_t get_header_capacity(const void* header=NULL);
+	bool get_header_isnode(const void* header=NULL) const;
+	bool get_header_hasrefs(const void* header=NULL) const;
+	WidthType get_header_wtype(const void* header=NULL) const;
+	size_t get_header_width(const void* header=NULL) const;
+	size_t get_header_len(const void* header=NULL) const;
+	size_t get_header_capacity(const void* header=NULL) const;
 
 	void SetWidth(size_t width);
 	bool Alloc(size_t count, size_t width);
@@ -225,26 +235,65 @@ protected:
 // Templates
 
 template<class S>
-size_t Array::Write(S& out) const {
-	// Calculate who many bytes the array takes up
-	const size_t len = CalcByteLen(m_len, m_width);
-
-	// Write header first
-	// TODO: replace capacity with checksum
-	out.write((const char*)m_data-8, 8);
-
-	// Write array
-	const size_t arrayByteLen = len - 8;
-	if (arrayByteLen) out.write((const char*)m_data, arrayByteLen);
-
-	// Pad so next block will be 64bit aligned
-	const char pad[8] = {0,0,0,0,0,0,0,0};
-	const size_t rest = (~len & 0x7)+1; // CHECK
-	if (rest < 8) {
-		out.write(pad, rest);
-		return len + rest;
+size_t Array::Write(S& out, size_t& pos, bool recurse) const {
+	// parse header
+	size_t len          = get_header_len();
+	const WidthType wt  = get_header_wtype();
+	
+	// Adjust length to number of bytes
+	if (wt == TDB_BITS) {
+		const size_t bits = (len * m_width);
+		len = bits / 8;
+		if (bits & 0x7) ++len; // include partial bytes
 	}
-	else return len; // Return number of bytes written
+	else if (wt == TDB_MULTIPLY) {
+		len *= m_width;
+	}
+	
+	if (recurse && m_hasRefs) {
+		// Temp array for updated refs
+		Array newRefs(m_isNode ? COLUMN_NODE : COLUMN_HASREFS);
+		
+		// First write out all sub-arrays
+		for (size_t i = 0; i < Size(); ++i) {
+			const size_t ref = Get(i);
+			if (ref == 0 || ref & 0x1) {
+				// zero-refs and refs that are not 64-aligned do not point to sub-trees
+				newRefs.Add(ref);
+			}
+			else {
+				const Array sub(ref, (const Array*)NULL, 0, GetAllocator());
+				const size_t sub_pos = sub.Write(out, pos);
+				newRefs.Add(sub_pos);
+			}
+		}
+		
+		// Write out the replacement array
+		// (but don't write sub-tree as it has alredy been written)
+		const size_t refs_pos = newRefs.Write(out, pos, false);
+		
+		// Clean-up
+		newRefs.SetType(COLUMN_NORMAL); // avoid recursive del
+		newRefs.Destroy();
+		
+		return refs_pos; // Return position
+	}
+	else {
+		const size_t array_pos = pos;
+		
+		// TODO: replace capacity with checksum
+		
+		// Calculate complete size
+		len += 8; // include header in total
+		const size_t rest = (~len & 0x7)+1; // CHECK
+		if (rest < 8) len += rest; // Add padding for 64bit alignment
+		
+		// Write array
+		out.write((const char*)m_data-8, len);
+		pos += len;
+		
+		return array_pos; // Return position of this array
+	}
 }
 
 #endif //__TDB_ARRAY__

@@ -76,47 +76,13 @@ size_t Group::Write(S& out) {
 	// Space for ref to top array
     out.write("\0\0\0\0\0\0\0\0", 8);
     size_t pos = 8;
-
-	// Write tables
-	Array tables(COLUMN_HASREFS);
-	for (size_t i = 0; i < m_tables.Size(); ++i) {
-		// Instantiate table if not in cache
-		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
-		if (!t) {
-			const size_t ref = m_tables.Get(i);
-			t = new TopLevelTable(m_alloc, ref, &m_tables, i);
-			m_cachedtables.Set(i, (intptr_t)t);
-		}
-
-		// Write the table
-		const size_t tablePos = t->Write(out, pos);
-		tables.Add(tablePos);
-	}
-
-	// Write table names
-	const size_t tableNamesPos = pos;
-	pos += m_tableNames.Write(out);
-
-	// Write list of tables
-	const size_t tablesPos = pos;
-	pos += tables.Write(out);
-
-	// Write top
-	Array top(COLUMN_HASREFS);
-	top.Add(tableNamesPos);
-	top.Add(tablesPos);
-	const size_t topPos = pos;
-	pos += top.Write(out);
+	
+	// Recursively write all arrays
+	const size_t topPos = m_top.Write(out, pos);
 
 	// top ref
 	out.seekp(0);
 	out.write((const char*)&topPos, 8);
-
-	// Clean-up
-	tables.SetType(COLUMN_NORMAL); // avoid recursive del
-	top.SetType(COLUMN_NORMAL);
-	tables.Destroy();
-	top.Destroy();
 
 	// return bytes written
 	return pos;

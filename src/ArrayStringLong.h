@@ -26,8 +26,6 @@ public:
 	size_t Find(const char* value, size_t start=0 , size_t end=-1) const;
 	void FindAll(Array &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
-	template<class S> size_t Write(S& out, size_t& pos) const;
-
 private:
 	size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
 
@@ -35,31 +33,5 @@ private:
 	Array m_offsets;
 	ArrayBlob m_blob;
 };
-
-// Templates
-
-template<class S>
-size_t ArrayStringLong::Write(S& out, size_t& pos) const{
-	// Write out offsets
-	const size_t offsets_pos = pos;
-	pos += m_offsets.Write(out);
-
-	// Write out data
-	const size_t blob_pos = pos;
-	pos += m_blob.Write(out);
-
-	// Write new array with node info
-	const size_t node_pos = pos;
-	Array node(COLUMN_HASREFS);
-	node.Add(offsets_pos);
-	node.Add(blob_pos);
-	pos += node.Write(out);
-
-	// Clean-up
-	node.SetType(COLUMN_NORMAL); // avoid recursive del
-	node.Destroy();
-
-	return node_pos;
-}
 
 #endif //__TDB_ARRAY_STRING_LONG__

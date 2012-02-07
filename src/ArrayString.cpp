@@ -24,6 +24,9 @@ size_t round_up(size_t len) {
 }
 
 ArrayString::ArrayString(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
+	// Manually set wtype as array constructor in initiatializer list
+	// will not be able to call correct virtual function
+	set_header_wtype(TDB_MULTIPLY);
 }
 
 ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(alloc) {
