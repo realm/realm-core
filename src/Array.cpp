@@ -613,7 +613,7 @@ size_t Array::CompareEquality(int64_t value, size_t start, size_t end, bool eq) 
 
 	start += 4;
 
-	if(start > end)
+	if(start >= end)
 		return (size_t)-1;
 
 	// Test 64 items with no latency for cases where the first few 64-bit chunks are likely to
@@ -625,7 +625,7 @@ size_t Array::CompareEquality(int64_t value, size_t start, size_t end, bool eq) 
 		if(eq ? (Get(start) == value)  :   (Get(start) != value))
 			return start;
 	
-	if(start > end)
+	if(start >= end)
 		return (size_t)-1;
 
 	const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));
@@ -974,7 +974,7 @@ size_t Array::CompareRelation(int64_t value, size_t start, size_t end, bool gt) 
 
 	start += 4;
 
-	if(start > end)
+	if(start >= end)
 		return (size_t)-1;
 
 	if (IsEmpty()) return -1;
@@ -991,7 +991,7 @@ size_t Array::CompareRelation(int64_t value, size_t start, size_t end, bool gt) 
 		if(gt ? (Get(start) > value)  :   (Get(start) < value))
 			return start;
 	
-	if(start > end)
+	if(start >= end)
 		return (size_t)-1;
 
 	const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));

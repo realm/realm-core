@@ -14,7 +14,7 @@
 #endif
 
 const int MAX_THREADS = 128;
-const int THREAD_CHUNK_SIZE = 1000000;
+const int THREAD_CHUNK_SIZE = 10000;
 
 class Query {
 public:
