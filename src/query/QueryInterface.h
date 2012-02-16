@@ -14,7 +14,7 @@
 #endif
 
 const int MAX_THREADS = 128;
-const int THREAD_CHUNK_SIZE = 10000;
+const int THREAD_CHUNK_SIZE = 1000;
 
 class Query {
 public:
@@ -138,13 +138,30 @@ public:
 		update_override.push_back(0);
 		first.push_back(0);
 	};
-
 	void Or(void) {
 		ParentNode* const o = new OR_NODE(first[first.size()-1]);
 		first[first.size()-1] = o;
 		update[update.size()-1] = &((OR_NODE*)o)->m_cond2;
 		update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
 	};
+
+	void Subtable(size_t column) {
+
+		ParentNode* const p = new SUBTABLE(column);
+		UpdatePointers(p, &p->m_child);
+		// once subtable conditions have been evaluated, resume evaluation from m_child2
+		subtables.push_back(&((SUBTABLE*)p)->m_child2); 
+		LeftParan();
+	}
+
+	void Parent() {
+		RightParan();
+
+		if (update[update.size()-1] != 0)
+			update[update.size()-1] = subtables[subtables.size()-1];
+
+		subtables.pop_back();
+	}
 
 	void RightParan(void) {
 		if(first.size() < 2) {
@@ -383,7 +400,7 @@ protected:
 	mutable std::vector<ParentNode *>first;
 	std::vector<ParentNode **>update;
 	std::vector<ParentNode **>update_override;
-
+	std::vector<ParentNode **>subtables;
 	private:
 	int m_threadcount;
 };

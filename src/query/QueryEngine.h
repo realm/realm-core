@@ -56,6 +56,43 @@ protected:
 };
 */
 
+// Not finished
+class SUBTABLE : public ParentNode {
+public:
+	SUBTABLE(size_t column) : m_column(column) {m_child = 0; m_child2 = 0;}
+	SUBTABLE() {};
+//	~NODE() {delete m_child; }
+
+	size_t Find(size_t start, size_t end, const Table& table) {
+		for (size_t s = start; s < end; ++s) {
+
+			Table subtable = ((Table&)table).GetTable(m_column, s);
+
+			const size_t sub = m_child->Find(0, subtable.GetSize(), subtable);
+
+			if(sub != subtable.GetSize()) {			
+
+				if (m_child2 == 0)
+					return s;
+				else {
+					const size_t a = m_child2->Find(s, end, table);
+					if (s == a)
+						return s;
+					else
+						s = a - 1;
+				}
+
+
+			}
+		}
+		return end;
+	}
+//protected:
+	ParentNode* m_child2;
+	size_t m_column;
+};
+
+
 template <class T, class C, class F> class NODE : public ParentNode {
 public:
 	NODE(T v, size_t column) : m_value(v), m_column(column) {m_child = 0;}
@@ -155,10 +192,8 @@ public:
 
 	size_t Find(size_t start, size_t end, const Table& table) {
 		int column_type = table.GetRealColumnType(m_column);
-		EQUAL function;// = {};
 		for (size_t s = start; s < end; ++s) {
 			const char* t;
-
 			// todo, can be optimized by placing outside loop
 			if (column_type == COLUMN_TYPE_STRING)
 				s = ((AdaptiveStringColumn&)(table.GetColumnBase(m_column))).Find(m_value, s, end);

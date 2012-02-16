@@ -559,7 +559,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	t = FindNaive(value, ((unsigned char *)b - m_data) * 8 / m_width, end);
 	return t;
 #else
-	return CompareEquality(value, start, end, true); //FindNaive(value, start, end); // enable legacy find
+	return CompareEquality<true>(value, start, end); //FindNaive(value, start, end); // enable legacy find
 #endif
 }
 
@@ -607,8 +607,7 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 
 // If gt = true: Find first element which is greater than value
 // If gt = false: Find first element which is smaller than value
-// The correct cases for eq are inlined by the compiler and won't hurt performance
-size_t Array::CompareEquality(int64_t value, size_t start, size_t end, bool eq) const {
+template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, size_t end) const {
 	if (end == (size_t)-1) end = m_len;
 
 	// Test 4 items with zero latency for cases where match frequency is high, such 
@@ -973,8 +972,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 
 // If gt = true: Find first element which is greater than value
 // If gt = false: Find first element which is smaller than value
-// The correct cases for gt are inlined by the compiler and won't hurt performance
-size_t Array::CompareRelation(int64_t value, size_t start, size_t end, bool gt) const{
+template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, size_t end) const{
 	if (end == (size_t)-1) end = m_len;
 
 	// Test 4 items with zero latency for cases where match frequency is high, such 
@@ -1191,17 +1189,17 @@ size_t Array::CompareRelation(int64_t value, size_t start, size_t end, bool gt) 
 }
 
 template <> size_t Array::Query<EQUAL>(int64_t value, size_t start, size_t end) {
-	return CompareEquality(value, start, end, true);
+	return CompareEquality<true>(value, start, end);
 }
 template <> size_t Array::Query<NOTEQUAL>(int64_t value, size_t start, size_t end) {
-	return CompareEquality(value, start, end, false);
+	return CompareEquality<false>(value, start, end);
 }
 template <> size_t Array::Query<GREATER>(int64_t value, size_t start, size_t end) {
-	return CompareRelation(value, start, end, true);
+	return CompareRelation<true>(value, start, end);
 }
 
 template <> size_t Array::Query<LESS>(int64_t value, size_t start, size_t end) {
-	return CompareRelation(value, start, end, false);
+	return CompareRelation<false>(value, start, end);
 }
 
 
@@ -1596,6 +1594,8 @@ void Array::Set_64b(size_t ndx, int64_t value) {
 void Array::Sort() {
 	DoSort(0, m_len-1);
 }
+
+
 
 void Array::DoSort(size_t lo, size_t hi) {
 	// Quicksort based on

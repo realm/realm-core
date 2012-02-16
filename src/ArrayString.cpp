@@ -257,12 +257,7 @@ size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, siz
 	
 	return (size_t)-1; // not found
 }
-/*
-template <class F> size_t ArrayString::Query(const char* value, size_t len, size_t start, size_t end) const {
-	F function;
-	function(
-}
-*/
+
 #ifdef _DEBUG
 #include "stdio.h"
 

@@ -150,6 +150,8 @@ public:\
 	TestQuery& LeftParan(void) {Query::LeftParan(); return *this;}; \
 	TestQuery& Or(void) {Query::Or(); return *this;}; \
 	TestQuery& RightParan(void) {Query::RightParan(); return *this;}; \
+	TestQuery& Subtable(size_t column) {Query::Subtable(column); return *this;}; \
+	TestQuery& Parent() {Query::Parent(); return *this;}; \
 };\
 \
 	TestQuery GetQuery() {return TestQuery();} \
