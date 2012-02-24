@@ -1,6 +1,6 @@
 #include <string>
-#include <Windows.h>
 #include <assert.h>
+#include "utf8.h"
 
 // Return size in bytes of one utf8 character
 size_t sequence_length(const char *lead)
@@ -59,7 +59,7 @@ size_t case_prefix(const char *constant_upper, const char *constant_lower, const
 // compare instead of one whole UTF-8 character at a time. This is very fast, but enough to guarantee
 // that the strings are identical, so we need a slower character compare later (we use case_prefix()
 // for this).
-inline bool case_cmp(const char *constant_upper, const char *constant_lower, const char *source) {
+bool case_cmp(const char *constant_upper, const char *constant_lower, const char *source) {
 	size_t matchlen = 0;
 	do {
 		if(constant_lower[matchlen] == source[matchlen] || constant_upper[matchlen] == source[matchlen])

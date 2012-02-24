@@ -102,7 +102,7 @@ public:
 		const C& column = (C&)(table.GetColumnBase(m_column));
 		const F function = {};
 		for (size_t s = start; s < end; ++s) {
-			s = column.TreeFind<T, C, F>(m_value, s, end);
+			s = column.template TreeFind<T, C, F>(m_value, s, end);
 			if(s == -1) 
 				s = end;
 
@@ -139,7 +139,7 @@ public:
 		bool b1 = utf8case(v, m_lcase, false);
 		bool b2 = utf8case(v, m_ucase, true);
 		if(!b1 || !b2)
-			error_code = "Malformed UTF-8: " + string(m_value);
+			error_code = "Malformed UTF-8: " + std::string(m_value);
 	}
 	~STRINGNODE() {delete m_child; free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase); }
 

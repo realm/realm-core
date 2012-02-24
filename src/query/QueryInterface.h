@@ -7,14 +7,18 @@
 #include <vector>
 #include "query/QueryEngine.h"
 #include <stdio.h>
+#include <limits.h>
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
 	#include "Win32/pthread/pthread.h"
 #else
-	#include <pthreads.h>
+	#include <pthread.h>
 #endif
 
 const int MAX_THREADS = 128;
 const int THREAD_CHUNK_SIZE = 1000;
+
+#define MIN(a, b)  (((a) < (b)) ? (a) : (b))
+#define MAX(a, b)  (((a) > (b)) ? (a) : (b))
 
 class Query {
 public:
@@ -255,7 +259,7 @@ static void *query_thread(void *arg) {
 				pthread_mutex_lock(&ts->jobs_mutex);
 				if(ts->next_job == ts->end_job)
 					break;
-				const size_t chunk = min(ts->end_job - ts->next_job, THREAD_CHUNK_SIZE);
+				const size_t chunk = MIN(ts->end_job - ts->next_job, THREAD_CHUNK_SIZE);
 				const size_t mine = ts->next_job;
 				ts->next_job += chunk;
 				size_t r = mine - 1;

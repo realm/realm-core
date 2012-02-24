@@ -1,6 +1,5 @@
 #include "tightdb.h"
 #include <UnitTest++.h>
-#include "../../test/UnitTest++/src/Win32/TimeHelpers.h"
 
 TDB_TABLE_2(TupleTableType,
 	Int, first,
@@ -43,7 +42,7 @@ TEST(TestQueryThreads) {
 	Query q1 = ttt.GetQuery().first.Equal(2).second.Equal("b");
 
 	// Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-	q1.SetThreads(5);
+	//q1.SetThreads(4);
 	TableView tv = q1.FindAll(ttt);
 
 	CHECK_EQUAL(100, tv.GetSize());

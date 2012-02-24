@@ -105,7 +105,7 @@ public:
 	size_t Find(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
 //	template <class F> size_t Find(F function, size_t start, size_t end) const;
 
-template <class F> size_t Find(F function, int64_t value, size_t start, size_t end) const {
+template <class F> size_t Find(F function_, int64_t value, size_t start, size_t end) const {
 	const F function = {};
 	if(end == -1)
 		end = m_len;

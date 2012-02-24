@@ -335,7 +335,8 @@ template<typename T, class C, class F> size_t ColumnBase::TreeFind(T value, size
 	 }*/
 //	F function;
 	if (!IsNode()) {
-		return static_cast<const C*>(this)->LeafFind<F>(value, start, end);
+		const C* c = static_cast<const C*>(this);
+		return c->template LeafFind<F>(value, start, end);
 	}
 	else {
 		// Get subnode table
