@@ -245,7 +245,7 @@ static void *query_thread(void *arg) {
 		thread_state *ts = (thread_state *)arg;
 
 		std::vector<size_t> res;
-		std::vector<std::pair<size_t, size_t>> chunks;
+		std::vector<std::pair<size_t, size_t> > chunks;
 
 		for(;;) {
 			// Main waiting loop that waits for a query to start
@@ -371,7 +371,7 @@ int SetThreads(unsigned int threadcount) {
 		ParentNode *node;
 		Table *table;
 		std::vector<size_t> results;
-		std::vector<std::pair<size_t, size_t>> chunks;
+		std::vector<std::pair<size_t, size_t> > chunks;
 	} ts;
 
 	std::string Verify(void) {

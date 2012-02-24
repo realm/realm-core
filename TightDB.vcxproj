@@ -120,6 +120,7 @@
       <WarningLevel>Level4</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
+      <AdditionalOptions>/DUSE_SSE %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>x64\Debug\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -198,7 +199,9 @@
     <ClCompile Include="src\utilities.cpp">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
     </ClCompile>
-    <ClCompile Include="src\win32\pthread\pthread.c" />
+    <ClCompile Include="src\win32\pthread\pthread.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+    </ClCompile>
     <ClCompile Include="test\large_tests\test_column.cpp" />
     <ClCompile Include="test\large_tests\test_strings.cpp" />
     <ClCompile Include="test\large_tests\verified_integer.cpp" />

@@ -158,7 +158,6 @@ private:
 #ifdef USE_SSE
 	size_t FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const;
 #endif //USE_SSE
-	size_t FindNaive(int64_t value, size_t start, size_t end) const;
 	template <bool eq>size_t CompareEquality(int64_t value, size_t start, size_t end) const;
 	template <bool gt>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
 protected:

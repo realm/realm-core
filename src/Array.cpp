@@ -534,14 +534,14 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		end = m_len;
 
 	if(end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) 
-		return FindNaive(value, start, end);
+		return CompareEquality<true>(value, start, end);
 
 	// FindSSE() must start at 16-byte boundary, so search area before that using FindNaive()
 	__m128i *a = (__m128i *)round_up(m_data + start * m_width / 8, sizeof(__m128i));
 	__m128i *b = (__m128i *)round_down(m_data + end * m_width / 8, sizeof(__m128i));
 	size_t t = 0;
 
-	t = FindNaive(value, start, ((unsigned char *)a - m_data) * 8 / m_width);
+	t = CompareEquality<true>(value, start, ((unsigned char *)a - m_data) * 8 / m_width);
 	if(t != -1)
 		return t;
 
@@ -550,13 +550,13 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		t = FindSSE(value, a, m_width / 8, b - a);
 		if(t != -1) {
 			// FindSSE returns SSE chunk number, so we use FindNative() to find packed position
-			t = FindNaive(value, t * sizeof(__m128i) * 8 / m_width  +  (((unsigned char *)a - m_data) / m_width), end);
+			t = CompareEquality<true>(value, t * sizeof(__m128i) * 8 / m_width  +  (((unsigned char *)a - m_data) / m_width), end);
 			return t;
 		}
 	}
 
 	// Search remainder with FindNaive()
-	t = FindNaive(value, ((unsigned char *)b - m_data) * 8 / m_width, end);
+	t = CompareEquality<true>(value, ((unsigned char *)b - m_data) * 8 / m_width, end);
 	return t;
 #else
 	return CompareEquality<true>(value, start, end); //FindNaive(value, start, end); // enable legacy find
