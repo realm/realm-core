@@ -223,7 +223,7 @@ public:
 		}
 	}
 
-size_t Find(Table& table, size_t start = 0, size_t end = -1) {
+size_t Find(Table& table, size_t start = 0, size_t end = -1) const {
 	size_t r;
 	TableView tv(table);
 	if(end == -1)
@@ -240,7 +240,7 @@ size_t Find(Table& table, size_t start = 0, size_t end = -1) {
 		return r;
 }
 
-int64_t Sum(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) {
+int64_t Sum(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
 	size_t r = start - 1;
 	size_t results = 0;
 	int64_t sum = 0;
@@ -256,7 +256,7 @@ int64_t Sum(Table& table, size_t column, size_t *resultcount, size_t start = 0, 
 	return sum;
 }
 
-int64_t Max(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) {
+int64_t Max(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
 	size_t r = start - 1;
 	size_t results = 0;
 	int64_t max = 0;
@@ -274,7 +274,7 @@ int64_t Max(Table& table, size_t column, size_t *resultcount, size_t start = 0, 
 	return max;
 }
 
-int64_t Min(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) {
+int64_t Min(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
 	size_t r = start - 1;
 	size_t results = 0;
 	int64_t min = 0;
@@ -292,7 +292,7 @@ int64_t Min(Table& table, size_t column, size_t *resultcount, size_t start = 0, 
 	return min;
 }
 
-int64_t Count(Table& table, size_t start = 0, size_t end = -1, size_t limit = -1) {
+int64_t Count(Table& table, size_t start = 0, size_t end = -1, size_t limit = -1) const {
 	size_t r = start - 1;
 	size_t results = 0;
 	for(;;) {
@@ -304,7 +304,7 @@ int64_t Count(Table& table, size_t start = 0, size_t end = -1, size_t limit = -1
 	return results;
 }
 
-double Avg(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) {
+double Avg(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
 	size_t resultcount2;
 	int64_t sum;
 	double avg;
