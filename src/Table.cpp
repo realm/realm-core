@@ -513,7 +513,7 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const {
 	}
 
 	assert(false);
-	return -1;
+	return (size_t)-1;
 }
 
 size_t Table::RegisterColumn(ColumnType type, const char* name) {

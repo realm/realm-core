@@ -5,13 +5,14 @@
 #include <string>
 #include <algorithm>
 #include <vector>
-#include "query/QueryEngine.h"
 #include <stdio.h>
 #include <limits.h>
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
 	#include "Win32/pthread/pthread.h"
+	#include "query/QueryEngine.h"
 #else
 	#include <pthread.h>
+	#include "QueryEngine.h"
 #endif
 
 const int MAX_THREADS = 128;
@@ -204,7 +205,7 @@ public:
 
 		// User created query with no criteria; return everything
 		if(first[0] == 0) {
-			for(int i = start; i < end; i++)
+			for(size_t i = start; i < end; i++)
 				tv.GetRefColumn().Add(i);
 		}
 		else if(m_threadcount > 0) {
@@ -223,9 +224,9 @@ public:
 		}
 	}
 
-size_t Find(Table& table, size_t start = 0, size_t end = -1) const {
+size_t Find(const Table& table, size_t start = 0, size_t end = -1) const {
 	size_t r;
-	TableView tv(table);
+	TableView tv((Table&)table);
 	if(end == -1)
 		end = table.GetSize();
 	if(start == end)
@@ -240,7 +241,7 @@ size_t Find(Table& table, size_t start = 0, size_t end = -1) const {
 		return r;
 }
 
-int64_t Sum(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
+int64_t Sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
 	size_t r = start - 1;
 	size_t results = 0;
 	int64_t sum = 0;
@@ -256,7 +257,7 @@ int64_t Sum(Table& table, size_t column, size_t *resultcount, size_t start = 0, 
 	return sum;
 }
 
-int64_t Max(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
+int64_t Max(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
 	size_t r = start - 1;
 	size_t results = 0;
 	int64_t max = 0;
@@ -274,7 +275,7 @@ int64_t Max(Table& table, size_t column, size_t *resultcount, size_t start = 0, 
 	return max;
 }
 
-int64_t Min(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
+int64_t Min(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
 	size_t r = start - 1;
 	size_t results = 0;
 	int64_t min = 0;
@@ -292,7 +293,7 @@ int64_t Min(Table& table, size_t column, size_t *resultcount, size_t start = 0, 
 	return min;
 }
 
-int64_t Count(Table& table, size_t start = 0, size_t end = -1, size_t limit = -1) const {
+size_t Count(const Table& table, size_t start = 0, size_t end = -1, size_t limit = -1) const {
 	size_t r = start - 1;
 	size_t results = 0;
 	for(;;) {
@@ -304,7 +305,7 @@ int64_t Count(Table& table, size_t start = 0, size_t end = -1, size_t limit = -1
 	return results;
 }
 
-double Avg(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
+double Avg(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) const {
 	size_t resultcount2;
 	int64_t sum;
 	double avg;
@@ -378,7 +379,6 @@ static void *query_thread(void *arg) {
 
 	void FindAllMulti(Table& table, TableView& tv, size_t start = 0, size_t end = -1) {
 		// Initialization
-		TableView *vtmp = new TableView(table);
 		ts.next_job = start;
 		ts.end_job = end;
 		ts.done_job = 0;
@@ -412,8 +412,6 @@ static void *query_thread(void *arg) {
 
 
 int SetThreads(unsigned int threadcount) {
-		size_t stacksize;
-		pthread_attr_t attr;
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
 		pthread_win32_process_attach_np ();
 #endif

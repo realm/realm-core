@@ -1,3 +1,5 @@
+#pragma warning (push, 0)
+
 /*
  * sched_get_priority_max.c
  * 

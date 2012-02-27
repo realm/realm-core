@@ -1,3 +1,5 @@
+#pragma warning (push, 0)
+
 /*
  * ptw32_InterlockedCompareExchange.c
  *

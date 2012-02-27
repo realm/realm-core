@@ -1,3 +1,5 @@
+#pragma warning (push, 0)
+
 /*
  * pthread_rwlockattr_init.c
  *

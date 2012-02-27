@@ -1,3 +1,6 @@
+#pragma warning (push, 0)
+
+
 /*
  * pthread_self.c
  *

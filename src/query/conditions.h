@@ -6,17 +6,19 @@
 
 struct CONTAINS { 
 	CONTAINS() {};
-	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { return strstr(v2, v1) != 0; }
+	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1_lower; (void)v1_upper; return strstr(v2, v1) != 0; }
 };
 
 // is v2 a prefix of v1?
 struct BEGINSWITH { 
-	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { return(strstr(v1, v2) == v1); }
+	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1_lower; (void)v1_upper; return(strstr(v1, v2) == v1); }
 };
 
 // does v1 end with s2?
 struct ENDSWITH { 
 	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { 
+		(void)v1_lower;
+		(void)v1_upper;
 		const size_t l1 = strlen(v1);
 		const size_t l2 = strlen(v2);
 		if (l1 > l2)
@@ -27,23 +29,23 @@ struct ENDSWITH {
 };
 
 struct EQUAL { 
-	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { return strcmp(v1, v2) == 0; }
+	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1_lower; (void)v1_upper; return strcmp(v1, v2) == 0; }
 	template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
 };
 
 struct NOTEQUAL { 
-	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { return strcmp(v1, v2) != 0; }
+	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1_lower; (void)v1_upper; return strcmp(v1, v2) != 0; }
 	template<class T> bool operator()(const T& v1, const T& v2) const { return v1 != v2; }
 };
 
 // does v1 contain v2?
 struct CONTAINS_INS { 
-	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { return case_strstr(v1_upper, v1_lower, v2); }
+	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1; return case_strstr(v1_upper, v1_lower, v2); }
 };
 
 // is v2 a prefix of v1?
 struct BEGINSWITH_INS { 
-	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { return(case_prefix(v1_upper, v1_lower, v2) != -1); }
+	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1; return(case_prefix(v1_upper, v1_lower, v2) != -1); }
 };
 
 // does v1 end with s2?
@@ -60,11 +62,11 @@ struct ENDSWITH_INS {
 };
 
 struct EQUAL_INS { 
-	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { return case_cmp(v1_upper, v1_lower, v2); }
+	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1; return case_cmp(v1_upper, v1_lower, v2); }
 };
 
 struct NOTEQUAL_INS { 
-	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { return !case_cmp(v1_upper, v1_lower, v2); }
+	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1_lower; (void)v1; return !case_cmp(v1_upper, v1_lower, v2); }
 };
 
 struct GREATER { 

@@ -43,7 +43,7 @@ size_t case_prefix(const char *constant_upper, const char *constant_lower, const
 		if(m != 0)
 			matchlen += m;
 		else
-			return -1;
+			return (size_t)-1;
 	}
 	while(constant_lower[matchlen] != 0 && source[matchlen] != 0); 
 
@@ -52,7 +52,7 @@ size_t case_prefix(const char *constant_upper, const char *constant_lower, const
 	else if (constant_lower[matchlen] == 0 && source[matchlen] == 0)
 		return 1;
 
-	return -1;
+	return (size_t)-1;
 }
 
 // If constant == source, return true. NOTE: This function first performs a case insensitive *byte*

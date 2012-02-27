@@ -100,7 +100,6 @@ public:
 
 	size_t Find(size_t start, size_t end, const Table& table) {
 		const C& column = (C&)(table.GetColumnBase(m_column));
-		const F function = {};
 		for (size_t s = start; s < end; ++s) {
 			s = column.template TreeFind<T, C, F>(m_value, s, end);
 			if(s == -1) 
@@ -193,7 +192,6 @@ public:
 	size_t Find(size_t start, size_t end, const Table& table) {
 		int column_type = table.GetRealColumnType(m_column);
 		for (size_t s = start; s < end; ++s) {
-			const char* t;
 			// todo, can be optimized by placing outside loop
 			if (column_type == COLUMN_TYPE_STRING)
 				s = ((AdaptiveStringColumn&)(table.GetColumnBase(m_column))).Find(m_value, s, end);

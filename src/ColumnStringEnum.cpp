@@ -74,7 +74,7 @@ void ColumnStringEnum::FindAll(Array &res, const char* value, size_t start, size
 size_t ColumnStringEnum::Find(const char* value, size_t start, size_t end) const {
 	// Find key
 	const size_t key_ndx = m_keys.Find(value);
-	if (key_ndx == (size_t)-1) return -1;
+	if (key_ndx == (size_t)-1) return (size_t)-1;
 
 	return m_values.Find(key_ndx, start, end);
 }

@@ -21,7 +21,7 @@ Array::Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc)
 }
 
 Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(-1), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+: m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 
@@ -31,7 +31,7 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
 Array::Array(Allocator& alloc)
-: m_ref(0), m_data(NULL), m_len(0), m_capacity(0), m_width(-1), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
+: m_ref(0), m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
 }
 
 // Copy-constructor
@@ -620,8 +620,8 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 	if(start + 3 < end && (eq ? (Get(start + 3) == value)   :   (Get(start + 3) != value)))
 		return start + 3;
 
-	if (IsEmpty()) return -1;
-	if (start >= end) return -1;
+	if (IsEmpty()) return (size_t)-1;
+	if (start >= end) return (size_t)-1;
 
 	assert(start < m_len && (end <= m_len || end == -1) && start < end);
 
@@ -722,7 +722,6 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 	else if (m_width == 64) {
 		while(p < e) {
 			int64_t v = *p;
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
 			if( eq ?   (v == value) : (v != value))
 				p++;
 			else
@@ -787,8 +786,8 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 	if(start >= end)
 		return (size_t)-1;
 
-	if (IsEmpty()) return -1;
-	if (start >= end) return -1;
+	if (IsEmpty()) return (size_t)-1;
+	if (start >= end) return (size_t)-1;
 
 	assert(start < m_len && (end <= m_len || end == -1) && start < end);
 

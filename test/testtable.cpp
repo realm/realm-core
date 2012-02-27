@@ -167,6 +167,8 @@ TEST(Table6) {
 	}};
 
 	TDB_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
+		(void)b;
+		(void)a;
 		//first.between(a, b);
 		second == str || second.MatchRegEx(".*");
 	}};
