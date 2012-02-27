@@ -533,10 +533,10 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	if(end == -1)
 		end = m_len;
 
-	if(end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) 
+	if(end - start < sizeof(__m128i) || m_width < 8) 
 		return CompareEquality<true>(value, start, end);
 
-	// FindSSE() must start at 16-byte boundary, so search area before that using FindNaive()
+	// FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
 	__m128i *a = (__m128i *)round_up(m_data + start * m_width / 8, sizeof(__m128i));
 	__m128i *b = (__m128i *)round_down(m_data + end * m_width / 8, sizeof(__m128i));
 	size_t t = 0;
@@ -549,13 +549,13 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	if(b > a) {
 		t = FindSSE(value, a, m_width / 8, b - a);
 		if(t != -1) {
-			// FindSSE returns SSE chunk number, so we use FindNative() to find packed position
-			t = CompareEquality<true>(value, t * sizeof(__m128i) * 8 / m_width  +  (((unsigned char *)a - m_data) / m_width), end);
+			// FindSSE returns SSE chunk number, so we use CompareEquality() to find packed position
+			t = CompareEquality<true>(value, t * sizeof(__m128i) * 8 / m_width  +  (((unsigned char *)a - m_data) * 8 / m_width), end);
 			return t;
 		}
 	}
 
-	// Search remainder with FindNaive()
+	// Search remainder with CompareEquality()
 	t = CompareEquality<true>(value, ((unsigned char *)b - m_data) * 8 / m_width, end);
 	return t;
 #else
@@ -565,7 +565,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 
 #ifdef USE_SSE
 // 'items' is the number of 16-byte SSE chunks. 'bytewidth' is the size of a packed data element.
-// Return value is SSE chunk number where the element is guaranteed to exist (use FindNative() to
+// Return value is SSE chunk number where the element is guaranteed to exist (use CompareEquality() to
 // find packed position)
 size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const{
 	__m128i search, next, compare = {1};
@@ -592,14 +592,13 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 			compare = _mm_cmpeq_epi32(search, next);
 		}
 	}
-
-	// Only supported by SSE 4.1. We use SSE 2 instead which is default in gcc (no -sse41 flag needed) and VC
-/*	else if(bytewidth == 8) {
+	else if(bytewidth == 8) {
+		// Only supported by SSE 4.1 because of _mm_cmpeq_epi64().
 		for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
 			next = _mm_load_si128(&data[i]);
 			compare = _mm_cmpeq_epi64(search, next);
 		}
-	}*/
+	}
 	return _mm_movemask_epi8(compare) == 0 ? -1 : i - 1;
 }
 #endif //USE_SSE
@@ -744,8 +743,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 }
 
 
-void Array::FindAll(Array& result, int64_t value, size_t colOffset,
-					size_t start, size_t end) const {
+void Array::FindAll(Array& result, int64_t value, size_t colOffset,	size_t start, size_t end) const {
 	if (IsEmpty()) return;
 	if (end == (size_t)-1) end = m_len;
 	if (start == end) return;
@@ -757,215 +755,13 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 	const size_t width = BitWidth(value);
 	if (width > m_width) return;
 
-	// Do optimized search based on column width
-	if (m_width == 0) {
-		for(size_t i = start; i < end; i++){
-			result.AddPositiveLocal(i + colOffset); // All values can only be zero.
-		}
-	}
-	else if (m_width == 2) {
-		// Create a pattern to match 64bits at a time
-		const int64_t v = ~0ULL/0x3 * value;
-
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 32;
-		const int64_t* const e = (const int64_t*)m_data + end64;
-
-		// Check 64bits at a time for match
-		while (p < e) {
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2 
-										 & 0xAAAAAAAAAAAAAAAAUL;
-			if (hasZeroByte){
-				// Element number at start of block
-				size_t i = (p - (const int64_t*)m_data) * 32;
-				const size_t j = i + 32; // Last element of block
-
-				// check block
-				while (i < j) {
-					const size_t offset = i >> 2;
-					const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
-					if (v == value) result.AddPositiveLocal(i + colOffset);
-					++i;
-				}
-			}
-			++p;
-		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 32;
-
-		// Manually check the rest
-		while (i < end) {
-			if (Get(i) == value) result.AddPositiveLocal(i + colOffset);
-			++i;
-		}
-	}
-	else if (m_width == 4) {
-		// Create a pattern to match 64bits at a time
-		const int64_t v = ~0ULL/0xF * value;
-
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 16;
-		const int64_t* const e = (const int64_t*)m_data + end64;
-
-		// Check 64bits at a time for match
-		while (p < e) {
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 
-										 & 0x8888888888888888UL;
-			if (hasZeroByte){
-				// Element number at start of block
-				size_t i = (p - (const int64_t*)m_data) * 16;
-				const size_t j = i + 16; // Last element of block
-
-				// check block
-				while (i < j) {
-					const size_t offset = i >> 1;
-					const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
-					if (v == value) result.AddPositiveLocal(i + colOffset);
-					++i;
-				}
-			}
-			++p;
-		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 16;
-
-		// Manually check the rest
-		while (i < end) {
-			if (Get(i) == value) result.AddPositiveLocal(i + colOffset);
-			++i;
-		}
-	}
-	else if (m_width == 8) {
-		// TODO: Handle partial searches
-
-		// Create a pattern to match 64bits at a time
-		const int64_t v = ~0ULL/0xFF * value;
-
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 8;
-		const int64_t* const e = (const int64_t*)m_data + end64;
-
-		// Check 64bits at a time for match
-		while (p < e) {
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2
-											 & 0x8080808080808080ULL;
-			if (hasZeroByte){
-				// Element number at start of block
-				size_t i = (p - (const int64_t*)m_data) * 8;
-				const size_t j = i + 8; // Last element of block
-				const int8_t* const d = (const int8_t*)m_data; // Data pointer
-
-				// check block
-				while (i < j) {
-					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
-					++i;
-				}
-			}
-			++p;
-		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 8;
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i)) result.AddPositiveLocal(i + colOffset);
-			++i;
-		}
-	}
-	else if (m_width == 16) {
-		// Create a pattern to match 64bits at a time
-		const int64_t v = ~0ULL/0xFFFF * value;
-
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 4;
-		const int64_t* const e = (const int64_t*)m_data + end64;
-
-		// Check 64bits at a time for match
-		while (p < e) {
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0001000100010001UL) & ~v2
-											 & 0x8000800080008000UL;
-			if (hasZeroByte){
-				// Element number at start of block
-				size_t i = (p - (const int64_t*)m_data) * 4;
-				const size_t j = i + 4; // Last element of block
-				const int16_t* const d = (const int16_t*)m_data; // Data pointer
-
-				// check block
-				while (i < j) {
-					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
-					++i;
-				}
-			}
-			++p;
-		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 4;
-
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i))
-				result.AddPositiveLocal(i + colOffset);
-			++i;
-		}
-	}
-	else if (m_width == 32) {
-		// Create a pattern to match 64bits at a time
-		const int64_t v = ~0ULL/0xFFFFFFFF * value;
-
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 2;
-		const int64_t* const e = (const int64_t*)m_data + end64;
-
-		// Check 64bits at a time for match
-		while (p < e) {
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2
-											 & 0x8000800080000000UL;
-			if (hasZeroByte){
-				size_t i = (p - (const int64_t*)m_data) * 2;     // Element number at start of block
-				const size_t j = i + 2;                          // Last element of block
-				const int32_t* const d = (const int32_t*)m_data; // Data pointer
-
-				// check block
-				while (i < j) {
-					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
-					++i;
-				}
-			}
-			++p;
-		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 2;
-
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i)) result.AddPositiveLocal(i + colOffset);
-			++i;
-		}
-	}
-	else if (m_width == 64) {
-		const int64_t v = (int64_t)value;
-		const int64_t* p = (const int64_t*)m_data + start;
-		const int64_t* const e = (const int64_t*)m_data + end;
-		while (p < e) {
-			if (*p == v) result.AddPositiveLocal((p - (const int64_t*)m_data) + colOffset);
-			++p;
-		}
-	}
-	else {
-		// Naive search
-		for (size_t i = start; i < end; ++i) {
-			const int64_t v = (this->*m_getter)(i);
-			if (v == value) result.AddPositiveLocal(i + colOffset);
-		}
+	size_t f = start - 1;
+	for(;;) {
+		f = Find(value, f + 1, end);
+		if (f == -1)
+			break;
+		else	
+			result.AddPositiveLocal(f + colOffset);
 	}
 }
 
@@ -1053,28 +849,6 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 8) {
-
-
-/*
-			// 772 ms
-		while(start < end && Get_8b(start) <= value)
-			start++;
-		return 0;		
-*/
-
-/*
-		// 762 ms
-		char *sta = (char *)(m_data + start);
-		char *eee = (char *)(m_data + end);
-
-		while(sta < eee && *sta <= value)
-			sta++;
-		return 0;		
-*/
-
-
-		// 174 ms!!
-
 		// Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
 		if(value <= 127) {
 			int64_t constant = gt ? (~0ULL / 255 * (127 - value))   :   (        ~0UL / 255 * value           );
@@ -1099,32 +873,8 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 				start++;
 		}
 		
-		
-
 	}
 	else if (m_width == 16) {
-
-	/*	
-		// L2 cache = 383 ms, L1 cache = 403
-		short int *st = (short int *)(m_data + start);
-		short int *en = (short int *)(m_data + end);
-
-		while(st < en && *st <= value)
-			st++;
-		return 0;
-*/
-
-/*
-		// L2 cache = 775 ms
-		while(start < end)
-			if(Get_16b(start) > value)
-				return start;
-			else
-				start++;
-*/
-
-
-		// L2 cache = 300 ms, L1 cache = 304 ms
 		if(value <= 32767) {
 			int64_t constant = gt ? (~0ULL / 65535 * (32767 - value))   :   ( ~0UL / 65535 * value);
 			while(p < e) {
@@ -1144,14 +894,6 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 		else {
 			while(start < end && gt ? (Get_16b(start) <= value)  :  (false))
 				start++;
-
-			/*
-			uint16_t *a = (uint16_t *)(m_data + start);
-			uint16_t *b = (uint16_t *)(m_data + end);
-			while(a < b && *a <= value)
-				a++;
-			start = a - (uint16_t *)m_data;
-			*/
 		}
 		
 
@@ -1161,21 +903,11 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 		// Faster than below version
 		while(start < end && gt ? (Get_32b(start) <= value) : (Get_32b(start) >= value) )
 			start++;
-
-/*
-			int32_t *a = (int32_t *)m_data + start;
-			int32_t *b = (int32_t *)m_data + end;
-			while(a < b && *a <= value)
-				a++;
-			start = ((unsigned char *)a - m_data) * 8 / m_width;
-*/
-
 	}
 	else if (m_width == 64) {
 		while(start < end && gt ? (Get_64b(start) <= value) : (Get_64b(start) >= value))
 			start++;
 	}
-
 
 	// Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
 	while(start < end)
@@ -1185,7 +917,6 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 			start++;
 
 	return (size_t)-1;
-
 }
 
 template <> size_t Array::Query<EQUAL>(int64_t value, size_t start, size_t end) {
