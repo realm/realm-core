@@ -187,15 +187,16 @@ TEST(TestQueryAggregateSum) {
 	TupleTableType ttt;
 	size_t resultcount;
 	int64_t agg;
+	double avg;
 
 	ttt.Add(1, "a");
 	ttt.Add(2, "a");
-	ttt.Add(3, "X");
-	ttt.Add(4, "a");
-	ttt.Add(5, "a");
-	ttt.Add(6, "X");
-	ttt.Add(7, "X");
-	ttt.Add(8, "a");
+	ttt.Add(3, "X"); //
+	ttt.Add(4, "a"); //
+	ttt.Add(5, "a"); //
+	ttt.Add(6, "X"); //
+	ttt.Add(7, "X"); 
+	ttt.Add(8, "a"); 
 	ttt.Add(9, "X");
 	ttt.Add(10, "X");
 
@@ -204,8 +205,8 @@ TEST(TestQueryAggregateSum) {
 	agg = q2.Sum(ttt, 0, &resultcount);
 	CHECK_EQUAL(55, agg);
 
-	agg = q2.Avg(ttt, 0, &resultcount);
-	CHECK_EQUAL(5, agg);
+	avg = q2.Avg(ttt, 0, &resultcount);
+	CHECK_EQUAL(5.5, avg);
 
 	agg = q2.Max(ttt, 0, &resultcount);
 	CHECK_EQUAL(10, agg);
@@ -215,6 +216,41 @@ TEST(TestQueryAggregateSum) {
 
 	agg = q2.Count(ttt);
 	CHECK_EQUAL(10, agg);
+
+
+
+	agg = q2.Sum(ttt, 0, &resultcount, 2, 6);
+	CHECK_EQUAL(18, agg);
+
+	avg = q2.Avg(ttt, 0, &resultcount, 2, 6);
+	CHECK_EQUAL(18.0 / 4.0, avg);
+
+	agg = q2.Max(ttt, 0, &resultcount, 2, 6);
+	CHECK_EQUAL(6, agg);
+
+	agg = q2.Min(ttt, 0, &resultcount, 2, 6);
+	CHECK_EQUAL(3, agg);
+
+	agg = q2.Count(ttt, 2, 6);
+	CHECK_EQUAL(4, agg);
+
+
+
+	agg = q2.Sum(ttt, 0, &resultcount, 2, 6, 2);
+	CHECK_EQUAL(7, agg);
+
+	avg = q2.Avg(ttt, 0, &resultcount, 2, 6, 2);
+	CHECK_EQUAL(7.0 / 2.0, avg);
+
+	agg = q2.Max(ttt, 0, &resultcount, 2, 6, 2);
+	CHECK_EQUAL(4, agg);
+
+	agg = q2.Min(ttt, 0, &resultcount, 2, 6, 2);
+	CHECK_EQUAL(3, agg);
+
+	agg = q2.Count(ttt, 2, 6, 2);
+	CHECK_EQUAL(2, agg);
+
 }
 
 
