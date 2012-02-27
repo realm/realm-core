@@ -38,6 +38,8 @@ public:
 	}
 
 	~Query() {
+		for(size_t i = 0; i < m_threadcount; i++)
+			pthread_detach(threads[i]);
 		delete first[0];
 	}
 
@@ -286,13 +288,14 @@ static void *query_thread(void *arg) {
 					}	
 					res.clear();
 				}
+				pthread_mutex_unlock(&ts->result_mutex);
 
 				// Signal main thread that we might have compleeted
-				pthread_mutex_unlock(&ts->completed_mutex);
+				pthread_mutex_lock(&ts->completed_mutex);
 				pthread_cond_signal(&ts->completed_cond);
-				pthread_mutex_unlock(&ts->result_mutex);
+				pthread_mutex_unlock(&ts->completed_mutex);
+
 			}
-			pthread_mutex_unlock(&ts->jobs_mutex);
 		}		
 	}
 
@@ -314,6 +317,7 @@ static void *query_thread(void *arg) {
 		pthread_mutex_lock(&ts.completed_mutex);
 		while(ts.done_job < ts.end_job)
 			pthread_cond_wait(&ts.completed_cond, &ts.completed_mutex);
+		pthread_mutex_lock(&ts.jobs_mutex);
 		pthread_mutex_unlock(&ts.completed_mutex);
 
 		// Sort search results because user expects ascending order
@@ -352,6 +356,8 @@ int SetThreads(unsigned int threadcount) {
 			if(r != 0)
 				assert(false); //todo
 		}
+
+		m_threadcount = threadcount;
 		return 0;
 	}
 
