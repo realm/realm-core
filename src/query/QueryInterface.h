@@ -228,6 +228,8 @@ size_t Find(Table& table, size_t start = 0, size_t end = -1) {
 	TableView tv(table);
 	if(end == -1)
 		end = table.GetSize();
+	if(start == end)
+		return (size_t)-1;
 	if(first[0] != 0)
 		r = first[0]->Find(start, end, table);
 	else
@@ -243,7 +245,7 @@ int64_t Sum(Table& table, size_t column, size_t *resultcount, size_t start = 0, 
 	size_t results = 0;
 	int64_t sum = 0;
 	for(;;) {
-		r = Find(table, r + 1, table.GetSize());
+		r = Find(table, r + 1, end);
 		if(r == -1 || r == table.GetSize() || results == limit)
 			break;
 		results++;
@@ -259,7 +261,7 @@ int64_t Max(Table& table, size_t column, size_t *resultcount, size_t start = 0, 
 	size_t results = 0;
 	int64_t max = 0;
 	for(;;) {
-		r = Find(table, r + 1, table.GetSize());
+		r = Find(table, r + 1, end);
 		if(r == -1 || r == table.GetSize() || results == limit)
 			break;
 		int64_t g = table.Get(column, r);
@@ -277,7 +279,7 @@ int64_t Min(Table& table, size_t column, size_t *resultcount, size_t start = 0, 
 	size_t results = 0;
 	int64_t min = 0;
 	for(;;) {
-		r = Find(table, r + 1, table.GetSize());
+		r = Find(table, r + 1, end);
 		if(r == -1 || r == table.GetSize() || results == limit)
 			break;
 		int64_t g = table.Get(column, r);
@@ -294,7 +296,7 @@ int64_t Count(Table& table, size_t start = 0, size_t end = -1, size_t limit = -1
 	size_t r = start - 1;
 	size_t results = 0;
 	for(;;) {
-		r = Find(table, r + 1, table.GetSize());
+		r = Find(table, r + 1, end);
 		if(r == -1 || r == table.GetSize() || results == limit)
 			break;
 		results++;
@@ -308,7 +310,7 @@ double Avg(Table& table, size_t column, size_t *resultcount, size_t start = 0, s
 	double avg;
 
 	sum = Sum(table, column, &resultcount2, start, end, limit);
-	avg = sum / resultcount2;
+	avg = (float)sum / (float)resultcount2;
 	if(resultcount != 0)
 		*resultcount = resultcount2;
 	return avg;
