@@ -183,6 +183,41 @@ TEST(TestQueryFindAll_Range) {
 }
 
 
+TEST(TestQueryAggregateSum) {
+	TupleTableType ttt;
+	size_t resultcount;
+	int64_t agg;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+	ttt.Add(4, "a");
+	ttt.Add(5, "a");
+	ttt.Add(6, "X");
+	ttt.Add(7, "X");
+	ttt.Add(8, "a");
+	ttt.Add(9, "X");
+	ttt.Add(10, "X");
+
+	Query q2 = ttt.GetQuery();
+
+	agg = q2.Sum(ttt, 0, &resultcount);
+	CHECK_EQUAL(55, agg);
+
+	agg = q2.Avg(ttt, 0, &resultcount);
+	CHECK_EQUAL(5, agg);
+
+	agg = q2.Max(ttt, 0, &resultcount);
+	CHECK_EQUAL(10, agg);
+
+	agg = q2.Min(ttt, 0, &resultcount);
+	CHECK_EQUAL(1, agg);
+
+	agg = q2.Count(ttt);
+	CHECK_EQUAL(10, agg);
+}
+
+
 TEST(TestQueryFindAll_Or) {
 	TupleTableType ttt;
 

@@ -223,21 +223,96 @@ public:
 		}
 	}
 
-	size_t Find(Table& table, size_t start, size_t end = -1) {
-		size_t r;
-		TableView tv(table);
-		if(end == -1)
-			end = table.GetSize();
-		if(first[0] != 0)
-			r = first[0]->Find(start, end, table);
-		else
-			r = 0; // user built an empty query; return any first
-		if(r == table.GetSize())
-			return (size_t)-1;
-		else
-			return r;
-	}
+size_t Find(Table& table, size_t start = 0, size_t end = -1) {
+	size_t r;
+	TableView tv(table);
+	if(end == -1)
+		end = table.GetSize();
+	if(first[0] != 0)
+		r = first[0]->Find(start, end, table);
+	else
+		r = start; // user built an empty query; return any first
+	if(r == table.GetSize())
+		return (size_t)-1;
+	else
+		return r;
+}
 
+int64_t Sum(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) {
+	size_t r = start - 1;
+	size_t results = 0;
+	int64_t sum = 0;
+	for(;;) {
+		r = Find(table, r + 1, table.GetSize());
+		if(r == -1 || r == table.GetSize() || results == limit)
+			break;
+		results++;
+		sum += table.Get(column, r);
+	}
+	if(resultcount != 0)
+		*resultcount = results;
+	return sum;
+}
+
+int64_t Max(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) {
+	size_t r = start - 1;
+	size_t results = 0;
+	int64_t max = 0;
+	for(;;) {
+		r = Find(table, r + 1, table.GetSize());
+		if(r == -1 || r == table.GetSize() || results == limit)
+			break;
+		int64_t g = table.Get(column, r);
+		if(results == 0 || g > max)
+			max = g;
+		results++;
+	}
+	if(resultcount != 0)
+		*resultcount = results;
+	return max;
+}
+
+int64_t Min(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) {
+	size_t r = start - 1;
+	size_t results = 0;
+	int64_t min = 0;
+	for(;;) {
+		r = Find(table, r + 1, table.GetSize());
+		if(r == -1 || r == table.GetSize() || results == limit)
+			break;
+		int64_t g = table.Get(column, r);
+		if(results == 0 || g < min)
+			min = g;
+		results++;
+	}
+	if(resultcount != 0)
+		*resultcount = results;
+	return min;
+}
+
+int64_t Count(Table& table, size_t start = 0, size_t end = -1, size_t limit = -1) {
+	size_t r = start - 1;
+	size_t results = 0;
+	for(;;) {
+		r = Find(table, r + 1, table.GetSize());
+		if(r == -1 || r == table.GetSize() || results == limit)
+			break;
+		results++;
+	}
+	return results;
+}
+
+double Avg(Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = -1, size_t limit = -1) {
+	size_t resultcount2;
+	int64_t sum;
+	double avg;
+
+	sum = Sum(table, column, &resultcount2, start, end, limit);
+	avg = sum / resultcount2;
+	if(resultcount != 0)
+		*resultcount = resultcount2;
+	return avg;
+}
 
 static bool comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b) {
 	return a.first < b.first;
