@@ -186,6 +186,7 @@ public:
 		m_child = 0;
 		m_value = (char *)malloc(strlen(v)*6);
 		memcpy(m_value, v, strlen(v) + 1);
+		key_ndx = -1;
 	}
 	~STRINGNODE() {delete m_child; free((void*)m_value); }
 
@@ -195,8 +196,12 @@ public:
 			// todo, can be optimized by placing outside loop
 			if (column_type == COLUMN_TYPE_STRING)
 				s = ((AdaptiveStringColumn&)(table.GetColumnBase(m_column))).Find(m_value, s, end);
-			else
-				s = ((ColumnStringEnum&)(table.GetColumnBase(m_column))).Find(m_value, s, end);
+			else {
+				ColumnStringEnum &cse = (ColumnStringEnum&)(table.GetColumnBase(m_column));
+				if(key_ndx == -1)
+					key_ndx = cse.GetKeyNdx(m_value);
+				s = cse.Find(key_ndx, s, end);
+			}
 
 			if(s == -1)
 				s = end;
@@ -216,6 +221,8 @@ public:
 protected:
 	char* m_value;
 	size_t m_column;
+private:
+	size_t key_ndx;
 };
 
 

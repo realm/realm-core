@@ -203,6 +203,7 @@ bool Column::Insert(size_t ndx, int64_t value) {
 }
 
 bool callme_sum(Array &a, size_t start, size_t end, size_t caller_base, void *state) {
+	(void)caller_base;
 	int64_t s = a.Sum(start, end);
 	*(int64_t *)state += s;
 	return true;
@@ -222,6 +223,7 @@ public:
 };
 
 bool callme_min(Array &a, size_t start, size_t end, size_t caller_offset, void *state) {
+	(void)caller_offset;
 	AggregateState* p = (AggregateState*)state;
 
 	int64_t res;
@@ -241,6 +243,7 @@ int64_t Column::Min(size_t start, size_t end) const {
 }
 
 bool callme_max(Array &a, size_t start, size_t end, size_t caller_offset, void *state) {
+	(void)caller_offset;
 	AggregateState* p = (AggregateState*)state;
 
 	int64_t res;
@@ -348,6 +351,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const {
 }
 
 void Column::FindAll(Array& result, int64_t value, size_t caller_offset, size_t start, size_t end) const {
+	(void)caller_offset;
 	assert(start <= Size());
 	assert(end == (size_t)-1 || end <= Size());
 	if (IsEmpty()) return;
