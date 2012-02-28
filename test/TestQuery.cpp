@@ -1,6 +1,5 @@
 #include "tightdb.h"
 #include <UnitTest++.h>
-#include "../../test/UnitTest++/src/Win32/TimeHelpers.h"
 #include "Group.h"
 
 TDB_TABLE_2(TupleTableType,
