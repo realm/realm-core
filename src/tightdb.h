@@ -51,11 +51,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -68,11 +68,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -80,7 +80,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -180,11 +180,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -197,11 +197,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -209,7 +209,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -322,11 +322,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -339,11 +339,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -351,7 +351,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -477,11 +477,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -494,11 +494,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -506,7 +506,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -645,11 +645,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -662,11 +662,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -674,7 +674,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -826,11 +826,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -843,11 +843,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -855,7 +855,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -1020,11 +1020,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -1037,11 +1037,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -1049,7 +1049,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -1227,11 +1227,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -1244,11 +1244,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -1256,7 +1256,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -1447,11 +1447,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -1464,11 +1464,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -1476,7 +1476,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -1680,11 +1680,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -1697,11 +1697,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -1709,7 +1709,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -1926,11 +1926,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -1943,11 +1943,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -1955,7 +1955,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -2185,11 +2185,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -2202,11 +2202,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -2214,7 +2214,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -2457,11 +2457,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -2474,11 +2474,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -2486,7 +2486,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -2742,11 +2742,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -2759,11 +2759,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -2771,7 +2771,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -3040,11 +3040,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -3057,11 +3057,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -3069,7 +3069,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -3351,11 +3351,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -3368,11 +3368,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -3380,7 +3380,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -3675,11 +3675,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -3692,11 +3692,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -3704,7 +3704,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -4012,11 +4012,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -4029,11 +4029,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -4041,7 +4041,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -4362,11 +4362,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -4379,11 +4379,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -4391,7 +4391,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -4725,11 +4725,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -4742,11 +4742,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -4754,7 +4754,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -5101,11 +5101,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -5118,11 +5118,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -5130,7 +5130,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -5490,11 +5490,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -5507,11 +5507,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -5519,7 +5519,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -5892,11 +5892,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -5909,11 +5909,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -5921,7 +5921,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -6307,11 +6307,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -6324,11 +6324,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -6336,7 +6336,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -6735,11 +6735,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -6752,11 +6752,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -6764,7 +6764,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -7176,11 +7176,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -7193,11 +7193,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -7205,7 +7205,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -7630,11 +7630,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -7647,11 +7647,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -7659,7 +7659,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -8097,11 +8097,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -8114,11 +8114,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -8126,7 +8126,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -8577,11 +8577,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -8594,11 +8594,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -8606,7 +8606,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -9070,11 +9070,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -9087,11 +9087,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -9099,7 +9099,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -9576,11 +9576,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -9593,11 +9593,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -9605,7 +9605,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -10095,11 +10095,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -10112,11 +10112,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -10124,7 +10124,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -10627,11 +10627,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -10644,11 +10644,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -10656,7 +10656,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -11172,11 +11172,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -11189,11 +11189,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -11201,7 +11201,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -11730,11 +11730,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -11747,11 +11747,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -11759,7 +11759,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -12301,11 +12301,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -12318,11 +12318,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -12330,7 +12330,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -12885,11 +12885,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -12902,11 +12902,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -12914,7 +12914,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -13482,11 +13482,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -13499,11 +13499,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -13511,7 +13511,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -14092,11 +14092,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -14109,11 +14109,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -14121,7 +14121,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -14715,11 +14715,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -14732,11 +14732,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -14744,7 +14744,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -15351,11 +15351,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -15368,11 +15368,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -15380,7 +15380,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -16000,11 +16000,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -16017,11 +16017,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -16029,7 +16029,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -16662,11 +16662,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -16679,11 +16679,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -16691,7 +16691,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -17337,11 +17337,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -17354,11 +17354,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -17366,7 +17366,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -18025,11 +18025,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -18042,11 +18042,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -18054,7 +18054,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -18726,11 +18726,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -18743,11 +18743,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -18755,7 +18755,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -19440,11 +19440,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -19457,11 +19457,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -19469,7 +19469,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -20167,11 +20167,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -20184,11 +20184,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -20196,7 +20196,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -20907,11 +20907,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -20924,11 +20924,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -20936,7 +20936,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -21660,11 +21660,11 @@ public: \
 			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \
-			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \
-			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \
-			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \
-			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \
+			TestQuery& Equal(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Equal(value));} \
+			TestQuery& NotEqual(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::NotEqual(value));} \
+			TestQuery& Greater(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Greater(value));} \
+			TestQuery& Less(int64_t value) {return static_cast<TestQuery &>(XQueryAccessorInt::Less(value));} \
+			TestQuery& Between(int64_t from, int64_t to) {return static_cast<TestQuery &>(XQueryAccessorInt::Between(from, to));} \
 		}; \
 \
 		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \
@@ -21677,11 +21677,11 @@ public: \
 			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \
-			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \
-			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \
-			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \
-			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Equal(value, CaseSensitive));} \
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::NotEqual(value, CaseSensitive));} \
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::BeginsWith(value, CaseSensitive));} \
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::EndsWith(value, CaseSensitive));} \
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return static_cast<TestQuery &>(XQueryAccessorString::Contains(value, CaseSensitive));} \
 		}; \
 \
 		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \
@@ -21689,7 +21689,7 @@ public: \
 			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \
 			void SetQuery(Query* query) {m_query = query;} \
 \
-			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \
+			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
