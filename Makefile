@@ -54,7 +54,7 @@ clean:
 
 # Code generation
 src/tightdb.h: src/tightdb-gen.py
-	python src/tightdb-gen.py >src/tightdb.h
+	python src/tightdb-gen.py 50 >src/tightdb.h
 
 # Compiling
 %.o: %.cpp

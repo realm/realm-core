@@ -27,7 +27,6 @@ public: \\
 QueryName
 
 #define TDB_QUERY_END }; \\
-%set $max_cols = 5
 %for $i in range($max_cols)
 %set $num_cols = $i + 1
 
@@ -213,5 +212,10 @@ private: \\
 #endif //__TIGHTDB_H__
 """
 
-t = Template(templateDef)
+args = sys.argv[1:]
+if len(args) != 1:
+	sys.stderr.write("Please specify the maximum number of table columns\n")
+	sys.exit(1)
+max_cols = int(args[0])
+t = Template(templateDef, searchList=[{'max_cols': max_cols}])
 sys.stdout.write(str(t))
