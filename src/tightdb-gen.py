@@ -57,9 +57,91 @@ public: \\
 %end for
 	}; \\
 \\
+	class TestQuery : public Query { \\
+	public: \\
+		TestQuery() : %slurp
+%for $j in range($num_cols)
+%if 0 < $j
+, %slurp
+%end if
+CName${j+1}%slurp
+($j)%slurp
+%end for
+ { \\
+%for $j in range($num_cols)
+			CName${j+1}.SetQuery(this); \\
+%end for
+		} \\
+\\
+		TestQuery(const TestQuery& copy) : Query(copy)%slurp
+%for $j in range($num_cols)
+, CName${j+1}%slurp
+($j)%slurp
+%end for
+ { \\
+%for $j in range($num_cols)
+			CName${j+1}.SetQuery(this); \\
+%end for
+		} \\
+\\
+		class TestQueryQueryAccessorInt : private XQueryAccessorInt { \\
+		public: \\
+			TestQueryQueryAccessorInt(size_t column_id) : XQueryAccessorInt(column_id) {} \\
+			void SetQuery(Query* query) {m_query = query;} \\
+\\
+			TestQuery& Equal(int64_t value) {return (TestQuery &)XQueryAccessorInt::Equal(value);} \\
+			TestQuery& NotEqual(int64_t value) {return (TestQuery &)XQueryAccessorInt::NotEqual(value);} \\
+			TestQuery& Greater(int64_t value) {return (TestQuery &)XQueryAccessorInt::Greater(value);} \\
+			TestQuery& Less(int64_t value) {return (TestQuery &)XQueryAccessorInt::Less(value);} \\
+			TestQuery& Between(int64_t from, int64_t to) {return (TestQuery &)XQueryAccessorInt::Between(from, to);} \\
+		}; \\
+\\
+		template <class T> class TestQueryQueryAccessorEnum : public TestQueryQueryAccessorInt { \\
+		public: \\
+			TestQueryQueryAccessorEnum<T>(size_t column_id) : TestQueryQueryAccessorInt(column_id) {} \\
+		}; \\
+\\
+		class TestQueryQueryAccessorString : private XQueryAccessorString { \\
+		public: \\
+			TestQueryQueryAccessorString(size_t column_id) : XQueryAccessorString(column_id) {} \\
+			void SetQuery(Query* query) {m_query = query;} \\
+\\
+			TestQuery& Equal(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Equal(value, CaseSensitive);} \\
+			TestQuery& NotEqual(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::NotEqual(value, CaseSensitive);} \\
+			TestQuery& BeginsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::BeginsWith(value, CaseSensitive);} \\
+			TestQuery& EndsWith(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::EndsWith(value, CaseSensitive);} \\
+			TestQuery& Contains(const char *value, bool CaseSensitive = true) {return (TestQuery &)XQueryAccessorString::Contains(value, CaseSensitive);} \\
+		}; \\
+\\
+		class TestQueryQueryAccessorBool : private XQueryAccessorBool { \\
+		public: \\
+			TestQueryQueryAccessorBool(size_t column_id) : XQueryAccessorBool(column_id) {} \\
+			void SetQuery(Query* query) {m_query = query;} \\
+\\
+			TestQuery& Equal(bool value) {return (TestQuery &)XQueryAccessorBool::Equal(value);} \\
+		}; \\
+\\
+%for $j in range($num_cols)
+		TestQueryQueryAccessor##CType${j+1} CName${j+1}; \\
+%end for
+\\
+		TestQuery& LeftParan(void) {Query::LeftParan(); return *this;}; \\
+		TestQuery& Or(void) {Query::Or(); return *this;}; \\
+		TestQuery& RightParan(void) {Query::RightParan(); return *this;}; \\
+		TestQuery& Subtable(size_t column) {Query::Subtable(column); return *this;}; \\
+		TestQuery& Parent() {Query::Parent(); return *this;}; \\
+	}; \\
+\\
+	TestQuery GetQuery() {return TestQuery();} \\
+\\
 	class Cursor : public CursorBase { \\
 	public: \\
 		Cursor(TableName& table, size_t ndx) : CursorBase(table, ndx) { \\
+%for $j in range($num_cols)
+			CName${j+1}.Create(this, $j); \\
+%end for
+		} \\
+		Cursor(const TableName& table, size_t ndx) : CursorBase(const_cast<TableName&>(table), ndx) { \\
 %for $j in range($num_cols)
 			CName${j+1}.Create(this, $j); \\
 %end for
@@ -79,23 +161,23 @@ public: \\
 %if 0 < $j
 , %slurp
 %end if
-tdbType##CType${j+1} v${j+1}%slurp
+tdbType##CType${j+1} CName${j+1}%slurp
 %end for
 ) { \\
 		const size_t ndx = GetSize(); \\
 %for $j in range($num_cols)
-		Insert##CType${j+1} ($j, ndx, v${j+1}); \\
+		Insert##CType${j+1} ($j, ndx, CName${j+1}); \\
 %end for
 		InsertDone(); \\
 	} \\
 \\
 	void Insert(size_t ndx%slurp
 %for $j in range($num_cols)
-, tdbType##CType${j+1} v${j+1}%slurp
+, tdbType##CType${j+1} CName${j+1}%slurp
 %end for
 ) { \\
 %for $j in range($num_cols)
-		Insert##CType${j+1} ($j, ndx, v${j+1}); \\
+		Insert##CType${j+1} ($j, ndx, CName${j+1}); \\
 %end for
 		InsertDone(); \\
 	} \\
@@ -103,7 +185,10 @@ tdbType##CType${j+1} v${j+1}%slurp
 	Cursor Add() {return Cursor(*this, AddRow());} \\
 	Cursor Get(size_t ndx) {return Cursor(*this, ndx);} \\
 	Cursor operator[](size_t ndx) {return Cursor(*this, ndx);} \\
+	const Cursor operator[](size_t ndx) const {return Cursor(*this, ndx);} \\
 	Cursor operator[](int ndx) {return Cursor(*this, (ndx < 0) ? GetSize() + ndx : ndx);} \\
+	Cursor Back() {return Cursor(*this, m_size-1);} \\
+	const Cursor Back() const {return Cursor(*this, m_size-1);} \\
 \\
 	size_t Find(const TableName##Query&) const {return (size_t)-1;} \\
 	TableName FindAll(const TableName##Query&) const {return TableName();} \\
@@ -124,6 +209,8 @@ private: \\
 	TableName& operator=(const TableName&) {return *this;} \\
 };
 %end for
+
+#endif //__TIGHTDB_H__
 """
 
 t = Template(templateDef)

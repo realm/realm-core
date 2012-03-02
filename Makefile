@@ -27,6 +27,7 @@ OBJ_SHARED = $(SOURCES:.cpp=.so)
 # Targets
 all: static
 all: shared
+all: src/tightdb.h
 
 static: CXXFLAGS += -DNDEBUG -O3
 static: $(LIB_STATIC)
@@ -50,6 +51,10 @@ clean:
 	@rm -f core *.o *.so *.1 *.a
 	@rm -f core src/*.o src/*.so src/*.1 src/*.a
 	@(cd test && make clean)
+
+# Code generation
+src/tightdb.h: src/tightdb-gen.py
+	python src/tightdb-gen.py >src/tightdb.h
 
 # Compiling
 %.o: %.cpp
