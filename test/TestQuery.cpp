@@ -1,6 +1,5 @@
 #include "tightdb.h"
 #include <UnitTest++.h>
-#include "../../test/UnitTest++/src/Win32/TimeHelpers.h"
 #include "Group.h"
 
 TDB_TABLE_2(TupleTableType,
@@ -11,9 +10,136 @@ TDB_TABLE_2(BoolTupleTable,
 	Int, first,
 	Bool, second)
 
-int64_t even(int64_t in) {
-	return true;
+
+
+TEST(TestQuerySort1) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a"); // 0
+	ttt.Add(2, "a"); // 1
+	ttt.Add(3, "X"); // 2
+	ttt.Add(1, "a"); // 3
+	ttt.Add(2, "a"); // 4
+	ttt.Add(3, "X"); // 5
+	ttt.Add(9, "a"); // 6
+	ttt.Add(8, "a"); // 7
+	ttt.Add(7, "X"); // 8
+
+	// tv.GetRef()	= 0, 2, 3, 5, 6, 7, 8
+	// Vals			= 1, 3, 1, 3, 9, 8, 7
+	// result		= 3, 0, 5, 2, 8, 7, 6
+
+	Query q = ttt.GetQuery().first.NotEqual(2);
+	TableView tv = q.FindAll(ttt);
+	tv.Sort(0);
+
+	CHECK(tv.GetSize() == 7);
+	CHECK(tv.Get(0, 0) == 1);
+	CHECK(tv.Get(0, 1) == 1);
+	CHECK(tv.Get(0, 2) == 3);
+	CHECK(tv.Get(0, 3) == 3);
+	CHECK(tv.Get(0, 4) == 7);
+	CHECK(tv.Get(0, 5) == 8);
+	CHECK(tv.Get(0, 6) == 9);
 }
+
+
+
+TEST(TestQuerySort_QuickSort) {
+	// Triggers QuickSort because range > len
+	TupleTableType ttt;
+
+	for(size_t t = 0; t < 1000; t++)
+		ttt.Add(rand() % 1100, "a"); // 0
+
+	Query q = ttt.GetQuery();
+	TableView tv = q.FindAll(ttt);
+	tv.Sort(0);
+
+	CHECK(tv.GetSize() == 1000);
+	for(size_t t = 1; t < tv.GetSize(); t++) {
+		CHECK(tv.Get(0, t - 1) <= tv.Get(0, t - 1));
+	}
+}
+
+TEST(TestQuerySort_CountSort) {
+	// Triggers CountSort because range <= len
+	TupleTableType ttt;
+
+	for(size_t t = 0; t < 1000; t++)
+		ttt.Add(rand() % 900, "a"); // 0
+
+	Query q = ttt.GetQuery();
+	TableView tv = q.FindAll(ttt);
+	tv.Sort(0);
+
+	CHECK(tv.GetSize() == 1000);
+	for(size_t t = 1; t < tv.GetSize(); t++) {
+		CHECK(tv.Get(0, t - 1) <= tv.Get(0, t - 1));
+	}
+}
+
+
+TEST(TestQuerySort_Descending) {
+	TupleTableType ttt;
+
+	for(size_t t = 0; t < 1000; t++)
+		ttt.Add(rand() % 1100, "a"); // 0
+
+	Query q = ttt.GetQuery();
+	TableView tv = q.FindAll(ttt);
+	tv.Sort(0, false);
+
+	CHECK(tv.GetSize() == 1000);
+	for(size_t t = 1; t < tv.GetSize(); t++) {
+		CHECK(tv.Get(0, t - 1) >= tv.Get(0, t - 1));
+	}
+}
+
+
+TEST(TestQuerySort_Dates) {
+	Table table;
+	table.RegisterColumn(COLUMN_TYPE_DATE, "first");
+
+	table.InsertDate(0, 0, 1000);
+	table.InsertDone();
+	table.InsertDate(0, 1, 3000);
+	table.InsertDone();
+	table.InsertDate(0, 2, 2000);
+	table.InsertDone();
+
+	Query *q = new Query();
+	TableView tv = q->FindAll(table);
+  	tv.Sort(0);
+
+	CHECK(tv.GetSize() == 3);
+	CHECK(tv.GetDate(0, 0) == 1000);
+	CHECK(tv.GetDate(0, 1) == 2000);
+	CHECK(tv.GetDate(0, 2) == 3000);
+}
+
+
+TEST(TestQuerySort_Bools) {
+	Table table;
+	table.RegisterColumn(COLUMN_TYPE_BOOL, "first");
+
+	table.InsertBool(0, 0, true);
+	table.InsertDone();
+	table.InsertBool(0, 0, false);
+	table.InsertDone();
+	table.InsertBool(0, 0, true);
+	table.InsertDone();
+
+	Query *q = new Query();
+	TableView tv = q->FindAll(table);
+  	tv.Sort(0);
+
+	CHECK(tv.GetSize() == 3);
+	CHECK(tv.GetBool(0, 0) == false);
+	CHECK(tv.GetBool(0, 1) == true);
+	CHECK(tv.GetBool(0, 2) == true);
+}
+
 
 TEST(TestQuerySubtable) {
 
@@ -165,7 +291,7 @@ TEST(TestQueryThreads) {
 	Query q1 = ttt.GetQuery().first.Equal(2).second.Equal("b");
 
 	// Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-	q1.SetThreads(5);
+	//q1.SetThreads(5);
 	TableView tv = q1.FindAll(ttt);
 
 	CHECK_EQUAL(100, tv.GetSize());

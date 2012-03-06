@@ -201,4 +201,3 @@ TEST(TableViewFindAllString) {
 	CHECK_EQUAL(2, v2->GetRef(1));
 	//v.Destroy();
 }
-

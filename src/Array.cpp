@@ -2,10 +2,13 @@
 #include <cassert>
 #include "Column.h"
 #include "utilities.h"
+#include <vector>
 #include "query/QueryEngine.h"
 #ifdef _MSC_VER
 	#include "win32\types.h"
 #endif
+
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 // Pre-declare local functions
 size_t CalcByteLen(size_t count, size_t width);
@@ -186,6 +189,22 @@ static unsigned int BitWidth(int64_t v) {
 
 	// Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
 	return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
+}
+
+// Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
+void Array::Preset(size_t bitwidth, size_t count) {
+	Clear();
+	SetWidth(bitwidth);
+	assert(Alloc(count, bitwidth));
+	m_len = count;
+	for(size_t n = 0; n < count; n++)
+		Set(n, 0);
+
+}
+
+void Array::Preset(int64_t min, int64_t max, size_t count) {
+	size_t w = MAX(BitWidth(max), BitWidth(min));
+	Preset(w, count);
 }
 
 void Array::SetParent(Array* parent, size_t pndx) {
@@ -1053,28 +1072,6 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 8) {
-
-
-/*
-			// 772 ms
-		while(start < end && Get_8b(start) <= value)
-			start++;
-		return 0;		
-*/
-
-/*
-		// 762 ms
-		char *sta = (char *)(m_data + start);
-		char *eee = (char *)(m_data + end);
-
-		while(sta < eee && *sta <= value)
-			sta++;
-		return 0;		
-*/
-
-
-		// 174 ms!!
-
 		// Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
 		if(value <= 127) {
 			int64_t constant = gt ? (~0ULL / 255 * (127 - value))   :   (        ~0UL / 255 * value           );
@@ -1103,27 +1100,6 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 
 	}
 	else if (m_width == 16) {
-
-	/*	
-		// L2 cache = 383 ms, L1 cache = 403
-		short int *st = (short int *)(m_data + start);
-		short int *en = (short int *)(m_data + end);
-
-		while(st < en && *st <= value)
-			st++;
-		return 0;
-*/
-
-/*
-		// L2 cache = 775 ms
-		while(start < end)
-			if(Get_16b(start) > value)
-				return start;
-			else
-				start++;
-*/
-
-
 		// L2 cache = 300 ms, L1 cache = 304 ms
 		if(value <= 32767) {
 			int64_t constant = gt ? (~0ULL / 65535 * (32767 - value))   :   ( ~0UL / 65535 * value);
@@ -1144,14 +1120,6 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 		else {
 			while(start < end && gt ? (Get_16b(start) <= value)  :  (false))
 				start++;
-
-			/*
-			uint16_t *a = (uint16_t *)(m_data + start);
-			uint16_t *b = (uint16_t *)(m_data + end);
-			while(a < b && *a <= value)
-				a++;
-			start = a - (uint16_t *)m_data;
-			*/
 		}
 		
 
@@ -1161,21 +1129,11 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 		// Faster than below version
 		while(start < end && gt ? (Get_32b(start) <= value) : (Get_32b(start) >= value) )
 			start++;
-
-/*
-			int32_t *a = (int32_t *)m_data + start;
-			int32_t *b = (int32_t *)m_data + end;
-			while(a < b && *a <= value)
-				a++;
-			start = ((unsigned char *)a - m_data) * 8 / m_width;
-*/
-
 	}
 	else if (m_width == 64) {
 		while(start < end && gt ? (Get_64b(start) <= value) : (Get_64b(start) >= value))
 			start++;
 	}
-
 
 	// Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
 	while(start < end)
@@ -1507,6 +1465,19 @@ void Array::SetWidth(size_t width) {
 	m_width = width;
 }
 
+
+
+template <size_t w>int64_t Array::Get(size_t ndx) const {
+	if(w == 0) return Get_0b(ndx);
+	else if(w == 1)	return Get_1b(ndx);
+	else if(w == 2) return Get_2b(ndx);
+	else if(w == 4) return Get_4b(ndx);
+	else if(w == 8)	return Get_8b(ndx);
+	else if(w == 16) return Get_16b(ndx);
+	else if(w == 32) return Get_32b(ndx);
+	else if(w == 64) return Get_64b(ndx);
+}
+
 int64_t Array::Get_0b(size_t) const {
 	return 0;
 }
@@ -1591,13 +1562,237 @@ void Array::Set_64b(size_t ndx, int64_t value) {
 	*(int64_t*)(m_data + offset) = value;
 }
 
+template <size_t w> bool Set(size_t ndx, int64_t value) {
+	if(w == 0) Set_0b(ndx, value);
+	else if(w == 1)	Set_1b(ndx, value);
+	else if(w == 2) Set_2b(ndx, value);
+	else if(w == 4) Set_4b(ndx, value);
+	else if(w == 8)	Set_8b(ndx, value);
+	else if(w == 16) Set_16b(ndx, value);
+	else if(w == 32) Set_32b(ndx, value);
+	else if(w == 64) Set_64b(ndx, value);
+}
+
+
+// Sort array.
 void Array::Sort() {
-	DoSort(0, m_len-1);
+	TEMPEX(Sort, ());
+}
+
+// Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
+// Useful for counting-sort functions
+template <size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max) {
+	int64_t min2;
+	int64_t max2;
+	size_t t;
+
+	max2 = Get<w>(from);
+	min2 = max2;
+
+	for(t = from + 1; t < to; t++) {
+		int64_t v = Get<w>(t);
+		// Utilizes that range test is only needed if max2 or min2 were changed
+		if(v < min2) {
+			min2 = v;
+			if(max2 - min2 > maxdiff)
+				break;
+		}
+		else if(v > max2) {
+			max2 = v;
+			if(max2 - min2 > maxdiff)
+				break;
+		}
+	}
+
+	if(t < to) {
+		*max = 0;
+		*min = 0;
+		return false;
+	}
+	else {
+		*max = max2;
+		*min = min2;
+		return true;
+	}
+}
+
+// Take index pointers to elements as argument and sort the pointers according to values they point at. Leave m_array untouched. The ref array
+// is allowed to contain fewer elements than m_array.
+void Array::ReferenceSort(Array &ref) {
+	TEMPEX(ReferenceSort, (ref));
+}
+
+template <size_t w>void Array::ReferenceSort(Array &ref) {
+	int64_t min;
+	int64_t max;
+
+	// in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
+	// So we chose range < m_len as treshold for deciding which to use
+
+	// If range isn't suited for CountSort, it's *probably* discovered very early, within first few values, in most practical cases,
+	// and won't add much wasted work. Max wasted work is O(n) which isn't much compared to QuickSort.
+
+	bool b = MinMax<w>(0, m_len, m_len, &min, &max); // auto detect
+//	bool b = MinMax<w>(0, m_len, -1, &min, &max); // force count sort
+//	bool b = MinMax<w>(0, m_len, 0, &min, &max); // force quicksort
+	
+	if(b) {
+		Array res;
+		Array count;
+
+		// Todo, Preset crashes for unknown reasons but would be faster.
+//		res.Preset(0, m_len, m_len);
+//		count.Preset(0, m_len, max - min + 1);
+
+		for(size_t t = 0; t < max - min + 1; t++)
+			count.Add(0);
+
+		// Count occurences of each value
+		for(size_t t = 0; t < m_len; t++) {
+			size_t i = Get<w>(t) - min;
+			count.Set(i, count.Get(i) + 1);
+		}
+
+		// Accumulate occurences
+		for(size_t t = 1; t < count.Size(); t++) {
+			count.Set(t, count.Get(t) + count.Get(t - 1));
+		}
+
+		for(size_t t = 0; t < m_len; t++)
+			res.Add(0);
+
+		for(size_t t = m_len; t > 0; t--) {
+			size_t v = Get<w>(t - 1) - min;
+			size_t i = count.Get(v);
+			count.Set(v, count.Get(v) - 1);
+			res.Set(i - 1, ref.Get(t - 1));
+		}
+
+		// Copy result into ref
+		for(size_t t = 0; t < res.Size(); t++)
+			ref.Set(t, res.Get(t));
+
+		res.Destroy();
+		count.Destroy();
+	}
+	else {
+		ReferenceQuickSort(ref); 
+	}
+}
+
+// Sort array 
+template <size_t w> void Array::Sort() {
+	size_t lo = 0;
+	size_t hi = m_len - 1;
+	std::vector<size_t> count;
+	int64_t min;
+	int64_t max;
+	bool b = false;
+
+	// in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
+	// Se we chose range < m_len as treshold for deciding which to use
+	if(m_width <= 8) {
+		max = m_ubound;
+		min = m_lbound;
+		b = true;
+	}
+	else {
+		// If range isn't suited for CountSort, it's *probably* discovered very early, within first few values,
+		// in most practical cases, and won't add much wasted work. Max wasted work is O(n) which isn't much
+		// compared to QuickSort.
+		b = MinMax<w>(lo, hi - 1, m_len, &min, &max);
+	}
+
+	if(b) {
+		for(size_t t = 0; t < max - min + 1; t++)
+			count.push_back(0);
+
+		// Count occurences of each value
+		for(size_t t = lo; t <= hi; t++) {
+			size_t i = Get<w>(t) - min;
+			count[i]++;
+		}
+
+		// Overwrite original array with sorted values
+		size_t dst = 0;
+		for(size_t i = 0; i < max - min + 1; i++) {
+			size_t c = count[i];
+			for(size_t j = 0; j < c; j++) {
+				Set<w>(dst, i + min);
+				dst++;
+			}
+		}
+	}
+	else {
+		QuickSort(lo, hi);
+	}
+	
+	return;
+}
+
+void Array::ReferenceQuickSort(Array &ref) {
+	TEMPEX(ReferenceQuickSort, (0, m_len - 1, ref));
 }
 
 
 
-void Array::DoSort(size_t lo, size_t hi) {
+template <size_t w>void Array::ReferenceQuickSort(size_t lo, size_t hi, Array &ref) {
+	// Quicksort based on
+	// http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
+	int i = (int)lo;
+	int j = (int)hi;
+
+	/*
+	// Swap both values and references but lookup values directly: 2.85 sec
+	// comparison element x
+	const size_t ndx = (lo + hi)/2;
+	const int64_t x = (size_t)Get(ndx);
+
+	// partition
+	do {
+		while (Get(i) < x) i++;
+		while (Get(j) > x) j--;
+		if (i <= j) {
+			size_t h = ref.Get(i);
+			ref.Set(i, ref.Get(j));
+			ref.Set(j, h);
+		//	h = Get(i);
+		//	Set(i, Get(j));
+		//	Set(j, h);
+			i++; j--;
+		}
+	} while (i <= j);
+*/	
+	
+	// Lookup values indirectly through references, but swap only references: 2.60 sec
+	// Templated get/set: 2.40 sec
+	// comparison element x
+	const size_t ndx = (lo + hi)/2;
+	const int64_t x = (size_t)Get<w>(ref.Get(ndx));
+
+	// partition
+	do {
+		while (Get<w>(ref.Get(i)) < x) i++;
+		while (Get<w>(ref.Get(j)) > x) j--;
+		if (i <= j) {
+			size_t h = ref.Get(i);
+			ref.Set<w>(i, ref.Get(j));
+			ref.Set<w>(j, h);
+			i++; j--;
+		}
+	} while (i <= j);
+	
+	//  recursion
+	if ((int)lo < j) ReferenceQuickSort<w>(lo, j, ref);
+	if (i < (int)hi) ReferenceQuickSort<w>(i, hi, ref);
+}
+
+
+void Array::QuickSort(size_t lo, size_t hi) {
+	TEMPEX(QuickSort, (lo, hi);)
+}
+
+template <size_t w>void Array::QuickSort(size_t lo, size_t hi) {
 	// Quicksort based on
 	// http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
 	int i = (int)lo;
@@ -1620,8 +1815,15 @@ void Array::DoSort(size_t lo, size_t hi) {
 	} while (i <= j);
 
 	//  recursion
-	if ((int)lo < j) DoSort(lo, j);
-	if (i < (int)hi) DoSort(i, hi);
+	if ((int)lo < j) QuickSort(lo, j);
+	if (i < (int)hi) QuickSort(i, hi);
+}
+
+std::vector<int64_t> Array::ToVector(void) {
+	std::vector<int64_t> v;
+	for(size_t t = 0; t < Size(); t++)
+		v.push_back(Get(t));
+	return v;
 }
 
 #ifdef _DEBUG

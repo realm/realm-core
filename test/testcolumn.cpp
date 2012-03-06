@@ -595,6 +595,22 @@ TEST(Column_Min2) {
 	c.Destroy();
 }
 
+TEST(Column_Sort2) {
+	Column c;
+	
+	for(size_t t = 0; t < 9*MAX_LIST_SIZE; t++)
+		c.Add(rand() % 300 - 100);
+
+	c.Sort();
+
+	for(size_t t = 1; t < 9*MAX_LIST_SIZE; t++) {
+		CHECK(c.Get(t) >= c.Get(t - 1));
+	}
+
+	c.Destroy();
+}
+
+
 
 #if TEST_DURATION > 0
 
