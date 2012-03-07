@@ -3,6 +3,7 @@
 *.vcproj.*.user
 *.d
 *.o
+*.so
 *.a
 *.swp
 cscope.*

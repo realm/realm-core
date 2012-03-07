@@ -23,6 +23,7 @@ LIB_SHARED = libtightdb.a
 SOURCES    = $(wildcard src/*.cpp)
 OBJECTS    = $(SOURCES:.cpp=.o)
 OBJ_SHARED = $(SOURCES:.cpp=.so)
+GENERATED_HEADERS = src/tightdb.h
 
 # Targets
 all: static
@@ -48,8 +49,8 @@ debug: all
 	@(cd test && make debug)
 
 clean:
-	@rm -f core *.o *.so *.1 *.a
-	@rm -f core src/*.o src/*.so src/*.1 src/*.a
+	@rm -f core *.o *.d *.so *.1 *.a
+	@rm -f core src/*.o src/*.d src/*.so src/*.1 src/*.a
 	@(cd test && make clean)
 
 # Code generation
@@ -60,14 +61,19 @@ src/tightdb.h: src/tightdb-gen.py
 %.o: %.cpp
 	@$(CXXCMD) -o $@ -c $<
 
+%.d: %.cpp $(GENERATED_HEADERS)
+	@$(CXXCMD) -M -MF $@ -MG -MP $< 
+
 %.so: %.cpp
 	@$(CXXCMD) -fPIC -fno-strict-aliasing -o $@ -c $<
 
+-include $(SOURCES:.cpp=.d)
+
 # Archive static object
 $(LIB_STATIC): $(OBJECTS)
-	@ar crs $(LIB_STATIC) $^
+	ar crs $(LIB_STATIC) $^
 
 # Linking
 $(LIB_SHARED): $(OBJ_SHARED)
-#	@$(CXXCMD) -shared -fPIC -rdynamic -Wl,-export-dynamic,-soname,$@ $^ -o $@
-	@$(CXXCMD) -shared -fPIC -rdynamic -Wl,-export-dynamic $^ -o $@
+#	$(CXXCMD) -shared -fPIC -rdynamic -Wl,-export-dynamic,-soname,$@ $^ -o $@
+	$(CXXCMD) -shared -fPIC -rdynamic -Wl,-export-dynamic $^ -o $@
