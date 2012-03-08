@@ -277,7 +277,7 @@ public:
 	void SetBool(size_t column_id, size_t ndx, bool value);
 	void SetDate(size_t column_id, size_t ndx, time_t value);
 	void SetString(size_t column_id, size_t ndx, const char* value);
-
+	void Sort(size_t column, bool Ascending = true);
 	// Sub-tables
 	Table* GetTablePtr(size_t column_id, size_t ndx);
 

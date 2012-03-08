@@ -66,7 +66,7 @@ protected:
 	template<typename T, class C> void TreeDelete(size_t ndx);
 	template<typename T, class C> void TreeFindAll(Array &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
-	template<typename T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T &arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const;
+	template<typename T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T *arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const;
 
 
 	template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
@@ -119,6 +119,8 @@ public:
 	int64_t Sum(size_t start = 0, size_t end = -1) const;
 	int64_t Max(size_t start = 0, size_t end = -1) const;
 	int64_t Min(size_t start = 0, size_t end = -1) const;
+	void Sort(size_t start, size_t end);
+	void ReferenceSort(size_t start, size_t end, Column &ref);
 
 	intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
 	void GetParentInfo(size_t ndx, Array*& parent, size_t& pndx, size_t offset=0) const;

@@ -179,3 +179,69 @@ void TableView::SetString(size_t column_id, size_t ndx, const char* value) {
 }
 
 
+void TableView::Sort(size_t column, bool Ascending) {
+	assert(m_table.GetColumnType(column) == COLUMN_TYPE_INT || m_table.GetColumnType(column) == COLUMN_TYPE_DATE || m_table.GetColumnType(column) == COLUMN_TYPE_BOOL);
+
+	if(m_refs.Size() == 0)
+		return;
+
+	Array vals;
+	Array ref;
+	Array result;
+
+	//ref.Preset(0, m_refs.Size() - 1, m_refs.Size());
+	for(size_t t = 0; t < m_refs.Size(); t++)
+		ref.Add(t);
+	
+	// Extract all values from the Column and put them in an Array because Array is much faster to operate on
+	// with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
+	if(m_table.GetColumnType(column) == COLUMN_TYPE_INT) {
+		for(size_t t = 0; t < m_refs.Size(); t++) {
+			int64_t v = m_table.Get(column, m_refs.Get(t));
+			vals.Add(v);
+		}
+	}
+	else if(m_table.GetColumnType(column) == COLUMN_TYPE_DATE) {
+		for(size_t t = 0; t < m_refs.Size(); t++) {
+			size_t idx = m_refs.Get(t);
+			int64_t v = (int64_t)m_table.GetDate(column, idx);
+			vals.Add(v);
+		}	
+	}
+	else if(m_table.GetColumnType(column) == COLUMN_TYPE_BOOL) {
+		for(size_t t = 0; t < m_refs.Size(); t++) {
+			size_t idx = m_refs.Get(t);
+			int64_t v = (int64_t)m_table.GetBool(column, idx);
+			vals.Add(v);
+		}		
+	}
+
+	vals.ReferenceSort(ref);
+	vals.Destroy();
+
+	for(size_t t = 0; t < m_refs.Size(); t++) {
+		size_t r = ref.Get(t);
+		size_t rr = m_refs.Get(r);
+		result.Add(rr);
+	}
+
+	ref.Destroy();
+
+	// Copy result to m_refs (todo, there might be a shortcut)
+	m_refs.Clear();
+	if(Ascending) {
+		for(size_t t = 0; t < ref.Size(); t++) {
+			size_t v = result.Get(t);
+			m_refs.Add(v);
+		}
+	} 
+	else {
+		for(size_t t = 0; t < ref.Size(); t++) {
+			size_t v = result.Get(ref.Size() - t - 1);
+				m_refs.Add(v);
+		}
+	}
+	result.Destroy();
+}
+
+

@@ -1052,3 +1052,16 @@ TEST(Less) {
 	}
 	a.Destroy();
 }
+
+TEST(ArraySort) {
+	Array a;
+	
+	for(size_t t = 0; t < 400; t++)
+		a.Add(rand() % 300 - 100);
+
+	a.Sort();
+
+	for(size_t t = 1; t < 400; t++)
+		CHECK(a.Get(t) >= a.Get(t - 1));
+
+}
