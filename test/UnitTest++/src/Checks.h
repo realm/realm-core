@@ -5,6 +5,8 @@
 #include "TestResults.h"
 #include "MemoryOutStream.h"
 
+#pragma warning(disable:4389)
+
 namespace UnitTest {
 
 

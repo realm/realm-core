@@ -132,13 +132,13 @@ static Column GetColumnFromRef(Array& parent, size_t ndx) {
 	return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
 }
 
-
+/*
 static const Column GetColumnFromRef(const Array& parent, size_t ndx) {
 	assert(parent.HasRefs());
 	assert(ndx < parent.Size());
 	return Column((size_t)parent.Get(ndx), &parent, ndx);
 }
-
+*/
 
 
 /*Column Column::GetSubColumn(size_t ndx) {
@@ -204,6 +204,7 @@ bool Column::Insert(size_t ndx, int64_t value) {
 }
 
 bool callme_sum(Array *a, size_t start, size_t end, size_t caller_base, void *state) {
+	(void)caller_base; 
 	int64_t s = a->Sum(start, end);
 	*(int64_t *)state += s;
 	return true;
@@ -223,6 +224,7 @@ public:
 };
 
 bool callme_min(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
+	(void)caller_offset;
 	AggregateState* p = (AggregateState*)state;
 
 	int64_t res;
@@ -242,6 +244,7 @@ int64_t Column::Min(size_t start, size_t end) const {
 }
 
 bool callme_max(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
+	(void)caller_offset;
 	AggregateState* p = (AggregateState*)state;
 
 	int64_t res;
@@ -399,7 +402,7 @@ Array *merge(Array *ArrayList) {
 // TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
 void merge_references(Array *valuelist, Array *indexlists, Array **indexresult) {
 	if(indexlists->Size() == 1) {
-		size_t ref = valuelist->Get(0);
+//		size_t ref = valuelist->Get(0);
 		*indexresult = (Array *)indexlists->Get(0);
 		return;
 	}
@@ -433,6 +436,9 @@ void merge_references(Array *valuelist, Array *indexlists, Array **indexresult) 
 
 
 bool callme_arrays(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
+	(void)end;
+	(void)start;
+	(void)caller_offset;
 	Array* p = (Array*)state;
 	size_t ref = a->GetRef();
 	p->Add((int64_t)ref); // todo, check cast

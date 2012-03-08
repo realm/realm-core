@@ -35,6 +35,10 @@
  *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
 
+#pragma warning(disable:4310)
+#pragma warning(disable:4273)
+
+
 #include "pthread.h"
 #include "implement.h"
 

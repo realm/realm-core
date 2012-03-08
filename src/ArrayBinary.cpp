@@ -14,7 +14,7 @@ ArrayBinary::ArrayBinary(Array* parent, size_t pndx, Allocator& alloc) : Array(C
 ArrayBinary::ArrayBinary(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc), m_offsets(Array::Get(0), (Array*)NULL, 0, alloc), m_blob(Array::Get(1), (Array*)NULL, 0, alloc) {
 	assert(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
 	assert(Array::Size() == 2);
-	assert(m_blob.Size() == m_offsets.IsEmpty() ? 0 : m_offsets.Back());
+	assert(m_blob.Size() ==(size_t)(m_offsets.IsEmpty() ? 0 : m_offsets.Back()));
 
 	m_offsets.SetParent((Array*)this, 0);
 	m_blob.SetParent((Array*)this, 1);

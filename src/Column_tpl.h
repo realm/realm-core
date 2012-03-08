@@ -347,7 +347,7 @@ template<typename T, class C, class F> size_t ColumnBase::TreeFind(T value, size
 		if (start == 0 && end == (size_t)-1) {
 			for (size_t i = 0; i < count; ++i) {
 				const C col((size_t)refs.Get(i), (const Array*)NULL, 0, m_array->GetAllocator());
-				const size_t ndx = col.TreeFind<T, C, F>(value, 0, -1);
+				const size_t ndx = col.TreeFind<T, C, F>(value, 0, (size_t)-1);
 				if (ndx != (size_t)-1) {
 					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
 					return offset + ndx;

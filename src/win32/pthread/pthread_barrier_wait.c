@@ -37,6 +37,7 @@
 #include "pthread.h"
 #include "implement.h"
 
+#pragma warning(disable:4273)
 
 int
 pthread_barrier_wait (pthread_barrier_t * barrier)

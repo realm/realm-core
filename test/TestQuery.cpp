@@ -78,7 +78,7 @@ TEST(TestQuerySubtable) {
 	q1->Subtable(2);
 	q1->Less(0, 50);
 	q1->Parent();
-	TableView t1 = q1->FindAll(table, 0, -1);
+	TableView t1 = q1->FindAll(table, 0, (size_t)-1);
 	CHECK_EQUAL(2, t1.GetSize());
 	CHECK_EQUAL(1, t1.GetRef(0));
 	CHECK_EQUAL(2, t1.GetRef(1));
@@ -90,7 +90,7 @@ TEST(TestQuerySubtable) {
 	q2->Or();
 	q2->Less(0, 20);
 	q2->Parent();
-	TableView t2 = q2->FindAll(table, 0, -1);
+	TableView t2 = q2->FindAll(table, 0, (size_t)-1);
 	CHECK_EQUAL(2, t2.GetSize());
 	CHECK_EQUAL(0, t2.GetRef(0));
 	CHECK_EQUAL(3, t2.GetRef(1));
@@ -103,7 +103,7 @@ TEST(TestQuerySubtable) {
 	q3->Less(0, 20);
 	q3->Parent();
 	q3->Less(0, 300);
-	TableView t3 = q3->FindAll(table, 0, -1);
+	TableView t3 = q3->FindAll(table, 0, (size_t)-1);
 	CHECK_EQUAL(1, t3.GetSize());
 	CHECK_EQUAL(0, t3.GetRef(0));
 
@@ -116,7 +116,7 @@ TEST(TestQuerySubtable) {
 	q4->Or();
 	q4->Less(0, 20);
 	q4->Parent();
-	TableView t4 = q4->FindAll(table, 0, -1);
+	TableView t4 = q4->FindAll(table, 0, (size_t)-1);
 
 	CHECK_EQUAL(3, t4.GetSize());
 	CHECK_EQUAL(0, t4.GetRef(0));
@@ -330,7 +330,7 @@ TEST(TestQuerySubtable2) {
 	q1->Subtable(2);
 	q1->Less(0, 50);
 	q1->Parent();
-	TableView t1 = q1->FindAll(table, 0, -1);
+	TableView t1 = q1->FindAll(table, 0, (size_t)-1);
 	CHECK_EQUAL(2, t1.GetSize());
 	CHECK_EQUAL(1, t1.GetRef(0));
 	CHECK_EQUAL(2, t1.GetRef(1));
@@ -342,7 +342,7 @@ TEST(TestQuerySubtable2) {
 	q2->Or();
 	q2->Less(0, 20);
 	q2->Parent();
-	TableView t2 = q2->FindAll(table, 0, -1);
+	TableView t2 = q2->FindAll(table, 0, (size_t)-1);
 	CHECK_EQUAL(2, t2.GetSize());
 	CHECK_EQUAL(0, t2.GetRef(0));
 	CHECK_EQUAL(3, t2.GetRef(1));
@@ -355,7 +355,7 @@ TEST(TestQuerySubtable2) {
 	q3->Less(0, 20);
 	q3->Parent();
 	q3->Less(0, 300);
-	TableView t3 = q3->FindAll(table, 0, -1);
+	TableView t3 = q3->FindAll(table, 0, (size_t)-1);
 	CHECK_EQUAL(1, t3.GetSize());
 	CHECK_EQUAL(0, t3.GetRef(0));
 
@@ -368,7 +368,7 @@ TEST(TestQuerySubtable2) {
 	q4->Or();
 	q4->Less(0, 20);
 	q4->Parent();
-	TableView t4 = q4->FindAll(table, 0, -1);
+	TableView t4 = q4->FindAll(table, 0, (size_t)-1);
 
 	CHECK_EQUAL(3, t4.GetSize());
 	CHECK_EQUAL(0, t4.GetRef(0));
@@ -466,17 +466,17 @@ TEST(TestQueryLimit) {
 	
 	Query q1 = ttt.GetQuery().first.Equal(2);
 	
-	TableView tv1 = q1.FindAll(ttt, 0, -1, 2);
+	TableView tv1 = q1.FindAll(ttt, 0, (size_t)-1, 2);
 	CHECK_EQUAL(2, tv1.GetSize());
 	CHECK_EQUAL(1, tv1.GetRef(0));
 	CHECK_EQUAL(4, tv1.GetRef(1));
 
-	TableView tv2 = q1.FindAll(ttt, tv1.GetRef(tv1.GetSize() - 1) + 1, -1, 2);
+	TableView tv2 = q1.FindAll(ttt, tv1.GetRef(tv1.GetSize() - 1) + 1, (size_t)-1, 2);
 	CHECK_EQUAL(2, tv2.GetSize());
 	CHECK_EQUAL(7, tv2.GetRef(0));
 	CHECK_EQUAL(10, tv2.GetRef(1));
 	
-	TableView tv3 = q1.FindAll(ttt, tv2.GetRef(tv2.GetSize() - 1) + 1, -1, 2);
+	TableView tv3 = q1.FindAll(ttt, tv2.GetRef(tv2.GetSize() - 1) + 1, (size_t)-1, 2);
 	CHECK_EQUAL(1, tv3.GetSize());
 	CHECK_EQUAL(13, tv3.GetRef(0));
 }

@@ -6,6 +6,7 @@
 #include "query/QueryEngine.h"
 #ifdef _MSC_VER
 	#include "win32\types.h"
+	#pragma warning (disable : 4127) // Condition is constant warning
 #endif
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
@@ -587,8 +588,8 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 // Return value is SSE chunk number where the element is guaranteed to exist (use CompareEquality() to
 // find packed position)
 size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const{
-	__m128i search, next, compare = {1};
-	size_t i;
+	__m128i search = {0}, next, compare = {1};
+	size_t i = 0;
 
 	for(int j = 0; j < sizeof(__m128i) / bytewidth; j++)
 		memcpy((char *)&search + j * bytewidth, &value, bytewidth);
@@ -618,7 +619,9 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 			compare = _mm_cmpeq_epi64(search, next);
 		}
 	}
-	return _mm_movemask_epi8(compare) == 0 ? -1 : i - 1;
+	else 
+		assert(true);
+	return _mm_movemask_epi8(compare) == 0 ? (size_t)-1 : i - 1;
 }
 #endif //USE_SSE
 
@@ -1257,7 +1260,6 @@ void Array::SetWidth(size_t width) {
 }
 
 
-
 template <size_t w>int64_t Array::Get(size_t ndx) const {
 	if(w == 0) return Get_0b(ndx);
 	else if(w == 1)	return Get_1b(ndx);
@@ -1353,6 +1355,8 @@ void Array::Set_64b(size_t ndx, int64_t value) {
 	*(int64_t*)(m_data + offset) = value;
 }
 
+#pragma warning (disable : 4127)
+
 template <size_t w> void Array::Set(size_t ndx, int64_t value) {
 	if(w == 0) return Set_0b(ndx, value);
 	else if(w == 1)	Set_1b(ndx, value);
@@ -1385,12 +1389,12 @@ template <size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, 
 		// Utilizes that range test is only needed if max2 or min2 were changed
 		if(v < min2) {
 			min2 = v;
-			if(max2 - min2 > maxdiff)
+			if((uint64_t)(max2 - min2) > maxdiff)
 				break;
 		}
 		else if(v > max2) {
 			max2 = v;
-			if(max2 - min2 > maxdiff)
+			if((uint64_t)(max2 - min2) > maxdiff)
 				break;
 		}
 	}
@@ -1435,7 +1439,7 @@ template <size_t w>void Array::ReferenceSort(Array &ref) {
 //		res.Preset(0, m_len, m_len);
 //		count.Preset(0, m_len, max - min + 1);
 
-		for(size_t t = 0; t < max - min + 1; t++)
+		for(int64_t t = 0; t < max - min + 1; t++)
 			count.Add(0);
 
 		// Count occurences of each value
@@ -1495,7 +1499,7 @@ template <size_t w> void Array::Sort() {
 	}
 
 	if(b) {
-		for(size_t t = 0; t < max - min + 1; t++)
+		for(int64_t t = 0; t < max - min + 1; t++)
 			count.push_back(0);
 
 		// Count occurences of each value
@@ -1506,7 +1510,7 @@ template <size_t w> void Array::Sort() {
 
 		// Overwrite original array with sorted values
 		size_t dst = 0;
-		for(size_t i = 0; i < max - min + 1; i++) {
+		for(int64_t i = 0; i < max - min + 1; i++) {
 			size_t c = count[i];
 			for(size_t j = 0; j < c; j++) {
 				Set<w>(dst, i + min);

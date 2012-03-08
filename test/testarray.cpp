@@ -923,7 +923,7 @@ TEST(Greater) {
 		}
 		for(int i = 0; i < items; i++) {
 			a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
-			size_t t = a.Query<GREATER>(1000ULL*1000ULL*1000ULL*1000ULL, 0, -1);
+			size_t t = a.Query<GREATER>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
 			CHECK_EQUAL(i, t);
 			a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
 		}

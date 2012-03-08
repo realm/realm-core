@@ -186,7 +186,7 @@ public:
 		m_child = 0;
 		m_value = (char *)malloc(strlen(v)*6);
 		memcpy(m_value, v, strlen(v) + 1);
-		key_ndx = -1;
+		key_ndx = (size_t)-1;
 	}
 	~STRINGNODE() {delete m_child; free((void*)m_value); }
 
@@ -273,6 +273,7 @@ public:
 		s = m_cond2->Verify();
 		if(s != "")
 			return s;
+		return "";
 	}
 	ParentNode* m_cond1;
 	ParentNode* m_cond2;

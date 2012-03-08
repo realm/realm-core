@@ -37,6 +37,7 @@
 #include "pthread.h"
 #include "implement.h"
 
+#pragma warning(disable:4273)
 
 int
 pthread_attr_setstacksize (pthread_attr_t * attr, size_t stacksize)

@@ -1,4 +1,5 @@
 #pragma warning (push, 0)
+#pragma warning(disable:4702)
 
 /*
  * pthread_mutex_timedlock.c

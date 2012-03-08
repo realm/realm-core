@@ -37,6 +37,8 @@
 #include "pthread.h"
 #include "implement.h"
 
+#pragma warning(disable:4273)
+
 /* ignore warning "unreferenced formal parameter" */
 #ifdef _MSC_VER
 #pragma warning( disable : 4100 )
