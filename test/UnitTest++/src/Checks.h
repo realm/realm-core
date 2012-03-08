@@ -4,9 +4,9 @@
 #include "Config.h"
 #include "TestResults.h"
 #include "MemoryOutStream.h"
-
+#ifdef _MSC_VER
 #pragma warning(disable:4389)
-
+#endif
 namespace UnitTest {
 
 
