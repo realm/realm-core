@@ -13,8 +13,6 @@
 #include "Column.h"
 #include "Index.h"
 
-#include "UnitTest++.h"
-
 // Pre-declare local functions
 void SetRefSize(void* ref, size_t len);
 bool callme_sum(Array &a, size_t start, size_t end, size_t caller_base, void *state);
