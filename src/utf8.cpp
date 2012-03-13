@@ -89,11 +89,13 @@ bool case_strstr(const char *constant_upper, const char *constant_lower, const c
 // Converts a single utf8 character to upper or lower case. Operating system specific function.
 bool utf8case_single(const char *source, char *destination, int upper) {
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
-	wchar_t tmp;
+	wchar_t tmp[2];
 
-	int i = MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)source, (int)sequence_length(source), &tmp, 1);
+	int i = MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)source, (int)sequence_length(source), &tmp[0], 1);
 	if(i == 0)
 		return false;
+
+	tmp[1] = 0;
 
 	if(upper)
 		CharUpperW((LPWSTR)&tmp);
