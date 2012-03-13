@@ -37,6 +37,8 @@
 #include "pthread.h"
 #include "implement.h"
 
+#pragma warning(disable:4273)
+
 
 int
 pthread_setcancelstate (int state, int *oldstate)

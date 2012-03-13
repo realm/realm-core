@@ -923,7 +923,7 @@ TEST(Greater) {
 		}
 		for(int i = 0; i < items; i++) {
 			a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
-			size_t t = a.Query<GREATER>(1000ULL*1000ULL*1000ULL*1000ULL, 0, -1);
+			size_t t = a.Query<GREATER>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
 			CHECK_EQUAL(i, t);
 			a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
 		}
@@ -1051,4 +1051,17 @@ TEST(Less) {
 
 	}
 	a.Destroy();
+}
+
+TEST(ArraySort) {
+	Array a;
+	
+	for(size_t t = 0; t < 400; t++)
+		a.Add(rand() % 300 - 100);
+
+	a.Sort();
+
+	for(size_t t = 1; t < 400; t++)
+		CHECK(a.Get(t) >= a.Get(t - 1));
+
 }

@@ -19,15 +19,14 @@ class TopLevelTable;
 
 class Date {
 public:
-	Date(time_t d) : m_date(d) {}
-	time_t GetDate() const {return m_date;}
+	Date(time_t d) : m_date(d) {}time_t GetDate() const {return m_date;}
 private:
 	time_t m_date;
 };
 
 class Mixed {
 public:
-	explicit Mixed(ColumnType v)  {assert(v = COLUMN_TYPE_TABLE); m_type = COLUMN_TYPE_TABLE;}
+	explicit Mixed(ColumnType v)  {assert(v == COLUMN_TYPE_TABLE); (void)v; m_type = COLUMN_TYPE_TABLE;}
 	Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
 	Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.GetDate();}
 	Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
@@ -277,7 +276,7 @@ public:
 	void SetBool(size_t column_id, size_t ndx, bool value);
 	void SetDate(size_t column_id, size_t ndx, time_t value);
 	void SetString(size_t column_id, size_t ndx, const char* value);
-
+	void Sort(size_t column, bool Ascending = true);
 	// Sub-tables
 	Table* GetTablePtr(size_t column_id, size_t ndx);
 

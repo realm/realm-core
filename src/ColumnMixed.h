@@ -4,6 +4,7 @@
 #include "Column.h"
 #include "ColumnType.h"
 #include "Table.h"
+#include "Index.h"
 
 // Pre-declarations
 class ColumnBinary;
@@ -50,7 +51,7 @@ public:
 	
 	// Indexing
 	bool HasIndex() const {return false;}
-	void BuildIndex(Index& index) {}
+	void BuildIndex(Index& index) {(void)index;}
 	void ClearIndex() {}
 	
 	size_t GetRef() const {return m_array->GetRef();}

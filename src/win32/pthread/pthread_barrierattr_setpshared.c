@@ -37,6 +37,7 @@
 #include "pthread.h"
 #include "implement.h"
 
+#pragma warning(disable:4273)
 
 int
 pthread_barrierattr_setpshared (pthread_barrierattr_t * attr, int pshared)

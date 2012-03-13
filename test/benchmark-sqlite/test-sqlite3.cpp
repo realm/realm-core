@@ -58,7 +58,7 @@ int main() {
 		// create random string
 		const size_t n = rand() % RANGE;// * 10 + rand();
 		sqlite3_reset(ppStmt);
-		sqlite3_bind_int(ppStmt, 1, n);
+sqlite3_bind_int(ppStmt, 1, n);
 		rc = sqlite3_step(ppStmt);
 		if (rc != SQLITE_DONE) {
 			fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));

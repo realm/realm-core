@@ -12,6 +12,17 @@
 #include "alloc.h"
 #include <iostream>
 #include "utilities.h"
+#include <vector>
+
+#define TEMPEX(fun, arg) \
+	if(m_width == 0) {fun<0> arg;} \
+	else if (m_width == 1) {fun<1> arg;} \
+	else if (m_width == 2) {fun<2> arg;} \
+	else if (m_width == 4) {fun<4> arg;} \
+	else if (m_width == 8) {fun<8> arg;} \
+	else if (m_width == 16) {fun<16> arg;} \
+	else if (m_width == 32) {fun<32> arg;} \
+	else if (m_width == 64) {fun<64> arg;}
 
 #ifdef USE_SSE
 /*
@@ -90,7 +101,9 @@ public:
 	bool Insert(size_t ndx, int64_t value);
 	bool Add(int64_t value);
 	bool Set(size_t ndx, int64_t value);
+	template <size_t w> void Set(size_t ndx, int64_t value);
 	int64_t Get(size_t ndx) const;
+	template <size_t w>int64_t Get(size_t ndx) const;
 	int64_t operator[](size_t ndx) const {return Get(ndx);}
 	int64_t Back() const;
 	void Delete(size_t ndx);
@@ -103,31 +116,28 @@ public:
 	size_t FindPos(int64_t value) const;
 	size_t FindPos2(int64_t value) const;
 	size_t Find(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
-//	template <class F> size_t Find(F function, size_t start, size_t end) const;
 
-template <class F> size_t Find(F function_, int64_t value, size_t start, size_t end) const {
-	const F function = {};
-	if(end == -1)
-		end = m_len;
-
-	for(size_t s = start; s < end; s++) {
-		if(function(value, Get(s)))
-			return s;
+	template <class F> size_t Find(F function_, int64_t value, size_t start, size_t end) const {
+		const F function = {};
+		if(end == -1)
+			end = m_len;
+		for(size_t s = start; s < end; s++) {
+			if(function(value, Get(s)))
+				return s;
+		}
+		return -1;
 	}
-
-	return -1;
-}
-
-	void FindAll(Array& result, int64_t value, size_t offset=0,
-				 size_t start=0, size_t end=(size_t)-1) const;
+	void Preset(int64_t min, int64_t max, size_t count);
+	void Preset(size_t bitwidth, size_t count); 
+	void FindAll(Array& result, int64_t value, size_t offset=0, size_t start=0, size_t end=(size_t)-1) const;
 	void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 	int64_t Sum(size_t start = 0, size_t end = -1) const;
 	bool Max(int64_t& result, size_t start = 0, size_t end = -1) const;
 	bool Min(int64_t& result, size_t start = 0, size_t end = -1) const;
 	template <class F> size_t Query(int64_t value, size_t start, size_t end);
 
-	void Sort();
-
+	void Sort(void);
+	void ReferenceSort(Array &ref);
 	void Resize(size_t count);
 
 	bool IsNode() const {return m_isNode;}
@@ -141,7 +151,7 @@ template <class F> size_t Find(F function_, int64_t value, size_t start, size_t 
 
 	// Serialization
 	template<class S> size_t Write(S& target, size_t& pos, bool recurse=true) const;
-
+	std::vector<int64_t> ToVector(void);
 	// Debug
 	size_t GetBitWidth() const {return m_width;}
 #ifdef _DEBUG
@@ -151,20 +161,28 @@ template <class F> size_t Find(F function_, int64_t value, size_t start, size_t 
 	void ToDot(FILE* f, bool horizontal=false) const;
 	MemStats Stats() const;
 #endif //_DEBUG
+	mutable unsigned char* m_data;
 
 private:
+	template <size_t w>bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max);
 	Array& operator=(const Array&) {return *this;} // not allowed
 	void SetBounds(size_t width);
+	template <size_t w>void QuickSort(size_t lo, size_t hi);
+	void QuickSort(size_t lo, size_t hi);
+	void ReferenceQuickSort(Array &ref);
+	template <size_t w>void ReferenceQuickSort(size_t lo, size_t hi, Array &ref);
 #ifdef USE_SSE
 	size_t FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const;
 #endif //USE_SSE
 	template <bool eq>size_t CompareEquality(int64_t value, size_t start, size_t end) const;
 	template <bool gt>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
+	template <size_t w> void Sort();
+	template <size_t w>void ReferenceSort(Array &ref);
+
 protected:
 	bool AddPositiveLocal(int64_t value);
 
 	void Create(size_t ref);
-	void DoSort(size_t lo, size_t hi);
 
 	// Getters and Setters for adaptive-packed arrays
 	typedef int64_t(Array::*Getter)(size_t) const;
@@ -217,7 +235,6 @@ protected:
 	Getter m_getter;
 	Setter m_setter;
 	size_t m_ref;
-	mutable unsigned char* m_data;
 	size_t m_len;
 	size_t m_capacity;
 	size_t m_width;

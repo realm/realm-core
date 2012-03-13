@@ -794,7 +794,7 @@ time_t Table::GetDate(size_t column_id, size_t ndx) const {
 	assert(ndx < m_size);
 
 	const Column& column = GetColumn(column_id);
-	return (time_t)column.Get(ndx) != 0;
+	return (time_t)column.Get(ndx);
 }
 
 void Table::SetDate(size_t column_id, size_t ndx, time_t value) {
@@ -1245,7 +1245,8 @@ void Table::Verify() const {
 }
 
 void Table::ToDot(const char* filename) const {
-	FILE* f = fopen(filename, "w");
+	FILE* f;
+	fopen_s(&f, filename, "w");
 	if (!f) return;
 
 	fprintf(f, "digraph G {\n");

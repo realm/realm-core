@@ -347,7 +347,7 @@ template<typename T, class C, class F> size_t ColumnBase::TreeFind(T value, size
 		if (start == 0 && end == (size_t)-1) {
 			for (size_t i = 0; i < count; ++i) {
 				const C col((size_t)refs.Get(i), (const Array*)NULL, 0, m_array->GetAllocator());
-				const size_t ndx = col.Find(value);
+				const size_t ndx = col.TreeFind<T, C, F>(value, 0, (size_t)-1);
 				if (ndx != (size_t)-1) {
 					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
 					return offset + ndx;
@@ -364,7 +364,7 @@ template<typename T, class C, class F> size_t ColumnBase::TreeFind(T value, size
 			for (;;) {
 				const C col((size_t)refs.Get(i), (const Array*)NULL, 0, m_array->GetAllocator());
 
-				const size_t ndx = col.Find(value, s, e);
+				const size_t ndx = col.TreeFind<T, C, F>(value, s, e);
 				if (ndx != (size_t)-1) {
 					const size_t offset = i ? (size_t)offsets.Get(i-1) : 0;
 					return offset + ndx;
@@ -390,6 +390,7 @@ template<typename T, class C, class F> size_t ColumnBase::TreeFind(T value, size
 		return (size_t)-1; // not found
 	}
 }
+
 
 
 template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const {
@@ -431,12 +432,13 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T valu
 }
 
 
-template<typename T, class C> void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T &arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const {
+
+template<typename T, class C> void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T *arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const {
 	if (!IsNode()) {
 		if(end == -1) 
 			end = m_array->Size();
 		if(m_array->Size() > 0)
-			call(*m_array, start, end, caller_offset, state);
+			call(m_array, start, end, caller_offset, state);
 	}
 	else {
 		const Array offsets = NodeGetOffsets();

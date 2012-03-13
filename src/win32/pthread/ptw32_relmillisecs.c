@@ -43,6 +43,7 @@
 #include <sys/timeb.h>
 #endif
 
+#pragma warning(disable:4996)
 
 INLINE DWORD
 ptw32_relmillisecs (const struct timespec * abstime)

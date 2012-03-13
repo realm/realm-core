@@ -91,7 +91,7 @@ bool utf8case_single(const char *source, char *destination, int upper) {
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 	wchar_t tmp;
 
-	int i = MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)source, sequence_length(source), &tmp, 1);
+	int i = MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)source, (int)sequence_length(source), &tmp, 1);
 	if(i == 0)
 		return false;
 
@@ -103,6 +103,8 @@ bool utf8case_single(const char *source, char *destination, int upper) {
 	i = WideCharToMultiByte(CP_UTF8, 0, (LPCWSTR)&tmp, 1, (LPSTR)destination, 6, 0, 0);
 	if(i == 0)
 		return false;
+
+	return true;
 #else
 	memcpy(destination, source, sequence_length(source));
 	return true;

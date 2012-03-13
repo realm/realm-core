@@ -37,6 +37,7 @@
 #include "pthread.h"
 #include "implement.h"
 
+#pragma warning(disable:4273)
 
 int
 pthread_attr_setstackaddr (pthread_attr_t * attr, void *stackaddr)
