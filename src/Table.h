@@ -260,7 +260,7 @@ public:
 
 	Table& GetParent() {return m_table;}
 	Array& GetRefColumn() {return m_refs;}
-	size_t GetRef(size_t ndx) const {return m_refs.Get(ndx);}
+	size_t GetRef(size_t ndx) const {return m_refs.GetAsRef(ndx);}
 
 	bool IsEmpty() const {return m_refs.IsEmpty();}
 	size_t GetSize() const {return m_refs.Size();}

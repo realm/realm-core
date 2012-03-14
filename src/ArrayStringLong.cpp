@@ -13,7 +13,7 @@ ArrayStringLong::ArrayStringLong(Array* parent, size_t pndx, Allocator& alloc) :
 	m_blob.SetParent((Array*)this, 1);
 }
 
-ArrayStringLong::ArrayStringLong(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc), m_offsets(Array::Get(0), (Array*)NULL, 0, alloc), m_blob(Array::Get(1), (Array*)NULL, 0, alloc) {
+ArrayStringLong::ArrayStringLong(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc), m_offsets(Array::GetAsRef(0), (Array*)NULL, 0, alloc), m_blob(Array::GetAsRef(1), (Array*)NULL, 0, alloc) {
 	assert(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
 	assert(Array::Size() == 2);
 	assert(m_blob.Size() == (m_offsets.IsEmpty() ? 0 : (size_t)m_offsets.Back()));
@@ -38,7 +38,7 @@ size_t ArrayStringLong::Size() const {
 const char* ArrayStringLong::Get(size_t ndx) const {
 	assert(ndx < m_offsets.Size());
 
-	const size_t offset = ndx ? m_offsets.Get(ndx-1) : 0;
+	const size_t offset = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
 	return (const char*)m_blob.Get(offset);
 }
 
@@ -62,8 +62,8 @@ void ArrayStringLong::Set(size_t ndx, const char* value, size_t len) {
 	assert(ndx < m_offsets.Size());
 	assert(value);
 
-	const size_t start = ndx ? m_offsets.Get(ndx-1) : 0;
-	const size_t current_end = m_offsets.Get(ndx);
+	const size_t start = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
+	const size_t current_end = m_offsets.GetAsRef(ndx);
 
 	len += 1; // include trailing null byte
 	const ssize_t diff =  (start + len) - current_end;
@@ -80,7 +80,7 @@ void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len) {
 	assert(ndx <= m_offsets.Size());
 	assert(value);
 
-	const size_t pos = ndx ? m_offsets.Get(ndx-1) : 0;
+	const size_t pos = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
 	len += 1; // include trailing null byte
 
 	m_blob.Insert(pos, (void*)value, len);
@@ -91,8 +91,8 @@ void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len) {
 void ArrayStringLong::Delete(size_t ndx) {
 	assert(ndx < m_offsets.Size());
 
-	const size_t start = ndx ? m_offsets.Get(ndx-1) : 0;
-	const size_t end = m_offsets.Get(ndx);
+	const size_t start = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
+	const size_t end = m_offsets.GetAsRef(ndx);
 
 	m_blob.Delete(start, end);
 	m_offsets.Delete(ndx);
@@ -128,9 +128,9 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
 
 	len += 1; // include trailing null byte
 	const size_t count = m_offsets.Size();
-	size_t offset = (start == 0 ? 0 : m_offsets.Get(start - 1)); // todo, verify
+	size_t offset = (start == 0 ? 0 : m_offsets.GetAsRef(start - 1)); // todo, verify
 	for (size_t i = start; i < count && i < end; ++i) {
-		const size_t end = m_offsets.Get(i);
+		const size_t end = m_offsets.GetAsRef(i);
 
 		// Only compare strings if length matches
 		if ((end - offset) == len) {

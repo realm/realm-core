@@ -102,7 +102,7 @@ int64_t TableView::Get(size_t column_id, size_t ndx) const {
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);
 	assert(ndx < m_refs.Size());
 
-	const size_t real_ndx = m_refs.Get(ndx);
+	const size_t real_ndx = m_refs.GetAsRef(ndx);
 	return m_table.Get(column_id, real_ndx);
 }
 
@@ -111,7 +111,7 @@ bool TableView::GetBool(size_t column_id, size_t ndx) const {
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_BOOL);
 	assert(ndx < m_refs.Size());
 
-	const size_t real_ndx = m_refs.Get(ndx);
+	const size_t real_ndx = m_refs.GetAsRef(ndx);
 	return m_table.GetBool(column_id, real_ndx);
 }
 
@@ -120,7 +120,7 @@ time_t TableView::GetDate(size_t column_id, size_t ndx) const {
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_DATE);
 	assert(ndx < m_refs.Size());
 
-	const size_t real_ndx = m_refs.Get(ndx);
+	const size_t real_ndx = m_refs.GetAsRef(ndx);
 	return m_table.GetDate(column_id, real_ndx);
 }
 
@@ -129,7 +129,7 @@ const char* TableView::GetString(size_t column_id, size_t ndx) const {
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_STRING);
 	assert(ndx < m_refs.Size());
 
-	const size_t real_ndx = m_refs.Get(ndx);
+	const size_t real_ndx = m_refs.GetAsRef(ndx);
 	return m_table.GetString(column_id, real_ndx);
 }
 
@@ -138,7 +138,7 @@ Table* TableView::GetTablePtr(size_t column_id, size_t ndx) {
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_TABLE);
 	assert(ndx < m_refs.Size());
 
-	const size_t real_ndx = m_refs.Get(ndx);
+	const size_t real_ndx = m_refs.GetAsRef(ndx);
 	return m_table.GetTablePtr(column_id, real_ndx);
 }
 
@@ -147,7 +147,7 @@ void TableView::Set(size_t column_id, size_t ndx, int64_t value) {
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);
 	assert(ndx < m_refs.Size());
 
-	const size_t real_ndx = m_refs.Get(ndx);
+	const size_t real_ndx = m_refs.GetAsRef(ndx);
 	m_table.Set(column_id, real_ndx, value);
 }
 
@@ -156,7 +156,7 @@ void TableView::SetBool(size_t column_id, size_t ndx, bool value) {
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_BOOL);
 	assert(ndx < m_refs.Size());
 
-	const size_t real_ndx = m_refs.Get(ndx);
+	const size_t real_ndx = m_refs.GetAsRef(ndx);
 	m_table.SetBool(column_id, real_ndx, value);
 }
 
@@ -165,7 +165,7 @@ void TableView::SetDate(size_t column_id, size_t ndx, time_t value) {
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_DATE);
 	assert(ndx < m_refs.Size());
 
-	const size_t real_ndx = m_refs.Get(ndx);
+	const size_t real_ndx = m_refs.GetAsRef(ndx);
 	m_table.SetDate(column_id, real_ndx, value);
 }
 
@@ -174,7 +174,7 @@ void TableView::SetString(size_t column_id, size_t ndx, const char* value) {
 	assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_STRING);
 	assert(ndx < m_refs.Size());
 
-	const size_t real_ndx = m_refs.Get(ndx);
+	const size_t real_ndx = m_refs.GetAsRef(ndx);
 	m_table.SetString(column_id, real_ndx, value);
 }
 
@@ -197,20 +197,20 @@ void TableView::Sort(size_t column, bool Ascending) {
 	// with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
 	if(m_table.GetColumnType(column) == COLUMN_TYPE_INT) {
 		for(size_t t = 0; t < m_refs.Size(); t++) {
-			int64_t v = m_table.Get(column, m_refs.Get(t));
+			int64_t v = m_table.Get(column, m_refs.GetAsRef(t));
 			vals.Add(v);
 		}
 	}
 	else if(m_table.GetColumnType(column) == COLUMN_TYPE_DATE) {
 		for(size_t t = 0; t < m_refs.Size(); t++) {
-			size_t idx = m_refs.Get(t);
+			size_t idx = m_refs.GetAsRef(t);
 			int64_t v = (int64_t)m_table.GetDate(column, idx);
 			vals.Add(v);
 		}	
 	}
 	else if(m_table.GetColumnType(column) == COLUMN_TYPE_BOOL) {
 		for(size_t t = 0; t < m_refs.Size(); t++) {
-			size_t idx = m_refs.Get(t);
+			size_t idx = m_refs.GetAsRef(t);
 			int64_t v = (int64_t)m_table.GetBool(column, idx);
 			vals.Add(v);
 		}		
@@ -220,8 +220,8 @@ void TableView::Sort(size_t column, bool Ascending) {
 	vals.Destroy();
 
 	for(size_t t = 0; t < m_refs.Size(); t++) {
-		size_t r = ref.Get(t);
-		size_t rr = m_refs.Get(r);
+		size_t r = ref.GetAsRef(t);
+		size_t rr = m_refs.GetAsRef(r);
 		result.Add(rr);
 	}
 
@@ -231,13 +231,13 @@ void TableView::Sort(size_t column, bool Ascending) {
 	m_refs.Clear();
 	if(Ascending) {
 		for(size_t t = 0; t < ref.Size(); t++) {
-			size_t v = result.Get(t);
+			size_t v = result.GetAsRef(t);
 			m_refs.Add(v);
 		}
 	} 
 	else {
 		for(size_t t = 0; t < ref.Size(); t++) {
-			size_t v = result.Get(ref.Size() - t - 1);
+			size_t v = result.GetAsRef(ref.Size() - t - 1);
 				m_refs.Add(v);
 		}
 	}

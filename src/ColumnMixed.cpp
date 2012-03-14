@@ -37,8 +37,8 @@ void ColumnMixed::Create(size_t ref, Array* parent, size_t pndx, Allocator& allo
 	m_array = new Array(ref, parent, pndx, alloc);
 	assert(m_array->Size() == 2 || m_array->Size() == 3);
 	
-	const size_t ref_types = m_array->Get(0);
-	const size_t ref_refs  = m_array->Get(1);
+	const size_t ref_types = m_array->GetAsRef(0);
+	const size_t ref_refs  = m_array->GetAsRef(1);
 	
 	m_types = new Column(ref_types, m_array, 0, alloc);
 	m_refs  = new Column(ref_refs,  m_array, 1, alloc);
@@ -47,7 +47,7 @@ void ColumnMixed::Create(size_t ref, Array* parent, size_t pndx, Allocator& allo
 	// Binary column with values that does not fit in refs
 	// is only there if needed
 	if (m_array->Size() == 3) {
-		const size_t ref_data = m_array->Get(2);
+		const size_t ref_data = m_array->GetAsRef(2);
 		m_data = new ColumnBinary(ref_data, m_array, 2, alloc);
 	}
 }
@@ -79,7 +79,7 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype) {
 			{
 				// If item is in middle of the column, we just clear
 				// it to avoid having to adjust refs to following items
-				const size_t ref = m_refs->Get(ndx) >> 1;
+				const size_t ref = m_refs->GetAsRef(ndx) >> 1;
 				if (ref == m_data->Size()-1) m_data->Delete(ref);
 				else m_data->Set(ref, "", 0);
 				break;
@@ -87,7 +87,7 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype) {
 			case COLUMN_TYPE_TABLE:
 			{
 				// Delete entire table
-				const size_t ref = m_refs->Get(ndx);
+				const size_t ref = m_refs->GetAsRef(ndx);
 				Array top(ref, (Array*)NULL, 0, m_array->GetAllocator());
 				top.Destroy();
 				break;
@@ -134,7 +134,7 @@ const char* ColumnMixed::GetString(size_t ndx) const {
 	assert(m_types->Get(ndx) == COLUMN_TYPE_STRING);
 	assert(m_data);
 	
-	const size_t ref = m_refs->Get(ndx) >> 1;
+	const size_t ref = m_refs->GetAsRef(ndx) >> 1;
 	const char* value = (const char*)m_data->GetData(ref);
 	
 	return value;
@@ -145,7 +145,7 @@ BinaryData ColumnMixed::GetBinary(size_t ndx) const {
 	assert(m_types->Get(ndx) == COLUMN_TYPE_BINARY);
 	assert(m_data);
 	
-	const size_t ref = m_refs->Get(ndx) >> 1;
+	const size_t ref = m_refs->GetAsRef(ndx) >> 1;
 	
 	return m_data->Get(ref);
 }
@@ -154,7 +154,7 @@ TopLevelTable ColumnMixed::GetTable(size_t ndx) {
 	assert(ndx < m_types->Size());
 	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
 	
-	const size_t ref = m_refs->Get(ndx);
+	const size_t ref = m_refs->GetAsRef(ndx);
 	Allocator& alloc = m_array->GetAllocator();
 	
 	// Get parent info for subtable
@@ -169,7 +169,7 @@ TopLevelTable* ColumnMixed::GetTablePtr(size_t ndx) {
 	assert(ndx < m_types->Size());
 	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
 	
-	const size_t ref = m_refs->Get(ndx);
+	const size_t ref = m_refs->GetAsRef(ndx);
 	Allocator& alloc = m_array->GetAllocator();
 	
 	// Get parent info for subtable
@@ -310,11 +310,11 @@ void ColumnMixed::SetString(size_t ndx, const char* value) {
 	
 	// See if we can reuse data position
 	if (type == COLUMN_TYPE_STRING) {
-		const size_t ref = m_refs->Get(ndx) >> 1;
+		const size_t ref = m_refs->GetAsRef(ndx) >> 1;
 		m_data->Set(ref, value, len);
 	}
 	else if (type == COLUMN_TYPE_BINARY) {
-		const size_t ref = m_refs->Get(ndx) >> 1;
+		const size_t ref = m_refs->GetAsRef(ndx) >> 1;
 		m_data->Set(ref, value, len);
 		m_types->Set(ndx, COLUMN_TYPE_STRING);
 	}
@@ -343,12 +343,12 @@ void ColumnMixed::SetBinary(size_t ndx, const char* value, size_t len) {
 	
 	// See if we can reuse data position
 	if (type == COLUMN_TYPE_STRING) {
-		const size_t ref = m_refs->Get(ndx) >> 1;
+		const size_t ref = m_refs->GetAsRef(ndx) >> 1;
 		m_data->Set(ref, value, len);
 		m_types->Set(ndx, COLUMN_TYPE_BINARY);
 	}
 	else if (type == COLUMN_TYPE_BINARY) {
-		const size_t ref = m_refs->Get(ndx) >> 1;
+		const size_t ref = m_refs->GetAsRef(ndx) >> 1;
 		m_data->Set(ref, value, len);
 	}
 	else {

@@ -160,7 +160,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 		if (nc.type == NodeChange::CT_SPLIT) {
 			// update offset for left node
 			const size_t newsize = target.Size();
-			const size_t preoffset = node_ndx ? offsets.Get(node_ndx-1) : 0;
+			const size_t preoffset = node_ndx ? offsets.GetAsRef(node_ndx-1) : 0;
 			offsets.Set(node_ndx, preoffset + newsize);
 
 			newNode.NodeAdd<C>(nc.ref2);
@@ -179,7 +179,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 			// Move items after split to new node
 			const size_t len = refs.Size();
 			for (size_t i = node_ndx; i < len; ++i) {
-				const size_t ref = refs.Get(i);
+				const size_t ref = refs.GetAsRef(i);
 				newNode.NodeAdd<C>(ref);
 			}
 			offsets.Resize(node_ndx);
@@ -229,11 +229,11 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref) {
 	const C new_col(new_ref, (const Array*)NULL, 0, m_array->GetAllocator());
 
 	// Update original size
-	const size_t offset = ndx ? offsets.Get(ndx-1) : 0;
+	const size_t offset = ndx ? offsets.GetAsRef(ndx-1) : 0;
 	const size_t newSize = orig_col.Size();
 	const size_t newOffset = offset + newSize;
 #ifdef _DEBUG
-	const size_t oldSize = offsets.Get(ndx) - offset;
+	const size_t oldSize = offsets.GetAsRef(ndx) - offset;
 #endif
 	offsets.Set(ndx, newOffset);
 
@@ -408,7 +408,7 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T valu
 		size_t e = (end == (size_t)-1 || (int)end >= offsets.Get(i)) ? -1 : end - offset;
 
 		for (;;) {
-			const size_t ref = refs.Get(i);
+			const size_t ref = refs.GetAsRef(i);
 			const C col(ref, (const Array*)NULL, 0, m_array->GetAllocator());
 
 			size_t add = i ? (size_t)offsets.Get(i-1) : 0;
@@ -450,7 +450,7 @@ template<typename T, class C> void ColumnBase::TreeVisitLeafs(size_t start, size
 		size_t e = (end == (size_t)-1 || (int)end >= offsets.Get(i)) ? (size_t)-1 : end - offset;
 
 		for (;;) {
-			const size_t ref = refs.Get(i);
+			const size_t ref = refs.GetAsRef(i);
 			const C col(ref, (const Array*)NULL, 0, m_array->GetAllocator());
 
 			size_t add = i ? (size_t)offsets.Get(i-1) : 0;

@@ -13,6 +13,7 @@
 #include <iostream>
 #include "utilities.h"
 #include <vector>
+#include <assert.h>
 
 #define TEMPEX(fun, arg) \
 	if(m_width == 0) {fun<0> arg;} \
@@ -103,6 +104,7 @@ public:
 	bool Set(size_t ndx, int64_t value);
 	template <size_t w> void Set(size_t ndx, int64_t value);
 	int64_t Get(size_t ndx) const;
+	size_t GetAsRef(size_t ndx) const;
 	template <size_t w>int64_t Get(size_t ndx) const;
 	int64_t operator[](size_t ndx) const {return Get(ndx);}
 	int64_t Back() const;
@@ -272,7 +274,7 @@ size_t Array::Write(S& out, size_t& pos, bool recurse) const {
 		
 		// First write out all sub-arrays
 		for (size_t i = 0; i < Size(); ++i) {
-			const size_t ref = Get(i);
+			const size_t ref = GetAsRef(i);
 			if (ref == 0 || ref & 0x1) {
 				// zero-refs and refs that are not 64-aligned do not point to sub-trees
 				newRefs.Add(ref);

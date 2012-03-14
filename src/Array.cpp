@@ -5,7 +5,7 @@
 #include <vector>
 #include "query/QueryEngine.h"
 #ifdef _MSC_VER
-	#include "win32\types.h"
+	#include "win32/types.h"
 	#pragma warning (disable : 4127) // Condition is constant warning
 #endif
 
@@ -306,6 +306,12 @@ void Array::Delete(size_t ndx) {
 int64_t Array::Get(size_t ndx) const {
 	assert(ndx < m_len);
 	return (this->*m_getter)(ndx);
+}
+
+size_t Array::GetAsRef(size_t ndx) const {
+	assert(ndx < m_len);
+	int64_t v = (this->*m_getter)(ndx);
+	return TO_REF(v);
 }
 
 int64_t Array::Back() const {
@@ -1444,7 +1450,7 @@ template <size_t w>void Array::ReferenceSort(Array &ref) {
 
 		// Count occurences of each value
 		for(size_t t = 0; t < m_len; t++) {
-			size_t i = Get<w>(t) - min;
+			size_t i = TO_REF(Get<w>(t) - min);
 			count.Set(i, count.Get(i) + 1);
 		}
 
@@ -1457,8 +1463,8 @@ template <size_t w>void Array::ReferenceSort(Array &ref) {
 			res.Add(0);
 
 		for(size_t t = m_len; t > 0; t--) {
-			size_t v = Get<w>(t - 1) - min;
-			size_t i = count.Get(v);
+			size_t v = TO_REF(Get<w>(t - 1) - min);
+			size_t i = count.GetAsRef(v);
 			count.Set(v, count.Get(v) - 1);
 			res.Set(i - 1, ref.Get(t - 1));
 		}
@@ -1504,14 +1510,14 @@ template <size_t w> void Array::Sort() {
 
 		// Count occurences of each value
 		for(size_t t = lo; t <= hi; t++) {
-			size_t i = Get<w>(t) - min;
+			size_t i = TO_REF(Get<w>(t) - min);
 			count[i]++;
 		}
 
 		// Overwrite original array with sorted values
 		size_t dst = 0;
 		for(int64_t i = 0; i < max - min + 1; i++) {
-			size_t c = count[i];
+			size_t c = count[(unsigned int)i];
 			for(size_t j = 0; j < c; j++) {
 				Set<w>(dst, i + min);
 				dst++;
@@ -1563,14 +1569,14 @@ template <size_t w>void Array::ReferenceQuickSort(size_t lo, size_t hi, Array &r
 	// Templated get/set: 2.40 sec (todo, enable again)
 	// comparison element x
 	const size_t ndx = (lo + hi)/2;
-	const int64_t x = (size_t)Get(ref.Get(ndx));
+	const int64_t x = Get(ref.GetAsRef(ndx));
 
 	// partition
 	do {
-		while (Get(ref.Get(i)) < x) i++;
-		while (Get(ref.Get(j)) > x) j--;
+		while (Get(ref.GetAsRef(i)) < x) i++;
+		while (Get(ref.GetAsRef(j)) > x) j--;
 		if (i <= j) {
-			size_t h = ref.Get(i);
+			size_t h = ref.GetAsRef(i);
 			ref.Set(i, ref.Get(j));
 			ref.Set(j, h);
 			i++; j--;

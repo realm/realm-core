@@ -111,6 +111,7 @@ public:
 	
 	// Getting and setting values
 	int64_t Get(size_t ndx) const;
+	size_t GetAsRef(size_t ndx) const;
 	bool Set(size_t ndx, int64_t value);
 	bool Insert(size_t ndx, int64_t value);
 	bool Add() {return Add(0);}

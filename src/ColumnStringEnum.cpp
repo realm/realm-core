@@ -29,7 +29,7 @@ bool ColumnStringEnum::IsEmpty() const {
 
 const char* ColumnStringEnum::Get(size_t ndx) const {
 	assert(ndx < m_values.Size());
-	const size_t key_ndx = m_values.Get(ndx);
+	const size_t key_ndx = m_values.GetAsRef(ndx);
 	return m_keys.Get(key_ndx);
 }
 
