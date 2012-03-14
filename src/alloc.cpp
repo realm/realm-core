@@ -230,8 +230,12 @@ bool SlabAlloc::IsReadOnly(size_t ref) const {
 bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
 	// Verify that the topref points to a location within buffer.
 	// This is currently the only integrity check we make
-	const size_t ref = TO_REF(*(uint64_t*)buffer);
+	size_t ref = *(uint64_t*)buffer;
 	if (ref > len) return false;
+	
+	// There is a unit test that calls this function with an invalid buffer
+	// so we can't size_t-test range with TO_REF until now
+	ref = TO_REF(*(uint64_t*)buffer);
 
 	m_shared = (char*)buffer;
 	m_baseline = len;

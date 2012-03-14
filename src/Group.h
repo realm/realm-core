@@ -78,7 +78,7 @@ size_t Group::Write(S& out) {
     size_t pos = 8;
 	
 	// Recursively write all arrays
-	const size_t topPos = m_top.Write(out, pos);
+	const uint64_t topPos = m_top.Write(out, pos);
 
 	// top ref
 	out.seekp(0);
