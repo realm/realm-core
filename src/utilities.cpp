@@ -8,7 +8,7 @@
 
 size_t TO_REF(int64_t v) {
 #if !defined(NDEBUG) && defined(_DEBUG)
-	int64_t m = (size_t)(-1);
+	uint64_t m = (size_t)(-1);
 	assert(v <= m);
 #endif
 	return (size_t)v;

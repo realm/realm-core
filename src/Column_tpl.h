@@ -435,7 +435,7 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T valu
 
 template<typename T, class C> void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T *arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const {
 	if (!IsNode()) {
-		if(end == -1) 
+		if(end == (size_t)-1) 
 			end = m_array->Size();
 		if(m_array->Size() > 0)
 			call(m_array, start, end, caller_offset, state);

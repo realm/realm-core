@@ -911,7 +911,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 						((int)(v>>0*16) < value || (int)(v>>1*16) < value || (int)(v>>2*16) < value || (int)(v>>3*16) < value))
 						break;
 				}
-				else if(gt ? (!(((v + constant | v)) & ~0ULL / 65535 * 32768)) : (!(         (v - constant) & ~v&~0UL/65535*32768        )))
+				else if(gt ? (!(((v + constant) | v) & ~0ULL / 65535 * 32768)) : (!(         (v - constant) & ~v&~0UL/65535*32768        )))
 					p++;
 				else
 					break;
