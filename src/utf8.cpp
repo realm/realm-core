@@ -68,7 +68,7 @@ bool case_cmp(const char *constant_upper, const char *constant_lower, const char
 			return false;
 	} while (constant_lower[matchlen] != 0 && source[matchlen] != 0);
 
-	if(case_prefix(constant_upper, constant_lower, source) != -1)
+	if(case_prefix(constant_upper, constant_lower, source) != (size_t)-1)
 		return true;
 	else
 		return false;
