@@ -162,6 +162,10 @@ int64_t Column::Get(size_t ndx) const {
 	return TreeGet<int64_t, Column>(ndx);
 }
 
+size_t Column::GetAsRef(size_t ndx) const {
+	return TO_REF(TreeGet<int64_t, Column>(ndx));
+}
+
 bool Column::Set(size_t ndx, int64_t value) {
 	const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
 
@@ -270,14 +274,15 @@ int64_t Column::Max(size_t start, size_t end) const {
 // Output:
 //     idxres: Merged array of indexes sorted with respect to vals
 void merge_core_references(Array *vals, Array *idx0, Array *idx1, Array *idxres) {
+
 	int64_t v0, v1;
 	size_t i0, i1;
 	size_t p0 = 0, p1 = 0;
 	size_t s0 = idx0->Size();
 	size_t s1 = idx1->Size();
 
-	i0 = idx0->Get(p0++);
-	i1 = idx1->Get(p1++);
+	i0 = idx0->GetAsRef(p0++);
+	i1 = idx1->GetAsRef(p1++);
 	v0 = vals->Get(i0);
 	v1 = vals->Get(i1);
 
@@ -287,14 +292,14 @@ void merge_core_references(Array *vals, Array *idx0, Array *idx1, Array *idxres)
 			// Only check p0 if it has been modified :)
 			if(p0 == s0)
 				break;
-			i0 = idx0->Get(p0++);
+			i0 = idx0->GetAsRef(p0++);
 			v0 = vals->Get(i0);
 		}
 		else {
 			idxres->Add(i1);
 			if(p1 == s1)
 				break;
-			i1 = idx1->Get(p1++);
+			i1 = idx1->GetAsRef(p1++);
 			v1 = vals->Get(i1);
 		}
 	}
@@ -305,12 +310,12 @@ void merge_core_references(Array *vals, Array *idx0, Array *idx1, Array *idxres)
 		p1--;
 
 	while(p0 < s0) {
-		i0 = idx0->Get(p0++);
+		i0 = idx0->GetAsRef(p0++);
 		v0 = vals->Get(i0);
 		idxres->Add(i0);
 	}
 	while(p1 < s1) {
-		i1 = idx1->Get(p1++);
+		i1 = idx1->GetAsRef(p1++);
 		v1 = vals->Get(i1);
 		idxres->Add(i1);
 	}
@@ -368,7 +373,7 @@ void merge_core(Array *a0, Array *a1, Array *res) {
 //     Merge-sorted array of all values
 Array *merge(Array *ArrayList) {
 	if(ArrayList->Size() == 1) {
-		size_t ref = ArrayList->Get(0);
+		size_t ref = ArrayList->GetAsRef(0);
 		Array *a = new Array(ref, (Array *)&merge);
 		return a;
 	}
@@ -447,7 +452,7 @@ void Column::Sort(size_t start, size_t end) {
 	Array arr;
 	TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
 	for(size_t t = 0; t < arr.Size(); t++) {	
-		size_t ref = arr.Get(t);
+		size_t ref = arr.GetAsRef(t);
 		Array a(ref);
 		a.Sort();
 	}
@@ -472,7 +477,7 @@ void Column::ReferenceSort(size_t start, size_t end, Column &ref) {
 	size_t offset = 0;
 	for(size_t t = 0; t < values.Size(); t++) {
 		Array *i = new Array();
-		size_t ref = values.Get(t);
+		size_t ref = values.GetAsRef(t);
 		Array v(ref);
 		for(size_t j = 0; j < v.Size(); j++)
 			all_values.Add(v.Get(j));
@@ -543,7 +548,7 @@ void Column::Delete(size_t ndx) {
 		Array refs = NodeGetRefs();
 		if (refs.Size() != 1) break;
 
-		const size_t ref = refs.Get(0);
+		const size_t ref = refs.GetAsRef(0);
 		refs.Delete(0); // avoid destroying subtree
 		m_array->Destroy();
 		m_array->UpdateRef(ref);
@@ -716,7 +721,7 @@ void Column::Verify() const {
 			col.Verify();
 
 			off += col.Size();
-			const size_t node_off = offsets.Get(i);
+			const size_t node_off = offsets.GetAsRef(i);
 			if (node_off != off) {
 				assert(false);
 			}

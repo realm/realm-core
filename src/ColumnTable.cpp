@@ -11,7 +11,7 @@ ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, Array* parent, s
 Table ColumnTable::GetTable(size_t ndx) {
 	assert(ndx < m_table_refs.Size());
 
-	const size_t ref_columns = m_table_refs.Get(ndx);
+	const size_t ref_columns = m_table_refs.GetAsRef(ndx);
 	Allocator& alloc = m_table_refs.GetAllocator();
 
 	// Get parent info for subtable
@@ -25,7 +25,7 @@ Table ColumnTable::GetTable(size_t ndx) {
 const Table ColumnTable::GetTable(size_t ndx) const {
 	assert(ndx < m_table_refs.Size());
 
-	const size_t ref_columns = m_table_refs.Get(ndx);
+	const size_t ref_columns = m_table_refs.GetAsRef(ndx);
 	Allocator& alloc = m_table_refs.GetAllocator();
 
 	// Even though it is const we still need a parent
@@ -40,7 +40,7 @@ const Table ColumnTable::GetTable(size_t ndx) const {
 Table* ColumnTable::GetTablePtr(size_t ndx) {
 	assert(ndx < m_table_refs.Size());
 
-	const size_t ref_columns = m_table_refs.Get(ndx);
+	const size_t ref_columns = m_table_refs.GetAsRef(ndx);
 	Allocator& alloc = m_table_refs.GetAllocator();
 
 	// Get parent info for subtable
@@ -55,7 +55,7 @@ Table* ColumnTable::GetTablePtr(size_t ndx) {
 size_t ColumnTable::GetTableSize(size_t ndx) const {
 	assert(ndx < m_table_refs.Size());
 
-	const size_t ref_columns = m_table_refs.Get(ndx);
+	const size_t ref_columns = m_table_refs.GetAsRef(ndx);
 
 	if (ref_columns == 0) return 0;
 	else {
@@ -77,7 +77,7 @@ void ColumnTable::Insert(size_t ndx) {
 void ColumnTable::Delete(size_t ndx) {
 	assert(ndx < m_table_refs.Size());
 
-	const size_t ref_columns = m_table_refs.Get(ndx);
+	const size_t ref_columns = m_table_refs.GetAsRef(ndx);
 
 	// Delete sub-tree
 	if (ref_columns != 0) {
@@ -92,7 +92,7 @@ void ColumnTable::Delete(size_t ndx) {
 void ColumnTable::Clear(size_t ndx) {
 	assert(ndx < m_table_refs.Size());
 
-	const size_t ref_columns = m_table_refs.Get(ndx);
+	const size_t ref_columns = m_table_refs.GetAsRef(ndx);
 	if (ref_columns == 0) return; // already empty
 
 	// Delete sub-tree

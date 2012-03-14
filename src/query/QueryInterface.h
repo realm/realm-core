@@ -361,7 +361,7 @@ static void *query_thread(void *arg) {
 				if(res.size() > 0) {
 					ts->chunks.push_back(std::pair<size_t, size_t>(mine, ts->results.size()));
 					ts->count += res.size();
-					for(int i = 0; i < res.size(); i++) {
+					for(size_t i = 0; i < res.size(); i++) {
 						ts->results.push_back(res[i]);
 					}	
 					res.clear();
@@ -487,7 +487,7 @@ protected:
 	std::vector<ParentNode **>update_override;
 	std::vector<ParentNode **>subtables;
 	private:
-	int m_threadcount;
+	size_t m_threadcount;
 };
 
 class XQueryAccessorInt {
