@@ -35,7 +35,7 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
 Array::Array(Allocator& alloc)
-: m_ref(0), m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
+: m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
 }
 
 // Copy-constructor
@@ -530,7 +530,7 @@ size_t Array::FindPos(int64_t target) const {
 		else            low = (int)probe;
 	}
 	if (high == (int)m_len) return (size_t)-1;
-	else return high;
+	else return (size_t)high;
 }
 
 size_t Array::FindPos2(int64_t target) const {
@@ -549,7 +549,7 @@ size_t Array::FindPos2(int64_t target) const {
 		else            high = (int)probe;
 	}
 	if (high == (int)m_len) return (size_t)-1;
-	else return high;
+	else return (size_t)high;
 }
 
 
@@ -651,7 +651,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 	if (IsEmpty()) return (size_t)-1;
 	if (start >= end) return (size_t)-1;
 
-	assert(start < m_len && (end <= m_len || end == -1) && start < end);
+	assert(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
 
 	start += 4;
 
@@ -691,7 +691,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 		const int64_t v = ~0ULL/0x3 * value;
 		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2 & 0xAAAAAAAAAAAAAAAAUL;
+			const uint64_t hasZeroByte = (v2 - 0x5555555555555555ULL) & ~v2 & 0xAAAAAAAAAAAAAAAAULL;
 			if( eq ?   hasZeroByte  :  !hasZeroByte     )
 				p++;
 			else
@@ -703,7 +703,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 		const int64_t v = ~0ULL/0xF * value;
 		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 & 0x8888888888888888UL;
+			const uint64_t hasZeroByte = (v2 - 0x1111111111111111ULL) & ~v2 & 0x8888888888888888ULL;
 			if( eq ?   hasZeroByte  :  !hasZeroByte     )
 				p++;
 			else
@@ -727,7 +727,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 		const int64_t v = ~0ULL/0xFFFF * value;
 		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0001000100010001UL) & ~v2 & 0x8000800080008000UL;
+			const uint64_t hasZeroByte = (v2 - 0x0001000100010001ULL) & ~v2 & 0x8000800080008000ULL;
 			if( eq ?   hasZeroByte  :  !hasZeroByte     )
 				p++;
 			else
@@ -739,7 +739,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 		const int64_t v = ~0ULL/0xFFFFFFFF * value;
 		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2 & 0x8000800080000000UL;
+			const uint64_t hasZeroByte = (v2 - 0x0000000100000001ULL) & ~v2 & 0x8000800080000000ULL;
 			if( eq ?   hasZeroByte  :  !hasZeroByte     )
 				p++;
 			else
@@ -785,7 +785,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,	size_t start
 	size_t f = start - 1;
 	for(;;) {
 		f = Find(value, f + 1, end);
-		if (f == -1)
+		if (f == (size_t)-1)
 			break;
 		else	
 			result.AddPositiveLocal(f + colOffset);
@@ -817,7 +817,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 	if (IsEmpty()) return (size_t)-1;
 	if (start >= end) return (size_t)-1;
 
-	assert(start < m_len && (end <= m_len || end == -1) && start < end);
+	assert(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
 
 	// Test 64 items with no latency for cases where the first few 64-bit chunks are likely to
 	// contain one or more matches (because the linear test we use later cannot extract the position)
@@ -857,7 +857,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 		int64_t constant = gt ? (~0ULL / 3 * (3 - value))   :  (   ~0UL / 3 * value );
 		while(p < e) {
 			int64_t v = *p;
-			if( gt ? (!((v + constant | v) & ~0ULL / 3 * 2))   :  ((v - constant) & ~v&~0UL/3*2)      )
+			if( gt ? (!(((v + constant) | v) & ~0ULL / 3 * 2))   :  ((v - constant) & ~v&~0UL/3*2)      )
 				p++;
 			else
 				break;
@@ -868,7 +868,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 		int64_t constant = gt ? (~0ULL / 15 * (7 - value))  :   (   ~0UL / 15 * value )  ;
 		while(p < e) {
 			int64_t v = *p;
-			if(gt ? (!((v + constant | v) & ~0ULL / 15 * 8)) :     ((v - constant) & ~v&~0UL/15*8)    )
+			if(gt ? (!(((v + constant) | v) & ~0ULL / 15 * 8)) :     ((v - constant) & ~v&~0UL/15*8)    )
 				p++;
 			else
 				break;
@@ -888,7 +888,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 					((char)(v>>0*8) < value || (char)(v>>1*8) < value || (char)(v>>2*8) < value || (char)(v>>3*8) < value || (char)(v>>4*8) < value || (char)(v>>5*8) < value || (char)(v>>6*8) < value || (char)(v>>7*8) < value))
 						break;
 				}
-				else if (gt ?  (!((v + constant | v) & ~0ULL / 255 * 128)) : (         (v - constant) & ~v&~0UL/255*128             ))
+				else if (gt ?  (!(((v + constant) | v) & ~0ULL / 255 * 128)) : (         (v - constant) & ~v&~0UL/255*128             ))
 					p++;
 				else
 					break;
@@ -911,7 +911,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 						((int)(v>>0*16) < value || (int)(v>>1*16) < value || (int)(v>>2*16) < value || (int)(v>>3*16) < value))
 						break;
 				}
-				else if(gt ? (!((v + constant | v) & ~0ULL / 65535 * 32768)) : (!(         (v - constant) & ~v&~0UL/65535*32768        )))
+				else if(gt ? (!(((v + constant | v)) & ~0ULL / 65535 * 32768)) : (!(         (v - constant) & ~v&~0UL/65535*32768        )))
 					p++;
 				else
 					break;
@@ -1005,7 +1005,7 @@ int64_t Array::Sum(size_t start, size_t end) const {
 	if (start == end) return 0;
 	assert(start < m_len && end <= m_len && start < end);
 
-	uint64_t sum = 0;
+	int64_t sum = 0;
 	
 	if (m_width == 0)
 		return 0;
@@ -1031,10 +1031,10 @@ int64_t Array::Sum(size_t start, size_t end) const {
 		// http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 
 		// staiic values needed for fast sums
-		const uint64_t m1  = 0x5555555555555555;
-		const uint64_t m2  = 0x3333333333333333;
-		const uint64_t m4  = 0x0f0f0f0f0f0f0f0f;
-		const uint64_t h01 = 0x0101010101010101;
+		const uint64_t m1  = 0x5555555555555555ULL;
+		const uint64_t m2  = 0x3333333333333333ULL;
+		const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
+		const uint64_t h01 = 0x0101010101010101ULL;
 
 		const uint64_t* const next = (const uint64_t*)m_data;
 		size_t i = start;
@@ -1093,6 +1093,11 @@ int64_t Array::Sum(size_t start, size_t end) const {
 
 
 void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const {
+	(void)result;
+	(void)value;
+	(void)maxdist;
+	(void)offset;
+	/*
 	// Only implemented for 64bit values
 	if (m_width != 64) {
 		assert(false);
@@ -1103,10 +1108,10 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
 	const uint64_t* const e = (const uint64_t*)m_data + m_len;
 
 	// static values needed for population count
-	const uint64_t m1  = 0x5555555555555555;
-	const uint64_t m2  = 0x3333333333333333;
-	const uint64_t m4  = 0x0f0f0f0f0f0f0f0f;
-	const uint64_t h01 = 0x0101010101010101;
+	const uint64_t m1  = 0x5555555555555555ULL;
+	const uint64_t m2  = 0x3333333333333333ULL;
+	const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
+	const uint64_t h01 = 0x0101010101010101ULL;
 
 	while (p < e) {
 		uint64_t x = *p ^ value;
@@ -1130,6 +1135,7 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
 
 		++p;
 	}
+	*/
 }
 
 size_t Array::CalcByteLen(size_t count, size_t width) const {
@@ -1360,9 +1366,9 @@ void Array::Set_64b(size_t ndx, int64_t value) {
 	const size_t offset = ndx * 8;
 	*(int64_t*)(m_data + offset) = value;
 }
-
+#ifdef __MSVCRT__
 #pragma warning (disable : 4127)
-
+#endif
 template <size_t w> void Array::Set(size_t ndx, int64_t value) {
 	if(w == 0) return Set_0b(ndx, value);
 	else if(w == 1)	Set_1b(ndx, value);

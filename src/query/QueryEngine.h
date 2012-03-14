@@ -102,7 +102,7 @@ public:
 		const C& column = (C&)(table.GetColumnBase(m_column));
 		for (size_t s = start; s < end; ++s) {
 			s = column.template TreeFind<T, C, F>(m_value, s, end);
-			if(s == -1) 
+			if(s == (size_t)-1) 
 				s = end;
 
 			if (m_child == 0)
@@ -198,12 +198,12 @@ public:
 				s = ((AdaptiveStringColumn&)(table.GetColumnBase(m_column))).Find(m_value, s, end);
 			else {
 				ColumnStringEnum &cse = (ColumnStringEnum&)(table.GetColumnBase(m_column));
-				if(key_ndx == -1)
+				if(key_ndx == (size_t)-1)
 					key_ndx = cse.GetKeyNdx(m_value);
 				s = cse.Find(key_ndx, s, end);
 			}
 
-			if(s == -1)
+			if(s == (size_t)-1)
 				s = end;
 
 			if (m_child == 0)

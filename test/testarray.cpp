@@ -106,7 +106,7 @@ TEST_FIXTURE(db_setup_array, Array_Add7) {
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add8) {
-	c.Add(4294967296);
+	c.Add(4294967296LL);
 	CHECK_EQUAL(c.Get(0), 0);
 	CHECK_EQUAL(c.Get(1), 1);
 	CHECK_EQUAL(c.Get(2), 2);
@@ -168,7 +168,7 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg3) {
 }
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg4) {
-	c.Add(-4294967296);
+	c.Add(-4294967296LL);
 
 	CHECK_EQUAL(c.Size(), 4);
 	CHECK_EQUAL(c.Get(0), -1);
@@ -372,7 +372,7 @@ TEST_FIXTURE(db_setup_array, Array_Find8) {
 
 TEST_FIXTURE(db_setup_array, Array_Find9) {
 	// expand to 64-bit width
-	c.Add(4294967296);
+	c.Add(4294967296LL);
 
 	size_t res = c.Find(4294967296LL);
 	CHECK_EQUAL(10, res);

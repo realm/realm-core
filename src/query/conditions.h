@@ -45,7 +45,7 @@ struct CONTAINS_INS {
 
 // is v2 a prefix of v1?
 struct BEGINSWITH_INS { 
-	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1; return(case_prefix(v1_upper, v1_lower, v2) != -1); }
+	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1; return(case_prefix(v1_upper, v1_lower, v2) != (size_t)-1); }
 };
 
 // does v1 end with s2?
