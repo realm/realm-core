@@ -56,10 +56,10 @@ src/tightdb.h: src/tightdb-gen.sh src/tightdb-gen.py
 
 # Compiling
 %.o: %.cpp
-	@$(CXXCMD) -o $@ -c $<
+	$(CXXCMD) -o $@ -c $<
 
 %.so: %.cpp
-	@$(CXXCMD) -fPIC -fno-strict-aliasing -o $@ -c $<
+	$(CXXCMD) -fPIC -fno-strict-aliasing -o $@ -c $<
 
 %.d: %.cpp $(GENERATED_HEADERS)
 	@$(CXXCMD) -MM -MF $@ -MG -MP -MT $*.o -MT $*.so $<
