@@ -37,6 +37,7 @@
 
 #include "pthread.h"
 #include "implement.h"
+#pragma warning (disable : 4306)
 
 
 void

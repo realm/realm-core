@@ -127,6 +127,7 @@ MemRef SlabAlloc::Alloc(size_t size) {
 }
 
 // Support function
+// todo, fixme: use header function in array instead!
 size_t GetSizeFromHeader(void* p) {
 	// parse the capacity part of 8byte header
 	const uint8_t* const header = (uint8_t*)p;
@@ -230,7 +231,7 @@ bool SlabAlloc::IsReadOnly(size_t ref) const {
 bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
 	// Verify that the topref points to a location within buffer.
 	// This is currently the only integrity check we make
-	size_t ref = *(uint64_t*)buffer;
+	size_t ref = (size_t)(*(uint64_t*)buffer);
 	if (ref > len) return false;
 	
 	// There is a unit test that calls this function with an invalid buffer

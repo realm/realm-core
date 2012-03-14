@@ -723,6 +723,7 @@ TEST(FindSSE) {
 		size_t t = a.Find(123);
 		assert(t == i);
 		a.Set(i, 10000);
+		(void)t;
 	}
 	a.Destroy();
 }
