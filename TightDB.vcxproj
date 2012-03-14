@@ -357,7 +357,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\alloc.cpp" />
-    <ClCompile Include="src\Array.cpp" />
+    <ClCompile Include="src\Array.cpp">
+      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">EnableAllWarnings</WarningLevel>
+    </ClCompile>
     <ClCompile Include="src\ArrayBinary.cpp" />
     <ClCompile Include="src\ArrayBlob.cpp" />
     <ClCompile Include="src\ArrayString.cpp" />
