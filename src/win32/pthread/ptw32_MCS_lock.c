@@ -92,6 +92,9 @@
 #include "implement.h"
 #include "pthread.h"
 
+#pragma warning (disable : 4306)
+#pragma warning (disable : 4305)
+
 /*
  * ptw32_mcs_flag_set -- notify another thread about an event.
  * 

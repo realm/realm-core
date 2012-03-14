@@ -121,6 +121,7 @@ void VerifiedInteger::Set(size_t ndx, int64_t value) {
 	size_t ndx = std::distance(v.begin(), it);
 	size_t index2 = u.Find(value);
 	assert(ndx == index2 || it == v.end() && index2 == -1);
+	(void)index2;
 	return ndx;
 }
 

@@ -156,6 +156,8 @@ TEST(Group_Serialize2) {
 	CHECK(fromDisk.IsValid());
 	TestTableGroup& t1 = fromDisk.GetTable<TestTableGroup>("test1");
 	TestTableGroup& t2 = fromDisk.GetTable<TestTableGroup>("test2");
+	(void)t2;
+	(void)t1;
 
 #ifdef _DEBUG
 	// Verify that original values are there
@@ -187,6 +189,7 @@ TEST(Group_Serialize3) {
 	Group fromDisk("table_test.tbl");
 	CHECK(fromDisk.IsValid());
 	TestTableGroup& t = fromDisk.GetTable<TestTableGroup>("test");
+	(void)t;
 
 
 #ifdef _DEBUG

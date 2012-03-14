@@ -245,6 +245,7 @@ Table::Table(Allocator& alloc, bool dontInit)
 : m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc), m_columns(alloc)
 {
 	assert(dontInit == true); // only there to differentiate constructor
+	(void)dontInit;
 }
 
 Table::Table(Allocator& alloc, size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns)

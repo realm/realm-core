@@ -37,7 +37,8 @@
 
 #pragma warning(disable:4310)
 #pragma warning(disable:4273)
-
+#pragma warning (disable : 4306)
+#pragma warning (disable : 4305)
 
 #include "pthread.h"
 #include "implement.h"

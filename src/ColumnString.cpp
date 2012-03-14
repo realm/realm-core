@@ -324,8 +324,9 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
 		const char* v = Get(i);
 
 		size_t pos;
-		const bool res = keys.FindKeyPos(v, pos);
+		const bool res = keys.FindKeyPos(v, pos);  // todo/fixme, res isn't used
 		assert(res);
+		(void)res;
 
 		values.Add(pos);
 	}
