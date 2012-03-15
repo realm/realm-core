@@ -1246,8 +1246,7 @@ void Table::Verify() const {
 }
 
 void Table::ToDot(const char* filename) const {
-	FILE* f;
-	fopen_s(&f, filename, "w");
+	FILE* f = fopen(filename, "w");
 	if (!f) return;
 
 	fprintf(f, "digraph G {\n");
