@@ -8,7 +8,7 @@
 
 # Compiler and flags
 # CXXFLAGS  = -Wall -Weffc++ -std=c++0x
-CXXFLAGS  = -Wall -std=c++0x -lpthread
+CXXFLAGS  = -Wall -pthread
 #CXXFLAGS += -DUSE_SSE -msse4.2
 CXXLIBS   = -L./src
 CXXINC    = -I./src
@@ -36,7 +36,7 @@ debug: all
 # Targets
 all: src/tightdb.h
 all: $(LIB_STATIC) # Comment out to disable building of static library
-all: $(LIB_SHARED) # Comment out to disable building of shared library
+# all: $(LIB_SHARED) # Comment out to disable building of shared library
 .PHONY: all
 
 test: clean debug
