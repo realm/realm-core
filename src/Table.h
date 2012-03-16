@@ -19,7 +19,8 @@ class TopLevelTable;
 
 class Date {
 public:
-	Date(time_t d) : m_date(d) {}time_t GetDate() const {return m_date;}
+	Date(time_t d) : m_date(d) {}
+	time_t GetDate() const {return m_date;}
 private:
 	time_t m_date;
 };
@@ -178,6 +179,9 @@ public:
 
 	// Optimizing
 	void Optimize();
+	
+	// Conversion
+	template<class S> void to_json(S& out);
 
 	// Debug
 #ifdef _DEBUG
@@ -251,6 +255,129 @@ protected:
 private:
 	TopLevelTable& operator=(const TopLevelTable&) {return *this;} // non assignable
 };
+
+template<class S>
+void Table::to_json(S& out) {
+	// Represent table as list of objects
+	out << "[";
+	
+	const size_t row_count    = GetSize();
+	const size_t column_count = GetColumnCount();
+	
+	// We need a buffer for formatting dates (and binary to hex). Max
+	// size is 21 bytes (incl quotes and zero byte) "YYYY-MM-DD HH:MM:SS"\0
+	char buffer[30];
+	
+	for (size_t r = 0; r < row_count; ++r) {
+		if (r) out << ",";
+		out << "{";
+		
+		for (size_t i = 0; i < column_count; ++i) {
+			if (i) out << ",";
+			
+			const char* const name = GetColumnName(i);
+			out << "\"" << name << "\":";
+			
+			const ColumnType type = GetColumnType(i);
+			switch (type) {
+				case COLUMN_TYPE_INT:
+					out << Get(i, r);
+					break;
+				case COLUMN_TYPE_BOOL:
+					out << (GetBool(i, r) ? "true" : "false");
+					break;
+				case COLUMN_TYPE_STRING:
+					out << "\"" << GetString(i, r) << "\"";
+					break;
+				case COLUMN_TYPE_DATE:
+				{
+					const time_t rawtime = GetDate(i, r);
+					struct tm* const t = gmtime(&rawtime);					
+					const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
+					if (!res) break;
+					
+					out << buffer;
+					break;
+				}
+				case COLUMN_TYPE_BINARY:
+				{
+					const BinaryData bin = GetBinary(i, r);
+					const char* const p = (char*)bin.pointer;
+					
+					out << "\"";
+					for (size_t i = 0; i < bin.len; ++i) {
+						sprintf(buffer, "%02x", (unsigned int)p[i]);
+						out << buffer;
+					}
+					out << "\"";
+					break;
+				}
+				case COLUMN_TYPE_TABLE:
+				{
+					Table table = GetTable(i, r);
+					table.to_json(out);
+					break;
+				}
+				case COLUMN_TYPE_MIXED:
+				{
+					const ColumnType mtype = GetMixedType(i, r);
+					if (mtype == COLUMN_TYPE_TABLE) {
+						TopLevelTable table = GetMixedTable(i, r);
+						table.to_json(out);
+					}
+					else {
+						const Mixed m = GetMixed(i, r);
+						switch (mtype) {
+							case COLUMN_TYPE_INT:
+								out << m.GetInt();
+								break;
+							case COLUMN_TYPE_BOOL:
+								out << m.GetBool();
+								break;
+							case COLUMN_TYPE_STRING:
+								out << "\"" << m.GetString() << "\"";
+								break;
+							case COLUMN_TYPE_DATE:
+							{
+								const time_t rawtime = m.GetDate();
+								struct tm* const t = gmtime(&rawtime);
+								const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
+								if (!res) break;
+								
+								out << buffer;
+								break;
+							}
+							case COLUMN_TYPE_BINARY:
+							{
+								const BinaryData bin = m.GetBinary();
+								const char* const p = (char*)bin.pointer;
+								
+								out << "\"";
+								for (size_t i = 0; i < bin.len; ++i) {
+									sprintf(buffer, "%02x", (unsigned int)p[i]);
+									out << buffer;
+								}
+								out << "\"";
+								break;
+							}
+							default:
+								assert(false);
+						}
+
+					}
+					break;
+				}
+					
+				default:
+					assert(false);
+			}
+		}
+		
+		out << "}";
+	}
+	
+	out << "]";
+}
 
 class TableView {
 public:
