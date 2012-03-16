@@ -58,7 +58,7 @@ int main() {
 		// create random string
 		const size_t n = rand() % RANGE;// * 10 + rand();
 		sqlite3_reset(ppStmt);
-		sqlite3_bind_int(ppStmt, 1, n);
+sqlite3_bind_int(ppStmt, 1, n);
 		rc = sqlite3_step(ppStmt);
 		if (rc != SQLITE_DONE) {
 			fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
@@ -197,13 +197,87 @@ int main() {
 		*/
 
 
-	}	
 
 
+
+
+
+
+
+
+
+		
+
+			printf("rrrr");
+						// new benchmark 
+	// Create table
+	char *zErrMsg = NULL;
+	rc = sqlite3_exec(db, "create table t9 (first INTEGER, second VARCHAR(100));", NULL, NULL, &zErrMsg);
+	if (rc != SQLITE_OK) {
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+	}
+	
+	// Prepare insert statement
+	sqlite3_stmt *ppStmt = NULL;
+	rc = sqlite3_prepare(db, "INSERT INTO t9 VALUES(?1, ?2);", -1, &ppStmt, NULL);
+	if (rc != SQLITE_OK) {
+		fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
+	}
+
+	// Fill with data
+	for (size_t i = 0; i < 5000000; ++i) {
+		// create random string
+		const size_t n = 3;// * 10 + rand();
+		sqlite3_reset(ppStmt);
+		sqlite3_bind_int(ppStmt, 1, n);
+		sqlite3_bind_text(ppStmt, 2, "test string", -1, NULL);
+		rc = sqlite3_step(ppStmt);
+		if (rc != SQLITE_DONE) {
+			fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
+		}
+	}
+	sqlite3_finalize(ppStmt); // Cleanup
+			// Prepare select statement
+		rc = sqlite3_prepare(db, "SELECT t9.first FROM t9 WHERE t9.first = 5 or t9.first > 10;", -1, &ppStmt, NULL);
+		if (rc != SQLITE_OK) {
+			fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
+		}
+
+		timer.Start();
+
+		printf("hej");
+
+		// Do a search over entire column (value not found)
+			sqlite3_reset(ppStmt);
+			size_t n = rand2() % RANGE;
+			sqlite3_bind_int(ppStmt, 1, n);
+			rc = sqlite3_step(ppStmt);
+		//	if (rc != SQLITE_ROW) {
+		//		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		//	}
+			// Sanity test
+			//printf("%s, ", (char*)sqlite3_column_text(ppStmt, 0)); 
+		
+		printf("SELECT: %dms\n", timer.GetTimeInMs());
 
 	printf("done");
 	getchar();
 	exit(1);
 
 	return 1;
+
+
+
+
+
+
+
+
+
+	}	
+
+
+
+
+
 }

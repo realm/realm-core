@@ -23,6 +23,9 @@ public:
 	size_t Find(const char* value, size_t start=0, size_t end=-1) const;
 	void FindAll(Array &res, const char* value, size_t start=0, size_t end=-1) const;
 
+	size_t Find(size_t key_index, size_t start=0, size_t end=-1) const;
+	void FindAll(Array &res, size_t key_index, size_t start=0, size_t end=-1) const;
+
 	void UpdateParentNdx(int diff);
 
 #ifdef _DEBUG
@@ -31,8 +34,9 @@ public:
 	MemStats Stats() const;
 #endif // _DEBUG
 
-private:
 	size_t GetKeyNdx(const char* value);
+
+private:
 
 	// Member variables
 	AdaptiveStringColumn m_keys;

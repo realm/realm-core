@@ -249,7 +249,7 @@ size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, siz
 	// todo, ensure behaves as expected when m_width = 0
 
 	for (size_t i = start; i < end; ++i) {
-		if (value[0] == m_data[i * m_width] && value[len] == m_data[i * m_width + len]) {
+		if (value[0] == (char)m_data[i * m_width] && value[len] == (char)m_data[i * m_width + len]) {
 			const char* const v = (const char *)m_data + i * m_width;
 			if (strncmp(value, v, len) == 0) return i;
 		}

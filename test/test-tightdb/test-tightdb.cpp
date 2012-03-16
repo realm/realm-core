@@ -54,7 +54,7 @@ int main() {
 	}
 	table.Add(0, "abcde", 100, Wed);
 
-	printf("Memory usage: %lld bytes\n", (int64_t)GetMemUsage()); // %zu doesn't work in vc
+	printf("Memory usage: %lld bytes\n", (long long)GetMemUsage()); // %zu doesn't work in vc
 
 	UnitTest::Timer timer;
 
@@ -116,7 +116,7 @@ int main() {
 		printf("Add index: %dms\n", search_time);
 	}
 
-	printf("Memory usage2: %lld bytes\n", (int64_t)GetMemUsage()); // %zu doesn't work in vc
+	printf("Memory usage2: %lld bytes\n", (long long)GetMemUsage()); // %zu doesn't work in vc
 
 	// Search with index
 	{

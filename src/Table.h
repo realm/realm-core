@@ -27,7 +27,7 @@ private:
 
 class Mixed {
 public:
-	explicit Mixed(ColumnType v)  {assert(v = COLUMN_TYPE_TABLE); m_type = COLUMN_TYPE_TABLE;}
+	explicit Mixed(ColumnType v)  {assert(v == COLUMN_TYPE_TABLE); (void)v; m_type = COLUMN_TYPE_TABLE;}
 	Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
 	Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.GetDate();}
 	Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
@@ -179,6 +179,9 @@ public:
 
 	// Optimizing
 	void Optimize();
+	
+	// Conversion
+	template<class S> void to_json(S& out);
 
 	// Debug
 #ifdef _DEBUG
@@ -253,6 +256,129 @@ private:
 	TopLevelTable& operator=(const TopLevelTable&) {return *this;} // non assignable
 };
 
+template<class S>
+void Table::to_json(S& out) {
+	// Represent table as list of objects
+	out << "[";
+	
+	const size_t row_count    = GetSize();
+	const size_t column_count = GetColumnCount();
+	
+	// We need a buffer for formatting dates (and binary to hex). Max
+	// size is 21 bytes (incl quotes and zero byte) "YYYY-MM-DD HH:MM:SS"\0
+	char buffer[30];
+	
+	for (size_t r = 0; r < row_count; ++r) {
+		if (r) out << ",";
+		out << "{";
+		
+		for (size_t i = 0; i < column_count; ++i) {
+			if (i) out << ",";
+			
+			const char* const name = GetColumnName(i);
+			out << "\"" << name << "\":";
+			
+			const ColumnType type = GetColumnType(i);
+			switch (type) {
+				case COLUMN_TYPE_INT:
+					out << Get(i, r);
+					break;
+				case COLUMN_TYPE_BOOL:
+					out << (GetBool(i, r) ? "true" : "false");
+					break;
+				case COLUMN_TYPE_STRING:
+					out << "\"" << GetString(i, r) << "\"";
+					break;
+				case COLUMN_TYPE_DATE:
+				{
+					const time_t rawtime = GetDate(i, r);
+					struct tm* const t = gmtime(&rawtime);					
+					const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
+					if (!res) break;
+					
+					out << buffer;
+					break;
+				}
+				case COLUMN_TYPE_BINARY:
+				{
+					const BinaryData bin = GetBinary(i, r);
+					const char* const p = (char*)bin.pointer;
+					
+					out << "\"";
+					for (size_t i = 0; i < bin.len; ++i) {
+						sprintf(buffer, "%02x", (unsigned int)p[i]);
+						out << buffer;
+					}
+					out << "\"";
+					break;
+				}
+				case COLUMN_TYPE_TABLE:
+				{
+					Table table = GetTable(i, r);
+					table.to_json(out);
+					break;
+				}
+				case COLUMN_TYPE_MIXED:
+				{
+					const ColumnType mtype = GetMixedType(i, r);
+					if (mtype == COLUMN_TYPE_TABLE) {
+						TopLevelTable table = GetMixedTable(i, r);
+						table.to_json(out);
+					}
+					else {
+						const Mixed m = GetMixed(i, r);
+						switch (mtype) {
+							case COLUMN_TYPE_INT:
+								out << m.GetInt();
+								break;
+							case COLUMN_TYPE_BOOL:
+								out << m.GetBool();
+								break;
+							case COLUMN_TYPE_STRING:
+								out << "\"" << m.GetString() << "\"";
+								break;
+							case COLUMN_TYPE_DATE:
+							{
+								const time_t rawtime = m.GetDate();
+								struct tm* const t = gmtime(&rawtime);
+								const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
+								if (!res) break;
+								
+								out << buffer;
+								break;
+							}
+							case COLUMN_TYPE_BINARY:
+							{
+								const BinaryData bin = m.GetBinary();
+								const char* const p = (char*)bin.pointer;
+								
+								out << "\"";
+								for (size_t i = 0; i < bin.len; ++i) {
+									sprintf(buffer, "%02x", (unsigned int)p[i]);
+									out << buffer;
+								}
+								out << "\"";
+								break;
+							}
+							default:
+								assert(false);
+						}
+
+					}
+					break;
+				}
+					
+				default:
+					assert(false);
+			}
+		}
+		
+		out << "}";
+	}
+	
+	out << "]";
+}
+
 class TableView {
 public:
 	TableView(Table& source);
@@ -261,7 +387,7 @@ public:
 
 	Table& GetParent() {return m_table;}
 	Array& GetRefColumn() {return m_refs;}
-	size_t GetRef(size_t ndx) const {return m_refs.Get(ndx);}
+	size_t GetRef(size_t ndx) const {return m_refs.GetAsRef(ndx);}
 
 	bool IsEmpty() const {return m_refs.IsEmpty();}
 	size_t GetSize() const {return m_refs.Size();}
@@ -277,7 +403,7 @@ public:
 	void SetBool(size_t column_id, size_t ndx, bool value);
 	void SetDate(size_t column_id, size_t ndx, time_t value);
 	void SetString(size_t column_id, size_t ndx, const char* value);
-
+	void Sort(size_t column, bool Ascending = true);
 	// Sub-tables
 	Table* GetTablePtr(size_t column_id, size_t ndx);
 
@@ -444,19 +570,19 @@ class ColumnProxyMixed : public ColumnProxy {
 public:
 };
 
-template<class T> class TypeEnum {
+template<class T> class tdbTypeEnum {
 public:
-	TypeEnum(T v) : m_value(v) {};
+	tdbTypeEnum(T v) : m_value(v) {};
 	operator T() const {return m_value;}
-	TypeEnum<T>& operator=(const TypeEnum<T>& v) {m_value = v.m_value;}
+	tdbTypeEnum<T>& operator=(const tdbTypeEnum<T>& v) {m_value = v.m_value;}
 private:
 	const T m_value;
 };
-#define TypeInt int64_t
-#define TypeBool bool
-#define TypeString const char*
-#define TypeMixed Mixed
-
+#define tdbTypeInt int64_t
+#define tdbTypeBool bool
+#define tdbTypeString const char*
+#define tdbTypeMixed Mixed
+	
 // Make all enum types return int type
 template<typename T> struct COLUMN_TYPE_Enum {
 public:

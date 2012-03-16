@@ -106,7 +106,7 @@ TEST_FIXTURE(db_setup_array, Array_Add7) {
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add8) {
-	c.Add(4294967296);
+	c.Add(4294967296LL);
 	CHECK_EQUAL(c.Get(0), 0);
 	CHECK_EQUAL(c.Get(1), 1);
 	CHECK_EQUAL(c.Get(2), 2);
@@ -168,7 +168,7 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg3) {
 }
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg4) {
-	c.Add(-4294967296);
+	c.Add(-4294967296LL);
 
 	CHECK_EQUAL(c.Size(), 4);
 	CHECK_EQUAL(c.Get(0), -1);
@@ -372,7 +372,7 @@ TEST_FIXTURE(db_setup_array, Array_Find8) {
 
 TEST_FIXTURE(db_setup_array, Array_Find9) {
 	// expand to 64-bit width
-	c.Add(4294967296);
+	c.Add(4294967296LL);
 
 	size_t res = c.Find(4294967296LL);
 	CHECK_EQUAL(10, res);
@@ -431,6 +431,7 @@ TEST(Array_Sort) {
 /** FindAll() int tests spread out over bitwidth
  *
  */
+
 
 TEST(findallint0){
 	Array a;
@@ -717,11 +718,12 @@ TEST(FindSSE) {
 		a.Add(10000);
 	}
 
-	for(uint64_t i = 0; i < 100; i++) {
+	for(size_t i = 0; i < 100; i++) {
 		a.Set(i, 123);
 		size_t t = a.Find(123);
 		assert(t == i);
 		a.Set(i, 10000);
+		(void)t;
 	}
 	a.Destroy();
 }
@@ -813,3 +815,254 @@ TEST(Sum16) {
 	a.Destroy();
 }
 
+TEST(Greater) {
+	Array a;
+
+	size_t items = 400;
+
+	for(items = 2; items < 200; items += 7) 
+	{
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(0);
+		}
+		size_t t = a.Query<GREATER>(0, 0, (size_t)-1);
+		CHECK_EQUAL(-1, t);
+
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(0);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 1);
+			size_t t = a.Query<GREATER>(0, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 0);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(2);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 3);
+			size_t t = a.Query<GREATER>(2, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 2);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(10);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 11);
+			size_t t = a.Query<GREATER>(10, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 10);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(100);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 110);
+			size_t t = a.Query<GREATER>(100, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 100);
+		}
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(200);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 210);
+			size_t t = a.Query<GREATER>(200, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 200);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(10000);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 11000);
+			size_t t = a.Query<GREATER>(10000, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 10000);
+		}
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(40000);
+		}
+
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 41000);
+			size_t t = a.Query<GREATER>(40000, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 40000);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(1000000);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 1100000);
+			size_t t = a.Query<GREATER>(1000000, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 1000000);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(1000ULL*1000ULL*1000ULL*1000ULL);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
+			size_t t = a.Query<GREATER>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+		}
+
+	}
+	a.Destroy();
+}
+
+
+
+
+TEST(Less) {
+	Array a;
+
+	size_t items = 400;
+
+	for(items = 2; items < 200; items += 7) 
+	{
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(0);
+		}
+		size_t t = a.Query<LESS>(0, 0, (size_t)-1);
+		CHECK_EQUAL(-1, t);
+
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(1);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 0);
+			size_t t = a.Query<LESS>(1, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 1);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(3);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 2);
+			size_t t = a.Query<LESS>(3, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 3);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(11);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 10);
+			size_t t = a.Query<LESS>(11, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 11);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(110);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 100);
+			size_t t = a.Query<LESS>(110, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 110);
+		}
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(210);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 200);
+			size_t t = a.Query<LESS>(210, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 210);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(11000);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 10000);
+			size_t t = a.Query<LESS>(11000, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 11000);
+		}
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(41000);
+		}
+
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 40000);
+			size_t t = a.Query<LESS>(41000, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 41000);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(1100000);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 1000000);
+			size_t t = a.Query<LESS>(1100000, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 1100000);
+		}
+
+		a.Clear();	
+		for(size_t i = 0; i < items; i++) {
+			a.Add(1000ULL*1000ULL*1000ULL*1000ULL);
+		}
+		for(size_t i = 0; i < items; i++) {
+			a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL - 1ULL);
+			size_t t = a.Query<LESS>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
+			CHECK_EQUAL(i, t);
+			a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+		}
+
+	}
+	a.Destroy();
+}
+
+TEST(ArraySort) {
+	Array a;
+	
+	for(size_t t = 0; t < 400; t++)
+		a.Add(rand() % 300 - 100);
+
+	a.Sort();
+
+	for(size_t t = 1; t < 400; t++)
+		CHECK(a.Get(t) >= a.Get(t - 1));
+
+}

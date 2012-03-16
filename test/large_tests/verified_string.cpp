@@ -71,6 +71,7 @@ size_t VerifiedString::Find(const char *value) {
 	std::vector<string>::iterator it = std::find(v.begin(), v.end(), value);
 	size_t ndx = std::distance(v.begin(), it);
 	size_t index2 = u.Find(value);
+	(void)index2;
 	assert(ndx == index2 || it == v.end() && index2 == -1);
 	return ndx;
 }
@@ -101,7 +102,7 @@ size_t VerifiedString::Find(const char *value) {
 	if (cs != result.size())
 		assert(false);
 	for(size_t t = 0; t < result.size(); ++t) {
-		if (result[t] != c.Get(t)) 
+		if (result[t] != (size_t)c.Get(t)) 
 			assert(false);
 	}
 

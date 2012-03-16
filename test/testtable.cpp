@@ -167,6 +167,8 @@ TEST(Table6) {
 	}};
 
 	TDB_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
+		(void)b;
+		(void)a;
 		//first.between(a, b);
 		second == str || second.MatchRegEx(".*");
 	}};
@@ -577,7 +579,7 @@ TEST(Table_Mixed) {
 	CHECK_EQUAL(1, subtable2->GetSize());
 	CHECK_EQUAL("John", subtable2->GetString(0, 0));
 	CHECK_EQUAL(40, subtable2->Get(1, 0));
-	
+	delete subtable2;
 #ifdef _DEBUG
 	table.Verify();
 #endif //_DEBUG

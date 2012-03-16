@@ -29,7 +29,7 @@ bool ColumnStringEnum::IsEmpty() const {
 
 const char* ColumnStringEnum::Get(size_t ndx) const {
 	assert(ndx < m_values.Size());
-	const size_t key_ndx = m_values.Get(ndx);
+	const size_t key_ndx = m_values.GetAsRef(ndx);
 	return m_keys.Get(key_ndx);
 }
 
@@ -70,11 +70,24 @@ void ColumnStringEnum::FindAll(Array &res, const char* value, size_t start, size
 	return;
 }
 
+void ColumnStringEnum::FindAll(Array &res, size_t key_ndx, size_t start, size_t end) const {
+	if (key_ndx == (size_t)-1) return;
+	m_values.FindAll(res, key_ndx, 0, start, end);
+	return;
+}
+
+
+size_t ColumnStringEnum::Find(size_t key_ndx, size_t start, size_t end) const {
+	// Find key
+	if (key_ndx == (size_t)-1) return (size_t)-1;
+
+	return m_values.Find(key_ndx, start, end);
+}
 
 size_t ColumnStringEnum::Find(const char* value, size_t start, size_t end) const {
 	// Find key
 	const size_t key_ndx = m_keys.Find(value);
-	if (key_ndx == (size_t)-1) return -1;
+	if (key_ndx == (size_t)-1) return (size_t)-1;
 
 	return m_values.Find(key_ndx, start, end);
 }

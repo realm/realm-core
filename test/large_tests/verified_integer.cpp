@@ -121,6 +121,7 @@ void VerifiedInteger::Set(size_t ndx, int64_t value) {
 	size_t ndx = std::distance(v.begin(), it);
 	size_t index2 = u.Find(value);
 	assert(ndx == index2 || it == v.end() && index2 == -1);
+	(void)index2;
 	return ndx;
 }
 
@@ -149,7 +150,7 @@ void VerifiedInteger::FindAll(Array &c, int64_t value, size_t start, size_t end)
 	if (c.Size() != result.size())
 		assert(false);
 	for(size_t t = 0; t < result.size(); ++t) {
-		if (result[t] != c.Get(t)) 
+		if (result[t] != (size_t)c.Get(t)) 
 			assert(false);
 	}
 

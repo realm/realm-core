@@ -1,3 +1,5 @@
+#if TEST_DURATION > 0
+
 #include "Column.h"
 #include <UnitTest++.h>
 #include <vector>
@@ -5,7 +7,6 @@
 #include "../testsettings.h"
 #include "verified_integer.h"
 
-#if TEST_DURATION > 0
 
 // Support functions for monkey test
 static uint64_t rand2(int bitwidth);

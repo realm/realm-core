@@ -8,7 +8,8 @@
 
 # Compiler and flags
 #CXXFLAGS  = -Wall -Weffc++ -Wextra -std=c++0x
-CXXFLAGS  = -std=c++0x
+CXXFLAGS  = -std=c++0x -lpthread
+CXXSSE    = -DUSE_SSE -msse4.2
 CXXLIBS   = -L./UnitTest++ -lUnitTest++
 CXXINC    = -I./UnitTest++/src -I../src
 CXX       = g++ $(CXXFLAGS)
@@ -27,6 +28,13 @@ SURFIXES   = %.cpp %.h
 OBJECTS    = $(SOURCES:.o=.cpp) $(TEST_SRC:.o=.cpp) 
 
 # Targets
+allsse: CXXFLAGS += -DNDEBUG -O3
+allsse: CXXFLAGS += $(CXXSSE)
+allsse: $(EXECUTABLE)
+	@make -C test-tightdb
+	@make -C test-stl
+
+
 all: CXXFLAGS += -DNDEBUG -O3
 all: $(EXECUTABLE)
 	@make -C test-tightdb

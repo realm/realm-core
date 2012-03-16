@@ -1,45 +1,17 @@
 
 #include "utilities.h"
 #include <string>
+#include <assert.h>
+#include <cstdlib> // size_t
 
-#ifdef _MSC_VER
-	#include "win32\types.h"
+
+
+size_t TO_REF(int64_t v) {
+#if !defined(NDEBUG) && defined(_DEBUG)
+	uint64_t m = (size_t)(-1);
+	assert(v <= m);
 #endif
-
-
-
-/*
-		const static std::locale& loc = std::locale(); 
-
-		wchar_t a, w = L'Å';
-
-		a = std::tolower(w, loc);
-		
-		return strcmp(v1, v2) == 0; 
-*/
-
-
-
-
-bool case_strstr(const char *ucase_needle, const char *lcase_needle, size_t *char_lens, const char *haystack, bool case_sensitive = true) {
-	size_t needle_ptr;
-	size_t haystack_ptr;
-	size_t matchlen;
-
-	for(;;) {
-
-		if(ucase_needle[needle_ptr] == haystack[haystack_ptr + matchlen] || lcase_needle[needle_ptr] == haystack[haystack_ptr + matchlen])
-			matchlen++;
-
-	}
-
-	return false;
-}
-
-
-int case_stcmp(const char *upper, const char *lower, char *charlens, const char *haystack, bool case_sensitive = true) {
-	
-	return 0;
+	return (size_t)v;
 }
 
 void *round_up(void *p, size_t align)

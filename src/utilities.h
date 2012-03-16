@@ -2,6 +2,10 @@
 #define UTILITIES_HEADER
 
 #include <cstdlib>
+#ifdef _MSC_VER
+	#include "win32/types.h"
+	#include "win32/stdint.h"
+#endif
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
 	#define WINDOWS
@@ -32,12 +36,14 @@ typedef struct
 	unsigned long long result;
 } checksum_t;
 
+size_t TO_REF(int64_t v);
 unsigned long long checksum(unsigned char *data, size_t len);
 void checksum_rolling(unsigned char *data, size_t len, checksum_t *t);
 void *round_up(void *p, size_t align);
 void *round_down(void *p, size_t align);
 size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
+void checksum_init(checksum_t *t);
 
 #endif
 
