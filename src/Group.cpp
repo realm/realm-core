@@ -80,28 +80,37 @@ bool Group::HasTable(const char* name) const {
 
 TopLevelTable& Group::GetTable(const char* name) {
 	const size_t n = m_tableNames.Find(name);
+	
 	if (n == (size_t)-1) {
 		// Create new table
 		TopLevelTable* const t = new TopLevelTable(m_alloc);
 		t->SetParent(&m_tables, m_tables.Size());
-
+		
 		m_tables.Add(t->GetRef());
 		m_tableNames.Add(name);
 		m_cachedtables.Add((intptr_t)t);
-
+		
 		return *t;
 	}
 	else {
 		// Get table from cache if exists, else create
-		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(n);
-		if (!t) {
-			const size_t ref = m_tables.GetAsRef(n);
-			t = new TopLevelTable(m_alloc, ref, &m_tables, n);
-			m_cachedtables.Set(n, (intptr_t)t);
-		}
-		return *t;
+		return GetTable(n);
 	}
 }
+
+TopLevelTable& Group::GetTable(size_t ndx) {
+	assert(ndx < m_tables.Size());
+	
+	// Get table from cache if exists, else create
+	TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(ndx);
+	if (!t) {
+		const size_t ref = m_tables.GetAsRef(ndx);
+		t = new TopLevelTable(m_alloc, ref, &m_tables, ndx);
+		m_cachedtables.Set(ndx, (intptr_t)t);
+	}
+	return *t;
+}
+
 
 void Group::Write(const char* filepath) {
 	assert(filepath);

@@ -19,7 +19,8 @@ class TopLevelTable;
 
 class Date {
 public:
-	Date(time_t d) : m_date(d) {}time_t GetDate() const {return m_date;}
+	Date(time_t d) : m_date(d) {}
+	time_t GetDate() const {return m_date;}
 private:
 	time_t m_date;
 };
@@ -178,6 +179,9 @@ public:
 
 	// Optimizing
 	void Optimize();
+	
+	// Conversion
+	void to_json(std::ostream& out);
 
 	// Debug
 #ifdef _DEBUG

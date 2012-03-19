@@ -15,9 +15,14 @@
 
 // Pre-declare local functions
 void SetRefSize(void* ref, size_t len);
-bool callme_sum(Array &a, size_t start, size_t end, size_t caller_base, void *state);
-bool callme_min(Array &a, size_t start, size_t end, size_t caller_offset, void *state);
-bool callme_max(Array &a, size_t start, size_t end, size_t caller_offset, void *state);
+bool callme_sum(Array *a, size_t start, size_t end, size_t caller_base, void *state);
+bool callme_min(Array *a, size_t start, size_t end, size_t caller_offset, void *state);
+bool callme_max(Array *a, size_t start, size_t end, size_t caller_offset, void *state);
+bool callme_arrays(Array *a, size_t start, size_t end, size_t caller_offset, void *state);
+void merge_core_references(Array *vals, Array *idx0, Array *idx1, Array *idxres);
+void merge_core(Array *a0, Array *a1, Array *res);
+Array* merge(Array *ArrayList);
+void merge_references(Array *valuelist, Array *indexlists, Array **indexresult);
 
 Column::Column(Allocator& alloc) : m_index(NULL) {
 	m_array = new Array(COLUMN_NORMAL, NULL, 0, alloc);

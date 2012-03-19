@@ -23,6 +23,9 @@ public:
 	// Serialization
 	void Write(const char* filepath);
 	char* WriteToMem(size_t& len);
+	
+	// Conversion
+	template<class S> void to_json(S& out);
 
 #ifdef _DEBUG
 	void Verify();
@@ -33,6 +36,9 @@ public:
 
 private:
 	void Create();
+	
+	TopLevelTable& GetTable(size_t ndx);
+	
 	template<class S> size_t Write(S& out);
 
 	// Member variables
@@ -61,13 +67,7 @@ template<class T> T& Group::GetTable(const char* name) {
 	}
 	else {
 		// Get table from cache if exists, else create
-		T* t = (T*)m_cachedtables.Get(n);
-		if (!t) {
-			const size_t ref = m_tables.GetAsRef(n);
-			t = new T(m_alloc, ref, &m_tables, n);
-			m_cachedtables.Set(n, (intptr_t)t);
-		}
-		return *t;
+		return (T&)GetTable(n);
 	}
 }
 
@@ -86,6 +86,23 @@ size_t Group::Write(S& out) {
 
 	// return bytes written
 	return pos;
+}
+
+template<class S>
+void Group::to_json(S& out) {
+	out << "{";
+	
+	for (size_t i = 0; i < m_tables.Size(); ++i) {
+		const char* const name = m_tableNames.Get(i);
+		TopLevelTable& table = GetTable(i);
+		
+		if (i) out << ",";
+		out << "\"" << name << "\"";
+		out << ":";
+		table.to_json(out);
+	}
+	
+	out << "}";
 }
 
 #endif //__TDB_GROUP__
