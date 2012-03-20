@@ -283,6 +283,10 @@ public:
 	void Sort(size_t column, bool Ascending = true);
 	// Sub-tables
 	Table* GetTablePtr(size_t column_id, size_t ndx);
+	
+	// Deleting
+	void Delete(size_t ndx);
+	void Clear();
 
 	// Finding
 	size_t Find(size_t column_id, int64_t value) const;

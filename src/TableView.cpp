@@ -244,4 +244,28 @@ void TableView::Sort(size_t column, bool Ascending) {
 	result.Destroy();
 }
 
+void TableView::Delete(size_t ndx) {
+	assert(ndx < m_refs.Size());
+	
+	// Delete row in source table
+	const size_t real_ndx = m_refs.GetAsRef(ndx);
+	m_table.DeleteRow(real_ndx);
+	
+	// Update refs
+	m_refs.Delete(ndx);
+	m_refs.IncrementIf(ndx, -1);
+}
 
+void TableView::Clear() {
+	m_refs.Sort();
+	
+	// Delete all referenced rows in source table
+	// (in reverse order to avoid index drift)
+	const size_t count = m_refs.Size();
+	for (size_t i = count; i; --i) {
+		const size_t ndx = m_refs.GetAsRef(i-1);
+		m_table.DeleteRow(ndx);
+	}
+	
+	m_refs.Clear();
+}
