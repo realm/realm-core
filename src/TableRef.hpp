@@ -5,29 +5,30 @@ template<class> class BasicTableRef;
 template<class, class> class FieldAccessorBase;
 
 
-template<class T> class BasicTableSubscrFields {};
+template<class, class> class BasicTableSubscrFields {};
 
-template<class T> class BasicTableSubscr: public BasicTableSubscrFields<T> {
+template<class T> class BasicTableSubscr: public BasicTableSubscrFields<T, BasicTableSubscr<T> > {
 private:
 	friend class BasicTableRef<T>;
 	friend class FieldAccessorBase<T, BasicTableSubscr<T> >;
+	template<class, class, int, class> friend class SubtableFieldAccessorBase;
 
-	BasicTableRef<T> const *const m_table;
+	T *const m_table;
 	size_t const m_row_index;
 
-	BasicTableSubscr(BasicTableRef<T> const *t, size_t i): BasicTableSubscrFields<T>(this), m_table(t), m_row_index(i) {}
+	BasicTableSubscr(T *t, size_t i): BasicTableSubscrFields<T, BasicTableSubscr<T> >(this), m_table(t), m_row_index(i) {}
 
-	BasicTableSubscr(BasicTableSubscr const &); // Disable
+	BasicTableSubscr(BasicTableSubscr const &s): BasicTableSubscrFields<T, BasicTableSubscr<T> >(this), m_table(s.m_table), m_row_index(s.m_row_index) {} // Hide
 	BasicTableSubscr &operator=(BasicTableSubscr const &); // Disable
 
-	T *tab_ptr() const { return m_table->m_table; }
+	T *tab_ptr() const { return m_table; }
 	size_t row_idx() const { return m_row_index; }
 };
 
 
 template<class T> class BasicTableRef {
 public:
-	BasicTableSubscr<T> operator[](size_t i) const { return BasicTableSubscr<T>(this, i); }
+	BasicTableSubscr<T> operator[](size_t i) const { return BasicTableSubscr<T>(m_table, i); }
 
 	/**
 	 * Construct a null reference.
@@ -57,11 +58,6 @@ public:
 	template<class U> BasicTableRef &operator=(BasicTableRef<U> const &r);
 
 	/**
-	 * Efficient swapping that avoids binding and unbinding.
-	 */
-	void swap(BasicTableRef &r) { using std::swap; swap(m_table, r.m_table); }
-
-	/**
 	 * Allow comparison between related reference types.
 	 */
 	template<class U> bool operator==(BasicTableRef<U> const &) const;
@@ -70,6 +66,21 @@ public:
 	 * Allow comparison between related reference types.
 	 */
 	template<class U> bool operator!=(BasicTableRef<U> const &) const;
+
+	/**
+	 * Dereference this table reference.
+	 */
+	T &operator*() const { return *m_table; }
+
+	/**
+	 * Dereference this table reference for method invocation.
+	 */
+	T *operator->() const { return m_table; }
+
+	/**
+	 * Efficient swapping that avoids binding and unbinding.
+	 */
+	void swap(BasicTableRef &r) { using std::swap; swap(m_table, r.m_table); }
 
 private:
 	typedef T *BasicTableRef::*unspecified_bool_type;
@@ -84,8 +95,9 @@ public:
 
 private:
 	friend class Table;
-	template<class> friend class BasicTableSubscr;
+	friend class BasicTableSubscr<T>;
 	template<class> friend class BasicTableRef;
+	template<class, class, int, class> friend class SubtableFieldAccessorBase;
 
 	T *m_table;
 
