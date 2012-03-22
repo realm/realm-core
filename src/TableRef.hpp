@@ -1,6 +1,8 @@
 #include <algorithm>
 
 
+template<class> class BasicTableSubscrIndir;
+template<class> class BasicTableIter;
 template<class> class BasicTableRef;
 template<class, class> class FieldAccessorBase;
 
@@ -9,26 +11,87 @@ template<class, class> class BasicTableSubscrFields {};
 
 template<class T> class BasicTableSubscr: public BasicTableSubscrFields<T, BasicTableSubscr<T> > {
 private:
+	friend class BasicTableSubscrIndir<T>;
+	friend class BasicTableIter<T>;
 	friend class BasicTableRef<T>;
 	friend class FieldAccessorBase<T, BasicTableSubscr<T> >;
 	template<class, class, int, class> friend class SubtableFieldAccessorBase;
 
 	T *const m_table;
-	size_t const m_row_index;
+	std::size_t const m_row;
 
-	BasicTableSubscr(T *t, size_t i): BasicTableSubscrFields<T, BasicTableSubscr<T> >(this), m_table(t), m_row_index(i) {}
+	BasicTableSubscr(T *t, std::size_t i): BasicTableSubscrFields<T, BasicTableSubscr<T> >(this), m_table(t), m_row(i) {}
 
-	BasicTableSubscr(BasicTableSubscr const &s): BasicTableSubscrFields<T, BasicTableSubscr<T> >(this), m_table(s.m_table), m_row_index(s.m_row_index) {} // Hide
+	BasicTableSubscr(BasicTableSubscr const &s): BasicTableSubscrFields<T, BasicTableSubscr<T> >(this), m_table(s.m_table), m_row(s.m_row) {} // Hide
 	BasicTableSubscr &operator=(BasicTableSubscr const &); // Disable
 
 	T *tab_ptr() const { return m_table; }
-	size_t row_idx() const { return m_row_index; }
+	std::size_t row_idx() const { return m_row; }
 };
+
+
+
+
+
+template<class T> class BasicTableSubscrIndir
+{
+public:
+	BasicTableSubscr<T> *operator->() { return &m_subscr; }
+
+private:
+	friend class BasicTableIter<T>;
+	BasicTableSubscr<T> m_subscr;
+	BasicTableSubscrIndir(T *tab, std::size_t row): m_subscr(tab, row) {}
+};
+
+template<class T> class BasicTableIter: std::iterator<std::random_access_iterator_tag,
+																											BasicTableSubscr<T>, std::size_t,
+																											BasicTableSubscrIndir<T>, BasicTableSubscr<T> > {
+public:
+	template<class U>	BasicTableIter(BasicTableIter<U> const &i): m_table(i.m_table), m_row(i.m_row) {}
+
+	BasicTableSubscr<T> operator*() const { return BasicTableSubscr<T>(m_table, m_row); }
+	BasicTableSubscrIndir<T> operator->() const { return BasicTableSubscrIndir<T>(m_table, m_row); }
+	BasicTableSubscr<T> operator[](std::size_t i) const { return BasicTableSubscr<T>(m_table, m_row+i); }
+
+	BasicTableIter &operator++() { ++m_row; return *this; }
+	BasicTableIter &operator--() { --m_row; return *this; }
+	BasicTableIter  operator++(int) { return BasicTableIter(m_table, m_row++); }
+	BasicTableIter  operator--(int) { return BasicTableIter(m_table, m_row--); }
+	BasicTableIter &operator+=(std::size_t i) { m_row += i; return *this; }
+	BasicTableIter &operator-=(std::size_t i) { m_row -= i; return *this; }
+	BasicTableIter operator+(std::size_t i) const { return BasicTableIter(m_table, m_row+i); }
+	BasicTableIter operator-(std::size_t i) const { return BasicTableIter(m_table, m_row-i); }
+
+	friend BasicTableIter operator+(std::size_t i, BasicTableIter const &j) {
+		return BasicTableIter(j.m_table, j.m_row+i);
+	}
+
+	template<class U> std::size_t operator-(BasicTableIter<U> const &i) const { return m_row - i.m_row; }
+	template<class U> bool operator==(BasicTableIter<U> const &i) const { return m_row == i.m_row; }
+	template<class U> bool operator!=(BasicTableIter<U> const &i) const { return m_row != i.m_row; }
+	template<class U> bool operator<(BasicTableIter<U> const &i) const { return m_row < i.m_row; }
+	template<class U> bool operator>(BasicTableIter<U> const &i) const { return m_row > i.m_row; }
+	template<class U> bool operator<=(BasicTableIter<U> const &i) const { return m_row <= i.m_row; }
+	template<class U> bool operator>=(BasicTableIter<U> const &i) const { return m_row >= i.m_row; }
+
+private:
+	template<class> friend class BasicTableIter;
+	friend class Table;
+
+	T *const m_table;
+	std::size_t m_row;
+
+	BasicTableIter(T *tab, std::size_t row): m_table(tab), m_row(row) {}
+};
+
+
+
 
 
 template<class T> class BasicTableRef {
 public:
-	BasicTableSubscr<T> operator[](size_t i) const { return BasicTableSubscr<T>(m_table, i); }
+	BasicTableSubscr<T> operator[](std::size_t i) const { return BasicTableSubscr<T>(m_table, i); }
 
 	/**
 	 * Construct a null reference.
