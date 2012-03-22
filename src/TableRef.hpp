@@ -1,29 +1,39 @@
 #include <algorithm>
 
 
-template<class> class BasicTableSubscrIndir;
+template<class> class TableSubscrIndir;
 template<class> class BasicTableIter;
 template<class> class BasicTableRef;
 template<class, class> class FieldAccessorBase;
 
 
-template<class, class> class BasicTableSubscrFields {};
+template<class, class> class TableSubscrFields {};
 
-template<class T> class BasicTableSubscr: public BasicTableSubscrFields<T, BasicTableSubscr<T> > {
+template<class T> class TableSubscr: public TableSubscrFields<T, TableSubscr<T> > {
+public:
+	/*
+	TableSubscr &operator=(TableSubscr const &s) {
+	  struct _tightdb_impl::FieldAssign {
+		  template<T> operator()() ...
+    };
+		_tightdb_impl::RowBinOp<T, _tightdb_impl::FieldAssign>()(*this, s);
+	}
+	*/
+
 private:
-	friend class BasicTableSubscrIndir<T>;
+	friend class TableSubscrIndir<T>;
 	friend class BasicTableIter<T>;
 	friend class BasicTableRef<T>;
-	friend class FieldAccessorBase<T, BasicTableSubscr<T> >;
+	friend class FieldAccessorBase<T, TableSubscr<T> >;
 	template<class, class, int, class> friend class SubtableFieldAccessorBase;
 
 	T *const m_table;
 	std::size_t const m_row;
 
-	BasicTableSubscr(T *t, std::size_t i): BasicTableSubscrFields<T, BasicTableSubscr<T> >(this), m_table(t), m_row(i) {}
+	TableSubscr(T *t, std::size_t i): TableSubscrFields<T, TableSubscr<T> >(this), m_table(t), m_row(i) {}
 
-	BasicTableSubscr(BasicTableSubscr const &s): BasicTableSubscrFields<T, BasicTableSubscr<T> >(this), m_table(s.m_table), m_row(s.m_row) {} // Hide
-	BasicTableSubscr &operator=(BasicTableSubscr const &); // Disable
+	TableSubscr(TableSubscr const &s): TableSubscrFields<T, TableSubscr<T> >(this), m_table(s.m_table), m_row(s.m_row) {} // Hide
+	TableSubscr &operator=(TableSubscr const &); // Disable
 
 	T *tab_ptr() const { return m_table; }
 	std::size_t row_idx() const { return m_row; }
@@ -33,26 +43,26 @@ private:
 
 
 
-template<class T> class BasicTableSubscrIndir
+template<class T> class TableSubscrIndir
 {
 public:
-	BasicTableSubscr<T> *operator->() { return &m_subscr; }
+	TableSubscr<T> *operator->() { return &m_subscr; }
 
 private:
 	friend class BasicTableIter<T>;
-	BasicTableSubscr<T> m_subscr;
-	BasicTableSubscrIndir(T *tab, std::size_t row): m_subscr(tab, row) {}
+	TableSubscr<T> m_subscr;
+	TableSubscrIndir(T *tab, std::size_t row): m_subscr(tab, row) {}
 };
 
 template<class T> class BasicTableIter: std::iterator<std::random_access_iterator_tag,
-																											BasicTableSubscr<T>, std::size_t,
-																											BasicTableSubscrIndir<T>, BasicTableSubscr<T> > {
+																											TableSubscr<T>, std::size_t,
+																											TableSubscrIndir<T>, TableSubscr<T> > {
 public:
 	template<class U>	BasicTableIter(BasicTableIter<U> const &i): m_table(i.m_table), m_row(i.m_row) {}
 
-	BasicTableSubscr<T> operator*() const { return BasicTableSubscr<T>(m_table, m_row); }
-	BasicTableSubscrIndir<T> operator->() const { return BasicTableSubscrIndir<T>(m_table, m_row); }
-	BasicTableSubscr<T> operator[](std::size_t i) const { return BasicTableSubscr<T>(m_table, m_row+i); }
+	TableSubscr<T> operator*() const { return TableSubscr<T>(m_table, m_row); }
+	TableSubscrIndir<T> operator->() const { return TableSubscrIndir<T>(m_table, m_row); }
+	TableSubscr<T> operator[](std::size_t i) const { return TableSubscr<T>(m_table, m_row+i); }
 
 	BasicTableIter &operator++() { ++m_row; return *this; }
 	BasicTableIter &operator--() { --m_row; return *this; }
@@ -91,7 +101,7 @@ private:
 
 template<class T> class BasicTableRef {
 public:
-	BasicTableSubscr<T> operator[](std::size_t i) const { return BasicTableSubscr<T>(m_table, i); }
+	TableSubscr<T> operator[](std::size_t i) const { return TableSubscr<T>(m_table, i); }
 
 	/**
 	 * Construct a null reference.
@@ -158,7 +168,7 @@ public:
 
 private:
 	friend class Table;
-	friend class BasicTableSubscr<T>;
+	friend class TableSubscr<T>;
 	template<class> friend class BasicTableRef;
 	template<class, class, int, class> friend class SubtableFieldAccessorBase;
 
