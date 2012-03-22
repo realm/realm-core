@@ -668,7 +668,7 @@ void Column::BuildIndex(Index& index) {
 }
 
 void Column::Sort() {
-	Sort(0, Size()-1);
+	Sort(0, Size());
 }
 
 
