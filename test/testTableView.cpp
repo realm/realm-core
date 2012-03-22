@@ -261,3 +261,15 @@ TEST(TableViewClear) {
 	CHECK_EQUAL(2, table[0].first);
 	CHECK_EQUAL(3, table[1].first);
 }
+
+
+TEST(TableViewClearNone) {
+	TestTableInt table;
+	
+	TableView v = table.first.FindAll(1);
+	CHECK_EQUAL(0, v.GetSize());
+	
+	v.Clear();
+
+}
+
