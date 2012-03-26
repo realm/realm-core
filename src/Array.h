@@ -160,7 +160,7 @@ public:
 	bool Compare(const Array& c) const;
 	void Print() const;
 	void Verify() const;
-	void ToDot(FILE* f, bool horizontal=false) const;
+	void ToDot(std::ostream& out, const char* title=NULL) const;
 	MemStats Stats() const;
 #endif //_DEBUG
 	mutable unsigned char* m_data;
@@ -232,7 +232,7 @@ protected:
 	void SetWidth(size_t width);
 	bool Alloc(size_t count, size_t width);
 	bool CopyOnWrite();
-
+	
 	// Member variables
 	Getter m_getter;
 	Setter m_setter;

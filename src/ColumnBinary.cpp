@@ -49,10 +49,16 @@ void ColumnBinary::UpdateRef(size_t ref) {
 
 	if (IsNode()) m_array->UpdateRef(ref);
 	else {
+		Array* const parent = m_array->GetParent();
+		const size_t pndx   = m_array->GetParentNdx();
+		
 		// Replace the string array with int array for node
-		Array* array = new Array(ref, m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
+		Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
 		delete m_array;
 		m_array = array;
+		
+		// Update ref in parent
+		if (parent) parent->Set(pndx, ref);
 	}
 }
 
@@ -159,3 +165,15 @@ bool ColumnBinary::LeafInsert(size_t ndx, BinaryData value) {
 void ColumnBinary::LeafDelete(size_t ndx) {
 	((ArrayBinary*)m_array)->Delete(ndx);
 }
+
+#ifdef _DEBUG
+
+void ColumnBinary::LeafToDot(std::ostream& out, const Array& array) const {
+	// Rebuild array to get correct type
+	const size_t ref = array.GetRef();
+	const ArrayBinary binarray(ref, NULL, 0, array.GetAllocator());
+	
+	binarray.ToDot(out);
+}
+
+#endif //_DEBUG

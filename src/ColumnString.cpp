@@ -71,8 +71,8 @@ void AdaptiveStringColumn::UpdateRef(size_t ref) {
 
 	if (IsNode()) m_array->UpdateRef(ref);
 	else {
-		Array* parent = m_array->GetParent();
-		size_t pndx   = m_array->GetParentNdx();
+		Array* const parent = m_array->GetParent();
+		const size_t pndx   = m_array->GetParentNdx();
 
 		// Replace the string array with int array for node
 		Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
@@ -80,7 +80,7 @@ void AdaptiveStringColumn::UpdateRef(size_t ref) {
 		m_array = array;
 
 		// Update ref in parent
-		if (parent) parent->Set(pndx, m_array->GetRef());
+		if (parent) parent->Set(pndx, ref);
 	}
 }
 
@@ -351,10 +351,6 @@ bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const {
 	return true;
 }
 
-void AdaptiveStringColumn::ToDot(FILE* f, bool) const {
-	m_array->ToDot(f);
-}
-
 MemStats AdaptiveStringColumn::Stats() const {
 	MemStats stats;
 
@@ -383,6 +379,17 @@ MemStats AdaptiveStringColumn::Stats() const {
 	}
 
 	return stats;
+}
+
+void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) const {
+	const bool isLongStrings = array.HasRefs(); // HasRefs indicates long string array
+	
+	if (isLongStrings) {
+		((ArrayStringLong&)array).ToDot(out);
+	}
+	else {
+		((ArrayString&)array).ToDot(out);
+	}
 }
 
 #endif //_DEBUG

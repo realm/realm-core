@@ -21,6 +21,10 @@ public:
 	void Insert(size_t ndx, const void* value, size_t len);
 	void Delete(size_t ndx);
 	void Clear();
+	
+#ifdef _DEBUG
+	void ToDot(std::ostream& out, const char* title=NULL) const;
+#endif //_DEBUG
 
 private:
 	Array m_offsets;

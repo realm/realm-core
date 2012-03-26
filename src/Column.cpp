@@ -735,37 +735,46 @@ void Column::Verify() const {
 	else m_array->Verify();
 }
 
-void Column::ToDot(FILE* f, bool isTop) const {
-	const size_t ref = m_array->GetRef();
-	if (isTop) fprintf(f, "subgraph cluster_%zu {\ncolor=black;\nstyle=dashed;\n", ref);
+void ColumnBase::ToDot(std::ostream& out, const char* title) const {
+	const size_t ref = GetRef();
+	
+	out << "subgraph cluster_column" << ref << " {" << std::endl;
+	out << " label = \"Column";
+	if (title) out << "\\n'" << title << "'";
+	out << "\";" << std::endl;
+	
+	ArrayToDot(out, *m_array);
+	
+	out << "}" << std::endl;
+}
 
-	if (m_array->IsNode()) {
-		const Array offsets = NodeGetOffsets();
-		const Array refs = NodeGetRefs();
-
-		fprintf(f, "n%zx [label=\"", ref);
-		for (size_t i = 0; i < offsets.Size(); ++i) {
-			if (i > 0) fprintf(f, " | ");
-			fprintf(f, "{%lld", offsets.Get(i));
-			fprintf(f, " | <%zu>}", i);
-		}
-		fprintf(f, "\"];\n");
-
-		for (size_t i = 0; i < refs.Size(); ++i) {
-			void* r = (void*)refs.Get(i);
-			fprintf(f, "n%zx:%zu -> n%p\n", ref, i, r);
-		}
-
-		// Sub-columns
-		for (size_t i = 0; i < refs.Size(); ++i) {
-			const size_t r = (size_t)refs.Get(i);
-			const Column col(r);
-			col.ToDot(f, false);
+void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const {
+	if (array.IsNode()) {
+		const Array offsets = array.GetSubArray(0);
+		const Array refs    = array.GetSubArray(1);
+		const size_t ref    = array.GetRef();
+		
+		out << "subgraph cluster_node" << ref << " {" << std::endl;
+		out << " label = \"Node\";" << std::endl;
+		
+		array.ToDot(out);
+		offsets.ToDot(out, "offsets");
+		
+		out << "}" << std::endl;
+		
+		refs.ToDot(out, "refs");
+		
+		const size_t count = refs.Size();
+		for (size_t i = 0; i < count; ++i) {
+			const Array r = refs.GetSubArray(i);
+			ArrayToDot(out, r);
 		}
 	}
-	else m_array->ToDot(f, false);
+	else LeafToDot(out, array);
+}
 
-	if (isTop) fprintf(f, "}\n\n");
+void ColumnBase::LeafToDot(std::ostream& out, const Array& array) const {
+	array.ToDot(out);
 }
 
 MemStats Column::Stats() const {

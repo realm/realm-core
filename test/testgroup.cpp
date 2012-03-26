@@ -320,4 +320,93 @@ TEST(Group_Serialize_All) {
 	CHECK_EQUAL(1, t.GetSize());
 }
 
+#ifdef _DEBUG
+#ifdef TIGHTDB_TO_DOT
+
+#include <fstream>
+TEST(Group_ToDot) {
+	// Create group with one table
+	Group mygroup;
+	
+	// Create table with all column types
+	TopLevelTable& table = mygroup.GetTable("test");
+	Spec s = table.GetSpec();
+	s.AddColumn(COLUMN_TYPE_INT,    "int");
+	s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
+	s.AddColumn(COLUMN_TYPE_DATE,   "date");
+	s.AddColumn(COLUMN_TYPE_STRING, "string");
+	s.AddColumn(COLUMN_TYPE_STRING, "string2"); // becomes ColumnStringEnum
+	s.AddColumn(COLUMN_TYPE_BINARY, "binary");
+	s.AddColumn(COLUMN_TYPE_MIXED,  "mixed");
+	Spec sub = s.AddColumnTable(    "tables");
+	sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
+	sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
+	table.UpdateFromSpec(s.GetRef());
+	
+	// Add some rows
+	for (size_t i = 0; i < 15; ++i) {
+		table.InsertInt(0, i, i);
+		table.InsertBool(1, i, (i % 2 ? true : false));
+		table.InsertDate(2, i, 12345);
+		
+		std::stringstream ss;
+		ss << "string" << i;
+		table.InsertString(3, i, ss.str().c_str());
+		
+		switch (i % 3) {
+			case 0:
+				table.InsertString(4, i, "test1");
+				break;
+			case 1:
+				table.InsertString(4, i, "test2");
+				break;
+			case 2:
+				table.InsertString(4, i, "test3");
+				break;
+		}
+		
+		table.InsertBinary(5, i, "binary", 7);
+		
+		switch (i % 3) {
+			case 0:
+				table.InsertMixed(6, i, false);
+				break;
+			case 1:
+				table.InsertMixed(6, i, (int64_t)i);
+				break;
+			case 2:
+				table.InsertMixed(6, i, "string");
+				break;
+		}
+		
+		table.InsertTable(7, i);
+		table.InsertDone();
+		
+		// Add sub-tables
+		if (i == 2) {
+			Table subtable = table.GetTable(7, i);
+			subtable.InsertInt(0, 0, 42);
+			subtable.InsertString(1, 0, "meaning");
+			subtable.InsertDone();
+		}
+	}
+	
+	// We also want ColumnStringEnum's
+	table.Optimize();
+	
+#if 1
+	// Write array graph to cout
+	std::stringstream ss;
+	mygroup.ToDot(ss);
+	cout << ss.str() << endl;
+#endif
+	
+	// Write array graph to file in dot format
+	std::ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
+	if (!fs.is_open()) cout << "file open error " << strerror << endl;
+	mygroup.ToDot(fs);
+}
+
+#endif //TIGHTDB_TO_DOT
+#endif //_DEBUG
 #endif

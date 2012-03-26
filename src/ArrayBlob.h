@@ -17,6 +17,10 @@ public:
 	void Replace(size_t start, size_t end, void* data, size_t len);
 	void Delete(size_t start, size_t end);
 	void Clear();
+	
+#ifdef _DEBUG
+	void ToDot(std::ostream& out, const char* title=NULL) const;
+#endif //_DEBUG
 
 private:
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
