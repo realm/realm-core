@@ -181,7 +181,7 @@ public:
 	void Optimize();
 	
 	// Conversion
-	void to_json(std::ostream& out);
+	void to_json(std::ostream& out); // FIXME: Should this not be const?
 
 	// Debug
 #ifdef _DEBUG
@@ -193,7 +193,7 @@ public:
 #endif //_DEBUG
 
 	// todo, note, these three functions have been protected
-	ColumnBase& GetColumnBase(size_t ndx);
+	ColumnBase& GetColumnBase(size_t ndx); // FIXME: Make private
 	const ColumnBase& GetColumnBase(size_t ndx) const;
 	ColumnType GetRealColumnType(size_t ndx) const;
 
@@ -213,7 +213,7 @@ protected:
 	size_t GetColumnRefPos(size_t column_ndx) const;
 	void UpdateColumnRefs(size_t column_ndx, int diff);
 
-	void InstantiateBeforeChange();
+	void InstantiateBeforeChange(); // FIXME: Make private
 
 	// Member variables
 	size_t m_size;
