@@ -75,6 +75,10 @@ public:
 	// Serialization
 	template<class S> size_t Write(S& out, size_t& pos) const;
 
+#ifdef _DEBUG
+	void ToDot(std::ostream& out, const char* title=NULL) const;
+#endif //_DEBUG
+
 private:
 	void Create(size_t ref, Array* parent, size_t pndx);
 
@@ -187,7 +191,7 @@ public:
 #ifdef _DEBUG
 	bool Compare(const Table& c) const;
 	void Verify() const;
-	void ToDot(const char* filename) const;
+	void ToDot(std::ostream& out, const char* title=NULL) const;
 	void Print() const;
 	MemStats Stats() const;
 #endif //_DEBUG
@@ -214,7 +218,11 @@ protected:
 	void UpdateColumnRefs(size_t column_ndx, int diff);
 
 	void InstantiateBeforeChange(); // FIXME: Make private
-
+	
+#ifdef _DEBUG
+	void ToDotInternal(std::ostream& out) const;
+#endif //_DEBUG
+	
 	// Member variables
 	size_t m_size;
 	
@@ -246,6 +254,7 @@ public:
 	// Debug
 #ifdef _DEBUG
 	MemStats Stats() const;
+	void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 
 protected:
@@ -283,6 +292,10 @@ public:
 	void Sort(size_t column, bool Ascending = true);
 	// Sub-tables
 	Table* GetTablePtr(size_t column_id, size_t ndx);
+	
+	// Deleting
+	void Delete(size_t ndx);
+	void Clear();
 
 	// Finding
 	size_t Find(size_t column_id, int64_t value) const;

@@ -58,6 +58,7 @@ public:
 	
 #ifdef _DEBUG
 	void Verify() const {}
+	void ToDot(std::ostream& out, const char* title) const;
 #endif //_DEBUG
 	
 private:

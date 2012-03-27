@@ -261,7 +261,10 @@ void Array::Clear() {
 	// Make sure we don't have any dangling references
 	if (m_hasRefs) {
 		for (size_t i = 0; i < Size(); ++i) {
-			Array sub((size_t)Get(i), this, i);
+			const size_t ref = GetAsRef(i);
+			if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+			
+			Array sub(ref, this, i);
 			sub.Destroy();
 		}
 	}
@@ -1430,6 +1433,9 @@ void Array::ReferenceSort(Array &ref) {
 }
 
 template <size_t w>void Array::ReferenceSort(Array &ref) {
+	if(m_len < 2)
+		return;
+
 	int64_t min;
 	int64_t max;
 
@@ -1489,6 +1495,9 @@ template <size_t w>void Array::ReferenceSort(Array &ref) {
 
 // Sort array 
 template <size_t w> void Array::Sort() {
+	if(m_len < 2)
+		return;
+
 	size_t lo = 0;
 	size_t hi = m_len - 1;
 	std::vector<size_t> count;
@@ -1507,7 +1516,7 @@ template <size_t w> void Array::Sort() {
 		// If range isn't suited for CountSort, it's *probably* discovered very early, within first few values,
 		// in most practical cases, and won't add much wasted work. Max wasted work is O(n) which isn't much
 		// compared to QuickSort.
-		b = MinMax<w>(lo, hi - 1, m_len, &min, &max);
+		b = MinMax<w>(lo, hi, m_len, &min, &max);
 	}
 
 	if(b) {
@@ -1607,7 +1616,7 @@ template <size_t w>void Array::QuickSort(size_t lo, size_t hi) {
 
 	// comparison element x
 	const size_t ndx = (lo + hi)/2;
-	const int64_t x = (size_t)Get(ndx);
+	const int64_t x = Get(ndx);
 
 	// partition
 	do {
@@ -1659,28 +1668,52 @@ void Array::Verify() const {
 	assert(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
 }
 
-void Array::ToDot(FILE* f, bool) const{
+void Array::ToDot(std::ostream& out, const char* title) const {
 	const size_t ref = GetRef();
-
-	fprintf(f, "n%zx [label=\"", ref);
-
-	//if (!horizontal) fprintf(f, "{");
-	for (size_t i = 0; i < m_len; ++i) {
-		if (i > 0) fprintf(f, " | ");
-
-		if (m_hasRefs) fprintf(f, "<%zu>",i);
-		else fprintf(f, "%lld", Get(i));
-	}
-	//if (!horizontal) fprintf(f, "}");
 	
-	fprintf(f, "\"];\n");
-
+	if (title) {
+		out << "subgraph cluster_" << ref << " {" << std::endl;
+		out << " label = \"" << title << "\";" << std::endl;
+		out << " color = white;" << std::endl;
+	}
+	
+	out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
+	out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
+	
+	// Header
+	out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
+	out << "0x" << std::hex << ref << std::dec << "<BR/>";
+	if (m_isNode) out << "IsNode<BR/>";
+	if (m_hasRefs) out << "HasRefs<BR/>";
+	out << "</FONT></TD>" << std::endl;
+	
+	// Values
+	for (size_t i = 0; i < m_len; ++i) {
+		const int64_t v =  Get(i);
+		if (m_hasRefs) {
+			// zero-refs and refs that are not 64-aligned do not point to sub-trees
+			if (v == 0) out << "<TD>none";
+			else if (v & 0x1) out << "<TD>" << (v >> 1);
+			else out << "<TD PORT=\"" << i << "\">";
+		}
+		else out << "<TD>" << v;
+		out << "</TD>" << std::endl;
+	}
+	
+	out << "</TR></TABLE>>];" << std::endl;
+	if (title) out << "}" << std::endl;
+	
 	if (m_hasRefs) {
 		for (size_t i = 0; i < m_len; ++i) {
-			fprintf(f, "n%zx:%zu -> n%lld\n", ref, i, Get(i));
+			const int64_t target = Get(i);
+			if (target == 0 || target & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+			
+			out << "n" << std::hex << ref << std::dec << ":" << i;
+			out << " -> n" << std::hex << target << std::dec << std::endl;
 		}
 	}
-	fprintf(f, "\n");
+	
+	out << std::endl;
 }
 
 MemStats Array::Stats() const {

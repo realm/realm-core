@@ -1055,14 +1055,72 @@ TEST(Less) {
 }
 
 TEST(ArraySort) {
+	// negative values
 	Array a;
 	
 	for(size_t t = 0; t < 400; t++)
 		a.Add(rand() % 300 - 100);
 
+	size_t orig_size = a.Size();
 	a.Sort();
 
-	for(size_t t = 1; t < 400; t++)
+	CHECK(a.Size() == orig_size);
+	for(size_t t = 1; t < a.Size(); t++)
 		CHECK(a.Get(t) >= a.Get(t - 1));
 
+	a.Destroy();
 }
+
+
+TEST(ArraySort2) {
+	// 64 bit values
+	Array a;
+		
+	for(size_t t = 0; t < 400; t++)
+		a.Add((int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand());
+
+	size_t orig_size = a.Size();
+	a.Sort();
+
+	CHECK(a.Size() == orig_size);
+	for(size_t t = 1; t < a.Size(); t++)
+		CHECK(a.Get(t) >= a.Get(t - 1));
+
+	a.Destroy();
+}
+
+TEST(ArraySort3) {
+	// many values
+	Array a;
+		
+	for(size_t t = 0; t < 1000000ULL; t++)
+		a.Add(rand());
+
+	size_t orig_size = a.Size();
+	a.Sort();
+
+	CHECK(a.Size() == orig_size);
+	for(size_t t = 1; t < a.Size(); t++)
+		CHECK(a.Get(t) >= a.Get(t - 1));
+
+	a.Destroy();
+}
+
+
+TEST(ArraySort4) {
+	// same values
+	Array a;
+
+	for(size_t t = 0; t < 1000; t++)
+		a.Add(0);
+
+	size_t orig_size = a.Size();
+	a.Sort();
+
+	CHECK(a.Size() == orig_size);
+	for(size_t t = 1; t < a.Size(); t++)
+		CHECK(a.Get(t) == 0);
+
+	a.Destroy();
+}
+

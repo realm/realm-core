@@ -32,6 +32,7 @@ public:
 	bool Compare(const ColumnStringEnum& c) const;
 	void Verify() const;
 	MemStats Stats() const;
+	void ToDot(std::ostream& out, const char* title) const;
 #endif // _DEBUG
 
 	size_t GetKeyNdx(const char* value);

@@ -201,3 +201,74 @@ TEST(TableViewFindAllString) {
 	CHECK_EQUAL(2, v2->GetRef(1));
 	//v.Destroy();
 }
+
+TEST(TableViewDelete) {
+	TestTableInt table;
+	
+	table.Add(1);
+	table.Add(2);
+	table.Add(1);
+	table.Add(3);
+	table.Add(1);
+	
+	TableView v = table.first.FindAll(1);
+	CHECK_EQUAL(3, v.GetSize());
+	
+	v.Delete(1);
+	CHECK_EQUAL(2, v.GetSize());
+	CHECK_EQUAL(0, v.GetRef(0));
+	CHECK_EQUAL(3, v.GetRef(1));
+	
+	CHECK_EQUAL(4, table.GetSize());
+	CHECK_EQUAL(1, table[0].first);
+	CHECK_EQUAL(2, table[1].first);
+	CHECK_EQUAL(3, table[2].first);
+	CHECK_EQUAL(1, table[3].first);
+	
+	v.Delete(0);
+	CHECK_EQUAL(1, v.GetSize());
+	CHECK_EQUAL(2, v.GetRef(0));
+	
+	CHECK_EQUAL(3, table.GetSize());
+	CHECK_EQUAL(2, table[0].first);
+	CHECK_EQUAL(3, table[1].first);
+	CHECK_EQUAL(1, table[2].first);
+	
+	v.Delete(0);
+	CHECK_EQUAL(0, v.GetSize());
+	
+	CHECK_EQUAL(2, table.GetSize());
+	CHECK_EQUAL(2, table[0].first);
+	CHECK_EQUAL(3, table[1].first);
+}
+
+TEST(TableViewClear) {
+	TestTableInt table;
+	
+	table.Add(1);
+	table.Add(2);
+	table.Add(1);
+	table.Add(3);
+	table.Add(1);
+	
+	TableView v = table.first.FindAll(1);
+	CHECK_EQUAL(3, v.GetSize());
+	
+	v.Clear();
+	CHECK_EQUAL(0, v.GetSize());
+	
+	CHECK_EQUAL(2, table.GetSize());
+	CHECK_EQUAL(2, table[0].first);
+	CHECK_EQUAL(3, table[1].first);
+}
+
+
+TEST(TableViewClearNone) {
+	TestTableInt table;
+	
+	TableView v = table.first.FindAll(1);
+	CHECK_EQUAL(0, v.GetSize());
+	
+	v.Clear();
+
+}

@@ -26,6 +26,7 @@ public:
 	bool Compare(const ArrayString& c) const;
 	void StringStats() const;
 	void ToDot(FILE* f) const;
+	void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 
 private:

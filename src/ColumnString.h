@@ -38,7 +38,6 @@ public:
 
 	size_t GetRef() const {return m_array->GetRef();}
 	void SetParent(Array* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
-	void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
 	// Optimizing data layout
 	bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
@@ -46,7 +45,6 @@ public:
 #ifdef _DEBUG
 	bool Compare(const AdaptiveStringColumn& c) const;
 	void Verify() const {};
-	void ToDot(FILE* f, bool isTop=true) const;
 	MemStats Stats() const;
 #endif //_DEBUG
 
@@ -65,6 +63,10 @@ protected:
 	bool IsLongStrings() const {return m_array->HasRefs();} // HasRefs indicates long string array
 
 	bool FindKeyPos(const char* target, size_t& pos) const;
+	
+#ifdef _DEBUG
+	virtual void LeafToDot(std::ostream& out, const Array& array) const;
+#endif //_DEBUG
 };
 
 #endif //__TDB_COLUMN_STRING__
