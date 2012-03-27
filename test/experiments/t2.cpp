@@ -13,6 +13,7 @@ using namespace std;
 
 
 
+
 Fast track to fixing dynamically typed subtables:
 -------------------------------------------------
 
@@ -90,8 +91,30 @@ Construct typed table
 
 Goals:
   Feel like STL
+
+
+
+Think of TableRef as an alias.
+tabel.Columns().foo
+
+
+Design criteria:
+	No overhead from statically typed layer.
+  Feel like STL.
+  Work syntactically as regular array over a struct.
+
   Strict propagation of constness from top table to subtables.
-  Seamless mixing of staically and dynamically typed APIs
+  Clear distiction between value and reference semantics.
+  Seamless mixing of statically and dynamically typed APIs.
+  Retain all elements of the current API whenver possible.
+
+Implementation:
+  Clone table_new.hpp, tightdb_new.hpp.
+  Make Table be able to act like a TopLevelTable.
+	Introduce table constructor into Spec and ColumnTable.
+	Replace meta classes with new ones.
+
+
 
 Query API.
 
@@ -109,6 +132,9 @@ AddRow.
 
 Mixed.
 
+Namespace 'tightdb'
+
+at(std::size_t) to match operator[]
 
 
 tab[6] = tab[4] // Copy row by value
@@ -147,6 +173,12 @@ doc:
 - subtables
 - constness
 
+
+Dangers:
+  Table &subtab = *table.GetTable(3,4)); // Error - smart subtable reference is destroyed, so 'subtable' may become a dangeling reference.
+
+Questions:
+  TableView v = query->FindAll(*table.GetTable(3,4)); // Error or not - should TableView keep a counted reference?
 
  */
 
