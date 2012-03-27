@@ -34,14 +34,16 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 }
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
-Array::Array(Allocator& alloc)
+Array::Array(Allocator& alloc, bool is_subtable_root)
 : m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
+	// FIXME: m_is_subtable_root(is_subtable_root)
 }
 
 // Copy-constructor
 // Note that this array now own the ref. Should only be used when
 // the source array goes away right after (like return values from functions)
 Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc) {
+	// FIXME: Copy 'm_is_subtable_root' from src to this
 	const size_t ref = src.GetRef();
 	Create(ref);
 	src.Invalidate();
@@ -168,9 +170,7 @@ bool Array::operator==(const Array& a) const {
 
 void Array::UpdateRef(size_t ref) {
 	Create(ref);
-
-	// Update ref in parent
-	if (m_parent) m_parent->Set(m_parentNdx, ref);
+	update_ref_in_parent(ref);
 }
 
 /**
@@ -1169,7 +1169,7 @@ bool Array::CopyOnWrite() {
 	const MemRef mref = m_alloc.Alloc(new_len);
 	if (!mref.pointer) return false;
 	memcpy(mref.pointer, m_data-8, len);
-	
+
 	// Update internal data
 	m_ref = mref.ref;
 	m_data = (unsigned char*)mref.pointer + 8;
@@ -1178,8 +1178,7 @@ bool Array::CopyOnWrite() {
 	// Update capacity in header
 	set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
 
-	// Update ref in parent
-	if (m_parent) m_parent->Set(m_parentNdx, mref.ref);
+	update_ref_in_parent(mref.ref);
 
 	return true;
 }
@@ -1219,8 +1218,7 @@ bool Array::Alloc(size_t count, size_t width) {
 			}
 			set_header_capacity(new_capacity);
 
-			// Update ref in parent
-			if (m_parent) m_parent->Set(m_parentNdx, mref.ref); //TODO: ref
+			update_ref_in_parent(mref.ref);
 		}
 
 		m_capacity = CalcItemCount(new_capacity, width);

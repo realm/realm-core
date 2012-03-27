@@ -153,16 +153,12 @@ BinaryData ColumnMixed::GetBinary(size_t ndx) const {
 TopLevelTable ColumnMixed::GetTable(size_t ndx) {
 	assert(ndx < m_types->Size());
 	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
-	
+
 	const size_t ref = m_refs->GetAsRef(ndx);
 	Allocator& alloc = m_array->GetAllocator();
-	
-	// Get parent info for subtable
-	Array* parent = NULL;
-	size_t pndx   = 0;
-	m_refs->GetParentInfo(ndx, parent, pndx);
-	
-	return TopLevelTable(alloc, ref, parent, pndx);
+
+	bool is_subtable = true;
+	return TopLevelTable(alloc, ref, parent, ndx, is_subtable);
 }
 
 TopLevelTable* ColumnMixed::GetTablePtr(size_t ndx) {

@@ -206,7 +206,8 @@ protected:
 	friend class ColumnTable;
 
 	Table(Allocator& alloc, bool dontInit); // Construct un-initialized
-	Table(Allocator& alloc, size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns); // Construct from ref
+	Table(Allocator& alloc, size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns,
+	      bool columns_ref_is_subtable_root); // Construct from ref
 
 	void Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns);
 	void CreateColumns();
@@ -240,10 +241,12 @@ private:
 	Table& operator=(const Table& t); // non assignable
 };
 
+
+
 class TopLevelTable : public Table {
 public:
 	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
-	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx);
+	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx, bool is_subtable);
 	TopLevelTable(const TopLevelTable& t);
 	~TopLevelTable();
 
@@ -264,6 +267,8 @@ protected:
 private:
 	TopLevelTable& operator=(const TopLevelTable&) {return *this;} // non assignable
 };
+
+
 
 class TableView {
 public:

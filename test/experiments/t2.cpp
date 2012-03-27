@@ -7,10 +7,16 @@ using namespace std;
 
 /*
 
+Continue with ColumnMixed.cpp / GetTable() and GetTablePtr()
+
+When Array::m_is_subtable_root is true, and m_ref is changed, call the following method on the parent to update it:
+virtual Array::update_subtable_ref(size_t subtable_ndx, size_t new_ref);
+It must only ever be called for the root array of either a ColumnTable or a ColumnMixed
 
 
-
-
+Table::GetSpec()
+const
+Modify array parent...???
 
 
 
@@ -18,14 +24,14 @@ Fast track to fixing dynamically typed subtables:
 -------------------------------------------------
 
 Introduce class TableRef:
-  Table *m_table;
-  Table *operator->();
+  Table *TableRef::m_table;
+  Table *TableRef::operator->();
 
 Table:
-  private mutable std::size_t m_ref_count;
-  private TableRef const m_parent;
-  private Table(Table *parent): m_parent(parent) {}
-  ~Table() - delete self from map in parent column
+  private mutable std::size_t Table::m_ref_count;
+  private TableRef const Table::m_parent;
+  private Table::Table(Table *parent): m_parent(parent) {}
+  Table::~Table() - delete self from map in parent column
   TableRef Table::GetTable() -> defer to ColumnTable
 
 ColumnTable

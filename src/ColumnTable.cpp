@@ -14,30 +14,9 @@ Table ColumnTable::GetTable(size_t ndx) {
 	const size_t ref_columns = GetAsRef(ndx);
 	Allocator& alloc = GetAllocator();
 
-	// Get parent info for subtable
-	/*
-	Array* parent = NULL;
-	size_t pndx   = 0;
-	GetParentInfo(ndx, parent, pndx);
-	*/
-
-	//	return Table(alloc, m_ref_specSet, ref_columns, parent, pndx);
-	return Table(alloc, m_ref_specSet, ref_columns, m_array, ndx);
-}
-
-const Table ColumnTable::GetTable(size_t ndx) const {
-	assert(ndx < Size());
-
-	const size_t ref_columns = GetAsRef(ndx);
-	Allocator& alloc = GetAllocator();
-
-	// Even though it is const we still need a parent
-	// so that the table can know it is attached
-	Array* parent = NULL;
-	size_t pndx   = 0;
-	GetParentInfo(ndx, parent, pndx);
-
-	return Table(alloc, m_ref_specSet, ref_columns, parent, pndx);
+	bool const columns_ref_is_subtable_root = true;
+	return Table(alloc, m_ref_specSet, ref_columns, m_array, ndx,
+	             columns_ref_is_subtable_root);
 }
 
 Table* ColumnTable::GetTablePtr(size_t ndx) {
@@ -46,13 +25,10 @@ Table* ColumnTable::GetTablePtr(size_t ndx) {
 	const size_t ref_columns = GetAsRef(ndx);
 	Allocator& alloc = GetAllocator();
 
-	// Get parent info for subtable
-	Array* parent = NULL;
-	size_t pndx   = 0;
-	GetParentInfo(ndx, parent, pndx);
-
+	bool const columns_ref_is_subtable_root = true;
 	// Receiver will own pointer and has to delete it when done
-	return new Table(alloc, m_ref_specSet, ref_columns, parent, pndx);
+	return new Table(alloc, m_ref_specSet, ref_columns, m_array, ndx,
+	                 columns_ref_is_subtable_root);
 }
 
 size_t ColumnTable::GetTableSize(size_t ndx) const {
@@ -63,7 +39,8 @@ size_t ColumnTable::GetTableSize(size_t ndx) const {
 	if (ref_columns == 0) return 0;
 	else {
 		Allocator& alloc = GetAllocator();
-		const Table table(alloc, m_ref_specSet, ref_columns, NULL, 0);
+		// FIXME: Should specify correct parent and that ref_columns is the root of a subtable, just like GetTable()
+		const Table table(alloc, m_ref_specSet, ref_columns, NULL, 0, false);
 		return table.GetSize();
 	}
 }

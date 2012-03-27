@@ -12,7 +12,7 @@ Group::Group() : m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(COLUMN_HASREF
 	m_tables.SetParent(&m_top, 1);
 }
 
-Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(false) {
+Group::Group(const char* filename) : m_top(m_alloc, false), m_tables(m_alloc, false), m_tableNames(m_alloc), m_isValid(false) {
 	assert(filename);
 
 	// Memory map file
@@ -21,7 +21,7 @@ Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableN
 	if (m_isValid) Create();
 }
 
-Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(false) {
+Group::Group(const char* buffer, size_t len) : m_top(m_alloc, false), m_tables(m_alloc, false), m_tableNames(m_alloc), m_isValid(false) {
 	assert(buffer);
 
 	// Memory map file

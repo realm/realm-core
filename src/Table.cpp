@@ -17,13 +17,13 @@ const ColumnType AccessorMixed::type  = COLUMN_TYPE_MIXED;
 // -- Spec ------------------------------------------------------------------------------------
 
 Spec::Spec(Allocator& alloc, size_t ref, Array* parent, size_t pndx)
-: m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
+: m_specSet(alloc, false), m_spec(alloc, false), m_names(alloc), m_subSpecs(alloc, false)
 {
 	Create(ref, parent, pndx);
 }
 
 Spec::Spec(const Spec& s)
-: m_specSet(s.m_specSet.GetAllocator()), m_spec(s.m_specSet.GetAllocator()), m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator())
+: m_specSet(s.m_specSet.GetAllocator(), false), m_spec(s.m_specSet.GetAllocator(), false), m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator(), false)
 {
 	const size_t ref  = m_specSet.GetRef();
 	Array* parent     = m_specSet.GetParent();
@@ -153,7 +153,7 @@ TopLevelTable::TopLevelTable(Allocator& alloc) : Table(alloc), m_top(COLUMN_HASR
     m_columns.SetParent(&m_top, 1);
 }
 
-TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx) : Table(alloc, true), m_top(alloc)
+TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx, bool is_subtable) : Table(alloc, true), m_top(alloc, is_subtable)
 {
 	// Load from allocated memory
     m_top.UpdateRef(ref_top);
@@ -248,13 +248,16 @@ Table::Table(Allocator& alloc, bool dontInit)
 	(void)dontInit;
 }
 
-Table::Table(Allocator& alloc, size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns)
-: m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc), m_columns(alloc)
+Table::Table(Allocator& alloc, size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns,
+             bool columns_ref_is_subtable_root)
+: m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc), m_columns(alloc, columns_ref_is_subtable_root)
 {
-	Create(ref_specSet, ref_columns, parent_columns, pndx_columns);
+	Create(ref_specSet, columns_ref, parent_columns, pndx_columns);
 }
 
 Table::Table(const Table& t) {
+	// FIXME: How is the allocator set?
+	// FIXME: Copy 'm_is_subtable_root' from t.m_columns to m_columns
 	const size_t ref_specSet = t.m_specSet.GetRef();
 	const size_t ref_columns = t.m_columns.GetRef();
 	Array* const parent      = t.m_columns.GetParent();
@@ -267,7 +270,7 @@ Table::Table(const Table& t) {
 	// TODO: implement ref-counting
 }
 
-void Table::Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns)
+void Table::Create(size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns)
 {
 	m_specSet.UpdateRef(ref_specSet);
 	assert(m_specSet.Size() == 2 || m_specSet.Size() == 3);
@@ -283,8 +286,8 @@ void Table::Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns
 
 	// A table instatiated with a zero-ref is just an empty table
 	// but it will have to create itself on first modification
-	if (ref_columns != 0) {
-		m_columns.UpdateRef(ref_columns);
+	if (columns_ref != 0) {
+		m_columns.UpdateRef(columns_ref);
 		CacheColumns();
 	}
 	m_columns.SetParent(parent_columns, pndx_columns);

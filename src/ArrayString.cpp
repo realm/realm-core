@@ -29,7 +29,7 @@ ArrayString::ArrayString(Array* parent, size_t pndx, Allocator& alloc) : Array(C
 	set_header_wtype(TDB_MULTIPLY);
 }
 
-ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(alloc) {
+ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(alloc, false) {
 	// Manually create array as doing it in initializer list
 	// will not be able to call correct virtual functions
 	Create(ref);
@@ -37,7 +37,7 @@ ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator
 }
 
 // Creates new array (but invalid, call UpdateRef to init)
-ArrayString::ArrayString(Allocator& alloc) : Array(alloc) {
+ArrayString::ArrayString(Allocator& alloc) : Array(alloc, false) {
 }
 
 

@@ -79,7 +79,7 @@ public:
 	Array(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Array(Allocator& alloc);
+	Array(Allocator& alloc, bool is_subtable_root);
 	Array(const Array& a);
 	virtual ~Array();
 
@@ -180,6 +180,7 @@ private:
 	template <bool gt>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
 	template <size_t w> void Sort();
 	template <size_t w>void ReferenceSort(Array &ref);
+        void update_ref_in_parent(size_t ref);
 
 protected:
 	bool AddPositiveLocal(int64_t value);
@@ -232,18 +233,20 @@ protected:
 	void SetWidth(size_t width);
 	bool Alloc(size_t count, size_t width);
 	bool CopyOnWrite();
-	
+
 	// Member variables
 	Getter m_getter;
 	Setter m_setter;
-	size_t m_ref;
+	size_t m_ref; // FIXME: Try to make private!
 	size_t m_len;
 	size_t m_capacity;
 	size_t m_width;
 	bool m_isNode;
 	bool m_hasRefs;
+private:
 	Array* m_parent;
 	size_t m_parentNdx;
+protected:
 	Allocator& m_alloc;
 
 	int64_t m_lbound;
@@ -312,6 +315,14 @@ size_t Array::Write(S& out, size_t& pos, bool recurse) const {
 		
 		return array_pos; // Return position of this array
 	}
+}
+
+
+inline void Array::update_ref_in_parent(size_t ref)
+{
+  if (!m_parent) return;
+  std::cerr << "CLICK: m_isNode = " << m_isNode << ", m_hasRefs = " << m_hasRefs << std::endl;
+  m_parent->Set(m_parentNdx, ref);
 }
 
 #endif //__TDB_ARRAY__
