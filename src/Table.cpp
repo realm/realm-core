@@ -1398,32 +1398,9 @@ void Table::ToDotInternal(std::ostream& out) const {
 	// Columns
 	const size_t column_count = GetColumnCount();
 	for (size_t i = 0; i < column_count; ++i) {
-		const ColumnType type = GetRealColumnType(i);
-		switch (type) {
-			case COLUMN_TYPE_INT:
-			case COLUMN_TYPE_BOOL:
-			case COLUMN_TYPE_DATE:
-			case COLUMN_TYPE_TABLE:
-			case COLUMN_TYPE_STRING:
-			case COLUMN_TYPE_BINARY:
-			case COLUMN_TYPE_MIXED:
-			{
-				const ColumnBase& column = GetColumnBase(i);
-				const char* const name = GetColumnName(i);
-				column.ToDot(out, name);
-				break;
-			}
-			case COLUMN_TYPE_STRING_ENUM:
-			{
-				//TODO: Make ColumnStringEnum derive from ColumnBase
-				const ColumnStringEnum& column = GetColumnStringEnum(i);
-				const char* const name = GetColumnName(i);
-				column.ToDot(out, name);
-				break;
-			}
-			default:
-				assert(false);
-		}
+		const ColumnBase& column = GetColumnBase(i);
+		const char* const name = GetColumnName(i);
+		column.ToDot(out, name);
 	}
 }
 
