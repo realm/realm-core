@@ -35,9 +35,11 @@ public:
 	virtual void ClearIndex() = 0;
 
 	virtual size_t GetRef() const = 0;
+	void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
 #ifdef _DEBUG
 	virtual void Verify() const = 0;
+	virtual void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 
 template<class C, class A> A* TreeGetArray(size_t start, size_t *first, size_t *last) const;
@@ -82,6 +84,11 @@ protected:
 	bool NodeUpdateOffsets(size_t ndx);
 	template<class C> bool NodeInsertSplit(size_t ndx, size_t newRef);
 	size_t GetRefSize(size_t ref) const;
+	
+#ifdef _DEBUG
+	void ArrayToDot(std::ostream& out, const Array& array) const;
+	virtual void LeafToDot(std::ostream& out, const Array& array) const;
+#endif //_DEBUG
 
 	// Member variables
 	mutable Array* m_array;
@@ -156,7 +163,6 @@ public:
 	bool Compare(const Column& c) const;
 	void Print() const;
 	void Verify() const;
-	void ToDot(FILE* f, bool isTop=true) const;
 	MemStats Stats() const;
 #endif //_DEBUG
 

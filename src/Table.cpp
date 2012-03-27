@@ -1148,6 +1148,18 @@ void Table::UpdateColumnRefs(size_t column_ndx, int diff) {
 				column->UpdateParentNdx(diff);
 			}
 			break;
+		case COLUMN_TYPE_MIXED:
+			{
+				ColumnMixed* column = (ColumnMixed*)m_cols.Get(i);
+				column->UpdateParentNdx(diff);
+			}
+			break;
+		case COLUMN_TYPE_TABLE:
+			{
+				ColumnTable* column = (ColumnTable*)m_cols.Get(i);
+				column->UpdateParentNdx(diff);
+			}
+			break;
 		default:
 			assert(false);
         }
@@ -1367,69 +1379,93 @@ void Table::Verify() const {
 	alloc.Verify();
 }
 
-void Table::ToDot(const char* filename) const {
-	FILE* f = fopen(filename, "w");
-	if (!f) return;
+void Table::ToDot(std::ostream& out, const char* title) const {
+	const size_t ref = m_columns.GetRef();
+	
+	out << "subgraph cluster_table_"  << ref <<  " {" << endl;
+	out << " label = \"Table";
+	if (title) out << " " << title;
+	out << "\";" << endl;
+	
+	ToDotInternal(out);
+	
+	out << "}" << endl;
+}
 
-	fprintf(f, "digraph G {\n");
-	fprintf(f, "node [shape=record];\n");
-
-	// Table header
-	fprintf(f, "table [label=\"{");
+void Table::ToDotInternal(std::ostream& out) const {
+	m_columns.ToDot(out, "columns");
+	
+	// Columns
 	const size_t column_count = GetColumnCount();
 	for (size_t i = 0; i < column_count; ++i) {
-		if (i > 0) fprintf(f, "} | {");
-		fprintf(f, "%s | ", m_columnNames.Get(i));
+		const ColumnType type = GetRealColumnType(i);
+		switch (type) {
+			case COLUMN_TYPE_INT:
+			case COLUMN_TYPE_BOOL:
+			case COLUMN_TYPE_DATE:
+			case COLUMN_TYPE_TABLE:
+			case COLUMN_TYPE_STRING:
+			case COLUMN_TYPE_BINARY:
+			case COLUMN_TYPE_MIXED:
+			{
+				const ColumnBase& column = GetColumnBase(i);
+				const char* const name = GetColumnName(i);
+				column.ToDot(out, name);
+				break;
+			}
+			case COLUMN_TYPE_STRING_ENUM:
+			{
+				//TODO: Make ColumnStringEnum derive from ColumnBase
+				const ColumnStringEnum& column = GetColumnStringEnum(i);
+				const char* const name = GetColumnName(i);
+				column.ToDot(out, name);
+				break;
+			}
+			default:
+				assert(false);
+		}
+	}
+}
+
+void TopLevelTable::ToDot(std::ostream& out, const char* title) const {
+	out << "subgraph cluster_topleveltable {" << endl;
+	out << " label = \"TopLevelTable";
+	if (title) out << "\\n'" << title << "'";
+	out << "\";" << endl;
 	
-		const ColumnType type = GetRealColumnType(i);
-		switch (type) {
-		case COLUMN_TYPE_INT:
-			fprintf(f, "Int"); break;
-		case COLUMN_TYPE_BOOL:
-			fprintf(f, "Bool"); break;
-		case COLUMN_TYPE_STRING:
-			fprintf(f, "String"); break;
-		default:
-			assert(false);
-		}
+	m_top.ToDot(out, "table_top");
+	
+	const Spec specset = GetSpec();
+	specset.ToDot(out);
+	
+	ToDotInternal(out);
+	
+	out << "}" << endl;
+}
 
-		fprintf(f, "| <%zu>", i);
-	}
-	fprintf(f, "}\"];\n");
-
-	// Refs
-	for (size_t i = 0; i < column_count; ++i) {
-		const ColumnBase& column = GetColumnBase(i);
-		const size_t ref = column.GetRef();
-		fprintf(f, "table:%zu -> n%zx\n", i, ref);
-	}
-
-
-	// Columns
-	for (size_t i = 0; i < column_count; ++i) {
-		const ColumnType type = GetRealColumnType(i);
-		switch (type) {
-		case COLUMN_TYPE_INT:
-		case COLUMN_TYPE_BOOL:
-			{
-				const Column& column = GetColumn(i);
-				column.ToDot(f);
-			}
-			break;
-		case COLUMN_TYPE_STRING:
-			{
-				const AdaptiveStringColumn& column = GetColumnString(i);
-				column.ToDot(f);
-			}
-			break;
-		default:
-			assert(false);
+void Spec::ToDot(std::ostream& out, const char* title) const {
+	out << "subgraph cluster_specset {" << endl;
+	out << " label = \"specset\";" << endl;
+	
+	m_specSet.ToDot(out);
+	m_spec.ToDot(out, "spec");
+	m_names.ToDot(out, "names");
+	if (m_subSpecs.IsValid()) {
+		m_subSpecs.ToDot(out, "subspecs");
+		
+		const size_t count = m_subSpecs.Size();
+		Allocator& alloc = m_specSet.GetAllocator();
+		
+		// Write out subspecs
+		for (size_t i = 0; i < count; ++i) {
+			const size_t ref = m_subSpecs.GetAsRef(i);
+			const Spec s(alloc, ref, NULL, 0);
+			
+			s.ToDot(out);
 		}
 	}
-
-	fprintf(f, "}\n");
-
-	fclose(f);
+	
+	out << "}" << endl;
 }
 
 void Table::Print() const {

@@ -401,3 +401,27 @@ void ColumnMixed::Delete(size_t ndx) {
 	m_types->Delete(ndx);
 	m_refs->Delete(ndx);
 }
+
+#ifdef _DEBUG
+
+void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
+	const size_t ref = GetRef();
+	
+	out << "subgraph cluster_columnmixed" << ref << " {" << std::endl;
+	out << " label = \"ColumnMixed";
+	if (title) out << "\\n'" << title << "'";
+	out << "\";" << std::endl;
+	
+	m_array->ToDot(out, "mixed_top");
+	
+	m_types->ToDot(out, "types");
+	m_refs->ToDot(out, "refs");
+	
+	if (m_array->Size() > 2) {
+		m_data->ToDot(out, "data");
+	}
+	
+	out << "}" << std::endl;
+}
+
+#endif //_DEBUG

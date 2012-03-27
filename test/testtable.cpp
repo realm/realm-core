@@ -141,6 +141,89 @@ TEST(Table_Delete) {
 #endif //_DEBUG
 }
 
+TEST(Table_Delete_All_Types) {
+	// Create table with all column types
+	TopLevelTable table;
+	Spec s = table.GetSpec();
+	s.AddColumn(COLUMN_TYPE_INT,    "int");
+	s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
+	s.AddColumn(COLUMN_TYPE_DATE,   "date");
+	s.AddColumn(COLUMN_TYPE_STRING, "string");
+	s.AddColumn(COLUMN_TYPE_STRING, "string2"); // becomes ColumnStringEnum
+	s.AddColumn(COLUMN_TYPE_BINARY, "binary");
+	s.AddColumn(COLUMN_TYPE_MIXED,  "mixed");
+	Spec sub = s.AddColumnTable(    "tables");
+	sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
+	sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
+	table.UpdateFromSpec(s.GetRef());
+	
+	// Add some rows
+	for (size_t i = 0; i < 15; ++i) {
+		table.InsertInt(0, i, i);
+		table.InsertBool(1, i, (i % 2 ? true : false));
+		table.InsertDate(2, i, 12345);
+		
+		std::stringstream ss;
+		ss << "string" << i;
+		table.InsertString(3, i, ss.str().c_str());
+		
+		switch (i % 3) {
+			case 0:
+				table.InsertString(4, i, "test1");
+				break;
+			case 1:
+				table.InsertString(4, i, "test2");
+				break;
+			case 2:
+				table.InsertString(4, i, "test3");
+				break;
+		}
+		
+		table.InsertBinary(5, i, "binary", 7);
+		
+		switch (i % 3) {
+			case 0:
+				table.InsertMixed(6, i, false);
+				break;
+			case 1:
+				table.InsertMixed(6, i, (int64_t)i);
+				break;
+			case 2:
+				table.InsertMixed(6, i, "string");
+				break;
+		}
+		
+		table.InsertTable(7, i);
+		table.InsertDone();
+		
+		// Add sub-tables
+		if (i == 2) {
+			Table subtable = table.GetTable(7, i);
+			subtable.InsertInt(0, 0, 42);
+			subtable.InsertString(1, 0, "meaning");
+			subtable.InsertDone();
+		}
+	}
+	
+	// Test Deletes
+	table.DeleteRow(14);
+	table.DeleteRow(0);
+	table.DeleteRow(5);
+	
+	CHECK_EQUAL(12, table.GetSize());
+	
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
+	
+	// Test Clear
+	table.Clear();
+	CHECK_EQUAL(0, table.GetSize());
+	
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
+}
 
 TEST(Table_Find_Int) {
 	TestTable table;

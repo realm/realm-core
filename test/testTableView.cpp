@@ -272,4 +272,3 @@ TEST(TableViewClearNone) {
 	v.Clear();
 
 }
-

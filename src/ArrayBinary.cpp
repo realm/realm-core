@@ -95,3 +95,22 @@ void ArrayBinary::Clear() {
 	m_blob.Clear();
 	m_offsets.Clear();
 }
+
+#ifdef _DEBUG
+
+void ArrayBinary::ToDot(std::ostream& out, const char* title) const {
+	const size_t ref = GetRef();
+	
+	out << "subgraph cluster_binary" << ref << " {" << std::endl;
+	out << " label = \"ArrayBinary";
+	if (title) out << "\\n'" << title << "'";
+	out << "\";" << std::endl;
+	
+	Array::ToDot(out, "binary_top");
+	m_offsets.ToDot(out, "offsets");
+	m_blob.ToDot(out, "blob");
+	
+	out << "}" << std::endl;
+}
+
+#endif //_DEBUG
