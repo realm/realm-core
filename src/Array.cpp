@@ -35,7 +35,7 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
 Array::Array(Allocator& alloc)
-: m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
+: m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
 }
 
 // Copy-constructor
