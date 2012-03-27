@@ -15,11 +15,14 @@ Table ColumnTable::GetTable(size_t ndx) {
 	Allocator& alloc = GetAllocator();
 
 	// Get parent info for subtable
+	/*
 	Array* parent = NULL;
 	size_t pndx   = 0;
 	GetParentInfo(ndx, parent, pndx);
+	*/
 
-	return Table(alloc, m_ref_specSet, ref_columns, parent, pndx);
+	//	return Table(alloc, m_ref_specSet, ref_columns, parent, pndx);
+	return Table(alloc, m_ref_specSet, ref_columns, m_array, ndx);
 }
 
 const Table ColumnTable::GetTable(size_t ndx) const {
