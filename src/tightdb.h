@@ -137,7 +137,7 @@ public: \
 \
 protected: \
 	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
 \
 private: \
 	TableName(const TableName&) {} \
@@ -274,7 +274,7 @@ public: \
 \
 protected: \
 	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
 \
 private: \
 	TableName(const TableName&) {} \
@@ -424,7 +424,7 @@ public: \
 \
 protected: \
 	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
 \
 private: \
 	TableName(const TableName&) {} \
@@ -587,7 +587,7 @@ public: \
 \
 protected: \
 	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
 \
 private: \
 	TableName(const TableName&) {} \
@@ -763,7 +763,7 @@ public: \
 \
 protected: \
 	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
 \
 private: \
 	TableName(const TableName&) {} \
@@ -952,7 +952,7 @@ public: \
 \
 protected: \
 	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
 \
 private: \
 	TableName(const TableName&) {} \
@@ -1154,7 +1154,7 @@ public: \
 \
 protected: \
 	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
 \
 private: \
 	TableName(const TableName&) {} \
@@ -1369,7 +1369,7 @@ public: \
 \
 protected: \
 	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
 \
 private: \
 	TableName(const TableName&) {} \
