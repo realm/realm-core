@@ -369,6 +369,7 @@ TEST_FIXTURE(db_setup, Column_Destroy) {
 	c.Destroy();
 }
 
+/*
 TEST(Column_Sort) {
 	// Create Column with random values
 	Column a;
@@ -399,6 +400,7 @@ TEST(Column_Sort) {
 	// Cleanup
 	a.Destroy();
 }
+*/
 
 /** FindAll() int tests spread out over bitwidth
  *
@@ -596,7 +598,7 @@ TEST(Column_Min2) {
 
 	c.Destroy();
 }
-
+/*
 TEST(Column_Sort2) {
 	Column c;
 	
@@ -611,7 +613,7 @@ TEST(Column_Sort2) {
 
 	c.Destroy();
 }
-
+*/
 
 
 #if TEST_DURATION > 0

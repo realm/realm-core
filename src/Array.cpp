@@ -1430,6 +1430,9 @@ void Array::ReferenceSort(Array &ref) {
 }
 
 template <size_t w>void Array::ReferenceSort(Array &ref) {
+	if(m_len < 2)
+		return;
+
 	int64_t min;
 	int64_t max;
 
@@ -1489,6 +1492,9 @@ template <size_t w>void Array::ReferenceSort(Array &ref) {
 
 // Sort array 
 template <size_t w> void Array::Sort() {
+	if(m_len < 2)
+		return;
+
 	size_t lo = 0;
 	size_t hi = m_len - 1;
 	std::vector<size_t> count;
@@ -1507,7 +1513,7 @@ template <size_t w> void Array::Sort() {
 		// If range isn't suited for CountSort, it's *probably* discovered very early, within first few values,
 		// in most practical cases, and won't add much wasted work. Max wasted work is O(n) which isn't much
 		// compared to QuickSort.
-		b = MinMax<w>(lo, hi - 1, m_len, &min, &max);
+		b = MinMax<w>(lo, hi, m_len, &min, &max);
 	}
 
 	if(b) {
@@ -1607,7 +1613,7 @@ template <size_t w>void Array::QuickSort(size_t lo, size_t hi) {
 
 	// comparison element x
 	const size_t ndx = (lo + hi)/2;
-	const int64_t x = (size_t)Get(ndx);
+	const int64_t x = Get(ndx);
 
 	// partition
 	do {
