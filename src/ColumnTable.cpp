@@ -86,7 +86,7 @@ void ColumnTable::Delete(size_t ndx) {
 		columns.Destroy();
 	}
 
-	Delete(ndx);
+	Column::Delete(ndx);
 }
 
 void ColumnTable::Clear(size_t ndx) {
