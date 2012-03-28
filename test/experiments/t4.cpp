@@ -6,6 +6,8 @@
 
 int main()
 {
+	int n = 15000;
+
 	Group g;
 	TopLevelTable &table = g.GetTable("test");
 	Spec s = table.GetSpec();
@@ -15,7 +17,7 @@ int main()
 	s.AddColumn(COLUMN_TYPE_MIXED, "baz");
 	table.UpdateFromSpec(s.GetRef());
 
-	for (int i=0; i<15000; ++i) {
+	for (int i=0; i<n; ++i) {
 		table.AddRow();
 		table.Set(0, i, 100+i);
 		if (i%2 == 0) {
@@ -35,7 +37,7 @@ int main()
 
 	cout << table.GetSize() << endl;
 
-	for (int i=0; i<15000; ++i) {
+	for (int i=0; i<n; ++i) {
 		if (table.Get(0, i) != 100+i) {
 			ostringstream o;
 			o << "Bad foo " << table.Get(0, i) << " at " << i;
@@ -56,7 +58,7 @@ int main()
 		}
 	}
 
-	for (int i=0; i<15000; ++i) {
+	for (int i=0; i<n; ++i) {
 		if (table.Get(0, i) != 100+i) {
 			ostringstream o;
 			o << "Bad foo " << table.Get(0, i) << " at " << i << " in second run";
@@ -90,7 +92,7 @@ int main()
 	Group g2("subtables.tdb");
 	TopLevelTable &table2 = g2.GetTable("test");
 
-	for (int i=0; i<15000; ++i) {
+	for (int i=0; i<n; ++i) {
 		if (table2.Get(0, i) != 100+i) {
 			ostringstream o;
 			o << "Bad foo " << table2.Get(0, i) << " at " << i << " in third run";
@@ -122,7 +124,7 @@ int main()
 		}
 	}
 
-	for (int i=0; i<15000; ++i) {
+	for (int i=0; i<n; ++i) {
 		if (table2.Get(0, i) != 100+i) {
 			ostringstream o;
 			o << "Bad foo " << table2.Get(0, i) << " at " << i << " in fourth run";
@@ -164,7 +166,7 @@ int main()
 	Group g3("subtables2.tdb");
 	TopLevelTable &table3 = g2.GetTable("test");
 
-	for (int i=0; i<15000; ++i) {
+	for (int i=0; i<n; ++i) {
 		if (table3.Get(0, i) != 100+i) {
 			ostringstream o;
 			o << "Bad foo " << table3.Get(0, i) << " at " << i << " in fourth run";
