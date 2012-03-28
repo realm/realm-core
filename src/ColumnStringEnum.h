@@ -3,7 +3,7 @@
 
 #include "ColumnString.h"
 
-class ColumnStringEnum {
+class ColumnStringEnum : public Column {
 public:
 	ColumnStringEnum(size_t ref_keys, size_t ref_values, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	ColumnStringEnum(size_t ref_keys, size_t ref_values, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
@@ -41,7 +41,6 @@ private:
 
 	// Member variables
 	AdaptiveStringColumn m_keys;
-	Column m_values;
 };
 
 #endif //__TDB_COLUMN_STRING_ENUM__

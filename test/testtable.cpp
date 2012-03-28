@@ -205,6 +205,9 @@ TEST(Table_Delete_All_Types) {
 		}
 	}
 	
+	// We also want a ColumnStringEnum
+	table.Optimize();
+	
 	// Test Deletes
 	table.DeleteRow(14);
 	table.DeleteRow(0);

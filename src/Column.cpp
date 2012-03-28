@@ -123,6 +123,11 @@ void Column::UpdateParentNdx(int diff) {
 	m_array->UpdateParentNdx(diff);
 }
 
+// Used by column b-tree code to ensure all leaf having same type
+void Column::SetHasRefs() {
+	m_array->SetType(COLUMN_HASREFS);
+}
+
 void Column::GetParentInfo(size_t ndx, Array*& parent, size_t& pndx, size_t offset) const {
 	if (IsNode()) {
 		// Get subnode table

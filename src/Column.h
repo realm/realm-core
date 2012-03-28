@@ -19,6 +19,8 @@ class Index;
 class ColumnBase {
 public:
 	virtual ~ColumnBase() {};
+	
+	virtual void SetHasRefs() {};
 
 	virtual bool IsIntColumn() const {return false;}
 	virtual bool IsStringColumn() const {return false;}
@@ -112,6 +114,7 @@ public:
 
 	void SetParent(Array* parent, size_t pndx);
 	void UpdateParentNdx(int diff);
+	void SetHasRefs();
 
 	size_t Size() const;
 	bool IsEmpty() const;

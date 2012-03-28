@@ -1661,6 +1661,12 @@ void Array::Print() const {
 
 void Array::Verify() const {
 	assert(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
+	
+	// Check that parent is set correctly
+	if (m_parent) {
+		const size_t ref_in_parent = m_parent->GetAsRef(m_parentNdx);
+		assert(ref_in_parent == m_ref);
+	}
 }
 
 void Array::ToDot(std::ostream& out, const char* title) const {
@@ -1688,7 +1694,7 @@ void Array::ToDot(std::ostream& out, const char* title) const {
 		if (m_hasRefs) {
 			// zero-refs and refs that are not 64-aligned do not point to sub-trees
 			if (v == 0) out << "<TD>none";
-			else if (v & 0x1) out << "<TD>" << (v >> 1);
+			else if (v & 0x1) out << "<TD BGCOLOR=\"grey90\">" << (v >> 1);
 			else out << "<TD PORT=\"" << i << "\">";
 		}
 		else out << "<TD>" << v;

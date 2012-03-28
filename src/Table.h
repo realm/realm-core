@@ -257,6 +257,7 @@ public:
 	// Debug
 #ifdef _DEBUG
 	MemStats Stats() const;
+	void DumpToDot(std::ostream& out) const;
 	void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 

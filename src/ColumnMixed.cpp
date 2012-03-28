@@ -351,7 +351,25 @@ void ColumnMixed::Delete(size_t ndx) {
 	m_refs->Delete(ndx);
 }
 
+void ColumnMixed::Clear() {
+	m_types->Clear();
+	m_refs->Clear();
+	if (m_data) m_data->Clear();
+}
+
 #ifdef _DEBUG
+
+void ColumnMixed::Verify() const {
+	m_array->Verify();
+	m_types->Verify();
+	m_refs->Verify();
+	if (m_data) m_data->Verify();
+	
+	// types and refs should be in sync
+	const size_t types_len = m_types->Size();
+	const size_t refs_len  = m_refs->Size();
+	assert(types_len == refs_len);
+}
 
 void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 	const size_t ref = GetRef();
