@@ -46,7 +46,7 @@ public:
 	void InsertTable(size_t ndx);
 	
 	bool Add();
-	void Clear(){}
+	void Clear();
 	void Delete(size_t ndx);
 	
 	// Indexing
@@ -57,7 +57,7 @@ public:
 	size_t GetRef() const {return m_array->GetRef();}
 	
 #ifdef _DEBUG
-	void Verify() const {}
+	void Verify() const;
 	void ToDot(std::ostream& out, const char* title) const;
 #endif //_DEBUG
 	

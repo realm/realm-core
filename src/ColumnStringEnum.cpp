@@ -2,77 +2,77 @@
 
 
 ColumnStringEnum::ColumnStringEnum(size_t ref_keys, size_t ref_values, Array* parent, size_t pndx, Allocator& alloc)
-: m_keys(ref_keys, parent, pndx, alloc), m_values(ref_values, parent, pndx+1, alloc) {}
+: Column(ref_values, parent, pndx+1, alloc), m_keys(ref_keys, parent, pndx, alloc) {}
 
 ColumnStringEnum::ColumnStringEnum(size_t ref_keys, size_t ref_values, const Array* parent, size_t pndx, Allocator& alloc)
-: m_keys(ref_keys, parent, pndx, alloc), m_values(ref_values, parent, pndx+1, alloc) {}
+: Column(ref_values, parent, pndx+1, alloc), m_keys(ref_keys, parent, pndx, alloc) {}
 
 ColumnStringEnum::~ColumnStringEnum() {}
 
 void ColumnStringEnum::Destroy() {
 	m_keys.Destroy();
-	m_values.Destroy();
+	Column::Destroy();
 }
 
 void ColumnStringEnum::UpdateParentNdx(int diff) {
 	m_keys.UpdateParentNdx(diff);
-	m_values.UpdateParentNdx(diff);
+	Column::UpdateParentNdx(diff);
 }
 
 size_t ColumnStringEnum::Size() const {
-	return m_values.Size();
+	return Column::Size();
 }
 
 bool ColumnStringEnum::IsEmpty() const {
-	return m_values.IsEmpty();
+	return Column::IsEmpty();
 }
 
 const char* ColumnStringEnum::Get(size_t ndx) const {
-	assert(ndx < m_values.Size());
-	const size_t key_ndx = m_values.GetAsRef(ndx);
+	assert(ndx < Column::Size());
+	const size_t key_ndx = Column::GetAsRef(ndx);
 	return m_keys.Get(key_ndx);
 }
 
 bool ColumnStringEnum::Add(const char* value) {
-	return Insert(m_values.Size(), value);
+	return Insert(Column::Size(), value);
 }
 
 bool ColumnStringEnum::Set(size_t ndx, const char* value) {
-	assert(ndx < m_values.Size());
+	assert(ndx < Column::Size());
 	assert(value);
 
 	const size_t key_ndx = GetKeyNdx(value);
-	return m_values.Set(ndx, key_ndx);
+	return Column::Set(ndx, key_ndx);
 }
 
 bool ColumnStringEnum::Insert(size_t ndx, const char* value) {
-	assert(ndx <= m_values.Size());
+	assert(ndx <= Column::Size());
 	assert(value);
 
 	const size_t key_ndx = GetKeyNdx(value);
-	return m_values.Insert(ndx, key_ndx);
+	return Column::Insert(ndx, key_ndx);
 }
 
 void ColumnStringEnum::Delete(size_t ndx) {
-	assert(ndx < m_values.Size());
-	m_values.Delete(ndx);
+	assert(ndx < Column::Size());
+	Column::Delete(ndx);
 }
 
 void ColumnStringEnum::Clear() {
 	// Note that clearing a StringEnum does not remove keys
-	m_values.Clear();
+	Column::Clear();
 }
 
 void ColumnStringEnum::FindAll(Array &res, const char* value, size_t start, size_t end) const {
 	const size_t key_ndx = m_keys.Find(value);
 	if (key_ndx == (size_t)-1) return;
-	m_values.FindAll(res, key_ndx, 0, start, end);
+	Column::FindAll(res, key_ndx, 0, start, end);
 	return;
 }
 
 void ColumnStringEnum::FindAll(Array &res, size_t key_ndx, size_t start, size_t end) const {
 	if (key_ndx == (size_t)-1) return;
-	m_values.FindAll(res, key_ndx, 0, start, end);
+	Column::FindAll(res, key_ndx, 0, start, end);
 	return;
 }
 
@@ -81,7 +81,7 @@ size_t ColumnStringEnum::Find(size_t key_ndx, size_t start, size_t end) const {
 	// Find key
 	if (key_ndx == (size_t)-1) return (size_t)-1;
 
-	return m_values.Find(key_ndx, start, end);
+	return Column::Find(key_ndx, start, end);
 }
 
 size_t ColumnStringEnum::Find(const char* value, size_t start, size_t end) const {
@@ -89,7 +89,7 @@ size_t ColumnStringEnum::Find(const char* value, size_t start, size_t end) const
 	const size_t key_ndx = m_keys.Find(value);
 	if (key_ndx == (size_t)-1) return (size_t)-1;
 
-	return m_values.Find(key_ndx, start, end);
+	return Column::Find(key_ndx, start, end);
 }
 
 size_t ColumnStringEnum::GetKeyNdx(const char* value) {
@@ -118,13 +118,13 @@ bool ColumnStringEnum::Compare(const ColumnStringEnum& c) const {
 
 void ColumnStringEnum::Verify() const {
 	m_keys.Verify();
-	m_values.Verify();
+	Column::Verify();
 }
 
 MemStats ColumnStringEnum::Stats() const {
 	MemStats stats;
 	stats.Add(m_keys.Stats());
-	stats.Add(m_values.Stats());
+	stats.Add(Column::Stats());
 	return stats;
 }
 
@@ -137,7 +137,7 @@ void ColumnStringEnum::ToDot(std::ostream& out, const char* title) const {
 	out << "\";" << std::endl;
 	
 	m_keys.ToDot(out, "keys");
-	m_values.ToDot(out, "values");
+	Column::ToDot(out, "values");
 	
 	out << "}" << std::endl;
 }

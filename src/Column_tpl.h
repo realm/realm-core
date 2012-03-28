@@ -195,6 +195,8 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 
 		// Create new list for item
 		C newList(m_array->GetAllocator());
+		if (m_array->HasRefs()) newList.SetHasRefs(); // all leafs should have same type
+		
 		if (!newList.Add(value)) return NodeChange(NodeChange::CT_ERROR);
 
 		switch (ndx) {
