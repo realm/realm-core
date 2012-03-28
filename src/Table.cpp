@@ -1106,7 +1106,11 @@ void Table::Optimize() {
 			const size_t column_ndx = GetColumnRefPos(i);
 			m_columns.Set(column_ndx, ref_keys);
 			m_columns.Insert(column_ndx+1, ref_values);
-			UpdateColumnRefs(column_ndx+2, 1);
+			
+			// There are still same number of columns, but since
+			// the enum type takes up two posistions in m_columns
+			// we have to move refs in all following columns
+			UpdateColumnRefs(column_ndx+1, 1);
 
 			// Replace cached column
 			ColumnStringEnum* e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc);
@@ -1365,10 +1369,25 @@ void Table::Verify() const {
 			}
 			break;
 		case COLUMN_TYPE_BINARY:
+			{
+				const ColumnBinary& column = GetColumnBinary(i);
+				assert(column.Size() == m_size);
+				column.Verify();
+			}
 			break;
 		case COLUMN_TYPE_TABLE:
+			{
+				const ColumnTable& column = GetColumnTable(i);
+				assert(column.Size() == m_size);
+				column.Verify();
+			}
 			break;
 		case COLUMN_TYPE_MIXED:
+			{
+				const ColumnMixed& column = GetColumnMixed(i);
+				assert(column.Size() == m_size);
+				column.Verify();
+			}
 			break;
 		default:
 			assert(false);
@@ -1377,6 +1396,12 @@ void Table::Verify() const {
 
 	Allocator& alloc = m_specSet.GetAllocator();
 	alloc.Verify();
+}
+
+void TopLevelTable::DumpToDot(std::ostream& out) const {
+	out << "digraph G {" << endl;
+	ToDot(out);
+	out << "}" << endl;
 }
 
 void Table::ToDot(std::ostream& out, const char* title) const {

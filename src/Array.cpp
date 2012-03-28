@@ -1666,6 +1666,12 @@ void Array::Print() const {
 
 void Array::Verify() const {
 	assert(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
+	
+	// Check that parent is set correctly
+	if (m_parent) {
+		const size_t ref_in_parent = m_parent->GetAsRef(m_parentNdx);
+		assert(ref_in_parent == m_ref);
+	}
 }
 
 void Array::ToDot(std::ostream& out, const char* title) const {

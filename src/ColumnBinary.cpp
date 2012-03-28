@@ -85,10 +85,17 @@ size_t ColumnBinary::Size() const {
 
 void ColumnBinary::Clear() {
 	if (m_array->IsNode()) {
+		Array* const parent = m_array->GetParent();
+		const size_t pndx   = m_array->GetParentNdx();
+		
 		// Revert to binary array
+		ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->GetAllocator());
+		if (parent) parent->Set(pndx, array->GetRef()); // Update parent
+		
+		// Remove original node
 		m_array->Destroy();
-		Array* array = new ArrayBinary(m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
 		delete m_array;
+		
 		m_array = array;
 	}
 	else ((ArrayBinary*)m_array)->Clear();
