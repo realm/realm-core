@@ -151,6 +151,8 @@ public:
 
 	Allocator& GetAllocator() const {return m_alloc;}
 
+	bool is_subtable_root() const { return m_is_subtable_root; }
+
 	// Serialization
 	template<class S> size_t Write(S& target, size_t& pos, bool recurse=true) const;
 	std::vector<int64_t> ToVector(void);
@@ -180,7 +182,7 @@ private:
 	template <bool gt>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
 	template <size_t w> void Sort();
 	template <size_t w>void ReferenceSort(Array &ref);
-        void update_ref_in_parent(size_t ref);
+	void update_ref_in_parent(size_t ref);
 
 protected:
 	bool AddPositiveLocal(int64_t value);
@@ -246,9 +248,18 @@ protected:
 private:
 	Array* m_parent;
 	size_t m_parentNdx;
-protected:
+
 	Allocator& m_alloc;
 
+	// When m_is_subtable_root is true, and m_ref is changed,
+	// update_subtable_ref() must be called on the parent to update its
+	// reference to this array. In this case the parent must point to
+	// the Array that corresponds to the root node of the B-tree of the
+	// parent column.
+	bool const m_is_subtable_root;
+	virtual void update_subtable_ref(size_t subtable_ndx, size_t new_ref);
+
+protected:
 	int64_t m_lbound;
 	int64_t m_ubound;
 };
@@ -321,7 +332,10 @@ size_t Array::Write(S& out, size_t& pos, bool recurse) const {
 inline void Array::update_ref_in_parent(size_t ref)
 {
   if (!m_parent) return;
-  std::cerr << "CLICK: m_isNode = " << m_isNode << ", m_hasRefs = " << m_hasRefs << std::endl;
+  if (m_is_subtable_root) {
+	  m_parent->update_subtable_ref(m_parentNdx, ref);
+	  return;
+  }
   m_parent->Set(m_parentNdx, ref);
 }
 

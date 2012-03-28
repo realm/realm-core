@@ -105,7 +105,7 @@ TopLevelTable& Group::GetTable(size_t ndx) {
 	TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(ndx);
 	if (!t) {
 		const size_t ref = m_tables.GetAsRef(ndx);
-		t = new TopLevelTable(m_alloc, ref, &m_tables, ndx);
+		t = new TopLevelTable(m_alloc, ref, &m_tables, ndx, false);
 		m_cachedtables.Set(ndx, (intptr_t)t);
 	}
 	return *t;

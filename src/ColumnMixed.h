@@ -66,11 +66,36 @@ private:
 	void InitDataColumn();
 	
 	void ClearValue(size_t ndx, ColumnType newtype);
+
+	class RefsColumn;
 	
 	// Member variables
 	Column*       m_types;
-	Column*       m_refs;
+	RefsColumn*   m_refs;
 	ColumnBinary* m_data;
 };
+
+
+class ColumnMixed::RefsColumn: public Column {
+public:
+	RefsColumn(Allocator &alloc): Column(COLUMN_HASREFS, alloc) {}
+	RefsColumn(size_t ref, Array *parent, size_t pndx, Allocator &alloc):
+		Column(ref, parent, pndx, alloc) {}
+	TopLevelTable get_table(size_t ndx);
+	TopLevelTable *get_table_ptr(size_t ndx);
+};
+
+
+inline TopLevelTable ColumnMixed::GetTable(size_t ndx) {
+	assert(ndx < m_types->Size());
+	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
+	return m_refs->get_table(ndx);
+}
+
+inline TopLevelTable *ColumnMixed::GetTablePtr(size_t ndx) {
+	assert(ndx < m_types->Size());
+	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
+	return m_refs->get_table_ptr(ndx);
+}
 
 #endif //__TDB_COLUMN_MIXED__

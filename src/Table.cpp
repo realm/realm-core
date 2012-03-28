@@ -153,7 +153,8 @@ TopLevelTable::TopLevelTable(Allocator& alloc) : Table(alloc), m_top(COLUMN_HASR
     m_columns.SetParent(&m_top, 1);
 }
 
-TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx, bool is_subtable) : Table(alloc, true), m_top(alloc, is_subtable)
+TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx, bool is_subtable):
+	Table(alloc, true), m_top(alloc, is_subtable)
 {
 	// Load from allocated memory
     m_top.UpdateRef(ref_top);
@@ -167,7 +168,9 @@ TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, si
 	m_specSet.SetParent(&m_top, 0);
 }
 
-TopLevelTable::TopLevelTable(const TopLevelTable& t) {
+TopLevelTable::TopLevelTable(const TopLevelTable& t):
+	Table(t.m_top.GetAllocator(), true), m_top(t.m_top.GetAllocator(), t.m_top.is_subtable_root())
+{
 	// NOTE: Original should be destroyed right after copy. Do not modify
 	// original after this. It could invalidate the copy (or worse).
 	// TODO: implement ref-counting
@@ -231,7 +234,7 @@ MemStats TopLevelTable::Stats() const {
 // -- Table ---------------------------------------------------------------------------------
 
 Table::Table(Allocator& alloc)
-: m_size(0), m_specSet(COLUMN_HASREFS, NULL, 0, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_subSpecs(alloc), m_columns(COLUMN_HASREFS, NULL, 0, alloc)
+  : m_size(0), m_specSet(COLUMN_HASREFS, NULL, 0, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_subSpecs(alloc, false), m_columns(COLUMN_HASREFS, NULL, 0, alloc)
 {
 	// The SpecSet contains the specification (types and names) of all columns and sub-tables
 	m_specSet.Add(m_spec.GetRef());
@@ -242,22 +245,27 @@ Table::Table(Allocator& alloc)
 
 // Creates un-initialized table. Remember to call Create() before use
 Table::Table(Allocator& alloc, bool dontInit)
-: m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc), m_columns(alloc)
+: m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc), m_subSpecs(alloc, false), m_columns(alloc, false)
 {
 	assert(dontInit == true); // only there to differentiate constructor
 	(void)dontInit;
 }
 
 Table::Table(Allocator& alloc, size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns,
-             bool columns_ref_is_subtable_root)
-: m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc), m_columns(alloc, columns_ref_is_subtable_root)
+             bool columns_ref_is_subtable_root):
+	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
+	m_subSpecs(alloc, false), m_columns(alloc, columns_ref_is_subtable_root)
 {
 	Create(ref_specSet, columns_ref, parent_columns, pndx_columns);
 }
 
-Table::Table(const Table& t) {
-	// FIXME: How is the allocator set?
-	// FIXME: Copy 'm_is_subtable_root' from t.m_columns to m_columns
+Table::Table(const Table& t):
+	m_size(0), m_specSet(t.m_columns.GetAllocator(), false),
+	m_spec(t.m_columns.GetAllocator(), false),
+	m_columnNames(t.m_columns.GetAllocator()),
+	m_subSpecs(t.m_columns.GetAllocator(), false),
+	m_columns(t.m_columns.GetAllocator(), t.m_columns.is_subtable_root())
+{
 	const size_t ref_specSet = t.m_specSet.GetRef();
 	const size_t ref_columns = t.m_columns.GetRef();
 	Array* const parent      = t.m_columns.GetParent();
