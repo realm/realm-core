@@ -145,7 +145,7 @@ size_t Spec::GetColumnIndex(const char* name) const {
 
 // -- TopLevelTable ---------------------------------------------------------------------------
 
-TopLevelTable::TopLevelTable(Allocator& alloc) : Table(alloc), m_top(COLUMN_HASREFS, NULL, 0, alloc) {
+TopLevelTable::TopLevelTable(Allocator& alloc): Table(alloc), m_top(COLUMN_HASREFS, NULL, 0, alloc) {
 	// A table is defined by a specset and a list of columns
 	m_top.Add(m_specSet.GetRef());
     m_top.Add(m_columns.GetRef());

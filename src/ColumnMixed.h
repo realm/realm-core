@@ -81,10 +81,24 @@ public:
 	RefsColumn(Allocator &alloc): Column(COLUMN_HASREFS, alloc) {}
 	RefsColumn(size_t ref, Array *parent, size_t pndx, Allocator &alloc):
 		Column(ref, parent, pndx, alloc) {}
+	void insert_table(size_t ndx);
+	void set_table(size_t ndx);
 	TopLevelTable get_table(size_t ndx);
 	TopLevelTable *get_table_ptr(size_t ndx);
 };
 
+
+inline void ColumnMixed::InsertTable(size_t ndx) {
+	assert(ndx <= m_types->Size());
+	m_types->Insert(ndx, COLUMN_TYPE_TABLE);
+	m_refs->insert_table(ndx);
+}
+
+inline void ColumnMixed::SetTable(size_t ndx) {
+	assert(ndx < m_types->Size());
+	ClearValue(ndx, COLUMN_TYPE_TABLE); // Remove refs or binary data
+	m_refs->set_table(ndx);
+}
 
 inline TopLevelTable ColumnMixed::GetTable(size_t ndx) {
 	assert(ndx < m_types->Size());

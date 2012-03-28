@@ -133,7 +133,7 @@ public:
 	// Strings
 	const char* GetString(size_t column_id, size_t ndx) const;
 	void SetString(size_t column_id, size_t ndx, const char* value);
-	
+
 	// Binary
 	BinaryData GetBinary(size_t column_id, size_t ndx) const;
 	void SetBinary(size_t column_id, size_t ndx, const void* value, size_t len);
@@ -218,7 +218,6 @@ protected:
 	size_t GetColumnRefPos(size_t column_ndx) const;
 	void UpdateColumnRefs(size_t column_ndx, int diff);
 
-	void InstantiateBeforeChange(); // FIXME: Make private
 	
 #ifdef _DEBUG
 	void ToDotInternal(std::ostream& out) const;
@@ -239,6 +238,8 @@ protected:
 
 private:
 	Table& operator=(const Table& t); // non assignable
+
+	void InstantiateBeforeChange();
 };
 
 
@@ -246,7 +247,6 @@ private:
 class TopLevelTable : public Table {
 public:
 	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
-	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx, bool is_subtable);
 	TopLevelTable(const TopLevelTable& t);
 	~TopLevelTable();
 
@@ -265,8 +265,13 @@ protected:
 	// On-disk format
 	Array m_top;
 
+	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx, bool is_subtable);
+
 private:
 	TopLevelTable& operator=(const TopLevelTable&) {return *this;} // non assignable
+
+	friend class Group;
+	friend class ColumnMixed;
 };
 
 
