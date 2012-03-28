@@ -66,12 +66,15 @@ size_t ColumnTable::GetTableSize(size_t ndx) const {
 }
 
 bool ColumnTable::Add() {
-	return Column::Add(0); // zero-ref indicates empty table
+	Insert(Size()); // zero-ref indicates empty table
+	return true;
 }
 
 void ColumnTable::Insert(size_t ndx) {
 	assert(ndx <= Size());
-	Column::Insert(ndx, 0); // zero-ref indicates empty table
+	
+	// zero-ref indicates empty table
+	Column::Insert(ndx, 0);
 }
 
 void ColumnTable::Delete(size_t ndx) {
