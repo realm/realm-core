@@ -115,7 +115,7 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const {
 	const size_t count = array.Size();
 	
 	for (size_t i = 0; i < count; ++i) {
-		const size_t tref = GetAsRef(i);
+		const size_t tref = array.GetAsRef(i);
 		if (tref == 0) continue;
 		
 		const Table t = GetTable(i);

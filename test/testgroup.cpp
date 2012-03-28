@@ -405,6 +405,7 @@ TEST(Group_ToDot) {
 	std::ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
 	if (!fs.is_open()) cout << "file open error " << strerror << endl;
 	mygroup.ToDot(fs);
+	fs.close();
 }
 
 #endif //TIGHTDB_TO_DOT
