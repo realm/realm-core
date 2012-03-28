@@ -8,6 +8,8 @@ using namespace std;
 /*
 
 
+Problem is that topLevelTable does not accept a null reference, so either implement that (no, because it will be changed soon), or Revert to the way it was (creation of table with zero rows)
+
 
 Table::GetSpec()
 const
