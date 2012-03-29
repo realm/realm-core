@@ -26,6 +26,7 @@ public:
 	bool Insert(size_t ndx, const char* value);
 	void Delete(size_t ndx);
 	void Clear();
+	void Resize(size_t ndx);
 
 	size_t Find(const char* value, size_t start=0 , size_t end=-1) const;
 	void FindAll(Array &result, const char* value, size_t start = 0, size_t end = -1) const;

@@ -91,6 +91,15 @@ void ArrayBinary::Delete(size_t ndx) {
 	m_offsets.Adjust(ndx, start - end);
 }
 
+void ArrayBinary::Resize(size_t ndx) {
+	assert(ndx < m_offsets.Size());
+	
+	const size_t len = ndx ? m_offsets.Get(ndx-1) : 0;
+	
+	m_offsets.Resize(ndx);
+	m_blob.Resize(len);
+}
+
 void ArrayBinary::Clear() {
 	m_blob.Clear();
 	m_offsets.Clear();

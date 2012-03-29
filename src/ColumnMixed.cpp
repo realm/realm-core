@@ -353,6 +353,16 @@ void ColumnMixed::Verify() const {
 	const size_t types_len = m_types->Size();
 	const size_t refs_len  = m_refs->Size();
 	assert(types_len == refs_len);
+	
+	// Verify each sub-table
+	const size_t count = Size();
+	for (size_t i = 0; i < count; ++i) {
+		const size_t tref = m_refs->GetAsRef(i);
+		if (tref == 0 || tref & 0x1) continue;
+		
+		const TopLevelTable t = ((ColumnMixed*)this)-> GetTable(i);
+		t.Verify();
+	}
 }
 
 void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
@@ -365,6 +375,17 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 	
 	m_array->ToDot(out, "mixed_top");
 	
+	// Write sub-tables
+	const size_t count = Size();
+	for (size_t i = 0; i < count; ++i) {
+		const ColumnType type = (ColumnType)m_types->Get(i);
+		if (type != COLUMN_TYPE_TABLE) continue;
+		if (m_refs->GetAsRef(i) == 0) continue; // empty table
+		
+		const TopLevelTable t = ((ColumnMixed*)this)->GetTable(i);
+		t.ToDot(out);
+	}
+	
 	m_types->ToDot(out, "types");
 	m_refs->ToDot(out, "refs");
 	
@@ -372,6 +393,7 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 		m_data->ToDot(out, "data");
 	}
 	
+		
 	out << "}" << std::endl;
 }
 

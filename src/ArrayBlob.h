@@ -16,6 +16,7 @@ public:
 	void Insert(size_t pos, void* data, size_t len);
 	void Replace(size_t start, size_t end, void* data, size_t len);
 	void Delete(size_t start, size_t end);
+	void Resize(size_t len);
 	void Clear();
 	
 #ifdef _DEBUG

@@ -149,7 +149,8 @@ TEST(Table_Delete_All_Types) {
 	s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
 	s.AddColumn(COLUMN_TYPE_DATE,   "date");
 	s.AddColumn(COLUMN_TYPE_STRING, "string");
-	s.AddColumn(COLUMN_TYPE_STRING, "string2"); // becomes ColumnStringEnum
+	s.AddColumn(COLUMN_TYPE_STRING, "string_long");
+	s.AddColumn(COLUMN_TYPE_STRING, "string_enum"); // becomes ColumnStringEnum
 	s.AddColumn(COLUMN_TYPE_BINARY, "binary");
 	s.AddColumn(COLUMN_TYPE_MIXED,  "mixed");
 	Spec sub = s.AddColumnTable(    "tables");
@@ -167,38 +168,41 @@ TEST(Table_Delete_All_Types) {
 		ss << "string" << i;
 		table.InsertString(3, i, ss.str().c_str());
 		
-		switch (i % 3) {
-			case 0:
-				table.InsertString(4, i, "test1");
-				break;
-			case 1:
-				table.InsertString(4, i, "test2");
-				break;
-			case 2:
-				table.InsertString(4, i, "test3");
-				break;
-		}
-		
-		table.InsertBinary(5, i, "binary", 7);
+		ss << " very long string.........";
+		table.InsertString(4, i, ss.str().c_str());
 		
 		switch (i % 3) {
 			case 0:
-				table.InsertMixed(6, i, false);
+				table.InsertString(5, i, "test1");
 				break;
 			case 1:
-				table.InsertMixed(6, i, (int64_t)i);
+				table.InsertString(5, i, "test2");
 				break;
 			case 2:
-				table.InsertMixed(6, i, "string");
+				table.InsertString(5, i, "test3");
 				break;
 		}
 		
-		table.InsertTable(7, i);
+		table.InsertBinary(6, i, "binary", 7);
+		
+		switch (i % 3) {
+			case 0:
+				table.InsertMixed(7, i, false);
+				break;
+			case 1:
+				table.InsertMixed(7, i, (int64_t)i);
+				break;
+			case 2:
+				table.InsertMixed(7, i, "string");
+				break;
+		}
+		
+		table.InsertTable(8, i);
 		table.InsertDone();
 		
 		// Add sub-tables
 		if (i == 2) {
-			Table subtable = table.GetTable(7, i);
+			Table subtable = table.GetTable(8, i);
 			subtable.InsertInt(0, 0, 42);
 			subtable.InsertString(1, 0, "meaning");
 			subtable.InsertDone();
