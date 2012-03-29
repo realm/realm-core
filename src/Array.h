@@ -239,18 +239,18 @@ protected:
 	// Member variables
 	Getter m_getter;
 	Setter m_setter;
-	size_t m_ref; // FIXME: Try to make private!
+
+private:
+	size_t m_ref;
+
+protected:
 	size_t m_len;
 	size_t m_capacity;
 	size_t m_width;
 	bool m_isNode;
 	bool m_hasRefs;
+
 private:
-	Array* m_parent;
-	size_t m_parentNdx;
-
-	Allocator& m_alloc;
-
 	// When m_is_subtable_root is true, and m_ref is changed,
 	// update_subtable_ref() must be called on the parent to update its
 	// reference to this array. In this case the parent must point to
@@ -258,6 +258,11 @@ private:
 	// parent column.
 	bool const m_is_subtable_root;
 	virtual void update_subtable_ref(size_t subtable_ndx, size_t new_ref);
+
+	Array* m_parent;
+	size_t m_parentNdx;
+
+	Allocator& m_alloc;
 
 protected:
 	int64_t m_lbound;
