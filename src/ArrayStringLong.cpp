@@ -152,3 +152,22 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
 
 	return (size_t)-1; // not found
 }
+
+#ifdef _DEBUG
+
+void ArrayStringLong::ToDot(std::ostream& out, const char* title) const {
+	const size_t ref = GetRef();
+	
+	out << "subgraph cluster_arraystringlong" << ref << " {" << std::endl;
+	out << " label = \"ArrayStringLong";
+	if (title) out << "\\n'" << title << "'";
+	out << "\";" << std::endl;
+	
+	Array::ToDot(out, "stringlong_top");
+	m_offsets.ToDot(out, "offsets");
+	m_blob.ToDot(out, "blob");
+	
+	out << "}" << std::endl;
+}
+
+#endif //_DEBUG

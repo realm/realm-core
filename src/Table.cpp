@@ -1430,7 +1430,9 @@ void Table::ToDotInternal(std::ostream& out) const {
 }
 
 void TopLevelTable::ToDot(std::ostream& out, const char* title) const {
-	out << "subgraph cluster_topleveltable {" << endl;
+	const size_t ref = m_top.GetRef();
+	
+	out << "subgraph cluster_topleveltable" << ref << " {" << endl;
 	out << " label = \"TopLevelTable";
 	if (title) out << "\\n'" << title << "'";
 	out << "\";" << endl;
@@ -1446,7 +1448,9 @@ void TopLevelTable::ToDot(std::ostream& out, const char* title) const {
 }
 
 void Spec::ToDot(std::ostream& out, const char* title) const {
-	out << "subgraph cluster_specset {" << endl;
+	const size_t ref = m_specSet.GetRef();
+	
+	out << "subgraph cluster_specset" << ref << " {" << endl;
 	out << " label = \"specset\";" << endl;
 	
 	m_specSet.ToDot(out);

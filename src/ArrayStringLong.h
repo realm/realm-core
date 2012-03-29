@@ -26,6 +26,10 @@ public:
 
 	size_t Find(const char* value, size_t start=0 , size_t end=-1) const;
 	void FindAll(Array &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+	
+#ifdef _DEBUG
+	void ToDot(std::ostream& out, const char* title=NULL) const;
+#endif //_DEBUG
 
 private:
 	size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;

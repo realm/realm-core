@@ -395,7 +395,11 @@ void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) cons
 	const bool isLongStrings = array.HasRefs(); // HasRefs indicates long string array
 	
 	if (isLongStrings) {
-		((ArrayStringLong&)array).ToDot(out);
+		// ArrayStringLong has more members than Array, so we have to
+		// really instantiate it (it is not enough with a cast)
+		const size_t ref = array.GetRef();
+		ArrayStringLong str_array(ref, (Array*)NULL, 0, array.GetAllocator());
+		str_array.ToDot(out);
 	}
 	else {
 		((ArrayString&)array).ToDot(out);
