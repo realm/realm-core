@@ -83,6 +83,12 @@ public: \
 			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
 		}; \
 \
+		class TestQueryQueryAccessorMixed : private XQueryAccessorMixed { \
+		public: \
+			TestQueryQueryAccessorMixed(size_t column_id) : XQueryAccessorMixed(column_id) {} \
+			void SetQuery(Query* query) {m_query = query;} \
+		}; \
+\
 		TestQueryQueryAccessor##CType1 CName1; \
 \
 		TestQuery& LeftParan(void) {Query::LeftParan(); return *this;}; \
@@ -210,6 +216,12 @@ public: \
 			void SetQuery(Query* query) {m_query = query;} \
 \
 			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
+		}; \
+\
+		class TestQueryQueryAccessorMixed : private XQueryAccessorMixed { \
+		public: \
+			TestQueryQueryAccessorMixed(size_t column_id) : XQueryAccessorMixed(column_id) {} \
+			void SetQuery(Query* query) {m_query = query;} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -352,6 +364,12 @@ public: \
 			void SetQuery(Query* query) {m_query = query;} \
 \
 			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
+		}; \
+\
+		class TestQueryQueryAccessorMixed : private XQueryAccessorMixed { \
+		public: \
+			TestQueryQueryAccessorMixed(size_t column_id) : XQueryAccessorMixed(column_id) {} \
+			void SetQuery(Query* query) {m_query = query;} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -507,6 +525,12 @@ public: \
 			void SetQuery(Query* query) {m_query = query;} \
 \
 			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
+		}; \
+\
+		class TestQueryQueryAccessorMixed : private XQueryAccessorMixed { \
+		public: \
+			TestQueryQueryAccessorMixed(size_t column_id) : XQueryAccessorMixed(column_id) {} \
+			void SetQuery(Query* query) {m_query = query;} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -675,6 +699,12 @@ public: \
 			void SetQuery(Query* query) {m_query = query;} \
 \
 			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
+		}; \
+\
+		class TestQueryQueryAccessorMixed : private XQueryAccessorMixed { \
+		public: \
+			TestQueryQueryAccessorMixed(size_t column_id) : XQueryAccessorMixed(column_id) {} \
+			void SetQuery(Query* query) {m_query = query;} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -856,6 +886,12 @@ public: \
 			void SetQuery(Query* query) {m_query = query;} \
 \
 			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
+		}; \
+\
+		class TestQueryQueryAccessorMixed : private XQueryAccessorMixed { \
+		public: \
+			TestQueryQueryAccessorMixed(size_t column_id) : XQueryAccessorMixed(column_id) {} \
+			void SetQuery(Query* query) {m_query = query;} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -1050,6 +1086,12 @@ public: \
 			void SetQuery(Query* query) {m_query = query;} \
 \
 			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
+		}; \
+\
+		class TestQueryQueryAccessorMixed : private XQueryAccessorMixed { \
+		public: \
+			TestQueryQueryAccessorMixed(size_t column_id) : XQueryAccessorMixed(column_id) {} \
+			void SetQuery(Query* query) {m_query = query;} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \
@@ -1257,6 +1299,12 @@ public: \
 			void SetQuery(Query* query) {m_query = query;} \
 \
 			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \
+		}; \
+\
+		class TestQueryQueryAccessorMixed : private XQueryAccessorMixed { \
+		public: \
+			TestQueryQueryAccessorMixed(size_t column_id) : XQueryAccessorMixed(column_id) {} \
+			void SetQuery(Query* query) {m_query = query;} \
 		}; \
 \
 		TestQueryQueryAccessor##CType1 CName1; \

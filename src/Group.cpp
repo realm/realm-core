@@ -166,7 +166,7 @@ void Group::Verify() {
 		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
 		if (!t) {
 			const size_t ref = m_tables.GetAsRef(i);
-			t = new TopLevelTable(m_alloc, ref, &m_tables, i);
+			t = new TopLevelTable(m_alloc, ref, &m_tables, i, false);
 			m_cachedtables.Set(i, (intptr_t)t);
 		}
 		t->Verify();
@@ -181,7 +181,7 @@ MemStats Group::Stats() {
 		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
 		if (!t) {
 			const size_t ref = m_tables.GetAsRef(i);
-			t = new TopLevelTable(m_alloc, ref, &m_tables, i);
+			t = new TopLevelTable(m_alloc, ref, &m_tables, i, false);
 			m_cachedtables.Set(i, (intptr_t)t);
 		}
 		const MemStats m = t->Stats();

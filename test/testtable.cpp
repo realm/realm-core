@@ -699,7 +699,6 @@ TEST(Table_Mixed2) {
 }
 
 
-
 TEST(Table_Subtable) {
 	int n = 150;
 

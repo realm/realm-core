@@ -28,9 +28,9 @@ nodebug: CXXFLAGS += -DNDEBUG -O3
 nodebug: all
 .PHONY: nodebug
 
-debug: CXXFLAGS += -DDEBUG -g3 -ggdb
+debug: CXXFLAGS += -D_DEBUG -g3 -ggdb
 debug: all
-	@(cd test && make debug)
+#	@(cd test && make debug)
 .PHONY: debug
 
 # Targets

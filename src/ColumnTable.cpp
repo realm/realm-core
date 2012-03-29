@@ -98,7 +98,7 @@ void ColumnTable::Verify() const {
 		const size_t tref = Column::GetAsRef(i);
 		if (tref == 0) continue;
 		
-		const Table t = GetTable(i);
+		const Table t = const_cast<ColumnTable *>(this)->GetTable(i);
 		t.Verify();
 	}
 }
@@ -112,7 +112,7 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const {
 		const size_t tref = array.GetAsRef(i);
 		if (tref == 0) continue;
 		
-		const Table t = GetTable(i);
+		const Table t = const_cast<ColumnTable *>(this)->GetTable(i);
 		t.ToDot(out);
 	}
 }

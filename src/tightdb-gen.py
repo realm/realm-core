@@ -120,6 +120,12 @@ CName${j+1}%slurp
 			TestQuery& Equal(bool value) {return static_cast<TestQuery &>(XQueryAccessorBool::Equal(value));} \\
 		}; \\
 \\
+		class TestQueryQueryAccessorMixed : private XQueryAccessorMixed { \\
+		public: \\
+			TestQueryQueryAccessorMixed(size_t column_id) : XQueryAccessorMixed(column_id) {} \\
+			void SetQuery(Query* query) {m_query = query;} \\
+		}; \\
+\\
 %for $j in range($num_cols)
 		TestQueryQueryAccessor##CType${j+1} CName${j+1}; \\
 %end for

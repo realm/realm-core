@@ -8,9 +8,9 @@
 
 # Compiler and flags
 #CXXFLAGS  = -Wall -Weffc++ -Wextra -std=c++0x
-CXXFLAGS  = -std=c++0x -lpthread
+CXXFLAGS  = -std=c++0x -pthread
 CXXSSE    = -DUSE_SSE -msse4.2
-CXXLIBS   = -L./UnitTest++ -lUnitTest++
+CXXLIBS   = -L./UnitTest++ -lUnitTest++ -L../ -ltightdb
 CXXINC    = -I./UnitTest++/src -I../src
 CXX       = g++ $(CXXFLAGS)
 
@@ -21,11 +21,10 @@ EXECUTABLE = tightdb-tests
 # Also, never use relative paths, or you'll get "time stamp" errors
 
 # HEADERS    = $(abspath $(wildcard ../src/*.h))
-SOURCES    = $(abspath $(wildcard ../src/*.cpp))
+#SOURCES    = $(abspath $(wildcard ../src/*.cpp))
 # TEST_H     = $(abspath $(wildcard *.h))
-TEST_SRC   = $(abspath $(wildcard *.cpp large_tests/*.cpp))
-SURFIXES   = %.cpp %.h
-OBJECTS    = $(SOURCES:.o=.cpp) $(TEST_SRC:.o=.cpp) 
+TEST_SRC   = $(wildcard *.cpp large_tests/*.cpp)
+OBJECTS    = $(TEST_SRC:.cpp=.o) 
 
 # Targets
 allsse: CXXFLAGS += -DNDEBUG -O3
@@ -43,10 +42,10 @@ all: $(EXECUTABLE)
 test: all
 	@./run_tests.sh
 
-debug: CXXFLAGS += -DDEBUG -g3 -ggdb
+debug: CXXFLAGS += -D_DEBUG -g3 -ggdb
 debug: $(EXECUTABLE)
 
-gcov: CXXFLAGS += -DDEBUG -g3 -ggdb --coverage
+gcov: CXXFLAGS += -D_DEBUG -g3 -ggdb --coverage
 gcov: clean $(EXECUTABLE)
 	@./$(EXECUTABLE)
 	@lcov --directory . --capture --output-file app.info
@@ -61,10 +60,10 @@ clean:
 
 # Linking
 $(EXECUTABLE): $(OBJECTS)
-	@make -C UnitTest++ > /dev/null
-	@$(CXX) $(OBJECTS) $(CXXLIBS) $(CXXINC) -o $@
+	make -C UnitTest++ > /dev/null
+	$(CXX) $(OBJECTS) $(CXXLIBS) -o $@
 
-# Compilation
-%.o: $(SURFIXES)
-	@$(CXX) -c $^
+# Compiling
+%.o: %.cpp
+	$(CXX) $(CXXINC) -o $@ -c $<
 
