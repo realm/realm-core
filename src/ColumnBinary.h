@@ -28,6 +28,7 @@ public:
 	void Set(size_t ndx, const void* value, size_t len);
 	void Insert(size_t ndx, const void* value, size_t len);
 	void Delete(size_t ndx);
+	void Resize(size_t ndx);
 	void Clear();
 
 	// Index

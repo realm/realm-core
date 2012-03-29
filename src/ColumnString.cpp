@@ -125,6 +125,16 @@ void AdaptiveStringColumn::Clear() {
 	else ((ArrayString*)m_array)->Clear();
 }
 
+void AdaptiveStringColumn::Resize(size_t ndx) {
+	assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
+	
+	if (IsLongStrings()) {
+		((ArrayStringLong*)m_array)->Resize(ndx);
+	}
+	else ((ArrayString*)m_array)->Resize(ndx);
+	
+}
+
 const char* AdaptiveStringColumn::Get(size_t ndx) const {
 	assert(ndx < Size());
 	return TreeGet<const char*, AdaptiveStringColumn>(ndx);

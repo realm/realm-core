@@ -63,6 +63,11 @@ void ArrayBlob::Delete(size_t start, size_t end) {
 	Replace(start, end, NULL, 0);
 }
 
+void ArrayBlob::Resize(size_t len) {
+	assert(len <= m_len);
+	Replace(len, m_len, NULL, 0);
+}
+
 void ArrayBlob::Clear() {
 	Replace(0, m_len, NULL, 0);
 }

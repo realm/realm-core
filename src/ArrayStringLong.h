@@ -21,6 +21,7 @@ public:
 	void Insert(size_t ndx, const char* value);
 	void Insert(size_t ndx, const char* value, size_t len);
 	void Delete(size_t ndx);
+	void Resize(size_t ndx);
 	void Clear();
 
 	size_t Find(const char* value, size_t start=0 , size_t end=-1) const;

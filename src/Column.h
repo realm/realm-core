@@ -29,6 +29,7 @@ public:
 	virtual bool Add() = 0;
 	virtual void Clear() = 0;
 	virtual void Delete(size_t ndx) = 0;
+	void Resize(size_t ndx) {m_array->Resize(ndx);}
 
 	// Indexing
 	virtual bool HasIndex() const = 0;

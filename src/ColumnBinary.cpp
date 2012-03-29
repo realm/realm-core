@@ -153,6 +153,12 @@ void ColumnBinary::Delete(size_t ndx) {
 	TreeDelete<BinaryData,ColumnBinary>(ndx);
 }
 
+void ColumnBinary::Resize(size_t ndx) {
+	assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
+	assert(ndx < Size());
+	((ArrayBinary*)m_array)->Resize(ndx);
+}
+
 BinaryData ColumnBinary::LeafGet(size_t ndx) const {
 	const ArrayBinary* const array = (ArrayBinary*)m_array;
 	const BinaryData bin = {array->Get(ndx), array->GetLen(ndx)};
