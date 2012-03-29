@@ -109,6 +109,20 @@ void ColumnTable::Clear(size_t ndx) {
 
 #ifdef _DEBUG
 
+void ColumnTable::Verify() const {
+	Column::Verify();
+	
+	// Verify each sub-table
+	const size_t count = Size();
+	for (size_t i = 0; i < count; ++i) {
+		const size_t tref = Column::GetAsRef(i);
+		if (tref == 0) continue;
+		
+		const Table t = GetTable(i);
+		t.Verify();
+	}
+}
+
 void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const {
 	array.ToDot(out);
 	

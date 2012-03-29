@@ -420,6 +420,16 @@ void ColumnMixed::Verify() const {
 	const size_t types_len = m_types->Size();
 	const size_t refs_len  = m_refs->Size();
 	assert(types_len == refs_len);
+	
+	// Verify each sub-table
+	const size_t count = Size();
+	for (size_t i = 0; i < count; ++i) {
+		const size_t tref = m_refs->GetAsRef(i);
+		if (tref == 0 || tref & 0x1) continue;
+		
+		const TopLevelTable t = ((ColumnMixed*)this)-> GetTable(i);
+		t.Verify();
+	}
 }
 
 void ColumnMixed::ToDot(std::ostream& out, const char* title) const {

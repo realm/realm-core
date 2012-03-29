@@ -19,6 +19,10 @@ public:
 	void Insert(size_t ndx);
 	void Delete(size_t ndx);
 	void Clear(size_t ndx);
+	
+#ifdef _DEBUG
+	void Verify() const;
+#endif //_DEBUG
 
 protected:
 	
