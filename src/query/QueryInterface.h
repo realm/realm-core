@@ -224,104 +224,108 @@ public:
 		}
 	}
 
-size_t Find(const Table& table, size_t start = 0, size_t end = (size_t)-1) const {
-	size_t r;
-	TableView tv((Table&)table);
-	 if(end == (size_t)-1)
-		end = table.GetSize();
-	if(start == end)
-		return (size_t)-1;
-	if(first[0] != 0)
-		r = first[0]->Find(start, end, table);
-	else
-		r = start; // user built an empty query; return any first
-	if(r == table.GetSize())
-		return (size_t)-1;
-	else
-		return r;
-}
+	size_t Find(const Table& table, size_t start = 0, size_t end = (size_t)-1) const {
+		if (end == (size_t)-1) end = table.GetSize();
+		if (start == end) return (size_t)-1;
 
-int64_t Sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
-	size_t r = start - 1;
-	size_t results = 0;
-	int64_t sum = 0;
-	for(;;) {
-		r = Find(table, r + 1, end);
-		if(r == (size_t)-1 || r == table.GetSize() || results == limit)
-			break;
-		results++;
-		sum += table.Get(column, r);
+		size_t r;
+		if (first[0] != 0)
+			r = first[0]->Find(start, end, table);
+		else
+			r = start; // user built an empty query; return any first
+
+		if (r == table.GetSize())
+			return (size_t)-1;
+		else
+			return r;
 	}
-	if(resultcount != 0)
-		*resultcount = results;
-	return sum;
-}
 
-int64_t Max(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
-	size_t r = start - 1;
-	size_t results = 0;
-	int64_t max = 0;
-	for(;;) {
-		r = Find(table, r + 1, end);
-		if(r == (size_t)-1 || r == table.GetSize() || results == limit)
-			break;
-		int64_t g = table.Get(column, r);
-		if(results == 0 || g > max)
-			max = g;
-		results++;
+	int64_t Sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+		size_t r = start - 1;
+		size_t results = 0;
+		int64_t sum = 0;
+
+		for (;;) {
+			r = Find(table, r + 1, end);
+			if (r == (size_t)-1 || r == table.GetSize() || results == limit)
+				break;
+			++results;
+			sum += table.Get(column, r);
+		}
+
+		if(resultcount != 0)
+			*resultcount = results;
+		return sum;
 	}
-	if(resultcount != 0)
-		*resultcount = results;
-	return max;
-}
 
-int64_t Min(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
-	size_t r = start - 1;
-	size_t results = 0;
-	int64_t min = 0;
-	for(;;) {
-		r = Find(table, r + 1, end);
-		if(r == (size_t)-1 || r == table.GetSize() || results == limit)
-			break;
-		int64_t g = table.Get(column, r);
-		if(results == 0 || g < min)
-			min = g;
-		results++;
+	int64_t Max(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+		size_t r = start - 1;
+		size_t results = 0;
+		int64_t max = 0;
+
+		for (;;) {
+			r = Find(table, r + 1, end);
+			if (r == (size_t)-1 || r == table.GetSize() || results == limit)
+				break;
+			const int64_t g = table.Get(column, r);
+			if (results == 0 || g > max)
+				max = g;
+			results++;
+		}
+
+		if(resultcount != 0)
+			*resultcount = results;
+		return max;
 	}
-	if(resultcount != 0)
-		*resultcount = results;
-	return min;
-}
 
-size_t Count(const Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
-	size_t r = start - 1;
-	size_t results = 0;
-	for(;;) {
-		r = Find(table, r + 1, end);
-		if(r == (size_t)-1 || r == table.GetSize() || results == limit)
-			break;
-		results++;
+	int64_t Min(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+		size_t r = start - 1;
+		size_t results = 0;
+		int64_t min = 0;
+		
+		for (;;) {
+			r = Find(table, r + 1, end);
+			if (r == (size_t)-1 || r == table.GetSize() || results == limit)
+				break;
+			const int64_t g = table.Get(column, r);
+			if (results == 0 || g < min)
+				min = g;
+			++results;
+		}
+		if(resultcount != 0)
+			*resultcount = results;
+		return min;
 	}
-	return results;
-}
 
-double Avg(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
-	size_t resultcount2;
-	int64_t sum;
-	double avg;
+	size_t Count(const Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+		size_t r = start - 1;
+		size_t results = 0;
+		
+		for(;;) {
+			r = Find(table, r + 1, end);
+			if (r == (size_t)-1 || r == table.GetSize() || results == limit)
+				break;
+			++results;
+		}
+		return results;
+	}
 
-	sum = Sum(table, column, &resultcount2, start, end, limit);
-	avg = (float)sum / (float)resultcount2;
-	if(resultcount != 0)
-		*resultcount = resultcount2;
-	return avg;
-}
+	double Avg(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+		size_t resultcount2;
 
-static bool comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b) {
-	return a.first < b.first;
-}
+		const int64_t sum = Sum(table, column, &resultcount2, start, end, limit);
+		const double avg = (float)sum / (float)resultcount2;
+		
+		if (resultcount != 0)
+			*resultcount = resultcount2;
+		return avg;
+	}
 
-static void *query_thread(void *arg) {
+	static bool comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b) {
+		return a.first < b.first;
+	}
+
+	static void *query_thread(void *arg) {
 		thread_state *ts = (thread_state *)arg;
 
 		std::vector<size_t> res;
@@ -412,7 +416,7 @@ static void *query_thread(void *arg) {
 	}
 
 
-int SetThreads(unsigned int threadcount) {
+	int SetThreads(unsigned int threadcount) {
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
 		pthread_win32_process_attach_np ();
 #endif
