@@ -31,6 +31,10 @@ public:
 		m_column->Set(subtable_ndx, new_ref);
 	}
 
+	virtual size_t get_subtable_ref_for_verify(size_t subtable_ndx) {
+		return m_column->Get(subtable_ndx);
+	}
+
 	RootArray(Column *col, ColumnDef type, Array *parent, size_t pndx, Allocator &alloc):
 		Array(type, parent, pndx, alloc), m_column(col) {}
 	RootArray(Column *col, size_t ref, Array *parent, size_t pndx, Allocator &alloc):
@@ -201,10 +205,6 @@ bool Column::Set(size_t ndx, int64_t value) {
 
 	// Update index
 	if (m_index) m_index->Set(ndx, oldVal, value);
-
-#ifdef _DEBUG
-	Verify();
-#endif //DEBUG
 
 	return true;
 }

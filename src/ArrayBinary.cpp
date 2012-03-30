@@ -88,7 +88,7 @@ void ArrayBinary::Delete(size_t ndx) {
 
 	m_blob.Delete(start, end);
 	m_offsets.Delete(ndx);
-	m_offsets.Adjust(ndx, start - end);
+	m_offsets.Adjust(ndx, int64_t(start) - end);
 }
 
 void ArrayBinary::Resize(size_t ndx) {

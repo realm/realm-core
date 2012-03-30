@@ -258,6 +258,9 @@ private:
 	// parent column.
 	bool const m_is_subtable_root;
 	virtual void update_subtable_ref(size_t subtable_ndx, size_t new_ref);
+#ifdef _DEBUG
+	virtual size_t get_subtable_ref_for_verify(size_t subtable_ndx) { return 0; }
+#endif
 
 	Array* m_parent;
 	size_t m_parentNdx;

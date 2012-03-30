@@ -72,10 +72,6 @@ template<typename T, class C> bool ColumnBase::TreeSet(size_t ndx, T value) {
 	// Update index
 	//if (m_index) m_index->Set(ndx, oldVal, value);
 
-#ifdef _DEBUG
-	Verify();
-#endif //DEBUG
-
 	return true;
 }
 
