@@ -32,7 +32,7 @@ public:
 	}
 
 	virtual size_t get_subtable_ref_for_verify(size_t subtable_ndx) {
-		return m_column->Get(subtable_ndx);
+		return m_column->GetAsRef(subtable_ndx);
 	}
 
 	RootArray(Column *col, ColumnDef type, Array *parent, size_t pndx, Allocator &alloc):

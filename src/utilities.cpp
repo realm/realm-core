@@ -3,8 +3,11 @@
 #include <string>
 #include <assert.h>
 #include <cstdlib> // size_t
+#ifndef _MSC_VER 
 #include <stdint.h>
-
+#else
+#include "win32/stdint.h"
+#endif
 
 
 size_t TO_REF(int64_t v) {

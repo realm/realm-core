@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include "Table.h"
 #include <assert.h>
 #include "Index.h"
@@ -1458,7 +1459,7 @@ void TopLevelTable::ToDot(std::ostream& out, const char* title) const {
 	out << "}" << endl;
 }
 
-void Spec::ToDot(std::ostream& out, const char* title) const {
+void Spec::ToDot(std::ostream& out, const char*) const {
 	const size_t ref = m_specSet.GetRef();
 	
 	out << "subgraph cluster_specset" << ref << " {" << endl;
