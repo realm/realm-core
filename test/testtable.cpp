@@ -185,7 +185,7 @@ TEST(Table_Delete_All_Types) {
 		
 		table.InsertBinary(6, i, "binary", 7);
 		
-		switch (i % 3) {
+		switch (i % 4) {
 			case 0:
 				table.InsertMixed(7, i, false);
 				break;
@@ -195,18 +195,37 @@ TEST(Table_Delete_All_Types) {
 			case 2:
 				table.InsertMixed(7, i, "string");
 				break;
+			case 3:
+			{
+				// Add subtable to mixed column
+				// We can first set schema and contents when the entire
+				// row has been inserted
+				table.InsertMixed(7, i, Mixed(COLUMN_TYPE_TABLE));
+				break;
+			}
 		}
 		
 		table.InsertTable(8, i);
 		table.InsertDone();
 		
-		// Add sub-tables
-		if (i == 2) {
-			Table subtable = table.GetTable(8, i);
+		// Add subtable to mixed column
+		if (i % 4 == 3) {
+			TopLevelTable subtable = table.GetMixedTable(7, i);
+			Spec s = subtable.GetSpec();
+			s.AddColumn(COLUMN_TYPE_INT,    "first");
+			s.AddColumn(COLUMN_TYPE_STRING, "second");
+			subtable.UpdateFromSpec(s.GetRef());
+			
 			subtable.InsertInt(0, 0, 42);
 			subtable.InsertString(1, 0, "meaning");
 			subtable.InsertDone();
 		}
+		
+		// Add sub-tables to table column
+		Table subtable = table.GetTable(8, i);
+		subtable.InsertInt(0, 0, 42);
+		subtable.InsertString(1, 0, "meaning");
+		subtable.InsertDone();
 	}
 	
 	// We also want a ColumnStringEnum
