@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include "Table.h"
 #include <assert.h>
 #include "Index.h"
@@ -17,13 +18,13 @@ const ColumnType AccessorMixed::type  = COLUMN_TYPE_MIXED;
 // -- Spec ------------------------------------------------------------------------------------
 
 Spec::Spec(Allocator& alloc, size_t ref, Array* parent, size_t pndx)
-: m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
+: m_specSet(alloc, false), m_spec(alloc, false), m_names(alloc), m_subSpecs(alloc, false)
 {
 	Create(ref, parent, pndx);
 }
 
 Spec::Spec(const Spec& s)
-: m_specSet(s.m_specSet.GetAllocator()), m_spec(s.m_specSet.GetAllocator()), m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator())
+: m_specSet(s.m_specSet.GetAllocator(), false), m_spec(s.m_specSet.GetAllocator(), false), m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator(), false)
 {
 	const size_t ref  = m_specSet.GetRef();
 	Array* parent     = m_specSet.GetParent();
@@ -145,7 +146,7 @@ size_t Spec::GetColumnIndex(const char* name) const {
 
 // -- TopLevelTable ---------------------------------------------------------------------------
 
-TopLevelTable::TopLevelTable(Allocator& alloc) : Table(alloc), m_top(COLUMN_HASREFS, NULL, 0, alloc) {
+TopLevelTable::TopLevelTable(Allocator& alloc): Table(alloc), m_top(COLUMN_HASREFS, NULL, 0, alloc) {
 	// A table is defined by a specset and a list of columns
 	m_top.Add(m_specSet.GetRef());
     m_top.Add(m_columns.GetRef());
@@ -153,7 +154,8 @@ TopLevelTable::TopLevelTable(Allocator& alloc) : Table(alloc), m_top(COLUMN_HASR
     m_columns.SetParent(&m_top, 1);
 }
 
-TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx) : Table(alloc, true), m_top(alloc)
+TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx, bool is_subtable):
+	Table(alloc, true), m_top(alloc, is_subtable)
 {
 	// Load from allocated memory
     m_top.UpdateRef(ref_top);
@@ -167,7 +169,9 @@ TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, si
 	m_specSet.SetParent(&m_top, 0);
 }
 
-TopLevelTable::TopLevelTable(const TopLevelTable& t) {
+TopLevelTable::TopLevelTable(const TopLevelTable& t):
+	Table(t.m_top.GetAllocator(), true), m_top(t.m_top.GetAllocator(), t.m_top.is_subtable_root())
+{
 	// NOTE: Original should be destroyed right after copy. Do not modify
 	// original after this. It could invalidate the copy (or worse).
 	// TODO: implement ref-counting
@@ -231,7 +235,7 @@ MemStats TopLevelTable::Stats() const {
 // -- Table ---------------------------------------------------------------------------------
 
 Table::Table(Allocator& alloc)
-: m_size(0), m_specSet(COLUMN_HASREFS, NULL, 0, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_subSpecs(alloc), m_columns(COLUMN_HASREFS, NULL, 0, alloc)
+  : m_size(0), m_specSet(COLUMN_HASREFS, NULL, 0, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_subSpecs(alloc, false), m_columns(COLUMN_HASREFS, NULL, 0, alloc)
 {
 	// The SpecSet contains the specification (types and names) of all columns and sub-tables
 	m_specSet.Add(m_spec.GetRef());
@@ -242,19 +246,27 @@ Table::Table(Allocator& alloc)
 
 // Creates un-initialized table. Remember to call Create() before use
 Table::Table(Allocator& alloc, bool dontInit)
-: m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc), m_columns(alloc)
+: m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc), m_subSpecs(alloc, false), m_columns(alloc, false)
 {
 	assert(dontInit == true); // only there to differentiate constructor
 	(void)dontInit;
 }
 
-Table::Table(Allocator& alloc, size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns)
-: m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc), m_columns(alloc)
+Table::Table(Allocator& alloc, size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns,
+             bool columns_ref_is_subtable_root):
+	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
+	m_subSpecs(alloc, false), m_columns(alloc, columns_ref_is_subtable_root)
 {
-	Create(ref_specSet, ref_columns, parent_columns, pndx_columns);
+	Create(ref_specSet, columns_ref, parent_columns, pndx_columns);
 }
 
-Table::Table(const Table& t) {
+Table::Table(const Table& t):
+	m_size(0), m_specSet(t.m_columns.GetAllocator(), false),
+	m_spec(t.m_columns.GetAllocator(), false),
+	m_columnNames(t.m_columns.GetAllocator()),
+	m_subSpecs(t.m_columns.GetAllocator(), false),
+	m_columns(t.m_columns.GetAllocator(), t.m_columns.is_subtable_root())
+{
 	const size_t ref_specSet = t.m_specSet.GetRef();
 	const size_t ref_columns = t.m_columns.GetRef();
 	Array* const parent      = t.m_columns.GetParent();
@@ -267,7 +279,7 @@ Table::Table(const Table& t) {
 	// TODO: implement ref-counting
 }
 
-void Table::Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns)
+void Table::Create(size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns)
 {
 	m_specSet.UpdateRef(ref_specSet);
 	assert(m_specSet.Size() == 2 || m_specSet.Size() == 3);
@@ -283,8 +295,8 @@ void Table::Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns
 
 	// A table instatiated with a zero-ref is just an empty table
 	// but it will have to create itself on first modification
-	if (ref_columns != 0) {
-		m_columns.UpdateRef(ref_columns);
+	if (columns_ref != 0) {
+		m_columns.UpdateRef(columns_ref);
 		CacheColumns();
 	}
 	m_columns.SetParent(parent_columns, pndx_columns);
@@ -1106,7 +1118,11 @@ void Table::Optimize() {
 			const size_t column_ndx = GetColumnRefPos(i);
 			m_columns.Set(column_ndx, ref_keys);
 			m_columns.Insert(column_ndx+1, ref_values);
-			UpdateColumnRefs(column_ndx+2, 1);
+			
+			// There are still same number of columns, but since
+			// the enum type takes up two posistions in m_columns
+			// we have to move refs in all following columns
+			UpdateColumnRefs(column_ndx+1, 1);
 
 			// Replace cached column
 			ColumnStringEnum* e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc);
@@ -1365,10 +1381,25 @@ void Table::Verify() const {
 			}
 			break;
 		case COLUMN_TYPE_BINARY:
+			{
+				const ColumnBinary& column = GetColumnBinary(i);
+				assert(column.Size() == m_size);
+				column.Verify();
+			}
 			break;
 		case COLUMN_TYPE_TABLE:
+			{
+				const ColumnTable& column = GetColumnTable(i);
+				assert(column.Size() == m_size);
+				column.Verify();
+			}
 			break;
 		case COLUMN_TYPE_MIXED:
+			{
+				const ColumnMixed& column = GetColumnMixed(i);
+				assert(column.Size() == m_size);
+				column.Verify();
+			}
 			break;
 		default:
 			assert(false);
@@ -1377,6 +1408,12 @@ void Table::Verify() const {
 
 	Allocator& alloc = m_specSet.GetAllocator();
 	alloc.Verify();
+}
+
+void TopLevelTable::DumpToDot(std::ostream& out) const {
+	out << "digraph G {" << endl;
+	ToDot(out);
+	out << "}" << endl;
 }
 
 void Table::ToDot(std::ostream& out, const char* title) const {
@@ -1405,7 +1442,9 @@ void Table::ToDotInternal(std::ostream& out) const {
 }
 
 void TopLevelTable::ToDot(std::ostream& out, const char* title) const {
-	out << "subgraph cluster_topleveltable {" << endl;
+	const size_t ref = m_top.GetRef();
+	
+	out << "subgraph cluster_topleveltable" << ref << " {" << endl;
 	out << " label = \"TopLevelTable";
 	if (title) out << "\\n'" << title << "'";
 	out << "\";" << endl;
@@ -1420,8 +1459,10 @@ void TopLevelTable::ToDot(std::ostream& out, const char* title) const {
 	out << "}" << endl;
 }
 
-void Spec::ToDot(std::ostream& out, const char* title) const {
-	out << "subgraph cluster_specset {" << endl;
+void Spec::ToDot(std::ostream& out, const char*) const {
+	const size_t ref = m_specSet.GetRef();
+	
+	out << "subgraph cluster_specset" << ref << " {" << endl;
 	out << " label = \"specset\";" << endl;
 	
 	m_specSet.ToDot(out);

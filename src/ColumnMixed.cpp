@@ -5,7 +5,7 @@ ColumnMixed::ColumnMixed(Allocator& alloc) : m_data(NULL){
 	m_array = new Array(COLUMN_HASREFS, NULL, 0, alloc);
 	
 	m_types = new Column(COLUMN_NORMAL, alloc);
-	m_refs  = new Column(COLUMN_HASREFS, alloc);
+	m_refs  = new RefsColumn(alloc);
 	
 	m_array->Add(m_types->GetRef());
 	m_array->Add(m_refs->GetRef());
@@ -41,7 +41,7 @@ void ColumnMixed::Create(size_t ref, Array* parent, size_t pndx, Allocator& allo
 	const size_t ref_refs  = m_array->GetAsRef(1);
 	
 	m_types = new Column(ref_types, m_array, 0, alloc);
-	m_refs  = new Column(ref_refs,  m_array, 1, alloc);
+	m_refs  = new RefsColumn(ref_refs,  m_array, 1, alloc);
 	assert(m_types->Size() == m_refs->Size());
 	
 	// Binary column with values that does not fit in refs
@@ -150,37 +150,6 @@ BinaryData ColumnMixed::GetBinary(size_t ndx) const {
 	return m_data->Get(ref);
 }
 
-TopLevelTable ColumnMixed::GetTable(size_t ndx) {
-	assert(ndx < m_types->Size());
-	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
-	
-	const size_t ref = m_refs->GetAsRef(ndx);
-	Allocator& alloc = m_array->GetAllocator();
-	
-	// Get parent info for subtable
-	Array* parent = NULL;
-	size_t pndx   = 0;
-	m_refs->GetParentInfo(ndx, parent, pndx);
-	
-	return TopLevelTable(alloc, ref, parent, pndx);
-}
-
-TopLevelTable* ColumnMixed::GetTablePtr(size_t ndx) {
-	assert(ndx < m_types->Size());
-	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
-	
-	const size_t ref = m_refs->GetAsRef(ndx);
-	Allocator& alloc = m_array->GetAllocator();
-	
-	// Get parent info for subtable
-	Array* parent = NULL;
-	size_t pndx   = 0;
-	m_refs->GetParentInfo(ndx, parent, pndx);
-	
-	// Receiver will own pointer and has to delete it when done
-	return new TopLevelTable(alloc, ref, parent, pndx);
-}
-
 void ColumnMixed::InsertInt(size_t ndx, int64_t value) {
 	assert(ndx <= m_types->Size());
 	
@@ -243,23 +212,6 @@ void ColumnMixed::InsertBinary(size_t ndx, const char* value, size_t len) {
 	
 	m_types->Insert(ndx, COLUMN_TYPE_BINARY);
 	m_refs->Insert(ndx, v);
-}
-
-void ColumnMixed::InsertTable(size_t ndx) {
-	assert(ndx <= m_types->Size());
-	
-	// Create new table
-	TopLevelTable table(m_array->GetAllocator());
-	
-	m_types->Insert(ndx, COLUMN_TYPE_TABLE);
-	m_refs->Insert(ndx, table.GetRef());
-
-	// Get parent info for subtable
-	Array* parent = NULL;
-	size_t pndx   = 0;
-	m_refs->GetParentInfo(ndx, parent, pndx);
-
-	table.SetParent(parent, pndx); // now the sub-tree won't be deleted
 }
 
 void ColumnMixed::SetInt(size_t ndx, int64_t value) {
@@ -368,25 +320,6 @@ void ColumnMixed::SetBinary(size_t ndx, const char* value, size_t len) {
 	}
 }
 
-void ColumnMixed::SetTable(size_t ndx) {
-	assert(ndx < m_types->Size());
-	
-	// Remove refs or binary data
-	ClearValue(ndx, COLUMN_TYPE_TABLE);
-	
-	// Create new table
-	TopLevelTable table(m_array->GetAllocator());
-	
-	m_refs->Set(ndx, table.GetRef());
-	
-	// Get parent info for subtable
-	Array* parent = NULL;
-	size_t pndx   = 0;
-	m_refs->GetParentInfo(ndx, parent, pndx);
-	
-	table.SetParent(parent, pndx); // now the sub-tree won't be deleted
-}
-
 bool ColumnMixed::Add() {
 	InsertInt(Size(), 0);
 	return true;
@@ -402,7 +335,35 @@ void ColumnMixed::Delete(size_t ndx) {
 	m_refs->Delete(ndx);
 }
 
+void ColumnMixed::Clear() {
+	m_types->Clear();
+	m_refs->Clear();
+	if (m_data) m_data->Clear();
+}
+
 #ifdef _DEBUG
+
+void ColumnMixed::Verify() const {
+	m_array->Verify();
+	m_types->Verify();
+	m_refs->Verify();
+	if (m_data) m_data->Verify();
+	
+	// types and refs should be in sync
+	const size_t types_len = m_types->Size();
+	const size_t refs_len  = m_refs->Size();
+	assert(types_len == refs_len);
+	
+	// Verify each sub-table
+	const size_t count = Size();
+	for (size_t i = 0; i < count; ++i) {
+		const size_t tref = m_refs->GetAsRef(i);
+		if (tref == 0 || tref & 0x1) continue;
+		
+		const TopLevelTable t = ((ColumnMixed*)this)-> GetTable(i);
+		t.Verify();
+	}
+}
 
 void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 	const size_t ref = GetRef();
@@ -414,6 +375,17 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 	
 	m_array->ToDot(out, "mixed_top");
 	
+	// Write sub-tables
+	const size_t count = Size();
+	for (size_t i = 0; i < count; ++i) {
+		const ColumnType type = (ColumnType)m_types->Get(i);
+		if (type != COLUMN_TYPE_TABLE) continue;
+		if (m_refs->GetAsRef(i) == 0) continue; // empty table
+		
+		const TopLevelTable t = ((ColumnMixed*)this)->GetTable(i);
+		t.ToDot(out);
+	}
+	
 	m_types->ToDot(out, "types");
 	m_refs->ToDot(out, "refs");
 	
@@ -421,7 +393,44 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 		m_data->ToDot(out, "data");
 	}
 	
+		
 	out << "}" << std::endl;
 }
 
 #endif //_DEBUG
+
+
+void ColumnMixed::RefsColumn::insert_table(size_t ndx) {
+	// Create new table
+	TopLevelTable table(m_array->GetAllocator());
+
+	Insert(ndx, table.GetRef());
+
+	table.SetParent(m_array, ndx);
+}
+
+void ColumnMixed::RefsColumn::set_table(size_t ndx) {
+	// Create new table
+	TopLevelTable table(m_array->GetAllocator());
+
+	Set(ndx, table.GetRef());
+
+	table.SetParent(m_array, ndx);
+}
+
+TopLevelTable ColumnMixed::RefsColumn::get_table(size_t ndx) {
+	const size_t ref = GetAsRef(ndx);
+	Allocator &alloc = m_array->GetAllocator();
+
+	bool is_subtable = true;
+	return TopLevelTable(alloc, ref, m_array, ndx, is_subtable);
+}
+
+TopLevelTable *ColumnMixed::RefsColumn::get_table_ptr(size_t ndx) {
+	const size_t ref = GetAsRef(ndx);
+	Allocator &alloc = m_array->GetAllocator();
+
+	bool is_subtable = true;
+	// Receiver will own pointer and has to delete it when done
+	return new TopLevelTable(alloc, ref, m_array, ndx, is_subtable);
+}

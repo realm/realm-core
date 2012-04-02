@@ -12,7 +12,7 @@ Group::Group() : m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(COLUMN_HASREF
 	m_tables.SetParent(&m_top, 1);
 }
 
-Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(false) {
+Group::Group(const char* filename) : m_top(m_alloc, false), m_tables(m_alloc, false), m_tableNames(m_alloc), m_isValid(false) {
 	assert(filename);
 
 	// Memory map file
@@ -21,7 +21,7 @@ Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableN
 	if (m_isValid) Create();
 }
 
-Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(false) {
+Group::Group(const char* buffer, size_t len) : m_top(m_alloc, false), m_tables(m_alloc, false), m_tableNames(m_alloc), m_isValid(false) {
 	assert(buffer);
 
 	// Memory map file
@@ -105,7 +105,7 @@ TopLevelTable& Group::GetTable(size_t ndx) {
 	TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(ndx);
 	if (!t) {
 		const size_t ref = m_tables.GetAsRef(ndx);
-		t = new TopLevelTable(m_alloc, ref, &m_tables, ndx);
+		t = new TopLevelTable(m_alloc, ref, &m_tables, ndx, false);
 		m_cachedtables.Set(ndx, (intptr_t)t);
 	}
 	return *t;
@@ -166,7 +166,7 @@ void Group::Verify() {
 		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
 		if (!t) {
 			const size_t ref = m_tables.GetAsRef(i);
-			t = new TopLevelTable(m_alloc, ref, &m_tables, i);
+			t = new TopLevelTable(m_alloc, ref, &m_tables, i, false);
 			m_cachedtables.Set(i, (intptr_t)t);
 		}
 		t->Verify();
@@ -181,7 +181,7 @@ MemStats Group::Stats() {
 		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
 		if (!t) {
 			const size_t ref = m_tables.GetAsRef(i);
-			t = new TopLevelTable(m_alloc, ref, &m_tables, i);
+			t = new TopLevelTable(m_alloc, ref, &m_tables, i, false);
 			m_cachedtables.Set(i, (intptr_t)t);
 		}
 		const MemStats m = t->Stats();

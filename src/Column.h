@@ -19,6 +19,8 @@ class Index;
 class ColumnBase {
 public:
 	virtual ~ColumnBase() {};
+	
+	virtual void SetHasRefs() {};
 
 	virtual bool IsIntColumn() const {return false;}
 	virtual bool IsStringColumn() const {return false;}
@@ -27,6 +29,7 @@ public:
 	virtual bool Add() = 0;
 	virtual void Clear() = 0;
 	virtual void Delete(size_t ndx) = 0;
+	void Resize(size_t ndx) {m_array->Resize(ndx);}
 
 	// Indexing
 	virtual bool HasIndex() const = 0;
@@ -112,6 +115,7 @@ public:
 
 	void SetParent(Array* parent, size_t pndx);
 	void UpdateParentNdx(int diff);
+	void SetHasRefs();
 
 	size_t Size() const;
 	bool IsEmpty() const;

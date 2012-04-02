@@ -3,7 +3,7 @@
 #include <assert.h>
 #include "win32/types.h"
 
-ArrayBinary::ArrayBinary(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_HASREFS, parent, pndx, alloc), m_offsets(COLUMN_NORMAL, NULL, 0, m_alloc), m_blob(NULL, 0, m_alloc) {
+ArrayBinary::ArrayBinary(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_HASREFS, parent, pndx, alloc), m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc) {
 	// Add subarrays for long string
 	Array::Add(m_offsets.GetRef());
 	Array::Add(m_blob.GetRef());
@@ -88,7 +88,16 @@ void ArrayBinary::Delete(size_t ndx) {
 
 	m_blob.Delete(start, end);
 	m_offsets.Delete(ndx);
-	m_offsets.Adjust(ndx, start - end);
+	m_offsets.Adjust(ndx, int64_t(start) - end);
+}
+
+void ArrayBinary::Resize(size_t ndx) {
+	assert(ndx < m_offsets.Size());
+	
+	const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
+	
+	m_offsets.Resize(ndx);
+	m_blob.Resize(len);
 }
 
 void ArrayBinary::Clear() {

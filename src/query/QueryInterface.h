@@ -543,4 +543,12 @@ protected:
 	size_t m_column_id;
 };
 
+class XQueryAccessorMixed {
+public:
+	XQueryAccessorMixed(size_t column_id) : m_column_id(column_id) {}
+protected:
+	Query* m_query;
+	size_t m_column_id;
+}; 
+
 #endif

@@ -1,0 +1,336 @@
+<!--?xml version="1.0" encoding="iso-8859-1"?-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+  <title>TightDB C++ Interface Tutorial</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+  <meta http-equiv="Content-Script-Type" content="text/javascript">
+  <link rel="stylesheet" href="style.css" type="text/css" media="screen">
+
+<link href="prettify.css" type="text/css" rel="stylesheet">
+<script src="tutorial_short_cpp_files/ga.js" async="" type="text/javascript"></script><script type="text/javascript" src="prettify.js"></script>
+
+
+<script type="text/javascript">
+
+  var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-23135871-1']);
+      _gaq.push(['_setDomainName', '.tightdb.com']);
+        _gaq.push(['_trackPageview']);
+
+  (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+          ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+              var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+                })();
+
+</script>
+
+<style type="text/css">
+
+.main {
+color: #0067AB;
+font-family: 'Open Sans','Helvetica Neue',Helvetica;
+}
+
+h1, h2, h3, h4, h5 {
+color: #0067AB;
+font-family: 'Open Sans','Helvetica Neue',Helvetica;
+}
+
+.p_docs h1 h2 {
+margin-bottom: 25px;
+-moz-border-radius: 3px;
+-webkit-border-radius: 3px;
+-o-border-radius: 3px;
+-ms-border-radius: 3px;
+-khtml-border-radius: 3px;
+border-radius: 3px;
+margin-top: 35px;
+border-bottom: 1px solid #CBE3F3;
+background: #E0EEF8;
+padding: 10px;
+color: #0067AB;
+font-size: 22px;
+}
+
+.code {
+background: #E0EEF8;
+border: 1px solid #B6D7EF;
+padding: 15px;
+font-size: 13px;
+line-height: 19px;
+font-family: "Monaco","Courier New",Courier;
+margin-bottom: 25px;
+}
+
+.header {
+background: #E0EEF8;
+border: 1px solid #E0EEF8;
+padding: 5px;
+font-size: 13px;
+line-height: 3px;
+font-family: "Monaco","Courier New",Courier;
+margin-bottom: 25px;
+color: #0067AB;
+}
+
+    .prettyprint
+    {
+        margin-left: 0px;
+    }
+
+</style>
+
+
+</head>
+<body onload="prettyPrint()" style="margin-top: 0px;">
+
+<div>
+<a href="index.html"><img src="logo200.png"></a>
+</div>
+
+<div class="main" style="width: 800px; margin: 0px auto -1px;">
+
+<!--
+ background: none repeat scroll 0% 0% rgb(240, 240, 240); padding: 10px;">
+-->
+
+<h1>TightDB C++ Interface</h1>
+
+<p>
+TightDB is a very fast embedded database that integrates transparently 
+into your
+language and gives you the full benefits of a database, but with a much 
+lower memory footprint and better performance than native data 
+structures. It is also much more flexible and has a friendly and easy to
+ use interface.
+</p>
+<p>
+A TightDB table supports the following column types:
+</p>
+<ul>
+<li>Integers (<tt>int64_t</tt>)</li>
+<li>Booleans (<tt>bool</tt>)</li>
+<li>Strings (<tt>const char *</tt>)</li>
+<li>Dates (<tt>time_t</tt>)</li>
+<li>Mixed (any of the above)</li>
+</ul> 
+<p>
+More types such as blobs, subtables and documents will be added in the near future. Check our
+website <a href="http://www.tightdb.com/">www.tightdb.com</a> for updates.
+</p>
+<h2>Creating tables</h2>
+<p>
+First let's create a table named &#8216;people&#8217; with 3 columns:
+</p>
+
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> // Define table
+ TDB_TABLE_3(MyTable,
+     String, name,
+     Int,    age,
+     Bool,   hired)
+
+ void func() {
+     MyTable table;
+     ...
+ }
+</pre>
+</div>
+<p>
+The above code instantiates a TightDB table with 3 typed columns called:
+&#8216;<tt>name</tt>&#8217;, &#8216;<tt>age</tt>&#8217; and &#8216;<tt>hired</tt>&#8217;.
+</p>
+<p>
+    We add rows to the end of the table with the <tt>
+    Add()</tt> method:</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> table.Add("John", 20, true);
+ table.Add("Mary", 21, false);
+ table.Add("Lars", 21, true);
+ table.Add("Phil", 43, false);
+ table.Add("Anni", 54, true);
+</pre>
+</div>
+<p>
+We now have 5 rows in our table. The order
+of the values in the array is very important. The order should be the same
+as the order in which we created the table columns, i.e. the same order we
+used in <tt>TDB_TABLE_3()</tt>.
+</p>
+<p>
+You can also insert rows at specific positions:
+</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> table.Insert(2, "Frank", 34, true);
+</pre>
+</div>
+<p>
+To get the size of our table we can use the <tt>GetSize()</tt> method or the convinience method <tt>IsEmpty()</tt>:
+</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> cout << table.GetSize();                               // =&gt; 6
+ cout << (table.IsEmpty() ? "Empty" : "Not empty");     // =&gt; Not Empty
+</pre>
+</div>
+<h2>Working with individual rows</h2>
+<p>
+To access the individual rows of our table, we can use the brackets syntax
+with an index. This gives us direct access to the values in the row:
+</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> // Getting values
+ const char* name = table[5].name;                  // =&gt; 'Anni'
+ int age          = table[5].age;                   // =&gt; 54
+ bool hired       = table[5].hired;                 // =&gt; true
+
+ // Changing values
+ table[5].age = 43;		                    // Getting younger
+ table[5].age += 1;                                 // Happy birthday!
+</pre>
+</div>
+<p>
+    To get the last row, the <tt>Back()</tt> method can be used:
+</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> table.Back().name;                                   // =&gt; "Anni"
+</pre>
+</div>
+<p>
+Replacing an entire row will be supported in the very near future:
+</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> table.Set(4, "Eric", 50, true);
+</pre>
+</div>
+<p>
+    Deleting a specific row can be done with the <tt>DeleteRow()</tt> method, and deleting all rows with the <tt>Clear()</tt> method.</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> table.Clear(2);                                          
+ cout << table.GetSize();                                  // =&gt; 5
+</pre>
+</div>
+<p>
+    Iterating over the rows can be done as follows:</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> for (size_t i = 0; i &lt; table.GetSize(); ++i) {
+     MyTable::Cursor row = table[i];
+     cout &lt;&lt; row.name &lt;&lt; " is " << row.age << " years old." << endl;
+ }
+</pre>
+</div>
+<p>
+Which will output the following:
+
+</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre> John is 20 years old.
+ Mary is 21 years old.
+ Lars is 21 years old.
+ Eric is 50 years old.
+ Anni is 44 years old.
+</pre>
+</div>
+<h2>Searching</h2>
+<p>
+To find values in a specific column, we use the <tt>find</tt> method with a
+column name and a search value:
+</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> size_t row; 
+ row = table.name.Find("Philip");		    	// row = (size_t)-1
+
+ row = table.name.Find("Mary");			        // row = 1
+</pre>
+</div>
+<p>To find all values, the <tt>FindAll()</tt> method is used:</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> TableView view = table.age.FindAll(21);   
+ size_t cnt = view.GetSize();  				// cnt = 2</pre>
+</div>
+    <p>&nbsp;</p>
+    <h2>Advanced Queries</h2>
+<p>
+Sometimes you may need to do more advanced queries on tables. You can do this using the <tt>GetQuery()</tt> method, which returns a new query object with properties for each column in the table (in this case <tt>name</tt>, <tt>age</tt> and <tt>hired</tt>).
+ Each property is an object with methods for comparisons depending on 
+type. All comparison methods return the query object itself, so they can
+ be chained. You can perform operations with the query itself, or use <tt>FindAll()</tt> to get a virtual table with all matching rows.
+ </p><p>
+So let's say you need to find all current employees who are between 20 and 30 years old:
+</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> // Create query (current employees between 20 and 30 years old)
+ Query q = table.GetQuery().hired.Equal(true)               // Implicit AND
+                           .age.Between(20, 30);
+
+ // Get number of matching entries
+ cout << q.Count();                                         // =&gt; 2
+
+ // Get the average age
+ cout << q.age.Avg();                                       // =&gt; 26 
+
+ // Execute the query and return a table (view)
+ TableView res = q.FindAll(table);
+ for (size_t i = 0; i < res.GetSize(); ++i) {
+    cout << i << ": " << res[i].name << " is " 
+         << res[i].age << " years old." << endl;
+ }
+</pre>
+</div>
+<p>
+Note that the result is a live virtual view, that allow you to directly access and modify the values in the original table.
+</p>
+
+<h2>Serialization</h2>
+<p>
+You can group tables and do very fast serialization to and from files and memory buffers.
+</p>
+<div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
+<pre class="prettyprint" lang-cpp=""> TDB_TABLE_3(MyTable,
+ String, name,
+ Int,    age,
+ Bool,   hired)
+ 
+ // Create Table in Group
+ Group group;
+ MyTable& table = group.GetTable&lt;MyTable&gt;("My great table");
+ 
+ // Add some rows
+ table.Add("John", 20, true);
+ table.Add("Mary", 21, false);
+ table.Add("Lars", 21, true);
+ table.Add("Phil", 43, false);
+ table.Add("Anni", 54, true);
+	
+ // Write to disk
+ group.Write("employees.tightdb");
+	
+ // Load a group from disk (and print contents)
+ Group fromDisk("employees.tightdb");
+ MyTable& diskTable = fromDisk.GetTable&lt;MyTable&gt;("employees");
+ for (size_t i = 0; i < diskTable.GetSize(); i++)
+    cout << i << ": " << diskTable[i].name << endl;
+
+ // Write same group to memory buffer
+ size_t len;
+ const char* const buffer = group.WriteToMem(len);
+
+ // Load a group from memory (and print contents)
+ Group fromMem(buffer, len);
+ MyTable& memTable = fromMem.GetTable&lt;MyTable&gt;("employees");
+ for (size_t i = 0; i < memTable.GetSize(); i++)
+    cout << i << ": " << memTable[i].name << endl; 
+</pre>	
+</div>
+<p>
+Hope this mini tutorial will get you started with TightDB :)
+</p>
+
+<h2>Copyright</h2>
+<p>
+Copyright (c) 2011 TightDB, Inc.
+</p>
+</div>
+
+
+</body></html>

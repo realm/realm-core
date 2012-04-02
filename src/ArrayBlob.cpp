@@ -7,7 +7,7 @@ ArrayBlob::ArrayBlob(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUM
 	set_header_wtype(TDB_IGNORE);
 }
 
-ArrayBlob::ArrayBlob(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(alloc) {
+ArrayBlob::ArrayBlob(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(alloc, false) {
 	// Manually create array as doing it in initializer list
 	// will not be able to call correct virtual functions
 	Create(ref);
@@ -15,7 +15,7 @@ ArrayBlob::ArrayBlob(size_t ref, const Array* parent, size_t pndx, Allocator& al
 }
 
 // Creates new array (but invalid, call UpdateRef to init)
-ArrayBlob::ArrayBlob(Allocator& alloc) : Array(alloc) {
+ArrayBlob::ArrayBlob(Allocator& alloc) : Array(alloc, false) {
 }
 
 ArrayBlob::~ArrayBlob() {
@@ -61,6 +61,11 @@ void ArrayBlob::Replace(size_t start, size_t end, void* data, size_t len) {
 
 void ArrayBlob::Delete(size_t start, size_t end) {
 	Replace(start, end, NULL, 0);
+}
+
+void ArrayBlob::Resize(size_t len) {
+	assert(len <= m_len);
+	Replace(len, m_len, NULL, 0);
 }
 
 void ArrayBlob::Clear() {

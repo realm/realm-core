@@ -85,10 +85,17 @@ size_t ColumnBinary::Size() const {
 
 void ColumnBinary::Clear() {
 	if (m_array->IsNode()) {
+		Array* const parent = m_array->GetParent();
+		const size_t pndx   = m_array->GetParentNdx();
+		
 		// Revert to binary array
+		ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->GetAllocator());
+		if (parent) parent->Set(pndx, array->GetRef()); // Update parent
+		
+		// Remove original node
 		m_array->Destroy();
-		Array* array = new ArrayBinary(m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
 		delete m_array;
+		
 		m_array = array;
 	}
 	else ((ArrayBinary*)m_array)->Clear();
@@ -144,6 +151,12 @@ bool ColumnBinary::Insert(size_t ndx, BinaryData bin) {
 void ColumnBinary::Delete(size_t ndx) {
 	assert(ndx < Size());
 	TreeDelete<BinaryData,ColumnBinary>(ndx);
+}
+
+void ColumnBinary::Resize(size_t ndx) {
+	assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
+	assert(ndx < Size());
+	((ArrayBinary*)m_array)->Resize(ndx);
 }
 
 BinaryData ColumnBinary::LeafGet(size_t ndx) const {

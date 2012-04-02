@@ -15,17 +15,17 @@
 size_t CalcByteLen(size_t count, size_t width);
 
 Array::Array(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	Create(ref);
 }
 
 Array::Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(const_cast<Array*>(parent)), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(const_cast<Array*>(parent)), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	Create(ref);
 }
 
 Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+: m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 
@@ -34,14 +34,13 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 }
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
-Array::Array(Allocator& alloc)
-: m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
-}
+Array::Array(Allocator& alloc, bool is_subtable_root)
+: m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_is_subtable_root(is_subtable_root), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
 
 // Copy-constructor
 // Note that this array now own the ref. Should only be used when
 // the source array goes away right after (like return values from functions)
-Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc) {
+Array::Array(const Array& src) : m_is_subtable_root(src.m_is_subtable_root), m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc) {
 	const size_t ref = src.GetRef();
 	Create(ref);
 	src.Invalidate();
@@ -168,9 +167,7 @@ bool Array::operator==(const Array& a) const {
 
 void Array::UpdateRef(size_t ref) {
 	Create(ref);
-
-	// Update ref in parent
-	if (m_parent) m_parent->Set(m_parentNdx, ref);
+	update_ref_in_parent(ref);
 }
 
 /**
@@ -1176,7 +1173,7 @@ bool Array::CopyOnWrite() {
 	const MemRef mref = m_alloc.Alloc(new_len);
 	if (!mref.pointer) return false;
 	memcpy(mref.pointer, m_data-8, len);
-	
+
 	// Update internal data
 	m_ref = mref.ref;
 	m_data = (unsigned char*)mref.pointer + 8;
@@ -1185,8 +1182,7 @@ bool Array::CopyOnWrite() {
 	// Update capacity in header
 	set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
 
-	// Update ref in parent
-	if (m_parent) m_parent->Set(m_parentNdx, mref.ref);
+	update_ref_in_parent(mref.ref);
 
 	return true;
 }
@@ -1226,8 +1222,7 @@ bool Array::Alloc(size_t count, size_t width) {
 			}
 			set_header_capacity(new_capacity);
 
-			// Update ref in parent
-			if (m_parent) m_parent->Set(m_parentNdx, mref.ref); //TODO: ref
+			update_ref_in_parent(mref.ref);
 		}
 
 		m_capacity = CalcItemCount(new_capacity, width);
@@ -1673,6 +1668,14 @@ void Array::Print() const {
 
 void Array::Verify() const {
 	assert(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
+	
+	// Check that parent is set correctly
+	if (!m_parent) return;
+
+	const size_t ref_in_parent = m_is_subtable_root ?
+		m_parent->get_subtable_ref_for_verify(m_parentNdx) :
+		m_parent->GetAsRef(m_parentNdx);
+	assert(ref_in_parent == m_ref);
 }
 
 void Array::ToDot(std::ostream& out, const char* title) const {
@@ -1700,7 +1703,7 @@ void Array::ToDot(std::ostream& out, const char* title) const {
 		if (m_hasRefs) {
 			// zero-refs and refs that are not 64-aligned do not point to sub-trees
 			if (v == 0) out << "<TD>none";
-			else if (v & 0x1) out << "<TD>" << (v >> 1);
+			else if (v & 0x1) out << "<TD BGCOLOR=\"grey90\">" << (v >> 1);
 			else out << "<TD PORT=\"" << i << "\">";
 		}
 		else out << "<TD>" << v;
@@ -1728,3 +1731,7 @@ MemStats Array::Stats() const {
 }
 
 #endif //_DEBUG
+
+void Array::update_subtable_ref(size_t, size_t) {
+	assert(false); // Must be overridden by column root arrays.
+}

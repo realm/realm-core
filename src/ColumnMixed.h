@@ -46,7 +46,7 @@ public:
 	void InsertTable(size_t ndx);
 	
 	bool Add();
-	void Clear(){}
+	void Clear();
 	void Delete(size_t ndx);
 	
 	// Indexing
@@ -57,7 +57,7 @@ public:
 	size_t GetRef() const {return m_array->GetRef();}
 	
 #ifdef _DEBUG
-	void Verify() const {}
+	void Verify() const;
 	void ToDot(std::ostream& out, const char* title) const;
 #endif //_DEBUG
 	
@@ -66,11 +66,50 @@ private:
 	void InitDataColumn();
 	
 	void ClearValue(size_t ndx, ColumnType newtype);
+
+	class RefsColumn;
 	
 	// Member variables
 	Column*       m_types;
-	Column*       m_refs;
+	RefsColumn*   m_refs;
 	ColumnBinary* m_data;
 };
+
+
+class ColumnMixed::RefsColumn: public Column {
+public:
+	RefsColumn(Allocator &alloc): Column(COLUMN_HASREFS, alloc) {}
+	RefsColumn(size_t ref, Array *parent, size_t pndx, Allocator &alloc):
+		Column(ref, parent, pndx, alloc) {}
+	void insert_table(size_t ndx);
+	void set_table(size_t ndx);
+	TopLevelTable get_table(size_t ndx);
+	TopLevelTable *get_table_ptr(size_t ndx);
+};
+
+
+inline void ColumnMixed::InsertTable(size_t ndx) {
+	assert(ndx <= m_types->Size());
+	m_types->Insert(ndx, COLUMN_TYPE_TABLE);
+	m_refs->insert_table(ndx);
+}
+
+inline void ColumnMixed::SetTable(size_t ndx) {
+	assert(ndx < m_types->Size());
+	ClearValue(ndx, COLUMN_TYPE_TABLE); // Remove refs or binary data
+	m_refs->set_table(ndx);
+}
+
+inline TopLevelTable ColumnMixed::GetTable(size_t ndx) {
+	assert(ndx < m_types->Size());
+	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
+	return m_refs->get_table(ndx);
+}
+
+inline TopLevelTable *ColumnMixed::GetTablePtr(size_t ndx) {
+	assert(ndx < m_types->Size());
+	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
+	return m_refs->get_table_ptr(ndx);
+}
 
 #endif //__TDB_COLUMN_MIXED__

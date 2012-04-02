@@ -24,31 +24,52 @@ void merge_core(Array *a0, Array *a1, Array *res);
 Array* merge(Array *ArrayList);
 void merge_references(Array *valuelist, Array *indexlists, Array **indexresult);
 
-Column::Column(Allocator& alloc) : m_index(NULL) {
-	m_array = new Array(COLUMN_NORMAL, NULL, 0, alloc);
+
+class RootArray: public Array {
+public:
+	virtual void update_subtable_ref(size_t subtable_ndx, size_t new_ref) {
+		m_column->Set(subtable_ndx, new_ref);
+	}
+
+	virtual size_t get_subtable_ref_for_verify(size_t subtable_ndx) {
+		return m_column->GetAsRef(subtable_ndx);
+	}
+
+	RootArray(Column *col, ColumnDef type, Array *parent, size_t pndx, Allocator &alloc):
+		Array(type, parent, pndx, alloc), m_column(col) {}
+	RootArray(Column *col, size_t ref, Array *parent, size_t pndx, Allocator &alloc):
+		Array(ref, parent, pndx, alloc), m_column(col) {}
+
+	Column *m_column;
+};
+
+
+Column::Column(Allocator& alloc): m_index(NULL) {
+	m_array = new RootArray(this, COLUMN_NORMAL, NULL, 0, alloc);
 	Create();
 }
 
-Column::Column(ColumnDef type, Allocator& alloc) : m_index(NULL) {
-	m_array = new Array(type, NULL, 0, alloc);
+Column::Column(ColumnDef type, Allocator& alloc): m_index(NULL) {
+	m_array = new RootArray(this, type, NULL, 0, alloc);
 	Create();
 }
 
-Column::Column(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc) : m_index(NULL) {
-	m_array = new Array(type, parent, pndx, alloc);
+Column::Column(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+	m_array = new RootArray(this, type, parent, pndx, alloc);
 	Create();
 }
 
-Column::Column(size_t ref, Array* parent, size_t pndx, Allocator& alloc) : m_index(NULL) {
-	m_array = new Array(ref, parent, pndx, alloc);
+Column::Column(size_t ref, Array* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+	m_array = new RootArray(this, ref, parent, pndx, alloc);
 }
 
 Column::Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
-	m_array = new Array(ref, parent, pndx, alloc);
+	m_array = new RootArray(this, ref, const_cast<Array *>(parent), pndx, alloc);
 }
 
 Column::Column(const Column& column) : m_index(NULL) {
 	m_array = column.m_array; // we now own array
+	static_cast<RootArray *>(m_array)->m_column = this;
 	column.m_array = NULL;    // so invalidate source
 }
 
@@ -104,6 +125,11 @@ void Column::SetParent(Array* parent, size_t pndx) {
 
 void Column::UpdateParentNdx(int diff) {
 	m_array->UpdateParentNdx(diff);
+}
+
+// Used by column b-tree code to ensure all leaf having same type
+void Column::SetHasRefs() {
+	m_array->SetType(COLUMN_HASREFS);
 }
 
 void Column::GetParentInfo(size_t ndx, Array*& parent, size_t& pndx, size_t offset) const {
@@ -179,10 +205,6 @@ bool Column::Set(size_t ndx, int64_t value) {
 
 	// Update index
 	if (m_index) m_index->Set(ndx, oldVal, value);
-
-#ifdef _DEBUG
-	Verify();
-#endif //DEBUG
 
 	return true;
 }

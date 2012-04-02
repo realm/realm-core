@@ -133,7 +133,7 @@ public:
 	// Strings
 	const char* GetString(size_t column_id, size_t ndx) const;
 	void SetString(size_t column_id, size_t ndx, const char* value);
-	
+
 	// Binary
 	BinaryData GetBinary(size_t column_id, size_t ndx) const;
 	void SetBinary(size_t column_id, size_t ndx, const void* value, size_t len);
@@ -197,7 +197,6 @@ public:
 #endif //_DEBUG
 
 	// todo, note, these three functions have been protected
-	ColumnBase& GetColumnBase(size_t ndx);
 	const ColumnBase& GetColumnBase(size_t ndx) const;
 	ColumnType GetRealColumnType(size_t ndx) const;
 
@@ -206,7 +205,8 @@ protected:
 	friend class ColumnTable;
 
 	Table(Allocator& alloc, bool dontInit); // Construct un-initialized
-	Table(Allocator& alloc, size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns); // Construct from ref
+	Table(Allocator& alloc, size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns,
+	      bool columns_ref_is_subtable_root); // Construct from ref
 
 	void Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns);
 	void CreateColumns();
@@ -217,7 +217,6 @@ protected:
 	size_t GetColumnRefPos(size_t column_ndx) const;
 	void UpdateColumnRefs(size_t column_ndx, int diff);
 
-	void InstantiateBeforeChange();
 	
 #ifdef _DEBUG
 	void ToDotInternal(std::ostream& out) const;
@@ -238,12 +237,16 @@ protected:
 
 private:
 	Table& operator=(const Table& t); // non assignable
+
+	ColumnBase& GetColumnBase(size_t ndx);
+	void InstantiateBeforeChange();
 };
+
+
 
 class TopLevelTable : public Table {
 public:
 	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
-	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx);
 	TopLevelTable(const TopLevelTable& t);
 	~TopLevelTable();
 
@@ -254,6 +257,7 @@ public:
 	// Debug
 #ifdef _DEBUG
 	MemStats Stats() const;
+	void DumpToDot(std::ostream& out) const;
 	void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 
@@ -261,9 +265,16 @@ protected:
 	// On-disk format
 	Array m_top;
 
+	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx, bool is_subtable);
+
 private:
 	TopLevelTable& operator=(const TopLevelTable&) {return *this;} // non assignable
+
+	friend class Group;
+	friend class ColumnMixed;
 };
+
+
 
 class TableView {
 public:

@@ -72,10 +72,6 @@ template<typename T, class C> bool ColumnBase::TreeSet(size_t ndx, T value) {
 	// Update index
 	//if (m_index) m_index->Set(ndx, oldVal, value);
 
-#ifdef _DEBUG
-	Verify();
-#endif //DEBUG
-
 	return true;
 }
 
@@ -189,12 +185,15 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 	}
 	else {
 		// Is there room in the list?
-		if (m_array->Size() < MAX_LIST_SIZE) {
+		const size_t count = static_cast<C*>(this)->Size();
+		if (count < MAX_LIST_SIZE) {
 			return static_cast<C*>(this)->LeafInsert(ndx, value);
 		}
 
 		// Create new list for item
 		C newList(m_array->GetAllocator());
+		if (m_array->HasRefs()) newList.SetHasRefs(); // all leafs should have same type
+		
 		if (!newList.Add(value)) return NodeChange(NodeChange::CT_ERROR);
 
 		switch (ndx) {
@@ -204,10 +203,10 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 			return NodeChange(NodeChange::CT_INSERT_AFTER, newList.GetRef());
 		default:            // split
 			// Move items after split to new list
-			for (size_t i = ndx; i < m_array->Size(); ++i) {
+			for (size_t i = ndx; i < count; ++i) {
 				newList.Add(static_cast<C*>(this)->LeafGet(i));
 			}
-			m_array->Resize(ndx);
+			static_cast<C*>(this)->Resize(ndx);
 
 			return NodeChange(NodeChange::CT_SPLIT, GetRef(), newList.GetRef());
 		}

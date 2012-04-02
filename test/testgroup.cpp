@@ -320,6 +320,237 @@ TEST(Group_Serialize_All) {
 	CHECK_EQUAL(1, t.GetSize());
 }
 
+
+TEST(Group_Subtable) {
+	int n = 150;
+
+	Group g;
+	TopLevelTable &table = g.GetTable("test");
+	Spec s = table.GetSpec();
+	s.AddColumn(COLUMN_TYPE_INT, "foo");
+	Spec sub = s.AddColumnTable("sub");
+	sub.AddColumn(COLUMN_TYPE_INT, "bar");
+	s.AddColumn(COLUMN_TYPE_MIXED, "baz");
+	table.UpdateFromSpec(s.GetRef());
+
+	for (int i=0; i<n; ++i) {
+		table.AddRow();
+		table.Set(0, i, 100+i);
+		if (i%2 == 0) {
+			Table st = table.GetTable(1, i);
+			st.AddRow();
+			st.Set(0, 0, 200+i);
+		}
+		if (i%3 == 1) {
+			table.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
+			TopLevelTable st = table.GetMixedTable(2, i);
+			st.RegisterColumn(COLUMN_TYPE_INT, "banach");
+			st.AddRow();
+			st.Set(0, 0, 700+i);
+		}
+	}
+
+	CHECK_EQUAL(table.GetSize(), n);
+
+	for (int i=0; i<n; ++i) {
+		CHECK_EQUAL(table.Get(0, i), 100+i);
+		{
+			Table st = table.GetTable(1, i);
+			CHECK_EQUAL(st.GetSize(), i%2 == 0 ? 1 : 0);
+			if (i%2 == 0) CHECK_EQUAL(st.Get(0,0), 200+i);
+			if (i%3 == 0) {
+				st.AddRow();
+				st.Set(0, st.GetSize()-1, 300+i);
+			}
+		}
+		CHECK_EQUAL(table.GetMixedType(2,i), i%3 == 1 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
+		if (i%3 == 1) {
+			TopLevelTable st = table.GetMixedTable(2, i);
+			CHECK_EQUAL(st.GetSize(), 1);
+			CHECK_EQUAL(st.Get(0,0), 700+i);
+		}
+		if (i%8 == 3) {
+			if (i%3 != 1) table.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
+			TopLevelTable st = table.GetMixedTable(2, i);
+			if (i%3 != 1) st.RegisterColumn(COLUMN_TYPE_INT, "banach");
+			st.AddRow();
+			st.Set(0, st.GetSize()-1, 800+i);
+		}
+	}
+
+	for (int i=0; i<n; ++i) {
+		CHECK_EQUAL(table.Get(0, i), 100+i);
+		{
+			Table st = table.GetTable(1, i);
+			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
+			CHECK_EQUAL(st.GetSize(), expected_size);
+			size_t idx = 0;
+			if (i%2 == 0) {
+				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				++idx;
+			}
+			if (i%3 == 0) {
+				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				++idx;
+			}
+		}
+		CHECK_EQUAL(table.GetMixedType(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
+		if (i%3 == 1 || i%8 == 3) {
+			TopLevelTable st = table.GetMixedTable(2, i);
+			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
+			CHECK_EQUAL(st.GetSize(), expected_size);
+			size_t idx = 0;
+			if (i%3 == 1) {
+				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				++idx;
+			}
+			if (i%8 == 3) {
+				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				++idx;
+			}
+		}
+	}
+
+	g.Write("subtables.tdb");
+
+	// Read back tables
+	Group g2("subtables.tdb");
+	TopLevelTable &table2 = g2.GetTable("test");
+
+	for (int i=0; i<n; ++i) {
+		CHECK_EQUAL(table2.Get(0, i), 100+i);
+		{
+			Table st = table2.GetTable(1, i);
+			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
+			CHECK_EQUAL(st.GetSize(), expected_size);
+			size_t idx = 0;
+			if (i%2 == 0) {
+				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				++idx;
+			}
+			if (i%3 == 0) {
+				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				++idx;
+			}
+			if (i%5 == 0) {
+				st.AddRow();
+				st.Set(0, st.GetSize()-1, 400+i);
+			}
+		}
+		CHECK_EQUAL(table2.GetMixedType(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
+		if (i%3 == 1 || i%8 == 3) {
+			TopLevelTable st = table2.GetMixedTable(2, i);
+			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
+			CHECK_EQUAL(st.GetSize(), expected_size);
+			size_t idx = 0;
+			if (i%3 == 1) {
+				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				++idx;
+			}
+			if (i%8 == 3) {
+				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				++idx;
+			}
+		}
+		if (i%7 == 4) {
+			if (i%3 != 1 && i%8 != 3) table2.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
+			TopLevelTable st = table2.GetMixedTable(2, i);
+			if (i%3 != 1 && i%8 != 3) st.RegisterColumn(COLUMN_TYPE_INT, "banach");
+			st.AddRow();
+			st.Set(0, st.GetSize()-1, 900+i);
+		}
+	}
+
+	for (int i=0; i<n; ++i) {
+		CHECK_EQUAL(table2.Get(0, i), 100+i);
+		{
+			Table st = table2.GetTable(1, i);
+			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
+			CHECK_EQUAL(st.GetSize(), expected_size);
+			size_t idx = 0;
+			if (i%2 == 0) {
+				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				++idx;
+			}
+			if (i%3 == 0) {
+				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				++idx;
+			}
+			if (i%5 == 0) {
+				CHECK_EQUAL(st.Get(0, idx), 400+i);
+				++idx;
+			}
+		}
+		CHECK_EQUAL(table2.GetMixedType(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
+		if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
+			TopLevelTable st = table2.GetMixedTable(2, i);
+			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
+			CHECK_EQUAL(st.GetSize(), expected_size);
+			size_t idx = 0;
+			if (i%3 == 1) {
+				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				++idx;
+			}
+			if (i%8 == 3) {
+				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				++idx;
+			}
+			if (i%7 == 4) {
+				CHECK_EQUAL(st.Get(0, idx), 900+i);
+				++idx;
+			}
+		}
+	}
+
+	g2.Write("subtables2.tdb");
+
+	// Read back tables
+	Group g3("subtables2.tdb");
+	TopLevelTable &table3 = g2.GetTable("test");
+
+	for (int i=0; i<n; ++i) {
+		CHECK_EQUAL(table3.Get(0, i), 100+i);
+		{
+			Table st = table3.GetTable(1, i);
+			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
+			CHECK_EQUAL(st.GetSize(), expected_size);
+			size_t idx = 0;
+			if (i%2 == 0) {
+				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				++idx;
+			}
+			if (i%3 == 0) {
+				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				++idx;
+			}
+			if (i%5 == 0) {
+				CHECK_EQUAL(st.Get(0, idx), 400+i);
+				++idx;
+			}
+		}
+		CHECK_EQUAL(table3.GetMixedType(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
+		if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
+			TopLevelTable st = table3.GetMixedTable(2, i);
+			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
+			CHECK_EQUAL(st.GetSize(), expected_size);
+			size_t idx = 0;
+			if (i%3 == 1) {
+				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				++idx;
+			}
+			if (i%8 == 3) {
+				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				++idx;
+			}
+			if (i%7 == 4) {
+				CHECK_EQUAL(st.Get(0, idx), 900+i);
+				++idx;
+			}
+		}
+	}
+}
+
+
 #ifdef _DEBUG
 #ifdef TIGHTDB_TO_DOT
 
@@ -335,7 +566,8 @@ TEST(Group_ToDot) {
 	s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
 	s.AddColumn(COLUMN_TYPE_DATE,   "date");
 	s.AddColumn(COLUMN_TYPE_STRING, "string");
-	s.AddColumn(COLUMN_TYPE_STRING, "string2"); // becomes ColumnStringEnum
+	s.AddColumn(COLUMN_TYPE_STRING, "string_long");
+	s.AddColumn(COLUMN_TYPE_STRING, "string_enum"); // becomes ColumnStringEnum
 	s.AddColumn(COLUMN_TYPE_BINARY, "binary");
 	s.AddColumn(COLUMN_TYPE_MIXED,  "mixed");
 	Spec sub = s.AddColumnTable(    "tables");
@@ -353,41 +585,58 @@ TEST(Group_ToDot) {
 		ss << "string" << i;
 		table.InsertString(3, i, ss.str().c_str());
 		
-		switch (i % 3) {
-			case 0:
-				table.InsertString(4, i, "test1");
-				break;
-			case 1:
-				table.InsertString(4, i, "test2");
-				break;
-			case 2:
-				table.InsertString(4, i, "test3");
-				break;
-		}
-		
-		table.InsertBinary(5, i, "binary", 7);
+		ss << " very long string.........";
+		table.InsertString(4, i, ss.str().c_str());
 		
 		switch (i % 3) {
 			case 0:
-				table.InsertMixed(6, i, false);
+				table.InsertString(5, i, "test1");
 				break;
 			case 1:
-				table.InsertMixed(6, i, (int64_t)i);
+				table.InsertString(5, i, "test2");
 				break;
 			case 2:
-				table.InsertMixed(6, i, "string");
+				table.InsertString(5, i, "test3");
 				break;
 		}
 		
-		table.InsertTable(7, i);
+		table.InsertBinary(6, i, "binary", 7);
+		
+		switch (i % 3) {
+			case 0:
+				table.InsertMixed(7, i, false);
+				break;
+			case 1:
+				table.InsertMixed(7, i, (int64_t)i);
+				break;
+			case 2:
+				table.InsertMixed(7, i, "string");
+				break;
+		}
+		
+		table.InsertTable(8, i);
 		table.InsertDone();
 		
 		// Add sub-tables
 		if (i == 2) {
-			Table subtable = table.GetTable(7, i);
+			// To mixed column
+			table.SetMixed(7, i, Mixed(COLUMN_TYPE_TABLE));
+			TopLevelTable subtable = table.GetMixedTable(7, i);
+			
+			Spec s = subtable.GetSpec();
+			s.AddColumn(COLUMN_TYPE_INT,    "first");
+			s.AddColumn(COLUMN_TYPE_STRING, "second");
+			subtable.UpdateFromSpec(s.GetRef());
+			
 			subtable.InsertInt(0, 0, 42);
 			subtable.InsertString(1, 0, "meaning");
 			subtable.InsertDone();
+			
+			// To table column
+			Table subtable2 = table.GetTable(8, i);
+			subtable2.InsertInt(0, 0, 42);
+			subtable2.InsertString(1, 0, "meaning");
+			subtable2.InsertDone();
 		}
 	}
 	
@@ -405,6 +654,7 @@ TEST(Group_ToDot) {
 	std::ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
 	if (!fs.is_open()) cout << "file open error " << strerror << endl;
 	mygroup.ToDot(fs);
+	fs.close();
 }
 
 #endif //TIGHTDB_TO_DOT
