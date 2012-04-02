@@ -132,29 +132,6 @@ void Column::SetHasRefs() {
 	m_array->SetType(COLUMN_HASREFS);
 }
 
-void Column::GetParentInfo(size_t ndx, Array*& parent, size_t& pndx, size_t offset) const {
-	if (IsNode()) {
-		// Get subnode table
-		const Array offsets = NodeGetOffsets();
-		const Array refs    = NodeGetRefs();
-
-		// Find the subnode containing the item
-		const size_t node_ndx = offsets.FindPos(ndx);
-
-		// Calc index in subnode
-		const size_t local_offset = node_ndx ? (size_t)offsets.Get(node_ndx-1) : 0;
-		const size_t local_ndx    = ndx - local_offset;
-
-		// Get parent info
-		const Column target = GetColumnFromRef<Column>(refs, node_ndx);
-		target.GetParentInfo(local_ndx, parent, pndx, offset + local_offset);
-	}
-	else {
-		parent = m_array;
-		pndx   = ndx + offset;
-	}
-}
-
 static Column GetColumnFromRef(Array& parent, size_t ndx) {
 	assert(parent.HasRefs());
 	assert(ndx < parent.Size());

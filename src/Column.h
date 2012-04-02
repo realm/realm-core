@@ -119,7 +119,7 @@ public:
 
 	size_t Size() const;
 	bool IsEmpty() const;
-	
+
 	// Getting and setting values
 	int64_t Get(size_t ndx) const;
 	size_t GetAsRef(size_t ndx) const;
@@ -135,8 +135,7 @@ public:
 	void ReferenceSort(size_t start, size_t end, Column &ref);
 
 	intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
-	void GetParentInfo(size_t ndx, Array*& parent, size_t& pndx, size_t offset=0) const;
-	
+
 	void Clear();
 	void Delete(size_t ndx);
 	//void Resize(size_t len);
@@ -176,7 +175,7 @@ protected:
 	friend class ColumnBase;
 	void Create();
 	void UpdateRef(size_t ref);
-	
+
 	// Node functions
 	int64_t LeafGet(size_t ndx) const {return m_array->Get(ndx);}
 	bool LeafSet(size_t ndx, int64_t value) {return m_array->Set(ndx, value);}
