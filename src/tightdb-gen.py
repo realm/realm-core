@@ -205,12 +205,10 @@ tdbType##CType${j+1} CName${j+1}%slurp
 	ColumnProxy##CType${j+1} CName${j+1}; \\
 %end for
 \\
-protected: \\
-	friend class Group; \\
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \\
-\\
 private: \\
+	friend class Group; \\
 	TableName(const TableName&) {} \\
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \\
 	TableName& operator=(const TableName&) {return *this;} \\
 };
 %end for

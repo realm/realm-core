@@ -8,27 +8,16 @@ ColumnTable::ColumnTable(size_t ref_specSet, Array* parent, size_t pndx, Allocat
 ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, Array* parent, size_t pndx, Allocator& alloc)
 : Column(ref_column, parent, pndx, alloc), m_ref_specSet(ref_specSet) {}
 
-Table ColumnTable::GetTable(size_t ndx) {
+Table *ColumnTable::get_subtable_ptr(size_t ndx, Table const *parent) const {
 	assert(ndx < Size());
+	assert(parent);
+
+	// FIXME: Must search local cache for table instance!
 
 	const size_t ref_columns = GetAsRef(ndx);
 	Allocator& alloc = GetAllocator();
 
-	bool const columns_ref_is_subtable_root = true;
-	return Table(alloc, m_ref_specSet, ref_columns, m_array, ndx,
-	             columns_ref_is_subtable_root);
-}
-
-Table* ColumnTable::GetTablePtr(size_t ndx) {
-	assert(ndx < Size());
-
-	const size_t ref_columns = GetAsRef(ndx);
-	Allocator& alloc = GetAllocator();
-
-	bool const columns_ref_is_subtable_root = true;
-	// Receiver will own pointer and has to delete it when done
-	return new Table(alloc, m_ref_specSet, ref_columns, m_array, ndx,
-	                 columns_ref_is_subtable_root);
+	return new Table(Table::SubtableTag(), alloc, m_ref_specSet, ref_columns, m_array, ndx, parent);
 }
 
 size_t ColumnTable::GetTableSize(size_t ndx) const {
@@ -38,10 +27,12 @@ size_t ColumnTable::GetTableSize(size_t ndx) const {
 
 	if (ref_columns == 0) return 0;
 	else {
-		Allocator& alloc = GetAllocator();
-		// FIXME: Should specify correct parent and that ref_columns is the root of a subtable, just like GetTable()
-		const Table table(alloc, m_ref_specSet, ref_columns, NULL, 0, false);
-		return table.GetSize();
+		Allocator &alloc = GetAllocator();
+		// FIXME: This should be done in a leaner way that avoids
+		// instantiation of a Table object.
+		// OK to fake that this is not a subtable table, because the
+		// operation is read-only.
+		return Table(alloc, m_ref_specSet, ref_columns, NULL, 0).GetSize();
 	}
 }
 
@@ -91,29 +82,33 @@ void ColumnTable::Clear(size_t ndx) {
 
 void ColumnTable::Verify() const {
 	Column::Verify();
-	
+
 	// Verify each sub-table
+	Allocator &alloc = GetAllocator();
 	const size_t count = Size();
 	for (size_t i = 0; i < count; ++i) {
-		const size_t tref = Column::GetAsRef(i);
+		const size_t tref = GetAsRef(i);
 		if (tref == 0) continue;
-		
-		const Table t = const_cast<ColumnTable *>(this)->GetTable(i);
-		t.Verify();
+
+		// OK to fake that this is not a subtable table, because the
+		// operation is read-only.
+		Table(alloc, m_ref_specSet, tref, NULL, 0).Verify();
 	}
 }
 
 void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const {
 	array.ToDot(out);
-	
+
+	Allocator &alloc = GetAllocator();
 	const size_t count = array.Size();
-	
+
 	for (size_t i = 0; i < count; ++i) {
 		const size_t tref = array.GetAsRef(i);
 		if (tref == 0) continue;
-		
-		const Table t = const_cast<ColumnTable *>(this)->GetTable(i);
-		t.ToDot(out);
+
+		// OK to fake that this is not a subtable table, because the
+		// operation is read-only.
+		Table(alloc, m_ref_specSet, tref, NULL, 0).ToDot(out);
 	}
 }
 

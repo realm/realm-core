@@ -27,10 +27,15 @@ public:
 	time_t GetDate(size_t ndx) const;
 	const char* GetString(size_t ndx) const;
 	BinaryData GetBinary(size_t ndx) const;
-	
-	TopLevelTable GetTable(size_t ndx);
-	TopLevelTable* GetTablePtr(size_t ndx);
-	
+
+	/**
+	 * The specified parent table must never be null.
+	 *
+	 * The returned table pointer must always end up being wrapped in
+	 * an instance of BasicTableRef.
+	 */
+	Table *get_subtable_ptr(size_t ndx, Table const *parent) const;
+
 	void SetInt(size_t ndx, int64_t value);
 	void SetBool(size_t ndx, bool value);
 	void SetDate(size_t ndx, time_t value);
@@ -76,40 +81,42 @@ private:
 };
 
 
-class ColumnMixed::RefsColumn: public Column {
+class ColumnMixed::RefsColumn: public Column
+{
 public:
 	RefsColumn(Allocator &alloc): Column(COLUMN_HASREFS, alloc) {}
 	RefsColumn(size_t ref, Array *parent, size_t pndx, Allocator &alloc):
 		Column(ref, parent, pndx, alloc) {}
 	void insert_table(size_t ndx);
 	void set_table(size_t ndx);
-	TopLevelTable get_table(size_t ndx);
-	TopLevelTable *get_table_ptr(size_t ndx);
+	Table *get_subtable_ptr(size_t ndx, Table const *parent);
+#ifdef _DEBUG
+	void verify(size_t ndx) const;
+	void to_dot(size_t ndx, std::ostream &) const;
+#endif //_DEBUG
 };
 
 
-inline void ColumnMixed::InsertTable(size_t ndx) {
+inline void ColumnMixed::InsertTable(size_t ndx)
+{
 	assert(ndx <= m_types->Size());
 	m_types->Insert(ndx, COLUMN_TYPE_TABLE);
 	m_refs->insert_table(ndx);
 }
 
-inline void ColumnMixed::SetTable(size_t ndx) {
+inline void ColumnMixed::SetTable(size_t ndx)
+{
 	assert(ndx < m_types->Size());
 	ClearValue(ndx, COLUMN_TYPE_TABLE); // Remove refs or binary data
 	m_refs->set_table(ndx);
 }
 
-inline TopLevelTable ColumnMixed::GetTable(size_t ndx) {
+inline Table *ColumnMixed::get_subtable_ptr(size_t ndx, Table const *parent) const
+{
 	assert(ndx < m_types->Size());
 	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
-	return m_refs->get_table(ndx);
-}
-
-inline TopLevelTable *ColumnMixed::GetTablePtr(size_t ndx) {
-	assert(ndx < m_types->Size());
-	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
-	return m_refs->get_table_ptr(ndx);
+	assert(parent);
+	return m_refs->get_subtable_ptr(ndx, parent);
 }
 
 #endif //__TDB_COLUMN_MIXED__

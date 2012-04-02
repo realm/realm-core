@@ -153,8 +153,8 @@ TopLevelTable::TopLevelTable(Allocator& alloc): Table(alloc), m_top(COLUMN_HASRE
     m_columns.SetParent(&m_top, 1);
 }
 
-TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx, bool is_subtable):
-	Table(alloc, true), m_top(alloc, is_subtable)
+TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx):
+	Table(NoInitTag(), alloc), m_top(alloc, false)
 {
 	// Load from allocated memory
     m_top.UpdateRef(ref_top);
@@ -168,6 +168,23 @@ TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, si
 	m_specSet.SetParent(&m_top, 0);
 }
 
+TopLevelTable::TopLevelTable(SubtableTag, Allocator& alloc, size_t ref_top,
+							 Array *parent_array, size_t parent_ndx, Table const *parent):
+	Table(NoInitTag(), SubtableTag(), alloc, parent), m_top(alloc, true)
+{
+	// Load from allocated memory
+    m_top.UpdateRef(ref_top);
+    m_top.SetParent(parent_array, parent_ndx);
+    assert(m_top.Size() == 2);
+
+	const size_t ref_specSet = m_top.GetAsRef(0);
+	const size_t ref_columns = m_top.GetAsRef(1);
+
+	Create(ref_specSet, ref_columns, &m_top, 1);
+	m_specSet.SetParent(&m_top, 0);
+}
+
+/*
 TopLevelTable::TopLevelTable(const TopLevelTable& t):
 	Table(t.m_top.GetAllocator(), true), m_top(t.m_top.GetAllocator(), t.m_top.is_subtable_root())
 {
@@ -190,6 +207,7 @@ TopLevelTable::TopLevelTable(const TopLevelTable& t):
 	Create(ref_specSet, ref_columns, &m_top, 1);
 	m_specSet.SetParent(&m_top, 0);
 }
+*/
 
 TopLevelTable::~TopLevelTable() {
 	// free cached columns
@@ -233,8 +251,10 @@ MemStats TopLevelTable::Stats() const {
 
 // -- Table ---------------------------------------------------------------------------------
 
-Table::Table(Allocator& alloc)
-  : m_size(0), m_specSet(COLUMN_HASREFS, NULL, 0, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_subSpecs(alloc, false), m_columns(COLUMN_HASREFS, NULL, 0, alloc)
+Table::Table(Allocator& alloc):
+	m_size(0), m_specSet(COLUMN_HASREFS, NULL, 0, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc),
+	m_columnNames(NULL, 0, alloc), m_subSpecs(alloc, false),
+	m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_ref_count(1)
 {
 	// The SpecSet contains the specification (types and names) of all columns and sub-tables
 	m_specSet.Add(m_spec.GetRef());
@@ -244,21 +264,36 @@ Table::Table(Allocator& alloc)
 }
 
 // Creates un-initialized table. Remember to call Create() before use
-Table::Table(Allocator& alloc, bool dontInit)
-: m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc), m_subSpecs(alloc, false), m_columns(alloc, false)
+Table::Table(NoInitTag, Allocator& alloc):
+	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
+	m_subSpecs(alloc, false), m_columns(alloc, false), m_ref_count(1) {}
+
+// Creates un-initialized table. Remember to call Create() before use
+Table::Table(NoInitTag, SubtableTag, Allocator& alloc, Table const *parent):
+	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
+	m_subSpecs(alloc, false), m_columns(alloc, false), m_ref_count(0), m_parent(parent)
 {
-	assert(dontInit == true); // only there to differentiate constructor
-	(void)dontInit;
+	assert(parent);
 }
 
-Table::Table(Allocator& alloc, size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns,
-             bool columns_ref_is_subtable_root):
+Table::Table(Allocator& alloc, size_t ref_specSet, size_t columns_ref,
+			 Array* parent_columns, size_t pndx_columns):
 	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
-	m_subSpecs(alloc, false), m_columns(alloc, columns_ref_is_subtable_root)
+	m_subSpecs(alloc, false), m_columns(alloc, false), m_ref_count(1)
 {
 	Create(ref_specSet, columns_ref, parent_columns, pndx_columns);
 }
 
+Table::Table(SubtableTag, Allocator& alloc, size_t ref_specSet, size_t columns_ref,
+			 Array* parent_columns, size_t pndx_columns, Table const *parent):
+	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
+	m_subSpecs(alloc, false), m_columns(alloc, true), m_ref_count(0), m_parent(parent)
+{
+	assert(parent);
+	Create(ref_specSet, columns_ref, parent_columns, pndx_columns);
+}
+
+/*
 Table::Table(const Table& t):
 	m_size(0), m_specSet(t.m_columns.GetAllocator(), false),
 	m_spec(t.m_columns.GetAllocator(), false),
@@ -277,6 +312,7 @@ Table::Table(const Table& t):
 	// original after this. It could invalidate the copy (or worse).
 	// TODO: implement ref-counting
 }
+*/
 
 void Table::Create(size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns)
 {
@@ -650,15 +686,15 @@ const ColumnBinary& Table::GetColumnBinary(size_t ndx) const {
 	return static_cast<const ColumnBinary&>(column);
 }
 
-ColumnTable& Table::GetColumnTable(size_t ndx) {
+ColumnTable &Table::GetColumnTable(size_t ndx) {
 	assert(ndx < GetColumnCount());
 	InstantiateBeforeChange();
-	return *(ColumnTable* const)m_cols.Get(ndx);
+	return *reinterpret_cast<ColumnTable *>(m_cols.Get(ndx));
 }
 
-const ColumnTable& Table::GetColumnTable(size_t ndx) const {
+ColumnTable const &Table::GetColumnTable(size_t ndx) const {
 	assert(ndx < GetColumnCount());
-	return *(const ColumnTable* const)m_cols.Get(ndx);
+	return *reinterpret_cast<ColumnTable *>(m_cols.Get(ndx));
 }
 
 ColumnMixed& Table::GetColumnMixed(size_t ndx) {
@@ -720,40 +756,43 @@ void Table::ClearTable(size_t column_id, size_t ndx) {
 	subtables.Clear(ndx);
 }
 
-Table Table::GetTable(size_t column_id, size_t ndx) {
+TableRef Table::GetTable(size_t column_id, size_t ndx) {
 	assert(column_id < GetColumnCount());
 	assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
 	assert(ndx < m_size);
 
-	ColumnTable& subtables = GetColumnTable(column_id);
-	return subtables.GetTable(ndx);
-}
-
-TopLevelTable Table::GetMixedTable(size_t column_id, size_t ndx) {
-	assert(column_id < GetColumnCount());
-	assert(GetRealColumnType(column_id) == COLUMN_TYPE_MIXED);
-	assert(ndx < m_size);
-	
-	ColumnMixed& subtables = GetColumnMixed(column_id);
-	return subtables.GetTable(ndx);
-}
-
-Table* Table::GetTablePtr(size_t column_id, size_t ndx) {
-	assert(column_id < GetColumnCount());
-	assert(ndx < m_size);
-	
 	const ColumnType type = GetRealColumnType(column_id);
 	if (type == COLUMN_TYPE_TABLE) {
-		ColumnTable& subtables = GetColumnTable(column_id);
-		return subtables.GetTablePtr(ndx);
+		ColumnTable &subtables = GetColumnTable(column_id);
+		return TableRef(subtables.get_subtable_ptr(ndx, this));
 	}
 	else if (type == COLUMN_TYPE_MIXED) {
-		ColumnMixed& subtables = GetColumnMixed(column_id);
-		return subtables.GetTablePtr(ndx);
+		ColumnMixed &subtables = GetColumnMixed(column_id);
+		return TableRef(subtables.get_subtable_ptr(ndx, this));
 	}
 	else {
 		assert(false);
-		return NULL;
+		return TableRef();
+	}
+}
+
+TableConstRef Table::GetTable(size_t column_id, size_t ndx) const {
+	assert(column_id < GetColumnCount());
+	assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
+	assert(ndx < m_size);
+
+	const ColumnType type = GetRealColumnType(column_id);
+	if (type == COLUMN_TYPE_TABLE) {
+		ColumnTable const &subtables = GetColumnTable(column_id);
+		return TableConstRef(subtables.get_subtable_ptr(ndx, this));
+	}
+	else if (type == COLUMN_TYPE_MIXED) {
+		ColumnMixed const &subtables = GetColumnMixed(column_id);
+		return TableConstRef(subtables.get_subtable_ptr(ndx, this));
+	}
+	else {
+		assert(false);
+		return TableConstRef();
 	}
 }
 
@@ -762,7 +801,7 @@ size_t Table::GetTableSize(size_t column_id, size_t ndx) const {
 	assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
 	assert(ndx < m_size);
 
-	const ColumnTable& subtables = GetColumnTable(column_id);
+	ColumnTable const &subtables = GetColumnTable(column_id);
 	return subtables.GetTableSize(ndx);
 }
 
@@ -1238,16 +1277,14 @@ void Table::to_json(std::ostream& out) {
 				}
 				case COLUMN_TYPE_TABLE:
 				{
-					Table table = GetTable(i, r);
-					table.to_json(out);
+					GetTable(i, r)->to_json(out);
 					break;
 				}
 				case COLUMN_TYPE_MIXED:
 				{
 					const ColumnType mtype = GetMixedType(i, r);
 					if (mtype == COLUMN_TYPE_TABLE) {
-						TopLevelTable table = GetMixedTable(i, r);
-						table.to_json(out);
+						GetTable(i, r)->to_json(out);
 					}
 					else {
 						const Mixed m = GetMixed(i, r);

@@ -337,16 +337,16 @@ TEST(Group_Subtable) {
 		table.AddRow();
 		table.Set(0, i, 100+i);
 		if (i%2 == 0) {
-			Table st = table.GetTable(1, i);
-			st.AddRow();
-			st.Set(0, 0, 200+i);
+			TableRef st = table.GetTable(1, i);
+			st->AddRow();
+			st->Set(0, 0, 200+i);
 		}
 		if (i%3 == 1) {
 			table.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
-			TopLevelTable st = table.GetMixedTable(2, i);
-			st.RegisterColumn(COLUMN_TYPE_INT, "banach");
-			st.AddRow();
-			st.Set(0, 0, 700+i);
+			TableRef st = table.GetTable(2, i);
+			st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+			st->AddRow();
+			st->Set(0, 0, 700+i);
 		}
 	}
 
@@ -355,57 +355,57 @@ TEST(Group_Subtable) {
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table.Get(0, i), 100+i);
 		{
-			Table st = table.GetTable(1, i);
-			CHECK_EQUAL(st.GetSize(), i%2 == 0 ? 1 : 0);
-			if (i%2 == 0) CHECK_EQUAL(st.Get(0,0), 200+i);
+			TableRef st = table.GetTable(1, i);
+			CHECK_EQUAL(st->GetSize(), i%2 == 0 ? 1 : 0);
+			if (i%2 == 0) CHECK_EQUAL(st->Get(0,0), 200+i);
 			if (i%3 == 0) {
-				st.AddRow();
-				st.Set(0, st.GetSize()-1, 300+i);
+				st->AddRow();
+				st->Set(0, st->GetSize()-1, 300+i);
 			}
 		}
 		CHECK_EQUAL(table.GetMixedType(2,i), i%3 == 1 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
 		if (i%3 == 1) {
-			TopLevelTable st = table.GetMixedTable(2, i);
-			CHECK_EQUAL(st.GetSize(), 1);
-			CHECK_EQUAL(st.Get(0,0), 700+i);
+			TableRef st = table.GetTable(2, i);
+			CHECK_EQUAL(st->GetSize(), 1);
+			CHECK_EQUAL(st->Get(0,0), 700+i);
 		}
 		if (i%8 == 3) {
 			if (i%3 != 1) table.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
-			TopLevelTable st = table.GetMixedTable(2, i);
-			if (i%3 != 1) st.RegisterColumn(COLUMN_TYPE_INT, "banach");
-			st.AddRow();
-			st.Set(0, st.GetSize()-1, 800+i);
+			TableRef st = table.GetTable(2, i);
+			if (i%3 != 1) st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+			st->AddRow();
+			st->Set(0, st->GetSize()-1, 800+i);
 		}
 	}
 
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table.Get(0, i), 100+i);
 		{
-			Table st = table.GetTable(1, i);
+			TableRef st = table.GetTable(1, i);
 			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%2 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				CHECK_EQUAL(st->Get(0, idx), 200+i);
 				++idx;
 			}
 			if (i%3 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				CHECK_EQUAL(st->Get(0, idx), 300+i);
 				++idx;
 			}
 		}
 		CHECK_EQUAL(table.GetMixedType(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
 		if (i%3 == 1 || i%8 == 3) {
-			TopLevelTable st = table.GetMixedTable(2, i);
+			TableRef st = table.GetTable(2, i);
 			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%3 == 1) {
-				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				CHECK_EQUAL(st->Get(0, idx), 700+i);
 				++idx;
 			}
 			if (i%8 == 3) {
-				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				CHECK_EQUAL(st->Get(0, idx), 800+i);
 				++idx;
 			}
 		}
@@ -420,83 +420,83 @@ TEST(Group_Subtable) {
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table2.Get(0, i), 100+i);
 		{
-			Table st = table2.GetTable(1, i);
+			TableRef st = table2.GetTable(1, i);
 			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%2 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				CHECK_EQUAL(st->Get(0, idx), 200+i);
 				++idx;
 			}
 			if (i%3 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				CHECK_EQUAL(st->Get(0, idx), 300+i);
 				++idx;
 			}
 			if (i%5 == 0) {
-				st.AddRow();
-				st.Set(0, st.GetSize()-1, 400+i);
+				st->AddRow();
+				st->Set(0, st->GetSize()-1, 400+i);
 			}
 		}
 		CHECK_EQUAL(table2.GetMixedType(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
 		if (i%3 == 1 || i%8 == 3) {
-			TopLevelTable st = table2.GetMixedTable(2, i);
+			TableRef st = table2.GetTable(2, i);
 			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%3 == 1) {
-				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				CHECK_EQUAL(st->Get(0, idx), 700+i);
 				++idx;
 			}
 			if (i%8 == 3) {
-				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				CHECK_EQUAL(st->Get(0, idx), 800+i);
 				++idx;
 			}
 		}
 		if (i%7 == 4) {
 			if (i%3 != 1 && i%8 != 3) table2.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
-			TopLevelTable st = table2.GetMixedTable(2, i);
-			if (i%3 != 1 && i%8 != 3) st.RegisterColumn(COLUMN_TYPE_INT, "banach");
-			st.AddRow();
-			st.Set(0, st.GetSize()-1, 900+i);
+			TableRef st = table2.GetTable(2, i);
+			if (i%3 != 1 && i%8 != 3) st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+			st->AddRow();
+			st->Set(0, st->GetSize()-1, 900+i);
 		}
 	}
 
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table2.Get(0, i), 100+i);
 		{
-			Table st = table2.GetTable(1, i);
+			TableRef st = table2.GetTable(1, i);
 			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%2 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				CHECK_EQUAL(st->Get(0, idx), 200+i);
 				++idx;
 			}
 			if (i%3 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				CHECK_EQUAL(st->Get(0, idx), 300+i);
 				++idx;
 			}
 			if (i%5 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 400+i);
+				CHECK_EQUAL(st->Get(0, idx), 400+i);
 				++idx;
 			}
 		}
 		CHECK_EQUAL(table2.GetMixedType(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
 		if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
-			TopLevelTable st = table2.GetMixedTable(2, i);
+			TableRef st = table2.GetTable(2, i);
 			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%3 == 1) {
-				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				CHECK_EQUAL(st->Get(0, idx), 700+i);
 				++idx;
 			}
 			if (i%8 == 3) {
-				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				CHECK_EQUAL(st->Get(0, idx), 800+i);
 				++idx;
 			}
 			if (i%7 == 4) {
-				CHECK_EQUAL(st.Get(0, idx), 900+i);
+				CHECK_EQUAL(st->Get(0, idx), 900+i);
 				++idx;
 			}
 		}
@@ -511,39 +511,39 @@ TEST(Group_Subtable) {
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table3.Get(0, i), 100+i);
 		{
-			Table st = table3.GetTable(1, i);
+			TableRef st = table3.GetTable(1, i);
 			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%2 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				CHECK_EQUAL(st->Get(0, idx), 200+i);
 				++idx;
 			}
 			if (i%3 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				CHECK_EQUAL(st->Get(0, idx), 300+i);
 				++idx;
 			}
 			if (i%5 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 400+i);
+				CHECK_EQUAL(st->Get(0, idx), 400+i);
 				++idx;
 			}
 		}
 		CHECK_EQUAL(table3.GetMixedType(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
 		if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
-			TopLevelTable st = table3.GetMixedTable(2, i);
+			TableRef st = table3.GetTable(2, i);
 			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%3 == 1) {
-				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				CHECK_EQUAL(st->Get(0, idx), 700+i);
 				++idx;
 			}
 			if (i%8 == 3) {
-				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				CHECK_EQUAL(st->Get(0, idx), 800+i);
 				++idx;
 			}
 			if (i%7 == 4) {
-				CHECK_EQUAL(st.Get(0, idx), 900+i);
+				CHECK_EQUAL(st->Get(0, idx), 900+i);
 				++idx;
 			}
 		}

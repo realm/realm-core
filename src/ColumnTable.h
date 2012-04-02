@@ -10,8 +10,14 @@ public:
 	ColumnTable(size_t ref_specSet, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	ColumnTable(size_t ref_column, size_t ref_specSet, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 
-	Table GetTable(size_t ndx);
-	Table* GetTablePtr(size_t ndx);
+	/**
+	 * The specified parent table must never be null.
+	 *
+	 * The returned table pointer must always end up being wrapped in
+	 * an instance of BasicTableRef.
+	 */
+	Table *get_subtable_ptr(size_t ndx, Table const *parent) const;
+
 	size_t GetTableSize(size_t ndx) const;
 
 	bool Add();

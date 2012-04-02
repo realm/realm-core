@@ -141,12 +141,10 @@ public: \
 \
 	ColumnProxy##CType1 CName1; \
 \
-protected: \
-	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
-\
 private: \
+	friend class Group; \
 	TableName(const TableName&) {} \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
 	TableName& operator=(const TableName&) {return *this;} \
 };
 
@@ -284,12 +282,10 @@ public: \
 	ColumnProxy##CType1 CName1; \
 	ColumnProxy##CType2 CName2; \
 \
-protected: \
-	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
-\
 private: \
+	friend class Group; \
 	TableName(const TableName&) {} \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
 	TableName& operator=(const TableName&) {return *this;} \
 };
 
@@ -440,12 +436,10 @@ public: \
 	ColumnProxy##CType2 CName2; \
 	ColumnProxy##CType3 CName3; \
 \
-protected: \
-	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
-\
 private: \
+	friend class Group; \
 	TableName(const TableName&) {} \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
 	TableName& operator=(const TableName&) {return *this;} \
 };
 
@@ -609,12 +603,10 @@ public: \
 	ColumnProxy##CType3 CName3; \
 	ColumnProxy##CType4 CName4; \
 \
-protected: \
-	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
-\
 private: \
+	friend class Group; \
 	TableName(const TableName&) {} \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
 	TableName& operator=(const TableName&) {return *this;} \
 };
 
@@ -791,12 +783,10 @@ public: \
 	ColumnProxy##CType4 CName4; \
 	ColumnProxy##CType5 CName5; \
 \
-protected: \
-	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
-\
 private: \
+	friend class Group; \
 	TableName(const TableName&) {} \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
 	TableName& operator=(const TableName&) {return *this;} \
 };
 
@@ -986,12 +976,10 @@ public: \
 	ColumnProxy##CType5 CName5; \
 	ColumnProxy##CType6 CName6; \
 \
-protected: \
-	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
-\
 private: \
+	friend class Group; \
 	TableName(const TableName&) {} \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
 	TableName& operator=(const TableName&) {return *this;} \
 };
 
@@ -1194,12 +1182,10 @@ public: \
 	ColumnProxy##CType6 CName6; \
 	ColumnProxy##CType7 CName7; \
 \
-protected: \
-	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
-\
 private: \
+	friend class Group; \
 	TableName(const TableName&) {} \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
 	TableName& operator=(const TableName&) {return *this;} \
 };
 
@@ -1415,12 +1401,10 @@ public: \
 	ColumnProxy##CType7 CName7; \
 	ColumnProxy##CType8 CName8; \
 \
-protected: \
-	friend class Group; \
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx, false) {}; \
-\
 private: \
+	friend class Group; \
 	TableName(const TableName&) {} \
+	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \
 	TableName& operator=(const TableName&) {return *this;} \
 };
 

@@ -66,11 +66,11 @@ public:
 	size_t Find(size_t start, size_t end, const Table& table) {
 		for (size_t s = start; s < end; ++s) {
 
-			Table subtable = ((Table&)table).GetTable(m_column, s);
+			TableConstRef subtable = table.GetTable(m_column, s);
 
-			const size_t sub = m_child->Find(0, subtable.GetSize(), subtable);
+			const size_t sub = m_child->Find(0, subtable->GetSize(), *subtable);
 
-			if(sub != subtable.GetSize()) {			
+			if(sub != subtable->GetSize()) {			
 
 				if (m_child2 == 0)
 					return s;

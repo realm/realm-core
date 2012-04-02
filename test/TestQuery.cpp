@@ -49,28 +49,28 @@ TEST(TestQuerySubtable) {
 
 
 	// Sub tables
-	Table subtable = table.GetTable(2, 0);
-	subtable.InsertInt(0, 0, 11);
-	subtable.InsertString(1, 0, "a");
-	subtable.InsertDone();
+	TableRef subtable = table.GetTable(2, 0);
+	subtable->InsertInt(0, 0, 11);
+	subtable->InsertString(1, 0, "a");
+	subtable->InsertDone();
 
-	Table subtable1 = table.GetTable(2, 1);
-	subtable1.InsertInt(0, 0, 22);
-	subtable1.InsertString(1, 0, "b");
-	subtable1.InsertDone();
-	subtable1.InsertInt(0, 1, 33);
-	subtable1.InsertString(1, 1, "c");
-	subtable1.InsertDone();
+	subtable = table.GetTable(2, 1);
+	subtable->InsertInt(0, 0, 22);
+	subtable->InsertString(1, 0, "b");
+	subtable->InsertDone();
+	subtable->InsertInt(0, 1, 33);
+	subtable->InsertString(1, 1, "c");
+	subtable->InsertDone();
 
-	Table subtable2 = table.GetTable(2, 2);
-	subtable2.InsertInt(0, 0, 44);
-	subtable2.InsertString(1, 0, "d");
-	subtable2.InsertDone();
+	subtable = table.GetTable(2, 2);
+	subtable->InsertInt(0, 0, 44);
+	subtable->InsertString(1, 0, "d");
+	subtable->InsertDone();
 
-	Table subtable3 = table.GetTable(2, 3);
-	subtable3.InsertInt(0, 0, 55);
-	subtable3.InsertString(1, 0, "e");
-	subtable3.InsertDone();
+	subtable = table.GetTable(2, 3);
+	subtable->InsertInt(0, 0, 55);
+	subtable->InsertString(1, 0, "e");
+	subtable->InsertDone();
 
 
 	Query *q1 = new Query;
@@ -301,28 +301,28 @@ TEST(TestQuerySubtable2) {
 
 
 	// Sub tables
-	Table subtable = table.GetTable(2, 0);
-	subtable.InsertInt(0, 0, 11);
-	subtable.InsertString(1, 0, "a");
-	subtable.InsertDone();
+	TableRef subtable = table.GetTable(2, 0);
+	subtable->InsertInt(0, 0, 11);
+	subtable->InsertString(1, 0, "a");
+	subtable->InsertDone();
 
-	Table subtable1 = table.GetTable(2, 1);
-	subtable1.InsertInt(0, 0, 22);
-	subtable1.InsertString(1, 0, "b");
-	subtable1.InsertDone();
-	subtable1.InsertInt(0, 1, 33);
-	subtable1.InsertString(1, 1, "c");
-	subtable1.InsertDone();
+	subtable = table.GetTable(2, 1);
+	subtable->InsertInt(0, 0, 22);
+	subtable->InsertString(1, 0, "b");
+	subtable->InsertDone();
+	subtable->InsertInt(0, 1, 33);
+	subtable->InsertString(1, 1, "c");
+	subtable->InsertDone();
 
-	Table subtable2 = table.GetTable(2, 2);
-	subtable2.InsertInt(0, 0, 44);
-	subtable2.InsertString(1, 0, "d");
-	subtable2.InsertDone();
+	subtable = table.GetTable(2, 2);
+	subtable->InsertInt(0, 0, 44);
+	subtable->InsertString(1, 0, "d");
+	subtable->InsertDone();
 
-	Table subtable3 = table.GetTable(2, 3);
-	subtable3.InsertInt(0, 0, 55);
-	subtable3.InsertString(1, 0, "e");
-	subtable3.InsertDone();
+	subtable = table.GetTable(2, 3);
+	subtable->InsertInt(0, 0, 55);
+	subtable->InsertString(1, 0, "e");
+	subtable->InsertDone();
 
 
 	Query *q1 = new Query;
