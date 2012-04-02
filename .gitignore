@@ -11,5 +11,8 @@ tags
 tightdb-tests
 TestUnitTest++
 
+/test/test-stl/test-stl
+/test/test-tightdb/test-tightdb
+
 /test/benchmark/x64
 /test/benchmark
