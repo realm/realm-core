@@ -25,7 +25,7 @@
 	else if (m_width == 32) {fun<32> arg;} \
 	else if (m_width == 64) {fun<64> arg;}
 
-#ifdef USE_SSE
+#ifdef USE_SSE42
 /*
     MMX: mmintrin.h
     SSE: xmmintrin.h
@@ -36,8 +36,10 @@
     SSE4.1: smmintrin.h
     SSE4.2: nmmintrin.h
 */
-#include <nmmintrin.h> // __SSE3__
-#endif //USE_SSE
+	#include <nmmintrin.h> // __SSE42__
+#elif defined (USE_SSE3)
+	#include <pmmintrin.h> // __SSE3__
+#endif
 
 #ifdef _DEBUG
 #include <stdio.h>
@@ -173,7 +175,7 @@ private:
 	void QuickSort(size_t lo, size_t hi);
 	void ReferenceQuickSort(Array &ref);
 	template <size_t w>void ReferenceQuickSort(size_t lo, size_t hi, Array &ref);
-#ifdef USE_SSE
+#if defined(USE_SSE42) || defined(USE_SSE3)
 	size_t FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const;
 #endif //USE_SSE
 	template <bool eq>size_t CompareEquality(int64_t value, size_t start, size_t end) const;
