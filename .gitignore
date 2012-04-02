@@ -14,5 +14,10 @@ TestUnitTest++
 /test/test-stl/test-stl
 /test/test-tightdb/test-tightdb
 
+/test/subtables.tdb
+/test/subtables.tightdb
+/test/subtables2.tdb
+/test/table_test.tbl
+
 /test/benchmark/x64
 /test/benchmark
