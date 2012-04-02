@@ -9,7 +9,7 @@
 # Compiler and flags
 #CXXFLAGS  = -Wall -Weffc++ -Wextra -std=c++0x
 CXXFLAGS  = -std=c++0x -lpthread
-CXXSSE    = -DUSE_SSE3 -msse4.2
+CXXSSE    = -DUSE_SSE3 -msse3
 CXXLIBS   = -L./UnitTest++ -lUnitTest++
 CXXINC    = -I./UnitTest++/src -I../src
 CXX       = g++ $(CXXFLAGS)
