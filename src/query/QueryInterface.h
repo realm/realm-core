@@ -244,13 +244,16 @@ public:
 		size_t r = start - 1;
 		size_t results = 0;
 		int64_t sum = 0;
+		
+		const Column& c = table.GetColumn(column);
+		const size_t table_size = table.GetSize();
 
 		for (;;) {
 			r = Find(table, r + 1, end);
-			if (r == (size_t)-1 || r == table.GetSize() || results == limit)
+			if (r == (size_t)-1 || r == table_size || results == limit)
 				break;
 			++results;
-			sum += table.Get(column, r);
+			sum += c.Get(r);
 		}
 
 		if(resultcount != 0)
