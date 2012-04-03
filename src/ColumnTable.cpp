@@ -39,8 +39,7 @@ size_t ColumnTable::GetTableSize(size_t ndx) const {
 	if (ref_columns == 0) return 0;
 	else {
 		Allocator& alloc = GetAllocator();
-		// FIXME: Should specify correct parent and that ref_columns is the root of a subtable, just like GetTable()
-		const Table table(alloc, m_ref_specSet, ref_columns, NULL, 0, false);
+		const Table table(alloc, m_ref_specSet, ref_columns, m_array, ndx, false);
 		return table.GetSize();
 	}
 }

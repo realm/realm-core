@@ -550,6 +550,8 @@ TEST(Table_Spec) {
 		CHECK_EQUAL("test", subtable.GetString(1, 0));
 	}
 
+	CHECK_EQUAL(1, table.GetTableSize(2, 0));
+
 	// Get the sub-table again and see if the values
 	// still match.
 	{
