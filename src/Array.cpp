@@ -1728,3 +1728,127 @@ MemStats Array::Stats() const {
 void Array::update_subtable_ref(size_t, size_t) {
 	assert(false); // Must be overridden by column root arrays.
 }
+
+// Direct access methods
+
+// Pre-declarations
+bool get_header_isnode(const char* const header);
+unsigned int get_header_width(const char* const header);
+size_t get_header_len(const char* const header);
+int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx);
+size_t FindPosDirect(const char* const header, const char* const data, const size_t width, const int64_t target);
+
+bool get_header_isnode(const char* const header) {
+	return (header[0] & 0x80) != 0;
+}
+
+unsigned int get_header_width(const char* const header) {
+	return (1 << (header[0] & 0x07)) >> 1;
+}
+
+size_t get_header_len(const char* const header) {
+	return (header[1] << 16) + (header[2] << 8) + header[3];
+}
+
+int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx) {
+	switch (width) {
+		case 0:
+			return 0;
+		case 1:
+		{
+			const size_t offset = ndx >> 3;
+			return (data[offset] >> (ndx & 7)) & 0x01;
+		}
+		case 2:
+		{
+			const size_t offset = ndx >> 2;
+			return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
+		}
+		case 4:
+		{
+			const size_t offset = ndx >> 1;
+			return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
+		}
+		case 8:
+			return *((const signed char*)(data + ndx));
+		case 16:
+		{
+			const size_t offset = ndx * 2;
+			return *(const int16_t*)(data + offset);
+		}
+		case 32:
+		{
+			const size_t offset = ndx * 4;
+			return *(const int32_t*)(data + offset);
+		}
+		case 64:
+		{
+			const size_t offset = ndx * 8;
+			return *(const int64_t*)(data + offset);
+		}
+		default:
+			assert(false);
+			return 0;
+	}
+}
+
+size_t FindPosDirect(const char* const header, const char* const data, const size_t width, const int64_t target) {
+	const size_t len    = get_header_len(header);
+	
+	int low = -1;
+	int high = (int)len;
+	
+	// Binary search based on:
+	// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+	// Finds position of largest value SMALLER than the target (for lookups in
+	// nodes)
+	while (high - low > 1) {
+		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+		const int64_t v = GetDirect(data, width, probe);
+		
+		if (v > target) high = (int)probe;
+		else            low = (int)probe;
+	}
+	if (high == (int)len) return (size_t)-1;
+	else return (size_t)high;
+}
+
+// Get value direct through column b-tree without instatiating any Arrays.
+int64_t Array::ColumnGet(size_t ndx) const {
+	const char* data   = (const char*)m_data;
+	const char* header = data - 8;
+	unsigned int width = m_width;
+	bool isNode = m_isNode;
+	
+	while (1) {
+		if (isNode) {
+			// Get subnode table
+			const size_t ref_offsets = GetDirect(data, width, 0);
+			const size_t ref_refs    = GetDirect(data, width, 1);
+			
+			// Find the subnode containing the item
+			const char* const offsets_header = (const char*)m_alloc.Translate(ref_offsets);
+			const char* const offsets_data = offsets_header + 8;
+			const size_t offsets_width  = get_header_width(offsets_header);
+			const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
+			
+			// Calc index in subnode
+			const size_t offset = node_ndx ? (size_t)GetDirect(offsets_data, offsets_width, node_ndx-1) : 0;
+			ndx = ndx - offset; // local index
+			
+			// Get ref to array
+			const char* const refs_header = (const char*)m_alloc.Translate(ref_refs);
+			const unsigned int refs_width  = get_header_width(refs_header);
+			const size_t ref = GetDirect(refs_header + 8, refs_width, node_ndx);
+			
+			// Set vars for next iteration
+			header = (const char*)m_alloc.Translate(ref);
+			data   = header + 8;
+			width  = get_header_width(header);
+			isNode = get_header_isnode(header);
+		}
+		else {
+			return GetDirect(data, width, ndx);
+		}
+	}
+}
