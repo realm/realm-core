@@ -32,7 +32,7 @@ size_t ColumnTable::GetTableSize(size_t ndx) const {
 		// instantiation of a Table object.
 		// OK to fake that this is not a subtable table, because the
 		// operation is read-only.
-		return Table(alloc, m_ref_specSet, ref_columns, NULL, 0).GetSize();
+		return Table(alloc, m_ref_specSet, ref_columns, m_array, ndx).GetSize();
 	}
 }
 
