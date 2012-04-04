@@ -232,10 +232,8 @@ protected:
 	/**
 	 * Construct top-level table from ref.
 	 */
-/*
 	Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-		  Array *parent_columns, size_t pndx_columns); // FIXME: Is this one ever used????
-*/
+		  Array *parent_columns, size_t pndx_columns);
 
 	/**
 	 * Construct subtable from ref.

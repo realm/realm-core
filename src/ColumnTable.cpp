@@ -10,14 +10,14 @@ void ColumnSubtableParent::subtable_wrapper_destroyed(size_t subtable_ndx)
 	m_subtable_map.remove(subtable_ndx);
 	// Note that this column instance may be destroyed upon return
 	// from Table::unbind_ref().
-	if (m_subtable_map.empty() && m_table) m_table->unbind_ref();
+	if (m_table && m_subtable_map.empty()) m_table->unbind_ref();
 }
 
 void ColumnSubtableParent::save_subtable_wrapper(size_t subtable_ndx, Table *subtable) const
 {
 	bool const was_empty = m_subtable_map.empty();
 	m_subtable_map.insert(subtable_ndx, subtable);
-	if (was_empty) m_table->bind_ref();
+	if (m_table && was_empty) m_table->bind_ref();
 }
 
 

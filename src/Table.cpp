@@ -188,6 +188,9 @@ TopLevelTable::TopLevelTable(SubtableTag, Allocator &alloc, size_t ref_top,
 
 TopLevelTable::~TopLevelTable()
 {
+	// Delete cached columns
+	ClearCachedColumns();
+
 	// 'm_top' has no parent if, and only if this is a free standing
 	// instance of TopLevelTable. In this case it is the
 	// responsibility of this destructor to deallocate all the memory
@@ -441,7 +444,8 @@ void Table::CacheColumns() {
     if (size != (size_t)-1) m_size = size;
 }
 
-void Table::ClearCachedColumns() {
+void Table::ClearCachedColumns()
+{
 	assert(m_cols.IsValid());
 
 	const size_t count = m_cols.Size();
@@ -461,10 +465,8 @@ void Table::ClearCachedColumns() {
 
 Table::~Table()
 {
-/*
-	// avoid double deletions if already cleared at higher level
-	if (!m_cols.IsValid()) return; // FIXME: Is this necessary???
-*/
+	// Delete cached columns if it has not already been done.
+	if (m_cols.IsValid()) ClearCachedColumns();
 
 	// 'm_columns' has no parent if, and only if this is a free
 	// standing instance of Table, and not a free standing instance of
@@ -486,9 +488,6 @@ Table::~Table()
 		size_t const ndx = m_columns.GetParentNdx();
 		static_cast<Column::RootArray *>(parent)->m_column->subtable_wrapper_destroyed(ndx);
 	}
-
-	// free cached columns
-	ClearCachedColumns();
 }
 
 size_t Table::GetColumnCount() const {

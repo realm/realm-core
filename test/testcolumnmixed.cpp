@@ -161,7 +161,6 @@ TEST(ColumnMixed_Binary) {
 	c.Destroy();
 }
 
-/*
 TEST(ColumnMixed_Table) {
 	ColumnMixed c;
 
@@ -173,17 +172,15 @@ TEST(ColumnMixed_Table) {
 		CHECK_EQUAL(COLUMN_TYPE_TABLE, c.GetType(i));
 	}
 
-	Table* const t1 = c.GetTablePtr(0); // ColumnMixed::get_table_ptr(size_t ndx, Table const *parent) - but there is not parent table!
-	Table* const t2 = c.GetTablePtr(1);
+	Table* const t1 = c.get_subtable_ptr(0);
+	Table* const t2 = c.get_subtable_ptr(1);
 	CHECK(t1->IsEmpty());
 	CHECK(t2->IsEmpty());
-
 	delete t1;
 	delete t2;
 
 	c.Destroy();
 }
-*/
 
 TEST(ColumnMixed_Mixed) {
 	ColumnMixed c;
