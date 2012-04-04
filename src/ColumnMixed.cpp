@@ -8,6 +8,7 @@ ColumnMixed::~ColumnMixed() {
 	delete m_types;
 	delete m_refs;
 	delete m_data;
+	delete m_array;
 }
 
 void ColumnMixed::Destroy() {

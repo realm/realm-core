@@ -176,6 +176,7 @@ TEST(TableViewFindAll) {
 	CHECK_EQUAL(1, v2->GetRef(0));
 	CHECK_EQUAL(2, v2->GetRef(1));
 	//v.Destroy();
+	delete v2;
 }
 
 TDB_TABLE_1(TestTableString,
@@ -200,6 +201,7 @@ TEST(TableViewFindAllString) {
 	CHECK_EQUAL(1, v2->GetRef(0));
 	CHECK_EQUAL(2, v2->GetRef(1));
 	//v.Destroy();
+	delete v2;
 }
 
 TEST(TableViewDelete) {
