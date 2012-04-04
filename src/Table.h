@@ -225,21 +225,23 @@ protected:
 	 */
 	class SubtableTag {};
 
-	Table(NoInitTag, Allocator& alloc); // Construct un-initialized
+	Table(NoInitTag, Allocator &alloc); // Construct un-initialized
 
-	Table(NoInitTag, SubtableTag, Allocator& alloc, Table const *parent); // Construct un-initialized
+	Table(NoInitTag, SubtableTag, Allocator &alloc); // Construct subtable un-initialized
 
 	/**
 	 * Construct top-level table from ref.
 	 */
-	Table(Allocator& alloc, size_t ref_specSet, size_t columns_ref,
-		  Array* parent_columns, size_t pndx_columns); // FIXME: Is this one ever used????
+/*
+	Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
+		  Array *parent_columns, size_t pndx_columns); // FIXME: Is this one ever used????
+*/
 
 	/**
 	 * Construct subtable from ref.
 	 */
-	Table(SubtableTag, Allocator& alloc, size_t ref_specSet, size_t columns_ref,
-		  Array* parent_columns, size_t pndx_columns, Table const *parent);
+	Table(SubtableTag, Allocator &alloc, size_t ref_specSet, size_t columns_ref,
+		  Array *parent_columns, size_t pndx_columns);
 
 	void Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns);
 	void CreateColumns();
@@ -269,13 +271,15 @@ protected:
 	Array m_cols;
 
 private:
-	template<class> friend class BasicTableRef;
-
-	mutable std::size_t m_ref_count;
-	TableConstRef m_parent;
-
 	Table(Table const &); // Disable copy construction
 	Table &operator=(Table const &); // Disable copying assignment
+
+	template<class> friend class BasicTableRef;
+	friend class ColumnSubtableParent;
+
+	mutable std::size_t m_ref_count;
+	void bind_ref() const { ++m_ref_count; }
+	void unbind_ref() const { if (--m_ref_count == 0) delete this; }
 
 	ColumnBase& GetColumnBase(size_t ndx);
 	void InstantiateBeforeChange();
@@ -316,7 +320,7 @@ private:
 	 * Construct subtable from ref.
 	 */
 	TopLevelTable(SubtableTag, Allocator& alloc, size_t ref_top,
-				  Array *parent_array, size_t parent_ndx, Table const *parent);
+				  Array *parent_array, size_t parent_ndx);
 };
 
 

@@ -322,7 +322,7 @@ TEST(Group_Serialize_All) {
 
 
 TEST(Group_Subtable) {
-	int n = 150;
+	int n = 1;
 
 	Group g;
 	TopLevelTable &table = g.GetTable("test");

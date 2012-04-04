@@ -161,6 +161,17 @@ public:
 
 	void Sort();
 
+	class RootArray;
+
+	/**
+	 * Must be called whenever a subtable wrapper (an instance of
+	 * Table) is destroyed.
+	 *
+	 * Must be overridden by any column class that can contain
+	 * subtables.
+	 */
+	virtual void subtable_wrapper_destroyed(size_t subtable_ndx);
+
 	// Debug
 #ifdef _DEBUG
 	bool Compare(const Column& c) const;
@@ -191,6 +202,31 @@ protected:
 	// Member variables
 	Index* m_index;
 };
+
+
+class Column::RootArray: public Array
+{
+public:
+	virtual void update_subtable_ref(size_t subtable_ndx, size_t new_ref)
+	{
+		m_column->Set(subtable_ndx, new_ref);
+	}
+
+#ifdef _DEBUG
+	virtual size_t get_subtable_ref_for_verify(size_t subtable_ndx)
+	{
+		return m_column->Get(subtable_ndx);
+	}
+#endif //_DEBUG
+
+	RootArray(Column *col, ColumnDef type, Array *parent, size_t pndx, Allocator &alloc):
+		Array(type, parent, pndx, alloc), m_column(col) {}
+	RootArray(Column *col, size_t ref, Array *parent, size_t pndx, Allocator &alloc):
+		Array(ref, parent, pndx, alloc), m_column(col) {}
+
+	Column *m_column;
+};
+
 
 // Templates
 #include "Column_tpl.h"

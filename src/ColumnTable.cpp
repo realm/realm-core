@@ -1,23 +1,46 @@
 #include "ColumnTable.h"
 #include "Table.h"
 
+using namespace std;
 
-ColumnTable::ColumnTable(size_t ref_specSet, Array* parent, size_t pndx, Allocator& alloc)
-: Column(COLUMN_HASREFS, parent, pndx, alloc), m_ref_specSet(ref_specSet) {}
 
-ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, Array* parent, size_t pndx, Allocator& alloc)
-: Column(ref_column, parent, pndx, alloc), m_ref_specSet(ref_specSet) {}
+// Overriding method in Column.
+void ColumnSubtableParent::subtable_wrapper_destroyed(size_t subtable_ndx)
+{
+	m_subtable_map.remove(subtable_ndx);
+	// Note that this column instance may be destroyed upon return
+	// from Table::unbind_ref().
+	if (m_subtable_map.empty() && m_table) m_table->unbind_ref();
+}
 
-Table *ColumnTable::get_subtable_ptr(size_t ndx, Table const *parent) const {
+void ColumnSubtableParent::save_subtable_wrapper(size_t subtable_ndx, Table *subtable) const
+{
+	bool const was_empty = m_subtable_map.empty();
+	m_subtable_map.insert(subtable_ndx, subtable);
+	if (was_empty) m_table->bind_ref();
+}
+
+
+ColumnTable::ColumnTable(size_t ref_specSet, Array *parent, size_t pndx,
+						 Allocator &alloc, Table const *tab):
+	ColumnSubtableParent(parent, pndx, alloc, tab), m_ref_specSet(ref_specSet) {}
+
+ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, Array* parent, size_t pndx,
+						 Allocator& alloc, Table const *tab):
+	ColumnSubtableParent(ref_column, parent, pndx, alloc, tab), m_ref_specSet(ref_specSet) {}
+
+Table *ColumnTable::get_subtable_ptr(size_t ndx) const {
 	assert(ndx < Size());
-	assert(parent);
 
-	// FIXME: Must search local cache for table instance!
+	Table *subtable = m_subtable_map.find(ndx);
+	if (subtable) return subtable;
 
-	const size_t ref_columns = GetAsRef(ndx);
+	size_t const ref_columns = GetAsRef(ndx);
 	Allocator& alloc = GetAllocator();
 
-	return new Table(Table::SubtableTag(), alloc, m_ref_specSet, ref_columns, m_array, ndx, parent);
+	subtable = new Table(Table::SubtableTag(), alloc, m_ref_specSet, ref_columns, m_array, ndx);
+	save_subtable_wrapper(ndx, subtable);
+	return subtable;
 }
 
 size_t ColumnTable::GetTableSize(size_t ndx) const {
@@ -30,7 +53,7 @@ size_t ColumnTable::GetTableSize(size_t ndx) const {
 		Allocator &alloc = GetAllocator();
 		// FIXME: This should be done in a leaner way that avoids
 		// instantiation of a Table object.
-		// OK to fake that this is not a subtable table, because the
+		// OK to fake that this is not a subtable, because the
 		// operation is read-only.
 		return Table(alloc, m_ref_specSet, ref_columns, m_array, ndx).GetSize();
 	}
@@ -90,9 +113,9 @@ void ColumnTable::Verify() const {
 		const size_t tref = GetAsRef(i);
 		if (tref == 0) continue;
 
-		// OK to fake that this is not a subtable table, because the
+		// OK to fake that this is not a subtable, because the
 		// operation is read-only.
-		Table(alloc, m_ref_specSet, tref, NULL, 0).Verify();
+		Table(alloc, m_ref_specSet, tref, m_array, i).Verify();
 	}
 }
 
@@ -106,9 +129,9 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const {
 		const size_t tref = array.GetAsRef(i);
 		if (tref == 0) continue;
 
-		// OK to fake that this is not a subtable table, because the
+		// OK to fake that this is not a subtable, because the
 		// operation is read-only.
-		Table(alloc, m_ref_specSet, tref, NULL, 0).ToDot(out);
+		Table(alloc, m_ref_specSet, tref, m_array, i).ToDot(out);
 	}
 }
 

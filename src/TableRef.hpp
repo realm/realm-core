@@ -154,13 +154,13 @@ template<class T> inline void BasicTableRef<T>::reset(T *t)
 
 template<class T> inline void BasicTableRef<T>::bind(T *t)
 {
-	if (t) ++t->m_ref_count;
+	if (t) t->bind_ref();
 	m_table = t;
 }
 
 template<class T> inline void BasicTableRef<T>::unbind()
 {
-	if (m_table && --m_table->m_ref_count == 0) delete m_table;
+	if (m_table) m_table->unbind_ref();
 }
 
 #endif //__TDB_TABLE_REF__

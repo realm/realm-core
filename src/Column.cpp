@@ -25,25 +25,6 @@ Array* merge(Array *ArrayList);
 void merge_references(Array *valuelist, Array *indexlists, Array **indexresult);
 
 
-class RootArray: public Array {
-public:
-	virtual void update_subtable_ref(size_t subtable_ndx, size_t new_ref) {
-		m_column->Set(subtable_ndx, new_ref);
-	}
-
-	virtual size_t get_subtable_ref_for_verify(size_t subtable_ndx) {
-		return m_column->Get(subtable_ndx);
-	}
-
-	RootArray(Column *col, ColumnDef type, Array *parent, size_t pndx, Allocator &alloc):
-		Array(type, parent, pndx, alloc), m_column(col) {}
-	RootArray(Column *col, size_t ref, Array *parent, size_t pndx, Allocator &alloc):
-		Array(ref, parent, pndx, alloc), m_column(col) {}
-
-	Column *m_column;
-};
-
-
 Column::Column(Allocator& alloc): m_index(NULL) {
 	m_array = new RootArray(this, COLUMN_NORMAL, NULL, 0, alloc);
 	Create();
@@ -668,6 +649,13 @@ void Column::BuildIndex(Index& index) {
 
 void Column::Sort() {
 	Sort(0, Size());
+}
+
+void Column::subtable_wrapper_destroyed(size_t subtable_ndx)
+{
+	// Must be overridden by any column class that can contain
+	// subtables.
+	assert(false);
 }
 
 

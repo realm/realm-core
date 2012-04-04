@@ -3,6 +3,7 @@
 
 #include "Column.h"
 #include "ColumnType.h"
+#include "ColumnTable.h"
 #include "Table.h"
 #include "Index.h"
 
@@ -11,17 +12,38 @@ class ColumnBinary;
 
 class ColumnMixed : public ColumnBase {
 public:
-	ColumnMixed(Allocator& alloc=GetDefaultAllocator());
-	ColumnMixed(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	/**
+	 * Create a freestanding mixed column.
+	 */
+	ColumnMixed();
+
+	/**
+	 * Create a mixed column and have it instantiate a new array
+	 * structure.
+	 *
+	 * \param tab If this column is used as part of a table you must
+	 * pass a pointer to that table. Otherwise you may pass null.
+	 */
+	ColumnMixed(Allocator &alloc, Table const *tab);
+
+	/**
+	 * Create a mixed column and attach it to an already existing
+	 * array structure.
+	 *
+	 * \param tab If this column is used as part of a table you must
+	 * pass a pointer to that table. Otherwise you may pass null.
+	 */
+	ColumnMixed(size_t ref, Array *parent, size_t pndx, Allocator &alloc, Table const *tab);
+
 	~ColumnMixed();
 	void Destroy();
-	
+
 	void SetParent(Array* parent, size_t pndx);
-	
+
 	ColumnType GetType(size_t ndx) const;
 	size_t Size() const {return m_types->Size();}
 	bool IsEmpty() const {return m_types->IsEmpty();}
-	
+
 	int64_t GetInt(size_t ndx) const;
 	bool GetBool(size_t ndx) const;
 	time_t GetDate(size_t ndx) const;
@@ -29,12 +51,10 @@ public:
 	BinaryData GetBinary(size_t ndx) const;
 
 	/**
-	 * The specified parent table must never be null.
-	 *
 	 * The returned table pointer must always end up being wrapped in
 	 * an instance of BasicTableRef.
 	 */
-	Table *get_subtable_ptr(size_t ndx, Table const *parent) const;
+	Table *get_subtable_ptr(size_t ndx) const;
 
 	void SetInt(size_t ndx, int64_t value);
 	void SetBool(size_t ndx, bool value);
@@ -60,14 +80,15 @@ public:
 	void ClearIndex() {}
 	
 	size_t GetRef() const {return m_array->GetRef();}
-	
+
 #ifdef _DEBUG
 	void Verify() const;
 	void ToDot(std::ostream& out, const char* title) const;
 #endif //_DEBUG
 	
 private:
-	void Create(size_t ref, Array* parent, size_t pndx, Allocator& alloc);
+	void Create(Allocator &alloc, Table const *tab);
+	void Create(size_t ref, Array *parent, size_t pndx, Allocator &alloc, Table const *tab);
 	void InitDataColumn();
 	
 	void ClearValue(size_t ndx, ColumnType newtype);
@@ -81,21 +102,37 @@ private:
 };
 
 
-class ColumnMixed::RefsColumn: public Column
+class ColumnMixed::RefsColumn: public ColumnSubtableParent
 {
 public:
-	RefsColumn(Allocator &alloc): Column(COLUMN_HASREFS, alloc) {}
-	RefsColumn(size_t ref, Array *parent, size_t pndx, Allocator &alloc):
-		Column(ref, parent, pndx, alloc) {}
+	RefsColumn(Allocator &alloc, Table const *tab): ColumnSubtableParent(0, 0, alloc, tab) {}
+	RefsColumn(size_t ref, Array *parent, size_t pndx, Allocator &alloc, Table const *tab):
+	ColumnSubtableParent(ref, parent, pndx, alloc, tab) {}
 	void insert_table(size_t ndx);
 	void set_table(size_t ndx);
-	Table *get_subtable_ptr(size_t ndx, Table const *parent);
+	Table *get_subtable_ptr(size_t ndx);
 #ifdef _DEBUG
 	void verify(size_t ndx) const;
 	void to_dot(size_t ndx, std::ostream &) const;
 #endif //_DEBUG
 };
 
+
+inline ColumnMixed::ColumnMixed(): m_data(NULL)
+{
+	Create(GetDefaultAllocator(), 0);
+}
+
+inline ColumnMixed::ColumnMixed(Allocator &alloc, Table const *tab): m_data(NULL)
+{
+	Create(alloc, tab);
+}
+
+inline ColumnMixed::ColumnMixed(size_t ref, Array *parent, size_t pndx,
+								Allocator &alloc, Table const *tab): m_data(NULL)
+{
+	Create(ref, parent, pndx, alloc, tab);
+}
 
 inline void ColumnMixed::InsertTable(size_t ndx)
 {
@@ -111,12 +148,11 @@ inline void ColumnMixed::SetTable(size_t ndx)
 	m_refs->set_table(ndx);
 }
 
-inline Table *ColumnMixed::get_subtable_ptr(size_t ndx, Table const *parent) const
+inline Table *ColumnMixed::get_subtable_ptr(size_t ndx) const
 {
 	assert(ndx < m_types->Size());
 	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
-	assert(parent);
-	return m_refs->get_subtable_ptr(ndx, parent);
+	return m_refs->get_subtable_ptr(ndx);
 }
 
 #endif //__TDB_COLUMN_MIXED__

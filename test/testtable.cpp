@@ -1,3 +1,4 @@
+#include <sstream>
 #include "tightdb.h"
 #include <UnitTest++.h>
 
@@ -680,6 +681,7 @@ TEST(Table_Mixed) {
 
 	subtable->InsertString(0, 0, "John");
 	subtable->InsertInt(1, 0, 40);
+	subtable->InsertDone();
 
 	// Get same table again and verify values
 	TableRef subtable2 = table.GetTable(1, 5);

@@ -145,7 +145,9 @@ size_t Spec::GetColumnIndex(const char* name) const {
 
 // -- TopLevelTable ---------------------------------------------------------------------------
 
-TopLevelTable::TopLevelTable(Allocator& alloc): Table(alloc), m_top(COLUMN_HASREFS, NULL, 0, alloc) {
+TopLevelTable::TopLevelTable(Allocator &alloc):
+	Table(alloc), m_top(COLUMN_HASREFS, NULL, 0, alloc)
+{
 	// A table is defined by a specset and a list of columns
 	m_top.Add(m_specSet.GetRef());
     m_top.Add(m_columns.GetRef());
@@ -153,7 +155,7 @@ TopLevelTable::TopLevelTable(Allocator& alloc): Table(alloc), m_top(COLUMN_HASRE
     m_columns.SetParent(&m_top, 1);
 }
 
-TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx):
+TopLevelTable::TopLevelTable(Allocator &alloc, size_t ref_top, Array *parent, size_t pndx):
 	Table(NoInitTag(), alloc), m_top(alloc, false)
 {
 	// Load from allocated memory
@@ -168,9 +170,9 @@ TopLevelTable::TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, si
 	m_specSet.SetParent(&m_top, 0);
 }
 
-TopLevelTable::TopLevelTable(SubtableTag, Allocator& alloc, size_t ref_top,
-							 Array *parent_array, size_t parent_ndx, Table const *parent):
-	Table(NoInitTag(), SubtableTag(), alloc, parent), m_top(alloc, true)
+TopLevelTable::TopLevelTable(SubtableTag, Allocator &alloc, size_t ref_top,
+							 Array *parent_array, size_t parent_ndx):
+	Table(NoInitTag(), SubtableTag(), alloc), m_top(alloc, true)
 {
 	// Load from allocated memory
     m_top.UpdateRef(ref_top);
@@ -184,38 +186,21 @@ TopLevelTable::TopLevelTable(SubtableTag, Allocator& alloc, size_t ref_top,
 	m_specSet.SetParent(&m_top, 0);
 }
 
-/*
-TopLevelTable::TopLevelTable(const TopLevelTable& t):
-	Table(t.m_top.GetAllocator(), true), m_top(t.m_top.GetAllocator(), t.m_top.is_subtable_root())
+TopLevelTable::~TopLevelTable()
 {
-	// NOTE: Original should be destroyed right after copy. Do not modify
-	// original after this. It could invalidate the copy (or worse).
-	// TODO: implement ref-counting
-	
-	const size_t ref    = t.m_top.GetRef();
-	Array* const parent = t.m_top.GetParent();
-	const size_t pndx   = t.m_top.GetParentNdx();
-	
-	// Load from allocated memory
-    m_top.UpdateRef(ref);
-    m_top.SetParent(parent, pndx);
-    assert(m_top.Size() == 2);
-	
-	const size_t ref_specSet = m_top.GetAsRef(0);
-	const size_t ref_columns = m_top.GetAsRef(1);
-	
-	Create(ref_specSet, ref_columns, &m_top, 1);
-	m_specSet.SetParent(&m_top, 0);
-}
-*/
-
-TopLevelTable::~TopLevelTable() {
-	// free cached columns
-	ClearCachedColumns();
-
-	// Clean-up if we are not attached to a parent
-	// (destroying m_top will also destroy specSet and columns)
+	// 'm_top' has no parent if, and only if this is a free standing
+	// instance of TopLevelTable. In this case it is the
+	// responsibility of this destructor to deallocate all the memory
+	// chunks that make up the entire hierarchy of arrays.
 	if (!m_top.HasParent()) m_top.Destroy();
+
+	// On the other hand, if 'm_top' is the root of a subtable
+	// then we must notify our parent.
+	if (m_top.is_subtable_root()) {
+		Array *const parent = m_top.GetParent();
+		size_t const ndx = m_top.GetParentNdx();
+		static_cast<Column::RootArray *>(parent)->m_column->subtable_wrapper_destroyed(ndx);
+	}
 }
 
 void TopLevelTable::UpdateFromSpec(size_t ref_specSet) {
@@ -264,55 +249,30 @@ Table::Table(Allocator& alloc):
 }
 
 // Creates un-initialized table. Remember to call Create() before use
-Table::Table(NoInitTag, Allocator& alloc):
+Table::Table(NoInitTag, Allocator &alloc):
 	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
 	m_subSpecs(alloc, false), m_columns(alloc, false), m_ref_count(1) {}
 
 // Creates un-initialized table. Remember to call Create() before use
-Table::Table(NoInitTag, SubtableTag, Allocator& alloc, Table const *parent):
+Table::Table(NoInitTag, SubtableTag, Allocator &alloc):
 	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
-	m_subSpecs(alloc, false), m_columns(alloc, false), m_ref_count(0), m_parent(parent)
-{
-	assert(parent);
-}
+	m_subSpecs(alloc, false), m_columns(alloc, false), m_ref_count(0) {}
 
-Table::Table(Allocator& alloc, size_t ref_specSet, size_t columns_ref,
-			 Array* parent_columns, size_t pndx_columns):
+Table::Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
+			 Array *parent_columns, size_t pndx_columns):
 	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
 	m_subSpecs(alloc, false), m_columns(alloc, false), m_ref_count(1)
 {
 	Create(ref_specSet, columns_ref, parent_columns, pndx_columns);
 }
 
-Table::Table(SubtableTag, Allocator& alloc, size_t ref_specSet, size_t columns_ref,
-			 Array* parent_columns, size_t pndx_columns, Table const *parent):
+Table::Table(SubtableTag, Allocator &alloc, size_t ref_specSet, size_t columns_ref,
+			 Array *parent_columns, size_t pndx_columns):
 	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
-	m_subSpecs(alloc, false), m_columns(alloc, true), m_ref_count(0), m_parent(parent)
+	m_subSpecs(alloc, false), m_columns(alloc, true), m_ref_count(0)
 {
-	assert(parent);
 	Create(ref_specSet, columns_ref, parent_columns, pndx_columns);
 }
-
-/*
-Table::Table(const Table& t):
-	m_size(0), m_specSet(t.m_columns.GetAllocator(), false),
-	m_spec(t.m_columns.GetAllocator(), false),
-	m_columnNames(t.m_columns.GetAllocator()),
-	m_subSpecs(t.m_columns.GetAllocator(), false),
-	m_columns(t.m_columns.GetAllocator(), t.m_columns.is_subtable_root())
-{
-	const size_t ref_specSet = t.m_specSet.GetRef();
-	const size_t ref_columns = t.m_columns.GetRef();
-	Array* const parent      = t.m_columns.GetParent();
-	const size_t pndx        = t.m_columns.GetParentNdx();
-
-	Create(ref_specSet, ref_columns, parent, pndx);
-
-	// NOTE: Original should be destroyed right after copy. Do not modify
-	// original after this. It could invalidate the copy (or worse).
-	// TODO: implement ref-counting
-}
-*/
 
 void Table::Create(size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns)
 {
@@ -374,14 +334,14 @@ void Table::CreateColumns() {
 			case COLUMN_TYPE_TABLE:
 			{
 				const size_t subspec_ref = m_subSpecs.GetAsRef(subtable_count);
-				newColumn = new ColumnTable(subspec_ref, NULL, 0, alloc);
+				newColumn = new ColumnTable(subspec_ref, NULL, 0, alloc, this);
 				m_columns.Add(((ColumnTable*)newColumn)->GetRef());
 				((ColumnTable*)newColumn)->SetParent(&m_columns, ref_pos);
 				++subtable_count;
 			}
 				break;
 			case COLUMN_TYPE_MIXED:
-				newColumn = new ColumnMixed(alloc);
+				newColumn = new ColumnMixed(alloc, this);
 				m_columns.Add(((ColumnMixed*)newColumn)->GetRef());
 				((ColumnMixed*)newColumn)->SetParent(&m_columns, ref_pos);
 				break;
@@ -455,12 +415,12 @@ void Table::CacheColumns() {
 				Spec subspec = spec.GetSpec(i);
 				const size_t ref_specSet = subspec.GetRef();
 
-				newColumn = new ColumnTable(ref, ref_specSet, &m_columns, column_ndx, alloc);
+				newColumn = new ColumnTable(ref, ref_specSet, &m_columns, column_ndx, alloc, this);
 				colsize = ((ColumnTable*)newColumn)->Size();
                 break;
 			}
 			case COLUMN_TYPE_MIXED:
-				newColumn = new ColumnMixed(ref, &m_columns, column_ndx, alloc);
+				newColumn = new ColumnMixed(ref, &m_columns, column_ndx, alloc, this);
 				colsize = ((ColumnMixed*)newColumn)->Size();
                 break;
 
@@ -499,25 +459,36 @@ void Table::ClearCachedColumns() {
 	m_cols.Destroy();
 }
 
-Table& Table::operator=(const Table&) {
-	//TODO: assignment operator (ref-counting?)
-	assert(false);
-	return *this;
-}
-
-Table::~Table() {
+Table::~Table()
+{
+/*
 	// avoid double deletions if already cleared at higher level
-	if (!m_cols.IsValid()) return;
+	if (!m_cols.IsValid()) return; // FIXME: Is this necessary???
+*/
 
-	// free cached columns
-	ClearCachedColumns();
-
-	// If we are not attached to a group,
-	// we have to do out own clean-up
-	if (m_columns.GetParent() == NULL) {
+	// 'm_columns' has no parent if, and only if this is a free
+	// standing instance of Table, and not a free standing instance of
+	// TopLevelTable. In this case it is the responsibility of this
+	// destructor to deallocate all the memory chunks that make up the
+	// entire hierarchy of arrays.
+	if (!m_columns.HasParent()) {
 		m_specSet.Destroy();
 		m_columns.Destroy();
 	}
+
+	// On the other hand, if 'm_columns' is the root of a subtable
+	// then we must notify our parent. Note that if this table is a
+	// subtable, and is an instance of TopLevelTable, then 'm_columns'
+	// is not the root of the subtable. In this case the notification
+	// of the parent is carried out by ~TopLevelTable() instead.
+	if (m_columns.is_subtable_root()) {
+		Array *const parent = m_columns.GetParent();
+		size_t const ndx = m_columns.GetParentNdx();
+		static_cast<Column::RootArray *>(parent)->m_column->subtable_wrapper_destroyed(ndx);
+	}
+
+	// free cached columns
+	ClearCachedColumns();
 }
 
 size_t Table::GetColumnCount() const {
@@ -589,7 +560,7 @@ size_t Table::RegisterColumn(ColumnType type, const char* name) {
 		((ColumnBinary*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
 		break;
 	case COLUMN_TYPE_MIXED:
-		newColumn = new ColumnMixed(alloc);
+		newColumn = new ColumnMixed(alloc, this);
 		m_columns.Add(((ColumnMixed*)newColumn)->GetRef());
 		((ColumnMixed*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
 		break;
@@ -758,17 +729,16 @@ void Table::ClearTable(size_t column_id, size_t ndx) {
 
 TableRef Table::GetTable(size_t column_id, size_t ndx) {
 	assert(column_id < GetColumnCount());
-	assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
 	assert(ndx < m_size);
 
 	const ColumnType type = GetRealColumnType(column_id);
 	if (type == COLUMN_TYPE_TABLE) {
 		ColumnTable &subtables = GetColumnTable(column_id);
-		return TableRef(subtables.get_subtable_ptr(ndx, this));
+		return TableRef(subtables.get_subtable_ptr(ndx));
 	}
 	else if (type == COLUMN_TYPE_MIXED) {
 		ColumnMixed &subtables = GetColumnMixed(column_id);
-		return TableRef(subtables.get_subtable_ptr(ndx, this));
+		return TableRef(subtables.get_subtable_ptr(ndx));
 	}
 	else {
 		assert(false);
@@ -784,11 +754,11 @@ TableConstRef Table::GetTable(size_t column_id, size_t ndx) const {
 	const ColumnType type = GetRealColumnType(column_id);
 	if (type == COLUMN_TYPE_TABLE) {
 		ColumnTable const &subtables = GetColumnTable(column_id);
-		return TableConstRef(subtables.get_subtable_ptr(ndx, this));
+		return TableConstRef(subtables.get_subtable_ptr(ndx));
 	}
 	else if (type == COLUMN_TYPE_MIXED) {
 		ColumnMixed const &subtables = GetColumnMixed(column_id);
-		return TableConstRef(subtables.get_subtable_ptr(ndx, this));
+		return TableConstRef(subtables.get_subtable_ptr(ndx));
 	}
 	else {
 		assert(false);

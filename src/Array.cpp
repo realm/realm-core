@@ -559,7 +559,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	if(end == -1)
 		end = m_len;
 
-	if(end - start < sizeof(__m128i) || m_width < 8) 
+	if(end - start < sizeof(__m128i) || m_width < 8)
 		return CompareEquality<true>(value, start, end);
 
 	// FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
