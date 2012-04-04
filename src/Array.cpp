@@ -1737,6 +1737,7 @@ unsigned int get_header_width(const char* const header);
 size_t get_header_len(const char* const header);
 int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx);
 size_t FindPosDirect(const char* const header, const char* const data, const size_t width, const int64_t target);
+template<size_t width> size_t FindPosDirectImp(const char* const header, const char* const data, const int64_t target);
 
 bool get_header_isnode(const char* const header) {
 	return (header[0] & 0x80) != 0;
@@ -1750,42 +1751,49 @@ size_t get_header_len(const char* const header) {
 	return (header[1] << 16) + (header[2] << 8) + header[3];
 }
 
+template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx);
+
+template<> int64_t GetDirect<0>(const char* const data, const size_t ndx) {
+	return 0;
+}
+template<> int64_t GetDirect<1>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx >> 3;
+	return (data[offset] >> (ndx & 7)) & 0x01;
+}
+template<> int64_t GetDirect<2>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx >> 2;
+	return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
+}
+template<> int64_t GetDirect<4>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx >> 1;
+	return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
+}
+template<> int64_t GetDirect<8>(const char* const data, const size_t ndx) {
+	return *((const signed char*)(data + ndx));
+}
+template<> int64_t GetDirect<16>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx * 2;
+	return *(const int16_t*)(data + offset);
+}
+template<> int64_t GetDirect<32>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx * 4;
+	return *(const int32_t*)(data + offset);
+}
+template<> int64_t GetDirect<64>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx * 8;
+	return *(const int64_t*)(data + offset);
+}
+
 int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx) {
 	switch (width) {
-		case 0:
-			return 0;
-		case 1:
-		{
-			const size_t offset = ndx >> 3;
-			return (data[offset] >> (ndx & 7)) & 0x01;
-		}
-		case 2:
-		{
-			const size_t offset = ndx >> 2;
-			return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
-		}
-		case 4:
-		{
-			const size_t offset = ndx >> 1;
-			return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
-		}
-		case 8:
-			return *((const signed char*)(data + ndx));
-		case 16:
-		{
-			const size_t offset = ndx * 2;
-			return *(const int16_t*)(data + offset);
-		}
-		case 32:
-		{
-			const size_t offset = ndx * 4;
-			return *(const int32_t*)(data + offset);
-		}
-		case 64:
-		{
-			const size_t offset = ndx * 8;
-			return *(const int64_t*)(data + offset);
-		}
+		case  0: return GetDirect<0>(data, ndx);
+		case  1: return GetDirect<1>(data, ndx);
+		case  2: return GetDirect<2>(data, ndx);
+		case  4: return GetDirect<4>(data, ndx);
+		case  8: return GetDirect<8>(data, ndx);
+		case 16: return GetDirect<16>(data, ndx);
+		case 32: return GetDirect<32>(data, ndx);
+		case 64: return GetDirect<64>(data, ndx);
 		default:
 			assert(false);
 			return 0;
@@ -1793,7 +1801,23 @@ int64_t GetDirect(const char* const data, const unsigned int width, const size_t
 }
 
 size_t FindPosDirect(const char* const header, const char* const data, const size_t width, const int64_t target) {
-	const size_t len    = get_header_len(header);
+	switch (width) {
+		case  0: return 0;
+		case  1: return FindPosDirectImp<1>(header, data, target);
+		case  2: return FindPosDirectImp<2>(header, data, target);
+		case  4: return FindPosDirectImp<4>(header, data, target);
+		case  8: return FindPosDirectImp<8>(header, data, target);
+		case 16: return FindPosDirectImp<16>(header, data, target);
+		case 32: return FindPosDirectImp<32>(header, data, target);
+		case 64: return FindPosDirectImp<64>(header, data, target);
+		default:
+			assert(false);
+			return 0;
+	}
+}
+
+template<size_t width> size_t FindPosDirectImp(const char* const header, const char* const data, const int64_t target) {
+	const size_t len = get_header_len(header);
 	
 	int low = -1;
 	int high = (int)len;
@@ -1804,7 +1828,7 @@ size_t FindPosDirect(const char* const header, const char* const data, const siz
 	// nodes)
 	while (high - low > 1) {
 		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
-		const int64_t v = GetDirect(data, width, probe);
+		const int64_t v = GetDirect<width>(data, probe);
 		
 		if (v > target) high = (int)probe;
 		else            low = (int)probe;
