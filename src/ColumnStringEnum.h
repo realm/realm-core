@@ -35,7 +35,8 @@ public:
 	void ToDot(std::ostream& out, const char* title) const;
 #endif // _DEBUG
 
-	size_t GetKeyNdx(const char* value);
+	size_t GetKeyNdx(const char* value) const;
+	size_t GetKeyNdxOrAdd(const char* value);
 
 private:
 
