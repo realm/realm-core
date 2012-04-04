@@ -82,6 +82,7 @@ TEST(TestQuerySubtable) {
 	CHECK_EQUAL(2, t1.GetSize());
 	CHECK_EQUAL(1, t1.GetRef(0));
 	CHECK_EQUAL(2, t1.GetRef(1));
+	delete q1;
 
 
 	Query *q2 = new Query;
@@ -94,6 +95,7 @@ TEST(TestQuerySubtable) {
 	CHECK_EQUAL(2, t2.GetSize());
 	CHECK_EQUAL(0, t2.GetRef(0));
 	CHECK_EQUAL(3, t2.GetRef(1));
+	delete q2;
 
 
 	Query *q3 = new Query;
@@ -106,6 +108,7 @@ TEST(TestQuerySubtable) {
 	TableView t3 = q3->FindAll(table, 0, (size_t)-1);
 	CHECK_EQUAL(1, t3.GetSize());
 	CHECK_EQUAL(0, t3.GetRef(0));
+	delete q3;
 
 
 	Query *q4 = new Query;
@@ -117,6 +120,8 @@ TEST(TestQuerySubtable) {
 	q4->Less(0, 20);
 	q4->Parent();
 	TableView t4 = q4->FindAll(table, 0, (size_t)-1);
+	delete q4;
+
 
 	CHECK_EQUAL(3, t4.GetSize());
 	CHECK_EQUAL(0, t4.GetRef(0));
@@ -226,6 +231,7 @@ TEST(TestQuerySort_Dates) {
 
 	Query *q = new Query();
 	TableView tv = q->FindAll(table);
+	delete q;
 	CHECK(tv.GetSize() == 3);
 	CHECK(tv.GetRef(0) == 0);
 	CHECK(tv.GetRef(1) == 1);
@@ -253,6 +259,7 @@ TEST(TestQuerySort_Bools) {
 
 	Query *q = new Query();
 	TableView tv = q->FindAll(table);
+	delete q;
   	tv.Sort(0);
 
 	CHECK(tv.GetSize() == 3);
@@ -334,6 +341,7 @@ TEST(TestQuerySubtable2) {
 	CHECK_EQUAL(2, t1.GetSize());
 	CHECK_EQUAL(1, t1.GetRef(0));
 	CHECK_EQUAL(2, t1.GetRef(1));
+	delete q1;
 
 
 	Query *q2 = new Query;
@@ -346,6 +354,7 @@ TEST(TestQuerySubtable2) {
 	CHECK_EQUAL(2, t2.GetSize());
 	CHECK_EQUAL(0, t2.GetRef(0));
 	CHECK_EQUAL(3, t2.GetRef(1));
+	delete q2;
 
 
 	Query *q3 = new Query;
@@ -358,6 +367,7 @@ TEST(TestQuerySubtable2) {
 	TableView t3 = q3->FindAll(table, 0, (size_t)-1);
 	CHECK_EQUAL(1, t3.GetSize());
 	CHECK_EQUAL(0, t3.GetRef(0));
+	delete q3;
 
 
 	Query *q4 = new Query;
@@ -369,6 +379,7 @@ TEST(TestQuerySubtable2) {
 	q4->Less(0, 20);
 	q4->Parent();
 	TableView t4 = q4->FindAll(table, 0, (size_t)-1);
+	delete q4;
 
 	CHECK_EQUAL(3, t4.GetSize());
 	CHECK_EQUAL(0, t4.GetRef(0));

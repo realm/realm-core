@@ -1,6 +1,9 @@
 #include "ColumnMixed.h"
 #include "ColumnBinary.h"
 
+using namespace std;
+
+
 ColumnMixed::ColumnMixed(Allocator& alloc) : m_data(NULL){
 	m_array = new Array(COLUMN_HASREFS, NULL, 0, alloc);
 	
@@ -22,6 +25,7 @@ ColumnMixed::~ColumnMixed() {
 	delete m_types;
 	delete m_refs;
 	delete m_data;
+	delete m_array;
 }
 
 void ColumnMixed::Destroy() {
