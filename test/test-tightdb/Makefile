@@ -6,8 +6,7 @@
 # $*  The stem (the bit which matches the % wildcard in the rule definition.
 #
 
-CXXFLAGS          = -Wall -pthread -DNDEBUG -O3 -I../UnitTest++/src -I../../src
-CXXFLAGS         += -DUSE_SSE -msse4.2
+CXXFLAGS          = -Wall -pthread -DNDEBUG -O3 -DUSE_SSE -msse4.2 -I../UnitTest++/src -I../../src
 LDFLAGS           = -pthread -lproc -L../UnitTest++ -lUnitTest++ ../../src/libtightdb.a
 
 TARGET            = test-tightdb
