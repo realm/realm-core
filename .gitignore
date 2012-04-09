@@ -6,18 +6,23 @@
 *.so
 *.a
 *.swp
+*.gcno
+*.gcda
+*~
 cscope.*
 tags
-tightdb-tests
-TestUnitTest++
 
-/test/test-stl/test-stl
-/test/test-tightdb/test-tightdb
-
+/cover_html
+/test/tightdb-tests
+/test/tightdb-tests-debug
+/test/tightdb-tests-cover
 /test/subtables.tdb
 /test/subtables.tightdb
 /test/subtables2.tdb
 /test/table_test.tbl
+/test/test-stl/test-stl
+/test/test-tightdb/test-tightdb
+/test/UnitTest++/TestUnitTest++
 
 /test/benchmark/x64
 /test/benchmark
