@@ -7,16 +7,15 @@
 #
 
 CXXFLAGS          = -Wall -pthread -IUnitTest++/src
-CXXFLAGS         += -DUSE_SSE -msse4.2
-LDFLAGS           = -static -pthread -LUnitTest++ -lUnitTest++ -L../src
+LDFLAGS           = -pthread -LUnitTest++ -lUnitTest++
 
-CXXFLAGS_OPTIMIZE = -DNDEBUG -O3 -I../src
+CXXFLAGS_OPTIMIZE = -DNDEBUG -O3 -DUSE_SSE -msse4.2 -I../src
 CXXFLAGS_DEBUG    = -D_DEBUG -ggdb3 -I../src
-CXXFLAGS_COVER    = -D_DEBUG -I$(abspath ../src)
+CXXFLAGS_COVER    = -D_DEBUG -DUSE_SSE -msse4.2 -I$(abspath ../src)
 
-LDFLAGS_OPTIMIZE  = -ltightdb
-LDFLAGS_DEBUG     = -ltightdb_d
-LDFLAGS_COVER     = -ltightdb_c
+LDFLAGS_OPTIMIZE  = ../src/libtightdb.a
+LDFLAGS_DEBUG     = ../src/libtightdb_d.a
+LDFLAGS_COVER     = ../src/libtightdb_c.a
 
 TARGET            = tightdb-tests
 DEBUG_TARGET      = tightdb-tests-debug
@@ -45,6 +44,11 @@ clean/local:
 $(CLEAN_EXTRA): clean/%:
 	@$(MAKE) -C $* clean
 .PHONY: clean clean/local $(CLEAN_EXTRA)
+
+
+test: debug
+	valgrind --quiet --error-exitcode=1 ./tightdb-tests-debug
+.PHONY: test
 
 benchmark: test-tightdb test-stl
 	@echo ""

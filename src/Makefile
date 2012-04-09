@@ -7,11 +7,10 @@
 #
 
 CXXFLAGS          = -Wall -pthread -fPIC -DPIC
-CXXFLAGS         += -DUSE_SSE -msse4.2
 
-CXXFLAGS_OPTIMIZE = -DNDEBUG -O3 -I.
+CXXFLAGS_OPTIMIZE = -DNDEBUG -O3 -DUSE_SSE -msse4.2 -I.
 CXXFLAGS_DEBUG    = -D_DEBUG -ggdb3 -I.
-CXXFLAGS_COVER    = -D_DEBUG -I$(abspath .)
+CXXFLAGS_COVER    = -D_DEBUG -DUSE_SSE -msse4.2 -I$(abspath .)
 
 LIB_SHARED        = libtightdb.so
 LIB_SHARED_DEBUG  = libtightdb_d.so

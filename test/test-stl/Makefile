@@ -6,8 +6,7 @@
 # $*  The stem (the bit which matches the % wildcard in the rule definition.
 #
 
-CXXFLAGS          = -Wall -pthread -DNDEBUG -O3 -I../UnitTest++/src
-CXXFLAGS         += -DUSE_SSE -msse4.2
+CXXFLAGS          = -Wall -pthread -DNDEBUG -O3 -msse4.2 -I../UnitTest++/src
 LDFLAGS           = -pthread -lproc -L../UnitTest++ -lUnitTest++
 
 TARGET            = test-stl

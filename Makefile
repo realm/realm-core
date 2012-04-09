@@ -32,9 +32,12 @@ clean/test:
 
 
 test: debug
-	@$(MAKE) -C test debug
-	cd test && valgrind --quiet ./tightdb-tests-debug
+	@$(MAKE) -C test test
 .PHONY: test
+
+benchmark: all
+	@$(MAKE) -C test benchmark
+.PHONY: benchmark
 
 lcov: cover
 	@$(MAKE) -C test cover
@@ -45,10 +48,6 @@ lcov: cover
 	rm -fr cover_html
 	genhtml --prefix $(abspath .) --output-directory cover_html /tmp/tightdb-clean.lcov
 .PHONY: lcov
-
-benchmark: all
-	@$(MAKE) -C test benchmark
-.PHONY: benchmark
 
 
 $(SUBDIRS):
