@@ -7,7 +7,9 @@
 #include "../Support/mem.h"
 #include "../Support/number_names.h"
 
-#ifdef _MSC_VER
+#ifndef _MSC_VER
+#include <stdint.h>
+#else
 #include "../../src/win32/stdint.h"
 #endif
 

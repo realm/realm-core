@@ -1,69 +1,93 @@
 # Note:
 # $@  The name of the target file (the one before the colon)
-# $<  The name of the first (or only) prerequisite file 
+# $<  The name of the first (or only) prerequisite file
 #     (the first one after the colon)
 # $^  The names of all the prerequisite files (space separated)
 # $*  The stem (the bit which matches the % wildcard in the rule definition.
 #
 
-# Compiler and flags
-#CXXFLAGS  = -Wall -Weffc++ -Wextra -std=c++0x
-CXXFLAGS  = -std=c++0x -pthread
-CXXSSE    = -DUSE_SSE -msse4.2
-CXXLIBS   = -L./UnitTest++ -lUnitTest++ -L../ -ltightdb
-CXXINC    = -I./UnitTest++/src -I../src
-CXX       = g++ $(CXXFLAGS)
+CXXFLAGS          = -Wall -pthread -IUnitTest++/src
+CXXFLAGS         += -DUSE_SSE -msse4.2
+LDFLAGS           = -static -pthread -LUnitTest++ -lUnitTest++ -L../src
 
-# Files
-EXECUTABLE = tightdb-tests
+CXXFLAGS_OPTIMIZE = -DNDEBUG -O3 -I../src
+CXXFLAGS_DEBUG    = -D_DEBUG -ggdb3 -I../src
+CXXFLAGS_COVER    = -D_DEBUG -I$(abspath ../src)
 
-# Note for gcov: You must not pass .h files to g++ or you'll get errors about missing data files.
-# Also, never use relative paths, or you'll get "time stamp" errors
+LDFLAGS_OPTIMIZE  = -ltightdb
+LDFLAGS_DEBUG     = -ltightdb_d
+LDFLAGS_COVER     = -ltightdb_c
 
-# HEADERS    = $(abspath $(wildcard ../src/*.h))
-#SOURCES    = $(abspath $(wildcard ../src/*.cpp))
-# TEST_H     = $(abspath $(wildcard *.h))
-TEST_SRC   = $(wildcard *.cpp large_tests/*.cpp)
-OBJECTS    = $(TEST_SRC:.cpp=.o) 
+TARGET            = tightdb-tests
+DEBUG_TARGET      = tightdb-tests-debug
+COVER_TARGET      = tightdb-tests-cover
 
-# Targets
-allsse: CXXFLAGS += -DNDEBUG -O3
-allsse: CXXFLAGS += $(CXXSSE)
-allsse: $(EXECUTABLE)
-	@make -C test-tightdb
-	@make -C test-stl
+SOURCES           = $(wildcard *.cpp large_tests/*.cpp)
+OBJECTS           = $(SOURCES:.cpp=.o)
+DEBUG_OBJECTS     = $(SOURCES:.cpp=.dbg.o)
+COVER_OBJECTS     = $(SOURCES:.cpp=.cov.o)
 
 
-all: CXXFLAGS += -DNDEBUG -O3
-all: $(EXECUTABLE)
-	@make -C test-tightdb
-	@make -C test-stl
+all: $(TARGET)
+.PHONY: all
 
-test: all
-	@./run_tests.sh
+debug: $(DEBUG_TARGET)
+.PHONY: debug
 
-debug: CXXFLAGS += -D_DEBUG -g3 -ggdb
-debug: $(EXECUTABLE)
+cover: $(COVER_TARGET)
+.PHONY: cover
 
-gcov: CXXFLAGS += -D_DEBUG -g3 -ggdb --coverage
-gcov: clean $(EXECUTABLE)
-	@./$(EXECUTABLE)
-	@lcov --directory . --capture --output-file app.info
-	@genhtml --output-directory cov_htmp app.info
+CLEAN_EXTRA = clean/UnitTest++ clean/test-tightdb clean/test-stl
+clean: clean/local $(CLEAN_EXTRA)
+clean/local:
+	$(RM) *.d *.o *.gcno *.gcda $(TARGET) $(DEBUG_TARGET) $(COVER_TARGET)
+	$(RM) large_tests/*.d large_tests/*.o large_tests/*.gcno large_tests/*.gcda
+$(CLEAN_EXTRA): clean/%:
+	@$(MAKE) -C $* clean
+.PHONY: clean clean/local $(CLEAN_EXTRA)
 
-clean:
-	@(cd UnitTest++ && make clean)
-	@(cd test-stl && make clean)
-	@(cd test-tightdb && make clean)
-	@(cd test-sqlite3 && make clean)
-	@rm -f core *.o *.gcda *.gcno *.gcov $(EXECUTABLE)
+benchmark: test-tightdb test-stl
+	@echo ""
+	@echo ".:: TightDB ::."
+	test-tightdb/test-tightdb
+	@echo ""
+	@echo ".:: STL Vector ::."
+	test-stl/test-stl
+test-tightdb test-stl: UnitTest++
+	@$(MAKE) -C $@
+.PHONY: benchmark test-tightdb test-stl
+
+
+UnitTest++:
+	$(MAKE) -C UnitTest++ >/dev/null
+.PHONY: UnitTest++
+$(TARGET) $(DEBUG_TARGET) $(COVER_TARGET): | UnitTest++
+
+
+$(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): Makefile
+
 
 # Linking
-$(EXECUTABLE): $(OBJECTS)
-	make -C UnitTest++ > /dev/null
-	$(CXX) $(OBJECTS) $(CXXLIBS) -o $@
 
-# Compiling
+$(TARGET): $(OBJECTS)
+	$(CXX) $(OBJECTS) $(LDFLAGS) $(LDFLAGS_OPTIMIZE) -o $@
+
+$(DEBUG_TARGET): $(DEBUG_OBJECTS)
+	$(CXX) $(DEBUG_OBJECTS) $(LDFLAGS) $(LDFLAGS_DEBUG) -o $@
+
+$(COVER_TARGET): $(COVER_OBJECTS)
+	$(CXX) --coverage $(COVER_OBJECTS) $(LDFLAGS) $(LDFLAGS_COVER) -o $@
+
+
+# Compiling + dependency generation
+
 %.o: %.cpp
-	$(CXX) $(CXXINC) -o $@ -c $<
+	$(CXX) $(CXXFLAGS) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@
 
+%.dbg.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(CXXFLAGS_DEBUG) -MMD -MP -c $< -o $@
+
+%.cov.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(CXXFLAGS_COVER) --coverage -MMD -MP -c $(abspath $<) -o $(abspath $@)
+
+-include $(SOURCES:.cpp=.d) $(SOURCES:.cpp=.dbg.d) $(SOURCES:.cpp=.cov.d)
