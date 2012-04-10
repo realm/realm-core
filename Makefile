@@ -49,6 +49,12 @@ lcov: cover
 	genhtml --prefix $(abspath .) --output-directory cover_html /tmp/tightdb-clean.lcov
 .PHONY: lcov
 
+gcovr: cover
+	@$(MAKE) -C test cover
+	find -name '*.gcda' -delete
+	cd test && ./tightdb-tests-cover
+	gcovr -r src -x >gcovr.xml
+.PHONY: gcovr
 
 $(SUBDIRS):
 	@$(MAKE) -C $@ $(SUBDIRS_MODE)
