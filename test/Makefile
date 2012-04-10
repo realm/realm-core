@@ -9,7 +9,7 @@
 CXXFLAGS          = -Wall -pthread -IUnitTest++/src
 LDFLAGS           = -pthread -LUnitTest++ -lUnitTest++
 CXXFLAGS_OPTIMIZE = -DNDEBUG -O3 -DUSE_SSE -msse4.2 -I../src
-CXXFLAGS_DEBUG    = -D_DEBUG -ggdb3 -I../src
+CXXFLAGS_DEBUG    = -D_DEBUG -ggdb3 -DMAX_LIST_SIZE=4 -I../src
 CXXFLAGS_COVER    = -D_DEBUG -DUSE_SSE -msse4.2 -I$(abspath ../src)
 
 SOURCES           = $(wildcard *.cpp large_tests/*.cpp)
