@@ -7,26 +7,25 @@
 #
 
 CXXFLAGS          = -Wall -pthread -fPIC -DPIC
-
 CXXFLAGS_OPTIMIZE = -DNDEBUG -O3 -DUSE_SSE -msse4.2 -I.
 CXXFLAGS_DEBUG    = -D_DEBUG -ggdb3 -I.
 CXXFLAGS_COVER    = -D_DEBUG -DUSE_SSE -msse4.2 -I$(abspath .)
 
+GEN_HEADERS       = tightdb.h
+SOURCES           = $(wildcard *.cpp)
 LIB_SHARED        = libtightdb.so
 LIB_STATIC        = libtightdb.a
 LIB_STATIC_DEBUG  = libtightdb_d.a
 LIB_STATIC_COVER  = libtightdb_c.a
 
-GEN_HEADERS       = tightdb.h
 
-SOURCES           = $(wildcard *.cpp)
-TARGETS           = $(LIB_SHARED) $(LIB_STATIC)
-DEBUG_TARGETS     = $(LIB_STATIC_DEBUG)
-COVER_TARGETS     = $(LIB_STATIC_COVER)
+TARGETS = $(LIB_SHARED) $(LIB_STATIC)
+DEBUG_TARGETS = $(LIB_STATIC_DEBUG)
+COVER_TARGETS = $(LIB_STATIC_COVER)
 
-OBJECTS           = $(SOURCES:.cpp=.o)
-DEBUG_OBJECTS     = $(SOURCES:.cpp=.dbg.o)
-COVER_OBJECTS     = $(SOURCES:.cpp=.cov.o)
+OBJECTS = $(SOURCES:.cpp=.o)
+DEBUG_OBJECTS = $(SOURCES:.cpp=.dbg.o)
+COVER_OBJECTS = $(SOURCES:.cpp=.cov.o)
 
 
 all: $(TARGETS) $(GEN_HEADERS)

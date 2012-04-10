@@ -9,16 +9,17 @@
 CXXFLAGS          = -Wall -pthread -DNDEBUG -O3 -msse4.2 -I../UnitTest++/src
 LDFLAGS           = -pthread -lproc -L../UnitTest++ -lUnitTest++
 
-TARGET            = test-stl
-
 SOURCES           = $(wildcard *.cpp)
-OBJECTS           = $(SOURCES:.cpp=.o)
+TARGET            = test-stl
 
 ifeq ($(MSYSTEM), MINGW32)
 	SOURCES += ../Support/win32/mem.cpp
 else
 	SOURCES += ../Support/posix/mem.cpp
 endif
+
+
+OBJECTS = $(SOURCES:.cpp=.o)
 
 
 all: $(TARGET)

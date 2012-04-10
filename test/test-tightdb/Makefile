@@ -7,18 +7,20 @@
 #
 
 CXXFLAGS          = -Wall -pthread -DNDEBUG -O3 -DUSE_SSE -msse4.2 -I../UnitTest++/src -I../../src
-LDFLAGS           = -pthread -lproc -L../UnitTest++ -lUnitTest++ ../../src/libtightdb.a
-
-TARGET            = test-tightdb
+LDFLAGS           = -pthread -lproc -L../UnitTest++ -lUnitTest++
 
 SOURCES           = $(wildcard *.cpp)
-OBJECTS           = $(SOURCES:.cpp=.o)
+LIBTIGHTDB        = ../../src/libtightdb.a
+TARGET            = test-tightdb
 
 ifeq ($(MSYSTEM), MINGW32)
 	SOURCES += ../Support/win32/mem.cpp
 else
 	SOURCES += ../Support/posix/mem.cpp
 endif
+
+
+OBJECTS = $(SOURCES:.cpp=.o)
 
 
 all: $(TARGET)
@@ -34,8 +36,8 @@ $(OBJECTS): Makefile
 
 # Linking
 
-$(TARGET): $(OBJECTS)
-	$(CXX) $(OBJECTS) $(LDFLAGS) -o $@
+$(TARGET): $(OBJECTS) $(LIBTIGHTDB)
+	$(CXX) $(OBJECTS) $(LIBTIGHTDB) $(LDFLAGS) -o $@
 
 
 # Compiling + dependency generation

@@ -35,6 +35,10 @@ test: debug
 	@$(MAKE) -C test test
 .PHONY: test
 
+memtest: debug
+	@$(MAKE) -C test memtest
+.PHONY: test
+
 benchmark: all
 	@$(MAKE) -C test benchmark
 .PHONY: benchmark
