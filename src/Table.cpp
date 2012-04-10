@@ -195,7 +195,10 @@ TopLevelTable::~TopLevelTable()
 	// instance of TopLevelTable. In this case it is the
 	// responsibility of this destructor to deallocate all the memory
 	// chunks that make up the entire hierarchy of arrays.
-	if (!m_top.HasParent()) m_top.Destroy();
+	if (!m_top.HasParent()) {
+		assert(get_ref_count() == 1);
+		m_top.Destroy();
+	}
 
 	// On the other hand, if 'm_top' is the root of a subtable
 	// then we must notify our parent.
@@ -474,6 +477,7 @@ Table::~Table()
 	// destructor to deallocate all the memory chunks that make up the
 	// entire hierarchy of arrays.
 	if (!m_columns.HasParent()) {
+		assert(m_ref_count == 1);
 		m_specSet.Destroy();
 		m_columns.Destroy();
 	}

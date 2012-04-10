@@ -268,6 +268,8 @@ protected:
 	// Cached columns
 	Array m_cols;
 
+	std::size_t get_ref_count() const { return m_ref_count; }
+
 private:
 	Table(Table const &); // Disable copy construction
 	Table &operator=(Table const &); // Disable copying assignment
