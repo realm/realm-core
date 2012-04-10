@@ -14,6 +14,7 @@ tags
 
 /cover_html
 /gcovr.xml
+/test/UnitTest++/TestUnitTest++
 /test/tightdb-tests
 /test/tightdb-tests-debug
 /test/tightdb-tests-cover
@@ -21,9 +22,9 @@ tags
 /test/subtables.tightdb
 /test/subtables2.tdb
 /test/table_test.tbl
-/test/test-stl/test-stl
 /test/test-tightdb/test-tightdb
-/test/UnitTest++/TestUnitTest++
+/test/test-tightdb/test-tightdb-debug
+/test/test-stl/test-stl
 
 /test/benchmark/x64
 /test/benchmark
