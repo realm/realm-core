@@ -13,8 +13,6 @@ CXXFLAGS_DEBUG    = -D_DEBUG -ggdb3 -I.
 CXXFLAGS_COVER    = -D_DEBUG -DUSE_SSE -msse4.2 -I$(abspath .)
 
 LIB_SHARED        = libtightdb.so
-LIB_SHARED_DEBUG  = libtightdb_d.so
-
 LIB_STATIC        = libtightdb.a
 LIB_STATIC_DEBUG  = libtightdb_d.a
 LIB_STATIC_COVER  = libtightdb_c.a
@@ -23,7 +21,7 @@ GEN_HEADERS       = tightdb.h
 
 SOURCES           = $(wildcard *.cpp)
 TARGETS           = $(LIB_SHARED) $(LIB_STATIC)
-DEBUG_TARGETS     = $(LIB_SHARED_DEBUG) $(LIB_STATIC_DEBUG)
+DEBUG_TARGETS     = $(LIB_STATIC_DEBUG)
 COVER_TARGETS     = $(LIB_STATIC_COVER)
 
 OBJECTS           = $(SOURCES:.cpp=.o)
@@ -59,10 +57,8 @@ tightdb.h: tightdb-gen.sh tightdb-gen.py Makefile
 # Shared library
 
 $(LIB_SHARED): $(OBJECTS)
+# FIXME: add -Wl,-soname and -Wl,-rpath
 	$(CXX) -shared $(OBJECTS) -o $@
-
-$(LIB_SHARED_DEBUG): $(DEBUG_OBJECTS)
-	$(CXX) -shared $(DEBUG_OBJECTS) -o $@
 
 
 # Static library
