@@ -8,23 +8,22 @@
 
 CXXFLAGS          = -Wall -pthread -IUnitTest++/src
 LDFLAGS           = -pthread -LUnitTest++ -lUnitTest++
-
 CXXFLAGS_OPTIMIZE = -DNDEBUG -O3 -DUSE_SSE -msse4.2 -I../src
 CXXFLAGS_DEBUG    = -D_DEBUG -ggdb3 -I../src
 CXXFLAGS_COVER    = -D_DEBUG -DUSE_SSE -msse4.2 -I$(abspath ../src)
 
-LDFLAGS_OPTIMIZE  = ../src/libtightdb.a
-LDFLAGS_DEBUG     = ../src/libtightdb_d.a
-LDFLAGS_COVER     = ../src/libtightdb_c.a
-
+SOURCES           = $(wildcard *.cpp large_tests/*.cpp)
+LIBTIGHTDB        = ../src/libtightdb.a
+LIBTIGHTDB_DEBUG  = ../src/libtightdb_d.a
+LIBTIGHTDB_COVER  = ../src/libtightdb_c.a
 TARGET            = tightdb-tests
 DEBUG_TARGET      = tightdb-tests-debug
 COVER_TARGET      = tightdb-tests-cover
 
-SOURCES           = $(wildcard *.cpp large_tests/*.cpp)
-OBJECTS           = $(SOURCES:.cpp=.o)
-DEBUG_OBJECTS     = $(SOURCES:.cpp=.dbg.o)
-COVER_OBJECTS     = $(SOURCES:.cpp=.cov.o)
+
+OBJECTS = $(SOURCES:.cpp=.o)
+DEBUG_OBJECTS = $(SOURCES:.cpp=.dbg.o)
+COVER_OBJECTS = $(SOURCES:.cpp=.cov.o)
 
 
 all: $(TARGET)
@@ -47,7 +46,11 @@ $(CLEAN_EXTRA): clean/%:
 
 
 test: debug
-	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=full --leak-resolution=low ./tightdb-tests-debug
+	./tightdb-tests-debug
+.PHONY: test
+
+memtest: debug
+	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./tightdb-tests-debug
 .PHONY: test
 
 benchmark: test-tightdb test-stl
@@ -73,14 +76,14 @@ $(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): Makefile
 
 # Linking
 
-$(TARGET): $(OBJECTS)
-	$(CXX) $(OBJECTS) $(LDFLAGS) $(LDFLAGS_OPTIMIZE) -o $@
+$(TARGET): $(OBJECTS) $(LIBTIGHTDB)
+	$(CXX) $(OBJECTS) $(LIBTIGHTDB) $(LDFLAGS) -o $@
 
-$(DEBUG_TARGET): $(DEBUG_OBJECTS)
-	$(CXX) $(DEBUG_OBJECTS) $(LDFLAGS) $(LDFLAGS_DEBUG) -o $@
+$(DEBUG_TARGET): $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG)
+	$(CXX) $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG) $(LDFLAGS) -o $@
 
-$(COVER_TARGET): $(COVER_OBJECTS)
-	$(CXX) --coverage $(COVER_OBJECTS) $(LDFLAGS) $(LDFLAGS_COVER) -o $@
+$(COVER_TARGET): $(COVER_OBJECTS) $(LIBTIGHTDB_COVER)
+	$(CXX) --coverage $(COVER_OBJECTS) $(LIBTIGHTDB_COVER) $(LDFLAGS) -o $@
 
 
 # Compiling + dependency generation
