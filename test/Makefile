@@ -47,7 +47,7 @@ $(CLEAN_EXTRA): clean/%:
 
 
 test: debug
-	valgrind --quiet --error-exitcode=1 ./tightdb-tests-debug
+	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=full --leak-resolution=low ./tightdb-tests-debug
 .PHONY: test
 
 benchmark: test-tightdb test-stl
