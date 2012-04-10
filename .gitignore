@@ -13,6 +13,7 @@ cscope.*
 tags
 
 /cover_html
+/gcovr.xml
 /test/tightdb-tests
 /test/tightdb-tests-debug
 /test/tightdb-tests-cover
