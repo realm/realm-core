@@ -77,8 +77,9 @@ size_t Group::Write(S& out) {
 	// Space for ref to top array
     out.write("\0\0\0\0\0\0\0\0", 8);
     size_t pos = 8;
-	
+
 	// Recursively write all arrays
+	// FIXME: 'valgrind' says this writes uninitialized bytes to the file/stream
 	const uint64_t topPos = m_top.Write(out, pos);
 
 	// top ref
