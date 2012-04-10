@@ -99,6 +99,7 @@ protected:
 
 class Column : public ColumnBase {
 public:
+	// FIXME: Can some of these constructors be make private or protected?
 	Column(Allocator& alloc);
 	Column(ColumnDef type, Allocator& alloc);
 	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
