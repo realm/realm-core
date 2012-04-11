@@ -63,7 +63,7 @@ private:
 
 class Spec {
 public:
-	Spec(Allocator& alloc, size_t ref, Array* parent, size_t pndx);
+	Spec(Allocator& alloc, size_t ref, ArrayParent *parent, size_t pndx);
 	Spec(const Spec& s);
 
 	void AddColumn(ColumnType type, const char* name);
@@ -87,7 +87,7 @@ public:
 #endif //_DEBUG
 
 private:
-	void Create(size_t ref, Array* parent, size_t pndx);
+	void Create(size_t ref, ArrayParent *parent, size_t pndx);
 
 	Array m_specSet;
 	Array m_spec;
@@ -233,15 +233,15 @@ protected:
 	 * Construct top-level table from ref.
 	 */
 	Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-		  Array *parent_columns, size_t pndx_columns);
+		  ArrayParent *parent_columns, size_t pndx_columns);
 
 	/**
 	 * Construct subtable from ref.
 	 */
 	Table(SubtableTag, Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-		  Array *parent_columns, size_t pndx_columns);
+		  ArrayParent *parent_columns, size_t pndx_columns);
 
-	void Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns);
+	void Create(size_t ref_specSet, size_t ref_columns, ArrayParent *parent_columns, size_t pndx_columns);
 	void CreateColumns();
 	void CacheColumns();
 	void ClearCachedColumns();
@@ -294,7 +294,7 @@ public:
 
 	void UpdateFromSpec(size_t ref_specSet);
 	size_t GetRef() const;
-	void SetParent(Array* parent, size_t pndx);
+	void SetParent(ArrayParent *parent, size_t pndx);
 
 	// Debug
 #ifdef _DEBUG
@@ -310,7 +310,7 @@ protected:
 	/**
 	 * Construct top-level table from ref.
 	 */
-	TopLevelTable(Allocator& alloc, size_t ref_top, Array *parent_array, size_t parent_ndx);
+	TopLevelTable(Allocator& alloc, size_t ref_top, ArrayParent *parent_array, size_t parent_ndx);
 
 private:
 	friend class Group;
@@ -320,7 +320,7 @@ private:
 	 * Construct subtable from ref.
 	 */
 	TopLevelTable(SubtableTag, Allocator& alloc, size_t ref_top,
-				  Array *parent_array, size_t parent_ndx);
+				  ArrayParent *parent_array, size_t parent_ndx);
 };
 
 

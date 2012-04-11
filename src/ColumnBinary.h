@@ -8,8 +8,8 @@
 class ColumnBinary : public ColumnBase {
 public:
 	ColumnBinary(Allocator& alloc=GetDefaultAllocator());
-	ColumnBinary(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	ColumnBinary(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	ColumnBinary(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ColumnBinary(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	~ColumnBinary();
 
 	void Destroy();
@@ -38,7 +38,7 @@ public:
 	size_t FindWithIndex(int64_t) const {return (size_t)-1;}
 
 	size_t GetRef() const {return m_array->GetRef();}
-	void SetParent(Array* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
+	void SetParent(ArrayParent *parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 	void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
 #ifdef _DEBUG

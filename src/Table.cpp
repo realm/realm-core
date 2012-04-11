@@ -16,7 +16,7 @@ const ColumnType AccessorMixed::type  = COLUMN_TYPE_MIXED;
 
 // -- Spec ------------------------------------------------------------------------------------
 
-Spec::Spec(Allocator& alloc, size_t ref, Array* parent, size_t pndx)
+Spec::Spec(Allocator& alloc, size_t ref, ArrayParent *parent, size_t pndx)
 : m_specSet(alloc, false), m_spec(alloc, false), m_names(alloc), m_subSpecs(alloc, false)
 {
 	Create(ref, parent, pndx);
@@ -25,14 +25,14 @@ Spec::Spec(Allocator& alloc, size_t ref, Array* parent, size_t pndx)
 Spec::Spec(const Spec& s)
 : m_specSet(s.m_specSet.GetAllocator(), false), m_spec(s.m_specSet.GetAllocator(), false), m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator(), false)
 {
-	const size_t ref  = m_specSet.GetRef();
-	Array* parent     = m_specSet.GetParent();
-	const size_t pndx = m_specSet.GetParentNdx();
+	const size_t ref    = m_specSet.GetRef();
+	ArrayParent *parent = m_specSet.GetParent();
+	const size_t pndx   = m_specSet.GetParentNdx();
 
 	Create(ref, parent, pndx);
 }
 
-void Spec::Create(size_t ref, Array* parent, size_t pndx) {
+void Spec::Create(size_t ref, ArrayParent *parent, size_t pndx) {
 	m_specSet.UpdateRef(ref);
 	m_specSet.SetParent(parent, pndx);
 	assert(m_specSet.Size() == 2 || m_specSet.Size() == 3);
@@ -155,7 +155,7 @@ TopLevelTable::TopLevelTable(Allocator &alloc):
     m_columns.SetParent(&m_top, 1);
 }
 
-TopLevelTable::TopLevelTable(Allocator &alloc, size_t ref_top, Array *parent, size_t pndx):
+TopLevelTable::TopLevelTable(Allocator &alloc, size_t ref_top, ArrayParent *parent, size_t pndx):
 	Table(NoInitTag(), alloc), m_top(alloc, false)
 {
 	// Load from allocated memory
@@ -171,7 +171,7 @@ TopLevelTable::TopLevelTable(Allocator &alloc, size_t ref_top, Array *parent, si
 }
 
 TopLevelTable::TopLevelTable(SubtableTag, Allocator &alloc, size_t ref_top,
-							 Array *parent_array, size_t parent_ndx):
+							 ArrayParent *parent_array, size_t parent_ndx):
 	Table(NoInitTag(), SubtableTag(), alloc), m_top(alloc, true)
 {
 	// Load from allocated memory
@@ -203,7 +203,7 @@ TopLevelTable::~TopLevelTable()
 	// On the other hand, if 'm_top' is the root of a subtable
 	// then we must notify our parent.
 	if (m_top.is_subtable_root()) {
-		Array *const parent = m_top.GetParent();
+		ArrayParent *const parent = m_top.GetParent();
 		size_t const ndx = m_top.GetParentNdx();
 		static_cast<Column::RootArray *>(parent)->m_column->subtable_wrapper_destroyed(ndx);
 	}
@@ -222,7 +222,7 @@ void TopLevelTable::UpdateFromSpec(size_t ref_specSet) {
 	CreateColumns();
 }
 
-void TopLevelTable::SetParent(Array* parent, size_t pndx) {
+void TopLevelTable::SetParent(ArrayParent *parent, size_t pndx) {
     m_top.SetParent(parent, pndx);
 }
 
@@ -265,7 +265,7 @@ Table::Table(NoInitTag, SubtableTag, Allocator &alloc):
 	m_subSpecs(alloc, false), m_columns(alloc, false), m_ref_count(0) {}
 
 Table::Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-			 Array *parent_columns, size_t pndx_columns):
+			 ArrayParent *parent_columns, size_t pndx_columns):
 	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
 	m_subSpecs(alloc, false), m_columns(alloc, false), m_ref_count(1)
 {
@@ -273,14 +273,14 @@ Table::Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
 }
 
 Table::Table(SubtableTag, Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-			 Array *parent_columns, size_t pndx_columns):
+			 ArrayParent *parent_columns, size_t pndx_columns):
 	m_size(0), m_specSet(alloc, false), m_spec(alloc, false), m_columnNames(alloc),
 	m_subSpecs(alloc, false), m_columns(alloc, true), m_ref_count(0)
 {
 	Create(ref_specSet, columns_ref, parent_columns, pndx_columns);
 }
 
-void Table::Create(size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns)
+void Table::Create(size_t ref_specSet, size_t columns_ref, ArrayParent *parent_columns, size_t pndx_columns)
 {
 	m_specSet.UpdateRef(ref_specSet);
 	assert(m_specSet.Size() == 2 || m_specSet.Size() == 3);
@@ -488,7 +488,7 @@ Table::~Table()
 	// is not the root of the subtable. In this case the notification
 	// of the parent is carried out by ~TopLevelTable() instead.
 	if (m_columns.is_subtable_root()) {
-		Array *const parent = m_columns.GetParent();
+		ArrayParent *const parent = m_columns.GetParent();
 		size_t const ndx = m_columns.GetParentNdx();
 		static_cast<Column::RootArray *>(parent)->m_column->subtable_wrapper_destroyed(ndx);
 	}

@@ -14,17 +14,17 @@
 // Pre-declare local functions
 size_t CalcByteLen(size_t count, size_t width);
 
-Array::Array(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
+Array::Array(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc)
 : m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	Create(ref);
 }
 
-Array::Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(const_cast<Array*>(parent)), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+Array::Array(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc)
+: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(const_cast<ArrayParent *>(parent)), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	Create(ref);
 }
 
-Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
+Array::Array(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc)
 : m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
@@ -205,7 +205,7 @@ void Array::Preset(int64_t min, int64_t max, size_t count) {
 	Preset(w, count);
 }
 
-void Array::SetParent(Array* parent, size_t pndx) {
+void Array::SetParent(ArrayParent *parent, size_t pndx) {
 	m_parent = parent;
 	m_parentNdx = pndx;
 }
@@ -1665,9 +1665,8 @@ void Array::Verify() const {
 	// Check that parent is set correctly
 	if (!m_parent) return;
 
-	const size_t ref_in_parent = m_is_subtable_root ?
-		m_parent->get_subtable_ref_for_verify(m_parentNdx) :
-		m_parent->GetAsRef(m_parentNdx);
+	const size_t ref_in_parent = m_is_subtable_root ? m_parent->get_child_ref(m_parentNdx) :
+		static_cast<Array *>(m_parent)->GetAsRef(m_parentNdx); // FIXME: Should always call get_ref_in_parent()
 	assert(ref_in_parent == m_ref);
 }
 
@@ -1724,7 +1723,3 @@ MemStats Array::Stats() const {
 }
 
 #endif //_DEBUG
-
-void Array::update_subtable_ref(size_t, size_t) {
-	assert(false); // Must be overridden by column root arrays.
-}

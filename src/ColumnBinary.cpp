@@ -14,7 +14,7 @@ ColumnBinary::ColumnBinary(Allocator& alloc) {
 	m_array = new ArrayBinary(NULL, 0, alloc);
 }
 
-ColumnBinary::ColumnBinary(size_t ref, Array* parent, size_t pndx, Allocator& alloc) {
+ColumnBinary::ColumnBinary(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc) {
 	const bool isNode = IsNodeFromRef(ref, alloc);
 	if (isNode) {
 		m_array = new Array(ref, parent, pndx, alloc);
@@ -24,7 +24,7 @@ ColumnBinary::ColumnBinary(size_t ref, Array* parent, size_t pndx, Allocator& al
 	}
 }
 
-ColumnBinary::ColumnBinary(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) {
+ColumnBinary::ColumnBinary(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) {
 	const bool isNode = IsNodeFromRef(ref, alloc);
 	if (isNode) {
 		m_array = new Array(ref, parent, pndx, alloc);
@@ -49,7 +49,7 @@ void ColumnBinary::UpdateRef(size_t ref) {
 
 	if (IsNode()) m_array->UpdateRef(ref);
 	else {
-		Array* const parent = m_array->GetParent();
+		ArrayParent *const parent = m_array->GetParent();
 		const size_t pndx   = m_array->GetParentNdx();
 		
 		// Replace the string array with int array for node
@@ -58,7 +58,7 @@ void ColumnBinary::UpdateRef(size_t ref) {
 		m_array = array;
 		
 		// Update ref in parent
-		if (parent) parent->Set(pndx, ref);
+		if (parent) static_cast<Array *>(parent)->Set(pndx, ref); // FIXME: Should just call ArrayParent::update_child_ref()
 	}
 }
 
@@ -85,12 +85,12 @@ size_t ColumnBinary::Size() const {
 
 void ColumnBinary::Clear() {
 	if (m_array->IsNode()) {
-		Array* const parent = m_array->GetParent();
+		ArrayParent *const parent = m_array->GetParent();
 		const size_t pndx   = m_array->GetParentNdx();
 		
 		// Revert to binary array
 		ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->GetAllocator());
-		if (parent) parent->Set(pndx, array->GetRef()); // Update parent
+		if (parent) static_cast<Array *>(parent)->Set(pndx, array->GetRef()); // Update parent // FIXME: Should just call ArrayParent::update_child_ref()
 		
 		// Remove original node
 		m_array->Destroy();

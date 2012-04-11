@@ -21,11 +21,11 @@ void ColumnSubtableParent::save_subtable_wrapper(size_t subtable_ndx, Table *sub
 }
 
 
-ColumnTable::ColumnTable(size_t ref_specSet, Array *parent, size_t pndx,
+ColumnTable::ColumnTable(size_t ref_specSet, ArrayParent *parent, size_t pndx,
 						 Allocator &alloc, Table const *tab):
 	ColumnSubtableParent(parent, pndx, alloc, tab), m_ref_specSet(ref_specSet) {}
 
-ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, Array* parent, size_t pndx,
+ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, ArrayParent *parent, size_t pndx,
 						 Allocator& alloc, Table const *tab):
 	ColumnSubtableParent(ref_column, parent, pndx, alloc, tab), m_ref_specSet(ref_specSet) {}
 

@@ -16,7 +16,7 @@ void ColumnMixed::Destroy() {
 		m_array->Destroy();
 }
 
-void ColumnMixed::SetParent(Array* parent, size_t pndx) {
+void ColumnMixed::SetParent(ArrayParent *parent, size_t pndx) {
 	m_array->SetParent(parent, pndx);
 }
 
@@ -34,7 +34,7 @@ void ColumnMixed::Create(Allocator &alloc, Table const *tab)
 	m_refs->SetParent(m_array, 1);
 }
 
-void ColumnMixed::Create(size_t ref, Array *parent, size_t pndx,
+void ColumnMixed::Create(size_t ref, ArrayParent *parent, size_t pndx,
 						 Allocator &alloc, Table const *tab)
 {
 	m_array = new Array(ref, parent, pndx, alloc);

@@ -67,12 +67,12 @@ protected:
 
 	mutable SubtableMap m_subtable_map;
 
-	ColumnSubtableParent(Array *parent_array, size_t parent_ndx,
+	ColumnSubtableParent(ArrayParent *parent_array, size_t parent_ndx,
 						 Allocator &alloc, Table const *tab):
 		Column(COLUMN_HASREFS, parent_array, parent_ndx, alloc),
 		m_table(tab), m_subtable_map(GetDefaultAllocator()) {}
 
-	ColumnSubtableParent(size_t ref, Array *parent_array, size_t parent_ndx,
+	ColumnSubtableParent(size_t ref, ArrayParent *parent_array, size_t parent_ndx,
 						 Allocator &alloc, Table const *tab):
 		Column(ref, parent_array, parent_ndx, alloc),
 		m_table(tab), m_subtable_map(GetDefaultAllocator()) {}
@@ -89,7 +89,7 @@ public:
 	 * \param tab If this column is used as part of a table you must
 	 * pass a pointer to that table. Otherwise you may pass null.
 	 */
-	ColumnTable(size_t ref_specSet, Array *parent, size_t pndx,
+	ColumnTable(size_t ref_specSet, ArrayParent *parent, size_t pndx,
 				Allocator& alloc, Table const *tab);
 
 	/**
@@ -99,7 +99,7 @@ public:
 	 * \param tab If this column is used as part of a table you must
 	 * pass a pointer to that table. Otherwise you may pass null.
 	 */
-	ColumnTable(size_t ref_column, size_t ref_specSet, Array *parent, size_t pndx,
+	ColumnTable(size_t ref_column, size_t ref_specSet, ArrayParent *parent, size_t pndx,
 				Allocator &alloc, Table const *tab);
 
 	/**

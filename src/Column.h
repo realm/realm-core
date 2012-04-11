@@ -101,9 +101,9 @@ class Column : public ColumnBase {
 public:
 	Column(Allocator& alloc);
 	Column(ColumnDef type, Allocator& alloc);
-	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Column(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	Column(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	Column(const Column& column);
 	~Column();
 
@@ -113,7 +113,7 @@ public:
 
 	bool operator==(const Column& column) const;
 
-	void SetParent(Array* parent, size_t pndx);
+	void SetParent(ArrayParent *parent, size_t pndx);
 	void UpdateParentNdx(int diff);
 	void SetHasRefs();
 
@@ -207,21 +207,21 @@ protected:
 class Column::RootArray: public Array
 {
 public:
-	virtual void update_subtable_ref(size_t subtable_ndx, size_t new_ref)
+	// Overrides method in ArrayParent
+	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
 	{
 		m_column->Set(subtable_ndx, new_ref);
 	}
 
-#ifdef _DEBUG
-	virtual size_t get_subtable_ref_for_verify(size_t subtable_ndx)
+	// Overrides method in ArrayParent
+	virtual size_t get_child_ref(size_t subtable_ndx)
 	{
-		return m_column->Get(subtable_ndx);
+		return m_column->GetAsRef(subtable_ndx);
 	}
-#endif //_DEBUG
 
-	RootArray(Column *col, ColumnDef type, Array *parent, size_t pndx, Allocator &alloc):
+	RootArray(Column *col, ColumnDef type, ArrayParent *parent, size_t pndx, Allocator &alloc):
 		Array(type, parent, pndx, alloc), m_column(col) {}
-	RootArray(Column *col, size_t ref, Array *parent, size_t pndx, Allocator &alloc):
+	RootArray(Column *col, size_t ref, ArrayParent *parent, size_t pndx, Allocator &alloc):
 		Array(ref, parent, pndx, alloc), m_column(col) {}
 
 	Column *m_column;

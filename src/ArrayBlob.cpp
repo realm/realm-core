@@ -1,17 +1,17 @@
 #include "ArrayBlob.h"
 #include <assert.h>
 
-ArrayBlob::ArrayBlob(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
+ArrayBlob::ArrayBlob(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
 	// Manually set wtype as array constructor in initiatializer list
 	// will not be able to call correct virtual function
 	set_header_wtype(TDB_IGNORE);
 }
 
-ArrayBlob::ArrayBlob(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(alloc, false) {
+ArrayBlob::ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(alloc, false) {
 	// Manually create array as doing it in initializer list
 	// will not be able to call correct virtual functions
 	Create(ref);
-	SetParent((Array*)parent, pndx);
+	SetParent(const_cast<ArrayParent *>(parent), pndx);
 }
 
 // Creates new array (but invalid, call UpdateRef to init)

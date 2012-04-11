@@ -33,12 +33,12 @@ public:
 	 * \param tab If this column is used as part of a table you must
 	 * pass a pointer to that table. Otherwise you may pass null.
 	 */
-	ColumnMixed(size_t ref, Array *parent, size_t pndx, Allocator &alloc, Table const *tab);
+	ColumnMixed(size_t ref, ArrayParent *parent, size_t pndx, Allocator &alloc, Table const *tab);
 
 	~ColumnMixed();
 	void Destroy();
 
-	void SetParent(Array* parent, size_t pndx);
+	void SetParent(ArrayParent *parent, size_t pndx);
 
 	ColumnType GetType(size_t ndx) const;
 	size_t Size() const {return m_types->Size();}
@@ -88,7 +88,7 @@ public:
 	
 private:
 	void Create(Allocator &alloc, Table const *tab);
-	void Create(size_t ref, Array *parent, size_t pndx, Allocator &alloc, Table const *tab);
+	void Create(size_t ref, ArrayParent *parent, size_t pndx, Allocator &alloc, Table const *tab);
 	void InitDataColumn();
 	
 	void ClearValue(size_t ndx, ColumnType newtype);
@@ -106,7 +106,7 @@ class ColumnMixed::RefsColumn: public ColumnSubtableParent
 {
 public:
 	RefsColumn(Allocator &alloc, Table const *tab): ColumnSubtableParent(0, 0, alloc, tab) {}
-	RefsColumn(size_t ref, Array *parent, size_t pndx, Allocator &alloc, Table const *tab):
+	RefsColumn(size_t ref, ArrayParent *parent, size_t pndx, Allocator &alloc, Table const *tab):
 	ColumnSubtableParent(ref, parent, pndx, alloc, tab) {}
 	void insert_table(size_t ndx);
 	void set_table(size_t ndx);
@@ -128,7 +128,7 @@ inline ColumnMixed::ColumnMixed(Allocator &alloc, Table const *tab): m_data(NULL
 	Create(alloc, tab);
 }
 
-inline ColumnMixed::ColumnMixed(size_t ref, Array *parent, size_t pndx,
+inline ColumnMixed::ColumnMixed(size_t ref, ArrayParent *parent, size_t pndx,
 								Allocator &alloc, Table const *tab): m_data(NULL)
 {
 	Create(ref, parent, pndx, alloc, tab);

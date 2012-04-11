@@ -8,8 +8,8 @@
 class AdaptiveStringColumn : public ColumnBase {
 public:
 	AdaptiveStringColumn(Allocator& alloc=GetDefaultAllocator());
-	AdaptiveStringColumn(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	AdaptiveStringColumn(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	AdaptiveStringColumn(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	AdaptiveStringColumn(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	~AdaptiveStringColumn();
 
 	void Destroy();
@@ -38,7 +38,7 @@ public:
 	size_t FindWithIndex(int64_t) const {return (size_t)-1;}
 
 	size_t GetRef() const {return m_array->GetRef();}
-	void SetParent(Array* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
+	void SetParent(ArrayParent *parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 
 	// Optimizing data layout
 	bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;

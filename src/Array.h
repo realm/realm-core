@@ -44,6 +44,7 @@
 #endif
 
 // Pre-definitions
+class Array;
 class Column;
 
 #ifdef _DEBUG
@@ -74,11 +75,21 @@ enum ColumnDef {
 	COLUMN_HASREFS
 };
 
-class Array {
+
+class ArrayParent
+{
+protected:
+	friend class Array;
+	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref) = 0;
+	virtual size_t get_child_ref(size_t subtable_ndx) const  = 0;
+};
+
+
+class Array: public ArrayParent {
 public:
-	Array(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
-	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Array(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Array(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	Array(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	Array(Allocator& alloc, bool is_subtable_root);
 	Array(const Array& a);
 	virtual ~Array();
@@ -87,9 +98,9 @@ public:
 
 	void SetType(ColumnDef type);
 	bool HasParent() const {return m_parent != NULL;}
-	void SetParent(Array* parent, size_t pndx);
+	void SetParent(ArrayParent *parent, size_t pndx);
 	void UpdateParentNdx(int diff) {m_parentNdx += diff;}
-	Array* GetParent() const {return m_parent;}
+	ArrayParent *GetParent() const {return m_parent;}
 	size_t GetParentNdx() const {return m_parentNdx;}
 	void UpdateRef(size_t ref);
 
@@ -252,17 +263,13 @@ protected:
 
 private:
 	// When m_is_subtable_root is true, and m_ref is changed,
-	// update_subtable_ref() must be called on the parent to update its
+	// update_child_ref() must be called on the parent to update its
 	// reference to this array. In this case the parent must point to
 	// the Array that corresponds to the root node of the B-tree of the
 	// parent column.
 	bool const m_is_subtable_root;
-	virtual void update_subtable_ref(size_t subtable_ndx, size_t new_ref);
-#ifdef _DEBUG
-	virtual size_t get_subtable_ref_for_verify(size_t subtable_ndx) { return 0; }
-#endif
 
-	Array* m_parent;
+	ArrayParent *m_parent;
 	size_t m_parentNdx;
 
 	Allocator& m_alloc;
@@ -270,6 +277,18 @@ private:
 protected:
 	int64_t m_lbound;
 	int64_t m_ubound;
+
+	// Overriding method in ArrayParent
+	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
+	{
+		Set(subtable_ndx, new_ref);
+	}
+
+	// Overriding method in ArrayParent
+	virtual size_t get_child_ref(size_t subtable_ndx) const
+	{
+		return GetAsRef(subtable_ndx);
+	}
 };
 
 // Templates
@@ -341,10 +360,10 @@ inline void Array::update_ref_in_parent(size_t ref)
 {
   if (!m_parent) return;
   if (m_is_subtable_root) {
-	  m_parent->update_subtable_ref(m_parentNdx, ref);
+	  m_parent->update_child_ref(m_parentNdx, ref);
 	  return;
   }
-  m_parent->Set(m_parentNdx, ref);
+  static_cast<Array *>(m_parent)->Set(m_parentNdx, ref);
 }
 
 #endif //__TDB_ARRAY__

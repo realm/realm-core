@@ -23,17 +23,17 @@ size_t round_up(size_t len) {
 	return width;
 }
 
-ArrayString::ArrayString(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
+ArrayString::ArrayString(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
 	// Manually set wtype as array constructor in initiatializer list
 	// will not be able to call correct virtual function
 	set_header_wtype(TDB_MULTIPLY);
 }
 
-ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(alloc, false) {
+ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(alloc, false) {
 	// Manually create array as doing it in initializer list
 	// will not be able to call correct virtual functions
 	Create(ref);
-	SetParent((Array*)parent, pndx);
+	SetParent(const_cast<ArrayParent *>(parent), pndx);
 }
 
 // Creates new array (but invalid, call UpdateRef to init)

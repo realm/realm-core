@@ -35,17 +35,17 @@ Column::Column(ColumnDef type, Allocator& alloc): m_index(NULL) {
 	Create();
 }
 
-Column::Column(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+Column::Column(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
 	m_array = new RootArray(this, type, parent, pndx, alloc);
 	Create();
 }
 
-Column::Column(size_t ref, Array* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+Column::Column(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
 	m_array = new RootArray(this, ref, parent, pndx, alloc);
 }
 
-Column::Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, ref, const_cast<Array *>(parent), pndx, alloc);
+Column::Column(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+	m_array = new RootArray(this, ref, const_cast<ArrayParent *>(parent), pndx, alloc);
 }
 
 Column::Column(const Column& column) : m_index(NULL) {
@@ -100,7 +100,7 @@ size_t Column::Size() const {
 	}
 }
 
-void Column::SetParent(Array* parent, size_t pndx) {
+void Column::SetParent(ArrayParent *parent, size_t pndx) {
 	m_array->SetParent(parent, pndx);
 }
 
@@ -113,7 +113,7 @@ void Column::SetHasRefs() {
 	m_array->SetType(COLUMN_HASREFS);
 }
 
-static Column GetColumnFromRef(Array& parent, size_t ndx) {
+static Column GetColumnFromRef(Array &parent, size_t ndx) {
 	assert(parent.HasRefs());
 	assert(ndx < parent.Size());
 	return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
