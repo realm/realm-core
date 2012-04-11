@@ -85,7 +85,7 @@ protected:
 public: // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
 	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref) = 0;
 protected:
-	virtual size_t get_child_ref(size_t subtable_ndx) const = 0;
+	virtual size_t get_child_ref(size_t subtable_ndx) const = 0; // FIXME: Should be renamed to 'get_child_ref_for_verify' and only be defined in _DEBUG mode
 };
 
 

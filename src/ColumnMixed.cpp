@@ -402,11 +402,6 @@ void ColumnMixed::Verify() const {
 		const size_t tref = m_refs->GetAsRef(i);
 		if (tref == 0 || tref & 0x1) continue;
 		m_refs->verify(i);
-/* FIXME: Cleanup
-		// OK to not pass real parent, because operation is non-modifying
-		Table const *const parent = 0;
-		TableConstRef(GetTable(i, parent))->Verify();
-*/
 	}
 }
 
@@ -425,13 +420,7 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 	for (size_t i = 0; i < count; ++i) {
 		const ColumnType type = (ColumnType)m_types->Get(i);
 		if (type != COLUMN_TYPE_TABLE) continue;
-//		if (m_refs->GetAsRef(i) == 0) continue; // empty table FIXME: Cleanup
 		m_refs->to_dot(i, out);
-/* FIXME: Cleanup
-		// OK to not pass real parent, because operation is non-modifying
-		Table const *const parent = 0;
-		TableConstRef(GetTable(i, parent))->ToDot(out);
-*/
 	}
 
 	m_types->ToDot(out, "types");
