@@ -4,7 +4,7 @@
 #include "Table.h"
 #include "AllocSlab.h"
 
-class Group {
+class Group: private Table::Parent {
 public:
 	Group();
 	Group(const char* filename);
@@ -35,6 +35,22 @@ public:
 	void ToDot(std::ostream& out);
 #endif //_DEBUG
 
+protected:
+	// Overriding method in ArrayParent
+	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
+	{
+		m_tables.Set(subtable_ndx, new_ref);
+	}
+
+	// Overriding method in ArrayParent
+	virtual size_t get_child_ref(size_t subtable_ndx) const
+	{
+		return m_tables.GetAsRef(subtable_ndx);
+	}
+
+	// Overriding method in Table::Parent
+	virtual void child_destroyed(std::size_t) {} // Ignore
+
 private:
 	void Create();
 	
@@ -58,7 +74,7 @@ template<class T> T& Group::GetTable(const char* name) {
 	if (n == -1) {
 		// Create new table
 		T* const t = new T(m_alloc);
-		t->SetParent(&m_tables, m_tables.Size());
+		t->SetParent(this, m_tables.Size());
 
 		m_tables.Add(t->GetRef());
 		m_tableNames.Add(name);

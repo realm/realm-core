@@ -26,31 +26,30 @@ void merge_references(Array *valuelist, Array *indexlists, Array **indexresult);
 
 
 Column::Column(Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, COLUMN_NORMAL, NULL, 0, alloc);
+	m_array = new Array(COLUMN_NORMAL, NULL, 0, alloc);
 	Create();
 }
 
 Column::Column(ColumnDef type, Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, type, NULL, 0, alloc);
+	m_array = new Array(type, NULL, 0, alloc);
 	Create();
 }
 
 Column::Column(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, type, parent, pndx, alloc);
+	m_array = new Array(type, parent, pndx, alloc);
 	Create();
 }
 
 Column::Column(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, ref, parent, pndx, alloc);
+	m_array = new Array(ref, parent, pndx, alloc);
 }
 
 Column::Column(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, ref, const_cast<ArrayParent *>(parent), pndx, alloc);
+	m_array = new Array(ref, const_cast<ArrayParent *>(parent), pndx, alloc);
 }
 
 Column::Column(const Column& column) : m_index(NULL) {
 	m_array = column.m_array; // we now own array
-	static_cast<RootArray *>(m_array)->m_column = this;
 	column.m_array = NULL;    // so invalidate source
 }
 
@@ -649,13 +648,6 @@ void Column::BuildIndex(Index& index) {
 
 void Column::Sort() {
 	Sort(0, Size());
-}
-
-void Column::subtable_wrapper_destroyed(size_t subtable_ndx)
-{
-	// Must be overridden by any column class that can contain
-	// subtables.
-	assert(false);
 }
 
 

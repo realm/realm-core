@@ -29,7 +29,7 @@ ArrayString::ArrayString(ArrayParent *parent, size_t pndx, Allocator& alloc) : A
 	set_header_wtype(TDB_MULTIPLY);
 }
 
-ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(alloc, false) {
+ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc): Array(alloc) {
 	// Manually create array as doing it in initializer list
 	// will not be able to call correct virtual functions
 	Create(ref);
@@ -37,12 +37,10 @@ ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, All
 }
 
 // Creates new array (but invalid, call UpdateRef to init)
-ArrayString::ArrayString(Allocator& alloc) : Array(alloc, false) {
-}
+ArrayString::ArrayString(Allocator& alloc): Array(alloc) {}
 
 
-ArrayString::~ArrayString() {
-}
+ArrayString::~ArrayString() {}
 
 const char* ArrayString::Get(size_t ndx) const {
 	assert(ndx < m_len);

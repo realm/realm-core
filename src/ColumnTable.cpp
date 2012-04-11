@@ -1,11 +1,9 @@
 #include "ColumnTable.h"
-#include "Table.h"
 
 using namespace std;
 
 
-// Overriding method in Column.
-void ColumnSubtableParent::subtable_wrapper_destroyed(size_t subtable_ndx)
+void ColumnSubtableParent::child_destroyed(size_t subtable_ndx)
 {
 	m_subtable_map.remove(subtable_ndx);
 	// Note that this column instance may be destroyed upon return
@@ -13,7 +11,7 @@ void ColumnSubtableParent::subtable_wrapper_destroyed(size_t subtable_ndx)
 	if (m_table && m_subtable_map.empty()) m_table->unbind_ref();
 }
 
-void ColumnSubtableParent::save_subtable_wrapper(size_t subtable_ndx, Table *subtable) const
+void ColumnSubtableParent::register_subtable(size_t subtable_ndx, Table *subtable) const
 {
 	bool const was_empty = m_subtable_map.empty();
 	m_subtable_map.insert(subtable_ndx, subtable);
@@ -38,10 +36,18 @@ Table *ColumnTable::get_subtable_ptr(size_t ndx) const {
 	size_t const ref_columns = GetAsRef(ndx);
 	Allocator& alloc = GetAllocator();
 
-	subtable = new Table(Table::SubtableTag(), alloc, m_ref_specSet, ref_columns, m_array, ndx);
-	save_subtable_wrapper(ndx, subtable);
+	subtable = new Table(Table::SubtableTag(), alloc, m_ref_specSet, ref_columns,
+						 const_cast<ColumnTable *>(this), ndx);
+	register_subtable(ndx, subtable);
 	return subtable;
 }
+
+struct FakeParent: Table::Parent
+{
+	virtual void update_child_ref(size_t, size_t) {} // Ignore
+	virtual size_t get_child_ref(size_t) const { return 0; } // Ignore
+	virtual void child_destroyed(size_t) {} // Ignore
+};
 
 size_t ColumnTable::GetTableSize(size_t ndx) const {
 	assert(ndx < Size());
@@ -53,9 +59,9 @@ size_t ColumnTable::GetTableSize(size_t ndx) const {
 		Allocator &alloc = GetAllocator();
 		// FIXME: This should be done in a leaner way that avoids
 		// instantiation of a Table object.
-		// OK to fake that this is not a subtable, because the
-		// operation is read-only.
-		return Table(alloc, m_ref_specSet, ref_columns, m_array, ndx).GetSize();
+		// OK to use a fake parent, because the operation is read-only.
+		FakeParent fake_parent;
+		return Table(alloc, m_ref_specSet, ref_columns, &fake_parent, 0).GetSize();
 	}
 }
 
@@ -115,7 +121,9 @@ void ColumnTable::Verify() const {
 
 		// OK to fake that this is not a subtable, because the
 		// operation is read-only.
-		Table(alloc, m_ref_specSet, tref, m_array, i).Verify();
+		Table t(alloc, m_ref_specSet, tref, const_cast<ColumnTable *>(this), i);
+		register_subtable(i, &t);
+		t.Verify();
 	}
 }
 
@@ -129,9 +137,9 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const {
 		const size_t tref = array.GetAsRef(i);
 		if (tref == 0) continue;
 
-		// OK to fake that this is not a subtable, because the
-		// operation is read-only.
-		Table(alloc, m_ref_specSet, tref, m_array, i).ToDot(out);
+		// OK to use a fake parent, because the operation is read-only.
+		FakeParent fake_parent;
+		Table(alloc, m_ref_specSet, tref, &fake_parent, 0).ToDot(out);
 	}
 }
 

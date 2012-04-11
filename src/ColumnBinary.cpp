@@ -51,14 +51,14 @@ void ColumnBinary::UpdateRef(size_t ref) {
 	else {
 		ArrayParent *const parent = m_array->GetParent();
 		const size_t pndx   = m_array->GetParentNdx();
-		
+
 		// Replace the string array with int array for node
 		Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
 		delete m_array;
 		m_array = array;
-		
+
 		// Update ref in parent
-		if (parent) static_cast<Array *>(parent)->Set(pndx, ref); // FIXME: Should just call ArrayParent::update_child_ref()
+		if (parent) parent->update_child_ref(pndx, ref);
 	}
 }
 
@@ -86,16 +86,16 @@ size_t ColumnBinary::Size() const {
 void ColumnBinary::Clear() {
 	if (m_array->IsNode()) {
 		ArrayParent *const parent = m_array->GetParent();
-		const size_t pndx   = m_array->GetParentNdx();
-		
+		const size_t pndx = m_array->GetParentNdx();
+
 		// Revert to binary array
 		ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->GetAllocator());
-		if (parent) static_cast<Array *>(parent)->Set(pndx, array->GetRef()); // Update parent // FIXME: Should just call ArrayParent::update_child_ref()
-		
+		if (parent) parent->update_child_ref(pndx, array->GetRef());
+
 		// Remove original node
 		m_array->Destroy();
 		delete m_array;
-		
+
 		m_array = array;
 	}
 	else ((ArrayBinary*)m_array)->Clear();

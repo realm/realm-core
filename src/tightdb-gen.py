@@ -207,9 +207,10 @@ tdbType##CType${j+1} CName${j+1}%slurp
 \\
 private: \\
 	friend class Group; \\
-	TableName(const TableName&) {} \\
-	TableName(Allocator& alloc, size_t ref, Array* parent, size_t pndx) : TopLevelTable(alloc, ref, parent, pndx) {}; \\
-	TableName& operator=(const TableName&) {return *this;} \\
+	TableName(const TableName &) {} \\
+	TableName(Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \\
+		TopLevelTable(alloc, ref, parent, ndx_in_parent) {}; \\
+	TableName& operator=(const TableName &) {return *this;} \\
 };
 %end for
 

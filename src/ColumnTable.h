@@ -3,23 +3,18 @@
 
 #include <map>
 #include "Column.h"
-
-class Table;
+#include "Table.h"
 
 
 /**
  * Base class for any column that can contain subtables.
  */
-class ColumnSubtableParent: public Column
+class ColumnSubtableParent: public Column, public Table::Parent
 {
-public:
-	// Overriding method in Column.
-	virtual void subtable_wrapper_destroyed(size_t subtable_ndx);
-
 protected:
 	struct SubtableMap
 	{
-		SubtableMap(Allocator &alloc): m_indices(alloc, false), m_wrappers(alloc, false) {}
+		SubtableMap(Allocator &alloc): m_indices(alloc), m_wrappers(alloc) {}
 
 		~SubtableMap()
 		{
@@ -70,17 +65,33 @@ protected:
 	ColumnSubtableParent(ArrayParent *parent_array, size_t parent_ndx,
 						 Allocator &alloc, Table const *tab):
 		Column(COLUMN_HASREFS, parent_array, parent_ndx, alloc),
-		m_table(tab), m_subtable_map(GetDefaultAllocator()) {}
+		m_table(tab), m_subtable_map(GetDefaultAllocator())	{}
 
 	ColumnSubtableParent(size_t ref, ArrayParent *parent_array, size_t parent_ndx,
 						 Allocator &alloc, Table const *tab):
 		Column(ref, parent_array, parent_ndx, alloc),
-		m_table(tab), m_subtable_map(GetDefaultAllocator()) {}
+		m_table(tab), m_subtable_map(GetDefaultAllocator())	{}
 
-	void save_subtable_wrapper(size_t subtable_ndx, Table *subtable) const;
+	void register_subtable(size_t subtable_ndx, Table *subtable) const;
+
+	// Overriding method in ArrayParent.
+	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
+	{
+		Set(subtable_ndx, new_ref);
+	}
+
+	// Overriding method in ArrayParent.
+	virtual size_t get_child_ref(size_t subtable_ndx) const
+	{
+		return Get(subtable_ndx);
+	}
+
+	// Overriding method in Table::Parent
+	virtual void child_destroyed(std::size_t subtable_ndx);
 };
 
-class ColumnTable : public ColumnSubtableParent {
+
+class ColumnTable: public ColumnSubtableParent {
 public:
 	/**
 	 * Create a table column and have it instantiate a new array
@@ -90,7 +101,7 @@ public:
 	 * pass a pointer to that table. Otherwise you may pass null.
 	 */
 	ColumnTable(size_t ref_specSet, ArrayParent *parent, size_t pndx,
-				Allocator& alloc, Table const *tab);
+				Allocator &alloc, Table const *tab);
 
 	/**
 	 * Create a table column and attach it to an already existing
@@ -120,7 +131,6 @@ public:
 #endif //_DEBUG
 
 protected:
-
 #ifdef _DEBUG
 	virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif //_DEBUG

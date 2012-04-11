@@ -7,7 +7,7 @@ ArrayBlob::ArrayBlob(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array
 	set_header_wtype(TDB_IGNORE);
 }
 
-ArrayBlob::ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(alloc, false) {
+ArrayBlob::ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(alloc) {
 	// Manually create array as doing it in initializer list
 	// will not be able to call correct virtual functions
 	Create(ref);
@@ -15,7 +15,7 @@ ArrayBlob::ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx, Allocat
 }
 
 // Creates new array (but invalid, call UpdateRef to init)
-ArrayBlob::ArrayBlob(Allocator& alloc) : Array(alloc, false) {
+ArrayBlob::ArrayBlob(Allocator& alloc) : Array(alloc) {
 }
 
 ArrayBlob::~ArrayBlob() {

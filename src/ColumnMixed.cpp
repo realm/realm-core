@@ -344,18 +344,29 @@ void ColumnMixed::Clear() {
 	if (m_data) m_data->Clear();
 }
 
+struct FakeParent: Table::Parent
+{
+	virtual void update_child_ref(size_t, size_t) {} // Ignore
+	virtual size_t get_child_ref(size_t) const { return 0; } // Ignore
+	virtual void child_destroyed(size_t) {} // Ignore
+};
+
 void ColumnMixed::RefsColumn::insert_table(size_t ndx)
 {
+	// OK to use a fake parent, because we only care about the ref.
+	FakeParent fake_parent;
 	TopLevelTable table(m_array->GetAllocator()); // Create new table
 	Insert(ndx, table.GetRef());
-	table.SetParent(m_array, ndx);
+	table.SetParent(&fake_parent, 0);
 }
 
 void ColumnMixed::RefsColumn::set_table(size_t ndx)
 {
+	// OK to use a fake parent, because we only care about the ref.
+	FakeParent fake_parent;
 	TopLevelTable table(m_array->GetAllocator()); // Create new table
 	Set(ndx, table.GetRef());
-	table.SetParent(m_array, ndx);
+	table.SetParent(&fake_parent, 0);
 }
 
 Table *ColumnMixed::RefsColumn::get_subtable_ptr(size_t ndx)
@@ -366,8 +377,8 @@ Table *ColumnMixed::RefsColumn::get_subtable_ptr(size_t ndx)
 	size_t const ref = GetAsRef(ndx);
 	Allocator &alloc = m_array->GetAllocator();
 
-	subtable = new TopLevelTable(Table::SubtableTag(), alloc, ref, m_array, ndx);
-	save_subtable_wrapper(ndx, subtable);
+	subtable = new TopLevelTable(Table::SubtableTag(), alloc, ref, this, ndx);
+	register_subtable(ndx, subtable);
 	return subtable;
 }
 
@@ -391,7 +402,7 @@ void ColumnMixed::Verify() const {
 		const size_t tref = m_refs->GetAsRef(i);
 		if (tref == 0 || tref & 0x1) continue;
 		m_refs->verify(i);
-/*
+/* FIXME: Cleanup
 		// OK to not pass real parent, because operation is non-modifying
 		Table const *const parent = 0;
 		TableConstRef(GetTable(i, parent))->Verify();
@@ -414,9 +425,9 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 	for (size_t i = 0; i < count; ++i) {
 		const ColumnType type = (ColumnType)m_types->Get(i);
 		if (type != COLUMN_TYPE_TABLE) continue;
-//		if (m_refs->GetAsRef(i) == 0) continue; // empty table
+//		if (m_refs->GetAsRef(i) == 0) continue; // empty table FIXME: Cleanup
 		m_refs->to_dot(i, out);
-/*
+/* FIXME: Cleanup
 		// OK to not pass real parent, because operation is non-modifying
 		Table const *const parent = 0;
 		TableConstRef(GetTable(i, parent))->ToDot(out);
@@ -436,17 +447,18 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 
 void ColumnMixed::RefsColumn::verify(size_t ndx) const
 {
-	// OK to fake that this is not a subtable, because the
-	// operation is read-only.
-	TopLevelTable(m_array->GetAllocator(), GetAsRef(ndx), m_array, ndx).Verify();
+	TopLevelTable t(m_array->GetAllocator(), GetAsRef(ndx),
+					const_cast<RefsColumn *>(this), ndx);
+	register_subtable(ndx, &t);
+	t.Verify();
 }
 
 
 void ColumnMixed::RefsColumn::to_dot(size_t ndx, std::ostream &out) const
 {
-	// OK to fake that this is not a subtable, because the
-	// operation is read-only.
-	TopLevelTable(m_array->GetAllocator(), GetAsRef(ndx), m_array, ndx).ToDot(out);
+	// OK to use a fake parent, because the operation is read-only.
+	FakeParent fake_parent;
+	TopLevelTable(m_array->GetAllocator(), GetAsRef(ndx), &fake_parent, 0).ToDot(out);
 }
 
 #endif //_DEBUG

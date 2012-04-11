@@ -161,17 +161,6 @@ public:
 
 	void Sort();
 
-	class RootArray;
-
-	/**
-	 * Must be called whenever a subtable wrapper (an instance of
-	 * Table) is destroyed.
-	 *
-	 * Must be overridden by any column class that can contain
-	 * subtables.
-	 */
-	virtual void subtable_wrapper_destroyed(size_t subtable_ndx);
-
 	// Debug
 #ifdef _DEBUG
 	bool Compare(const Column& c) const;
@@ -180,8 +169,6 @@ public:
 	MemStats Stats() const;
 #endif //_DEBUG
 
-private:
-	Column& operator=(const Column&) {return *this;} // not allowed
 protected:
 	friend class ColumnBase;
 	void Create();
@@ -201,30 +188,9 @@ protected:
 
 	// Member variables
 	Index* m_index;
-};
 
-
-class Column::RootArray: public Array
-{
-public:
-	// Overrides method in ArrayParent
-	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
-	{
-		m_column->Set(subtable_ndx, new_ref);
-	}
-
-	// Overrides method in ArrayParent
-	virtual size_t get_child_ref(size_t subtable_ndx)
-	{
-		return m_column->GetAsRef(subtable_ndx);
-	}
-
-	RootArray(Column *col, ColumnDef type, ArrayParent *parent, size_t pndx, Allocator &alloc):
-		Array(type, parent, pndx, alloc), m_column(col) {}
-	RootArray(Column *col, size_t ref, ArrayParent *parent, size_t pndx, Allocator &alloc):
-		Array(ref, parent, pndx, alloc), m_column(col) {}
-
-	Column *m_column;
+private:
+	Column &operator=(Column const &); // not allowed
 };
 
 

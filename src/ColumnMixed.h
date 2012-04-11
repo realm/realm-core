@@ -105,9 +105,10 @@ private:
 class ColumnMixed::RefsColumn: public ColumnSubtableParent
 {
 public:
-	RefsColumn(Allocator &alloc, Table const *tab): ColumnSubtableParent(0, 0, alloc, tab) {}
+	RefsColumn(Allocator &alloc, Table const *tab):
+		ColumnSubtableParent(NULL, 0, alloc, tab) {}
 	RefsColumn(size_t ref, ArrayParent *parent, size_t pndx, Allocator &alloc, Table const *tab):
-	ColumnSubtableParent(ref, parent, pndx, alloc, tab) {}
+		ColumnSubtableParent(ref, parent, pndx, alloc, tab) {}
 	void insert_table(size_t ndx);
 	void set_table(size_t ndx);
 	Table *get_subtable_ptr(size_t ndx);

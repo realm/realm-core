@@ -80,7 +80,7 @@ void AdaptiveStringColumn::UpdateRef(size_t ref) {
 		m_array = array;
 
 		// Update ref in parent
-		if (parent) static_cast<Array *>(parent)->Set(pndx, ref); // FIXME: Should just call ArrayParent::update_child_ref()
+		if (parent) parent->update_child_ref(pndx, ref);
 	}
 }
 
@@ -204,7 +204,7 @@ bool AdaptiveStringColumn::LeafSet(size_t ndx, const char* value) {
 	ArrayParent *const parent = oldarray->GetParent();
 	if (parent) {
 		const size_t pndx = oldarray->GetParentNdx();
-		static_cast<Array *>(parent)->Set(pndx, newarray->GetRef()); // FIXME: Should just call ArrayParent::update_child_ref()
+		parent->update_child_ref(pndx, newarray->GetRef());
 		newarray->SetParent(parent, pndx);
 	}
 
@@ -240,7 +240,7 @@ bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value) {
 	ArrayParent *const parent = oldarray->GetParent();
 	if (parent) {
 		const size_t pndx = oldarray->GetParentNdx();
-		static_cast<Array *>(parent)->Set(pndx, newarray->GetRef()); // FIXME: Should just call ArrayParent::update_child_ref()
+		parent->update_child_ref(pndx, newarray->GetRef());
 		newarray->SetParent(parent, pndx);
 	}
 

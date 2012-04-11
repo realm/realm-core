@@ -19,7 +19,6 @@ class ColumnMixed;
 class TopLevelTable;
 
 
-
 class Date {
 public:
 	Date(time_t d) : m_date(d) {}
@@ -211,6 +210,18 @@ public:
 	const ColumnBase& GetColumnBase(size_t ndx) const;
 	ColumnType GetRealColumnType(size_t ndx) const;
 
+	class Parent: public ArrayParent
+	{
+	protected:
+		friend class Table;
+		friend class TopLevelTable;
+
+		/**
+		 * Must be called whenever a child Table is destroyed.
+		 */
+		virtual void child_destroyed(std::size_t child_ndx) = 0;
+	};
+
 protected:
 	friend class Group;
 	friend class ColumnTable;
@@ -233,15 +244,15 @@ protected:
 	 * Construct top-level table from ref.
 	 */
 	Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-		  ArrayParent *parent_columns, size_t pndx_columns);
+		  Parent *parent, size_t ndx_in_parent);
 
 	/**
 	 * Construct subtable from ref.
 	 */
 	Table(SubtableTag, Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-		  ArrayParent *parent_columns, size_t pndx_columns);
+		  Parent *parent, size_t ndx_in_parent);
 
-	void Create(size_t ref_specSet, size_t ref_columns, ArrayParent *parent_columns, size_t pndx_columns);
+	void Create(size_t ref_specSet, size_t ref_columns, ArrayParent *parent, size_t ndx_in_parent);
 	void CreateColumns();
 	void CacheColumns();
 	void ClearCachedColumns();
@@ -294,7 +305,6 @@ public:
 
 	void UpdateFromSpec(size_t ref_specSet);
 	size_t GetRef() const;
-	void SetParent(ArrayParent *parent, size_t pndx);
 
 	// Debug
 #ifdef _DEBUG
@@ -310,7 +320,7 @@ protected:
 	/**
 	 * Construct top-level table from ref.
 	 */
-	TopLevelTable(Allocator& alloc, size_t ref_top, ArrayParent *parent_array, size_t parent_ndx);
+	TopLevelTable(Allocator& alloc, size_t ref_top, Parent *parent, size_t ndx_in_parent);
 
 private:
 	friend class Group;
@@ -320,7 +330,9 @@ private:
 	 * Construct subtable from ref.
 	 */
 	TopLevelTable(SubtableTag, Allocator& alloc, size_t ref_top,
-				  ArrayParent *parent_array, size_t parent_ndx);
+				  Parent *parent, size_t ndx_in_parent);
+
+	void SetParent(Parent *parent, size_t ndx_in_parent);
 };
 
 

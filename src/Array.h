@@ -45,7 +45,6 @@
 
 // Pre-definitions
 class Array;
-class Column;
 
 #ifdef _DEBUG
 class MemStats {
@@ -78,10 +77,15 @@ enum ColumnDef {
 
 class ArrayParent
 {
+public:
+	virtual ~ArrayParent() {}
+
 protected:
 	friend class Array;
+public: // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
 	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref) = 0;
-	virtual size_t get_child_ref(size_t subtable_ndx) const  = 0;
+protected:
+	virtual size_t get_child_ref(size_t subtable_ndx) const = 0;
 };
 
 
@@ -90,7 +94,7 @@ public:
 	Array(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	Array(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	Array(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Array(Allocator& alloc, bool is_subtable_root);
+	Array(Allocator& alloc);
 	Array(const Array& a);
 	virtual ~Array();
 
@@ -161,8 +165,6 @@ public:
 	void Destroy();
 
 	Allocator& GetAllocator() const {return m_alloc;}
-
-	bool is_subtable_root() const { return m_is_subtable_root; }
 
 	// Serialization
 	template<class S> size_t Write(S& target, size_t& pos, bool recurse=true) const;
@@ -262,13 +264,6 @@ protected:
 	bool m_hasRefs;
 
 private:
-	// When m_is_subtable_root is true, and m_ref is changed,
-	// update_child_ref() must be called on the parent to update its
-	// reference to this array. In this case the parent must point to
-	// the Array that corresponds to the root node of the B-tree of the
-	// parent column.
-	bool const m_is_subtable_root;
-
 	ArrayParent *m_parent;
 	size_t m_parentNdx;
 
@@ -359,11 +354,7 @@ size_t Array::Write(S& out, size_t& pos, bool recurse) const {
 inline void Array::update_ref_in_parent(size_t ref)
 {
   if (!m_parent) return;
-  if (m_is_subtable_root) {
-	  m_parent->update_child_ref(m_parentNdx, ref);
-	  return;
-  }
-  static_cast<Array *>(m_parent)->Set(m_parentNdx, ref);
+  m_parent->update_child_ref(m_parentNdx, ref);
 }
 
 #endif //__TDB_ARRAY__

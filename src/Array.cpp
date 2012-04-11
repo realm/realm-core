@@ -14,18 +14,25 @@
 // Pre-declare local functions
 size_t CalcByteLen(size_t count, size_t width);
 
-Array::Array(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+Array::Array(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc):
+	m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+	m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
 	Create(ref);
 }
 
-Array::Array(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(const_cast<ArrayParent *>(parent)), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+Array::Array(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc):
+	m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+	m_parent(const_cast<ArrayParent *>(parent)), m_parentNdx(pndx), m_alloc(alloc),
+	m_lbound(0), m_ubound(0)
+{
 	Create(ref);
 }
 
-Array::Array(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+Array::Array(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc):
+	m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false),
+	m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 
@@ -34,13 +41,16 @@ Array::Array(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc)
 }
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
-Array::Array(Allocator& alloc, bool is_subtable_root)
-: m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_is_subtable_root(is_subtable_root), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
+Array::Array(Allocator& alloc):
+	m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
+	m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
 
 // Copy-constructor
 // Note that this array now own the ref. Should only be used when
 // the source array goes away right after (like return values from functions)
-Array::Array(const Array& src) : m_is_subtable_root(src.m_is_subtable_root), m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc) {
+Array::Array(const Array& src):
+	m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
+{
 	const size_t ref = src.GetRef();
 	Create(ref);
 	src.Invalidate();
@@ -1665,8 +1675,7 @@ void Array::Verify() const {
 	// Check that parent is set correctly
 	if (!m_parent) return;
 
-	const size_t ref_in_parent = m_is_subtable_root ? m_parent->get_child_ref(m_parentNdx) :
-		static_cast<Array *>(m_parent)->GetAsRef(m_parentNdx); // FIXME: Should always call get_ref_in_parent()
+	const size_t ref_in_parent = m_parent->get_child_ref(m_parentNdx);
 	assert(ref_in_parent == m_ref);
 }
 
