@@ -6,12 +6,21 @@
 # $*  The stem (the bit which matches the % wildcard in the rule definition.
 #
 
-CXXFLAGS          = -Wall -pthread -DNDEBUG -O3 -DUSE_SSE -msse4.2 -I../UnitTest++/src -I../../src
-LDFLAGS           = -pthread -lproc -L../UnitTest++ -lUnitTest++
+ROOT = ../..
+CONFIG_MK = $(ROOT)/config.mk
+include $(CONFIG_MK)
 
-SOURCES           = $(wildcard *.cpp)
-LIBTIGHTDB        = ../../src/libtightdb.a
-TARGET            = test-tightdb
+CXXFLAGS           ?= $(CXXFLAGS_COMMON)
+CXXFLAGS_COMMON_2   = -pthread $(CXXFLAGS) -I../UnitTest++/src
+CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src
+CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src
+LDFLAGS             = -pthread -lproc -L../UnitTest++ -lUnitTest++
+
+SOURCES             = $(wildcard *.cpp)
+LIBTIGHTDB          = $(ROOT)/src/libtightdb.a
+LIBTIGHTDB_DEBUG    = $(ROOT)/src/libtightdb_d.a
+TARGET              = test-tightdb
+DEBUG_TARGET        = test-tightdb-debug
 
 ifeq ($(MSYSTEM), MINGW32)
 	SOURCES += ../Support/win32/mem.cpp
@@ -21,17 +30,21 @@ endif
 
 
 OBJECTS = $(SOURCES:.cpp=.o)
+DEBUG_OBJECTS = $(SOURCES:.cpp=.dbg.o)
 
 
 all: $(TARGET)
 .PHONY: all
 
+debug: $(DEBUG_TARGET)
+.PHONY: debug
+
 clean:
-	$(RM) *.d *.o $(TARGET)
+	$(RM) *.d *.o $(TARGET) $(DEBUG_TARGET)
 .PHONY: clean
 
 
-$(OBJECTS): Makefile
+$(OBJECTS) $(DEBUG_OBJECTS): Makefile $(CONFIG_MK)
 
 
 # Linking
@@ -39,10 +52,16 @@ $(OBJECTS): Makefile
 $(TARGET): $(OBJECTS) $(LIBTIGHTDB)
 	$(CXX) $(OBJECTS) $(LIBTIGHTDB) $(LDFLAGS) -o $@
 
+$(DEBUG_TARGET): $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG)
+	$(CXX) $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG) $(LDFLAGS) -o $@
+
 
 # Compiling + dependency generation
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	$(CXX) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@
 
--include $(SOURCES:.cpp=.d)
+%.dbg.o: %.cpp
+	$(CXX) $(CXXFLAGS_DEBUG) -MMD -MP -c $< -o $@
+
+-include $(SOURCES:.cpp=.d) $(SOURCES:.cpp=.dbg.d)

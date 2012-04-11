@@ -6,11 +6,16 @@
 # $*  The stem (the bit which matches the % wildcard in the rule definition.
 #
 
-CXXFLAGS          = -Wall -pthread -DNDEBUG -O3 -msse4.2 -I../UnitTest++/src
-LDFLAGS           = -pthread -lproc -L../UnitTest++ -lUnitTest++
+ROOT = ../..
+CONFIG_MK = $(ROOT)/config.mk
+include $(CONFIG_MK)
 
-SOURCES           = $(wildcard *.cpp)
-TARGET            = test-stl
+CXXFLAGS           ?= $(CXXFLAGS_COMMON)
+CXXFLAGS_OPTIMIZE  += -pthread $(CXXFLAGS) -I../UnitTest++/src
+LDFLAGS             = -pthread -lproc -L../UnitTest++ -lUnitTest++
+
+SOURCES             = $(wildcard *.cpp)
+TARGET              = test-stl
 
 ifeq ($(MSYSTEM), MINGW32)
 	SOURCES += ../Support/win32/mem.cpp
@@ -30,7 +35,7 @@ clean:
 .PHONY: clean
 
 
-$(OBJECTS): Makefile
+$(OBJECTS): Makefile $(CONFIG_MK)
 
 
 # Linking
@@ -42,6 +47,6 @@ $(TARGET): $(OBJECTS)
 # Compiling + dependency generation
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	$(CXX) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@
 
 -include $(SOURCES:.cpp=.d)

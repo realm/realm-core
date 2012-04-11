@@ -6,22 +6,27 @@
 # $*  The stem (the bit which matches the % wildcard in the rule definition.
 #
 
-CXXFLAGS          = -Wall -pthread -fPIC -DPIC
-CXXFLAGS_OPTIMIZE = -DNDEBUG -O3 -DUSE_SSE -msse4.2 -I.
-CXXFLAGS_DEBUG    = -D_DEBUG -ggdb3 -I.
-CXXFLAGS_COVER    = -D_DEBUG -DUSE_SSE -msse4.2 -I$(abspath .)
+ROOT = ..
+CONFIG_MK = $(ROOT)/config.mk
+include $(CONFIG_MK)
 
-GEN_HEADERS       = tightdb.h
-SOURCES           = $(wildcard *.cpp)
-LIB_SHARED        = libtightdb.so
-LIB_STATIC        = libtightdb.a
-LIB_STATIC_DEBUG  = libtightdb_d.a
-LIB_STATIC_COVER  = libtightdb_c.a
+CXXFLAGS           ?= $(CXXFLAGS_COMMON)
+CXXFLAGS_COMMON_2   = -pthread -fPIC -DPIC $(CXXFLAGS)
+CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I.
+CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I.
+CXXFLAGS_COVERAGE  += $(CXXFLAGS_COMMON_2) -I$(abspath .)
+
+GEN_HEADERS         = tightdb.h
+SOURCES             = $(wildcard *.cpp)
+LIB_SHARED          = libtightdb.so
+LIB_STATIC          = libtightdb.a
+LIB_STATIC_DEBUG    = libtightdb_d.a
+LIB_STATIC_COVERAGE = libtightdb_c.a
 
 
 TARGETS = $(LIB_SHARED) $(LIB_STATIC)
 DEBUG_TARGETS = $(LIB_STATIC_DEBUG)
-COVER_TARGETS = $(LIB_STATIC_COVER)
+COVER_TARGETS = $(LIB_STATIC_COVERAGE)
 
 OBJECTS = $(SOURCES:.cpp=.o)
 DEBUG_OBJECTS = $(SOURCES:.cpp=.dbg.o)
@@ -42,14 +47,14 @@ clean:
 .PHONY: clean
 
 
-$(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): Makefile
+$(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): Makefile $(CONFIG_MK)
 
-$(GEN_HEADERS): Makefile
+$(GEN_HEADERS): Makefile $(CONFIG_MK)
 $(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): $(GEN_HEADERS)
 
 
 # Code generation
-tightdb.h: tightdb-gen.sh tightdb-gen.py Makefile
+tightdb.h: tightdb-gen.sh tightdb-gen.py
 	$(SHELL) tightdb-gen.sh tightdb.h
 
 
@@ -68,19 +73,19 @@ $(LIB_STATIC): $(OBJECTS)
 $(LIB_STATIC_DEBUG): $(DEBUG_OBJECTS)
 	ar crs $@ $(DEBUG_OBJECTS)
 
-$(LIB_STATIC_COVER): $(COVER_OBJECTS)
+$(LIB_STATIC_COVERAGE): $(COVER_OBJECTS)
 	ar crs $@ $(COVER_OBJECTS)
 
 
 # Compiling + dependency generation
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@
+	$(CXX) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@
 
 %.dbg.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(CXXFLAGS_DEBUG) -MMD -MP -c $< -o $@
+	$(CXX) $(CXXFLAGS_DEBUG) -MMD -MP -c $< -o $@
 
 %.cov.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(CXXFLAGS_COVER) --coverage -MMD -MP -c $(abspath $<) -o $(abspath $@)
+	$(CXX) --coverage $(CXXFLAGS_COVERAGE) -MMD -MP -c $(abspath $<) -o $(abspath $@)
 
 -include $(SOURCES:.cpp=.d) $(SOURCES:.cpp=.dbg.d) $(SOURCES:.cpp=.cov.d)

@@ -6,19 +6,24 @@
 # $*  The stem (the bit which matches the % wildcard in the rule definition.
 #
 
-CXXFLAGS          = -Wall -pthread -IUnitTest++/src
-LDFLAGS           = -pthread -LUnitTest++ -lUnitTest++
-CXXFLAGS_OPTIMIZE = -DNDEBUG -O3 -DUSE_SSE -msse4.2 -I../src
-CXXFLAGS_DEBUG    = -D_DEBUG -ggdb3 -I../src
-CXXFLAGS_COVER    = -D_DEBUG -DUSE_SSE -msse4.2 -I$(abspath ../src)
+ROOT = ..
+CONFIG_MK = $(ROOT)/config.mk
+include $(CONFIG_MK)
 
-SOURCES           = $(wildcard *.cpp large_tests/*.cpp)
-LIBTIGHTDB        = ../src/libtightdb.a
-LIBTIGHTDB_DEBUG  = ../src/libtightdb_d.a
-LIBTIGHTDB_COVER  = ../src/libtightdb_c.a
-TARGET            = tightdb-tests
-DEBUG_TARGET      = tightdb-tests-debug
-COVER_TARGET      = tightdb-tests-cover
+CXXFLAGS           ?= $(CXXFLAGS_COMMON)
+CXXFLAGS_COMMON_2   = -pthread $(CXXFLAGS) -IUnitTest++/src
+CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src
+CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src
+CXXFLAGS_COVERAGE  += $(CXXFLAGS_COMMON_2) -I$(abspath $(ROOT)/src)
+LDFLAGS             = -pthread -LUnitTest++ -lUnitTest++
+
+SOURCES             = $(wildcard *.cpp large_tests/*.cpp)
+LIBTIGHTDB          = $(ROOT)/src/libtightdb.a
+LIBTIGHTDB_DEBUG    = $(ROOT)/src/libtightdb_d.a
+LIBTIGHTDB_COVERAGE = $(ROOT)/src/libtightdb_c.a
+TARGET              = tightdb-tests
+DEBUG_TARGET        = tightdb-tests-debug
+COVER_TARGET        = tightdb-tests-cover
 
 
 OBJECTS = $(SOURCES:.cpp=.o)
@@ -71,7 +76,7 @@ UnitTest++:
 $(TARGET) $(DEBUG_TARGET) $(COVER_TARGET): | UnitTest++
 
 
-$(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): Makefile
+$(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): Makefile $(CONFIG_MK)
 
 
 # Linking
@@ -82,19 +87,19 @@ $(TARGET): $(OBJECTS) $(LIBTIGHTDB)
 $(DEBUG_TARGET): $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG)
 	$(CXX) $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG) $(LDFLAGS) -o $@
 
-$(COVER_TARGET): $(COVER_OBJECTS) $(LIBTIGHTDB_COVER)
-	$(CXX) --coverage $(COVER_OBJECTS) $(LIBTIGHTDB_COVER) $(LDFLAGS) -o $@
+$(COVER_TARGET): $(COVER_OBJECTS) $(LIBTIGHTDB_COVERAGE)
+	$(CXX) --coverage $(COVER_OBJECTS) $(LIBTIGHTDB_COVERAGE) $(LDFLAGS) -o $@
 
 
 # Compiling + dependency generation
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@
+	$(CXX) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@
 
 %.dbg.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(CXXFLAGS_DEBUG) -MMD -MP -c $< -o $@
+	$(CXX) $(CXXFLAGS_DEBUG) -MMD -MP -c $< -o $@
 
 %.cov.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(CXXFLAGS_COVER) --coverage -MMD -MP -c $(abspath $<) -o $(abspath $@)
+	$(CXX) --coverage $(CXXFLAGS_COVERAGE) -MMD -MP -c $(abspath $<) -o $(abspath $@)
 
 -include $(SOURCES:.cpp=.d) $(SOURCES:.cpp=.dbg.d) $(SOURCES:.cpp=.cov.d)
