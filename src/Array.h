@@ -262,7 +262,7 @@ private:
 	virtual size_t get_subtable_ref_for_verify(size_t subtable_ndx) { return 0; }
 #endif
 
-	Array *m_parent;
+	Array* m_parent;
 	size_t m_parentNdx;
 
 	Allocator& m_alloc;
@@ -340,7 +340,11 @@ size_t Array::Write(S& out, size_t& pos, bool recurse) const {
 inline void Array::update_ref_in_parent(size_t ref)
 {
   if (!m_parent) return;
-  m_parent->update_subtable_ref(m_parentNdx, ref);
+  if (m_is_subtable_root) {
+	  m_parent->update_subtable_ref(m_parentNdx, ref);
+	  return;
+  }
+  m_parent->Set(m_parentNdx, ref);
 }
 
 #endif //__TDB_ARRAY__

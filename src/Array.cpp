@@ -1637,11 +1637,6 @@ std::vector<int64_t> Array::ToVector(void) {
 	return v;
 }
 
-void Array::update_subtable_ref(size_t subtable_ndx, size_t new_ref)
-{
-	Set(subtable_ndx, new_ref);
-}
-
 #ifdef _DEBUG
 #include "stdio.h"
 
@@ -1729,3 +1724,7 @@ MemStats Array::Stats() const {
 }
 
 #endif //_DEBUG
+
+void Array::update_subtable_ref(size_t, size_t) {
+	assert(false); // Must be overridden by column root arrays.
+}
