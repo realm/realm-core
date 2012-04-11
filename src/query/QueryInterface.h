@@ -240,6 +240,21 @@ public:
 			return r;
 	}
 
+	// todo, not sure if start, end and limit could be useful for delete.
+	size_t Delete(Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+		size_t r = start - 1;
+		size_t results = 0;
+		for(;;) {
+			r = Find(table, r + 1 - results, end);
+			if(r == (size_t)-1 || r == table.GetSize() || results == limit)
+				break;
+			results++;
+			table.DeleteRow(r);
+		}
+		return results;
+	}
+
+
 	int64_t Sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
 		size_t r = start - 1;
 		size_t results = 0;

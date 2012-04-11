@@ -555,12 +555,17 @@ size_t Array::FindPos2(int64_t target) const {
 
 
 size_t Array::Find(int64_t value, size_t start, size_t end) const {
-#ifdef USE_SSE
+#if defined(USE_SSE42) || defined(USE_SSE3)
 	if(end == -1)
 		end = m_len;
 
+#if defined(USE_SSE42)
 	if(end - start < sizeof(__m128i) || m_width < 8) 
 		return CompareEquality<true>(value, start, end);
+#elif defined(USE_SSE3) 
+	if(end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) // 64 bit not supported by sse3
+		return CompareEquality<true>(value, start, end);
+#endif
 
 	// FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
 	__m128i *a = (__m128i *)round_up(m_data + start * m_width / 8, sizeof(__m128i));
@@ -589,7 +594,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 #endif
 }
 
-#ifdef USE_SSE
+#if defined(USE_SSE42) || defined(USE_SSE3)
 // 'items' is the number of 16-byte SSE chunks. 'bytewidth' is the size of a packed data element.
 // Return value is SSE chunk number where the element is guaranteed to exist (use CompareEquality() to
 // find packed position)
@@ -618,6 +623,7 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 			compare = _mm_cmpeq_epi32(search, next);
 		}
 	}
+#if defined(USE_SSE42)
 	else if(bytewidth == 8) {
 		// Only supported by SSE 4.1 because of _mm_cmpeq_epi64().
 		for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
@@ -625,6 +631,7 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 			compare = _mm_cmpeq_epi64(search, next);
 		}
 	}
+#endif
 	else 
 		assert(true);
 	return _mm_movemask_epi8(compare) == 0 ? (size_t)-1 : i - 1;

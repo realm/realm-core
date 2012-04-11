@@ -3,14 +3,17 @@
 #include <string>
 #include <assert.h>
 #include <cstdlib> // size_t
+#ifndef _MSC_VER 
 #include <stdint.h>
-
+#else
+#include "win32/stdint.h"
+#endif
 
 
 size_t TO_REF(int64_t v) {
 #if !defined(NDEBUG) && defined(_DEBUG)
 	uint64_t m = (size_t)(-1);
-	assert(v <= m);
+	assert((uint64_t)v <= m);
 #endif
 	return (size_t)v;
 }

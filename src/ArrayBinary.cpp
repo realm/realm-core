@@ -94,7 +94,7 @@ void ArrayBinary::Delete(size_t ndx) {
 void ArrayBinary::Resize(size_t ndx) {
 	assert(ndx < m_offsets.Size());
 	
-	const size_t len = ndx ? m_offsets.Get(ndx-1) : 0;
+	const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
 	
 	m_offsets.Resize(ndx);
 	m_blob.Resize(len);
