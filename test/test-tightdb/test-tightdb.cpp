@@ -134,7 +134,6 @@ int main() {
 		printf("Search index: %dms\n", search_time);
 	}
 
-	//getchar(); // wait for key
-	//return 1;
+	return 0;
 }
 

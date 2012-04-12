@@ -160,8 +160,7 @@ int main() {
 		sqlite3_finalize(ppStmt); // Cleanup
 	}
 
-	getchar(); // wait for key
 	sqlite3_close(db);
 
-	return 1;
+	return 0;
 }
