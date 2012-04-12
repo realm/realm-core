@@ -65,7 +65,7 @@ int main() {
 		// Do a search over entire column (value not found)
 		for (size_t i = 0; i < 100; ++i) {
 			const size_t res = table.fourth.Find(Tue);
-			if (res != -1) {	
+			if (res != size_t(-1)) {	
 				printf("error");
 			}
 		}
@@ -81,7 +81,7 @@ int main() {
 		// Do a search over entire column (value not found)
 		for (size_t i = 0; i < 100; ++i) {
 			const size_t res = table.third.Find(50);
-			if (res != -1) {	
+			if (res != size_t(-1)) {	
 				printf("error");
 			}
 		}

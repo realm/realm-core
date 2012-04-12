@@ -343,7 +343,7 @@ void SlabAlloc::Verify() const {
 		const size_t ref = TO_REF(c.ref);
 
 		const size_t ndx = m_slabs.offset.FindPos(ref);
-		assert(ndx != -1);
+		assert(ndx != size_t(-1));
 
 		const size_t slab_end = TO_REF(m_slabs[ndx].offset);
 		const size_t free_end = ref + TO_REF(c.size);

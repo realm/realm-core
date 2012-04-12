@@ -358,7 +358,8 @@ void merge_core(Array *a0, Array *a1, Array *res) {
 Array *merge(Array *ArrayList) {
 	if(ArrayList->Size() == 1) {
 		size_t ref = ArrayList->GetAsRef(0);
-		Array *a = new Array(ref, (Array *)&merge);
+//		Array *a = new Array(ref, reinterpret_cast<Array *>(&merge)); // FIXME: Breaks strict-aliasing
+                Array *a = new Array(ref, NULL); 
 		return a;
 	}
 	

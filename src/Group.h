@@ -71,7 +71,7 @@ private:
 
 template<class T> T& Group::GetTable(const char* name) {
 	const size_t n = m_tableNames.Find(name);
-	if (n == -1) {
+	if (n == size_t(-1)) {
 		// Create new table
 		T* const t = new T(m_alloc);
 		t->SetParent(this, m_tables.Size());

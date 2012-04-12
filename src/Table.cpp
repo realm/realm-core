@@ -1529,7 +1529,7 @@ void Table::Print() const {
 			case COLUMN_TYPE_INT:
 				{
 					const Column& column = GetColumn(n);
-					printf("%10lld ", column.Get(i));
+					printf("%10lld ", static_cast<long long>(column.Get(i)));
 				}
 				break;
 			case COLUMN_TYPE_BOOL:

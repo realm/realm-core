@@ -46,7 +46,7 @@ $(TARGET): $(OBJECTS)
 # Compiling + dependency generation
 
 %.o: %.c
-	$(CC) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@
+	$(CC) $(CXXFLAGS_OPTIMIZE) -Wno-unused-but-set-variable -Wno-strict-overflow -Wno-uninitialized -MMD -MP -c $< -o $@
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@

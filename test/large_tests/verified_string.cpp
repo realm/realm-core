@@ -72,7 +72,7 @@ size_t VerifiedString::Find(const char *value) {
 	size_t ndx = std::distance(v.begin(), it);
 	size_t index2 = u.Find(value);
 	(void)index2;
-	assert(ndx == index2 || it == v.end() && index2 == -1);
+	assert(ndx == index2 || (it == v.end() && index2 == size_t(-1)));
 	return ndx;
 }
 
@@ -84,7 +84,7 @@ size_t VerifiedString::Find(const char *value) {
 // todo/fixme, end ignored
  void VerifiedString::FindAll(Array &c, const char *value, size_t start, size_t end) {
 	std::vector<string>::iterator ita = v.begin() + start;
-	std::vector<string>::iterator itb = v.begin() + (end == -1 ? v.size() : end);
+	std::vector<string>::iterator itb = v.begin() + (end == size_t(-1) ? v.size() : end);
 	std::vector<size_t> result;
 	while(ita != itb) {
 		ita = std::find(ita, itb, value);
