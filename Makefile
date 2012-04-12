@@ -56,7 +56,7 @@ lcov: cover
 gcovr: cover
 	@$(MAKE) -C test cover
 	find -name '*.gcda' -delete
-	cd test && ./tightdb-tests-cover
+	-cd test && ./tightdb-tests-cover
 	gcovr -r src -x >gcovr.xml
 .PHONY: gcovr
 
