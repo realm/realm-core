@@ -55,7 +55,7 @@ test: debug
 .PHONY: test
 
 memtest: debug
-	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./tightdb-tests-debug
+	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./tightdb-tests-debug --no-error-exit-staus
 .PHONY: test
 
 benchmark: test-tightdb test-sqlite3 test-stl

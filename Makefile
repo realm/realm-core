@@ -46,7 +46,7 @@ benchmark: all
 lcov: cover
 	@$(MAKE) -C test cover
 	find -name '*.gcda' -delete
-	cd test && ./tightdb-tests-cover
+	cd test && ./tightdb-tests-cover --no-error-exit-staus
 	lcov --capture --directory . --output-file /tmp/tightdb.lcov
 	lcov --extract /tmp/tightdb.lcov '$(abspath .)/src/*' --output-file /tmp/tightdb-clean.lcov
 	rm -fr cover_html
@@ -56,7 +56,7 @@ lcov: cover
 gcovr: cover
 	@$(MAKE) -C test cover
 	find -name '*.gcda' -delete
-	-cd test && ./tightdb-tests-cover
+	cd test && ./tightdb-tests-cover --no-error-exit-staus
 	gcovr -r src -x >gcovr.xml
 .PHONY: gcovr
 
