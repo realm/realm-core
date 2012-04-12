@@ -14,18 +14,25 @@
 // Pre-declare local functions
 size_t CalcByteLen(size_t count, size_t width);
 
-Array::Array(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+Array::Array(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc):
+	m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+	m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
 	Create(ref);
 }
 
-Array::Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(const_cast<Array*>(parent)), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+Array::Array(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc):
+	m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+	m_parent(const_cast<ArrayParent *>(parent)), m_parentNdx(pndx), m_alloc(alloc),
+	m_lbound(0), m_ubound(0)
+{
 	Create(ref);
 }
 
-Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false), m_is_subtable_root(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+Array::Array(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc):
+	m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false),
+	m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 
@@ -34,13 +41,16 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 }
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
-Array::Array(Allocator& alloc, bool is_subtable_root)
-: m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_is_subtable_root(is_subtable_root), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
+Array::Array(Allocator& alloc):
+	m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
+	m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
 
 // Copy-constructor
 // Note that this array now own the ref. Should only be used when
 // the source array goes away right after (like return values from functions)
-Array::Array(const Array& src) : m_is_subtable_root(src.m_is_subtable_root), m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc) {
+Array::Array(const Array& src):
+	m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
+{
 	const size_t ref = src.GetRef();
 	Create(ref);
 	src.Invalidate();
@@ -205,7 +215,7 @@ void Array::Preset(int64_t min, int64_t max, size_t count) {
 	Preset(w, count);
 }
 
-void Array::SetParent(Array* parent, size_t pndx) {
+void Array::SetParent(ArrayParent *parent, size_t pndx) {
 	m_parent = parent;
 	m_parentNdx = pndx;
 }
@@ -560,7 +570,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 		end = m_len;
 
 #if defined(USE_SSE42)
-	if(end - start < sizeof(__m128i) || m_width < 8) 
+	if(end - start < sizeof(__m128i) || m_width < 8)
 		return CompareEquality<true>(value, start, end);
 #elif defined(USE_SSE3) 
 	if(end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) // 64 bit not supported by sse3
@@ -1672,9 +1682,7 @@ void Array::Verify() const {
 	// Check that parent is set correctly
 	if (!m_parent) return;
 
-	const size_t ref_in_parent = m_is_subtable_root ?
-		m_parent->get_subtable_ref_for_verify(m_parentNdx) :
-		m_parent->GetAsRef(m_parentNdx);
+	const size_t ref_in_parent = m_parent->get_child_ref(m_parentNdx);
 	assert(ref_in_parent == m_ref);
 }
 
@@ -1731,7 +1739,3 @@ MemStats Array::Stats() const {
 }
 
 #endif //_DEBUG
-
-void Array::update_subtable_ref(size_t, size_t) {
-	assert(false); // Must be overridden by column root arrays.
-}

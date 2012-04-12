@@ -9,6 +9,7 @@
 #include "ColumnBinary.h"
 #include "alloc.h"
 #include "ColumnType.h"
+#include "TableRef.hpp"
 
 class Accessor;
 class TableView;
@@ -17,6 +18,7 @@ class ColumnTable;
 class ColumnMixed;
 class TopLevelTable;
 
+
 class Date {
 public:
 	Date(time_t d) : m_date(d) {}
@@ -24,6 +26,8 @@ public:
 private:
 	time_t m_date;
 };
+
+
 
 class Mixed {
 public:
@@ -54,9 +58,11 @@ private:
 	size_t m_len;
 };
 
+
+
 class Spec {
 public:
-	Spec(Allocator& alloc, size_t ref, Array* parent, size_t pndx);
+	Spec(Allocator& alloc, size_t ref, ArrayParent *parent, size_t pndx);
 	Spec(const Spec& s);
 
 	void AddColumn(ColumnType type, const char* name);
@@ -80,7 +86,7 @@ public:
 #endif //_DEBUG
 
 private:
-	void Create(size_t ref, Array* parent, size_t pndx);
+	void Create(size_t ref, ArrayParent *parent, size_t pndx);
 
 	Array m_specSet;
 	Array m_spec;
@@ -88,10 +94,15 @@ private:
 	Array m_subSpecs;
 };
 
+
+
+class Table;
+typedef BasicTableRef<Table> TableRef;
+typedef BasicTableRef<Table const> TableConstRef;
+
 class Table {
 public:
 	Table(Allocator& alloc=GetDefaultAllocator());
-	Table(const Table& t);
 	virtual ~Table();
 
 	// Column meta info
@@ -139,8 +150,8 @@ public:
 	void SetBinary(size_t column_id, size_t ndx, const void* value, size_t len);
 
 	// Sub-tables
-	Table  GetTable(size_t column_id, size_t ndx);
-	Table* GetTablePtr(size_t column_id, size_t ndx);
+	TableRef GetTable(size_t column_id, size_t ndx);
+	TableConstRef GetTable(size_t column_id, size_t ndx) const;
 	size_t GetTableSize(size_t column_id, size_t ndx) const;
 	void   InsertTable(size_t column_id, size_t ndx);
 	void   ClearTable(size_t column_id, size_t ndx);
@@ -148,7 +159,6 @@ public:
 	// Mixed
 	Mixed GetMixed(size_t column_id, size_t ndx) const;
 	ColumnType GetMixedType(size_t column_id, size_t ndx) const;
-	TopLevelTable GetMixedTable(size_t column_id, size_t ndx);
 	void InsertMixed(size_t column_id, size_t ndx, Mixed value);
 	void SetMixed(size_t column_id, size_t ndx, Mixed value);
 
@@ -200,15 +210,49 @@ public:
 	const ColumnBase& GetColumnBase(size_t ndx) const;
 	ColumnType GetRealColumnType(size_t ndx) const;
 
+	class Parent: public ArrayParent
+	{
+	protected:
+		friend class Table;
+		friend class TopLevelTable;
+
+		/**
+		 * Must be called whenever a child Table is destroyed.
+		 */
+		virtual void child_destroyed(std::size_t child_ndx) = 0;
+	};
+
 protected:
 	friend class Group;
 	friend class ColumnTable;
+	friend class ColumnMixed;
 
-	Table(Allocator& alloc, bool dontInit); // Construct un-initialized
-	Table(Allocator& alloc, size_t ref_specSet, size_t columns_ref, Array* parent_columns, size_t pndx_columns,
-	      bool columns_ref_is_subtable_root); // Construct from ref
+	class NoInitTag {};
 
-	void Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns);
+	/**
+	 * Used when constructing subtables tables, that is, tables whose
+	 * lifetime is managed by reference counting, not by the
+	 * application.
+	 */
+	class SubtableTag {};
+
+	Table(NoInitTag, Allocator &alloc); // Construct un-initialized
+
+	Table(NoInitTag, SubtableTag, Allocator &alloc); // Construct subtable un-initialized
+
+	/**
+	 * Construct top-level table from ref.
+	 */
+	Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
+		  Parent *parent, size_t ndx_in_parent);
+
+	/**
+	 * Construct subtable from ref.
+	 */
+	Table(SubtableTag, Allocator &alloc, size_t ref_specSet, size_t columns_ref,
+		  Parent *parent, size_t ndx_in_parent);
+
+	void Create(size_t ref_specSet, size_t ref_columns, ArrayParent *parent, size_t ndx_in_parent);
 	void CreateColumns();
 	void CacheColumns();
 	void ClearCachedColumns();
@@ -235,8 +279,18 @@ protected:
 	// Cached columns
 	Array m_cols;
 
+	std::size_t get_ref_count() const { return m_ref_count; }
+
 private:
-	Table& operator=(const Table& t); // non assignable
+	Table(Table const &); // Disable copy construction
+	Table &operator=(Table const &); // Disable copying assignment
+
+	template<class> friend class BasicTableRef;
+	friend class ColumnSubtableParent;
+
+	mutable std::size_t m_ref_count;
+	void bind_ref() const { ++m_ref_count; }
+	void unbind_ref() const { if (--m_ref_count == 0) delete this; }
 
 	ColumnBase& GetColumnBase(size_t ndx);
 	void InstantiateBeforeChange();
@@ -247,12 +301,10 @@ private:
 class TopLevelTable : public Table {
 public:
 	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
-	TopLevelTable(const TopLevelTable& t);
-	~TopLevelTable();
+	virtual ~TopLevelTable();
 
 	void UpdateFromSpec(size_t ref_specSet);
 	size_t GetRef() const;
-	void SetParent(Array* parent, size_t pndx);
 
 	// Debug
 #ifdef _DEBUG
@@ -265,13 +317,22 @@ protected:
 	// On-disk format
 	Array m_top;
 
-	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx, bool is_subtable);
+	/**
+	 * Construct top-level table from ref.
+	 */
+	TopLevelTable(Allocator& alloc, size_t ref_top, Parent *parent, size_t ndx_in_parent);
 
 private:
-	TopLevelTable& operator=(const TopLevelTable&) {return *this;} // non assignable
-
 	friend class Group;
 	friend class ColumnMixed;
+
+	/**
+	 * Construct subtable from ref.
+	 */
+	TopLevelTable(SubtableTag, Allocator& alloc, size_t ref_top,
+				  Parent *parent, size_t ndx_in_parent);
+
+	void SetParent(Parent *parent, size_t ndx_in_parent);
 };
 
 
@@ -302,8 +363,8 @@ public:
 	void SetString(size_t column_id, size_t ndx, const char* value);
 	void Sort(size_t column, bool Ascending = true);
 	// Sub-tables
-	Table* GetTablePtr(size_t column_id, size_t ndx);
-	
+	TableRef GetTable(size_t column_id, size_t ndx); // FIXME: Const version? Two kinds of TableView, one for const, one for non-const?
+
 	// Deleting
 	void Delete(size_t ndx);
 	void Clear();

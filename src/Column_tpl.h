@@ -14,13 +14,13 @@
 #define MAX_LIST_SIZE 1000
 #endif
 
-template<class T> T GetColumnFromRef(Array& parent, size_t ndx) {
+template<class T> T GetColumnFromRef(Array &parent, size_t ndx) {
 	//assert(parent.HasRefs());
 	//assert(ndx < parent.Size());
 	return T((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
 }
 
-template<class T> const T GetColumnFromRef(const Array& parent, size_t ndx) {
+template<class T> const T GetColumnFromRef(const Array &parent, size_t ndx) {
 	//assert(parent.HasRefs());
 	//assert(ndx < parent.Size());
 	return T((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());

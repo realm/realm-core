@@ -101,9 +101,9 @@ class Column : public ColumnBase {
 public:
 	Column(Allocator& alloc);
 	Column(ColumnDef type, Allocator& alloc);
-	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Column(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	Column(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	Column(const Column& column);
 	~Column();
 
@@ -113,7 +113,7 @@ public:
 
 	bool operator==(const Column& column) const;
 
-	void SetParent(Array* parent, size_t pndx);
+	void SetParent(ArrayParent *parent, size_t pndx);
 	void UpdateParentNdx(int diff);
 	void SetHasRefs();
 
@@ -169,8 +169,6 @@ public:
 	MemStats Stats() const;
 #endif //_DEBUG
 
-private:
-	Column& operator=(const Column&) {return *this;} // not allowed
 protected:
 	friend class ColumnBase;
 	void Create();
@@ -190,7 +188,11 @@ protected:
 
 	// Member variables
 	Index* m_index;
+
+private:
+	Column &operator=(Column const &); // not allowed
 };
+
 
 // Templates
 #include "Column_tpl.h"

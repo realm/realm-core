@@ -4,23 +4,6 @@
 using namespace std;
 
 
-ColumnMixed::ColumnMixed(Allocator& alloc) : m_data(NULL){
-	m_array = new Array(COLUMN_HASREFS, NULL, 0, alloc);
-	
-	m_types = new Column(COLUMN_NORMAL, alloc);
-	m_refs  = new RefsColumn(alloc);
-	
-	m_array->Add(m_types->GetRef());
-	m_array->Add(m_refs->GetRef());
-	
-	m_types->SetParent(m_array, 0);
-	m_refs->SetParent(m_array, 1);
-}
-
-ColumnMixed::ColumnMixed(size_t ref, Array* parent, size_t pndx, Allocator& alloc) : m_data(NULL){
-	Create(ref, parent, pndx, alloc);
-}
-
 ColumnMixed::~ColumnMixed() {
 	delete m_types;
 	delete m_refs;
@@ -33,21 +16,37 @@ void ColumnMixed::Destroy() {
 		m_array->Destroy();
 }
 
-void ColumnMixed::SetParent(Array* parent, size_t pndx) {
+void ColumnMixed::SetParent(ArrayParent *parent, size_t pndx) {
 	m_array->SetParent(parent, pndx);
 }
 
-void ColumnMixed::Create(size_t ref, Array* parent, size_t pndx, Allocator& alloc) {
+void ColumnMixed::Create(Allocator &alloc, Table const *tab)
+{
+	m_array = new Array(COLUMN_HASREFS, NULL, 0, alloc);
+
+	m_types = new Column(COLUMN_NORMAL, alloc);
+	m_refs  = new RefsColumn(alloc, tab);
+
+	m_array->Add(m_types->GetRef());
+	m_array->Add(m_refs->GetRef());
+
+	m_types->SetParent(m_array, 0);
+	m_refs->SetParent(m_array, 1);
+}
+
+void ColumnMixed::Create(size_t ref, ArrayParent *parent, size_t pndx,
+						 Allocator &alloc, Table const *tab)
+{
 	m_array = new Array(ref, parent, pndx, alloc);
 	assert(m_array->Size() == 2 || m_array->Size() == 3);
-	
+
 	const size_t ref_types = m_array->GetAsRef(0);
 	const size_t ref_refs  = m_array->GetAsRef(1);
-	
+
 	m_types = new Column(ref_types, m_array, 0, alloc);
-	m_refs  = new RefsColumn(ref_refs,  m_array, 1, alloc);
+	m_refs  = new RefsColumn(ref_refs, m_array, 1, alloc, tab);
 	assert(m_types->Size() == m_refs->Size());
-	
+
 	// Binary column with values that does not fit in refs
 	// is only there if needed
 	if (m_array->Size() == 3) {
@@ -345,6 +344,45 @@ void ColumnMixed::Clear() {
 	if (m_data) m_data->Clear();
 }
 
+struct FakeParent: Table::Parent
+{
+	virtual void update_child_ref(size_t, size_t) {} // Ignore
+	virtual size_t get_child_ref(size_t) const { return 0; } // Ignore
+	virtual void child_destroyed(size_t) {} // Ignore
+};
+
+void ColumnMixed::RefsColumn::insert_table(size_t ndx)
+{
+	// OK to use a fake parent, because we only care about the ref.
+	FakeParent fake_parent;
+	TopLevelTable table(m_array->GetAllocator()); // Create new table
+	Insert(ndx, table.GetRef());
+	table.SetParent(&fake_parent, 0);
+}
+
+void ColumnMixed::RefsColumn::set_table(size_t ndx)
+{
+	// OK to use a fake parent, because we only care about the ref.
+	FakeParent fake_parent;
+	TopLevelTable table(m_array->GetAllocator()); // Create new table
+	Set(ndx, table.GetRef());
+	table.SetParent(&fake_parent, 0);
+}
+
+Table *ColumnMixed::RefsColumn::get_subtable_ptr(size_t ndx)
+{
+	Table *subtable = m_subtable_map.find(ndx);
+	if (subtable) return subtable;
+
+	size_t const ref = GetAsRef(ndx);
+	Allocator &alloc = m_array->GetAllocator();
+
+	subtable = new TopLevelTable(Table::SubtableTag(), alloc, ref, this, ndx);
+	register_subtable(ndx, subtable);
+	return subtable;
+}
+
+
 #ifdef _DEBUG
 
 void ColumnMixed::Verify() const {
@@ -352,89 +390,64 @@ void ColumnMixed::Verify() const {
 	m_types->Verify();
 	m_refs->Verify();
 	if (m_data) m_data->Verify();
-	
+
 	// types and refs should be in sync
 	const size_t types_len = m_types->Size();
 	const size_t refs_len  = m_refs->Size();
 	assert(types_len == refs_len);
-	
+
 	// Verify each sub-table
 	const size_t count = Size();
 	for (size_t i = 0; i < count; ++i) {
 		const size_t tref = m_refs->GetAsRef(i);
 		if (tref == 0 || tref & 0x1) continue;
-		
-		const TopLevelTable t = ((ColumnMixed*)this)-> GetTable(i);
-		t.Verify();
+		m_refs->verify(i);
 	}
 }
 
 void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 	const size_t ref = GetRef();
-	
+
 	out << "subgraph cluster_columnmixed" << ref << " {" << std::endl;
 	out << " label = \"ColumnMixed";
 	if (title) out << "\\n'" << title << "'";
 	out << "\";" << std::endl;
-	
+
 	m_array->ToDot(out, "mixed_top");
-	
+
 	// Write sub-tables
 	const size_t count = Size();
 	for (size_t i = 0; i < count; ++i) {
 		const ColumnType type = (ColumnType)m_types->Get(i);
 		if (type != COLUMN_TYPE_TABLE) continue;
-		if (m_refs->GetAsRef(i) == 0) continue; // empty table
-		
-		const TopLevelTable t = ((ColumnMixed*)this)->GetTable(i);
-		t.ToDot(out);
+		m_refs->to_dot(i, out);
 	}
-	
+
 	m_types->ToDot(out, "types");
 	m_refs->ToDot(out, "refs");
-	
+
 	if (m_array->Size() > 2) {
 		m_data->ToDot(out, "data");
 	}
-	
-		
+
 	out << "}" << std::endl;
 }
 
+
+void ColumnMixed::RefsColumn::verify(size_t ndx) const
+{
+	TopLevelTable t(m_array->GetAllocator(), GetAsRef(ndx),
+					const_cast<RefsColumn *>(this), ndx);
+	register_subtable(ndx, &t);
+	t.Verify();
+}
+
+
+void ColumnMixed::RefsColumn::to_dot(size_t ndx, std::ostream &out) const
+{
+	// OK to use a fake parent, because the operation is read-only.
+	FakeParent fake_parent;
+	TopLevelTable(m_array->GetAllocator(), GetAsRef(ndx), &fake_parent, 0).ToDot(out);
+}
+
 #endif //_DEBUG
-
-
-void ColumnMixed::RefsColumn::insert_table(size_t ndx) {
-	// Create new table
-	TopLevelTable table(m_array->GetAllocator());
-
-	Insert(ndx, table.GetRef());
-
-	table.SetParent(m_array, ndx);
-}
-
-void ColumnMixed::RefsColumn::set_table(size_t ndx) {
-	// Create new table
-	TopLevelTable table(m_array->GetAllocator());
-
-	Set(ndx, table.GetRef());
-
-	table.SetParent(m_array, ndx);
-}
-
-TopLevelTable ColumnMixed::RefsColumn::get_table(size_t ndx) {
-	const size_t ref = GetAsRef(ndx);
-	Allocator &alloc = m_array->GetAllocator();
-
-	bool is_subtable = true;
-	return TopLevelTable(alloc, ref, m_array, ndx, is_subtable);
-}
-
-TopLevelTable *ColumnMixed::RefsColumn::get_table_ptr(size_t ndx) {
-	const size_t ref = GetAsRef(ndx);
-	Allocator &alloc = m_array->GetAllocator();
-
-	bool is_subtable = true;
-	// Receiver will own pointer and has to delete it when done
-	return new TopLevelTable(alloc, ref, m_array, ndx, is_subtable);
-}

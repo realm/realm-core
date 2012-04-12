@@ -27,7 +27,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) {
 	m_array = new ArrayString(NULL, 0, alloc);
 }
 
-AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, Array* parent, size_t pndx, Allocator& alloc) {
+AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc) {
 	const ColumnDef type = GetTypeFromArray(ref, alloc);
 	if (type == COLUMN_NODE) {
 		m_array = new Array(ref, parent, pndx, alloc);
@@ -40,7 +40,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, Array* parent, size_t pnd
 	}
 }
 
-AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) {
+AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) {
 	const ColumnDef type = GetTypeFromArray(ref, alloc);
 	if (type == COLUMN_NODE) {
 		m_array = new Array(ref, parent, pndx, alloc);
@@ -71,7 +71,7 @@ void AdaptiveStringColumn::UpdateRef(size_t ref) {
 
 	if (IsNode()) m_array->UpdateRef(ref);
 	else {
-		Array* const parent = m_array->GetParent();
+		ArrayParent *const parent = m_array->GetParent();
 		const size_t pndx   = m_array->GetParentNdx();
 
 		// Replace the string array with int array for node
@@ -80,7 +80,7 @@ void AdaptiveStringColumn::UpdateRef(size_t ref) {
 		m_array = array;
 
 		// Update ref in parent
-		if (parent) parent->Set(pndx, ref);
+		if (parent) parent->update_child_ref(pndx, ref);
 	}
 }
 
@@ -201,15 +201,15 @@ bool AdaptiveStringColumn::LeafSet(size_t ndx, const char* value) {
 	newarray->Set(ndx, value, len);
 
 	// Update parent to point to new array
-	Array* const parent = oldarray->GetParent();
+	ArrayParent *const parent = oldarray->GetParent();
 	if (parent) {
 		const size_t pndx = oldarray->GetParentNdx();
-		parent->Set(pndx, newarray->GetRef());
+		parent->update_child_ref(pndx, newarray->GetRef());
 		newarray->SetParent(parent, pndx);
 	}
 
 	// Replace string array with long string array
-	m_array = (Array*)newarray;
+	m_array = newarray;
 	oldarray->Destroy();
 	delete oldarray;
 
@@ -237,15 +237,15 @@ bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value) {
 	newarray->Insert(ndx, value, len);
 
 	// Update parent to point to new array
-	Array* const parent = oldarray->GetParent();
+	ArrayParent *const parent = oldarray->GetParent();
 	if (parent) {
 		const size_t pndx = oldarray->GetParentNdx();
-		parent->Set(pndx, newarray->GetRef());
+		parent->update_child_ref(pndx, newarray->GetRef());
 		newarray->SetParent(parent, pndx);
 	}
 
 	// Replace string array with long string array
-	m_array = (Array*)newarray;
+	m_array = newarray;
 	oldarray->Destroy();
 	delete oldarray;
 
