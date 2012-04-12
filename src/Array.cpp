@@ -1732,22 +1732,22 @@ void Array::update_subtable_ref(size_t, size_t) {
 // Direct access methods
 
 // Pre-declarations
-bool get_header_isnode(const char* const header);
-unsigned int get_header_width(const char* const header);
-size_t get_header_len(const char* const header);
+bool get_header_isnode_direct(const uint8_t* const header);
+unsigned int get_header_width_direct(const uint8_t* const header);
+size_t get_header_len_direct(const uint8_t* const header);
 int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx);
-size_t FindPosDirect(const char* const header, const char* const data, const size_t width, const int64_t target);
-template<size_t width> size_t FindPosDirectImp(const char* const header, const char* const data, const int64_t target);
+size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target);
+template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target);
 
-bool get_header_isnode(const char* const header) {
+bool get_header_isnode_direct(const uint8_t* const header) {
 	return (header[0] & 0x80) != 0;
 }
 
-unsigned int get_header_width(const char* const header) {
+unsigned int get_header_width_direct(const uint8_t* const header) {
 	return (1 << (header[0] & 0x07)) >> 1;
 }
 
-size_t get_header_len(const char* const header) {
+size_t get_header_len_direct(const uint8_t* const header) {
 	return (header[1] << 16) + (header[2] << 8) + header[3];
 }
 
@@ -1800,7 +1800,7 @@ int64_t GetDirect(const char* const data, const unsigned int width, const size_t
 	}
 }
 
-size_t FindPosDirect(const char* const header, const char* const data, const size_t width, const int64_t target) {
+size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target) {
 	switch (width) {
 		case  0: return 0;
 		case  1: return FindPosDirectImp<1>(header, data, target);
@@ -1816,8 +1816,8 @@ size_t FindPosDirect(const char* const header, const char* const data, const siz
 	}
 }
 
-template<size_t width> size_t FindPosDirectImp(const char* const header, const char* const data, const int64_t target) {
-	const size_t len = get_header_len(header);
+template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target) {
+	const size_t len = get_header_len_direct(header);
 	
 	int low = -1;
 	int high = (int)len;
@@ -1840,7 +1840,7 @@ template<size_t width> size_t FindPosDirectImp(const char* const header, const c
 // Get value direct through column b-tree without instatiating any Arrays.
 int64_t Array::ColumnGet(size_t ndx) const {
 	const char* data   = (const char*)m_data;
-	const char* header = data - 8;
+	const uint8_t* header = (const uint8_t*)data - 8;
 	unsigned int width = m_width;
 	bool isNode = m_isNode;
 	
@@ -1851,9 +1851,9 @@ int64_t Array::ColumnGet(size_t ndx) const {
 			const size_t ref_refs    = GetDirect(data, width, 1);
 			
 			// Find the subnode containing the item
-			const char* const offsets_header = (const char*)m_alloc.Translate(ref_offsets);
-			const char* const offsets_data = offsets_header + 8;
-			const size_t offsets_width  = get_header_width(offsets_header);
+			const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+			const char* const offsets_data = (const char*)offsets_header + 8;
+			const size_t offsets_width  = get_header_width_direct(offsets_header);
 			const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
 			
 			// Calc index in subnode
@@ -1861,15 +1861,16 @@ int64_t Array::ColumnGet(size_t ndx) const {
 			ndx = ndx - offset; // local index
 			
 			// Get ref to array
-			const char* const refs_header = (const char*)m_alloc.Translate(ref_refs);
-			const unsigned int refs_width  = get_header_width(refs_header);
-			const size_t ref = GetDirect(refs_header + 8, refs_width, node_ndx);
+			const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+			const char* const refs_data = (const char*)refs_header + 8;
+			const unsigned int refs_width  = get_header_width_direct(refs_header);
+			const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
 			
 			// Set vars for next iteration
-			header = (const char*)m_alloc.Translate(ref);
-			data   = header + 8;
-			width  = get_header_width(header);
-			isNode = get_header_isnode(header);
+			header = (const uint8_t*)m_alloc.Translate(ref);
+			data   = (const char*)header + 8;
+			width  = get_header_width_direct(header);
+			isNode = get_header_isnode_direct(header);
 		}
 		else {
 			return GetDirect(data, width, ndx);
