@@ -40,7 +40,7 @@ debug: $(DEBUG_TARGET)
 cover: $(COVER_TARGET)
 .PHONY: cover
 
-CLEAN_EXTRA = clean/UnitTest++ clean/test-tightdb clean/test-stl
+CLEAN_EXTRA = clean/UnitTest++ clean/test-tightdb clean/test-sqlite3 clean/test-stl
 clean: clean/local $(CLEAN_EXTRA)
 clean/local:
 	$(RM) *.d *.o *.gcno *.gcda $(TARGET) $(DEBUG_TARGET) $(COVER_TARGET)
@@ -58,16 +58,19 @@ memtest: debug
 	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./tightdb-tests-debug
 .PHONY: test
 
-benchmark: test-tightdb test-stl
+benchmark: test-tightdb test-sqlite3 test-stl
 	@echo ""
 	@echo ".:: TightDB ::."
 	test-tightdb/test-tightdb
 	@echo ""
+	@echo ".:: SQLite 3 ::."
+	test-sqlite3/test-sqlite3
+	@echo ""
 	@echo ".:: STL Vector ::."
 	test-stl/test-stl
-test-tightdb test-stl: UnitTest++
+test-tightdb test-sqlite3 test-stl: UnitTest++
 	@$(MAKE) -C $@
-.PHONY: benchmark test-tightdb test-stl
+.PHONY: benchmark test-tightdb test-sqlite3 test-stl
 
 
 UnitTest++:

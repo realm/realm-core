@@ -24,6 +24,7 @@ tags
 /test/table_test.tbl
 /test/test-tightdb/test-tightdb
 /test/test-tightdb/test-tightdb-debug
+/test/test-sqlite3/test-sqlite3
 /test/test-stl/test-stl
 
 /test/benchmark/x64
