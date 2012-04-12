@@ -41,7 +41,7 @@ bool ColumnStringEnum::Set(size_t ndx, const char* value) {
 	assert(ndx < Column::Size());
 	assert(value);
 
-	const size_t key_ndx = GetKeyNdx(value);
+	const size_t key_ndx = GetKeyNdxOrAdd(value);
 	return Column::Set(ndx, key_ndx);
 }
 
@@ -49,7 +49,7 @@ bool ColumnStringEnum::Insert(size_t ndx, const char* value) {
 	assert(ndx <= Column::Size());
 	assert(value);
 
-	const size_t key_ndx = GetKeyNdx(value);
+	const size_t key_ndx = GetKeyNdxOrAdd(value);
 	return Column::Insert(ndx, key_ndx);
 }
 
@@ -92,10 +92,15 @@ size_t ColumnStringEnum::Find(const char* value, size_t start, size_t end) const
 	return Column::Find(key_ndx, start, end);
 }
 
-size_t ColumnStringEnum::GetKeyNdx(const char* value) {
+size_t ColumnStringEnum::GetKeyNdx(const char* value) const {
+	return m_keys.Find(value);
+}
+
+size_t ColumnStringEnum::GetKeyNdxOrAdd(const char* value) {
 	const size_t res = m_keys.Find(value);
 	if (res != (size_t)-1) return res;
 	else {
+		// Add key if it does not exist
 		const size_t pos = m_keys.Size();
 		m_keys.Add(value);
 		return pos;

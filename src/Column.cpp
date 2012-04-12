@@ -147,7 +147,8 @@ void Column::Clear() {
 }
 
 int64_t Column::Get(size_t ndx) const {
-	return TreeGet<int64_t, Column>(ndx);
+	return m_array->ColumnGet(ndx);
+	//return TreeGet<int64_t, Column>(ndx);
 }
 
 size_t Column::GetAsRef(size_t ndx) const {

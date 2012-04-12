@@ -1739,3 +1739,153 @@ MemStats Array::Stats() const {
 }
 
 #endif //_DEBUG
+
+
+// Direct access methods
+
+// Pre-declarations
+bool get_header_isnode_direct(const uint8_t* const header);
+unsigned int get_header_width_direct(const uint8_t* const header);
+size_t get_header_len_direct(const uint8_t* const header);
+int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx);
+size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target);
+template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target);
+
+bool get_header_isnode_direct(const uint8_t* const header) {
+	return (header[0] & 0x80) != 0;
+}
+
+unsigned int get_header_width_direct(const uint8_t* const header) {
+	return (1 << (header[0] & 0x07)) >> 1;
+}
+
+size_t get_header_len_direct(const uint8_t* const header) {
+	return (header[1] << 16) + (header[2] << 8) + header[3];
+}
+
+template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx);
+
+template<> int64_t GetDirect<0>(const char* const data, const size_t ndx) {
+	return 0;
+}
+template<> int64_t GetDirect<1>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx >> 3;
+	return (data[offset] >> (ndx & 7)) & 0x01;
+}
+template<> int64_t GetDirect<2>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx >> 2;
+	return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
+}
+template<> int64_t GetDirect<4>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx >> 1;
+	return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
+}
+template<> int64_t GetDirect<8>(const char* const data, const size_t ndx) {
+	return *((const signed char*)(data + ndx));
+}
+template<> int64_t GetDirect<16>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx * 2;
+	return *(const int16_t*)(data + offset);
+}
+template<> int64_t GetDirect<32>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx * 4;
+	return *(const int32_t*)(data + offset);
+}
+template<> int64_t GetDirect<64>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx * 8;
+	return *(const int64_t*)(data + offset);
+}
+
+int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx) {
+	switch (width) {
+		case  0: return GetDirect<0>(data, ndx);
+		case  1: return GetDirect<1>(data, ndx);
+		case  2: return GetDirect<2>(data, ndx);
+		case  4: return GetDirect<4>(data, ndx);
+		case  8: return GetDirect<8>(data, ndx);
+		case 16: return GetDirect<16>(data, ndx);
+		case 32: return GetDirect<32>(data, ndx);
+		case 64: return GetDirect<64>(data, ndx);
+		default:
+			assert(false);
+			return 0;
+	}
+}
+
+size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target) {
+	switch (width) {
+		case  0: return 0;
+		case  1: return FindPosDirectImp<1>(header, data, target);
+		case  2: return FindPosDirectImp<2>(header, data, target);
+		case  4: return FindPosDirectImp<4>(header, data, target);
+		case  8: return FindPosDirectImp<8>(header, data, target);
+		case 16: return FindPosDirectImp<16>(header, data, target);
+		case 32: return FindPosDirectImp<32>(header, data, target);
+		case 64: return FindPosDirectImp<64>(header, data, target);
+		default:
+			assert(false);
+			return 0;
+	}
+}
+
+template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target) {
+	const size_t len = get_header_len_direct(header);
+	
+	int low = -1;
+	int high = (int)len;
+	
+	// Binary search based on:
+	// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+	// Finds position of largest value SMALLER than the target (for lookups in
+	// nodes)
+	while (high - low > 1) {
+		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+		const int64_t v = GetDirect<width>(data, probe);
+		
+		if (v > target) high = (int)probe;
+		else            low = (int)probe;
+	}
+	if (high == (int)len) return (size_t)-1;
+	else return (size_t)high;
+}
+
+// Get value direct through column b-tree without instatiating any Arrays.
+int64_t Array::ColumnGet(size_t ndx) const {
+	const char* data   = (const char*)m_data;
+	const uint8_t* header = (const uint8_t*)data - 8;
+	unsigned int width = m_width;
+	bool isNode = m_isNode;
+	
+	while (1) {
+		if (isNode) {
+			// Get subnode table
+			const size_t ref_offsets = GetDirect(data, width, 0);
+			const size_t ref_refs    = GetDirect(data, width, 1);
+			
+			// Find the subnode containing the item
+			const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+			const char* const offsets_data = (const char*)offsets_header + 8;
+			const size_t offsets_width  = get_header_width_direct(offsets_header);
+			const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
+			
+			// Calc index in subnode
+			const size_t offset = node_ndx ? (size_t)GetDirect(offsets_data, offsets_width, node_ndx-1) : 0;
+			ndx = ndx - offset; // local index
+			
+			// Get ref to array
+			const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+			const char* const refs_data = (const char*)refs_header + 8;
+			const unsigned int refs_width  = get_header_width_direct(refs_header);
+			const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
+			
+			// Set vars for next iteration
+			header = (const uint8_t*)m_alloc.Translate(ref);
+			data   = (const char*)header + 8;
+			width  = get_header_width_direct(header);
+			isNode = get_header_isnode_direct(header);
+		}
+		else {
+			return GetDirect(data, width, ndx);
+		}
+	}
+}
