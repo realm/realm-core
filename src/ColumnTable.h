@@ -1,7 +1,6 @@
 #ifndef __TDB_COLUMN_TABLE__
 #define __TDB_COLUMN_TABLE__
 
-#include <map>
 #include "Column.h"
 #include "Table.h"
 
