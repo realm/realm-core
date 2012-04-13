@@ -716,3 +716,19 @@ TEST(Table_Mixed2) {
 	CHECK_EQUAL((time_t)1234, table[2].first.GetDate());
 	CHECK_EQUAL("test",       table[3].first.GetString());
 }
+
+
+TEST(Table_CastRef)
+{
+	TopLevelTable t;
+	{
+		TableRef t2 = t.GetTableRef();
+		TopLevelTableRef t3 = static_table_cast<TopLevelTable>(t2);
+		TopLevelTableRef t4 = dynamic_table_cast<TopLevelTable>(t2);
+	}
+	{
+		TableConstRef t2 = t.GetTableRef();
+		TopLevelTableConstRef t3 = static_table_cast<TopLevelTable const>(t2);
+		TopLevelTableConstRef t4 = dynamic_table_cast<TopLevelTable const>(t2);
+	}
+}

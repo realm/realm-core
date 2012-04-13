@@ -109,6 +109,9 @@ public:
 	Table(Allocator& alloc=GetDefaultAllocator());
 	virtual ~Table();
 
+	TableRef GetTableRef() { return TableRef(this); }
+	TableConstRef GetTableRef() const { return TableConstRef(this); }
+
 	// Column meta info
 	size_t GetColumnCount() const;
 	const char* GetColumnName(size_t ndx) const;
@@ -312,6 +315,9 @@ class TopLevelTable : public Table {
 public:
 	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
 	virtual ~TopLevelTable();
+
+	TopLevelTableRef GetTableRef() { return TopLevelTableRef(this); }
+	TopLevelTableConstRef GetTableRef() const { return TopLevelTableConstRef(this); }
 
 	void UpdateFromSpec(size_t ref_specSet);
 	size_t GetRef() const;
