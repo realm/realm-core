@@ -42,14 +42,16 @@ protected:
 		m_tables.Set(subtable_ndx, new_ref);
 	}
 
+	// Overriding method in Table::Parent
+	virtual void child_destroyed(std::size_t) {} // Ignore
+
+#ifdef _DEBUG
 	// Overriding method in ArrayParent
-	virtual size_t get_child_ref(size_t subtable_ndx) const
+	virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const
 	{
 		return m_tables.GetAsRef(subtable_ndx);
 	}
-
-	// Overriding method in Table::Parent
-	virtual void child_destroyed(std::size_t) {} // Ignore
+#endif
 
 private:
 	void Create();

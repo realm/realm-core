@@ -199,7 +199,7 @@ public:
 
 	// Optimizing
 	void Optimize();
-	
+
 	// Conversion
 	void to_json(std::ostream& out);
 
@@ -216,17 +216,7 @@ public:
 	const ColumnBase& GetColumnBase(size_t ndx) const;
 	ColumnType GetRealColumnType(size_t ndx) const;
 
-	class Parent: public ArrayParent
-	{
-	protected:
-		friend class Table;
-		friend class TopLevelTable;
-
-		/**
-		 * Must be called whenever a child Table is destroyed.
-		 */
-		virtual void child_destroyed(std::size_t child_ndx) = 0;
-	};
+	class Parent;
 
 protected:
 	friend class Group;
@@ -300,6 +290,20 @@ private:
 
 	ColumnBase& GetColumnBase(size_t ndx);
 	void InstantiateBeforeChange();
+};
+
+
+
+class Table::Parent: public ArrayParent
+{
+protected:
+	friend class Table;
+	friend class TopLevelTable;
+
+	/**
+	 * Must be called whenever a child Table is destroyed.
+	 */
+	virtual void child_destroyed(std::size_t child_ndx) = 0;
 };
 
 

@@ -1682,7 +1682,7 @@ void Array::Verify() const {
 	// Check that parent is set correctly
 	if (!m_parent) return;
 
-	const size_t ref_in_parent = m_parent->get_child_ref(m_parentNdx);
+	const size_t ref_in_parent = m_parent->get_child_ref_for_verify(m_parentNdx);
 	assert(ref_in_parent == m_ref);
 }
 

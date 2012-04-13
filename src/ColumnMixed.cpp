@@ -347,8 +347,10 @@ void ColumnMixed::Clear() {
 struct FakeParent: Table::Parent
 {
 	virtual void update_child_ref(size_t, size_t) {} // Ignore
-	virtual size_t get_child_ref(size_t) const { return 0; } // Ignore
 	virtual void child_destroyed(size_t) {} // Ignore
+#ifdef _DEBUG
+	virtual size_t get_child_ref_for_verify(size_t) const { return 0; }
+#endif
 };
 
 void ColumnMixed::RefsColumn::insert_table(size_t ndx)

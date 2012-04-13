@@ -87,7 +87,9 @@ protected:
 public: // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
 	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref) = 0;
 protected:
-	virtual size_t get_child_ref(size_t subtable_ndx) const = 0; // FIXME: Should be renamed to 'get_child_ref_for_verify' and only be defined in _DEBUG mode
+#ifdef _DEBUG
+	virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const = 0;
+#endif
 };
 
 
@@ -278,18 +280,14 @@ protected:
 	int64_t m_lbound;
 	int64_t m_ubound;
 
-	// Overriding method in ArrayParent
-	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
-	{
-		Set(subtable_ndx, new_ref);
-	}
-
-	// Overriding method in ArrayParent
-	virtual size_t get_child_ref(size_t subtable_ndx) const
-	{
-		return GetAsRef(subtable_ndx);
-	}
+	// Overriding methods in ArrayParent
+	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref);
+#ifdef _DEBUG
+	virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const;
+#endif
 };
+
+
 
 // Templates
 
@@ -361,5 +359,18 @@ inline void Array::update_ref_in_parent(size_t ref)
   if (!m_parent) return;
   m_parent->update_child_ref(m_parentNdx, ref);
 }
+
+
+inline void Array::update_child_ref(size_t subtable_ndx, size_t new_ref)
+{
+	Set(subtable_ndx, new_ref);
+}
+
+#ifdef _DEBUG
+inline size_t Array::get_child_ref_for_verify(size_t subtable_ndx) const
+{
+	return GetAsRef(subtable_ndx);
+}
+#endif // _DEBUG
 
 #endif //__TDB_ARRAY__
