@@ -369,9 +369,9 @@ void ColumnMixed::RefsColumn::set_table(size_t ndx)
 	table.SetParent(&fake_parent, 0);
 }
 
-Table *ColumnMixed::RefsColumn::get_subtable_ptr(size_t ndx)
+TopLevelTable *ColumnMixed::RefsColumn::get_subtable_ptr(size_t ndx)
 {
-	Table *subtable = m_subtable_map.find(ndx);
+	TopLevelTable *subtable = static_cast<TopLevelTable *>(m_subtable_map.find(ndx));
 	if (subtable) return subtable;
 
 	size_t const ref = GetAsRef(ndx);

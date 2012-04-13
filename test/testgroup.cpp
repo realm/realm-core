@@ -551,6 +551,142 @@ TEST(Group_Subtable) {
 }
 
 
+
+TEST(Group_MultiLevelSubtables)
+{
+	{
+		Group g;
+		TopLevelTable &table = g.GetTable("test");
+		{
+			Spec s = table.GetSpec();
+			s.AddColumn(COLUMN_TYPE_INT, "int");
+			{
+				Spec sub = s.AddColumnTable("tab");
+				sub.AddColumn(COLUMN_TYPE_INT, "int");
+				{
+					Spec subsub = sub.AddColumnTable("tab");
+					subsub.AddColumn(COLUMN_TYPE_INT, "int");
+				}
+			}
+			s.AddColumn(COLUMN_TYPE_MIXED, "mix");
+			table.UpdateFromSpec(s.GetRef());
+		}
+		table.AddRow();
+		{
+			TableRef a = table.GetTable(1, 0);
+			a->AddRow();
+			TableRef b = a->GetTable(1, 0);
+			b->AddRow();
+		}
+		{
+			table.SetMixed(2, 0, Mixed(COLUMN_TYPE_TABLE));
+			TopLevelTableRef a = table.GetTopLevelTable(2, 0);
+			{
+				Spec s = a->GetSpec();
+				s.AddColumn(COLUMN_TYPE_INT, "int");
+				s.AddColumn(COLUMN_TYPE_MIXED, "mix");
+				a->UpdateFromSpec(s.GetRef());
+			}
+			a->AddRow();
+			a->SetMixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
+			TopLevelTableRef b = a->GetTopLevelTable(1, 0);
+			{
+				Spec s = b->GetSpec();
+				s.AddColumn(COLUMN_TYPE_INT, "int");
+				b->UpdateFromSpec(s.GetRef());
+			}
+			b->AddRow();
+		}
+		g.Write("subtables.tdb");
+	}
+
+	// Non-mixed
+	{
+		Group g("subtables.tdb");
+		Table &table = g.GetTable("test");
+		// Get A as subtable
+		TableRef a = table.GetTable(1, 0);
+		// Get B as subtable from A
+		TableRef b = a->GetTable(1, 0);
+		// Modify B
+		b->Set(0, 0, 6661012);
+		// Modify A
+		a->Set(0, 0, 6661011);
+		// Modify top
+		table.Set(0, 0, 6661010);
+		// Get a second ref to A (compare)
+		CHECK_EQUAL(table.GetTable(1, 0), a);
+		CHECK_EQUAL(table.GetTable(1, 0)->Get(0,0), 6661011);
+		// get a second ref to B (compare)
+		CHECK_EQUAL(a->GetTable(1, 0), b);
+		CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661012);
+		g.Write("subtables2.tdb");
+	}
+	{
+		Group g("subtables2.tdb");
+		Table &table = g.GetTable("test");
+		// Get A as subtable
+		TableRef a = table.GetTable(1, 0);
+		// Get B as subtable from A
+		TableRef b = a->GetTable(1, 0);
+		// Drop reference to A
+		a = TableRef();
+		// Modify B
+		b->Set(0, 0, 6661013);
+		// Get a third ref to A (compare)
+		a = table.GetTable(1, 0);
+		CHECK_EQUAL(table.GetTable(1, 0)->Get(0,0), 6661011);
+		// Get third ref to B and verify last mod
+		b = a->GetTable(1, 0);
+		CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661013);
+		g.Write("subtables3.tdb");
+	}
+
+	// Mixed
+	{
+		Group g("subtables3.tdb");
+		Table &table = g.GetTable("test");
+		// Get A as subtable
+		TableRef a = table.GetTable(2, 0);
+		// Get B as subtable from A
+		TableRef b = a->GetTable(1, 0);
+		// Modify B
+		b->Set(0, 0, 6661012);
+		// Modify A
+		a->Set(0, 0, 6661011);
+		// Modify top
+		table.Set(0, 0, 6661010);
+		// Get a second ref to A (compare)
+		CHECK_EQUAL(table.GetTable(2, 0), a);
+		CHECK_EQUAL(table.GetTable(2, 0)->Get(0,0), 6661011);
+		// get a second ref to B (compare)
+		CHECK_EQUAL(a->GetTable(1, 0), b);
+		CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661012);
+		g.Write("subtables4.tdb");
+	}
+	{
+		Group g("subtables4.tdb");
+		Table &table = g.GetTable("test");
+		// Get A as subtable
+		TableRef a = table.GetTable(2, 0);
+		// Get B as subtable from A
+		TableRef b = a->GetTable(1, 0);
+		// Drop reference to A
+		a = TableRef();
+		// Modify B
+		b->Set(0, 0, 6661013);
+		// Get a third ref to A (compare)
+		a = table.GetTable(2, 0);
+		CHECK_EQUAL(table.GetTable(2, 0)->Get(0,0), 6661011);
+		// Get third ref to B and verify last mod
+		b = a->GetTable(1, 0);
+		CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661013);
+		g.Write("subtables5.tdb");
+	}
+}
+
+
+
 #ifdef _DEBUG
 #ifdef TIGHTDB_TO_DOT
 

@@ -54,7 +54,7 @@ public:
 	 * The returned table pointer must always end up being wrapped in
 	 * an instance of BasicTableRef.
 	 */
-	Table *get_subtable_ptr(size_t ndx) const;
+	TopLevelTable *get_subtable_ptr(size_t ndx) const;
 
 	void SetInt(size_t ndx, int64_t value);
 	void SetBool(size_t ndx, bool value);
@@ -111,7 +111,7 @@ public:
 		ColumnSubtableParent(ref, parent, pndx, alloc, tab) {}
 	void insert_table(size_t ndx);
 	void set_table(size_t ndx);
-	Table *get_subtable_ptr(size_t ndx);
+	TopLevelTable *get_subtable_ptr(size_t ndx);
 #ifdef _DEBUG
 	void verify(size_t ndx) const;
 	void to_dot(size_t ndx, std::ostream &) const;
@@ -149,7 +149,7 @@ inline void ColumnMixed::SetTable(size_t ndx)
 	m_refs->set_table(ndx);
 }
 
-inline Table *ColumnMixed::get_subtable_ptr(size_t ndx) const
+inline TopLevelTable *ColumnMixed::get_subtable_ptr(size_t ndx) const
 {
 	assert(ndx < m_types->Size());
 	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);

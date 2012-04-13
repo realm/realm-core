@@ -18,9 +18,8 @@ tags
 /test/tightdb-tests
 /test/tightdb-tests-debug
 /test/tightdb-tests-cover
-/test/subtables.tdb
+/test/subtables*.tdb
 /test/subtables.tightdb
-/test/subtables2.tdb
 /test/table_test.tbl
 /test/test-tightdb/test-tightdb
 /test/test-tightdb/test-tightdb-debug

@@ -32,7 +32,7 @@ public:
 	void Print() const;
 	MemStats Stats();
 	void EnableMemDiagnostics(bool enable=true) {m_alloc.EnableDebug(enable);}
-	void ToDot(std::ostream& out);
+	void ToDot(std::ostream& out = std::cerr);
 #endif //_DEBUG
 
 protected:

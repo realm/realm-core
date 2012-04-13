@@ -16,6 +16,7 @@ class TableView;
 class Group;
 class ColumnTable;
 class ColumnMixed;
+class Table;
 class TopLevelTable;
 
 
@@ -96,9 +97,12 @@ private:
 
 
 
-class Table;
 typedef BasicTableRef<Table> TableRef;
 typedef BasicTableRef<Table const> TableConstRef;
+
+typedef BasicTableRef<TopLevelTable> TopLevelTableRef;
+typedef BasicTableRef<TopLevelTable const> TopLevelTableConstRef;
+
 
 class Table {
 public:
@@ -152,6 +156,8 @@ public:
 	// Sub-tables
 	TableRef GetTable(size_t column_id, size_t ndx);
 	TableConstRef GetTable(size_t column_id, size_t ndx) const;
+	TopLevelTableRef GetTopLevelTable(size_t column_id, size_t ndx); // Must be a mixed column
+	TopLevelTableConstRef GetTopLevelTable(size_t column_id, size_t ndx) const; // Must be a mixed column
 	size_t GetTableSize(size_t column_id, size_t ndx) const;
 	void   InsertTable(size_t column_id, size_t ndx);
 	void   ClearTable(size_t column_id, size_t ndx);

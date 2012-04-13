@@ -749,7 +749,6 @@ TableRef Table::GetTable(size_t column_id, size_t ndx) {
 
 TableConstRef Table::GetTable(size_t column_id, size_t ndx) const {
 	assert(column_id < GetColumnCount());
-	assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
 	assert(ndx < m_size);
 
 	const ColumnType type = GetRealColumnType(column_id);
@@ -764,6 +763,36 @@ TableConstRef Table::GetTable(size_t column_id, size_t ndx) const {
 	else {
 		assert(false);
 		return TableConstRef();
+	}
+}
+
+TopLevelTableRef Table::GetTopLevelTable(size_t column_id, size_t ndx) {
+	assert(column_id < GetColumnCount());
+	assert(ndx < m_size);
+
+	const ColumnType type = GetRealColumnType(column_id);
+	if (type == COLUMN_TYPE_MIXED) {
+		ColumnMixed &subtables = GetColumnMixed(column_id);
+		return TopLevelTableRef(subtables.get_subtable_ptr(ndx));
+	}
+	else {
+		assert(false);
+		return TopLevelTableRef();
+	}
+}
+
+TopLevelTableConstRef Table::GetTopLevelTable(size_t column_id, size_t ndx) const {
+	assert(column_id < GetColumnCount());
+	assert(ndx < m_size);
+
+	const ColumnType type = GetRealColumnType(column_id);
+	if (type == COLUMN_TYPE_MIXED) {
+		ColumnMixed const &subtables = GetColumnMixed(column_id);
+		return TopLevelTableConstRef(subtables.get_subtable_ptr(ndx));
+	}
+	else {
+		assert(false);
+		return TopLevelTableConstRef();
 	}
 }
 
