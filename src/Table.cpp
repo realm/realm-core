@@ -3,11 +3,15 @@
 #include <assert.h>
 #include "Index.h"
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include "AllocSlab.h"
 #include "ColumnStringEnum.h"
 #include "ColumnTable.h"
 #include "ColumnMixed.h"
+
+using namespace std;
+
 
 const ColumnType Accessor::type       = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type   = COLUMN_TYPE_BOOL;
@@ -1526,60 +1530,60 @@ void Spec::ToDot(std::ostream& out, const char*) const {
 void Table::Print() const {
 
 	// Table header
-	printf("Table: len(%zu)\n    ", m_size);
+	cout << "Table: len(" << m_size << ")\n    ";
 	const size_t column_count = GetColumnCount();
 	for (size_t i = 0; i < column_count; ++i) {
-		printf("%-10s ", m_columnNames.Get(i));
+		cout << left << setw(10) << m_columnNames.Get(i) << right << " ";
 	}
 
 	// Types
-	printf("\n    ");
+	cout << "\n    ";
 	for (size_t i = 0; i < column_count; ++i) {
 		const ColumnType type = GetRealColumnType(i);
 		switch (type) {
 		case COLUMN_TYPE_INT:
-			printf("Int        "); break;
+			cout << "Int        "; break;
 		case COLUMN_TYPE_BOOL:
-			printf("Bool       "); break;
+			cout << "Bool       "; break;
 		case COLUMN_TYPE_STRING:
-			printf("String     "); break;
+			cout << "String     "; break;
 		default:
 			assert(false);
 		}
 	}
-	printf("\n");
+	cout << "\n";
 
 	// Columns
 	for (size_t i = 0; i < m_size; ++i) {
-		printf("%3zu ", i);
+		cout << setw(3) << i;
 		for (size_t n = 0; n < column_count; ++n) {
 			const ColumnType type = GetRealColumnType(n);
 			switch (type) {
 			case COLUMN_TYPE_INT:
 				{
 					const Column& column = GetColumn(n);
-					printf("%10lld ", static_cast<long long>(column.Get(i)));
+					cout << setw(10) << column.Get(i) << " ";
 				}
 				break;
 			case COLUMN_TYPE_BOOL:
 				{
 					const Column& column = GetColumn(n);
-					printf(column.Get(i) == 0 ? "     false " : "      true ");
+					cout << (column.Get(i) == 0 ? "     false " : "      true ");
 				}
 				break;
 			case COLUMN_TYPE_STRING:
 				{
 					const AdaptiveStringColumn& column = GetColumnString(n);
-					printf("%10s ", column.Get(i));
+					cout << setw(10) << column.Get(i) << " ";
 				}
 				break;
 			default:
 				assert(false);
 			}
 		}
-		printf("\n");
+		cout << "\n";
 	}
-	printf("\n");
+	cout << "\n";
 }
 
 MemStats Table::Stats() const {

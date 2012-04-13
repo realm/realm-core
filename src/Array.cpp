@@ -1,8 +1,10 @@
-#include "Array.h"
 #include <cassert>
+#include <vector>
+#include <iostream>
+#include <iomanip>
+#include "Array.h"
 #include "Column.h"
 #include "utilities.h"
-#include <vector>
 #include "query/QueryEngine.h"
 #ifdef _MSC_VER
 	#include "win32/types.h"
@@ -10,6 +12,8 @@
 #endif
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
+
+using namespace std;
 
 // Pre-declare local functions
 size_t CalcByteLen(size_t count, size_t width);
@@ -1668,12 +1672,12 @@ bool Array::Compare(const Array& c) const {
 }
 
 void Array::Print() const {
-	printf("%zx: (%zu) ", GetRef(), Size());
+	cout << hex << GetRef() << dec << ": (" << Size() << ") ";
 	for (size_t i = 0; i < Size(); ++i) {
-		if (i) printf(", ");
-		printf("%d", (int)Get(i));
+		if (i) cout << ", ";
+		cout << Get(i);
 	}
-	printf("\n");
+	cout << "\n";
 }
 
 void Array::Verify() const {
@@ -1765,7 +1769,7 @@ size_t get_header_len_direct(const uint8_t* const header) {
 
 template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx);
 
-template<> int64_t GetDirect<0>(const char* const data, const size_t ndx) {
+template<> int64_t GetDirect<0>(const char* const, const size_t) {
 	return 0;
 }
 template<> int64_t GetDirect<1>(const char* const data, const size_t ndx) {

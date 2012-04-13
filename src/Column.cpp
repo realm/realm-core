@@ -3,6 +3,8 @@
 #include <cstring>
 #include <cstdio> // debug output
 #include <climits> // size_t
+#include <iostream>
+#include <iomanip>
 #include "query/QueryEngine.h"
 #ifdef _MSC_VER
 #include "win32/stdint.h"
@@ -12,6 +14,9 @@
 
 #include "Column.h"
 #include "Index.h"
+
+using namespace std;
+
 
 // Pre-declare local functions
 void SetRefSize(void* ref, size_t len);
@@ -668,13 +673,13 @@ bool Column::Compare(const Column& c) const {
 
 void Column::Print() const {
 	if (IsNode()) {
-		printf("Node: %zx\n", m_array->GetRef());
+		cout << "Node: " << hex << m_array->GetRef() << dec << "\n";
 		
 		const Array offsets = NodeGetOffsets();
 		const Array refs = NodeGetRefs();
 
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			printf(" %zu: %d %x\n", i, (int)offsets.Get(i), (int)refs.Get(i));
+			cout << " " << i << ": " << offsets.Get(i) << " " << hex << refs.Get(i) << dec <<"\n";
 		}
 		for (size_t i = 0; i < refs.Size(); ++i) {
 			const Column col((size_t)refs.Get(i));

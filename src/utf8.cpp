@@ -109,6 +109,7 @@ bool utf8case_single(const char *source, char *destination, int upper) {
 	return true;
 #else
 	memcpy(destination, source, sequence_length(source));
+	(void)upper;
 	return true;
 #endif
 }

@@ -12,12 +12,13 @@
 #include <sys/mman.h>
 #endif
 
+#include <cassert>
+#include <iostream>
 #include "AllocSlab.h"
-#include <assert.h>
 #include "Array.h"
 
 #ifdef _DEBUG
-#include <stdio.h>
+#include <cstdio>
 #endif //_DEBUG
 
 Allocator& GetDefaultAllocator() {
@@ -360,7 +361,7 @@ void SlabAlloc::Print() const {
 		free += TO_REF(m_freeSpace[i].size);
 	}
 
-	printf("Base: %zu Allocated: %zu\n", m_shared ? m_baseline : 0,  allocated - free);
+	cout << "Base: " << (m_shared ? m_baseline : 0) << " Allocated: " << (allocated - free) << "\n";
 }
 
 

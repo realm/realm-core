@@ -2,9 +2,13 @@
 #include <cassert>
 #include <cstring>
 #include <cstdio> // debug
+#include <iostream>
 #include "utilities.h"
 #include "Column.h"
 #include "ArrayString.h"
+
+using namespace std;
+
 
 // Pre-declare local functions
 size_t round_up(size_t len);
@@ -285,16 +289,17 @@ void ArrayString::StringStats() const {
 	const size_t zeroes = size - total;
 	const size_t zavg = zeroes / m_len;
 
-	printf("Count: %zu\n", m_len);
-	printf("Width: %zu\n", m_width);
-	printf("Total: %zu\n", size);
-	printf("Capacity: %zu\n\n", m_capacity);
-	printf("Bytes string: %zu\n", total);
-	printf("     longest: %zu\n", longest);
-	printf("Bytes zeroes: %zu\n", zeroes);
-	printf("         avg: %zu\n", zavg);
+	cout << "Count: " << m_len << "\n";
+	cout << "Width: " << m_width << "\n";
+	cout << "Total: " << size << "\n";
+	cout << "Capacity: " << m_capacity << "\n\n";
+	cout << "Bytes string: " << total << "\n";
+	cout << "     longest: " << longest << "\n";
+	cout << "Bytes zeroes: " << zeroes << "\n";
+	cout << "         avg: " << zavg << "\n";
 }
 
+/*
 void ArrayString::ToDot(FILE* f) const {
 	const size_t ref = GetRef();
 
@@ -308,6 +313,7 @@ void ArrayString::ToDot(FILE* f) const {
 	
 	fprintf(f, "\"];\n");
 }
+*/
 
 void ArrayString::ToDot(std::ostream& out, const char* title) const {
 	const size_t ref = GetRef();
