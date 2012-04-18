@@ -322,7 +322,7 @@ TEST(Group_Serialize_All) {
 
 
 TEST(Group_Subtable) {
-	int n = 150;
+	int n = 1;
 
 	Group g;
 	TopLevelTable &table = g.GetTable("test");
@@ -337,16 +337,16 @@ TEST(Group_Subtable) {
 		table.AddRow();
 		table.Set(0, i, 100+i);
 		if (i%2 == 0) {
-			Table st = table.GetTable(1, i);
-			st.AddRow();
-			st.Set(0, 0, 200+i);
+			TableRef st = table.GetTable(1, i);
+			st->AddRow();
+			st->Set(0, 0, 200+i);
 		}
 		if (i%3 == 1) {
 			table.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
-			TopLevelTable st = table.GetMixedTable(2, i);
-			st.RegisterColumn(COLUMN_TYPE_INT, "banach");
-			st.AddRow();
-			st.Set(0, 0, 700+i);
+			TableRef st = table.GetTable(2, i);
+			st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+			st->AddRow();
+			st->Set(0, 0, 700+i);
 		}
 	}
 
@@ -355,57 +355,57 @@ TEST(Group_Subtable) {
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table.Get(0, i), 100+i);
 		{
-			Table st = table.GetTable(1, i);
-			CHECK_EQUAL(st.GetSize(), i%2 == 0 ? 1 : 0);
-			if (i%2 == 0) CHECK_EQUAL(st.Get(0,0), 200+i);
+			TableRef st = table.GetTable(1, i);
+			CHECK_EQUAL(st->GetSize(), i%2 == 0 ? 1 : 0);
+			if (i%2 == 0) CHECK_EQUAL(st->Get(0,0), 200+i);
 			if (i%3 == 0) {
-				st.AddRow();
-				st.Set(0, st.GetSize()-1, 300+i);
+				st->AddRow();
+				st->Set(0, st->GetSize()-1, 300+i);
 			}
 		}
 		CHECK_EQUAL(table.GetMixedType(2,i), i%3 == 1 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
 		if (i%3 == 1) {
-			TopLevelTable st = table.GetMixedTable(2, i);
-			CHECK_EQUAL(st.GetSize(), 1);
-			CHECK_EQUAL(st.Get(0,0), 700+i);
+			TableRef st = table.GetTable(2, i);
+			CHECK_EQUAL(st->GetSize(), 1);
+			CHECK_EQUAL(st->Get(0,0), 700+i);
 		}
 		if (i%8 == 3) {
 			if (i%3 != 1) table.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
-			TopLevelTable st = table.GetMixedTable(2, i);
-			if (i%3 != 1) st.RegisterColumn(COLUMN_TYPE_INT, "banach");
-			st.AddRow();
-			st.Set(0, st.GetSize()-1, 800+i);
+			TableRef st = table.GetTable(2, i);
+			if (i%3 != 1) st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+			st->AddRow();
+			st->Set(0, st->GetSize()-1, 800+i);
 		}
 	}
 
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table.Get(0, i), 100+i);
 		{
-			Table st = table.GetTable(1, i);
+			TableRef st = table.GetTable(1, i);
 			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%2 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				CHECK_EQUAL(st->Get(0, idx), 200+i);
 				++idx;
 			}
 			if (i%3 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				CHECK_EQUAL(st->Get(0, idx), 300+i);
 				++idx;
 			}
 		}
 		CHECK_EQUAL(table.GetMixedType(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
 		if (i%3 == 1 || i%8 == 3) {
-			TopLevelTable st = table.GetMixedTable(2, i);
+			TableRef st = table.GetTable(2, i);
 			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%3 == 1) {
-				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				CHECK_EQUAL(st->Get(0, idx), 700+i);
 				++idx;
 			}
 			if (i%8 == 3) {
-				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				CHECK_EQUAL(st->Get(0, idx), 800+i);
 				++idx;
 			}
 		}
@@ -420,83 +420,83 @@ TEST(Group_Subtable) {
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table2.Get(0, i), 100+i);
 		{
-			Table st = table2.GetTable(1, i);
+			TableRef st = table2.GetTable(1, i);
 			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%2 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				CHECK_EQUAL(st->Get(0, idx), 200+i);
 				++idx;
 			}
 			if (i%3 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				CHECK_EQUAL(st->Get(0, idx), 300+i);
 				++idx;
 			}
 			if (i%5 == 0) {
-				st.AddRow();
-				st.Set(0, st.GetSize()-1, 400+i);
+				st->AddRow();
+				st->Set(0, st->GetSize()-1, 400+i);
 			}
 		}
 		CHECK_EQUAL(table2.GetMixedType(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
 		if (i%3 == 1 || i%8 == 3) {
-			TopLevelTable st = table2.GetMixedTable(2, i);
+			TableRef st = table2.GetTable(2, i);
 			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%3 == 1) {
-				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				CHECK_EQUAL(st->Get(0, idx), 700+i);
 				++idx;
 			}
 			if (i%8 == 3) {
-				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				CHECK_EQUAL(st->Get(0, idx), 800+i);
 				++idx;
 			}
 		}
 		if (i%7 == 4) {
 			if (i%3 != 1 && i%8 != 3) table2.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
-			TopLevelTable st = table2.GetMixedTable(2, i);
-			if (i%3 != 1 && i%8 != 3) st.RegisterColumn(COLUMN_TYPE_INT, "banach");
-			st.AddRow();
-			st.Set(0, st.GetSize()-1, 900+i);
+			TableRef st = table2.GetTable(2, i);
+			if (i%3 != 1 && i%8 != 3) st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+			st->AddRow();
+			st->Set(0, st->GetSize()-1, 900+i);
 		}
 	}
 
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table2.Get(0, i), 100+i);
 		{
-			Table st = table2.GetTable(1, i);
+			TableRef st = table2.GetTable(1, i);
 			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%2 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				CHECK_EQUAL(st->Get(0, idx), 200+i);
 				++idx;
 			}
 			if (i%3 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				CHECK_EQUAL(st->Get(0, idx), 300+i);
 				++idx;
 			}
 			if (i%5 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 400+i);
+				CHECK_EQUAL(st->Get(0, idx), 400+i);
 				++idx;
 			}
 		}
 		CHECK_EQUAL(table2.GetMixedType(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
 		if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
-			TopLevelTable st = table2.GetMixedTable(2, i);
+			TableRef st = table2.GetTable(2, i);
 			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%3 == 1) {
-				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				CHECK_EQUAL(st->Get(0, idx), 700+i);
 				++idx;
 			}
 			if (i%8 == 3) {
-				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				CHECK_EQUAL(st->Get(0, idx), 800+i);
 				++idx;
 			}
 			if (i%7 == 4) {
-				CHECK_EQUAL(st.Get(0, idx), 900+i);
+				CHECK_EQUAL(st->Get(0, idx), 900+i);
 				++idx;
 			}
 		}
@@ -511,44 +511,180 @@ TEST(Group_Subtable) {
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table3.Get(0, i), 100+i);
 		{
-			Table st = table3.GetTable(1, i);
+			TableRef st = table3.GetTable(1, i);
 			size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%2 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 200+i);
+				CHECK_EQUAL(st->Get(0, idx), 200+i);
 				++idx;
 			}
 			if (i%3 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 300+i);
+				CHECK_EQUAL(st->Get(0, idx), 300+i);
 				++idx;
 			}
 			if (i%5 == 0) {
-				CHECK_EQUAL(st.Get(0, idx), 400+i);
+				CHECK_EQUAL(st->Get(0, idx), 400+i);
 				++idx;
 			}
 		}
 		CHECK_EQUAL(table3.GetMixedType(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
 		if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
-			TopLevelTable st = table3.GetMixedTable(2, i);
+			TableRef st = table3.GetTable(2, i);
 			size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
-			CHECK_EQUAL(st.GetSize(), expected_size);
+			CHECK_EQUAL(st->GetSize(), expected_size);
 			size_t idx = 0;
 			if (i%3 == 1) {
-				CHECK_EQUAL(st.Get(0, idx), 700+i);
+				CHECK_EQUAL(st->Get(0, idx), 700+i);
 				++idx;
 			}
 			if (i%8 == 3) {
-				CHECK_EQUAL(st.Get(0, idx), 800+i);
+				CHECK_EQUAL(st->Get(0, idx), 800+i);
 				++idx;
 			}
 			if (i%7 == 4) {
-				CHECK_EQUAL(st.Get(0, idx), 900+i);
+				CHECK_EQUAL(st->Get(0, idx), 900+i);
 				++idx;
 			}
 		}
 	}
 }
+
+
+
+TEST(Group_MultiLevelSubtables)
+{
+	{
+		Group g;
+		TopLevelTable &table = g.GetTable("test");
+		{
+			Spec s = table.GetSpec();
+			s.AddColumn(COLUMN_TYPE_INT, "int");
+			{
+				Spec sub = s.AddColumnTable("tab");
+				sub.AddColumn(COLUMN_TYPE_INT, "int");
+				{
+					Spec subsub = sub.AddColumnTable("tab");
+					subsub.AddColumn(COLUMN_TYPE_INT, "int");
+				}
+			}
+			s.AddColumn(COLUMN_TYPE_MIXED, "mix");
+			table.UpdateFromSpec(s.GetRef());
+		}
+		table.AddRow();
+		{
+			TableRef a = table.GetTable(1, 0);
+			a->AddRow();
+			TableRef b = a->GetTable(1, 0);
+			b->AddRow();
+		}
+		{
+			table.SetMixed(2, 0, Mixed(COLUMN_TYPE_TABLE));
+			TopLevelTableRef a = table.GetTopLevelTable(2, 0);
+			{
+				Spec s = a->GetSpec();
+				s.AddColumn(COLUMN_TYPE_INT, "int");
+				s.AddColumn(COLUMN_TYPE_MIXED, "mix");
+				a->UpdateFromSpec(s.GetRef());
+			}
+			a->AddRow();
+			a->SetMixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
+			TopLevelTableRef b = a->GetTopLevelTable(1, 0);
+			{
+				Spec s = b->GetSpec();
+				s.AddColumn(COLUMN_TYPE_INT, "int");
+				b->UpdateFromSpec(s.GetRef());
+			}
+			b->AddRow();
+		}
+		g.Write("subtables.tdb");
+	}
+
+	// Non-mixed
+	{
+		Group g("subtables.tdb");
+		Table &table = g.GetTable("test");
+		// Get A as subtable
+		TableRef a = table.GetTable(1, 0);
+		// Get B as subtable from A
+		TableRef b = a->GetTable(1, 0);
+		// Modify B
+		b->Set(0, 0, 6661012);
+		// Modify A
+		a->Set(0, 0, 6661011);
+		// Modify top
+		table.Set(0, 0, 6661010);
+		// Get a second ref to A (compare)
+		CHECK_EQUAL(table.GetTable(1, 0), a);
+		CHECK_EQUAL(table.GetTable(1, 0)->Get(0,0), 6661011);
+		// get a second ref to B (compare)
+		CHECK_EQUAL(a->GetTable(1, 0), b);
+		CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661012);
+		g.Write("subtables2.tdb");
+	}
+	{
+		Group g("subtables2.tdb");
+		Table &table = g.GetTable("test");
+		// Get A as subtable
+		TableRef a = table.GetTable(1, 0);
+		// Get B as subtable from A
+		TableRef b = a->GetTable(1, 0);
+		// Drop reference to A
+		a = TableRef();
+		// Modify B
+		b->Set(0, 0, 6661013);
+		// Get a third ref to A (compare)
+		a = table.GetTable(1, 0);
+		CHECK_EQUAL(table.GetTable(1, 0)->Get(0,0), 6661011);
+		// Get third ref to B and verify last mod
+		b = a->GetTable(1, 0);
+		CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661013);
+		g.Write("subtables3.tdb");
+	}
+
+	// Mixed
+	{
+		Group g("subtables3.tdb");
+		Table &table = g.GetTable("test");
+		// Get A as subtable
+		TableRef a = table.GetTable(2, 0);
+		// Get B as subtable from A
+		TableRef b = a->GetTable(1, 0);
+		// Modify B
+		b->Set(0, 0, 6661012);
+		// Modify A
+		a->Set(0, 0, 6661011);
+		// Modify top
+		table.Set(0, 0, 6661010);
+		// Get a second ref to A (compare)
+		CHECK_EQUAL(table.GetTable(2, 0), a);
+		CHECK_EQUAL(table.GetTable(2, 0)->Get(0,0), 6661011);
+		// get a second ref to B (compare)
+		CHECK_EQUAL(a->GetTable(1, 0), b);
+		CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661012);
+		g.Write("subtables4.tdb");
+	}
+	{
+		Group g("subtables4.tdb");
+		Table &table = g.GetTable("test");
+		// Get A as subtable
+		TableRef a = table.GetTable(2, 0);
+		// Get B as subtable from A
+		TableRef b = a->GetTable(1, 0);
+		// Drop reference to A
+		a = TableRef();
+		// Modify B
+		b->Set(0, 0, 6661013);
+		// Get a third ref to A (compare)
+		a = table.GetTable(2, 0);
+		CHECK_EQUAL(table.GetTable(2, 0)->Get(0,0), 6661011);
+		// Get third ref to B and verify last mod
+		b = a->GetTable(1, 0);
+		CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661013);
+		g.Write("subtables5.tdb");
+	}
+}
+
 
 
 #ifdef _DEBUG

@@ -5,8 +5,8 @@
 
 class ArrayString : public Array {
 public:
-	ArrayString(Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	ArrayString(ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	ArrayString(Allocator& alloc);
 	~ArrayString();
 
@@ -25,7 +25,7 @@ public:
 #ifdef _DEBUG
 	bool Compare(const ArrayString& c) const;
 	void StringStats() const;
-	void ToDot(FILE* f) const;
+	//void ToDot(FILE* f) const;
 	void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 

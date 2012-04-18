@@ -3,21 +3,21 @@
 #include <assert.h>
 #include "win32/types.h"
 
-ArrayBinary::ArrayBinary(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_HASREFS, parent, pndx, alloc), m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc) {
+ArrayBinary::ArrayBinary(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_HASREFS, parent, pndx, alloc), m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc) {
 	// Add subarrays for long string
 	Array::Add(m_offsets.GetRef());
 	Array::Add(m_blob.GetRef());
-	m_offsets.SetParent((Array*)this, 0);
-	m_blob.SetParent((Array*)this, 1);
+	m_offsets.SetParent(this, 0);
+	m_blob.SetParent(this, 1);
 }
 
-ArrayBinary::ArrayBinary(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc), m_offsets(Array::GetAsRef(0), (Array*)NULL, 0, alloc), m_blob(Array::GetAsRef(1), (Array*)NULL, 0, alloc) {
+ArrayBinary::ArrayBinary(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc), m_offsets(Array::GetAsRef(0), static_cast<ArrayParent *>(NULL), 0, alloc), m_blob(Array::GetAsRef(1), static_cast<ArrayParent *>(NULL), 0, alloc) {
 	assert(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
 	assert(Array::Size() == 2);
 	assert(m_blob.Size() ==(size_t)(m_offsets.IsEmpty() ? 0 : m_offsets.Back()));
 
-	m_offsets.SetParent((Array*)this, 0);
-	m_blob.SetParent((Array*)this, 1);
+	m_offsets.SetParent(this, 0);
+	m_blob.SetParent(this, 1);
 }
 
 // Creates new array (but invalid, call UpdateRef to init)
@@ -94,7 +94,7 @@ void ArrayBinary::Delete(size_t ndx) {
 void ArrayBinary::Resize(size_t ndx) {
 	assert(ndx < m_offsets.Size());
 	
-	const size_t len = ndx ? m_offsets.Get(ndx-1) : 0;
+	const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
 	
 	m_offsets.Resize(ndx);
 	m_blob.Resize(len);

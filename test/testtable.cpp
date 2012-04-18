@@ -1,3 +1,4 @@
+#include <sstream>
 #include "tightdb.h"
 #include <UnitTest++.h>
 
@@ -210,22 +211,19 @@ TEST(Table_Delete_All_Types) {
 		
 		// Add subtable to mixed column
 		if (i % 4 == 3) {
-			TopLevelTable subtable = table.GetMixedTable(7, i);
-			Spec s = subtable.GetSpec();
-			s.AddColumn(COLUMN_TYPE_INT,    "first");
-			s.AddColumn(COLUMN_TYPE_STRING, "second");
-			subtable.UpdateFromSpec(s.GetRef());
-			
-			subtable.InsertInt(0, 0, 42);
-			subtable.InsertString(1, 0, "meaning");
-			subtable.InsertDone();
+			TableRef subtable = table.GetTable(7, i);
+			subtable->RegisterColumn(COLUMN_TYPE_INT,    "first");
+			subtable->RegisterColumn(COLUMN_TYPE_STRING, "second");
+			subtable->InsertInt(0, 0, 42);
+			subtable->InsertString(1, 0, "meaning");
+			subtable->InsertDone();
 		}
 		
 		// Add sub-tables to table column
-		Table subtable = table.GetTable(8, i);
-		subtable.InsertInt(0, 0, 42);
-		subtable.InsertString(1, 0, "meaning");
-		subtable.InsertDone();
+		TableRef subtable = table.GetTable(8, i);
+		subtable->InsertInt(0, 0, 42);
+		subtable->InsertString(1, 0, "meaning");
+		subtable->InsertDone();
 	}
 	
 	// We also want a ColumnStringEnum
@@ -539,25 +537,27 @@ TEST(Table_Spec) {
 
 	// Get the sub-table
 	{
-		Table subtable = table.GetTable(2, 0);
-		CHECK(subtable.IsEmpty());
+		TableRef subtable = table.GetTable(2, 0);
+		CHECK(subtable->IsEmpty());
 
-		subtable.InsertInt(0, 0, 42);
-		subtable.InsertString(1, 0, "test");
-		subtable.InsertDone();
+		subtable->InsertInt(0, 0, 42);
+		subtable->InsertString(1, 0, "test");
+		subtable->InsertDone();
 
-		CHECK_EQUAL(42,     subtable.Get(0, 0));
-		CHECK_EQUAL("test", subtable.GetString(1, 0));
+		CHECK_EQUAL(42,     subtable->Get(0, 0));
+		CHECK_EQUAL("test", subtable->GetString(1, 0));
 	}
+
+	CHECK_EQUAL(1, table.GetTableSize(2, 0));
 
 	// Get the sub-table again and see if the values
 	// still match.
 	{
-		const Table subtable = table.GetTable(2, 0);
+		TableRef subtable = table.GetTable(2, 0);
 
-		CHECK_EQUAL(1,      subtable.GetSize());
-		CHECK_EQUAL(42,     subtable.Get(0, 0));
-		CHECK_EQUAL("test", subtable.GetString(1, 0));
+		CHECK_EQUAL(1,      subtable->GetSize());
+		CHECK_EQUAL(42,     subtable->Get(0, 0));
+		CHECK_EQUAL("test", subtable->GetString(1, 0));
 	}
 
 	// Write the group to disk
@@ -567,11 +567,11 @@ TEST(Table_Spec) {
 	Group fromDisk("subtables.tightdb");
 	TopLevelTable& fromDiskTable = fromDisk.GetTable("test");
 
-	const Table subtable2 = fromDiskTable.GetTable(2, 0);
+	TableRef subtable2 = fromDiskTable.GetTable(2, 0);
 
-	CHECK_EQUAL(1,      subtable2.GetSize());
-	CHECK_EQUAL(42,     subtable2.Get(0, 0));
-	CHECK_EQUAL("test", subtable2.GetString(1, 0));
+	CHECK_EQUAL(1,      subtable2->GetSize());
+	CHECK_EQUAL(42,     subtable2->Get(0, 0));
+	CHECK_EQUAL("test", subtable2->GetString(1, 0));
 }
 
 TEST(Table_Mixed) {
@@ -673,22 +673,22 @@ TEST(Table_Mixed) {
 	CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
 	CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).GetBinary().pointer);
 	CHECK_EQUAL(7,      table.GetMixed(1, 4).GetBinary().len);
-	
+
 	// Get table from mixed column and add schema and some values
-	Table* const subtable = table.GetTablePtr(1, 5);
+	TableRef subtable = table.GetTable(1, 5);
 	subtable->RegisterColumn(COLUMN_TYPE_STRING, "name");
 	subtable->RegisterColumn(COLUMN_TYPE_INT,    "age");
-	
+
 	subtable->InsertString(0, 0, "John");
 	subtable->InsertInt(1, 0, 40);
-	delete subtable;
-	
+	subtable->InsertDone();
+
 	// Get same table again and verify values
-	Table* const subtable2 = table.GetTablePtr(1, 5);
+	TableRef subtable2 = table.GetTable(1, 5);
 	CHECK_EQUAL(1, subtable2->GetSize());
 	CHECK_EQUAL("John", subtable2->GetString(0, 0));
 	CHECK_EQUAL(40, subtable2->Get(1, 0));
-	delete subtable2;
+
 #ifdef _DEBUG
 	table.Verify();
 #endif //_DEBUG
@@ -715,4 +715,20 @@ TEST(Table_Mixed2) {
 	CHECK_EQUAL(true,         table[1].first.GetBool());
 	CHECK_EQUAL((time_t)1234, table[2].first.GetDate());
 	CHECK_EQUAL("test",       table[3].first.GetString());
+}
+
+
+TEST(Table_CastRef)
+{
+	TopLevelTable t;
+	{
+		TableRef t2 = t.GetTableRef();
+		TopLevelTableRef t3 = static_table_cast<TopLevelTable>(t2);
+		TopLevelTableRef t4 = dynamic_table_cast<TopLevelTable>(t2);
+	}
+	{
+		TableConstRef t2 = t.GetTableRef();
+		TopLevelTableConstRef t3 = static_table_cast<TopLevelTable const>(t2);
+		TopLevelTableConstRef t4 = dynamic_table_cast<TopLevelTable const>(t2);
+	}
 }

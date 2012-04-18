@@ -323,6 +323,22 @@ public:
 			*resultcount = resultcount2;
 		return avg;
 	}
+	
+	// todo, not sure if start, end and limit could be useful for delete.
+	size_t Delete(Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+		size_t r = start - 1;
+		size_t results = 0;
+		Init(table);
+		
+		for (;;) {
+			r = FindInternal(table, r + 1 - results, end);
+			if (r == (size_t)-1 || r == table.GetSize() || results == limit)
+				break;
+			++results;
+			table.DeleteRow(r);
+		}
+		return results;
+	}
 
 	void FindAllMulti(Table& table, TableView& tv, size_t start = 0, size_t end = (size_t)-1) {
 		// Initialization

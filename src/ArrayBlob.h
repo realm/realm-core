@@ -5,8 +5,8 @@
 
 class ArrayBlob : public Array {
 public:
-	ArrayBlob(Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	ArrayBlob(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	ArrayBlob(ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	ArrayBlob(Allocator& alloc);
 	~ArrayBlob();
 

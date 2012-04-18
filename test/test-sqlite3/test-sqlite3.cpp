@@ -51,7 +51,7 @@ int main() {
 	sqlite3_finalize(ppStmt); // Cleanup
 
 	const size_t memUsed = GetMemUsage();
-	printf("Memory usage: %d bytes\n", memUsed);
+	printf("Memory usage: %ld bytes\n", long(memUsed));
 
 	UnitTest::Timer timer;
 
@@ -129,7 +129,7 @@ int main() {
 		sqlite3_finalize(ppStmt); // Cleanup
 	}
 
-	printf("Memory usage2: %d bytes\n", GetMemUsage());
+	printf("Memory usage2: %ld bytes\n", long(GetMemUsage()));
 
 	// Search with index
 	{
@@ -160,8 +160,7 @@ int main() {
 		sqlite3_finalize(ppStmt); // Cleanup
 	}
 
-	getchar(); // wait for key
 	sqlite3_close(db);
 
-	return 1;
+	return 0;
 }

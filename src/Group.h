@@ -4,7 +4,7 @@
 #include "Table.h"
 #include "AllocSlab.h"
 
-class Group {
+class Group: private Table::Parent {
 public:
 	Group();
 	Group(const char* filename);
@@ -32,8 +32,26 @@ public:
 	void Print() const;
 	MemStats Stats();
 	void EnableMemDiagnostics(bool enable=true) {m_alloc.EnableDebug(enable);}
-	void ToDot(std::ostream& out);
+	void ToDot(std::ostream& out = std::cerr);
 #endif //_DEBUG
+
+protected:
+	// Overriding method in ArrayParent
+	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
+	{
+		m_tables.Set(subtable_ndx, new_ref);
+	}
+
+	// Overriding method in Table::Parent
+	virtual void child_destroyed(std::size_t) {} // Ignore
+
+#ifdef _DEBUG
+	// Overriding method in ArrayParent
+	virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const
+	{
+		return m_tables.GetAsRef(subtable_ndx);
+	}
+#endif
 
 private:
 	void Create();
@@ -55,10 +73,10 @@ private:
 
 template<class T> T& Group::GetTable(const char* name) {
 	const size_t n = m_tableNames.Find(name);
-	if (n == -1) {
+	if (n == size_t(-1)) {
 		// Create new table
 		T* const t = new T(m_alloc);
-		t->SetParent(&m_tables, m_tables.Size());
+		t->SetParent(this, m_tables.Size());
 
 		m_tables.Add(t->GetRef());
 		m_tableNames.Add(name);
@@ -77,8 +95,9 @@ size_t Group::Write(S& out) {
 	// Space for ref to top array
     out.write("\0\0\0\0\0\0\0\0", 8);
     size_t pos = 8;
-	
+
 	// Recursively write all arrays
+	// FIXME: 'valgrind' says this writes uninitialized bytes to the file/stream
 	const uint64_t topPos = m_top.Write(out, pos);
 
 	// top ref

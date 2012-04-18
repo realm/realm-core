@@ -5,8 +5,8 @@
 
 class ColumnStringEnum : public Column {
 public:
-	ColumnStringEnum(size_t ref_keys, size_t ref_values, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	ColumnStringEnum(size_t ref_keys, size_t ref_values, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ColumnStringEnum(size_t ref_keys, size_t ref_values, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	~ColumnStringEnum();
 	void Destroy();
 

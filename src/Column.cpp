@@ -3,6 +3,8 @@
 #include <cstring>
 #include <cstdio> // debug output
 #include <climits> // size_t
+#include <iostream>
+#include <iomanip>
 #include "query/QueryEngine.h"
 #ifdef _MSC_VER
 #include "win32/stdint.h"
@@ -12,6 +14,9 @@
 
 #include "Column.h"
 #include "Index.h"
+
+using namespace std;
+
 
 // Pre-declare local functions
 void SetRefSize(void* ref, size_t len);
@@ -25,51 +30,31 @@ Array* merge(Array *ArrayList);
 void merge_references(Array *valuelist, Array *indexlists, Array **indexresult);
 
 
-class RootArray: public Array {
-public:
-	virtual void update_subtable_ref(size_t subtable_ndx, size_t new_ref) {
-		m_column->Set(subtable_ndx, new_ref);
-	}
-
-	virtual size_t get_subtable_ref_for_verify(size_t subtable_ndx) {
-		return m_column->Get(subtable_ndx);
-	}
-
-	RootArray(Column *col, ColumnDef type, Array *parent, size_t pndx, Allocator &alloc):
-		Array(type, parent, pndx, alloc), m_column(col) {}
-	RootArray(Column *col, size_t ref, Array *parent, size_t pndx, Allocator &alloc):
-		Array(ref, parent, pndx, alloc), m_column(col) {}
-
-	Column *m_column;
-};
-
-
 Column::Column(Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, COLUMN_NORMAL, NULL, 0, alloc);
+	m_array = new Array(COLUMN_NORMAL, NULL, 0, alloc);
 	Create();
 }
 
 Column::Column(ColumnDef type, Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, type, NULL, 0, alloc);
+	m_array = new Array(type, NULL, 0, alloc);
 	Create();
 }
 
-Column::Column(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, type, parent, pndx, alloc);
+Column::Column(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+	m_array = new Array(type, parent, pndx, alloc);
 	Create();
 }
 
-Column::Column(size_t ref, Array* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, ref, parent, pndx, alloc);
+Column::Column(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+	m_array = new Array(ref, parent, pndx, alloc);
 }
 
-Column::Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
-	m_array = new RootArray(this, ref, const_cast<Array *>(parent), pndx, alloc);
+Column::Column(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+	m_array = new Array(ref, const_cast<ArrayParent *>(parent), pndx, alloc);
 }
 
 Column::Column(const Column& column) : m_index(NULL) {
 	m_array = column.m_array; // we now own array
-	static_cast<RootArray *>(m_array)->m_column = this;
 	column.m_array = NULL;    // so invalidate source
 }
 
@@ -119,7 +104,7 @@ size_t Column::Size() const {
 	}
 }
 
-void Column::SetParent(Array* parent, size_t pndx) {
+void Column::SetParent(ArrayParent *parent, size_t pndx) {
 	m_array->SetParent(parent, pndx);
 }
 
@@ -132,30 +117,7 @@ void Column::SetHasRefs() {
 	m_array->SetType(COLUMN_HASREFS);
 }
 
-void Column::GetParentInfo(size_t ndx, Array*& parent, size_t& pndx, size_t offset) const {
-	if (IsNode()) {
-		// Get subnode table
-		const Array offsets = NodeGetOffsets();
-		const Array refs    = NodeGetRefs();
-
-		// Find the subnode containing the item
-		const size_t node_ndx = offsets.FindPos(ndx);
-
-		// Calc index in subnode
-		const size_t local_offset = node_ndx ? (size_t)offsets.Get(node_ndx-1) : 0;
-		const size_t local_ndx    = ndx - local_offset;
-
-		// Get parent info
-		const Column target = GetColumnFromRef<Column>(refs, node_ndx);
-		target.GetParentInfo(local_ndx, parent, pndx, offset + local_offset);
-	}
-	else {
-		parent = m_array;
-		pndx   = ndx + offset;
-	}
-}
-
-static Column GetColumnFromRef(Array& parent, size_t ndx) {
+static Column GetColumnFromRef(Array &parent, size_t ndx) {
 	assert(parent.HasRefs());
 	assert(ndx < parent.Size());
 	return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
@@ -402,7 +364,8 @@ void merge_core(Array *a0, Array *a1, Array *res) {
 Array *merge(Array *ArrayList) {
 	if(ArrayList->Size() == 1) {
 		size_t ref = ArrayList->GetAsRef(0);
-		Array *a = new Array(ref, (Array *)&merge);
+//		Array *a = new Array(ref, reinterpret_cast<Array *>(&merge)); // FIXME: Breaks strict-aliasing
+                Array *a = new Array(ref, NULL); 
 		return a;
 	}
 	
@@ -710,13 +673,13 @@ bool Column::Compare(const Column& c) const {
 
 void Column::Print() const {
 	if (IsNode()) {
-		printf("Node: %zx\n", m_array->GetRef());
+		cout << "Node: " << hex << m_array->GetRef() << dec << "\n";
 		
 		const Array offsets = NodeGetOffsets();
 		const Array refs = NodeGetRefs();
 
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			printf(" %zu: %d %x\n", i, (int)offsets.Get(i), (int)refs.Get(i));
+			cout << " " << i << ": " << offsets.Get(i) << " " << hex << refs.Get(i) << dec <<"\n";
 		}
 		for (size_t i = 0; i < refs.Size(); ++i) {
 			const Column col((size_t)refs.Get(i));

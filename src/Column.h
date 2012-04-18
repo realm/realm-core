@@ -101,9 +101,9 @@ class Column : public ColumnBase {
 public:
 	Column(Allocator& alloc);
 	Column(ColumnDef type, Allocator& alloc);
-	Column(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Column(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Column(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	Column(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	Column(const Column& column);
 	~Column();
 
@@ -113,13 +113,13 @@ public:
 
 	bool operator==(const Column& column) const;
 
-	void SetParent(Array* parent, size_t pndx);
+	void SetParent(ArrayParent *parent, size_t pndx);
 	void UpdateParentNdx(int diff);
 	void SetHasRefs();
 
 	size_t Size() const;
 	bool IsEmpty() const;
-	
+
 	// Getting and setting values
 	int64_t Get(size_t ndx) const;
 	size_t GetAsRef(size_t ndx) const;
@@ -135,8 +135,7 @@ public:
 	void ReferenceSort(size_t start, size_t end, Column &ref);
 
 	intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
-	void GetParentInfo(size_t ndx, Array*& parent, size_t& pndx, size_t offset=0) const;
-	
+
 	void Clear();
 	void Delete(size_t ndx);
 	//void Resize(size_t len);
@@ -170,13 +169,11 @@ public:
 	MemStats Stats() const;
 #endif //_DEBUG
 
-private:
-	Column& operator=(const Column&) {return *this;} // not allowed
 protected:
 	friend class ColumnBase;
 	void Create();
 	void UpdateRef(size_t ref);
-	
+
 	// Node functions
 	int64_t LeafGet(size_t ndx) const {return m_array->Get(ndx);}
 	bool LeafSet(size_t ndx, int64_t value) {return m_array->Set(ndx, value);}
@@ -191,7 +188,11 @@ protected:
 
 	// Member variables
 	Index* m_index;
+
+private:
+	Column &operator=(Column const &); // not allowed
 };
+
 
 // Templates
 #include "Column_tpl.h"

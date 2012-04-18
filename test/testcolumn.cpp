@@ -413,7 +413,7 @@ TEST(Column_FindAll_IntMin){
 	const int value = 0;
 	const int vReps = 5;
 
-	for(size_t i = 0; i < vReps; i++){
+	for(int i = 0; i < vReps; i++){
 		c.Add(0);
 	}
 
@@ -424,7 +424,7 @@ TEST(Column_FindAll_IntMin){
 	size_t j = 0;
 	while(i < c.Size()){
 		if(c.Get(i) == value)
-			CHECK_EQUAL(i, r.Get(j++));
+			CHECK_EQUAL(int64_t(i), r.Get(j++));
 		i += 1;
 	}
 
@@ -440,7 +440,7 @@ TEST(Column_FindAll_IntMax){
 	const int64_t value = 4300000003ULL;
 	const int vReps = 5;
 
-	for(size_t i = 0; i < vReps; i++){
+	for(int i = 0; i < vReps; i++){
 		// 64 bitwidth
 		c.Add(4300000000ULL);
 		c.Add(4300000001ULL);
@@ -455,7 +455,7 @@ TEST(Column_FindAll_IntMax){
 	size_t j = 0;
 	while(i < c.Size()){
 		if(c.Get(i) == value)
-			CHECK_EQUAL(i, r.Get(j++));
+			CHECK_EQUAL(int64_t(i), r.Get(j++));
 		i += 1;
 	}
 

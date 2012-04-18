@@ -10,6 +10,44 @@ TDB_TABLE_2(BoolTupleTable,
 	Int, first,
 	Bool, second)
 
+
+
+TEST(TestQueryDelete) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "X");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+	ttt.Add(4, "a");
+	ttt.Add(5, "X");
+	ttt.Add(6, "X");
+
+	Query q = ttt.GetQuery().second.Equal("X");
+	size_t r = q.Delete(ttt);
+
+	CHECK_EQUAL(4, r);
+	CHECK_EQUAL(2, ttt.GetSize());
+	CHECK_EQUAL(2, ttt[0].first);
+	CHECK_EQUAL(4, ttt[1].first);
+}
+
+
+
+TEST(TestQuerySimple) {
+	TupleTableType ttt;
+
+	ttt.Add(1, "a");
+	ttt.Add(2, "a");
+	ttt.Add(3, "X");
+
+	Query q1 = ttt.GetQuery().first.Equal(2);
+
+	TableView tv1 = q1.FindAll(ttt);
+	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(1, tv1.GetRef(0));
+}
+
+
 TEST(TestQuerySubtable) {
 
 	Group group;
@@ -49,28 +87,28 @@ TEST(TestQuerySubtable) {
 
 
 	// Sub tables
-	Table subtable = table.GetTable(2, 0);
-	subtable.InsertInt(0, 0, 11);
-	subtable.InsertString(1, 0, "a");
-	subtable.InsertDone();
+	TableRef subtable = table.GetTable(2, 0);
+	subtable->InsertInt(0, 0, 11);
+	subtable->InsertString(1, 0, "a");
+	subtable->InsertDone();
 
-	Table subtable1 = table.GetTable(2, 1);
-	subtable1.InsertInt(0, 0, 22);
-	subtable1.InsertString(1, 0, "b");
-	subtable1.InsertDone();
-	subtable1.InsertInt(0, 1, 33);
-	subtable1.InsertString(1, 1, "c");
-	subtable1.InsertDone();
+	subtable = table.GetTable(2, 1);
+	subtable->InsertInt(0, 0, 22);
+	subtable->InsertString(1, 0, "b");
+	subtable->InsertDone();
+	subtable->InsertInt(0, 1, 33);
+	subtable->InsertString(1, 1, "c");
+	subtable->InsertDone();
 
-	Table subtable2 = table.GetTable(2, 2);
-	subtable2.InsertInt(0, 0, 44);
-	subtable2.InsertString(1, 0, "d");
-	subtable2.InsertDone();
+	subtable = table.GetTable(2, 2);
+	subtable->InsertInt(0, 0, 44);
+	subtable->InsertString(1, 0, "d");
+	subtable->InsertDone();
 
-	Table subtable3 = table.GetTable(2, 3);
-	subtable3.InsertInt(0, 0, 55);
-	subtable3.InsertString(1, 0, "e");
-	subtable3.InsertDone();
+	subtable = table.GetTable(2, 3);
+	subtable->InsertInt(0, 0, 55);
+	subtable->InsertString(1, 0, "e");
+	subtable->InsertDone();
 
 
 	Query *q1 = new Query;
@@ -82,6 +120,7 @@ TEST(TestQuerySubtable) {
 	CHECK_EQUAL(2, t1.GetSize());
 	CHECK_EQUAL(1, t1.GetRef(0));
 	CHECK_EQUAL(2, t1.GetRef(1));
+	delete q1;
 
 
 	Query *q2 = new Query;
@@ -94,6 +133,7 @@ TEST(TestQuerySubtable) {
 	CHECK_EQUAL(2, t2.GetSize());
 	CHECK_EQUAL(0, t2.GetRef(0));
 	CHECK_EQUAL(3, t2.GetRef(1));
+	delete q2;
 
 
 	Query *q3 = new Query;
@@ -106,6 +146,7 @@ TEST(TestQuerySubtable) {
 	TableView t3 = q3->FindAll(table, 0, (size_t)-1);
 	CHECK_EQUAL(1, t3.GetSize());
 	CHECK_EQUAL(0, t3.GetRef(0));
+	delete q3;
 
 
 	Query *q4 = new Query;
@@ -117,6 +158,8 @@ TEST(TestQuerySubtable) {
 	q4->Less(0, 20);
 	q4->Parent();
 	TableView t4 = q4->FindAll(table, 0, (size_t)-1);
+	delete q4;
+
 
 	CHECK_EQUAL(3, t4.GetSize());
 	CHECK_EQUAL(0, t4.GetRef(0));
@@ -226,6 +269,7 @@ TEST(TestQuerySort_Dates) {
 
 	Query *q = new Query();
 	TableView tv = q->FindAll(table);
+	delete q;
 	CHECK(tv.GetSize() == 3);
 	CHECK(tv.GetRef(0) == 0);
 	CHECK(tv.GetRef(1) == 1);
@@ -253,6 +297,7 @@ TEST(TestQuerySort_Bools) {
 
 	Query *q = new Query();
 	TableView tv = q->FindAll(table);
+	delete q;
   	tv.Sort(0);
 
 	CHECK(tv.GetSize() == 3);
@@ -262,136 +307,6 @@ TEST(TestQuerySort_Bools) {
 }
 
 
-TEST(TestQuerySubtable2) {
-
-	Group group;
-	TopLevelTable& table = group.GetTable("test");
-
-	// Create specification with sub-table
-	Spec s = table.GetSpec();
-	s.AddColumn(COLUMN_TYPE_INT,    "first");
-	s.AddColumn(COLUMN_TYPE_STRING, "second");
-	Spec sub = s.AddColumnTable(    "third");
-		sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
-		sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
-	table.UpdateFromSpec(s.GetRef());
-
-	CHECK_EQUAL(3, table.GetColumnCount());
-
-	// Main table
-	table.InsertInt(0, 0, 111);
-	table.InsertString(1, 0, "this");
-	table.InsertTable(2, 0);
-	table.InsertDone();
-
-	table.InsertInt(0, 1, 222);
-	table.InsertString(1, 1, "is");
-	table.InsertTable(2, 1);
-	table.InsertDone();
-
-	table.InsertInt(0, 2, 333);
-	table.InsertString(1, 2, "a test");
-	table.InsertTable(2, 2);
-	table.InsertDone();
-
-	table.InsertInt(0, 3, 444);
-	table.InsertString(1, 3, "of queries");
-	table.InsertTable(2, 3);
-	table.InsertDone();
-
-
-	// Sub tables
-	Table subtable = table.GetTable(2, 0);
-	subtable.InsertInt(0, 0, 11);
-	subtable.InsertString(1, 0, "a");
-	subtable.InsertDone();
-
-	Table subtable1 = table.GetTable(2, 1);
-	subtable1.InsertInt(0, 0, 22);
-	subtable1.InsertString(1, 0, "b");
-	subtable1.InsertDone();
-	subtable1.InsertInt(0, 1, 33);
-	subtable1.InsertString(1, 1, "c");
-	subtable1.InsertDone();
-
-	Table subtable2 = table.GetTable(2, 2);
-	subtable2.InsertInt(0, 0, 44);
-	subtable2.InsertString(1, 0, "d");
-	subtable2.InsertDone();
-
-	Table subtable3 = table.GetTable(2, 3);
-	subtable3.InsertInt(0, 0, 55);
-	subtable3.InsertString(1, 0, "e");
-	subtable3.InsertDone();
-
-
-	Query *q1 = new Query;
-	q1->Greater(0, 200);
-	q1->Subtable(2);
-	q1->Less(0, 50);
-	q1->Parent();
-	TableView t1 = q1->FindAll(table, 0, (size_t)-1);
-	CHECK_EQUAL(2, t1.GetSize());
-	CHECK_EQUAL(1, t1.GetRef(0));
-	CHECK_EQUAL(2, t1.GetRef(1));
-
-
-	Query *q2 = new Query;
-	q2->Subtable(2);
-	q2->Greater(0, 50);
-	q2->Or();
-	q2->Less(0, 20);
-	q2->Parent();
-	TableView t2 = q2->FindAll(table, 0, (size_t)-1);
-	CHECK_EQUAL(2, t2.GetSize());
-	CHECK_EQUAL(0, t2.GetRef(0));
-	CHECK_EQUAL(3, t2.GetRef(1));
-
-
-	Query *q3 = new Query;
-	q3->Subtable(2);
-	q3->Greater(0, 50);
-	q3->Or();
-	q3->Less(0, 20);
-	q3->Parent();
-	q3->Less(0, 300);
-	TableView t3 = q3->FindAll(table, 0, (size_t)-1);
-	CHECK_EQUAL(1, t3.GetSize());
-	CHECK_EQUAL(0, t3.GetRef(0));
-
-
-	Query *q4 = new Query;
-	q4->Equal(0, (int64_t)333);
-	q4->Or();
-	q4->Subtable(2);
-	q4->Greater(0, 50);
-	q4->Or();
-	q4->Less(0, 20);
-	q4->Parent();
-	TableView t4 = q4->FindAll(table, 0, (size_t)-1);
-
-	CHECK_EQUAL(3, t4.GetSize());
-	CHECK_EQUAL(0, t4.GetRef(0));
-	CHECK_EQUAL(2, t4.GetRef(1));
-	CHECK_EQUAL(3, t4.GetRef(2));
-
-}
-
-
-
-TEST(TestQuerySimple) {
-	TupleTableType ttt;
-
-	ttt.Add(1, "a");
-	ttt.Add(2, "a");
-	ttt.Add(3, "X");
-
-	Query q1 = ttt.GetQuery().first.Equal(2);
-
-	TableView tv1 = q1.FindAll(ttt);
-	CHECK_EQUAL(1, tv1.GetSize());
-	CHECK_EQUAL(1, tv1.GetRef(0));
-}
 
 TEST(TestQueryThreads) {
 	TupleTableType ttt;
