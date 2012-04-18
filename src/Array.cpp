@@ -1,15 +1,16 @@
-#include "Array.h"
-#include <cassert>
-#include "Column.h"
 #include "utilities.h"
-#include <vector>
-#include "query/QueryEngine.h"
+
 #ifdef _MSC_VER
-	#include "win32/types.h"
+    #define NOMINMAX
+#include "win32/types.h"
 	#pragma warning (disable : 4127) // Condition is constant warning
 #endif
 
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#include "Array.h"
+#include <cassert>
+#include "Column.h"
+#include <vector>
+#include "query/QueryEngine.h"
 
 // Pre-declare local functions
 size_t CalcByteLen(size_t count, size_t width);
@@ -200,8 +201,8 @@ void Array::Preset(size_t bitwidth, size_t count) {
 
 }
 
-void Array::Preset(int64_t min, int64_t max, size_t count) {
-	size_t w = MAX(BitWidth(max), BitWidth(min));
+void Array::Preset(int64_t min2, int64_t max2, size_t count) {
+	size_t w = std::max(BitWidth(max2), BitWidth(min2));
 	Preset(w, count);
 }
 
