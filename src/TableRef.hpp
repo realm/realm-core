@@ -27,8 +27,9 @@
  * references obtained from it, or from any of its subtables, are
  * invalidated.
  */
-template<class T> struct BasicTableRef
+template<class T> class BasicTableRef
 {
+public:
 	/**
 	 * Construct a null reference.
 	 */
