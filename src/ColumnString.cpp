@@ -1,8 +1,9 @@
 #include <cstdlib>
 #include <cassert>
+#include <assert.h>
 #include <cstring>
 #include <cstdio> // debug
-
+#include "query/conditions.h"
 #ifdef _MSC_VER
 	#include "win32\types.h"
 #endif
@@ -26,7 +27,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) {
 	m_array = new ArrayString(NULL, 0, alloc);
 }
 
-AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, Array* parent, size_t pndx, Allocator& alloc) {
+AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc) {
 	const ColumnDef type = GetTypeFromArray(ref, alloc);
 	if (type == COLUMN_NODE) {
 		m_array = new Array(ref, parent, pndx, alloc);
@@ -39,7 +40,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, Array* parent, size_t pnd
 	}
 }
 
-AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) {
+AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) {
 	const ColumnDef type = GetTypeFromArray(ref, alloc);
 	if (type == COLUMN_NODE) {
 		m_array = new Array(ref, parent, pndx, alloc);
@@ -70,8 +71,8 @@ void AdaptiveStringColumn::UpdateRef(size_t ref) {
 
 	if (IsNode()) m_array->UpdateRef(ref);
 	else {
-		Array* parent = m_array->GetParent();
-		size_t pndx   = m_array->GetParentNdx();
+		ArrayParent *const parent = m_array->GetParent();
+		const size_t pndx   = m_array->GetParentNdx();
 
 		// Replace the string array with int array for node
 		Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
@@ -79,7 +80,7 @@ void AdaptiveStringColumn::UpdateRef(size_t ref) {
 		m_array = array;
 
 		// Update ref in parent
-		if (parent) parent->Set(pndx, m_array->GetRef());
+		if (parent) parent->update_child_ref(pndx, ref);
 	}
 }
 
@@ -124,6 +125,16 @@ void AdaptiveStringColumn::Clear() {
 	else ((ArrayString*)m_array)->Clear();
 }
 
+void AdaptiveStringColumn::Resize(size_t ndx) {
+	assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
+	
+	if (IsLongStrings()) {
+		((ArrayStringLong*)m_array)->Resize(ndx);
+	}
+	else ((ArrayString*)m_array)->Resize(ndx);
+	
+}
+
 const char* AdaptiveStringColumn::Get(size_t ndx) const {
 	assert(ndx < Size());
 	return TreeGet<const char*, AdaptiveStringColumn>(ndx);
@@ -148,10 +159,11 @@ void AdaptiveStringColumn::Delete(size_t ndx) {
 	TreeDelete<const char*, AdaptiveStringColumn>(ndx);
 }
 
-size_t AdaptiveStringColumn::Find(const char* value, size_t, size_t) const {
+size_t AdaptiveStringColumn::Find(const char* value, size_t start, size_t end) const {
 	assert(value);
-	return TreeFind<const char*, AdaptiveStringColumn>(value, 0, -1);
+	return TreeFind<const char*, AdaptiveStringColumn, EQUAL>(value, start, end);
 }
+
 
 void AdaptiveStringColumn::FindAll(Array &result, const char* value, size_t start, size_t end) const {
 	assert(value);
@@ -189,15 +201,15 @@ bool AdaptiveStringColumn::LeafSet(size_t ndx, const char* value) {
 	newarray->Set(ndx, value, len);
 
 	// Update parent to point to new array
-	Array* const parent = oldarray->GetParent();
+	ArrayParent *const parent = oldarray->GetParent();
 	if (parent) {
 		const size_t pndx = oldarray->GetParentNdx();
-		parent->Set(pndx, newarray->GetRef());
+		parent->update_child_ref(pndx, newarray->GetRef());
 		newarray->SetParent(parent, pndx);
 	}
 
 	// Replace string array with long string array
-	m_array = (Array*)newarray;
+	m_array = newarray;
 	oldarray->Destroy();
 	delete oldarray;
 
@@ -225,28 +237,28 @@ bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value) {
 	newarray->Insert(ndx, value, len);
 
 	// Update parent to point to new array
-	Array* const parent = oldarray->GetParent();
+	ArrayParent *const parent = oldarray->GetParent();
 	if (parent) {
 		const size_t pndx = oldarray->GetParentNdx();
-		parent->Set(pndx, newarray->GetRef());
+		parent->update_child_ref(pndx, newarray->GetRef());
 		newarray->SetParent(parent, pndx);
 	}
 
 	// Replace string array with long string array
-	m_array = (Array*)newarray;
+	m_array = newarray;
 	oldarray->Destroy();
 	delete oldarray;
 
 	return true;
 }
 
-size_t AdaptiveStringColumn::LeafFind(const char* value, size_t start, size_t end) const {
-	if (IsLongStrings()) {
-		return ((ArrayStringLong*)m_array)->Find(value, start, end);
-	}
-	else {
-		return ((ArrayString*)m_array)->Find(value, start, end);
-	}
+template<class F>size_t AdaptiveStringColumn::LeafFind(const char* value, size_t start, size_t end) const {
+		if (IsLongStrings()) {
+			return ((ArrayStringLong*)m_array)->Find(value, start, end);
+		}
+		else {
+			return ((ArrayString*)m_array)->Find(value, start, end);
+		}
 }
 
 void AdaptiveStringColumn::LeafFindAll(Array &result, const char* value, size_t add_offset, size_t start, size_t end) const {
@@ -322,8 +334,9 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
 		const char* v = Get(i);
 
 		size_t pos;
-		const bool res = keys.FindKeyPos(v, pos);
+		const bool res = keys.FindKeyPos(v, pos);  // todo/fixme, res isn't used
 		assert(res);
+		(void)res;
 
 		values.Add(pos);
 	}
@@ -346,10 +359,6 @@ bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const {
 	}
 
 	return true;
-}
-
-void AdaptiveStringColumn::ToDot(FILE* f, bool) const {
-	m_array->ToDot(f);
 }
 
 MemStats AdaptiveStringColumn::Stats() const {
@@ -380,6 +389,21 @@ MemStats AdaptiveStringColumn::Stats() const {
 	}
 
 	return stats;
+}
+
+void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) const {
+	const bool isLongStrings = array.HasRefs(); // HasRefs indicates long string array
+	
+	if (isLongStrings) {
+		// ArrayStringLong has more members than Array, so we have to
+		// really instantiate it (it is not enough with a cast)
+		const size_t ref = array.GetRef();
+		ArrayStringLong str_array(ref, (Array*)NULL, 0, array.GetAllocator());
+		str_array.ToDot(out);
+	}
+	else {
+		((ArrayString&)array).ToDot(out);
+	}
 }
 
 #endif //_DEBUG

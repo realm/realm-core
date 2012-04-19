@@ -12,8 +12,20 @@
 #include "alloc.h"
 #include <iostream>
 #include "utilities.h"
+#include <vector>
+#include <assert.h>
 
-#ifdef USE_SSE
+#define TEMPEX(fun, arg) \
+	if(m_width == 0) {fun<0> arg;} \
+	else if (m_width == 1) {fun<1> arg;} \
+	else if (m_width == 2) {fun<2> arg;} \
+	else if (m_width == 4) {fun<4> arg;} \
+	else if (m_width == 8) {fun<8> arg;} \
+	else if (m_width == 16) {fun<16> arg;} \
+	else if (m_width == 32) {fun<32> arg;} \
+	else if (m_width == 64) {fun<64> arg;}
+
+#ifdef USE_SSE42
 /*
     MMX: mmintrin.h
     SSE: xmmintrin.h
@@ -24,15 +36,17 @@
     SSE4.1: smmintrin.h
     SSE4.2: nmmintrin.h
 */
-#include <nmmintrin.h> // __SSE3__
-#endif //USE_SSE
+	#include <nmmintrin.h> // __SSE42__
+#elif defined (USE_SSE3)
+	#include <pmmintrin.h> // __SSE3__
+#endif
 
 #ifdef _DEBUG
 #include <stdio.h>
 #endif
 
 // Pre-definitions
-class Column;
+class Array;
 
 #ifdef _DEBUG
 class MemStats {
@@ -62,37 +76,62 @@ enum ColumnDef {
 	COLUMN_HASREFS
 };
 
-class Array {
+
+class ArrayParent
+{
 public:
-	Array(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
-	Array(ColumnDef type=COLUMN_NORMAL, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	virtual ~ArrayParent() {}
+
+protected:
+	friend class Array;
+public: // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
+	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref) = 0;
+protected:
+#ifdef _DEBUG
+	virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const = 0;
+#endif
+};
+
+
+class Array: public ArrayParent {
+public:
+	Array(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Array(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	Array(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	Array(Allocator& alloc);
 	Array(const Array& a);
+	virtual ~Array();
 
 	bool operator==(const Array& a) const;
 
 	void SetType(ColumnDef type);
-	void SetParent(Array* parent, size_t pndx);
+	bool HasParent() const {return m_parent != NULL;}
+	void SetParent(ArrayParent *parent, size_t pndx);
 	void UpdateParentNdx(int diff) {m_parentNdx += diff;}
-	Array* GetParent() const {return m_parent;}
+	ArrayParent *GetParent() const {return m_parent;}
 	size_t GetParentNdx() const {return m_parentNdx;}
 	void UpdateRef(size_t ref);
 
 	bool IsValid() const {return m_data != NULL;}
-	void Invalidate() {m_data = NULL;}
+	void Invalidate() const {m_data = NULL;}
 
-	size_t Size() const {return m_len;}
+	virtual size_t Size() const {return m_len;}
 	bool IsEmpty() const {return m_len == 0;}
 
 	bool Insert(size_t ndx, int64_t value);
 	bool Add(int64_t value);
 	bool Set(size_t ndx, int64_t value);
+	template <size_t w> void Set(size_t ndx, int64_t value);
 	int64_t Get(size_t ndx) const;
+	size_t GetAsRef(size_t ndx) const;
+	template <size_t w>int64_t Get(size_t ndx) const;
 	int64_t operator[](size_t ndx) const {return Get(ndx);}
 	int64_t Back() const;
 	void Delete(size_t ndx);
 	void Clear();
+	
+	// Direct access methods
+	int64_t ColumnGet(size_t ndx) const;
 
 	bool Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
 	bool IncrementIf(int64_t limit, int64_t value);
@@ -101,15 +140,28 @@ public:
 	size_t FindPos(int64_t value) const;
 	size_t FindPos2(int64_t value) const;
 	size_t Find(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
-	void FindAll(Array& result, int64_t value, size_t offset=0,
-				 size_t start=0, size_t end=(size_t)-1) const;
+
+	template <class F> size_t Find(F function_, int64_t value, size_t start, size_t end) const {
+		const F function = {};
+		if(end == (size_t)-1)
+			end = m_len;
+		for(size_t s = start; s < end; s++) {
+			if(function(value, Get(s)))
+				return s;
+		}
+		return (size_t)-1;
+	}
+	void Preset(int64_t min, int64_t max, size_t count);
+	void Preset(size_t bitwidth, size_t count); 
+	void FindAll(Array& result, int64_t value, size_t offset=0, size_t start=0, size_t end=(size_t)-1) const;
 	void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
-	int64_t Sum(size_t start = 0, size_t end = -1) const;
-	bool Max(int64_t& result, size_t start = 0, size_t end = -1) const;
-	bool Min(int64_t& result, size_t start = 0, size_t end = -1) const;
+	int64_t Sum(size_t start = 0, size_t end = (size_t)-1) const;
+	bool Max(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
+	bool Min(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
+	template <class F> size_t Query(int64_t value, size_t start, size_t end);
 
-	void Sort();
-
+	void Sort(void);
+	void ReferenceSort(Array &ref);
 	void Resize(size_t count);
 
 	bool IsNode() const {return m_isNode;}
@@ -122,31 +174,40 @@ public:
 	Allocator& GetAllocator() const {return m_alloc;}
 
 	// Serialization
-	template<class S> size_t Write(S& target) const;
-
+	template<class S> size_t Write(S& target, size_t& pos, bool recurse=true) const;
+	std::vector<int64_t> ToVector(void);
 	// Debug
 	size_t GetBitWidth() const {return m_width;}
 #ifdef _DEBUG
 	bool Compare(const Array& c) const;
 	void Print() const;
 	void Verify() const;
-	void ToDot(FILE* f, bool horizontal=false) const;
+	void ToDot(std::ostream& out, const char* title=NULL) const;
 	MemStats Stats() const;
 #endif //_DEBUG
+	mutable unsigned char* m_data;
 
 private:
+	template <size_t w>bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max);
 	Array& operator=(const Array&) {return *this;} // not allowed
 	void SetBounds(size_t width);
-#ifdef USE_SSE
+	template <size_t w>void QuickSort(size_t lo, size_t hi);
+	void QuickSort(size_t lo, size_t hi);
+	void ReferenceQuickSort(Array &ref);
+	template <size_t w>void ReferenceQuickSort(size_t lo, size_t hi, Array &ref);
+#if defined(USE_SSE42) || defined(USE_SSE3)
 	size_t FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const;
 #endif //USE_SSE
-	size_t FindNaive(int64_t value, size_t start, size_t end) const;
+	template <bool eq>size_t CompareEquality(int64_t value, size_t start, size_t end) const;
+	template <bool gt>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
+	template <size_t w> void Sort();
+	template <size_t w>void ReferenceSort(Array &ref);
+	void update_ref_in_parent(size_t ref);
 
 protected:
 	bool AddPositiveLocal(int64_t value);
 
 	void Create(size_t ref);
-	void DoSort(size_t lo, size_t hi);
 
 	// Getters and Setters for adaptive-packed arrays
 	typedef int64_t(Array::*Getter)(size_t) const;
@@ -168,18 +229,28 @@ protected:
 	void Set_32b(size_t ndx, int64_t value);
 	void Set_64b(size_t ndx, int64_t value);
 
+	enum WidthType {
+		TDB_BITS     = 0,
+		TDB_MULTIPLY = 1,
+		TDB_IGNORE   = 2
+	};
+
 	virtual size_t CalcByteLen(size_t count, size_t width) const;
+	virtual size_t CalcItemCount(size_t bytes, size_t width) const;
+	virtual WidthType GetWidthType() const {return TDB_BITS;}
 
 	void set_header_isnode(bool value, void* header=NULL);
 	void set_header_hasrefs(bool value, void* header=NULL);
+	void set_header_wtype(WidthType value, void* header=NULL);
 	void set_header_width(size_t value, void* header=NULL);
 	void set_header_len(size_t value, void* header=NULL);
 	void set_header_capacity(size_t value, void* header=NULL);
-	bool get_header_isnode(const void* header=NULL);
-	bool get_header_hasrefs(const void* header=NULL);
-	size_t get_header_width(const void* header=NULL);
-	size_t get_header_len(const void* header=NULL);
-	size_t get_header_capacity(const void* header=NULL);
+	bool get_header_isnode(const void* header=NULL) const;
+	bool get_header_hasrefs(const void* header=NULL) const;
+	WidthType get_header_wtype(const void* header=NULL) const;
+	size_t get_header_width(const void* header=NULL) const;
+	size_t get_header_len(const void* header=NULL) const;
+	size_t get_header_capacity(const void* header=NULL) const;
 
 	void SetWidth(size_t width);
 	bool Alloc(size_t count, size_t width);
@@ -188,44 +259,118 @@ protected:
 	// Member variables
 	Getter m_getter;
 	Setter m_setter;
+
+private:
 	size_t m_ref;
-	unsigned char* m_data;
+
+protected:
 	size_t m_len;
 	size_t m_capacity;
 	size_t m_width;
 	bool m_isNode;
 	bool m_hasRefs;
-	Array* m_parent;
+
+private:
+	ArrayParent *m_parent;
 	size_t m_parentNdx;
+
 	Allocator& m_alloc;
 
+protected:
 	int64_t m_lbound;
 	int64_t m_ubound;
+
+	// Overriding methods in ArrayParent
+	virtual void update_child_ref(size_t subtable_ndx, size_t new_ref);
+#ifdef _DEBUG
+	virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const;
+#endif
 };
+
+
 
 // Templates
 
 template<class S>
-size_t Array::Write(S& out) const {
-	// Calculate who many bytes the array takes up
-	const size_t len = CalcByteLen(m_len, m_width);
-
-	// Write header first
-	// TODO: replace capacity with checksum
-	out.write((const char*)m_data-8, 8);
-
-	// Write array
-	const size_t arrayByteLen = len - 8;
-	if (arrayByteLen) out.write((const char*)m_data, arrayByteLen);
-
-	// Pad so next block will be 64bit aligned
-	const char pad[8] = {0,0,0,0,0,0,0,0};
-	const size_t rest = (~len & 0x7)+1; // CHECK
-	if (rest < 8) {
-		out.write(pad, rest);
-		return len + rest;
+size_t Array::Write(S& out, size_t& pos, bool recurse) const {
+	// parse header
+	size_t len          = get_header_len();
+	const WidthType wt  = get_header_wtype();
+	
+	// Adjust length to number of bytes
+	if (wt == TDB_BITS) {
+		const size_t bits = (len * m_width);
+		len = bits / 8;
+		if (bits & 0x7) ++len; // include partial bytes
 	}
-	else return len; // Return number of bytes written
+	else if (wt == TDB_MULTIPLY) {
+		len *= m_width;
+	}
+	
+	if (recurse && m_hasRefs) {
+		// Temp array for updated refs
+		Array newRefs(m_isNode ? COLUMN_NODE : COLUMN_HASREFS);
+		
+		// First write out all sub-arrays
+		for (size_t i = 0; i < Size(); ++i) {
+			const size_t ref = GetAsRef(i);
+			if (ref == 0 || ref & 0x1) {
+				// zero-refs and refs that are not 64-aligned do not point to sub-trees
+				newRefs.Add(ref);
+			}
+			else {
+				const Array sub(ref, (const Array*)NULL, 0, GetAllocator());
+				const size_t sub_pos = sub.Write(out, pos);
+				newRefs.Add(sub_pos);
+			}
+		}
+		
+		// Write out the replacement array
+		// (but don't write sub-tree as it has alredy been written)
+		const size_t refs_pos = newRefs.Write(out, pos, false);
+		
+		// Clean-up
+		newRefs.SetType(COLUMN_NORMAL); // avoid recursive del
+		newRefs.Destroy();
+		
+		return refs_pos; // Return position
+	}
+	else {
+		const size_t array_pos = pos;
+		
+		// TODO: replace capacity with checksum
+		
+		// Calculate complete size
+		len += 8; // include header in total
+		const size_t rest = (~len & 0x7)+1; // CHECK
+		if (rest < 8) len += rest; // Add padding for 64bit alignment
+		
+		// Write array
+		out.write((const char*)m_data-8, len);
+		pos += len;
+		
+		return array_pos; // Return position of this array
+	}
 }
+
+
+inline void Array::update_ref_in_parent(size_t ref)
+{
+  if (!m_parent) return;
+  m_parent->update_child_ref(m_parentNdx, ref);
+}
+
+
+inline void Array::update_child_ref(size_t subtable_ndx, size_t new_ref)
+{
+	Set(subtable_ndx, new_ref);
+}
+
+#ifdef _DEBUG
+inline size_t Array::get_child_ref_for_verify(size_t subtable_ndx) const
+{
+	return GetAsRef(subtable_ndx);
+}
+#endif // _DEBUG
 
 #endif //__TDB_ARRAY__

@@ -3,8 +3,12 @@
 #include <iostream>
 #include <fstream>
 
-Group::Group() : m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(COLUMN_HASREFS, NULL, 0, m_alloc), m_tableNames(NULL, 0, m_alloc)
+Group::Group():
+	m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc),	m_tableNames(NULL, 0, m_alloc),
+	m_isValid(true)
 {
+	m_tables.SetType(COLUMN_HASREFS);
+
 	m_top.Add(m_tableNames.GetRef());
 	m_top.Add(m_tables.GetRef());
 
@@ -12,23 +16,26 @@ Group::Group() : m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(COLUMN_HASREF
 	m_tables.SetParent(&m_top, 1);
 }
 
-Group::Group(const char* filename) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc) {
+Group::Group(const char* filename):
+	m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(false)
+{
 	assert(filename);
 
 	// Memory map file
-	const bool res = m_alloc.SetShared(filename);
-	assert(res);
+	m_isValid = m_alloc.SetShared(filename);
 
-	Create();
+	if (m_isValid) Create();
 }
 
-Group::Group(const char* buffer, size_t len) : m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc) {
+Group::Group(const char* buffer, size_t len):
+	m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(false)
+{
 	assert(buffer);
 
 	// Memory map file
-	m_alloc.SetSharedBuffer(buffer, len);
+	m_isValid = m_alloc.SetSharedBuffer(buffer, len);
 
-	Create();
+	if (m_isValid) Create();
 }
 
 void Group::Create() {
@@ -39,8 +46,8 @@ void Group::Create() {
 	m_top.UpdateRef(top_ref);
 	assert(m_top.Size() == 2);
 
-	m_tableNames.UpdateRef(m_top.Get(0));
-	m_tables.UpdateRef(m_top.Get(1));
+	m_tableNames.UpdateRef(m_top.GetAsRef(0));
+	m_tables.UpdateRef(m_top.GetAsRef(1));
 	m_tableNames.SetParent(&m_top, 0);
 	m_tables.SetParent(&m_top, 1);
 
@@ -50,14 +57,13 @@ void Group::Create() {
 	}
 
 #ifdef _DEBUG
-	Verify();
+//	Verify();
 #endif //_DEBUG
 }
 
 Group::~Group() {
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
 		TopLevelTable* const t = (TopLevelTable*)m_cachedtables.Get(i);
-		t->Invalidate(); // don't destroy subtree yet
 		delete t;
 	}
 	m_cachedtables.Destroy();
@@ -82,10 +88,11 @@ bool Group::HasTable(const char* name) const {
 
 TopLevelTable& Group::GetTable(const char* name) {
 	const size_t n = m_tableNames.Find(name);
+
 	if (n == (size_t)-1) {
 		// Create new table
 		TopLevelTable* const t = new TopLevelTable(m_alloc);
-		t->SetParent(&m_tables, m_tables.Size());
+		t->SetParent(this, m_tables.Size());
 
 		m_tables.Add(t->GetRef());
 		m_tableNames.Add(name);
@@ -95,15 +102,23 @@ TopLevelTable& Group::GetTable(const char* name) {
 	}
 	else {
 		// Get table from cache if exists, else create
-		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(n);
-		if (!t) {
-			const size_t ref = m_tables.Get(n);
-			t = new TopLevelTable(m_alloc, ref, &m_tables, n);
-			m_cachedtables.Set(n, (intptr_t)t);
-		}
-		return *t;
+		return GetTable(n);
 	}
 }
+
+TopLevelTable& Group::GetTable(size_t ndx) {
+	assert(ndx < m_tables.Size());
+
+	// Get table from cache if exists, else create
+	TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(ndx);
+	if (!t) {
+		const size_t ref = m_tables.GetAsRef(ndx);
+		t = new TopLevelTable(m_alloc, ref, this, ndx);
+		m_cachedtables.Set(ndx, (intptr_t)t);
+	}
+	return *t;
+}
+
 
 void Group::Write(const char* filepath) {
 	assert(filepath);
@@ -158,8 +173,8 @@ void Group::Verify() {
 		// Get table from cache if exists, else create
 		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
 		if (!t) {
-			const size_t ref = m_tables.Get(i);
-			t = new TopLevelTable(m_alloc, ref, &m_tables, i);
+			const size_t ref = m_tables.GetAsRef(i);
+			t = new TopLevelTable(m_alloc, ref, this, i);
 			m_cachedtables.Set(i, (intptr_t)t);
 		}
 		t->Verify();
@@ -173,8 +188,8 @@ MemStats Group::Stats() {
 		// Get table from cache if exists, else create
 		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
 		if (!t) {
-			const size_t ref = m_tables.Get(i);
-			t = new TopLevelTable(m_alloc, ref, &m_tables, i);
+			const size_t ref = m_tables.GetAsRef(i);
+			t = new TopLevelTable(m_alloc, ref, this, i);
 			m_cachedtables.Set(i, (intptr_t)t);
 		}
 		const MemStats m = t->Stats();
@@ -186,6 +201,27 @@ MemStats Group::Stats() {
 
 void Group::Print() const {
 	m_alloc.Print();
+}
+
+void Group::ToDot(std::ostream& out) {
+	out << "digraph G {" << endl;
+	
+	out << "subgraph cluster_group {" << endl;
+	out << " label = \"Group\";" << endl;
+	
+	m_top.ToDot(out, "group_top");
+	m_tableNames.ToDot(out, "table_names");
+	m_tables.ToDot(out, "tables");
+	
+	// Tables
+	for (size_t i = 0; i < m_tables.Size(); ++i) {
+		const TopLevelTable& table = GetTable(i);
+		const char* const name = GetTableName(i);
+		table.ToDot(out, name);
+	}
+	
+	out << "}" << endl;
+	out << "}" << endl;
 }
 
 #endif //_DEBUG

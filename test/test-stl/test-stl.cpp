@@ -7,7 +7,9 @@
 #include "../Support/mem.h"
 #include "../Support/number_names.h"
 
-#ifdef _MSC_VER
+#ifndef _MSC_VER
+#include <stdint.h>
+#else
 #include "../../src/win32/stdint.h"
 #endif
 
@@ -85,7 +87,7 @@ int main() {
 	table.push_back(t);
 
 	const size_t memUsed = GetMemUsage();
-	printf("Memory usage: %lld bytes\n", (int64_t)memUsed);
+	printf("Memory usage: %lld bytes\n", (long long)memUsed);
 
 	UnitTest::Timer timer;
 	
@@ -154,7 +156,7 @@ int main() {
 		const int search_time = timer.GetTimeInMs();
 		printf("Add index: %dms\n", search_time);
 
-		printf("Memory usage2: %lld bytes\n", (int64_t)GetMemUsage());
+		printf("Memory usage2: %lld bytes\n", (long long)GetMemUsage());
 	}
 
 	// Search with index
@@ -173,6 +175,5 @@ int main() {
 		printf("Search index: %dms\n", search_time);
 	}
 
-	getchar(); // wait for key
-	//return 1;
+	return 0;
 }

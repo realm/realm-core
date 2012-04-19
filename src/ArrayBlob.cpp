@@ -1,10 +1,17 @@
 #include "ArrayBlob.h"
 #include <assert.h>
 
-ArrayBlob::ArrayBlob(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
+ArrayBlob::ArrayBlob(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
+	// Manually set wtype as array constructor in initiatializer list
+	// will not be able to call correct virtual function
+	set_header_wtype(TDB_IGNORE);
 }
 
-ArrayBlob::ArrayBlob(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc) {
+ArrayBlob::ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(alloc) {
+	// Manually create array as doing it in initializer list
+	// will not be able to call correct virtual functions
+	Create(ref);
+	SetParent(const_cast<ArrayParent *>(parent), pndx);
 }
 
 // Creates new array (but invalid, call UpdateRef to init)
@@ -56,6 +63,11 @@ void ArrayBlob::Delete(size_t start, size_t end) {
 	Replace(start, end, NULL, 0);
 }
 
+void ArrayBlob::Resize(size_t len) {
+	assert(len <= m_len);
+	Replace(len, m_len, NULL, 0);
+}
+
 void ArrayBlob::Clear() {
 	Replace(0, m_len, NULL, 0);
 }
@@ -63,3 +75,39 @@ void ArrayBlob::Clear() {
 size_t ArrayBlob::CalcByteLen(size_t count, size_t) const {
 	return 8 + count; // include room for header
 }
+
+size_t ArrayBlob::CalcItemCount(size_t bytes, size_t) const {
+	return bytes - 8;
+}
+
+#ifdef _DEBUG
+
+void ArrayBlob::ToDot(std::ostream& out, const char* title) const {
+	const size_t ref = GetRef();
+	
+	if (title) {
+		out << "subgraph cluster_" << ref << " {" << std::endl;
+		out << " label = \"" << title << "\";" << std::endl;
+		out << " color = white;" << std::endl;
+	}
+	
+	out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
+	out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
+	
+	// Header
+	out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
+	out << "0x" << std::hex << ref << std::dec << "<BR/>";
+	out << "</FONT></TD>" << std::endl;
+	
+	// Values
+	out << "<TD>";
+	out << Size() << " bytes"; //TODO: write content
+	out << "</TD>" << std::endl;
+	
+	out << "</TR></TABLE>>];" << std::endl;
+	if (title) out << "}" << std::endl;
+	
+	out << std::endl;
+}
+
+#endif //_DEBUG

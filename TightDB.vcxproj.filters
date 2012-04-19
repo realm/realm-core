@@ -40,6 +40,15 @@
     </ClCompile>
     <ClCompile Include="src\ColumnStringEnum.cpp" />
     <ClCompile Include="src\ColumnTable.cpp" />
+    <ClCompile Include="test\TestQuery.cpp" />
+    <ClCompile Include="src\utf8.cpp" />
+    <ClCompile Include="src\win32\pthread\pthread.c">
+      <Filter>pthreads</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ColumnMixed.cpp" />
+    <ClCompile Include="src\query\conditions.h">
+      <Filter>query</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\alloc.h" />
@@ -69,10 +78,27 @@
     </ClInclude>
     <ClInclude Include="src\ColumnStringEnum.h" />
     <ClInclude Include="src\ColumnTable.h" />
+    <ClInclude Include="src\query\QueryInterface.h">
+      <Filter>query</Filter>
+    </ClInclude>
+    <ClInclude Include="src\query\QueryEngine.h">
+      <Filter>query</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utf8.h" />
+    <ClInclude Include="src\win32\pthread\pthread.h">
+      <Filter>pthreads</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ColumnMixed.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">
       <UniqueIdentifier>{3e451fa6-2e90-45e6-824f-68fe7042fbcf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="query">
+      <UniqueIdentifier>{775025cf-a8a9-4cb2-a6fa-9e324b3c7f1d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="pthreads">
+      <UniqueIdentifier>{b4eeb124-957f-4448-b620-3662238e268a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

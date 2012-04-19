@@ -1,26 +1,42 @@
-#include "Array.h"
 #include <cassert>
+#include <vector>
+#include <iostream>
+#include <iomanip>
+#include "Array.h"
 #include "Column.h"
 #include "utilities.h"
+#include "query/QueryEngine.h"
 #ifdef _MSC_VER
-	#include "win32\types.h"
+	#include "win32/types.h"
+	#pragma warning (disable : 4127) // Condition is constant warning
 #endif
+
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+
+using namespace std;
 
 // Pre-declare local functions
 size_t CalcByteLen(size_t count, size_t width);
 
-Array::Array(size_t ref, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+Array::Array(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc):
+	m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+	m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
 	Create(ref);
 }
 
-Array::Array(size_t ref, const Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(const_cast<Array*>(parent)), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+Array::Array(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc):
+	m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+	m_parent(const_cast<ArrayParent *>(parent)), m_parentNdx(pndx), m_alloc(alloc),
+	m_lbound(0), m_ubound(0)
+{
 	Create(ref);
 }
 
-Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
-: m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false), m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0) {
+Array::Array(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc):
+	m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false),
+	m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
 	if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
 	else if (type == COLUMN_HASREFS)    m_hasRefs = true;
 
@@ -29,23 +45,28 @@ Array::Array(ColumnDef type, Array* parent, size_t pndx, Allocator& alloc)
 }
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
-Array::Array(Allocator& alloc)
-: m_ref(0), m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {
-}
+Array::Array(Allocator& alloc):
+	m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
+	m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
 
 // Copy-constructor
 // Note that this array now own the ref. Should only be used when
 // the source array goes away right after (like return values from functions)
-Array::Array(const Array& src) : m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc) {
+Array::Array(const Array& src):
+	m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
+{
 	const size_t ref = src.GetRef();
 	Create(ref);
+	src.Invalidate();
 }
+
+Array::~Array() {}
 
 // Header format (8 bytes):
 // |--------|--------|--------|--------|--------|--------|--------|--------|
-// |12---333|          length          |         capacity         |reserved|
+// |12-33444|          length          |         capacity         |reserved|
 //
-//  1: isNode  2: hasRefs  3: width (packed in 3 bits)
+//  1: isNode  2: hasRefs  3: multiplier  4: width (packed in 3 bits)
 
 void Array::set_header_isnode(bool value, void* header) {
 	uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
@@ -55,6 +76,16 @@ void Array::set_header_hasrefs(bool value, void* header) {
 	uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
 	header2[0] = (header2[0] & (~0x40)) | ((uint8_t)value << 6);
 }
+
+void Array::set_header_wtype(WidthType value, void* header) {
+	// Indicates how to calculate size in bytes based on width
+	// 0: bits      (width/8) * length
+	// 1: multiply  width * length
+	// 2: ignore    1 * length
+	uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
+	header2[0] = (header2[0] & (~0x18)) | ((uint8_t)value << 3);
+}
+
 void Array::set_header_width(size_t value, void* header) {
 	// Pack width in 3 bits (log2)
 	unsigned int w = 0;
@@ -80,23 +111,27 @@ void Array::set_header_capacity(size_t value, void* header) {
 	header2[6] = value & 0x000000FF;
 }
 
-bool Array::get_header_isnode(const void* header) {
+bool Array::get_header_isnode(const void* header) const {
 	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
 	return (header2[0] & 0x80) != 0;
 }
-bool Array::get_header_hasrefs(const void* header) {
+bool Array::get_header_hasrefs(const void* header) const {
 	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
 	return (header2[0] & 0x40) != 0;
 }
-size_t Array::get_header_width(const void* header) {
+Array::WidthType Array::get_header_wtype(const void* header) const {
+	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
+	return (WidthType)((header2[0] & 0x18) >> 3);
+}
+size_t Array::get_header_width(const void* header) const {
 	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
 	return (1 << (header2[0] & 0x07)) >> 1;
 }
-size_t Array::get_header_len(const void* header) {
+size_t Array::get_header_len(const void* header) const {
 	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
 	return (header2[1] << 16) + (header2[2] << 8) + header2[3];
 }
-size_t Array::get_header_capacity(const void* header) {
+size_t Array::get_header_capacity(const void* header) const {
 	const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
 	return (header2[4] << 16) + (header2[5] << 8) + header2[6];
 }
@@ -110,7 +145,10 @@ void Array::Create(size_t ref) {
 	m_hasRefs  = get_header_hasrefs(header);
 	m_width    = get_header_width(header);
 	m_len      = get_header_len(header);
-	m_capacity = get_header_capacity(header);
+	const size_t byte_capacity = get_header_capacity(header);
+
+	// Capacity is how many items there are room for
+	m_capacity = CalcItemCount(byte_capacity, m_width);
 
 	m_ref = ref;
 	m_data = header + 8;
@@ -143,9 +181,7 @@ bool Array::operator==(const Array& a) const {
 
 void Array::UpdateRef(size_t ref) {
 	Create(ref);
-
-	// Update ref in parent
-	if (m_parent) m_parent->Set(m_parentNdx, ref);
+	update_ref_in_parent(ref);
 }
 
 /**
@@ -167,7 +203,23 @@ static unsigned int BitWidth(int64_t v) {
 	return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
 }
 
-void Array::SetParent(Array* parent, size_t pndx) {
+// Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
+void Array::Preset(size_t bitwidth, size_t count) {
+	Clear();
+	SetWidth(bitwidth);
+	assert(Alloc(count, bitwidth));
+	m_len = count;
+	for(size_t n = 0; n < count; n++)
+		Set(n, 0);
+
+}
+
+void Array::Preset(int64_t min, int64_t max, size_t count) {
+	size_t w = MAX(BitWidth(max), BitWidth(min));
+	Preset(w, count);
+}
+
+void Array::SetParent(ArrayParent *parent, size_t pndx) {
 	m_parent = parent;
 	m_parentNdx = pndx;
 }
@@ -199,6 +251,11 @@ void Array::Destroy() {
 			// null-refs signify empty sub-trees
 			if (ref == 0) continue;
 
+			// all refs are 64bit aligned, so the lowest bits
+			// cannot be set. If they are it means that it should
+			// not be interpreted as a ref
+			if (ref & 0x1) continue;
+
 			Array sub(ref, this, i, m_alloc);
 			sub.Destroy();
 		}
@@ -215,13 +272,17 @@ void Array::Clear() {
 	// Make sure we don't have any dangling references
 	if (m_hasRefs) {
 		for (size_t i = 0; i < Size(); ++i) {
-			Array sub((size_t)Get(i), this, i);
+			const size_t ref = GetAsRef(i);
+			if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+			
+			Array sub(ref, this, i);
 			sub.Destroy();
 		}
 	}
 
 	// Truncate size to zero (but keep capacity)
-	m_len = 0;
+	m_len      = 0;
+	m_capacity = CalcItemCount(get_header_capacity(), 0);
 	SetWidth(0);
 
 	// Update header
@@ -259,6 +320,12 @@ void Array::Delete(size_t ndx) {
 int64_t Array::Get(size_t ndx) const {
 	assert(ndx < m_len);
 	return (this->*m_getter)(ndx);
+}
+
+size_t Array::GetAsRef(size_t ndx) const {
+	assert(ndx < m_len);
+	int64_t v = (this->*m_getter)(ndx);
+	return TO_REF(v);
 }
 
 int64_t Array::Back() const {
@@ -346,9 +413,7 @@ bool Array::AddPositiveLocal(int64_t value) {
 	assert(&m_alloc == &GetDefaultAllocator());
 
 	if (value <= m_ubound) {
-		const size_t bytes = CalcByteLen(m_len+1, m_width);
-
-		if (bytes < m_capacity) {
+		if (m_len < m_capacity) {
 			(this->*m_setter)(m_len, value);
 			++m_len;
 			set_header_len(m_len);
@@ -479,7 +544,7 @@ size_t Array::FindPos(int64_t target) const {
 		else            low = (int)probe;
 	}
 	if (high == (int)m_len) return (size_t)-1;
-	else return high;
+	else return (size_t)high;
 }
 
 size_t Array::FindPos2(int64_t target) const {
@@ -498,23 +563,30 @@ size_t Array::FindPos2(int64_t target) const {
 		else            high = (int)probe;
 	}
 	if (high == (int)m_len) return (size_t)-1;
-	else return high;
+	else return (size_t)high;
 }
 
+
+
 size_t Array::Find(int64_t value, size_t start, size_t end) const {
-#ifdef USE_SSE
+#if defined(USE_SSE42) || defined(USE_SSE3)
 	if(end == -1)
 		end = m_len;
 
-	if(end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) 
-		return FindNaive(value, start, end);
+#if defined(USE_SSE42)
+	if(end - start < sizeof(__m128i) || m_width < 8)
+		return CompareEquality<true>(value, start, end);
+#elif defined(USE_SSE3) 
+	if(end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) // 64 bit not supported by sse3
+		return CompareEquality<true>(value, start, end);
+#endif
 
-	// FindSSE() must start at 16-byte boundary, so search area before that using FindNaive()
+	// FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
 	__m128i *a = (__m128i *)round_up(m_data + start * m_width / 8, sizeof(__m128i));
 	__m128i *b = (__m128i *)round_down(m_data + end * m_width / 8, sizeof(__m128i));
 	size_t t = 0;
 
-	t = FindNaive(value, start, ((unsigned char *)a - m_data) * 8 / m_width);
+	t = CompareEquality<true>(value, start, ((unsigned char *)a - m_data) * 8 / m_width);
 	if(t != -1)
 		return t;
 
@@ -522,27 +594,27 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 	if(b > a) {
 		t = FindSSE(value, a, m_width / 8, b - a);
 		if(t != -1) {
-			// FindSSE returns SSE chunk number, so we use FindNative() to find packed position
-			t = FindNaive(value, t * sizeof(__m128i) * 8 / m_width  +  (((unsigned char *)a - m_data) / m_width), end);
+			// FindSSE returns SSE chunk number, so we use CompareEquality() to find packed position
+			t = CompareEquality<true>(value, t * sizeof(__m128i) * 8 / m_width  +  (((unsigned char *)a - m_data) * 8 / m_width), end);
 			return t;
 		}
 	}
 
-	// Search remainder with FindNaive()
-	t = FindNaive(value, ((unsigned char *)b - m_data) * 8 / m_width, end);
+	// Search remainder with CompareEquality()
+	t = CompareEquality<true>(value, ((unsigned char *)b - m_data) * 8 / m_width, end);
 	return t;
 #else
-	return FindNaive(value, start, end); // enable legacy find
+	return CompareEquality<true>(value, start, end); //FindNaive(value, start, end); // enable legacy find
 #endif
 }
 
-#ifdef USE_SSE
+#if defined(USE_SSE42) || defined(USE_SSE3)
 // 'items' is the number of 16-byte SSE chunks. 'bytewidth' is the size of a packed data element.
-// Return value is SSE chunk number where the element is guaranteed to exist (use FindNative() to
+// Return value is SSE chunk number where the element is guaranteed to exist (use CompareEquality() to
 // find packed position)
 size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const{
-	__m128i search, next, compare = {1};
-	size_t i;
+	__m128i search = {0}, next, compare = {1};
+	size_t i = 0;
 
 	for(int j = 0; j < sizeof(__m128i) / bytewidth; j++)
 		memcpy((char *)&search + j * bytewidth, &value, bytewidth);
@@ -565,183 +637,161 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 			compare = _mm_cmpeq_epi32(search, next);
 		}
 	}
-
-	// Only supported by SSE 4.1. We use SSE 2 instead which is default in gcc (no -sse41 flag needed) and VC
-/*	else if(bytewidth == 8) {
+#if defined(USE_SSE42)
+	else if(bytewidth == 8) {
+		// Only supported by SSE 4.1 because of _mm_cmpeq_epi64().
 		for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
 			next = _mm_load_si128(&data[i]);
 			compare = _mm_cmpeq_epi64(search, next);
 		}
-	}*/
-	return _mm_movemask_epi8(compare) == 0 ? -1 : i - 1;
+	}
+#endif
+	else 
+		assert(true);
+	return _mm_movemask_epi8(compare) == 0 ? (size_t)-1 : i - 1;
 }
 #endif //USE_SSE
 
-size_t Array::FindNaive(int64_t value, size_t start, size_t end) const {
-	if (IsEmpty()) return (size_t)-1;
+
+// If gt = true: Find first element which is greater than value
+// If gt = false: Find first element which is smaller than value
+template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, size_t end) const {
 	if (end == (size_t)-1) end = m_len;
-	if (start == end) return (size_t)-1;
-		
-	assert(start < m_len && end <= m_len && start < end);
 
-	// If the value is wider than the column
-	// then we know it can't be there
-	const size_t width = BitWidth(value);
-	if (width > m_width) return (size_t)-1;
+	// Test 4 items with zero latency for cases where match frequency is high, such 
+	// as 2-bit values
+	if(start + 0 < end && (eq ? (Get(start + 0) == value)   :   (Get(start + 0) != value)))
+		return start + 0;
+	if(start + 1 < end && (eq ? (Get(start + 1) == value)   :   (Get(start + 1) != value)))
+		return start + 1;
+	if(start + 2 < end && (eq ? (Get(start + 2) == value)   :   (Get(start + 2) != value)))
+		return start + 2;
+	if(start + 3 < end && (eq ? (Get(start + 3) == value)   :   (Get(start + 3) != value)))
+		return start + 3;
 
-	// Do optimized search based on column width
+	if (IsEmpty()) return (size_t)-1;
+	if (start >= end) return (size_t)-1;
+
+	assert(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
+
+	start += 4;
+
+	if(start >= end)
+		return (size_t)-1;
+
+	// Test 64 items with no latency for cases where the first few 64-bit chunks are likely to
+	// contain one or more matches (because the linear test we use later cannot extract the position)
+	// Also stop at a 64-bit aligned position so we can do aligned chunk reads in later linear test
+	size_t ee = round_up(start, 64) + 64;
+	ee = ee > end ? end : ee;
+	for(; start < ee; start++)
+		if(eq ? (Get(start) == value)  :   (Get(start) != value))
+			return start;
+	
+	if(start >= end)
+		return (size_t)-1;
+
+	const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));
+	const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8) / 8) - 1;
+
+	// Matches are rare enough to setup fast linear search for remaining items. We use 
+	// bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
 	if (m_width == 0) {
-		return start; // value can only be zero
+	}
+	else if (m_width == 1) {
+		if(eq) {
+			while(*p == 0)
+				p++;
+		} 
+		else {
+			while(*p == -1)
+				p++;
+		}
 	}
 	else if (m_width == 2) {
-		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0x3 * value;
-
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-
-		// Check 64bits at a time for match
-		while (p < e) {
+		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2
-											 & 0xAAAAAAAAAAAAAAAAUL;
-			if (hasZeroByte) break;
-			++p;
+			const uint64_t hasZeroByte = (v2 - 0x5555555555555555ULL) & ~v2 & 0xAAAAAAAAAAAAAAAAULL;
+			if( eq ?   hasZeroByte  :  !hasZeroByte     )
+				p++;
+			else
+				break;
 		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 32;
-
-		// Manually check the rest
-		while (i < end) {
-			if (Get(i) == value) return i;
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 4) {
-		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0xF * value;
-
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-
-		// Check 64bits at a time for match
-		while (p < e) {
+		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 
-											 & 0x8888888888888888UL;
-			if (hasZeroByte) break;
-			++p;
+			const uint64_t hasZeroByte = (v2 - 0x1111111111111111ULL) & ~v2 & 0x8888888888888888ULL;
+			if( eq ?   hasZeroByte  :  !hasZeroByte     )
+				p++;
+			else
+				break;
 		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 16;
-
-		// Manually check the rest
-		while (i < end) {
-			if (Get(i) == value) return i;
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
-  else if (m_width == 8) {
-		// TODO: Handle partial searches
-
-		// Create a pattern to match 64bits at a time
+	else if (m_width == 8) {
 		const int64_t v = ~0ULL/0xFF * value;
-
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-
-		// Check 64bits at a time for match
-		while (p < e) {
+		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2
-											 & 0x8080808080808080ULL;
-			if (hasZeroByte) break;
-			++p;
+			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2 & 0x8080808080808080ULL;
+			if( eq ?   hasZeroByte  :  !hasZeroByte     )
+				p++;
+			else
+				break;
 		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 8;
-
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i)) return i;
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 16) {
-		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0xFFFF * value;
-
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-
-		// Check 64bits at a time for match
-		while (p < e) {
+		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0001000100010001UL) & ~v2
-											 & 0x8000800080008000UL;
-			if (hasZeroByte) break;
-			++p;
+			const uint64_t hasZeroByte = (v2 - 0x0001000100010001ULL) & ~v2 & 0x8000800080008000ULL;
+			if( eq ?   hasZeroByte  :  !hasZeroByte     )
+				p++;
+			else
+				break;
 		}
-		
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 4;
-
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i)) return i;
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 32) {
-		// Create a pattern to match 64bits at a time
 		const int64_t v = ~0ULL/0xFFFFFFFF * value;
-
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-
-		// Check 64bits at a time for match
-		while (p < e) {
+		while(p < e) {
 			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2
-											 & 0x8000800080000000UL;
-			if (hasZeroByte) break;
-			++p;
+			const uint64_t hasZeroByte = (v2 - 0x0000000100000001ULL) & ~v2 & 0x8000800080000000ULL;
+			if( eq ?   hasZeroByte  :  !hasZeroByte     )
+				p++;
+			else
+				break;
 		}
-		
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 2;
-
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i)) return i;
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 64) {
-		const int64_t v = (int64_t)value;
-		const int64_t* p = (const int64_t*)(m_data + start * m_width / 8);
-		const int64_t* const e = (const int64_t*)(m_data + end * m_width / 8);
-		while (p < e) {
-			if (*p == v) return p - (const int64_t*)m_data;
-			++p;
+		while(p < e) {
+			int64_t v = *p;
+			if( eq ?   (v == value) : (v != value))
+				p++;
+			else
+				break;
 		}
-	}
-	else {
-		// Naive search
-		for (size_t i = start; i < end; ++i) {
-			const int64_t v = Get(i);
-			if (v == value) return i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 
-	return (size_t)-1; // not found
+	// Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
+	while(start < end)
+		if(eq ? Get(start) == value : Get(start) != value)
+			return start;
+		else
+			start++;
+
+	return (size_t)-1;
+
 }
 
-void Array::FindAll(Array& result, int64_t value, size_t colOffset,
-					size_t start, size_t end) const {
+
+void Array::FindAll(Array& result, int64_t value, size_t colOffset,	size_t start, size_t end) const {
 	if (IsEmpty()) return;
 	if (end == (size_t)-1) end = m_len;
 	if (start == end) return;
@@ -753,216 +803,182 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset,
 	const size_t width = BitWidth(value);
 	if (width > m_width) return;
 
-	// Do optimized search based on column width
+	size_t f = start - 1;
+	for(;;) {
+		f = Find(value, f + 1, end);
+		if (f == (size_t)-1)
+			break;
+		else	
+			result.AddPositiveLocal(f + colOffset);
+	}
+}
+
+
+// If gt = true: Find first element which is greater than value
+// If gt = false: Find first element which is smaller than value
+template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, size_t end) const{
+	if (end == (size_t)-1) end = m_len;
+
+	// Test 4 items with zero latency for cases where match frequency is high, such 
+	// as 2-bit values where each second item is greater on average
+	if(start + 0 < end && (gt ? (Get(start + 0) > value)   :   (Get(start + 0) < value)))
+		return start + 0;
+	if(start + 1 < end && (gt ? (Get(start + 1) > value)   :   (Get(start + 1) < value)))
+		return start + 1;
+	if(start + 2 < end && (gt ? (Get(start + 2) > value)   :   (Get(start + 2) < value)))
+		return start + 2;
+	if(start + 3 < end && (gt ? (Get(start + 3) > value)   :   (Get(start + 3) < value)))
+		return start + 3;
+
+	start += 4;
+
+	if(start >= end)
+		return (size_t)-1;
+
+	if (IsEmpty()) return (size_t)-1;
+	if (start >= end) return (size_t)-1;
+
+	assert(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
+
+	// Test 64 items with no latency for cases where the first few 64-bit chunks are likely to
+	// contain one or more matches (because the linear test we use later cannot extract the position)
+	// Also stop at a 64-bit aligned position so we can do aligned chunk reads in later linear test
+	size_t ee = round_up(start, 64) + 64;
+	ee = ee > end ? end : ee;
+	for(; start < ee; start++)
+		if(gt ? (Get(start) > value)  :   (Get(start) < value))
+			return start;
+	
+	if(start >= end)
+		return (size_t)-1;
+
+	const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));
+	const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8) / 8) - 1;
+
+	// Matches are rare enough to setup fast linear search for remaining items. We use 
+	// bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
 	if (m_width == 0) {
-		for(size_t i = start; i < end; i++){
-			result.AddPositiveLocal(i + colOffset); // All values can only be zero.
+	}
+	else if (m_width == 1) {
+		if(gt) {
+			if(value == 1)
+				return (size_t)-1;
+			else
+				while(*p == 0)
+					p++;
+		} else {
+			if(value == 0)
+				return (size_t)-1;
+			else
+				while(*p == -1)
+					p++;
 		}
 	}
 	else if (m_width == 2) {
-		// Create a pattern to match 64bits at a time
-		const int64_t v = ~0ULL/0x3 * value;
-
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 32;
-		const int64_t* const e = (const int64_t*)m_data + end64;
-
-		// Check 64bits at a time for match
-		while (p < e) {
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x5555555555555555UL) & ~v2 
-										 & 0xAAAAAAAAAAAAAAAAUL;
-			if (hasZeroByte){
-				// Element number at start of block
-				size_t i = (p - (const int64_t*)m_data) * 32;
-				const size_t j = i + 32; // Last element of block
-
-				// check block
-				while (i < j) {
-					const size_t offset = i >> 2;
-					const int64_t v = (m_data[offset] >> ((i & 3) << 1)) & 0x03;
-					if (v == value) result.AddPositiveLocal(i + colOffset);
-					++i;
-				}
-			}
-			++p;
+		int64_t constant = gt ? (~0ULL / 3 * (3 - value))   :  (   ~0UL / 3 * value );
+		while(p < e) {
+			int64_t v = *p;
+			if( gt ? (!(((v + constant) | v) & ~0ULL / 3 * 2))   :  ((v - constant) & ~v&~0UL/3*2)      )
+				p++;
+			else
+				break;
 		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 32;
-
-		// Manually check the rest
-		while (i < end) {
-			if (Get(i) == value) result.AddPositiveLocal(i + colOffset);
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 4) {
-		// Create a pattern to match 64bits at a time
-		const int64_t v = ~0ULL/0xF * value;
-
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 16;
-		const int64_t* const e = (const int64_t*)m_data + end64;
-
-		// Check 64bits at a time for match
-		while (p < e) {
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x1111111111111111UL) & ~v2 
-										 & 0x8888888888888888UL;
-			if (hasZeroByte){
-				// Element number at start of block
-				size_t i = (p - (const int64_t*)m_data) * 16;
-				const size_t j = i + 16; // Last element of block
-
-				// check block
-				while (i < j) {
-					const size_t offset = i >> 1;
-					const int64_t v = (m_data[offset] >> ((i & 1) << 2)) & 0xF;
-					if (v == value) result.AddPositiveLocal(i + colOffset);
-					++i;
-				}
-			}
-			++p;
+		int64_t constant = gt ? (~0ULL / 15 * (7 - value))  :   (   ~0UL / 15 * value )  ;
+		while(p < e) {
+			int64_t v = *p;
+			if(gt ? (!(((v + constant) | v) & ~0ULL / 15 * 8)) :     ((v - constant) & ~v&~0UL/15*8)    )
+				p++;
+			else
+				break;
 		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 16;
-
-		// Manually check the rest
-		while (i < end) {
-			if (Get(i) == value) result.AddPositiveLocal(i + colOffset);
-			++i;
-		}
+		start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
 	}
 	else if (m_width == 8) {
-		// TODO: Handle partial searches
-
-		// Create a pattern to match 64bits at a time
-		const int64_t v = ~0ULL/0xFF * value;
-
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 8;
-		const int64_t* const e = (const int64_t*)m_data + end64;
-
-		// Check 64bits at a time for match
-		while (p < e) {
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2
-											 & 0x8080808080808080ULL;
-			if (hasZeroByte){
-				// Element number at start of block
-				size_t i = (p - (const int64_t*)m_data) * 8;
-				const size_t j = i + 8; // Last element of block
-				const int8_t* const d = (const int8_t*)m_data; // Data pointer
-
-				// check block
-				while (i < j) {
-					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
-					++i;
+		// Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
+		if(value <= 127) {
+			int64_t constant = gt ? (~0ULL / 255 * (127 - value))   :   (        ~0UL / 255 * value           );
+			while(p < e) {
+				int64_t v = *p;
+				// Bit hacks also only works for positive items in chunk, so test their sign bits
+				if(v & 0x8080808080808080ULL) {					
+					if (gt ? ((char)(v>>0*8) > value || (char)(v>>1*8) > value || (char)(v>>2*8) > value || (char)(v>>3*8) > value || (char)(v>>4*8) > value || (char)(v>>5*8) > value || (char)(v>>6*8) > value || (char)(v>>7*8) > value)
+					  : 
+					((char)(v>>0*8) < value || (char)(v>>1*8) < value || (char)(v>>2*8) < value || (char)(v>>3*8) < value || (char)(v>>4*8) < value || (char)(v>>5*8) < value || (char)(v>>6*8) < value || (char)(v>>7*8) < value))
+						break;
 				}
+				else if (gt ?  (!(((v + constant) | v) & ~0ULL / 255 * 128)) : (         (v - constant) & ~v&~0UL/255*128             ))
+					p++;
+				else
+					break;
 			}
-			++p;
+			start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+		} 
+		else {
+			while(start < end && gt ? (Get_8b(start) <= value) : (Get_8b(start) >= value))
+				start++;
 		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 8;
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i)) result.AddPositiveLocal(i + colOffset);
-			++i;
-		}
+		
 	}
 	else if (m_width == 16) {
-		// Create a pattern to match 64bits at a time
-		const int64_t v = ~0ULL/0xFFFF * value;
-
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 4;
-		const int64_t* const e = (const int64_t*)m_data + end64;
-
-		// Check 64bits at a time for match
-		while (p < e) {
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0001000100010001UL) & ~v2
-											 & 0x8000800080008000UL;
-			if (hasZeroByte){
-				// Element number at start of block
-				size_t i = (p - (const int64_t*)m_data) * 4;
-				const size_t j = i + 4; // Last element of block
-				const int16_t* const d = (const int16_t*)m_data; // Data pointer
-
-				// check block
-				while (i < j) {
-					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
-					++i;
+		if(value <= 32767) {
+			int64_t constant = gt ? (~0ULL / 65535 * (32767 - value))   :   ( ~0UL / 65535 * value);
+			while(p < e) {
+				int64_t v = *p;
+				if(v & 0x8000800080008000ULL) {					
+					if (gt ? ((int)(v>>0*16) > value || (int)(v>>1*16) > value || (int)(v>>2*16) > value || (int)(v>>3*16) > value) :
+						((int)(v>>0*16) < value || (int)(v>>1*16) < value || (int)(v>>2*16) < value || (int)(v>>3*16) < value))
+						break;
 				}
+				else if(gt ? (!(((v + constant) | v) & ~0ULL / 65535 * 32768)) : (!(         (v - constant) & ~v&~0UL/65535*32768        )))
+					p++;
+				else
+					break;
 			}
-			++p;
+			start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+		} 
+		else {
+			while(start < end && gt ? (Get_16b(start) <= value)  :  (false))
+				start++;
 		}
+		
 
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 4;
-
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i))
-				result.AddPositiveLocal(i + colOffset);
-			++i;
-		}
 	}
 	else if (m_width == 32) {
-		// Create a pattern to match 64bits at a time
-		const int64_t v = ~0ULL/0xFFFFFFFF * value;
-
-		const int64_t* p = (const int64_t*)m_data + start;
-		const size_t end64 = m_len / 2;
-		const int64_t* const e = (const int64_t*)m_data + end64;
-
-		// Check 64bits at a time for match
-		while (p < e) {
-			const uint64_t v2 = *p ^ v; // zero matching bit segments
-			const uint64_t hasZeroByte = (v2 - 0x0000000100000001UL) & ~v2
-											 & 0x8000800080000000UL;
-			if (hasZeroByte){
-				size_t i = (p - (const int64_t*)m_data) * 2;     // Element number at start of block
-				const size_t j = i + 2;                          // Last element of block
-				const int32_t* const d = (const int32_t*)m_data; // Data pointer
-
-				// check block
-				while (i < j) {
-					if (value == d[i]) result.AddPositiveLocal(i + colOffset);
-					++i;
-				}
-			}
-			++p;
-		}
-
-		// Position of last chunk (may be partial)
-		size_t i = (p - (const int64_t*)m_data) * 2;
-
-		// Manually check the rest
-		while (i < end) {
-			if (value == Get(i)) result.AddPositiveLocal(i + colOffset);
-			++i;
-		}
+		// extra logic in SIMD no longer pays off because we have just 2 elements
+		// Faster than below version
+		while(start < end && gt ? (Get_32b(start) <= value) : (Get_32b(start) >= value) )
+			start++;
 	}
 	else if (m_width == 64) {
-		const int64_t v = (int64_t)value;
-		const int64_t* p = (const int64_t*)m_data + start;
-		const int64_t* const e = (const int64_t*)m_data + end;
-		while (p < e) {
-			if (*p == v) result.AddPositiveLocal((p - (const int64_t*)m_data) + colOffset);
-			++p;
-		}
+		while(start < end && gt ? (Get_64b(start) <= value) : (Get_64b(start) >= value))
+			start++;
 	}
-	else {
-		// Naive search
-		for (size_t i = start; i < end; ++i) {
-			const int64_t v = (this->*m_getter)(i);
-			if (v == value) result.AddPositiveLocal(i + colOffset);
-		}
-	}
+
+	// Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
+	while(start < end)
+		if(gt ? Get(start) > value : Get(start) < value)
+			return start;
+		else
+			start++;
+
+	return (size_t)-1;
+}
+
+template <> size_t Array::Query<EQUAL>(int64_t value, size_t start, size_t end) {
+	return CompareEquality<true>(value, start, end);
+}
+template <> size_t Array::Query<NOTEQUAL>(int64_t value, size_t start, size_t end) {
+	return CompareEquality<false>(value, start, end);
+}
+template <> size_t Array::Query<GREATER>(int64_t value, size_t start, size_t end) {
+	return CompareRelation<true>(value, start, end);
+}
+
+template <> size_t Array::Query<LESS>(int64_t value, size_t start, size_t end) {
+	return CompareRelation<false>(value, start, end);
 }
 
 
@@ -1010,7 +1026,7 @@ int64_t Array::Sum(size_t start, size_t end) const {
 	if (start == end) return 0;
 	assert(start < m_len && end <= m_len && start < end);
 
-	uint64_t sum = 0;
+	int64_t sum = 0;
 	
 	if (m_width == 0)
 		return 0;
@@ -1036,10 +1052,10 @@ int64_t Array::Sum(size_t start, size_t end) const {
 		// http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 
 		// staiic values needed for fast sums
-		const uint64_t m1  = 0x5555555555555555;
-		const uint64_t m2  = 0x3333333333333333;
-		const uint64_t m4  = 0x0f0f0f0f0f0f0f0f;
-		const uint64_t h01 = 0x0101010101010101;
+		const uint64_t m1  = 0x5555555555555555ULL;
+		const uint64_t m2  = 0x3333333333333333ULL;
+		const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
+		const uint64_t h01 = 0x0101010101010101ULL;
 
 		const uint64_t* const next = (const uint64_t*)m_data;
 		size_t i = start;
@@ -1098,6 +1114,11 @@ int64_t Array::Sum(size_t start, size_t end) const {
 
 
 void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const {
+	(void)result;
+	(void)value;
+	(void)maxdist;
+	(void)offset;
+	/*
 	// Only implemented for 64bit values
 	if (m_width != 64) {
 		assert(false);
@@ -1108,10 +1129,10 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
 	const uint64_t* const e = (const uint64_t*)m_data + m_len;
 
 	// static values needed for population count
-	const uint64_t m1  = 0x5555555555555555;
-	const uint64_t m2  = 0x3333333333333333;
-	const uint64_t m4  = 0x0f0f0f0f0f0f0f0f;
-	const uint64_t h01 = 0x0101010101010101;
+	const uint64_t m1  = 0x5555555555555555ULL;
+	const uint64_t m2  = 0x3333333333333333ULL;
+	const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
+	const uint64_t h01 = 0x0101010101010101ULL;
 
 	while (p < e) {
 		uint64_t x = *p ^ value;
@@ -1135,6 +1156,7 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
 
 		++p;
 	}
+	*/
 }
 
 size_t Array::CalcByteLen(size_t count, size_t width) const {
@@ -1142,6 +1164,14 @@ size_t Array::CalcByteLen(size_t count, size_t width) const {
 	size_t bytes = (bits / 8) + 8; // add room for 8 byte header
 	if (bits & 0x7) ++bytes;       // include partial bytes
 	return bytes;
+}
+
+size_t Array::CalcItemCount(size_t bytes, size_t width) const {
+	if (width == 0) return (size_t)-1; // zero width gives infinite space
+
+	const size_t bytes_data = bytes - 8; // ignore 8 byte header
+	const size_t total_bits = bytes_data * 8;
+	return total_bits / width;
 }
 
 bool Array::CopyOnWrite() {
@@ -1157,60 +1187,63 @@ bool Array::CopyOnWrite() {
 	const MemRef mref = m_alloc.Alloc(new_len);
 	if (!mref.pointer) return false;
 	memcpy(mref.pointer, m_data-8, len);
-	
+
 	// Update internal data
 	m_ref = mref.ref;
 	m_data = (unsigned char*)mref.pointer + 8;
-	m_capacity = new_len;
+	m_capacity = CalcItemCount(new_len, m_width);
 
 	// Update capacity in header
 	set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
 
-	// Update ref in parent
-	if (m_parent) m_parent->Set(m_parentNdx, mref.ref);
+	update_ref_in_parent(mref.ref);
 
 	return true;
 }
 
 bool Array::Alloc(size_t count, size_t width) {
-	// Calculate size in bytes
-	const size_t len = CalcByteLen(count, width);
+	if (count > m_capacity || width != m_width) {
+		const size_t len      = CalcByteLen(count, width);              // bytes needed
+		const size_t capacity = m_capacity ? get_header_capacity() : 0; // bytes currently available
+		size_t new_capacity   = capacity;
 
-	if (len > m_capacity) {
-		// Double to avoid too many reallocs
-		size_t new_capacity = m_capacity ? m_capacity * 2 : 128;
-		if (new_capacity < len) {
-			const size_t rest = (~len & 0x7)+1;
-			new_capacity = len;
-			if (rest < 8) new_capacity += rest; // 64bit align
+		if (len > capacity) {
+			// Double to avoid too many reallocs
+			new_capacity = capacity ? capacity * 2 : 128;
+			if (new_capacity < len) {
+				const size_t rest = (~len & 0x7)+1;
+				new_capacity = len;
+				if (rest < 8) new_capacity += rest; // 64bit align
+			}
+
+			// Allocate the space
+			MemRef mref;
+			if (m_data) mref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
+			else mref = m_alloc.Alloc(new_capacity);
+
+			if (!mref.pointer) return false;
+
+			const bool isFirst = (capacity == 0);
+			m_ref = mref.ref;
+			m_data = (unsigned char*)mref.pointer + 8;
+
+			// Create header
+			if (isFirst) {
+				set_header_isnode(m_isNode);
+				set_header_hasrefs(m_hasRefs);
+				set_header_wtype(GetWidthType());
+				set_header_width(width);
+			}
+			set_header_capacity(new_capacity);
+
+			update_ref_in_parent(mref.ref);
 		}
 
-		// Allocate the space
-		MemRef mref;
-		if (m_data) mref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
-		else mref = m_alloc.Alloc(new_capacity);
-
-		if (!mref.pointer) return false;
-
-		const bool isFirst = (m_capacity == 0);
-		m_ref = mref.ref;
-		m_data = (unsigned char*)mref.pointer + 8;
-		m_capacity = new_capacity;
-
-		// Create header
-		if (isFirst) {
-			set_header_isnode(m_isNode);
-			set_header_hasrefs(m_hasRefs);
-			set_header_width(width);
-		}
-		set_header_capacity(new_capacity);
-
-		// Update ref in parent
-		if (m_parent) m_parent->Set(m_parentNdx, mref.ref); //TODO: ref
+		m_capacity = CalcItemCount(new_capacity, width);
+		set_header_width(width);
 	}
 
 	// Update header
-	set_header_width(width);
 	set_header_len(count);
 
 	return true;
@@ -1255,6 +1288,18 @@ void Array::SetWidth(size_t width) {
 //	printf("%d ", width);
 	SetBounds(width);
 	m_width = width;
+}
+
+
+template <size_t w>int64_t Array::Get(size_t ndx) const {
+	if(w == 0) return Get_0b(ndx);
+	else if(w == 1)	return Get_1b(ndx);
+	else if(w == 2) return Get_2b(ndx);
+	else if(w == 4) return Get_4b(ndx);
+	else if(w == 8)	return Get_8b(ndx);
+	else if(w == 16) return Get_16b(ndx);
+	else if(w == 32) return Get_32b(ndx);
+	else if(w == 64) return Get_64b(ndx);
 }
 
 int64_t Array::Get_0b(size_t) const {
@@ -1340,12 +1385,246 @@ void Array::Set_64b(size_t ndx, int64_t value) {
 	const size_t offset = ndx * 8;
 	*(int64_t*)(m_data + offset) = value;
 }
-
-void Array::Sort() {
-	DoSort(0, m_len-1);
+#ifdef __MSVCRT__
+#pragma warning (disable : 4127)
+#endif
+template <size_t w> void Array::Set(size_t ndx, int64_t value) {
+	if(w == 0) return Set_0b(ndx, value);
+	else if(w == 1)	Set_1b(ndx, value);
+	else if(w == 2) Set_2b(ndx, value);
+	else if(w == 4) Set_4b(ndx, value);
+	else if(w == 8)	Set_8b(ndx, value);
+	else if(w == 16) Set_16b(ndx, value);
+	else if(w == 32) Set_32b(ndx, value);
+	else if(w == 64) Set_64b(ndx, value);
 }
 
-void Array::DoSort(size_t lo, size_t hi) {
+
+// Sort array.
+void Array::Sort() {
+	TEMPEX(Sort, ());
+}
+
+// Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
+// Useful for counting-sort functions
+template <size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max) {
+	int64_t min2;
+	int64_t max2;
+	size_t t;
+
+	max2 = Get<w>(from);
+	min2 = max2;
+
+	for(t = from + 1; t < to; t++) {
+		int64_t v = Get<w>(t);
+		// Utilizes that range test is only needed if max2 or min2 were changed
+		if(v < min2) {
+			min2 = v;
+			if((uint64_t)(max2 - min2) > maxdiff)
+				break;
+		}
+		else if(v > max2) {
+			max2 = v;
+			if((uint64_t)(max2 - min2) > maxdiff)
+				break;
+		}
+	}
+
+	if(t < to) {
+		*max = 0;
+		*min = 0;
+		return false;
+	}
+	else {
+		*max = max2;
+		*min = min2;
+		return true;
+	}
+}
+
+// Take index pointers to elements as argument and sort the pointers according to values they point at. Leave m_array untouched. The ref array
+// is allowed to contain fewer elements than m_array.
+void Array::ReferenceSort(Array &ref) {
+	TEMPEX(ReferenceSort, (ref));
+}
+
+template <size_t w>void Array::ReferenceSort(Array &ref) {
+	if(m_len < 2)
+		return;
+
+	int64_t min;
+	int64_t max;
+
+	// in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
+	// So we chose range < m_len as treshold for deciding which to use
+
+	// If range isn't suited for CountSort, it's *probably* discovered very early, within first few values, in most practical cases,
+	// and won't add much wasted work. Max wasted work is O(n) which isn't much compared to QuickSort.
+
+//	bool b = MinMax<w>(0, m_len, m_len, &min, &max); // auto detect
+//	bool b = MinMax<w>(0, m_len, -1, &min, &max); // force count sort
+	bool b = MinMax<w>(0, m_len, 0, &min, &max); // force quicksort
+	
+	if(b) {
+		Array res;
+		Array count;
+
+		// Todo, Preset crashes for unknown reasons but would be faster.
+//		res.Preset(0, m_len, m_len);
+//		count.Preset(0, m_len, max - min + 1);
+
+		for(int64_t t = 0; t < max - min + 1; t++)
+			count.Add(0);
+
+		// Count occurences of each value
+		for(size_t t = 0; t < m_len; t++) {
+			size_t i = TO_REF(Get<w>(t) - min);
+			count.Set(i, count.Get(i) + 1);
+		}
+
+		// Accumulate occurences
+		for(size_t t = 1; t < count.Size(); t++) {
+			count.Set(t, count.Get(t) + count.Get(t - 1));
+		}
+
+		for(size_t t = 0; t < m_len; t++)
+			res.Add(0);
+
+		for(size_t t = m_len; t > 0; t--) {
+			size_t v = TO_REF(Get<w>(t - 1) - min);
+			size_t i = count.GetAsRef(v);
+			count.Set(v, count.Get(v) - 1);
+			res.Set(i - 1, ref.Get(t - 1));
+		}
+
+		// Copy result into ref
+		for(size_t t = 0; t < res.Size(); t++)
+			ref.Set(t, res.Get(t));
+
+		res.Destroy();
+		count.Destroy();
+	}
+	else {
+		ReferenceQuickSort(ref); 
+	}
+}
+
+// Sort array 
+template <size_t w> void Array::Sort() {
+	if(m_len < 2)
+		return;
+
+	size_t lo = 0;
+	size_t hi = m_len - 1;
+	std::vector<size_t> count;
+	int64_t min;
+	int64_t max;
+	bool b = false;
+
+	// in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
+	// Se we chose range < m_len as treshold for deciding which to use
+	if(m_width <= 8) {
+		max = m_ubound;
+		min = m_lbound;
+		b = true;
+	}
+	else {
+		// If range isn't suited for CountSort, it's *probably* discovered very early, within first few values,
+		// in most practical cases, and won't add much wasted work. Max wasted work is O(n) which isn't much
+		// compared to QuickSort.
+		b = MinMax<w>(lo, hi, m_len, &min, &max);
+	}
+
+	if(b) {
+		for(int64_t t = 0; t < max - min + 1; t++)
+			count.push_back(0);
+
+		// Count occurences of each value
+		for(size_t t = lo; t <= hi; t++) {
+			size_t i = TO_REF(Get<w>(t) - min);
+			count[i]++;
+		}
+
+		// Overwrite original array with sorted values
+		size_t dst = 0;
+		for(int64_t i = 0; i < max - min + 1; i++) {
+			size_t c = count[(unsigned int)i];
+			for(size_t j = 0; j < c; j++) {
+				Set<w>(dst, i + min);
+				dst++;
+			}
+		}
+	}
+	else {
+		QuickSort(lo, hi);
+	}
+	
+	return;
+}
+
+void Array::ReferenceQuickSort(Array &ref) {
+	TEMPEX(ReferenceQuickSort, (0, m_len - 1, ref));
+}
+
+
+
+template <size_t w>void Array::ReferenceQuickSort(size_t lo, size_t hi, Array &ref) {
+	// Quicksort based on
+	// http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
+	int i = (int)lo;
+	int j = (int)hi;
+
+	/*
+	// Swap both values and references but lookup values directly: 2.85 sec
+	// comparison element x
+	const size_t ndx = (lo + hi)/2;
+	const int64_t x = (size_t)Get(ndx);
+
+	// partition
+	do {
+		while (Get(i) < x) i++;
+		while (Get(j) > x) j--;
+		if (i <= j) {
+			size_t h = ref.Get(i);
+			ref.Set(i, ref.Get(j));
+			ref.Set(j, h);
+		//	h = Get(i);
+		//	Set(i, Get(j));
+		//	Set(j, h);
+			i++; j--;
+		}
+	} while (i <= j);
+*/	
+	
+	// Lookup values indirectly through references, but swap only references: 2.60 sec
+	// Templated get/set: 2.40 sec (todo, enable again)
+	// comparison element x
+	const size_t ndx = (lo + hi)/2;
+	const int64_t x = Get(ref.GetAsRef(ndx));
+
+	// partition
+	do {
+		while (Get(ref.GetAsRef(i)) < x) i++;
+		while (Get(ref.GetAsRef(j)) > x) j--;
+		if (i <= j) {
+			size_t h = ref.GetAsRef(i);
+			ref.Set(i, ref.Get(j));
+			ref.Set(j, h);
+			i++; j--;
+		}
+	} while (i <= j);
+	
+	//  recursion
+	if ((int)lo < j) ReferenceQuickSort<w>(lo, j, ref);
+	if (i < (int)hi) ReferenceQuickSort<w>(i, hi, ref);
+}
+
+
+void Array::QuickSort(size_t lo, size_t hi) {
+	TEMPEX(QuickSort, (lo, hi);)
+}
+
+template <size_t w>void Array::QuickSort(size_t lo, size_t hi) {
 	// Quicksort based on
 	// http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
 	int i = (int)lo;
@@ -1353,7 +1632,7 @@ void Array::DoSort(size_t lo, size_t hi) {
 
 	// comparison element x
 	const size_t ndx = (lo + hi)/2;
-	const int64_t x = (size_t)Get(ndx);
+	const int64_t x = Get(ndx);
 
 	// partition
 	do {
@@ -1368,8 +1647,15 @@ void Array::DoSort(size_t lo, size_t hi) {
 	} while (i <= j);
 
 	//  recursion
-	if ((int)lo < j) DoSort(lo, j);
-	if (i < (int)hi) DoSort(i, hi);
+	if ((int)lo < j) QuickSort(lo, j);
+	if (i < (int)hi) QuickSort(i, hi);
+}
+
+std::vector<int64_t> Array::ToVector(void) {
+	std::vector<int64_t> v;
+	for(size_t t = 0; t < Size(); t++)
+		v.push_back(Get(t));
+	return v;
 }
 
 #ifdef _DEBUG
@@ -1386,40 +1672,70 @@ bool Array::Compare(const Array& c) const {
 }
 
 void Array::Print() const {
-	printf("%zx: (%zu) ", GetRef(), Size());
+	cout << hex << GetRef() << dec << ": (" << Size() << ") ";
 	for (size_t i = 0; i < Size(); ++i) {
-		if (i) printf(", ");
-		printf("%d", (int)Get(i));
+		if (i) cout << ", ";
+		cout << Get(i);
 	}
-	printf("\n");
+	cout << "\n";
 }
 
 void Array::Verify() const {
 	assert(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
+	
+	// Check that parent is set correctly
+	if (!m_parent) return;
+
+	const size_t ref_in_parent = m_parent->get_child_ref_for_verify(m_parentNdx);
+	assert(ref_in_parent == m_ref);
 }
 
-void Array::ToDot(FILE* f, bool) const{
+void Array::ToDot(std::ostream& out, const char* title) const {
 	const size_t ref = GetRef();
-
-	fprintf(f, "n%zx [label=\"", ref);
-
-	//if (!horizontal) fprintf(f, "{");
-	for (size_t i = 0; i < m_len; ++i) {
-		if (i > 0) fprintf(f, " | ");
-
-		if (m_hasRefs) fprintf(f, "<%zu>",i);
-		else fprintf(f, "%lld", Get(i));
-	}
-	//if (!horizontal) fprintf(f, "}");
 	
-	fprintf(f, "\"];\n");
-
+	if (title) {
+		out << "subgraph cluster_" << ref << " {" << std::endl;
+		out << " label = \"" << title << "\";" << std::endl;
+		out << " color = white;" << std::endl;
+	}
+	
+	out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
+	out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
+	
+	// Header
+	out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
+	out << "0x" << std::hex << ref << std::dec << "<BR/>";
+	if (m_isNode) out << "IsNode<BR/>";
+	if (m_hasRefs) out << "HasRefs<BR/>";
+	out << "</FONT></TD>" << std::endl;
+	
+	// Values
+	for (size_t i = 0; i < m_len; ++i) {
+		const int64_t v =  Get(i);
+		if (m_hasRefs) {
+			// zero-refs and refs that are not 64-aligned do not point to sub-trees
+			if (v == 0) out << "<TD>none";
+			else if (v & 0x1) out << "<TD BGCOLOR=\"grey90\">" << (v >> 1);
+			else out << "<TD PORT=\"" << i << "\">";
+		}
+		else out << "<TD>" << v;
+		out << "</TD>" << std::endl;
+	}
+	
+	out << "</TR></TABLE>>];" << std::endl;
+	if (title) out << "}" << std::endl;
+	
 	if (m_hasRefs) {
 		for (size_t i = 0; i < m_len; ++i) {
-			fprintf(f, "n%zx:%zu -> n%lld\n", ref, i, Get(i));
+			const int64_t target = Get(i);
+			if (target == 0 || target & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+			
+			out << "n" << std::hex << ref << std::dec << ":" << i;
+			out << " -> n" << std::hex << target << std::dec << std::endl;
 		}
 	}
-	fprintf(f, "\n");
+	
+	out << std::endl;
 }
 
 MemStats Array::Stats() const {
@@ -1427,3 +1743,153 @@ MemStats Array::Stats() const {
 }
 
 #endif //_DEBUG
+
+
+// Direct access methods
+
+// Pre-declarations
+bool get_header_isnode_direct(const uint8_t* const header);
+unsigned int get_header_width_direct(const uint8_t* const header);
+size_t get_header_len_direct(const uint8_t* const header);
+int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx);
+size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target);
+template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target);
+
+bool get_header_isnode_direct(const uint8_t* const header) {
+	return (header[0] & 0x80) != 0;
+}
+
+unsigned int get_header_width_direct(const uint8_t* const header) {
+	return (1 << (header[0] & 0x07)) >> 1;
+}
+
+size_t get_header_len_direct(const uint8_t* const header) {
+	return (header[1] << 16) + (header[2] << 8) + header[3];
+}
+
+template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx);
+
+template<> int64_t GetDirect<0>(const char* const, const size_t) {
+	return 0;
+}
+template<> int64_t GetDirect<1>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx >> 3;
+	return (data[offset] >> (ndx & 7)) & 0x01;
+}
+template<> int64_t GetDirect<2>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx >> 2;
+	return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
+}
+template<> int64_t GetDirect<4>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx >> 1;
+	return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
+}
+template<> int64_t GetDirect<8>(const char* const data, const size_t ndx) {
+	return *((const signed char*)(data + ndx));
+}
+template<> int64_t GetDirect<16>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx * 2;
+	return *(const int16_t*)(data + offset);
+}
+template<> int64_t GetDirect<32>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx * 4;
+	return *(const int32_t*)(data + offset);
+}
+template<> int64_t GetDirect<64>(const char* const data, const size_t ndx) {
+	const size_t offset = ndx * 8;
+	return *(const int64_t*)(data + offset);
+}
+
+int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx) {
+	switch (width) {
+		case  0: return GetDirect<0>(data, ndx);
+		case  1: return GetDirect<1>(data, ndx);
+		case  2: return GetDirect<2>(data, ndx);
+		case  4: return GetDirect<4>(data, ndx);
+		case  8: return GetDirect<8>(data, ndx);
+		case 16: return GetDirect<16>(data, ndx);
+		case 32: return GetDirect<32>(data, ndx);
+		case 64: return GetDirect<64>(data, ndx);
+		default:
+			assert(false);
+			return 0;
+	}
+}
+
+size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target) {
+	switch (width) {
+		case  0: return 0;
+		case  1: return FindPosDirectImp<1>(header, data, target);
+		case  2: return FindPosDirectImp<2>(header, data, target);
+		case  4: return FindPosDirectImp<4>(header, data, target);
+		case  8: return FindPosDirectImp<8>(header, data, target);
+		case 16: return FindPosDirectImp<16>(header, data, target);
+		case 32: return FindPosDirectImp<32>(header, data, target);
+		case 64: return FindPosDirectImp<64>(header, data, target);
+		default:
+			assert(false);
+			return 0;
+	}
+}
+
+template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target) {
+	const size_t len = get_header_len_direct(header);
+	
+	int low = -1;
+	int high = (int)len;
+	
+	// Binary search based on:
+	// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+	// Finds position of largest value SMALLER than the target (for lookups in
+	// nodes)
+	while (high - low > 1) {
+		const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+		const int64_t v = GetDirect<width>(data, probe);
+		
+		if (v > target) high = (int)probe;
+		else            low = (int)probe;
+	}
+	if (high == (int)len) return (size_t)-1;
+	else return (size_t)high;
+}
+
+// Get value direct through column b-tree without instatiating any Arrays.
+int64_t Array::ColumnGet(size_t ndx) const {
+	const char* data   = (const char*)m_data;
+	const uint8_t* header = (const uint8_t*)data - 8;
+	unsigned int width = m_width;
+	bool isNode = m_isNode;
+	
+	while (1) {
+		if (isNode) {
+			// Get subnode table
+			const size_t ref_offsets = GetDirect(data, width, 0);
+			const size_t ref_refs    = GetDirect(data, width, 1);
+			
+			// Find the subnode containing the item
+			const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+			const char* const offsets_data = (const char*)offsets_header + 8;
+			const size_t offsets_width  = get_header_width_direct(offsets_header);
+			const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
+			
+			// Calc index in subnode
+			const size_t offset = node_ndx ? (size_t)GetDirect(offsets_data, offsets_width, node_ndx-1) : 0;
+			ndx = ndx - offset; // local index
+			
+			// Get ref to array
+			const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+			const char* const refs_data = (const char*)refs_header + 8;
+			const unsigned int refs_width  = get_header_width_direct(refs_header);
+			const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
+			
+			// Set vars for next iteration
+			header = (const uint8_t*)m_alloc.Translate(ref);
+			data   = (const char*)header + 8;
+			width  = get_header_width_direct(header);
+			isNode = get_header_isnode_direct(header);
+		}
+		else {
+			return GetDirect(data, width, ndx);
+		}
+	}
+}

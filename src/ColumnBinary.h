@@ -8,8 +8,8 @@
 class ColumnBinary : public ColumnBase {
 public:
 	ColumnBinary(Allocator& alloc=GetDefaultAllocator());
-	ColumnBinary(size_t ref, Array* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	ColumnBinary(size_t ref, const Array* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	ColumnBinary(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ColumnBinary(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	~ColumnBinary();
 
 	void Destroy();
@@ -28,6 +28,7 @@ public:
 	void Set(size_t ndx, const void* value, size_t len);
 	void Insert(size_t ndx, const void* value, size_t len);
 	void Delete(size_t ndx);
+	void Resize(size_t ndx);
 	void Clear();
 
 	// Index
@@ -37,11 +38,8 @@ public:
 	size_t FindWithIndex(int64_t) const {return (size_t)-1;}
 
 	size_t GetRef() const {return m_array->GetRef();}
-	void SetParent(Array* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
+	void SetParent(ArrayParent *parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 	void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
-
-	// Serialization
-	template<class S> size_t Write(S& out, size_t& pos) const;
 
 #ifdef _DEBUG
 	void Verify() const {};
@@ -60,20 +58,11 @@ protected:
 	bool LeafSet(size_t ndx, BinaryData value);
 	bool LeafInsert(size_t ndx, BinaryData value);
 	void LeafDelete(size_t ndx);
-	template<class S> size_t LeafWrite(S& out, size_t& pos) const;
+	
+#ifdef _DEBUG
+	virtual void LeafToDot(std::ostream& out, const Array& array) const;
+#endif //_DEBUG
 };
-
-// Templates
-
-template<class S>
-size_t ColumnBinary::Write(S& out, size_t& pos) const {
-	return TreeWrite<const char*, ColumnBinary>(out, pos);
-}
-
-template<class S>
-size_t ColumnBinary::LeafWrite(S& out, size_t& pos) const {
-	return ((ArrayBinary*)m_array)->Write(out, pos);
-}
 
 #endif //__TDB_COLUMN_BINARY__
 

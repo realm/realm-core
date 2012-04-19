@@ -54,7 +54,7 @@ int main() {
 	}
 	table.Add(0, "abcde", 100, Wed);
 
-	printf("Memory usage: %lld bytes\n", (int64_t)GetMemUsage()); // %zu doesn't work in vc
+	printf("Memory usage: %lld bytes\n", (long long)GetMemUsage()); // %zu doesn't work in vc
 
 	UnitTest::Timer timer;
 
@@ -65,7 +65,7 @@ int main() {
 		// Do a search over entire column (value not found)
 		for (size_t i = 0; i < 100; ++i) {
 			const size_t res = table.fourth.Find(Tue);
-			if (res != -1) {	
+			if (res != size_t(-1)) {	
 				printf("error");
 			}
 		}
@@ -81,7 +81,7 @@ int main() {
 		// Do a search over entire column (value not found)
 		for (size_t i = 0; i < 100; ++i) {
 			const size_t res = table.third.Find(50);
-			if (res != -1) {	
+			if (res != size_t(-1)) {	
 				printf("error");
 			}
 		}
@@ -116,7 +116,7 @@ int main() {
 		printf("Add index: %dms\n", search_time);
 	}
 
-	printf("Memory usage2: %lld bytes\n", (int64_t)GetMemUsage()); // %zu doesn't work in vc
+	printf("Memory usage2: %lld bytes\n", (long long)GetMemUsage()); // %zu doesn't work in vc
 
 	// Search with index
 	{
@@ -134,7 +134,6 @@ int main() {
 		printf("Search index: %dms\n", search_time);
 	}
 
-	//getchar(); // wait for key
-	//return 1;
+	return 0;
 }
 

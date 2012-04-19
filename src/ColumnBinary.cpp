@@ -14,7 +14,7 @@ ColumnBinary::ColumnBinary(Allocator& alloc) {
 	m_array = new ArrayBinary(NULL, 0, alloc);
 }
 
-ColumnBinary::ColumnBinary(size_t ref, Array* parent, size_t pndx, Allocator& alloc) {
+ColumnBinary::ColumnBinary(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc) {
 	const bool isNode = IsNodeFromRef(ref, alloc);
 	if (isNode) {
 		m_array = new Array(ref, parent, pndx, alloc);
@@ -24,7 +24,7 @@ ColumnBinary::ColumnBinary(size_t ref, Array* parent, size_t pndx, Allocator& al
 	}
 }
 
-ColumnBinary::ColumnBinary(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) {
+ColumnBinary::ColumnBinary(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) {
 	const bool isNode = IsNodeFromRef(ref, alloc);
 	if (isNode) {
 		m_array = new Array(ref, parent, pndx, alloc);
@@ -49,10 +49,16 @@ void ColumnBinary::UpdateRef(size_t ref) {
 
 	if (IsNode()) m_array->UpdateRef(ref);
 	else {
+		ArrayParent *const parent = m_array->GetParent();
+		const size_t pndx   = m_array->GetParentNdx();
+
 		// Replace the string array with int array for node
-		Array* array = new Array(ref, m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
+		Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
 		delete m_array;
 		m_array = array;
+
+		// Update ref in parent
+		if (parent) parent->update_child_ref(pndx, ref);
 	}
 }
 
@@ -79,10 +85,17 @@ size_t ColumnBinary::Size() const {
 
 void ColumnBinary::Clear() {
 	if (m_array->IsNode()) {
+		ArrayParent *const parent = m_array->GetParent();
+		const size_t pndx = m_array->GetParentNdx();
+
 		// Revert to binary array
+		ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->GetAllocator());
+		if (parent) parent->update_child_ref(pndx, array->GetRef());
+
+		// Remove original node
 		m_array->Destroy();
-		Array* array = new ArrayBinary(m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
 		delete m_array;
+
 		m_array = array;
 	}
 	else ((ArrayBinary*)m_array)->Clear();
@@ -140,6 +153,12 @@ void ColumnBinary::Delete(size_t ndx) {
 	TreeDelete<BinaryData,ColumnBinary>(ndx);
 }
 
+void ColumnBinary::Resize(size_t ndx) {
+	assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
+	assert(ndx < Size());
+	((ArrayBinary*)m_array)->Resize(ndx);
+}
+
 BinaryData ColumnBinary::LeafGet(size_t ndx) const {
 	const ArrayBinary* const array = (ArrayBinary*)m_array;
 	const BinaryData bin = {array->Get(ndx), array->GetLen(ndx)};
@@ -159,3 +178,15 @@ bool ColumnBinary::LeafInsert(size_t ndx, BinaryData value) {
 void ColumnBinary::LeafDelete(size_t ndx) {
 	((ArrayBinary*)m_array)->Delete(ndx);
 }
+
+#ifdef _DEBUG
+
+void ColumnBinary::LeafToDot(std::ostream& out, const Array& array) const {
+	// Rebuild array to get correct type
+	const size_t ref = array.GetRef();
+	const ArrayBinary binarray(ref, NULL, 0, array.GetAllocator());
+	
+	binarray.ToDot(out);
+}
+
+#endif //_DEBUG

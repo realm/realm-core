@@ -2,9 +2,13 @@
 #include <cassert>
 #include <cstring>
 #include <cstdio> // debug
+#include <iostream>
 #include "utilities.h"
 #include "Column.h"
 #include "ArrayString.h"
+
+using namespace std;
+
 
 // Pre-declare local functions
 size_t round_up(size_t len);
@@ -23,19 +27,24 @@ size_t round_up(size_t len) {
 	return width;
 }
 
-ArrayString::ArrayString(Array* parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
+ArrayString::ArrayString(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
+	// Manually set wtype as array constructor in initiatializer list
+	// will not be able to call correct virtual function
+	set_header_wtype(TDB_MULTIPLY);
 }
 
-ArrayString::ArrayString(size_t ref, const Array* parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc) {
+ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc): Array(alloc) {
+	// Manually create array as doing it in initializer list
+	// will not be able to call correct virtual functions
+	Create(ref);
+	SetParent(const_cast<ArrayParent *>(parent), pndx);
 }
 
 // Creates new array (but invalid, call UpdateRef to init)
-ArrayString::ArrayString(Allocator& alloc) : Array(alloc) {
-}
+ArrayString::ArrayString(Allocator& alloc): Array(alloc) {}
 
 
-ArrayString::~ArrayString() {
-}
+ArrayString::~ArrayString() {}
 
 const char* ArrayString::Get(size_t ndx) const {
 	assert(ndx < m_len);
@@ -65,8 +74,8 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 	// Make room for the new value
 	if (width > m_width) {
 		const size_t oldwidth = m_width;
+		if (!Alloc(m_len, width)) return false;
 		m_width = width;
-		if (!Alloc(m_len, m_width)) return false;
 
 		// Expand the old values
 		int k = (int)m_len;
@@ -123,8 +132,8 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
 	// Make room for the new value
 	const size_t oldwidth = m_width;
+	if (!Alloc(m_len+1, doExpand ? width : m_width)) return false;
 	if (doExpand) m_width = width;
-	if (!Alloc(m_len+1, m_width)) return false;
 
 	// Move values below insertion (may expand)
 	if (doExpand) {
@@ -152,10 +161,12 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
 	// Set the value
 	char* data = (char*)m_data + (ndx * m_width);
+	memcpy(data, value, len);
+
+	// Pad with zeroes
 	char* const end = data + m_width;
-	memmove(data, value, len);
 	for (data += len; data < end; ++data) {
-		*data = '\0'; // pad with zeroes
+		*data = '\0';
 	}
 
 	// Expand values above insertion
@@ -202,6 +213,13 @@ size_t ArrayString::CalcByteLen(size_t count, size_t width) const {
 	return 8 + (count * width);
 }
 
+size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const {
+	if (width == 0) return (size_t)-1; // zero-width gives infinite space
+
+	const size_t bytes_without_header = bytes - 8;
+	return bytes_without_header / width;
+}
+
 size_t ArrayString::Find(const char* value, size_t start, size_t end) const {
 	assert(value);
 	return FindWithLen(value, strlen(value), start, end);
@@ -233,7 +251,7 @@ size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, siz
 	// todo, ensure behaves as expected when m_width = 0
 
 	for (size_t i = start; i < end; ++i) {
-		if (value[0] == m_data[i * m_width] && value[len] == m_data[i * m_width + len]) {
+		if (value[0] == (char)m_data[i * m_width] && value[len] == (char)m_data[i * m_width + len]) {
 			const char* const v = (const char *)m_data + i * m_width;
 			if (strncmp(value, v, len) == 0) return i;
 		}
@@ -271,16 +289,17 @@ void ArrayString::StringStats() const {
 	const size_t zeroes = size - total;
 	const size_t zavg = zeroes / m_len;
 
-	printf("Count: %zu\n", m_len);
-	printf("Width: %zu\n", m_width);
-	printf("Total: %zu\n", size);
-	printf("Capacity: %zu\n\n", m_capacity);
-	printf("Bytes string: %zu\n", total);
-	printf("     longest: %zu\n", longest);
-	printf("Bytes zeroes: %zu\n", zeroes);
-	printf("         avg: %zu\n", zavg);
+	cout << "Count: " << m_len << "\n";
+	cout << "Width: " << m_width << "\n";
+	cout << "Total: " << size << "\n";
+	cout << "Capacity: " << m_capacity << "\n\n";
+	cout << "Bytes string: " << total << "\n";
+	cout << "     longest: " << longest << "\n";
+	cout << "Bytes zeroes: " << zeroes << "\n";
+	cout << "         avg: " << zavg << "\n";
 }
 
+/*
 void ArrayString::ToDot(FILE* f) const {
 	const size_t ref = GetRef();
 
@@ -293,6 +312,31 @@ void ArrayString::ToDot(FILE* f) const {
 	}
 	
 	fprintf(f, "\"];\n");
+}
+*/
+
+void ArrayString::ToDot(std::ostream& out, const char* title) const {
+	const size_t ref = GetRef();
+	
+	if (title) {
+		out << "subgraph cluster_" << ref << " {" << std::endl;
+		out << " label = \"" << title << "\";" << std::endl;
+		out << " color = white;" << std::endl;
+	}
+	
+	out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
+	out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
+
+	// Header
+	out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\">";
+	out << "0x" << std::hex << ref << std::dec << "</FONT></TD>" << std::endl;
+	
+	for (size_t i = 0; i < m_len; ++i) {
+		out << "<TD>\"" << Get(i) << "\"</TD>" << std::endl;
+	}
+	
+	out << "</TR></TABLE>>];" << std::endl;
+	if (title) out << "}" << std::endl;
 }
 
 #endif //_DEBUG

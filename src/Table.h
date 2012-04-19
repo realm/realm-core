@@ -9,15 +9,61 @@
 #include "ColumnBinary.h"
 #include "alloc.h"
 #include "ColumnType.h"
+#include "TableRef.hpp"
 
 class Accessor;
 class TableView;
 class Group;
 class ColumnTable;
+class ColumnMixed;
+class Table;
+class TopLevelTable;
+
+
+class Date {
+public:
+	Date(time_t d) : m_date(d) {}
+	time_t GetDate() const {return m_date;}
+private:
+	time_t m_date;
+};
+
+
+
+class Mixed {
+public:
+	explicit Mixed(ColumnType v)  {assert(v == COLUMN_TYPE_TABLE); (void)v; m_type = COLUMN_TYPE_TABLE;}
+	Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
+	Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.GetDate();}
+	Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
+	Mixed(const char* v) {m_type = COLUMN_TYPE_STRING; m_str  = v;}
+	Mixed(BinaryData v)  {m_type = COLUMN_TYPE_BINARY; m_str = (const char*)v.pointer; m_len = v.len;}
+	Mixed(const char* v, size_t len) {m_type = COLUMN_TYPE_BINARY; m_str = v; m_len = len;}
+
+	ColumnType GetType() const {return m_type;}
+
+	int64_t     GetInt()    const {assert(m_type == COLUMN_TYPE_INT);    return m_int;}
+	bool        GetBool()   const {assert(m_type == COLUMN_TYPE_BOOL);   return m_bool;}
+	time_t      GetDate()   const {assert(m_type == COLUMN_TYPE_DATE);   return m_date;}
+	const char* GetString() const {assert(m_type == COLUMN_TYPE_STRING); return m_str;}
+	BinaryData	GetBinary() const {assert(m_type == COLUMN_TYPE_BINARY); BinaryData b = {m_str, m_len}; return b;}
+
+private:
+	ColumnType m_type;
+	union {
+		int64_t m_int;
+		bool    m_bool;
+		time_t  m_date;
+		const char* m_str;
+	};
+	size_t m_len;
+};
+
+
 
 class Spec {
 public:
-	Spec(Allocator& alloc, size_t ref, Array* parent, size_t pndx);
+	Spec(Allocator& alloc, size_t ref, ArrayParent *parent, size_t pndx);
 	Spec(const Spec& s);
 
 	void AddColumn(ColumnType type, const char* name);
@@ -36,8 +82,12 @@ public:
 	// Serialization
 	template<class S> size_t Write(S& out, size_t& pos) const;
 
+#ifdef _DEBUG
+	void ToDot(std::ostream& out, const char* title=NULL) const;
+#endif //_DEBUG
+
 private:
-	void Create(size_t ref, Array* parent, size_t pndx);
+	void Create(size_t ref, ArrayParent *parent, size_t pndx);
 
 	Array m_specSet;
 	Array m_spec;
@@ -45,11 +95,22 @@ private:
 	Array m_subSpecs;
 };
 
+
+
+typedef BasicTableRef<Table> TableRef;
+typedef BasicTableRef<Table const> TableConstRef;
+
+typedef BasicTableRef<TopLevelTable> TopLevelTableRef;
+typedef BasicTableRef<TopLevelTable const> TopLevelTableConstRef;
+
+
 class Table {
 public:
 	Table(Allocator& alloc=GetDefaultAllocator());
-	Table(const Table& t);
-	~Table();
+	virtual ~Table();
+
+	TableRef GetTableRef() { return TableRef(this); }
+	TableConstRef GetTableRef() const { return TableConstRef(this); }
 
 	// Column meta info
 	size_t GetColumnCount() const;
@@ -90,17 +151,25 @@ public:
 	// Strings
 	const char* GetString(size_t column_id, size_t ndx) const;
 	void SetString(size_t column_id, size_t ndx, const char* value);
-	
+
 	// Binary
 	BinaryData GetBinary(size_t column_id, size_t ndx) const;
 	void SetBinary(size_t column_id, size_t ndx, const void* value, size_t len);
 
 	// Sub-tables
-	Table  GetTable(size_t column_id, size_t ndx);
-	Table* GetTablePtr(size_t column_id, size_t ndx);
+	TableRef GetTable(size_t column_id, size_t ndx);
+	TableConstRef GetTable(size_t column_id, size_t ndx) const;
+	TopLevelTableRef GetTopLevelTable(size_t column_id, size_t ndx); // Must be a mixed column
+	TopLevelTableConstRef GetTopLevelTable(size_t column_id, size_t ndx) const; // Must be a mixed column
 	size_t GetTableSize(size_t column_id, size_t ndx) const;
 	void   InsertTable(size_t column_id, size_t ndx);
 	void   ClearTable(size_t column_id, size_t ndx);
+
+	// Mixed
+	Mixed GetMixed(size_t column_id, size_t ndx) const;
+	ColumnType GetMixedType(size_t column_id, size_t ndx) const;
+	void InsertMixed(size_t column_id, size_t ndx, Mixed value);
+	void SetMixed(size_t column_id, size_t ndx, Mixed value);
 
 	size_t RegisterColumn(ColumnType type, const char* name);
 
@@ -114,6 +183,8 @@ public:
 	const ColumnStringEnum& GetColumnStringEnum(size_t ndx) const;
 	ColumnTable& GetColumnTable(size_t ndx);
 	const ColumnTable& GetColumnTable(size_t ndx) const;
+	ColumnMixed& GetColumnMixed(size_t ndx);
+	const ColumnMixed& GetColumnMixed(size_t ndx) const;
 
 	// Searching
 	size_t Find(size_t column_id, int64_t value) const;
@@ -132,41 +203,68 @@ public:
 	// Optimizing
 	void Optimize();
 
+	// Conversion
+	void to_json(std::ostream& out);
+
 	// Debug
 #ifdef _DEBUG
 	bool Compare(const Table& c) const;
 	void Verify() const;
-	void ToDot(const char* filename) const;
+	void ToDot(std::ostream& out, const char* title=NULL) const;
 	void Print() const;
 	MemStats Stats() const;
 #endif //_DEBUG
 
+	// todo, note, these three functions have been protected
+	const ColumnBase& GetColumnBase(size_t ndx) const;
+	ColumnType GetRealColumnType(size_t ndx) const;
+
+	class Parent;
+
 protected:
 	friend class Group;
 	friend class ColumnTable;
+	friend class ColumnMixed;
 
-	Table(Allocator& alloc, bool dontInit); // Construct un-initialized
-	Table(Allocator& alloc, size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns); // Construct from ref
+	class NoInitTag {};
 
-	void Create(size_t ref_specSet, size_t ref_columns, Array* parent_columns, size_t pndx_columns);
+	/**
+	 * Used when constructing subtables tables, that is, tables whose
+	 * lifetime is managed by reference counting, not by the
+	 * application.
+	 */
+	class SubtableTag {};
+
+	Table(NoInitTag, Allocator &alloc); // Construct un-initialized
+
+	Table(NoInitTag, SubtableTag, Allocator &alloc); // Construct subtable un-initialized
+
+	/**
+	 * Construct top-level table from ref.
+	 */
+	Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
+		  Parent *parent, size_t ndx_in_parent);
+
+	/**
+	 * Construct subtable from ref.
+	 */
+	Table(SubtableTag, Allocator &alloc, size_t ref_specSet, size_t columns_ref,
+		  Parent *parent, size_t ndx_in_parent);
+
+	void Create(size_t ref_specSet, size_t ref_columns, ArrayParent *parent, size_t ndx_in_parent);
 	void CreateColumns();
 	void CacheColumns();
 	void ClearCachedColumns();
 
-	// Serialization
-	template<class S> size_t Write(S& out, size_t& pos) const;
-	static Table LoadFromFile(const char* path);
-
-	ColumnBase& GetColumnBase(size_t ndx);
-	const ColumnBase& GetColumnBase(size_t ndx) const;
-
 	// Specification
-	ColumnType GetRealColumnType(size_t ndx) const;
 	size_t GetColumnRefPos(size_t column_ndx) const;
 	void UpdateColumnRefs(size_t column_ndx, int diff);
 
-	void InstantiateBeforeChange();
-
+	
+#ifdef _DEBUG
+	void ToDotInternal(std::ostream& out) const;
+#endif //_DEBUG
+	
 	// Member variables
 	size_t m_size;
 	
@@ -180,43 +278,80 @@ protected:
 	// Cached columns
 	Array m_cols;
 
+	std::size_t get_ref_count() const { return m_ref_count; }
+
 private:
-	Table& operator=(const Table& t); // non assignable
+	Table(Table const &); // Disable copy construction
+	Table &operator=(Table const &); // Disable copying assignment
+
+	template<class> friend class BasicTableRef;
+	friend class ColumnSubtableParent;
+
+	mutable std::size_t m_ref_count;
+	void bind_ref() const { ++m_ref_count; }
+	void unbind_ref() const { if (--m_ref_count == 0) delete this; }
+
+	ColumnBase& GetColumnBase(size_t ndx);
+	void InstantiateBeforeChange();
 };
+
+
+
+class Table::Parent: public ArrayParent
+{
+protected:
+	friend class Table;
+	friend class TopLevelTable;
+
+	/**
+	 * Must be called whenever a child Table is destroyed.
+	 */
+	virtual void child_destroyed(std::size_t child_ndx) = 0;
+};
+
+
 
 class TopLevelTable : public Table {
 public:
 	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
-	~TopLevelTable();
+	virtual ~TopLevelTable();
+
+	TopLevelTableRef GetTableRef() { return TopLevelTableRef(this); }
+	TopLevelTableConstRef GetTableRef() const { return TopLevelTableConstRef(this); }
 
 	void UpdateFromSpec(size_t ref_specSet);
+	size_t GetRef() const;
 
 	// Debug
 #ifdef _DEBUG
 	MemStats Stats() const;
+	void DumpToDot(std::ostream& out) const;
+	void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 
 protected:
-	friend class Group;
-
-	// Construct from ref
-	TopLevelTable(Allocator& alloc, size_t ref_top, Array* parent, size_t pndx);
-
-	void SetParent(Array* parent, size_t pndx);
-	size_t GetRef() const;
-
-	void Invalidate() {m_top.Invalidate();}
-
-	// Serialization
-	template<class S> size_t Write(S& out, size_t& pos) const;
-
 	// On-disk format
 	Array m_top;
 
+	/**
+	 * Construct top-level table from ref.
+	 */
+	TopLevelTable(Allocator& alloc, size_t ref_top, Parent *parent, size_t ndx_in_parent);
+
 private:
-	TopLevelTable(const TopLevelTable&) {}            // not copyable
-	TopLevelTable& operator=(const TopLevelTable&) {return *this;} // non assignable
+	friend class Group;
+	friend class ColumnMixed;
+
+	/**
+	 * Construct subtable from ref.
+	 */
+	TopLevelTable(SubtableTag, Allocator& alloc, size_t ref_top,
+				  Parent *parent, size_t ndx_in_parent);
+
+	void SetParent(Parent *parent, size_t ndx_in_parent);
 };
+
+
 
 class TableView {
 public:
@@ -226,7 +361,7 @@ public:
 
 	Table& GetParent() {return m_table;}
 	Array& GetRefColumn() {return m_refs;}
-	size_t GetRef(size_t ndx) const {return m_refs.Get(ndx);}
+	size_t GetRef(size_t ndx) const {return m_refs.GetAsRef(ndx);}
 
 	bool IsEmpty() const {return m_refs.IsEmpty();}
 	size_t GetSize() const {return m_refs.Size();}
@@ -242,6 +377,13 @@ public:
 	void SetBool(size_t column_id, size_t ndx, bool value);
 	void SetDate(size_t column_id, size_t ndx, time_t value);
 	void SetString(size_t column_id, size_t ndx, const char* value);
+	void Sort(size_t column, bool Ascending = true);
+	// Sub-tables
+	TableRef GetTable(size_t column_id, size_t ndx); // FIXME: Const version? Two kinds of TableView, one for const, one for non-const?
+
+	// Deleting
+	void Delete(size_t ndx);
+	void Clear();
 
 	// Finding
 	size_t Find(size_t column_id, int64_t value) const;
@@ -296,6 +438,10 @@ protected:
 	const char* GetString() const {return m_cursor->m_table.GetString(m_column, m_cursor->m_index);}
 	void SetString(const char* value) {m_cursor->m_table.SetString(m_column, m_cursor->m_index, value);}
 
+	Mixed GetMixed() const {return m_cursor->m_table.GetMixed(m_column, m_cursor->m_index);}
+	ColumnType GetMixedType() const {return m_cursor->m_table.GetMixedType(m_column, m_cursor->m_index);}
+	void SetMixed(Mixed value) {m_cursor->m_table.SetMixed(m_column, m_cursor->m_index, value);}
+
 	CursorBase* m_cursor;
 	size_t m_column;
 };
@@ -333,6 +479,20 @@ class AccessorDate : public Accessor {
 public:
 	operator time_t() const {return GetDate();}
 	void operator=(time_t value) {SetDate(value);}
+	static const ColumnType type;
+};
+
+class AccessorMixed : public Accessor {
+public:
+	operator Mixed() const {return GetMixed();}
+	void operator=(Mixed value) {SetMixed(value);}
+	ColumnType GetType() const {return GetMixedType();}
+	Mixed Get() const {return GetMixed();}
+	int64_t GetInt() const {return GetMixed().GetInt();}
+	bool GetBool() const {return GetMixed().GetBool();}
+	time_t GetDate() const {return GetMixed().GetDate();}
+	const char* GetString() const {return GetMixed().GetString();}
+	BinaryData GetBinary() const {return GetMixed().GetBinary();}
 	static const ColumnType type;
 };
 
@@ -384,18 +544,23 @@ public:
 
 };
 
-template<class T> class TypeEnum {
+class ColumnProxyMixed : public ColumnProxy {
 public:
-	TypeEnum(T v) : m_value(v) {};
+};
+
+template<class T> class tdbTypeEnum {
+public:
+	tdbTypeEnum(T v) : m_value(v) {};
 	operator T() const {return m_value;}
-	TypeEnum<T>& operator=(const TypeEnum<T>& v) {m_value = v.m_value;}
+	tdbTypeEnum<T>& operator=(const tdbTypeEnum<T>& v) {m_value = v.m_value;}
 private:
 	const T m_value;
 };
-#define TypeInt int64_t
-#define TypeBool bool
-#define TypeString const char*
-
+#define tdbTypeInt int64_t
+#define tdbTypeBool bool
+#define tdbTypeString const char*
+#define tdbTypeMixed Mixed
+	
 // Make all enum types return int type
 template<typename T> struct COLUMN_TYPE_Enum {
 public:
@@ -447,139 +612,8 @@ public:
 	QueryItem between(T, T) {return QueryItem();}
 };
 
-// Templates
-
-#include "ColumnTable.h"
-
-template<class S>
-size_t Spec::Write(S& out, size_t& pos) const {
-	Array specSet(COLUMN_HASREFS);
-
-	// Spec
-    const size_t specPos = pos;
-    pos += m_spec.Write(out);
-	specSet.Add(specPos);
-
-    // Names
-    const size_t namesPos = pos;
-    pos += m_names.Write(out);
-	specSet.Add(namesPos);
-
-	// Sub-Specs
-	if (m_specSet.Size() == 3) {
-		Allocator& alloc = m_specSet.GetAllocator();
-		Array subSpecs(COLUMN_HASREFS);
-
-		for (size_t i = 0; i < m_subSpecs.Size(); ++i) {
-			const size_t ref = m_subSpecs.Get(i);
-			const Spec spec(alloc, ref, NULL, 0);
-			const size_t subpos = spec.Write(out, pos);
-			subSpecs.Add(subpos);
-		}
-
-		const size_t subspecsPos = pos;
-		pos += subSpecs.Write(out);
-		specSet.Add(subspecsPos);
-
-		// Clean-up
-		subSpecs.SetType(COLUMN_NORMAL); // avoid recursive del
-		subSpecs.Destroy();
-	}
-
-	// SpecSet
-	const size_t specSetPos = pos;
-	pos += specSet.Write(out);
-
-	// Clean-up
-	specSet.SetType(COLUMN_NORMAL); // avoid recursive del
-	specSet.Destroy();
-
-	return specSetPos;
-}
-
-template<class S>
-size_t Table::Write(S& out, size_t& pos) const {
-    // Write Columns
-    Array columns(COLUMN_HASREFS);
-    const size_t column_count = GetColumnCount();
-	for (size_t i = 0; i < column_count; ++i) {
-		const ColumnType type = GetRealColumnType(i);
-		switch (type) {
-			case COLUMN_TYPE_INT:
-			case COLUMN_TYPE_BOOL:
-			case COLUMN_TYPE_DATE:
-            {
-                const Column& column = GetColumn(i);
-                const size_t cpos = column.Write(out, pos);
-                columns.Add(cpos);
-            }
-				break;
-			case COLUMN_TYPE_STRING:
-            {
-                const AdaptiveStringColumn& column = GetColumnString(i);
-                const size_t cpos = column.Write(out, pos);
-                columns.Add(cpos);
-            }
-				break;
-			case COLUMN_TYPE_STRING_ENUM:
-            {
-                const ColumnStringEnum& column = GetColumnStringEnum(i);
-                size_t ref_keys;
-				size_t ref_values;
-				column.Write(out, pos, ref_keys, ref_values);
-                columns.Add(ref_keys);
-				columns.Add(ref_values);
-            }
-				break;
-			case COLUMN_TYPE_TABLE:
-            {
-				const ColumnTable& column = GetColumnTable(i);
-                const size_t cpos = column.Write(out, pos);
-                columns.Add(cpos);
-			}
-				break;
-			case COLUMN_TYPE_BINARY:
-            {
-                const ColumnBinary& column = GetColumnBinary(i);
-                const size_t cpos = column.Write(out, pos);
-                columns.Add(cpos);
-            }
-				break;
-			default: assert(false);
-		}
-	}
-    const size_t columnsPos = pos;
-    pos += columns.Write(out);
-
-	// Clean-up
-	columns.SetType(COLUMN_NORMAL); // avoid recursive del
-	columns.Destroy();
-
-    return columnsPos;
-}
-
-template<class S>
-size_t TopLevelTable::Write(S& out, size_t& pos) const {
-	// Write entire spec tree
-	const Spec spec = GetSpec();
-	const size_t specSetPos = spec.Write(out, pos);
-
-	// Write columns
-	const size_t columnsPos = Table::Write(out, pos);
-
-	// Top-level Table array
-    Array top(COLUMN_HASREFS);
-	top.Add(specSetPos);
-    top.Add(columnsPos);
-    const size_t topPos = pos; // sized for top ref
-    pos += top.Write(out);
-
-    // Clean-up
-	top.SetType(COLUMN_NORMAL); // avoid recursive del
-	top.Destroy();
-
-    return topPos;
-}
-
+class QueryAccessorMixed {
+public:
+};
 
 #endif //__TDB_TABLE__

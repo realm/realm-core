@@ -12,11 +12,13 @@
 #include <sys/mman.h>
 #endif
 
+#include <cassert>
+#include <iostream>
 #include "AllocSlab.h"
-#include <assert.h>
+#include "Array.h"
 
 #ifdef _DEBUG
-#include <stdio.h>
+#include <cstdio>
 #endif //_DEBUG
 
 Allocator& GetDefaultAllocator() {
@@ -126,6 +128,7 @@ MemRef SlabAlloc::Alloc(size_t size) {
 }
 
 // Support function
+// todo, fixme: use header function in array instead!
 size_t GetSizeFromHeader(void* p) {
 	// parse the capacity part of 8byte header
 	const uint8_t* const header = (uint8_t*)p;
@@ -162,7 +165,10 @@ void SlabAlloc::Free(size_t ref, void* p) {
 		const size_t count = m_freeSpace.GetSize();
 		for (size_t i = 0; i < count; ++i) {
 			FreeSpace::Cursor c = m_freeSpace[i];
-			const size_t end = c.ref + c.size;
+
+		//	printf("%d %d", c.ref, c.size);
+
+			const size_t end = TO_REF(c.ref + c.size);
 			if (ref == end) {
 				if (isMerged) {
 					c.size += m_freeSpace[n].size;
@@ -223,10 +229,20 @@ bool SlabAlloc::IsReadOnly(size_t ref) const {
 	return ref < m_baseline;
 }
 
-void SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
+bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
+	// Verify that the topref points to a location within buffer.
+	// This is currently the only integrity check we make
+	size_t ref = (size_t)(*(uint64_t*)buffer);
+	if (ref > len) return false;
+	
+	// There is a unit test that calls this function with an invalid buffer
+	// so we can't size_t-test range with TO_REF until now
+	ref = TO_REF(*(uint64_t*)buffer);
+
 	m_shared = (char*)buffer;
 	m_baseline = len;
 	m_owned = true; // we now own the buffer
+	return true;
 }
 
 bool SlabAlloc::SetShared(const char* path) {
@@ -237,6 +253,7 @@ bool SlabAlloc::SetShared(const char* path) {
 	// Map to memory (read only)
 	const HANDLE hMapFile = CreateFileMapping(m_fd, NULL, PAGE_WRITECOPY, 0, 0, 0);
 	if (hMapFile == NULL || hMapFile == INVALID_HANDLE_VALUE) {
+		CloseHandle(m_fd);
 		return false;
 	}
 	const LPCTSTR pBuf = (LPTSTR) MapViewOfFile(hMapFile, FILE_MAP_COPY, 0, 0, 0);
@@ -247,7 +264,7 @@ bool SlabAlloc::SetShared(const char* path) {
 	// Get Size
 	LARGE_INTEGER size;
 	GetFileSizeEx(m_fd, &size);
-	m_baseline = size.QuadPart;
+	m_baseline = TO_REF(size.QuadPart);
 
 	m_shared = (char *)pBuf;
 	m_mapfile = hMapFile;
@@ -285,7 +302,7 @@ bool SlabAlloc::SetShared(const char* path) {
 size_t SlabAlloc::GetTopRef() const {
 	assert(m_shared && m_baseline > 0);
 
-	const size_t ref = *(uint64_t*)m_shared;
+	const size_t ref = TO_REF(*(uint64_t*)m_shared);
 	assert(ref < m_baseline);
 
 	return ref;
@@ -296,7 +313,7 @@ size_t SlabAlloc::GetTotalSize() const {
 		return m_baseline;
 	}
 	else {
-		return m_slabs.Back().offset;
+		return TO_REF(m_slabs.Back().offset);
 	}
 }
 
@@ -309,13 +326,13 @@ bool SlabAlloc::IsAllFree() const {
 	size_t ref = m_baseline;
 	for (size_t i = 0; i < m_slabs.GetSize(); ++i) {
 		const Slabs::Cursor c = m_slabs[i];
-		const size_t size = c.offset - ref;
+		const size_t size = TO_REF(c.offset) - ref;
 
 		const size_t r = m_freeSpace.ref.Find(ref);
 		if (r == (size_t)-1) return false;
 		if (size != (size_t)m_freeSpace[r].size) return false;
 
-		ref = c.offset;
+		ref = TO_REF(c.offset);
 	}
 	return true;
 }
@@ -324,13 +341,13 @@ void SlabAlloc::Verify() const {
 	// Make sure that all free blocks fit within a slab
 	for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
 		const FreeSpace::Cursor c = m_freeSpace[i];
-		const size_t ref = c.ref;
+		const size_t ref = TO_REF(c.ref);
 
 		const size_t ndx = m_slabs.offset.FindPos(ref);
-		assert(ndx != -1);
+		assert(ndx != size_t(-1));
 
-		const size_t slab_end = m_slabs[ndx].offset;
-		const size_t free_end = ref + c.size;
+		const size_t slab_end = TO_REF(m_slabs[ndx].offset);
+		const size_t free_end = ref + TO_REF(c.size);
 
 		assert(free_end <= slab_end);
 	}
@@ -341,10 +358,10 @@ void SlabAlloc::Print() const {
 
 	size_t free = 0;
 	for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
-		free += m_freeSpace[i].size;
+		free += TO_REF(m_freeSpace[i].size);
 	}
 
-	printf("Base: %zu Allocated: %zu\n", m_shared ? m_baseline : 0,  allocated - free);
+	cout << "Base: " << (m_shared ? m_baseline : 0) << " Allocated: " << (allocated - free) << "\n";
 }
 
 

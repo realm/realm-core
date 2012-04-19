@@ -50,7 +50,7 @@ int64_t VerifiedInteger::Sum(size_t start, size_t end) {
 	if(start == end)
 		return 0;
 
-	if(end == -1)
+	if(end == size_t(-1))
 		end = v.size();
 
 	for(size_t t = start; t < end; ++t)
@@ -61,7 +61,7 @@ int64_t VerifiedInteger::Sum(size_t start, size_t end) {
 }
 
 int64_t VerifiedInteger::Max(size_t start, size_t end) {
-	if(end == -1)
+	if(end == size_t(-1))
 		end = v.size();
 
 	if(end == start)
@@ -78,7 +78,7 @@ int64_t VerifiedInteger::Max(size_t start, size_t end) {
 }
 
 int64_t VerifiedInteger::Min(size_t start, size_t end) {
-	if(end == -1)
+	if(end == size_t(-1))
 		end = v.size();
 
 	if(end == start)
@@ -120,7 +120,8 @@ void VerifiedInteger::Set(size_t ndx, int64_t value) {
 	std::vector<int64_t>::iterator it = std::find(v.begin(), v.end(), value);
 	size_t ndx = std::distance(v.begin(), it);
 	size_t index2 = u.Find(value);
-	assert(ndx == index2 || it == v.end() && index2 == -1);
+	assert(ndx == index2 || (it == v.end() && index2 == size_t(-1)));
+	(void)index2;
 	return ndx;
 }
 
@@ -132,7 +133,7 @@ void VerifiedInteger::Set(size_t ndx, int64_t value) {
 // todo/fixme, end ignored
 void VerifiedInteger::FindAll(Array &c, int64_t value, size_t start, size_t end) {
 	std::vector<int64_t>::iterator ita = v.begin() + start;
-	std::vector<int64_t>::iterator itb = end == -1 ? v.end() : v.begin() + (end == -1 ? v.size() : end);;
+	std::vector<int64_t>::iterator itb = end == size_t(-1) ? v.end() : v.begin() + (end == size_t(-1) ? v.size() : end);;
 	std::vector<size_t> result;
 	while(ita != itb) {
 		ita = std::find(ita, itb, value);
@@ -149,7 +150,7 @@ void VerifiedInteger::FindAll(Array &c, int64_t value, size_t start, size_t end)
 	if (c.Size() != result.size())
 		assert(false);
 	for(size_t t = 0; t < result.size(); ++t) {
-		if (result[t] != c.Get(t)) 
+		if (result[t] != (size_t)c.Get(t)) 
 			assert(false);
 	}
 

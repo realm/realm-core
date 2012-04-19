@@ -12,6 +12,11 @@ struct db_setup {
 
 Column db_setup::c;
 
+TEST_FIXTURE(db_setup, Column_IsEmpty) {
+	CHECK(c.IsEmpty());
+	CHECK_EQUAL(c.Size(), (size_t)0);
+}
+
 TEST_FIXTURE(db_setup, Column_Add0) {
 	c.Add(0);
 	CHECK_EQUAL(c.Get(0), 0);
@@ -89,7 +94,7 @@ TEST_FIXTURE(db_setup, Column_Add7) {
 }
 
 TEST_FIXTURE(db_setup, Column_Add8) {
-	c.Add(4294967296);
+	c.Add(4294967296LL);
 	CHECK_EQUAL(c.Get(0), 0);
 	CHECK_EQUAL(c.Get(1), 1);
 	CHECK_EQUAL(c.Get(2), 2);
@@ -128,7 +133,7 @@ TEST_FIXTURE(db_setup, Column_AddNeg3) {
 }
 
 TEST_FIXTURE(db_setup, Column_AddNeg4) {
-	c.Add(-4294967296);
+	c.Add(-4294967296LL);
 
 	CHECK_EQUAL(c.Size(), 4);
 	CHECK_EQUAL(c.Get(0), -1);
@@ -332,9 +337,9 @@ TEST_FIXTURE(db_setup, Column_Find8) {
 
 TEST_FIXTURE(db_setup, Column_Find9) {
 	// expand to 64-bit width
-	c.Add(4294967296);
+	c.Add(4294967296LL);
 
-	size_t res = c.Find(4294967296);
+	size_t res = c.Find(4294967296LL);
 	CHECK_EQUAL(10, res);
 }
 
@@ -364,6 +369,7 @@ TEST_FIXTURE(db_setup, Column_Destroy) {
 	c.Destroy();
 }
 
+/*
 TEST(Column_Sort) {
 	// Create Column with random values
 	Column a;
@@ -394,6 +400,7 @@ TEST(Column_Sort) {
 	// Cleanup
 	a.Destroy();
 }
+*/
 
 /** FindAll() int tests spread out over bitwidth
  *
@@ -406,7 +413,7 @@ TEST(Column_FindAll_IntMin){
 	const int value = 0;
 	const int vReps = 5;
 
-	for(size_t i = 0; i < vReps; i++){
+	for(int i = 0; i < vReps; i++){
 		c.Add(0);
 	}
 
@@ -417,7 +424,7 @@ TEST(Column_FindAll_IntMin){
 	size_t j = 0;
 	while(i < c.Size()){
 		if(c.Get(i) == value)
-			CHECK_EQUAL(i, r.Get(j++));
+			CHECK_EQUAL(int64_t(i), r.Get(j++));
 		i += 1;
 	}
 
@@ -433,7 +440,7 @@ TEST(Column_FindAll_IntMax){
 	const int64_t value = 4300000003ULL;
 	const int vReps = 5;
 
-	for(size_t i = 0; i < vReps; i++){
+	for(int i = 0; i < vReps; i++){
 		// 64 bitwidth
 		c.Add(4300000000ULL);
 		c.Add(4300000001ULL);
@@ -448,7 +455,7 @@ TEST(Column_FindAll_IntMax){
 	size_t j = 0;
 	while(i < c.Size()){
 		if(c.Get(i) == value)
-			CHECK_EQUAL(i, r.Get(j++));
+			CHECK_EQUAL(int64_t(i), r.Get(j++));
 		i += 1;
 	}
 
@@ -457,6 +464,7 @@ TEST(Column_FindAll_IntMax){
 	r.Destroy();
 }
 
+/*
 TEST(Column_FindHamming) {
 	Column col;
 	for (size_t i = 0; i < 10; ++i) {
@@ -473,6 +481,7 @@ TEST(Column_FindHamming) {
 	col.Destroy();
 	res.Destroy();
 }
+*/
 
 TEST(Column_Sum) {
 	Column c;
@@ -532,7 +541,7 @@ TEST(Column_Sum) {
 
 TEST(Column_Max) {
 	Column c;
-	size_t t = c.Max();
+	int64_t t = c.Max();
 	CHECK_EQUAL(0, t); // max on empty range returns zero
 
 	c.Add(1);
@@ -554,7 +563,7 @@ TEST(Column_Max2) {
 	c.Set(51, 11);
 	c.Set(81, 20);
 
-	size_t t = c.Max(51, 81);
+	int64_t t = c.Max(51, 81);
 	CHECK_EQUAL(11, t);
 
 	c.Destroy();
@@ -562,7 +571,7 @@ TEST(Column_Max2) {
 
 TEST(Column_Min) {
 	Column c;
-	size_t t = c.Min();
+	int64_t t = c.Min();
 	CHECK_EQUAL(0, t); // min on empty range returns zero
 
 	c.Add(1);
@@ -584,11 +593,27 @@ TEST(Column_Min2) {
 	c.Set(51, 9);
 	c.Set(81, 20);
 
-	size_t t = c.Min(51, 81);
+	int64_t t = c.Min(51, 81);
 	CHECK_EQUAL(9, t);
 
 	c.Destroy();
 }
+/*
+TEST(Column_Sort2) {
+	Column c;
+	
+	for(size_t t = 0; t < 9*MAX_LIST_SIZE; t++)
+		c.Add(rand() % 300 - 100);
+
+	c.Sort();
+
+	for(size_t t = 1; t < 9*MAX_LIST_SIZE; t++) {
+		CHECK(c.Get(t) >= c.Get(t - 1));
+	}
+
+	c.Destroy();
+}
+*/
 
 
 #if TEST_DURATION > 0

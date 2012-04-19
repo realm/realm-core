@@ -1,3 +1,4 @@
+#include <sstream>
 #include "tightdb.h"
 #include <UnitTest++.h>
 
@@ -141,6 +142,112 @@ TEST(Table_Delete) {
 #endif //_DEBUG
 }
 
+TEST(Table_Delete_All_Types) {
+	// Create table with all column types
+	TopLevelTable table;
+	Spec s = table.GetSpec();
+	s.AddColumn(COLUMN_TYPE_INT,    "int");
+	s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
+	s.AddColumn(COLUMN_TYPE_DATE,   "date");
+	s.AddColumn(COLUMN_TYPE_STRING, "string");
+	s.AddColumn(COLUMN_TYPE_STRING, "string_long");
+	s.AddColumn(COLUMN_TYPE_STRING, "string_enum"); // becomes ColumnStringEnum
+	s.AddColumn(COLUMN_TYPE_BINARY, "binary");
+	s.AddColumn(COLUMN_TYPE_MIXED,  "mixed");
+	Spec sub = s.AddColumnTable(    "tables");
+	sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
+	sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
+	table.UpdateFromSpec(s.GetRef());
+	
+	// Add some rows
+	for (size_t i = 0; i < 15; ++i) {
+		table.InsertInt(0, i, i);
+		table.InsertBool(1, i, (i % 2 ? true : false));
+		table.InsertDate(2, i, 12345);
+		
+		std::stringstream ss;
+		ss << "string" << i;
+		table.InsertString(3, i, ss.str().c_str());
+		
+		ss << " very long string.........";
+		table.InsertString(4, i, ss.str().c_str());
+		
+		switch (i % 3) {
+			case 0:
+				table.InsertString(5, i, "test1");
+				break;
+			case 1:
+				table.InsertString(5, i, "test2");
+				break;
+			case 2:
+				table.InsertString(5, i, "test3");
+				break;
+		}
+		
+		table.InsertBinary(6, i, "binary", 7);
+		
+		switch (i % 4) {
+			case 0:
+				table.InsertMixed(7, i, false);
+				break;
+			case 1:
+				table.InsertMixed(7, i, (int64_t)i);
+				break;
+			case 2:
+				table.InsertMixed(7, i, "string");
+				break;
+			case 3:
+			{
+				// Add subtable to mixed column
+				// We can first set schema and contents when the entire
+				// row has been inserted
+				table.InsertMixed(7, i, Mixed(COLUMN_TYPE_TABLE));
+				break;
+			}
+		}
+		
+		table.InsertTable(8, i);
+		table.InsertDone();
+		
+		// Add subtable to mixed column
+		if (i % 4 == 3) {
+			TableRef subtable = table.GetTable(7, i);
+			subtable->RegisterColumn(COLUMN_TYPE_INT,    "first");
+			subtable->RegisterColumn(COLUMN_TYPE_STRING, "second");
+			subtable->InsertInt(0, 0, 42);
+			subtable->InsertString(1, 0, "meaning");
+			subtable->InsertDone();
+		}
+		
+		// Add sub-tables to table column
+		TableRef subtable = table.GetTable(8, i);
+		subtable->InsertInt(0, 0, 42);
+		subtable->InsertString(1, 0, "meaning");
+		subtable->InsertDone();
+	}
+	
+	// We also want a ColumnStringEnum
+	table.Optimize();
+	
+	// Test Deletes
+	table.DeleteRow(14);
+	table.DeleteRow(0);
+	table.DeleteRow(5);
+	
+	CHECK_EQUAL(12, table.GetSize());
+	
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
+	
+	// Test Clear
+	table.Clear();
+	CHECK_EQUAL(0, table.GetSize());
+	
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
+}
 
 TEST(Table_Find_Int) {
 	TestTable table;
@@ -162,12 +269,14 @@ TEST(Table6) {
 	TestTableEnum table;
 
 	TDB_QUERY(TestQuery, TestTableEnum) {
-		first.between(Mon, Thu);
+	//	first.between(Mon, Thu);
 		second == "Hello" || (second == "Hey" && first == Mon);
 	}};
 
 	TDB_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
-		first.between(a, b);
+		(void)b;
+		(void)a;
+		//first.between(a, b);
 		second == str || second.MatchRegEx(".*");
 	}};
 
@@ -428,25 +537,27 @@ TEST(Table_Spec) {
 
 	// Get the sub-table
 	{
-		Table subtable = table.GetTable(2, 0);
-		CHECK(subtable.IsEmpty());
+		TableRef subtable = table.GetTable(2, 0);
+		CHECK(subtable->IsEmpty());
 
-		subtable.InsertInt(0, 0, 42);
-		subtable.InsertString(1, 0, "test");
-		subtable.InsertDone();
+		subtable->InsertInt(0, 0, 42);
+		subtable->InsertString(1, 0, "test");
+		subtable->InsertDone();
 
-		CHECK_EQUAL(42,     subtable.Get(0, 0));
-		CHECK_EQUAL("test", subtable.GetString(1, 0));
+		CHECK_EQUAL(42,     subtable->Get(0, 0));
+		CHECK_EQUAL("test", subtable->GetString(1, 0));
 	}
+
+	CHECK_EQUAL(1, table.GetTableSize(2, 0));
 
 	// Get the sub-table again and see if the values
 	// still match.
 	{
-		const Table subtable = table.GetTable(2, 0);
+		TableRef subtable = table.GetTable(2, 0);
 
-		CHECK_EQUAL(1,      subtable.GetSize());
-		CHECK_EQUAL(42,     subtable.Get(0, 0));
-		CHECK_EQUAL("test", subtable.GetString(1, 0));
+		CHECK_EQUAL(1,      subtable->GetSize());
+		CHECK_EQUAL(42,     subtable->Get(0, 0));
+		CHECK_EQUAL("test", subtable->GetString(1, 0));
 	}
 
 	// Write the group to disk
@@ -456,12 +567,168 @@ TEST(Table_Spec) {
 	Group fromDisk("subtables.tightdb");
 	TopLevelTable& fromDiskTable = fromDisk.GetTable("test");
 
-	const Table subtable2 = fromDiskTable.GetTable(2, 0);
+	TableRef subtable2 = fromDiskTable.GetTable(2, 0);
 
-	CHECK_EQUAL(1,      subtable2.GetSize());
-	CHECK_EQUAL(42,     subtable2.Get(0, 0));
-	CHECK_EQUAL("test", subtable2.GetString(1, 0));
+	CHECK_EQUAL(1,      subtable2->GetSize());
+	CHECK_EQUAL(42,     subtable2->Get(0, 0));
+	CHECK_EQUAL("test", subtable2->GetString(1, 0));
+}
+
+TEST(Table_Mixed) {
+	Table table;
+	table.RegisterColumn(COLUMN_TYPE_INT, "first");
+	table.RegisterColumn(COLUMN_TYPE_MIXED, "second");
+	
+	CHECK_EQUAL(COLUMN_TYPE_INT, table.GetColumnType(0));
+	CHECK_EQUAL(COLUMN_TYPE_MIXED, table.GetColumnType(1));
+	CHECK_EQUAL("first", table.GetColumnName(0));
+	CHECK_EQUAL("second", table.GetColumnName(1));
+	
+	const size_t ndx = table.AddRow();
+	table.Set(0, ndx, 0);
+	table.SetMixed(1, ndx, true);
+	
+	CHECK_EQUAL(0, table.Get(0, 0));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(true, table.GetMixed(1, 0).GetBool());
+	
+	table.InsertInt(0, 1, 43);
+	table.InsertMixed(1, 1, (int64_t)12);
+	table.InsertDone();
+	
+	CHECK_EQUAL(0,  table.Get(0, ndx));
+	CHECK_EQUAL(43, table.Get(0, 1));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_INT,  table.GetMixed(1, 1).GetType());
+	CHECK_EQUAL(true, table.GetMixed(1, 0).GetBool());
+	CHECK_EQUAL(12,   table.GetMixed(1, 1).GetInt());
+	
+	table.InsertInt(0, 2, 100);
+	table.InsertMixed(1, 2, "test");
+	table.InsertDone();
+	
+	CHECK_EQUAL(0,  table.Get(0, 0));
+	CHECK_EQUAL(43, table.Get(0, 1));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
+	CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
+	CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
+	CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
+	
+	table.InsertInt(0, 3, 0);
+	table.InsertMixed(1, 3, Date(324234));
+	table.InsertDone();
+	
+	CHECK_EQUAL(0,  table.Get(0, 0));
+	CHECK_EQUAL(43, table.Get(0, 1));
+	CHECK_EQUAL(0,  table.Get(0, 3));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).GetType());
+	CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
+	CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
+	CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
+	CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
+	
+	table.InsertInt(0, 4, 43);
+	table.InsertMixed(1, 4, Mixed("binary", 7));
+	table.InsertDone();
+	
+	CHECK_EQUAL(0,  table.Get(0, 0));
+	CHECK_EQUAL(43, table.Get(0, 1));
+	CHECK_EQUAL(0,  table.Get(0, 3));
+	CHECK_EQUAL(43, table.Get(0, 4));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_BINARY, table.GetMixed(1, 4).GetType());
+	CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
+	CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
+	CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
+	CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
+	CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).GetBinary().pointer);
+	CHECK_EQUAL(7,      table.GetMixed(1, 4).GetBinary().len);
+	
+	table.InsertInt(0, 5, 0);
+	table.InsertMixed(1, 5, Mixed(COLUMN_TYPE_TABLE));
+	table.InsertDone();
+	
+	CHECK_EQUAL(0,  table.Get(0, 0));
+	CHECK_EQUAL(43, table.Get(0, 1));
+	CHECK_EQUAL(0,  table.Get(0, 3));
+	CHECK_EQUAL(43, table.Get(0, 4));
+	CHECK_EQUAL(0,  table.Get(0, 5));
+	CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_BINARY, table.GetMixed(1, 4).GetType());
+	CHECK_EQUAL(COLUMN_TYPE_TABLE,  table.GetMixed(1, 5).GetType());
+	CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
+	CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
+	CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
+	CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
+	CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).GetBinary().pointer);
+	CHECK_EQUAL(7,      table.GetMixed(1, 4).GetBinary().len);
+
+	// Get table from mixed column and add schema and some values
+	TableRef subtable = table.GetTable(1, 5);
+	subtable->RegisterColumn(COLUMN_TYPE_STRING, "name");
+	subtable->RegisterColumn(COLUMN_TYPE_INT,    "age");
+
+	subtable->InsertString(0, 0, "John");
+	subtable->InsertInt(1, 0, 40);
+	subtable->InsertDone();
+
+	// Get same table again and verify values
+	TableRef subtable2 = table.GetTable(1, 5);
+	CHECK_EQUAL(1, subtable2->GetSize());
+	CHECK_EQUAL("John", subtable2->GetString(0, 0));
+	CHECK_EQUAL(40, subtable2->Get(1, 0));
+
+#ifdef _DEBUG
+	table.Verify();
+#endif //_DEBUG
+}
+
+TDB_TABLE_1(TestTableMX,
+			Mixed,  first)
+
+
+TEST(Table_Mixed2) {
+	TestTableMX table;
+	
+	table.Add((int64_t)1);
+	table.Add(true);
+	table.Add(Date(1234));
+	table.Add("test");
+
+	CHECK_EQUAL(COLUMN_TYPE_INT,    table[0].first.GetType());
+	CHECK_EQUAL(COLUMN_TYPE_BOOL,   table[1].first.GetType());
+	CHECK_EQUAL(COLUMN_TYPE_DATE,   table[2].first.GetType());
+	CHECK_EQUAL(COLUMN_TYPE_STRING, table[3].first.GetType());
+	
+	CHECK_EQUAL(1,            table[0].first.GetInt());
+	CHECK_EQUAL(true,         table[1].first.GetBool());
+	CHECK_EQUAL((time_t)1234, table[2].first.GetDate());
+	CHECK_EQUAL("test",       table[3].first.GetString());
 }
 
 
-
+TEST(Table_CastRef)
+{
+	TopLevelTable t;
+	{
+		TableRef t2 = t.GetTableRef();
+		TopLevelTableRef t3 = static_table_cast<TopLevelTable>(t2);
+		TopLevelTableRef t4 = dynamic_table_cast<TopLevelTable>(t2);
+	}
+	{
+		TableConstRef t2 = t.GetTableRef();
+		TopLevelTableConstRef t3 = static_table_cast<TopLevelTable const>(t2);
+		TopLevelTableConstRef t4 = dynamic_table_cast<TopLevelTable const>(t2);
+	}
+}
