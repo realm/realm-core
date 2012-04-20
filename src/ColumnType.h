@@ -1,11 +1,7 @@
 #ifndef __TDB_COLUMNTYPE__
 #define __TDB_COLUMNTYPE__
 
-#include <cstdlib>
-
-#ifdef __cplusplus
-namespace tightdb {
-#endif
+#include <stdlib.h>
 
 enum ColumnType {
 	// Single ref
@@ -25,9 +21,5 @@ struct BinaryData {
 	const void* pointer;
 	size_t len;
 };
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif //__TDB_COLUMNTYPE__
