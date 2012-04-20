@@ -32,9 +32,9 @@ Spec::Spec(const Spec& s):
 	m_specSet(s.m_specSet.GetAllocator()), m_spec(s.m_specSet.GetAllocator()),
 	m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator())
 {
-	const size_t ref    = m_specSet.GetRef();
-	ArrayParent *parent = m_specSet.GetParent();
-	const size_t pndx   = m_specSet.GetParentNdx();
+	const size_t ref    = s.m_specSet.GetRef();
+	ArrayParent *parent = s.m_specSet.GetParent();
+	const size_t pndx   = s.m_specSet.GetParentNdx();
 
 	Create(ref, parent, pndx);
 }
