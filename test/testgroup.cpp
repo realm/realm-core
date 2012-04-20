@@ -2,6 +2,8 @@
 #include "tightdb.h"
 #include <UnitTest++.h>
 
+using namespace tightdb;
+
 enum Days {
 	Mon,
 	Tue,

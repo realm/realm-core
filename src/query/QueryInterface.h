@@ -15,11 +15,13 @@
 	#include "QueryEngine.h"
 #endif
 
-const size_t MAX_THREADS = 128;
-const size_t THREAD_CHUNK_SIZE = 1000;
-
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
+
+namespace tightdb {
+
+const size_t MAX_THREADS = 128;
+const size_t THREAD_CHUNK_SIZE = 1000;
 
 class Query {
 public:
@@ -557,5 +559,7 @@ protected:
 	Query* m_query;
 	size_t m_column_id;
 }; 
+
+}
 
 #endif

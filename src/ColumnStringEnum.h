@@ -3,6 +3,8 @@
 
 #include "ColumnString.h"
 
+namespace tightdb {
+
 class ColumnStringEnum : public Column {
 public:
 	ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
@@ -43,5 +45,7 @@ private:
 	// Member variables
 	AdaptiveStringColumn m_keys;
 };
+
+}
 
 #endif //__TDB_COLUMN_STRING_ENUM__

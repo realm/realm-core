@@ -4,6 +4,7 @@
 #include <assert.h>
 #include "win32/types.h" //ssize_t
 
+namespace tightdb {
 
 ArrayStringLong::ArrayStringLong(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_HASREFS, parent, pndx, alloc), m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc) {
 	// Add subarrays for long string
@@ -171,3 +172,5 @@ void ArrayStringLong::ToDot(std::ostream& out, const char* title) const {
 }
 
 #endif //_DEBUG
+
+}

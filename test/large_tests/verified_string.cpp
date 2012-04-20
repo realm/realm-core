@@ -10,6 +10,7 @@
 #include "verified_string.h"
 
 using namespace std;
+using namespace tightdb;
 
 void VerifiedString::VerifyNeighbours(size_t ndx) {
 	if(v.size() > ndx)

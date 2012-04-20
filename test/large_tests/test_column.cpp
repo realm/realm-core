@@ -7,6 +7,7 @@
 #include "../testsettings.h"
 #include "verified_integer.h"
 
+using namespace tightdb;
 
 // Support functions for monkey test
 static uint64_t rand2(int bitwidth);

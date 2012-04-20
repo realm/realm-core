@@ -1,5 +1,6 @@
 #include "ColumnStringEnum.h"
 
+namespace tightdb {
 
 ColumnStringEnum::ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent *parent, size_t pndx, Allocator& alloc)
 : Column(ref_values, parent, pndx+1, alloc), m_keys(ref_keys, parent, pndx, alloc) {}
@@ -148,3 +149,5 @@ void ColumnStringEnum::ToDot(std::ostream& out, const char* title) const {
 }
 
 #endif //_DEBUG
+
+}

@@ -15,14 +15,20 @@
 
 
 #ifdef __cplusplus
+namespace tightdb {
+    class Table;
+    class TableView;
+}
+typedef tightdb::ColumnType ColumnType;
+typedef tightdb::Table Table;
+typedef tightdb::TableView TableView;
 extern "C" {
 #else
 #include <stdbool.h>
-#endif
-
 typedef enum ColumnType ColumnType;
 typedef struct Table Table;
 typedef struct TableView TableView;
+#endif
 
 	/*** Table ************************************/
 

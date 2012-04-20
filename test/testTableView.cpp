@@ -1,6 +1,8 @@
 #include "tightdb.h"
 #include <UnitTest++.h>
 
+using namespace tightdb;
+
 TDB_TABLE_1(TestTableInt,
 			Int,        first
 )

@@ -2,6 +2,8 @@
 #include "ColumnStringEnum.h"
 #include <UnitTest++.h>
 
+using namespace tightdb;
+
 struct db_setup_column_string {
 	static AdaptiveStringColumn c;
 };

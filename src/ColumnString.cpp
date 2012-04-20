@@ -10,8 +10,9 @@
 
 #include "ColumnString.h"
 
-// Pre-declare local functions
-ColumnDef GetTypeFromArray(size_t ref, Allocator& alloc);
+namespace {
+
+using namespace tightdb;
 
 ColumnDef GetTypeFromArray(size_t ref, Allocator& alloc) {
 	const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
@@ -22,6 +23,11 @@ ColumnDef GetTypeFromArray(size_t ref, Allocator& alloc) {
 	else if (hasRefs) return COLUMN_HASREFS;
 	else return COLUMN_NORMAL;
 }
+
+}
+
+
+namespace tightdb {
 
 AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) {
 	m_array = new ArrayString(NULL, 0, alloc);
@@ -347,7 +353,6 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
 }
 
 #ifdef _DEBUG
-#include <cstring> // strcmp()
 
 bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const {
 	if (c.Size() != Size()) return false;
@@ -407,3 +412,5 @@ void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) cons
 }
 
 #endif //_DEBUG
+
+}

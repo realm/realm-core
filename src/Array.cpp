@@ -15,8 +15,7 @@
 
 using namespace std;
 
-// Pre-declare local functions
-size_t CalcByteLen(size_t count, size_t width);
+namespace tightdb {
 
 Array::Array(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc):
 	m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
@@ -1744,6 +1743,10 @@ MemStats Array::Stats() const {
 
 #endif //_DEBUG
 
+}
+
+
+namespace {
 
 // Direct access methods
 
@@ -1853,6 +1856,11 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 	else return (size_t)high;
 }
 
+}
+
+
+namespace tightdb {
+
 // Get value direct through column b-tree without instatiating any Arrays.
 int64_t Array::ColumnGet(size_t ndx) const {
 	const char* data   = (const char*)m_data;
@@ -1892,4 +1900,6 @@ int64_t Array::ColumnGet(size_t ndx) const {
 			return GetDirect(data, width, ndx);
 		}
 	}
+}
+
 }

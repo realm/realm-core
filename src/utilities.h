@@ -27,6 +27,8 @@
 	#define BITS64
 #endif
 
+namespace tightdb {
+
 typedef struct 
 {
 	unsigned long long remainder;
@@ -44,6 +46,8 @@ void *round_down(void *p, size_t align);
 size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
 void checksum_init(checksum_t *t);
+
+}
 
 #endif
 

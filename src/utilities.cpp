@@ -9,6 +9,7 @@
 #include "win32/stdint.h"
 #endif
 
+namespace tightdb {
 
 size_t TO_REF(int64_t v) {
 #if !defined(NDEBUG) && defined(_DEBUG)
@@ -113,3 +114,4 @@ void checksum_rolling(unsigned char *data, size_t len, checksum_t *t)
 	return;
 }
 
+}

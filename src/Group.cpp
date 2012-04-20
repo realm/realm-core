@@ -3,6 +3,37 @@
 #include <iostream>
 #include <fstream>
 
+namespace {
+
+class MemoryOStream {
+public:
+	MemoryOStream(size_t size) : m_pos(0), m_buffer(NULL) {
+		m_buffer = (char*)malloc(size);
+	}
+
+	bool IsValid() const {return m_buffer != NULL;}
+
+	void write(const char* p, size_t n) {
+		memcpy(m_buffer+m_pos, p, n);
+		m_pos += n;
+	}
+	void seekp(size_t pos) {m_pos = pos;}
+
+	char* ReleaseBuffer() {
+		char* tmp = m_buffer;
+		m_buffer = NULL; // invalidate
+		return tmp;
+	}
+private:
+	size_t m_pos;
+	char* m_buffer;
+};
+
+}
+
+
+namespace tightdb {
+
 Group::Group():
 	m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc),	m_tableNames(NULL, 0, m_alloc),
 	m_isValid(true)
@@ -131,30 +162,6 @@ void Group::Write(const char* filepath) {
 }
 
 
-class MemoryOStream {
-public:
-	MemoryOStream(size_t size) : m_pos(0), m_buffer(NULL) {
-		m_buffer = (char*)malloc(size);
-	}
-
-	bool IsValid() const {return m_buffer != NULL;}
-
-	void write(const char* p, size_t n) {
-		memcpy(m_buffer+m_pos, p, n);
-		m_pos += n;
-	}
-	void seekp(size_t pos) {m_pos = pos;}
-
-	char* ReleaseBuffer() {
-		char* tmp = m_buffer;
-		m_buffer = NULL; // invalidate
-		return tmp;
-	}
-private:
-	size_t m_pos;
-	char* m_buffer;
-};
-
 char* Group::WriteToMem(size_t& len) {
 	// Get max possible size of buffer
 	const size_t max_size = m_alloc.GetTotalSize();
@@ -225,3 +232,5 @@ void Group::ToDot(std::ostream& out) {
 }
 
 #endif //_DEBUG
+
+}

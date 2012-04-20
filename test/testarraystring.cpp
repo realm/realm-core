@@ -2,6 +2,8 @@
 #include "Column.h"
 #include <UnitTest++.h>
 
+using namespace tightdb;
+
 struct db_setup_string {
 	static ArrayString c;
 };

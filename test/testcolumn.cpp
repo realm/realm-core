@@ -4,6 +4,8 @@
 #include <algorithm>
 #include "testsettings.h"
 
+using namespace tightdb;
+
 struct db_setup {
 	static Column c;
 };

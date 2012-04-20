@@ -3,6 +3,8 @@
 
 #include "Array.h"
 
+namespace tightdb {
+
 class ArrayString : public Array {
 public:
 	ArrayString(ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
@@ -35,5 +37,7 @@ private:
 	virtual size_t CalcItemCount(size_t bytes, size_t width) const;
 	virtual WidthType GetWidthType() const {return TDB_MULTIPLY;}
 };
+
+}
 
 #endif //__TDB_ARRAY__

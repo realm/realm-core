@@ -3,6 +3,8 @@
 #include <assert.h>
 #include "win32/types.h"
 
+namespace tightdb {
+
 ArrayBinary::ArrayBinary(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_HASREFS, parent, pndx, alloc), m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc) {
 	// Add subarrays for long string
 	Array::Add(m_offsets.GetRef());
@@ -123,3 +125,5 @@ void ArrayBinary::ToDot(std::ostream& out, const char* title) const {
 }
 
 #endif //_DEBUG
+
+}

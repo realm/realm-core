@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <ostream>
 
-
+namespace tightdb {
 
 /**
  * A "smart" reference to a table.
@@ -207,6 +207,8 @@ std::basic_ostream<C,T> &operator<<(std::basic_ostream<C,T> &out, BasicTableRef<
 {
 	out << static_cast<void *>(t.m_table);
 	return out;
+}
+
 }
 
 #endif //__TDB_TABLE_REF__

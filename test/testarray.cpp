@@ -1,4 +1,3 @@
-
 #include "Array.h"
 #include "Column.h"
 #include <UnitTest++.h>
@@ -7,6 +6,8 @@
 #include "testsettings.h"
 #include <map>
 #include <string>
+
+using namespace tightdb;
 
 struct db_setup_array {
 	static Array c;

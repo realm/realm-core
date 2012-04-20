@@ -2,6 +2,8 @@
 #include "tightdb.h"
 #include <UnitTest++.h>
 
+using namespace tightdb;
+
 TEST(Table1) {
 	Table table;
 	table.RegisterColumn(COLUMN_TYPE_INT, "first");

@@ -1,6 +1,8 @@
 #include "ColumnMixed.h"
 #include <UnitTest++.h>
 
+using namespace tightdb;
+
 TEST(ColumnMixed_Int) {
 	ColumnMixed c;
 	

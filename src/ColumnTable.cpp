@@ -2,6 +2,23 @@
 
 using namespace std;
 
+namespace {
+
+using namespace tightdb;
+
+struct FakeParent: Table::Parent
+{
+	virtual void update_child_ref(size_t, size_t) {} // Ignore
+	virtual void child_destroyed(size_t) {} // Ignore
+#ifdef _DEBUG
+	virtual size_t get_child_ref_for_verify(size_t) const { return 0; }
+#endif
+};
+
+}
+
+
+namespace tightdb {
 
 void ColumnSubtableParent::child_destroyed(size_t subtable_ndx)
 {
@@ -41,15 +58,6 @@ Table *ColumnTable::get_subtable_ptr(size_t ndx) const {
 	register_subtable(ndx, subtable);
 	return subtable;
 }
-
-struct FakeParent: Table::Parent
-{
-	virtual void update_child_ref(size_t, size_t) {} // Ignore
-	virtual void child_destroyed(size_t) {} // Ignore
-#ifdef _DEBUG
-	virtual size_t get_child_ref_for_verify(size_t) const { return 0; }
-#endif
-};
 
 size_t ColumnTable::GetTableSize(size_t ndx) const {
 	assert(ndx < Size());
@@ -146,3 +154,5 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const {
 }
 
 #endif //_DEBUG
+
+}

@@ -8,6 +8,8 @@
 
 #if TEST_DURATION > 0
 
+using namespace tightdb;
+
 static uint64_t rand2(int bitwidth);
 string randstring(void);
 

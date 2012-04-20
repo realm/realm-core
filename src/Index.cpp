@@ -5,6 +5,28 @@
 #define MAX_LIST_SIZE 1000
 #endif
 
+namespace {
+
+using namespace tightdb;
+
+Index GetIndexFromRef(Array& parent, size_t ndx) {
+	assert(parent.HasRefs());
+	assert(ndx < parent.Size());
+	return Index((size_t)parent.Get(ndx), &parent, ndx);
+}
+
+const Index GetIndexFromRef(const Array& parent, size_t ndx) {
+	assert(parent.HasRefs());
+	assert(ndx < parent.Size());
+	return Index((size_t)parent.Get(ndx));
+}
+
+}
+
+
+
+namespace tightdb {
+
 Index::Index() : Column(COLUMN_HASREFS) {
 	// Add subcolumns for leafs
 	const Array values(COLUMN_NORMAL);
@@ -39,18 +61,6 @@ void Index::BuildIndex(const Column& src) {
 #ifdef _DEBUG
 	Verify();
 #endif //_DEBUG
-}
-
-static Index GetIndexFromRef(Array& parent, size_t ndx) {
-	assert(parent.HasRefs());
-	assert(ndx < parent.Size());
-	return Index((size_t)parent.Get(ndx), &parent, ndx);
-}
-
-static const Index GetIndexFromRef(const Array& parent, size_t ndx) {
-	assert(parent.HasRefs());
-	assert(ndx < parent.Size());
-	return Index((size_t)parent.Get(ndx));
 }
 
 void Index::Set(size_t ndx, int64_t oldValue, int64_t newValue) {
@@ -421,3 +431,5 @@ void Index::Verify() const {
 }
 
 #endif //_DEBUG
+
+}

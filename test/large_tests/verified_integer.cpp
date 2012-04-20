@@ -11,6 +11,7 @@
 #include "verified_integer.h"
 
 using namespace std;
+using namespace tightdb;
 
 void VerifiedInteger::VerifyNeighbours(size_t ndx) {
 	if(v.size() > ndx)

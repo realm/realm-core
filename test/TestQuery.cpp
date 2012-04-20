@@ -2,6 +2,8 @@
 #include <UnitTest++.h>
 #include "Group.h"
 
+using namespace tightdb;
+
 TDB_TABLE_2(TupleTableType,
 	Int, first,
 	String, second)

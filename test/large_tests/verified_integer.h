@@ -8,28 +8,26 @@
 #include <stdio.h>
 #include <Column.h>
 
-using namespace std;
-
 class VerifiedInteger {
-    vector<int64_t> v;
-	Column u;
+    std::vector<int64_t> v;
+	tightdb::Column u;
 public:
 	void Add(int64_t value);
-	void Insert(size_t ndx, int64_t value);
-	void Insert(size_t ndx, const char *value);
-	int64_t Get(size_t ndx);
-	void Set(size_t ndx, int64_t value);
-	void Delete(size_t ndx);
+	void Insert(std::size_t ndx, int64_t value);
+	void Insert(std::size_t ndx, const char *value);
+	int64_t Get(std::size_t ndx);
+	void Set(std::size_t ndx, int64_t value);
+	void Delete(std::size_t ndx);
 	void Clear();
 	size_t Find(int64_t value);
-	void FindAll(Array &c, int64_t value, size_t start = 0, size_t end = -1);
-	size_t Size(void);
-	int64_t Sum(size_t start = 0, size_t end = -1);
-	int64_t Max(size_t start = 0, size_t end = -1);
-	int64_t Min(size_t start = 0, size_t end = -1);
+	void FindAll(tightdb::Array &c, int64_t value, std::size_t start = 0, std::size_t end = -1);
+	std::size_t Size(void);
+	int64_t Sum(std::size_t start = 0, std::size_t end = -1);
+	int64_t Max(std::size_t start = 0, std::size_t end = -1);
+	int64_t Min(std::size_t start = 0, std::size_t end = -1);
 	bool Verify(void);
 	bool ConditionalVerify(void);
-	void VerifyNeighbours(size_t ndx);
+	void VerifyNeighbours(std::size_t ndx);
 	void Destroy(void);
 };
 
