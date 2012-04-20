@@ -559,7 +559,7 @@ class XQueryAccessorString {
 public:
 	XQueryAccessorString(size_t column_id) : m_column_id(column_id) {}
 	Query& Equal(const char *value, bool CaseSensitive) {return m_query->Equal(m_column_id, value, CaseSensitive);}
-	Query& BeginsWith(const char *value, bool CaseSensitive) {return m_query->Equal(m_column_id, value, CaseSensitive);}
+	Query& BeginsWith(const char *value, bool CaseSensitive) {return m_query->BeginsWith(m_column_id, value, CaseSensitive);}
 	Query& EndsWith(const char *value, bool CaseSensitive) {return m_query->EndsWith(m_column_id, value, CaseSensitive);}
 	Query& Contains(const char *value, bool CaseSensitive) {return m_query->Contains(m_column_id, value, CaseSensitive);}
 	Query& NotEqual(const char *value, bool CaseSensitive) {return m_query->NotEqual(m_column_id, value, CaseSensitive);}

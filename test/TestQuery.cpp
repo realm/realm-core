@@ -653,8 +653,9 @@ TEST(TestQueryFindAll_Begins) {
 
 	Query q1 = ttt.GetQuery().second.BeginsWith("foo");
 	TableView tv1 = q1.FindAll(ttt);
-	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(2, tv1.GetSize());
 	CHECK_EQUAL(1, tv1.GetRef(0));
+	CHECK_EQUAL(2, tv1.GetRef(1));
 }
 
 TEST(TestQueryFindAll_Ends) {
@@ -807,8 +808,9 @@ TEST(TestQueryFindAll_BeginsUNICODE) {
 
 	Query q1 = ttt.GetQuery().second.BeginsWith(uad "foo");
 	TableView tv1 = q1.FindAll(ttt);
-	CHECK_EQUAL(1, tv1.GetSize());
+	CHECK_EQUAL(2, tv1.GetSize());
 	CHECK_EQUAL(1, tv1.GetRef(0));
+	CHECK_EQUAL(2, tv1.GetRef(1));
 }
 
 
