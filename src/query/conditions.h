@@ -13,7 +13,7 @@ struct CONTAINS {
 
 // is v2 a prefix of v1?
 struct BEGINSWITH { 
-	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1_lower; (void)v1_upper; return(strstr(v1, v2) == v1); }
+	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1_lower; (void)v1_upper; return(strstr(v2, v1) == v2); }
 };
 
 // does v1 end with s2?
