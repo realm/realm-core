@@ -1,6 +1,7 @@
 #include "ArrayBlob.h"
 #include <UnitTest++.h>
 
+using namespace tightdb;
 
 TEST(ArrayBlob) {
 	ArrayBlob blob;

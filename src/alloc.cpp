@@ -21,13 +21,27 @@
 #include <cstdio>
 #endif //_DEBUG
 
+namespace {
+
+using namespace tightdb;
+
+// Support function
+// todo, fixme: use header function in array instead!
+size_t GetSizeFromHeader(void* p) {
+	// parse the capacity part of 8byte header
+	const uint8_t* const header = (uint8_t*)p;
+	return (header[4] << 16) + (header[5] << 8) + header[6];
+}
+
+}
+
+
+namespace tightdb {
+
 Allocator& GetDefaultAllocator() {
 	static Allocator DefaultAllocator;
 	return DefaultAllocator;
 }
-
-// Pre-declare local functions
-size_t GetSizeFromHeader(void* p);
 
 SlabAlloc::SlabAlloc() : m_shared(NULL), m_owned(false), m_baseline(8) {
 #ifdef _DEBUG
@@ -125,14 +139,6 @@ MemRef SlabAlloc::Alloc(size_t size) {
 #endif //_DEBUG
 
 	return MemRef(slab, slabsBack);
-}
-
-// Support function
-// todo, fixme: use header function in array instead!
-size_t GetSizeFromHeader(void* p) {
-	// parse the capacity part of 8byte header
-	const uint8_t* const header = (uint8_t*)p;
-	return (header[4] << 16) + (header[5] << 8) + header[6];
 }
 
 void SlabAlloc::Free(size_t ref, void* p) {
@@ -364,6 +370,6 @@ void SlabAlloc::Print() const {
 	cout << "Base: " << (m_shared ? m_baseline : 0) << " Allocated: " << (allocated - free) << "\n";
 }
 
-
-
 #endif //_DEBUG
+
+}

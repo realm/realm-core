@@ -1,6 +1,8 @@
 #include <UnitTest++.h>
 #include "AllocSlab.h"
 
+using namespace tightdb;
+
 // Pre-declare local functions
 void SetCapacity(void* p, size_t size);
 

@@ -9,6 +9,8 @@
 #include <stdint.h> // unint8_t etc
 #endif
 
+namespace tightdb {
+
 struct MemRef {
 	MemRef() : pointer(NULL), ref(0) {}
 	MemRef(void* p, size_t r) : pointer(p), ref(r) {}
@@ -31,5 +33,7 @@ public:
 };
 
 Allocator& GetDefaultAllocator();
+
+}
 
 #endif //__TDB_ALLOC__

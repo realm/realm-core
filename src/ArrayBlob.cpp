@@ -1,6 +1,8 @@
 #include "ArrayBlob.h"
 #include <assert.h>
 
+namespace tightdb {
+
 ArrayBlob::ArrayBlob(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
 	// Manually set wtype as array constructor in initiatializer list
 	// will not be able to call correct virtual function
@@ -111,3 +113,5 @@ void ArrayBlob::ToDot(std::ostream& out, const char* title) const {
 }
 
 #endif //_DEBUG
+
+}

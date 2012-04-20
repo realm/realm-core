@@ -12,6 +12,7 @@
 
 using namespace std;
 
+namespace tightdb {
 
 const ColumnType Accessor::type       = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type   = COLUMN_TYPE_BOOL;
@@ -1635,3 +1636,5 @@ MemStats Table::Stats() const {
 }
 
 #endif //_DEBUG
+
+}

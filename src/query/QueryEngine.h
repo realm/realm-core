@@ -4,6 +4,7 @@
 #include "../utf8.h"
 #include "conditions.h"
 
+namespace tightdb {
 
 class ParentNode { 
 public:
@@ -333,3 +334,5 @@ public:
 	ParentNode* m_cond1;
 	ParentNode* m_cond2;
 };
+
+}

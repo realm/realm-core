@@ -5,6 +5,8 @@
 #include "../Support/mem.h"
 #include "../Support/number_names.h"
 
+using namespace tightdb;
+
 // Pre-declare local functions
 uint64_t rand2();
 

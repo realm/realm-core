@@ -1,6 +1,8 @@
 #include "ArrayStringLong.h"
 #include <UnitTest++.h>
 
+using namespace tightdb;
+
 struct db_setup_string_long {
 	static ArrayStringLong c;
 };

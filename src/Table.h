@@ -11,6 +11,8 @@
 #include "ColumnType.h"
 #include "TableRef.hpp"
 
+namespace tightdb {
+
 class Accessor;
 class TableView;
 class Group;
@@ -615,5 +617,7 @@ public:
 class QueryAccessorMixed {
 public:
 };
+
+}
 
 #endif //__TDB_TABLE__

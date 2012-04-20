@@ -4,6 +4,8 @@
 #include <string>
 #include "../utf8.h"
 
+namespace tightdb {
+
 struct CONTAINS { 
 	CONTAINS() {};
 	bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char *v2) const { (void)v1_lower; (void)v1_upper; return strstr(v2, v1) != 0; }
@@ -84,5 +86,7 @@ struct LESSEQUAL {
 struct GREATEREQUAL { 
 	template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
 };
+
+}
 
 #endif

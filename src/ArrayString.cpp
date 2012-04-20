@@ -9,9 +9,7 @@
 
 using namespace std;
 
-
-// Pre-declare local functions
-size_t round_up(size_t len);
+namespace {
 
 size_t round_up(size_t len) {
 	size_t width = 0;
@@ -26,6 +24,11 @@ size_t round_up(size_t len) {
 	}
 	return width;
 }
+
+}
+
+
+namespace tightdb {
 
 ArrayString::ArrayString(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
 	// Manually set wtype as array constructor in initiatializer list
@@ -69,7 +72,7 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
 	if (!CopyOnWrite()) return false;
 
 	// Calc min column width (incl trailing zero-byte)
-	size_t width = round_up(len);
+	size_t width = ::round_up(len);
 
 	// Make room for the new value
 	if (width > m_width) {
@@ -126,7 +129,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 	if (!CopyOnWrite()) return false;
 
 	// Calc min column width (incl trailing zero-byte)
-	size_t width = round_up(len);
+	size_t width = ::round_up(len);
 	
 	const bool doExpand = width > m_width;
 
@@ -340,3 +343,5 @@ void ArrayString::ToDot(std::ostream& out, const char* title) const {
 }
 
 #endif //_DEBUG
+
+}

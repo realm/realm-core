@@ -2,6 +2,8 @@
 #include <assert.h>
 #include "utf8.h"
 
+namespace tightdb {
+
 // Return size in bytes of one utf8 character
 size_t sequence_length(const char *lead)
 {
@@ -141,3 +143,4 @@ bool utf8case(const char *source, char *destination, int upper) {
 	return true;
 }
 
+}

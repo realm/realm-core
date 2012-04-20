@@ -17,9 +17,11 @@
 
 using namespace std;
 
+namespace {
+
+using namespace tightdb;
 
 // Pre-declare local functions
-void SetRefSize(void* ref, size_t len);
 bool callme_sum(Array *a, size_t start, size_t end, size_t caller_base, void *state);
 bool callme_min(Array *a, size_t start, size_t end, size_t caller_offset, void *state);
 bool callme_max(Array *a, size_t start, size_t end, size_t caller_offset, void *state);
@@ -29,6 +31,238 @@ void merge_core(Array *a0, Array *a1, Array *res);
 Array* merge(Array *ArrayList);
 void merge_references(Array *valuelist, Array *indexlists, Array **indexresult);
 
+Column GetColumnFromRef(Array &parent, size_t ndx) {
+	assert(parent.HasRefs());
+	assert(ndx < parent.Size());
+	return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
+}
+
+bool callme_sum(Array *a, size_t start, size_t end, size_t caller_base, void *state) {
+	(void)caller_base; 
+	int64_t s = a->Sum(start, end);
+	*(int64_t *)state += s;
+	return true;
+}
+
+class AggregateState {
+public:
+	AggregateState() : isValid(false), result(0) {}
+	bool    isValid;
+	int64_t result;
+};
+
+bool callme_min(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
+	(void)caller_offset;
+	AggregateState* p = (AggregateState*)state;
+
+	int64_t res;
+	if (!a->Min(res, start, end)) return true;
+
+	if (!p->isValid || (res < p->result)) {
+		p->result  = res;
+		p->isValid = true;
+	}
+	return true;
+}
+
+bool callme_max(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
+	(void)caller_offset;
+	AggregateState* p = (AggregateState*)state;
+
+	int64_t res;
+	if (!a->Max(res, start, end)) return true;
+
+	if (!p->isValid || (res > p->result)) {
+		p->result  = res;
+		p->isValid = true;
+	}
+	return true;
+}
+
+// Input: 
+//     vals:   An array of values 
+//     idx0:   Array of indexes pointing into vals, sorted with respect to vals
+//     idx1:   Array of indexes pointing into vals, sorted with respect to vals
+//     idx0 and idx1 are allowed not to contain index pointers to *all* elements in vals
+//     (idx0->Size() + idx1->Size() < vals.Size() is OK).
+// Output:
+//     idxres: Merged array of indexes sorted with respect to vals
+void merge_core_references(Array *vals, Array *idx0, Array *idx1, Array *idxres) {
+
+	int64_t v0, v1;
+	size_t i0, i1;
+	size_t p0 = 0, p1 = 0;
+	size_t s0 = idx0->Size();
+	size_t s1 = idx1->Size();
+
+	i0 = idx0->GetAsRef(p0++);
+	i1 = idx1->GetAsRef(p1++);
+	v0 = vals->Get(i0);
+	v1 = vals->Get(i1);
+
+	for(;;) {
+		if(v0 < v1) {
+			idxres->Add(i0);
+			// Only check p0 if it has been modified :)
+			if(p0 == s0)
+				break;
+			i0 = idx0->GetAsRef(p0++);
+			v0 = vals->Get(i0);
+		}
+		else {
+			idxres->Add(i1);
+			if(p1 == s1)
+				break;
+			i1 = idx1->GetAsRef(p1++);
+			v1 = vals->Get(i1);
+		}
+	}
+
+	if(p0 == s0)
+		p0--;
+	else
+		p1--;
+
+	while(p0 < s0) {
+		i0 = idx0->GetAsRef(p0++);
+		v0 = vals->Get(i0);
+		idxres->Add(i0);
+	}
+	while(p1 < s1) {
+		i1 = idx1->GetAsRef(p1++);
+		v1 = vals->Get(i1);
+		idxres->Add(i1);
+	}
+
+	assert(idxres->Size() == idx0->Size() + idx1->Size());
+}
+
+// Merge two sorted arrays into a single sorted array
+void merge_core(Array *a0, Array *a1, Array *res) {
+	int64_t v0, v1;
+	size_t p0 = 0, p1 = 0;
+	size_t s0 = a0->Size();
+	size_t s1 = a1->Size();
+
+	v0 = a0->Get(p0++);
+	v1 = a1->Get(p1++);
+
+	for(;;) {
+		if(v0 < v1) {
+			res->Add(v0);
+			if(p0 == s0)
+				break;
+			v0 = a0->Get(p0++);
+		}
+		else {
+			res->Add(v1);
+			if(p1 == s1)
+				break;
+			v1 = a1->Get(p1++);
+		}
+	}
+
+	if(p0 == s0)
+		p0--;
+	else
+		p1--;
+
+	while(p0 < s0) {
+		v0 = a0->Get(p0++);
+		res->Add(v0);
+	}
+	while(p1 < s1) {
+		v1 = a1->Get(p1++);
+		res->Add(v1);
+	}
+
+	assert(res->Size() == a0->Size() + a1->Size());
+}
+
+// Input: 
+//     ArrayList: An array of references to non-instantiated Arrays of values. The values in each array must be in sorted order
+// Return value:
+//     Merge-sorted array of all values
+Array *merge(Array *ArrayList) {
+	if(ArrayList->Size() == 1) {
+		size_t ref = ArrayList->GetAsRef(0);
+//		Array *a = new Array(ref, reinterpret_cast<Array *>(&merge)); // FIXME: Breaks strict-aliasing
+                Array *a = new Array(ref, NULL); 
+		return a;
+	}
+	
+	Array Left, Right;
+	size_t left = ArrayList->Size() / 2;
+	for(size_t t = 0; t < left; t++)
+		Left.Add(ArrayList->Get(t));
+	for(size_t t = left; t < ArrayList->Size(); t++)
+		Right.Add(ArrayList->Get(t));
+
+	Array *l;
+	Array *r;
+	Array *res = new Array();
+
+	// We merge left-half-first instead of bottom-up so that we access the same data in each call
+	// so that it's in cache, at least for the first few iterations until lists get too long
+	l = merge(&Left);
+	r = merge(&Right);
+	merge_core(l, r, res);
+	return res;
+}
+
+// Input: 
+//     valuelist:   One array of values
+//     indexlists:  Array of pointers to non-instantiated Arrays of index numbers into valuelist
+// Output:
+//     indexresult: Array of indexes into valuelist, sorted with respect to values in valuelist
+// TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
+void merge_references(Array *valuelist, Array *indexlists, Array **indexresult) {
+	if(indexlists->Size() == 1) {
+//		size_t ref = valuelist->Get(0);
+		*indexresult = (Array *)indexlists->Get(0);
+		return;
+	}
+	
+	Array LeftV, RightV;
+	Array LeftI, RightI;
+	size_t left = indexlists->Size() / 2;
+	for(size_t t = 0; t < left; t++) {
+		LeftV.Add(indexlists->Get(t));
+		LeftI.Add(indexlists->Get(t));
+	}
+	for(size_t t = left; t < indexlists->Size(); t++) {
+		RightV.Add(indexlists->Get(t));
+		RightI.Add(indexlists->Get(t));
+	}
+
+	Array *li;
+	Array *ri;
+
+	Array *ResI = new Array();
+
+	// We merge left-half-first instead of bottom-up so that we access the same data in each call
+	// so that it's in cache, at least for the first few iterations until lists get too long
+	merge_references(valuelist, &LeftI, &ri);
+	merge_references(valuelist, &RightI, &li);
+	merge_core_references(valuelist, li, ri, ResI);
+
+	*indexresult = ResI;
+}
+
+bool callme_arrays(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
+	(void)end;
+	(void)start;
+	(void)caller_offset;
+	Array* p = (Array*)state;
+	size_t ref = a->GetRef();
+	p->Add((int64_t)ref); // todo, check cast
+	return true;
+}
+
+}
+
+
+namespace tightdb {
 
 Column::Column(Allocator& alloc): m_index(NULL) {
 	m_array = new Array(COLUMN_NORMAL, NULL, 0, alloc);
@@ -117,12 +351,6 @@ void Column::SetHasRefs() {
 	m_array->SetType(COLUMN_HASREFS);
 }
 
-static Column GetColumnFromRef(Array &parent, size_t ndx) {
-	assert(parent.HasRefs());
-	assert(ndx < parent.Size());
-	return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
-}
-
 /*
 static const Column GetColumnFromRef(const Array& parent, size_t ndx) {
 	assert(parent.HasRefs());
@@ -195,38 +423,10 @@ bool Column::Insert(size_t ndx, int64_t value) {
 	return true;
 }
 
-bool callme_sum(Array *a, size_t start, size_t end, size_t caller_base, void *state) {
-	(void)caller_base; 
-	int64_t s = a->Sum(start, end);
-	*(int64_t *)state += s;
-	return true;
-}
-
 int64_t Column::Sum(size_t start, size_t end) const {
 	int64_t sum = 0;
 	TreeVisitLeafs<Array, Column>(start, end, 0, callme_sum, (void *)&sum);
 	return sum;
-}
-
-class AggregateState {
-public:
-	AggregateState() : isValid(false), result(0) {}
-	bool    isValid;
-	int64_t result;
-};
-
-bool callme_min(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
-	(void)caller_offset;
-	AggregateState* p = (AggregateState*)state;
-
-	int64_t res;
-	if (!a->Min(res, start, end)) return true;
-
-	if (!p->isValid || (res < p->result)) {
-		p->result  = res;
-		p->isValid = true;
-	}
-	return true;
 }
 
 int64_t Column::Min(size_t start, size_t end) const {
@@ -235,208 +435,10 @@ int64_t Column::Min(size_t start, size_t end) const {
 	return state.result; // will return zero for empty ranges
 }
 
-bool callme_max(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
-	(void)caller_offset;
-	AggregateState* p = (AggregateState*)state;
-
-	int64_t res;
-	if (!a->Max(res, start, end)) return true;
-
-	if (!p->isValid || (res > p->result)) {
-		p->result  = res;
-		p->isValid = true;
-	}
-	return true;
-}
-
 int64_t Column::Max(size_t start, size_t end) const {
 	AggregateState state;
 	TreeVisitLeafs<Array, Column>(start, end, 0, callme_max, (void *)&state);
 	return state.result; // will return zero for empty ranges
-}
-
-// Input: 
-//     vals:   An array of values 
-//     idx0:   Array of indexes pointing into vals, sorted with respect to vals
-//     idx1:   Array of indexes pointing into vals, sorted with respect to vals
-//     idx0 and idx1 are allowed not to contain index pointers to *all* elements in vals
-//     (idx0->Size() + idx1->Size() < vals.Size() is OK).
-// Output:
-//     idxres: Merged array of indexes sorted with respect to vals
-void merge_core_references(Array *vals, Array *idx0, Array *idx1, Array *idxres) {
-
-	int64_t v0, v1;
-	size_t i0, i1;
-	size_t p0 = 0, p1 = 0;
-	size_t s0 = idx0->Size();
-	size_t s1 = idx1->Size();
-
-	i0 = idx0->GetAsRef(p0++);
-	i1 = idx1->GetAsRef(p1++);
-	v0 = vals->Get(i0);
-	v1 = vals->Get(i1);
-
-	for(;;) {
-		if(v0 < v1) {
-			idxres->Add(i0);
-			// Only check p0 if it has been modified :)
-			if(p0 == s0)
-				break;
-			i0 = idx0->GetAsRef(p0++);
-			v0 = vals->Get(i0);
-		}
-		else {
-			idxres->Add(i1);
-			if(p1 == s1)
-				break;
-			i1 = idx1->GetAsRef(p1++);
-			v1 = vals->Get(i1);
-		}
-	}
-
-	if(p0 == s0)
-		p0--;
-	else
-		p1--;
-
-	while(p0 < s0) {
-		i0 = idx0->GetAsRef(p0++);
-		v0 = vals->Get(i0);
-		idxres->Add(i0);
-	}
-	while(p1 < s1) {
-		i1 = idx1->GetAsRef(p1++);
-		v1 = vals->Get(i1);
-		idxres->Add(i1);
-	}
-
-	assert(idxres->Size() == idx0->Size() + idx1->Size());
-}
-
-
-// Merge two sorted arrays into a single sorted array
-void merge_core(Array *a0, Array *a1, Array *res) {
-	int64_t v0, v1;
-	size_t p0 = 0, p1 = 0;
-	size_t s0 = a0->Size();
-	size_t s1 = a1->Size();
-
-	v0 = a0->Get(p0++);
-	v1 = a1->Get(p1++);
-
-	for(;;) {
-		if(v0 < v1) {
-			res->Add(v0);
-			if(p0 == s0)
-				break;
-			v0 = a0->Get(p0++);
-		}
-		else {
-			res->Add(v1);
-			if(p1 == s1)
-				break;
-			v1 = a1->Get(p1++);
-		}
-	}
-
-	if(p0 == s0)
-		p0--;
-	else
-		p1--;
-
-	while(p0 < s0) {
-		v0 = a0->Get(p0++);
-		res->Add(v0);
-	}
-	while(p1 < s1) {
-		v1 = a1->Get(p1++);
-		res->Add(v1);
-	}
-
-	assert(res->Size() == a0->Size() + a1->Size());
-}
-
-
-// Input: 
-//     ArrayList: An array of references to non-instantiated Arrays of values. The values in each array must be in sorted order
-// Return value:
-//     Merge-sorted array of all values
-Array *merge(Array *ArrayList) {
-	if(ArrayList->Size() == 1) {
-		size_t ref = ArrayList->GetAsRef(0);
-//		Array *a = new Array(ref, reinterpret_cast<Array *>(&merge)); // FIXME: Breaks strict-aliasing
-                Array *a = new Array(ref, NULL); 
-		return a;
-	}
-	
-	Array Left, Right;
-	size_t left = ArrayList->Size() / 2;
-	for(size_t t = 0; t < left; t++)
-		Left.Add(ArrayList->Get(t));
-	for(size_t t = left; t < ArrayList->Size(); t++)
-		Right.Add(ArrayList->Get(t));
-
-	Array *l;
-	Array *r;
-	Array *res = new Array();
-
-	// We merge left-half-first instead of bottom-up so that we access the same data in each call
-	// so that it's in cache, at least for the first few iterations until lists get too long
-	l = merge(&Left);
-	r = merge(&Right);
-	merge_core(l, r, res);
-	return res;
-}
-
-// Input: 
-//     valuelist:   One array of values
-//     indexlists:  Array of pointers to non-instantiated Arrays of index numbers into valuelist
-// Output:
-//     indexresult: Array of indexes into valuelist, sorted with respect to values in valuelist
-// TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
-void merge_references(Array *valuelist, Array *indexlists, Array **indexresult) {
-	if(indexlists->Size() == 1) {
-//		size_t ref = valuelist->Get(0);
-		*indexresult = (Array *)indexlists->Get(0);
-		return;
-	}
-	
-	Array LeftV, RightV;
-	Array LeftI, RightI;
-	size_t left = indexlists->Size() / 2;
-	for(size_t t = 0; t < left; t++) {
-		LeftV.Add(indexlists->Get(t));
-		LeftI.Add(indexlists->Get(t));
-	}
-	for(size_t t = left; t < indexlists->Size(); t++) {
-		RightV.Add(indexlists->Get(t));
-		RightI.Add(indexlists->Get(t));
-	}
-
-	Array *li;
-	Array *ri;
-
-	Array *ResI = new Array();
-
-	// We merge left-half-first instead of bottom-up so that we access the same data in each call
-	// so that it's in cache, at least for the first few iterations until lists get too long
-	merge_references(valuelist, &LeftI, &ri);
-	merge_references(valuelist, &RightI, &li);
-	merge_core_references(valuelist, li, ri, ResI);
-
-	*indexresult = ResI;
-}
-
-
-
-bool callme_arrays(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
-	(void)end;
-	(void)start;
-	(void)caller_offset;
-	Array* p = (Array*)state;
-	size_t ref = a->GetRef();
-	p->Add((int64_t)ref); // todo, check cast
-	return true;
 }
 
 void Column::Sort(size_t start, size_t end) {
@@ -558,7 +560,7 @@ bool Column::Increment64(int64_t value, size_t start, size_t end) {
 		//TODO: partial incr
 		Array refs = NodeGetRefs();
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			Column col = GetColumnFromRef(refs, i);
+			Column col = ::GetColumnFromRef(refs, i);
 			if (!col.Increment64(value)) return false;
 		}
 		return true;
@@ -784,5 +786,5 @@ MemStats Column::Stats() const {
 
 #endif //_DEBUG
 
-
+}
 

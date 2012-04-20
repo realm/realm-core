@@ -1,7 +1,8 @@
 #include "ColumnBinary.h"
 
-// Pre-declare local functions
-bool IsNodeFromRef(size_t ref, Allocator& alloc);
+namespace {
+
+using namespace tightdb;
 
 bool IsNodeFromRef(size_t ref, Allocator& alloc) {
 	const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
@@ -9,6 +10,11 @@ bool IsNodeFromRef(size_t ref, Allocator& alloc) {
 
 	return isNode;
 }
+
+}
+
+
+namespace tightdb {
 
 ColumnBinary::ColumnBinary(Allocator& alloc) {
 	m_array = new ArrayBinary(NULL, 0, alloc);
@@ -190,3 +196,5 @@ void ColumnBinary::LeafToDot(std::ostream& out, const Array& array) const {
 }
 
 #endif //_DEBUG
+
+}

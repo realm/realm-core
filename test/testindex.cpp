@@ -1,6 +1,8 @@
 #include "Index.h"
 #include <UnitTest++.h>
 
+using namespace tightdb;
+
 TEST(Index_Test1) {
 	// Create a column with random values
 	Column col;

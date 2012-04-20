@@ -5,6 +5,8 @@
 #include "ArrayString.h"
 #include "ArrayStringLong.h"
 
+namespace tightdb {
+
 class AdaptiveStringColumn : public ColumnBase {
 public:
 	AdaptiveStringColumn(Allocator& alloc=GetDefaultAllocator());
@@ -69,5 +71,7 @@ protected:
 	virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif //_DEBUG
 };
+
+}
 
 #endif //__TDB_COLUMN_STRING__

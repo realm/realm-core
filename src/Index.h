@@ -3,6 +3,8 @@
 
 #include "Column.h"
 
+namespace tightdb {
+
 class Index : public Column {
 public:
 	Index();
@@ -41,5 +43,7 @@ protected:
 	int64_t MaxValue() const;
 	size_t MaxRef() const;
 };
+
+}
 
 #endif //__TDB_INDEX__

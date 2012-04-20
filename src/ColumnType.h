@@ -3,6 +3,10 @@
 
 #include <cstdlib>
 
+#ifdef __cplusplus
+namespace tightdb {
+#endif
+
 enum ColumnType {
 	// Single ref
 	COLUMN_TYPE_INT,
@@ -21,5 +25,9 @@ struct BinaryData {
 	const void* pointer;
 	size_t len;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //__TDB_COLUMNTYPE__

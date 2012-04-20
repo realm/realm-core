@@ -14,6 +14,8 @@
 #define MAX_LIST_SIZE 1000
 #endif
 
+namespace tightdb {
+
 template<class T> T GetColumnFromRef(Array &parent, size_t ndx) {
 	//assert(parent.HasRefs());
 	//assert(ndx < parent.Size());
@@ -471,6 +473,8 @@ template<typename T, class C> void ColumnBase::TreeVisitLeafs(size_t start, size
 		}
 	}
 	return;
+}
+
 }
 
 #endif //__TDB_COLUMN_TEMPLATES__

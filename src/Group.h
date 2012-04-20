@@ -4,6 +4,8 @@
 #include "Table.h"
 #include "AllocSlab.h"
 
+namespace tightdb {
+
 class Group: private Table::Parent {
 public:
 	Group();
@@ -123,6 +125,8 @@ void Group::to_json(S& out) {
 	}
 	
 	out << "}";
+}
+
 }
 
 #endif //__TDB_GROUP__

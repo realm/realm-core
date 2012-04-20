@@ -3,6 +3,8 @@
 #include <cstdarg>
 #include <assert.h>
 
+using namespace tightdb;
+
 extern "C" {
 
 // Pre-declare local functions

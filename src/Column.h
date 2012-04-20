@@ -12,6 +12,8 @@
 #include <cstdlib> // size_t
 #include <assert.h> 
 
+namespace tightdb {
+
 // Pre-definitions
 class Column;
 class Index;
@@ -193,6 +195,7 @@ private:
 	Column &operator=(Column const &); // not allowed
 };
 
+}
 
 // Templates
 #include "Column_tpl.h"

@@ -45,6 +45,8 @@
 #include <stdio.h>
 #endif
 
+namespace tightdb {
+
 // Pre-definitions
 class Array;
 
@@ -372,5 +374,7 @@ inline size_t Array::get_child_ref_for_verify(size_t subtable_ndx) const
 	return GetAsRef(subtable_ndx);
 }
 #endif // _DEBUG
+
+}
 
 #endif //__TDB_ARRAY__

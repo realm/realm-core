@@ -4,6 +4,7 @@
 #include "Column.h"
 #include "Table.h"
 
+namespace tightdb {
 
 /**
  * Base class for any column that can contain subtables.
@@ -155,5 +156,7 @@ inline size_t ColumnSubtableParent::get_child_ref_for_verify(size_t subtable_ndx
 	return Get(subtable_ndx);
 }
 #endif
+
+}
 
 #endif //__TDB_COLUMN_TABLE__

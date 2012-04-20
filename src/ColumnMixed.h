@@ -7,6 +7,8 @@
 #include "Table.h"
 #include "Index.h"
 
+namespace tightdb {
+
 // Pre-declarations
 class ColumnBinary;
 
@@ -154,6 +156,8 @@ inline TopLevelTable *ColumnMixed::get_subtable_ptr(size_t ndx) const
 	assert(ndx < m_types->Size());
 	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
 	return m_refs->get_subtable_ptr(ndx);
+}
+
 }
 
 #endif //__TDB_COLUMN_MIXED__

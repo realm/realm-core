@@ -1,6 +1,8 @@
 #include "ArrayBinary.h"
 #include <UnitTest++.h>
 
+using namespace tightdb;
+
 struct db_setup_binary {
 	static ArrayBinary c;
 };

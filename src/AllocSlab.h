@@ -9,6 +9,8 @@
 #include <stdint.h> // unint8_t etc
 #endif
 
+namespace tightdb {
+
 class SlabAlloc : public Allocator {
 public:
 	SlabAlloc();
@@ -61,5 +63,7 @@ private:
 	bool m_debugOut;
 #endif //_DEBUG
 };
+
+}
 
 #endif //__TDB_ALLOC_SLAB__

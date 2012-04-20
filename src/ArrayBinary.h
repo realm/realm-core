@@ -3,6 +3,8 @@
 
 #include "ArrayBlob.h"
 
+namespace tightdb {
+
 class ArrayBinary : public Array {
 public:
 	ArrayBinary(ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
@@ -31,5 +33,7 @@ private:
 	Array m_offsets;
 	ArrayBlob m_blob;
 };
+
+}
 
 #endif //__TDB_ARRAY_BINARY__

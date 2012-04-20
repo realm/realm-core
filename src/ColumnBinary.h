@@ -5,6 +5,8 @@
 #include "ColumnType.h" // BinaryData
 #include "ArrayBinary.h"
 
+namespace tightdb {
+
 class ColumnBinary : public ColumnBase {
 public:
 	ColumnBinary(Allocator& alloc=GetDefaultAllocator());
@@ -63,6 +65,8 @@ protected:
 	virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif //_DEBUG
 };
+
+}
 
 #endif //__TDB_COLUMN_BINARY__
 

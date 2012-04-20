@@ -2,6 +2,8 @@
 #include "Column.h"
 #include <assert.h>
 
+namespace tightdb {
+
 TableView::TableView(Table& source) : m_table(source) {
 }
 
@@ -268,4 +270,6 @@ void TableView::Clear() {
 	}
 	
 	m_refs.Clear();
+}
+
 }

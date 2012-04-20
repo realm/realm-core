@@ -3,6 +3,23 @@
 
 using namespace std;
 
+namespace {
+
+using namespace tightdb;
+
+struct FakeParent: Table::Parent
+{
+	virtual void update_child_ref(size_t, size_t) {} // Ignore
+	virtual void child_destroyed(size_t) {} // Ignore
+#ifdef _DEBUG
+	virtual size_t get_child_ref_for_verify(size_t) const { return 0; }
+#endif
+};
+
+}
+
+
+namespace tightdb {
 
 ColumnMixed::~ColumnMixed() {
 	delete m_types;
@@ -344,15 +361,6 @@ void ColumnMixed::Clear() {
 	if (m_data) m_data->Clear();
 }
 
-struct FakeParent: Table::Parent
-{
-	virtual void update_child_ref(size_t, size_t) {} // Ignore
-	virtual void child_destroyed(size_t) {} // Ignore
-#ifdef _DEBUG
-	virtual size_t get_child_ref_for_verify(size_t) const { return 0; }
-#endif
-};
-
 void ColumnMixed::RefsColumn::insert_table(size_t ndx)
 {
 	// OK to use a fake parent, because we only care about the ref.
@@ -453,3 +461,5 @@ void ColumnMixed::RefsColumn::to_dot(size_t ndx, std::ostream &out) const
 }
 
 #endif //_DEBUG
+
+}
