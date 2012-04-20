@@ -11,7 +11,7 @@
 #include <time.h>
 
 #include "ColumnType.h"
-#include <cstdlib> // size_t
+#include <stdlib.h> // size_t
 
 
 #ifdef __cplusplus
@@ -19,7 +19,6 @@ namespace tightdb {
     class Table;
     class TableView;
 }
-typedef tightdb::ColumnType ColumnType;
 typedef tightdb::Table Table;
 typedef tightdb::TableView TableView;
 extern "C" {
