@@ -36,7 +36,7 @@ int main() {
         // create random string
         const size_t n = rand() % 1000;// * 10 + rand();
         const string s = number_name(n);
-        
+
         sqlite3_reset(ppStmt);
         sqlite3_bind_int(ppStmt, 1, n);
         sqlite3_bind_text(ppStmt, 2, s.c_str(), -1, NULL);

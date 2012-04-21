@@ -181,7 +181,7 @@ void ColumnBinary::LeafToDot(std::ostream& out, const Array& array) const {
     // Rebuild array to get correct type
     const size_t ref = array.GetRef();
     const ArrayBinary binarray(ref, NULL, 0, array.GetAllocator());
-    
+
     binarray.ToDot(out);
 }
 

@@ -25,7 +25,7 @@ const size_t THREAD_CHUNK_SIZE = 1000;
 
 class Query {
 public:
-    Query() { 
+    Query() {
         update.push_back(0);
         update_override.push_back(0);
         first.push_back(0);
@@ -115,7 +115,7 @@ public:
         return *this;
     };
     Query& EndsWith(size_t column_id, const char* value, bool caseSensitive=true) {
-        ParentNode* p; 
+        ParentNode* p;
         if(caseSensitive)
             p = new STRINGNODE<ENDSWITH>(value, column_id);
         else
@@ -124,7 +124,7 @@ public:
         return *this;
     };
     Query& Contains(size_t column_id, const char* value, bool caseSensitive=true) {
-        ParentNode* p; 
+        ParentNode* p;
         if(caseSensitive)
             p = new STRINGNODE<CONTAINS>(value, column_id);
         else
@@ -159,7 +159,7 @@ public:
         ParentNode* const p = new SUBTABLE(column);
         UpdatePointers(p, &p->m_child);
         // once subtable conditions have been evaluated, resume evaluation from m_child2
-        subtables.push_back(&((SUBTABLE*)p)->m_child2); 
+        subtables.push_back(&((SUBTABLE*)p)->m_child2);
         LeftParan();
     }
 
@@ -180,7 +180,7 @@ public:
 
         if (update[update.size()-2] != 0)
             *update[update.size()-2] = first[first.size()-1];
-        
+
         if(first[first.size()-2] == 0)
             first[first.size()-2] = first[first.size()-1];
 
@@ -202,7 +202,7 @@ public:
 
     void FindAll(Table& table, TableView& tv, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) {
         Init(table);
-        
+
         size_t r  = start - 1;
         if(end == (size_t)-1)
             end = table.GetSize();
@@ -216,10 +216,10 @@ public:
             // Use multithreading
             FindAllMulti(table, tv, start, end);
             return;
-        } 
+        }
         else {
             const size_t table_size = table.GetSize();
-            
+
             // Use single threading
             for(;;) {
                 r = first[0]->Find(r + 1, table_size);
@@ -230,14 +230,14 @@ public:
         }
     }
 
-    int64_t Sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, 
+    int64_t Sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1,
         size_t limit = (size_t)-1) const {
         Init(table);
-        
+
         size_t r = start - 1;
         size_t results = 0;
         int64_t sum = 0;
-        
+
         const Column& c = table.GetColumn(column);
         const size_t table_size = table.GetSize();
 
@@ -254,10 +254,10 @@ public:
         return sum;
     }
 
-    int64_t Max(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, 
+    int64_t Max(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1,
         size_t limit = (size_t)-1) const {
         Init(table);
-        
+
         size_t r = start - 1;
         size_t results = 0;
         int64_t max = 0;
@@ -279,11 +279,11 @@ public:
 
     int64_t Min(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
         Init(table);
-        
+
         size_t r = start - 1;
         size_t results = 0;
         int64_t min = 0;
-        
+
         for (;;) {
             r = FindInternal(table, r + 1, end);
             if (r == (size_t)-1 || r == table.GetSize() || results == limit)
@@ -300,10 +300,10 @@ public:
 
     size_t Count(const Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
         Init(table);
-        
+
         size_t r = start - 1;
         size_t results = 0;
-        
+
         for(;;) {
             r = FindInternal(table, r + 1, end);
             if (r == (size_t)-1 || r == table.GetSize() || results == limit)
@@ -315,23 +315,23 @@ public:
 
     double Avg(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
         Init(table);
-        
+
         size_t resultcount2;
 
         const int64_t sum = Sum(table, column, &resultcount2, start, end, limit);
         const double avg = (float)sum / (float)resultcount2;
-        
+
         if (resultcount != 0)
             *resultcount = resultcount2;
         return avg;
     }
-    
+
     // todo, not sure if start, end and limit could be useful for delete.
     size_t Delete(Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
         size_t r = start - 1;
         size_t results = 0;
         Init(table);
-        
+
         for (;;) {
             r = FindInternal(table, r + 1 - results, end);
             if (r == (size_t)-1 || r == table.GetSize() || results == limit)
@@ -369,7 +369,7 @@ public:
             const size_t from = ts.chunks[i].first;
             const size_t upto = (i == ts.chunks.size() - 1) ? (size_t)-1 : ts.chunks[i + 1].first;
             size_t first = ts.chunks[i].second;
-            
+
             while(first < ts.results.size() && ts.results[first] < upto && ts.results[first] >= from) {
                 tv.GetRefColumn().Add(ts.results[first]);
                 ++first;
@@ -420,24 +420,24 @@ public:
 protected:
     friend class XQueryAccessorInt;
     friend class XQueryAccessorString;
-    
+
     void Init(const Table& table) const {
         if (first[0] != NULL) {
             ParentNode* top = (ParentNode*)first[0];
             top->Init(table);
         }
     }
-    
+
     size_t FindInternal(const Table& table, size_t start = 0, size_t end = (size_t)-1) const {
         if (end == (size_t)-1) end = table.GetSize();
         if (start == end) return (size_t)-1;
-        
+
         size_t r;
         if (first[0] != 0)
             r = first[0]->Find(start, end);
         else
             r = start; // user built an empty query; return any first
-        
+
         if (r == table.GetSize())
             return (size_t)-1;
         else
@@ -453,24 +453,24 @@ protected:
 
         update[update.size()-1] = newnode;
     }
-    
+
     static bool comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b) {
         return a.first < b.first;
     }
-    
+
     static void *query_thread(void *arg) {
         thread_state *ts = (thread_state *)arg;
-        
+
         std::vector<size_t> res;
         std::vector<std::pair<size_t, size_t> > chunks;
-        
+
         for(;;) {
             // Main waiting loop that waits for a query to start
             pthread_mutex_lock(&ts->jobs_mutex);
             while(ts->next_job == ts->end_job)
                 pthread_cond_wait(&ts->jobs_cond, &ts->jobs_mutex);
             pthread_mutex_unlock(&ts->jobs_mutex);
-            
+
             for(;;) {
                 // Pick a job
                 pthread_mutex_lock(&ts->jobs_mutex);
@@ -481,9 +481,9 @@ protected:
                 ts->next_job += chunk;
                 size_t r = mine - 1;
                 const size_t end = mine + chunk;
-                
+
                 pthread_mutex_unlock(&ts->jobs_mutex);
-                
+
                 // Execute job
                 for(;;) {
                     r = ts->node->Find(r + 1, end);
@@ -491,7 +491,7 @@ protected:
                         break;
                     res.push_back(r);
                 }
-                
+
                 // Append result in common queue shared by all threads.
                 pthread_mutex_lock(&ts->result_mutex);
                 ts->done_job += chunk;
@@ -500,21 +500,21 @@ protected:
                     ts->count += res.size();
                     for(size_t i = 0; i < res.size(); i++) {
                         ts->results.push_back(res[i]);
-                    }   
+                    }
                     res.clear();
                 }
                 pthread_mutex_unlock(&ts->result_mutex);
-                
+
                 // Signal main thread that we might have compleeted
                 pthread_mutex_lock(&ts->completed_mutex);
                 pthread_cond_signal(&ts->completed_cond);
                 pthread_mutex_unlock(&ts->completed_mutex);
-                
+
             }
-        }       
+        }
         return 0;
     }
-    
+
     struct thread_state {
         pthread_mutex_t result_mutex;
         pthread_cond_t completed_cond;
@@ -553,8 +553,8 @@ public:
 protected:
     Query* m_query;
     size_t m_column_id;
-}; 
- 
+};
+
 class XQueryAccessorString {
 public:
     XQueryAccessorString(size_t column_id) : m_column_id(column_id) {}
@@ -583,7 +583,7 @@ public:
 protected:
     Query* m_query;
     size_t m_column_id;
-}; 
+};
 
 }
 

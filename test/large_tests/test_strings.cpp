@@ -76,7 +76,7 @@ TEST(ColumnString_monkeytest2) {
             a.Delete(i);
         }
     }
-    
+
     // Cleanup
     a.Destroy();
     res.Destroy();

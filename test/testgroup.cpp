@@ -293,14 +293,14 @@ TEST(Group_Serialize_All) {
     // Create group with one table
     Group toMem;
     Table& table = toMem.GetTable("test");
-    
+
     table.RegisterColumn(COLUMN_TYPE_INT,    "int");
     table.RegisterColumn(COLUMN_TYPE_BOOL,   "bool");
     table.RegisterColumn(COLUMN_TYPE_DATE,   "date");
     table.RegisterColumn(COLUMN_TYPE_STRING, "string");
     table.RegisterColumn(COLUMN_TYPE_BINARY, "binary");
     table.RegisterColumn(COLUMN_TYPE_MIXED,  "mixed");
-    
+
     table.InsertInt(0, 0, 12);
     table.InsertBool(1, 0, true);
     table.InsertDate(2, 0, 12345);
@@ -308,16 +308,16 @@ TEST(Group_Serialize_All) {
     table.InsertBinary(4, 0, "binary", 7);
     table.InsertMixed(5, 0, false);
     table.InsertDone();
-    
+
     // Serialize to memory (we now own the buffer)
     size_t len;
     const char* const buffer = toMem.WriteToMem(len);
-    
+
     // Load the table
     Group fromMem(buffer, len);
     CHECK(fromMem.IsValid());
     Table& t = fromMem.GetTable("test");
-    
+
     CHECK_EQUAL(6, t.GetColumnCount());
     CHECK_EQUAL(1, t.GetSize());
 }
@@ -696,7 +696,7 @@ TEST(Group_MultiLevelSubtables)
 TEST(Group_ToDot) {
     // Create group with one table
     Group mygroup;
-    
+
     // Create table with all column types
     Table& table = mygroup.GetTable("test");
     Spec s = table.GetSpec();
@@ -712,20 +712,20 @@ TEST(Group_ToDot) {
     sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
     sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
     table.UpdateFromSpec(s.GetRef());
-    
+
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
         table.InsertInt(0, i, i);
         table.InsertBool(1, i, (i % 2 ? true : false));
         table.InsertDate(2, i, 12345);
-        
+
         std::stringstream ss;
         ss << "string" << i;
         table.InsertString(3, i, ss.str().c_str());
-        
+
         ss << " very long string.........";
         table.InsertString(4, i, ss.str().c_str());
-        
+
         switch (i % 3) {
             case 0:
                 table.InsertString(5, i, "test1");
@@ -737,9 +737,9 @@ TEST(Group_ToDot) {
                 table.InsertString(5, i, "test3");
                 break;
         }
-        
+
         table.InsertBinary(6, i, "binary", 7);
-        
+
         switch (i % 3) {
             case 0:
                 table.InsertMixed(7, i, false);
@@ -751,25 +751,25 @@ TEST(Group_ToDot) {
                 table.InsertMixed(7, i, "string");
                 break;
         }
-        
+
         table.InsertTable(8, i);
         table.InsertDone();
-        
+
         // Add sub-tables
         if (i == 2) {
             // To mixed column
             table.SetMixed(7, i, Mixed(COLUMN_TYPE_TABLE));
             Table subtable = table.GetMixedTable(7, i);
-            
+
             Spec s = subtable.GetSpec();
             s.AddColumn(COLUMN_TYPE_INT,    "first");
             s.AddColumn(COLUMN_TYPE_STRING, "second");
             subtable.UpdateFromSpec(s.GetRef());
-            
+
             subtable.InsertInt(0, 0, 42);
             subtable.InsertString(1, 0, "meaning");
             subtable.InsertDone();
-            
+
             // To table column
             Table subtable2 = table.GetTable(8, i);
             subtable2.InsertInt(0, 0, 42);
@@ -777,17 +777,17 @@ TEST(Group_ToDot) {
             subtable2.InsertDone();
         }
     }
-    
+
     // We also want ColumnStringEnum's
     table.Optimize();
-    
+
 #if 1
     // Write array graph to cout
     std::stringstream ss;
     mygroup.ToDot(ss);
     cout << ss.str() << endl;
 #endif
-    
+
     // Write array graph to file in dot format
     std::ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
     if (!fs.is_open()) cout << "file open error " << strerror << endl;

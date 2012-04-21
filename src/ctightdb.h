@@ -94,7 +94,7 @@ typedef struct TableView TableView;
 
     /* Creating and deleting tableviews */
     void tableview_delete(TableView* t);
-    
+
     /* TableView size */
     bool tableview_is_empty(const TableView* t);
     size_t tableview_get_size(const TableView* t);

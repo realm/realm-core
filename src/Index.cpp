@@ -286,7 +286,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
         // Create new list for item
         Index newList;
         if (!newList.LeafInsert(ndx, value)) return NodeChange(NodeChange::CT_ERROR);
-        
+
         switch (ndx) {
         case 0:             // insert before
             return NodeChange(NodeChange::CT_INSERT_BEFORE, newList.GetRef());
@@ -318,7 +318,7 @@ size_t Index::Find(int64_t value) const {
             if (values.Get(pos) == value) return (size_t)refs.Get(pos);
             else return (size_t)-1;
         }
-        
+
         ref = (size_t)refs.Get(pos);
     }
 }
@@ -408,7 +408,7 @@ void Index::Verify() const {
     offsets.Verify();
     refs.Verify();
     assert(offsets.Size() == refs.Size());
-    
+
     if (m_array->IsNode()) {
         assert(refs.HasRefs());
 

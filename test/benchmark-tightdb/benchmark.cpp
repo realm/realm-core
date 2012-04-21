@@ -15,12 +15,12 @@
 
 
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
-uint64_t rand2() { 
-    static int64_t seed = 2862933555777941757ULL; 
+uint64_t rand2() {
+    static int64_t seed = 2862933555777941757ULL;
     static int64_t seed2 = 0;
-    seed = (2862933555777941757ULL * seed + 3037000493ULL); 
+    seed = (2862933555777941757ULL * seed + 3037000493ULL);
     seed2++;
-    return seed * seed2 + seed2; 
+    return seed * seed2 + seed2;
 }
 
 TDB_TABLE_1(IntegerTable,
@@ -60,11 +60,11 @@ void tightdb(void) {
         }
 
         overhead = 0;
-        
+
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (i + 1);
-            integers.Add((int64_t)rand2() % RANGE); 
+            integers.Add((int64_t)rand2() % RANGE);
         }
 //      printf((indexed + "Memory usage: %lld bytes\n").c_str(), (int64_t)GetMemUsage()); // %zu doesn't work in vc
         printf((indexed + "Add: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
@@ -74,7 +74,7 @@ void tightdb(void) {
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (i + 1);
-            integers.InsertInt(0, p, (int64_t)rand2() % RANGE); 
+            integers.InsertInt(0, p, (int64_t)rand2() % RANGE);
         }
         printf((indexed + "Insert: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 

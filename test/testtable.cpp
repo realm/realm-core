@@ -160,20 +160,20 @@ TEST(Table_Delete_All_Types) {
     sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
     sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
     table.UpdateFromSpec(s.GetRef());
-    
+
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
         table.InsertInt(0, i, i);
         table.InsertBool(1, i, (i % 2 ? true : false));
         table.InsertDate(2, i, 12345);
-        
+
         std::stringstream ss;
         ss << "string" << i;
         table.InsertString(3, i, ss.str().c_str());
-        
+
         ss << " very long string.........";
         table.InsertString(4, i, ss.str().c_str());
-        
+
         switch (i % 3) {
             case 0:
                 table.InsertString(5, i, "test1");
@@ -185,9 +185,9 @@ TEST(Table_Delete_All_Types) {
                 table.InsertString(5, i, "test3");
                 break;
         }
-        
+
         table.InsertBinary(6, i, "binary", 7);
-        
+
         switch (i % 4) {
             case 0:
                 table.InsertMixed(7, i, false);
@@ -207,10 +207,10 @@ TEST(Table_Delete_All_Types) {
                 break;
             }
         }
-        
+
         table.InsertTable(8, i);
         table.InsertDone();
-        
+
         // Add subtable to mixed column
         if (i % 4 == 3) {
             TableRef subtable = table.GetTable(7, i);
@@ -220,32 +220,32 @@ TEST(Table_Delete_All_Types) {
             subtable->InsertString(1, 0, "meaning");
             subtable->InsertDone();
         }
-        
+
         // Add sub-tables to table column
         TableRef subtable = table.GetTable(8, i);
         subtable->InsertInt(0, 0, 42);
         subtable->InsertString(1, 0, "meaning");
         subtable->InsertDone();
     }
-    
+
     // We also want a ColumnStringEnum
     table.Optimize();
-    
+
     // Test Deletes
     table.DeleteRow(14);
     table.DeleteRow(0);
     table.DeleteRow(5);
-    
+
     CHECK_EQUAL(12, table.GetSize());
-    
+
 #ifdef _DEBUG
     table.verify();
 #endif //_DEBUG
-    
+
     // Test Clear
     table.Clear();
     CHECK_EQUAL(0, table.GetSize());
-    
+
 #ifdef _DEBUG
     table.verify();
 #endif //_DEBUG
@@ -353,7 +353,7 @@ TEST(Table_Index_Int) {
     CHECK_EQUAL(2, table.second.Find(10));
     CHECK_EQUAL(3, table.second.Find(20));
     CHECK_EQUAL(4, table.second.Find(11));
-    CHECK_EQUAL(5, table.second.Find(45)); 
+    CHECK_EQUAL(5, table.second.Find(45));
     //CHECK_EQUAL(6, table.second.Find(10)); // only finds first match
     CHECK_EQUAL(7, table.second.Find(0));
     CHECK_EQUAL(8, table.second.Find(30));
@@ -368,7 +368,7 @@ TEST(Table_Index_Int) {
     CHECK_EQUAL(2, table.second.Find(13));
     CHECK_EQUAL(3, table.second.Find(20));
     CHECK_EQUAL(4, table.second.Find(11));
-    CHECK_EQUAL(5, table.second.Find(45)); 
+    CHECK_EQUAL(5, table.second.Find(45));
     CHECK_EQUAL(6, table.second.Find(10));
     CHECK_EQUAL(7, table.second.Find(0));
     CHECK_EQUAL(8, table.second.Find(30));
@@ -383,7 +383,7 @@ TEST(Table_Index_Int) {
     CHECK_EQUAL(2, table.second.Find(13));
     CHECK_EQUAL(3, table.second.Find(20));
     CHECK_EQUAL(4, table.second.Find(11));
-    CHECK_EQUAL(5, table.second.Find(45)); 
+    CHECK_EQUAL(5, table.second.Find(45));
     CHECK_EQUAL(6, table.second.Find(10));
     CHECK_EQUAL(7, table.second.Find(0));
     CHECK_EQUAL(8, table.second.Find(30));
@@ -399,7 +399,7 @@ TEST(Table_Index_Int) {
     CHECK_EQUAL(1, table.second.Find(13));
     CHECK_EQUAL(2, table.second.Find(20));
     CHECK_EQUAL(3, table.second.Find(11));
-    CHECK_EQUAL(4, table.second.Find(45)); 
+    CHECK_EQUAL(4, table.second.Find(45));
     CHECK_EQUAL(5, table.second.Find(0));
     CHECK_EQUAL(6, table.second.Find(30));
     CHECK_EQUAL(7, table.second.Find(100));
@@ -580,35 +580,35 @@ TEST(Table_Mixed) {
     Table table;
     table.RegisterColumn(COLUMN_TYPE_INT, "first");
     table.RegisterColumn(COLUMN_TYPE_MIXED, "second");
-    
+
     CHECK_EQUAL(COLUMN_TYPE_INT, table.GetColumnType(0));
     CHECK_EQUAL(COLUMN_TYPE_MIXED, table.GetColumnType(1));
     CHECK_EQUAL("first", table.GetColumnName(0));
     CHECK_EQUAL("second", table.GetColumnName(1));
-    
+
     const size_t ndx = table.AddRow();
     table.Set(0, ndx, 0);
     table.SetMixed(1, ndx, true);
-    
+
     CHECK_EQUAL(0, table.Get(0, 0));
     CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(1, 0).GetType());
     CHECK_EQUAL(true, table.GetMixed(1, 0).GetBool());
-    
+
     table.InsertInt(0, 1, 43);
     table.InsertMixed(1, 1, (int64_t)12);
     table.InsertDone();
-    
+
     CHECK_EQUAL(0,  table.Get(0, ndx));
     CHECK_EQUAL(43, table.Get(0, 1));
     CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(1, 0).GetType());
     CHECK_EQUAL(COLUMN_TYPE_INT,  table.GetMixed(1, 1).GetType());
     CHECK_EQUAL(true, table.GetMixed(1, 0).GetBool());
     CHECK_EQUAL(12,   table.GetMixed(1, 1).GetInt());
-    
+
     table.InsertInt(0, 2, 100);
     table.InsertMixed(1, 2, "test");
     table.InsertDone();
-    
+
     CHECK_EQUAL(0,  table.Get(0, 0));
     CHECK_EQUAL(43, table.Get(0, 1));
     CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
@@ -617,11 +617,11 @@ TEST(Table_Mixed) {
     CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
     CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
     CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
-    
+
     table.InsertInt(0, 3, 0);
     table.InsertMixed(1, 3, Date(324234));
     table.InsertDone();
-    
+
     CHECK_EQUAL(0,  table.Get(0, 0));
     CHECK_EQUAL(43, table.Get(0, 1));
     CHECK_EQUAL(0,  table.Get(0, 3));
@@ -633,11 +633,11 @@ TEST(Table_Mixed) {
     CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
     CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
     CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
-    
+
     table.InsertInt(0, 4, 43);
     table.InsertMixed(1, 4, Mixed("binary", 7));
     table.InsertDone();
-    
+
     CHECK_EQUAL(0,  table.Get(0, 0));
     CHECK_EQUAL(43, table.Get(0, 1));
     CHECK_EQUAL(0,  table.Get(0, 3));
@@ -653,11 +653,11 @@ TEST(Table_Mixed) {
     CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
     CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).GetBinary().pointer);
     CHECK_EQUAL(7,      table.GetMixed(1, 4).GetBinary().len);
-    
+
     table.InsertInt(0, 5, 0);
     table.InsertMixed(1, 5, Mixed(COLUMN_TYPE_TABLE));
     table.InsertDone();
-    
+
     CHECK_EQUAL(0,  table.Get(0, 0));
     CHECK_EQUAL(43, table.Get(0, 1));
     CHECK_EQUAL(0,  table.Get(0, 3));
@@ -702,7 +702,7 @@ TDB_TABLE_1(TestTableMX,
 
 TEST(Table_Mixed2) {
     TestTableMX table;
-    
+
     table.Add((int64_t)1);
     table.Add(true);
     table.Add(Date(1234));
@@ -712,7 +712,7 @@ TEST(Table_Mixed2) {
     CHECK_EQUAL(COLUMN_TYPE_BOOL,   table[1].first.GetType());
     CHECK_EQUAL(COLUMN_TYPE_DATE,   table[2].first.GetType());
     CHECK_EQUAL(COLUMN_TYPE_STRING, table[3].first.GetType());
-    
+
     CHECK_EQUAL(1,            table[0].first.GetInt());
     CHECK_EQUAL(true,         table[1].first.GetBool());
     CHECK_EQUAL((time_t)1234, table[2].first.GetDate());

@@ -101,9 +101,9 @@ void ArrayBinary::Delete(size_t ndx) {
 
 void ArrayBinary::Resize(size_t ndx) {
     assert(ndx < m_offsets.Size());
-    
+
     const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
-    
+
     m_offsets.Resize(ndx);
     m_blob.Resize(len);
 }
@@ -117,16 +117,16 @@ void ArrayBinary::Clear() {
 
 void ArrayBinary::ToDot(std::ostream& out, const char* title) const {
     const size_t ref = GetRef();
-    
+
     out << "subgraph cluster_binary" << ref << " {" << std::endl;
     out << " label = \"ArrayBinary";
     if (title) out << "\\n'" << title << "'";
     out << "\";" << std::endl;
-    
+
     Array::ToDot(out, "binary_top");
     m_offsets.ToDot(out, "offsets");
     m_blob.ToDot(out, "blob");
-    
+
     out << "}" << std::endl;
 }
 

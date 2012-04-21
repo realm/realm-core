@@ -22,7 +22,7 @@ Table *TableView::GetTable(void) {
 size_t TableView::Find(size_t column_id, int64_t value) const {
     assert(column_id < m_table.GetColumnCount());
     assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);
-    
+
     for(size_t i = 0; i < m_refs.Size(); i++)
         if(Get(column_id, i) == value)
             return i;
@@ -33,9 +33,9 @@ size_t TableView::Find(size_t column_id, int64_t value) const {
 void TableView::FindAll(TableView& tv, size_t column_id, int64_t value) {
     assert(column_id < m_table.GetColumnCount());
     assert(m_table.GetColumnType(column_id) == COLUMN_TYPE_INT);
-    
+
     for(size_t i = 0; i < m_refs.Size(); i++)
-        if(Get(column_id, i) == value)          
+        if(Get(column_id, i) == value)
             tv.GetRefColumn().Add(i);
 }
 
@@ -194,7 +194,7 @@ void TableView::Sort(size_t column, bool Ascending) {
     //ref.Preset(0, m_refs.Size() - 1, m_refs.Size());
     for(size_t t = 0; t < m_refs.Size(); t++)
         ref.Add(t);
-    
+
     // Extract all values from the Column and put them in an Array because Array is much faster to operate on
     // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
     if(m_table.GetColumnType(column) == COLUMN_TYPE_INT) {
@@ -208,14 +208,14 @@ void TableView::Sort(size_t column, bool Ascending) {
             size_t idx = m_refs.GetAsRef(t);
             int64_t v = (int64_t)m_table.GetDate(column, idx);
             vals.Add(v);
-        }   
+        }
     }
     else if(m_table.GetColumnType(column) == COLUMN_TYPE_BOOL) {
         for(size_t t = 0; t < m_refs.Size(); t++) {
             size_t idx = m_refs.GetAsRef(t);
             int64_t v = (int64_t)m_table.GetBool(column, idx);
             vals.Add(v);
-        }       
+        }
     }
 
     vals.ReferenceSort(ref);
@@ -236,7 +236,7 @@ void TableView::Sort(size_t column, bool Ascending) {
             size_t v = result.GetAsRef(t);
             m_refs.Add(v);
         }
-    } 
+    }
     else {
         for(size_t t = 0; t < ref.Size(); t++) {
             size_t v = result.GetAsRef(ref.Size() - t - 1);
@@ -248,11 +248,11 @@ void TableView::Sort(size_t column, bool Ascending) {
 
 void TableView::Delete(size_t ndx) {
     assert(ndx < m_refs.Size());
-    
+
     // Delete row in source table
     const size_t real_ndx = m_refs.GetAsRef(ndx);
     m_table.DeleteRow(real_ndx);
-    
+
     // Update refs
     m_refs.Delete(ndx);
     m_refs.IncrementIf(ndx, -1);
@@ -260,7 +260,7 @@ void TableView::Delete(size_t ndx) {
 
 void TableView::Clear() {
     m_refs.Sort();
-    
+
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)
     const size_t count = m_refs.Size();
@@ -268,7 +268,7 @@ void TableView::Clear() {
         const size_t ndx = m_refs.GetAsRef(i-1);
         m_table.DeleteRow(ndx);
     }
-    
+
     m_refs.Clear();
 }
 

@@ -215,7 +215,7 @@ TEST_FIXTURE(db_setup, Column_Index1) {
     CHECK_EQUAL(4, c.FindWithIndex(2));
     CHECK_EQUAL(5, c.FindWithIndex(3));
     CHECK_EQUAL(6, c.FindWithIndex(65536));
-    
+
     c.ClearIndex();
 }
 */
@@ -495,7 +495,7 @@ TEST(Column_Sum) {
     // Sum of 1 elements
     c.Add(123);
     CHECK_EQUAL(123, c.Sum());
-    
+
     c.Clear();
 
     for(int i = 0; i < 100; i++) {
@@ -603,7 +603,7 @@ TEST(Column_Min2) {
 /*
 TEST(Column_Sort2) {
     Column c;
-    
+
     for(size_t t = 0; t < 9*MAX_LIST_SIZE; t++)
         c.Add(rand() % 300 - 100);
 

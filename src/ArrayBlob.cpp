@@ -86,29 +86,29 @@ size_t ArrayBlob::CalcItemCount(size_t bytes, size_t) const {
 
 void ArrayBlob::ToDot(std::ostream& out, const char* title) const {
     const size_t ref = GetRef();
-    
+
     if (title) {
         out << "subgraph cluster_" << ref << " {" << std::endl;
         out << " label = \"" << title << "\";" << std::endl;
         out << " color = white;" << std::endl;
     }
-    
+
     out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
     out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
-    
+
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
     out << "0x" << std::hex << ref << std::dec << "<BR/>";
     out << "</FONT></TD>" << std::endl;
-    
+
     // Values
     out << "<TD>";
     out << Size() << " bytes"; //TODO: write content
     out << "</TD>" << std::endl;
-    
+
     out << "</TR></TABLE>>];" << std::endl;
     if (title) out << "}" << std::endl;
-    
+
     out << std::endl;
 }
 

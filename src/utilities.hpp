@@ -29,7 +29,7 @@
 
 namespace tightdb {
 
-typedef struct 
+typedef struct
 {
     unsigned long long remainder;
     unsigned long long remainder_len;

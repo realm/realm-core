@@ -265,7 +265,7 @@ void Array::Clear() {
         for (size_t i = 0; i < Size(); ++i) {
             const size_t ref = GetAsRef(i);
             if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
-            
+
             Array sub(ref, this, i);
             sub.Destroy();
         }
@@ -424,11 +424,11 @@ bool Array::Insert(size_t ndx, int64_t value) {
     Getter getter = m_getter;
 
     // Make room for the new value
-    size_t width = m_width; 
+    size_t width = m_width;
 
     if(value < m_lbound || value > m_ubound)
         width = BitWidth(value);
-    
+
     const bool doExpand = (width > m_width);
     if (doExpand) {
         if (!Alloc(m_len+1, width)) return false;
@@ -567,7 +567,7 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 #if defined(USE_SSE42)
     if(end - start < sizeof(__m128i) || m_width < 8)
         return CompareEquality<true>(value, start, end);
-#elif defined(USE_SSE3) 
+#elif defined(USE_SSE3)
     if(end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) // 64 bit not supported by sse3
         return CompareEquality<true>(value, start, end);
 #endif
@@ -637,7 +637,7 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
         }
     }
 #endif
-    else 
+    else
         assert(true);
     return _mm_movemask_epi8(compare) == 0 ? (size_t)-1 : i - 1;
 }
@@ -649,7 +649,7 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, size_t end) const {
     if (end == (size_t)-1) end = m_len;
 
-    // Test 4 items with zero latency for cases where match frequency is high, such 
+    // Test 4 items with zero latency for cases where match frequency is high, such
     // as 2-bit values
     if(start + 0 < end && (eq ? (Get(start + 0) == value)   :   (Get(start + 0) != value)))
         return start + 0;
@@ -678,14 +678,14 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
     for(; start < ee; start++)
         if(eq ? (Get(start) == value)  :   (Get(start) != value))
             return start;
-    
+
     if(start >= end)
         return (size_t)-1;
 
     const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));
     const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8) / 8) - 1;
 
-    // Matches are rare enough to setup fast linear search for remaining items. We use 
+    // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
     if (m_width == 0) {
     }
@@ -693,7 +693,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
         if(eq) {
             while(*p == 0)
                 p++;
-        } 
+        }
         else {
             while(*p == -1)
                 p++;
@@ -799,7 +799,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset, size_t start
         f = Find(value, f + 1, end);
         if (f == (size_t)-1)
             break;
-        else    
+        else
             result.AddPositiveLocal(f + colOffset);
     }
 }
@@ -810,7 +810,7 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset, size_t start
 template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, size_t end) const{
     if (end == (size_t)-1) end = m_len;
 
-    // Test 4 items with zero latency for cases where match frequency is high, such 
+    // Test 4 items with zero latency for cases where match frequency is high, such
     // as 2-bit values where each second item is greater on average
     if(start + 0 < end && (gt ? (Get(start + 0) > value)   :   (Get(start + 0) < value)))
         return start + 0;
@@ -839,14 +839,14 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     for(; start < ee; start++)
         if(gt ? (Get(start) > value)  :   (Get(start) < value))
             return start;
-    
+
     if(start >= end)
         return (size_t)-1;
 
     const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));
     const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8) / 8) - 1;
 
-    // Matches are rare enough to setup fast linear search for remaining items. We use 
+    // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
     if (m_width == 0) {
     }
@@ -894,9 +894,9 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
             while(p < e) {
                 int64_t v = *p;
                 // Bit hacks also only works for positive items in chunk, so test their sign bits
-                if(v & 0x8080808080808080ULL) {                 
+                if(v & 0x8080808080808080ULL) {
                     if (gt ? ((char)(v>>0*8) > value || (char)(v>>1*8) > value || (char)(v>>2*8) > value || (char)(v>>3*8) > value || (char)(v>>4*8) > value || (char)(v>>5*8) > value || (char)(v>>6*8) > value || (char)(v>>7*8) > value)
-                      : 
+                      :
                     ((char)(v>>0*8) < value || (char)(v>>1*8) < value || (char)(v>>2*8) < value || (char)(v>>3*8) < value || (char)(v>>4*8) < value || (char)(v>>5*8) < value || (char)(v>>6*8) < value || (char)(v>>7*8) < value))
                         break;
                 }
@@ -906,19 +906,19 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
                     break;
             }
             start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
-        } 
+        }
         else {
             while(start < end && gt ? (Get_8b(start) <= value) : (Get_8b(start) >= value))
                 start++;
         }
-        
+
     }
     else if (m_width == 16) {
         if(value <= 32767) {
             int64_t constant = gt ? (~0ULL / 65535 * (32767 - value))   :   ( ~0UL / 65535 * value);
             while(p < e) {
                 int64_t v = *p;
-                if(v & 0x8000800080008000ULL) {                 
+                if(v & 0x8000800080008000ULL) {
                     if (gt ? ((int)(v>>0*16) > value || (int)(v>>1*16) > value || (int)(v>>2*16) > value || (int)(v>>3*16) > value) :
                         ((int)(v>>0*16) < value || (int)(v>>1*16) < value || (int)(v>>2*16) < value || (int)(v>>3*16) < value))
                         break;
@@ -929,12 +929,12 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
                     break;
             }
             start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
-        } 
+        }
         else {
             while(start < end && gt ? (Get_16b(start) <= value)  :  (false))
                 start++;
         }
-        
+
 
     }
     else if (m_width == 32) {
@@ -1018,7 +1018,7 @@ int64_t Array::Sum(size_t start, size_t end) const {
     assert(start < m_len && end <= m_len && start < end);
 
     int64_t sum = 0;
-    
+
     if (m_width == 0)
         return 0;
     else if( m_width == 8) {
@@ -1095,7 +1095,7 @@ int64_t Array::Sum(size_t start, size_t end) const {
             }
         }
 
-        // Sum remainding elements 
+        // Sum remainding elements
         for(; i < end; i++)
             sum += Get(i);
     }
@@ -1455,7 +1455,7 @@ template <size_t w>void Array::ReferenceSort(Array &ref) {
 //  bool b = MinMax<w>(0, m_len, m_len, &min, &max); // auto detect
 //  bool b = MinMax<w>(0, m_len, -1, &min, &max); // force count sort
     bool b = MinMax<w>(0, m_len, 0, &min, &max); // force quicksort
-    
+
     if(b) {
         Array res;
         Array count;
@@ -1496,11 +1496,11 @@ template <size_t w>void Array::ReferenceSort(Array &ref) {
         count.Destroy();
     }
     else {
-        ReferenceQuickSort(ref); 
+        ReferenceQuickSort(ref);
     }
 }
 
-// Sort array 
+// Sort array
 template <size_t w> void Array::Sort() {
     if(m_len < 2)
         return;
@@ -1549,7 +1549,7 @@ template <size_t w> void Array::Sort() {
     else {
         QuickSort(lo, hi);
     }
-    
+
     return;
 }
 
@@ -1585,8 +1585,8 @@ template <size_t w>void Array::ReferenceQuickSort(size_t lo, size_t hi, Array &r
             i++; j--;
         }
     } while (i <= j);
-*/  
-    
+*/
+
     // Lookup values indirectly through references, but swap only references: 2.60 sec
     // Templated get/set: 2.40 sec (todo, enable again)
     // comparison element x
@@ -1604,7 +1604,7 @@ template <size_t w>void Array::ReferenceQuickSort(size_t lo, size_t hi, Array &r
             i++; j--;
         }
     } while (i <= j);
-    
+
     //  recursion
     if ((int)lo < j) ReferenceQuickSort<w>(lo, j, ref);
     if (i < (int)hi) ReferenceQuickSort<w>(i, hi, ref);
@@ -1673,7 +1673,7 @@ void Array::Print() const {
 
 void Array::Verify() const {
     assert(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
-    
+
     // Check that parent is set correctly
     if (!m_parent) return;
 
@@ -1683,23 +1683,23 @@ void Array::Verify() const {
 
 void Array::ToDot(std::ostream& out, const char* title) const {
     const size_t ref = GetRef();
-    
+
     if (title) {
         out << "subgraph cluster_" << ref << " {" << std::endl;
         out << " label = \"" << title << "\";" << std::endl;
         out << " color = white;" << std::endl;
     }
-    
+
     out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
     out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
-    
+
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
     out << "0x" << std::hex << ref << std::dec << "<BR/>";
     if (m_isNode) out << "IsNode<BR/>";
     if (m_hasRefs) out << "HasRefs<BR/>";
     out << "</FONT></TD>" << std::endl;
-    
+
     // Values
     for (size_t i = 0; i < m_len; ++i) {
         const int64_t v =  Get(i);
@@ -1712,20 +1712,20 @@ void Array::ToDot(std::ostream& out, const char* title) const {
         else out << "<TD>" << v;
         out << "</TD>" << std::endl;
     }
-    
+
     out << "</TR></TABLE>>];" << std::endl;
     if (title) out << "}" << std::endl;
-    
+
     if (m_hasRefs) {
         for (size_t i = 0; i < m_len; ++i) {
             const int64_t target = Get(i);
             if (target == 0 || target & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
-            
+
             out << "n" << std::hex << ref << std::dec << ":" << i;
             out << " -> n" << std::hex << target << std::dec << std::endl;
         }
     }
-    
+
     out << std::endl;
 }
 
@@ -1829,10 +1829,10 @@ size_t FindPosDirect(const uint8_t* const header, const char* const data, const 
 
 template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target) {
     const size_t len = get_header_len_direct(header);
-    
+
     int low = -1;
     int high = (int)len;
-    
+
     // Binary search based on:
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
     // Finds position of largest value SMALLER than the target (for lookups in
@@ -1840,7 +1840,7 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
     while (high - low > 1) {
         const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
         const int64_t v = GetDirect<width>(data, probe);
-        
+
         if (v > target) high = (int)probe;
         else            low = (int)probe;
     }
@@ -1859,29 +1859,29 @@ int64_t Array::ColumnGet(size_t ndx) const {
     const uint8_t* header = (const uint8_t*)data - 8;
     unsigned int width = m_width;
     bool isNode = m_isNode;
-    
+
     while (1) {
         if (isNode) {
             // Get subnode table
             const size_t ref_offsets = GetDirect(data, width, 0);
             const size_t ref_refs    = GetDirect(data, width, 1);
-            
+
             // Find the subnode containing the item
             const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
             const char* const offsets_data = (const char*)offsets_header + 8;
             const size_t offsets_width  = get_header_width_direct(offsets_header);
             const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
-            
+
             // Calc index in subnode
             const size_t offset = node_ndx ? (size_t)GetDirect(offsets_data, offsets_width, node_ndx-1) : 0;
             ndx = ndx - offset; // local index
-            
+
             // Get ref to array
             const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
             const char* const refs_data = (const char*)refs_header + 8;
             const unsigned int refs_width  = get_header_width_direct(refs_header);
             const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
-            
+
             // Set vars for next iteration
             header = (const uint8_t*)m_alloc.Translate(ref);
             data   = (const char*)header + 8;

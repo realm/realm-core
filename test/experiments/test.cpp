@@ -47,14 +47,14 @@ void test() {
     // Create advanced query
     TDB_QUERY_OPT(TestQuery, MyTable) (int v) {
         count <= v;
-        desc == "Hello" || 
+        desc == "Hello" ||
             (desc == "Hey" && weekday.between(Mon, Thu));
     }};
 
     // Run query with modifiers (single result)
     size_t result2 = table.Range(10, 200).Find(TestQuery(12));
     if (result2 != -1) printf("found match at %d\n", result2);
-    
+
     // Run query with modifiers (all results)
     MyTable result = table.FindAll(TestQuery(2)).Sort().Limit(10);
 }

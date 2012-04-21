@@ -130,7 +130,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
 
     // Calc min column width (incl trailing zero-byte)
     size_t width = ::round_up(len);
-    
+
     const bool doExpand = width > m_width;
 
     // Make room for the new value
@@ -259,7 +259,7 @@ size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, siz
             if (strncmp(value, v, len) == 0) return i;
         }
     }
-    
+
     return (size_t)-1; // not found
 }
 
@@ -313,31 +313,31 @@ void ArrayString::ToDot(FILE* f) const {
 
         fprintf(f, "%s", Get(i));
     }
-    
+
     fprintf(f, "\"];\n");
 }
 */
 
 void ArrayString::ToDot(std::ostream& out, const char* title) const {
     const size_t ref = GetRef();
-    
+
     if (title) {
         out << "subgraph cluster_" << ref << " {" << std::endl;
         out << " label = \"" << title << "\";" << std::endl;
         out << " color = white;" << std::endl;
     }
-    
+
     out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
     out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\">";
     out << "0x" << std::hex << ref << std::dec << "</FONT></TD>" << std::endl;
-    
+
     for (size_t i = 0; i < m_len; ++i) {
         out << "<TD>\"" << Get(i) << "\"</TD>" << std::endl;
     }
-    
+
     out << "</TR></TABLE>>];" << std::endl;
     if (title) out << "}" << std::endl;
 }

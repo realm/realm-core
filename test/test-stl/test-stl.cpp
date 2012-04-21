@@ -59,15 +59,15 @@ private:
 };
 
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
-uint64_t rand2() { 
+uint64_t rand2() {
     return (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand();
 
 
-    static int64_t seed = 2862933555777941757ULL; 
+    static int64_t seed = 2862933555777941757ULL;
     static int64_t seed2 = 0;
-    seed = (2862933555777941757ULL * seed + 3037000493ULL); 
+    seed = (2862933555777941757ULL * seed + 3037000493ULL);
     seed2++;
-    return seed * seed2 + seed2; 
+    return seed * seed2 + seed2;
 }
 
 int main() {
@@ -90,7 +90,7 @@ int main() {
     printf("Memory usage: %lld bytes\n", (long long)memUsed);
 
     UnitTest::Timer timer;
-    
+
     // Search small integer column
     {
         timer.Start();
@@ -122,7 +122,7 @@ int main() {
         const int search_time = timer.GetTimeInMs();
         printf("Search (byte-sized integer): %dms\n", search_time);
     }
-    
+
     // Search string column
     {
         timer.Start();
@@ -144,7 +144,7 @@ int main() {
     multimap<int, TestTable> mapTable;
     {
         timer.Start();
-        
+
         // Copy data to map
         for (vector<TestTable>::const_iterator p = table.begin(); p != table.end(); ++p) {
             mapTable.insert(pair<int,TestTable>(p->first,*p));

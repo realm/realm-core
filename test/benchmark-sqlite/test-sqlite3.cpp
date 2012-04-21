@@ -8,25 +8,25 @@
 #include "../../src/win32/stdint.h"
 using namespace std;
 
-uint64_t rand2() { 
-    static int64_t seed = 2862933555777941757ULL; 
+uint64_t rand2() {
+    static int64_t seed = 2862933555777941757ULL;
     static int64_t seed2 = 0;
-    seed = (2862933555777941757ULL * seed + 3037000493ULL); 
+    seed = (2862933555777941757ULL * seed + 3037000493ULL);
     seed2++;
-    return seed * seed2 + seed2; 
+    return seed * seed2 + seed2;
 }
 
 int ITEMS = 50000;
 int RANGE = 50000;
 
-// NOT FINISHED 
-// NOT FINISHED 
-// NOT FINISHED 
-// NOT FINISHED 
-// NOT FINISHED 
-// NOT FINISHED 
-// NOT FINISHED 
-// NOT FINISHED 
+// NOT FINISHED
+// NOT FINISHED
+// NOT FINISHED
+// NOT FINISHED
+// NOT FINISHED
+// NOT FINISHED
+// NOT FINISHED
+// NOT FINISHED
 
 int main() {
 
@@ -45,7 +45,7 @@ int main() {
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
     }
-    
+
     // Prepare insert statement
     sqlite3_stmt *ppStmt = NULL;
     rc = sqlite3_prepare(db, "INSERT INTO t1 VALUES(?1);", -1, &ppStmt, NULL);
@@ -66,7 +66,7 @@ sqlite3_bind_int(ppStmt, 1, n);
     }
     sqlite3_finalize(ppStmt); // Cleanup
 
-    
+
 
     // Create table
     rc = sqlite3_exec(db, "create table t2 (id INTEGER, value INTEGER);", NULL, NULL, &zErrMsg);
@@ -118,7 +118,7 @@ sqlite3_bind_int(ppStmt, 1, n);
 
         UnitTest::Timer timer;
 
-    
+
         // Prepare select statement
         rc = sqlite3_prepare(db, "SELECT t2.id FROM t2 where t2.value = ?1;", -1, &ppStmt, NULL);
         if (rc != SQLITE_OK) {
@@ -135,7 +135,7 @@ sqlite3_bind_int(ppStmt, 1, n);
         //      fprintf(stderr, "SQL error: %s\n", zErrMsg);
         //  }
             // Sanity test
-            //printf("%s, ", (char*)sqlite3_column_text(ppStmt, 0)); 
+            //printf("%s, ", (char*)sqlite3_column_text(ppStmt, 0));
         }
         if(indexed)
             printf("Indexed FindAll: %dms\n", timer.GetTimeInMs());
@@ -162,7 +162,7 @@ sqlite3_bind_int(ppStmt, 1, n);
     //          fprintf(stderr, "SQL error: %s\n", zErrMsg);
     //      }
             // Sanity test
-            //printf("%s, ", (char*)sqlite3_column_text(ppStmt, 0)); 
+            //printf("%s, ", (char*)sqlite3_column_text(ppStmt, 0));
         }
         if(indexed)
             printf("Indexed Find: %dms\n", timer.GetTimeInMs());
@@ -173,7 +173,7 @@ sqlite3_bind_int(ppStmt, 1, n);
 
         sqlite3_finalize(ppStmt); // Cleanup
 
-    
+
 /*
         // Prepare select statement
         rc = sqlite3_prepare(db, "SELECT sum(t2.id) FROM t1, t2 where t1.find = t2.value;", -1, &ppStmt, NULL);
@@ -189,7 +189,7 @@ sqlite3_bind_int(ppStmt, 1, n);
                 fprintf(stderr, "SQL error: %s\n", zErrMsg);
                 sqlite3_free(zErrMsg);
             }
-    //      printf("%s, ", (char*)sqlite3_column_text(ppStmt, 0)); 
+    //      printf("%s, ", (char*)sqlite3_column_text(ppStmt, 0));
 
         }
         printf("Non-indexed Join: %dms\n", timer.GetTimeInMs());
@@ -206,17 +206,17 @@ sqlite3_bind_int(ppStmt, 1, n);
 
 
 
-        
+
 
             printf("rrrr");
-                        // new benchmark 
+                        // new benchmark
     // Create table
     char *zErrMsg = NULL;
     rc = sqlite3_exec(db, "create table t9 (first INTEGER, second VARCHAR(100));", NULL, NULL, &zErrMsg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
     }
-    
+
     // Prepare insert statement
     sqlite3_stmt *ppStmt = NULL;
     rc = sqlite3_prepare(db, "INSERT INTO t9 VALUES(?1, ?2);", -1, &ppStmt, NULL);
@@ -256,8 +256,8 @@ sqlite3_bind_int(ppStmt, 1, n);
         //      fprintf(stderr, "SQL error: %s\n", zErrMsg);
         //  }
             // Sanity test
-            //printf("%s, ", (char*)sqlite3_column_text(ppStmt, 0)); 
-        
+            //printf("%s, ", (char*)sqlite3_column_text(ppStmt, 0));
+
         printf("SELECT: %dms\n", timer.GetTimeInMs());
 
     printf("done");
@@ -274,7 +274,7 @@ sqlite3_bind_int(ppStmt, 1, n);
 
 
 
-    }   
+    }
 
 
 

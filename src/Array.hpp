@@ -297,7 +297,7 @@ size_t Array::Write(S& out, size_t& pos, bool recurse) const {
     // parse header
     size_t len          = get_header_len();
     const WidthType wt  = get_header_wtype();
-    
+
     // Adjust length to number of bytes
     if (wt == TDB_BITS) {
         const size_t bits = (len * m_width);
@@ -307,11 +307,11 @@ size_t Array::Write(S& out, size_t& pos, bool recurse) const {
     else if (wt == TDB_MULTIPLY) {
         len *= m_width;
     }
-    
+
     if (recurse && m_hasRefs) {
         // Temp array for updated refs
         Array newRefs(m_isNode ? COLUMN_NODE : COLUMN_HASREFS);
-        
+
         // First write out all sub-arrays
         for (size_t i = 0; i < Size(); ++i) {
             const size_t ref = GetAsRef(i);
@@ -325,31 +325,31 @@ size_t Array::Write(S& out, size_t& pos, bool recurse) const {
                 newRefs.Add(sub_pos);
             }
         }
-        
+
         // Write out the replacement array
         // (but don't write sub-tree as it has alredy been written)
         const size_t refs_pos = newRefs.Write(out, pos, false);
-        
+
         // Clean-up
         newRefs.SetType(COLUMN_NORMAL); // avoid recursive del
         newRefs.Destroy();
-        
+
         return refs_pos; // Return position
     }
     else {
         const size_t array_pos = pos;
-        
+
         // TODO: replace capacity with checksum
-        
+
         // Calculate complete size
         len += 8; // include header in total
         const size_t rest = (~len & 0x7)+1; // CHECK
         if (rest < 8) len += rest; // Add padding for 64bit alignment
-        
+
         // Write array
         out.write((const char*)m_data-8, len);
         pos += len;
-        
+
         return array_pos; // Return position of this array
     }
 }

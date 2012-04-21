@@ -1,5 +1,5 @@
 #include <cstdio>
-// Debian package: libproc-dev 
+// Debian package: libproc-dev
 // Linker flag   : -lproc
 // Documentation : /usr/include/proc/readproc.h
 #include <proc/readproc.h>

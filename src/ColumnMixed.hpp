@@ -64,39 +64,39 @@ public:
     void SetString(size_t ndx, const char* value);
     void SetBinary(size_t ndx, const char* value, size_t len);
     void SetTable(size_t ndx);
-    
+
     void InsertInt(size_t ndx, int64_t value);
     void InsertBool(size_t ndx, bool value);
     void InsertDate(size_t ndx, time_t value);
     void InsertString(size_t ndx, const char* value);
     void InsertBinary(size_t ndx, const char* value, size_t len);
     void InsertTable(size_t ndx);
-    
+
     bool Add();
     void Clear();
     void Delete(size_t ndx);
-    
+
     // Indexing
     bool HasIndex() const {return false;}
     void BuildIndex(Index& index) {(void)index;}
     void ClearIndex() {}
-    
+
     size_t GetRef() const {return m_array->GetRef();}
 
 #ifdef _DEBUG
     void verify() const;
     void ToDot(std::ostream& out, const char* title) const;
 #endif //_DEBUG
-    
+
 private:
     void Create(Allocator& alloc, const Table* tab);
     void Create(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc, const Table* tab);
     void InitDataColumn();
-    
+
     void ClearValue(size_t ndx, ColumnType newtype);
 
     class RefsColumn;
-    
+
     // Member variables
     Column*       m_types;
     RefsColumn*   m_refs;

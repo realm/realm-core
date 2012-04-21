@@ -12,12 +12,12 @@ uint64_t rand2();
 
 
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
-uint64_t rand2() { 
-    static int64_t seed = 2862933555777941757ULL; 
+uint64_t rand2() {
+    static int64_t seed = 2862933555777941757ULL;
     static int64_t seed2 = 0;
-    seed = (2862933555777941757ULL * seed + 3037000493ULL); 
+    seed = (2862933555777941757ULL * seed + 3037000493ULL);
     seed2++;
-    return seed * seed2 + seed2; 
+    return seed * seed2 + seed2;
 }
 
 TDB_TABLE_1(IntegerTable,
@@ -67,7 +67,7 @@ int main() {
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
             const size_t res = table.fourth.Find(Tue);
-            if (res != size_t(-1)) {    
+            if (res != size_t(-1)) {
                 printf("error");
             }
         }
@@ -83,7 +83,7 @@ int main() {
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
             const size_t res = table.third.Find(50);
-            if (res != size_t(-1)) {    
+            if (res != size_t(-1)) {
                 printf("error");
             }
         }
@@ -99,7 +99,7 @@ int main() {
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
             const size_t res = table.second.Find("abcde");
-            if (res != 250000) {    
+            if (res != 250000) {
                 printf("error");
             }
         }

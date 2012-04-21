@@ -103,7 +103,7 @@ size_t VerifiedString::Find(const char *value) {
     if (cs != result.size())
         assert(false);
     for(size_t t = 0; t < result.size(); ++t) {
-        if (result[t] != (size_t)c.Get(t)) 
+        if (result[t] != (size_t)c.Get(t))
             assert(false);
     }
 
@@ -117,7 +117,7 @@ size_t VerifiedString::Find(const char *value) {
 
     for(size_t t = 0; t < v.size(); ++t) {
         assert(v[t] == u.Get(t));
-        if (v[t] != u.Get(t)) 
+        if (v[t] != u.Get(t))
             return false;
     }
     return true;

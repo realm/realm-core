@@ -10,7 +10,7 @@
 #endif
 //#include <climits> // size_t
 #include <cstdlib> // size_t
-#include <assert.h> 
+#include <assert.h>
 
 namespace tightdb {
 
@@ -21,7 +21,7 @@ class Index;
 class ColumnBase {
 public:
     virtual ~ColumnBase() {};
-    
+
     virtual void SetHasRefs() {};
 
     virtual bool IsIntColumn() const {return false;}
@@ -64,7 +64,7 @@ protected:
         NodeChange(ChangeType t, size_t r1=0, size_t r2=0) : ref1(r1), ref2(r2), type(t) {}
         NodeChange(bool success) : ref1(0), ref2(0), type(success ? CT_NONE : CT_ERROR) {}
     };
-    
+
     // Tree functions
     template<typename T, class C> T TreeGet(size_t ndx) const;
     template<typename T, class C> bool TreeSet(size_t ndx, T value);
@@ -89,7 +89,7 @@ protected:
     bool NodeUpdateOffsets(size_t ndx);
     template<class C> bool NodeInsertSplit(size_t ndx, size_t newRef);
     size_t GetRefSize(size_t ref) const;
-    
+
 #ifdef _DEBUG
     void ArrayToDot(std::ostream& out, const Array& array) const;
     virtual void LeafToDot(std::ostream& out, const Array& array) const;

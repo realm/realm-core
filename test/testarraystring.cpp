@@ -287,7 +287,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind4) {
     // Expand to 32 bytes width
     c.Add("gggggggggggggggggggggggg");
 
-    // Search for last item 
+    // Search for last item
     const size_t r = c.Find("gggggggggggggggggggggggg");
 
     CHECK_EQUAL(6, r);
@@ -297,7 +297,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind5) {
     // Expand to 64 bytes width
     c.Add("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
 
-    // Search for last item 
+    // Search for last item
     const size_t r = c.Find("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
 
     CHECK_EQUAL(7, r);

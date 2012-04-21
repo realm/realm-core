@@ -58,20 +58,20 @@ void ColumnMixed::Create(size_t ref, ArrayParent *parent, size_t pndx,
 
 void ColumnMixed::InitDataColumn() {
     if (m_data) return;
-    
+
     assert(m_array->Size() == 2);
-    
+
     // Create new data column for items that do not fit in refs
     m_data = new ColumnBinary(m_array->GetAllocator());
     const size_t ref = m_data->GetRef();
-    
+
     m_array->Add(ref);
     m_data->SetParent(m_array, 2);
 }
 
 void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype) {
     assert(ndx < m_types->Size());
-    
+
     const ColumnType type = (ColumnType)m_types->Get(ndx);
     if (type != COLUMN_TYPE_INT) {
         switch (type) {
@@ -100,7 +100,7 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype) {
                 assert(false);
         }
     }
-    
+
     if (type != newtype) m_types->Set(ndx, newtype);
 }
 
@@ -112,7 +112,7 @@ ColumnType ColumnMixed::GetType(size_t ndx) const {
 int64_t ColumnMixed::GetInt(size_t ndx) const {
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_INT);
-    
+
     const int64_t value = m_refs->Get(ndx) >> 1;
     return value;
 }
@@ -120,7 +120,7 @@ int64_t ColumnMixed::GetInt(size_t ndx) const {
 bool ColumnMixed::GetBool(size_t ndx) const {
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_BOOL);
-    
+
     const bool value = (m_refs->Get(ndx) >> 1) == 1;
     return value;
 }
@@ -128,7 +128,7 @@ bool ColumnMixed::GetBool(size_t ndx) const {
 time_t ColumnMixed::GetDate(size_t ndx) const {
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_DATE);
-    
+
     const time_t value = m_refs->Get(ndx) >> 1;
     return value;
 }
@@ -137,10 +137,10 @@ const char* ColumnMixed::GetString(size_t ndx) const {
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_STRING);
     assert(m_data);
-    
+
     const size_t ref = m_refs->GetAsRef(ndx) >> 1;
     const char* value = (const char*)m_data->GetData(ref);
-    
+
     return value;
 }
 
@@ -148,41 +148,41 @@ BinaryData ColumnMixed::GetBinary(size_t ndx) const {
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_BINARY);
     assert(m_data);
-    
+
     const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-    
+
     return m_data->Get(ref);
 }
 
 void ColumnMixed::InsertInt(size_t ndx, int64_t value) {
     assert(ndx <= m_types->Size());
-    
+
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
     const int64_t v = (value << 1) + 1;
-    
+
     m_types->Insert(ndx, COLUMN_TYPE_INT);
     m_refs->Insert(ndx, v);
 }
 
 void ColumnMixed::InsertBool(size_t ndx, bool value) {
     assert(ndx <= m_types->Size());
-    
+
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
     const int64_t v = ((value ? 1 : 0) << 1) + 1;
-    
+
     m_types->Insert(ndx, COLUMN_TYPE_BOOL);
     m_refs->Insert(ndx, v);
 }
 
 void ColumnMixed::InsertDate(size_t ndx, time_t value) {
     assert(ndx <= m_types->Size());
-    
+
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
     const int64_t v = (value << 1) + 1;
-    
+
     m_types->Insert(ndx, COLUMN_TYPE_DATE);
     m_refs->Insert(ndx, v);
 }
@@ -190,15 +190,15 @@ void ColumnMixed::InsertDate(size_t ndx, time_t value) {
 void ColumnMixed::InsertString(size_t ndx, const char* value) {
     assert(ndx <= m_types->Size());
     InitDataColumn();
-    
+
     const size_t len = strlen(value)+1;
     const size_t ref = m_data->Size();
     m_data->Add(value, len);
-    
+
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
     const int64_t v = (ref << 1) + 1;
-    
+
     m_types->Insert(ndx, COLUMN_TYPE_STRING);
     m_refs->Insert(ndx, v);
 }
@@ -206,64 +206,64 @@ void ColumnMixed::InsertString(size_t ndx, const char* value) {
 void ColumnMixed::InsertBinary(size_t ndx, const char* value, size_t len) {
     assert(ndx <= m_types->Size());
     InitDataColumn();
-    
+
     const size_t ref = m_data->Size();
     m_data->Add(value, len);
-    
+
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
     const int64_t v = (ref << 1) + 1;
-    
+
     m_types->Insert(ndx, COLUMN_TYPE_BINARY);
     m_refs->Insert(ndx, v);
 }
 
 void ColumnMixed::SetInt(size_t ndx, int64_t value) {
     assert(ndx < m_types->Size());
-    
+
     // Remove refs or binary data (sets type to int)
     ClearValue(ndx, COLUMN_TYPE_INT);
-    
+
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
     const int64_t v = (value << 1) + 1;
-    
+
     m_refs->Set(ndx, v);
 }
 
 void ColumnMixed::SetBool(size_t ndx, bool value) {
     assert(ndx < m_types->Size());
-    
+
     // Remove refs or binary data (sets type to int)
     ClearValue(ndx, COLUMN_TYPE_BOOL);
-    
+
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
     const int64_t v = ((value ? 1 : 0) << 1) + 1;
-    
+
     m_refs->Set(ndx, v);
 }
 
 void ColumnMixed::SetDate(size_t ndx, time_t value) {
     assert(ndx < m_types->Size());
-    
+
     // Remove refs or binary data (sets type to int)
     ClearValue(ndx, COLUMN_TYPE_DATE);
-    
+
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
     const int64_t v = (value << 1) + 1;
-    
+
     m_refs->Set(ndx, v);
 }
 
 void ColumnMixed::SetString(size_t ndx, const char* value) {
     assert(ndx < m_types->Size());
     InitDataColumn();
-    
+
     const ColumnType type = (ColumnType)m_types->Get(ndx);
     const size_t len = strlen(value)+1;
-    
+
     // See if we can reuse data position
     if (type == COLUMN_TYPE_STRING) {
         const size_t ref = m_refs->GetAsRef(ndx) >> 1;
@@ -277,15 +277,15 @@ void ColumnMixed::SetString(size_t ndx, const char* value) {
     else {
         // Remove refs or binary data
         ClearValue(ndx, COLUMN_TYPE_STRING);
-        
+
         // Add value to data column
         const size_t ref = m_data->Size();
         m_data->Add(value, len);
-        
+
         // Shift value one bit and set lowest bit to indicate
         // that this is not a ref
         const int64_t v = (ref << 1) + 1;
-        
+
         m_types->Set(ndx, COLUMN_TYPE_STRING);
         m_refs->Set(ndx, v);
     }
@@ -294,9 +294,9 @@ void ColumnMixed::SetString(size_t ndx, const char* value) {
 void ColumnMixed::SetBinary(size_t ndx, const char* value, size_t len) {
     assert(ndx < m_types->Size());
     InitDataColumn();
-    
+
     const ColumnType type = (ColumnType)m_types->Get(ndx);
-    
+
     // See if we can reuse data position
     if (type == COLUMN_TYPE_STRING) {
         const size_t ref = m_refs->GetAsRef(ndx) >> 1;
@@ -310,15 +310,15 @@ void ColumnMixed::SetBinary(size_t ndx, const char* value, size_t len) {
     else {
         // Remove refs or binary data
         ClearValue(ndx, COLUMN_TYPE_BINARY);
-        
+
         // Add value to data column
         const size_t ref = m_data->Size();
         m_data->Add(value, len);
-        
+
         // Shift value one bit and set lowest bit to indicate
         // that this is not a ref
         const int64_t v = (ref << 1) + 1;
-        
+
         m_types->Set(ndx, COLUMN_TYPE_BINARY);
         m_refs->Set(ndx, v);
     }
@@ -347,10 +347,10 @@ bool ColumnMixed::Add() {
 
 void ColumnMixed::Delete(size_t ndx) {
     assert(ndx < m_types->Size());
-    
+
     // Remove refs or binary data
     ClearValue(ndx, COLUMN_TYPE_INT);
-    
+
     m_types->Delete(ndx);
     m_refs->Delete(ndx);
 }

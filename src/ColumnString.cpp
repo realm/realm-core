@@ -120,12 +120,12 @@ void AdaptiveStringColumn::Clear() {
 
 void AdaptiveStringColumn::Resize(size_t ndx) {
     assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
-    
+
     if (IsLongStrings()) {
         ((ArrayStringLong*)m_array)->Resize(ndx);
     }
     else ((ArrayString*)m_array)->Resize(ndx);
-    
+
 }
 
 const char* AdaptiveStringColumn::Get(size_t ndx) const {
@@ -385,7 +385,7 @@ MemStats AdaptiveStringColumn::Stats() const {
 
 void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) const {
     const bool isLongStrings = array.HasRefs(); // HasRefs indicates long string array
-    
+
     if (isLongStrings) {
         // ArrayStringLong has more members than Array, so we have to
         // really instantiate it (it is not enough with a cast)

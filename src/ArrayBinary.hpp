@@ -24,7 +24,7 @@ public:
     void Delete(size_t ndx);
     void Resize(size_t ndx);
     void Clear();
-    
+
 #ifdef _DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG

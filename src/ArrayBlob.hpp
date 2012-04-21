@@ -20,7 +20,7 @@ public:
     void Delete(size_t start, size_t end);
     void Resize(size_t len);
     void Clear();
-    
+
 #ifdef _DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG

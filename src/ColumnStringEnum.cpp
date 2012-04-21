@@ -133,15 +133,15 @@ MemStats ColumnStringEnum::Stats() const {
 
 void ColumnStringEnum::ToDot(std::ostream& out, const char* title) const {
     const size_t ref = m_keys.GetRef();
-    
+
     out << "subgraph cluster_columnstringenum" << ref << " {" << std::endl;
     out << " label = \"ColumnStringEnum";
     if (title) out << "\\n'" << title << "'";
     out << "\";" << std::endl;
-    
+
     m_keys.ToDot(out, "keys");
     Column::ToDot(out, "values");
-    
+
     out << "}" << std::endl;
 }
 

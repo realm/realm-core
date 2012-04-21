@@ -17,12 +17,12 @@
 
 
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
-uint64_t rand2() { 
-    static int64_t seed = 2862933555777941757ULL; 
+uint64_t rand2() {
+    static int64_t seed = 2862933555777941757ULL;
     static int64_t seed2 = 0;
-    seed = (2862933555777941757ULL * seed + 3037000493ULL); 
+    seed = (2862933555777941757ULL * seed + 3037000493ULL);
     seed2++;
-    return seed * seed2 + seed2; 
+    return seed * seed2 + seed2;
 }
 
 TDB_TABLE_1(IntegerTable,
@@ -49,7 +49,7 @@ void stl(void) {
     timer.Start();
     for (size_t i = 0; i < ITEMS; ++i) {
         size_t p = rand2() % (i + 1);
-        integers.push_back((int64_t)rand2() % RANGE); 
+        integers.push_back((int64_t)rand2() % RANGE);
     }
 
 //  printf("Memory usage: %lld bytes\n", (int64_t)GetMemUsage()); // %zu doesn't work in vc
@@ -60,7 +60,7 @@ void stl(void) {
     timer.Start();
     for (size_t i = 0; i < ITEMS; ++i) {
         size_t p = rand2() % (i + 1);
-        integers.insert(integers.begin() + p, (int64_t)rand2() % RANGE); 
+        integers.insert(integers.begin() + p, (int64_t)rand2() % RANGE);
     }
     printf("Insert: %dms\n", timer.GetTimeInMs());
 
@@ -107,7 +107,7 @@ void stl(void) {
         while(it != integers.end())
         {
             it = std::find(it + 1, integers.end(), f);
-        }                       
+        }
 
     }
     printf("Linear FindAll: %dms\n", timer.GetTimeInMs());

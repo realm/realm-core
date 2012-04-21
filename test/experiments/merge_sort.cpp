@@ -76,7 +76,7 @@ void merge_core(Array *a0, Array *a1, Array *res) {
 
     v0 = a0->Get<8>(p0);
     v1 = a1->Get<8>(p1);
-    
+
     for(size_t i = 0; p0 + 1 < s0 && p1 + 1 < s1; i++) {
         if(v0 < v1) {
             vv0 = a1->Get<8>(++p0);
@@ -108,7 +108,7 @@ void merge_core(Array *a0, Array *a1, Array *res) {
         }
 
     }
-    
+
 
     volatile size_t wush2 = wush;
 }
@@ -135,7 +135,7 @@ void merge_core(Array *a1, Array *a2, Array *res) {
 
         v0 = a1->Get<32>(p0 >> 2);
         v1 = a2->Get<32>(p1 >> 2);
-        
+
         if(v0 < v1) {
             // v0 < v1 implies v0 >> (64 - 8) <= v1 >> (64 - 8)
             wush += v0 >> (64 - 8);
@@ -274,7 +274,7 @@ Array *merge(Array *ArrayList, bool delete_old) {
         Array *a = new Array(ref);
         return a;
     }
-    
+
     Array Left, Right;
     size_t left = ArrayList->Size() / 2;
     for(size_t t = 0; t < left; t++)
@@ -507,21 +507,21 @@ void merge_core(Array *a0, Array *a1, Array *res) {
 
     for(size_t i = 0; p0 + 8 < s0 && p1 + 8 < s1; i++) {
 
-        v0 = a0->Get<8>(p0 + 0) << 0*8 | 
-             a0->Get<8>(p0 + 1) << 1*8 | 
-             a0->Get<8>(p0 + 2) << 2*8 | 
+        v0 = a0->Get<8>(p0 + 0) << 0*8 |
+             a0->Get<8>(p0 + 1) << 1*8 |
+             a0->Get<8>(p0 + 2) << 2*8 |
              a0->Get<8>(p0 + 3) << 3*8 |
-             a0->Get<8>(p0 + 4) << 4*8 | 
-             a0->Get<8>(p0 + 5) << 5*8 | 
-             a0->Get<8>(p0 + 6) << 6*8 | 
-             a0->Get<8>(p0 + 7) << 7*8; 
+             a0->Get<8>(p0 + 4) << 4*8 |
+             a0->Get<8>(p0 + 5) << 5*8 |
+             a0->Get<8>(p0 + 6) << 6*8 |
+             a0->Get<8>(p0 + 7) << 7*8;
 
-        v1 = a1->Get<8>(p1 + 0) << 0*8 | 
-             a1->Get<8>(p1 + 1) << 1*8 | 
-             a1->Get<8>(p1 + 2) << 2*8 | 
+        v1 = a1->Get<8>(p1 + 0) << 0*8 |
+             a1->Get<8>(p1 + 1) << 1*8 |
+             a1->Get<8>(p1 + 2) << 2*8 |
              a1->Get<8>(p1 + 3) << 3*8 |
-             a1->Get<8>(p1 + 4) << 4*8 | 
-             a1->Get<8>(p1 + 5) << 5*8 | 
+             a1->Get<8>(p1 + 4) << 4*8 |
+             a1->Get<8>(p1 + 5) << 5*8 |
              a1->Get<8>(p1 + 6) << 6*8 |
              a1->Get<8>(p1 + 7) << 7*8;
 

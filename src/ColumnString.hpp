@@ -65,7 +65,7 @@ protected:
     bool IsLongStrings() const {return m_array->HasRefs();} // HasRefs indicates long string array
 
     bool FindKeyPos(const char* target, size_t& pos) const;
-    
+
 #ifdef _DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif //_DEBUG

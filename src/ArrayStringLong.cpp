@@ -108,9 +108,9 @@ void ArrayStringLong::Delete(size_t ndx) {
 
 void ArrayStringLong::Resize(size_t ndx) {
     assert(ndx < m_offsets.Size());
-    
+
     const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
-    
+
     m_offsets.Resize(ndx);
     m_blob.Resize(len);
 }
@@ -164,16 +164,16 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
 
 void ArrayStringLong::ToDot(std::ostream& out, const char* title) const {
     const size_t ref = GetRef();
-    
+
     out << "subgraph cluster_arraystringlong" << ref << " {" << std::endl;
     out << " label = \"ArrayStringLong";
     if (title) out << "\\n'" << title << "'";
     out << "\";" << std::endl;
-    
+
     Array::ToDot(out, "stringlong_top");
     m_offsets.ToDot(out, "offsets");
     m_blob.ToDot(out, "blob");
-    
+
     out << "}" << std::endl;
 }
 

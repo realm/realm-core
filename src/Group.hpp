@@ -25,7 +25,7 @@ public:
     // Serialization
     void Write(const char* filepath);
     char* WriteToMem(size_t& len);
-    
+
     // Conversion
     template<class S> void to_json(S& out);
 

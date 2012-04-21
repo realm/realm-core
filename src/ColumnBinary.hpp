@@ -59,7 +59,7 @@ protected:
     bool LeafSet(size_t ndx, BinaryData value);
     bool LeafInsert(size_t ndx, BinaryData value);
     void LeafDelete(size_t ndx);
-    
+
 #ifdef _DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif //_DEBUG

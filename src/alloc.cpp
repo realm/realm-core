@@ -117,7 +117,7 @@ MemRef SlabAlloc::Alloc(size_t size) {
                                                   (slabsBack - ((m_slabs.GetSize() == 1) ? (size_t)0 : m_slabs[-2].offset)) * 2;
     const size_t newsize = multible > doubleLast ? multible : doubleLast;
 
-    // Allocate memory 
+    // Allocate memory
     void* slab = malloc(newsize);
     if (!slab) return MemRef(NULL, 0);
 
@@ -240,7 +240,7 @@ bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
     // This is currently the only integrity check we make
     size_t ref = (size_t)(*(uint64_t*)buffer);
     if (ref > len) return false;
-    
+
     // There is a unit test that calls this function with an invalid buffer
     // so we can't size_t-test range with TO_REF until now
     ref = TO_REF(*(uint64_t*)buffer);

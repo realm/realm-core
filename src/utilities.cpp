@@ -3,7 +3,7 @@
 #include <string>
 #include <assert.h>
 #include <cstdlib> // size_t
-#ifndef _MSC_VER 
+#ifndef _MSC_VER
 #include <stdint.h>
 #else
 #include "win32/stdint.h"
@@ -61,7 +61,7 @@ unsigned long long checksum(unsigned char *data, size_t len)
     return t.result;
 }
 
-void checksum_rolling(unsigned char *data, size_t len, checksum_t *t) 
+void checksum_rolling(unsigned char *data, size_t len, checksum_t *t)
 {
     while(t->remainder_len < 8 && len > 0)
     {
@@ -87,7 +87,7 @@ void checksum_rolling(unsigned char *data, size_t len, checksum_t *t)
     {
 #ifdef X86X64
         t->a_val += (*(unsigned long long *)data) * t->b_val;
-#else       
+#else
         unsigned long long l = 0;
         for(unsigned int i = 0; i < 8; i++)
         {

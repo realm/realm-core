@@ -47,7 +47,7 @@ size_t case_prefix(const char *constant_upper, const char *constant_lower, const
         else
             return (size_t)-1;
     }
-    while(constant_lower[matchlen] != 0 && source[matchlen] != 0); 
+    while(constant_lower[matchlen] != 0 && source[matchlen] != 0);
 
     if(constant_lower[matchlen] == 0 && source[matchlen] != 0)
         return 0;
@@ -84,7 +84,7 @@ bool case_strstr(const char *constant_upper, const char *constant_lower, const c
             return true;
         source_pos++;
     } while(source[source_pos] != 0);
-    
+
     return false;
 }
 
@@ -117,7 +117,7 @@ bool utf8case_single(const char *source, char *destination, int upper) {
 }
 
 // Converts utf8 source into upper or lower case. This function preserves the byte length of each utf8
-// character in following way: If an output character differs in size, it is simply substituded by the 
+// character in following way: If an output character differs in size, it is simply substituded by the
 // original character. This may of course give wrong search results in very special cases. Todo.
 bool utf8case(const char *source, char *destination, int upper) {
     while(*source != 0) {

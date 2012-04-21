@@ -144,7 +144,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryInsert) {
     CHECK_EQUAL("d", (const char*)c.GetData(3));
     CHECK_EQUAL("ef", (const char*)c.GetData(4));
     CHECK_EQUAL(5, c.Size());
-    
+
     c.Insert(2, (void*)"as", 3); // middle again
     CHECK_EQUAL("klmno", (const char*)c.GetData(0));
     CHECK_EQUAL("abc",   (const char*)c.GetData(1));

@@ -46,7 +46,7 @@ Array* merge(Array *ArrayList);
 void merge_references(Array *valuelist, Array *indexlists, Array **indexresult);
 
 bool callme_sum(Array *a, size_t start, size_t end, size_t caller_base, void *state) {
-    (void)caller_base; 
+    (void)caller_base;
     int64_t s = a->Sum(start, end);
     *(int64_t *)state += s;
     return true;
@@ -87,8 +87,8 @@ bool callme_max(Array *a, size_t start, size_t end, size_t caller_offset, void *
     return true;
 }
 
-// Input: 
-//     vals:   An array of values 
+// Input:
+//     vals:   An array of values
 //     idx0:   Array of indexes pointing into vals, sorted with respect to vals
 //     idx1:   Array of indexes pointing into vals, sorted with respect to vals
 //     idx0 and idx1 are allowed not to contain index pointers to *all* elements in vals
@@ -187,7 +187,7 @@ void merge_core(Array *a0, Array *a1, Array *res) {
     assert(res->Size() == a0->Size() + a1->Size());
 }
 
-// Input: 
+// Input:
 //     ArrayList: An array of references to non-instantiated Arrays of values. The values in each array must be in sorted order
 // Return value:
 //     Merge-sorted array of all values
@@ -195,10 +195,10 @@ Array *merge(Array *ArrayList) {
     if(ArrayList->Size() == 1) {
         size_t ref = ArrayList->GetAsRef(0);
 //      Array *a = new Array(ref, reinterpret_cast<Array *>(&merge)); // FIXME: Breaks strict-aliasing
-                Array *a = new Array(ref, NULL); 
+                Array *a = new Array(ref, NULL);
         return a;
     }
-    
+
     Array Left, Right;
     size_t left = ArrayList->Size() / 2;
     for(size_t t = 0; t < left; t++)
@@ -218,7 +218,7 @@ Array *merge(Array *ArrayList) {
     return res;
 }
 
-// Input: 
+// Input:
 //     valuelist:   One array of values
 //     indexlists:  Array of pointers to non-instantiated Arrays of index numbers into valuelist
 // Output:
@@ -230,7 +230,7 @@ void merge_references(Array *valuelist, Array *indexlists, Array **indexresult) 
         *indexresult = (Array *)indexlists->Get(0);
         return;
     }
-    
+
     Array LeftV, RightV;
     Array LeftI, RightI;
     size_t left = indexlists->Size() / 2;
@@ -442,7 +442,7 @@ int64_t Column::Max(size_t start, size_t end) const {
 void Column::Sort(size_t start, size_t end) {
     Array arr;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
-    for(size_t t = 0; t < arr.Size(); t++) {    
+    for(size_t t = 0; t < arr.Size(); t++) {
         size_t ref = arr.GetAsRef(t);
         Array a(ref);
         a.Sort();
@@ -523,7 +523,7 @@ bool ColumnBase::NodeUpdateOffsets(size_t ndx) {
     const int64_t newSize = GetRefSize((size_t)refs.Get(ndx));
     const int64_t oldSize = offsets.Get(ndx) - (ndx ? offsets.Get(ndx-1) : 0);
     const int64_t diff = newSize - oldSize;
-    
+
     return offsets.Increment(diff, ndx);
 }
 
@@ -631,7 +631,7 @@ size_t Column::FindPos(int64_t target) const {
 size_t Column::FindWithIndex(int64_t target) const {
     assert(m_index);
     assert(m_index->Size() == Size());
-    
+
     return m_index->Find(target);
 }
 
@@ -674,7 +674,7 @@ bool Column::Compare(const Column& c) const {
 void Column::Print() const {
     if (IsNode()) {
         cout << "Node: " << hex << m_array->GetRef() << dec << "\n";
-        
+
         const Array offsets = NodeGetOffsets();
         const Array refs = NodeGetRefs();
 
@@ -723,14 +723,14 @@ void Column::verify() const {
 
 void ColumnBase::ToDot(std::ostream& out, const char* title) const {
     const size_t ref = GetRef();
-    
+
     out << "subgraph cluster_column" << ref << " {" << std::endl;
     out << " label = \"Column";
     if (title) out << "\\n'" << title << "'";
     out << "\";" << std::endl;
-    
+
     ArrayToDot(out, *m_array);
-    
+
     out << "}" << std::endl;
 }
 
@@ -739,17 +739,17 @@ void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const {
         const Array offsets = array.GetSubArray(0);
         const Array refs    = array.GetSubArray(1);
         const size_t ref    = array.GetRef();
-        
+
         out << "subgraph cluster_node" << ref << " {" << std::endl;
         out << " label = \"Node\";" << std::endl;
-        
+
         array.ToDot(out);
         offsets.ToDot(out, "offsets");
-        
+
         out << "}" << std::endl;
-        
+
         refs.ToDot(out, "refs");
-        
+
         const size_t count = refs.Size();
         for (size_t i = 0; i < count; ++i) {
             const Array r = refs.GetSubArray(i);

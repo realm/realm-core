@@ -212,21 +212,21 @@ void Group::Print() const {
 
 void Group::ToDot(std::ostream& out) {
     out << "digraph G {" << endl;
-    
+
     out << "subgraph cluster_group {" << endl;
     out << " label = \"Group\";" << endl;
-    
+
     m_top.ToDot(out, "group_top");
     m_tableNames.ToDot(out, "table_names");
     m_tables.ToDot(out, "tables");
-    
+
     // Tables
     for (size_t i = 0; i < m_tables.Size(); ++i) {
         const Table& table = GetTable(i);
         const char* const name = GetTableName(i);
         table.ToDot(out, name);
     }
-    
+
     out << "}" << endl;
     out << "}" << endl;
 }

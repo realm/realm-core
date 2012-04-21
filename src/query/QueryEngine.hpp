@@ -6,13 +6,13 @@
 
 namespace tightdb {
 
-class ParentNode { 
+class ParentNode {
 public:
     ParentNode() : m_table(NULL) {}
     virtual ~ParentNode() {}
     virtual void Init(const Table& table) {m_table = &table; if (m_child) m_child->Init(table);}
     virtual size_t Find(size_t start, size_t end) = 0;
-    
+
     virtual std::string Verify(void) {
         if(error_code != "")
             return error_code;
@@ -21,9 +21,9 @@ public:
         else
             return m_child->Verify();
     };
-    
+
     ParentNode* m_child;
-    
+
 protected:
     const Table* m_table;
     std::string error_code;
@@ -68,10 +68,10 @@ class SUBTABLE : public ParentNode {
 public:
     SUBTABLE(size_t column) : m_column(column) {m_child = 0; m_child2 = 0;}
     SUBTABLE() {};
-    
+
     void Init(const Table& table) {
         m_table = &table;
-        
+
         if (m_child) m_child->Init(table);
         if (m_child2) m_child2->Init(table);
     }
@@ -79,7 +79,7 @@ public:
     size_t Find(size_t start, size_t end) {
         assert(m_table);
         assert(m_child);
-        
+
         for (size_t s = start; s < end; ++s) {
             const TableRef subtable = ((Table*)m_table)->GetTable(m_column, s);
 
@@ -87,7 +87,7 @@ public:
             const size_t subsize = subtable->GetSize();
             const size_t sub = m_child->Find(0, subsize);
 
-            if(sub != subsize) {            
+            if(sub != subsize) {
                 if (m_child2 == 0)
                     return s;
                 else {
@@ -111,20 +111,20 @@ template <class T, class C, class F> class NODE : public ParentNode {
 public:
     NODE(T v, size_t column) : m_value(v), m_column_id(column) {m_child = 0;}
     ~NODE() {delete m_child; }
-    
+
     void Init(const Table& table) {
         m_table = &table;
         m_column = (C*)&table.GetColumnBase(m_column_id);
-        
+
         if (m_child) m_child->Init(table);
     }
 
     size_t Find(size_t start, size_t end) {
         assert(m_table);
-        
+
         for (size_t s = start; s < end; ++s) {
             s = m_column->template TreeFind<T, C, F>(m_value, s, end);
-            if (s == (size_t)-1) 
+            if (s == (size_t)-1)
                 s = end;
 
             if (m_child == 0)
@@ -157,19 +157,19 @@ public:
         memcpy(m_value, v, strlen(v) + 1);
         m_ucase = (char *)malloc(strlen(v)*6);
         m_lcase = (char *)malloc(strlen(v)*6);
-    
+
         const bool b1 = utf8case(v, m_lcase, false);
         const bool b2 = utf8case(v, m_ucase, true);
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(m_value);
     }
     ~STRINGNODE() {delete m_child; free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase); }
-    
+
     void Init(const Table& table) {
         m_table = &table;
         m_column = &table.GetColumnBase(m_column_id);
         m_column_type = table.GetRealColumnType(m_column_id);
-        
+
         if (m_child) m_child->Init(table);
     }
 
@@ -221,22 +221,22 @@ public:
         memcpy(m_value, v, strlen(v) + 1);
     }
     ~STRINGNODE() {delete m_child; free((void*)m_value); }
-    
+
     void Init(const Table& table) {
         m_table = &table;
         m_column = &table.GetColumnBase(m_column_id);
         m_column_type = table.GetRealColumnType(m_column_id);
-        
+
         if (m_column_type == COLUMN_TYPE_STRING_ENUM) {
             m_key_ndx =  ((const ColumnStringEnum*)m_column)->GetKeyNdx(m_value);
         }
-        
+
         if (m_child) m_child->Init(table);
     }
 
     size_t Find(size_t start, size_t end) {
         assert(m_table);
-        
+
         for (size_t s = start; s < end; ++s) {
             // todo, can be optimized by placing outside loop
             if (m_column_type == COLUMN_TYPE_STRING)
@@ -264,11 +264,11 @@ public:
         }
         return end;
     }
-    
+
 protected:
     char*  m_value;
     size_t m_column_id;
-    
+
 private:
     const ColumnBase* m_column;
     ColumnType m_column_type;
@@ -284,7 +284,7 @@ public:
         delete m_cond2;
         delete m_child;
     }
-    
+
     void Init(const Table& table) {
         m_cond1->Init(table);
         m_cond2->Init(table);
@@ -309,7 +309,7 @@ public:
         }
         return end;
     }
-    
+
     virtual std::string Verify(void) {
         if(error_code != "")
             return error_code;
@@ -330,7 +330,7 @@ public:
             return s;
         return "";
     }
-    
+
     ParentNode* m_cond1;
     ParentNode* m_cond2;
 };
