@@ -6,7 +6,7 @@
 DWORD CalculateWSPrivate(DWORD processID);
 
 size_t GetMemUsage() {
-	return CalculateWSPrivate(GetCurrentProcessId());
+    return CalculateWSPrivate(GetCurrentProcessId());
 }
 
 // Calculate Private Working Set
@@ -21,7 +21,7 @@ int Compare( const void * Val1, const void * Val2 )
 }
 
 DWORD dWorkingSetPages[ 1024 * 128 ]; // hold the working set 
-				// information get from QueryWorkingSet()
+                // information get from QueryWorkingSet()
 DWORD dPageSize = 0x1000;
 
 DWORD CalculateWSPrivate(DWORD processID)
@@ -31,7 +31,7 @@ DWORD CalculateWSPrivate(DWORD processID)
     DWORD dPageTablePages = 0;
  
     HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | 
-		PROCESS_VM_READ, FALSE, processID );
+        PROCESS_VM_READ, FALSE, processID );
 
     if ( !hProcess )
     return 0;
@@ -68,7 +68,7 @@ DWORD CalculateWSPrivate(DWORD processID)
                 //decide whether iterate further or exit
                 //(this is non-contiguous page or have different flags) 
                 if ( (dNextPageAddress == (dCurrentPageAddress + dPageSize)) 
-			&& (dNextPageFlags == dPageFlags) )
+            && (dNextPageFlags == dPageFlags) )
                 {
                     i++;
                 }
@@ -98,5 +98,5 @@ DWORD CalculateWSPrivate(DWORD processID)
     {
         CloseHandle( hProcess );
     }
-	return -1;
+    return -1;
 }
