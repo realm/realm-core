@@ -20,17 +20,7 @@ ColumnBinary::ColumnBinary(Allocator& alloc) {
 	m_array = new ArrayBinary(NULL, 0, alloc);
 }
 
-ColumnBinary::ColumnBinary(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc) {
-	const bool isNode = IsNodeFromRef(ref, alloc);
-	if (isNode) {
-		m_array = new Array(ref, parent, pndx, alloc);
-	}
-	else {
-		m_array = new ArrayBinary(ref, parent, pndx, alloc);
-	}
-}
-
-ColumnBinary::ColumnBinary(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) {
+ColumnBinary::ColumnBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc) {
 	const bool isNode = IsNodeFromRef(ref, alloc);
 	if (isNode) {
 		m_array = new Array(ref, parent, pndx, alloc);

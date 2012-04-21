@@ -14,6 +14,16 @@ using namespace std;
 
 namespace tightdb {
 
+struct FakeParent: Table::Parent
+{
+virtual void update_child_ref(size_t, size_t) {} // Ignore
+virtual void child_destroyed(size_t) {} // Ignore
+#ifdef _DEBUG
+virtual size_t get_child_ref_for_verify(size_t) const { return 0; }
+#endif
+};
+
+
 const ColumnType Accessor::type       = COLUMN_TYPE_INT;
 const ColumnType AccessorBool::type   = COLUMN_TYPE_BOOL;
 const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
@@ -150,139 +160,64 @@ size_t Spec::GetColumnIndex(const char* name) const {
 	return m_names.Find(name);
 }
 
-// -- TopLevelTable ---------------------------------------------------------------------------
-
-TopLevelTable::TopLevelTable(Allocator &alloc):
-	Table(alloc), m_top(COLUMN_HASREFS, NULL, 0, alloc)
-{
-	// A table is defined by a specset and a list of columns
-	m_top.Add(m_specSet.GetRef());
-    m_top.Add(m_columns.GetRef());
-    m_specSet.SetParent(&m_top, 0);
-    m_columns.SetParent(&m_top, 1);
-}
-
-TopLevelTable::TopLevelTable(Allocator &alloc, size_t ref_top, Parent *parent, size_t pndx):
-	Table(NoInitTag(), alloc), m_top(alloc)
-{
-	// Load from allocated memory
-    m_top.UpdateRef(ref_top);
-    m_top.SetParent(parent, pndx);
-    assert(m_top.Size() == 2);
-
-	const size_t ref_specSet = m_top.GetAsRef(0);
-	const size_t ref_columns = m_top.GetAsRef(1);
-
-	Create(ref_specSet, ref_columns, &m_top, 1);
-	m_specSet.SetParent(&m_top, 0);
-}
-
-TopLevelTable::TopLevelTable(SubtableTag, Allocator &alloc, size_t ref_top,
-							 Parent *parent, size_t ndx_in_parent):
-	Table(NoInitTag(), SubtableTag(), alloc), m_top(alloc)
-{
-	// Load from allocated memory
-    m_top.UpdateRef(ref_top);
-    m_top.SetParent(parent, ndx_in_parent);
-    assert(m_top.Size() == 2);
-
-	const size_t ref_specSet = m_top.GetAsRef(0);
-	const size_t ref_columns = m_top.GetAsRef(1);
-
-	Create(ref_specSet, ref_columns, &m_top, 1);
-	m_specSet.SetParent(&m_top, 0);
-}
-
-TopLevelTable::~TopLevelTable()
-{
-	// Delete cached columns
-	ClearCachedColumns();
-
-	// 'm_top' has no parent if, and only if this is a free standing
-	// instance of TopLevelTable. In that case it is the
-	// responsibility of this destructor to deallocate all the memory
-	// chunks that make up the entire hierarchy of arrays. Otherwise
-	// we must notify our parent.
-	if (ArrayParent *parent = m_top.GetParent()) {
-		assert(get_ref_count() == 0 || get_ref_count() == 1);
-		assert(dynamic_cast<Parent *>(parent));
-		static_cast<Parent *>(parent)->child_destroyed(m_top.GetParentNdx());
-		return;
-	}
-
-	assert(get_ref_count() == 1);
-	m_top.Destroy();
-}
-
-void TopLevelTable::UpdateFromSpec(size_t ref_specSet) {
-	assert(m_columns.IsEmpty() && m_cols.IsEmpty()); // only on initial creation
-
-	m_specSet.UpdateRef(ref_specSet);
-	m_spec.UpdateRef(m_specSet.GetAsRef(0));
-	m_columnNames.UpdateRef(m_specSet.GetAsRef(1));
-	if (m_specSet.Size() == 3) { // only defined if there are subtables
-		m_subSpecs.UpdateRef(m_specSet.GetAsRef(2));
-	}
-
-	CreateColumns();
-}
-
-void TopLevelTable::SetParent(Parent *parent, size_t ndx_in_parent) {
-    m_top.SetParent(parent, ndx_in_parent);
-}
-
-size_t TopLevelTable::GetRef() const {
-    return m_top.GetRef();
-}
-
-#ifdef _DEBUG
-
-MemStats TopLevelTable::Stats() const {
-	MemStats stats = Table::Stats();
-	stats.Add(m_top.Stats());
-	return stats;
-}
-
-#endif //_DEBUG
 
 // -- Table ---------------------------------------------------------------------------------
 
 Table::Table(Allocator& alloc):
-	m_size(0), m_specSet(COLUMN_HASREFS, NULL, 0, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc),
-	m_columnNames(NULL, 0, alloc), m_subSpecs(alloc), m_columns(COLUMN_HASREFS, NULL, 0, alloc),
-	m_ref_count(1)
+	m_size(0), m_top(COLUMN_HASREFS, NULL, 0, alloc), m_specSet(COLUMN_HASREFS, NULL, 0, alloc),
+	m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_subSpecs(alloc),
+	m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_ref_count(1)
 {
 	// The SpecSet contains the specification (types and names) of all columns and sub-tables
 	m_specSet.Add(m_spec.GetRef());
 	m_specSet.Add(m_columnNames.GetRef());
 	m_spec.SetParent(&m_specSet, 0);
 	m_columnNames.SetParent(&m_specSet, 1);
+
+	m_top.Add(m_specSet.GetRef());
+    m_top.Add(m_columns.GetRef());
+    m_specSet.SetParent(&m_top, 0);
+    m_columns.SetParent(&m_top, 1);
 }
 
-// Creates un-initialized table. Remember to call Create() before use
-Table::Table(NoInitTag, Allocator &alloc):
-	m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc),
-	m_columns(alloc), m_ref_count(1) {}
-
-// Creates un-initialized table. Remember to call Create() before use
-Table::Table(NoInitTag, SubtableTag, Allocator &alloc):
-	m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc),
-	m_columns(alloc), m_ref_count(0) {}
-
-Table::Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-			 Parent *parent, size_t ndx_in_parent):
-	m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc),
-	m_columns(alloc), m_ref_count(1)
+Table::Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent):
+	m_size(0), m_top(alloc), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc),
+	m_subSpecs(alloc), m_columns(alloc), m_ref_count(1)
 {
-	Create(ref_specSet, columns_ref, parent, ndx_in_parent);
+	// Load from allocated memory
+    m_top.UpdateRef(top_ref);
+    m_top.SetParent(parent, ndx_in_parent);
+    assert(m_top.Size() == 2);
+
+	const size_t schema_ref  = m_top.GetAsRef(0);
+	const size_t columns_ref = m_top.GetAsRef(1);
+
+	Create(schema_ref, columns_ref, &m_top, 1);
+	m_specSet.SetParent(&m_top, 0);
 }
 
-Table::Table(SubtableTag, Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-			 Parent *parent, size_t ndx_in_parent):
-	m_size(0), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc), m_subSpecs(alloc),
-	m_columns(alloc), m_ref_count(0)
+Table::Table(SubtableTag, Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent):
+	m_size(0), m_top(alloc), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc),
+	m_subSpecs(alloc), m_columns(alloc), m_ref_count(0)
 {
-	Create(ref_specSet, columns_ref, parent, ndx_in_parent);
+	// Load from allocated memory
+    m_top.UpdateRef(top_ref);
+    m_top.SetParent(parent, ndx_in_parent);
+    assert(m_top.Size() == 2);
+
+	const size_t schema_ref  = m_top.GetAsRef(0);
+	const size_t columns_ref = m_top.GetAsRef(1);
+
+	Create(schema_ref, columns_ref, &m_top, 1);
+	m_specSet.SetParent(&m_top, 0);
+}
+
+Table::Table(SubtableTag, Allocator& alloc, size_t schema_ref, size_t columns_ref,
+			 Parent* parent, size_t ndx_in_parent):
+	m_size(0), m_top(alloc), m_specSet(alloc), m_spec(alloc), m_columnNames(alloc),
+	m_subSpecs(alloc), m_columns(alloc), m_ref_count(0)
+{
+	Create(schema_ref, columns_ref, parent, ndx_in_parent);
 }
 
 void Table::Create(size_t ref_specSet, size_t columns_ref,
@@ -474,11 +409,26 @@ void Table::ClearCachedColumns()
 
 Table::~Table()
 {
-	// Bail if ~TopLevelTable() has done the job already
-	if (!m_cols.IsValid()) return;
-
 	// Delete cached columns
 	ClearCachedColumns();
+
+	if (m_top.IsValid()) {
+		// 'm_top' has no parent if, and only if this is a free
+		// standing instance of TopLevelTable. In that case it is the
+		// responsibility of this destructor to deallocate all the
+		// memory chunks that make up the entire hierarchy of
+		// arrays. Otherwise we must notify our parent.
+		if (ArrayParent *parent = m_top.GetParent()) {
+			assert(m_ref_count == 0 || m_ref_count == 1);
+			assert(dynamic_cast<Parent *>(parent));
+			static_cast<Parent *>(parent)->child_destroyed(m_top.GetParentNdx());
+			return;
+		}
+
+		assert(m_ref_count == 1);
+		m_top.Destroy();
+		return;
+	}
 
 	// 'm_columns' has no parent if, and only if this is a free
 	// standing instance of Table. In that case it is the
@@ -486,13 +436,13 @@ Table::~Table()
 	// chunks that make up the entire hierarchy of arrays. Otherwise
 	// we must notify our parent.
 	if (ArrayParent *parent = m_columns.GetParent()) {
-		assert(get_ref_count() == 0 || get_ref_count() == 1);
+		assert(m_ref_count == 0 || m_ref_count == 1);
 		assert(dynamic_cast<Parent *>(parent));
 		static_cast<Parent *>(parent)->child_destroyed(m_columns.GetParentNdx());
 		return;
 	}
 
-	assert(get_ref_count() == 1);
+	assert(m_ref_count == 1);
 	m_specSet.Destroy();
 	m_columns.Destroy();
 }
@@ -733,7 +683,8 @@ void Table::ClearTable(size_t column_id, size_t ndx) {
 	subtables.Clear(ndx);
 }
 
-TableRef Table::GetTable(size_t column_id, size_t ndx) {
+TableRef Table::GetTable(size_t column_id, size_t ndx)
+{
 	assert(column_id < GetColumnCount());
 	assert(ndx < m_size);
 
@@ -752,7 +703,8 @@ TableRef Table::GetTable(size_t column_id, size_t ndx) {
 	}
 }
 
-TableConstRef Table::GetTable(size_t column_id, size_t ndx) const {
+TableConstRef Table::GetTable(size_t column_id, size_t ndx) const
+{
 	assert(column_id < GetColumnCount());
 	assert(ndx < m_size);
 
@@ -771,41 +723,12 @@ TableConstRef Table::GetTable(size_t column_id, size_t ndx) const {
 	}
 }
 
-TopLevelTableRef Table::GetTopLevelTable(size_t column_id, size_t ndx) {
-	assert(column_id < GetColumnCount());
-	assert(ndx < m_size);
-
-	const ColumnType type = GetRealColumnType(column_id);
-	if (type == COLUMN_TYPE_MIXED) {
-		ColumnMixed &subtables = GetColumnMixed(column_id);
-		return TopLevelTableRef(subtables.get_subtable_ptr(ndx));
-	}
-	else {
-		assert(false);
-		return TopLevelTableRef();
-	}
-}
-
-TopLevelTableConstRef Table::GetTopLevelTable(size_t column_id, size_t ndx) const {
-	assert(column_id < GetColumnCount());
-	assert(ndx < m_size);
-
-	const ColumnType type = GetRealColumnType(column_id);
-	if (type == COLUMN_TYPE_MIXED) {
-		ColumnMixed const &subtables = GetColumnMixed(column_id);
-		return TopLevelTableConstRef(subtables.get_subtable_ptr(ndx));
-	}
-	else {
-		assert(false);
-		return TopLevelTableConstRef();
-	}
-}
-
 size_t Table::GetTableSize(size_t column_id, size_t ndx) const {
 	assert(column_id < GetColumnCount());
 	assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
 	assert(ndx < m_size);
 
+	// FIXME: Should also be made to work for ColumnMixed
 	ColumnTable const &subtables = GetColumnTable(column_id);
 	return subtables.GetTableSize(ndx);
 }
@@ -1051,7 +974,7 @@ void Table::InsertDone() {
 	++m_size;
 
 #ifdef _DEBUG
-	Verify();
+	verify();
 #endif //_DEBUG
 }
 
@@ -1226,6 +1149,29 @@ void Table::UpdateColumnRefs(size_t column_ndx, int diff) {
 }
 
 
+void Table::UpdateFromSpec(size_t ref_specSet) {
+	assert(m_columns.IsEmpty() && m_cols.IsEmpty()); // only on initial creation
+
+	m_specSet.UpdateRef(ref_specSet);
+	m_spec.UpdateRef(m_specSet.GetAsRef(0));
+	m_columnNames.UpdateRef(m_specSet.GetAsRef(1));
+	if (m_specSet.Size() == 3) { // only defined if there are subtables
+		m_subSpecs.UpdateRef(m_specSet.GetAsRef(2));
+	}
+
+	CreateColumns();
+}
+
+
+size_t Table::create_table(Allocator& alloc)
+{
+	FakeParent fake_parent;
+	Table t(alloc);
+	t.m_top.SetParent(&fake_parent, 0);
+	return t.m_top.GetRef();
+}
+
+
 void Table::to_json(std::ostream& out) {
 	// Represent table as list of objects
 	out << "[";
@@ -1390,7 +1336,7 @@ bool Table::Compare(const Table& c) const {
     return true;
 }
 
-void Table::Verify() const {
+void Table::verify() const {
 	const size_t column_count = GetColumnCount();
 	assert(column_count == m_cols.Size());
 	assert(column_count == m_columnNames.Size());
@@ -1405,42 +1351,42 @@ void Table::Verify() const {
 			{
 				const Column& column = GetColumn(i);
 				assert(column.Size() == m_size);
-				column.Verify();
+				column.verify();
 			}
 			break;
 		case COLUMN_TYPE_STRING:
 			{
 				const AdaptiveStringColumn& column = GetColumnString(i);
 				assert(column.Size() == m_size);
-				column.Verify();
+				column.verify();
 			}
 			break;
 		case COLUMN_TYPE_STRING_ENUM:
 			{
 				const ColumnStringEnum& column = GetColumnStringEnum(i);
 				assert(column.Size() == m_size);
-				column.Verify();
+				column.verify();
 			}
 			break;
 		case COLUMN_TYPE_BINARY:
 			{
 				const ColumnBinary& column = GetColumnBinary(i);
 				assert(column.Size() == m_size);
-				column.Verify();
+				column.verify();
 			}
 			break;
 		case COLUMN_TYPE_TABLE:
 			{
 				const ColumnTable& column = GetColumnTable(i);
 				assert(column.Size() == m_size);
-				column.Verify();
+				column.verify();
 			}
 			break;
 		case COLUMN_TYPE_MIXED:
 			{
 				const ColumnMixed& column = GetColumnMixed(i);
 				assert(column.Size() == m_size);
-				column.Verify();
+				column.verify();
 			}
 			break;
 		default:
@@ -1452,28 +1398,32 @@ void Table::Verify() const {
 	alloc.Verify();
 }
 
-void TopLevelTable::DumpToDot(std::ostream& out) const {
-	out << "digraph G {" << endl;
-	ToDot(out);
-	out << "}" << endl;
-}
+void Table::ToDot(std::ostream& out, const char* title) const
+{
+	if (m_top.IsValid()) {
+		out << "subgraph cluster_topleveltable" << m_top.GetRef() << " {" << endl;
+		out << " label = \"TopLevelTable";
+		if (title) out << "\\n'" << title << "'";
+		out << "\";" << endl;
+		m_top.ToDot(out, "table_top");
+		const Spec specset = GetSpec();
+		specset.ToDot(out);
+	}
+	else {
+		out << "subgraph cluster_table_"  << m_columns.GetRef() <<  " {" << endl;
+		out << " label = \"Table";
+		if (title) out << " " << title;
+		out << "\";" << endl;
+	}
 
-void Table::ToDot(std::ostream& out, const char* title) const {
-	const size_t ref = m_columns.GetRef();
-	
-	out << "subgraph cluster_table_"  << ref <<  " {" << endl;
-	out << " label = \"Table";
-	if (title) out << " " << title;
-	out << "\";" << endl;
-	
 	ToDotInternal(out);
-	
+
 	out << "}" << endl;
 }
 
 void Table::ToDotInternal(std::ostream& out) const {
 	m_columns.ToDot(out, "columns");
-	
+
 	// Columns
 	const size_t column_count = GetColumnCount();
 	for (size_t i = 0; i < column_count; ++i) {
@@ -1481,24 +1431,6 @@ void Table::ToDotInternal(std::ostream& out) const {
 		const char* const name = GetColumnName(i);
 		column.ToDot(out, name);
 	}
-}
-
-void TopLevelTable::ToDot(std::ostream& out, const char* title) const {
-	const size_t ref = m_top.GetRef();
-	
-	out << "subgraph cluster_topleveltable" << ref << " {" << endl;
-	out << " label = \"TopLevelTable";
-	if (title) out << "\\n'" << title << "'";
-	out << "\";" << endl;
-	
-	m_top.ToDot(out, "table_top");
-	
-	const Spec specset = GetSpec();
-	specset.ToDot(out);
-	
-	ToDotInternal(out);
-	
-	out << "}" << endl;
 }
 
 void Spec::ToDot(std::ostream& out, const char*) const {
@@ -1631,6 +1563,9 @@ MemStats Table::Stats() const {
 
 	stats.Add(m_spec.Stats());
 	stats.Add(m_columns.Stats());
+
+	if (m_top.IsValid())
+		stats.Add(m_top.Stats());
 
 	return stats;
 }

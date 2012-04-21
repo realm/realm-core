@@ -3,22 +3,6 @@
 
 using namespace std;
 
-namespace {
-
-using namespace tightdb;
-
-struct FakeParent: Table::Parent
-{
-	virtual void update_child_ref(size_t, size_t) {} // Ignore
-	virtual void child_destroyed(size_t) {} // Ignore
-#ifdef _DEBUG
-	virtual size_t get_child_ref_for_verify(size_t) const { return 0; }
-#endif
-};
-
-}
-
-
 namespace tightdb {
 
 ColumnMixed::~ColumnMixed() {
@@ -340,6 +324,22 @@ void ColumnMixed::SetBinary(size_t ndx, const char* value, size_t len) {
 	}
 }
 
+void ColumnMixed::InsertTable(size_t ndx)
+{
+	assert(ndx <= m_types->Size());
+	const size_t ref = Table::create_table(m_array->GetAllocator());
+	m_types->Insert(ndx, COLUMN_TYPE_TABLE);
+	m_refs->Insert(ndx, ref);
+}
+
+void ColumnMixed::SetTable(size_t ndx)
+{
+	assert(ndx < m_types->Size());
+	const size_t ref = Table::create_table(m_array->GetAllocator());
+	ClearValue(ndx, COLUMN_TYPE_TABLE); // Remove any previous refs or binary data
+	m_refs->Set(ndx, ref);
+}
+
 bool ColumnMixed::Add() {
 	InsertInt(Size(), 0);
 	return true;
@@ -355,51 +355,22 @@ void ColumnMixed::Delete(size_t ndx) {
 	m_refs->Delete(ndx);
 }
 
-void ColumnMixed::Clear() {
+void ColumnMixed::Clear()
+{
 	m_types->Clear();
 	m_refs->Clear();
 	if (m_data) m_data->Clear();
 }
 
-void ColumnMixed::RefsColumn::insert_table(size_t ndx)
-{
-	// OK to use a fake parent, because we only care about the ref.
-	FakeParent fake_parent;
-	TopLevelTable table(m_array->GetAllocator()); // Create new table
-	Insert(ndx, table.GetRef());
-	table.SetParent(&fake_parent, 0);
-}
-
-void ColumnMixed::RefsColumn::set_table(size_t ndx)
-{
-	// OK to use a fake parent, because we only care about the ref.
-	FakeParent fake_parent;
-	TopLevelTable table(m_array->GetAllocator()); // Create new table
-	Set(ndx, table.GetRef());
-	table.SetParent(&fake_parent, 0);
-}
-
-TopLevelTable *ColumnMixed::RefsColumn::get_subtable_ptr(size_t ndx)
-{
-	TopLevelTable *subtable = static_cast<TopLevelTable *>(m_subtable_map.find(ndx));
-	if (subtable) return subtable;
-
-	size_t const ref = GetAsRef(ndx);
-	Allocator &alloc = m_array->GetAllocator();
-
-	subtable = new TopLevelTable(Table::SubtableTag(), alloc, ref, this, ndx);
-	register_subtable(ndx, subtable);
-	return subtable;
-}
-
 
 #ifdef _DEBUG
 
-void ColumnMixed::Verify() const {
+void ColumnMixed::verify() const
+{
 	m_array->Verify();
-	m_types->Verify();
-	m_refs->Verify();
-	if (m_data) m_data->Verify();
+	m_types->verify();
+	m_refs->verify();
+	if (m_data) m_data->verify();
 
 	// types and refs should be in sync
 	const size_t types_len = m_types->Size();
@@ -411,7 +382,8 @@ void ColumnMixed::Verify() const {
 	for (size_t i = 0; i < count; ++i) {
 		const size_t tref = m_refs->GetAsRef(i);
 		if (tref == 0 || tref & 0x1) continue;
-		m_refs->verify(i);
+		TableConstRef subtable = m_refs->get_subtable(i);
+		subtable->verify();
 	}
 }
 
@@ -430,7 +402,8 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 	for (size_t i = 0; i < count; ++i) {
 		const ColumnType type = (ColumnType)m_types->Get(i);
 		if (type != COLUMN_TYPE_TABLE) continue;
-		m_refs->to_dot(i, out);
+		TableConstRef subtable = m_refs->get_subtable(i);
+		subtable->ToDot(out);
 	}
 
 	m_types->ToDot(out, "types");
@@ -441,23 +414,6 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
 	}
 
 	out << "}" << std::endl;
-}
-
-
-void ColumnMixed::RefsColumn::verify(size_t ndx) const
-{
-	TopLevelTable t(m_array->GetAllocator(), GetAsRef(ndx),
-					const_cast<RefsColumn *>(this), ndx);
-	register_subtable(ndx, &t);
-	t.Verify();
-}
-
-
-void ColumnMixed::RefsColumn::to_dot(size_t ndx, std::ostream &out) const
-{
-	// OK to use a fake parent, because the operation is read-only.
-	FakeParent fake_parent;
-	TopLevelTable(m_array->GetAllocator(), GetAsRef(ndx), &fake_parent, 0).ToDot(out);
 }
 
 #endif //_DEBUG

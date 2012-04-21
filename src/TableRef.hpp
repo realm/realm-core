@@ -99,7 +99,7 @@ public:
 
 private:
 	friend class Table;
-	friend class TopLevelTable;
+	friend class ColumnSubtableParent;
 	template<class> friend class BasicTableRef;
 
 	template<class U, class V> friend
@@ -111,7 +111,7 @@ private:
 
 	T *m_table;
 
-	BasicTableRef(T *t) { bind(t); }
+	explicit BasicTableRef(T *t) { bind(t); }
 
 	void reset(T * = 0);
 	void bind(T *);

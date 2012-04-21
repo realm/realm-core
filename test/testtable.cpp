@@ -22,7 +22,7 @@ TEST(Table1) {
 	CHECK_EQUAL(10, table.Get(1, ndx));
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
@@ -54,7 +54,7 @@ TEST(Table2) {
 	CHECK_EQUAL(Wed, r.fourth);
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
@@ -81,7 +81,7 @@ TEST(Table3) {
 	CHECK_EQUAL(3, table[99].first);
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
@@ -104,7 +104,7 @@ TEST(Table4) {
 	CHECK_EQUAL((size_t)-1, table.second.Find("Foo"));
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
@@ -128,7 +128,7 @@ TEST(Table_Delete) {
 	CHECK_EQUAL(8, table[6].second);
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 
 	// Delete all items one at a time
@@ -140,13 +140,13 @@ TEST(Table_Delete) {
 	CHECK_EQUAL(0, table.GetSize());
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
 TEST(Table_Delete_All_Types) {
 	// Create table with all column types
-	TopLevelTable table;
+	Table table;
 	Spec s = table.GetSpec();
 	s.AddColumn(COLUMN_TYPE_INT,    "int");
 	s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
@@ -239,7 +239,7 @@ TEST(Table_Delete_All_Types) {
 	CHECK_EQUAL(12, table.GetSize());
 	
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 	
 	// Test Clear
@@ -247,7 +247,7 @@ TEST(Table_Delete_All_Types) {
 	CHECK_EQUAL(0, table.GetSize());
 	
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
@@ -263,7 +263,7 @@ TEST(Table_Find_Int) {
 	CHECK_EQUAL((size_t)-1, table.second.Find(1001));
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
@@ -287,7 +287,7 @@ TEST(Table6) {
 	//CHECK_EQUAL((size_t)-1, result2);
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
@@ -322,7 +322,7 @@ TEST(Table_FindAll_Int) {
 	CHECK_EQUAL(9, v.GetRef(4));
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
@@ -405,7 +405,7 @@ TEST(Table_Index_Int) {
 	CHECK_EQUAL(7, table.second.Find(100));
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
@@ -509,14 +509,14 @@ TEST(Table_SlabAlloc) {
 	table.DeleteRow(4);
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
 #include "Group.h"
 TEST(Table_Spec) {
 	Group group;
-	TopLevelTable& table = group.GetTable("test");
+	Table& table = group.GetTable("test");
 
 	// Create specification with sub-table
 	Spec s = table.GetSpec();
@@ -567,7 +567,7 @@ TEST(Table_Spec) {
 
 	// Read back tables
 	Group fromDisk("subtables.tightdb");
-	TopLevelTable& fromDiskTable = fromDisk.GetTable("test");
+	Table& fromDiskTable = fromDisk.GetTable("test");
 
 	TableRef subtable2 = fromDiskTable.GetTable(2, 0);
 
@@ -692,7 +692,7 @@ TEST(Table_Mixed) {
 	CHECK_EQUAL(40, subtable2->Get(1, 0));
 
 #ifdef _DEBUG
-	table.Verify();
+	table.verify();
 #endif //_DEBUG
 }
 
@@ -717,20 +717,4 @@ TEST(Table_Mixed2) {
 	CHECK_EQUAL(true,         table[1].first.GetBool());
 	CHECK_EQUAL((time_t)1234, table[2].first.GetDate());
 	CHECK_EQUAL("test",       table[3].first.GetString());
-}
-
-
-TEST(Table_CastRef)
-{
-	TopLevelTable t;
-	{
-		TableRef t2 = t.GetTableRef();
-		TopLevelTableRef t3 = static_table_cast<TopLevelTable>(t2);
-		TopLevelTableRef t4 = dynamic_table_cast<TopLevelTable>(t2);
-	}
-	{
-		TableConstRef t2 = t.GetTableRef();
-		TopLevelTableConstRef t3 = static_table_cast<TopLevelTable const>(t2);
-		TopLevelTableConstRef t4 = dynamic_table_cast<TopLevelTable const>(t2);
-	}
 }

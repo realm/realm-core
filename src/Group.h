@@ -19,7 +19,7 @@ public:
 	const char* GetTableName(size_t table_ndx) const;
 	bool HasTable(const char* name) const;
 
-	TopLevelTable& GetTable(const char* name);
+	Table& GetTable(const char* name);
 	template<class T> T& GetTable(const char* name);
 
 	// Serialization
@@ -57,9 +57,9 @@ protected:
 
 private:
 	void Create();
-	
-	TopLevelTable& GetTable(size_t ndx);
-	
+
+	Table& GetTable(size_t ndx);
+
 	template<class S> size_t Write(S& out);
 
 	// Member variables
@@ -78,17 +78,17 @@ template<class T> T& Group::GetTable(const char* name) {
 	if (n == size_t(-1)) {
 		// Create new table
 		T* const t = new T(m_alloc);
-		t->SetParent(this, m_tables.Size());
+		t->m_top.SetParent(this, m_tables.Size());
 
-		m_tables.Add(t->GetRef());
+		m_tables.Add(t->m_top.GetRef());
 		m_tableNames.Add(name);
-		m_cachedtables.Add((intptr_t)t);
+		m_cachedtables.Add(intptr_t(t));
 
 		return *t;
 	}
 	else {
 		// Get table from cache if exists, else create
-		return (T&)GetTable(n);
+		return static_cast<T&>(GetTable(n));
 	}
 }
 
@@ -113,17 +113,17 @@ size_t Group::Write(S& out) {
 template<class S>
 void Group::to_json(S& out) {
 	out << "{";
-	
+
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
 		const char* const name = m_tableNames.Get(i);
-		TopLevelTable& table = GetTable(i);
-		
+		Table& table = GetTable(i);
+
 		if (i) out << ",";
 		out << "\"" << name << "\"";
 		out << ":";
 		table.to_json(out);
 	}
-	
+
 	out << "}";
 }
 

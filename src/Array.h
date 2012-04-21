@@ -97,9 +97,8 @@ protected:
 
 class Array: public ArrayParent {
 public:
-	Array(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Array(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
-	Array(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Array(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	Array(ColumnDef type=COLUMN_NORMAL, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	Array(Allocator& alloc);
 	Array(const Array& a);
 	virtual ~Array();
@@ -131,7 +130,7 @@ public:
 	int64_t Back() const;
 	void Delete(size_t ndx);
 	void Clear();
-	
+
 	// Direct access methods
 	int64_t ColumnGet(size_t ndx) const;
 
@@ -154,7 +153,7 @@ public:
 		return (size_t)-1;
 	}
 	void Preset(int64_t min, int64_t max, size_t count);
-	void Preset(size_t bitwidth, size_t count); 
+	void Preset(size_t bitwidth, size_t count);
 	void FindAll(Array& result, int64_t value, size_t offset=0, size_t start=0, size_t end=(size_t)-1) const;
 	void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
 	int64_t Sum(size_t start = 0, size_t end = (size_t)-1) const;
@@ -321,7 +320,7 @@ size_t Array::Write(S& out, size_t& pos, bool recurse) const {
 				newRefs.Add(ref);
 			}
 			else {
-				const Array sub(ref, (const Array*)NULL, 0, GetAllocator());
+				const Array sub(ref, NULL, 0, GetAllocator());
 				const size_t sub_pos = sub.Write(out, pos);
 				newRefs.Add(sub_pos);
 			}

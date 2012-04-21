@@ -44,9 +44,9 @@ protected: \\
 %end for
 }; \\
 \\
-class TableName : public TopLevelTable { \\
+class TableName: public Table { \\
 public: \\
-	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \\
+	TableName(Allocator& alloc=GetDefaultAllocator()): Table(alloc) { \\
 %for $j in range($num_cols)
 		RegisterColumn(Accessor##CType${j+1}::type, #CName${j+1}); \\
 %end for
@@ -208,9 +208,11 @@ tdbType##CType${j+1} CName${j+1}%slurp
 private: \\
 	friend class Group; \\
 	TableName(Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \\
-		TopLevelTable(alloc, ref, parent, ndx_in_parent) {} \\
-	TableName(const TableName &); /* Disable */ \\
-	TableName& operator=(const TableName &); /* Disable */ \\
+		Table(alloc, ref, parent, ndx_in_parent) {} \\
+	TableName(SubtableTag, Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \\
+		Table(SubtableTag(), alloc, ref, parent, ndx_in_parent) {} \\
+	TableName(const TableName &); /* Disable copy construction */ \\
+	TableName& operator=(const TableName &); /* Disable copying assignment */ \\
 };
 %end for
 

@@ -94,7 +94,7 @@ void Group::Create() {
 
 Group::~Group() {
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
-		TopLevelTable* const t = (TopLevelTable*)m_cachedtables.Get(i);
+		Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
 		delete t;
 	}
 	m_cachedtables.Destroy();
@@ -117,15 +117,15 @@ bool Group::HasTable(const char* name) const {
 	return (n != (size_t)-1);
 }
 
-TopLevelTable& Group::GetTable(const char* name) {
+Table& Group::GetTable(const char* name) {
 	const size_t n = m_tableNames.Find(name);
 
-	if (n == (size_t)-1) {
+	if (n == size_t(-1)) {
 		// Create new table
-		TopLevelTable* const t = new TopLevelTable(m_alloc);
-		t->SetParent(this, m_tables.Size());
+		Table* const t = new Table(m_alloc);
+		t->m_top.SetParent(this, m_tables.Size());
 
-		m_tables.Add(t->GetRef());
+		m_tables.Add(t->m_top.GetRef());
 		m_tableNames.Add(name);
 		m_cachedtables.Add((intptr_t)t);
 
@@ -137,15 +137,15 @@ TopLevelTable& Group::GetTable(const char* name) {
 	}
 }
 
-TopLevelTable& Group::GetTable(size_t ndx) {
+Table& Group::GetTable(size_t ndx) {
 	assert(ndx < m_tables.Size());
 
 	// Get table from cache if exists, else create
-	TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(ndx);
+	Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(ndx));
 	if (!t) {
 		const size_t ref = m_tables.GetAsRef(ndx);
-		t = new TopLevelTable(m_alloc, ref, this, ndx);
-		m_cachedtables.Set(ndx, (intptr_t)t);
+		t = new Table(m_alloc, ref, this, ndx);
+		m_cachedtables.Set(ndx, intptr_t(t));
 	}
 	return *t;
 }
@@ -178,13 +178,13 @@ char* Group::WriteToMem(size_t& len) {
 void Group::Verify() {
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
 		// Get table from cache if exists, else create
-		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
+		Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
 		if (!t) {
 			const size_t ref = m_tables.GetAsRef(i);
-			t = new TopLevelTable(m_alloc, ref, this, i);
-			m_cachedtables.Set(i, (intptr_t)t);
+			t = new Table(m_alloc, ref, this, i);
+			m_cachedtables.Set(i, intptr_t(t));
 		}
-		t->Verify();
+		t->verify();
 	}
 }
 
@@ -193,11 +193,11 @@ MemStats Group::Stats() {
 
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
 		// Get table from cache if exists, else create
-		TopLevelTable* t = (TopLevelTable*)m_cachedtables.Get(i);
+		Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
 		if (!t) {
 			const size_t ref = m_tables.GetAsRef(i);
-			t = new TopLevelTable(m_alloc, ref, this, i);
-			m_cachedtables.Set(i, (intptr_t)t);
+			t = new Table(m_alloc, ref, this, i);
+			m_cachedtables.Set(i, intptr_t(t));
 		}
 		const MemStats m = t->Stats();
 		stats.Add(m);
@@ -222,7 +222,7 @@ void Group::ToDot(std::ostream& out) {
 	
 	// Tables
 	for (size_t i = 0; i < m_tables.Size(); ++i) {
-		const TopLevelTable& table = GetTable(i);
+		const Table& table = GetTable(i);
 		const char* const name = GetTableName(i);
 		table.ToDot(out, name);
 	}

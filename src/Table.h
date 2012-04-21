@@ -19,7 +19,6 @@ class Group;
 class ColumnTable;
 class ColumnMixed;
 class Table;
-class TopLevelTable;
 
 
 class Date {
@@ -102,13 +101,14 @@ private:
 typedef BasicTableRef<Table> TableRef;
 typedef BasicTableRef<Table const> TableConstRef;
 
-typedef BasicTableRef<TopLevelTable> TopLevelTableRef;
-typedef BasicTableRef<TopLevelTable const> TopLevelTableConstRef;
-
 
 class Table {
 public:
-	Table(Allocator& alloc=GetDefaultAllocator());
+	/**
+	 * Construct a new top-level table with an independent schema.
+	 */
+	Table(Allocator& alloc = GetDefaultAllocator());
+
 	virtual ~Table();
 
 	TableRef GetTableRef() { return TableRef(this); }
@@ -121,6 +121,7 @@ public:
 	ColumnType GetColumnType(size_t ndx) const;
 	Spec GetSpec();
 	const Spec GetSpec() const;
+	void UpdateFromSpec(size_t ref_specSet); ///< Must not be called for a table with shared schema
 
 	bool IsEmpty() const {return m_size == 0;}
 	size_t GetSize() const {return m_size;}
@@ -161,8 +162,6 @@ public:
 	// Sub-tables
 	TableRef GetTable(size_t column_id, size_t ndx);
 	TableConstRef GetTable(size_t column_id, size_t ndx) const;
-	TopLevelTableRef GetTopLevelTable(size_t column_id, size_t ndx); // Must be a mixed column
-	TopLevelTableConstRef GetTopLevelTable(size_t column_id, size_t ndx) const; // Must be a mixed column
 	size_t GetTableSize(size_t column_id, size_t ndx) const;
 	void   InsertTable(size_t column_id, size_t ndx);
 	void   ClearTable(size_t column_id, size_t ndx);
@@ -211,7 +210,7 @@ public:
 	// Debug
 #ifdef _DEBUG
 	bool Compare(const Table& c) const;
-	void Verify() const;
+	void verify() const;
 	void ToDot(std::ostream& out, const char* title=NULL) const;
 	void Print() const;
 	MemStats Stats() const;
@@ -225,35 +224,36 @@ public:
 
 protected:
 	friend class Group;
-	friend class ColumnTable;
 	friend class ColumnMixed;
 
-	class NoInitTag {};
+	/**
+	 * Construct a top-level table with independent schema from ref.
+	 */
+	Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent);
 
 	/**
-	 * Used when constructing subtables tables, that is, tables whose
-	 * lifetime is managed by reference counting, not by the
+	 * Used when constructing subtables, that is, tables whose
+	 * lifetime is managed by reference counting, and not by the
 	 * application.
 	 */
 	class SubtableTag {};
 
-	Table(NoInitTag, Allocator &alloc); // Construct un-initialized
-
-	Table(NoInitTag, SubtableTag, Allocator &alloc); // Construct subtable un-initialized
+	/**
+	 * Construct a subtable with independent schema from ref.
+	 */
+	Table(SubtableTag, Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent);
 
 	/**
-	 * Construct top-level table from ref.
+	 * Construct a subtable with shared schema from ref.
+	 *
+	 * It is possible to construct a 'null' table by passing zero for
+	 * columns_ref, in this case the columns will be created on
+	 * demand.
 	 */
-	Table(Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-		  Parent *parent, size_t ndx_in_parent);
+	Table(SubtableTag, Allocator& alloc, size_t schema_ref, size_t columns_ref,
+		  Parent* parent, size_t ndx_in_parent);
 
-	/**
-	 * Construct subtable from ref.
-	 */
-	Table(SubtableTag, Allocator &alloc, size_t ref_specSet, size_t columns_ref,
-		  Parent *parent, size_t ndx_in_parent);
-
-	void Create(size_t ref_specSet, size_t ref_columns, ArrayParent *parent, size_t ndx_in_parent);
+	void Create(size_t ref_specSet, size_t ref_columns, ArrayParent* parent, size_t ndx_in_parent);
 	void CreateColumns();
 	void CacheColumns();
 	void ClearCachedColumns();
@@ -262,15 +262,16 @@ protected:
 	size_t GetColumnRefPos(size_t column_ndx) const;
 	void UpdateColumnRefs(size_t column_ndx, int diff);
 
-	
+
 #ifdef _DEBUG
 	void ToDotInternal(std::ostream& out) const;
 #endif //_DEBUG
-	
+
 	// Member variables
 	size_t m_size;
-	
+
 	// On-disk format
+	Array m_top;
 	Array m_specSet;
 	Array m_spec;
 	ArrayString m_columnNames;
@@ -279,8 +280,6 @@ protected:
 
 	// Cached columns
 	Array m_cols;
-
-	std::size_t get_ref_count() const { return m_ref_count; }
 
 private:
 	Table(Table const &); // Disable copy construction
@@ -295,6 +294,12 @@ private:
 
 	ColumnBase& GetColumnBase(size_t ndx);
 	void InstantiateBeforeChange();
+
+	/**
+	 * Construct a table with independent schema and return just the
+	 * reference to the underlying memory.
+	 */
+	static std::size_t create_table(Allocator&);
 };
 
 
@@ -303,7 +308,6 @@ class Table::Parent: public ArrayParent
 {
 protected:
 	friend class Table;
-	friend class TopLevelTable;
 
 	/**
 	 * Must be called whenever a child Table is destroyed.
@@ -313,45 +317,17 @@ protected:
 
 
 
+/**
+ * A table whose schema can be modified a run-time.
+ */
+/*
 class TopLevelTable : public Table {
 public:
-	TopLevelTable(Allocator& alloc=GetDefaultAllocator());
-	virtual ~TopLevelTable();
-
-	TopLevelTableRef GetTableRef() { return TopLevelTableRef(this); }
-	TopLevelTableConstRef GetTableRef() const { return TopLevelTableConstRef(this); }
-
-	void UpdateFromSpec(size_t ref_specSet);
-	size_t GetRef() const;
-
 	// Debug
 #ifdef _DEBUG
-	MemStats Stats() const;
-	void DumpToDot(std::ostream& out) const;
 	void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
-
-protected:
-	// On-disk format
-	Array m_top;
-
-	/**
-	 * Construct top-level table from ref.
-	 */
-	TopLevelTable(Allocator& alloc, size_t ref_top, Parent *parent, size_t ndx_in_parent);
-
-private:
-	friend class Group;
-	friend class ColumnMixed;
-
-	/**
-	 * Construct subtable from ref.
-	 */
-	TopLevelTable(SubtableTag, Allocator& alloc, size_t ref_top,
-				  Parent *parent, size_t ndx_in_parent);
-
-	void SetParent(Parent *parent, size_t ndx_in_parent);
-};
+*/
 
 
 

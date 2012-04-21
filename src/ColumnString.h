@@ -10,8 +10,7 @@ namespace tightdb {
 class AdaptiveStringColumn : public ColumnBase {
 public:
 	AdaptiveStringColumn(Allocator& alloc=GetDefaultAllocator());
-	AdaptiveStringColumn(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	AdaptiveStringColumn(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	AdaptiveStringColumn(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	~AdaptiveStringColumn();
 
 	void Destroy();
@@ -47,7 +46,7 @@ public:
 
 #ifdef _DEBUG
 	bool Compare(const AdaptiveStringColumn& c) const;
-	void Verify() const {};
+	void verify() const {};
 	MemStats Stats() const;
 #endif //_DEBUG
 

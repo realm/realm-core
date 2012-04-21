@@ -7,8 +7,8 @@ namespace tightdb {
 
 class ArrayBinary : public Array {
 public:
-	ArrayBinary(ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	ArrayBinary(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	ArrayBinary(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+	ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
 	//ArrayBinary(Allocator& alloc);
 	~ArrayBinary();
 

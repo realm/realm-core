@@ -43,7 +43,7 @@ public:
 	void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
 #ifdef _DEBUG
-	virtual void Verify() const = 0;
+	virtual void verify() const = 0;
 	virtual void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 
@@ -104,8 +104,7 @@ public:
 	Column(Allocator& alloc);
 	Column(ColumnDef type, Allocator& alloc);
 	Column(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Column(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	Column(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	Column(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	Column(const Column& column);
 	~Column();
 
@@ -167,7 +166,7 @@ public:
 #ifdef _DEBUG
 	bool Compare(const Column& c) const;
 	void Print() const;
-	void Verify() const;
+	void verify() const;
 	MemStats Stats() const;
 #endif //_DEBUG
 
@@ -190,6 +189,8 @@ protected:
 
 	// Member variables
 	Index* m_index;
+
+	static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
 
 private:
 	Column &operator=(Column const &); // not allowed

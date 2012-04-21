@@ -17,22 +17,14 @@ using namespace std;
 
 namespace tightdb {
 
-Array::Array(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc):
+Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
 	m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
 	m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
 	Create(ref);
 }
 
-Array::Array(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc):
-	m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
-	m_parent(const_cast<ArrayParent *>(parent)), m_parentNdx(pndx), m_alloc(alloc),
-	m_lbound(0), m_ubound(0)
-{
-	Create(ref);
-}
-
-Array::Array(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc):
+Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc):
 	m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false),
 	m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
@@ -237,7 +229,7 @@ const Array Array::GetSubArray(size_t ndx) const {
 	assert(ndx < m_len);
 	assert(m_hasRefs);
 
-	return Array((size_t)Get(ndx), this, ndx, m_alloc);
+	return Array(size_t(Get(ndx)), const_cast<Array *>(this), ndx, m_alloc);
 }
 
 void Array::Destroy() {

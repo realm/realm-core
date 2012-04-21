@@ -26,7 +26,7 @@ public:
 	 * \param tab If this column is used as part of a table you must
 	 * pass a pointer to that table. Otherwise you may pass null.
 	 */
-	ColumnMixed(Allocator &alloc, Table const *tab);
+	ColumnMixed(Allocator& alloc, const Table* tab);
 
 	/**
 	 * Create a mixed column and attach it to an already existing
@@ -35,12 +35,12 @@ public:
 	 * \param tab If this column is used as part of a table you must
 	 * pass a pointer to that table. Otherwise you may pass null.
 	 */
-	ColumnMixed(size_t ref, ArrayParent *parent, size_t pndx, Allocator &alloc, Table const *tab);
+	ColumnMixed(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc, const Table* tab);
 
 	~ColumnMixed();
 	void Destroy();
 
-	void SetParent(ArrayParent *parent, size_t pndx);
+	void SetParent(ArrayParent* parent, size_t pndx);
 
 	ColumnType GetType(size_t ndx) const;
 	size_t Size() const {return m_types->Size();}
@@ -56,7 +56,7 @@ public:
 	 * The returned table pointer must always end up being wrapped in
 	 * an instance of BasicTableRef.
 	 */
-	TopLevelTable *get_subtable_ptr(size_t ndx) const;
+	Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
 	void SetInt(size_t ndx, int64_t value);
 	void SetBool(size_t ndx, bool value);
@@ -84,13 +84,13 @@ public:
 	size_t GetRef() const {return m_array->GetRef();}
 
 #ifdef _DEBUG
-	void Verify() const;
+	void verify() const;
 	void ToDot(std::ostream& out, const char* title) const;
 #endif //_DEBUG
 	
 private:
-	void Create(Allocator &alloc, Table const *tab);
-	void Create(size_t ref, ArrayParent *parent, size_t pndx, Allocator &alloc, Table const *tab);
+	void Create(Allocator& alloc, const Table* tab);
+	void Create(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc, const Table* tab);
 	void InitDataColumn();
 	
 	void ClearValue(size_t ndx, ColumnType newtype);
@@ -107,17 +107,12 @@ private:
 class ColumnMixed::RefsColumn: public ColumnSubtableParent
 {
 public:
-	RefsColumn(Allocator &alloc, Table const *tab):
+	RefsColumn(Allocator& alloc, const Table* tab):
 		ColumnSubtableParent(NULL, 0, alloc, tab) {}
-	RefsColumn(size_t ref, ArrayParent *parent, size_t pndx, Allocator &alloc, Table const *tab):
+	RefsColumn(std::size_t ref, ArrayParent* parent, std::size_t pndx, Allocator& alloc, const Table* tab):
 		ColumnSubtableParent(ref, parent, pndx, alloc, tab) {}
-	void insert_table(size_t ndx);
-	void set_table(size_t ndx);
-	TopLevelTable *get_subtable_ptr(size_t ndx);
-#ifdef _DEBUG
-	void verify(size_t ndx) const;
-	void to_dot(size_t ndx, std::ostream &) const;
-#endif //_DEBUG
+	using ColumnSubtableParent::get_subtable_ptr;
+	using ColumnSubtableParent::get_subtable;
 };
 
 
@@ -126,36 +121,22 @@ inline ColumnMixed::ColumnMixed(): m_data(NULL)
 	Create(GetDefaultAllocator(), 0);
 }
 
-inline ColumnMixed::ColumnMixed(Allocator &alloc, Table const *tab): m_data(NULL)
+inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* tab): m_data(NULL)
 {
 	Create(alloc, tab);
 }
 
-inline ColumnMixed::ColumnMixed(size_t ref, ArrayParent *parent, size_t pndx,
-								Allocator &alloc, Table const *tab): m_data(NULL)
+inline ColumnMixed::ColumnMixed(size_t ref, ArrayParent* parent, size_t pndx,
+								Allocator& alloc, const Table* tab): m_data(NULL)
 {
 	Create(ref, parent, pndx, alloc, tab);
 }
 
-inline void ColumnMixed::InsertTable(size_t ndx)
+inline Table* ColumnMixed::get_subtable_ptr(size_t subtable_ndx) const
 {
-	assert(ndx <= m_types->Size());
-	m_types->Insert(ndx, COLUMN_TYPE_TABLE);
-	m_refs->insert_table(ndx);
-}
-
-inline void ColumnMixed::SetTable(size_t ndx)
-{
-	assert(ndx < m_types->Size());
-	ClearValue(ndx, COLUMN_TYPE_TABLE); // Remove refs or binary data
-	m_refs->set_table(ndx);
-}
-
-inline TopLevelTable *ColumnMixed::get_subtable_ptr(size_t ndx) const
-{
-	assert(ndx < m_types->Size());
-	assert(m_types->Get(ndx) == COLUMN_TYPE_TABLE);
-	return m_refs->get_subtable_ptr(ndx);
+	assert(subtable_ndx < m_types->Size());
+	assert(m_types->Get(subtable_ndx) == COLUMN_TYPE_TABLE);
+	return m_refs->get_subtable_ptr(subtable_ndx);
 }
 
 }

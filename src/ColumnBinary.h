@@ -10,8 +10,7 @@ namespace tightdb {
 class ColumnBinary : public ColumnBase {
 public:
 	ColumnBinary(Allocator& alloc=GetDefaultAllocator());
-	ColumnBinary(size_t ref, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	ColumnBinary(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	ColumnBinary(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	~ColumnBinary();
 
 	void Destroy();
@@ -44,7 +43,7 @@ public:
 	void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
 #ifdef _DEBUG
-	void Verify() const {};
+	void verify() const {};
 #endif //_DEBUG
 
 protected:

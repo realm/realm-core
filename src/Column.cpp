@@ -21,6 +21,20 @@ namespace {
 
 using namespace tightdb;
 
+Column GetColumnFromRef(Array &parent, size_t ndx) {
+	assert(parent.HasRefs());
+	assert(ndx < parent.Size());
+	return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
+}
+
+/*
+const Column GetColumnFromRef(const Array& parent, size_t ndx) {
+	assert(parent.HasRefs());
+	assert(ndx < parent.Size());
+	return Column((size_t)parent.Get(ndx), &parent, ndx);
+}
+*/
+
 // Pre-declare local functions
 bool callme_sum(Array *a, size_t start, size_t end, size_t caller_base, void *state);
 bool callme_min(Array *a, size_t start, size_t end, size_t caller_offset, void *state);
@@ -30,12 +44,6 @@ void merge_core_references(Array *vals, Array *idx0, Array *idx1, Array *idxres)
 void merge_core(Array *a0, Array *a1, Array *res);
 Array* merge(Array *ArrayList);
 void merge_references(Array *valuelist, Array *indexlists, Array **indexresult);
-
-Column GetColumnFromRef(Array &parent, size_t ndx) {
-	assert(parent.HasRefs());
-	assert(ndx < parent.Size());
-	return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
-}
 
 bool callme_sum(Array *a, size_t start, size_t end, size_t caller_base, void *state) {
 	(void)caller_base; 
@@ -274,17 +282,13 @@ Column::Column(ColumnDef type, Allocator& alloc): m_index(NULL) {
 	Create();
 }
 
-Column::Column(ColumnDef type, ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+Column::Column(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
 	m_array = new Array(type, parent, pndx, alloc);
 	Create();
 }
 
-Column::Column(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+Column::Column(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
 	m_array = new Array(ref, parent, pndx, alloc);
-}
-
-Column::Column(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc): m_index(NULL) {
-	m_array = new Array(ref, const_cast<ArrayParent *>(parent), pndx, alloc);
 }
 
 Column::Column(const Column& column) : m_index(NULL) {
@@ -324,18 +328,21 @@ void Column::Destroy() {
 
 bool Column::IsEmpty() const {
 	if (!IsNode()) return m_array->IsEmpty();
-	else {
-		const Array offsets = NodeGetOffsets();
-		return offsets.IsEmpty();
-	}
+	const Array offsets = NodeGetOffsets();
+	return offsets.IsEmpty();
 }
 
 size_t Column::Size() const {
 	if (!IsNode()) return m_array->Size();
-	else {
-		const Array offsets = NodeGetOffsets();
-		return offsets.IsEmpty() ? 0 : (size_t)offsets.Back();
-	}
+	const Array offsets = NodeGetOffsets();
+	return offsets.IsEmpty() ? 0 : size_t(offsets.Back());
+}
+
+size_t Column::get_size_from_ref(size_t ref, Allocator& alloc) {
+	Array a(ref, NULL, 0, alloc);
+	if (!a.IsNode()) return a.Size();
+	Array offsets(a.Get(0), NULL, 0, alloc);
+	return offsets.IsEmpty() ? 0 : size_t(offsets.Back());
 }
 
 void Column::SetParent(ArrayParent *parent, size_t pndx) {
@@ -350,15 +357,6 @@ void Column::UpdateParentNdx(int diff) {
 void Column::SetHasRefs() {
 	m_array->SetType(COLUMN_HASREFS);
 }
-
-/*
-static const Column GetColumnFromRef(const Array& parent, size_t ndx) {
-	assert(parent.HasRefs());
-	assert(ndx < parent.Size());
-	return Column((size_t)parent.Get(ndx), &parent, ndx);
-}
-*/
-
 
 /*Column Column::GetSubColumn(size_t ndx) {
 	assert(ndx < m_len);
@@ -417,7 +415,7 @@ bool Column::Insert(size_t ndx, int64_t value) {
 	}
 
 #ifdef _DEBUG
-	Verify();
+	verify();
 #endif //DEBUG
 
 	return true;
@@ -693,7 +691,7 @@ void Column::Print() const {
 	}
 }
 
-void Column::Verify() const {
+void Column::verify() const {
 	if (IsNode()) {
 		assert(m_array->Size() == 2);
 		//assert(m_hasRefs);
@@ -707,11 +705,11 @@ void Column::Verify() const {
 
 		size_t off = 0;
 		for (size_t i = 0; i < refs.Size(); ++i) {
-			const size_t ref = (size_t)refs.Get(i);
+			const size_t ref = size_t(refs.Get(i));
 			assert(ref);
 
-			const Column col(ref, (const Array*)NULL, 0, m_array->GetAllocator());
-			col.Verify();
+			const Column col(ref, NULL, 0, m_array->GetAllocator());
+			col.verify();
 
 			off += col.Size();
 			const size_t node_off = offsets.GetAsRef(i);
@@ -787,4 +785,3 @@ MemStats Column::Stats() const {
 #endif //_DEBUG
 
 }
-

@@ -6,7 +6,10 @@
 
 namespace tightdb {
 
-ArrayStringLong::ArrayStringLong(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_HASREFS, parent, pndx, alloc), m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc) {
+ArrayStringLong::ArrayStringLong(ArrayParent *parent, size_t pndx, Allocator& alloc):
+	Array(COLUMN_HASREFS, parent, pndx, alloc),
+	m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc)
+{
 	// Add subarrays for long string
 	Array::Add(m_offsets.GetRef());
 	Array::Add(m_blob.GetRef());
@@ -14,7 +17,10 @@ ArrayStringLong::ArrayStringLong(ArrayParent *parent, size_t pndx, Allocator& al
 	m_blob.SetParent(this, 1);
 }
 
-ArrayStringLong::ArrayStringLong(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(ref, parent, pndx, alloc), m_offsets(Array::GetAsRef(0), static_cast<ArrayParent *>(NULL), 0, alloc), m_blob(Array::GetAsRef(1), static_cast<ArrayParent *>(NULL), 0, alloc) {
+ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
+	Array(ref, parent, pndx, alloc), m_offsets(Array::GetAsRef(0), NULL, 0, alloc),
+	m_blob(Array::GetAsRef(1), NULL, 0, alloc)
+{
 	assert(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
 	assert(Array::Size() == 2);
 	assert(m_blob.Size() == (m_offsets.IsEmpty() ? 0 : (size_t)m_offsets.Back()));

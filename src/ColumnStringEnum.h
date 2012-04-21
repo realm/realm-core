@@ -7,8 +7,7 @@ namespace tightdb {
 
 class ColumnStringEnum : public Column {
 public:
-	ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-	ColumnStringEnum(size_t ref_keys, size_t ref_values, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+	ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
 	~ColumnStringEnum();
 	void Destroy();
 
@@ -32,7 +31,7 @@ public:
 
 #ifdef _DEBUG
 	bool Compare(const ColumnStringEnum& c) const;
-	void Verify() const;
+	void verify() const;
 	MemStats Stats() const;
 	void ToDot(std::ostream& out, const char* title) const;
 #endif // _DEBUG

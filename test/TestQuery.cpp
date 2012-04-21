@@ -53,7 +53,7 @@ TEST(TestQuerySimple) {
 TEST(TestQuerySubtable) {
 
 	Group group;
-	TopLevelTable& table = group.GetTable("test");
+	Table& table = group.GetTable("test");
 
 	// Create specification with sub-table
 	Spec s = table.GetSpec();

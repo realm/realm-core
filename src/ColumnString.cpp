@@ -33,20 +33,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) {
 	m_array = new ArrayString(NULL, 0, alloc);
 }
 
-AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc) {
-	const ColumnDef type = GetTypeFromArray(ref, alloc);
-	if (type == COLUMN_NODE) {
-		m_array = new Array(ref, parent, pndx, alloc);
-	}
-	else if (type == COLUMN_HASREFS) {
-		m_array = new ArrayStringLong(ref, parent, pndx, alloc);
-	}
-	else {
-		m_array = new ArrayString(ref, parent, pndx, alloc);
-	}
-}
-
-AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) {
+AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc) {
 	const ColumnDef type = GetTypeFromArray(ref, alloc);
 	if (type == COLUMN_NODE) {
 		m_array = new Array(ref, parent, pndx, alloc);

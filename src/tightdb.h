@@ -28,9 +28,9 @@ protected: \
 	QueryAccessor##CType1 CName1; \
 }; \
 \
-class TableName : public TopLevelTable { \
+class TableName: public Table { \
 public: \
-	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()): Table(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 \
 		CName1.Create(this, 0); \
@@ -144,9 +144,11 @@ public: \
 private: \
 	friend class Group; \
 	TableName(Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
-		TopLevelTable(alloc, ref, parent, ndx_in_parent) {} \
-	TableName(const TableName &); /* Disable */ \
-	TableName& operator=(const TableName &); /* Disable */ \
+		Table(alloc, ref, parent, ndx_in_parent) {} \
+	TableName(SubtableTag, Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
+		Table(SubtableTag(), alloc, ref, parent, ndx_in_parent) {} \
+	TableName(const TableName &); /* Disable copy construction */ \
+	TableName& operator=(const TableName &); /* Disable copying assignment */ \
 };
 
 
@@ -158,9 +160,9 @@ protected: \
 	QueryAccessor##CType2 CName2; \
 }; \
 \
-class TableName : public TopLevelTable { \
+class TableName: public Table { \
 public: \
-	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()): Table(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 \
@@ -286,9 +288,11 @@ public: \
 private: \
 	friend class Group; \
 	TableName(Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
-		TopLevelTable(alloc, ref, parent, ndx_in_parent) {} \
-	TableName(const TableName &); /* Disable */ \
-	TableName& operator=(const TableName &); /* Disable */ \
+		Table(alloc, ref, parent, ndx_in_parent) {} \
+	TableName(SubtableTag, Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
+		Table(SubtableTag(), alloc, ref, parent, ndx_in_parent) {} \
+	TableName(const TableName &); /* Disable copy construction */ \
+	TableName& operator=(const TableName &); /* Disable copying assignment */ \
 };
 
 
@@ -301,9 +305,9 @@ protected: \
 	QueryAccessor##CType3 CName3; \
 }; \
 \
-class TableName : public TopLevelTable { \
+class TableName: public Table { \
 public: \
-	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()): Table(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 		RegisterColumn(Accessor##CType3::type, #CName3); \
@@ -441,9 +445,11 @@ public: \
 private: \
 	friend class Group; \
 	TableName(Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
-		TopLevelTable(alloc, ref, parent, ndx_in_parent) {} \
-	TableName(const TableName &); /* Disable */ \
-	TableName& operator=(const TableName &); /* Disable */ \
+		Table(alloc, ref, parent, ndx_in_parent) {} \
+	TableName(SubtableTag, Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
+		Table(SubtableTag(), alloc, ref, parent, ndx_in_parent) {} \
+	TableName(const TableName &); /* Disable copy construction */ \
+	TableName& operator=(const TableName &); /* Disable copying assignment */ \
 };
 
 
@@ -457,9 +463,9 @@ protected: \
 	QueryAccessor##CType4 CName4; \
 }; \
 \
-class TableName : public TopLevelTable { \
+class TableName: public Table { \
 public: \
-	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()): Table(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 		RegisterColumn(Accessor##CType3::type, #CName3); \
@@ -609,9 +615,11 @@ public: \
 private: \
 	friend class Group; \
 	TableName(Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
-		TopLevelTable(alloc, ref, parent, ndx_in_parent) {} \
-	TableName(const TableName &); /* Disable */ \
-	TableName& operator=(const TableName &); /* Disable */ \
+		Table(alloc, ref, parent, ndx_in_parent) {} \
+	TableName(SubtableTag, Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
+		Table(SubtableTag(), alloc, ref, parent, ndx_in_parent) {} \
+	TableName(const TableName &); /* Disable copy construction */ \
+	TableName& operator=(const TableName &); /* Disable copying assignment */ \
 };
 
 
@@ -626,9 +634,9 @@ protected: \
 	QueryAccessor##CType5 CName5; \
 }; \
 \
-class TableName : public TopLevelTable { \
+class TableName: public Table { \
 public: \
-	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()): Table(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 		RegisterColumn(Accessor##CType3::type, #CName3); \
@@ -790,9 +798,11 @@ public: \
 private: \
 	friend class Group; \
 	TableName(Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
-		TopLevelTable(alloc, ref, parent, ndx_in_parent) {} \
-	TableName(const TableName &); /* Disable */ \
-	TableName& operator=(const TableName &); /* Disable */ \
+		Table(alloc, ref, parent, ndx_in_parent) {} \
+	TableName(SubtableTag, Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
+		Table(SubtableTag(), alloc, ref, parent, ndx_in_parent) {} \
+	TableName(const TableName &); /* Disable copy construction */ \
+	TableName& operator=(const TableName &); /* Disable copying assignment */ \
 };
 
 
@@ -808,9 +818,9 @@ protected: \
 	QueryAccessor##CType6 CName6; \
 }; \
 \
-class TableName : public TopLevelTable { \
+class TableName: public Table { \
 public: \
-	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()): Table(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 		RegisterColumn(Accessor##CType3::type, #CName3); \
@@ -984,9 +994,11 @@ public: \
 private: \
 	friend class Group; \
 	TableName(Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
-		TopLevelTable(alloc, ref, parent, ndx_in_parent) {} \
-	TableName(const TableName &); /* Disable */ \
-	TableName& operator=(const TableName &); /* Disable */ \
+		Table(alloc, ref, parent, ndx_in_parent) {} \
+	TableName(SubtableTag, Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
+		Table(SubtableTag(), alloc, ref, parent, ndx_in_parent) {} \
+	TableName(const TableName &); /* Disable copy construction */ \
+	TableName& operator=(const TableName &); /* Disable copying assignment */ \
 };
 
 
@@ -1003,9 +1015,9 @@ protected: \
 	QueryAccessor##CType7 CName7; \
 }; \
 \
-class TableName : public TopLevelTable { \
+class TableName: public Table { \
 public: \
-	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()): Table(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 		RegisterColumn(Accessor##CType3::type, #CName3); \
@@ -1191,9 +1203,11 @@ public: \
 private: \
 	friend class Group; \
 	TableName(Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
-		TopLevelTable(alloc, ref, parent, ndx_in_parent) {} \
-	TableName(const TableName &); /* Disable */ \
-	TableName& operator=(const TableName &); /* Disable */ \
+		Table(alloc, ref, parent, ndx_in_parent) {} \
+	TableName(SubtableTag, Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
+		Table(SubtableTag(), alloc, ref, parent, ndx_in_parent) {} \
+	TableName(const TableName &); /* Disable copy construction */ \
+	TableName& operator=(const TableName &); /* Disable copying assignment */ \
 };
 
 
@@ -1211,9 +1225,9 @@ protected: \
 	QueryAccessor##CType8 CName8; \
 }; \
 \
-class TableName : public TopLevelTable { \
+class TableName: public Table { \
 public: \
-	TableName(Allocator& alloc=GetDefaultAllocator()) : TopLevelTable(alloc) { \
+	TableName(Allocator& alloc=GetDefaultAllocator()): Table(alloc) { \
 		RegisterColumn(Accessor##CType1::type, #CName1); \
 		RegisterColumn(Accessor##CType2::type, #CName2); \
 		RegisterColumn(Accessor##CType3::type, #CName3); \
@@ -1411,9 +1425,11 @@ public: \
 private: \
 	friend class Group; \
 	TableName(Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
-		TopLevelTable(alloc, ref, parent, ndx_in_parent) {} \
-	TableName(const TableName &); /* Disable */ \
-	TableName& operator=(const TableName &); /* Disable */ \
+		Table(alloc, ref, parent, ndx_in_parent) {} \
+	TableName(SubtableTag, Allocator& alloc, size_t ref, Parent *parent, size_t ndx_in_parent): \
+		Table(SubtableTag(), alloc, ref, parent, ndx_in_parent) {} \
+	TableName(const TableName &); /* Disable copy construction */ \
+	TableName& operator=(const TableName &); /* Disable copying assignment */ \
 };
 
 #endif //__TIGHTDB_H__

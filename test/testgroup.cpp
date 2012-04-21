@@ -327,7 +327,7 @@ TEST(Group_Subtable) {
 	int n = 1;
 
 	Group g;
-	TopLevelTable &table = g.GetTable("test");
+	Table& table = g.GetTable("test");
 	Spec s = table.GetSpec();
 	s.AddColumn(COLUMN_TYPE_INT, "foo");
 	Spec sub = s.AddColumnTable("sub");
@@ -417,7 +417,7 @@ TEST(Group_Subtable) {
 
 	// Read back tables
 	Group g2("subtables.tdb");
-	TopLevelTable &table2 = g2.GetTable("test");
+	Table& table2 = g2.GetTable("test");
 
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table2.Get(0, i), 100+i);
@@ -508,7 +508,7 @@ TEST(Group_Subtable) {
 
 	// Read back tables
 	Group g3("subtables2.tdb");
-	TopLevelTable &table3 = g2.GetTable("test");
+	Table& table3 = g2.GetTable("test");
 
 	for (int i=0; i<n; ++i) {
 		CHECK_EQUAL(table3.Get(0, i), 100+i);
@@ -558,7 +558,7 @@ TEST(Group_MultiLevelSubtables)
 {
 	{
 		Group g;
-		TopLevelTable &table = g.GetTable("test");
+		Table& table = g.GetTable("test");
 		{
 			Spec s = table.GetSpec();
 			s.AddColumn(COLUMN_TYPE_INT, "int");
@@ -582,7 +582,7 @@ TEST(Group_MultiLevelSubtables)
 		}
 		{
 			table.SetMixed(2, 0, Mixed(COLUMN_TYPE_TABLE));
-			TopLevelTableRef a = table.GetTopLevelTable(2, 0);
+			TableRef a = table.GetTable(2, 0);
 			{
 				Spec s = a->GetSpec();
 				s.AddColumn(COLUMN_TYPE_INT, "int");
@@ -591,7 +591,7 @@ TEST(Group_MultiLevelSubtables)
 			}
 			a->AddRow();
 			a->SetMixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
-			TopLevelTableRef b = a->GetTopLevelTable(1, 0);
+			TableRef b = a->GetTable(1, 0);
 			{
 				Spec s = b->GetSpec();
 				s.AddColumn(COLUMN_TYPE_INT, "int");
@@ -698,7 +698,7 @@ TEST(Group_ToDot) {
 	Group mygroup;
 	
 	// Create table with all column types
-	TopLevelTable& table = mygroup.GetTable("test");
+	Table& table = mygroup.GetTable("test");
 	Spec s = table.GetSpec();
 	s.AddColumn(COLUMN_TYPE_INT,    "int");
 	s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
@@ -759,7 +759,7 @@ TEST(Group_ToDot) {
 		if (i == 2) {
 			// To mixed column
 			table.SetMixed(7, i, Mixed(COLUMN_TYPE_TABLE));
-			TopLevelTable subtable = table.GetMixedTable(7, i);
+			Table subtable = table.GetMixedTable(7, i);
 			
 			Spec s = subtable.GetSpec();
 			s.AddColumn(COLUMN_TYPE_INT,    "first");
