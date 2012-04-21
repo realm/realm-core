@@ -2,10 +2,10 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
-#include "Array.h"
-#include "Column.h"
-#include "utilities.h"
-#include "query/QueryEngine.h"
+#include "Array.hpp"
+#include "Column.hpp"
+#include "utilities.hpp"
+#include "query/QueryEngine.hpp"
 #ifdef _MSC_VER
 	#include "win32/types.h"
 	#pragma warning (disable : 4127) // Condition is constant warning

@@ -1,7 +1,7 @@
 #ifndef __TDB_ARRAY_STRING__
 #define __TDB_ARRAY_STRING__
 
-#include "Array.h"
+#include "Array.hpp"
 
 namespace tightdb {
 

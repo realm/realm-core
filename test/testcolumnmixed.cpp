@@ -1,4 +1,4 @@
-#include "ColumnMixed.h"
+#include "ColumnMixed.hpp"
 #include <UnitTest++.h>
 
 using namespace tightdb;

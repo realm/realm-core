@@ -4,8 +4,8 @@
 #include <string>
 #include <algorithm>
 #include <UnitTest++.h>
-#include "../Support/mem.h"
-#include "../Support/number_names.h"
+#include "../Support/mem.hpp"
+#include "../Support/number_names.hpp"
 
 #ifndef _MSC_VER
 #include <stdint.h>

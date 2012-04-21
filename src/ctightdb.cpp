@@ -1,5 +1,5 @@
 #include "ctightdb.h"
-#include "Table.h"
+#include "Table.hpp"
 #include <cstdarg>
 #include <assert.h>
 

@@ -1,7 +1,7 @@
 #ifndef __TDB_INDEX__
 #define __TDB_INDEX__
 
-#include "Column.h"
+#include "Column.hpp"
 
 namespace tightdb {
 

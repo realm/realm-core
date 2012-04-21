@@ -1,4 +1,4 @@
-#include "Index.h"
+#include "Index.hpp"
 #include <cassert>
 
 #ifndef MAX_LIST_SIZE

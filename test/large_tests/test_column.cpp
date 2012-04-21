@@ -1,11 +1,11 @@
 #if TEST_DURATION > 0
 
-#include "Column.h"
+#include "Column.hpp"
 #include <UnitTest++.h>
 #include <vector>
 #include <algorithm>
-#include "../testsettings.h"
-#include "verified_integer.h"
+#include "../testsettings.hpp"
+#include "verified_integer.hpp"
 
 using namespace tightdb;
 

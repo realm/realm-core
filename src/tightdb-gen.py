@@ -9,10 +9,10 @@ directiveStartToken = %
 #ifndef __TIGHTDB_H__
 #define __TIGHTDB_H__
 
-#include "Table.h"
+#include "Table.hpp"
 #include <vector>
 
-#include "query/QueryInterface.h"
+#include "query/QueryInterface.hpp"
 
 using namespace std;
 

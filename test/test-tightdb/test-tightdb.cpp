@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include <tightdb.h>
+#include "tightdb.hpp"
 #include <UnitTest++.h>
 #include <assert.h>
-#include "../Support/mem.h"
-#include "../Support/number_names.h"
+#include "../Support/mem.hpp"
+#include "../Support/number_names.hpp"
 
 using namespace tightdb;
 

@@ -14,8 +14,8 @@
 
 #include <cassert>
 #include <iostream>
-#include "AllocSlab.h"
-#include "Array.h"
+#include "AllocSlab.hpp"
+#include "Array.hpp"
 
 #ifdef _DEBUG
 #include <cstdio>

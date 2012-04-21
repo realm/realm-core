@@ -1,5 +1,5 @@
 #include <sstream>
-#include "tightdb.h"
+#include "tightdb.hpp"
 #include <UnitTest++.h>
 
 using namespace tightdb;
@@ -484,7 +484,7 @@ TEST(TableAutoEnumerationFindFindAll) {
 	CHECK_EQUAL("eftg", tv.GetString(1, 4));
 }
 
-#include "AllocSlab.h"
+#include "AllocSlab.hpp"
 TEST(Table_SlabAlloc) {
 	SlabAlloc alloc;
 	TestTable table(alloc);
@@ -513,7 +513,7 @@ TEST(Table_SlabAlloc) {
 #endif //_DEBUG
 }
 
-#include "Group.h"
+#include "Group.hpp"
 TEST(Table_Spec) {
 	Group group;
 	Table& table = group.GetTable("test");

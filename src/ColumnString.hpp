@@ -1,9 +1,9 @@
 #ifndef __TDB_COLUMN_STRING__
 #define __TDB_COLUMN_STRING__
 
-#include "Column.h"
-#include "ArrayString.h"
-#include "ArrayStringLong.h"
+#include "Column.hpp"
+#include "ArrayString.hpp"
+#include "ArrayStringLong.hpp"
 
 namespace tightdb {
 

@@ -2,7 +2,7 @@
 #define CONDITIONS_H
 
 #include <string>
-#include "../utf8.h"
+#include "../utf8.hpp"
 
 namespace tightdb {
 

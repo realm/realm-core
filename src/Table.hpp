@@ -3,12 +3,12 @@
 
 #include <cstring> // strcmp()
 #include <time.h>
-#include "Column.h"
-#include "ColumnString.h"
-#include "ColumnStringEnum.h"
-#include "ColumnBinary.h"
-#include "alloc.h"
-#include "ColumnType.h"
+#include "Column.hpp"
+#include "ColumnString.hpp"
+#include "ColumnStringEnum.hpp"
+#include "ColumnBinary.hpp"
+#include "alloc.hpp"
+#include "ColumnType.hpp"
 #include "TableRef.hpp"
 
 namespace tightdb {

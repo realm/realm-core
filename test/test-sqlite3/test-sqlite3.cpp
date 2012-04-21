@@ -2,8 +2,8 @@
 #include <UnitTest++.h>
 #include "sqlite3.h"
 #include <string>
-#include "../Support/mem.h"
-#include "../Support/number_names.h"
+#include "../Support/mem.hpp"
+#include "../Support/number_names.hpp"
 using namespace std;
 
 int main() {

@@ -1,4 +1,4 @@
-#include "Group.h"
+#include "Group.hpp"
 #include <assert.h>
 #include <iostream>
 #include <fstream>

@@ -1,5 +1,5 @@
-#include "Table.h"
-#include "Column.h"
+#include "Table.hpp"
+#include "Column.hpp"
 #include <assert.h>
 
 namespace tightdb {

@@ -1,4 +1,4 @@
-#include "ColumnTable.h"
+#include "ColumnTable.hpp"
 
 using namespace std;
 

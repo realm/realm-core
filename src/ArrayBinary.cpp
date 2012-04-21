@@ -1,5 +1,5 @@
-#include "ArrayBinary.h"
-#include "ArrayBlob.h"
+#include "ArrayBinary.hpp"
+#include "ArrayBlob.hpp"
 #include <assert.h>
 #include "win32/types.h"
 

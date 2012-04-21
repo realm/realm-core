@@ -3,12 +3,12 @@
 #include <assert.h>
 #include <cstring>
 #include <cstdio> // debug
-#include "query/conditions.h"
+#include "query/conditions.hpp"
 #ifdef _MSC_VER
 	#include "win32\types.h"
 #endif
 
-#include "ColumnString.h"
+#include "ColumnString.hpp"
 
 namespace {
 

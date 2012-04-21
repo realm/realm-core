@@ -8,7 +8,7 @@
 	#include "win32\stdint.h"
 #endif
 #include <stdio.h>
-#include "verified_integer.h"
+#include "verified_integer.hpp"
 
 using namespace std;
 using namespace tightdb;

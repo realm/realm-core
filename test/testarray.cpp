@@ -1,9 +1,9 @@
-#include "Array.h"
-#include "Column.h"
+#include "Array.hpp"
+#include "Column.hpp"
 #include <UnitTest++.h>
 #include <vector>
 #include <algorithm>
-#include "testsettings.h"
+#include "testsettings.hpp"
 #include <map>
 #include <string>
 

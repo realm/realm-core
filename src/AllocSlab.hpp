@@ -1,7 +1,7 @@
 #ifndef __TDB_ALLOC_SLAB__
 #define __TDB_ALLOC_SLAB__
 
-#include "tightdb.h"
+#include "tightdb.hpp"
 
 #ifdef _MSC_VER
 #include "win32/stdint.h"

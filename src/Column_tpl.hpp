@@ -3,11 +3,11 @@
 
 #include <assert.h>
 
-#include "Array.h"
-#include "Column.h"
+#include "Array.hpp"
+#include "Column.hpp"
 
 #include <cstdlib>
-#include "query/conditions.h"
+#include "query/conditions.hpp"
 
 // Has to be define to allow overload from build settings
 #ifndef MAX_LIST_SIZE

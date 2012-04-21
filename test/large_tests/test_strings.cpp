@@ -1,10 +1,10 @@
 
 #include <UnitTest++.h>
-#include "../testsettings.h"
-#include "../Support/number_names.h"
-#include "Column.h"
+#include "../testsettings.hpp"
+#include "../Support/number_names.hpp"
+#include "Column.hpp"
 
-#include "verified_string.h"
+#include "verified_string.hpp"
 
 #if TEST_DURATION > 0
 

@@ -1,4 +1,4 @@
-#include "ArrayStringLong.h"
+#include "ArrayStringLong.hpp"
 #include <UnitTest++.h>
 
 using namespace tightdb;

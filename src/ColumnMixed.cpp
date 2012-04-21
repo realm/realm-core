@@ -1,5 +1,5 @@
-#include "ColumnMixed.h"
-#include "ColumnBinary.h"
+#include "ColumnMixed.hpp"
+#include "ColumnBinary.hpp"
 
 using namespace std;
 

@@ -1,6 +1,6 @@
-#include "tightdb.h"
+#include "tightdb.hpp"
 #include <UnitTest++.h>
-#include "Group.h"
+#include "Group.hpp"
 
 using namespace tightdb;
 

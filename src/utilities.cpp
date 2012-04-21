@@ -1,5 +1,5 @@
 
-#include "utilities.h"
+#include "utilities.hpp"
 #include <string>
 #include <assert.h>
 #include <cstdlib> // size_t

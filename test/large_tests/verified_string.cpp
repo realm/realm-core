@@ -6,8 +6,8 @@
 	#include "win32\stdint.h"
 #endif
 #include <stdio.h>
-#include "ColumnString.h"
-#include "verified_string.h"
+#include "ColumnString.hpp"
+#include "verified_string.hpp"
 
 using namespace std;
 using namespace tightdb;

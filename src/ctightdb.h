@@ -10,7 +10,7 @@
 
 #include <time.h>
 
-#include "ColumnType.h"
+#include "ColumnType.hpp"
 #include <stdlib.h> // size_t
 
 

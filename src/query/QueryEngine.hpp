@@ -1,8 +1,8 @@
 #include <string>
-#include "Table.h"
+#include "Table.hpp"
 
-#include "../utf8.h"
-#include "conditions.h"
+#include "../utf8.hpp"
+#include "conditions.hpp"
 
 namespace tightdb {
 

@@ -9,9 +9,9 @@
 //#include <climits> // size_t
 #include <cstdlib> // size_t
 #include <cstring> // memmove
-#include "alloc.h"
+#include "alloc.hpp"
 #include <iostream>
-#include "utilities.h"
+#include "utilities.hpp"
 #include <vector>
 #include <assert.h>
 

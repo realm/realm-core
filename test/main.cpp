@@ -3,7 +3,7 @@
 #include <cstring>
 #include <string>
 #include <math.h>
-#include "Column.h"
+#include "Column.hpp"
 
 int main(int argc, char const *const argv[])
 {

@@ -6,7 +6,7 @@
 	#include "win32\stdint.h"
 #endif
 #include <stdio.h>
-#include <Column.h>
+#include "Column.hpp"
 
 class VerifiedInteger {
     std::vector<int64_t> v;

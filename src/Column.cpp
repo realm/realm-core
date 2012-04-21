@@ -5,15 +5,15 @@
 #include <climits> // size_t
 #include <iostream>
 #include <iomanip>
-#include "query/QueryEngine.h"
+#include "query/QueryEngine.hpp"
 #ifdef _MSC_VER
 #include "win32/stdint.h"
 #else
 #include <stdint.h> // unint8_t etc
 #endif
 
-#include "Column.h"
-#include "Index.h"
+#include "Column.hpp"
+#include "Index.hpp"
 
 using namespace std;
 

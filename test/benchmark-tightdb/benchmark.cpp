@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include "../../src/tightdb.h"
+#include "../../src/tightdb.hpp"
 #include "../../test/UnitTest++/src/UnitTest++.h"
 #include "../../test/UnitTest++/src/Win32/TimeHelpers.h"
-#include "../Support/mem.h"
-#include "../Support/number_names.h"
+#include "../Support/mem.hpp"
+#include "../Support/number_names.hpp"
 #include <assert.h>
 #include <string>
 #include <vector>

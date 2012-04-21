@@ -3,9 +3,9 @@
 #include <cstring>
 #include <cstdio> // debug
 #include <iostream>
-#include "utilities.h"
-#include "Column.h"
-#include "ArrayString.h"
+#include "utilities.hpp"
+#include "Column.hpp"
+#include "ArrayString.hpp"
 
 using namespace std;
 

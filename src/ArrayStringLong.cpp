@@ -1,6 +1,6 @@
-#include "ArrayStringLong.h"
-#include "ArrayBlob.h"
-#include "Column.h"
+#include "ArrayStringLong.hpp"
+#include "ArrayBlob.hpp"
+#include "Column.hpp"
 #include <assert.h>
 #include "win32/types.h" //ssize_t
 

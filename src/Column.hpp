@@ -1,7 +1,7 @@
 #ifndef __TDB_COLUMN__
 #define __TDB_COLUMN__
 
-#include "Array.h"
+#include "Array.hpp"
 
 #ifdef _MSC_VER
 #include "win32/stdint.h"
@@ -199,6 +199,6 @@ private:
 }
 
 // Templates
-#include "Column_tpl.h"
+#include "Column_tpl.hpp"
 
 #endif //__TDB_COLUMN__

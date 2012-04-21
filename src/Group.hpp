@@ -1,8 +1,8 @@
 #ifndef __TDB_GROUP__
 #define __TDB_GROUP__
 
-#include "Table.h"
-#include "AllocSlab.h"
+#include "Table.hpp"
+#include "AllocSlab.hpp"
 
 namespace tightdb {
 

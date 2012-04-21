@@ -3,8 +3,8 @@
 #include "sqlite3.h"
 #include <string>
 #include <vector>
-#include "../Support/mem.h"
-#include "../Support/number_names.h"
+#include "../Support/mem.hpp"
+#include "../Support/number_names.hpp"
 #include "../../src/win32/stdint.h"
 using namespace std;
 

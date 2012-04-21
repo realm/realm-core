@@ -8,7 +8,7 @@
 	#include "win32\stdint.h"
 #endif
 #include <stdio.h>
-#include "ColumnString.h"
+#include "ColumnString.hpp"
 
 class VerifiedString {
     std::vector<std::string> v;

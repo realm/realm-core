@@ -1,4 +1,4 @@
-#include "ArrayBlob.h"
+#include "ArrayBlob.hpp"
 #include <assert.h>
 
 namespace tightdb {

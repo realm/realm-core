@@ -1,4 +1,4 @@
-#include "ArrayBinary.h"
+#include "ArrayBinary.hpp"
 #include <UnitTest++.h>
 
 using namespace tightdb;

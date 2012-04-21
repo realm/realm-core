@@ -1,8 +1,8 @@
-#include "Column.h"
+#include "Column.hpp"
 #include <UnitTest++.h>
 #include <vector>
 #include <algorithm>
-#include "testsettings.h"
+#include "testsettings.hpp"
 
 using namespace tightdb;
 
