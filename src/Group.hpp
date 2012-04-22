@@ -71,9 +71,12 @@ private:
     bool m_isValid;
 };
 
+
+
 // Templates
 
-template<class T> T& Group::GetTable(const char* name) {
+template<class T> T& Group::GetTable(const char* name)
+{
     const size_t n = m_tableNames.Find(name);
     if (n == size_t(-1)) {
         // Create new table
@@ -93,7 +96,8 @@ template<class T> T& Group::GetTable(const char* name) {
 }
 
 template<class S>
-size_t Group::Write(S& out) {
+size_t Group::Write(S& out)
+{
     // Space for ref to top array
     out.write("\0\0\0\0\0\0\0\0", 8);
     size_t pos = 8;
@@ -111,7 +115,8 @@ size_t Group::Write(S& out) {
 }
 
 template<class S>
-void Group::to_json(S& out) {
+void Group::to_json(S& out)
+{
     out << "{";
 
     for (size_t i = 0; i < m_tables.Size(); ++i) {

@@ -12,7 +12,8 @@
 using namespace std;
 using namespace tightdb;
 
-void VerifiedString::VerifyNeighbours(size_t ndx) {
+void VerifiedString::VerifyNeighbours(size_t ndx)
+{
     if(v.size() > ndx)
         assert(v[ndx] == u.Get(ndx));
 
@@ -23,7 +24,8 @@ void VerifiedString::VerifyNeighbours(size_t ndx) {
         assert(v[ndx + 1] == u.Get(ndx + 1));
 }
 
-void VerifiedString::Add(const char * value) {
+void VerifiedString::Add(const char * value)
+{
     v.push_back(value);
     u.Add(value);
     assert(v.size() == u.Size());
@@ -32,7 +34,8 @@ void VerifiedString::Add(const char * value) {
 }
 
 
-void VerifiedString::Insert(size_t ndx, const char * value) {
+void VerifiedString::Insert(size_t ndx, const char * value)
+{
     v.insert(v.begin() + ndx, value);
     u.Insert(ndx, value);
     assert(v.size() == u.Size());
@@ -41,19 +44,22 @@ void VerifiedString::Insert(size_t ndx, const char * value) {
 }
 
 
-const char *VerifiedString::Get(size_t ndx) {
+const char *VerifiedString::Get(size_t ndx)
+{
     assert(v[ndx] == u.Get(ndx));
     return v[ndx].c_str();
 }
 
-void VerifiedString::Set(size_t ndx, const char *value) {
+void VerifiedString::Set(size_t ndx, const char *value)
+{
     v[ndx] = value;
     u.Set(ndx, value);
     VerifyNeighbours(ndx);
     assert(ConditionalVerify());
 }
 
-void VerifiedString::Delete(size_t ndx) {
+void VerifiedString::Delete(size_t ndx)
+{
     v.erase(v.begin() + ndx);
     u.Delete(ndx);
     assert(v.size() == u.Size());
@@ -61,14 +67,16 @@ void VerifiedString::Delete(size_t ndx) {
     assert(ConditionalVerify());
 }
 
-void VerifiedString::Clear() {
+void VerifiedString::Clear()
+{
     v.clear();
     u.Clear();
     assert(v.size() == u.Size());
     assert(ConditionalVerify());
 }
 
-size_t VerifiedString::Find(const char *value) {
+size_t VerifiedString::Find(const char *value)
+{
     std::vector<string>::iterator it = std::find(v.begin(), v.end(), value);
     size_t ndx = std::distance(v.begin(), it);
     size_t index2 = u.Find(value);
@@ -77,13 +85,15 @@ size_t VerifiedString::Find(const char *value) {
     return ndx;
 }
 
- size_t VerifiedString::Size(void) {
+size_t VerifiedString::Size(void)
+{
     assert(v.size() == u.Size());
     return v.size();
 }
 
 // todo/fixme, end ignored
- void VerifiedString::FindAll(Array &c, const char *value, size_t start, size_t end) {
+void VerifiedString::FindAll(Array &c, const char *value, size_t start, size_t end)
+{
     std::vector<string>::iterator ita = v.begin() + start;
     std::vector<string>::iterator itb = v.begin() + (end == size_t(-1) ? v.size() : end);
     std::vector<size_t> result;
@@ -110,7 +120,8 @@ size_t VerifiedString::Find(const char *value) {
     return;
 }
 
- bool VerifiedString::Verify(void) {
+bool VerifiedString::Verify()
+{
     assert(u.Size() == v.size());
     if (u.Size() != v.size())
         return false;
@@ -124,7 +135,7 @@ size_t VerifiedString::Find(const char *value) {
 }
 
 // makes it run amortized the same time complexity as original, even though the row count grows
-bool VerifiedString::ConditionalVerify(void)
+bool VerifiedString::ConditionalVerify()
 {
     if(((uint64_t)rand() * (uint64_t)rand())  % (v.size() / 10 + 1) == 0) {
         return Verify();
@@ -134,7 +145,7 @@ bool VerifiedString::ConditionalVerify(void)
     }
 }
 
-void VerifiedString::Destroy(void)
+void VerifiedString::Destroy()
 {
     u.Destroy();
 }

@@ -6,7 +6,8 @@
 #include "../Support/number_names.hpp"
 using namespace std;
 
-int main() {
+int main()
+{
     // Open sqlite in-memory db
     sqlite3 *db = NULL;
     int rc = sqlite3_open(":memory:", &db);

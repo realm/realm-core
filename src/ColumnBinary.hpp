@@ -68,4 +68,3 @@ protected:
 }
 
 #endif //__TDB_COLUMN_BINARY__
-

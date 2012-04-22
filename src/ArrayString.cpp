@@ -11,7 +11,8 @@ using namespace std;
 
 namespace {
 
-size_t round_up(size_t len) {
+size_t round_up(size_t len)
+{
     size_t width = 0;
     if (len == 0)     width = 0;
     else if (len < 3) width = 4;
@@ -30,13 +31,17 @@ size_t round_up(size_t len) {
 
 namespace tightdb {
 
-ArrayString::ArrayString(ArrayParent *parent, size_t pndx, Allocator& alloc) : Array(COLUMN_NORMAL, parent, pndx, alloc) {
+ArrayString::ArrayString(ArrayParent *parent, size_t pndx, Allocator& alloc):
+    Array(COLUMN_NORMAL, parent, pndx, alloc)
+{
     // Manually set wtype as array constructor in initiatializer list
     // will not be able to call correct virtual function
     set_header_wtype(TDB_MULTIPLY);
 }
 
-ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc): Array(alloc) {
+ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc):
+    Array(alloc)
+{
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     Create(ref);
@@ -49,21 +54,24 @@ ArrayString::ArrayString(Allocator& alloc): Array(alloc) {}
 
 ArrayString::~ArrayString() {}
 
-const char* ArrayString::Get(size_t ndx) const {
+const char* ArrayString::Get(size_t ndx) const
+{
     assert(ndx < m_len);
 
     if (m_width == 0) return "";
     else return (const char*)(m_data + (ndx * m_width));
 }
 
-bool ArrayString::Set(size_t ndx, const char* value) {
+bool ArrayString::Set(size_t ndx, const char* value)
+{
     assert(ndx < m_len);
     assert(value);
 
     return Set(ndx, value, strlen(value));
 }
 
-bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
+bool ArrayString::Set(size_t ndx, const char* value, size_t len)
+{
     assert(ndx < m_len);
     assert(value);
     assert(len < 64); // otherwise we have to use another column type
@@ -106,21 +114,25 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len) {
     return true;
 }
 
-bool ArrayString::Add() {
+bool ArrayString::Add()
+{
     return Insert(m_len, "", 0);
 }
 
-bool ArrayString::Add(const char* value) {
+bool ArrayString::Add(const char* value)
+{
     return Insert(m_len, value, strlen(value));
 }
 
-bool ArrayString::Insert(size_t ndx, const char* value) {
+bool ArrayString::Insert(size_t ndx, const char* value)
+{
     return Insert(ndx, value, strlen(value));
 }
 
 
 
-bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
+bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
+{
     assert(ndx <= m_len);
     assert(value);
     assert(len < 64); // otherwise we have to use another column type
@@ -192,7 +204,8 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len) {
     return true;
 }
 
-void ArrayString::Delete(size_t ndx) {
+void ArrayString::Delete(size_t ndx)
+{
     assert(ndx < m_len);
 
     // Check if we need to copy before modifying
@@ -212,23 +225,27 @@ void ArrayString::Delete(size_t ndx) {
     set_header_len(m_len);
 }
 
-size_t ArrayString::CalcByteLen(size_t count, size_t width) const {
+size_t ArrayString::CalcByteLen(size_t count, size_t width) const
+{
     return 8 + (count * width);
 }
 
-size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const {
+size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const
+{
     if (width == 0) return (size_t)-1; // zero-width gives infinite space
 
     const size_t bytes_without_header = bytes - 8;
     return bytes_without_header / width;
 }
 
-size_t ArrayString::Find(const char* value, size_t start, size_t end) const {
+size_t ArrayString::Find(const char* value, size_t start, size_t end) const
+{
     assert(value);
     return FindWithLen(value, strlen(value), start, end);
 }
 
-void ArrayString::FindAll(Array& result, const char* value, size_t add_offset, size_t start, size_t end) {
+void ArrayString::FindAll(Array& result, const char* value, size_t add_offset, size_t start, size_t end)
+{
     assert(value);
 
     const size_t len = strlen(value);
@@ -242,7 +259,8 @@ void ArrayString::FindAll(Array& result, const char* value, size_t add_offset, s
     }
 }
 
-size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, size_t end) const {
+size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, size_t end) const
+{
     assert(value);
 
     if (end == (size_t)-1) end = m_len;
@@ -266,7 +284,8 @@ size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, siz
 #ifdef _DEBUG
 #include "stdio.h"
 
-bool ArrayString::Compare(const ArrayString& c) const {
+bool ArrayString::Compare(const ArrayString& c) const
+{
     if (c.Size() != Size()) return false;
 
     for (size_t i = 0; i < Size(); ++i) {
@@ -276,7 +295,8 @@ bool ArrayString::Compare(const ArrayString& c) const {
     return true;
 }
 
-void ArrayString::StringStats() const {
+void ArrayString::StringStats() const
+{
     size_t total = 0;
     size_t longest = 0;
 
@@ -303,7 +323,8 @@ void ArrayString::StringStats() const {
 }
 
 /*
-void ArrayString::ToDot(FILE* f) const {
+void ArrayString::ToDot(FILE* f) const
+{
     const size_t ref = GetRef();
 
     fprintf(f, "n%zx [label=\"", ref);
@@ -318,7 +339,8 @@ void ArrayString::ToDot(FILE* f) const {
 }
 */
 
-void ArrayString::ToDot(std::ostream& out, const char* title) const {
+void ArrayString::ToDot(std::ostream& out, const char* title) const
+{
     const size_t ref = GetRef();
 
     if (title) {

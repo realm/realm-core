@@ -21,14 +21,16 @@ namespace {
 
 using namespace tightdb;
 
-Column GetColumnFromRef(Array &parent, size_t ndx) {
+Column GetColumnFromRef(Array &parent, size_t ndx)
+{
     assert(parent.HasRefs());
     assert(ndx < parent.Size());
     return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
 }
 
 /*
-const Column GetColumnFromRef(const Array& parent, size_t ndx) {
+const Column GetColumnFromRef(const Array& parent, size_t ndx)
+{
     assert(parent.HasRefs());
     assert(ndx < parent.Size());
     return Column((size_t)parent.Get(ndx), &parent, ndx);
@@ -36,16 +38,17 @@ const Column GetColumnFromRef(const Array& parent, size_t ndx) {
 */
 
 // Pre-declare local functions
-bool callme_sum(Array *a, size_t start, size_t end, size_t caller_base, void *state);
-bool callme_min(Array *a, size_t start, size_t end, size_t caller_offset, void *state);
-bool callme_max(Array *a, size_t start, size_t end, size_t caller_offset, void *state);
-bool callme_arrays(Array *a, size_t start, size_t end, size_t caller_offset, void *state);
-void merge_core_references(Array *vals, Array *idx0, Array *idx1, Array *idxres);
-void merge_core(Array *a0, Array *a1, Array *res);
-Array* merge(Array *ArrayList);
-void merge_references(Array *valuelist, Array *indexlists, Array **indexresult);
+bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state);
+bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
+bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
+bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
+void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres);
+void merge_core(Array* a0, Array* a1, Array* res);
+Array* merge(Array* ArrayList);
+void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
 
-bool callme_sum(Array *a, size_t start, size_t end, size_t caller_base, void *state) {
+bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state)
+{
     (void)caller_base;
     int64_t s = a->Sum(start, end);
     *(int64_t *)state += s;
@@ -59,7 +62,8 @@ public:
     int64_t result;
 };
 
-bool callme_min(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
+bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
+{
     (void)caller_offset;
     AggregateState* p = (AggregateState*)state;
 
@@ -73,7 +77,8 @@ bool callme_min(Array *a, size_t start, size_t end, size_t caller_offset, void *
     return true;
 }
 
-bool callme_max(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
+bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
+{
     (void)caller_offset;
     AggregateState* p = (AggregateState*)state;
 
@@ -95,8 +100,8 @@ bool callme_max(Array *a, size_t start, size_t end, size_t caller_offset, void *
 //     (idx0->Size() + idx1->Size() < vals.Size() is OK).
 // Output:
 //     idxres: Merged array of indexes sorted with respect to vals
-void merge_core_references(Array *vals, Array *idx0, Array *idx1, Array *idxres) {
-
+void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
+{
     int64_t v0, v1;
     size_t i0, i1;
     size_t p0 = 0, p1 = 0;
@@ -146,7 +151,8 @@ void merge_core_references(Array *vals, Array *idx0, Array *idx1, Array *idxres)
 }
 
 // Merge two sorted arrays into a single sorted array
-void merge_core(Array *a0, Array *a1, Array *res) {
+void merge_core(Array* a0, Array* a1, Array* res)
+{
     int64_t v0, v1;
     size_t p0 = 0, p1 = 0;
     size_t s0 = a0->Size();
@@ -191,7 +197,8 @@ void merge_core(Array *a0, Array *a1, Array *res) {
 //     ArrayList: An array of references to non-instantiated Arrays of values. The values in each array must be in sorted order
 // Return value:
 //     Merge-sorted array of all values
-Array *merge(Array *ArrayList) {
+Array* merge(Array* ArrayList)
+{
     if(ArrayList->Size() == 1) {
         size_t ref = ArrayList->GetAsRef(0);
 //      Array *a = new Array(ref, reinterpret_cast<Array *>(&merge)); // FIXME: Breaks strict-aliasing
@@ -224,7 +231,8 @@ Array *merge(Array *ArrayList) {
 // Output:
 //     indexresult: Array of indexes into valuelist, sorted with respect to values in valuelist
 // TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
-void merge_references(Array *valuelist, Array *indexlists, Array **indexresult) {
+void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
+{
     if(indexlists->Size() == 1) {
 //      size_t ref = valuelist->Get(0);
         *indexresult = (Array *)indexlists->Get(0);
@@ -257,7 +265,8 @@ void merge_references(Array *valuelist, Array *indexlists, Array **indexresult) 
     *indexresult = ResI;
 }
 
-bool callme_arrays(Array *a, size_t start, size_t end, size_t caller_offset, void *state) {
+bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
+{
     (void)end;
     (void)start;
     (void)caller_offset;
@@ -272,31 +281,37 @@ bool callme_arrays(Array *a, size_t start, size_t end, size_t caller_offset, voi
 
 namespace tightdb {
 
-Column::Column(Allocator& alloc): m_index(NULL) {
+Column::Column(Allocator& alloc): m_index(NULL)
+{
     m_array = new Array(COLUMN_NORMAL, NULL, 0, alloc);
     Create();
 }
 
-Column::Column(ColumnDef type, Allocator& alloc): m_index(NULL) {
+Column::Column(ColumnDef type, Allocator& alloc): m_index(NULL)
+{
     m_array = new Array(type, NULL, 0, alloc);
     Create();
 }
 
-Column::Column(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+Column::Column(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(NULL)
+{
     m_array = new Array(type, parent, pndx, alloc);
     Create();
 }
 
-Column::Column(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(NULL) {
+Column::Column(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(NULL)
+{
     m_array = new Array(ref, parent, pndx, alloc);
 }
 
-Column::Column(const Column& column) : m_index(NULL) {
+Column::Column(const Column& column): m_index(NULL)
+{
     m_array = column.m_array; // we now own array
     column.m_array = NULL;    // so invalidate source
 }
 
-void Column::Create() {
+void Column::Create()
+{
     // Add subcolumns for nodes
     if (IsNode()) {
         const Array offsets(COLUMN_NORMAL, NULL, 0, m_array->GetAllocator());
@@ -306,87 +321,105 @@ void Column::Create() {
     }
 }
 
-void Column::UpdateRef(size_t ref) {
+void Column::UpdateRef(size_t ref)
+{
     m_array->UpdateRef(ref);
 }
 
-bool Column::operator==(const Column& column) const {
+bool Column::operator==(const Column& column) const
+{
     return *m_array == *(column.m_array);
 }
 
-Column::~Column() {
+Column::~Column()
+{
     delete m_array;
     delete m_index; // does not destroy index!
 }
 
-void Column::Destroy() {
+void Column::Destroy()
+{
     ClearIndex();
     if(m_array != NULL)
         m_array->Destroy();
 }
 
 
-bool Column::IsEmpty() const {
+bool Column::IsEmpty() const
+{
     if (!IsNode()) return m_array->IsEmpty();
     const Array offsets = NodeGetOffsets();
     return offsets.IsEmpty();
 }
 
-size_t Column::Size() const {
+size_t Column::Size() const
+{
     if (!IsNode()) return m_array->Size();
     const Array offsets = NodeGetOffsets();
     return offsets.IsEmpty() ? 0 : size_t(offsets.Back());
 }
 
-size_t Column::get_size_from_ref(size_t ref, Allocator& alloc) {
+size_t Column::get_size_from_ref(size_t ref, Allocator& alloc)
+{
     Array a(ref, NULL, 0, alloc);
     if (!a.IsNode()) return a.Size();
     Array offsets(a.Get(0), NULL, 0, alloc);
     return offsets.IsEmpty() ? 0 : size_t(offsets.Back());
 }
 
-void Column::SetParent(ArrayParent *parent, size_t pndx) {
+void Column::SetParent(ArrayParent* parent, size_t pndx)
+{
     m_array->SetParent(parent, pndx);
 }
 
-void Column::UpdateParentNdx(int diff) {
+void Column::UpdateParentNdx(int diff)
+{
     m_array->UpdateParentNdx(diff);
 }
 
 // Used by column b-tree code to ensure all leaf having same type
-void Column::SetHasRefs() {
+void Column::SetHasRefs()
+{
     m_array->SetType(COLUMN_HASREFS);
 }
 
-/*Column Column::GetSubColumn(size_t ndx) {
+/*
+Column Column::GetSubColumn(size_t ndx)
+{
     assert(ndx < m_len);
     assert(m_hasRefs);
 
     return Column((void*)ListGet(ndx), this, ndx);
 }
 
-const Column Column::GetSubColumn(size_t ndx) const {
+const Column Column::GetSubColumn(size_t ndx) const
+{
     assert(ndx < m_len);
     assert(m_hasRefs);
 
     return Column((void*)ListGet(ndx), this, ndx);
-}*/
+}
+*/
 
-void Column::Clear() {
+void Column::Clear()
+{
     m_array->Clear();
     if (m_array->IsNode()) m_array->SetType(COLUMN_NORMAL);
 }
 
-int64_t Column::Get(size_t ndx) const {
+int64_t Column::Get(size_t ndx) const
+{
     return m_array->ColumnGet(ndx);
     //return TreeGet<int64_t, Column>(ndx);
 }
 
-size_t Column::GetAsRef(size_t ndx) const {
+size_t Column::GetAsRef(size_t ndx) const
+{
     return TO_REF(TreeGet<int64_t, Column>(ndx));
 }
 
-bool Column::Set(size_t ndx, int64_t value) {
+bool Column::Set(size_t ndx, int64_t value)
+{
     const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
 
     const bool res = TreeSet<int64_t, Column>(ndx, value);
@@ -398,11 +431,13 @@ bool Column::Set(size_t ndx, int64_t value) {
     return true;
 }
 
-bool Column::Add(int64_t value) {
+bool Column::Add(int64_t value)
+{
     return Insert(Size(), value);
 }
 
-bool Column::Insert(size_t ndx, int64_t value) {
+bool Column::Insert(size_t ndx, int64_t value)
+{
     assert(ndx <= Size());
 
     const bool res = TreeInsert<int64_t, Column>(ndx, value);
@@ -421,25 +456,29 @@ bool Column::Insert(size_t ndx, int64_t value) {
     return true;
 }
 
-int64_t Column::Sum(size_t start, size_t end) const {
+int64_t Column::Sum(size_t start, size_t end) const
+{
     int64_t sum = 0;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_sum, (void *)&sum);
     return sum;
 }
 
-int64_t Column::Min(size_t start, size_t end) const {
+int64_t Column::Min(size_t start, size_t end) const
+{
     AggregateState state;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_min, (void *)&state);
     return state.result; // will return zero for empty ranges
 }
 
-int64_t Column::Max(size_t start, size_t end) const {
+int64_t Column::Max(size_t start, size_t end) const
+{
     AggregateState state;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_max, (void *)&state);
     return state.result; // will return zero for empty ranges
 }
 
-void Column::Sort(size_t start, size_t end) {
+void Column::Sort(size_t start, size_t end)
+{
     Array arr;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
     for(size_t t = 0; t < arr.Size(); t++) {
@@ -459,7 +498,8 @@ void Column::Sort(size_t start, size_t end) {
 
 
 // TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
-void Column::ReferenceSort(size_t start, size_t end, Column &ref) {
+void Column::ReferenceSort(size_t start, size_t end, Column& ref)
+{
     Array values; // pointers to non-instantiated arrays of values
     Array indexes; // pointers to instantiated arrays of index pointers
     Array all_values;
@@ -487,33 +527,39 @@ void Column::ReferenceSort(size_t start, size_t end, Column &ref) {
         ref.Add(ResI->Get(t));
 }
 
-size_t ColumnBase::GetRefSize(size_t ref) const {
+size_t ColumnBase::GetRefSize(size_t ref) const
+{
     // parse the length part of 8byte header
     const uint8_t* const header = (uint8_t*)m_array->GetAllocator().Translate(ref);
     return (header[1] << 16) + (header[2] << 8) + header[3];
 }
 
-Array ColumnBase::NodeGetOffsets() {
+Array ColumnBase::NodeGetOffsets()
+{
     assert(IsNode());
     return m_array->GetSubArray(0);
 }
 
-const Array ColumnBase::NodeGetOffsets() const {
+const Array ColumnBase::NodeGetOffsets() const
+{
     assert(IsNode());
     return m_array->GetSubArray(0);
 }
 
-Array ColumnBase::NodeGetRefs() {
+Array ColumnBase::NodeGetRefs()
+{
     assert(IsNode());
     return m_array->GetSubArray(1);
 }
 
-const Array ColumnBase::NodeGetRefs() const {
+const Array ColumnBase::NodeGetRefs() const
+{
     assert(IsNode());
     return m_array->GetSubArray(1);
 }
 
-bool ColumnBase::NodeUpdateOffsets(size_t ndx) {
+bool ColumnBase::NodeUpdateOffsets(size_t ndx)
+{
     assert(IsNode());
 
     Array offsets = NodeGetOffsets();
@@ -527,7 +573,8 @@ bool ColumnBase::NodeUpdateOffsets(size_t ndx) {
     return offsets.Increment(diff, ndx);
 }
 
-void Column::Delete(size_t ndx) {
+void Column::Delete(size_t ndx)
+{
     assert(ndx < Size());
 
     const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
@@ -552,7 +599,8 @@ void Column::Delete(size_t ndx) {
     }
 }
 
-bool Column::Increment64(int64_t value, size_t start, size_t end) {
+bool Column::Increment64(int64_t value, size_t start, size_t end)
+{
     if (!IsNode()) return m_array->Increment(value, start, end);
     else {
         //TODO: partial incr
@@ -565,14 +613,17 @@ bool Column::Increment64(int64_t value, size_t start, size_t end) {
     }
 }
 
-size_t Column::Find(int64_t value, size_t start, size_t end) const {
+size_t Column::Find(int64_t value, size_t start, size_t end) const
+{
     assert(start <= Size());
     assert(end == (size_t)-1 || end <= Size());
     if (IsEmpty()) return (size_t)-1;
     return TreeFind<int64_t, Column, EQUAL>(value, start, end);
 }
 
-void Column::FindAll(Array& result, int64_t value, size_t caller_offset, size_t start, size_t end) const {
+void Column::FindAll(Array& result, int64_t value, size_t caller_offset,
+                     size_t start, size_t end) const
+{
     (void)caller_offset;
     assert(start <= Size());
     assert(end == (size_t)-1 || end <= Size());
@@ -580,11 +631,14 @@ void Column::FindAll(Array& result, int64_t value, size_t caller_offset, size_t 
     TreeFindAll<int64_t, Column>(result, value, 0, start, end);
 }
 
-void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const {
+void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset,
+                         size_t start, size_t end) const
+{
     return m_array->FindAll(result, value, add_offset, start, end);
 }
 
-void Column::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const {
+void Column::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const
+{
     if (!IsNode()) {
         m_array->FindAllHamming(result, value, maxdist, offset);
     }
@@ -602,7 +656,8 @@ void Column::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_
     }
 }
 
-size_t Column::FindPos(int64_t target) const {
+size_t Column::FindPos(int64_t target) const
+{
     // NOTE: Binary search only works if the column is sorted
 
     if (!IsNode()) {
@@ -628,19 +683,22 @@ size_t Column::FindPos(int64_t target) const {
 }
 
 
-size_t Column::FindWithIndex(int64_t target) const {
+size_t Column::FindWithIndex(int64_t target) const
+{
     assert(m_index);
     assert(m_index->Size() == Size());
 
     return m_index->Find(target);
 }
 
-Index& Column::GetIndex() {
+Index& Column::GetIndex()
+{
     assert(m_index);
     return *m_index;
 }
 
-void Column::ClearIndex() {
+void Column::ClearIndex()
+{
     if (m_index) {
         m_index->Destroy();
         delete m_index;
@@ -648,12 +706,14 @@ void Column::ClearIndex() {
     }
 }
 
-void Column::BuildIndex(Index& index) {
+void Column::BuildIndex(Index& index)
+{
     index.BuildIndex(*this);
     m_index = &index; // Keep ref to index
 }
 
-void Column::Sort() {
+void Column::Sort()
+{
     Sort(0, Size());
 }
 
@@ -661,7 +721,8 @@ void Column::Sort() {
 #ifdef _DEBUG
 #include "stdio.h"
 
-bool Column::Compare(const Column& c) const {
+bool Column::Compare(const Column& c) const
+{
     if (c.Size() != Size()) return false;
 
     for (size_t i = 0; i < Size(); ++i) {
@@ -671,7 +732,8 @@ bool Column::Compare(const Column& c) const {
     return true;
 }
 
-void Column::Print() const {
+void Column::Print() const
+{
     if (IsNode()) {
         cout << "Node: " << hex << m_array->GetRef() << dec << "\n";
 
@@ -691,7 +753,8 @@ void Column::Print() const {
     }
 }
 
-void Column::verify() const {
+void Column::verify() const
+{
     if (IsNode()) {
         assert(m_array->Size() == 2);
         //assert(m_hasRefs);
@@ -721,7 +784,8 @@ void Column::verify() const {
     else m_array->Verify();
 }
 
-void ColumnBase::ToDot(std::ostream& out, const char* title) const {
+void ColumnBase::ToDot(std::ostream& out, const char* title) const
+{
     const size_t ref = GetRef();
 
     out << "subgraph cluster_column" << ref << " {" << std::endl;
@@ -734,7 +798,8 @@ void ColumnBase::ToDot(std::ostream& out, const char* title) const {
     out << "}" << std::endl;
 }
 
-void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const {
+void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const
+{
     if (array.IsNode()) {
         const Array offsets = array.GetSubArray(0);
         const Array refs    = array.GetSubArray(1);
@@ -759,11 +824,13 @@ void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const {
     else LeafToDot(out, array);
 }
 
-void ColumnBase::LeafToDot(std::ostream& out, const Array& array) const {
+void ColumnBase::LeafToDot(std::ostream& out, const Array& array) const
+{
     array.ToDot(out);
 }
 
-MemStats Column::Stats() const {
+MemStats Column::Stats() const
+{
     MemStats stats(m_array->Stats());
 
     if (m_array->IsNode()) {
@@ -780,7 +847,6 @@ MemStats Column::Stats() const {
 
     return stats;
 }
-
 
 #endif //_DEBUG
 

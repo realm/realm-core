@@ -29,8 +29,7 @@
 
 namespace tightdb {
 
-typedef struct
-{
+typedef struct {
     unsigned long long remainder;
     unsigned long long remainder_len;
     unsigned long long b_val;
@@ -39,15 +38,14 @@ typedef struct
 } checksum_t;
 
 size_t TO_REF(int64_t v);
-unsigned long long checksum(unsigned char *data, size_t len);
-void checksum_rolling(unsigned char *data, size_t len, checksum_t *t);
-void *round_up(void *p, size_t align);
-void *round_down(void *p, size_t align);
+unsigned long long checksum(unsigned char* data, size_t len);
+void checksum_rolling(unsigned char* data, size_t len, checksum_t* t);
+void* round_up(void* p, size_t align);
+void* round_down(void* p, size_t align);
 size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
-void checksum_init(checksum_t *t);
+void checksum_init(checksum_t* t);
 
 }
 
 #endif
-

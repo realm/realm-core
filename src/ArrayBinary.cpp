@@ -31,25 +31,28 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
 // Creates new array (but invalid, call UpdateRef to init)
 //ArrayBinary::ArrayBinary(Allocator& alloc) : Array(alloc) {}
 
-ArrayBinary::~ArrayBinary() {
-}
+ArrayBinary::~ArrayBinary() {}
 
-bool ArrayBinary::IsEmpty() const {
+bool ArrayBinary::IsEmpty() const
+{
     return m_offsets.IsEmpty();
 }
 
-size_t ArrayBinary::Size() const {
+size_t ArrayBinary::Size() const
+{
     return m_offsets.Size();
 }
 
-const void* ArrayBinary::Get(size_t ndx) const {
+const void* ArrayBinary::Get(size_t ndx) const
+{
     assert(ndx < m_offsets.Size());
 
     const size_t offset = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
     return m_blob.Get(offset);
 }
 
-size_t ArrayBinary::GetLen(size_t ndx) const {
+size_t ArrayBinary::GetLen(size_t ndx) const
+{
     assert(ndx < m_offsets.Size());
 
     const size_t start = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
@@ -58,14 +61,16 @@ size_t ArrayBinary::GetLen(size_t ndx) const {
     return end - start;
 }
 
-void ArrayBinary::Add(const void* value, size_t len) {
+void ArrayBinary::Add(const void* value, size_t len)
+{
     assert(len == 0 || value);
 
     m_blob.Add((void*)value, len);
     m_offsets.Add(m_offsets.IsEmpty() ? len : m_offsets.Back() + len);
 }
 
-void ArrayBinary::Set(size_t ndx, const void* value, size_t len) {
+void ArrayBinary::Set(size_t ndx, const void* value, size_t len)
+{
     assert(ndx < m_offsets.Size());
     assert(len == 0 || value);
 
@@ -77,7 +82,8 @@ void ArrayBinary::Set(size_t ndx, const void* value, size_t len) {
     m_offsets.Adjust(ndx, diff);
 }
 
-void ArrayBinary::Insert(size_t ndx, const void* value, size_t len) {
+void ArrayBinary::Insert(size_t ndx, const void* value, size_t len)
+{
     assert(ndx <= m_offsets.Size());
     assert(len == 0 || value);
 
@@ -88,7 +94,8 @@ void ArrayBinary::Insert(size_t ndx, const void* value, size_t len) {
     m_offsets.Adjust(ndx+1, len);
 }
 
-void ArrayBinary::Delete(size_t ndx) {
+void ArrayBinary::Delete(size_t ndx)
+{
     assert(ndx < m_offsets.Size());
 
     const size_t start = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
@@ -99,7 +106,8 @@ void ArrayBinary::Delete(size_t ndx) {
     m_offsets.Adjust(ndx, int64_t(start) - end);
 }
 
-void ArrayBinary::Resize(size_t ndx) {
+void ArrayBinary::Resize(size_t ndx)
+{
     assert(ndx < m_offsets.Size());
 
     const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
@@ -108,14 +116,16 @@ void ArrayBinary::Resize(size_t ndx) {
     m_blob.Resize(len);
 }
 
-void ArrayBinary::Clear() {
+void ArrayBinary::Clear()
+{
     m_blob.Clear();
     m_offsets.Clear();
 }
 
 #ifdef _DEBUG
 
-void ArrayBinary::ToDot(std::ostream& out, const char* title) const {
+void ArrayBinary::ToDot(std::ostream& out, const char* title) const
+{
     const size_t ref = GetRef();
 
     out << "subgraph cluster_binary" << ref << " {" << std::endl;

@@ -9,10 +9,10 @@
 
 using namespace tightdb;
 
-// Support functions for monkey test
-static uint64_t rand2(int bitwidth);
+namespace {
 
-static uint64_t rand2(int bitwidth = 64) {
+uint64_t rand2(int bitwidth = 64)
+{
     uint64_t i = (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand();
     if(bitwidth < 64) {
         const uint64_t mask = ((1ULL << bitwidth) - 1ULL);
@@ -21,7 +21,11 @@ static uint64_t rand2(int bitwidth = 64) {
     return i;
 }
 
-TEST(Column_monkeytest2) {
+}
+
+
+TEST(Column_monkeytest2)
+{
     const uint64_t ITER_PER_BITWIDTH = 16 * 1000 * TEST_DURATION * TEST_DURATION * TEST_DURATION;
     const uint64_t SEED = 123;
 

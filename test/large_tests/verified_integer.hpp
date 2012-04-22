@@ -30,4 +30,3 @@ public:
     void VerifyNeighbours(std::size_t ndx);
     void Destroy(void);
 };
-

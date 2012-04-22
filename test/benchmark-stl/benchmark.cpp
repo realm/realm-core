@@ -17,7 +17,8 @@
 
 
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
-uint64_t rand2() {
+uint64_t rand2()
+{
     static int64_t seed = 2862933555777941757ULL;
     static int64_t seed2 = 0;
     seed = (2862933555777941757ULL * seed + 3037000493ULL);
@@ -32,18 +33,20 @@ UnitTest::Timer timer;
 int ITEMS = 50000;
 int RANGE = 50000;
 
-void tightdb(void);
-void stl(void);
+void tightdb();
+void stl();
 
 volatile uint64_t writethrough;
 
-void main(void) {
+int main()
+{
     stl();
-//  getchar();
+//    getchar();
 }
 
 
-void stl(void) {
+void stl()
+{
     std::vector<uint64_t>integers;
 
     timer.Start();
@@ -161,8 +164,4 @@ void stl(void) {
 //          printf("%d %d\n", i->second, i->first); // sanity check
     }
     printf("Indexed FindAll: %dms\n", timer.GetTimeInMs());
-
-
 }
-
-

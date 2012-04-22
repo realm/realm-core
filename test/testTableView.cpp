@@ -8,7 +8,8 @@ TDB_TABLE_1(TestTableInt,
 )
 
 
-TEST(GetSetInteger) {
+TEST(GetSetInteger)
+{
     TestTableInt table;
 
     table.Add(1);
@@ -33,7 +34,8 @@ TEST(GetSetInteger) {
 }
 
 
-TEST(TableViewSum) {
+TEST(TableViewSum)
+{
     TestTableInt table;
 
     table.Add(2);
@@ -51,7 +53,8 @@ TEST(TableViewSum) {
     //v.Destroy();
 }
 
-TEST(TableViewSumNegative) {
+TEST(TableViewSumNegative)
+{
     TestTableInt table;
 
     table.Add(0);
@@ -68,7 +71,8 @@ TEST(TableViewSumNegative) {
     //v.Destroy();
 }
 
-TEST(TableViewMax) {
+TEST(TableViewMax)
+{
     TestTableInt table;
 
     table.Add(0);
@@ -87,7 +91,8 @@ TEST(TableViewMax) {
 
 
 
-TEST(TableViewMax2) {
+TEST(TableViewMax2)
+{
     TestTableInt table;
 
     table.Add(0);
@@ -105,7 +110,8 @@ TEST(TableViewMax2) {
 }
 
 
-TEST(TableViewMin) {
+TEST(TableViewMin)
+{
     TestTableInt table;
 
     table.Add(0);
@@ -123,7 +129,8 @@ TEST(TableViewMin) {
 }
 
 
-TEST(TableViewMin2) {
+TEST(TableViewMin2)
+{
     TestTableInt table;
 
     table.Add(0);
@@ -142,7 +149,8 @@ TEST(TableViewMin2) {
 
 
 
-TEST(TableViewFind) {
+TEST(TableViewFind)
+{
     TestTableInt table;
 
     table.Add(0);
@@ -160,7 +168,8 @@ TEST(TableViewFind) {
 }
 
 
-TEST(TableViewFindAll) {
+TEST(TableViewFindAll)
+{
     TestTableInt table;
 
     table.Add(0);
@@ -185,7 +194,8 @@ TDB_TABLE_1(TestTableString,
             String,        first
 )
 
-TEST(TableViewFindAllString) {
+TEST(TableViewFindAllString)
+{
     TestTableString table;
 
     table.Add("a");
@@ -206,7 +216,8 @@ TEST(TableViewFindAllString) {
     delete v2;
 }
 
-TEST(TableViewDelete) {
+TEST(TableViewDelete)
+{
     TestTableInt table;
 
     table.Add(1);
@@ -246,7 +257,8 @@ TEST(TableViewDelete) {
     CHECK_EQUAL(3, table[1].first);
 }
 
-TEST(TableViewClear) {
+TEST(TableViewClear)
+{
     TestTableInt table;
 
     table.Add(1);
@@ -267,7 +279,8 @@ TEST(TableViewClear) {
 }
 
 
-TEST(TableViewClearNone) {
+TEST(TableViewClearNone)
+{
     TestTableInt table;
 
     TableView v = table.first.FindAll(1);

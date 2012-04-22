@@ -11,7 +11,8 @@
 
 namespace tightdb {
 
-size_t TO_REF(int64_t v) {
+size_t TO_REF(int64_t v)
+{
 #if !defined(NDEBUG) && defined(_DEBUG)
     uint64_t m = (size_t)(-1);
     assert((uint64_t)v <= m);
@@ -19,13 +20,13 @@ size_t TO_REF(int64_t v) {
     return (size_t)v;
 }
 
-void *round_up(void *p, size_t align)
+void* round_up(void* p, size_t align)
 {
     size_t r = ((size_t)p % align == 0 ? 0 : align - (size_t)p % align);
     return (char *)p + r;
 }
 
-void *round_down(void *p, size_t align)
+void* round_down(void* p, size_t align)
 {
     size_t r = (size_t)p;
     return (void *)(r & (~(align - 1)));
@@ -44,7 +45,7 @@ size_t round_down(size_t p, size_t align)
 }
 
 
-void checksum_init(checksum_t *t)
+void checksum_init(checksum_t* t)
 {
     t->remainder = 0;
     t->remainder_len = 0;
@@ -53,7 +54,7 @@ void checksum_init(checksum_t *t)
     t->result = 0;
 }
 
-unsigned long long checksum(unsigned char *data, size_t len)
+unsigned long long checksum(unsigned char* data, size_t len)
 {
     checksum_t t;
     checksum_init(&t);
@@ -61,7 +62,7 @@ unsigned long long checksum(unsigned char *data, size_t len)
     return t.result;
 }
 
-void checksum_rolling(unsigned char *data, size_t len, checksum_t *t)
+void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
 {
     while(t->remainder_len < 8 && len > 0)
     {

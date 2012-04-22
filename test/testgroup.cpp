@@ -23,7 +23,8 @@ TDB_TABLE_4(TestTableGroup,
 // Windows version of serialization is not implemented yet
 #if 1 //_MSC_VER
 
-TEST(Group_Invalid1) {
+TEST(Group_Invalid1)
+{
     // Delete old file if there
     remove("table_test.tbl");
 
@@ -32,14 +33,16 @@ TEST(Group_Invalid1) {
     CHECK(!fromDisk.IsValid());
 }
 
-TEST(Group_Invalid2) {
+TEST(Group_Invalid2)
+{
     // Try to open buffer with invalid data
     const char* const buffer = "invalid data";
     Group fromMen(buffer, strlen(buffer));
     CHECK(!fromMen.IsValid());
 }
 
-TEST(Group_Serialize0) {
+TEST(Group_Serialize0)
+{
     // Create empty group and serialize to disk
     Group toDisk;
     toDisk.Write("table_test.tbl");
@@ -63,14 +66,16 @@ TEST(Group_Serialize0) {
     CHECK_EQUAL(Wed,    t[0].fourth);
 }
 
-TEST(Group_Read0) {
+TEST(Group_Read0)
+{
     // Load the group and let it clean up without loading
     // any tables
     Group fromDisk("table_test.tbl");
     CHECK(fromDisk.IsValid());
 }
 
-TEST(Group_Serialize1) {
+TEST(Group_Serialize1)
+{
     // Create group with one table
     Group toDisk;
     TestTableGroup& table = toDisk.GetTable<TestTableGroup>("test");
@@ -124,14 +129,16 @@ TEST(Group_Serialize1) {
 #endif //_DEBUG
 }
 
-TEST(Group_Read1) {
+TEST(Group_Read1)
+{
     // Load the group and let it clean up without loading
     // any tables
     Group fromDisk("table_test.tbl");
     CHECK(fromDisk.IsValid());
 }
 
-TEST(Group_Serialize2) {
+TEST(Group_Serialize2)
+{
     // Create group with two tables
     Group toDisk;
     TestTableGroup& table1 = toDisk.GetTable<TestTableGroup>("test1");
@@ -170,7 +177,8 @@ TEST(Group_Serialize2) {
 #endif //_DEBUG
 }
 
-TEST(Group_Serialize3) {
+TEST(Group_Serialize3)
+{
     // Create group with one table (including long strings
     Group toDisk;
     TestTableGroup& table = toDisk.GetTable<TestTableGroup>("test");
@@ -202,7 +210,8 @@ TEST(Group_Serialize3) {
 #endif //_DEBUG}
 }
 
-TEST(Group_Serialize_Men) {
+TEST(Group_Serialize_Men)
+{
     // Create group with one table
     Group toMem;
     TestTableGroup& table = toMem.GetTable<TestTableGroup>("test");
@@ -242,7 +251,8 @@ TEST(Group_Serialize_Men) {
 #endif //_DEBUG
 }
 
-TEST(Group_Serialize_Optimized) {
+TEST(Group_Serialize_Optimized)
+{
     // Create group with one table
     Group toMem;
     TestTableGroup& table = toMem.GetTable<TestTableGroup>("test");
@@ -289,7 +299,8 @@ TEST(Group_Serialize_Optimized) {
 #endif //_DEBUG
 }
 
-TEST(Group_Serialize_All) {
+TEST(Group_Serialize_All)
+{
     // Create group with one table
     Group toMem;
     Table& table = toMem.GetTable("test");
@@ -323,7 +334,8 @@ TEST(Group_Serialize_All) {
 }
 
 
-TEST(Group_Subtable) {
+TEST(Group_Subtable)
+{
     int n = 1;
 
     Group g;
@@ -693,7 +705,8 @@ TEST(Group_MultiLevelSubtables)
 #ifdef TIGHTDB_TO_DOT
 
 #include <fstream>
-TEST(Group_ToDot) {
+TEST(Group_ToDot)
+{
     // Create group with one table
     Group mygroup;
 

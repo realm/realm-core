@@ -12,8 +12,8 @@
 namespace tightdb {
 
 struct MemRef {
-    MemRef() : pointer(NULL), ref(0) {}
-    MemRef(void* p, size_t r) : pointer(p), ref(r) {}
+    MemRef(): pointer(NULL), ref(0) {}
+    MemRef(void* p, size_t r): pointer(p), ref(r) {}
     void* pointer;
     size_t ref;
 };

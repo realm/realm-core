@@ -14,7 +14,7 @@ directiveStartToken = %
 
 #include "query/QueryInterface.hpp"
 
-using namespace std;
+using namespace std; // FIXME: Not to appear in a header file
 
 #define TDB_QUERY(QueryName, TableName) \\
 class QueryName : public TableName##Query { \\

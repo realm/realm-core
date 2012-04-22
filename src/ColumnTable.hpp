@@ -72,8 +72,7 @@ protected:
 #endif
 
 private:
-    struct SubtableMap
-    {
+    struct SubtableMap {
         SubtableMap(Allocator& alloc): m_indices(alloc), m_wrappers(alloc) {}
         ~SubtableMap();
         bool empty() const { return !m_indices.IsValid() || m_indices.IsEmpty(); }
@@ -190,14 +189,14 @@ inline ColumnSubtableParent::SubtableMap::~SubtableMap()
     }
 }
 
-inline Table *ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const
+inline Table* ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const
 {
     if (!m_indices.IsValid()) return 0;
     size_t const pos = m_indices.Find(subtable_ndx);
     return pos != size_t(-1) ? reinterpret_cast<Table *>(m_wrappers.Get(pos)) : 0;
 }
 
-inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table *wrapper)
+inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table* wrapper)
 {
     if (!m_indices.IsValid()) {
         m_indices.SetType(COLUMN_NORMAL);

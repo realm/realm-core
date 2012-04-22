@@ -3,7 +3,8 @@
 
 using namespace tightdb;
 
-TEST(Index_Test1) {
+TEST(Index_Test1)
+{
     // Create a column with random values
     Column col;
     col.Add(3);
@@ -27,7 +28,8 @@ TEST(Index_Test1) {
     ndx.Destroy();
 }
 
-TEST(Index_FindAll) {
+TEST(Index_FindAll)
+{
     // Create a column with random values
     Column col;
     col.Add(3);
@@ -61,7 +63,8 @@ TEST(Index_FindAll) {
     ndx.Destroy();
 }
 
-TEST(Index_FindAllRange) {
+TEST(Index_FindAllRange)
+{
     // Create a column with random values
     Column col;
     col.Add(3);
@@ -97,7 +100,8 @@ TEST(Index_FindAllRange) {
     ndx.Destroy();
 }
 
-TEST(Index_Delete) {
+TEST(Index_Delete)
+{
     // Create a column with random values
     Column col;
     col.Add(3);
@@ -147,7 +151,8 @@ TEST(Index_Delete) {
     ndx.Destroy();
 }
 
-TEST(Index_Insert) {
+TEST(Index_Insert)
+{
     // Create a column with random values
     Column col;
     col.Add(3);
@@ -198,7 +203,8 @@ TEST(Index_Insert) {
     ndx.Destroy();
 }
 
-TEST(Index_Set) {
+TEST(Index_Set)
+{
     // Create a column with random values
     Column col;
     col.Add(3);

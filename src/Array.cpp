@@ -59,16 +59,20 @@ Array::~Array() {}
 //
 //  1: isNode  2: hasRefs  3: multiplier  4: width (packed in 3 bits)
 
-void Array::set_header_isnode(bool value, void* header) {
+void Array::set_header_isnode(bool value, void* header)
+{
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
     header2[0] = (header2[0] & (~0x80)) | ((uint8_t)value << 7);
 }
-void Array::set_header_hasrefs(bool value, void* header) {
+
+void Array::set_header_hasrefs(bool value, void* header)
+{
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
     header2[0] = (header2[0] & (~0x40)) | ((uint8_t)value << 6);
 }
 
-void Array::set_header_wtype(WidthType value, void* header) {
+void Array::set_header_wtype(WidthType value, void* header)
+{
     // Indicates how to calculate size in bytes based on width
     // 0: bits      (width/8) * length
     // 1: multiply  width * length
@@ -77,7 +81,8 @@ void Array::set_header_wtype(WidthType value, void* header) {
     header2[0] = (header2[0] & (~0x18)) | ((uint8_t)value << 3);
 }
 
-void Array::set_header_width(size_t value, void* header) {
+void Array::set_header_width(size_t value, void* header)
+{
     // Pack width in 3 bits (log2)
     unsigned int w = 0;
     unsigned int b = (unsigned int)value;
@@ -87,14 +92,18 @@ void Array::set_header_width(size_t value, void* header) {
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
     header2[0] = (header2[0] & (~0x7)) | (uint8_t)w;
 }
-void Array::set_header_len(size_t value, void* header) {
+
+void Array::set_header_len(size_t value, void* header)
+{
     assert(value <= 0xFFFFFF);
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
     header2[1] = ((value >> 16) & 0x000000FF);
     header2[2] = (value >> 8) & 0x000000FF;
     header2[3] = value & 0x000000FF;
 }
-void Array::set_header_capacity(size_t value, void* header) {
+
+void Array::set_header_capacity(size_t value, void* header)
+{
     assert(value <= 0xFFFFFF);
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
     header2[4] = (value >> 16) & 0x000000FF;
@@ -102,32 +111,44 @@ void Array::set_header_capacity(size_t value, void* header) {
     header2[6] = value & 0x000000FF;
 }
 
-bool Array::get_header_isnode(const void* header) const {
+bool Array::get_header_isnode(const void* header) const
+{
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[0] & 0x80) != 0;
 }
-bool Array::get_header_hasrefs(const void* header) const {
+
+bool Array::get_header_hasrefs(const void* header) const
+{
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[0] & 0x40) != 0;
 }
-Array::WidthType Array::get_header_wtype(const void* header) const {
+
+Array::WidthType Array::get_header_wtype(const void* header) const
+{
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (WidthType)((header2[0] & 0x18) >> 3);
 }
-size_t Array::get_header_width(const void* header) const {
+
+size_t Array::get_header_width(const void* header) const
+{
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (1 << (header2[0] & 0x07)) >> 1;
 }
-size_t Array::get_header_len(const void* header) const {
+
+size_t Array::get_header_len(const void* header) const
+{
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[1] << 16) + (header2[2] << 8) + header2[3];
 }
-size_t Array::get_header_capacity(const void* header) const {
+
+size_t Array::get_header_capacity(const void* header) const
+{
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[4] << 16) + (header2[5] << 8) + header2[6];
 }
 
-void Array::Create(size_t ref) {
+void Array::Create(size_t ref)
+{
     assert(ref);
     uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
 
@@ -147,7 +168,8 @@ void Array::Create(size_t ref) {
     SetWidth(m_width);
 }
 
-void Array::SetType(ColumnDef type) {
+void Array::SetType(ColumnDef type)
+{
     if (m_ref) CopyOnWrite();
 
     if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
@@ -166,11 +188,13 @@ void Array::SetType(ColumnDef type) {
     }
 }
 
-bool Array::operator==(const Array& a) const {
+bool Array::operator==(const Array& a) const
+{
     return m_data == a.m_data;
 }
 
-void Array::UpdateRef(size_t ref) {
+void Array::UpdateRef(size_t ref)
+{
     Create(ref);
     update_ref_in_parent(ref);
 }
@@ -181,7 +205,8 @@ void Array::UpdateRef(size_t ref) {
  * For alignment this is rounded up to nearest log2.
  * Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
  */
-static unsigned int BitWidth(int64_t v) {
+static unsigned int BitWidth(int64_t v)
+{
     if ((v >> 4) == 0) {
         static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
         return bits[(int8_t)v];
@@ -195,27 +220,30 @@ static unsigned int BitWidth(int64_t v) {
 }
 
 // Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
-void Array::Preset(size_t bitwidth, size_t count) {
+void Array::Preset(size_t bitwidth, size_t count)
+{
     Clear();
     SetWidth(bitwidth);
     assert(Alloc(count, bitwidth));
     m_len = count;
     for(size_t n = 0; n < count; n++)
         Set(n, 0);
-
 }
 
-void Array::Preset(int64_t min, int64_t max, size_t count) {
+void Array::Preset(int64_t min, int64_t max, size_t count)
+{
     size_t w = MAX(BitWidth(max), BitWidth(min));
     Preset(w, count);
 }
 
-void Array::SetParent(ArrayParent *parent, size_t pndx) {
+void Array::SetParent(ArrayParent *parent, size_t pndx)
+{
     m_parent = parent;
     m_parentNdx = pndx;
 }
 
-Array Array::GetSubArray(size_t ndx) {
+Array Array::GetSubArray(size_t ndx)
+{
     assert(ndx < m_len);
     assert(m_hasRefs);
 
@@ -225,14 +253,16 @@ Array Array::GetSubArray(size_t ndx) {
     return Array(ref, this, ndx, m_alloc);
 }
 
-const Array Array::GetSubArray(size_t ndx) const {
+const Array Array::GetSubArray(size_t ndx) const
+{
     assert(ndx < m_len);
     assert(m_hasRefs);
 
     return Array(size_t(Get(ndx)), const_cast<Array *>(this), ndx, m_alloc);
 }
 
-void Array::Destroy() {
+void Array::Destroy()
+{
     if (!m_data) return;
 
     if (m_hasRefs) {
@@ -257,7 +287,8 @@ void Array::Destroy() {
     m_data = NULL;
 }
 
-void Array::Clear() {
+void Array::Clear()
+{
     CopyOnWrite();
 
     // Make sure we don't have any dangling references
@@ -281,7 +312,8 @@ void Array::Clear() {
     set_header_width(0);
 }
 
-void Array::Delete(size_t ndx) {
+void Array::Delete(size_t ndx)
+{
     assert(ndx < m_len);
 
     // Check if we need to copy before modifying
@@ -308,25 +340,29 @@ void Array::Delete(size_t ndx) {
     set_header_len(m_len);
 }
 
-int64_t Array::Get(size_t ndx) const {
+int64_t Array::Get(size_t ndx) const
+{
     assert(ndx < m_len);
     return (this->*m_getter)(ndx);
 }
 
-size_t Array::GetAsRef(size_t ndx) const {
+size_t Array::GetAsRef(size_t ndx) const
+{
     assert(ndx < m_len);
     int64_t v = (this->*m_getter)(ndx);
     return TO_REF(v);
 }
 
-int64_t Array::Back() const {
+int64_t Array::Back() const
+{
     assert(m_len);
     return (this->*m_getter)(m_len-1);
 }
 
 
 
-void Array::SetBounds(size_t width) {
+void Array::SetBounds(size_t width)
+{
     if(width == 0) {
         m_lbound = 0;
         m_ubound = 0;
@@ -363,7 +399,8 @@ void Array::SetBounds(size_t width) {
 
 
 
-bool Array::Set(size_t ndx, int64_t value) {
+bool Array::Set(size_t ndx, int64_t value)
+{
     assert(ndx < m_len);
 
     // Check if we need to copy before modifying
@@ -399,7 +436,8 @@ bool Array::Set(size_t ndx, int64_t value) {
 // Optimization for the common case of adding
 // positive values to a local array (happens a
 // lot when returning results to TableViews)
-bool Array::AddPositiveLocal(int64_t value) {
+bool Array::AddPositiveLocal(int64_t value)
+{
     assert(value >= 0);
     assert(&m_alloc == &GetDefaultAllocator());
 
@@ -415,7 +453,8 @@ bool Array::AddPositiveLocal(int64_t value) {
     return Insert(m_len, value);
 }
 
-bool Array::Insert(size_t ndx, int64_t value) {
+bool Array::Insert(size_t ndx, int64_t value)
+{
     assert(ndx <= m_len);
 
     // Check if we need to copy before modifying
@@ -475,11 +514,13 @@ bool Array::Insert(size_t ndx, int64_t value) {
 }
 
 
-bool Array::Add(int64_t value) {
+bool Array::Add(int64_t value)
+{
     return Insert(m_len, value);
 }
 
-void Array::Resize(size_t count) {
+void Array::Resize(size_t count)
+{
     assert(count <= m_len);
 
     CopyOnWrite();
@@ -489,7 +530,8 @@ void Array::Resize(size_t count) {
     set_header_len(m_len);
 }
 
-bool Array::Increment(int64_t value, size_t start, size_t end) {
+bool Array::Increment(int64_t value, size_t start, size_t end)
+{
     if (end == (size_t)-1) end = m_len;
     assert(start < m_len);
     assert(end >= start && end <= m_len);
@@ -501,7 +543,8 @@ bool Array::Increment(int64_t value, size_t start, size_t end) {
     return true;
 }
 
-bool Array::IncrementIf(int64_t limit, int64_t value) {
+bool Array::IncrementIf(int64_t limit, int64_t value)
+{
     // Update (incr or decrement) values bigger or equal to the limit
     for (size_t i = 0; i < m_len; ++i) {
         const int64_t v = Get(i);
@@ -510,7 +553,8 @@ bool Array::IncrementIf(int64_t limit, int64_t value) {
     return true;
 }
 
-void Array::Adjust(size_t start, int64_t diff) {
+void Array::Adjust(size_t start, int64_t diff)
+{
     assert(start <= m_len);
 
     for (size_t i = start; i < m_len; ++i) {
@@ -519,7 +563,8 @@ void Array::Adjust(size_t start, int64_t diff) {
     }
 }
 
-size_t Array::FindPos(int64_t target) const {
+size_t Array::FindPos(int64_t target) const
+{
     int low = -1;
     int high = (int)m_len;
 
@@ -538,7 +583,8 @@ size_t Array::FindPos(int64_t target) const {
     else return (size_t)high;
 }
 
-size_t Array::FindPos2(int64_t target) const {
+size_t Array::FindPos2(int64_t target) const
+{
     int low = -1;
     int high = (int)m_len;
 
@@ -559,7 +605,8 @@ size_t Array::FindPos2(int64_t target) const {
 
 
 
-size_t Array::Find(int64_t value, size_t start, size_t end) const {
+size_t Array::Find(int64_t value, size_t start, size_t end) const
+{
 #if defined(USE_SSE42) || defined(USE_SSE3)
     if(end == -1)
         end = m_len;
@@ -603,7 +650,8 @@ size_t Array::Find(int64_t value, size_t start, size_t end) const {
 // 'items' is the number of 16-byte SSE chunks. 'bytewidth' is the size of a packed data element.
 // Return value is SSE chunk number where the element is guaranteed to exist (use CompareEquality() to
 // find packed position)
-size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const{
+size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const
+{
     __m128i search = {0}, next, compare = {1};
     size_t i = 0;
 
@@ -646,7 +694,8 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 
 // If gt = true: Find first element which is greater than value
 // If gt = false: Find first element which is smaller than value
-template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, size_t end) const {
+template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, size_t end) const
+{
     if (end == (size_t)-1) end = m_len;
 
     // Test 4 items with zero latency for cases where match frequency is high, such
@@ -782,7 +831,8 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 }
 
 
-void Array::FindAll(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const {
+void Array::FindAll(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
+{
     if (IsEmpty()) return;
     if (end == (size_t)-1) end = m_len;
     if (start == end) return;
@@ -807,7 +857,8 @@ void Array::FindAll(Array& result, int64_t value, size_t colOffset, size_t start
 
 // If gt = true: Find first element which is greater than value
 // If gt = false: Find first element which is smaller than value
-template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, size_t end) const{
+template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, size_t end) const
+{
     if (end == (size_t)-1) end = m_len;
 
     // Test 4 items with zero latency for cases where match frequency is high, such
@@ -958,22 +1009,27 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     return (size_t)-1;
 }
 
-template <> size_t Array::Query<EQUAL>(int64_t value, size_t start, size_t end) {
+template <> size_t Array::Query<EQUAL>(int64_t value, size_t start, size_t end)
+{
     return CompareEquality<true>(value, start, end);
 }
-template <> size_t Array::Query<NOTEQUAL>(int64_t value, size_t start, size_t end) {
+template <> size_t Array::Query<NOTEQUAL>(int64_t value, size_t start, size_t end)
+{
     return CompareEquality<false>(value, start, end);
 }
-template <> size_t Array::Query<GREATER>(int64_t value, size_t start, size_t end) {
+template <> size_t Array::Query<GREATER>(int64_t value, size_t start, size_t end)
+{
     return CompareRelation<true>(value, start, end);
 }
 
-template <> size_t Array::Query<LESS>(int64_t value, size_t start, size_t end) {
+template <> size_t Array::Query<LESS>(int64_t value, size_t start, size_t end)
+{
     return CompareRelation<false>(value, start, end);
 }
 
 
-bool Array::Max(int64_t& result, size_t start, size_t end) const {
+bool Array::Max(int64_t& result, size_t start, size_t end) const
+{
     if (end == (size_t)-1) end = m_len;
     if (start == end) return false;
     assert(start < m_len && end <= m_len && start < end);
@@ -992,7 +1048,8 @@ bool Array::Max(int64_t& result, size_t start, size_t end) const {
 }
 
 
-bool Array::Min(int64_t& result, size_t start, size_t end) const {
+bool Array::Min(int64_t& result, size_t start, size_t end) const
+{
     if (end == (size_t)-1) end = m_len;
     if (start == end) return false;
     assert(start < m_len && end <= m_len && start < end);
@@ -1011,7 +1068,8 @@ bool Array::Min(int64_t& result, size_t start, size_t end) const {
 }
 
 
-int64_t Array::Sum(size_t start, size_t end) const {
+int64_t Array::Sum(size_t start, size_t end) const
+{
     if (IsEmpty()) return 0;
     if (end == (size_t)-1) end = m_len;
     if (start == end) return 0;
@@ -1104,7 +1162,8 @@ int64_t Array::Sum(size_t start, size_t end) const {
 }
 
 
-void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const {
+void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const
+{
     (void)result;
     (void)value;
     (void)maxdist;
@@ -1150,14 +1209,16 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
     */
 }
 
-size_t Array::CalcByteLen(size_t count, size_t width) const {
+size_t Array::CalcByteLen(size_t count, size_t width) const
+{
     const size_t bits = (count * width);
     size_t bytes = (bits / 8) + 8; // add room for 8 byte header
     if (bits & 0x7) ++bytes;       // include partial bytes
     return bytes;
 }
 
-size_t Array::CalcItemCount(size_t bytes, size_t width) const {
+size_t Array::CalcItemCount(size_t bytes, size_t width) const
+{
     if (width == 0) return (size_t)-1; // zero width gives infinite space
 
     const size_t bytes_data = bytes - 8; // ignore 8 byte header
@@ -1165,7 +1226,8 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const {
     return total_bits / width;
 }
 
-bool Array::CopyOnWrite() {
+bool Array::CopyOnWrite()
+{
     if (!m_alloc.IsReadOnly(m_ref)) return true;
 
     // Calculate size in bytes (plus a bit of extra room for expansion)
@@ -1192,7 +1254,8 @@ bool Array::CopyOnWrite() {
     return true;
 }
 
-bool Array::Alloc(size_t count, size_t width) {
+bool Array::Alloc(size_t count, size_t width)
+{
     if (count > m_capacity || width != m_width) {
         const size_t len      = CalcByteLen(count, width);              // bytes needed
         const size_t capacity = m_capacity ? get_header_capacity() : 0; // bytes currently available
@@ -1240,7 +1303,8 @@ bool Array::Alloc(size_t count, size_t width) {
     return true;
 }
 
-void Array::SetWidth(size_t width) {
+void Array::SetWidth(size_t width)
+{
     if (width == 0) {
         m_getter = &Array::Get_0b;
         m_setter = &Array::Set_0b;
@@ -1282,7 +1346,8 @@ void Array::SetWidth(size_t width) {
 }
 
 
-template <size_t w>int64_t Array::Get(size_t ndx) const {
+template <size_t w>int64_t Array::Get(size_t ndx) const
+{
     if(w == 0) return Get_0b(ndx);
     else if(w == 1) return Get_1b(ndx);
     else if(w == 2) return Get_2b(ndx);
@@ -1293,48 +1358,56 @@ template <size_t w>int64_t Array::Get(size_t ndx) const {
     else if(w == 64) return Get_64b(ndx);
 }
 
-int64_t Array::Get_0b(size_t) const {
+int64_t Array::Get_0b(size_t) const
+{
     return 0;
 }
 
-int64_t Array::Get_1b(size_t ndx) const {
+int64_t Array::Get_1b(size_t ndx) const
+{
     const size_t offset = ndx >> 3;
     return (m_data[offset] >> (ndx & 7)) & 0x01;
 }
 
-int64_t Array::Get_2b(size_t ndx) const {
+int64_t Array::Get_2b(size_t ndx) const
+{
     const size_t offset = ndx >> 2;
     return (m_data[offset] >> ((ndx & 3) << 1)) & 0x03;
 }
 
-int64_t Array::Get_4b(size_t ndx) const {
+int64_t Array::Get_4b(size_t ndx) const
+{
     const size_t offset = ndx >> 1;
     return (m_data[offset] >> ((ndx & 1) << 2)) & 0x0F;
 }
 
-int64_t Array::Get_8b(size_t ndx) const {
+int64_t Array::Get_8b(size_t ndx) const
+{
     return *((const signed char*)(m_data + ndx));
 }
 
-int64_t Array::Get_16b(size_t ndx) const {
+int64_t Array::Get_16b(size_t ndx) const
+{
     const size_t offset = ndx * 2;
     return *(const int16_t*)(m_data + offset);
 }
 
-int64_t Array::Get_32b(size_t ndx) const {
+int64_t Array::Get_32b(size_t ndx) const
+{
     const size_t offset = ndx * 4;
     return *(const int32_t*)(m_data + offset);
 }
 
-int64_t Array::Get_64b(size_t ndx) const {
+int64_t Array::Get_64b(size_t ndx) const
+{
     const size_t offset = ndx * 8;
     return *(const int64_t*)(m_data + offset);
 }
 
-void Array::Set_0b(size_t, int64_t) {
-}
+void Array::Set_0b(size_t, int64_t) {}
 
-void Array::Set_1b(size_t ndx, int64_t value) {
+void Array::Set_1b(size_t ndx, int64_t value)
+{
     const size_t offset = ndx >> 3;
     ndx &= 7;
 
@@ -1342,7 +1415,8 @@ void Array::Set_1b(size_t ndx, int64_t value) {
     *p = (*p &~ (1 << ndx)) | (((uint8_t)value & 1) << ndx);
 }
 
-void Array::Set_2b(size_t ndx, int64_t value) {
+void Array::Set_2b(size_t ndx, int64_t value)
+{
     const size_t offset = ndx >> 2;
     const uint8_t n = (ndx & 3) << 1;
 
@@ -1350,7 +1424,8 @@ void Array::Set_2b(size_t ndx, int64_t value) {
     *p = (*p &~ (0x03 << n)) | (((uint8_t)value & 0x03) << n);
 }
 
-void Array::Set_4b(size_t ndx, int64_t value) {
+void Array::Set_4b(size_t ndx, int64_t value)
+{
     const size_t offset = ndx >> 1;
     const uint8_t n = (ndx & 1) << 2;
 
@@ -1358,28 +1433,33 @@ void Array::Set_4b(size_t ndx, int64_t value) {
     *p = (*p &~ (0x0F << n)) | (((uint8_t)value & 0x0F) << n);
 }
 
-void Array::Set_8b(size_t ndx, int64_t value) {
+void Array::Set_8b(size_t ndx, int64_t value)
+{
     *((char*)m_data + ndx) = (char)value;
 }
 
-void Array::Set_16b(size_t ndx, int64_t value) {
+void Array::Set_16b(size_t ndx, int64_t value)
+{
     const size_t offset = ndx * 2;
     *(int16_t*)(m_data + offset) = (int16_t)value;
 }
 
-void Array::Set_32b(size_t ndx, int64_t value) {
+void Array::Set_32b(size_t ndx, int64_t value)
+{
     const size_t offset = ndx * 4;
     *(int32_t*)(m_data + offset) = (int32_t)value;
 }
 
-void Array::Set_64b(size_t ndx, int64_t value) {
+void Array::Set_64b(size_t ndx, int64_t value)
+{
     const size_t offset = ndx * 8;
     *(int64_t*)(m_data + offset) = value;
 }
 #ifdef __MSVCRT__
 #pragma warning (disable : 4127)
 #endif
-template <size_t w> void Array::Set(size_t ndx, int64_t value) {
+template <size_t w> void Array::Set(size_t ndx, int64_t value)
+{
     if(w == 0) return Set_0b(ndx, value);
     else if(w == 1) Set_1b(ndx, value);
     else if(w == 2) Set_2b(ndx, value);
@@ -1392,13 +1472,15 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value) {
 
 
 // Sort array.
-void Array::Sort() {
+void Array::Sort()
+{
     TEMPEX(Sort, ());
 }
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions
-template <size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max) {
+template <size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max)
+{
     int64_t min2;
     int64_t max2;
     size_t t;
@@ -1435,11 +1517,13 @@ template <size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, 
 
 // Take index pointers to elements as argument and sort the pointers according to values they point at. Leave m_array untouched. The ref array
 // is allowed to contain fewer elements than m_array.
-void Array::ReferenceSort(Array &ref) {
+void Array::ReferenceSort(Array& ref)
+{
     TEMPEX(ReferenceSort, (ref));
 }
 
-template <size_t w>void Array::ReferenceSort(Array &ref) {
+template <size_t w>void Array::ReferenceSort(Array& ref)
+{
     if(m_len < 2)
         return;
 
@@ -1501,7 +1585,8 @@ template <size_t w>void Array::ReferenceSort(Array &ref) {
 }
 
 // Sort array
-template <size_t w> void Array::Sort() {
+template <size_t w> void Array::Sort()
+{
     if(m_len < 2)
         return;
 
@@ -1553,13 +1638,15 @@ template <size_t w> void Array::Sort() {
     return;
 }
 
-void Array::ReferenceQuickSort(Array &ref) {
+void Array::ReferenceQuickSort(Array& ref)
+{
     TEMPEX(ReferenceQuickSort, (0, m_len - 1, ref));
 }
 
 
 
-template <size_t w>void Array::ReferenceQuickSort(size_t lo, size_t hi, Array &ref) {
+template <size_t w>void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref)
+{
     // Quicksort based on
     // http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
     int i = (int)lo;
@@ -1611,7 +1698,8 @@ template <size_t w>void Array::ReferenceQuickSort(size_t lo, size_t hi, Array &r
 }
 
 
-void Array::QuickSort(size_t lo, size_t hi) {
+void Array::QuickSort(size_t lo, size_t hi)
+{
     TEMPEX(QuickSort, (lo, hi);)
 }
 
@@ -1652,7 +1740,8 @@ std::vector<int64_t> Array::ToVector(void) {
 #ifdef _DEBUG
 #include "stdio.h"
 
-bool Array::Compare(const Array& c) const {
+bool Array::Compare(const Array& c) const
+{
     if (c.Size() != Size()) return false;
 
     for (size_t i = 0; i < Size(); ++i) {
@@ -1662,7 +1751,8 @@ bool Array::Compare(const Array& c) const {
     return true;
 }
 
-void Array::Print() const {
+void Array::Print() const
+{
     cout << hex << GetRef() << dec << ": (" << Size() << ") ";
     for (size_t i = 0; i < Size(); ++i) {
         if (i) cout << ", ";
@@ -1671,7 +1761,8 @@ void Array::Print() const {
     cout << "\n";
 }
 
-void Array::Verify() const {
+void Array::Verify() const
+{
     assert(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
 
     // Check that parent is set correctly
@@ -1681,7 +1772,8 @@ void Array::Verify() const {
     assert(ref_in_parent == m_ref);
 }
 
-void Array::ToDot(std::ostream& out, const char* title) const {
+void Array::ToDot(std::ostream& out, const char* title) const
+{
     const size_t ref = GetRef();
 
     if (title) {
@@ -1729,7 +1821,8 @@ void Array::ToDot(std::ostream& out, const char* title) const {
     out << std::endl;
 }
 
-MemStats Array::Stats() const {
+MemStats Array::Stats() const
+{
     return MemStats(m_capacity, CalcByteLen(m_len, m_width), 1);
 }
 
@@ -1750,52 +1843,64 @@ int64_t GetDirect(const char* const data, const unsigned int width, const size_t
 size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target);
 template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target);
 
-bool get_header_isnode_direct(const uint8_t* const header) {
+bool get_header_isnode_direct(const uint8_t* const header)
+{
     return (header[0] & 0x80) != 0;
 }
 
-unsigned int get_header_width_direct(const uint8_t* const header) {
+unsigned int get_header_width_direct(const uint8_t* const header)
+{
     return (1 << (header[0] & 0x07)) >> 1;
 }
 
-size_t get_header_len_direct(const uint8_t* const header) {
+size_t get_header_len_direct(const uint8_t* const header)
+{
     return (header[1] << 16) + (header[2] << 8) + header[3];
 }
 
 template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx);
 
-template<> int64_t GetDirect<0>(const char* const, const size_t) {
+template<> int64_t GetDirect<0>(const char* const, const size_t)
+{
     return 0;
 }
-template<> int64_t GetDirect<1>(const char* const data, const size_t ndx) {
+template<> int64_t GetDirect<1>(const char* const data, const size_t ndx)
+{
     const size_t offset = ndx >> 3;
     return (data[offset] >> (ndx & 7)) & 0x01;
 }
-template<> int64_t GetDirect<2>(const char* const data, const size_t ndx) {
+template<> int64_t GetDirect<2>(const char* const data, const size_t ndx)
+{
     const size_t offset = ndx >> 2;
     return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
 }
-template<> int64_t GetDirect<4>(const char* const data, const size_t ndx) {
+template<> int64_t GetDirect<4>(const char* const data, const size_t ndx)
+{
     const size_t offset = ndx >> 1;
     return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
 }
-template<> int64_t GetDirect<8>(const char* const data, const size_t ndx) {
+template<> int64_t GetDirect<8>(const char* const data, const size_t ndx)
+{
     return *((const signed char*)(data + ndx));
 }
-template<> int64_t GetDirect<16>(const char* const data, const size_t ndx) {
+template<> int64_t GetDirect<16>(const char* const data, const size_t ndx)
+{
     const size_t offset = ndx * 2;
     return *(const int16_t*)(data + offset);
 }
-template<> int64_t GetDirect<32>(const char* const data, const size_t ndx) {
+template<> int64_t GetDirect<32>(const char* const data, const size_t ndx)
+{
     const size_t offset = ndx * 4;
     return *(const int32_t*)(data + offset);
 }
-template<> int64_t GetDirect<64>(const char* const data, const size_t ndx) {
+template<> int64_t GetDirect<64>(const char* const data, const size_t ndx)
+{
     const size_t offset = ndx * 8;
     return *(const int64_t*)(data + offset);
 }
 
-int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx) {
+int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx)
+{
     switch (width) {
         case  0: return GetDirect<0>(data, ndx);
         case  1: return GetDirect<1>(data, ndx);
@@ -1811,7 +1916,9 @@ int64_t GetDirect(const char* const data, const unsigned int width, const size_t
     }
 }
 
-size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target) {
+size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width,
+                     const int64_t target)
+{
     switch (width) {
         case  0: return 0;
         case  1: return FindPosDirectImp<1>(header, data, target);
@@ -1827,7 +1934,9 @@ size_t FindPosDirect(const uint8_t* const header, const char* const data, const 
     }
 }
 
-template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target) {
+template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data,
+                                               const int64_t target)
+{
     const size_t len = get_header_len_direct(header);
 
     int low = -1;
@@ -1854,7 +1963,8 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 namespace tightdb {
 
 // Get value direct through column b-tree without instatiating any Arrays.
-int64_t Array::ColumnGet(size_t ndx) const {
+int64_t Array::ColumnGet(size_t ndx) const
+{
     const char* data   = (const char*)m_data;
     const uint8_t* header = (const uint8_t*)data - 8;
     unsigned int width = m_width;

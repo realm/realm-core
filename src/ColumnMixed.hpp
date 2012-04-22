@@ -109,7 +109,8 @@ class ColumnMixed::RefsColumn: public ColumnSubtableParent
 public:
     RefsColumn(Allocator& alloc, const Table* tab):
         ColumnSubtableParent(NULL, 0, alloc, tab) {}
-    RefsColumn(std::size_t ref, ArrayParent* parent, std::size_t pndx, Allocator& alloc, const Table* tab):
+    RefsColumn(std::size_t ref, ArrayParent* parent, std::size_t pndx,
+               Allocator& alloc, const Table* tab):
         ColumnSubtableParent(ref, parent, pndx, alloc, tab) {}
     using ColumnSubtableParent::get_subtable_ptr;
     using ColumnSubtableParent::get_subtable;

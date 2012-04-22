@@ -9,7 +9,8 @@ struct db_setup_string_long {
 
 ArrayStringLong db_setup_string_long::c;
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongMultiEmpty) {
+TEST_FIXTURE(db_setup_string_long, ArrayStringLongMultiEmpty)
+{
     c.Add("");
     c.Add("");
     c.Add("");
@@ -26,7 +27,8 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongMultiEmpty) {
     CHECK_EQUAL("", c.Get(5));
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet) {
+TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet)
+{
     c.Set(0, "hey");
 
     CHECK_EQUAL(6, c.Size());
@@ -38,7 +40,8 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet) {
     CHECK_EQUAL("", c.Get(5));
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongAdd) {
+TEST_FIXTURE(db_setup_string_long, ArrayStringLongAdd)
+{
     c.Clear();
     CHECK_EQUAL(0, c.Size());
 
@@ -52,7 +55,8 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongAdd) {
     CHECK_EQUAL(2, c.Size());
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2) {
+TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2)
+{
     // {shrink, grow} x {first, middle, last, single}
     c.Clear();
 
@@ -107,7 +111,8 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2) {
 }
 
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongInsert) {
+TEST_FIXTURE(db_setup_string_long, ArrayStringLongInsert)
+{
     c.Clear();
 
     c.Insert(0, "abc"); // single
@@ -141,7 +146,8 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongInsert) {
     CHECK_EQUAL(5, c.Size());
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete) {
+TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete)
+{
     c.Clear();
 
     c.Add("a");
@@ -177,7 +183,8 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete) {
     CHECK(c.IsEmpty());
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind) {
+TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind)
+{
     c.Clear();
 
     c.Add("a");
@@ -197,7 +204,8 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind) {
 }
 
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLong_Destroy) {
+TEST_FIXTURE(db_setup_string_long, ArrayStringLong_Destroy)
+{
     // clean up (ALWAYS PUT THIS LAST)
     c.Destroy();
 }

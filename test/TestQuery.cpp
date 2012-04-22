@@ -14,7 +14,8 @@ TDB_TABLE_2(BoolTupleTable,
 
 
 
-TEST(TestQueryDelete) {
+TEST(TestQueryDelete)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "X");
@@ -35,7 +36,8 @@ TEST(TestQueryDelete) {
 
 
 
-TEST(TestQuerySimple) {
+TEST(TestQuerySimple)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -50,8 +52,8 @@ TEST(TestQuerySimple) {
 }
 
 
-TEST(TestQuerySubtable) {
-
+TEST(TestQuerySubtable)
+{
     Group group;
     Table& table = group.GetTable("test");
 
@@ -167,13 +169,13 @@ TEST(TestQuerySubtable) {
     CHECK_EQUAL(0, t4.GetRef(0));
     CHECK_EQUAL(2, t4.GetRef(1));
     CHECK_EQUAL(3, t4.GetRef(2));
-
 }
 
 
 
 
-TEST(TestQuerySort1) {
+TEST(TestQuerySort1)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a"); // 0
@@ -206,7 +208,8 @@ TEST(TestQuerySort1) {
 
 
 
-TEST(TestQuerySort_QuickSort) {
+TEST(TestQuerySort_QuickSort)
+{
     // Triggers QuickSort because range > len
     TupleTableType ttt;
 
@@ -223,7 +226,8 @@ TEST(TestQuerySort_QuickSort) {
     }
 }
 
-TEST(TestQuerySort_CountSort) {
+TEST(TestQuerySort_CountSort)
+{
     // Triggers CountSort because range <= len
     TupleTableType ttt;
 
@@ -241,7 +245,8 @@ TEST(TestQuerySort_CountSort) {
 }
 
 
-TEST(TestQuerySort_Descending) {
+TEST(TestQuerySort_Descending)
+{
     TupleTableType ttt;
 
     for(size_t t = 0; t < 1000; t++)
@@ -258,7 +263,8 @@ TEST(TestQuerySort_Descending) {
 }
 
 
-TEST(TestQuerySort_Dates) {
+TEST(TestQuerySort_Dates)
+{
     Table table;
     table.RegisterColumn(COLUMN_TYPE_DATE, "first");
 
@@ -286,7 +292,8 @@ TEST(TestQuerySort_Dates) {
 }
 
 
-TEST(TestQuerySort_Bools) {
+TEST(TestQuerySort_Bools)
+{
     Table table;
     table.RegisterColumn(COLUMN_TYPE_BOOL, "first");
 
@@ -310,7 +317,8 @@ TEST(TestQuerySort_Bools) {
 
 
 
-TEST(TestQueryThreads) {
+TEST(TestQueryThreads)
+{
     TupleTableType ttt;
 
     // Spread query search hits in an odd way to test more edge cases
@@ -340,7 +348,8 @@ TEST(TestQueryThreads) {
 
 
 
-TEST(TestQuerySimple2) {
+TEST(TestQuerySimple2)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -362,7 +371,8 @@ TEST(TestQuerySimple2) {
 }
 
 
-TEST(TestQueryLimit) {
+TEST(TestQueryLimit)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -399,7 +409,8 @@ TEST(TestQueryLimit) {
 }
 
 
-TEST(TestQueryFindAll1) {
+TEST(TestQueryFindAll1)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -421,7 +432,8 @@ TEST(TestQueryFindAll1) {
 
 }
 
-TEST(TestQueryFindAll2) {
+TEST(TestQueryFindAll2)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -437,7 +449,8 @@ TEST(TestQueryFindAll2) {
     CHECK_EQUAL(6, tv2.GetRef(0));
 }
 
-TEST(TestQueryFindAllBetween) {
+TEST(TestQueryFindAllBetween)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -457,7 +470,8 @@ TEST(TestQueryFindAllBetween) {
 }
 
 
-TEST(TestQueryFindAll_Range) {
+TEST(TestQueryFindAll_Range)
+{
     TupleTableType ttt;
 
     ttt.Add(5, "a");
@@ -470,7 +484,8 @@ TEST(TestQueryFindAll_Range) {
 }
 
 
-TEST(TestQueryFindAll_Or) {
+TEST(TestQueryFindAll_Or)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -491,7 +506,8 @@ TEST(TestQueryFindAll_Or) {
 }
 
 
-TEST(TestQueryFindAll_Parans1) {
+TEST(TestQueryFindAll_Parans1)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -510,7 +526,8 @@ TEST(TestQueryFindAll_Parans1) {
 }
 
 
-TEST(TestQueryFindAll_OrParan) {
+TEST(TestQueryFindAll_OrParan)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -532,7 +549,8 @@ TEST(TestQueryFindAll_OrParan) {
 }
 
 
-TEST(TestQueryFindAll_OrNested0) {
+TEST(TestQueryFindAll_OrNested0)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -552,7 +570,8 @@ TEST(TestQueryFindAll_OrNested0) {
     CHECK_EQUAL(6, tv1.GetRef(1));
 }
 
-TEST(TestQueryFindAll_OrNested) {
+TEST(TestQueryFindAll_OrNested)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -572,7 +591,8 @@ TEST(TestQueryFindAll_OrNested) {
     CHECK_EQUAL(7, tv1.GetRef(2));
 }
 
-TEST(TestQueryFindAll_OrPHP) {
+TEST(TestQueryFindAll_OrPHP)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "Joe");
@@ -587,7 +607,8 @@ TEST(TestQueryFindAll_OrPHP) {
 
 
 
-TEST(TestQueryFindAll_Parans2) {
+TEST(TestQueryFindAll_Parans2)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -607,7 +628,8 @@ TEST(TestQueryFindAll_Parans2) {
     CHECK_EQUAL(6, tv1.GetRef(2));
 }
 
-TEST(TestQueryFindAll_Parans4) {
+TEST(TestQueryFindAll_Parans4)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "a");
@@ -625,7 +647,8 @@ TEST(TestQueryFindAll_Parans4) {
 }
 
 
-TEST(TestQueryFindAll_Bool) {
+TEST(TestQueryFindAll_Bool)
+{
     BoolTupleTable btt;
 
     btt.Add(1, true);
@@ -644,7 +667,8 @@ TEST(TestQueryFindAll_Bool) {
     CHECK_EQUAL(3, tv2.GetRef(1));
 }
 
-TEST(TestQueryFindAll_Begins) {
+TEST(TestQueryFindAll_Begins)
+{
     TupleTableType ttt;
 
     ttt.Add(0, "fo");
@@ -658,7 +682,8 @@ TEST(TestQueryFindAll_Begins) {
     CHECK_EQUAL(2, tv1.GetRef(1));
 }
 
-TEST(TestQueryFindAll_Ends) {
+TEST(TestQueryFindAll_Ends)
+{
     TupleTableType ttt;
 
     ttt.Add(0, "barfo");
@@ -672,7 +697,8 @@ TEST(TestQueryFindAll_Ends) {
 }
 
 
-TEST(TestQueryFindAll_Contains) {
+TEST(TestQueryFindAll_Contains)
+{
     TupleTableType ttt;
 
     ttt.Add(0, "foo");
@@ -692,7 +718,8 @@ TEST(TestQueryFindAll_Contains) {
     CHECK_EQUAL(3, tv1.GetRef(3));
 }
 
-TEST(TestQueryEnums) {
+TEST(TestQueryEnums)
+{
     TupleTableType table;
 
     for (size_t i = 0; i < 5; ++i) {
@@ -723,7 +750,8 @@ TEST(TestQueryEnums) {
 #define uy  "\x0CF\x08B"              // greek small letter upsilon with dialytika (U+03AB)
 #define uyd "\x0cf\x085\x0CC\x088"    // decomposed form (Y followed by two dots)
 
-TEST(TestQueryCaseSensitivity) {
+TEST(TestQueryCaseSensitivity)
+{
     TupleTableType ttt;
 
     ttt.Add(1, "BLAAbaergroed");
@@ -734,7 +762,8 @@ TEST(TestQueryCaseSensitivity) {
     CHECK_EQUAL(0, tv1.GetRef(0));
 }
 
-TEST(TestQueryUnicode2) {
+TEST(TestQueryUnicode2)
+{
     TupleTableType ttt;
 
     ttt.Add(1, uY);
@@ -765,7 +794,8 @@ TEST(TestQueryUnicode2) {
 #define ua  "\x0c3\x0a5"         // danish lower case a with ring above (as in blaabaergroed)
 #define uad "\x061\x0cc\x08a"    // decomposed form (a (41) followed by ring)
 
-TEST(TestQueryUnicode3) {
+TEST(TestQueryUnicode3)
+{
     TupleTableType ttt;
 
     ttt.Add(1, uA);
@@ -799,7 +829,8 @@ TEST(TestQueryUnicode3) {
 }
 
 
-TEST(TestQueryFindAll_BeginsUNICODE) {
+TEST(TestQueryFindAll_BeginsUNICODE)
+{
     TupleTableType ttt;
 
     ttt.Add(0, uad "fo");
@@ -814,7 +845,8 @@ TEST(TestQueryFindAll_BeginsUNICODE) {
 }
 
 
-TEST(TestQueryFindAll_EndsUNICODE) {
+TEST(TestQueryFindAll_EndsUNICODE)
+{
     TupleTableType ttt;
 
     ttt.Add(0, "barfo");
@@ -833,7 +865,8 @@ TEST(TestQueryFindAll_EndsUNICODE) {
 }
 
 
-TEST(TestQueryFindAll_ContainsUNICODE) {
+TEST(TestQueryFindAll_ContainsUNICODE)
+{
     TupleTableType ttt;
 
     ttt.Add(0, uad "foo");
@@ -863,7 +896,8 @@ TEST(TestQueryFindAll_ContainsUNICODE) {
 
 #endif
 
-TEST(TestQuerySyntaxCheck) {
+TEST(TestQuerySyntaxCheck)
+{
     TupleTableType ttt;
     std::string s;
 
@@ -899,4 +933,3 @@ TEST(TestQuerySyntaxCheck) {
     s = q7.Verify();
     CHECK(s != "");
 }
-

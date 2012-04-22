@@ -23,7 +23,8 @@ template<class T> T GetColumnFromRef(Array& parent, size_t ndx)
     return T(size_t(parent.Get(ndx)), &parent, ndx, parent.GetAllocator());
 }
 
-template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const {
+template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const
+{
     if (IsNode()) {
         // Get subnode table
         const Array offsets = NodeGetOffsets();
@@ -45,7 +46,8 @@ template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const {
     }
 }
 
-template<typename T, class C> bool ColumnBase::TreeSet(size_t ndx, T value) {
+template<typename T, class C> bool ColumnBase::TreeSet(size_t ndx, T value)
+{
     //const T oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
 
     if (IsNode()) {
@@ -72,7 +74,8 @@ template<typename T, class C> bool ColumnBase::TreeSet(size_t ndx, T value) {
     return true;
 }
 
-template<typename T, class C> bool ColumnBase::TreeInsert(size_t ndx, T value) {
+template<typename T, class C> bool ColumnBase::TreeInsert(size_t ndx, T value)
+{
     const NodeChange nc = DoInsert<T,C>(ndx, value);
 
     switch (nc.type) {
@@ -112,7 +115,8 @@ template<typename T, class C> bool ColumnBase::TreeInsert(size_t ndx, T value) {
     return true;
 }
 
-template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx, T value) {
+template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx, T value)
+{
     if (IsNode()) {
         // Get subnode table
         Array offsets = NodeGetOffsets();
@@ -210,7 +214,8 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
     }
 }
 
-template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref) {
+template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
+{
     assert(IsNode());
     assert(new_ref);
 
@@ -249,7 +254,8 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref) {
     return true;
 }
 
-template<class C> bool ColumnBase::NodeInsert(size_t ndx, size_t ref) {
+template<class C> bool ColumnBase::NodeInsert(size_t ndx, size_t ref)
+{
     assert(ref);
     assert(IsNode());
 
@@ -270,7 +276,8 @@ template<class C> bool ColumnBase::NodeInsert(size_t ndx, size_t ref) {
     return refs.Insert(ndx, ref);
 }
 
-template<class C> bool ColumnBase::NodeAdd(size_t ref) {
+template<class C> bool ColumnBase::NodeAdd(size_t ref)
+{
     assert(ref);
     assert(IsNode());
 
@@ -285,7 +292,8 @@ template<class C> bool ColumnBase::NodeAdd(size_t ref) {
     return refs.Add(ref);
 }
 
-template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx) {
+template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
+{
     if (!IsNode()) {
         static_cast<C*>(this)->LeafDelete(ndx);
     }
@@ -324,7 +332,9 @@ template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx) {
     }
 }
 
-template<typename T, class C, class F> size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const {
+template<typename T, class C, class F>
+size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
+{
     // Use index if possible
     /*if (m_index && start == 0 && end == -1) {
      return FindWithIndex(value);
@@ -389,7 +399,10 @@ template<typename T, class C, class F> size_t ColumnBase::TreeFind(T value, size
 
 
 
-template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const {
+template<typename T, class C>
+void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset,
+                             size_t start, size_t end) const
+{
     if (!IsNode()) {
         return static_cast<const C*>(this)->LeafFindAll(result, value, add_offset, start, end);
     }
@@ -429,7 +442,12 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T valu
 
 
 
-template<typename T, class C> void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T *arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const {
+template<typename T, class C>
+void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
+                                bool (*call)(T *arr, size_t start, size_t end,
+                                             size_t caller_offset, void *state),
+                                void *state) const
+{
     if (!IsNode()) {
         if(end == size_t(-1))
             end = m_array->Size();

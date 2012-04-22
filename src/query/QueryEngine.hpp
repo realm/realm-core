@@ -13,7 +13,8 @@ public:
     virtual void Init(const Table& table) {m_table = &table; if (m_child) m_child->Init(table);}
     virtual size_t Find(size_t start, size_t end) = 0;
 
-    virtual std::string Verify(void) {
+    virtual std::string Verify(void)
+    {
         if(error_code != "")
             return error_code;
         if(m_child == 0)
@@ -32,12 +33,13 @@ protected:
 
 
 /*
-template <class T, class C, class F> class NODE : public ParentNode {
+template <class T, class C, class F> class NODE: public ParentNode {
 public:
     NODE(T v, size_t column) : m_value(v), m_column(column)  {m_child = 0;}
     ~NODE() {delete m_child; }
 
-    size_t Find(size_t start, size_t end, const Table& table) {
+    size_t Find(size_t start, size_t end, const Table& table)
+    {
         const C& column = (C&)(table.GetColumnBase(m_column));
         const F function = {};
         for (size_t s = start; s < end; ++s) {
@@ -64,19 +66,21 @@ protected:
 */
 
 // Not finished
-class SUBTABLE : public ParentNode {
+class SUBTABLE: public ParentNode {
 public:
-    SUBTABLE(size_t column) : m_column(column) {m_child = 0; m_child2 = 0;}
+    SUBTABLE(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
     SUBTABLE() {};
 
-    void Init(const Table& table) {
+    void Init(const Table& table)
+    {
         m_table = &table;
 
         if (m_child) m_child->Init(table);
         if (m_child2) m_child2->Init(table);
     }
 
-    size_t Find(size_t start, size_t end) {
+    size_t Find(size_t start, size_t end)
+    {
         assert(m_table);
         assert(m_child);
 
@@ -107,19 +111,21 @@ public:
 };
 
 
-template <class T, class C, class F> class NODE : public ParentNode {
+template <class T, class C, class F> class NODE: public ParentNode {
 public:
     NODE(T v, size_t column) : m_value(v), m_column_id(column) {m_child = 0;}
     ~NODE() {delete m_child; }
 
-    void Init(const Table& table) {
+    void Init(const Table& table)
+    {
         m_table = &table;
         m_column = (C*)&table.GetColumnBase(m_column_id);
 
         if (m_child) m_child->Init(table);
     }
 
-    size_t Find(size_t start, size_t end) {
+    size_t Find(size_t start, size_t end)
+    {
         assert(m_table);
 
         for (size_t s = start; s < end; ++s) {
@@ -148,9 +154,10 @@ protected:
 
 
 
-template <class F> class STRINGNODE : public ParentNode {
+template <class F> class STRINGNODE: public ParentNode {
 public:
-    STRINGNODE(const char* v, size_t column) : m_column_id(column) {
+    STRINGNODE(const char* v, size_t column): m_column_id(column)
+    {
         m_child = 0;
 
         m_value = (char *)malloc(strlen(v)*6);
@@ -165,7 +172,8 @@ public:
     }
     ~STRINGNODE() {delete m_child; free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase); }
 
-    void Init(const Table& table) {
+    void Init(const Table& table)
+    {
         m_table = &table;
         m_column = &table.GetColumnBase(m_column_id);
         m_column_type = table.GetRealColumnType(m_column_id);
@@ -173,7 +181,8 @@ public:
         if (m_child) m_child->Init(table);
     }
 
-    size_t Find(size_t start, size_t end) {
+    size_t Find(size_t start, size_t end)
+    {
         F function;// = {};
 
         for (size_t s = start; s < end; ++s) {
@@ -213,16 +222,17 @@ protected:
 
 
 
-template <> class STRINGNODE<EQUAL> : public ParentNode {
+template <> class STRINGNODE<EQUAL>: public ParentNode {
 public:
-    STRINGNODE(const char* v, size_t column) : m_column_id(column), m_key_ndx((size_t)-1) {
+    STRINGNODE(const char* v, size_t column): m_column_id(column), m_key_ndx((size_t)-1) {
         m_child = 0;
         m_value = (char *)malloc(strlen(v)*6);
         memcpy(m_value, v, strlen(v) + 1);
     }
     ~STRINGNODE() {delete m_child; free((void*)m_value); }
 
-    void Init(const Table& table) {
+    void Init(const Table& table)
+    {
         m_table = &table;
         m_column = &table.GetColumnBase(m_column_id);
         m_column_type = table.GetRealColumnType(m_column_id);
@@ -234,7 +244,8 @@ public:
         if (m_child) m_child->Init(table);
     }
 
-    size_t Find(size_t start, size_t end) {
+    size_t Find(size_t start, size_t end)
+    {
         assert(m_table);
 
         for (size_t s = start; s < end; ++s) {
@@ -276,21 +287,24 @@ private:
 };
 
 
-class OR_NODE : public ParentNode {
+class OR_NODE: public ParentNode {
 public:
     OR_NODE(ParentNode* p1) {m_child = 0; m_cond1 = p1; m_cond2 = 0;};
-    ~OR_NODE() {
+    ~OR_NODE()
+    {
         delete m_cond1;
         delete m_cond2;
         delete m_child;
     }
 
-    void Init(const Table& table) {
+    void Init(const Table& table)
+    {
         m_cond1->Init(table);
         m_cond2->Init(table);
     }
 
-    size_t Find(size_t start, size_t end) {
+    size_t Find(size_t start, size_t end)
+    {
         for (size_t s = start; s < end; ++s) {
             // Todo, redundant searches can occur
             const size_t f1 = m_cond1->Find(s, end);
@@ -310,7 +324,8 @@ public:
         return end;
     }
 
-    virtual std::string Verify(void) {
+    virtual std::string Verify(void)
+    {
         if(error_code != "")
             return error_code;
         if(m_cond1 == 0)

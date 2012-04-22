@@ -14,12 +14,11 @@ using namespace std;
 
 namespace tightdb {
 
-struct FakeParent: Table::Parent
-{
-virtual void update_child_ref(size_t, size_t) {} // Ignore
-virtual void child_destroyed(size_t) {} // Ignore
+struct FakeParent: Table::Parent {
+    virtual void update_child_ref(size_t, size_t) {} // Ignore
+    virtual void child_destroyed(size_t) {} // Ignore
 #ifdef _DEBUG
-virtual size_t get_child_ref_for_verify(size_t) const { return 0; }
+    virtual size_t get_child_ref_for_verify(size_t) const { return 0; }
 #endif
 };
 
@@ -32,7 +31,7 @@ const ColumnType AccessorMixed::type  = COLUMN_TYPE_MIXED;
 
 // -- Spec ------------------------------------------------------------------------------------
 
-Spec::Spec(Allocator& alloc, size_t ref, ArrayParent *parent, size_t pndx):
+Spec::Spec(Allocator& alloc, size_t ref, ArrayParent* parent, size_t pndx):
     m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
 {
     Create(ref, parent, pndx);
@@ -49,7 +48,8 @@ Spec::Spec(const Spec& s):
     Create(ref, parent, pndx);
 }
 
-void Spec::Create(size_t ref, ArrayParent *parent, size_t pndx) {
+void Spec::Create(size_t ref, ArrayParent* parent, size_t pndx)
+{
     m_specSet.UpdateRef(ref);
     m_specSet.SetParent(parent, pndx);
     assert(m_specSet.Size() == 2 || m_specSet.Size() == 3);
@@ -66,7 +66,8 @@ void Spec::Create(size_t ref, ArrayParent *parent, size_t pndx) {
     }
 }
 
-void Spec::AddColumn(ColumnType type, const char* name) {
+void Spec::AddColumn(ColumnType type, const char* name)
+{
     assert(name);
 
     m_names.Add(name);
@@ -97,14 +98,16 @@ void Spec::AddColumn(ColumnType type, const char* name) {
     }
 }
 
-Spec Spec::AddColumnTable(const char* name) {
+Spec Spec::AddColumnTable(const char* name)
+{
     const size_t column_id = m_names.Size();
     AddColumn(COLUMN_TYPE_TABLE, name);
 
     return GetSpec(column_id);
 }
 
-Spec Spec::GetSpec(size_t column_id) {
+Spec Spec::GetSpec(size_t column_id)
+{
     assert(column_id < m_spec.Size());
     assert((ColumnType)m_spec.Get(column_id) == COLUMN_TYPE_TABLE);
 
@@ -121,7 +124,8 @@ Spec Spec::GetSpec(size_t column_id) {
     return Spec(alloc, ref, &m_subSpecs, pos);
 }
 
-const Spec Spec::GetSpec(size_t column_id) const {
+const Spec Spec::GetSpec(size_t column_id) const
+{
     assert(column_id < m_spec.Size());
     assert((ColumnType)m_spec.Get(column_id) == COLUMN_TYPE_TABLE);
 
@@ -138,11 +142,13 @@ const Spec Spec::GetSpec(size_t column_id) const {
     return Spec(alloc, ref, NULL, 0);
 }
 
-size_t Spec::GetColumnCount() const {
+size_t Spec::GetColumnCount() const
+{
     return m_names.Size();
 }
 
-ColumnType Spec::GetColumnType(size_t ndx) const {
+ColumnType Spec::GetColumnType(size_t ndx) const
+{
     assert(ndx < GetColumnCount());
     const ColumnType type = (ColumnType)m_spec.Get(ndx);
 
@@ -151,12 +157,14 @@ ColumnType Spec::GetColumnType(size_t ndx) const {
     else return type;
 }
 
-const char* Spec::GetColumnName(size_t ndx) const {
+const char* Spec::GetColumnName(size_t ndx) const
+{
     assert(ndx < GetColumnCount());
     return m_names.Get(ndx);
 }
 
-size_t Spec::GetColumnIndex(const char* name) const {
+size_t Spec::GetColumnIndex(const char* name) const
+{
     return m_names.Find(name);
 }
 
@@ -244,7 +252,8 @@ void Table::Create(size_t ref_specSet, size_t columns_ref,
     m_columns.SetParent(parent, ndx_in_parent);
 }
 
-void Table::CreateColumns() {
+void Table::CreateColumns()
+{
     assert(!m_columns.IsValid() || m_columns.IsEmpty()); // only on initial creation
 
     // Instantiate first if we have an empty table (from zero-ref)
@@ -301,25 +310,29 @@ void Table::CreateColumns() {
     }
 }
 
-Spec Table::GetSpec() {
+Spec Table::GetSpec()
+{
     assert(GetColumnCount() == 0); // only set spec on new table
 
     Allocator& alloc = m_specSet.GetAllocator();
     return Spec(alloc, m_specSet.GetRef(), m_specSet.GetParent(), 0);
 }
 
-const Spec Table::GetSpec() const {
+const Spec Table::GetSpec() const
+{
     Allocator& alloc = m_specSet.GetAllocator();
     return Spec(alloc, m_specSet.GetRef(), NULL, 0);
 }
 
 
-void Table::InstantiateBeforeChange() {
+void Table::InstantiateBeforeChange()
+{
     // Empty (zero-ref'ed) tables need to be instantiated before first modification
     if (!m_columns.IsValid()) CreateColumns();
 }
 
-void Table::CacheColumns() {
+void Table::CacheColumns()
+{
     assert(m_cols.IsEmpty()); // only done on creation
 
     Allocator& alloc = m_specSet.GetAllocator();
@@ -447,25 +460,30 @@ Table::~Table()
     m_columns.Destroy();
 }
 
-size_t Table::GetColumnCount() const {
+size_t Table::GetColumnCount() const
+{
     return m_columnNames.Size();
 }
 
-const char* Table::GetColumnName(size_t ndx) const {
+const char* Table::GetColumnName(size_t ndx) const
+{
     assert(ndx < GetColumnCount());
     return m_columnNames.Get(ndx);
 }
 
-size_t Table::GetColumnIndex(const char* name) const {
+size_t Table::GetColumnIndex(const char* name) const
+{
     return m_columnNames.Find(name);
 }
 
-ColumnType Table::GetRealColumnType(size_t ndx) const {
+ColumnType Table::GetRealColumnType(size_t ndx) const
+{
     assert(ndx < GetColumnCount());
     return (ColumnType)m_spec.Get(ndx);
 }
 
-ColumnType Table::GetColumnType(size_t ndx) const {
+ColumnType Table::GetColumnType(size_t ndx) const
+{
     assert(ndx < GetColumnCount());
     const ColumnType type = (ColumnType)m_spec.Get(ndx);
 
@@ -474,7 +492,8 @@ ColumnType Table::GetColumnType(size_t ndx) const {
     else return type;
 }
 
-size_t Table::GetColumnRefPos(size_t column_ndx) const {
+size_t Table::GetColumnRefPos(size_t column_ndx) const
+{
     size_t pos = 0;
     size_t current_column = 0;
     for (size_t i = 0; i < m_spec.Size(); ++i) {
@@ -491,7 +510,8 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const {
     return (size_t)-1;
 }
 
-size_t Table::RegisterColumn(ColumnType type, const char* name) {
+size_t Table::RegisterColumn(ColumnType type, const char* name)
+{
     const size_t column_ndx = m_cols.Size();
 
     ColumnBase* newColumn = NULL;
@@ -531,13 +551,15 @@ size_t Table::RegisterColumn(ColumnType type, const char* name) {
     return column_ndx;
 }
 
-bool Table::HasIndex(size_t column_id) const {
+bool Table::HasIndex(size_t column_id) const
+{
     assert(column_id < GetColumnCount());
     const ColumnBase& col = GetColumnBase(column_id);
     return col.HasIndex();
 }
 
-void Table::SetIndex(size_t column_id) {
+void Table::SetIndex(size_t column_id)
+{
     assert(column_id < GetColumnCount());
     if (HasIndex(column_id)) return;
 
@@ -554,88 +576,103 @@ void Table::SetIndex(size_t column_id) {
     }
 }
 
-ColumnBase& Table::GetColumnBase(size_t ndx) {
+ColumnBase& Table::GetColumnBase(size_t ndx)
+{
     assert(ndx < GetColumnCount());
     InstantiateBeforeChange();
     return *(ColumnBase* const)m_cols.Get(ndx);
 }
 
-const ColumnBase& Table::GetColumnBase(size_t ndx) const {
+const ColumnBase& Table::GetColumnBase(size_t ndx) const
+{
     assert(ndx < GetColumnCount());
     return *(const ColumnBase* const)m_cols.Get(ndx);
 }
 
-Column& Table::GetColumn(size_t ndx) {
+Column& Table::GetColumn(size_t ndx)
+{
     ColumnBase& column = GetColumnBase(ndx);
     assert(column.IsIntColumn());
     return static_cast<Column&>(column);
 }
 
-const Column& Table::GetColumn(size_t ndx) const {
+const Column& Table::GetColumn(size_t ndx) const
+{
     const ColumnBase& column = GetColumnBase(ndx);
     assert(column.IsIntColumn());
     return static_cast<const Column&>(column);
 }
 
-AdaptiveStringColumn& Table::GetColumnString(size_t ndx) {
+AdaptiveStringColumn& Table::GetColumnString(size_t ndx)
+{
     ColumnBase& column = GetColumnBase(ndx);
     assert(column.IsStringColumn());
     return static_cast<AdaptiveStringColumn&>(column);
 }
 
-const AdaptiveStringColumn& Table::GetColumnString(size_t ndx) const {
+const AdaptiveStringColumn& Table::GetColumnString(size_t ndx) const
+{
     const ColumnBase& column = GetColumnBase(ndx);
     assert(column.IsStringColumn());
     return static_cast<const AdaptiveStringColumn&>(column);
 }
 
 
-ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) {
+ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx)
+{
     assert(ndx < GetColumnCount());
     InstantiateBeforeChange();
     return *(ColumnStringEnum* const)m_cols.Get(ndx);
 }
 
-const ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) const {
+const ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) const
+{
     assert(ndx < GetColumnCount());
     return *(const ColumnStringEnum* const)m_cols.Get(ndx);
 }
 
-ColumnBinary& Table::GetColumnBinary(size_t ndx) {
+ColumnBinary& Table::GetColumnBinary(size_t ndx)
+{
     ColumnBase& column = GetColumnBase(ndx);
     assert(column.IsBinaryColumn());
     return static_cast<ColumnBinary&>(column);
 }
 
-const ColumnBinary& Table::GetColumnBinary(size_t ndx) const {
+const ColumnBinary& Table::GetColumnBinary(size_t ndx) const
+{
     const ColumnBase& column = GetColumnBase(ndx);
     assert(column.IsBinaryColumn());
     return static_cast<const ColumnBinary&>(column);
 }
 
-ColumnTable &Table::GetColumnTable(size_t ndx) {
+ColumnTable &Table::GetColumnTable(size_t ndx)
+{
     assert(ndx < GetColumnCount());
     InstantiateBeforeChange();
     return *reinterpret_cast<ColumnTable *>(m_cols.Get(ndx));
 }
 
-ColumnTable const &Table::GetColumnTable(size_t ndx) const {
+ColumnTable const &Table::GetColumnTable(size_t ndx) const
+{
     assert(ndx < GetColumnCount());
     return *reinterpret_cast<ColumnTable *>(m_cols.Get(ndx));
 }
 
-ColumnMixed& Table::GetColumnMixed(size_t ndx) {
+ColumnMixed& Table::GetColumnMixed(size_t ndx)
+{
     assert(ndx < GetColumnCount());
     InstantiateBeforeChange();
     return *(ColumnMixed* const)m_cols.Get(ndx);
 }
 
-const ColumnMixed& Table::GetColumnMixed(size_t ndx) const {
+const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
+{
     assert(ndx < GetColumnCount());
     return *(const ColumnMixed* const)m_cols.Get(ndx);
 }
 
-size_t Table::AddRow() {
+size_t Table::AddRow()
+{
     const size_t count = GetColumnCount();
     for (size_t i = 0; i < count; ++i) {
         ColumnBase& column = GetColumnBase(i);
@@ -645,7 +682,8 @@ size_t Table::AddRow() {
     return m_size++;
 }
 
-void Table::Clear() {
+void Table::Clear()
+{
     const size_t count = GetColumnCount();
     for (size_t i = 0; i < count; ++i) {
         ColumnBase& column = GetColumnBase(i);
@@ -654,7 +692,8 @@ void Table::Clear() {
     m_size = 0;
 }
 
-void Table::DeleteRow(size_t ndx) {
+void Table::DeleteRow(size_t ndx)
+{
     assert(ndx < m_size);
 
     const size_t count = GetColumnCount();
@@ -665,7 +704,8 @@ void Table::DeleteRow(size_t ndx) {
     --m_size;
 }
 
-void Table::InsertTable(size_t column_id, size_t ndx) {
+void Table::InsertTable(size_t column_id, size_t ndx)
+{
     assert(column_id < GetColumnCount());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
     assert(ndx <= m_size);
@@ -674,7 +714,8 @@ void Table::InsertTable(size_t column_id, size_t ndx) {
     subtables.Insert(ndx);
 }
 
-void Table::ClearTable(size_t column_id, size_t ndx) {
+void Table::ClearTable(size_t column_id, size_t ndx)
+{
     assert(column_id < GetColumnCount());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
     assert(ndx <= m_size);
@@ -723,7 +764,8 @@ TableConstRef Table::GetTable(size_t column_id, size_t ndx) const
     }
 }
 
-size_t Table::GetTableSize(size_t column_id, size_t ndx) const {
+size_t Table::GetTableSize(size_t column_id, size_t ndx) const
+{
     assert(column_id < GetColumnCount());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
     assert(ndx < m_size);
@@ -733,7 +775,8 @@ size_t Table::GetTableSize(size_t column_id, size_t ndx) const {
     return subtables.GetTableSize(ndx);
 }
 
-int64_t Table::Get(size_t column_id, size_t ndx) const {
+int64_t Table::Get(size_t column_id, size_t ndx) const
+{
     assert(column_id < GetColumnCount());
     assert(ndx < m_size);
 
@@ -741,7 +784,8 @@ int64_t Table::Get(size_t column_id, size_t ndx) const {
     return column.Get(ndx);
 }
 
-void Table::Set(size_t column_id, size_t ndx, int64_t value) {
+void Table::Set(size_t column_id, size_t ndx, int64_t value)
+{
     assert(column_id < GetColumnCount());
     assert(ndx < m_size);
 
@@ -749,7 +793,8 @@ void Table::Set(size_t column_id, size_t ndx, int64_t value) {
     column.Set(ndx, value);
 }
 
-bool Table::GetBool(size_t column_id, size_t ndx) const {
+bool Table::GetBool(size_t column_id, size_t ndx) const
+{
     assert(column_id < GetColumnCount());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
     assert(ndx < m_size);
@@ -758,7 +803,8 @@ bool Table::GetBool(size_t column_id, size_t ndx) const {
     return column.Get(ndx) != 0;
 }
 
-void Table::SetBool(size_t column_id, size_t ndx, bool value) {
+void Table::SetBool(size_t column_id, size_t ndx, bool value)
+{
     assert(column_id < GetColumnCount());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
     assert(ndx < m_size);
@@ -767,7 +813,8 @@ void Table::SetBool(size_t column_id, size_t ndx, bool value) {
     column.Set(ndx, value ? 1 : 0);
 }
 
-time_t Table::GetDate(size_t column_id, size_t ndx) const {
+time_t Table::GetDate(size_t column_id, size_t ndx) const
+{
     assert(column_id < GetColumnCount());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
     assert(ndx < m_size);
@@ -776,7 +823,8 @@ time_t Table::GetDate(size_t column_id, size_t ndx) const {
     return (time_t)column.Get(ndx);
 }
 
-void Table::SetDate(size_t column_id, size_t ndx, time_t value) {
+void Table::SetDate(size_t column_id, size_t ndx, time_t value)
+{
     assert(column_id < GetColumnCount());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
     assert(ndx < m_size);
@@ -785,7 +833,8 @@ void Table::SetDate(size_t column_id, size_t ndx, time_t value) {
     column.Set(ndx, (int64_t)value);
 }
 
-void Table::InsertInt(size_t column_id, size_t ndx, int64_t value) {
+void Table::InsertInt(size_t column_id, size_t ndx, int64_t value)
+{
     assert(column_id < GetColumnCount());
     assert(ndx <= m_size);
 
@@ -793,7 +842,8 @@ void Table::InsertInt(size_t column_id, size_t ndx, int64_t value) {
     column.Insert(ndx, value);
 }
 
-const char* Table::GetString(size_t column_id, size_t ndx) const {
+const char* Table::GetString(size_t column_id, size_t ndx) const
+{
     assert(column_id < m_columns.Size());
     assert(ndx < m_size);
 
@@ -810,7 +860,8 @@ const char* Table::GetString(size_t column_id, size_t ndx) const {
     }
 }
 
-void Table::SetString(size_t column_id, size_t ndx, const char* value) {
+void Table::SetString(size_t column_id, size_t ndx, const char* value)
+{
     assert(column_id < GetColumnCount());
     assert(ndx < m_size);
 
@@ -827,7 +878,8 @@ void Table::SetString(size_t column_id, size_t ndx, const char* value) {
     }
 }
 
-void Table::InsertString(size_t column_id, size_t ndx, const char* value) {
+void Table::InsertString(size_t column_id, size_t ndx, const char* value)
+{
     assert(column_id < GetColumnCount());
     assert(ndx <= m_size);
 
@@ -844,7 +896,8 @@ void Table::InsertString(size_t column_id, size_t ndx, const char* value) {
     }
 }
 
-BinaryData Table::GetBinary(size_t column_id, size_t ndx) const {
+BinaryData Table::GetBinary(size_t column_id, size_t ndx) const
+{
     assert(column_id < m_columns.Size());
     assert(ndx < m_size);
 
@@ -852,7 +905,8 @@ BinaryData Table::GetBinary(size_t column_id, size_t ndx) const {
     return column.Get(ndx);
 }
 
-void Table::SetBinary(size_t column_id, size_t ndx, const void* value, size_t len) {
+void Table::SetBinary(size_t column_id, size_t ndx, const void* value, size_t len)
+{
     assert(column_id < GetColumnCount());
     assert(ndx < m_size);
 
@@ -860,7 +914,8 @@ void Table::SetBinary(size_t column_id, size_t ndx, const void* value, size_t le
     column.Set(ndx, value, len);
 }
 
-void Table::InsertBinary(size_t column_id, size_t ndx, const void* value, size_t len) {
+void Table::InsertBinary(size_t column_id, size_t ndx, const void* value, size_t len)
+{
     assert(column_id < GetColumnCount());
     assert(ndx <= m_size);
 
@@ -868,7 +923,8 @@ void Table::InsertBinary(size_t column_id, size_t ndx, const void* value, size_t
     column.Insert(ndx, value, len);
 }
 
-Mixed Table::GetMixed(size_t column_id, size_t ndx) const {
+Mixed Table::GetMixed(size_t column_id, size_t ndx) const
+{
     assert(column_id < m_columns.Size());
     assert(ndx < m_size);
 
@@ -894,7 +950,8 @@ Mixed Table::GetMixed(size_t column_id, size_t ndx) const {
     }
 }
 
-ColumnType Table::GetMixedType(size_t column_id, size_t ndx) const {
+ColumnType Table::GetMixedType(size_t column_id, size_t ndx) const
+{
     assert(column_id < m_columns.Size());
     assert(ndx < m_size);
 
@@ -902,7 +959,8 @@ ColumnType Table::GetMixedType(size_t column_id, size_t ndx) const {
     return column.GetType(ndx);
 }
 
-void Table::SetMixed(size_t column_id, size_t ndx, Mixed value) {
+void Table::SetMixed(size_t column_id, size_t ndx, Mixed value)
+{
     assert(column_id < GetColumnCount());
     assert(ndx < m_size);
 
@@ -970,7 +1028,8 @@ void Table::InsertMixed(size_t column_id, size_t ndx, Mixed value) {
     }
 }
 
-void Table::InsertDone() {
+void Table::InsertDone()
+{
     ++m_size;
 
 #ifdef _DEBUG
@@ -978,7 +1037,8 @@ void Table::InsertDone() {
 #endif //_DEBUG
 }
 
-size_t Table::Find(size_t column_id, int64_t value) const {
+size_t Table::Find(size_t column_id, int64_t value) const
+{
     assert(column_id < m_columns.Size());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_INT);
     const Column& column = GetColumn(column_id);
@@ -986,7 +1046,8 @@ size_t Table::Find(size_t column_id, int64_t value) const {
     return column.Find(value);
 }
 
-size_t Table::FindBool(size_t column_id, bool value) const {
+size_t Table::FindBool(size_t column_id, bool value) const
+{
     assert(column_id < m_columns.Size());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
     const Column& column = GetColumn(column_id);
@@ -994,7 +1055,8 @@ size_t Table::FindBool(size_t column_id, bool value) const {
     return column.Find(value ? 1 : 0);
 }
 
-size_t Table::FindDate(size_t column_id, time_t value) const {
+size_t Table::FindDate(size_t column_id, time_t value) const
+{
     assert(column_id < m_columns.Size());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
     const Column& column = GetColumn(column_id);
@@ -1002,7 +1064,8 @@ size_t Table::FindDate(size_t column_id, time_t value) const {
     return column.Find((int64_t)value);
 }
 
-size_t Table::FindString(size_t column_id, const char* value) const {
+size_t Table::FindString(size_t column_id, const char* value) const
+{
     assert(column_id < m_columns.Size());
 
     const ColumnType type = GetRealColumnType(column_id);
@@ -1018,7 +1081,8 @@ size_t Table::FindString(size_t column_id, const char* value) const {
     }
 }
 
-void Table::FindAll(TableView& tv, size_t column_id, int64_t value) {
+void Table::FindAll(TableView& tv, size_t column_id, int64_t value)
+{
     assert(column_id < m_columns.Size());
     assert(&tv.GetParent() == this);
 
@@ -1027,7 +1091,8 @@ void Table::FindAll(TableView& tv, size_t column_id, int64_t value) {
     column.FindAll(tv.GetRefColumn(), value);
 }
 
-void Table::FindAllBool(TableView& tv, size_t column_id, bool value) {
+void Table::FindAllBool(TableView& tv, size_t column_id, bool value)
+{
     assert(column_id < m_columns.Size());
     assert(&tv.GetParent() == this);
 
@@ -1036,7 +1101,8 @@ void Table::FindAllBool(TableView& tv, size_t column_id, bool value) {
     column.FindAll(tv.GetRefColumn(), value ? 1 :0);
 }
 
-void Table::FindAllString(TableView& tv, size_t column_id, const char *value) {
+void Table::FindAllString(TableView& tv, size_t column_id, const char *value)
+{
     assert(column_id < m_columns.Size());
     assert(&tv.GetParent() == this);
 
@@ -1055,7 +1121,8 @@ void Table::FindAllString(TableView& tv, size_t column_id, const char *value) {
 
 
 
-void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max) {
+void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max)
+{
     assert(column_id < m_columns.Size());
     assert(&tv.GetParent() == this);
 
@@ -1064,7 +1131,8 @@ void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size
     column.FindAllHamming(tv.GetRefColumn(), value, max);
 }
 
-void Table::Optimize() {
+void Table::Optimize()
+{
     const size_t column_count = GetColumnCount();
     Allocator& alloc = m_specSet.GetAllocator();
 
@@ -1099,7 +1167,8 @@ void Table::Optimize() {
     }
 }
 
-void Table::UpdateColumnRefs(size_t column_ndx, int diff) {
+void Table::UpdateColumnRefs(size_t column_ndx, int diff)
+{
     for (size_t i = column_ndx; i < m_cols.Size(); ++i) {
         const ColumnType type = GetRealColumnType(i);
 
@@ -1149,7 +1218,8 @@ void Table::UpdateColumnRefs(size_t column_ndx, int diff) {
 }
 
 
-void Table::UpdateFromSpec(size_t ref_specSet) {
+void Table::UpdateFromSpec(size_t ref_specSet)
+{
     assert(m_columns.IsEmpty() && m_cols.IsEmpty()); // only on initial creation
 
     m_specSet.UpdateRef(ref_specSet);
@@ -1172,7 +1242,8 @@ size_t Table::create_table(Allocator& alloc)
 }
 
 
-void Table::to_json(std::ostream& out) {
+void Table::to_json(std::ostream& out)
+{
     // Represent table as list of objects
     out << "[";
 
@@ -1295,7 +1366,8 @@ void Table::to_json(std::ostream& out) {
 #ifdef _DEBUG
 #include "stdio.h"
 
-bool Table::Compare(const Table& c) const {
+bool Table::Compare(const Table& c) const
+{
     if (!m_spec.Compare(c.m_spec)) return false;
     if (!m_columnNames.Compare(c.m_columnNames)) return false;
 
@@ -1336,7 +1408,8 @@ bool Table::Compare(const Table& c) const {
     return true;
 }
 
-void Table::verify() const {
+void Table::verify() const
+{
     const size_t column_count = GetColumnCount();
     assert(column_count == m_cols.Size());
     assert(column_count == m_columnNames.Size());
@@ -1421,7 +1494,8 @@ void Table::ToDot(std::ostream& out, const char* title) const
     out << "}" << endl;
 }
 
-void Table::ToDotInternal(std::ostream& out) const {
+void Table::ToDotInternal(std::ostream& out) const
+{
     m_columns.ToDot(out, "columns");
 
     // Columns
@@ -1433,7 +1507,8 @@ void Table::ToDotInternal(std::ostream& out) const {
     }
 }
 
-void Spec::ToDot(std::ostream& out, const char*) const {
+void Spec::ToDot(std::ostream& out, const char*) const
+{
     const size_t ref = m_specSet.GetRef();
 
     out << "subgraph cluster_specset" << ref << " {" << endl;
@@ -1460,8 +1535,8 @@ void Spec::ToDot(std::ostream& out, const char*) const {
     out << "}" << endl;
 }
 
-void Table::Print() const {
-
+void Table::Print() const
+{
     // Table header
     cout << "Table: len(" << m_size << ")\n    ";
     const size_t column_count = GetColumnCount();
@@ -1519,7 +1594,8 @@ void Table::Print() const {
     cout << "\n";
 }
 
-MemStats Table::Stats() const {
+MemStats Table::Stats() const
+{
     MemStats stats;
 
     const size_t column_count = GetColumnCount();

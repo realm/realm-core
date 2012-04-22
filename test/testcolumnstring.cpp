@@ -10,7 +10,8 @@ struct db_setup_column_string {
 
 AdaptiveStringColumn db_setup_column_string::c;
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringMultiEmpty) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringMultiEmpty)
+{
     c.Add("");
     c.Add("");
     c.Add("");
@@ -28,7 +29,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringMultiEmpty) {
 }
 
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand4) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand4)
+{
     c.Set(0, "hey");
 
     CHECK_EQUAL(6, c.Size());
@@ -40,7 +42,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand4) {
     CHECK_EQUAL("", c.Get(5));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand8) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand8)
+{
     c.Set(1, "test");
 
     CHECK_EQUAL(6, c.Size());
@@ -52,21 +55,24 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand8) {
     CHECK_EQUAL("", c.Get(5));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd0) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringAdd0)
+{
     c.Clear();
     c.Add();
     CHECK_EQUAL("", c.Get(0));
     CHECK_EQUAL(1, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd1) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringAdd1)
+{
     c.Add("a");
     CHECK_EQUAL("",  c.Get(0));
     CHECK_EQUAL("a", c.Get(1));
     CHECK_EQUAL(2, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd2) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringAdd2)
+{
     c.Add("bb");
     CHECK_EQUAL("",   c.Get(0));
     CHECK_EQUAL("a",  c.Get(1));
@@ -74,7 +80,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd2) {
     CHECK_EQUAL(3, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd3) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringAdd3)
+{
     c.Add("ccc");
     CHECK_EQUAL("",    c.Get(0));
     CHECK_EQUAL("a",   c.Get(1));
@@ -83,7 +90,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd3) {
     CHECK_EQUAL(4, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd4) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringAdd4)
+{
     c.Add("dddd");
     CHECK_EQUAL("",     c.Get(0));
     CHECK_EQUAL("a",    c.Get(1));
@@ -93,7 +101,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd4) {
     CHECK_EQUAL(5, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd8) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringAdd8)
+{
     c.Add("eeeeeeee");
     CHECK_EQUAL("",     c.Get(0));
     CHECK_EQUAL("a",    c.Get(1));
@@ -104,7 +113,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd8) {
     CHECK_EQUAL(6, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd16) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringAdd16)
+{
     c.Add("ffffffffffffffff");
     CHECK_EQUAL("",     c.Get(0));
     CHECK_EQUAL("a",    c.Get(1));
@@ -116,7 +126,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd16) {
     CHECK_EQUAL(7, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd32) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringAdd32)
+{
     c.Add("gggggggggggggggggggggggggggggggg");
 
     CHECK_EQUAL("",     c.Get(0));
@@ -130,7 +141,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd32) {
     CHECK_EQUAL(8, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd64) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringAdd64)
+{
     // Add a string longer than 64 bytes to trigger long strings
     c.Add("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx");
 
@@ -147,7 +159,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd64) {
 }
 
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringSet1) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringSet1)
+{
     c.Set(0, "ccc");
     c.Set(1, "bb");
     c.Set(2, "a");
@@ -166,7 +179,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSet1) {
     CHECK_EQUAL("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx", c.Get(8));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringInsert1) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringInsert1)
+{
     // Insert in middle
     c.Insert(4, "xx");
 
@@ -184,7 +198,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert1) {
     CHECK_EQUAL("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx", c.Get(9));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1)
+{
     // Delete from end
     c.Delete(9);
 
@@ -201,7 +216,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1) {
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(8));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2)
+{
     // Delete from top
     c.Delete(0);
 
@@ -217,7 +233,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2) {
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(7));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3)
+{
     // Delete from middle
     c.Delete(3);
 
@@ -232,7 +249,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3) {
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(6));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll)
+{
     // Delete all items one at a time
     c.Delete(0);
     CHECK_EQUAL(6, c.Size());
@@ -252,7 +270,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll) {
     CHECK(c.IsEmpty());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringInsert2) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringInsert2)
+{
     // Create new list
     c.Clear();
     c.Add("a");
@@ -271,7 +290,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert2) {
     CHECK_EQUAL(5, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringInsert3) {
+TEST_FIXTURE(db_setup_column_string, ColumnStringInsert3)
+{
     // Insert in middle with expansion
     c.Insert(3, "xxxxxxxxxx");
 
@@ -284,7 +304,8 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert3) {
     CHECK_EQUAL(6, c.Size());
 }
 
-TEST(ColumnStringFind1) {
+TEST(ColumnStringFind1)
+{
     AdaptiveStringColumn c;
 
     c.Add("a");
@@ -306,7 +327,8 @@ TEST(ColumnStringFind1) {
     c.Destroy();
 }
 
-TEST(ColumnStringFind2) {
+TEST(ColumnStringFind2)
+{
     AdaptiveStringColumn c;
 
     c.Add("a");
@@ -334,7 +356,8 @@ TEST(ColumnStringFind2) {
     c.Destroy();
 }
 
-TEST(ColumnStringAutoEnumerate) {
+TEST(ColumnStringAutoEnumerate)
+{
     AdaptiveStringColumn c;
 
     // Add duplicate values
@@ -375,7 +398,8 @@ TEST(ColumnStringAutoEnumerate) {
 }
 
 // Test "Replace string array with long string array" when doing it through LeafSet()
-TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2) {
+TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
+{
     c.Clear();
     Column col;
 
@@ -395,7 +419,8 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2) {
 }
 
 // Test against a bug where FindWithLen() would fail finding ajacent hits
-TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent) {
+TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
+{
     c.Clear();
     Array col;
 
@@ -412,8 +437,8 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent) {
     col.Destroy();
 }
 
-TEST(AdaptiveStringColumnFindAllExpand) {
-
+TEST(AdaptiveStringColumnFindAllExpand)
+{
     AdaptiveStringColumn asc;
     Array c;
 
@@ -456,7 +481,8 @@ TEST(AdaptiveStringColumnFindAllExpand) {
 }
 
 // FindAll using ranges, when expanded ArrayStringLong
-TEST(AdaptiveStringColumnFindAllRangesLong) {
+TEST(AdaptiveStringColumnFindAllRangesLong)
+{
     AdaptiveStringColumn asc;
     Array c;
 
@@ -509,7 +535,8 @@ TEST(AdaptiveStringColumnFindAllRangesLong) {
 }
 
 // FindAll using ranges, when not expanded (using ArrayString)
-TEST(AdaptiveStringColumnFindAllRanges) {
+TEST(AdaptiveStringColumnFindAllRanges)
+{
     AdaptiveStringColumn asc;
     Array c;
 
@@ -561,7 +588,8 @@ TEST(AdaptiveStringColumnFindAllRanges) {
     c.Destroy();
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy) {
+TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy)
+{
     // clean up (ALWAYS PUT THIS LAST)
     c.Destroy();
 }

@@ -25,13 +25,15 @@ const size_t THREAD_CHUNK_SIZE = 1000;
 
 class Query {
 public:
-    Query() {
+    Query()
+    {
         update.push_back(0);
         update_override.push_back(0);
         first.push_back(0);
         m_threadcount = 0;
     }
-    Query(const Query& copy) {
+    Query(const Query& copy)
+    {
         update = copy.update;
         update_override = copy.update_override;
         first = copy.first;
@@ -40,28 +42,33 @@ public:
         copy.first[0] = 0;
     }
 
-    ~Query() {
+    ~Query()
+    {
         for(size_t i = 0; i < m_threadcount; i++)
             pthread_detach(threads[i]);
         delete first[0];
     }
 
-    Query& Equal(size_t column_id, int64_t value) {
+    Query& Equal(size_t column_id, int64_t value)
+    {
         ParentNode* const p = new NODE<int64_t, Column, EQUAL>(value, column_id);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& NotEqual(size_t column_id, int64_t value) {
+    Query& NotEqual(size_t column_id, int64_t value)
+    {
         ParentNode* const p = new NODE<int64_t, Column, NOTEQUAL>(value, column_id);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& Greater(size_t column_id, int64_t value) {
+    Query& Greater(size_t column_id, int64_t value)
+    {
         ParentNode* const p = new NODE<int64_t, Column, GREATER>(value, column_id);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& GreaterEqual(size_t column_id, int64_t value) {
+    Query& GreaterEqual(size_t column_id, int64_t value)
+    {
         if(value > LLONG_MIN) {
             ParentNode* const p = new NODE<int64_t, Column, GREATER>(value - 1, column_id);
             UpdatePointers(p, &p->m_child);
@@ -69,7 +76,8 @@ public:
         // field >= LLONG_MIN has no effect
         return *this;
     };
-    Query& LessEqual(size_t column_id, int64_t value) {
+    Query& LessEqual(size_t column_id, int64_t value)
+    {
         if(value < LLONG_MAX) {
             ParentNode* const p = new NODE<int64_t, Column, LESS>(value + 1, column_id);
             UpdatePointers(p, &p->m_child);
@@ -77,18 +85,21 @@ public:
         // field <= LLONG_MAX has no effect
         return *this;
     };
-    Query& Less(size_t column_id, int64_t value) {
+    Query& Less(size_t column_id, int64_t value)
+    {
         ParentNode* const p = new NODE<int64_t, Column, LESS>(value, column_id);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
 
-    Query& Between(size_t column_id, int64_t from, int64_t to) {
+    Query& Between(size_t column_id, int64_t from, int64_t to)
+    {
         GreaterEqual(column_id, from);
         LessEqual(column_id, to);
         return *this;
     };
-    Query& Equal(size_t column_id, bool value) {
+    Query& Equal(size_t column_id, bool value)
+    {
         ParentNode* const p = new NODE<bool, Column, EQUAL>(value, column_id);
         UpdatePointers(p, &p->m_child);
         return *this;
@@ -96,7 +107,8 @@ public:
 
 
     // STRINGS
-    Query& Equal(size_t column_id, const char* value, bool caseSensitive=true) {
+    Query& Equal(size_t column_id, const char* value, bool caseSensitive=true)
+    {
         ParentNode* p;
         if(caseSensitive)
             p = new STRINGNODE<EQUAL>(value, column_id);
@@ -105,7 +117,8 @@ public:
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& BeginsWith(size_t column_id, const char* value, bool caseSensitive=true) {
+    Query& BeginsWith(size_t column_id, const char* value, bool caseSensitive=true)
+    {
         ParentNode* p;
         if(caseSensitive)
             p = new STRINGNODE<BEGINSWITH>(value, column_id);
@@ -114,7 +127,8 @@ public:
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& EndsWith(size_t column_id, const char* value, bool caseSensitive=true) {
+    Query& EndsWith(size_t column_id, const char* value, bool caseSensitive=true)
+    {
         ParentNode* p;
         if(caseSensitive)
             p = new STRINGNODE<ENDSWITH>(value, column_id);
@@ -123,7 +137,8 @@ public:
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& Contains(size_t column_id, const char* value, bool caseSensitive=true) {
+    Query& Contains(size_t column_id, const char* value, bool caseSensitive=true)
+    {
         ParentNode* p;
         if(caseSensitive)
             p = new STRINGNODE<CONTAINS>(value, column_id);
@@ -132,7 +147,8 @@ public:
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& NotEqual(size_t column_id, const char* value, bool caseSensitive=true) {
+    Query& NotEqual(size_t column_id, const char* value, bool caseSensitive=true)
+    {
         ParentNode* p;
         if(caseSensitive)
             p = new STRINGNODE<NOTEQUAL>(value, column_id);
@@ -142,19 +158,22 @@ public:
         return *this;
     };
 
-    void LeftParan(void) {
+    void LeftParan(void)
+    {
         update.push_back(0);
         update_override.push_back(0);
         first.push_back(0);
     };
-    void Or(void) {
+    void Or(void)
+    {
         ParentNode* const o = new OR_NODE(first[first.size()-1]);
         first[first.size()-1] = o;
         update[update.size()-1] = &((OR_NODE*)o)->m_cond2;
         update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
     };
 
-    void Subtable(size_t column) {
+    void Subtable(size_t column)
+    {
 
         ParentNode* const p = new SUBTABLE(column);
         UpdatePointers(p, &p->m_child);
@@ -163,7 +182,8 @@ public:
         LeftParan();
     }
 
-    void Parent() {
+    void Parent()
+    {
         RightParan();
 
         if (update[update.size()-1] != 0)
@@ -172,7 +192,8 @@ public:
         subtables.pop_back();
     }
 
-    void RightParan(void) {
+    void RightParan(void)
+    {
         if(first.size() < 2) {
             error_code = "Unbalanced blockBegin/blockEnd";
             return;
@@ -194,13 +215,15 @@ public:
         update_override.pop_back();
     };
 
-    TableView FindAll(Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) {
+    TableView FindAll(Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1)
+    {
         TableView tv(table);
         FindAll(table, tv, start, end, limit);
         return tv;
     }
 
-    void FindAll(Table& table, TableView& tv, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) {
+    void FindAll(Table& table, TableView& tv, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1)
+    {
         Init(table);
 
         size_t r  = start - 1;
@@ -231,7 +254,8 @@ public:
     }
 
     int64_t Sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1,
-        size_t limit = (size_t)-1) const {
+        size_t limit = (size_t)-1) const
+    {
         Init(table);
 
         size_t r = start - 1;
@@ -255,7 +279,8 @@ public:
     }
 
     int64_t Max(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1,
-        size_t limit = (size_t)-1) const {
+        size_t limit = (size_t)-1) const
+    {
         Init(table);
 
         size_t r = start - 1;
@@ -277,7 +302,8 @@ public:
         return max;
     }
 
-    int64_t Min(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+    int64_t Min(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const
+    {
         Init(table);
 
         size_t r = start - 1;
@@ -298,7 +324,8 @@ public:
         return min;
     }
 
-    size_t Count(const Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+    size_t Count(const Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const
+    {
         Init(table);
 
         size_t r = start - 1;
@@ -313,7 +340,8 @@ public:
         return results;
     }
 
-    double Avg(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+    double Avg(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const
+    {
         Init(table);
 
         size_t resultcount2;
@@ -327,7 +355,8 @@ public:
     }
 
     // todo, not sure if start, end and limit could be useful for delete.
-    size_t Delete(Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const {
+    size_t Delete(Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const
+    {
         size_t r = start - 1;
         size_t results = 0;
         Init(table);
@@ -342,7 +371,8 @@ public:
         return results;
     }
 
-    void FindAllMulti(Table& table, TableView& tv, size_t start = 0, size_t end = (size_t)-1) {
+    void FindAllMulti(Table& table, TableView& tv, size_t start = 0, size_t end = (size_t)-1)
+    {
         // Initialization
         Init(table);
         ts.next_job = start;
@@ -377,7 +407,8 @@ public:
         }
     }
 
-    int SetThreads(unsigned int threadcount) {
+    int SetThreads(unsigned int threadcount)
+    {
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
         pthread_win32_process_attach_np ();
 #endif
@@ -404,7 +435,8 @@ public:
 
     std::string error_code;
 
-    std::string Verify(void) {
+    std::string Verify()
+    {
         if(first.size() == 0)
             return "";
 
@@ -421,14 +453,16 @@ protected:
     friend class XQueryAccessorInt;
     friend class XQueryAccessorString;
 
-    void Init(const Table& table) const {
+    void Init(const Table& table) const
+    {
         if (first[0] != NULL) {
             ParentNode* top = (ParentNode*)first[0];
             top->Init(table);
         }
     }
 
-    size_t FindInternal(const Table& table, size_t start = 0, size_t end = (size_t)-1) const {
+    size_t FindInternal(const Table& table, size_t start = 0, size_t end = (size_t)-1) const
+    {
         if (end == (size_t)-1) end = table.GetSize();
         if (start == end) return (size_t)-1;
 
@@ -444,7 +478,8 @@ protected:
             return r;
     }
 
-    void UpdatePointers(ParentNode *p, ParentNode **newnode) {
+    void UpdatePointers(ParentNode* p, ParentNode** newnode)
+    {
         if(first[first.size()-1] == 0)
             first[first.size()-1] = p;
 
@@ -454,12 +489,14 @@ protected:
         update[update.size()-1] = newnode;
     }
 
-    static bool comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b) {
+    static bool comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b)
+    {
         return a.first < b.first;
     }
 
-    static void *query_thread(void *arg) {
-        thread_state *ts = (thread_state *)arg;
+    static void* query_thread(void* arg)
+    {
+        thread_state* ts = (thread_state*)arg;
 
         std::vector<size_t> res;
         std::vector<std::pair<size_t, size_t> > chunks;
@@ -532,17 +569,17 @@ protected:
     } ts;
     pthread_t threads[MAX_THREADS];
 
-    mutable std::vector<ParentNode *>first;
-    std::vector<ParentNode **>update;
-    std::vector<ParentNode **>update_override;
-    std::vector<ParentNode **>subtables;
+    mutable std::vector<ParentNode*>first;
+    std::vector<ParentNode**>update;
+    std::vector<ParentNode**>update_override;
+    std::vector<ParentNode**>subtables;
     private:
     size_t m_threadcount;
 };
 
 class XQueryAccessorInt {
 public:
-    XQueryAccessorInt(size_t column_id) : m_column_id(column_id) {}
+    XQueryAccessorInt(size_t column_id): m_column_id(column_id) {}
     Query& Equal(int64_t value) {return m_query->Equal(m_column_id, value);}
     Query& NotEqual(int64_t value) {return m_query->NotEqual(m_column_id, value);}
     Query& Greater(int64_t value) {return m_query->Greater(m_column_id, value);}
@@ -557,7 +594,7 @@ protected:
 
 class XQueryAccessorString {
 public:
-    XQueryAccessorString(size_t column_id) : m_column_id(column_id) {}
+    XQueryAccessorString(size_t column_id): m_column_id(column_id) {}
     Query& Equal(const char *value, bool CaseSensitive) {return m_query->Equal(m_column_id, value, CaseSensitive);}
     Query& BeginsWith(const char *value, bool CaseSensitive) {return m_query->BeginsWith(m_column_id, value, CaseSensitive);}
     Query& EndsWith(const char *value, bool CaseSensitive) {return m_query->EndsWith(m_column_id, value, CaseSensitive);}
@@ -570,7 +607,7 @@ protected:
 
 class XQueryAccessorBool {
 public:
-    XQueryAccessorBool(size_t column_id) : m_column_id(column_id) {}
+    XQueryAccessorBool(size_t column_id): m_column_id(column_id) {}
     Query& Equal(bool value) {return m_query->Equal(m_column_id, value);}
 protected:
     Query* m_query;
@@ -579,7 +616,7 @@ protected:
 
 class XQueryAccessorMixed {
 public:
-    XQueryAccessorMixed(size_t column_id) : m_column_id(column_id) {}
+    XQueryAccessorMixed(size_t column_id): m_column_id(column_id) {}
 protected:
     Query* m_query;
     size_t m_column_id;

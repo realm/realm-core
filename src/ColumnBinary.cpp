@@ -4,7 +4,8 @@ namespace {
 
 using namespace tightdb;
 
-bool IsNodeFromRef(size_t ref, Allocator& alloc) {
+bool IsNodeFromRef(size_t ref, Allocator& alloc)
+{
     const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
     const bool isNode = (header[0] & 0x80) != 0;
 
@@ -16,11 +17,13 @@ bool IsNodeFromRef(size_t ref, Allocator& alloc) {
 
 namespace tightdb {
 
-ColumnBinary::ColumnBinary(Allocator& alloc) {
+ColumnBinary::ColumnBinary(Allocator& alloc)
+{
     m_array = new ArrayBinary(NULL, 0, alloc);
 }
 
-ColumnBinary::ColumnBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc) {
+ColumnBinary::ColumnBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
+{
     const bool isNode = IsNodeFromRef(ref, alloc);
     if (isNode) {
         m_array = new Array(ref, parent, pndx, alloc);
@@ -30,17 +33,20 @@ ColumnBinary::ColumnBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocat
     }
 }
 
-ColumnBinary::~ColumnBinary() {
+ColumnBinary::~ColumnBinary()
+{
     if (IsNode()) delete m_array;
     else delete (ArrayBinary*)m_array;
 }
 
-void ColumnBinary::Destroy() {
+void ColumnBinary::Destroy()
+{
     if (IsNode()) m_array->Destroy();
     else ((ArrayBinary*)m_array)->Destroy();
 }
 
-void ColumnBinary::UpdateRef(size_t ref) {
+void ColumnBinary::UpdateRef(size_t ref)
+{
     assert(IsNodeFromRef(ref, m_array->GetAllocator())); // Can only be called when creating node
 
     if (IsNode()) m_array->UpdateRef(ref);
@@ -58,7 +64,8 @@ void ColumnBinary::UpdateRef(size_t ref) {
     }
 }
 
-bool ColumnBinary::IsEmpty() const {
+bool ColumnBinary::IsEmpty() const
+{
     if (IsNode()) {
         const Array offsets = NodeGetOffsets();
         return offsets.IsEmpty();
@@ -68,7 +75,8 @@ bool ColumnBinary::IsEmpty() const {
     }
 }
 
-size_t ColumnBinary::Size() const {
+size_t ColumnBinary::Size() const
+{
     if (IsNode())  {
         const Array offsets = NodeGetOffsets();
         const size_t size = offsets.IsEmpty() ? 0 : (size_t)offsets.Back();
@@ -79,7 +87,8 @@ size_t ColumnBinary::Size() const {
     }
 }
 
-void ColumnBinary::Clear() {
+void ColumnBinary::Clear()
+{
     if (m_array->IsNode()) {
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx = m_array->GetParentNdx();
@@ -97,87 +106,103 @@ void ColumnBinary::Clear() {
     else ((ArrayBinary*)m_array)->Clear();
 }
 
-BinaryData ColumnBinary::Get(size_t ndx) const {
+BinaryData ColumnBinary::Get(size_t ndx) const
+{
     assert(ndx < Size());
     return TreeGet<BinaryData,ColumnBinary>(ndx);
 }
 
-const void* ColumnBinary::GetData(size_t ndx) const {
+const void* ColumnBinary::GetData(size_t ndx) const
+{
     assert(ndx < Size());
     const BinaryData bin = TreeGet<BinaryData,ColumnBinary>(ndx);
     return bin.pointer;
 }
 
-size_t ColumnBinary::GetLen(size_t ndx) const {
+size_t ColumnBinary::GetLen(size_t ndx) const
+{
     assert(ndx < Size());
     const BinaryData bin = TreeGet<BinaryData,ColumnBinary>(ndx);
     return bin.len;
 }
 
-void ColumnBinary::Set(size_t ndx, const void* value, size_t len) {
+void ColumnBinary::Set(size_t ndx, const void* value, size_t len)
+{
     assert(ndx < Size());
     const BinaryData bin = {value, len};
     Set(ndx, bin);
 }
 
-bool ColumnBinary::Set(size_t ndx, BinaryData bin) {
+bool ColumnBinary::Set(size_t ndx, BinaryData bin)
+{
     assert(ndx < Size());
     return TreeSet<BinaryData,ColumnBinary>(ndx, bin);
 }
 
-void ColumnBinary::Add(const void* value, size_t len) {
+void ColumnBinary::Add(const void* value, size_t len)
+{
     Insert(Size(), value, len);
 }
 
-bool ColumnBinary::Add(BinaryData bin) {
+bool ColumnBinary::Add(BinaryData bin)
+{
     return Insert(Size(), bin);
 }
 
-void ColumnBinary::Insert(size_t ndx, const void* value, size_t len) {
+void ColumnBinary::Insert(size_t ndx, const void* value, size_t len)
+{
     assert(ndx <= Size());
     const BinaryData bin = {value, len};
     Insert(ndx, bin);
 }
 
-bool ColumnBinary::Insert(size_t ndx, BinaryData bin) {
+bool ColumnBinary::Insert(size_t ndx, BinaryData bin)
+{
     assert(ndx <= Size());
     return TreeInsert<BinaryData,ColumnBinary>(ndx, bin);
 }
 
-void ColumnBinary::Delete(size_t ndx) {
+void ColumnBinary::Delete(size_t ndx)
+{
     assert(ndx < Size());
     TreeDelete<BinaryData,ColumnBinary>(ndx);
 }
 
-void ColumnBinary::Resize(size_t ndx) {
+void ColumnBinary::Resize(size_t ndx)
+{
     assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
     assert(ndx < Size());
     ((ArrayBinary*)m_array)->Resize(ndx);
 }
 
-BinaryData ColumnBinary::LeafGet(size_t ndx) const {
+BinaryData ColumnBinary::LeafGet(size_t ndx) const
+{
     const ArrayBinary* const array = (ArrayBinary*)m_array;
     const BinaryData bin = {array->Get(ndx), array->GetLen(ndx)};
     return bin;
 }
 
-bool ColumnBinary::LeafSet(size_t ndx, BinaryData value) {
+bool ColumnBinary::LeafSet(size_t ndx, BinaryData value)
+{
     ((ArrayBinary*)m_array)->Set(ndx, value.pointer, value.len);
     return true;
 }
 
-bool ColumnBinary::LeafInsert(size_t ndx, BinaryData value) {
+bool ColumnBinary::LeafInsert(size_t ndx, BinaryData value)
+{
     ((ArrayBinary*)m_array)->Insert(ndx, value.pointer, value.len);
     return true;
 }
 
-void ColumnBinary::LeafDelete(size_t ndx) {
+void ColumnBinary::LeafDelete(size_t ndx)
+{
     ((ArrayBinary*)m_array)->Delete(ndx);
 }
 
 #ifdef _DEBUG
 
-void ColumnBinary::LeafToDot(std::ostream& out, const Array& array) const {
+void ColumnBinary::LeafToDot(std::ostream& out, const Array& array) const
+{
     // Rebuild array to get correct type
     const size_t ref = array.GetRef();
     const ArrayBinary binarray(ref, NULL, 0, array.GetAllocator());

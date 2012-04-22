@@ -7,12 +7,9 @@
 
 using namespace tightdb;
 
-// Pre-declare local functions
-uint64_t rand2();
-
-
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
-uint64_t rand2() {
+uint64_t rand2()
+{
     static int64_t seed = 2862933555777941757ULL;
     static int64_t seed2 = 0;
     seed = (2862933555777941757ULL * seed + 3037000493ULL);
@@ -42,8 +39,8 @@ TDB_TABLE_4(TestTable,
             Int,        third,
             Enum<Days>, fourth)
 
-int main() {
-
+int main()
+{
     TestTable table;
 
     // Build large table
@@ -138,4 +135,3 @@ int main() {
 
     return 0;
 }
-

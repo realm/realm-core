@@ -22,7 +22,8 @@ size_t sequence_length(const char *lead)
 
 
 // assumes both chars have same lengths. Assumes both chars are in 0-terminated strings
-size_t comparechars(const char *c1, const char *c2) {
+size_t comparechars(const char* c1, const char* c2)
+{
     size_t p = 0;
     do {
         if(c1[p] != c2[p])
@@ -36,7 +37,8 @@ size_t comparechars(const char *c1, const char *c2) {
 // If constant == source, return 1.
 // Else, if constant is a prefix of source, return 0
 // Else return -1
-size_t case_prefix(const char *constant_upper, const char *constant_lower, const char *source) {
+size_t case_prefix(const char* constant_upper, const char* constant_lower, const char* source)
+{
     size_t matchlen = 0;
     do {
         size_t m = comparechars(&constant_lower[matchlen], &source[matchlen]);
@@ -61,7 +63,8 @@ size_t case_prefix(const char *constant_upper, const char *constant_lower, const
 // compare instead of one whole UTF-8 character at a time. This is very fast, but enough to guarantee
 // that the strings are identical, so we need a slower character compare later (we use case_prefix()
 // for this).
-bool case_cmp(const char *constant_upper, const char *constant_lower, const char *source) {
+bool case_cmp(const char* constant_upper, const char* constant_lower, const char *source)
+{
     size_t matchlen = 0;
     do {
         if(constant_lower[matchlen] == source[matchlen] || constant_upper[matchlen] == source[matchlen])
@@ -89,7 +92,8 @@ bool case_strstr(const char *constant_upper, const char *constant_lower, const c
 }
 
 // Converts a single utf8 character to upper or lower case. Operating system specific function.
-bool utf8case_single(const char *source, char *destination, int upper) {
+bool utf8case_single(const char* source, char* destination, int upper)
+{
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
     wchar_t tmp[2];
 
@@ -119,7 +123,8 @@ bool utf8case_single(const char *source, char *destination, int upper) {
 // Converts utf8 source into upper or lower case. This function preserves the byte length of each utf8
 // character in following way: If an output character differs in size, it is simply substituded by the
 // original character. This may of course give wrong search results in very special cases. Todo.
-bool utf8case(const char *source, char *destination, int upper) {
+bool utf8case(const char* source, char* destination, int upper)
+{
     while(*source != 0) {
         if(sequence_length(source) == 0)
             return false;

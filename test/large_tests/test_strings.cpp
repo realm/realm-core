@@ -10,17 +10,21 @@
 
 using namespace tightdb;
 
-static uint64_t rand2(int bitwidth);
 string randstring(void);
 
+namespace {
+
 // Support functions for monkey test
-static uint64_t rand2(int bitwidth = 64) {
+uint64_t rand2(int bitwidth = 64)
+{
     uint64_t i = (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand();
     if(bitwidth < 64) {
         const uint64_t mask = ((1ULL << bitwidth) - 1ULL);
         i &= mask;
     }
     return i;
+}
+
 }
 
 string randstring(void)
@@ -38,7 +42,8 @@ string randstring(void)
     return s;
 }
 
-TEST(ColumnString_monkeytest2) {
+TEST(ColumnString_monkeytest2)
+{
     const uint64_t ITER = 16 * 5000 * TEST_DURATION * TEST_DURATION * TEST_DURATION;
     const uint64_t SEED = 123;
 
@@ -81,6 +86,5 @@ TEST(ColumnString_monkeytest2) {
     a.Destroy();
     res.Destroy();
 }
-
 
 #endif

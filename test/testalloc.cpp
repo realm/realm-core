@@ -7,14 +7,16 @@ using namespace tightdb;
 void SetCapacity(void* p, size_t size);
 
 
-void SetCapacity(void* p, size_t size) {
+void SetCapacity(void* p, size_t size)
+{
     uint8_t* header = (uint8_t*)p;
     header[4] = (size >> 16) & 0x000000FF;
     header[5] = (size >> 8) & 0x000000FF;
     header[6] = size & 0x000000FF;
 }
 
-TEST(Alloc1) {
+TEST(Alloc1)
+{
     SlabAlloc alloc;
 
     const MemRef mr1 = alloc.Alloc(8);

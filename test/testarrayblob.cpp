@@ -3,7 +3,8 @@
 
 using namespace tightdb;
 
-TEST(ArrayBlob) {
+TEST(ArrayBlob)
+{
     ArrayBlob blob;
 
     const char* const t1 = "aaa";

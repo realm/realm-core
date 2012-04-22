@@ -2,12 +2,10 @@
 #define __NUMBER_NAMES__
 
 #include <string>
-using namespace std;
+using namespace std; // FIXME: Not to appear in a header file
 
-// Pre-declare local functions
-string number_name(size_t n);
-
-string number_name(size_t n) {
+string number_name(size_t n)
+{
     static const char* ones[] = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
                                  "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
                                  "eighteen", "nineteen"};

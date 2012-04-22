@@ -181,7 +181,8 @@ protected:
     bool LeafInsert(size_t ndx, int64_t value) {return m_array->Insert(ndx, value);}
     void LeafDelete(size_t ndx) {m_array->Delete(ndx);}
 
-    template <class F>size_t LeafFind(int64_t value, size_t start, size_t end) const {
+    template <class F>size_t LeafFind(int64_t value, size_t start, size_t end) const
+    {
         return m_array->Query<F>(value, start, end);
     }
 

@@ -144,7 +144,8 @@ public:
     void InsertInt(size_t column_id, size_t ndx, int64_t value);
     void InsertBool(size_t column_id, size_t ndx, bool value) {InsertInt(column_id, ndx, value ? 1 :0);}
     void InsertDate(size_t column_id, size_t ndx, time_t value) {InsertInt(column_id, ndx, (int64_t)value);}
-    template<class T> void InsertEnum(size_t column_id, size_t ndx, T value) {
+    template<class T> void InsertEnum(size_t column_id, size_t ndx, T value)
+    {
         InsertInt(column_id, ndx, (int)value);
     }
     void InsertString(size_t column_id, size_t ndx, const char* value);
@@ -304,8 +305,7 @@ private:
 
 
 
-class Table::Parent: public ArrayParent
-{
+class Table::Parent: public ArrayParent {
 protected:
     friend class Table;
 
@@ -314,20 +314,6 @@ protected:
      */
     virtual void child_destroyed(std::size_t child_ndx) = 0;
 };
-
-
-
-/**
- * A table whose schema can be modified a run-time.
- */
-/*
-class TopLevelTable : public Table {
-public:
-    // Debug
-#ifdef _DEBUG
-    void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
-*/
 
 
 
@@ -486,7 +472,7 @@ protected:
     size_t m_column;
 };
 
-class ColumnProxyInt : public ColumnProxy {
+class ColumnProxyInt: public ColumnProxy {
 public:
     size_t Find(int64_t value) const {return m_table->Find(m_column, value);}
     size_t FindPos(int64_t value) const {return m_table->GetColumn(m_column).FindPos(value);}
@@ -499,22 +485,22 @@ public:
     int operator+=(int value) {m_table->GetColumn(m_column).Increment64(value); return 0;}
 };
 
-class ColumnProxyBool : public ColumnProxy {
+class ColumnProxyBool: public ColumnProxy {
 public:
     size_t Find(bool value) const {return m_table->FindBool(m_column, value);}
 };
 
-class ColumnProxyDate : public ColumnProxy {
+class ColumnProxyDate: public ColumnProxy {
 public:
     size_t Find(time_t value) const {return m_table->FindDate(m_column, value);}
 };
 
-template<class T> class ColumnProxyEnum : public ColumnProxy {
+template<class T> class ColumnProxyEnum: public ColumnProxy {
 public:
     size_t Find(T value) const {return m_table->Find(m_column, (int64_t)value);}
 };
 
-class ColumnProxyString : public ColumnProxy {
+class ColumnProxyString: public ColumnProxy {
 public:
     size_t Find(const char* value) const {return m_table->FindString(m_column, value);}
     TableView FindAll(const char *value) {TableView tv(*m_table); m_table->FindAllString(tv, m_column, value); return tv;}
@@ -522,9 +508,7 @@ public:
 
 };
 
-class ColumnProxyMixed : public ColumnProxy {
-public:
-};
+class ColumnProxyMixed: public ColumnProxy {};
 
 template<class T> class tdbTypeEnum {
 public:
@@ -590,9 +574,7 @@ public:
     QueryItem between(T, T) {return QueryItem();}
 };
 
-class QueryAccessorMixed {
-public:
-};
+class QueryAccessorMixed {};
 
 }
 

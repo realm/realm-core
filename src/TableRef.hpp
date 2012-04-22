@@ -27,8 +27,7 @@ namespace tightdb {
  * references obtained from it, or from any of its subtables, are
  * invalidated.
  */
-template<class T> struct BasicTableRef
-{
+template<class T> struct BasicTableRef {
     /**
      * Construct a null reference.
      */

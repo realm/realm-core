@@ -5,19 +5,22 @@ using namespace std;
 
 namespace tightdb {
 
-ColumnMixed::~ColumnMixed() {
+ColumnMixed::~ColumnMixed()
+{
     delete m_types;
     delete m_refs;
     delete m_data;
     delete m_array;
 }
 
-void ColumnMixed::Destroy() {
+void ColumnMixed::Destroy()
+{
     if(m_array != NULL)
         m_array->Destroy();
 }
 
-void ColumnMixed::SetParent(ArrayParent *parent, size_t pndx) {
+void ColumnMixed::SetParent(ArrayParent *parent, size_t pndx)
+{
     m_array->SetParent(parent, pndx);
 }
 
@@ -56,7 +59,8 @@ void ColumnMixed::Create(size_t ref, ArrayParent *parent, size_t pndx,
     }
 }
 
-void ColumnMixed::InitDataColumn() {
+void ColumnMixed::InitDataColumn()
+{
     if (m_data) return;
 
     assert(m_array->Size() == 2);
@@ -69,7 +73,8 @@ void ColumnMixed::InitDataColumn() {
     m_data->SetParent(m_array, 2);
 }
 
-void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype) {
+void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype)
+{
     assert(ndx < m_types->Size());
 
     const ColumnType type = (ColumnType)m_types->Get(ndx);
@@ -104,12 +109,14 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype) {
     if (type != newtype) m_types->Set(ndx, newtype);
 }
 
-ColumnType ColumnMixed::GetType(size_t ndx) const {
+ColumnType ColumnMixed::GetType(size_t ndx) const
+{
     assert(ndx < m_types->Size());
     return (ColumnType)m_types->Get(ndx);
 }
 
-int64_t ColumnMixed::GetInt(size_t ndx) const {
+int64_t ColumnMixed::GetInt(size_t ndx) const
+{
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_INT);
 
@@ -117,7 +124,8 @@ int64_t ColumnMixed::GetInt(size_t ndx) const {
     return value;
 }
 
-bool ColumnMixed::GetBool(size_t ndx) const {
+bool ColumnMixed::GetBool(size_t ndx) const
+{
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_BOOL);
 
@@ -125,7 +133,8 @@ bool ColumnMixed::GetBool(size_t ndx) const {
     return value;
 }
 
-time_t ColumnMixed::GetDate(size_t ndx) const {
+time_t ColumnMixed::GetDate(size_t ndx) const
+{
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_DATE);
 
@@ -133,7 +142,8 @@ time_t ColumnMixed::GetDate(size_t ndx) const {
     return value;
 }
 
-const char* ColumnMixed::GetString(size_t ndx) const {
+const char* ColumnMixed::GetString(size_t ndx) const
+{
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_STRING);
     assert(m_data);
@@ -144,7 +154,8 @@ const char* ColumnMixed::GetString(size_t ndx) const {
     return value;
 }
 
-BinaryData ColumnMixed::GetBinary(size_t ndx) const {
+BinaryData ColumnMixed::GetBinary(size_t ndx) const
+{
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_BINARY);
     assert(m_data);
@@ -154,7 +165,8 @@ BinaryData ColumnMixed::GetBinary(size_t ndx) const {
     return m_data->Get(ref);
 }
 
-void ColumnMixed::InsertInt(size_t ndx, int64_t value) {
+void ColumnMixed::InsertInt(size_t ndx, int64_t value)
+{
     assert(ndx <= m_types->Size());
 
     // Shift value one bit and set lowest bit to indicate
@@ -165,7 +177,8 @@ void ColumnMixed::InsertInt(size_t ndx, int64_t value) {
     m_refs->Insert(ndx, v);
 }
 
-void ColumnMixed::InsertBool(size_t ndx, bool value) {
+void ColumnMixed::InsertBool(size_t ndx, bool value)
+{
     assert(ndx <= m_types->Size());
 
     // Shift value one bit and set lowest bit to indicate
@@ -176,7 +189,8 @@ void ColumnMixed::InsertBool(size_t ndx, bool value) {
     m_refs->Insert(ndx, v);
 }
 
-void ColumnMixed::InsertDate(size_t ndx, time_t value) {
+void ColumnMixed::InsertDate(size_t ndx, time_t value)
+{
     assert(ndx <= m_types->Size());
 
     // Shift value one bit and set lowest bit to indicate
@@ -187,7 +201,8 @@ void ColumnMixed::InsertDate(size_t ndx, time_t value) {
     m_refs->Insert(ndx, v);
 }
 
-void ColumnMixed::InsertString(size_t ndx, const char* value) {
+void ColumnMixed::InsertString(size_t ndx, const char* value)
+{
     assert(ndx <= m_types->Size());
     InitDataColumn();
 
@@ -203,7 +218,8 @@ void ColumnMixed::InsertString(size_t ndx, const char* value) {
     m_refs->Insert(ndx, v);
 }
 
-void ColumnMixed::InsertBinary(size_t ndx, const char* value, size_t len) {
+void ColumnMixed::InsertBinary(size_t ndx, const char* value, size_t len)
+{
     assert(ndx <= m_types->Size());
     InitDataColumn();
 
@@ -218,7 +234,8 @@ void ColumnMixed::InsertBinary(size_t ndx, const char* value, size_t len) {
     m_refs->Insert(ndx, v);
 }
 
-void ColumnMixed::SetInt(size_t ndx, int64_t value) {
+void ColumnMixed::SetInt(size_t ndx, int64_t value)
+{
     assert(ndx < m_types->Size());
 
     // Remove refs or binary data (sets type to int)
@@ -231,7 +248,8 @@ void ColumnMixed::SetInt(size_t ndx, int64_t value) {
     m_refs->Set(ndx, v);
 }
 
-void ColumnMixed::SetBool(size_t ndx, bool value) {
+void ColumnMixed::SetBool(size_t ndx, bool value)
+{
     assert(ndx < m_types->Size());
 
     // Remove refs or binary data (sets type to int)
@@ -244,7 +262,8 @@ void ColumnMixed::SetBool(size_t ndx, bool value) {
     m_refs->Set(ndx, v);
 }
 
-void ColumnMixed::SetDate(size_t ndx, time_t value) {
+void ColumnMixed::SetDate(size_t ndx, time_t value)
+{
     assert(ndx < m_types->Size());
 
     // Remove refs or binary data (sets type to int)
@@ -257,7 +276,8 @@ void ColumnMixed::SetDate(size_t ndx, time_t value) {
     m_refs->Set(ndx, v);
 }
 
-void ColumnMixed::SetString(size_t ndx, const char* value) {
+void ColumnMixed::SetString(size_t ndx, const char* value)
+{
     assert(ndx < m_types->Size());
     InitDataColumn();
 
@@ -291,7 +311,8 @@ void ColumnMixed::SetString(size_t ndx, const char* value) {
     }
 }
 
-void ColumnMixed::SetBinary(size_t ndx, const char* value, size_t len) {
+void ColumnMixed::SetBinary(size_t ndx, const char* value, size_t len)
+{
     assert(ndx < m_types->Size());
     InitDataColumn();
 
@@ -340,12 +361,14 @@ void ColumnMixed::SetTable(size_t ndx)
     m_refs->Set(ndx, ref);
 }
 
-bool ColumnMixed::Add() {
+bool ColumnMixed::Add()
+{
     InsertInt(Size(), 0);
     return true;
 }
 
-void ColumnMixed::Delete(size_t ndx) {
+void ColumnMixed::Delete(size_t ndx)
+{
     assert(ndx < m_types->Size());
 
     // Remove refs or binary data
@@ -387,7 +410,8 @@ void ColumnMixed::verify() const
     }
 }
 
-void ColumnMixed::ToDot(std::ostream& out, const char* title) const {
+void ColumnMixed::ToDot(std::ostream& out, const char* title) const
+{
     const size_t ref = GetRef();
 
     out << "subgraph cluster_columnmixed" << ref << " {" << std::endl;

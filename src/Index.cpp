@@ -9,13 +9,15 @@ namespace {
 
 using namespace tightdb;
 
-Index GetIndexFromRef(Array& parent, size_t ndx) {
+Index GetIndexFromRef(Array& parent, size_t ndx)
+{
     assert(parent.HasRefs());
     assert(ndx < parent.Size());
     return Index((size_t)parent.Get(ndx), &parent, ndx);
 }
 
-const Index GetIndexFromRef(const Array& parent, size_t ndx) {
+const Index GetIndexFromRef(const Array& parent, size_t ndx)
+{
     assert(parent.HasRefs());
     assert(ndx < parent.Size());
     return Index((size_t)parent.Get(ndx));
@@ -27,7 +29,8 @@ const Index GetIndexFromRef(const Array& parent, size_t ndx) {
 
 namespace tightdb {
 
-Index::Index() : Column(COLUMN_HASREFS) {
+Index::Index(): Column(COLUMN_HASREFS)
+{
     // Add subcolumns for leafs
     const Array values(COLUMN_NORMAL);
     const Array refs(COLUMN_NORMAL); // we do not own these refs (to column positions), so no COLUMN_HASREF
@@ -35,21 +38,20 @@ Index::Index() : Column(COLUMN_HASREFS) {
     m_array->Add((intptr_t)refs.GetRef());
 }
 
-Index::Index(ColumnDef type, Array* parent, size_t pndx) : Column(type, parent, pndx) {
-}
+Index::Index(ColumnDef type, Array* parent, size_t pndx): Column(type, parent, pndx) {}
 
-Index::Index(size_t ref) : Column(ref) {
-}
+Index::Index(size_t ref): Column(ref) {}
 
-Index::Index(size_t ref, Array* parent, size_t pndx) : Column(ref, parent, pndx) {
-}
+Index::Index(size_t ref, Array* parent, size_t pndx): Column(ref, parent, pndx) {}
 
-bool Index::IsEmpty() const {
+bool Index::IsEmpty() const
+{
     const Array offsets = m_array->GetSubArray(0);
     return offsets.IsEmpty();
 }
 
-void Index::BuildIndex(const Column& src) {
+void Index::BuildIndex(const Column& src)
+{
     //assert(IsEmpty());
 
     // Brute-force build-up
@@ -63,12 +65,14 @@ void Index::BuildIndex(const Column& src) {
 #endif //_DEBUG
 }
 
-void Index::Set(size_t ndx, int64_t oldValue, int64_t newValue) {
+void Index::Set(size_t ndx, int64_t oldValue, int64_t newValue)
+{
     Delete(ndx, oldValue, true); // set isLast to avoid updating refs
     Insert(ndx, newValue, true); // set isLast to avoid updating refs
 }
 
-void Index::Delete(size_t ndx, int64_t value, bool isLast) {
+void Index::Delete(size_t ndx, int64_t value, bool isLast)
+{
     DoDelete(ndx, value);
 
     // Collapse top nodes with single item
@@ -87,7 +91,8 @@ void Index::Delete(size_t ndx, int64_t value, bool isLast) {
     if (!isLast) UpdateRefs(ndx, -1);
 }
 
-bool Index::DoDelete(size_t ndx, int64_t value) {
+bool Index::DoDelete(size_t ndx, int64_t value)
+{
     Array values = m_array->GetSubArray(0);
     Array refs = m_array->GetSubArray(1);
 
@@ -128,7 +133,8 @@ bool Index::DoDelete(size_t ndx, int64_t value) {
     return false;
 }
 
-bool Index::Insert(size_t ndx, int64_t value, bool isLast) {
+bool Index::Insert(size_t ndx, int64_t value, bool isLast)
+{
     // If it is last item in column, we don't have to update refs
     if (!isLast) UpdateRefs(ndx, 1);
 
@@ -170,7 +176,8 @@ bool Index::Insert(size_t ndx, int64_t value, bool isLast) {
     return true;
 }
 
-bool Index::LeafInsert(size_t ref, int64_t value) {
+bool Index::LeafInsert(size_t ref, int64_t value)
+{
     assert(!IsNode());
 
     // Get subnode table
@@ -191,7 +198,8 @@ bool Index::LeafInsert(size_t ref, int64_t value) {
     return true;
 }
 
-bool Index::NodeAdd(size_t ref) {
+bool Index::NodeAdd(size_t ref)
+{
     assert(ref);
     assert(IsNode());
 
@@ -216,12 +224,14 @@ bool Index::NodeAdd(size_t ref) {
     return true;
 }
 
-int64_t Index::MaxValue() const {
+int64_t Index::MaxValue() const
+{
     const Array values = m_array->GetSubArray(0);
     return values.IsEmpty() ? 0 : values.Back();
 }
 
-Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
+Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
+{
     if (IsNode()) {
         // Get subnode table
         Array offsets = m_array->GetSubArray(0);
@@ -304,7 +314,8 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value) {
     }
 }
 
-size_t Index::Find(int64_t value) const {
+size_t Index::Find(int64_t value) const
+{
     size_t ref = GetRef();
     for (;;) {
         const Array node(ref);
@@ -323,7 +334,8 @@ size_t Index::Find(int64_t value) const {
     }
 }
 
-bool Index::FindAll(Column& result, int64_t value) const {
+bool Index::FindAll(Column& result, int64_t value) const
+{
     const Array values = m_array->GetSubArray(0);
     const Array refs = m_array->GetSubArray(1);
 
@@ -351,7 +363,8 @@ bool Index::FindAll(Column& result, int64_t value) const {
     return true; // may be more matches in next node
 }
 
-bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const {
+bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const
+{
     const Array values = m_array->GetSubArray(0);
     const Array refs = m_array->GetSubArray(1);
 
@@ -380,7 +393,8 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const {
     return true; // may be more matches in next node
 }
 
-void Index::UpdateRefs(size_t pos, int diff) {
+void Index::UpdateRefs(size_t pos, int diff)
+{
     assert(diff == 1 || diff == -1); // only used by insert and delete
 
     Array refs = m_array->GetSubArray(1);
@@ -399,7 +413,8 @@ void Index::UpdateRefs(size_t pos, int diff) {
 
 #ifdef _DEBUG
 
-void Index::Verify() const {
+void Index::Verify() const
+{
     assert(m_array->Size() == 2);
     assert(m_array->HasRefs());
 

@@ -6,7 +6,7 @@
 
 namespace tightdb {
 
-ArrayStringLong::ArrayStringLong(ArrayParent *parent, size_t pndx, Allocator& alloc):
+ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& alloc):
     Array(COLUMN_HASREFS, parent, pndx, alloc),
     m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc)
 {
@@ -32,28 +32,32 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
 // Creates new array (but invalid, call UpdateRef to init)
 //ArrayStringLong::ArrayStringLong(Allocator& alloc) : Array(alloc) {}
 
-ArrayStringLong::~ArrayStringLong() {
-}
+ArrayStringLong::~ArrayStringLong() {}
 
-bool ArrayStringLong::IsEmpty() const {
+bool ArrayStringLong::IsEmpty() const
+{
     return m_offsets.IsEmpty();
 }
-size_t ArrayStringLong::Size() const {
+size_t ArrayStringLong::Size() const
+{
     return m_offsets.Size();
 }
 
-const char* ArrayStringLong::Get(size_t ndx) const {
+const char* ArrayStringLong::Get(size_t ndx) const
+{
     assert(ndx < m_offsets.Size());
 
     const size_t offset = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
     return (const char*)m_blob.Get(offset);
 }
 
-void ArrayStringLong::Add(const char* value) {
+void ArrayStringLong::Add(const char* value)
+{
     Add(value, strlen(value));
 }
 
-void ArrayStringLong::Add(const char* value, size_t len) {
+void ArrayStringLong::Add(const char* value, size_t len)
+{
     assert(value);
 
     len += 1; // include trailing null byte
@@ -61,11 +65,13 @@ void ArrayStringLong::Add(const char* value, size_t len) {
     m_offsets.Add(m_offsets.IsEmpty() ? len : m_offsets.Back() + len);
 }
 
-void ArrayStringLong::Set(size_t ndx, const char* value) {
+void ArrayStringLong::Set(size_t ndx, const char* value)
+{
     Set(ndx, value, strlen(value));
 }
 
-void ArrayStringLong::Set(size_t ndx, const char* value, size_t len) {
+void ArrayStringLong::Set(size_t ndx, const char* value, size_t len)
+{
     assert(ndx < m_offsets.Size());
     assert(value);
 
@@ -79,11 +85,13 @@ void ArrayStringLong::Set(size_t ndx, const char* value, size_t len) {
     m_offsets.Adjust(ndx, diff);
 }
 
-void ArrayStringLong::Insert(size_t ndx, const char* value) {
+void ArrayStringLong::Insert(size_t ndx, const char* value)
+{
     Insert(ndx, value, strlen(value));
 }
 
-void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len) {
+void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len)
+{
     assert(ndx <= m_offsets.Size());
     assert(value);
 
@@ -95,7 +103,8 @@ void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len) {
     m_offsets.Adjust(ndx+1, len);
 }
 
-void ArrayStringLong::Delete(size_t ndx) {
+void ArrayStringLong::Delete(size_t ndx)
+{
     assert(ndx < m_offsets.Size());
 
     const size_t start = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
@@ -106,7 +115,8 @@ void ArrayStringLong::Delete(size_t ndx) {
     m_offsets.Adjust(ndx, (int64_t)start - end);
 }
 
-void ArrayStringLong::Resize(size_t ndx) {
+void ArrayStringLong::Resize(size_t ndx)
+{
     assert(ndx < m_offsets.Size());
 
     const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
@@ -115,17 +125,21 @@ void ArrayStringLong::Resize(size_t ndx) {
     m_blob.Resize(len);
 }
 
-void ArrayStringLong::Clear() {
+void ArrayStringLong::Clear()
+{
     m_blob.Clear();
     m_offsets.Clear();
 }
 
-size_t ArrayStringLong::Find(const char* value, size_t start, size_t end) const {
+size_t ArrayStringLong::Find(const char* value, size_t start, size_t end) const
+{
     assert(value);
     return FindWithLen(value, strlen(value), start, end);
 }
 
-void ArrayStringLong::FindAll(Array &result, const char* value, size_t add_offset, size_t start, size_t end) const {
+void ArrayStringLong::FindAll(Array& result, const char* value, size_t add_offset,
+                              size_t start, size_t end) const
+{
     assert(value);
 
     const size_t len = strlen(value);
@@ -139,7 +153,8 @@ void ArrayStringLong::FindAll(Array &result, const char* value, size_t add_offse
     }
 }
 
-size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start, size_t end) const {
+size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start, size_t end) const
+{
     assert(value);
 
     len += 1; // include trailing null byte
@@ -162,7 +177,8 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
 
 #ifdef _DEBUG
 
-void ArrayStringLong::ToDot(std::ostream& out, const char* title) const {
+void ArrayStringLong::ToDot(std::ostream& out, const char* title) const
+{
     const size_t ref = GetRef();
 
     out << "subgraph cluster_arraystringlong" << ref << " {" << std::endl;

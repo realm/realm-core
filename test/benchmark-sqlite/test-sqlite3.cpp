@@ -8,7 +8,8 @@
 #include "../../src/win32/stdint.h"
 using namespace std;
 
-uint64_t rand2() {
+uint64_t rand2()
+{
     static int64_t seed = 2862933555777941757ULL;
     static int64_t seed2 = 0;
     seed = (2862933555777941757ULL * seed + 3037000493ULL);
@@ -28,8 +29,8 @@ int RANGE = 50000;
 // NOT FINISHED
 // NOT FINISHED
 
-int main() {
-
+int main()
+{
     // Open sqlite in-memory db
     sqlite3 *db = NULL;
     int rc = sqlite3_open(":memory:", &db);
@@ -265,19 +266,5 @@ sqlite3_bind_int(ppStmt, 1, n);
     exit(1);
 
     return 1;
-
-
-
-
-
-
-
-
-
     }
-
-
-
-
-
 }

@@ -3,7 +3,8 @@
 
 using namespace tightdb;
 
-TEST(ColumnMixed_Int) {
+TEST(ColumnMixed_Int)
+{
     ColumnMixed c;
 
     c.InsertInt(0,     2);
@@ -35,7 +36,8 @@ TEST(ColumnMixed_Int) {
     c.Destroy();
 }
 
-TEST(ColumnMixed_Bool) {
+TEST(ColumnMixed_Bool)
+{
     ColumnMixed c;
 
     c.InsertBool(0, true);
@@ -67,7 +69,8 @@ TEST(ColumnMixed_Bool) {
     c.Destroy();
 }
 
-TEST(ColumnMixed_Date) {
+TEST(ColumnMixed_Date)
+{
     ColumnMixed c;
 
     c.InsertDate(0,     2);
@@ -99,7 +102,8 @@ TEST(ColumnMixed_Date) {
     c.Destroy();
 }
 
-TEST(ColumnMixed_String) {
+TEST(ColumnMixed_String)
+{
     ColumnMixed c;
 
     c.InsertString(0, "aaa");
@@ -131,7 +135,8 @@ TEST(ColumnMixed_String) {
     c.Destroy();
 }
 
-TEST(ColumnMixed_Binary) {
+TEST(ColumnMixed_Binary)
+{
     ColumnMixed c;
 
     c.InsertBinary(0, "aaa", 4);
@@ -163,7 +168,8 @@ TEST(ColumnMixed_Binary) {
     c.Destroy();
 }
 
-TEST(ColumnMixed_Table) {
+TEST(ColumnMixed_Table)
+{
     ColumnMixed c;
 
     c.InsertTable(0);
@@ -184,7 +190,8 @@ TEST(ColumnMixed_Table) {
     c.Destroy();
 }
 
-TEST(ColumnMixed_Mixed) {
+TEST(ColumnMixed_Mixed)
+{
     ColumnMixed c;
 
     // Insert mixed types

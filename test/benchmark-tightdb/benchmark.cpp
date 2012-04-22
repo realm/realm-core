@@ -15,7 +15,8 @@
 
 
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
-uint64_t rand2() {
+uint64_t rand2()
+{
     static int64_t seed = 2862933555777941757ULL;
     static int64_t seed2 = 0;
     seed = (2862933555777941757ULL * seed + 3037000493ULL);
@@ -35,26 +36,26 @@ void stl(void);
 
 volatile uint64_t writethrough;
 
-void main(void) {
+void main(void)
+{
     tightdb();
-//  getchar();
+//    getchar();
 }
 
 
 
-void tightdb(void) {
+void tightdb(void)
+{
     IntegerTable integers;
     volatile uint64_t force;
     int overhead; // Time of computing 1 rand and 1 modulo and doing a loop (is ~0ms with new rand)
 
     uint64_t dummy = 0;
 
-    for(int index = 0; index < 2; index++)
-    {
+    for(int index = 0; index < 2; index++) {
         std::string indexed;
         integers.Clear();
-        if(index == 1)
-        {
+        if(index == 1) {
             integers.SetIndex(0);
             indexed = "Indexed ";
         }

@@ -27,7 +27,8 @@ using namespace tightdb;
 
 // Support function
 // todo, fixme: use header function in array instead!
-size_t GetSizeFromHeader(void* p) {
+size_t GetSizeFromHeader(void* p)
+{
     // parse the capacity part of 8byte header
     const uint8_t* const header = (uint8_t*)p;
     return (header[4] << 16) + (header[5] << 8) + header[6];
@@ -38,18 +39,21 @@ size_t GetSizeFromHeader(void* p) {
 
 namespace tightdb {
 
-Allocator& GetDefaultAllocator() {
+Allocator& GetDefaultAllocator()
+{
     static Allocator DefaultAllocator;
     return DefaultAllocator;
 }
 
-SlabAlloc::SlabAlloc() : m_shared(NULL), m_owned(false), m_baseline(8) {
+SlabAlloc::SlabAlloc(): m_shared(NULL), m_owned(false), m_baseline(8)
+{
 #ifdef _DEBUG
     m_debugOut = false;
 #endif //_DEBUG
 }
 
-SlabAlloc::~SlabAlloc() {
+SlabAlloc::~SlabAlloc()
+{
 #ifdef _DEBUG
     if (!IsAllFree()) {
         m_slabs.Print();
@@ -82,7 +86,8 @@ SlabAlloc::~SlabAlloc() {
     }
 }
 
-MemRef SlabAlloc::Alloc(size_t size) {
+MemRef SlabAlloc::Alloc(size_t size)
+{
     assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
     // Do we have a free space we can reuse?
@@ -141,7 +146,8 @@ MemRef SlabAlloc::Alloc(size_t size) {
     return MemRef(slab, slabsBack);
 }
 
-void SlabAlloc::Free(size_t ref, void* p) {
+void SlabAlloc::Free(size_t ref, void* p)
+{
     if (IsReadOnly(ref)) return;
 
     // Get size from segment
@@ -191,7 +197,8 @@ void SlabAlloc::Free(size_t ref, void* p) {
     if (!isMerged) m_freeSpace.Add(ref, size);
 }
 
-MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size) {
+MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
+{
     assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
     //TODO: Check if we can extend current space
@@ -220,7 +227,8 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size) {
     return space;
 }
 
-void* SlabAlloc::Translate(size_t ref) const {
+void* SlabAlloc::Translate(size_t ref) const
+{
     if (ref < m_baseline) return m_shared + ref;
     else {
         const size_t ndx = m_slabs.offset.FindPos(ref);
@@ -231,11 +239,13 @@ void* SlabAlloc::Translate(size_t ref) const {
     }
 }
 
-bool SlabAlloc::IsReadOnly(size_t ref) const {
+bool SlabAlloc::IsReadOnly(size_t ref) const
+{
     return ref < m_baseline;
 }
 
-bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
+bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len)
+{
     // Verify that the topref points to a location within buffer.
     // This is currently the only integrity check we make
     size_t ref = (size_t)(*(uint64_t*)buffer);
@@ -251,7 +261,8 @@ bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len) {
     return true;
 }
 
-bool SlabAlloc::SetShared(const char* path) {
+bool SlabAlloc::SetShared(const char* path)
+{
 #ifdef _MSC_VER
     // Open file
     m_fd = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, NULL, NULL);
@@ -305,7 +316,8 @@ bool SlabAlloc::SetShared(const char* path) {
     return true;
 }
 
-size_t SlabAlloc::GetTopRef() const {
+size_t SlabAlloc::GetTopRef() const
+{
     assert(m_shared && m_baseline > 0);
 
     const size_t ref = TO_REF(*(uint64_t*)m_shared);
@@ -314,7 +326,8 @@ size_t SlabAlloc::GetTopRef() const {
     return ref;
 }
 
-size_t SlabAlloc::GetTotalSize() const {
+size_t SlabAlloc::GetTotalSize() const
+{
     if (m_slabs.IsEmpty()) {
         return m_baseline;
     }
@@ -325,7 +338,8 @@ size_t SlabAlloc::GetTotalSize() const {
 
 #ifdef _DEBUG
 
-bool SlabAlloc::IsAllFree() const {
+bool SlabAlloc::IsAllFree() const
+{
     if (m_freeSpace.GetSize() != m_slabs.GetSize()) return false;
 
     // Verify that free space matches slabs
@@ -343,7 +357,8 @@ bool SlabAlloc::IsAllFree() const {
     return true;
 }
 
-void SlabAlloc::Verify() const {
+void SlabAlloc::Verify() const
+{
     // Make sure that all free blocks fit within a slab
     for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
         const FreeSpace::Cursor c = m_freeSpace[i];
@@ -359,7 +374,8 @@ void SlabAlloc::Verify() const {
     }
 }
 
-void SlabAlloc::Print() const {
+void SlabAlloc::Print() const
+{
     const size_t allocated = m_slabs.IsEmpty() ? 0 : m_slabs[m_slabs.GetSize()-1].offset;
 
     size_t free = 0;

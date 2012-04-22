@@ -9,7 +9,8 @@ struct db_setup_column_binary {
 
 ColumnBinary db_setup_column_binary::c;
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryMultiEmpty) {
+TEST_FIXTURE(db_setup_column_binary, ColumnBinaryMultiEmpty)
+{
     c.Add("", 0);
     c.Add("", 0);
     c.Add("", 0);
@@ -27,7 +28,8 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryMultiEmpty) {
     CHECK_EQUAL(0, c.GetLen(5));
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet) {
+TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet)
+{
     c.Set(0, (void*)"hey", 4);
 
     CHECK_EQUAL(6, c.Size());
@@ -41,7 +43,8 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet) {
     CHECK_EQUAL(0, c.GetLen(5));
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryAdd) {
+TEST_FIXTURE(db_setup_column_binary, ColumnBinaryAdd)
+{
     c.Clear();
     CHECK_EQUAL(0, c.Size());
 
@@ -58,7 +61,8 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryAdd) {
     CHECK_EQUAL(2, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2) {
+TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2)
+{
     // {shrink, grow} x {first, middle, last, single}
     c.Clear();
 
@@ -112,7 +116,8 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2) {
     CHECK_EQUAL(3, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryInsert) {
+TEST_FIXTURE(db_setup_column_binary, ColumnBinaryInsert)
+{
     c.Clear();
 
     c.Insert(0, (void*)"abc", 4); // single
@@ -155,7 +160,8 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryInsert) {
     CHECK_EQUAL(6, c.Size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete) {
+TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
+{
     c.Clear();
 
     c.Add((void*)"a", 2);
@@ -191,7 +197,8 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete) {
     CHECK(c.IsEmpty());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinary_Destroy) {
+TEST_FIXTURE(db_setup_column_binary, ColumnBinary_Destroy)
+{
     // clean up (ALWAYS PUT THIS LAST)
     c.Destroy();
 }

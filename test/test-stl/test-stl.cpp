@@ -59,7 +59,8 @@ private:
 };
 
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
-uint64_t rand2() {
+uint64_t rand2()
+{
     return (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand();
 
 
@@ -70,7 +71,8 @@ uint64_t rand2() {
     return seed * seed2 + seed2;
 }
 
-int main() {
+int main()
+{
     vector<TestTable> table;
 
     for (size_t i = 0; i < 250000; ++i) {

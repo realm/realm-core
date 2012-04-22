@@ -22,7 +22,8 @@ ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, ArrayParent *par
                          Allocator& alloc, Table const *tab):
     ColumnSubtableParent(ref_column, parent, pndx, alloc, tab), m_ref_specSet(ref_specSet) {}
 
-size_t ColumnTable::GetTableSize(size_t ndx) const {
+size_t ColumnTable::GetTableSize(size_t ndx) const
+{
     assert(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);
@@ -32,19 +33,22 @@ size_t ColumnTable::GetTableSize(size_t ndx) const {
     return get_size_from_ref(ref_first_col, GetAllocator());
 }
 
-bool ColumnTable::Add() {
+bool ColumnTable::Add()
+{
     Insert(Size()); // zero-ref indicates empty table
     return true;
 }
 
-void ColumnTable::Insert(size_t ndx) {
+void ColumnTable::Insert(size_t ndx)
+{
     assert(ndx <= Size());
 
     // zero-ref indicates empty table
     Column::Insert(ndx, 0);
 }
 
-void ColumnTable::Delete(size_t ndx) {
+void ColumnTable::Delete(size_t ndx)
+{
     assert(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);
@@ -59,7 +63,8 @@ void ColumnTable::Delete(size_t ndx) {
     Column::Delete(ndx);
 }
 
-void ColumnTable::Clear(size_t ndx) {
+void ColumnTable::Clear(size_t ndx)
+{
     assert(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);

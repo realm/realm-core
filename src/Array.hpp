@@ -56,12 +56,14 @@ public:
     MemStats() : allocated(0), used(0), array_count(0) {}
     MemStats(size_t allocated, size_t used, size_t array_count)
     : allocated(allocated), used(used), array_count(array_count) {}
-    MemStats(const MemStats& m) {
+    MemStats(const MemStats& m)
+    {
         allocated = m.allocated;
         used = m.used;
         array_count = m.array_count;
     }
-    void Add(const MemStats& m) {
+    void Add(const MemStats& m)
+    {
         allocated += m.allocated;
         used += m.used;
         array_count += m.array_count;
@@ -142,7 +144,8 @@ public:
     size_t FindPos2(int64_t value) const;
     size_t Find(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
 
-    template <class F> size_t Find(F function_, int64_t value, size_t start, size_t end) const {
+    template <class F> size_t Find(F function_, int64_t value, size_t start, size_t end) const
+    {
         const F function = {};
         if(end == (size_t)-1)
             end = m_len;
@@ -292,8 +295,8 @@ protected:
 
 // Templates
 
-template<class S>
-size_t Array::Write(S& out, size_t& pos, bool recurse) const {
+template<class S> size_t Array::Write(S& out, size_t& pos, bool recurse) const
+{
     // parse header
     size_t len          = get_header_len();
     const WidthType wt  = get_header_wtype();

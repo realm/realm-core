@@ -4,7 +4,8 @@
 
 using namespace tightdb;
 
-TEST(Table1) {
+TEST(Table1)
+{
     Table table;
     table.RegisterColumn(COLUMN_TYPE_INT, "first");
     table.RegisterColumn(COLUMN_TYPE_INT, "second");
@@ -42,7 +43,8 @@ TDB_TABLE_4(TestTable,
             Bool,       third,
             Enum<Days>, fourth)
 
-TEST(Table2) {
+TEST(Table2)
+{
     TestTable table;
 
     table.Add(0, 10, true, Wed);
@@ -58,7 +60,8 @@ TEST(Table2) {
 #endif //_DEBUG
 }
 
-TEST(Table3) {
+TEST(Table3)
+{
     TestTable table;
 
     for (size_t i = 0; i < 100; ++i) {
@@ -89,7 +92,8 @@ TDB_TABLE_2(TestTableEnum,
             Enum<Days>, first,
             String, second)
 
-TEST(Table4) {
+TEST(Table4)
+{
     TestTableEnum table;
 
     table.Add(Mon, "Hello");
@@ -108,7 +112,8 @@ TEST(Table4) {
 #endif //_DEBUG
 }
 
-TEST(Table_Delete) {
+TEST(Table_Delete)
+{
     TestTable table;
 
     for (size_t i = 0; i < 10; ++i) {
@@ -144,7 +149,8 @@ TEST(Table_Delete) {
 #endif //_DEBUG
 }
 
-TEST(Table_Delete_All_Types) {
+TEST(Table_Delete_All_Types)
+{
     // Create table with all column types
     Table table;
     Spec s = table.GetSpec();
@@ -251,7 +257,8 @@ TEST(Table_Delete_All_Types) {
 #endif //_DEBUG
 }
 
-TEST(Table_Find_Int) {
+TEST(Table_Find_Int)
+{
     TestTable table;
 
     for (int i = 1000; i >= 0; --i) {
@@ -267,7 +274,8 @@ TEST(Table_Find_Int) {
 #endif //_DEBUG
 }
 
-TEST(Table6) {
+TEST(Table6)
+{
     TestTableEnum table;
 
     TDB_QUERY(TestQuery, TestTableEnum) {
@@ -293,7 +301,8 @@ TEST(Table6) {
 
 
 
-TEST(Table_FindAll_Int) {
+TEST(Table_FindAll_Int)
+{
     TestTable table;
 
     table.Add(0, 10, true, Wed);
@@ -326,7 +335,8 @@ TEST(Table_FindAll_Int) {
 #endif //_DEBUG
 }
 
-TEST(Table_Index_Int) {
+TEST(Table_Index_Int)
+{
     TestTable table;
 
     table.Add(0,  1, true, Wed);
@@ -415,7 +425,8 @@ TDB_TABLE_4(TestTableAE,
             Bool,       third,
             Enum<Days>, fourth)
 
-TEST(TableAutoEnumeration) {
+TEST(TableAutoEnumeration)
+{
     TestTableAE table;
 
     for (size_t i = 0; i < 5; ++i) {
@@ -459,7 +470,8 @@ TEST(TableAutoEnumeration) {
 }
 
 
-TEST(TableAutoEnumerationFindFindAll) {
+TEST(TableAutoEnumerationFindFindAll)
+{
     TestTableAE table;
 
     for (size_t i = 0; i < 5; ++i) {
@@ -485,7 +497,8 @@ TEST(TableAutoEnumerationFindFindAll) {
 }
 
 #include "AllocSlab.hpp"
-TEST(Table_SlabAlloc) {
+TEST(Table_SlabAlloc)
+{
     SlabAlloc alloc;
     TestTable table(alloc);
 
@@ -514,7 +527,8 @@ TEST(Table_SlabAlloc) {
 }
 
 #include "Group.hpp"
-TEST(Table_Spec) {
+TEST(Table_Spec)
+{
     Group group;
     Table& table = group.GetTable("test");
 
@@ -576,7 +590,8 @@ TEST(Table_Spec) {
     CHECK_EQUAL("test", subtable2->GetString(1, 0));
 }
 
-TEST(Table_Mixed) {
+TEST(Table_Mixed)
+{
     Table table;
     table.RegisterColumn(COLUMN_TYPE_INT, "first");
     table.RegisterColumn(COLUMN_TYPE_MIXED, "second");
@@ -700,7 +715,8 @@ TDB_TABLE_1(TestTableMX,
             Mixed,  first)
 
 
-TEST(Table_Mixed2) {
+TEST(Table_Mixed2)
+{
     TestTableMX table;
 
     table.Add((int64_t)1);

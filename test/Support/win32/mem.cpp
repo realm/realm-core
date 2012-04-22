@@ -5,7 +5,8 @@
 // Pre-declarations
 DWORD CalculateWSPrivate(DWORD processID);
 
-size_t GetMemUsage() {
+size_t GetMemUsage()
+{
     return CalculateWSPrivate(GetCurrentProcessId());
 }
 

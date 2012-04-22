@@ -7,7 +7,8 @@ namespace tightdb {
 
 class ColumnStringEnum : public Column {
 public:
-    ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+    ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent* parent=NULL, size_t pndx=0,
+                     Allocator& alloc=GetDefaultAllocator());
     ~ColumnStringEnum();
     void Destroy();
 
@@ -22,10 +23,10 @@ public:
     void Clear();
 
     size_t Find(const char* value, size_t start=0, size_t end=-1) const;
-    void FindAll(Array &res, const char* value, size_t start=0, size_t end=-1) const;
+    void FindAll(Array& res, const char* value, size_t start=0, size_t end=-1) const;
 
     size_t Find(size_t key_index, size_t start=0, size_t end=-1) const;
-    void FindAll(Array &res, size_t key_index, size_t start=0, size_t end=-1) const;
+    void FindAll(Array& res, size_t key_index, size_t start=0, size_t end=-1) const;
 
     void UpdateParentNdx(int diff);
 

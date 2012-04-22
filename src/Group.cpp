@@ -7,19 +7,22 @@ namespace {
 
 class MemoryOStream {
 public:
-    MemoryOStream(size_t size) : m_pos(0), m_buffer(NULL) {
+    MemoryOStream(size_t size): m_pos(0), m_buffer(NULL)
+    {
         m_buffer = (char*)malloc(size);
     }
 
     bool IsValid() const {return m_buffer != NULL;}
 
-    void write(const char* p, size_t n) {
+    void write(const char* p, size_t n)
+    {
         memcpy(m_buffer+m_pos, p, n);
         m_pos += n;
     }
     void seekp(size_t pos) {m_pos = pos;}
 
-    char* ReleaseBuffer() {
+    char* ReleaseBuffer()
+    {
         char* tmp = m_buffer;
         m_buffer = NULL; // invalidate
         return tmp;
@@ -69,7 +72,8 @@ Group::Group(const char* buffer, size_t len):
     if (m_isValid) Create();
 }
 
-void Group::Create() {
+void Group::Create()
+{
     // Get ref for table top array
     const size_t top_ref = m_alloc.GetTopRef();
 
@@ -92,7 +96,8 @@ void Group::Create() {
 #endif //_DEBUG
 }
 
-Group::~Group() {
+Group::~Group()
+{
     for (size_t i = 0; i < m_tables.Size(); ++i) {
         Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
         delete t;
@@ -103,21 +108,25 @@ Group::~Group() {
     m_top.Destroy();
 }
 
-size_t Group::GetTableCount() const {
+size_t Group::GetTableCount() const
+{
     return m_tableNames.Size();
 }
 
-const char* Group::GetTableName(size_t table_ndx) const {
+const char* Group::GetTableName(size_t table_ndx) const
+{
     assert(table_ndx < m_tableNames.Size());
     return m_tableNames.Get(table_ndx);
 }
 
-bool Group::HasTable(const char* name) const {
+bool Group::HasTable(const char* name) const
+{
     const size_t n = m_tableNames.Find(name);
     return (n != (size_t)-1);
 }
 
-Table& Group::GetTable(const char* name) {
+Table& Group::GetTable(const char* name)
+{
     const size_t n = m_tableNames.Find(name);
 
     if (n == size_t(-1)) {
@@ -137,7 +146,8 @@ Table& Group::GetTable(const char* name) {
     }
 }
 
-Table& Group::GetTable(size_t ndx) {
+Table& Group::GetTable(size_t ndx)
+{
     assert(ndx < m_tables.Size());
 
     // Get table from cache if exists, else create
@@ -151,7 +161,8 @@ Table& Group::GetTable(size_t ndx) {
 }
 
 
-void Group::Write(const char* filepath) {
+void Group::Write(const char* filepath)
+{
     assert(filepath);
 
     std::ofstream out(filepath, std::ios_base::out|std::ios_base::binary);
@@ -162,7 +173,8 @@ void Group::Write(const char* filepath) {
 }
 
 
-char* Group::WriteToMem(size_t& len) {
+char* Group::WriteToMem(size_t& len)
+{
     // Get max possible size of buffer
     const size_t max_size = m_alloc.GetTotalSize();
 
@@ -175,7 +187,8 @@ char* Group::WriteToMem(size_t& len) {
 
 #ifdef _DEBUG
 
-void Group::Verify() {
+void Group::Verify()
+{
     for (size_t i = 0; i < m_tables.Size(); ++i) {
         // Get table from cache if exists, else create
         Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
@@ -188,7 +201,8 @@ void Group::Verify() {
     }
 }
 
-MemStats Group::Stats() {
+MemStats Group::Stats()
+{
     MemStats stats;
 
     for (size_t i = 0; i < m_tables.Size(); ++i) {
@@ -206,11 +220,13 @@ MemStats Group::Stats() {
 }
 
 
-void Group::Print() const {
+void Group::Print() const
+{
     m_alloc.Print();
 }
 
-void Group::ToDot(std::ostream& out) {
+void Group::ToDot(std::ostream& out)
+{
     out << "digraph G {" << endl;
 
     out << "subgraph cluster_group {" << endl;

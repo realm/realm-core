@@ -10,7 +10,8 @@ namespace tightdb {
 class AdaptiveStringColumn : public ColumnBase {
 public:
     AdaptiveStringColumn(Allocator& alloc=GetDefaultAllocator());
-    AdaptiveStringColumn(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+    AdaptiveStringColumn(size_t ref, ArrayParent* parent=NULL, size_t pndx=0,
+                         Allocator& alloc=GetDefaultAllocator());
     ~AdaptiveStringColumn();
 
     void Destroy();
@@ -30,7 +31,7 @@ public:
     void Resize(size_t ndx);
 
     size_t Find(const char* value, size_t start=0 , size_t end=-1) const;
-    void FindAll(Array &result, const char* value, size_t start = 0, size_t end = -1) const;
+    void FindAll(Array& result, const char* value, size_t start = 0, size_t end = -1) const;
 
     // Index
     bool HasIndex() const {return false;}
@@ -39,7 +40,7 @@ public:
     size_t FindWithIndex(int64_t) const {return (size_t)-1;}
 
     size_t GetRef() const {return m_array->GetRef();}
-    void SetParent(ArrayParent *parent, size_t pndx) {m_array->SetParent(parent, pndx);}
+    void SetParent(ArrayParent* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 
     // Optimizing data layout
     bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
@@ -58,7 +59,7 @@ protected:
     bool LeafSet(size_t ndx, const char* value);
     bool LeafInsert(size_t ndx, const char* value);
     template<class F> size_t LeafFind(const char* value, size_t start, size_t end) const;
-    void LeafFindAll(Array &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+    void LeafFindAll(Array& result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
     void LeafDelete(size_t ndx);
 
