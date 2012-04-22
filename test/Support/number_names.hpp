@@ -2,16 +2,15 @@
 #define __NUMBER_NAMES__
 
 #include <string>
-using namespace std; // FIXME: Not to appear in a header file
 
-string number_name(size_t n)
+std::string number_name(std::size_t n)
 {
     static const char* ones[] = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
                                  "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
                                  "eighteen", "nineteen"};
     static const char* tens[] = {"", "ten", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"};
 
-    string txt;
+    std::string txt;
     if (n >= 1000) {
         txt = number_name(n/1000) + " thousand ";
         n %= 1000;

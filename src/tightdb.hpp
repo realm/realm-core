@@ -2,11 +2,7 @@
 #define __TIGHTDB_H__
 
 #include "Table.hpp"
-#include <vector>
-
 #include "query/QueryInterface.hpp"
-
-using namespace std; // FIXME: Not to appear in a header file
 
 #define TDB_QUERY(QueryName, TableName) \
 class QueryName : public TableName##Query { \

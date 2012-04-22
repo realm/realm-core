@@ -21,6 +21,8 @@
 #include <cstdio>
 #endif //_DEBUG
 
+using namespace std;
+
 namespace {
 
 using namespace tightdb;

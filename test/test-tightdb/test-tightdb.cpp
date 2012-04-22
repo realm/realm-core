@@ -5,6 +5,7 @@
 #include "../Support/mem.hpp"
 #include "../Support/number_names.hpp"
 
+using namespace std;
 using namespace tightdb;
 
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
