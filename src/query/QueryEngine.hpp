@@ -253,7 +253,7 @@ public:
             if (m_column_type == COLUMN_TYPE_STRING)
                 s = ((const AdaptiveStringColumn*)m_column)->Find(m_value, s, end);
             else {
-                if (m_key_ndx == -1) s = end; // not in key set
+                if (m_key_ndx == size_t(-1)) s = end; // not in key set
                 else {
                     const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_column;
                     s = cse->Find(m_key_ndx, s, end);
