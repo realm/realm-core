@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <limits.h>
 
+#define TDBMIN(a, b) (a) < (b) ? (a) : (b)
+
 const size_t MAX_THREADS = 128;
 const size_t THREAD_CHUNK_SIZE = 1000;
 
@@ -353,7 +355,7 @@ static void *query_thread(void *arg) {
 				pthread_mutex_lock(&ts->jobs_mutex);
 				if(ts->next_job == ts->end_job)
 					break;
-				const size_t chunk = std::min(ts->end_job - ts->next_job, THREAD_CHUNK_SIZE);
+				const size_t chunk = TDBMIN(ts->end_job - ts->next_job, THREAD_CHUNK_SIZE);
 				const size_t mine = ts->next_job;
 				ts->next_job += chunk;
 				size_t r = mine - 1;
