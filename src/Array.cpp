@@ -1751,7 +1751,7 @@ MemStats Array::Stats() const {
 bool get_header_isnode_direct(const uint8_t* const header);
 unsigned int get_header_width_direct(const uint8_t* const header);
 size_t get_header_len_direct(const uint8_t* const header);
-int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx);
+int64_t GetDirect(const char* const data, const size_t width, const size_t ndx);
 size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target);
 template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target);
 
@@ -1800,7 +1800,7 @@ template<> int64_t GetDirect<64>(const char* const data, const size_t ndx) {
 	return *(const int64_t*)(data + offset);
 }
 
-int64_t GetDirect(const char* const data, const unsigned int width, const size_t ndx) {
+int64_t GetDirect(const char* const data, const size_t width, const size_t ndx) {
 	switch (width) {
 		case  0: return GetDirect<0>(data, ndx);
 		case  1: return GetDirect<1>(data, ndx);
@@ -1857,14 +1857,14 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 int64_t Array::ColumnGet(size_t ndx) const {
 	const char* data   = (const char*)m_data;
 	const uint8_t* header = (const uint8_t*)data - 8;
-	unsigned int width = m_width;
+	size_t width = m_width;
 	bool isNode = m_isNode;
 	
 	while (1) {
 		if (isNode) {
 			// Get subnode table
-			const size_t ref_offsets = GetDirect(data, width, 0);
-			const size_t ref_refs    = GetDirect(data, width, 1);
+			const size_t ref_offsets = TO_REF(GetDirect(data, width, 0));
+			const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
 			
 			// Find the subnode containing the item
 			const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -1873,13 +1873,13 @@ int64_t Array::ColumnGet(size_t ndx) const {
 			const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
 			
 			// Calc index in subnode
-			const size_t offset = node_ndx ? (size_t)GetDirect(offsets_data, offsets_width, node_ndx-1) : 0;
+			const size_t offset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
 			ndx = ndx - offset; // local index
 			
 			// Get ref to array
 			const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
 			const char* const refs_data = (const char*)refs_header + 8;
-			const unsigned int refs_width  = get_header_width_direct(refs_header);
+			const size_t refs_width  = get_header_width_direct(refs_header);
 			const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
 			
 			// Set vars for next iteration
