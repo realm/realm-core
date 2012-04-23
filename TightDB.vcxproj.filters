@@ -46,30 +46,8 @@
       <Filter>pthreads</Filter>
     </ClCompile>
     <ClCompile Include="src\ColumnMixed.cpp" />
-    <ClCompile Include="src\query\conditions.h">
-      <Filter>query</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\alloc.h" />
-    <ClInclude Include="src\AllocSlab.h" />
-    <ClInclude Include="src\Array.h" />
-    <ClInclude Include="src\ArrayBinary.h" />
-    <ClInclude Include="src\ArrayBlob.h" />
-    <ClInclude Include="src\ArrayString.h" />
-    <ClInclude Include="src\ArrayStringLong.h" />
-    <ClInclude Include="src\Column.h" />
-    <ClInclude Include="src\ColumnBinary.h" />
-    <ClInclude Include="src\ColumnString.h" />
-    <ClInclude Include="src\ColumnType.h" />
-    <ClInclude Include="src\Column_tpl.h" />
-    <ClInclude Include="src\ctightdb.h" />
-    <ClInclude Include="src\Group.h" />
-    <ClInclude Include="src\Index.h" />
-    <ClInclude Include="src\Table.h" />
-    <ClInclude Include="src\tightdb.h" />
-    <ClInclude Include="src\utilities.h" />
-    <ClInclude Include="test\testsettings.h" />
     <ClInclude Include="test\large_tests\verified_integer.h">
       <Filter>large_tests</Filter>
     </ClInclude>
@@ -77,18 +55,41 @@
       <Filter>large_tests</Filter>
     </ClInclude>
     <ClInclude Include="src\ColumnStringEnum.h" />
-    <ClInclude Include="src\ColumnTable.h" />
-    <ClInclude Include="src\query\QueryInterface.h">
-      <Filter>query</Filter>
-    </ClInclude>
-    <ClInclude Include="src\query\QueryEngine.h">
-      <Filter>query</Filter>
-    </ClInclude>
-    <ClInclude Include="src\utf8.h" />
     <ClInclude Include="src\win32\pthread\pthread.h">
       <Filter>pthreads</Filter>
     </ClInclude>
-    <ClInclude Include="src\ColumnMixed.h" />
+    <ClInclude Include="src\query\conditions.hpp">
+      <Filter>query</Filter>
+    </ClInclude>
+    <ClInclude Include="src\query\QueryEngine.hpp">
+      <Filter>query</Filter>
+    </ClInclude>
+    <ClInclude Include="src\query\QueryInterface.hpp">
+      <Filter>query</Filter>
+    </ClInclude>
+    <ClInclude Include="src\alloc.hpp" />
+    <ClInclude Include="src\Array.hpp" />
+    <ClInclude Include="src\ArrayBinary.hpp" />
+    <ClInclude Include="src\ArrayBlob.hpp" />
+    <ClInclude Include="src\AllocSlab.hpp" />
+    <ClInclude Include="src\ArrayString.hpp" />
+    <ClInclude Include="src\ArrayStringLong.hpp" />
+    <ClInclude Include="src\Column.hpp" />
+    <ClInclude Include="src\Column_tpl.hpp" />
+    <ClInclude Include="src\ColumnBinary.hpp" />
+    <ClInclude Include="src\ColumnMixed.hpp" />
+    <ClInclude Include="src\ColumnString.hpp" />
+    <ClInclude Include="src\ColumnStringEnum.hpp" />
+    <ClInclude Include="src\ColumnTable.hpp" />
+    <ClInclude Include="src\ColumnType.hpp" />
+    <ClInclude Include="src\ctightdb.h" />
+    <ClInclude Include="src\Group.hpp" />
+    <ClInclude Include="src\Index.hpp" />
+    <ClInclude Include="src\Table.hpp" />
+    <ClInclude Include="src\TableRef.hpp" />
+    <ClInclude Include="src\tightdb.hpp" />
+    <ClInclude Include="src\utf8.hpp" />
+    <ClInclude Include="src\utilities.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">

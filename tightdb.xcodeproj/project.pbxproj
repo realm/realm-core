@@ -38,6 +38,37 @@
 		368063321445977300283774 /* Group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063311445977300283774 /* Group.cpp */; };
 		368063381445AF9B00283774 /* testgroup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063361445AD9200283774 /* testgroup.cpp */; };
 		3680633A1446D12B00283774 /* testalloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063391446D12A00283774 /* testalloc.cpp */; };
+		36DB875A153F02250096CF75 /* alloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEEB14209C1200D56FD7 /* alloc.cpp */; };
+		36DB875B153F02250096CF75 /* Array.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEEE14209C1200D56FD7 /* Array.cpp */; };
+		36DB875C153F02250096CF75 /* ArrayString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEF014209C1200D56FD7 /* ArrayString.cpp */; };
+		36DB875D153F02250096CF75 /* Column.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEF214209C1200D56FD7 /* Column.cpp */; };
+		36DB875E153F02250096CF75 /* ColumnString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEF414209C1200D56FD7 /* ColumnString.cpp */; };
+		36DB875F153F02250096CF75 /* ctightdb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEF614209C1200D56FD7 /* ctightdb.cpp */; };
+		36DB8760153F02250096CF75 /* Index.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEF814209C1200D56FD7 /* Index.cpp */; };
+		36DB8761153F02250096CF75 /* Table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEFA14209C1200D56FD7 /* Table.cpp */; };
+		36DB8762153F02250096CF75 /* TableView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEFC14209C1200D56FD7 /* TableView.cpp */; };
+		36DB8763153F02250096CF75 /* Group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063311445977300283774 /* Group.cpp */; };
+		36DB8764153F02250096CF75 /* ArrayBlob.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6088D1459E5DC00CCC3E8 /* ArrayBlob.cpp */; };
+		36DB8765153F02250096CF75 /* ArrayStringLong.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E60892145A88F800CCC3E8 /* ArrayStringLong.cpp */; };
+		36DB8766153F02250096CF75 /* ArrayBinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6089A145AE53500CCC3E8 /* ArrayBinary.cpp */; };
+		36DB8767153F02250096CF75 /* ColumnBinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E608A2145AEE9000CCC3E8 /* ColumnBinary.cpp */; };
+		36DB8768153F02250096CF75 /* ColumnStringEnum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 363141F814751E9600ADD5AC /* ColumnStringEnum.cpp */; };
+		36DB8769153F02250096CF75 /* ColumnTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E4755814877FA4009FB135 /* ColumnTable.cpp */; };
+		36DB876A153F02250096CF75 /* ColumnMixed.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3604594F14C96DBA008ACFFD /* ColumnMixed.cpp */; };
+		36DB876B153F02250096CF75 /* utf8.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 360BAE2E14FBB9FE00A28045 /* utf8.cpp */; };
+		36DB876C153F02250096CF75 /* utilities.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 360BAE3214FBBA2E00A28045 /* utilities.cpp */; };
+		36DB876F153F02250096CF75 /* ArrayBlob.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E6088C1459E5C000CCC3E8 /* ArrayBlob.h */; };
+		36DB8770153F02250096CF75 /* ArrayStringLong.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E60894145A891100CCC3E8 /* ArrayStringLong.h */; };
+		36DB8771153F02250096CF75 /* ArrayBinary.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E6089C145AE54900CCC3E8 /* ArrayBinary.h */; };
+		36DB8772153F02250096CF75 /* ColumnBinary.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E608A0145AEE7200CCC3E8 /* ColumnBinary.h */; };
+		36DB8773153F02250096CF75 /* ColumnString.h in Headers */ = {isa = PBXBuildFile; fileRef = 360F1A36146BF71400EBB9C6 /* ColumnString.h */; };
+		36DB8774153F02250096CF75 /* ColumnStringEnum.h in Headers */ = {isa = PBXBuildFile; fileRef = 363141F614751E8000ADD5AC /* ColumnStringEnum.h */; };
+		36DB8775153F02250096CF75 /* ColumnTable.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E4755B14877FB8009FB135 /* ColumnTable.h */; };
+		36DB8776153F02250096CF75 /* QueryEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 36FD6F3914BDC965009E0003 /* QueryEngine.h */; };
+		36DB8777153F02250096CF75 /* QueryInterface.h in Headers */ = {isa = PBXBuildFile; fileRef = 36FD6F3A14BDC965009E0003 /* QueryInterface.h */; };
+		36DB8778153F02250096CF75 /* ColumnMixed.h in Headers */ = {isa = PBXBuildFile; fileRef = 3604594C14C96DA2008ACFFD /* ColumnMixed.h */; };
+		36DB8779153F02250096CF75 /* utf8.h in Headers */ = {isa = PBXBuildFile; fileRef = 360BAE2F14FBB9FE00A28045 /* utf8.h */; };
+		36DB877A153F02250096CF75 /* utilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 360BAE3314FBBA2E00A28045 /* utilities.h */; };
 		36E4755914877FA4009FB135 /* ColumnTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E4755814877FA4009FB135 /* ColumnTable.cpp */; };
 		36E4755C14877FB9009FB135 /* ColumnTable.h in Headers */ = {isa = PBXBuildFile; fileRef = 36E4755B14877FB8009FB135 /* ColumnTable.h */; };
 		36E608681459976700CCC3E8 /* test-tightdb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E02214209CE600D56FD7 /* test-tightdb.cpp */; };
@@ -230,6 +261,7 @@
 		368063341445979100283774 /* Group.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Group.h; sourceTree = "<group>"; };
 		368063361445AD9200283774 /* testgroup.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testgroup.cpp; sourceTree = "<group>"; };
 		368063391446D12A00283774 /* testalloc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testalloc.cpp; sourceTree = "<group>"; };
+		36DB877E153F02250096CF75 /* libtightdb_ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libtightdb_ios.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		36E4755814877FA4009FB135 /* ColumnTable.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ColumnTable.cpp; sourceTree = "<group>"; };
 		36E4755B14877FB8009FB135 /* ColumnTable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ColumnTable.h; sourceTree = "<group>"; };
 		36E608581458289F00CCC3E8 /* Column_tpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Column_tpl.h; sourceTree = "<group>"; };
@@ -268,6 +300,13 @@
 			files = (
 				360F1A1D146AB3AA00EBB9C6 /* libUnitTest++.a in Frameworks */,
 				3626F56B14A228850097F17B /* libtightdb.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		36DB876D153F02250096CF75 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -564,6 +603,7 @@
 				3647E0E714209E6B00D56FD7 /* libtightdb.a */,
 				3647E1031420E4D800D56FD7 /* tightdb_unit_tests */,
 				36E6085E1459972100CCC3E8 /* test-tightdb */,
+				36DB877E153F02250096CF75 /* libtightdb_ios.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -595,6 +635,25 @@
 				3604594D14C96DA2008ACFFD /* ColumnMixed.h in Headers */,
 				360BAE3114FBB9FE00A28045 /* utf8.h in Headers */,
 				360BAE3514FBBA2E00A28045 /* utilities.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		36DB876E153F02250096CF75 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				36DB876F153F02250096CF75 /* ArrayBlob.h in Headers */,
+				36DB8770153F02250096CF75 /* ArrayStringLong.h in Headers */,
+				36DB8771153F02250096CF75 /* ArrayBinary.h in Headers */,
+				36DB8772153F02250096CF75 /* ColumnBinary.h in Headers */,
+				36DB8773153F02250096CF75 /* ColumnString.h in Headers */,
+				36DB8774153F02250096CF75 /* ColumnStringEnum.h in Headers */,
+				36DB8775153F02250096CF75 /* ColumnTable.h in Headers */,
+				36DB8776153F02250096CF75 /* QueryEngine.h in Headers */,
+				36DB8777153F02250096CF75 /* QueryInterface.h in Headers */,
+				36DB8778153F02250096CF75 /* ColumnMixed.h in Headers */,
+				36DB8779153F02250096CF75 /* utf8.h in Headers */,
+				36DB877A153F02250096CF75 /* utilities.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -635,6 +694,23 @@
 			productName = tightdb_test;
 			productReference = 3647E1031420E4D800D56FD7 /* tightdb_unit_tests */;
 			productType = "com.apple.product-type.tool";
+		};
+		36DB8758153F02250096CF75 /* libtightdb ios */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 36DB877B153F02250096CF75 /* Build configuration list for PBXNativeTarget "libtightdb ios" */;
+			buildPhases = (
+				36DB8759153F02250096CF75 /* Sources */,
+				36DB876D153F02250096CF75 /* Frameworks */,
+				36DB876E153F02250096CF75 /* Headers */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "libtightdb ios";
+			productName = libtightdb;
+			productReference = 36DB877E153F02250096CF75 /* libtightdb_ios.a */;
+			productType = "com.apple.product-type.library.static";
 		};
 		36E6085D1459972100CCC3E8 /* test-tightdb */ = {
 			isa = PBXNativeTarget;
@@ -678,6 +754,7 @@
 				3647E0E614209E6B00D56FD7 /* libtightdb */,
 				3647E1021420E4D800D56FD7 /* tightdb_unit_tests */,
 				36E6085D1459972100CCC3E8 /* test-tightdb */,
+				36DB8758153F02250096CF75 /* libtightdb ios */,
 			);
 		};
 /* End PBXProject section */
@@ -729,6 +806,32 @@
 				36FD6F3614BDC61A009E0003 /* TestQuery.cpp in Sources */,
 				36FD6F3714BDC61A009E0003 /* testTableView.cpp in Sources */,
 				3604595214C97A4E008ACFFD /* testcolumnmixed.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		36DB8759153F02250096CF75 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				36DB875A153F02250096CF75 /* alloc.cpp in Sources */,
+				36DB875B153F02250096CF75 /* Array.cpp in Sources */,
+				36DB875C153F02250096CF75 /* ArrayString.cpp in Sources */,
+				36DB875D153F02250096CF75 /* Column.cpp in Sources */,
+				36DB875E153F02250096CF75 /* ColumnString.cpp in Sources */,
+				36DB875F153F02250096CF75 /* ctightdb.cpp in Sources */,
+				36DB8760153F02250096CF75 /* Index.cpp in Sources */,
+				36DB8761153F02250096CF75 /* Table.cpp in Sources */,
+				36DB8762153F02250096CF75 /* TableView.cpp in Sources */,
+				36DB8763153F02250096CF75 /* Group.cpp in Sources */,
+				36DB8764153F02250096CF75 /* ArrayBlob.cpp in Sources */,
+				36DB8765153F02250096CF75 /* ArrayStringLong.cpp in Sources */,
+				36DB8766153F02250096CF75 /* ArrayBinary.cpp in Sources */,
+				36DB8767153F02250096CF75 /* ColumnBinary.cpp in Sources */,
+				36DB8768153F02250096CF75 /* ColumnStringEnum.cpp in Sources */,
+				36DB8769153F02250096CF75 /* ColumnTable.cpp in Sources */,
+				36DB876A153F02250096CF75 /* ColumnMixed.cpp in Sources */,
+				36DB876B153F02250096CF75 /* utf8.cpp in Sources */,
+				36DB876C153F02250096CF75 /* utilities.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -892,6 +995,63 @@
 			};
 			name = Release;
 		};
+		36DB877C153F02250096CF75 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				EXECUTABLE_PREFIX = lib;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = (
+					"DEBUG=1",
+					"_DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = tightdb_ios;
+				SDKROOT = iphoneos;
+			};
+			name = Debug;
+		};
+		36DB877D153F02250096CF75 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				EXECUTABLE_PREFIX = lib;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = NDEBUG;
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = tightdb_ios;
+				SDKROOT = iphoneos;
+			};
+			name = Release;
+		};
 		36E608661459972200CCC3E8 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -985,6 +1145,15 @@
 			buildConfigurations = (
 				3647E10B1420E4D800D56FD7 /* Debug */,
 				3647E10C1420E4D800D56FD7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		36DB877B153F02250096CF75 /* Build configuration list for PBXNativeTarget "libtightdb ios" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				36DB877C153F02250096CF75 /* Debug */,
+				36DB877D153F02250096CF75 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
