@@ -16,7 +16,7 @@ CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I.
 CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I.
 CXXFLAGS_COVERAGE  += $(CXXFLAGS_COMMON_2) -I$(abspath .)
 
-GEN_HEADERS         = tightdb.h
+GEN_HEADERS         = tightdb.hpp
 SOURCES             = $(wildcard *.cpp)
 LIB_SHARED          = libtightdb.so
 LIB_STATIC          = libtightdb.a
@@ -54,8 +54,8 @@ $(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): $(GEN_HEADERS)
 
 
 # Code generation
-tightdb.h: tightdb-gen.sh tightdb-gen.py
-	$(SHELL) tightdb-gen.sh tightdb.h
+tightdb.hpp: tightdb-gen.sh tightdb-gen.py
+	$(SHELL) tightdb-gen.sh tightdb.hpp
 
 
 # Shared library

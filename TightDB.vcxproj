@@ -390,7 +390,6 @@
     </ClCompile>
     <ClCompile Include="src\Group.cpp" />
     <ClCompile Include="src\Index.cpp" />
-    <ClCompile Include="src\query\conditions.h" />
     <ClCompile Include="src\utf8.cpp" />
     <ClCompile Include="src\utilities.cpp">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
@@ -495,30 +494,33 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\alloc.h" />
-    <ClInclude Include="src\AllocSlab.h" />
-    <ClInclude Include="src\Array.h" />
-    <ClInclude Include="src\ArrayBinary.h" />
-    <ClInclude Include="src\ArrayBlob.h" />
-    <ClInclude Include="src\ArrayString.h" />
-    <ClInclude Include="src\ArrayStringLong.h" />
-    <ClInclude Include="src\Column.h" />
-    <ClInclude Include="src\ColumnBinary.h" />
-    <ClInclude Include="src\ColumnMixed.h" />
-    <ClInclude Include="src\ColumnString.h" />
+    <ClInclude Include="src\alloc.hpp" />
+    <ClInclude Include="src\AllocSlab.hpp" />
+    <ClInclude Include="src\Array.hpp" />
+    <ClInclude Include="src\ArrayBinary.hpp" />
+    <ClInclude Include="src\ArrayBlob.hpp" />
+    <ClInclude Include="src\ArrayString.hpp" />
+    <ClInclude Include="src\ArrayStringLong.hpp" />
+    <ClInclude Include="src\Column.hpp" />
+    <ClInclude Include="src\ColumnBinary.hpp" />
+    <ClInclude Include="src\ColumnMixed.hpp" />
+    <ClInclude Include="src\ColumnString.hpp" />
     <ClInclude Include="src\ColumnStringEnum.h" />
-    <ClInclude Include="src\ColumnTable.h" />
-    <ClInclude Include="src\ColumnType.h" />
-    <ClInclude Include="src\Column_tpl.h" />
+    <ClInclude Include="src\ColumnStringEnum.hpp" />
+    <ClInclude Include="src\ColumnTable.hpp" />
+    <ClInclude Include="src\ColumnType.hpp" />
+    <ClInclude Include="src\Column_tpl.hpp" />
     <ClInclude Include="src\ctightdb.h" />
-    <ClInclude Include="src\Group.h" />
-    <ClInclude Include="src\Index.h" />
-    <ClInclude Include="src\query\QueryInterface.h" />
-    <ClInclude Include="src\query\QueryEngine.h" />
-    <ClInclude Include="src\Table.h" />
-    <ClInclude Include="src\tightdb.h" />
-    <ClInclude Include="src\utf8.h" />
-    <ClInclude Include="src\utilities.h" />
+    <ClInclude Include="src\Group.hpp" />
+    <ClInclude Include="src\Index.hpp" />
+    <ClInclude Include="src\query\conditions.hpp" />
+    <ClInclude Include="src\query\QueryEngine.hpp" />
+    <ClInclude Include="src\query\QueryInterface.hpp" />
+    <ClInclude Include="src\Table.hpp" />
+    <ClInclude Include="src\TableRef.hpp" />
+    <ClInclude Include="src\tightdb.hpp" />
+    <ClInclude Include="src\utf8.hpp" />
+    <ClInclude Include="src\utilities.hpp" />
     <ClInclude Include="src\win32\pthread\pthread.h" />
     <ClInclude Include="test\large_tests\verified_integer.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
@@ -527,12 +529,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="test\large_tests\verified_string.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
-    </ClInclude>
-    <ClInclude Include="test\testsettings.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>

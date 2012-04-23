@@ -3,407 +3,431 @@
 #include <assert.h>
 #include <cstring>
 #include <cstdio> // debug
-#include "query/conditions.h"
+#include "query/conditions.hpp"
 #ifdef _MSC_VER
-	#include "win32\types.h"
+    #include "win32\types.h"
 #endif
 
-#include "ColumnString.h"
+#include "ColumnString.hpp"
 
-// Pre-declare local functions
-ColumnDef GetTypeFromArray(size_t ref, Allocator& alloc);
+namespace {
 
-ColumnDef GetTypeFromArray(size_t ref, Allocator& alloc) {
-	const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
-	const bool isNode = (header[0] & 0x80) != 0;
-	const bool hasRefs  = (header[0] & 0x40) != 0;
+using namespace tightdb;
 
-	if (isNode) return COLUMN_NODE;
-	else if (hasRefs) return COLUMN_HASREFS;
-	else return COLUMN_NORMAL;
+ColumnDef GetTypeFromArray(size_t ref, Allocator& alloc)
+{
+    const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
+    const bool isNode = (header[0] & 0x80) != 0;
+    const bool hasRefs  = (header[0] & 0x40) != 0;
+
+    if (isNode) return COLUMN_NODE;
+    else if (hasRefs) return COLUMN_HASREFS;
+    else return COLUMN_NORMAL;
 }
 
-AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) {
-	m_array = new ArrayString(NULL, 0, alloc);
-}
-
-AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, ArrayParent *parent, size_t pndx, Allocator& alloc) {
-	const ColumnDef type = GetTypeFromArray(ref, alloc);
-	if (type == COLUMN_NODE) {
-		m_array = new Array(ref, parent, pndx, alloc);
-	}
-	else if (type == COLUMN_HASREFS) {
-		m_array = new ArrayStringLong(ref, parent, pndx, alloc);
-	}
-	else {
-		m_array = new ArrayString(ref, parent, pndx, alloc);
-	}
-}
-
-AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc) {
-	const ColumnDef type = GetTypeFromArray(ref, alloc);
-	if (type == COLUMN_NODE) {
-		m_array = new Array(ref, parent, pndx, alloc);
-	}
-	else if (type == COLUMN_HASREFS) {
-		m_array = new ArrayStringLong(ref, parent, pndx, alloc);
-	}
-	else {
-		m_array = new ArrayString(ref, parent, pndx, alloc);
-	}
-}
-
-AdaptiveStringColumn::~AdaptiveStringColumn() {
-	delete m_array;
-}
-
-void AdaptiveStringColumn::Destroy() {
-	if (IsNode()) m_array->Destroy();
-	else if (IsLongStrings()) {
-		((ArrayStringLong*)m_array)->Destroy();
-	}
-	else ((ArrayString*)m_array)->Destroy();
 }
 
 
-void AdaptiveStringColumn::UpdateRef(size_t ref) {
-	assert(GetTypeFromArray(ref, m_array->GetAllocator()) == COLUMN_NODE); // Can only be called when creating node
+namespace tightdb {
 
-	if (IsNode()) m_array->UpdateRef(ref);
-	else {
-		ArrayParent *const parent = m_array->GetParent();
-		const size_t pndx   = m_array->GetParentNdx();
-
-		// Replace the string array with int array for node
-		Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
-		delete m_array;
-		m_array = array;
-
-		// Update ref in parent
-		if (parent) parent->update_child_ref(pndx, ref);
-	}
+AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc)
+{
+    m_array = new ArrayString(NULL, 0, alloc);
 }
 
-bool AdaptiveStringColumn::IsEmpty() const {
-	if (IsNode()) {
-		const Array offsets = NodeGetOffsets();
-		return offsets.IsEmpty();
-	}
-	else if (IsLongStrings()) {
-		return ((ArrayStringLong*)m_array)->IsEmpty();
-	}
-	else {
-		return ((ArrayString*)m_array)->IsEmpty();
-	}
+AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
+{
+    const ColumnDef type = GetTypeFromArray(ref, alloc);
+    if (type == COLUMN_NODE) {
+        m_array = new Array(ref, parent, pndx, alloc);
+    }
+    else if (type == COLUMN_HASREFS) {
+        m_array = new ArrayStringLong(ref, parent, pndx, alloc);
+    }
+    else {
+        m_array = new ArrayString(ref, parent, pndx, alloc);
+    }
 }
 
-size_t AdaptiveStringColumn::Size() const {
-	if (IsNode())  {
-		const Array offsets = NodeGetOffsets();
-		const size_t size = offsets.IsEmpty() ? 0 : (size_t)offsets.Back();
-		return size;
-	}
-	else if (IsLongStrings()) {
-		return ((ArrayStringLong*)m_array)->Size();
-	}
-	else {
-		return ((ArrayString*)m_array)->Size();
-	}
+AdaptiveStringColumn::~AdaptiveStringColumn()
+{
+    delete m_array;
 }
 
-void AdaptiveStringColumn::Clear() {
-	if (m_array->IsNode()) {
-		// Revert to string array
-		m_array->Destroy();
-		Array* array = new ArrayString(m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
-		delete m_array;
-		m_array = array;
-	}
-	else if (IsLongStrings()) {
-		((ArrayStringLong*)m_array)->Clear();
-	}
-	else ((ArrayString*)m_array)->Clear();
-}
-
-void AdaptiveStringColumn::Resize(size_t ndx) {
-	assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
-	
-	if (IsLongStrings()) {
-		((ArrayStringLong*)m_array)->Resize(ndx);
-	}
-	else ((ArrayString*)m_array)->Resize(ndx);
-	
-}
-
-const char* AdaptiveStringColumn::Get(size_t ndx) const {
-	assert(ndx < Size());
-	return TreeGet<const char*, AdaptiveStringColumn>(ndx);
-}
-
-bool AdaptiveStringColumn::Set(size_t ndx, const char* value) {
-	assert(ndx < Size());
-	return TreeSet<const char*, AdaptiveStringColumn>(ndx, value);
-}
-
-bool AdaptiveStringColumn::Add(const char* value) {
-	return Insert(Size(), value);
-}
-
-bool AdaptiveStringColumn::Insert(size_t ndx, const char* value) {
-	assert(ndx <= Size());
-	return TreeInsert<const char*, AdaptiveStringColumn>(ndx, value);
-}
-
-void AdaptiveStringColumn::Delete(size_t ndx) {
-	assert(ndx < Size());
-	TreeDelete<const char*, AdaptiveStringColumn>(ndx);
-}
-
-size_t AdaptiveStringColumn::Find(const char* value, size_t start, size_t end) const {
-	assert(value);
-	return TreeFind<const char*, AdaptiveStringColumn, EQUAL>(value, start, end);
+void AdaptiveStringColumn::Destroy()
+{
+    if (IsNode()) m_array->Destroy();
+    else if (IsLongStrings()) {
+        ((ArrayStringLong*)m_array)->Destroy();
+    }
+    else ((ArrayString*)m_array)->Destroy();
 }
 
 
-void AdaptiveStringColumn::FindAll(Array &result, const char* value, size_t start, size_t end) const {
-	assert(value);
-	TreeFindAll<const char*, AdaptiveStringColumn>(result, value, 0, start, end);
+void AdaptiveStringColumn::UpdateRef(size_t ref)
+{
+    assert(GetTypeFromArray(ref, m_array->GetAllocator()) == COLUMN_NODE); // Can only be called when creating node
+
+    if (IsNode()) m_array->UpdateRef(ref);
+    else {
+        ArrayParent *const parent = m_array->GetParent();
+        const size_t pndx   = m_array->GetParentNdx();
+
+        // Replace the string array with int array for node
+        Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
+        delete m_array;
+        m_array = array;
+
+        // Update ref in parent
+        if (parent) parent->update_child_ref(pndx, ref);
+    }
 }
 
-const char* AdaptiveStringColumn::LeafGet(size_t ndx) const {
-	if (IsLongStrings()) {
-		return ((ArrayStringLong*)m_array)->Get(ndx);
-	}
-	else {
-		return ((ArrayString*)m_array)->Get(ndx);
-	}
+bool AdaptiveStringColumn::IsEmpty() const
+{
+    if (IsNode()) {
+        const Array offsets = NodeGetOffsets();
+        return offsets.IsEmpty();
+    }
+    else if (IsLongStrings()) {
+        return ((ArrayStringLong*)m_array)->IsEmpty();
+    }
+    else {
+        return ((ArrayString*)m_array)->IsEmpty();
+    }
 }
 
-bool AdaptiveStringColumn::LeafSet(size_t ndx, const char* value) {
-	// Easy to set if the strings fit
-	const size_t len = strlen(value);
-	if (IsLongStrings()) {
-		((ArrayStringLong*)m_array)->Set(ndx, value, len);
-		return true;
-	}
-	else if (len < 16) {
-		return ((ArrayString*)m_array)->Set(ndx, value);
-	}
-
-	// Replace string array with long string array
-	ArrayStringLong* const newarray = new ArrayStringLong((Array*)NULL, 0, m_array->GetAllocator());
-
-	// Copy strings to new array
-	ArrayString* const oldarray = (ArrayString*)m_array;
-	for (size_t i = 0; i < oldarray->Size(); ++i) {
-		newarray->Add(oldarray->Get(i));
-	}
-	newarray->Set(ndx, value, len);
-
-	// Update parent to point to new array
-	ArrayParent *const parent = oldarray->GetParent();
-	if (parent) {
-		const size_t pndx = oldarray->GetParentNdx();
-		parent->update_child_ref(pndx, newarray->GetRef());
-		newarray->SetParent(parent, pndx);
-	}
-
-	// Replace string array with long string array
-	m_array = newarray;
-	oldarray->Destroy();
-	delete oldarray;
-
-	return true;}
-
-bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value) {
-	// Easy to insert if the strings fit
-	const size_t len = strlen(value);
-	if (IsLongStrings()) {
-		((ArrayStringLong*)m_array)->Insert(ndx, value, len);
-		return true;
-	}
-	else if (len < 16) {
-		return ((ArrayString*)m_array)->Insert(ndx, value);
-	}
-
-	// Replace string array with long string array
-	ArrayStringLong* const newarray = new ArrayStringLong((Array*)NULL, 0, m_array->GetAllocator());
-
-	// Copy strings to new array
-	ArrayString* const oldarray = (ArrayString*)m_array;
-	for (size_t i = 0; i < oldarray->Size(); ++i) {
-		newarray->Add(oldarray->Get(i));
-	}
-	newarray->Insert(ndx, value, len);
-
-	// Update parent to point to new array
-	ArrayParent *const parent = oldarray->GetParent();
-	if (parent) {
-		const size_t pndx = oldarray->GetParentNdx();
-		parent->update_child_ref(pndx, newarray->GetRef());
-		newarray->SetParent(parent, pndx);
-	}
-
-	// Replace string array with long string array
-	m_array = newarray;
-	oldarray->Destroy();
-	delete oldarray;
-
-	return true;
+size_t AdaptiveStringColumn::Size() const
+{
+    if (IsNode())  {
+        const Array offsets = NodeGetOffsets();
+        const size_t size = offsets.IsEmpty() ? 0 : (size_t)offsets.Back();
+        return size;
+    }
+    else if (IsLongStrings()) {
+        return ((ArrayStringLong*)m_array)->Size();
+    }
+    else {
+        return ((ArrayString*)m_array)->Size();
+    }
 }
 
-template<class F>size_t AdaptiveStringColumn::LeafFind(const char* value, size_t start, size_t end) const {
-		if (IsLongStrings()) {
-			return ((ArrayStringLong*)m_array)->Find(value, start, end);
-		}
-		else {
-			return ((ArrayString*)m_array)->Find(value, start, end);
-		}
+void AdaptiveStringColumn::Clear()
+{
+    if (m_array->IsNode()) {
+        // Revert to string array
+        m_array->Destroy();
+        Array* array = new ArrayString(m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
+        delete m_array;
+        m_array = array;
+    }
+    else if (IsLongStrings()) {
+        ((ArrayStringLong*)m_array)->Clear();
+    }
+    else ((ArrayString*)m_array)->Clear();
 }
 
-void AdaptiveStringColumn::LeafFindAll(Array &result, const char* value, size_t add_offset, size_t start, size_t end) const {
-	if (IsLongStrings()) {
-		return ((ArrayStringLong*)m_array)->FindAll(result, value, add_offset, start, end);
-	}
-	else {
-		return ((ArrayString*)m_array)->FindAll(result, value, add_offset, start, end);
-	}
+void AdaptiveStringColumn::Resize(size_t ndx)
+{
+    assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
+
+    if (IsLongStrings()) {
+        ((ArrayStringLong*)m_array)->Resize(ndx);
+    }
+    else ((ArrayString*)m_array)->Resize(ndx);
+
+}
+
+const char* AdaptiveStringColumn::Get(size_t ndx) const
+{
+    assert(ndx < Size());
+    return TreeGet<const char*, AdaptiveStringColumn>(ndx);
+}
+
+bool AdaptiveStringColumn::Set(size_t ndx, const char* value)
+{
+    assert(ndx < Size());
+    return TreeSet<const char*, AdaptiveStringColumn>(ndx, value);
+}
+
+bool AdaptiveStringColumn::Add(const char* value)
+{
+    return Insert(Size(), value);
+}
+
+bool AdaptiveStringColumn::Insert(size_t ndx, const char* value)
+{
+    assert(ndx <= Size());
+    return TreeInsert<const char*, AdaptiveStringColumn>(ndx, value);
+}
+
+void AdaptiveStringColumn::Delete(size_t ndx)
+{
+    assert(ndx < Size());
+    TreeDelete<const char*, AdaptiveStringColumn>(ndx);
+}
+
+size_t AdaptiveStringColumn::Find(const char* value, size_t start, size_t end) const
+{
+    assert(value);
+    return TreeFind<const char*, AdaptiveStringColumn, EQUAL>(value, start, end);
 }
 
 
-void AdaptiveStringColumn::LeafDelete(size_t ndx) {
-	if (IsLongStrings()) {
-		((ArrayStringLong*)m_array)->Delete(ndx);
-	}
-	else {
-		((ArrayString*)m_array)->Delete(ndx);
-	}
+void AdaptiveStringColumn::FindAll(Array &result, const char* value, size_t start, size_t end) const
+{
+    assert(value);
+    TreeFindAll<const char*, AdaptiveStringColumn>(result, value, 0, start, end);
 }
 
-bool AdaptiveStringColumn::FindKeyPos(const char* target, size_t& pos) const {
-	const int len = (int)Size();
-	bool found = false;
-	ssize_t low  = -1;
-	ssize_t high = len;
-
-	// Binary search based on:
-	// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-	// Finds position of closest value BIGGER OR EQUAL to the target (for
-	// lookups in indexes)
-	while (high - low > 1) {
-		const ssize_t probe = ((size_t)low + (size_t)high) >> 1;
-		const char* v = Get(probe);
-
-		const int cmp = strcmp(v, target);
-
-		if (cmp < 0) low  = probe;
-		else {
-			high = probe;
-			if (cmp == 0) found = true;
-		}
-	}
-
-	pos = high;
-	return found;
+const char* AdaptiveStringColumn::LeafGet(size_t ndx) const
+{
+    if (IsLongStrings()) {
+        return ((ArrayStringLong*)m_array)->Get(ndx);
+    }
+    else {
+        return ((ArrayString*)m_array)->Get(ndx);
+    }
 }
 
-bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) const {
-	AdaptiveStringColumn keys(m_array->GetAllocator());
+bool AdaptiveStringColumn::LeafSet(size_t ndx, const char* value)
+{
+    // Easy to set if the strings fit
+    const size_t len = strlen(value);
+    if (IsLongStrings()) {
+        ((ArrayStringLong*)m_array)->Set(ndx, value, len);
+        return true;
+    }
+    else if (len < 16) {
+        return ((ArrayString*)m_array)->Set(ndx, value);
+    }
 
-	// Generate list of unique values (keys)
-	const size_t count = Size();
-	for (size_t i = 0; i < count; ++i) {
-		const char* v = Get(i);
+    // Replace string array with long string array
+    ArrayStringLong* const newarray = new ArrayStringLong((Array*)NULL, 0, m_array->GetAllocator());
 
-		// Insert keys in sorted order, ignoring duplicates
-		size_t pos;
-		if (!keys.FindKeyPos(v, pos)) {
-			keys.Insert(pos, v);
-		}
-	}
+    // Copy strings to new array
+    ArrayString* const oldarray = (ArrayString*)m_array;
+    for (size_t i = 0; i < oldarray->Size(); ++i) {
+        newarray->Add(oldarray->Get(i));
+    }
+    newarray->Set(ndx, value, len);
 
-	// Don't bpther auto enumerating if there are too few duplicates
-	if (keys.Size() > (count / 2)) {
-		keys.Destroy(); // cleanup
-		return false;
-	}
+    // Update parent to point to new array
+    ArrayParent *const parent = oldarray->GetParent();
+    if (parent) {
+        const size_t pndx = oldarray->GetParentNdx();
+        parent->update_child_ref(pndx, newarray->GetRef());
+        newarray->SetParent(parent, pndx);
+    }
 
-	// Generate enumerated list of entries
-	Column values(m_array->GetAllocator());
-	for (size_t i = 0; i < count; ++i) {
-		const char* v = Get(i);
+    // Replace string array with long string array
+    m_array = newarray;
+    oldarray->Destroy();
+    delete oldarray;
 
-		size_t pos;
-		const bool res = keys.FindKeyPos(v, pos);  // todo/fixme, res isn't used
-		assert(res);
-		(void)res;
+    return true;}
 
-		values.Add(pos);
-	}
+bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
+{
+    // Easy to insert if the strings fit
+    const size_t len = strlen(value);
+    if (IsLongStrings()) {
+        ((ArrayStringLong*)m_array)->Insert(ndx, value, len);
+        return true;
+    }
+    else if (len < 16) {
+        return ((ArrayString*)m_array)->Insert(ndx, value);
+    }
 
-	ref_keys   = keys.GetRef();
-	ref_values = values.GetRef();
-	return true;
+    // Replace string array with long string array
+    ArrayStringLong* const newarray = new ArrayStringLong((Array*)NULL, 0, m_array->GetAllocator());
+
+    // Copy strings to new array
+    ArrayString* const oldarray = (ArrayString*)m_array;
+    for (size_t i = 0; i < oldarray->Size(); ++i) {
+        newarray->Add(oldarray->Get(i));
+    }
+    newarray->Insert(ndx, value, len);
+
+    // Update parent to point to new array
+    ArrayParent *const parent = oldarray->GetParent();
+    if (parent) {
+        const size_t pndx = oldarray->GetParentNdx();
+        parent->update_child_ref(pndx, newarray->GetRef());
+        newarray->SetParent(parent, pndx);
+    }
+
+    // Replace string array with long string array
+    m_array = newarray;
+    oldarray->Destroy();
+    delete oldarray;
+
+    return true;
+}
+
+template<class F>size_t AdaptiveStringColumn::LeafFind(const char* value,
+                                                       size_t start, size_t end) const
+{
+        if (IsLongStrings()) {
+            return ((ArrayStringLong*)m_array)->Find(value, start, end);
+        }
+        else {
+            return ((ArrayString*)m_array)->Find(value, start, end);
+        }
+}
+
+void AdaptiveStringColumn::LeafFindAll(Array &result, const char* value, size_t add_offset,
+                                       size_t start, size_t end) const
+{
+    if (IsLongStrings()) {
+        return ((ArrayStringLong*)m_array)->FindAll(result, value, add_offset, start, end);
+    }
+    else {
+        return ((ArrayString*)m_array)->FindAll(result, value, add_offset, start, end);
+    }
+}
+
+
+void AdaptiveStringColumn::LeafDelete(size_t ndx)
+{
+    if (IsLongStrings()) {
+        ((ArrayStringLong*)m_array)->Delete(ndx);
+    }
+    else {
+        ((ArrayString*)m_array)->Delete(ndx);
+    }
+}
+
+bool AdaptiveStringColumn::FindKeyPos(const char* target, size_t& pos) const
+{
+    const int len = (int)Size();
+    bool found = false;
+    ssize_t low  = -1;
+    ssize_t high = len;
+
+    // Binary search based on:
+    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+    // Finds position of closest value BIGGER OR EQUAL to the target (for
+    // lookups in indexes)
+    while (high - low > 1) {
+        const ssize_t probe = ((size_t)low + (size_t)high) >> 1;
+        const char* v = Get(probe);
+
+        const int cmp = strcmp(v, target);
+
+        if (cmp < 0) low  = probe;
+        else {
+            high = probe;
+            if (cmp == 0) found = true;
+        }
+    }
+
+    pos = high;
+    return found;
+}
+
+bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) const
+{
+    AdaptiveStringColumn keys(m_array->GetAllocator());
+
+    // Generate list of unique values (keys)
+    const size_t count = Size();
+    for (size_t i = 0; i < count; ++i) {
+        const char* v = Get(i);
+
+        // Insert keys in sorted order, ignoring duplicates
+        size_t pos;
+        if (!keys.FindKeyPos(v, pos)) {
+            keys.Insert(pos, v);
+        }
+    }
+
+    // Don't bpther auto enumerating if there are too few duplicates
+    if (keys.Size() > (count / 2)) {
+        keys.Destroy(); // cleanup
+        return false;
+    }
+
+    // Generate enumerated list of entries
+    Column values(m_array->GetAllocator());
+    for (size_t i = 0; i < count; ++i) {
+        const char* v = Get(i);
+
+        size_t pos;
+        const bool res = keys.FindKeyPos(v, pos);  // todo/fixme, res isn't used
+        assert(res);
+        (void)res;
+
+        values.Add(pos);
+    }
+
+    ref_keys   = keys.GetRef();
+    ref_values = values.GetRef();
+    return true;
 }
 
 #ifdef _DEBUG
-#include <cstring> // strcmp()
 
-bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const {
-	if (c.Size() != Size()) return false;
+bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const
+{
+    if (c.Size() != Size()) return false;
 
-	for (size_t i = 0; i < Size(); ++i) {
-		const char* s1 = Get(i);
-		const char* s2 = c.Get(i);
-		if (strcmp(s1, s2) != 0) return false;
-	}
+    for (size_t i = 0; i < Size(); ++i) {
+        const char* s1 = Get(i);
+        const char* s2 = c.Get(i);
+        if (strcmp(s1, s2) != 0) return false;
+    }
 
-	return true;
+    return true;
 }
 
-MemStats AdaptiveStringColumn::Stats() const {
-	MemStats stats;
+MemStats AdaptiveStringColumn::Stats() const
+{
+    MemStats stats;
 
-	if (m_array->IsNode()) {
-		const Array refs = NodeGetRefs();
+    if (m_array->IsNode()) {
+        const Array refs = NodeGetRefs();
 
-		for (size_t i = 0; i < refs.Size(); ++i) {
-			const size_t r = (size_t)refs.Get(i);
-			const AdaptiveStringColumn col(r);
+        for (size_t i = 0; i < refs.Size(); ++i) {
+            const size_t r = (size_t)refs.Get(i);
+            const AdaptiveStringColumn col(r);
 
-			const MemStats m = col.Stats();
-			stats.Add(m);
-		}
+            const MemStats m = col.Stats();
+            stats.Add(m);
+        }
 
-		// Add node itself
-		const MemStats m = m_array->Stats();
-		stats.Add(m);
-	}
-	else if (IsLongStrings()) {
-		const MemStats m = ((ArrayStringLong*)m_array)->Stats();
-		stats.Add(m);
-	}
-	else {
-		const MemStats m = ((ArrayString*)m_array)->Stats();
-		stats.Add(m);
-	}
+        // Add node itself
+        const MemStats m = m_array->Stats();
+        stats.Add(m);
+    }
+    else if (IsLongStrings()) {
+        const MemStats m = ((ArrayStringLong*)m_array)->Stats();
+        stats.Add(m);
+    }
+    else {
+        const MemStats m = ((ArrayString*)m_array)->Stats();
+        stats.Add(m);
+    }
 
-	return stats;
+    return stats;
 }
 
-void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) const {
-	const bool isLongStrings = array.HasRefs(); // HasRefs indicates long string array
-	
-	if (isLongStrings) {
-		// ArrayStringLong has more members than Array, so we have to
-		// really instantiate it (it is not enough with a cast)
-		const size_t ref = array.GetRef();
-		ArrayStringLong str_array(ref, (Array*)NULL, 0, array.GetAllocator());
-		str_array.ToDot(out);
-	}
-	else {
-		((ArrayString&)array).ToDot(out);
-	}
+void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) const
+{
+    const bool isLongStrings = array.HasRefs(); // HasRefs indicates long string array
+
+    if (isLongStrings) {
+        // ArrayStringLong has more members than Array, so we have to
+        // really instantiate it (it is not enough with a cast)
+        const size_t ref = array.GetRef();
+        ArrayStringLong str_array(ref, (Array*)NULL, 0, array.GetAllocator());
+        str_array.ToDot(out);
+    }
+    else {
+        ((ArrayString&)array).ToDot(out);
+    }
 }
 
 #endif //_DEBUG
+
+}
