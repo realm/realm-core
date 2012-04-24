@@ -77,6 +77,10 @@ public:
     ColumnType GetColumnType(size_t ndx) const;
     const char* GetColumnName(size_t ndx) const;
     size_t GetColumnIndex(const char* name) const;
+    
+    // Column Attributes
+    ColumnType GetColumnAttr(size_t ndx) const;
+    void SetColumnAttr(size_t ndx, ColumnType attr);
 
     size_t GetRef() const {return m_specSet.GetRef();}
 

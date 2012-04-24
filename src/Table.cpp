@@ -150,11 +150,64 @@ size_t Spec::GetColumnCount() const
 ColumnType Spec::GetColumnType(size_t ndx) const
 {
     assert(ndx < GetColumnCount());
-    const ColumnType type = (ColumnType)m_spec.Get(ndx);
+	
+    ColumnType type;
+    size_t column_ndx = 0;
+    for (size_t i = 0; column_ndx <= ndx; ++i) {
+        type = (ColumnType)m_spec.Get(i);
+        if (type >= COLUMN_ATTR_INDEXED) continue; // ignore attributes
+        ++column_ndx;
+    }
 
     // Hide internal types
     if (type == COLUMN_TYPE_STRING_ENUM) return COLUMN_TYPE_STRING;
     else return type;
+}
+
+ColumnType Spec::GetColumnAttr(size_t ndx) const
+{
+    assert(ndx < GetColumnCount());
+	
+    size_t column_ndx = 0;
+	
+    // The attribute is an optional prefix for the type
+    for (size_t i = 0; column_ndx <= ndx; ++i) {
+        const ColumnType type = (ColumnType)m_spec.Get(i);
+        if (type >= COLUMN_ATTR_INDEXED) {
+            if (column_ndx == ndx) return type;
+        }
+        else ++column_ndx;
+    }
+	
+    return COLUMN_ATTR_NONE;
+}
+
+void Spec::SetColumnAttr(size_t ndx, ColumnType attr)
+{
+    assert(ndx < GetColumnCount());
+    assert(attr >= COLUMN_ATTR_INDEXED);
+	
+    size_t column_ndx = 0;
+	
+    for (size_t i = 0; column_ndx <= ndx; ++i) {
+        const ColumnType type = (ColumnType)m_spec.Get(i);
+        if (type >= COLUMN_ATTR_INDEXED) {
+            if (column_ndx == ndx) {
+                // if column already has an attr, we replace it
+                if (attr == COLUMN_ATTR_NONE) m_spec.Delete(i);
+                else m_spec.Set(i, attr);
+                return;
+            }
+        }
+        else {
+            if (column_ndx == ndx) {
+                // prefix type with attr
+                m_spec.Insert(i, attr);
+                return;
+            }
+            ++column_ndx;
+        }
+    }
 }
 
 const char* Spec::GetColumnName(size_t ndx) const
@@ -260,14 +313,16 @@ void Table::CreateColumns()
     if (!m_columns.IsValid()) {
         m_columns.SetType(COLUMN_HASREFS);
     }
+	
+    size_t subtable_count = 0;
+    ColumnType attr = COLUMN_ATTR_NONE;
 
     // Add the newly defined columns
-    size_t subtable_count = 0;
     for (size_t i = 0; i < m_spec.Size(); ++i) {
         const ColumnType type = (ColumnType)m_spec.Get(i);
         Allocator& alloc = m_specSet.GetAllocator();
         const size_t ref_pos =  m_columns.Size();
-        void* newColumn = NULL;
+        ColumnBase* newColumn = NULL;
 
         switch (type) {
             case COLUMN_TYPE_INT:
@@ -301,8 +356,24 @@ void Table::CreateColumns()
                 m_columns.Add(((ColumnMixed*)newColumn)->GetRef());
                 ((ColumnMixed*)newColumn)->SetParent(&m_columns, ref_pos);
                 break;
+
+            // Attributes
+            case COLUMN_ATTR_INDEXED:
+            case COLUMN_ATTR_UNIQUE:
+                attr = type;
+                break;
+
             default:
                 assert(false);
+        }
+		
+        // Atributes on columns may define that they come with an index
+        if (attr != COLUMN_ATTR_NONE) {
+            assert(false); //TODO: 
+            //const index_ref = newColumn->CreateIndex(attr);
+            //m_columns.Add(index_ref); 
+
+            attr = COLUMN_ATTR_NONE;
         }
 
         // Cache Columns
@@ -337,15 +408,16 @@ void Table::CacheColumns()
 
     Allocator& alloc = m_specSet.GetAllocator();
     const Spec spec = ((const Table*)this)->GetSpec();
-
-    // Cache columns
+    ColumnType attr = COLUMN_ATTR_NONE;
     size_t size = (size_t)-1;
     size_t column_ndx = 0;
+
+    // Cache columns
     for (size_t i = 0; i < m_spec.Size(); ++i) {
         const ColumnType type = (ColumnType)m_spec.Get(i);
         const size_t ref = m_columns.GetAsRef(column_ndx);
 
-        void* newColumn = NULL;
+        ColumnBase* newColumn = NULL;
         size_t colsize = (size_t)-1;
         switch (type) {
             case COLUMN_TYPE_INT:
@@ -367,7 +439,7 @@ void Table::CacheColumns()
                 const size_t ref_values = m_columns.GetAsRef(column_ndx+1);
                 newColumn = new ColumnStringEnum(ref, ref_values, &m_columns, column_ndx, alloc);
                 colsize = ((ColumnStringEnum*)newColumn)->Size();
-                ++column_ndx; // advance one extra pos to account for for keys/values pair
+                ++column_ndx; // advance one extra pos to account for keys/values pair
                 break;
             }
             case COLUMN_TYPE_TABLE:
@@ -383,12 +455,27 @@ void Table::CacheColumns()
                 newColumn = new ColumnMixed(ref, &m_columns, column_ndx, alloc, this);
                 colsize = ((ColumnMixed*)newColumn)->Size();
                 break;
+				
+            // Attributes
+            case COLUMN_ATTR_INDEXED:
+            case COLUMN_ATTR_UNIQUE:
+                attr = type;
+                break;
 
             default:
                 assert(false);
         }
 
         m_cols.Add((intptr_t)newColumn);
+		
+        // Atributes on columns may define that they come with an index
+        if (attr != COLUMN_ATTR_NONE) {
+            const size_t index_ref = m_columns.GetAsRef(column_ndx+1);
+            newColumn->SetIndexRef(index_ref);
+
+            ++column_ndx; // advance one extra pos to account for index
+            attr = COLUMN_ATTR_NONE;
+        }
 
         // Set table size
         // (and verify that all column are same length)
@@ -479,13 +566,22 @@ size_t Table::GetColumnIndex(const char* name) const
 ColumnType Table::GetRealColumnType(size_t ndx) const
 {
     assert(ndx < GetColumnCount());
-    return (ColumnType)m_spec.Get(ndx);
+	
+    // Column types could also be cached in columns to avoid iteration
+    ColumnType type;
+    size_t column_ndx = 0;
+    for (size_t i = 0; column_ndx <= ndx; ++i) {
+        type = (ColumnType)m_spec.Get(i);
+        if (type >= COLUMN_ATTR_INDEXED) continue; // ignore attributes
+        ++column_ndx;
+    }
+
+    return type;
 }
 
 ColumnType Table::GetColumnType(size_t ndx) const
 {
-    assert(ndx < GetColumnCount());
-    const ColumnType type = (ColumnType)m_spec.Get(ndx);
+    const ColumnType type = GetRealColumnType(ndx);
 
     // Hide internal types
     if (type == COLUMN_TYPE_STRING_ENUM) return COLUMN_TYPE_STRING;
