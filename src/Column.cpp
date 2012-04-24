@@ -138,12 +138,10 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
 
     while(p0 < s0) {
         i0 = idx0->GetAsRef(p0++);
-        v0 = vals->Get(i0);
         idxres->Add(i0);
     }
     while(p1 < s1) {
         i1 = idx1->GetAsRef(p1++);
-        v1 = vals->Get(i1);
         idxres->Add(i1);
     }
 

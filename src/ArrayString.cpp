@@ -310,7 +310,7 @@ void ArrayString::StringStats() const
 
     const size_t size = m_len * m_width;
     const size_t zeroes = size - total;
-    const size_t zavg = zeroes / m_len;
+    const size_t zavg = zeroes / (m_len ? m_len : 1); // avoid possible div by zero
 
     cout << "Count: " << m_len << "\n";
     cout << "Width: " << m_width << "\n";

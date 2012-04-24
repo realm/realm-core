@@ -125,7 +125,7 @@ MemRef SlabAlloc::Alloc(size_t size)
     const size_t newsize = multible > doubleLast ? multible : doubleLast;
 
     // Allocate memory
-    void* slab = malloc(newsize);
+    void* slab = newsize ? malloc(newsize): NULL;
     if (!slab) return MemRef(NULL, 0);
 
     // Add to slab table
@@ -256,6 +256,7 @@ bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len)
     // There is a unit test that calls this function with an invalid buffer
     // so we can't size_t-test range with TO_REF until now
     ref = TO_REF(*(uint64_t*)buffer);
+    (void)ref; // the above macro contains an assert, this avoids warning for unused var
 
     m_shared = (char*)buffer;
     m_baseline = len;
@@ -378,7 +379,7 @@ void SlabAlloc::Verify() const
 
 void SlabAlloc::Print() const
 {
-    const size_t allocated = m_slabs.IsEmpty() ? 0 : m_slabs[m_slabs.GetSize()-1].offset;
+    const size_t allocated = m_slabs.IsEmpty() ? 0 : (size_t)m_slabs[m_slabs.GetSize()-1].offset;
 
     size_t free = 0;
     for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {

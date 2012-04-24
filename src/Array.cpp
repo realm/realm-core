@@ -62,13 +62,13 @@ Array::~Array() {}
 void Array::set_header_isnode(bool value, void* header)
 {
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[0] = (header2[0] & (~0x80)) | ((uint8_t)value << 7);
+    header2[0] = (header2[0] & (~0x80)) | (uint8_t)(value << 7);
 }
 
 void Array::set_header_hasrefs(bool value, void* header)
 {
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[0] = (header2[0] & (~0x40)) | ((uint8_t)value << 6);
+    header2[0] = (header2[0] & (~0x40)) | (uint8_t)(value << 6);
 }
 
 void Array::set_header_wtype(WidthType value, void* header)
@@ -78,7 +78,7 @@ void Array::set_header_wtype(WidthType value, void* header)
     // 1: multiply  width * length
     // 2: ignore    1 * length
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[0] = (header2[0] & (~0x18)) | ((uint8_t)value << 3);
+    header2[0] = (header2[0] & (~0x18)) | (uint8_t)(value << 3);
 }
 
 void Array::set_header_width(size_t value, void* header)
@@ -1412,25 +1412,25 @@ void Array::Set_1b(size_t ndx, int64_t value)
     ndx &= 7;
 
     uint8_t* p = &m_data[offset];
-    *p = (*p &~ (1 << ndx)) | (((uint8_t)value & 1) << ndx);
+    *p = (*p &~ (1 << ndx)) | (uint8_t)((value & 1) << ndx);
 }
 
 void Array::Set_2b(size_t ndx, int64_t value)
 {
     const size_t offset = ndx >> 2;
-    const uint8_t n = (ndx & 3) << 1;
+    const uint8_t n = (uint8_t)((ndx & 3) << 1);
 
     uint8_t* p = &m_data[offset];
-    *p = (*p &~ (0x03 << n)) | (((uint8_t)value & 0x03) << n);
+    *p = (*p &~ (0x03 << n)) | (uint8_t)((value & 0x03) << n);
 }
 
 void Array::Set_4b(size_t ndx, int64_t value)
 {
     const size_t offset = ndx >> 1;
-    const uint8_t n = (ndx & 1) << 2;
+    const uint8_t n = (uint8_t)((ndx & 1) << 2);
 
     uint8_t* p = &m_data[offset];
-    *p = (*p &~ (0x0F << n)) | (((uint8_t)value & 0x0F) << n);
+    *p = (*p &~ (0x0F << n)) | (uint8_t)((value & 0x0F) << n);
 }
 
 void Array::Set_8b(size_t ndx, int64_t value)
@@ -1966,7 +1966,7 @@ namespace tightdb {
 int64_t Array::ColumnGet(size_t ndx) const
 {
     const char* data   = (const char*)m_data;
-    const uint8_t* header = (const uint8_t*)data - 8;
+    const uint8_t* header;
     size_t width = m_width;
     bool isNode = m_isNode;
 
