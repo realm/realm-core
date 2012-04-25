@@ -187,6 +187,29 @@ char* Group::WriteToMem(size_t& len)
     return out.ReleaseBuffer();
 }
 
+void Group::UpdateRefs(size_t topRef) {
+    // Update top with the new (persistent) ref
+    m_top.UpdateRef(topRef);
+    
+    // Now we can update it's child arrays
+    m_tableNames.UpdateFromParent();
+    //m_freePositions.UpdateFromParent();
+    //m_freeLengths.UpdateFromParent();
+    
+    // if the tables have not been modfied we don't
+    // need to update cached tables
+    if (!m_tables.UpdateFromParent()) return;
+    
+    // Also update cached tables
+    const size_t count = m_cachedtables.Size();
+    for (size_t i = 0; i < count; ++i) {
+        Table* const t = (Table*)m_cachedtables.Get(i);
+        if (t) {
+            t->UpdateFromParent();
+        }
+    }
+}
+
 #ifdef _DEBUG
 
 void Group::Verify()

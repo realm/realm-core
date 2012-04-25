@@ -42,6 +42,7 @@ public:
 
     virtual size_t GetRef() const = 0;
     void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
+    virtual void UpdateFromParent() {m_array->UpdateFromParent();}
 
 #ifdef _DEBUG
     virtual void verify() const = 0;

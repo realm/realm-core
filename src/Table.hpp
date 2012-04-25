@@ -266,6 +266,7 @@ protected:
     // Specification
     size_t GetColumnRefPos(size_t column_ndx) const;
     void UpdateColumnRefs(size_t column_ndx, int diff);
+    void UpdateFromParent();
 
 
 #ifdef _DEBUG

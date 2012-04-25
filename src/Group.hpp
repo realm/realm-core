@@ -38,6 +38,9 @@ public:
 #endif //_DEBUG
 
 protected:
+    // Recursively update all internal refs after commit
+    void UpdateRefs(size_t TopRef);
+    
     // Overriding method in ArrayParent
     virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
     {
@@ -47,13 +50,11 @@ protected:
     // Overriding method in Table::Parent
     virtual void child_destroyed(std::size_t) {} // Ignore
 
-#ifdef _DEBUG
     // Overriding method in ArrayParent
-    virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const
+    virtual size_t get_child_ref(size_t subtable_ndx) const
     {
         return m_tables.GetAsRef(subtable_ndx);
     }
-#endif
 
 private:
     void Create();

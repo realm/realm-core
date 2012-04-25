@@ -24,6 +24,16 @@ void ColumnMixed::SetParent(ArrayParent *parent, size_t pndx)
     m_array->SetParent(parent, pndx);
 }
 
+void ColumnMixed::UpdateFromParent()
+{
+    if (!m_array->UpdateFromParent()) return;
+    
+    m_types->UpdateFromParent();
+    m_refs->UpdateFromParent();
+    m_data->UpdateFromParent();
+}
+
+
 void ColumnMixed::Create(Allocator &alloc, Table const *tab)
 {
     m_array = new Array(COLUMN_HASREFS, NULL, 0, alloc);

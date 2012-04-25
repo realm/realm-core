@@ -20,6 +20,12 @@ void ColumnStringEnum::UpdateParentNdx(int diff)
     Column::UpdateParentNdx(diff);
 }
 
+void ColumnStringEnum::UpdateFromParent()
+{
+    m_array->UpdateFromParent();
+    m_keys.UpdateFromParent();
+}
+
 size_t ColumnStringEnum::Size() const
 {
     return Column::Size();

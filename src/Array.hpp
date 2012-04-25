@@ -86,14 +86,13 @@ class ArrayParent
 public:
     virtual ~ArrayParent() {}
 
+    // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
+    virtual void update_child_ref(size_t subtable_ndx, size_t new_ref) = 0;
+
 protected:
     friend class Array;
-public: // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
-    virtual void update_child_ref(size_t subtable_ndx, size_t new_ref) = 0;
-protected:
-#ifdef _DEBUG
-    virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const = 0;
-#endif
+
+    virtual size_t get_child_ref(size_t subtable_ndx) const = 0;
 };
 
 
@@ -108,12 +107,15 @@ public:
     bool operator==(const Array& a) const;
 
     void SetType(ColumnDef type);
+    void UpdateRef(size_t ref);
+
+    // Parent tracking
     bool HasParent() const {return m_parent != NULL;}
     void SetParent(ArrayParent *parent, size_t pndx);
     void UpdateParentNdx(int diff) {m_parentNdx += diff;}
     ArrayParent *GetParent() const {return m_parent;}
     size_t GetParentNdx() const {return m_parentNdx;}
-    void UpdateRef(size_t ref);
+    bool UpdateFromParent();
 
     bool IsValid() const {return m_data != NULL;}
     void Invalidate() const {m_data = NULL;}
@@ -180,6 +182,7 @@ public:
     // Serialization
     template<class S> size_t Write(S& target, size_t& pos, bool recurse=true) const;
     std::vector<int64_t> ToVector(void);
+
     // Debug
     size_t GetBitWidth() const {return m_width;}
 #ifdef _DEBUG
@@ -286,9 +289,7 @@ protected:
 
     // Overriding methods in ArrayParent
     virtual void update_child_ref(size_t subtable_ndx, size_t new_ref);
-#ifdef _DEBUG
-    virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const;
-#endif
+    virtual size_t get_child_ref(size_t subtable_ndx) const;
 };
 
 
@@ -370,12 +371,10 @@ inline void Array::update_child_ref(size_t subtable_ndx, size_t new_ref)
     Set(subtable_ndx, new_ref);
 }
 
-#ifdef _DEBUG
-inline size_t Array::get_child_ref_for_verify(size_t subtable_ndx) const
+inline size_t Array::get_child_ref(size_t subtable_ndx) const
 {
     return GetAsRef(subtable_ndx);
 }
-#endif // _DEBUG
 
 }
 

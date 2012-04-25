@@ -17,9 +17,7 @@ namespace tightdb {
 struct FakeParent: Table::Parent {
     virtual void update_child_ref(size_t, size_t) {} // Ignore
     virtual void child_destroyed(size_t) {} // Ignore
-#ifdef _DEBUG
-    virtual size_t get_child_ref_for_verify(size_t) const { return 0; }
-#endif
+    virtual size_t get_child_ref(size_t) const { return 0; }
 };
 
 
@@ -383,6 +381,7 @@ void Table::CreateColumns()
 
 Spec Table::GetSpec()
 {
+    assert(m_top.IsValid()); // you can only change specs on top-level tablesu
     assert(GetColumnCount() == 0); // only set spec on new table
 
     Allocator& alloc = m_specSet.GetAllocator();
@@ -1266,50 +1265,32 @@ void Table::Optimize()
 void Table::UpdateColumnRefs(size_t column_ndx, int diff)
 {
     for (size_t i = column_ndx; i < m_cols.Size(); ++i) {
-        const ColumnType type = GetRealColumnType(i);
-
-        switch (type) {
-        case COLUMN_TYPE_INT:
-        case COLUMN_TYPE_BOOL:
-        case COLUMN_TYPE_DATE:
-            {
-                Column* column = (Column*)m_cols.Get(i);
-                column->UpdateParentNdx(diff);
-            }
-            break;
-        case COLUMN_TYPE_STRING:
-            {
-                AdaptiveStringColumn* column = (AdaptiveStringColumn*)m_cols.Get(i);
-                column->UpdateParentNdx(diff);
-            }
-            break;
-        case COLUMN_TYPE_BINARY:
-            {
-                ColumnBinary* column = (ColumnBinary*)m_cols.Get(i);
-                column->UpdateParentNdx(diff);
-            }
-            break;
-        case COLUMN_TYPE_STRING_ENUM:
-            {
-                ColumnStringEnum* column = (ColumnStringEnum*)m_cols.Get(i);
-                column->UpdateParentNdx(diff);
-            }
-            break;
-        case COLUMN_TYPE_MIXED:
-            {
-                ColumnMixed* column = (ColumnMixed*)m_cols.Get(i);
-                column->UpdateParentNdx(diff);
-            }
-            break;
-        case COLUMN_TYPE_TABLE:
-            {
-                ColumnTable* column = (ColumnTable*)m_cols.Get(i);
-                column->UpdateParentNdx(diff);
-            }
-            break;
-        default:
-            assert(false);
+        ColumnBase* const column = (ColumnBase*)m_cols.Get(i);
+        column->UpdateParentNdx(diff);
+    }
+}
+    
+void Table::UpdateFromParent() {
+    // There is no top for sub-tables sharing schema
+    if (m_top.IsValid()) {
+        if (!m_top.UpdateFromParent()) return;
+    }
+    
+    if (m_specSet.UpdateFromParent()) {
+        m_spec.UpdateFromParent();
+        m_columnNames.UpdateFromParent();
+        if (m_specSet.Size() == 3) {
+            m_subSpecs.UpdateFromParent();
         }
+    }
+
+    if (!m_columns.UpdateFromParent()) return;
+    
+    // Update cached columns
+    const size_t column_count = GetColumnCount();
+    for (size_t i = 0; i < column_count; ++i) {
+        ColumnBase* const column = (ColumnBase*)m_cols.Get(i);
+        column->UpdateFromParent();
     }
 }
 

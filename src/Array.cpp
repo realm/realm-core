@@ -199,6 +199,21 @@ void Array::UpdateRef(size_t ref)
     update_ref_in_parent(ref);
 }
 
+bool Array::UpdateFromParent() {
+    if (!m_parent) return false;
+
+    // After commit to disk, the array may have moved
+    // so get ref from parent and see if it has changed
+    const size_t new_ref = m_parent->get_child_ref(m_parentNdx);
+
+    if (new_ref != m_ref) {
+        Create(new_ref);
+        return true;
+    }
+
+    return false; // not modified
+}
+
 /**
  * Takes a 64bit value and return the minimum number of bits needed to fit the
  * value.
@@ -1768,7 +1783,7 @@ void Array::Verify() const
     // Check that parent is set correctly
     if (!m_parent) return;
 
-    const size_t ref_in_parent = m_parent->get_child_ref_for_verify(m_parentNdx);
+    const size_t ref_in_parent = m_parent->get_child_ref(m_parentNdx);
     assert(ref_in_parent == m_ref);
 }
 
