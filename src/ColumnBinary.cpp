@@ -112,7 +112,7 @@ BinaryData ColumnBinary::Get(size_t ndx) const
     return TreeGet<BinaryData,ColumnBinary>(ndx);
 }
 
-const void* ColumnBinary::GetData(size_t ndx) const
+const char* ColumnBinary::GetData(size_t ndx) const
 {
     assert(ndx < Size());
     const BinaryData bin = TreeGet<BinaryData,ColumnBinary>(ndx);
@@ -126,7 +126,7 @@ size_t ColumnBinary::GetLen(size_t ndx) const
     return bin.len;
 }
 
-void ColumnBinary::Set(size_t ndx, const void* value, size_t len)
+void ColumnBinary::Set(size_t ndx, const char* value, size_t len)
 {
     assert(ndx < Size());
     const BinaryData bin = {value, len};
@@ -139,7 +139,7 @@ bool ColumnBinary::Set(size_t ndx, BinaryData bin)
     return TreeSet<BinaryData,ColumnBinary>(ndx, bin);
 }
 
-void ColumnBinary::Add(const void* value, size_t len)
+void ColumnBinary::Add(const char* value, size_t len)
 {
     Insert(Size(), value, len);
 }
@@ -149,7 +149,7 @@ bool ColumnBinary::Add(BinaryData bin)
     return Insert(Size(), bin);
 }
 
-void ColumnBinary::Insert(size_t ndx, const void* value, size_t len)
+void ColumnBinary::Insert(size_t ndx, const char* value, size_t len)
 {
     assert(ndx <= Size());
     const BinaryData bin = {value, len};
@@ -177,7 +177,7 @@ void ColumnBinary::Resize(size_t ndx)
 
 BinaryData ColumnBinary::LeafGet(size_t ndx) const
 {
-    const ArrayBinary* const array = (ArrayBinary*)m_array;
+    const ArrayBinary* const array = static_cast<ArrayBinary*>(m_array);
     const BinaryData bin = {array->Get(ndx), array->GetLen(ndx)};
     return bin;
 }

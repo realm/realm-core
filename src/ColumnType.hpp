@@ -24,7 +24,7 @@ enum ColumnType {
 };
 
 struct BinaryData {
-    const void* pointer;
+    const char* pointer;
     size_t len;
 };
 

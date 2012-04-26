@@ -1000,7 +1000,7 @@ BinaryData Table::GetBinary(size_t column_id, size_t ndx) const
     return column.Get(ndx);
 }
 
-void Table::SetBinary(size_t column_id, size_t ndx, const void* value, size_t len)
+void Table::SetBinary(size_t column_id, size_t ndx, const char* value, size_t len)
 {
     assert(column_id < GetColumnCount());
     assert(ndx < m_size);
@@ -1009,7 +1009,7 @@ void Table::SetBinary(size_t column_id, size_t ndx, const void* value, size_t le
     column.Set(ndx, value, len);
 }
 
-void Table::InsertBinary(size_t column_id, size_t ndx, const void* value, size_t len)
+void Table::InsertBinary(size_t column_id, size_t ndx, const char* value, size_t len)
 {
     assert(column_id < GetColumnCount());
     assert(ndx <= m_size);

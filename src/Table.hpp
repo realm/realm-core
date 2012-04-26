@@ -1,70 +1,25 @@
 #ifndef __TDB_TABLE__
 #define __TDB_TABLE__
 
-#include <cstring> // strcmp()
-#include <time.h>
 #include "Column.hpp"
 #include "ColumnString.hpp"
 #include "ColumnStringEnum.hpp"
 #include "ColumnBinary.hpp"
 #include "alloc.hpp"
-#include "ColumnType.hpp"
 #include "TableRef.hpp"
 #include "spec.hpp"
+#include "mixed.hpp"
 
 namespace tightdb {
 
+
 class TableView;
-class Group;
 class ColumnTable;
 class ColumnMixed;
 class Table;
-
-
-class Date {
-public:
-    Date(time_t d) : m_date(d) {}
-    time_t GetDate() const {return m_date;}
-private:
-    time_t m_date;
-};
-
-
-
-class Mixed {
-public:
-    explicit Mixed(ColumnType v)  {assert(v == COLUMN_TYPE_TABLE); (void)v; m_type = COLUMN_TYPE_TABLE;}
-    Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
-    Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.GetDate();}
-    Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
-    Mixed(const char* v) {m_type = COLUMN_TYPE_STRING; m_str  = v;}
-    Mixed(BinaryData v)  {m_type = COLUMN_TYPE_BINARY; m_str = (const char*)v.pointer; m_len = v.len;}
-    Mixed(const char* v, size_t len) {m_type = COLUMN_TYPE_BINARY; m_str = v; m_len = len;}
-
-    ColumnType GetType() const {return m_type;}
-
-    int64_t     GetInt()    const {assert(m_type == COLUMN_TYPE_INT);    return m_int;}
-    bool        GetBool()   const {assert(m_type == COLUMN_TYPE_BOOL);   return m_bool;}
-    time_t      GetDate()   const {assert(m_type == COLUMN_TYPE_DATE);   return m_date;}
-    const char* GetString() const {assert(m_type == COLUMN_TYPE_STRING); return m_str;}
-    BinaryData  GetBinary() const {assert(m_type == COLUMN_TYPE_BINARY); BinaryData b = {m_str, m_len}; return b;}
-
-private:
-    ColumnType m_type;
-    union {
-        int64_t m_int;
-        bool    m_bool;
-        time_t  m_date;
-        const char* m_str;
-    };
-    size_t m_len;
-};
-
-
-
-
 typedef BasicTableRef<Table> TableRef;
 typedef BasicTableRef<const Table> ConstTableRef;
+
 
 
 /**
@@ -111,20 +66,20 @@ public:
     void Set(size_t column_id, size_t ndx, int64_t value);
     bool GetBool(size_t column_id, size_t ndx) const;
     void SetBool(size_t column_id, size_t ndx, bool value);
-    time_t GetDate(size_t column_id, size_t ndx) const;
-    void SetDate(size_t column_id, size_t ndx, time_t value);
+    std::time_t GetDate(size_t column_id, size_t ndx) const;
+    void SetDate(size_t column_id, size_t ndx, std::time_t value);
 
     // NOTE: Low-level insert functions. Always insert in all columns at once
     // and call InsertDone after to avoid table getting un-balanced.
     void InsertInt(size_t column_id, size_t ndx, int64_t value);
     void InsertBool(size_t column_id, size_t ndx, bool value) {InsertInt(column_id, ndx, value);}
-    void InsertDate(size_t column_id, size_t ndx, time_t value) {InsertInt(column_id, ndx, value);}
+    void InsertDate(size_t column_id, size_t ndx, std::time_t value) {InsertInt(column_id, ndx, value);}
     template<class T> void InsertEnum(size_t column_id, size_t ndx, T value)
     {
         InsertInt(column_id, ndx, value);
     }
     void InsertString(size_t column_id, size_t ndx, const char* value);
-    void InsertBinary(size_t column_id, size_t ndx, const void* value, size_t len);
+    void InsertBinary(size_t column_id, size_t ndx, const char* value, size_t len);
     void InsertDone();
 
     // Strings
@@ -133,7 +88,7 @@ public:
 
     // Binary
     BinaryData GetBinary(size_t column_id, size_t ndx) const;
-    void SetBinary(size_t column_id, size_t ndx, const void* value, size_t len);
+    void SetBinary(size_t column_id, size_t ndx, const char* value, size_t len);
 
     // Sub-tables
     TableRef GetTable(size_t column_id, size_t ndx);
@@ -167,7 +122,7 @@ public:
     size_t Find(size_t column_id, int64_t value) const;
     size_t FindBool(size_t column_id, bool value) const;
     size_t FindString(size_t column_id, const char* value) const;
-    size_t FindDate(size_t column_id, time_t value) const;
+    size_t FindDate(size_t column_id, std::time_t value) const;
     void FindAll(TableView& tv, size_t column_id, int64_t value);
     void FindAllBool(TableView& tv, size_t column_id, bool value);
     void FindAllString(TableView& tv, size_t column_id, const char *value);
@@ -327,13 +282,13 @@ public:
     // Getting values
     int64_t Get(size_t column_id, size_t ndx) const;
     bool GetBool(size_t column_id, size_t ndx) const;
-    time_t GetDate(size_t column_id, size_t ndx) const;
+    std::time_t GetDate(size_t column_id, size_t ndx) const;
     const char* GetString(size_t column_id, size_t ndx) const;
 
     // Setting values
     void Set(size_t column_id, size_t ndx, int64_t value);
     void SetBool(size_t column_id, size_t ndx, bool value);
-    void SetDate(size_t column_id, size_t ndx, time_t value);
+    void SetDate(size_t column_id, size_t ndx, std::time_t value);
     void SetString(size_t column_id, size_t ndx, const char* value);
     void Sort(size_t column, bool Ascending = true);
     // Sub-tables
@@ -380,6 +335,6 @@ inline ConstTableRef Table::GetTable(size_t column_id, size_t ndx) const
 }
 
 
-}
+} // namespace tightdb
 
 #endif //__TDB_TABLE__

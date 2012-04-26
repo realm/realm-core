@@ -25,8 +25,8 @@ template<int col_idx, class Type> class RegisterColumn;
  * functions. Further more, it has no destructor, and it adds no new
  * data-members. These properties are important, because it ensures
  * that there is no run-time distinction between a Table instance and
- * an instance of any variation of this class, and therefore it valid
- * to cast a pointer from Table to basic_table<T> even when the
+ * an instance of any variation of this class, and therefore it is
+ * valid to cast a pointer from Table to basic_table<T> even when the
  * instance is constructed as a Table. Of couse, this also assumes
  * that Table is non-polymorphic.
  */

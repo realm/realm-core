@@ -5,6 +5,7 @@
 
 namespace tightdb {
 
+
 ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
     Array(COLUMN_HASREFS, parent, pndx, alloc),
     m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc)
@@ -43,7 +44,7 @@ size_t ArrayBinary::Size() const
     return m_offsets.Size();
 }
 
-const void* ArrayBinary::Get(size_t ndx) const
+const char* ArrayBinary::Get(size_t ndx) const
 {
     assert(ndx < m_offsets.Size());
 
@@ -61,15 +62,15 @@ size_t ArrayBinary::GetLen(size_t ndx) const
     return end - start;
 }
 
-void ArrayBinary::Add(const void* value, size_t len)
+void ArrayBinary::Add(const char* value, size_t len)
 {
     assert(len == 0 || value);
 
-    m_blob.Add((void*)value, len);
+    m_blob.Add(value, len);
     m_offsets.Add(m_offsets.IsEmpty() ? len : m_offsets.Back() + len);
 }
 
-void ArrayBinary::Set(size_t ndx, const void* value, size_t len)
+void ArrayBinary::Set(size_t ndx, const char* value, size_t len)
 {
     assert(ndx < m_offsets.Size());
     assert(len == 0 || value);
@@ -78,18 +79,18 @@ void ArrayBinary::Set(size_t ndx, const void* value, size_t len)
     const size_t current_end = m_offsets.GetAsRef(ndx);
     const ssize_t diff =  (start + len) - current_end;
 
-    m_blob.Replace(start, current_end, (void*)value, len);
+    m_blob.Replace(start, current_end, value, len);
     m_offsets.Adjust(ndx, diff);
 }
 
-void ArrayBinary::Insert(size_t ndx, const void* value, size_t len)
+void ArrayBinary::Insert(size_t ndx, const char* value, size_t len)
 {
     assert(ndx <= m_offsets.Size());
     assert(len == 0 || value);
 
     const size_t pos = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
 
-    m_blob.Insert(pos, (void*)value, len);
+    m_blob.Insert(pos, value, len);
     m_offsets.Insert(ndx, pos + len);
     m_offsets.Adjust(ndx+1, len);
 }
