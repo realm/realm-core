@@ -43,7 +43,7 @@ bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* 
 bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
 bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
 void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres);
-void merge_core(Array* a0, Array* a1, Array* res);
+void merge_core(const Array& a0, const Array& a1, Array& res);
 Array* merge(const Array& ArrayList);
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
 
@@ -149,46 +149,48 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
 }
 
 // Merge two sorted arrays into a single sorted array
-void merge_core(Array* a0, Array* a1, Array* res)
+void merge_core(const Array& a0, const Array& a1, Array& res)
 {
-    int64_t v0, v1;
-    size_t p0 = 0, p1 = 0;
-    size_t s0 = a0->Size();
-    size_t s1 = a1->Size();
+    assert(res.IsEmpty());
+    
+    size_t p0 = 0;
+    size_t p1 = 0;
+    const size_t s0 = a0.Size();
+    const size_t s1 = a1.Size();
 
-    v0 = a0->Get(p0++);
-    v1 = a1->Get(p1++);
+    int64_t v0 = a0.Get(p0++);
+    int64_t v1 = a1.Get(p1++);
 
-    for(;;) {
-        if(v0 < v1) {
-            res->Add(v0);
-            if(p0 == s0)
+    for (;;) {
+        if (v0 < v1) {
+            res.Add(v0);
+            if (p0 == s0)
                 break;
-            v0 = a0->Get(p0++);
+            v0 = a0.Get(p0++);
         }
         else {
-            res->Add(v1);
-            if(p1 == s1)
+            res.Add(v1);
+            if (p1 == s1)
                 break;
-            v1 = a1->Get(p1++);
+            v1 = a1.Get(p1++);
         }
     }
 
-    if(p0 == s0)
-        p0--;
+    if (p0 == s0)
+        --p0;
     else
-        p1--;
+        --p1;
 
-    while(p0 < s0) {
-        v0 = a0->Get(p0++);
-        res->Add(v0);
+    while (p0 < s0) {
+        v0 = a0.Get(p0++);
+        res.Add(v0);
     }
-    while(p1 < s1) {
-        v1 = a1->Get(p1++);
-        res->Add(v1);
+    while (p1 < s1) {
+        v1 = a1.Get(p1++);
+        res.Add(v1);
     }
 
-    assert(res->Size() == a0->Size() + a1->Size());
+    assert(res.Size() == a0.Size() + a1.Size());
 }
 
 // Input:
@@ -208,21 +210,32 @@ Array* merge(const Array& arrayList)
     for (size_t t = left; t < count; ++t)
         Right.Add(arrayList.Get(t));
 
-    Array* l;
-    Array* r;
+    Array* l = NULL;
+    Array* r = NULL;
     Array* res = new Array();
 
     // We merge left-half-first instead of bottom-up so that we access the same data in each call
     // so that it's in cache, at least for the first few iterations until lists get too long
     l = merge(Left);
     r = merge(Right);
-    merge_core(l, r, res);
+    if (l && r)
+        merge_core(*l, *r, *res);
+    else if (l) {
+        const size_t ref = Right.Get(0);
+        Array r0(ref, NULL);
+        merge_core(*l, r0, *res);
+    }
+    else if (r) {
+        const size_t ref = Left.Get(0);
+        Array l0(ref, NULL);
+        merge_core(l0, *r, *res);
+    }
     
     // Clean-up
     Left.Destroy();
     Right.Destroy();
-    l->Destroy();
-    r->Destroy();
+    if (l) l->Destroy();
+    if (r) r->Destroy();
     delete l;
     delete r;
     
