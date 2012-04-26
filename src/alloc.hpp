@@ -27,6 +27,8 @@ public:
     virtual void* Translate(size_t ref) const {return (void*)ref;}
     virtual bool IsReadOnly(size_t) const {return false;}
 
+    virtual ~Allocator() {}
+
 #ifdef _DEBUG
     virtual void Verify() const {};
 #endif //_DEBUG

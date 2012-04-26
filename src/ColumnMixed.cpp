@@ -415,7 +415,7 @@ void ColumnMixed::verify() const
     for (size_t i = 0; i < count; ++i) {
         const size_t tref = m_refs->GetAsRef(i);
         if (tref == 0 || tref & 0x1) continue;
-        TableConstRef subtable = m_refs->get_subtable(i);
+        ConstTableRef subtable = m_refs->get_subtable(i);
         subtable->verify();
     }
 }
@@ -436,7 +436,7 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const
     for (size_t i = 0; i < count; ++i) {
         const ColumnType type = (ColumnType)m_types->Get(i);
         if (type != COLUMN_TYPE_TABLE) continue;
-        TableConstRef subtable = m_refs->get_subtable(i);
+        ConstTableRef subtable = m_refs->get_subtable(i);
         subtable->ToDot(out);
     }
 

@@ -32,6 +32,8 @@ public:
         first.push_back(0);
         m_threadcount = 0;
     }
+
+    // FIXME: Try to remove this
     Query(const Query& copy)
     {
         update = copy.update;
@@ -158,13 +160,13 @@ public:
         return *this;
     };
 
-    void LeftParan(void)
+    void LeftParan()
     {
         update.push_back(0);
         update_override.push_back(0);
         first.push_back(0);
     };
-    void Or(void)
+    void Or()
     {
         ParentNode* const o = new OR_NODE(first[first.size()-1]);
         first[first.size()-1] = o;
@@ -192,7 +194,7 @@ public:
         subtables.pop_back();
     }
 
-    void RightParan(void)
+    void RightParan()
     {
         if(first.size() < 2) {
             error_code = "Unbalanced blockBegin/blockEnd";
@@ -215,19 +217,19 @@ public:
         update_override.pop_back();
     };
 
-    TableView FindAll(Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1)
+    TableView FindAll(Table& table, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1))
     {
         TableView tv(table);
         FindAll(table, tv, start, end, limit);
         return tv;
     }
 
-    void FindAll(Table& table, TableView& tv, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1)
+    void FindAll(Table& table, TableView& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1))
     {
         Init(table);
 
         size_t r  = start - 1;
-        if(end == (size_t)-1)
+        if(end == size_t(-1))
             end = table.GetSize();
 
         // User created query with no criteria; return everything
@@ -253,8 +255,8 @@ public:
         }
     }
 
-    int64_t Sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1,
-        size_t limit = (size_t)-1) const
+    int64_t Sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1),
+        size_t limit = size_t(-1)) const
     {
         Init(table);
 
@@ -267,7 +269,7 @@ public:
 
         for (;;) {
             r = FindInternal(table, r + 1, end);
-            if (r == (size_t)-1 || r == table_size || results == limit)
+            if (r == size_t(-1) || r == table_size || results == limit)
                 break;
             ++results;
             sum += c.Get(r);
@@ -278,8 +280,8 @@ public:
         return sum;
     }
 
-    int64_t Max(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1,
-        size_t limit = (size_t)-1) const
+    int64_t Max(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1),
+        size_t limit = size_t(-1)) const
     {
         Init(table);
 
@@ -289,7 +291,7 @@ public:
 
         for (;;) {
             r = FindInternal(table, r + 1, end);
-            if (r == (size_t)-1 || r == table.GetSize() || results == limit)
+            if (r == size_t(-1) || r == table.GetSize() || results == limit)
                 break;
             const int64_t g = table.Get(column, r);
             if (results == 0 || g > max)
@@ -302,7 +304,7 @@ public:
         return max;
     }
 
-    int64_t Min(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const
+    int64_t Min(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         Init(table);
 
@@ -312,7 +314,7 @@ public:
 
         for (;;) {
             r = FindInternal(table, r + 1, end);
-            if (r == (size_t)-1 || r == table.GetSize() || results == limit)
+            if (r == size_t(-1) || r == table.GetSize() || results == limit)
                 break;
             const int64_t g = table.Get(column, r);
             if (results == 0 || g < min)
@@ -324,7 +326,7 @@ public:
         return min;
     }
 
-    size_t Count(const Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const
+    size_t Count(const Table& table, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         Init(table);
 
@@ -333,14 +335,14 @@ public:
 
         for(;;) {
             r = FindInternal(table, r + 1, end);
-            if (r == (size_t)-1 || r == table.GetSize() || results == limit)
+            if (r == size_t(-1) || r == table.GetSize() || results == limit)
                 break;
             ++results;
         }
         return results;
     }
 
-    double Avg(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const
+    double Avg(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         Init(table);
 
@@ -355,7 +357,7 @@ public:
     }
 
     // todo, not sure if start, end and limit could be useful for delete.
-    size_t Delete(Table& table, size_t start = 0, size_t end = (size_t)-1, size_t limit = (size_t)-1) const
+    size_t Delete(Table& table, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         size_t r = start - 1;
         size_t results = 0;
@@ -363,7 +365,7 @@ public:
 
         for (;;) {
             r = FindInternal(table, r + 1 - results, end);
-            if (r == (size_t)-1 || r == table.GetSize() || results == limit)
+            if (r == size_t(-1) || r == table.GetSize() || results == limit)
                 break;
             ++results;
             table.DeleteRow(r);
@@ -371,7 +373,7 @@ public:
         return results;
     }
 
-    void FindAllMulti(Table& table, TableView& tv, size_t start = 0, size_t end = (size_t)-1)
+    void FindAllMulti(Table& table, TableView& tv, size_t start = 0, size_t end = size_t(-1))
     {
         // Initialization
         Init(table);
@@ -397,7 +399,7 @@ public:
         std::sort (ts.chunks.begin(), ts.chunks.end(), &Query::comp);
         for (size_t i = 0; i < ts.chunks.size(); ++i) {
             const size_t from = ts.chunks[i].first;
-            const size_t upto = (i == ts.chunks.size() - 1) ? (size_t)-1 : ts.chunks[i + 1].first;
+            const size_t upto = (i == ts.chunks.size() - 1) ? size_t(-1) : ts.chunks[i + 1].first;
             size_t first = ts.chunks[i].second;
 
             while(first < ts.results.size() && ts.results[first] < upto && ts.results[first] >= from) {
@@ -461,10 +463,10 @@ protected:
         }
     }
 
-    size_t FindInternal(const Table& table, size_t start = 0, size_t end = (size_t)-1) const
+    size_t FindInternal(const Table& table, size_t start = 0, size_t end = size_t(-1)) const
     {
-        if (end == (size_t)-1) end = table.GetSize();
-        if (start == end) return (size_t)-1;
+        if (end == size_t(-1)) end = table.GetSize();
+        if (start == end) return size_t(-1);
 
         size_t r;
         if (first[0] != 0)
@@ -473,7 +475,7 @@ protected:
             r = start; // user built an empty query; return any first
 
         if (r == table.GetSize())
-            return (size_t)-1;
+            return size_t(-1);
         else
             return r;
     }
@@ -577,6 +579,7 @@ protected:
     size_t m_threadcount;
 };
 
+// FIXME: All these should go away
 class XQueryAccessorInt {
 public:
     XQueryAccessorInt(size_t column_id): m_column_id(column_id) {}

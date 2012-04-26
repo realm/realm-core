@@ -6,6 +6,7 @@
 #include <conio.h>
 #include <stdio.h>
 #else
+#include <unistd.h> // close()
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -121,7 +122,7 @@ MemRef SlabAlloc::Alloc(size_t size)
     const size_t multible = 256 * ((size / 256) + 1);
     const size_t slabsBack = m_slabs.IsEmpty() ? m_baseline : m_slabs.Back().offset;
     const size_t doubleLast = m_slabs.IsEmpty() ? 0 :
-                                                  (slabsBack - ((m_slabs.GetSize() == 1) ? (size_t)0 : m_slabs[-2].offset)) * 2;
+        (slabsBack - ((m_slabs.GetSize() == 1) ? size_t(0) : m_slabs.Back(-2).offset)) * 2;
     const size_t newsize = multible > doubleLast ? multible : doubleLast;
 
     // Allocate memory
@@ -164,10 +165,10 @@ void SlabAlloc::Free(size_t ref, void* p)
 #endif //_DEBUG
 
     // Check if we can merge with start of free block
-    size_t n = m_freeSpace.ref.Find(refEnd);
+    size_t n = m_freeSpace.cols().ref.Find(refEnd);
     if (n != (size_t)-1) {
         // No consolidation over slab borders
-        if (m_slabs.offset.Find(refEnd) == (size_t)-1) {
+        if (m_slabs.cols().offset.Find(refEnd) == (size_t)-1) {
             m_freeSpace[n].ref = ref;
             m_freeSpace[n].size += size;
             isMerged = true;
@@ -175,7 +176,7 @@ void SlabAlloc::Free(size_t ref, void* p)
     }
 
     // Check if we can merge with end of free block
-    if (m_slabs.offset.Find(ref) == (size_t)-1) { // avoid slab borders
+    if (m_slabs.cols().offset.Find(ref) == (size_t)-1) { // avoid slab borders
         const size_t count = m_freeSpace.GetSize();
         for (size_t i = 0; i < count; ++i) {
             FreeSpace::Cursor c = m_freeSpace[i];
@@ -233,8 +234,8 @@ void* SlabAlloc::Translate(size_t ref) const
 {
     if (ref < m_baseline) return m_shared + ref;
     else {
-        const size_t ndx = m_slabs.offset.FindPos(ref);
-        assert(ndx != (size_t)-1);
+        const size_t ndx = m_slabs.cols().offset.FindPos(ref);
+        assert(ndx != size_t(-1));
 
         const size_t offset = ndx ? m_slabs[ndx-1].offset : m_baseline;
         return (char*)(intptr_t)m_slabs[ndx].pointer + (ref - offset);
@@ -348,10 +349,10 @@ bool SlabAlloc::IsAllFree() const
     // Verify that free space matches slabs
     size_t ref = m_baseline;
     for (size_t i = 0; i < m_slabs.GetSize(); ++i) {
-        const Slabs::Cursor c = m_slabs[i];
+        Slabs::ConstCursor c = m_slabs[i];
         const size_t size = TO_REF(c.offset) - ref;
 
-        const size_t r = m_freeSpace.ref.Find(ref);
+        const size_t r = m_freeSpace.cols().ref.Find(ref);
         if (r == (size_t)-1) return false;
         if (size != (size_t)m_freeSpace[r].size) return false;
 
@@ -364,10 +365,10 @@ void SlabAlloc::Verify() const
 {
     // Make sure that all free blocks fit within a slab
     for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
-        const FreeSpace::Cursor c = m_freeSpace[i];
+        FreeSpace::ConstCursor c = m_freeSpace[i];
         const size_t ref = TO_REF(c.ref);
 
-        const size_t ndx = m_slabs.offset.FindPos(ref);
+        const size_t ndx = m_slabs.cols().offset.FindPos(ref);
         assert(ndx != size_t(-1));
 
         const size_t slab_end = TO_REF(m_slabs[ndx].offset);

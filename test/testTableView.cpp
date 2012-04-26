@@ -18,7 +18,7 @@ TEST(GetSetInteger)
     table.Add(1);
     table.Add(2);
 
-    TableView v = table.first.FindAll(2);
+    TableView v = table.cols().first.FindAll(2);
 
     CHECK_EQUAL(2, v.GetSize());
 
@@ -44,7 +44,7 @@ TEST(TableViewSum)
     table.Add(2);
     table.Add(2);
 
-    TableView v = table.first.FindAll(2);
+    TableView v = table.cols().first.FindAll(2);
     CHECK_EQUAL(5, v.GetSize());
 
     int64_t sum = v.Sum(0);
@@ -61,7 +61,7 @@ TEST(TableViewSumNegative)
     table.Add(0);
     table.Add(0);
 
-    TableView v = table.first.FindAll(0);
+    TableView v = table.cols().first.FindAll(0);
     v.Set(0, 0, 11);
     v.Set(0, 2, -20);
 
@@ -79,7 +79,7 @@ TEST(TableViewMax)
     table.Add(0);
     table.Add(0);
 
-    TableView v = table.first.FindAll(0);
+    TableView v = table.cols().first.FindAll(0);
     v.Set(0, 0, -1);
     v.Set(0, 1, 2);
     v.Set(0, 2, 1);
@@ -99,7 +99,7 @@ TEST(TableViewMax2)
     table.Add(0);
     table.Add(0);
 
-    TableView v = table.first.FindAll(0);
+    TableView v = table.cols().first.FindAll(0);
     v.Set(0, 0, -1);
     v.Set(0, 1, -2);
     v.Set(0, 2, -3);
@@ -118,7 +118,7 @@ TEST(TableViewMin)
     table.Add(0);
     table.Add(0);
 
-    TableView v = table.first.FindAll(0);
+    TableView v = table.cols().first.FindAll(0);
     v.Set(0, 0, -1);
     v.Set(0, 1, 2);
     v.Set(0, 2, 1);
@@ -137,7 +137,7 @@ TEST(TableViewMin2)
     table.Add(0);
     table.Add(0);
 
-    TableView v = table.first.FindAll(0);
+    TableView v = table.cols().first.FindAll(0);
     v.Set(0, 0, -1);
     v.Set(0, 1, -2);
     v.Set(0, 2, -3);
@@ -157,7 +157,7 @@ TEST(TableViewFind)
     table.Add(0);
     table.Add(0);
 
-    TableView v = table.first.FindAll(0);
+    TableView v = table.cols().first.FindAll(0);
     v.Set(0, 0, 5);
     v.Set(0, 1, 4);
     v.Set(0, 2, 4);
@@ -176,7 +176,7 @@ TEST(TableViewFindAll)
     table.Add(0);
     table.Add(0);
 
-    TableView v = table.first.FindAll(0);
+    TableView v = table.cols().first.FindAll(0);
     v.Set(0, 0, 5);
     v.Set(0, 1, 4); // match
     v.Set(0, 2, 4); // match
@@ -202,7 +202,7 @@ TEST(TableViewFindAllString)
     table.Add("a");
     table.Add("a");
 
-    TableView v = table.first.FindAll("a");
+    TableView v = table.cols().first.FindAll("a");
     v.SetString(0, 0, "foo");
     v.SetString(0, 1, "bar"); // match
     v.SetString(0, 2, "bar"); // match
@@ -226,7 +226,7 @@ TEST(TableViewDelete)
     table.Add(3);
     table.Add(1);
 
-    TableView v = table.first.FindAll(1);
+    TableView v = table.cols().first.FindAll(1);
     CHECK_EQUAL(3, v.GetSize());
 
     v.Delete(1);
@@ -267,7 +267,7 @@ TEST(TableViewClear)
     table.Add(3);
     table.Add(1);
 
-    TableView v = table.first.FindAll(1);
+    TableView v = table.cols().first.FindAll(1);
     CHECK_EQUAL(3, v.GetSize());
 
     v.Clear();
@@ -283,7 +283,7 @@ TEST(TableViewClearNone)
 {
     TestTableInt table;
 
-    TableView v = table.first.FindAll(1);
+    TableView v = table.cols().first.FindAll(1);
     CHECK_EQUAL(0, v.GetSize());
 
     v.Clear();

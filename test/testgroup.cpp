@@ -290,7 +290,7 @@ TEST(Group_Serialize_Optimized)
     // Add a row with a known (but unique) value
     table.Add("search_target", 9, true, Fri);
 
-    const size_t res = table.first.Find("search_target");
+    const size_t res = table.cols().first.Find("search_target");
     CHECK_EQUAL(table.GetSize()-1, res);
 
 #ifdef _DEBUG
@@ -305,12 +305,12 @@ TEST(Group_Serialize_All)
     Group toMem;
     Table& table = toMem.GetTable("test");
 
-    table.RegisterColumn(COLUMN_TYPE_INT,    "int");
-    table.RegisterColumn(COLUMN_TYPE_BOOL,   "bool");
-    table.RegisterColumn(COLUMN_TYPE_DATE,   "date");
-    table.RegisterColumn(COLUMN_TYPE_STRING, "string");
-    table.RegisterColumn(COLUMN_TYPE_BINARY, "binary");
-    table.RegisterColumn(COLUMN_TYPE_MIXED,  "mixed");
+    table.register_column(COLUMN_TYPE_INT,    "int");
+    table.register_column(COLUMN_TYPE_BOOL,   "bool");
+    table.register_column(COLUMN_TYPE_DATE,   "date");
+    table.register_column(COLUMN_TYPE_STRING, "string");
+    table.register_column(COLUMN_TYPE_BINARY, "binary");
+    table.register_column(COLUMN_TYPE_MIXED,  "mixed");
 
     table.InsertInt(0, 0, 12);
     table.InsertBool(1, 0, true);
@@ -358,7 +358,7 @@ TEST(Group_Subtable)
         if (i%3 == 1) {
             table.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
             TableRef st = table.GetTable(2, i);
-            st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+            st->register_column(COLUMN_TYPE_INT, "banach");
             st->AddRow();
             st->Set(0, 0, 700+i);
         }
@@ -386,7 +386,7 @@ TEST(Group_Subtable)
         if (i%8 == 3) {
             if (i%3 != 1) table.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
             TableRef st = table.GetTable(2, i);
-            if (i%3 != 1) st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+            if (i%3 != 1) st->register_column(COLUMN_TYPE_INT, "banach");
             st->AddRow();
             st->Set(0, st->GetSize()-1, 800+i);
         }
@@ -469,7 +469,7 @@ TEST(Group_Subtable)
         if (i%7 == 4) {
             if (i%3 != 1 && i%8 != 3) table2.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
             TableRef st = table2.GetTable(2, i);
-            if (i%3 != 1 && i%8 != 3) st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+            if (i%3 != 1 && i%8 != 3) st->register_column(COLUMN_TYPE_INT, "banach");
             st->AddRow();
             st->Set(0, st->GetSize()-1, 900+i);
         }

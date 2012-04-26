@@ -10,6 +10,7 @@
 #include "alloc.hpp"
 #include "ColumnType.hpp"
 #include "TableRef.hpp"
+#include "spec.hpp"
 
 namespace tightdb {
 
@@ -62,48 +63,9 @@ private:
 
 
 
-class Spec {
-public:
-    Spec(Allocator& alloc, size_t ref, ArrayParent *parent, size_t pndx);
-    Spec(const Spec& s);
-
-    void AddColumn(ColumnType type, const char* name);
-    Spec AddColumnTable(const char* name);
-
-    Spec GetSpec(size_t column_id);
-    const Spec GetSpec(size_t column_id) const;
-
-    size_t GetColumnCount() const;
-    ColumnType GetColumnType(size_t ndx) const;
-    const char* GetColumnName(size_t ndx) const;
-    size_t GetColumnIndex(const char* name) const;
-    
-    // Column Attributes
-    ColumnType GetColumnAttr(size_t ndx) const;
-    void SetColumnAttr(size_t ndx, ColumnType attr);
-
-    size_t GetRef() const {return m_specSet.GetRef();}
-
-    // Serialization
-    template<class S> size_t Write(S& out, size_t& pos) const;
-
-#ifdef _DEBUG
-    void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
-
-private:
-    void Create(size_t ref, ArrayParent *parent, size_t pndx);
-
-    Array m_specSet;
-    Array m_spec;
-    ArrayString m_names;
-    Array m_subSpecs;
-};
-
-
 
 typedef BasicTableRef<Table> TableRef;
-typedef BasicTableRef<Table const> TableConstRef;
+typedef BasicTableRef<const Table> ConstTableRef;
 
 
 class Table {
@@ -116,7 +78,7 @@ public:
     virtual ~Table();
 
     TableRef GetTableRef() { return TableRef(this); }
-    TableConstRef GetTableRef() const { return TableConstRef(this); }
+    ConstTableRef GetTableRef() const { return ConstTableRef(this); }
 
     // Column meta info
     size_t GetColumnCount() const;
@@ -146,11 +108,11 @@ public:
     // NOTE: Low-level insert functions. Always insert in all columns at once
     // and call InsertDone after to avoid table getting un-balanced.
     void InsertInt(size_t column_id, size_t ndx, int64_t value);
-    void InsertBool(size_t column_id, size_t ndx, bool value) {InsertInt(column_id, ndx, value ? 1 :0);}
-    void InsertDate(size_t column_id, size_t ndx, time_t value) {InsertInt(column_id, ndx, (int64_t)value);}
+    void InsertBool(size_t column_id, size_t ndx, bool value) {InsertInt(column_id, ndx, value);}
+    void InsertDate(size_t column_id, size_t ndx, time_t value) {InsertInt(column_id, ndx, value);}
     template<class T> void InsertEnum(size_t column_id, size_t ndx, T value)
     {
-        InsertInt(column_id, ndx, (int)value);
+        InsertInt(column_id, ndx, value);
     }
     void InsertString(size_t column_id, size_t ndx, const char* value);
     void InsertBinary(size_t column_id, size_t ndx, const void* value, size_t len);
@@ -166,7 +128,7 @@ public:
 
     // Sub-tables
     TableRef GetTable(size_t column_id, size_t ndx);
-    TableConstRef GetTable(size_t column_id, size_t ndx) const;
+    ConstTableRef GetTable(size_t column_id, size_t ndx) const;
     size_t GetTableSize(size_t column_id, size_t ndx) const;
     void   InsertTable(size_t column_id, size_t ndx);
     void   ClearTable(size_t column_id, size_t ndx);
@@ -177,7 +139,7 @@ public:
     void InsertMixed(size_t column_id, size_t ndx, Mixed value);
     void SetMixed(size_t column_id, size_t ndx, Mixed value);
 
-    size_t RegisterColumn(ColumnType type, const char* name);
+    size_t register_column(ColumnType type, const char* name);
 
     Column& GetColumn(size_t ndx);
     const Column& GetColumn(size_t ndx) const;
@@ -287,6 +249,24 @@ protected:
     // Cached columns
     Array m_cols;
 
+    /**
+     * Get the subtable at the specified column and row index.
+     *
+     * The returned table pointer must always end up being wrapped in
+     * a TableRef.
+     */
+    Table *get_subtable_ptr(std::size_t col_idx, std::size_t row_idx);
+
+    /**
+     * Get the subtable at the specified column and row index.
+     *
+     * The returned table pointer must always end up being wrapped in
+     * a ConstTableRef.
+     */
+    const Table *get_subtable_ptr(std::size_t col_idx, std::size_t row_idx) const;
+
+    template<class T> static BasicTableRef<T> make_ref(T* p) { return BasicTableRef<T>(p); }
+
 private:
     Table(Table const &); // Disable copy construction
     Table &operator=(Table const &); // Disable copying assignment
@@ -365,7 +345,7 @@ public:
     int64_t Max(size_t column_id) const;
     int64_t Min(size_t column_id) const;
 
-    Table *GetTable(void); // todo, temporary for tests
+    Table *GetTable(); // todo, temporary for tests FIXME: Is this still needed????
 
 private:
     // Don't allow copying
@@ -535,6 +515,7 @@ public:
     operator ColumnType() const {return COLUMN_TYPE_INT;}
 };
 
+// FIXME: General cleanup needed
 class QueryItem {
 public:
     QueryItem operator&&(const QueryItem&) {return QueryItem();}
@@ -580,6 +561,22 @@ public:
 };
 
 class QueryAccessorMixed {};
+
+
+
+
+// Implementation:
+
+inline TableRef Table::GetTable(size_t column_id, size_t ndx)
+{
+    return TableRef(get_subtable_ptr(column_id, ndx));
+}
+
+inline ConstTableRef Table::GetTable(size_t column_id, size_t ndx) const
+{
+    return ConstTableRef(get_subtable_ptr(column_id, ndx));
+}
+
 
 }
 
