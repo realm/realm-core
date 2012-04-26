@@ -87,7 +87,7 @@ public:
     ConstRowAccessor Front() const { return ConstRowAccessor(std::make_pair(this, 0)); }
 
     /**
-     * \param rel_idx The index of the row specified relatibe to the
+     * \param rel_idx The index of the row specified relative to the
      * end. Thus, <tt>table.Back(rel_idx)</tt> is the same as
      * <tt>table[table.GetSize() + rel_idx]</tt>.
      */
@@ -532,7 +532,7 @@ public:
         Base::m_table->SetString(col_idx, Base::m_row_idx, value);
         return *this;
     }
-    // FIXME: Not good to defined operator==() here, beacuse it does
+    // FIXME: Not good to define operator==() here, beacuse it does
     // not have this semantic for char pointers in general. However,
     // if we choose to keep it, we should also have all the other
     // comparison operators, and many other operators need to be
