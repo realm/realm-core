@@ -44,7 +44,7 @@ bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* 
 bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
 void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres);
 void merge_core(Array* a0, Array* a1, Array* res);
-Array* merge(Array* ArrayList);
+Array* merge(const Array& ArrayList);
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
 
 bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state)
@@ -195,32 +195,38 @@ void merge_core(Array* a0, Array* a1, Array* res)
 //     ArrayList: An array of references to non-instantiated Arrays of values. The values in each array must be in sorted order
 // Return value:
 //     Merge-sorted array of all values
-Array* merge(Array* ArrayList)
+Array* merge(const Array& arrayList)
 {
-    if(ArrayList->Size() == 1) {
-        size_t ref = ArrayList->GetAsRef(0);
-//      Array *a = new Array(ref, reinterpret_cast<Array *>(&merge)); // FIXME: Breaks strict-aliasing
-                Array *a = new Array(ref, NULL);
-        return a;
-    }
+    const size_t count = arrayList.Size();
+    
+    if (count == 1) return NULL; // already sorted
 
     Array Left, Right;
-    size_t left = ArrayList->Size() / 2;
-    for(size_t t = 0; t < left; t++)
-        Left.Add(ArrayList->Get(t));
-    for(size_t t = left; t < ArrayList->Size(); t++)
-        Right.Add(ArrayList->Get(t));
+    const size_t left = count / 2;
+    for (size_t t = 0; t < left; ++t)
+        Left.Add(arrayList.Get(t));
+    for (size_t t = left; t < count; ++t)
+        Right.Add(arrayList.Get(t));
 
-    Array *l;
-    Array *r;
-    Array *res = new Array();
+    Array* l;
+    Array* r;
+    Array* res = new Array();
 
     // We merge left-half-first instead of bottom-up so that we access the same data in each call
     // so that it's in cache, at least for the first few iterations until lists get too long
-    l = merge(&Left);
-    r = merge(&Right);
+    l = merge(Left);
+    r = merge(Right);
     merge_core(l, r, res);
-    return res;
+    
+    // Clean-up
+    Left.Destroy();
+    Right.Destroy();
+    l->Destroy();
+    r->Destroy();
+    delete l;
+    delete r;
+    
+    return res; // receiver now own the array, and has to delete it when done
 }
 
 // Input:
@@ -269,7 +275,7 @@ bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, voi
     (void)start;
     (void)caller_offset;
     Array* p = (Array*)state;
-    size_t ref = a->GetRef();
+    const size_t ref = a->GetRef();
     p->Add((int64_t)ref); // todo, check cast
     return true;
 }
@@ -479,19 +485,26 @@ void Column::Sort(size_t start, size_t end)
 {
     Array arr;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
-    for(size_t t = 0; t < arr.Size(); t++) {
-        size_t ref = arr.GetAsRef(t);
+    for (size_t t = 0; t < arr.Size(); t++) {
+        const size_t ref = arr.GetAsRef(t);
         Array a(ref);
         a.Sort();
     }
 
-    Array *sorted = merge(&arr);
-    Clear();
-
-    // Todo, this is a bit slow. Add bulk insert or the like to Column
-    for(size_t t = 0; t < sorted->Size(); t++) {
-        Insert(t, sorted->Get(t));
+    Array* sorted = merge(arr);
+    if (sorted) {
+        // Todo, this is a bit slow. Add bulk insert or the like to Column
+        const size_t count = sorted->Size();
+        for(size_t t = 0; t < count; ++t) {
+            Set(t, sorted->Get(t));
+        }
+        
+        sorted->Destroy();
+        delete sorted;
     }
+    
+    // Clean-up
+    arr.Destroy();
 }
 
 
