@@ -21,11 +21,6 @@ struct FakeParent: Table::Parent {
 };
 
 
-const ColumnType Accessor::type       = COLUMN_TYPE_INT;
-const ColumnType AccessorBool::type   = COLUMN_TYPE_BOOL;
-const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
-const ColumnType AccessorDate::type   = COLUMN_TYPE_DATE;
-const ColumnType AccessorMixed::type  = COLUMN_TYPE_MIXED;
 
 // -- Spec ------------------------------------------------------------------------------------
 
@@ -96,7 +91,7 @@ void Spec::AddColumn(ColumnType type, const char* name)
     }
 }
 
-Spec Spec::AddColumnTable(const char* name)
+Spec Spec::AddColumnTable(const char* name, TableColumnFactory*) // FIXME: Need to handle the column factory
 {
     const size_t column_id = m_names.Size();
     AddColumn(COLUMN_TYPE_TABLE, name);
@@ -223,9 +218,14 @@ size_t Spec::GetColumnIndex(const char* name) const
 // -- Table ---------------------------------------------------------------------------------
 
 Table::Table(Allocator& alloc):
-    m_size(0), m_top(COLUMN_HASREFS, NULL, 0, alloc), m_specSet(COLUMN_HASREFS, NULL, 0, alloc),
-    m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_columnNames(NULL, 0, alloc), m_subSpecs(alloc),
-    m_columns(COLUMN_HASREFS, NULL, 0, alloc), m_ref_count(1)
+    m_size(0),
+    m_top(COLUMN_HASREFS, NULL, 0, alloc),
+    m_specSet(COLUMN_HASREFS, NULL, 0, alloc),
+    m_spec(COLUMN_NORMAL, NULL, 0, alloc),
+    m_columnNames(NULL, 0, alloc),
+    m_subSpecs(alloc),
+    m_columns(COLUMN_HASREFS, NULL, 0, alloc),
+    m_ref_count(1)
 {
     // The SpecSet contains the specification (types and names) of all columns and sub-tables
     m_specSet.Add(m_spec.GetRef());
@@ -605,7 +605,7 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const
     return (size_t)-1;
 }
 
-size_t Table::RegisterColumn(ColumnType type, const char* name)
+size_t Table::register_column(ColumnType type, const char* name)
 {
     const size_t column_ndx = m_cols.Size();
 
@@ -819,43 +819,43 @@ void Table::ClearTable(size_t column_id, size_t ndx)
     subtables.Clear(ndx);
 }
 
-TableRef Table::GetTable(size_t column_id, size_t ndx)
+Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx)
 {
-    assert(column_id < GetColumnCount());
-    assert(ndx < m_size);
+    assert(col_idx < GetColumnCount());
+    assert(row_idx < m_size);
 
-    const ColumnType type = GetRealColumnType(column_id);
+    const ColumnType type = GetRealColumnType(col_idx);
     if (type == COLUMN_TYPE_TABLE) {
-        ColumnTable &subtables = GetColumnTable(column_id);
-        return TableRef(subtables.get_subtable_ptr(ndx));
+        ColumnTable& subtables = GetColumnTable(col_idx);
+        return subtables.get_subtable_ptr(row_idx);
     }
     else if (type == COLUMN_TYPE_MIXED) {
-        ColumnMixed &subtables = GetColumnMixed(column_id);
-        return TableRef(subtables.get_subtable_ptr(ndx));
+        ColumnMixed& subtables = GetColumnMixed(col_idx);
+        return subtables.get_subtable_ptr(row_idx);
     }
     else {
         assert(false);
-        return TableRef();
+        return 0;
     }
 }
 
-TableConstRef Table::GetTable(size_t column_id, size_t ndx) const
+const Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx) const
 {
-    assert(column_id < GetColumnCount());
-    assert(ndx < m_size);
+    assert(col_idx < GetColumnCount());
+    assert(row_idx < m_size);
 
-    const ColumnType type = GetRealColumnType(column_id);
+    const ColumnType type = GetRealColumnType(col_idx);
     if (type == COLUMN_TYPE_TABLE) {
-        ColumnTable const &subtables = GetColumnTable(column_id);
-        return TableConstRef(subtables.get_subtable_ptr(ndx));
+        const ColumnTable& subtables = GetColumnTable(col_idx);
+        return subtables.get_subtable_ptr(row_idx);
     }
     else if (type == COLUMN_TYPE_MIXED) {
-        ColumnMixed const &subtables = GetColumnMixed(column_id);
-        return TableConstRef(subtables.get_subtable_ptr(ndx));
+        const ColumnMixed& subtables = GetColumnMixed(col_idx);
+        return subtables.get_subtable_ptr(row_idx);
     }
     else {
         assert(false);
-        return TableConstRef();
+        return 0;
     }
 }
 

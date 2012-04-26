@@ -22,26 +22,24 @@ protected:
                          Allocator& alloc, const Table* tab);
 
     /**
-     * Get the subtable at the specified row index which is assumed to
-     * have the specified type.
+     * Get the subtable at the specified index.
      *
      * This method must be used only for subtables with shared schema,
      * i.e. for elements of ColumnTable.
      *
      * The returned table pointer must always end up being wrapped in
-     * an instance of BasicTableRef.
+     * a TableRef.
      */
     Table* get_subtable_ptr(std::size_t subtable_ndx, std::size_t schema_ref) const;
 
     /**
-     * Get the subtable at the specified row index which is assumed to
-     * have the specified type.
+     * Get the subtable at the specified index.
      *
      * This method must be used only for subtables with independent
      * schemas, i.e. for elements of ColumnMixed.
      *
      * The returned table pointer must always end up being wrapped in
-     * an instance of BasicTableRef.
+     * a TableRef.
      */
     Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
@@ -99,7 +97,7 @@ public:
      * \param tab If this column is used as part of a table you must
      * pass a pointer to that table. Otherwise you may pass null.
      */
-    ColumnTable(size_t ref_specSet, ArrayParent* parent, size_t pndx,
+    ColumnTable(std::size_t schema_ref, ArrayParent* parent, std::size_t idx_in_parent,
                 Allocator& alloc, const Table* tab);
 
     /**
@@ -109,7 +107,8 @@ public:
      * \param tab If this column is used as part of a table you must
      * pass a pointer to that table. Otherwise you may pass null.
      */
-    ColumnTable(size_t ref_column, size_t ref_specSet, ArrayParent* parent, size_t pndx,
+    ColumnTable(std::size_t columns_ref, std::size_t schema_ref,
+                ArrayParent* parent, std::size_t idx_in_parent,
                 Allocator& alloc, const Table* tab);
 
     size_t GetTableSize(size_t ndx) const;
