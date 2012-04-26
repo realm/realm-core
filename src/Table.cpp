@@ -21,11 +21,6 @@ struct FakeParent: Table::Parent {
 };
 
 
-const ColumnType Accessor::type       = COLUMN_TYPE_INT;
-const ColumnType AccessorBool::type   = COLUMN_TYPE_BOOL;
-const ColumnType AccessorString::type = COLUMN_TYPE_STRING;
-const ColumnType AccessorDate::type   = COLUMN_TYPE_DATE;
-const ColumnType AccessorMixed::type  = COLUMN_TYPE_MIXED;
 
 // -- Spec ------------------------------------------------------------------------------------
 

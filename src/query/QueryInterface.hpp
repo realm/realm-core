@@ -579,52 +579,7 @@ protected:
     size_t m_threadcount;
 };
 
-// FIXME: All these should go away
-class XQueryAccessorInt {
-public:
-    XQueryAccessorInt(size_t column_id): m_column_id(column_id) {}
-    Query& Equal(int64_t value) {return m_query->Equal(m_column_id, value);}
-    Query& NotEqual(int64_t value) {return m_query->NotEqual(m_column_id, value);}
-    Query& Greater(int64_t value) {return m_query->Greater(m_column_id, value);}
-    Query& GreaterEqual(int64_t value) {return m_query->GreaterEqual(m_column_id, value);}
-    Query& Less(int64_t value) {return m_query->Less(m_column_id, value);}
-    Query& LessEqual(int64_t value) {return m_query->LessEqual(m_column_id, value);}
-    Query& Between(int64_t from, int64_t to) {return m_query->Between(m_column_id, from, to);}
-protected:
-    Query* m_query;
-    size_t m_column_id;
-};
-
-class XQueryAccessorString {
-public:
-    XQueryAccessorString(size_t column_id): m_column_id(column_id) {}
-    Query& Equal(const char *value, bool CaseSensitive) {return m_query->Equal(m_column_id, value, CaseSensitive);}
-    Query& BeginsWith(const char *value, bool CaseSensitive) {return m_query->BeginsWith(m_column_id, value, CaseSensitive);}
-    Query& EndsWith(const char *value, bool CaseSensitive) {return m_query->EndsWith(m_column_id, value, CaseSensitive);}
-    Query& Contains(const char *value, bool CaseSensitive) {return m_query->Contains(m_column_id, value, CaseSensitive);}
-    Query& NotEqual(const char *value, bool CaseSensitive) {return m_query->NotEqual(m_column_id, value, CaseSensitive);}
-protected:
-    Query* m_query;
-    size_t m_column_id;
-};
-
-class XQueryAccessorBool {
-public:
-    XQueryAccessorBool(size_t column_id): m_column_id(column_id) {}
-    Query& Equal(bool value) {return m_query->Equal(m_column_id, value);}
-protected:
-    Query* m_query;
-    size_t m_column_id;
-};
-
-class XQueryAccessorMixed {
-public:
-    XQueryAccessorMixed(size_t column_id): m_column_id(column_id) {}
-protected:
-    Query* m_query;
-    size_t m_column_id;
-};
 
 }
 
-#endif
+#endif // Testing_Query_h

@@ -38,7 +38,7 @@ public:
     //virtual Index& GetIndex() = 0;
     virtual void BuildIndex(Index& index) = 0;
     virtual void ClearIndex() = 0;
-    virtual void SetIndexRef(size_t ref) {}
+    virtual void SetIndexRef(size_t ref) { static_cast<void>(ref); }
 
     virtual size_t GetRef() const = 0;
     void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
