@@ -8,8 +8,6 @@ consider MyTableSpec: public cols_types<a, b, c, d>
 
 New opportunity to privatize accessor copying! No, because a class cannot declare friendship with anaother class specified as template parameter.
 
-UPS: How to support basic_table::Add()
-
 Iterators, queries, and TableViews do not hold a reference count on subtables, so it is up to the application to ensure that a TableRef exists.
 
 Copy rows
