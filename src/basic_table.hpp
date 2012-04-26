@@ -10,7 +10,6 @@
 
 #include "meta.hpp"
 #include "Table.hpp"
-#include "ColumnTable.hpp"
 #include "query/QueryInterface.hpp"
 
 namespace tightdb {
@@ -21,6 +20,16 @@ template<int col_idx, class Type> class RegisterColumn;
 
 
 
+/**
+ * This class is non-polymorphic, that is, it has no virtual
+ * functions. Further more, it has no destructor, and it adds no new
+ * data-members. These properties are important, because it ensures
+ * that there is no run-time distinction between a Table instance and
+ * an instance of any variation of this class, and therefore it valid
+ * to cast a pointer from Table to basic_table<T> even when the
+ * instance is constructed as a Table. Of couse, this also assumes
+ * that Table is non-polymorphic.
+ */
 template<class Spec> class BasicTable: public Table {
 private:
     template<class> friend class BasicTable;
@@ -387,47 +396,6 @@ template<> struct GetColumnTypeId<Mixed> {
 
 
 
-template<class Subspec> class BasicTableColumn: public ColumnTable {
-private:
-    BasicTableColumn(std::size_t schema_ref,
-                     ArrayParent* parent, std::size_t idx_in_parent,
-                     Allocator& alloc, const Table* tab):
-        ColumnTable(schema_ref, parent, idx_in_parent, alloc, tab) {}
-
-    BasicTableColumn(std::size_t columns_ref, std::size_t schema_ref,
-                     ArrayParent* parent, size_t idx_in_parent,
-                     Allocator& alloc, const Table* tab):
-        ColumnTable(columns_ref, schema_ref, parent, idx_in_parent, alloc, tab) {}
-
-    class Factory: public TableColumnFactory {
-        virtual ColumnTable* create(std::size_t schema_ref,
-                                    ArrayParent* parent, std::size_t idx_in_parent,
-                                    Allocator& alloc, const Table* tab)
-        {
-            return new BasicTableColumn<Subspec>(schema_ref, parent, idx_in_parent, alloc, tab);
-        }
-
-        virtual ColumnTable* create(std::size_t columns_ref, std::size_t schema_ref,
-                                    ArrayParent* parent, size_t idx_in_parent,
-                                    Allocator& alloc, const Table* tab)
-        {
-            return new BasicTableColumn<Subspec>(columns_ref, schema_ref, parent, idx_in_parent,
-                                                 alloc, tab);
-        }
-    };
-
-    template<int, class> friend class RegisterColumn;
-
-    static Factory* factory()
-    {
-        static Factory factory;
-        return &factory;
-    }
-};
-
-
-
-
 template<int col_idx, class Type> class RegisterColumn {
 public:
     RegisterColumn(tightdb::Spec* spec, const char* column_name)
@@ -443,8 +411,7 @@ public:
     RegisterColumn(tightdb::Spec* spec, const char* column_name)
     {
         assert(col_idx == spec->GetColumnCount());
-        TableColumnFactory* factory = BasicTableColumn<Subspec>::factory();
-        tightdb::Spec subspec = spec->AddColumnTable(column_name, factory);
+        tightdb::Spec subspec = spec->AddColumnTable(column_name);
         typename Subspec::template Columns<tightdb::RegisterColumn, tightdb::Spec*> c(&subspec);
     }
 };

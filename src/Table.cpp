@@ -91,7 +91,7 @@ void Spec::AddColumn(ColumnType type, const char* name)
     }
 }
 
-Spec Spec::AddColumnTable(const char* name, TableColumnFactory*) // FIXME: Need to handle the column factory
+Spec Spec::AddColumnTable(const char* name)
 {
     const size_t column_id = m_names.Size();
     AddColumn(COLUMN_TYPE_TABLE, name);

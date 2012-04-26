@@ -67,6 +67,16 @@ typedef BasicTableRef<Table> TableRef;
 typedef BasicTableRef<const Table> ConstTableRef;
 
 
+/**
+ * The Table class is non-polymorphic, that is, it has no virtual
+ * functions. This is important because it ensures that there is no
+ * run-time distinction between a Table instance and an instance of
+ * any variation of basic_table<T>, and this, in turn, makes it valid
+ * to cast a pointer from Table to basic_table<T> even when the
+ * instance is constructed as a Table. Of couse, this also assumes
+ * that basic_table<> is non-polymorphic, has no destructor, and adds
+ * no extra data members.
+ */
 class Table {
 public:
     /**
@@ -74,7 +84,7 @@ public:
      */
     Table(Allocator& alloc = GetDefaultAllocator());
 
-    virtual ~Table();
+    ~Table();
 
     TableRef GetTableRef() { return TableRef(this); }
     ConstTableRef GetTableRef() const { return ConstTableRef(this); }

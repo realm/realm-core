@@ -6,7 +6,6 @@
 #else
 #include <stdint.h> // unint8_t etc
 #endif
-//#include <climits> // size_t
 #include <cstdlib> // size_t
 #include <cstring> // memmove
 #include "alloc.hpp"
