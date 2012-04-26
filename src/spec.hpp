@@ -14,8 +14,8 @@ class ColumnTable;
 class TableColumnFactory {
 public:
     /**
-     * Create a new table column by calling the BasicTableColumn with
-     * the same arguments.
+     * Create a new table column by calling the constructor of the
+     * appropriate table column type with the same arguments.
      */
     virtual ColumnTable* create(std::size_t schema_ref,
                                 ArrayParent* parent, std::size_t idx_in_parent,
@@ -23,8 +23,8 @@ public:
 
     /**
      * Create a table column and attach it to an already existing
-     * array structure by calling the BasicTableColumn with the same
-     * arguments.
+     * array structure. This is done by calling the constructor of the
+     * appropriate table column type with the same arguments.
      */
     virtual ColumnTable *create(std::size_t columns_ref, std::size_t schema_ref,
                                 ArrayParent* parent, size_t idx_in_parent,

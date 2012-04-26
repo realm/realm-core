@@ -174,7 +174,7 @@ struct SpecBase {
     typedef bool            Bool;
     typedef const char*     String;
     typedef std::time_t     Date;
-//    typedef tightdb::Binary Binary;
+//    typedef tightdb::Binary Binary; // FIXME: Use tightdb::BinaryData here?
     typedef tightdb::Mixed  Mixed;
     template<class E> class Enum {
     public:
@@ -476,7 +476,8 @@ public:
     }
     const Field& operator+=(int64_t value) const
     {
-        // FIXME: Should be optimized (probably using expression templates)
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
         value = Base::m_table->Get(col_idx, Base::m_row_idx) + value;
         Base::m_table->Set(col_idx, Base::m_row_idx, value);
         return *this;
