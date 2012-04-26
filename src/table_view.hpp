@@ -2,7 +2,7 @@
 #define TIGHTDB_TABLE_VIEW_H
 
 #include "Array.hpp"
-#include "TableRef.hpp"
+#include "table_ref.hpp"
 
 namespace tightdb {
 

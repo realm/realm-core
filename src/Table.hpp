@@ -6,7 +6,7 @@
 #include "ColumnStringEnum.hpp"
 #include "ColumnBinary.hpp"
 #include "alloc.hpp"
-#include "TableRef.hpp"
+#include "table_ref.hpp"
 #include "spec.hpp"
 #include "mixed.hpp"
 #include "table_view.hpp"
