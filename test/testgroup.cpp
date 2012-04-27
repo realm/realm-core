@@ -331,8 +331,78 @@ TEST(Group_Serialize_All)
 
     CHECK_EQUAL(6, t.GetColumnCount());
     CHECK_EQUAL(1, t.GetSize());
+    CHECK_EQUAL(12, t.Get(0, 0));
+	CHECK_EQUAL(true, t.GetBool(1, 0));
+	CHECK_EQUAL((time_t)12345, t.GetDate(2, 0));
+	CHECK_EQUAL("test", t.GetString(3, 0));
+	CHECK_EQUAL(7, t.GetBinary(4, 0).len);
+	CHECK_EQUAL("binary", (const char*)t.GetBinary(4, 0).pointer);
+	CHECK_EQUAL(COLUMN_TYPE_BOOL, t.GetMixed(5, 0).GetType());
+	CHECK_EQUAL(false, t.GetMixed(5, 0).GetBool());
 }
 
+TEST(Group_Persist) {
+	// Delete old file if there
+	remove("testdb.tdb");
+    
+	// Create new database
+	Group db("testdb.tdb", false);
+    
+	// Insert some data
+	Table& table = db.GetTable("test");
+	table.register_column(COLUMN_TYPE_INT,    "int");
+	table.register_column(COLUMN_TYPE_BOOL,   "bool");
+	table.register_column(COLUMN_TYPE_DATE,   "date");
+	table.register_column(COLUMN_TYPE_STRING, "string");
+	table.register_column(COLUMN_TYPE_BINARY, "binary");
+	table.register_column(COLUMN_TYPE_MIXED,  "mixed");
+	table.InsertInt(0, 0, 12);
+	table.InsertBool(1, 0, true);
+	table.InsertDate(2, 0, 12345);
+	table.InsertString(3, 0, "test");
+	table.InsertBinary(4, 0, "binary", 7);
+	table.InsertMixed(5, 0, false);
+	table.InsertDone();
+    
+	// Write changes to file
+	db.Commit();
+    
+#ifdef _DEBUG
+	db.Verify();
+#endif //_DEBUG
+    
+	CHECK_EQUAL(6, table.GetColumnCount());
+	CHECK_EQUAL(1, table.GetSize());
+	CHECK_EQUAL(12, table.Get(0, 0));
+	CHECK_EQUAL(true, table.GetBool(1, 0));
+	CHECK_EQUAL((time_t)12345, table.GetDate(2, 0));
+	CHECK_EQUAL("test", table.GetString(3, 0));
+	CHECK_EQUAL(7, table.GetBinary(4, 0).len);
+	CHECK_EQUAL("binary", (const char*)table.GetBinary(4, 0).pointer);
+	CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(5, 0).GetType());
+	CHECK_EQUAL(false, table.GetMixed(5, 0).GetBool());
+    
+	// Change a bit
+	table.SetString(3, 0, "Changed!");
+    
+	// Write changes to file
+	db.Commit();
+    
+#ifdef _DEBUG
+	db.Verify();
+#endif //_DEBUG
+    
+	CHECK_EQUAL(6, table.GetColumnCount());
+	CHECK_EQUAL(1, table.GetSize());
+	CHECK_EQUAL(12, table.Get(0, 0));
+	CHECK_EQUAL(true, table.GetBool(1, 0));
+	CHECK_EQUAL((time_t)12345, table.GetDate(2, 0));
+	CHECK_EQUAL("Changed!", table.GetString(3, 0));
+	CHECK_EQUAL(7, table.GetBinary(4, 0).len);
+	CHECK_EQUAL("binary", (const char*)table.GetBinary(4, 0).pointer);
+	CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(5, 0).GetType());
+	CHECK_EQUAL(false, table.GetMixed(5, 0).GetBool());
+}
 
 TEST(Group_Subtable)
 {

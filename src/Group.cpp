@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <iostream>
 #include <fstream>
+#include "group_writer.hpp"
 
 using namespace std;
 
@@ -14,16 +15,19 @@ public:
         m_buffer = (char*)malloc(size);
     }
 
-    bool IsValid() const {return m_buffer != NULL;}
+    bool   is_valid() const {return m_buffer != NULL;}
+    size_t getpos() const {return m_pos;}
 
-    void write(const char* p, size_t n)
+    size_t write(const char* p, size_t n)
     {
+        const size_t pos = m_pos;
         memcpy(m_buffer+m_pos, p, n);
         m_pos += n;
+        return pos;
     }
-    void seekp(size_t pos) {m_pos = pos;}
+    void seek(size_t pos) {m_pos = pos;}
 
-    char* ReleaseBuffer()
+    char* release_buffer()
     {
         char* tmp = m_buffer;
         m_buffer = NULL; // invalidate
@@ -34,68 +38,131 @@ private:
     char* m_buffer;
 };
 
-}
+class FileOStream {
+public:
+    FileOStream(const char* filepath) : m_pos(0), m_file(NULL)
+    {
+        m_file = fopen(filepath, "wb");
+    }
+
+    ~FileOStream()
+    {
+        fclose(m_file);
+    }
+
+    bool is_valid() const {return m_file != NULL;}
+    size_t getpos() const {return m_pos;}
+
+    size_t write(const char* p, size_t n)
+    {
+        const size_t pos = m_pos;
+        fwrite(p, 1, n, m_file);
+        m_pos += n;
+        return pos;
+    }
+
+    void seek(size_t pos)
+    {
+        fseek(m_file, pos, SEEK_SET);
+    }
+    
+private:
+    size_t m_pos;
+    FILE*  m_file;
+};
+
+} //namespace
 
 
 namespace tightdb {
 
 Group::Group():
     m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
-    m_isValid(true)
+    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc), m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc), m_isValid(true)
 {
-    m_tables.SetType(COLUMN_HASREFS);
-
-    m_top.Add(m_tableNames.GetRef());
-    m_top.Add(m_tables.GetRef());
-
-    m_tableNames.SetParent(&m_top, 0);
-    m_tables.SetParent(&m_top, 1);
+    Create();
 }
 
-Group::Group(const char* filename):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(false)
+Group::Group(const char* filename, bool readOnly):
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_isValid(false)
 {
     assert(filename);
 
     // Memory map file
-    m_isValid = m_alloc.SetShared(filename);
+    m_isValid = m_alloc.SetShared(filename, readOnly);
 
-    if (m_isValid) Create();
+    if (m_isValid) CreateFromRef();
 }
 
 Group::Group(const char* buffer, size_t len):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_isValid(false)
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_isValid(false)
 {
     assert(buffer);
 
     // Memory map file
     m_isValid = m_alloc.SetSharedBuffer(buffer, len);
 
-    if (m_isValid) Create();
+    if (m_isValid) CreateFromRef();
 }
 
 void Group::Create()
 {
-    // Get ref for table top array
-    const size_t top_ref = m_alloc.GetTopRef();
-
-    // Instantiate top arrays
-    m_top.UpdateRef(top_ref);
-    assert(m_top.Size() == 2);
-
-    m_tableNames.UpdateRef(m_top.GetAsRef(0));
-    m_tables.UpdateRef(m_top.GetAsRef(1));
+    m_tables.SetType(COLUMN_HASREFS);
+    
+    m_top.Add(m_tableNames.GetRef());
+    m_top.Add(m_tables.GetRef());
+    m_top.Add(m_freePositions.GetRef());
+    m_top.Add(m_freeLengths.GetRef());
+    
+    // Set parent info
     m_tableNames.SetParent(&m_top, 0);
     m_tables.SetParent(&m_top, 1);
+    m_freePositions.SetParent(&m_top, 2);
+    m_freeLengths.SetParent(&m_top, 3);
+}
 
-    // Make room for pointers to cached tables
-    for (size_t i = 0; i < m_tables.Size(); ++i) {
-        m_cachedtables.Add(0);
+void Group::CreateFromRef()
+{
+    // Get ref for table top array
+    const size_t top_ref = m_alloc.GetTopRef();
+    
+    // Instantiate top arrays
+    if (top_ref == 0) {
+        m_top.SetType(COLUMN_HASREFS);
+        m_tables.SetType(COLUMN_HASREFS);
+        m_tableNames.SetType(COLUMN_NORMAL);
+        m_freePositions.SetType(COLUMN_NORMAL);
+        m_freeLengths.SetType(COLUMN_NORMAL);
+        
+        Create();
+        
+        // Everything but header is free space
+        m_freePositions.Add(8);
+        m_freeLengths.Add(m_alloc.GetFileLen()-8);
     }
-
-#ifdef _DEBUG
-//  Verify();
-#endif //_DEBUG
+    else {
+        m_top.UpdateRef(top_ref);
+        assert(m_top.Size() >= 2);
+        
+        m_tableNames.UpdateRef(m_top.Get(0));
+        m_tables.UpdateRef(m_top.Get(1));
+        m_tableNames.SetParent(&m_top, 0);
+        m_tables.SetParent(&m_top, 1);
+        
+        // Serialized files do not have free space markers
+        if (m_top.Size() > 2) {
+            m_freePositions.UpdateRef(m_top.Get(2));
+            m_freeLengths.UpdateRef(m_top.Get(3));
+            m_freePositions.SetParent(&m_top, 2);
+            m_freeLengths.SetParent(&m_top, 3);
+        }
+        
+        // Make room for pointers to cached tables
+        const size_t count = m_tables.Size();
+        for (size_t i = 0; i < count; ++i) {
+            m_cachedtables.Add(0);
+        }
+    }
 }
 
 Group::~Group()
@@ -163,17 +230,17 @@ Table& Group::GetTable(size_t ndx)
 }
 
 
-void Group::Write(const char* filepath)
+bool Group::Write(const char* filepath)
 {
     assert(filepath);
 
-    std::ofstream out(filepath, std::ios_base::out|std::ios_base::binary);
-    assert(out);
+    FileOStream out(filepath);
+    if (!out.is_valid()) return false;
 
     Write(out);
-    out.close();
-}
 
+    return true;
+}
 
 char* Group::WriteToMem(size_t& len)
 {
@@ -181,13 +248,99 @@ char* Group::WriteToMem(size_t& len)
     const size_t max_size = m_alloc.GetTotalSize();
 
     MemoryOStream out(max_size);
-    if (!out.IsValid()) return NULL; // alloc failed
+    if (!out.is_valid()) return NULL; // alloc failed
 
     len = Write(out);
-    return out.ReleaseBuffer();
+    return out.release_buffer();
 }
 
-void Group::UpdateRefs(size_t topRef) {
+bool Group::Commit()
+{
+    if (!m_alloc.CanPersist()) return false;
+    
+    // If we have an empty db file, we can just serialize directly
+    //if (m_alloc.GetTopRef() == 0) {}
+    
+    GroupWriter out(*this);
+    if (!out.IsValid()) return false;
+    
+    // Recursively write all changed arrays to end of file
+    out.Commit();
+    
+    return true;
+}
+
+size_t Group::GetFreeSpace(size_t len, size_t& filesize, bool testOnly, bool ensureRest)
+{
+    if (ensureRest) ++len;
+    
+    // Do we have a free space we can reuse?
+    for (size_t i = 0; i < m_freeLengths.Size(); ++i) {
+        const size_t free_len = m_freeLengths.Get(i);
+        if (len <= free_len) {
+            const size_t location = m_freePositions.Get(i);
+            if (testOnly) return location;
+            if (ensureRest) --len;
+            
+            // Update free list
+            const size_t rest = free_len - len;
+            if (rest == 0) {
+                m_freePositions.Delete(i);
+                m_freeLengths.Delete(i);
+            }
+            else {
+                m_freeLengths.Set(i, rest);
+                m_freePositions.Set(i, location + len);
+            }
+            
+            return location;
+        }
+    }
+    
+    // No free space, so we have to expand the file.
+    // we always expand megabytes at a time, both for
+    // performance and to avoid excess fragmentation
+    const size_t old_filesize = filesize;
+    const size_t needed_size = old_filesize + len;
+    while (filesize < needed_size) {
+        filesize += 1024*1024;
+    }
+    
+    // Extend the file
+    const int fd = m_alloc.GetFileDescriptor();
+    lseek(fd, filesize-1, SEEK_SET);
+    write(fd, "\0", 1);
+    
+    // Add new free space
+    const size_t end  = old_filesize + len;
+    const size_t rest = filesize - end;
+    m_freePositions.Add(end);
+    m_freeLengths.Add(rest);
+    
+    return old_filesize;
+}
+
+void Group::ConnectFreeSpace(bool doConnect)
+{
+    assert(m_top.Size() == 4);
+
+    if (doConnect) {
+        m_top.Set(2, m_freePositions.GetRef());
+        m_top.Set(3, m_freeLengths.GetRef());
+        m_freePositions.SetParent(&m_top, 2);
+        m_freeLengths.SetParent(&m_top, 3);
+    }
+    else {
+        m_top.Set(2, 0);
+        m_top.Set(3, 0);
+        m_freePositions.SetParent(NULL, 0);
+        m_freeLengths.SetParent(NULL, 0);
+        
+    }
+}
+
+void Group::UpdateRefs(size_t topRef)
+{
     // Update top with the new (persistent) ref
     m_top.UpdateRef(topRef);
     
@@ -274,4 +427,4 @@ void Group::ToDot(std::ostream& out)
 
 #endif //_DEBUG
 
-}
+} //namespace tightdb
