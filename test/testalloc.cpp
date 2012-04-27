@@ -1,5 +1,5 @@
 #include <UnitTest++.h>
-#include "AllocSlab.hpp"
+#include "alloc_slab.hpp"
 
 using namespace tightdb;
 

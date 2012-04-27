@@ -498,7 +498,7 @@ TEST(TableAutoEnumerationFindFindAll)
     CHECK_EQUAL("eftg", tv.GetString(1, 4));
 }
 
-#include "AllocSlab.hpp"
+#include "alloc_slab.hpp"
 TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;

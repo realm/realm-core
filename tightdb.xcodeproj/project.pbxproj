@@ -19,7 +19,7 @@
 		3626F56B14A228850097F17B /* libtightdb.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* libtightdb.a */; };
 		363141F714751E8000ADD5AC /* ColumnStringEnum.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 363141F614751E8000ADD5AC /* ColumnStringEnum.hpp */; };
 		363141F914751E9600ADD5AC /* ColumnStringEnum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 363141F814751E9600ADD5AC /* ColumnStringEnum.cpp */; };
-		3647E0EC14209EBB00D56FD7 /* alloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEEB14209C1200D56FD7 /* alloc.cpp */; };
+		3647E0EC14209EBB00D56FD7 /* alloc_slab.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEEB14209C1200D56FD7 /* alloc_slab.cpp */; };
 		3647E0EF14209EBB00D56FD7 /* Array.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEEE14209C1200D56FD7 /* Array.cpp */; };
 		3647E0F114209EBB00D56FD7 /* ArrayString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEF014209C1200D56FD7 /* ArrayString.cpp */; };
 		3647E0F314209EBB00D56FD7 /* Column.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEF214209C1200D56FD7 /* Column.cpp */; };
@@ -38,7 +38,7 @@
 		368063321445977300283774 /* Group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063311445977300283774 /* Group.cpp */; };
 		368063381445AF9B00283774 /* testgroup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063361445AD9200283774 /* testgroup.cpp */; };
 		3680633A1446D12B00283774 /* testalloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063391446D12A00283774 /* testalloc.cpp */; };
-		36DB875A153F02250096CF75 /* alloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEEB14209C1200D56FD7 /* alloc.cpp */; };
+		36DB875A153F02250096CF75 /* alloc_slab.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEEB14209C1200D56FD7 /* alloc_slab.cpp */; };
 		36DB875B153F02250096CF75 /* Array.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEEE14209C1200D56FD7 /* Array.cpp */; };
 		36DB875C153F02250096CF75 /* ArrayString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEF014209C1200D56FD7 /* ArrayString.cpp */; };
 		36DB875D153F02250096CF75 /* Column.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEF214209C1200D56FD7 /* Column.cpp */; };
@@ -151,9 +151,9 @@
 		360F1A36146BF71400EBB9C6 /* ColumnString.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = ColumnString.hpp; sourceTree = "<group>"; };
 		363141F614751E8000ADD5AC /* ColumnStringEnum.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = ColumnStringEnum.hpp; sourceTree = "<group>"; };
 		363141F814751E9600ADD5AC /* ColumnStringEnum.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ColumnStringEnum.cpp; sourceTree = "<group>"; };
-		3647DEEB14209C1200D56FD7 /* alloc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = alloc.cpp; sourceTree = "<group>"; };
+		3647DEEB14209C1200D56FD7 /* alloc_slab.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = alloc_slab.cpp; sourceTree = "<group>"; };
 		3647DEEC14209C1200D56FD7 /* alloc.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = alloc.hpp; sourceTree = "<group>"; };
-		3647DEED14209C1200D56FD7 /* AllocSlab.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AllocSlab.hpp; sourceTree = "<group>"; };
+		3647DEED14209C1200D56FD7 /* alloc_slab.hpp */ = {isa = PBXFileReference; path = alloc_slab.hpp; sourceTree = "<group>"; };
 		3647DEEE14209C1200D56FD7 /* Array.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Array.cpp; sourceTree = "<group>"; };
 		3647DEEF14209C1200D56FD7 /* Array.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Array.hpp; sourceTree = "<group>"; };
 		3647DEF014209C1200D56FD7 /* ArrayString.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ArrayString.cpp; sourceTree = "<group>"; };
@@ -348,9 +348,9 @@
 			isa = PBXGroup;
 			children = (
 				36DBF0C715498B4000CC12CC /* basic_table.hpp */,
-				3647DEEB14209C1200D56FD7 /* alloc.cpp */,
 				3647DEEC14209C1200D56FD7 /* alloc.hpp */,
-				3647DEED14209C1200D56FD7 /* AllocSlab.hpp */,
+				3647DEEB14209C1200D56FD7 /* alloc_slab.cpp */,
+				3647DEED14209C1200D56FD7 /* alloc_slab.hpp */,
 				3647DEEE14209C1200D56FD7 /* Array.cpp */,
 				3647DEEF14209C1200D56FD7 /* Array.hpp */,
 				3647DEF014209C1200D56FD7 /* ArrayString.cpp */,
@@ -788,7 +788,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3647E0EC14209EBB00D56FD7 /* alloc.cpp in Sources */,
+				3647E0EC14209EBB00D56FD7 /* alloc_slab.cpp in Sources */,
 				3647E0EF14209EBB00D56FD7 /* Array.cpp in Sources */,
 				3647E0F114209EBB00D56FD7 /* ArrayString.cpp in Sources */,
 				3647E0F314209EBB00D56FD7 /* Column.cpp in Sources */,
@@ -837,7 +837,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				36DB875A153F02250096CF75 /* alloc.cpp in Sources */,
+				36DB875A153F02250096CF75 /* alloc_slab.cpp in Sources */,
 				36DB875B153F02250096CF75 /* Array.cpp in Sources */,
 				36DB875C153F02250096CF75 /* ArrayString.cpp in Sources */,
 				36DB875D153F02250096CF75 /* Column.cpp in Sources */,

@@ -2,7 +2,7 @@
 #define __TDB_GROUP__
 
 #include "Table.hpp"
-#include "AllocSlab.hpp"
+#include "alloc_slab.hpp"
 
 namespace tightdb {
 

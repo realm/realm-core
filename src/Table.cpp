@@ -5,7 +5,7 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
-#include "AllocSlab.hpp"
+#include "alloc_slab.hpp"
 #include "ColumnStringEnum.hpp"
 #include "ColumnTable.hpp"
 #include "ColumnMixed.hpp"
