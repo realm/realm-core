@@ -25,22 +25,22 @@ ArrayBlob::ArrayBlob(Allocator& alloc) : Array(alloc) {}
 
 ArrayBlob::~ArrayBlob() {}
 
-const uint8_t* ArrayBlob::Get(size_t pos) const
+const char* ArrayBlob::Get(size_t pos) const
 {
-    return m_data + pos;
+    return reinterpret_cast<const char*>(m_data) + pos;
 }
 
-void ArrayBlob::Add(void* data, size_t len)
+void ArrayBlob::Add(const char* data, size_t len)
 {
     Replace(m_len, m_len, data, len);
 }
 
-void ArrayBlob::Insert(size_t pos, void* data, size_t len)
+void ArrayBlob::Insert(size_t pos, const char* data, size_t len)
 {
     Replace(pos, pos, data, len);
 }
 
-void ArrayBlob::Replace(size_t start, size_t end, void* data, size_t len)
+void ArrayBlob::Replace(size_t start, size_t end, const char* data, size_t len)
 {
     assert(start <= end);
     assert(end <= m_len);

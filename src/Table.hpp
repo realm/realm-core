@@ -1,72 +1,34 @@
-#ifndef __TDB_TABLE__
-#define __TDB_TABLE__
+#ifndef TIGHTDB_TABLE_H
+#define TIGHTDB_TABLE_H
 
-#include <cstring> // strcmp()
-#include <time.h>
 #include "Column.hpp"
 #include "ColumnString.hpp"
 #include "ColumnStringEnum.hpp"
 #include "ColumnBinary.hpp"
 #include "alloc.hpp"
-#include "ColumnType.hpp"
-#include "TableRef.hpp"
+#include "table_ref.hpp"
 #include "spec.hpp"
+#include "mixed.hpp"
+#include "table_view.hpp"
 
 namespace tightdb {
 
-class TableView;
-class Group;
+
 class ColumnTable;
 class ColumnMixed;
-class Table;
-
-
-class Date {
-public:
-    Date(time_t d) : m_date(d) {}
-    time_t GetDate() const {return m_date;}
-private:
-    time_t m_date;
-};
 
 
 
-class Mixed {
-public:
-    explicit Mixed(ColumnType v)  {assert(v == COLUMN_TYPE_TABLE); (void)v; m_type = COLUMN_TYPE_TABLE;}
-    Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
-    Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.GetDate();}
-    Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
-    Mixed(const char* v) {m_type = COLUMN_TYPE_STRING; m_str  = v;}
-    Mixed(BinaryData v)  {m_type = COLUMN_TYPE_BINARY; m_str = (const char*)v.pointer; m_len = v.len;}
-    Mixed(const char* v, size_t len) {m_type = COLUMN_TYPE_BINARY; m_str = v; m_len = len;}
-
-    ColumnType GetType() const {return m_type;}
-
-    int64_t     GetInt()    const {assert(m_type == COLUMN_TYPE_INT);    return m_int;}
-    bool        GetBool()   const {assert(m_type == COLUMN_TYPE_BOOL);   return m_bool;}
-    time_t      GetDate()   const {assert(m_type == COLUMN_TYPE_DATE);   return m_date;}
-    const char* GetString() const {assert(m_type == COLUMN_TYPE_STRING); return m_str;}
-    BinaryData  GetBinary() const {assert(m_type == COLUMN_TYPE_BINARY); BinaryData b = {m_str, m_len}; return b;}
-
-private:
-    ColumnType m_type;
-    union {
-        int64_t m_int;
-        bool    m_bool;
-        time_t  m_date;
-        const char* m_str;
-    };
-    size_t m_len;
-};
-
-
-
-
-typedef BasicTableRef<Table> TableRef;
-typedef BasicTableRef<const Table> ConstTableRef;
-
-
+/**
+ * The Table class is non-polymorphic, that is, it has no virtual
+ * functions. This is important because it ensures that there is no
+ * run-time distinction between a Table instance and an instance of
+ * any variation of basic_table<T>, and this, in turn, makes it valid
+ * to cast a pointer from Table to basic_table<T> even when the
+ * instance is constructed as a Table. Of couse, this also assumes
+ * that basic_table<> is non-polymorphic, has no destructor, and adds
+ * no extra data members.
+ */
 class Table {
 public:
     /**
@@ -74,98 +36,98 @@ public:
      */
     Table(Allocator& alloc = GetDefaultAllocator());
 
-    virtual ~Table();
+    ~Table();
 
     TableRef GetTableRef() { return TableRef(this); }
     ConstTableRef GetTableRef() const { return ConstTableRef(this); }
 
     // Column meta info
-    size_t GetColumnCount() const;
-    const char* GetColumnName(size_t ndx) const;
-    size_t GetColumnIndex(const char* name) const;
-    ColumnType GetColumnType(size_t ndx) const;
+    std::size_t GetColumnCount() const;
+    const char* GetColumnName(std::size_t ndx) const;
+    std::size_t GetColumnIndex(const char* name) const;
+    ColumnType GetColumnType(std::size_t ndx) const;
+
     Spec GetSpec();
     const Spec GetSpec() const;
-    void UpdateFromSpec(size_t ref_specSet); ///< Must not be called for a table with shared schema
+
+    /// Must not be called for a table with shared schema
+    void UpdateFromSpec(std::size_t ref_specSet);
 
     bool IsEmpty() const {return m_size == 0;}
-    size_t GetSize() const {return m_size;}
+    std::size_t GetSize() const {return m_size;}
 
-    size_t AddRow();
+    std::size_t AddRow();
     void Clear();
-    void DeleteRow(size_t ndx);
+    void DeleteRow(std::size_t ndx);
     void PopBack() {if (!IsEmpty()) DeleteRow(m_size-1);}
 
     // Adaptive ints
-    int64_t Get(size_t column_id, size_t ndx) const;
-    void Set(size_t column_id, size_t ndx, int64_t value);
-    bool GetBool(size_t column_id, size_t ndx) const;
-    void SetBool(size_t column_id, size_t ndx, bool value);
-    time_t GetDate(size_t column_id, size_t ndx) const;
-    void SetDate(size_t column_id, size_t ndx, time_t value);
+    int64_t Get(std::size_t column_id, std::size_t ndx) const;
+    void Set(std::size_t column_id, std::size_t ndx, int64_t value);
+    bool GetBool(std::size_t column_id, std::size_t ndx) const;
+    void SetBool(std::size_t column_id, std::size_t ndx, bool value);
+    std::time_t GetDate(std::size_t column_id, std::size_t ndx) const;
+    void SetDate(std::size_t column_id, std::size_t ndx, std::time_t value);
 
     // NOTE: Low-level insert functions. Always insert in all columns at once
     // and call InsertDone after to avoid table getting un-balanced.
-    void InsertInt(size_t column_id, size_t ndx, int64_t value);
-    void InsertBool(size_t column_id, size_t ndx, bool value) {InsertInt(column_id, ndx, value);}
-    void InsertDate(size_t column_id, size_t ndx, time_t value) {InsertInt(column_id, ndx, value);}
-    template<class T> void InsertEnum(size_t column_id, size_t ndx, T value)
-    {
-        InsertInt(column_id, ndx, value);
-    }
-    void InsertString(size_t column_id, size_t ndx, const char* value);
-    void InsertBinary(size_t column_id, size_t ndx, const void* value, size_t len);
+    void InsertInt(std::size_t column_id, std::size_t ndx, int64_t value);
+    void InsertBool(std::size_t column_id, std::size_t ndx, bool value);
+    void InsertDate(std::size_t column_id, std::size_t ndx, std::time_t value);
+    template<class T> void InsertEnum(std::size_t column_id, std::size_t ndx, T value);
+    void InsertString(std::size_t column_id, std::size_t ndx, const char* value);
+    void InsertBinary(std::size_t column_id, std::size_t ndx, const char* value, std::size_t len);
     void InsertDone();
 
     // Strings
-    const char* GetString(size_t column_id, size_t ndx) const;
-    void SetString(size_t column_id, size_t ndx, const char* value);
+    const char* GetString(std::size_t column_id, std::size_t ndx) const;
+    void SetString(std::size_t column_id, std::size_t ndx, const char* value);
 
     // Binary
-    BinaryData GetBinary(size_t column_id, size_t ndx) const;
-    void SetBinary(size_t column_id, size_t ndx, const void* value, size_t len);
+    BinaryData GetBinary(std::size_t column_id, std::size_t ndx) const;
+    void SetBinary(std::size_t column_id, std::size_t ndx, const char* value, std::size_t len);
 
     // Sub-tables
-    TableRef GetTable(size_t column_id, size_t ndx);
-    ConstTableRef GetTable(size_t column_id, size_t ndx) const;
-    size_t GetTableSize(size_t column_id, size_t ndx) const;
-    void   InsertTable(size_t column_id, size_t ndx);
-    void   ClearTable(size_t column_id, size_t ndx);
+    TableRef GetTable(std::size_t column_id, std::size_t ndx);
+    ConstTableRef GetTable(std::size_t column_id, std::size_t ndx) const;
+    std::size_t GetTableSize(std::size_t column_id, std::size_t ndx) const;
+    void   InsertTable(std::size_t column_id, std::size_t ndx);
+    void   ClearTable(std::size_t column_id, std::size_t ndx);
 
     // Mixed
-    Mixed GetMixed(size_t column_id, size_t ndx) const;
-    ColumnType GetMixedType(size_t column_id, size_t ndx) const;
-    void InsertMixed(size_t column_id, size_t ndx, Mixed value);
-    void SetMixed(size_t column_id, size_t ndx, Mixed value);
+    Mixed GetMixed(std::size_t column_id, std::size_t ndx) const;
+    ColumnType GetMixedType(std::size_t column_id, std::size_t ndx) const;
+    void InsertMixed(std::size_t column_id, std::size_t ndx, Mixed value);
+    void SetMixed(std::size_t column_id, std::size_t ndx, Mixed value);
 
-    size_t register_column(ColumnType type, const char* name);
+    std::size_t register_column(ColumnType type, const char* name);
 
-    Column& GetColumn(size_t ndx);
-    const Column& GetColumn(size_t ndx) const;
-    AdaptiveStringColumn& GetColumnString(size_t ndx);
-    const AdaptiveStringColumn& GetColumnString(size_t ndx) const;
-    ColumnBinary& GetColumnBinary(size_t ndx);
-    const ColumnBinary& GetColumnBinary(size_t ndx) const;
-    ColumnStringEnum& GetColumnStringEnum(size_t ndx);
-    const ColumnStringEnum& GetColumnStringEnum(size_t ndx) const;
-    ColumnTable& GetColumnTable(size_t ndx);
-    const ColumnTable& GetColumnTable(size_t ndx) const;
-    ColumnMixed& GetColumnMixed(size_t ndx);
-    const ColumnMixed& GetColumnMixed(size_t ndx) const;
+    Column& GetColumn(std::size_t ndx);
+    const Column& GetColumn(std::size_t ndx) const;
+    AdaptiveStringColumn& GetColumnString(std::size_t ndx);
+    const AdaptiveStringColumn& GetColumnString(std::size_t ndx) const;
+    ColumnBinary& GetColumnBinary(std::size_t ndx);
+    const ColumnBinary& GetColumnBinary(std::size_t ndx) const;
+    ColumnStringEnum& GetColumnStringEnum(std::size_t ndx);
+    const ColumnStringEnum& GetColumnStringEnum(std::size_t ndx) const;
+    ColumnTable& GetColumnTable(std::size_t ndx);
+    const ColumnTable& GetColumnTable(std::size_t ndx) const;
+    ColumnMixed& GetColumnMixed(std::size_t ndx);
+    const ColumnMixed& GetColumnMixed(std::size_t ndx) const;
 
     // Searching
-    size_t Find(size_t column_id, int64_t value) const;
-    size_t FindBool(size_t column_id, bool value) const;
-    size_t FindString(size_t column_id, const char* value) const;
-    size_t FindDate(size_t column_id, time_t value) const;
-    void FindAll(TableView& tv, size_t column_id, int64_t value);
-    void FindAllBool(TableView& tv, size_t column_id, bool value);
-    void FindAllString(TableView& tv, size_t column_id, const char *value);
-    void FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max);
+    std::size_t Find(std::size_t column_id, int64_t value) const;
+    std::size_t FindBool(std::size_t column_id, bool value) const;
+    std::size_t FindString(std::size_t column_id, const char* value) const;
+    std::size_t FindDate(std::size_t column_id, std::time_t value) const;
+    void FindAll(TableView& tv, std::size_t column_id, int64_t value);
+    void FindAllBool(TableView& tv, std::size_t column_id, bool value);
+    void FindAllString(TableView& tv, std::size_t column_id, const char *value);
+    void FindAllHamming(TableView& tv, std::size_t column_id, uint64_t value, std::size_t max);
 
     // Indexing
-    bool HasIndex(size_t column_id) const;
-    void SetIndex(size_t column_id);
+    bool HasIndex(std::size_t column_id) const;
+    void SetIndex(std::size_t column_id);
 
     // Optimizing
     void Optimize();
@@ -183,8 +145,8 @@ public:
 #endif //_DEBUG
 
     // todo, note, these three functions have been protected
-    const ColumnBase& GetColumnBase(size_t ndx) const;
-    ColumnType GetRealColumnType(size_t ndx) const;
+    const ColumnBase& GetColumnBase(std::size_t ndx) const;
+    ColumnType GetRealColumnType(std::size_t ndx) const;
 
     class Parent;
 
@@ -195,7 +157,7 @@ protected:
     /**
      * Construct a top-level table with independent schema from ref.
      */
-    Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent);
+    Table(Allocator& alloc, std::size_t top_ref, Parent* parent, std::size_t ndx_in_parent);
 
     /**
      * Used when constructing subtables, that is, tables whose
@@ -207,7 +169,8 @@ protected:
     /**
      * Construct a subtable with independent schema from ref.
      */
-    Table(SubtableTag, Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent);
+    Table(SubtableTag, Allocator& alloc, std::size_t top_ref,
+          Parent* parent, std::size_t ndx_in_parent);
 
     /**
      * Construct a subtable with shared schema from ref.
@@ -216,17 +179,18 @@ protected:
      * columns_ref, in this case the columns will be created on
      * demand.
      */
-    Table(SubtableTag, Allocator& alloc, size_t schema_ref, size_t columns_ref,
-          Parent* parent, size_t ndx_in_parent);
+    Table(SubtableTag, Allocator& alloc, std::size_t schema_ref, std::size_t columns_ref,
+          Parent* parent, std::size_t ndx_in_parent);
 
-    void Create(size_t ref_specSet, size_t ref_columns, ArrayParent* parent, size_t ndx_in_parent);
+    void Create(std::size_t ref_specSet, std::size_t ref_columns,
+                ArrayParent* parent, std::size_t ndx_in_parent);
     void CreateColumns();
     void CacheColumns();
     void ClearCachedColumns();
 
     // Specification
-    size_t GetColumnRefPos(size_t column_ndx) const;
-    void UpdateColumnRefs(size_t column_ndx, int diff);
+    std::size_t GetColumnRefPos(std::size_t column_ndx) const;
+    void UpdateColumnRefs(std::size_t column_ndx, int diff);
     void UpdateFromParent();
 
 
@@ -235,7 +199,7 @@ protected:
 #endif //_DEBUG
 
     // Member variables
-    size_t m_size;
+    std::size_t m_size;
 
     // On-disk format
     Array m_top;
@@ -277,7 +241,7 @@ private:
     void bind_ref() const { ++m_ref_count; }
     void unbind_ref() const { if (--m_ref_count == 0) delete this; }
 
-    ColumnBase& GetColumnBase(size_t ndx);
+    ColumnBase& GetColumnBase(std::size_t ndx);
     void InstantiateBeforeChange();
 
     /**
@@ -301,75 +265,35 @@ protected:
 
 
 
-class TableView {
-public:
-    TableView(Table& source);
-    TableView(const TableView& v);
-    ~TableView();
-
-    Table& GetParent() {return m_table;}
-    Array& GetRefColumn() {return m_refs;}
-    size_t GetRef(size_t ndx) const {return m_refs.GetAsRef(ndx);}
-
-    bool IsEmpty() const {return m_refs.IsEmpty();}
-    size_t GetSize() const {return m_refs.Size();}
-
-    // Getting values
-    int64_t Get(size_t column_id, size_t ndx) const;
-    bool GetBool(size_t column_id, size_t ndx) const;
-    time_t GetDate(size_t column_id, size_t ndx) const;
-    const char* GetString(size_t column_id, size_t ndx) const;
-
-    // Setting values
-    void Set(size_t column_id, size_t ndx, int64_t value);
-    void SetBool(size_t column_id, size_t ndx, bool value);
-    void SetDate(size_t column_id, size_t ndx, time_t value);
-    void SetString(size_t column_id, size_t ndx, const char* value);
-    void Sort(size_t column, bool Ascending = true);
-    // Sub-tables
-    TableRef GetTable(size_t column_id, size_t ndx); // FIXME: Const version? Two kinds of TableView, one for const, one for non-const?
-
-    // Deleting
-    void Delete(size_t ndx);
-    void Clear();
-
-    // Finding
-    size_t Find(size_t column_id, int64_t value) const;
-    void FindAll(TableView& tv, size_t column_id, int64_t value);
-    size_t FindString(size_t column_id, const char* value) const;
-    void FindAllString(TableView& tv, size_t column_id, const char *value);
-
-    // Aggregate functions
-    int64_t Sum(size_t column_id) const;
-    int64_t Max(size_t column_id) const;
-    int64_t Min(size_t column_id) const;
-
-    Table *GetTable(); // todo, temporary for tests FIXME: Is this still needed????
-
-private:
-    // Don't allow copying
-    TableView& operator=(const TableView&) {return *this;}
-
-    Table& m_table;
-    Array m_refs;
-};
-
-
-
 
 // Implementation:
 
-inline TableRef Table::GetTable(size_t column_id, size_t ndx)
+inline void Table::InsertBool(std::size_t column_id, std::size_t ndx, bool value)
+{
+    InsertInt(column_id, ndx, value);
+}
+
+inline void Table::InsertDate(std::size_t column_id, std::size_t ndx, std::time_t value)
+{
+    InsertInt(column_id, ndx, value);
+}
+
+template<class T> inline void Table::InsertEnum(std::size_t column_id, std::size_t ndx, T value)
+{
+    InsertInt(column_id, ndx, value);
+}
+
+inline TableRef Table::GetTable(std::size_t column_id, std::size_t ndx)
 {
     return TableRef(get_subtable_ptr(column_id, ndx));
 }
 
-inline ConstTableRef Table::GetTable(size_t column_id, size_t ndx) const
+inline ConstTableRef Table::GetTable(std::size_t column_id, std::size_t ndx) const
 {
     return ConstTableRef(get_subtable_ptr(column_id, ndx));
 }
 
 
-}
+} // namespace tightdb
 
-#endif //__TDB_TABLE__
+#endif // TIGHTDB_TABLE_H

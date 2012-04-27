@@ -10,7 +10,6 @@
 
 #include "meta.hpp"
 #include "Table.hpp"
-#include "ColumnTable.hpp"
 #include "query/QueryInterface.hpp"
 
 namespace tightdb {
@@ -21,6 +20,16 @@ template<int col_idx, class Type> class RegisterColumn;
 
 
 
+/**
+ * This class is non-polymorphic, that is, it has no virtual
+ * functions. Further more, it has no destructor, and it adds no new
+ * data-members. These properties are important, because it ensures
+ * that there is no run-time distinction between a Table instance and
+ * an instance of any variation of this class, and therefore it is
+ * valid to cast a pointer from Table to basic_table<T> even when the
+ * instance is constructed as a Table. Of couse, this also assumes
+ * that Table is non-polymorphic.
+ */
 template<class Spec> class BasicTable: public Table {
 private:
     template<class> friend class BasicTable;
@@ -87,7 +96,7 @@ public:
     ConstRowAccessor Front() const { return ConstRowAccessor(std::make_pair(this, 0)); }
 
     /**
-     * \param rel_idx The index of the row specified relatibe to the
+     * \param rel_idx The index of the row specified relative to the
      * end. Thus, <tt>table.Back(rel_idx)</tt> is the same as
      * <tt>table[table.GetSize() + rel_idx]</tt>.
      */
@@ -174,7 +183,7 @@ struct SpecBase {
     typedef bool            Bool;
     typedef const char*     String;
     typedef std::time_t     Date;
-//    typedef tightdb::Binary Binary;
+//    typedef tightdb::Binary Binary; // FIXME: Use tightdb::BinaryData here?
     typedef tightdb::Mixed  Mixed;
     template<class E> class Enum {
     public:
@@ -387,47 +396,6 @@ template<> struct GetColumnTypeId<Mixed> {
 
 
 
-template<class Subspec> class BasicTableColumn: public ColumnTable {
-private:
-    BasicTableColumn(std::size_t schema_ref,
-                     ArrayParent* parent, std::size_t idx_in_parent,
-                     Allocator& alloc, const Table* tab):
-        ColumnTable(schema_ref, parent, idx_in_parent, alloc, tab) {}
-
-    BasicTableColumn(std::size_t columns_ref, std::size_t schema_ref,
-                     ArrayParent* parent, size_t idx_in_parent,
-                     Allocator& alloc, const Table* tab):
-        ColumnTable(columns_ref, schema_ref, parent, idx_in_parent, alloc, tab) {}
-
-    class Factory: public TableColumnFactory {
-        virtual ColumnTable* create(std::size_t schema_ref,
-                                    ArrayParent* parent, std::size_t idx_in_parent,
-                                    Allocator& alloc, const Table* tab)
-        {
-            return new BasicTableColumn<Subspec>(schema_ref, parent, idx_in_parent, alloc, tab);
-        }
-
-        virtual ColumnTable* create(std::size_t columns_ref, std::size_t schema_ref,
-                                    ArrayParent* parent, size_t idx_in_parent,
-                                    Allocator& alloc, const Table* tab)
-        {
-            return new BasicTableColumn<Subspec>(columns_ref, schema_ref, parent, idx_in_parent,
-                                                 alloc, tab);
-        }
-    };
-
-    template<int, class> friend class RegisterColumn;
-
-    static Factory* factory()
-    {
-        static Factory factory;
-        return &factory;
-    }
-};
-
-
-
-
 template<int col_idx, class Type> class RegisterColumn {
 public:
     RegisterColumn(tightdb::Spec* spec, const char* column_name)
@@ -443,8 +411,7 @@ public:
     RegisterColumn(tightdb::Spec* spec, const char* column_name)
     {
         assert(col_idx == spec->GetColumnCount());
-        TableColumnFactory* factory = BasicTableColumn<Subspec>::factory();
-        tightdb::Spec subspec = spec->AddColumnTable(column_name, factory);
+        tightdb::Spec subspec = spec->AddColumnTable(column_name);
         typename Subspec::template Columns<tightdb::RegisterColumn, tightdb::Spec*> c(&subspec);
     }
 };
@@ -476,7 +443,8 @@ public:
     }
     const Field& operator+=(int64_t value) const
     {
-        // FIXME: Should be optimized (probably using expression templates)
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
         value = Base::m_table->Get(col_idx, Base::m_row_idx) + value;
         Base::m_table->Set(col_idx, Base::m_row_idx, value);
         return *this;
@@ -532,7 +500,7 @@ public:
         Base::m_table->SetString(col_idx, Base::m_row_idx, value);
         return *this;
     }
-    // FIXME: Not good to defined operator==() here, beacuse it does
+    // FIXME: Not good to define operator==() here, beacuse it does
     // not have this semantic for char pointers in general. However,
     // if we choose to keep it, we should also have all the other
     // comparison operators, and many other operators need to be

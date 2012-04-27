@@ -4,7 +4,6 @@
 namespace tightdb {
 
 
-// Meta stuff
 template<class From, class To> struct CopyConstness { typedef To type; };
 template<class From, class To> struct CopyConstness<const From, To> { typedef const To type; };
 

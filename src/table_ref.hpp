@@ -133,6 +133,10 @@ template<class C, class T, class U>
 std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BasicTableRef<U>&);
 
 
+class Table;
+typedef BasicTableRef<Table> TableRef;
+typedef BasicTableRef<const Table> ConstTableRef;
+
 
 
 

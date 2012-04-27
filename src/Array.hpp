@@ -6,7 +6,6 @@
 #else
 #include <stdint.h> // unint8_t etc
 #endif
-//#include <climits> // size_t
 #include <cstdlib> // size_t
 #include <cstring> // memmove
 #include "alloc.hpp"
@@ -192,7 +191,7 @@ public:
     void ToDot(std::ostream& out, const char* title=NULL) const;
     MemStats Stats() const;
 #endif //_DEBUG
-    mutable unsigned char* m_data;
+    mutable unsigned char* m_data; // FIXME: Should be 'char' not 'unsigned char'
 
 private:
     template <size_t w>bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max);

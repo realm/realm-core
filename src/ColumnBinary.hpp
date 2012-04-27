@@ -21,13 +21,13 @@ public:
     bool IsEmpty() const;
 
     BinaryData Get(size_t ndx) const;
-    const void* GetData(size_t ndx) const;
+    const char* GetData(size_t ndx) const;
     size_t GetLen(size_t ndx) const;
 
     bool Add() {Add(NULL, 0); return true;}
-    void Add(const void* value, size_t len);
-    void Set(size_t ndx, const void* value, size_t len);
-    void Insert(size_t ndx, const void* value, size_t len);
+    void Add(const char* value, size_t len);
+    void Set(size_t ndx, const char* value, size_t len);
+    void Insert(size_t ndx, const char* value, size_t len);
     void Delete(size_t ndx);
     void Resize(size_t ndx);
     void Clear();
