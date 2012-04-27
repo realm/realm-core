@@ -265,9 +265,10 @@ bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len)
     return true;
 }
 
-bool SlabAlloc::SetShared(const char* path)
+bool SlabAlloc::SetShared(const char* path, bool readOnly)
 {
 #ifdef _MSC_VER
+    assert(readOnly); // write persistence is not implemented for windows yet
     // Open file
     m_fd = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, NULL, NULL);
 
@@ -291,7 +292,7 @@ bool SlabAlloc::SetShared(const char* path)
     m_mapfile = hMapFile;
 #else
     // Open file
-    m_fd = open(path, O_RDONLY);
+    m_fd = open(path, readOnly ? O_RDONLY : O_RDWR|O_CREAT);
     if (m_fd < 0) return false;
 
     // Get size
@@ -300,12 +301,29 @@ bool SlabAlloc::SetShared(const char* path)
         close(m_fd);
         return false;
     }
+    size_t len = statbuf.st_size;
+
+    if (readOnly && len == 0) {
+        // You have opened an non-existing or empty file
+        close(m_fd);
+        return false;
+    }
+
+    // Handle empty files (new database)
+    if (len == 0) {
+        if (readOnly) return false;
+        write(m_fd, "\0\0\0\0\0\0\0\0", 8); // write top-ref
+
+        // pre-alloc initial space when mmapping
+        len = 1024*1024;
+        ftruncate(m_fd, len);
+	}
 
     // Verify that data is 64bit aligned
-    if ((statbuf.st_size & 0x7) != 0) return false;
+    if ((len & 0x7) != 0) return false;
 
     // Map to memory (read only)
-    void* p = mmap(0, statbuf.st_size, PROT_READ, MAP_SHARED, m_fd, 0);
+    void* const p = mmap(0, len, PROT_READ, MAP_SHARED, m_fd, 0);
     if (p == (void*)-1) {
         close(m_fd);
         return false;
@@ -314,10 +332,14 @@ bool SlabAlloc::SetShared(const char* path)
     //TODO: Verify the data structures
 
     m_shared = (char*)p;
-    m_baseline = statbuf.st_size;
+    m_baseline = len;
 #endif
 
     return true;
+}
+
+bool SlabAlloc::CanPersist() const {
+    return m_shared != NULL;
 }
 
 size_t SlabAlloc::GetTopRef() const
@@ -337,6 +359,23 @@ size_t SlabAlloc::GetTotalSize() const
     }
     else {
         return TO_REF(m_slabs.Back().offset);
+    }
+}
+
+void SlabAlloc::FreeAll() {
+    // Free all scratch space (done after all data has
+    // been commited to persistent space)
+    m_freeSpace.Clear();
+
+    size_t ref = m_baseline;
+    const size_t count = m_slabs.GetSize();
+    for (size_t i = 0; i < count; ++i) {
+        const Slabs::Cursor c = m_slabs[i];
+        const size_t size = c.offset - ref;
+
+        m_freeSpace.Add(ref, size);
+
+        ref = c.offset;
     }
 }
 
@@ -364,7 +403,8 @@ bool SlabAlloc::IsAllFree() const
 void SlabAlloc::Verify() const
 {
     // Make sure that all free blocks fit within a slab
-    for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
+    const size_t count = m_freeSpace.GetSize();
+    for (size_t i = 0; i < count; ++i) {
         FreeSpace::ConstCursor c = m_freeSpace[i];
         const size_t ref = TO_REF(c.ref);
 
