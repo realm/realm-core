@@ -69,8 +69,8 @@
 		36DB8778153F02250096CF75 /* ColumnMixed.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3604594C14C96DA2008ACFFD /* ColumnMixed.hpp */; };
 		36DB8779153F02250096CF75 /* utf8.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 360BAE2F14FBB9FE00A28045 /* utf8.hpp */; };
 		36DB877A153F02250096CF75 /* utilities.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 360BAE3314FBBA2E00A28045 /* utilities.hpp */; };
-		36DBF0CC15498B4100CC12CC /* basic_table.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0C715498B4000CC12CC /* basic_table.hpp */; };
-		36DBF0CD15498B4100CC12CC /* basic_table.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0C715498B4000CC12CC /* basic_table.hpp */; };
+		36DBF0CC15498B4100CC12CC /* table_basic.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0C715498B4000CC12CC /* table_basic.hpp */; };
+		36DBF0CD15498B4100CC12CC /* table_basic.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0C715498B4000CC12CC /* table_basic.hpp */; };
 		36DBF0CE15498B4100CC12CC /* meta.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0C815498B4000CC12CC /* meta.hpp */; };
 		36DBF0CF15498B4100CC12CC /* meta.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0C815498B4000CC12CC /* meta.hpp */; };
 		36DBF0D015498B4100CC12CC /* spec.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0C915498B4000CC12CC /* spec.hpp */; };
@@ -270,7 +270,7 @@
 		368063361445AD9200283774 /* testgroup.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testgroup.cpp; sourceTree = "<group>"; };
 		368063391446D12A00283774 /* testalloc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testalloc.cpp; sourceTree = "<group>"; };
 		36DB877E153F02250096CF75 /* libtightdb_ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libtightdb_ios.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		36DBF0C715498B4000CC12CC /* basic_table.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = basic_table.hpp; sourceTree = "<group>"; };
+		36DBF0C715498B4000CC12CC /* table_basic.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = table_basic.hpp; sourceTree = "<group>"; };
 		36DBF0C815498B4000CC12CC /* meta.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = meta.hpp; sourceTree = "<group>"; };
 		36DBF0C915498B4000CC12CC /* spec.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = spec.hpp; sourceTree = "<group>"; };
 		36DBF0CB15498B4100CC12CC /* table_ref.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = table_ref.hpp; sourceTree = "<group>"; };
@@ -347,7 +347,6 @@
 		3647DEEA14209C1200D56FD7 /* src */ = {
 			isa = PBXGroup;
 			children = (
-				36DBF0C715498B4000CC12CC /* basic_table.hpp */,
 				3647DEEC14209C1200D56FD7 /* alloc.hpp */,
 				3647DEEB14209C1200D56FD7 /* alloc_slab.cpp */,
 				3647DEED14209C1200D56FD7 /* alloc_slab.hpp */,
@@ -385,6 +384,7 @@
 				36DBF0C915498B4000CC12CC /* spec.hpp */,
 				3647DEFA14209C1200D56FD7 /* Table.cpp */,
 				3647DEFB14209C1200D56FD7 /* Table.hpp */,
+				36DBF0C715498B4000CC12CC /* table_basic.hpp */,
 				36DBF0CB15498B4100CC12CC /* table_ref.hpp */,
 				3647DEFC14209C1200D56FD7 /* table_view.cpp */,
 				3647DEFD14209C1200D56FD7 /* tightdb.hpp */,
@@ -651,7 +651,7 @@
 				3604594D14C96DA2008ACFFD /* ColumnMixed.hpp in Headers */,
 				360BAE3114FBB9FE00A28045 /* utf8.hpp in Headers */,
 				360BAE3514FBBA2E00A28045 /* utilities.hpp in Headers */,
-				36DBF0CC15498B4100CC12CC /* basic_table.hpp in Headers */,
+				36DBF0CC15498B4100CC12CC /* table_basic.hpp in Headers */,
 				36DBF0CE15498B4100CC12CC /* meta.hpp in Headers */,
 				36DBF0D015498B4100CC12CC /* spec.hpp in Headers */,
 				36DBF0D415498B4100CC12CC /* table_ref.hpp in Headers */,
@@ -674,7 +674,7 @@
 				36DB8778153F02250096CF75 /* ColumnMixed.hpp in Headers */,
 				36DB8779153F02250096CF75 /* utf8.hpp in Headers */,
 				36DB877A153F02250096CF75 /* utilities.hpp in Headers */,
-				36DBF0CD15498B4100CC12CC /* basic_table.hpp in Headers */,
+				36DBF0CD15498B4100CC12CC /* table_basic.hpp in Headers */,
 				36DBF0CF15498B4100CC12CC /* meta.hpp in Headers */,
 				36DBF0D115498B4100CC12CC /* spec.hpp in Headers */,
 				36DBF0D515498B4100CC12CC /* table_ref.hpp in Headers */,
