@@ -165,7 +165,7 @@ void SlabAlloc::Free(size_t ref, void* p)
 #endif //_DEBUG
 
     // Check if we can merge with start of free block
-    size_t n = m_freeSpace.cols().ref.Find(refEnd);
+    const size_t n = m_freeSpace.cols().ref.Find(refEnd);
     if (n != (size_t)-1) {
         // No consolidation over slab borders
         if (m_slabs.cols().offset.Find(refEnd) == (size_t)-1) {
@@ -338,7 +338,8 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
     return true;
 }
 
-bool SlabAlloc::CanPersist() const {
+bool SlabAlloc::CanPersist() const
+{
     return m_shared != NULL;
 }
 
@@ -362,11 +363,27 @@ size_t SlabAlloc::GetTotalSize() const
     }
 }
 
-void SlabAlloc::FreeAll() {
+void SlabAlloc::FreeAll(size_t filesize)
+{
+    assert(filesize >= m_baseline);
+    assert((filesize & 0x7) == 0); // 64bit alignment
+    
+    // If the file size have changed, we need to remap the readonly buffer
+    if (filesize != m_baseline) {
+        //void* const p = mremap(m_shared, m_baseline, filesize); // linux only
+        munmap(m_shared, m_baseline);
+        void* const p = mmap(0, filesize, PROT_READ, MAP_SHARED, m_fd, 0);
+        assert(p);
+        
+        m_shared   = (char*)p;
+        m_baseline = filesize;
+    }
+    
     // Free all scratch space (done after all data has
     // been commited to persistent space)
     m_freeSpace.Clear();
 
+    // Rebuild free list to include all slabs
     size_t ref = m_baseline;
     const size_t count = m_slabs.GetSize();
     for (size_t i = 0; i < count; ++i) {

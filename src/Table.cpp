@@ -214,7 +214,6 @@ size_t Spec::GetColumnIndex(const char* name) const
     return m_names.Find(name);
 }
 
-
 // -- Table ---------------------------------------------------------------------------------
 
 Table::Table(Allocator& alloc):

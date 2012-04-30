@@ -70,12 +70,13 @@ void GroupWriter::Commit() {
     // Commit
     DoCommit(top_pos);
     
+    // Clear old allocs
+    // and remap if file size has changed
+    SlabAlloc& alloc = m_group.GetAllocator();
+    alloc.FreeAll(m_len);
+    
     // Recusively update refs in all active tables (columns, arrays..)
     m_group.UpdateRefs(top_pos);
-    
-    // Clear old allocs
-    SlabAlloc& alloc = m_group.GetAllocator();
-    alloc.FreeAll();
 }
 
 size_t GroupWriter::write(const char* p, size_t n) {
@@ -97,8 +98,8 @@ void GroupWriter::WriteAt(size_t pos, const char* p, size_t n) {
 
 void GroupWriter::DoCommit(uint64_t topPos)
 {
-    //fsync(m_fd);
+    fsync(m_fd);
     lseek(m_fd, 0, SEEK_SET);
     ::write(m_fd, (const char*)&topPos, 8);
-    //fsync(m_fd); // Could be fdatasync on Linux
+    fsync(m_fd); // Could be fdatasync on Linux
 }

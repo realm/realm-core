@@ -30,7 +30,7 @@ public:
 
     bool CanPersist() const;
     size_t GetFileLen() const {return m_baseline;}
-    void FreeAll();
+    void FreeAll(size_t filesize);
 
 #ifndef _MSC_VER
     int GetFileDescriptor() {return m_fd;}
