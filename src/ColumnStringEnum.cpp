@@ -149,14 +149,6 @@ void ColumnStringEnum::verify() const
     Column::verify();
 }
 
-MemStats ColumnStringEnum::Stats() const
-{
-    MemStats stats;
-    stats.Add(m_keys.Stats());
-    stats.Add(Column::Stats());
-    return stats;
-}
-
 void ColumnStringEnum::ToDot(std::ostream& out, const char* title) const
 {
     const size_t ref = m_keys.GetRef();

@@ -1836,9 +1836,22 @@ void Array::ToDot(std::ostream& out, const char* title) const
     out << std::endl;
 }
 
-MemStats Array::Stats() const
+void Array::Stats(MemStats& stats) const
 {
-    return MemStats(m_capacity, CalcByteLen(m_len, m_width), 1);
+    const MemStats m(m_capacity, CalcByteLen(m_len, m_width), 1);
+    stats.Add(m);
+    
+    // Add stats for all sub-arrays
+    if (m_hasRefs) {
+        for (size_t i = 0; i < m_len; ++i) {
+            const size_t ref = GetAsRef(i);
+            if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+            
+            const Array sub(ref, NULL, 0, GetAllocator());
+            sub.Stats(stats);
+        }
+    }
+    
 }
 
 #endif //_DEBUG

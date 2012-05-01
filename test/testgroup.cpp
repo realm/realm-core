@@ -410,12 +410,12 @@ TEST(Group_Subtable)
 
     Group g;
     Table& table = g.GetTable("test");
-    Spec s = table.GetSpec();
+    Spec& s = table.GetSpec();
     s.AddColumn(COLUMN_TYPE_INT, "foo");
     Spec sub = s.AddColumnTable("sub");
     sub.AddColumn(COLUMN_TYPE_INT, "bar");
     s.AddColumn(COLUMN_TYPE_MIXED, "baz");
-    table.UpdateFromSpec(s.GetRef());
+    table.UpdateFromSpec();
 
     for (int i=0; i<n; ++i) {
         table.AddRow();
@@ -642,7 +642,7 @@ TEST(Group_MultiLevelSubtables)
         Group g;
         Table& table = g.GetTable("test");
         {
-            Spec s = table.GetSpec();
+            Spec& s = table.GetSpec();
             s.AddColumn(COLUMN_TYPE_INT, "int");
             {
                 Spec sub = s.AddColumnTable("tab");
@@ -653,7 +653,7 @@ TEST(Group_MultiLevelSubtables)
                 }
             }
             s.AddColumn(COLUMN_TYPE_MIXED, "mix");
-            table.UpdateFromSpec(s.GetRef());
+            table.UpdateFromSpec();
         }
         table.AddRow();
         {
@@ -666,18 +666,18 @@ TEST(Group_MultiLevelSubtables)
             table.SetMixed(2, 0, Mixed(COLUMN_TYPE_TABLE));
             TableRef a = table.GetTable(2, 0);
             {
-                Spec s = a->GetSpec();
+                Spec& s = a->GetSpec();
                 s.AddColumn(COLUMN_TYPE_INT, "int");
                 s.AddColumn(COLUMN_TYPE_MIXED, "mix");
-                a->UpdateFromSpec(s.GetRef());
+                a->UpdateFromSpec();
             }
             a->AddRow();
             a->SetMixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
             TableRef b = a->GetTable(1, 0);
             {
-                Spec s = b->GetSpec();
+                Spec& s = b->GetSpec();
                 s.AddColumn(COLUMN_TYPE_INT, "int");
-                b->UpdateFromSpec(s.GetRef());
+                b->UpdateFromSpec();
             }
             b->AddRow();
         }

@@ -73,9 +73,9 @@ public:
 
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc)
     {
-        tightdb::Spec spec = GetSpec();
+        tightdb::Spec& spec = GetSpec();
         typename Spec::template Columns<RegisterColumn, tightdb::Spec*> c(&spec);
-        UpdateFromSpec(spec.GetRef());
+        UpdateFromSpec();
     }
 
     ColsAccessor cols() { return ColsAccessor(this); }

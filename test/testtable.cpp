@@ -153,7 +153,7 @@ TEST(Table_Delete_All_Types)
 {
     // Create table with all column types
     Table table;
-    Spec s = table.GetSpec();
+    Spec& s = table.GetSpec();
     s.AddColumn(COLUMN_TYPE_INT,    "int");
     s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
     s.AddColumn(COLUMN_TYPE_DATE,   "date");
@@ -165,7 +165,7 @@ TEST(Table_Delete_All_Types)
     Spec sub = s.AddColumnTable(    "tables");
     sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
     sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
-    table.UpdateFromSpec(s.GetRef());
+    table.UpdateFromSpec();
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
@@ -535,13 +535,13 @@ TEST(Table_Spec)
     Table& table = group.GetTable("test");
 
     // Create specification with sub-table
-    Spec s = table.GetSpec();
+    Spec& s = table.GetSpec();
     s.AddColumn(COLUMN_TYPE_INT,    "first");
     s.AddColumn(COLUMN_TYPE_STRING, "second");
     Spec sub = s.AddColumnTable(    "third");
         sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
         sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
-    table.UpdateFromSpec(s.GetRef());
+    table.UpdateFromSpec();
 
     CHECK_EQUAL(3, table.GetColumnCount());
 

@@ -48,7 +48,6 @@ public:
 #ifdef _DEBUG
     bool Compare(const AdaptiveStringColumn& c) const;
     void verify() const {};
-    MemStats Stats() const;
 #endif //_DEBUG
 
 protected:

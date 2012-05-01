@@ -34,7 +34,6 @@ public:
 #ifdef _DEBUG
     bool Compare(const ColumnStringEnum& c) const;
     void verify() const;
-    MemStats Stats() const;
     void ToDot(std::ostream& out, const char* title) const;
 #endif // _DEBUG
 
