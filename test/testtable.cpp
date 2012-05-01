@@ -120,9 +120,9 @@ TEST(Table_Delete)
         table.Add(0, i, true, Wed);
     }
 
-    table.DeleteRow(0);
-    table.DeleteRow(4);
-    table.DeleteRow(7);
+    table.erase(0);
+    table.erase(4);
+    table.erase(7);
 
     CHECK_EQUAL(1, table[0].second);
     CHECK_EQUAL(2, table[1].second);
@@ -138,7 +138,7 @@ TEST(Table_Delete)
 
     // Delete all items one at a time
     for (size_t i = 0; i < 7; ++i) {
-        table.DeleteRow(0);
+        table.erase(0);
     }
 
     CHECK(table.IsEmpty());
@@ -238,9 +238,9 @@ TEST(Table_Delete_All_Types)
     table.Optimize();
 
     // Test Deletes
-    table.DeleteRow(14);
-    table.DeleteRow(0);
-    table.DeleteRow(5);
+    table.erase(14);
+    table.erase(0);
+    table.erase(5);
 
     CHECK_EQUAL(12, table.GetSize());
 
@@ -249,7 +249,7 @@ TEST(Table_Delete_All_Types)
 #endif //_DEBUG
 
     // Test Clear
-    table.Clear();
+    table.clear();
     CHECK_EQUAL(0, table.GetSize());
 
 #ifdef _DEBUG
@@ -403,9 +403,9 @@ TEST(Table_Index_Int)
     CHECK_EQUAL(10, table.cols().second.Find(29));
 
     // Delete some values
-    table.DeleteRow(0);
-    table.DeleteRow(5);
-    table.DeleteRow(8);
+    table.erase(0);
+    table.erase(5);
+    table.erase(8);
 
     CHECK_EQUAL(0, table.cols().second.Find(15));
     CHECK_EQUAL(1, table.cols().second.Find(13));
@@ -520,8 +520,8 @@ TEST(Table_SlabAlloc)
     table.Add(5, 10, true, Wed);
 
     // Delete some rows
-    table.DeleteRow(2);
-    table.DeleteRow(4);
+    table.erase(2);
+    table.erase(4);
 
 #ifdef _DEBUG
     table.verify();

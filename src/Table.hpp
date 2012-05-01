@@ -57,9 +57,9 @@ public:
     std::size_t GetSize() const {return m_size;}
 
     std::size_t AddRow();
-    void Clear();
-    void DeleteRow(std::size_t ndx);
-    void PopBack() {if (!IsEmpty()) DeleteRow(m_size-1);}
+    void clear();
+    void erase(std::size_t ndx);
+    void pop_back() {if (!IsEmpty()) erase(m_size-1);}
 
     // Adaptive ints
     int64_t Get(std::size_t column_id, std::size_t ndx) const;

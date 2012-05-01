@@ -25,19 +25,24 @@ public:
     bool GetBool(std::size_t column_id, std::size_t ndx) const;
     std::time_t GetDate(std::size_t column_id, std::size_t ndx) const;
     const char* GetString(std::size_t column_id, std::size_t ndx) const;
+    BinaryData GetBinary(std::size_t column_id, std::size_t ndx) const;
+    Mixed GetMixed(std::size_t column_id, std::size_t ndx) const;
+    TableRef GetTable(std::size_t column_id, std::size_t ndx);
 
     // Setting values
     void Set(std::size_t column_id, std::size_t ndx, int64_t value);
     void SetBool(std::size_t column_id, std::size_t ndx, bool value);
     void SetDate(std::size_t column_id, std::size_t ndx, std::time_t value);
     void SetString(std::size_t column_id, std::size_t ndx, const char* value);
+    void SetBinary(std::size_t column_id, std::size_t ndx, const char* value, std::size_t len);
+    void SetMixed(std::size_t column_id, std::size_t ndx, Mixed value);
+
     void Sort(std::size_t column, bool Ascending = true);
-    // Sub-tables
-    TableRef GetTable(std::size_t column_id, std::size_t ndx);
 
     // Deleting
-    void Delete(std::size_t ndx);
-    void Clear();
+    void clear();
+    void erase(std::size_t ndx);
+    void pop_back() { if (!IsEmpty()) erase(GetSize()-1); }
 
     // Finding
     std::size_t Find(std::size_t column_id, int64_t value) const;

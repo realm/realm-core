@@ -776,7 +776,7 @@ size_t Table::AddRow()
     return m_size++;
 }
 
-void Table::Clear()
+void Table::clear()
 {
     const size_t count = GetColumnCount();
     for (size_t i = 0; i < count; ++i) {
@@ -786,7 +786,7 @@ void Table::Clear()
     m_size = 0;
 }
 
-void Table::DeleteRow(size_t ndx)
+void Table::erase(size_t ndx)
 {
     assert(ndx < m_size);
 
