@@ -115,6 +115,11 @@ public:
     ColumnMixed& GetColumnMixed(std::size_t ndx);
     const ColumnMixed& GetColumnMixed(std::size_t ndx) const;
 
+    // Aggregate functions
+    int64_t Sum(std::size_t column_id) const;
+    int64_t Max(std::size_t column_id) const;
+    int64_t Min(std::size_t column_id) const;
+
     // Searching
     std::size_t Find(std::size_t column_id, int64_t value) const;
     std::size_t FindBool(std::size_t column_id, bool value) const;
