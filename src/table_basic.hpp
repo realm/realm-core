@@ -586,7 +586,7 @@ template<class Spec> template<class Tab> template<int col_idx>
 class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, int64_t>:
     public ColumnBase<col_idx, int64_t> {
 private:
-    typedef BasicTable<Spec>::Accessors<Tab>::ColumnBase<col_idx, int64_t> Base;
+    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, int64_t> Base;
 
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
@@ -625,7 +625,7 @@ template<class Spec> template<class Tab> template<int col_idx>
 class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, bool>:
     public ColumnBase<col_idx, bool> {
 private:
-    typedef BasicTable<Spec>::Accessors<Tab>::ColumnBase<col_idx, bool> Base;
+    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, bool> Base;
 
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
@@ -653,7 +653,7 @@ template<class Spec> template<class Tab> template<int col_idx, class E>
 class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, SpecBase::Enum<E> >:
     public ColumnBase<col_idx, SpecBase::Enum<E> > {
 private:
-    typedef BasicTable<Spec>::Accessors<Tab>::ColumnBase<col_idx, SpecBase::Enum<E> > Base;
+    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, SpecBase::Enum<E> > Base;
 
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
@@ -681,7 +681,7 @@ template<class Spec> template<class Tab> template<int col_idx>
 class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, const char*>:
     public ColumnBase<col_idx, const char*> {
 private:
-    typedef BasicTable<Spec>::Accessors<Tab>::ColumnBase<col_idx, const char*> Base;
+    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, const char*> Base;
 
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
@@ -708,7 +708,7 @@ public:
 template<class Spec> template<class Tab> template<int col_idx>
 class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, Mixed>: public ColumnBase<col_idx, Mixed> {
 private:
-    typedef BasicTable<Spec>::Accessors<Tab>::ColumnBase<col_idx, Mixed> Base;
+    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, Mixed> Base;
 
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
@@ -724,7 +724,7 @@ template<class Spec> template<class Tab> template<int col_idx, class Subspec>
 class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, BasicTable<Subspec> >:
     public ColumnBase<col_idx, BasicTable<Subspec> > {
 private:
-    typedef BasicTable<Spec>::Accessors<Tab>::ColumnBase<col_idx, BasicTable<Subspec> > Base;
+    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, BasicTable<Subspec> > Base;
 
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
