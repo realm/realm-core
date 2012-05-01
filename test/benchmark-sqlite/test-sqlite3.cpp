@@ -141,7 +141,7 @@ sqlite3_bind_int(ppStmt, 1, n);
         if(indexed)
             printf("Indexed FindAll: %dms\n", timer.GetTimeInMs());
         else
-            printf("FindAll: %dms\n", timer.GetTimeInMs() * 1000);
+            printf("FindAll: %dms\n", timer.GetTimeInMs());
 
 
 
@@ -168,7 +168,7 @@ sqlite3_bind_int(ppStmt, 1, n);
         if(indexed)
             printf("Indexed Find: %dms\n", timer.GetTimeInMs());
         else
-            printf("Find: %dms\n", timer.GetTimeInMs() * 1000);
+            printf("Find: %dms\n", timer.GetTimeInMs());
 
 
 
@@ -197,19 +197,6 @@ sqlite3_bind_int(ppStmt, 1, n);
         sqlite3_finalize(ppStmt); // Cleanup
         */
 
-
-
-
-
-
-
-
-
-
-
-
-
-            printf("rrrr");
                         // new benchmark
     // Create table
     char *zErrMsg = NULL;
@@ -246,8 +233,6 @@ sqlite3_bind_int(ppStmt, 1, n);
 
         timer.Start();
 
-        printf("hej");
-
         // Do a search over entire column (value not found)
             sqlite3_reset(ppStmt);
             size_t n = rand2() % RANGE;
@@ -261,7 +246,6 @@ sqlite3_bind_int(ppStmt, 1, n);
 
         printf("SELECT: %dms\n", timer.GetTimeInMs());
 
-    printf("done");
     getchar();
     exit(1);
 
