@@ -47,11 +47,11 @@ public:
     std::size_t GetColumnIndex(const char* name) const;
     ColumnType GetColumnType(std::size_t ndx) const;
 
-    Spec GetSpec();
-    const Spec GetSpec() const;
+    Spec& GetSpec();
+    const Spec& GetSpec() const;
 
     /// Must not be called for a table with shared schema
-    void UpdateFromSpec(std::size_t ref_specSet);
+    void UpdateFromSpec();
 
     bool IsEmpty() const {return m_size == 0;}
     std::size_t GetSize() const {return m_size;}
@@ -203,11 +203,8 @@ protected:
 
     // On-disk format
     Array m_top;
-    Array m_specSet;
-    Array m_spec;
-    ArrayString m_columnNames;
-    Array m_subSpecs;
     Array m_columns;
+    Spec m_spec_set;
 
     // Cached columns
     Array m_cols;

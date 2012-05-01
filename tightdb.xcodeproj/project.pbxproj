@@ -81,6 +81,8 @@
 		36DBF0D9154AC77A00CC12CC /* group_writer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36DBF0D7154AC77A00CC12CC /* group_writer.cpp */; };
 		36DBF0DB154AC79700CC12CC /* group_writer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0DA154AC79600CC12CC /* group_writer.hpp */; };
 		36DBF0DC154AC79700CC12CC /* group_writer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0DA154AC79600CC12CC /* group_writer.hpp */; };
+		36DBF0DE154FD89700CC12CC /* spec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36DBF0DD154FD89700CC12CC /* spec.cpp */; };
+		36DBF0DF154FD89700CC12CC /* spec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36DBF0DD154FD89700CC12CC /* spec.cpp */; };
 		36E4755914877FA4009FB135 /* ColumnTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E4755814877FA4009FB135 /* ColumnTable.cpp */; };
 		36E4755C14877FB9009FB135 /* ColumnTable.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36E4755B14877FB8009FB135 /* ColumnTable.hpp */; };
 		36E608681459976700CCC3E8 /* test-tightdb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E02214209CE600D56FD7 /* test-tightdb.cpp */; };
@@ -280,6 +282,7 @@
 		36DBF0CB15498B4100CC12CC /* table_ref.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = table_ref.hpp; sourceTree = "<group>"; };
 		36DBF0D7154AC77A00CC12CC /* group_writer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = group_writer.cpp; sourceTree = "<group>"; };
 		36DBF0DA154AC79600CC12CC /* group_writer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = group_writer.hpp; sourceTree = "<group>"; };
+		36DBF0DD154FD89700CC12CC /* spec.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = spec.cpp; sourceTree = "<group>"; };
 		36E4755814877FA4009FB135 /* ColumnTable.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ColumnTable.cpp; sourceTree = "<group>"; };
 		36E4755B14877FB8009FB135 /* ColumnTable.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = ColumnTable.hpp; sourceTree = "<group>"; };
 		36E608581458289F00CCC3E8 /* Column_tpl.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = Column_tpl.hpp; sourceTree = "<group>"; };
@@ -389,6 +392,7 @@
 				3647DEF814209C1200D56FD7 /* Index.cpp */,
 				3647DEF914209C1200D56FD7 /* Index.hpp */,
 				36DBF0C815498B4000CC12CC /* meta.hpp */,
+				36DBF0DD154FD89700CC12CC /* spec.cpp */,
 				36DBF0C915498B4000CC12CC /* spec.hpp */,
 				3647DEFA14209C1200D56FD7 /* Table.cpp */,
 				3647DEFB14209C1200D56FD7 /* Table.hpp */,
@@ -818,6 +822,7 @@
 				360BAE3014FBB9FE00A28045 /* utf8.cpp in Sources */,
 				360BAE3414FBBA2E00A28045 /* utilities.cpp in Sources */,
 				36DBF0D8154AC77A00CC12CC /* group_writer.cpp in Sources */,
+				36DBF0DE154FD89700CC12CC /* spec.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -868,6 +873,7 @@
 				36DB876B153F02250096CF75 /* utf8.cpp in Sources */,
 				36DB876C153F02250096CF75 /* utilities.cpp in Sources */,
 				36DBF0D9154AC77A00CC12CC /* group_writer.cpp in Sources */,
+				36DBF0DF154FD89700CC12CC /* spec.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
