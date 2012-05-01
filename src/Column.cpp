@@ -856,19 +856,8 @@ void ColumnBase::LeafToDot(std::ostream& out, const Array& array) const
 
 MemStats Column::Stats() const
 {
-    MemStats stats(m_array->Stats());
-
-    if (m_array->IsNode()) {
-        const Array refs = NodeGetRefs();
-
-        for (size_t i = 0; i < refs.Size(); ++i) {
-            const size_t r = (size_t)refs.Get(i);
-            const Column col(r);
-
-            const MemStats m = col.Stats();
-            stats.Add(m);
-        }
-    }
+    MemStats stats;
+    m_array->Stats(stats);
 
     return stats;
 }

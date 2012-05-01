@@ -191,7 +191,7 @@ public:
     void Print() const;
     void Verify() const;
     void ToDot(std::ostream& out, const char* title=NULL) const;
-    MemStats Stats() const;
+    void Stats(MemStats& stats) const;
 #endif //_DEBUG
     mutable unsigned char* m_data; // FIXME: Should be 'char' not 'unsigned char'
 

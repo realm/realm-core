@@ -382,18 +382,8 @@ void Group::Verify()
 MemStats Group::Stats()
 {
     MemStats stats;
-
-    for (size_t i = 0; i < m_tables.Size(); ++i) {
-        // Get table from cache if exists, else create
-        Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
-        if (!t) {
-            const size_t ref = m_tables.GetAsRef(i);
-            t = new Table(m_alloc, ref, this, i);
-            m_cachedtables.Set(i, intptr_t(t));
-        }
-        const MemStats m = t->Stats();
-        stats.Add(m);
-    }
+    m_top.Stats(stats);
+    
     return stats;
 }
 
