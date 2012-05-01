@@ -30,7 +30,7 @@ void ColumnMixed::UpdateFromParent()
     
     m_types->UpdateFromParent();
     m_refs->UpdateFromParent();
-    m_data->UpdateFromParent();
+    if (m_data) m_data->UpdateFromParent();
 }
 
 

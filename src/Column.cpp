@@ -392,6 +392,7 @@ void Column::SetParent(ArrayParent* parent, size_t pndx)
 void Column::UpdateParentNdx(int diff)
 {
     m_array->UpdateParentNdx(diff);
+    if (m_index) m_index->UpdateParentNdx(diff);
 }
 
 // Used by column b-tree code to ensure all leaf having same type

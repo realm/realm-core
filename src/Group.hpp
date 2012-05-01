@@ -9,7 +9,7 @@ namespace tightdb {
 class Group: private Table::Parent {
 public:
     Group();
-    Group(const char* filename);
+    Group(const char* filename, bool readOnly=true);
     Group(const char* buffer, size_t len);
     ~Group();
 
@@ -23,8 +23,10 @@ public:
     template<class T> T& GetTable(const char* name);
 
     // Serialization
-    void Write(const char* filepath);
+    bool Write(const char* filepath);
     char* WriteToMem(size_t& len);
+    
+    bool Commit();
 
     // Conversion
     template<class S> void to_json(S& out);
@@ -38,6 +40,13 @@ public:
 #endif //_DEBUG
 
 protected:
+    friend class GroupWriter;
+    
+    SlabAlloc& GetAllocator() {return m_alloc;}
+    size_t GetFreeSpace(size_t len, size_t& filesize, bool testOnly=false, bool ensureRest=false);
+    Array& GetTopArray() {return m_top;}
+    void ConnectFreeSpace(bool doConnect);
+    
     // Recursively update all internal refs after commit
     void UpdateRefs(size_t TopRef);
     
@@ -56,8 +65,8 @@ protected:
         return m_tables.GetAsRef(subtable_ndx);
     }
 
-private:
     void Create();
+    void CreateFromRef();
 
     Table& GetTable(size_t ndx);
 
@@ -68,6 +77,8 @@ private:
     Array m_top;
     Array m_tables;
     ArrayString m_tableNames;
+    Array m_freePositions;
+    Array m_freeLengths;
     Array m_cachedtables;
     bool m_isValid;
 };
@@ -84,7 +95,8 @@ template<class T> T& Group::GetTable(const char* name)
         T* const t = new T(m_alloc);
         t->m_top.SetParent(this, m_tables.Size());
 
-        m_tables.Add(t->m_top.GetRef());
+        const size_t ref = t->m_top.GetRef();
+        m_tables.Add(ref);
         m_tableNames.Add(name);
         m_cachedtables.Add(intptr_t(t));
 
@@ -101,18 +113,18 @@ size_t Group::Write(S& out)
 {
     // Space for ref to top array
     out.write("\0\0\0\0\0\0\0\0", 8);
-    size_t pos = 8;
 
     // Recursively write all arrays
     // FIXME: 'valgrind' says this writes uninitialized bytes to the file/stream
-    const uint64_t topPos = m_top.Write(out, pos);
+    const uint64_t topPos = m_top.Write(out);
+    const size_t byte_size = out.getpos();
 
     // top ref
-    out.seekp(0);
+    out.seek(0);
     out.write((const char*)&topPos, 8);
 
     // return bytes written
-    return pos;
+    return byte_size;
 }
 
 template<class S>

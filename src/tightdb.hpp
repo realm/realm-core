@@ -1,7 +1,7 @@
 #ifndef TIGHTDB_H
 #define TIGHTDB_H
 
-#include "basic_table.hpp"
+#include "table_basic.hpp"
 
 
 #define TDB_TABLE_1(Table, type1, name1) \

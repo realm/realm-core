@@ -16,7 +16,7 @@ public:
     SlabAlloc();
     ~SlabAlloc();
 
-    bool SetShared(const char* path);
+    bool SetShared(const char* path, bool readOnly=true);
     bool SetSharedBuffer(const char* buffer, size_t len);
 
     MemRef Alloc(size_t size);
@@ -27,6 +27,16 @@ public:
     bool IsReadOnly(size_t ref) const;
     size_t GetTopRef() const;
     size_t GetTotalSize() const;
+
+    bool CanPersist() const;
+    size_t GetFileLen() const {return m_baseline;}
+    void FreeAll(size_t filesize);
+
+#ifndef _MSC_VER
+    int GetFileDescriptor() {return m_fd;}
+#else
+    void* GetFileDescriptor() {return m_fd;}
+#endif
 
 #ifdef _DEBUG
     void EnableDebug(bool enable) {m_debugOut = enable;}
@@ -45,22 +55,22 @@ private:
                 Int, size)
 
     // Member variables
-    char* m_shared;
-    bool m_owned;
-    size_t m_baseline;
-    Slabs m_slabs;
+    char*     m_shared;
+    bool      m_owned;
+    size_t    m_baseline;
+    Slabs     m_slabs;
     FreeSpace m_freeSpace;
 
 #ifndef _MSC_VER
-    int m_fd;
+    int       m_fd;
 #else
     //TODO: Something in a tightdb header won't let us include windows.h, so we can't use HANDLE
-    void *m_mapfile;
-    void *m_fd;
+    void*     m_mapfile;
+    void*     m_fd;
 #endif
 
 #ifdef _DEBUG
-    bool m_debugOut;
+    bool      m_debugOut;
 #endif //_DEBUG
 };
 
