@@ -43,7 +43,7 @@ protected:
     friend class GroupWriter;
     
     SlabAlloc& GetAllocator() {return m_alloc;}
-    size_t GetFreeSpace(size_t len, size_t& filesize, bool testOnly=false, bool ensureRest=false);
+    size_t get_free_space(size_t len, size_t& filesize, bool testOnly=false, bool ensureRest=false);
     Array& GetTopArray() {return m_top;}
     void ConnectFreeSpace(bool doConnect);
     

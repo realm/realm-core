@@ -367,7 +367,8 @@ void SlabAlloc::FreeAll(size_t filesize)
 {
     assert(filesize >= m_baseline);
     assert((filesize & 0x7) == 0); // 64bit alignment
-    
+  
+#if !defined(_MSC_VER) // write persistence
     // If the file size have changed, we need to remap the readonly buffer
     if (filesize != m_baseline) {
         //void* const p = mremap(m_shared, m_baseline, filesize); // linux only
@@ -378,7 +379,8 @@ void SlabAlloc::FreeAll(size_t filesize)
         m_shared   = (char*)p;
         m_baseline = filesize;
     }
-    
+#endif
+
     // Free all scratch space (done after all data has
     // been commited to persistent space)
     m_freeSpace.Clear();
