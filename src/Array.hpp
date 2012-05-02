@@ -6,7 +6,6 @@
 #else
 #include <stdint.h> // unint8_t etc
 #endif
-//#include <climits> // size_t
 #include <cstdlib> // size_t
 #include <cstring> // memmove
 #include "alloc.hpp"
@@ -86,14 +85,13 @@ class ArrayParent
 public:
     virtual ~ArrayParent() {}
 
+    // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
+    virtual void update_child_ref(size_t subtable_ndx, size_t new_ref) = 0;
+
 protected:
     friend class Array;
-public: // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
-    virtual void update_child_ref(size_t subtable_ndx, size_t new_ref) = 0;
-protected:
-#ifdef _DEBUG
-    virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const = 0;
-#endif
+
+    virtual size_t get_child_ref(size_t subtable_ndx) const = 0;
 };
 
 
@@ -108,12 +106,15 @@ public:
     bool operator==(const Array& a) const;
 
     void SetType(ColumnDef type);
+    void UpdateRef(size_t ref);
+
+    // Parent tracking
     bool HasParent() const {return m_parent != NULL;}
     void SetParent(ArrayParent *parent, size_t pndx);
     void UpdateParentNdx(int diff) {m_parentNdx += diff;}
     ArrayParent *GetParent() const {return m_parent;}
     size_t GetParentNdx() const {return m_parentNdx;}
-    void UpdateRef(size_t ref);
+    bool UpdateFromParent();
 
     bool IsValid() const {return m_data != NULL;}
     void Invalidate() const {m_data = NULL;}
@@ -178,8 +179,11 @@ public:
     Allocator& GetAllocator() const {return m_alloc;}
 
     // Serialization
-    template<class S> size_t Write(S& target, size_t& pos, bool recurse=true) const;
+    template<class S> size_t Write(S& target, bool recurse=true, bool persist=false) const;
+    template<class S> void WriteAt(size_t pos, S& out) const;
+    size_t GetByteSize() const {return CalcByteLen(m_len, m_width);}
     std::vector<int64_t> ToVector(void);
+
     // Debug
     size_t GetBitWidth() const {return m_width;}
 #ifdef _DEBUG
@@ -187,9 +191,9 @@ public:
     void Print() const;
     void Verify() const;
     void ToDot(std::ostream& out, const char* title=NULL) const;
-    MemStats Stats() const;
+    void Stats(MemStats& stats) const;
 #endif //_DEBUG
-    mutable unsigned char* m_data;
+    mutable unsigned char* m_data; // FIXME: Should be 'char' not 'unsigned char'
 
 private:
     template <size_t w>bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max);
@@ -286,16 +290,14 @@ protected:
 
     // Overriding methods in ArrayParent
     virtual void update_child_ref(size_t subtable_ndx, size_t new_ref);
-#ifdef _DEBUG
-    virtual size_t get_child_ref_for_verify(size_t subtable_ndx) const;
-#endif
+    virtual size_t get_child_ref(size_t subtable_ndx) const;
 };
 
 
 
 // Templates
 
-template<class S> size_t Array::Write(S& out, size_t& pos, bool recurse) const
+template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 {
     // parse header
     size_t len          = get_header_len();
@@ -322,16 +324,20 @@ template<class S> size_t Array::Write(S& out, size_t& pos, bool recurse) const
                 // zero-refs and refs that are not 64-aligned do not point to sub-trees
                 newRefs.Add(ref);
             }
+            else if (persist && m_alloc.IsReadOnly(ref)) {
+                // Ignore un-changed arrays when persisting
+                newRefs.Add(ref);
+            }
             else {
                 const Array sub(ref, NULL, 0, GetAllocator());
-                const size_t sub_pos = sub.Write(out, pos);
+                const size_t sub_pos = sub.Write(out, true, persist);
                 newRefs.Add(sub_pos);
             }
         }
 
         // Write out the replacement array
         // (but don't write sub-tree as it has alredy been written)
-        const size_t refs_pos = newRefs.Write(out, pos, false);
+        const size_t refs_pos = newRefs.Write(out, false, persist);
 
         // Clean-up
         newRefs.SetType(COLUMN_NORMAL); // avoid recursive del
@@ -340,8 +346,6 @@ template<class S> size_t Array::Write(S& out, size_t& pos, bool recurse) const
         return refs_pos; // Return position
     }
     else {
-        const size_t array_pos = pos;
-
         // TODO: replace capacity with checksum
 
         // Calculate complete size
@@ -350,13 +354,38 @@ template<class S> size_t Array::Write(S& out, size_t& pos, bool recurse) const
         if (rest < 8) len += rest; // Add padding for 64bit alignment
 
         // Write array
-        out.write((const char*)m_data-8, len);
-        pos += len;
+        const size_t array_pos = out.write((const char*)m_data-8, len);
 
         return array_pos; // Return position of this array
     }
 }
 
+template<class S> void Array::WriteAt(size_t pos, S& out) const
+{
+    // parse header
+    size_t len          = get_header_len();
+    const WidthType wt  = get_header_wtype();
+    
+    // Adjust length to number of bytes
+    if (wt == TDB_BITS) {
+        const size_t bits = (len * m_width);
+        len = bits / 8;
+        if (bits & 0x7) ++len; // include partial bytes
+    }
+    else if (wt == TDB_MULTIPLY) {
+        len *= m_width;
+    }
+    
+    // TODO: replace capacity with checksum
+    
+    // Calculate complete size
+    len += 8; // include header in total
+    const size_t rest = (~len & 0x7)+1; // CHECK
+    if (rest < 8) len += rest; // Add padding for 64bit alignment
+    
+    // Write array
+    out.WriteAt(pos, (const char*)m_data-8, len);
+}
 
 inline void Array::update_ref_in_parent(size_t ref)
 {
@@ -370,12 +399,10 @@ inline void Array::update_child_ref(size_t subtable_ndx, size_t new_ref)
     Set(subtable_ndx, new_ref);
 }
 
-#ifdef _DEBUG
-inline size_t Array::get_child_ref_for_verify(size_t subtable_ndx) const
+inline size_t Array::get_child_ref(size_t subtable_ndx) const
 {
     return GetAsRef(subtable_ndx);
 }
-#endif // _DEBUG
 
 }
 

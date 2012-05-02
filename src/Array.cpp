@@ -62,13 +62,13 @@ Array::~Array() {}
 void Array::set_header_isnode(bool value, void* header)
 {
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[0] = (header2[0] & (~0x80)) | ((uint8_t)value << 7);
+    header2[0] = (header2[0] & (~0x80)) | (uint8_t)(value << 7);
 }
 
 void Array::set_header_hasrefs(bool value, void* header)
 {
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[0] = (header2[0] & (~0x40)) | ((uint8_t)value << 6);
+    header2[0] = (header2[0] & (~0x40)) | (uint8_t)(value << 6);
 }
 
 void Array::set_header_wtype(WidthType value, void* header)
@@ -78,7 +78,7 @@ void Array::set_header_wtype(WidthType value, void* header)
     // 1: multiply  width * length
     // 2: ignore    1 * length
     uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[0] = (header2[0] & (~0x18)) | ((uint8_t)value << 3);
+    header2[0] = (header2[0] & (~0x18)) | (uint8_t)(value << 3);
 }
 
 void Array::set_header_width(size_t value, void* header)
@@ -197,6 +197,21 @@ void Array::UpdateRef(size_t ref)
 {
     Create(ref);
     update_ref_in_parent(ref);
+}
+
+bool Array::UpdateFromParent() {
+    if (!m_parent) return false;
+
+    // After commit to disk, the array may have moved
+    // so get ref from parent and see if it has changed
+    const size_t new_ref = m_parent->get_child_ref(m_parentNdx);
+
+    if (new_ref != m_ref) {
+        Create(new_ref);
+        return true;
+    }
+
+    return false; // not modified
 }
 
 /**
@@ -1412,25 +1427,25 @@ void Array::Set_1b(size_t ndx, int64_t value)
     ndx &= 7;
 
     uint8_t* p = &m_data[offset];
-    *p = (*p &~ (1 << ndx)) | (((uint8_t)value & 1) << ndx);
+    *p = (*p &~ (1 << ndx)) | (uint8_t)((value & 1) << ndx);
 }
 
 void Array::Set_2b(size_t ndx, int64_t value)
 {
     const size_t offset = ndx >> 2;
-    const uint8_t n = (ndx & 3) << 1;
+    const uint8_t n = (uint8_t)((ndx & 3) << 1);
 
     uint8_t* p = &m_data[offset];
-    *p = (*p &~ (0x03 << n)) | (((uint8_t)value & 0x03) << n);
+    *p = (*p &~ (0x03 << n)) | (uint8_t)((value & 0x03) << n);
 }
 
 void Array::Set_4b(size_t ndx, int64_t value)
 {
     const size_t offset = ndx >> 1;
-    const uint8_t n = (ndx & 1) << 2;
+    const uint8_t n = (uint8_t)((ndx & 1) << 2);
 
     uint8_t* p = &m_data[offset];
-    *p = (*p &~ (0x0F << n)) | (((uint8_t)value & 0x0F) << n);
+    *p = (*p &~ (0x0F << n)) | (uint8_t)((value & 0x0F) << n);
 }
 
 void Array::Set_8b(size_t ndx, int64_t value)
@@ -1768,7 +1783,7 @@ void Array::Verify() const
     // Check that parent is set correctly
     if (!m_parent) return;
 
-    const size_t ref_in_parent = m_parent->get_child_ref_for_verify(m_parentNdx);
+    const size_t ref_in_parent = m_parent->get_child_ref(m_parentNdx);
     assert(ref_in_parent == m_ref);
 }
 
@@ -1821,9 +1836,22 @@ void Array::ToDot(std::ostream& out, const char* title) const
     out << std::endl;
 }
 
-MemStats Array::Stats() const
+void Array::Stats(MemStats& stats) const
 {
-    return MemStats(m_capacity, CalcByteLen(m_len, m_width), 1);
+    const MemStats m(m_capacity, CalcByteLen(m_len, m_width), 1);
+    stats.Add(m);
+    
+    // Add stats for all sub-arrays
+    if (m_hasRefs) {
+        for (size_t i = 0; i < m_len; ++i) {
+            const size_t ref = GetAsRef(i);
+            if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+            
+            const Array sub(ref, NULL, 0, GetAllocator());
+            sub.Stats(stats);
+        }
+    }
+    
 }
 
 #endif //_DEBUG
@@ -1966,7 +1994,7 @@ namespace tightdb {
 int64_t Array::ColumnGet(size_t ndx) const
 {
     const char* data   = (const char*)m_data;
-    const uint8_t* header = (const uint8_t*)data - 8;
+    const uint8_t* header;
     size_t width = m_width;
     bool isNode = m_isNode;
 

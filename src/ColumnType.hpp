@@ -14,11 +14,17 @@ enum ColumnType {
     COLUMN_TYPE_MIXED,
 
     // Double refs
-    COLUMN_TYPE_STRING_ENUM
+    COLUMN_TYPE_STRING_ENUM,
+
+    // Attributes
+    COLUMN_ATTR_INDEXED,
+    COLUMN_ATTR_UNIQUE,
+    COLUMN_ATTR_SORTED,
+    COLUMN_ATTR_NONE
 };
 
 struct BinaryData {
-    const void* pointer;
+    const char* pointer;
     size_t len;
 };
 

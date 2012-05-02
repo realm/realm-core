@@ -24,6 +24,16 @@ void ColumnMixed::SetParent(ArrayParent *parent, size_t pndx)
     m_array->SetParent(parent, pndx);
 }
 
+void ColumnMixed::UpdateFromParent()
+{
+    if (!m_array->UpdateFromParent()) return;
+    
+    m_types->UpdateFromParent();
+    m_refs->UpdateFromParent();
+    if (m_data) m_data->UpdateFromParent();
+}
+
+
 void ColumnMixed::Create(Allocator &alloc, Table const *tab)
 {
     m_array = new Array(COLUMN_HASREFS, NULL, 0, alloc);
@@ -405,7 +415,7 @@ void ColumnMixed::verify() const
     for (size_t i = 0; i < count; ++i) {
         const size_t tref = m_refs->GetAsRef(i);
         if (tref == 0 || tref & 0x1) continue;
-        TableConstRef subtable = m_refs->get_subtable(i);
+        ConstTableRef subtable = m_refs->get_subtable(i);
         subtable->verify();
     }
 }
@@ -426,7 +436,7 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const
     for (size_t i = 0; i < count; ++i) {
         const ColumnType type = (ColumnType)m_types->Get(i);
         if (type != COLUMN_TYPE_TABLE) continue;
-        TableConstRef subtable = m_refs->get_subtable(i);
+        ConstTableRef subtable = m_refs->get_subtable(i);
         subtable->ToDot(out);
     }
 

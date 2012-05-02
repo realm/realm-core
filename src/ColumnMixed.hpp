@@ -41,6 +41,7 @@ public:
     void Destroy();
 
     void SetParent(ArrayParent* parent, size_t pndx);
+    void UpdateFromParent();
 
     ColumnType GetType(size_t ndx) const;
     size_t Size() const {return m_types->Size();}

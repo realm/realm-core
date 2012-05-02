@@ -11,6 +11,9 @@ namespace tightdb {
  */
 class ColumnSubtableParent: public Column, public Table::Parent
 {
+public:
+    void UpdateFromParent();
+    
 protected:
     ColumnSubtableParent(ArrayParent* parent_array, std::size_t parent_ndx,
                          Allocator& alloc, const Table* tab);
@@ -19,26 +22,24 @@ protected:
                          Allocator& alloc, const Table* tab);
 
     /**
-     * Get the subtable at the specified row index which is assumed to
-     * have the specified type.
+     * Get the subtable at the specified index.
      *
      * This method must be used only for subtables with shared schema,
      * i.e. for elements of ColumnTable.
      *
      * The returned table pointer must always end up being wrapped in
-     * an instance of BasicTableRef.
+     * a TableRef.
      */
     Table* get_subtable_ptr(std::size_t subtable_ndx, std::size_t schema_ref) const;
 
     /**
-     * Get the subtable at the specified row index which is assumed to
-     * have the specified type.
+     * Get the subtable at the specified index.
      *
      * This method must be used only for subtables with independent
      * schemas, i.e. for elements of ColumnMixed.
      *
      * The returned table pointer must always end up being wrapped in
-     * an instance of BasicTableRef.
+     * a TableRef.
      */
     Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
@@ -60,16 +61,12 @@ protected:
         return TableRef(get_subtable_ptr(subtable_ndx));
     }
 
-    // Overriding method in ArrayParent.
+    // Overriding methods in ArrayParent.
     virtual void update_child_ref(std::size_t subtable_ndx, std::size_t new_ref);
+    virtual std::size_t get_child_ref(std::size_t subtable_ndx) const;
 
     // Overriding method in Table::Parent
     virtual void child_destroyed(std::size_t subtable_ndx);
-
-#ifdef _DEBUG
-    // Overriding method in ArrayParent.
-    virtual std::size_t get_child_ref_for_verify(std::size_t subtable_ndx) const;
-#endif
 
 private:
     struct SubtableMap {
@@ -79,6 +76,7 @@ private:
         Table* find(std::size_t subtable_ndx) const;
         void insert(std::size_t subtable_ndx, Table* wrapper);
         void remove(std::size_t subtable_ndx);
+        void update_from_parents();
     private:
         Array m_indices;
         Array m_wrappers;
@@ -99,7 +97,7 @@ public:
      * \param tab If this column is used as part of a table you must
      * pass a pointer to that table. Otherwise you may pass null.
      */
-    ColumnTable(size_t ref_specSet, ArrayParent* parent, size_t pndx,
+    ColumnTable(std::size_t schema_ref, ArrayParent* parent, std::size_t idx_in_parent,
                 Allocator& alloc, const Table* tab);
 
     /**
@@ -109,7 +107,8 @@ public:
      * \param tab If this column is used as part of a table you must
      * pass a pointer to that table. Otherwise you may pass null.
      */
-    ColumnTable(size_t ref_column, size_t ref_specSet, ArrayParent* parent, size_t pndx,
+    ColumnTable(std::size_t columns_ref, std::size_t schema_ref,
+                ArrayParent* parent, std::size_t idx_in_parent,
                 Allocator& alloc, const Table* tab);
 
     size_t GetTableSize(size_t ndx) const;
@@ -144,6 +143,12 @@ protected:
 
 
 // Implementation
+    
+inline void ColumnSubtableParent::UpdateFromParent()
+{
+    if (!m_array->UpdateFromParent()) return;
+    m_subtable_map.update_from_parents();
+}
 
 inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) const
 {
@@ -214,6 +219,17 @@ inline void ColumnSubtableParent::SubtableMap::remove(size_t subtable_ndx)
     m_indices.Delete(pos);
     m_wrappers.Delete(pos);
 }
+    
+inline void ColumnSubtableParent::SubtableMap::update_from_parents()
+{
+    if (!m_indices.IsValid()) return;
+    
+    const size_t count = m_wrappers.Size();
+    for (size_t i = 0; i < count; ++i) {
+        Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));
+        t->UpdateFromParent();
+    }
+}
 
 inline ColumnSubtableParent::ColumnSubtableParent(ArrayParent* parent_array, size_t parent_ndx,
                                                   Allocator& alloc, const Table* tab):
@@ -230,12 +246,10 @@ inline void ColumnSubtableParent::update_child_ref(size_t subtable_ndx, size_t n
     Set(subtable_ndx, new_ref);
 }
 
-#ifdef _DEBUG
-inline size_t ColumnSubtableParent::get_child_ref_for_verify(size_t subtable_ndx) const
+inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const
 {
     return Get(subtable_ndx);
 }
-#endif
 
 }
 

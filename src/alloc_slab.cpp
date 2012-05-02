@@ -6,6 +6,7 @@
 #include <conio.h>
 #include <stdio.h>
 #else
+#include <unistd.h> // close()
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -14,7 +15,7 @@
 
 #include <cassert>
 #include <iostream>
-#include "AllocSlab.hpp"
+#include "alloc_slab.hpp"
 #include "Array.hpp"
 
 #ifdef _DEBUG
@@ -121,11 +122,11 @@ MemRef SlabAlloc::Alloc(size_t size)
     const size_t multible = 256 * ((size / 256) + 1);
     const size_t slabsBack = m_slabs.IsEmpty() ? m_baseline : m_slabs.Back().offset;
     const size_t doubleLast = m_slabs.IsEmpty() ? 0 :
-                                                  (slabsBack - ((m_slabs.GetSize() == 1) ? (size_t)0 : m_slabs[-2].offset)) * 2;
+        (slabsBack - ((m_slabs.GetSize() == 1) ? size_t(0) : m_slabs.Back(-2).offset)) * 2;
     const size_t newsize = multible > doubleLast ? multible : doubleLast;
 
     // Allocate memory
-    void* slab = malloc(newsize);
+    void* slab = newsize ? malloc(newsize): NULL;
     if (!slab) return MemRef(NULL, 0);
 
     // Add to slab table
@@ -164,10 +165,10 @@ void SlabAlloc::Free(size_t ref, void* p)
 #endif //_DEBUG
 
     // Check if we can merge with start of free block
-    size_t n = m_freeSpace.ref.Find(refEnd);
+    const size_t n = m_freeSpace.cols().ref.Find(refEnd);
     if (n != (size_t)-1) {
         // No consolidation over slab borders
-        if (m_slabs.offset.Find(refEnd) == (size_t)-1) {
+        if (m_slabs.cols().offset.Find(refEnd) == (size_t)-1) {
             m_freeSpace[n].ref = ref;
             m_freeSpace[n].size += size;
             isMerged = true;
@@ -175,7 +176,7 @@ void SlabAlloc::Free(size_t ref, void* p)
     }
 
     // Check if we can merge with end of free block
-    if (m_slabs.offset.Find(ref) == (size_t)-1) { // avoid slab borders
+    if (m_slabs.cols().offset.Find(ref) == (size_t)-1) { // avoid slab borders
         const size_t count = m_freeSpace.GetSize();
         for (size_t i = 0; i < count; ++i) {
             FreeSpace::Cursor c = m_freeSpace[i];
@@ -233,8 +234,8 @@ void* SlabAlloc::Translate(size_t ref) const
 {
     if (ref < m_baseline) return m_shared + ref;
     else {
-        const size_t ndx = m_slabs.offset.FindPos(ref);
-        assert(ndx != (size_t)-1);
+        const size_t ndx = m_slabs.cols().offset.FindPos(ref);
+        assert(ndx != size_t(-1));
 
         const size_t offset = ndx ? m_slabs[ndx-1].offset : m_baseline;
         return (char*)(intptr_t)m_slabs[ndx].pointer + (ref - offset);
@@ -256,6 +257,7 @@ bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len)
     // There is a unit test that calls this function with an invalid buffer
     // so we can't size_t-test range with TO_REF until now
     ref = TO_REF(*(uint64_t*)buffer);
+    (void)ref; // the above macro contains an assert, this avoids warning for unused var
 
     m_shared = (char*)buffer;
     m_baseline = len;
@@ -263,9 +265,10 @@ bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len)
     return true;
 }
 
-bool SlabAlloc::SetShared(const char* path)
+bool SlabAlloc::SetShared(const char* path, bool readOnly)
 {
 #ifdef _MSC_VER
+    assert(readOnly); // write persistence is not implemented for windows yet
     // Open file
     m_fd = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, NULL, NULL);
 
@@ -289,7 +292,7 @@ bool SlabAlloc::SetShared(const char* path)
     m_mapfile = hMapFile;
 #else
     // Open file
-    m_fd = open(path, O_RDONLY);
+    m_fd = open(path, readOnly ? O_RDONLY : O_RDWR|O_CREAT);
     if (m_fd < 0) return false;
 
     // Get size
@@ -298,12 +301,29 @@ bool SlabAlloc::SetShared(const char* path)
         close(m_fd);
         return false;
     }
+    size_t len = statbuf.st_size;
+
+    if (readOnly && len == 0) {
+        // You have opened an non-existing or empty file
+        close(m_fd);
+        return false;
+    }
+
+    // Handle empty files (new database)
+    if (len == 0) {
+        if (readOnly) return false;
+        write(m_fd, "\0\0\0\0\0\0\0\0", 8); // write top-ref
+
+        // pre-alloc initial space when mmapping
+        len = 1024*1024;
+        ftruncate(m_fd, len);
+	}
 
     // Verify that data is 64bit aligned
-    if ((statbuf.st_size & 0x7) != 0) return false;
+    if ((len & 0x7) != 0) return false;
 
     // Map to memory (read only)
-    void* p = mmap(0, statbuf.st_size, PROT_READ, MAP_SHARED, m_fd, 0);
+    void* const p = mmap(0, len, PROT_READ, MAP_SHARED, m_fd, 0);
     if (p == (void*)-1) {
         close(m_fd);
         return false;
@@ -312,10 +332,15 @@ bool SlabAlloc::SetShared(const char* path)
     //TODO: Verify the data structures
 
     m_shared = (char*)p;
-    m_baseline = statbuf.st_size;
+    m_baseline = len;
 #endif
 
     return true;
+}
+
+bool SlabAlloc::CanPersist() const
+{
+    return m_shared != NULL;
 }
 
 size_t SlabAlloc::GetTopRef() const
@@ -338,6 +363,39 @@ size_t SlabAlloc::GetTotalSize() const
     }
 }
 
+void SlabAlloc::FreeAll(size_t filesize)
+{
+    assert(filesize >= m_baseline);
+    assert((filesize & 0x7) == 0); // 64bit alignment
+    
+    // If the file size have changed, we need to remap the readonly buffer
+    if (filesize != m_baseline) {
+        //void* const p = mremap(m_shared, m_baseline, filesize); // linux only
+        munmap(m_shared, m_baseline);
+        void* const p = mmap(0, filesize, PROT_READ, MAP_SHARED, m_fd, 0);
+        assert(p);
+        
+        m_shared   = (char*)p;
+        m_baseline = filesize;
+    }
+    
+    // Free all scratch space (done after all data has
+    // been commited to persistent space)
+    m_freeSpace.Clear();
+
+    // Rebuild free list to include all slabs
+    size_t ref = m_baseline;
+    const size_t count = m_slabs.GetSize();
+    for (size_t i = 0; i < count; ++i) {
+        const Slabs::Cursor c = m_slabs[i];
+        const size_t size = c.offset - ref;
+
+        m_freeSpace.Add(ref, size);
+
+        ref = c.offset;
+    }
+}
+
 #ifdef _DEBUG
 
 bool SlabAlloc::IsAllFree() const
@@ -347,10 +405,10 @@ bool SlabAlloc::IsAllFree() const
     // Verify that free space matches slabs
     size_t ref = m_baseline;
     for (size_t i = 0; i < m_slabs.GetSize(); ++i) {
-        const Slabs::Cursor c = m_slabs[i];
+        Slabs::ConstCursor c = m_slabs[i];
         const size_t size = TO_REF(c.offset) - ref;
 
-        const size_t r = m_freeSpace.ref.Find(ref);
+        const size_t r = m_freeSpace.cols().ref.Find(ref);
         if (r == (size_t)-1) return false;
         if (size != (size_t)m_freeSpace[r].size) return false;
 
@@ -362,11 +420,12 @@ bool SlabAlloc::IsAllFree() const
 void SlabAlloc::Verify() const
 {
     // Make sure that all free blocks fit within a slab
-    for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
-        const FreeSpace::Cursor c = m_freeSpace[i];
+    const size_t count = m_freeSpace.GetSize();
+    for (size_t i = 0; i < count; ++i) {
+        FreeSpace::ConstCursor c = m_freeSpace[i];
         const size_t ref = TO_REF(c.ref);
 
-        const size_t ndx = m_slabs.offset.FindPos(ref);
+        const size_t ndx = m_slabs.cols().offset.FindPos(ref);
         assert(ndx != size_t(-1));
 
         const size_t slab_end = TO_REF(m_slabs[ndx].offset);
@@ -378,7 +437,7 @@ void SlabAlloc::Verify() const
 
 void SlabAlloc::Print() const
 {
-    const size_t allocated = m_slabs.IsEmpty() ? 0 : m_slabs[m_slabs.GetSize()-1].offset;
+    const size_t allocated = m_slabs.IsEmpty() ? 0 : (size_t)m_slabs[m_slabs.GetSize()-1].offset;
 
     size_t free = 0;
     for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {

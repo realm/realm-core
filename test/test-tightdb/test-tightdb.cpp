@@ -64,7 +64,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.fourth.Find(Tue);
+            const size_t res = table.cols().fourth.Find(Tue);
             if (res != size_t(-1)) {
                 printf("error");
             }
@@ -80,7 +80,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.third.Find(50);
+            const size_t res = table.cols().third.Find(50);
             if (res != size_t(-1)) {
                 printf("error");
             }
@@ -96,7 +96,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.second.Find("abcde");
+            const size_t res = table.cols().second.Find("abcde");
             if (res != 250000) {
                 printf("error");
             }
@@ -124,7 +124,7 @@ int main()
 
         for (size_t i = 0; i < 100000; ++i) {
             const size_t n = rand() % 1000;
-            const size_t res = table.first.Find(n);
+            const size_t res = table.cols().first.Find(n);
             if (res == 2500002) { // to avoid above find being optimized away
                 printf("error");
             }

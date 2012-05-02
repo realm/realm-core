@@ -15,12 +15,12 @@ public:
     bool IsEmpty() const;
     size_t Size() const;
 
-    const void* Get(size_t ndx) const;
+    const char* Get(size_t ndx) const;
     size_t GetLen(size_t ndx) const;
 
-    void Add(const void* value, size_t len);
-    void Set(size_t ndx, const void* value, size_t len);
-    void Insert(size_t ndx, const void* value, size_t len);
+    void Add(const char* value, size_t len);
+    void Set(size_t ndx, const char* value, size_t len);
+    void Insert(size_t ndx, const char* value, size_t len);
     void Delete(size_t ndx);
     void Resize(size_t ndx);
     void Clear();

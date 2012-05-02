@@ -61,7 +61,7 @@ void ArrayStringLong::Add(const char* value, size_t len)
     assert(value);
 
     len += 1; // include trailing null byte
-    m_blob.Add((void*)value, len);
+    m_blob.Add(value, len);
     m_offsets.Add(m_offsets.IsEmpty() ? len : m_offsets.Back() + len);
 }
 
@@ -81,7 +81,7 @@ void ArrayStringLong::Set(size_t ndx, const char* value, size_t len)
     len += 1; // include trailing null byte
     const ssize_t diff =  (start + len) - current_end;
 
-    m_blob.Replace(start, current_end, (void*)value, len);
+    m_blob.Replace(start, current_end, value, len);
     m_offsets.Adjust(ndx, diff);
 }
 
@@ -98,7 +98,7 @@ void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len)
     const size_t pos = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
     len += 1; // include trailing null byte
 
-    m_blob.Insert(pos, (void*)value, len);
+    m_blob.Insert(pos, value, len);
     m_offsets.Insert(ndx, pos + len);
     m_offsets.Adjust(ndx+1, len);
 }

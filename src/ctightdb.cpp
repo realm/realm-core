@@ -20,7 +20,7 @@ void table_delete(Table* t)
 
 size_t table_register_column(Table* t, ColumnType type, const char* name)
 {
-    return t->RegisterColumn(type, name);
+    return t->register_column(type, name);
 }
 
 size_t table_get_column_count(const Table* t)

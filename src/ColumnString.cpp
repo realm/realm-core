@@ -381,37 +381,6 @@ bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const
     return true;
 }
 
-MemStats AdaptiveStringColumn::Stats() const
-{
-    MemStats stats;
-
-    if (m_array->IsNode()) {
-        const Array refs = NodeGetRefs();
-
-        for (size_t i = 0; i < refs.Size(); ++i) {
-            const size_t r = (size_t)refs.Get(i);
-            const AdaptiveStringColumn col(r);
-
-            const MemStats m = col.Stats();
-            stats.Add(m);
-        }
-
-        // Add node itself
-        const MemStats m = m_array->Stats();
-        stats.Add(m);
-    }
-    else if (IsLongStrings()) {
-        const MemStats m = ((ArrayStringLong*)m_array)->Stats();
-        stats.Add(m);
-    }
-    else {
-        const MemStats m = ((ArrayString*)m_array)->Stats();
-        stats.Add(m);
-    }
-
-    return stats;
-}
-
 void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) const
 {
     const bool isLongStrings = array.HasRefs(); // HasRefs indicates long string array

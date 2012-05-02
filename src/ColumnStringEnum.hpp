@@ -29,11 +29,11 @@ public:
     void FindAll(Array& res, size_t key_index, size_t start=0, size_t end=-1) const;
 
     void UpdateParentNdx(int diff);
+    void  UpdateFromParent();
 
 #ifdef _DEBUG
     bool Compare(const ColumnStringEnum& c) const;
     void verify() const;
-    MemStats Stats() const;
     void ToDot(std::ostream& out, const char* title) const;
 #endif // _DEBUG
 

@@ -58,13 +58,13 @@ TEST(TestQuerySubtable)
     Table& table = group.GetTable("test");
 
     // Create specification with sub-table
-    Spec s = table.GetSpec();
+    Spec& s = table.GetSpec();
     s.AddColumn(COLUMN_TYPE_INT,    "first");
     s.AddColumn(COLUMN_TYPE_STRING, "second");
     Spec sub = s.AddColumnTable(    "third");
         sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
         sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
-    table.UpdateFromSpec(s.GetRef());
+    table.UpdateFromSpec();
 
     CHECK_EQUAL(3, table.GetColumnCount());
 
@@ -266,7 +266,7 @@ TEST(TestQuerySort_Descending)
 TEST(TestQuerySort_Dates)
 {
     Table table;
-    table.RegisterColumn(COLUMN_TYPE_DATE, "first");
+    table.register_column(COLUMN_TYPE_DATE, "first");
 
     table.InsertDate(0, 0, 1000);
     table.InsertDone();
@@ -295,7 +295,7 @@ TEST(TestQuerySort_Dates)
 TEST(TestQuerySort_Bools)
 {
     Table table;
-    table.RegisterColumn(COLUMN_TYPE_BOOL, "first");
+    table.register_column(COLUMN_TYPE_BOOL, "first");
 
     table.InsertBool(0, 0, true);
     table.InsertDone();
@@ -519,7 +519,7 @@ TEST(TestQueryFindAll_Parans1)
     ttt.Add(11, "X");
 
     // first > 3 && (second == X)
-    Query q1 = ttt.GetQuery().first.Greater(3).LeftParan().second.Equal("X").RightParan();
+    Query q1 = ttt.GetQuery().first.Greater(3).Group().second.Equal("X").EndGroup();
     TableView tv1 = q1.FindAll(ttt);
     CHECK_EQUAL(1, tv1.GetSize());
     CHECK_EQUAL(6, tv1.GetRef(0));
@@ -540,7 +540,7 @@ TEST(TestQueryFindAll_OrParan)
     ttt.Add(2, "X");
 
     // (first == 5 || second == X && first > 2)
-    Query q1 = ttt.GetQuery().LeftParan().first.Equal(5).Or().second.Equal("X").first.Greater(2).RightParan();
+    Query q1 = ttt.GetQuery().Group().first.Equal(5).Or().second.Equal("X").first.Greater(2).EndGroup();
     TableView tv1 = q1.FindAll(ttt);
     CHECK_EQUAL(3, tv1.GetSize());
     CHECK_EQUAL(2, tv1.GetRef(0));
@@ -563,7 +563,7 @@ TEST(TestQueryFindAll_OrNested0)
     ttt.Add(8, "Y");
 
     // first > 3 && (first == 5 || second == X)
-    Query q1 = ttt.GetQuery().first.Greater(3).LeftParan().first.Equal(5).Or().second.Equal("X").RightParan();
+    Query q1 = ttt.GetQuery().first.Greater(3).Group().first.Equal(5).Or().second.Equal("X").EndGroup();
     TableView tv1 = q1.FindAll(ttt);
     CHECK_EQUAL(2, tv1.GetSize());
     CHECK_EQUAL(5, tv1.GetRef(0));
@@ -584,7 +584,7 @@ TEST(TestQueryFindAll_OrNested)
     ttt.Add(8, "Y");
 
     // first > 3 && (first == 5 || (second == X || second == Y))
-    Query q1 = ttt.GetQuery().first.Greater(3).LeftParan().first.Equal(5).Or().LeftParan().second.Equal("X").Or().second.Equal("Y").RightParan().RightParan();
+    Query q1 = ttt.GetQuery().first.Greater(3).Group().first.Equal(5).Or().Group().second.Equal("X").Or().second.Equal("Y").EndGroup().EndGroup();
     TableView tv1 = q1.FindAll(ttt);
     CHECK_EQUAL(5, tv1.GetRef(0));
     CHECK_EQUAL(6, tv1.GetRef(1));
@@ -600,7 +600,7 @@ TEST(TestQueryFindAll_OrPHP)
     ttt.Add(3, "Jim");
 
     // (second == Jim || second == Joe) && first = 1
-    Query q1 = ttt.GetQuery().LeftParan().second.Equal("Jim").Or().second.Equal("Joe").RightParan().first.Equal(1);
+    Query q1 = ttt.GetQuery().Group().second.Equal("Jim").Or().second.Equal("Joe").EndGroup().first.Equal(1);
     TableView tv1 = q1.FindAll(ttt);
     CHECK_EQUAL(0, tv1.GetRef(0));
 }
@@ -620,7 +620,7 @@ TEST(TestQueryFindAll_Parans2)
     ttt.Add(11, "X");
 
     // ()((first > 3()) && (()))
-    Query q1 = ttt.GetQuery().LeftParan().RightParan().LeftParan().LeftParan().first.Greater(3).LeftParan().RightParan().RightParan().LeftParan().LeftParan().RightParan().RightParan().RightParan();
+    Query q1 = ttt.GetQuery().Group().EndGroup().Group().Group().first.Greater(3).Group().EndGroup().EndGroup().Group().Group().EndGroup().EndGroup().EndGroup();
     TableView tv1 = q1.FindAll(ttt);
     CHECK_EQUAL(3, tv1.GetSize());
     CHECK_EQUAL(4, tv1.GetRef(0));
@@ -641,7 +641,7 @@ TEST(TestQueryFindAll_Parans4)
     ttt.Add(11, "X");
 
     // ()
-    Query q1 = ttt.GetQuery().LeftParan().RightParan();
+    Query q1 = ttt.GetQuery().Group().EndGroup();
     TableView tv1 = q1.FindAll(ttt);
     CHECK_EQUAL(7, tv1.GetSize());
 }
@@ -905,11 +905,11 @@ TEST(TestQuerySyntaxCheck)
     ttt.Add(2, "a");
     ttt.Add(3, "X");
 
-    Query q1 = ttt.GetQuery().first.Equal(2).RightParan();
+    Query q1 = ttt.GetQuery().first.Equal(2).EndGroup();
     s = q1.Verify();
     CHECK(s != "");
 
-    Query q2 = ttt.GetQuery().LeftParan().LeftParan().first.Equal(2).RightParan();
+    Query q2 = ttt.GetQuery().Group().Group().first.Equal(2).EndGroup();
     s = q2.Verify();
     CHECK(s != "");
 
@@ -925,7 +925,7 @@ TEST(TestQuerySyntaxCheck)
     s = q5.Verify();
     CHECK(s == "");
 
-    Query q6 = ttt.GetQuery().LeftParan().first.Equal(2);
+    Query q6 = ttt.GetQuery().Group().first.Equal(2);
     s = q6.Verify();
     CHECK(s != "");
 

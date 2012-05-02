@@ -290,7 +290,7 @@ TEST(Group_Serialize_Optimized)
     // Add a row with a known (but unique) value
     table.Add("search_target", 9, true, Fri);
 
-    const size_t res = table.first.Find("search_target");
+    const size_t res = table.cols().first.Find("search_target");
     CHECK_EQUAL(table.GetSize()-1, res);
 
 #ifdef _DEBUG
@@ -305,12 +305,12 @@ TEST(Group_Serialize_All)
     Group toMem;
     Table& table = toMem.GetTable("test");
 
-    table.RegisterColumn(COLUMN_TYPE_INT,    "int");
-    table.RegisterColumn(COLUMN_TYPE_BOOL,   "bool");
-    table.RegisterColumn(COLUMN_TYPE_DATE,   "date");
-    table.RegisterColumn(COLUMN_TYPE_STRING, "string");
-    table.RegisterColumn(COLUMN_TYPE_BINARY, "binary");
-    table.RegisterColumn(COLUMN_TYPE_MIXED,  "mixed");
+    table.register_column(COLUMN_TYPE_INT,    "int");
+    table.register_column(COLUMN_TYPE_BOOL,   "bool");
+    table.register_column(COLUMN_TYPE_DATE,   "date");
+    table.register_column(COLUMN_TYPE_STRING, "string");
+    table.register_column(COLUMN_TYPE_BINARY, "binary");
+    table.register_column(COLUMN_TYPE_MIXED,  "mixed");
 
     table.InsertInt(0, 0, 12);
     table.InsertBool(1, 0, true);
@@ -331,8 +331,78 @@ TEST(Group_Serialize_All)
 
     CHECK_EQUAL(6, t.GetColumnCount());
     CHECK_EQUAL(1, t.GetSize());
+    CHECK_EQUAL(12, t.Get(0, 0));
+	CHECK_EQUAL(true, t.GetBool(1, 0));
+	CHECK_EQUAL((time_t)12345, t.GetDate(2, 0));
+	CHECK_EQUAL("test", t.GetString(3, 0));
+	CHECK_EQUAL(7, t.GetBinary(4, 0).len);
+	CHECK_EQUAL("binary", (const char*)t.GetBinary(4, 0).pointer);
+	CHECK_EQUAL(COLUMN_TYPE_BOOL, t.GetMixed(5, 0).GetType());
+	CHECK_EQUAL(false, t.GetMixed(5, 0).GetBool());
 }
 
+TEST(Group_Persist) {
+	// Delete old file if there
+	remove("testdb.tdb");
+    
+	// Create new database
+	Group db("testdb.tdb", false);
+    
+	// Insert some data
+	Table& table = db.GetTable("test");
+	table.register_column(COLUMN_TYPE_INT,    "int");
+	table.register_column(COLUMN_TYPE_BOOL,   "bool");
+	table.register_column(COLUMN_TYPE_DATE,   "date");
+	table.register_column(COLUMN_TYPE_STRING, "string");
+	table.register_column(COLUMN_TYPE_BINARY, "binary");
+	table.register_column(COLUMN_TYPE_MIXED,  "mixed");
+	table.InsertInt(0, 0, 12);
+	table.InsertBool(1, 0, true);
+	table.InsertDate(2, 0, 12345);
+	table.InsertString(3, 0, "test");
+	table.InsertBinary(4, 0, "binary", 7);
+	table.InsertMixed(5, 0, false);
+	table.InsertDone();
+    
+	// Write changes to file
+	db.Commit();
+    
+#ifdef _DEBUG
+	db.Verify();
+#endif //_DEBUG
+    
+	CHECK_EQUAL(6, table.GetColumnCount());
+	CHECK_EQUAL(1, table.GetSize());
+	CHECK_EQUAL(12, table.Get(0, 0));
+	CHECK_EQUAL(true, table.GetBool(1, 0));
+	CHECK_EQUAL((time_t)12345, table.GetDate(2, 0));
+	CHECK_EQUAL("test", table.GetString(3, 0));
+	CHECK_EQUAL(7, table.GetBinary(4, 0).len);
+	CHECK_EQUAL("binary", (const char*)table.GetBinary(4, 0).pointer);
+	CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(5, 0).GetType());
+	CHECK_EQUAL(false, table.GetMixed(5, 0).GetBool());
+    
+	// Change a bit
+	table.SetString(3, 0, "Changed!");
+    
+	// Write changes to file
+	db.Commit();
+    
+#ifdef _DEBUG
+	db.Verify();
+#endif //_DEBUG
+    
+	CHECK_EQUAL(6, table.GetColumnCount());
+	CHECK_EQUAL(1, table.GetSize());
+	CHECK_EQUAL(12, table.Get(0, 0));
+	CHECK_EQUAL(true, table.GetBool(1, 0));
+	CHECK_EQUAL((time_t)12345, table.GetDate(2, 0));
+	CHECK_EQUAL("Changed!", table.GetString(3, 0));
+	CHECK_EQUAL(7, table.GetBinary(4, 0).len);
+	CHECK_EQUAL("binary", (const char*)table.GetBinary(4, 0).pointer);
+	CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(5, 0).GetType());
+	CHECK_EQUAL(false, table.GetMixed(5, 0).GetBool());
+}
 
 TEST(Group_Subtable)
 {
@@ -340,12 +410,12 @@ TEST(Group_Subtable)
 
     Group g;
     Table& table = g.GetTable("test");
-    Spec s = table.GetSpec();
+    Spec& s = table.GetSpec();
     s.AddColumn(COLUMN_TYPE_INT, "foo");
     Spec sub = s.AddColumnTable("sub");
     sub.AddColumn(COLUMN_TYPE_INT, "bar");
     s.AddColumn(COLUMN_TYPE_MIXED, "baz");
-    table.UpdateFromSpec(s.GetRef());
+    table.UpdateFromSpec();
 
     for (int i=0; i<n; ++i) {
         table.AddRow();
@@ -358,7 +428,7 @@ TEST(Group_Subtable)
         if (i%3 == 1) {
             table.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
             TableRef st = table.GetTable(2, i);
-            st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+            st->register_column(COLUMN_TYPE_INT, "banach");
             st->AddRow();
             st->Set(0, 0, 700+i);
         }
@@ -386,7 +456,7 @@ TEST(Group_Subtable)
         if (i%8 == 3) {
             if (i%3 != 1) table.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
             TableRef st = table.GetTable(2, i);
-            if (i%3 != 1) st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+            if (i%3 != 1) st->register_column(COLUMN_TYPE_INT, "banach");
             st->AddRow();
             st->Set(0, st->GetSize()-1, 800+i);
         }
@@ -469,7 +539,7 @@ TEST(Group_Subtable)
         if (i%7 == 4) {
             if (i%3 != 1 && i%8 != 3) table2.SetMixed(2, i, Mixed(COLUMN_TYPE_TABLE));
             TableRef st = table2.GetTable(2, i);
-            if (i%3 != 1 && i%8 != 3) st->RegisterColumn(COLUMN_TYPE_INT, "banach");
+            if (i%3 != 1 && i%8 != 3) st->register_column(COLUMN_TYPE_INT, "banach");
             st->AddRow();
             st->Set(0, st->GetSize()-1, 900+i);
         }
@@ -572,7 +642,7 @@ TEST(Group_MultiLevelSubtables)
         Group g;
         Table& table = g.GetTable("test");
         {
-            Spec s = table.GetSpec();
+            Spec& s = table.GetSpec();
             s.AddColumn(COLUMN_TYPE_INT, "int");
             {
                 Spec sub = s.AddColumnTable("tab");
@@ -583,7 +653,7 @@ TEST(Group_MultiLevelSubtables)
                 }
             }
             s.AddColumn(COLUMN_TYPE_MIXED, "mix");
-            table.UpdateFromSpec(s.GetRef());
+            table.UpdateFromSpec();
         }
         table.AddRow();
         {
@@ -596,18 +666,18 @@ TEST(Group_MultiLevelSubtables)
             table.SetMixed(2, 0, Mixed(COLUMN_TYPE_TABLE));
             TableRef a = table.GetTable(2, 0);
             {
-                Spec s = a->GetSpec();
+                Spec& s = a->GetSpec();
                 s.AddColumn(COLUMN_TYPE_INT, "int");
                 s.AddColumn(COLUMN_TYPE_MIXED, "mix");
-                a->UpdateFromSpec(s.GetRef());
+                a->UpdateFromSpec();
             }
             a->AddRow();
             a->SetMixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
             TableRef b = a->GetTable(1, 0);
             {
-                Spec s = b->GetSpec();
+                Spec& s = b->GetSpec();
                 s.AddColumn(COLUMN_TYPE_INT, "int");
-                b->UpdateFromSpec(s.GetRef());
+                b->UpdateFromSpec();
             }
             b->AddRow();
         }

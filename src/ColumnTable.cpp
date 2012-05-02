@@ -89,7 +89,7 @@ void ColumnTable::verify() const
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
         if (GetAsRef(i) == 0) continue;
-        const TableConstRef subtable = get_subtable(i, m_ref_specSet);
+        const ConstTableRef subtable = get_subtable(i, m_ref_specSet);
         subtable->verify();
     }
 }
@@ -101,7 +101,7 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const
     const size_t count = array.Size();
     for (size_t i = 0; i < count; ++i) {
         if (array.GetAsRef(i) == 0) continue;
-        const TableConstRef subtable = get_subtable(i, m_ref_specSet);
+        const ConstTableRef subtable = get_subtable(i, m_ref_specSet);
         subtable->ToDot(out);
     }
 }

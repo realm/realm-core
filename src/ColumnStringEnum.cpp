@@ -20,6 +20,12 @@ void ColumnStringEnum::UpdateParentNdx(int diff)
     Column::UpdateParentNdx(diff);
 }
 
+void ColumnStringEnum::UpdateFromParent()
+{
+    m_array->UpdateFromParent();
+    m_keys.UpdateFromParent();
+}
+
 size_t ColumnStringEnum::Size() const
 {
     return Column::Size();
@@ -141,14 +147,6 @@ void ColumnStringEnum::verify() const
 {
     m_keys.verify();
     Column::verify();
-}
-
-MemStats ColumnStringEnum::Stats() const
-{
-    MemStats stats;
-    stats.Add(m_keys.Stats());
-    stats.Add(Column::Stats());
-    return stats;
 }
 
 void ColumnStringEnum::ToDot(std::ostream& out, const char* title) const
