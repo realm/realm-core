@@ -1,6 +1,7 @@
 #ifndef TIGHTDB_TABLE_REF_H
 #define TIGHTDB_TABLE_REF_H
 
+#include <cstddef>
 #include <algorithm>
 #include <ostream>
 
@@ -88,6 +89,7 @@ public:
 
 private:
     typedef T* BasicTableRef::*unspecified_bool_type;
+    typedef typename T::template Accessors<T>::Row RowAccessor;
 
 public:
     /**
@@ -97,9 +99,12 @@ public:
      */
     operator unspecified_bool_type() const;
 
+    RowAccessor operator[](std::size_t i) const { return (*m_table)[i]; }
+
 private:
-    friend class Table;
     friend class ColumnSubtableParent;
+    friend class Table;
+    template<class> friend class BasicTable;
     template<class> friend class BasicTableRef;
 
     template<class U, class V> friend

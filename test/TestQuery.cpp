@@ -55,48 +55,48 @@ TEST(TestQuerySimple)
 TEST(TestQuerySubtable)
 {
     Group group;
-    Table& table = group.get_table("test");
+    TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    Spec& s = table.GetSpec();
+    Spec& s = table->GetSpec();
     s.add_column(COLUMN_TYPE_INT,    "first");
     s.add_column(COLUMN_TYPE_STRING, "second");
     Spec sub = s.add_subtable_column("third");
         sub.add_column(COLUMN_TYPE_INT,    "sub_first");
         sub.add_column(COLUMN_TYPE_STRING, "sub_second");
-    table.UpdateFromSpec();
+    table->UpdateFromSpec();
 
-    CHECK_EQUAL(3, table.GetColumnCount());
+    CHECK_EQUAL(3, table->GetColumnCount());
 
     // Main table
-    table.InsertInt(0, 0, 111);
-    table.InsertString(1, 0, "this");
-    table.InsertTable(2, 0);
-    table.InsertDone();
+    table->InsertInt(0, 0, 111);
+    table->InsertString(1, 0, "this");
+    table->InsertTable(2, 0);
+    table->InsertDone();
 
-    table.InsertInt(0, 1, 222);
-    table.InsertString(1, 1, "is");
-    table.InsertTable(2, 1);
-    table.InsertDone();
+    table->InsertInt(0, 1, 222);
+    table->InsertString(1, 1, "is");
+    table->InsertTable(2, 1);
+    table->InsertDone();
 
-    table.InsertInt(0, 2, 333);
-    table.InsertString(1, 2, "a test");
-    table.InsertTable(2, 2);
-    table.InsertDone();
+    table->InsertInt(0, 2, 333);
+    table->InsertString(1, 2, "a test");
+    table->InsertTable(2, 2);
+    table->InsertDone();
 
-    table.InsertInt(0, 3, 444);
-    table.InsertString(1, 3, "of queries");
-    table.InsertTable(2, 3);
-    table.InsertDone();
+    table->InsertInt(0, 3, 444);
+    table->InsertString(1, 3, "of queries");
+    table->InsertTable(2, 3);
+    table->InsertDone();
 
 
     // Sub tables
-    TableRef subtable = table.GetTable(2, 0);
+    TableRef subtable = table->GetTable(2, 0);
     subtable->InsertInt(0, 0, 11);
     subtable->InsertString(1, 0, "a");
     subtable->InsertDone();
 
-    subtable = table.GetTable(2, 1);
+    subtable = table->GetTable(2, 1);
     subtable->InsertInt(0, 0, 22);
     subtable->InsertString(1, 0, "b");
     subtable->InsertDone();
@@ -104,12 +104,12 @@ TEST(TestQuerySubtable)
     subtable->InsertString(1, 1, "c");
     subtable->InsertDone();
 
-    subtable = table.GetTable(2, 2);
+    subtable = table->GetTable(2, 2);
     subtable->InsertInt(0, 0, 44);
     subtable->InsertString(1, 0, "d");
     subtable->InsertDone();
 
-    subtable = table.GetTable(2, 3);
+    subtable = table->GetTable(2, 3);
     subtable->InsertInt(0, 0, 55);
     subtable->InsertString(1, 0, "e");
     subtable->InsertDone();
@@ -120,7 +120,7 @@ TEST(TestQuerySubtable)
     q1->Subtable(2);
     q1->Less(0, 50);
     q1->Parent();
-    TableView t1 = q1->FindAll(table, 0, (size_t)-1);
+    TableView t1 = q1->FindAll(*table, 0, (size_t)-1);
     CHECK_EQUAL(2, t1.GetSize());
     CHECK_EQUAL(1, t1.GetRef(0));
     CHECK_EQUAL(2, t1.GetRef(1));
@@ -133,7 +133,7 @@ TEST(TestQuerySubtable)
     q2->Or();
     q2->Less(0, 20);
     q2->Parent();
-    TableView t2 = q2->FindAll(table, 0, (size_t)-1);
+    TableView t2 = q2->FindAll(*table, 0, (size_t)-1);
     CHECK_EQUAL(2, t2.GetSize());
     CHECK_EQUAL(0, t2.GetRef(0));
     CHECK_EQUAL(3, t2.GetRef(1));
@@ -147,7 +147,7 @@ TEST(TestQuerySubtable)
     q3->Less(0, 20);
     q3->Parent();
     q3->Less(0, 300);
-    TableView t3 = q3->FindAll(table, 0, (size_t)-1);
+    TableView t3 = q3->FindAll(*table, 0, (size_t)-1);
     CHECK_EQUAL(1, t3.GetSize());
     CHECK_EQUAL(0, t3.GetRef(0));
     delete q3;
@@ -161,7 +161,7 @@ TEST(TestQuerySubtable)
     q4->Or();
     q4->Less(0, 20);
     q4->Parent();
-    TableView t4 = q4->FindAll(table, 0, (size_t)-1);
+    TableView t4 = q4->FindAll(*table, 0, (size_t)-1);
     delete q4;
 
 

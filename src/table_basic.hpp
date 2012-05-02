@@ -38,6 +38,7 @@ template<int col_idx, class Type> class RegisterColumn;
 template<class Spec> class BasicTable: public Table {
 private:
     template<class> friend class BasicTable;
+    friend class BasicTableRef<BasicTable>;
 
     template<class Tab> class Accessors {
     public:
@@ -82,6 +83,9 @@ public:
         typename Spec::template Columns<RegisterColumn, tightdb::Spec*> c(&spec);
         UpdateFromSpec();
     }
+
+    BasicTableRef<BasicTable> GetTableRef() { return BasicTableRef<BasicTable>(this); }
+    BasicTableRef<const BasicTable> GetTableRef() const { return BasicTableRef<const BasicTable>(this); }
 
     ColsAccessor cols() { return ColsAccessor(this); }
 

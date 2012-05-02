@@ -532,30 +532,30 @@ TEST(Table_SlabAlloc)
 TEST(Table_Spec)
 {
     Group group;
-    Table& table = group.get_table("test");
+    TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    Spec& s = table.GetSpec();
+    Spec& s = table->GetSpec();
     s.add_column(COLUMN_TYPE_INT,    "first");
     s.add_column(COLUMN_TYPE_STRING, "second");
     Spec sub = s.add_subtable_column("third");
         sub.add_column(COLUMN_TYPE_INT,    "sub_first");
         sub.add_column(COLUMN_TYPE_STRING, "sub_second");
-    table.UpdateFromSpec();
+    table->UpdateFromSpec();
 
-    CHECK_EQUAL(3, table.GetColumnCount());
+    CHECK_EQUAL(3, table->GetColumnCount());
 
     // Add a row
-    table.InsertInt(0, 0, 4);
-    table.InsertString(1, 0, "Hello");
-    table.InsertTable(2, 0);
-    table.InsertDone();
+    table->InsertInt(0, 0, 4);
+    table->InsertString(1, 0, "Hello");
+    table->InsertTable(2, 0);
+    table->InsertDone();
 
-    CHECK_EQUAL(0, table.GetTableSize(2, 0));
+    CHECK_EQUAL(0, table->GetTableSize(2, 0));
 
     // Get the sub-table
     {
-        TableRef subtable = table.GetTable(2, 0);
+        TableRef subtable = table->GetTable(2, 0);
         CHECK(subtable->IsEmpty());
 
         subtable->InsertInt(0, 0, 42);
@@ -566,12 +566,12 @@ TEST(Table_Spec)
         CHECK_EQUAL("test", subtable->GetString(1, 0));
     }
 
-    CHECK_EQUAL(1, table.GetTableSize(2, 0));
+    CHECK_EQUAL(1, table->GetTableSize(2, 0));
 
     // Get the sub-table again and see if the values
     // still match.
     {
-        TableRef subtable = table.GetTable(2, 0);
+        TableRef subtable = table->GetTable(2, 0);
 
         CHECK_EQUAL(1,      subtable->GetSize());
         CHECK_EQUAL(42,     subtable->Get(0, 0));
@@ -583,9 +583,9 @@ TEST(Table_Spec)
 
     // Read back tables
     Group fromDisk("subtables.tightdb");
-    Table& fromDiskTable = fromDisk.get_table("test");
+    TableRef fromDiskTable = fromDisk.get_table("test");
 
-    TableRef subtable2 = fromDiskTable.GetTable(2, 0);
+    TableRef subtable2 = fromDiskTable->GetTable(2, 0);
 
     CHECK_EQUAL(1,      subtable2->GetSize());
     CHECK_EQUAL(42,     subtable2->Get(0, 0));

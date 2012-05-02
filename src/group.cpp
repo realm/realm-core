@@ -194,7 +194,7 @@ bool Group::has_table(const char* name) const
     return (n != (size_t)-1);
 }
 
-Table& Group::get_table(const char* name)
+TableRef Group::get_table(const char* name)
 {
     const size_t n = m_tableNames.Find(name);
 
@@ -207,11 +207,11 @@ Table& Group::get_table(const char* name)
         m_tableNames.Add(name);
         m_cachedtables.Add((intptr_t)t);
 
-        return *t;
+        return t->GetTableRef();
     }
     else {
         // Get table from cache if exists, else create
-        return get_table(n);
+        return get_table(n).GetTableRef();
     }
 }
 

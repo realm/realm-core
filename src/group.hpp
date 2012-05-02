@@ -19,13 +19,13 @@ public:
     const char* get_table_name(size_t table_ndx) const;
     bool has_table(const char* name) const;
 
-    Table& get_table(const char* name);
-    template<class T> T& get_table(const char* name);
+    TableRef get_table(const char* name);
+    template<class T> BasicTableRef<T> get_table(const char* name);
 
     // Serialization
     bool write(const char* filepath);
     char* write_to_mem(size_t& len);
-    
+
     bool commit();
 
     // Conversion
@@ -41,15 +41,15 @@ public:
 
 protected:
     friend class GroupWriter;
-    
+
     SlabAlloc& get_allocator() {return m_alloc;}
     size_t get_free_space(size_t len, size_t& filesize, bool testOnly=false, bool ensureRest=false);
     Array& get_top_array() {return m_top;}
     void connect_free_space(bool doConnect);
-    
+
     // Recursively update all internal refs after commit
     void update_refs(size_t TopRef);
-    
+
     // Overriding method in ArrayParent
     virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
     {
@@ -87,7 +87,7 @@ protected:
 
 // Templates
 
-template<class T> T& Group::get_table(const char* name)
+template<class T> BasicTableRef<T> Group::get_table(const char* name)
 {
     const size_t n = m_tableNames.Find(name);
     if (n == size_t(-1)) {
@@ -100,11 +100,11 @@ template<class T> T& Group::get_table(const char* name)
         m_tableNames.Add(name);
         m_cachedtables.Add(intptr_t(t));
 
-        return *t;
+        return t->GetTableRef();
     }
     else {
         // Get table from cache if exists, else create
-        return static_cast<T&>(get_table(n));
+        return static_cast<T&>(get_table(n)).GetTableRef();
     }
 }
 
@@ -144,6 +144,7 @@ void Group::to_json(S& out)
 
     out << "}";
 }
+
 
 } // namespace tightdb
 
