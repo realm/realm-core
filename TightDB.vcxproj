@@ -165,7 +165,7 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -211,7 +211,7 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DUSE_SSE3 %(AdditionalOptions)</AdditionalOptions>
@@ -237,7 +237,7 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
       <AdditionalOptions>/DUSE_SSE %(AdditionalOptions)</AdditionalOptions>
@@ -311,7 +311,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -356,42 +356,24 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\tightdb\src\c-api\c-table.cpp" />
     <ClCompile Include="src\alloc_slab.cpp" />
-    <ClCompile Include="src\Array.cpp">
-      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">EnableAllWarnings</WarningLevel>
-    </ClCompile>
+    <ClCompile Include="src\array.cpp" />
     <ClCompile Include="src\array_binary.cpp" />
     <ClCompile Include="src\array_blob.cpp" />
     <ClCompile Include="src\array_string.cpp" />
     <ClCompile Include="src\array_string_long.cpp" />
-    <ClCompile Include="src\Column.cpp" />
-    <ClCompile Include="src\ColumnBinary.cpp" />
-    <ClCompile Include="src\ColumnMixed.cpp" />
-    <ClCompile Include="src\ColumnString.cpp" />
-    <ClCompile Include="src\ColumnStringEnum.cpp" />
-    <ClCompile Include="src\ColumnTable.cpp" />
-    <ClCompile Include="src\ctightdb.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MultiThreadedDebug</RuntimeLibrary>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">MultiThreadedDebug</RuntimeLibrary>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MultiThreaded</RuntimeLibrary>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">MultiThreaded</RuntimeLibrary>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">MultiThreadedDebug</RuntimeLibrary>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">MultiThreaded</RuntimeLibrary>
-    </ClCompile>
-    <ClCompile Include="src\Group.cpp" />
+    <ClCompile Include="src\column.cpp" />
+    <ClCompile Include="src\column_binary.cpp" />
+    <ClCompile Include="src\column_mixed.cpp" />
+    <ClCompile Include="src\column_string.cpp" />
+    <ClCompile Include="src\column_string_enum.cpp" />
+    <ClCompile Include="src\column_table.cpp" />
+    <ClCompile Include="src\group.cpp" />
     <ClCompile Include="src\group_writer.cpp" />
     <ClCompile Include="src\Index.cpp" />
     <ClCompile Include="src\spec.cpp" />
+    <ClCompile Include="src\table.cpp" />
     <ClCompile Include="src\table_view.cpp" />
     <ClCompile Include="src\utf8.cpp" />
     <ClCompile Include="src\utilities.cpp">
@@ -433,7 +415,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="src\Table.cpp" />
     <ClCompile Include="test\testalloc.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
@@ -496,26 +477,26 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\tightdb\src\c-api\c-table.h" />
+    <ClInclude Include="..\tightdb\src\c-api\c-tightdb.h" />
     <ClInclude Include="src\alloc.hpp" />
-    <ClInclude Include="src\AllocSlab.hpp" />
     <ClInclude Include="src\alloc_slab.hpp" />
-    <ClInclude Include="src\Array.hpp" />
+    <ClInclude Include="src\array.hpp" />
     <ClInclude Include="src\array_binary.hpp" />
     <ClInclude Include="src\array_blob.hpp" />
     <ClInclude Include="src\array_string.hpp" />
     <ClInclude Include="src\array_string_long.hpp" />
-    <ClInclude Include="src\Column.hpp" />
-    <ClInclude Include="src\ColumnBinary.hpp" />
-    <ClInclude Include="src\ColumnMixed.hpp" />
-    <ClInclude Include="src\ColumnString.hpp" />
-    <ClInclude Include="src\ColumnStringEnum.h" />
-    <ClInclude Include="src\ColumnStringEnum.hpp" />
-    <ClInclude Include="src\ColumnTable.hpp" />
-    <ClInclude Include="src\ColumnType.hpp" />
-    <ClInclude Include="src\Column_tpl.hpp" />
-    <ClInclude Include="src\ctightdb.h" />
+    <ClInclude Include="src\column.hpp" />
+    <ClInclude Include="src\column_binary.hpp" />
+    <ClInclude Include="src\column_fwd.hpp" />
+    <ClInclude Include="src\column_mixed.hpp" />
+    <ClInclude Include="src\column_string.hpp" />
+    <ClInclude Include="src\column_string_enum.hpp" />
+    <ClInclude Include="src\column_table.hpp" />
+    <ClInclude Include="src\column_tpl.hpp" />
+    <ClInclude Include="src\column_type.hpp" />
     <ClInclude Include="src\date.hpp" />
-    <ClInclude Include="src\Group.hpp" />
+    <ClInclude Include="src\group.hpp" />
     <ClInclude Include="src\group_writer.hpp" />
     <ClInclude Include="src\Index.hpp" />
     <ClInclude Include="src\meta.hpp" />
@@ -526,8 +507,7 @@
     <ClInclude Include="src\query_engine.hpp" />
     <ClInclude Include="src\spec.hpp" />
     <ClInclude Include="src\static_assert.hpp" />
-    <ClInclude Include="src\Table.hpp" />
-    <ClInclude Include="src\TableRef.hpp" />
+    <ClInclude Include="src\table.hpp" />
     <ClInclude Include="src\table_basic.hpp" />
     <ClInclude Include="src\table_ref.hpp" />
     <ClInclude Include="src\table_view.hpp" />

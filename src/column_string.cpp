@@ -8,7 +8,7 @@
     #include "win32\types.h"
 #endif
 
-#include "ColumnString.hpp"
+#include "column_string.hpp"
 
 namespace {
 

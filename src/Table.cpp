@@ -1,17 +1,17 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include "Table.hpp"
+#include "table.hpp"
 #include <assert.h>
-#include "Index.hpp"
+#include "index.hpp"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
 #include "alloc_slab.hpp"
-#include "Column.hpp"
-#include "ColumnString.hpp"
-#include "ColumnStringEnum.hpp"
-#include "ColumnBinary.hpp"
-#include "ColumnTable.hpp"
-#include "ColumnMixed.hpp"
+#include "column.hpp"
+#include "column_string.hpp"
+#include "column_string_enum.hpp"
+#include "column_binary.hpp"
+#include "column_table.hpp"
+#include "column_mixed.hpp"
 
 using namespace std;
 

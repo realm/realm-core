@@ -1,5 +1,5 @@
-#include "ColumnString.hpp"
-#include "ColumnStringEnum.hpp"
+#include "column_string.hpp"
+#include "column_string_enum.hpp"
 #include <UnitTest++.h>
 
 using namespace tightdb;

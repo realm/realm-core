@@ -1,9 +1,9 @@
 #ifndef TIGHTDB_SPEC_H
 #define TIGHTDB_SPEC_H
 
-#include "Array.hpp"
+#include "array.hpp"
 #include "array_string.hpp"
-#include "ColumnType.hpp"
+#include "column_type.hpp"
 
 namespace tightdb {
 

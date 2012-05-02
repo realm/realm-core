@@ -1,11 +1,11 @@
 #ifndef __TDB_COLUMN_MIXED__
 #define __TDB_COLUMN_MIXED__
 
-#include "Column.hpp"
-#include "ColumnType.hpp"
-#include "ColumnTable.hpp"
-#include "Table.hpp"
-#include "Index.hpp"
+#include "column.hpp"
+#include "column_type.hpp"
+#include "column_table.hpp"
+#include "table.hpp"
+#include "index.hpp"
 
 namespace tightdb {
 

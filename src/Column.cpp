@@ -12,8 +12,8 @@
 #include <stdint.h> // unint8_t etc
 #endif
 
-#include "Column.hpp"
-#include "Index.hpp"
+#include "column.hpp"
+#include "index.hpp"
 #include "query_conditions.hpp"
 
 using namespace std;

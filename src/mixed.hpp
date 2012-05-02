@@ -10,7 +10,7 @@
 #include <cassert>
 #include <cstddef> // size_t
 
-#include "ColumnType.hpp"
+#include "column_type.hpp"
 #include "date.hpp"
 
 namespace tightdb {

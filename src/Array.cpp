@@ -2,8 +2,8 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
-#include "Array.hpp"
-#include "Column.hpp"
+#include "array.hpp"
+#include "column.hpp"
 #include "utilities.hpp"
 #include "query_conditions.hpp"
 

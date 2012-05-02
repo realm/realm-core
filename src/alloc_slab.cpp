@@ -16,7 +16,7 @@
 #include <cassert>
 #include <iostream>
 #include "alloc_slab.hpp"
-#include "Array.hpp"
+#include "array.hpp"
 
 #ifdef _DEBUG
 #include <cstdio>

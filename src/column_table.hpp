@@ -1,8 +1,8 @@
 #ifndef __TDB_COLUMN_TABLE__
 #define __TDB_COLUMN_TABLE__
 
-#include "Column.hpp"
-#include "Table.hpp"
+#include "column.hpp"
+#include "table.hpp"
 
 namespace tightdb {
 

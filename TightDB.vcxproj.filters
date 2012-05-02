@@ -1,15 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="src\Array.cpp" />
-    <ClCompile Include="src\Column.cpp" />
-    <ClCompile Include="src\ColumnBinary.cpp" />
-    <ClCompile Include="src\ColumnString.cpp" />
-    <ClCompile Include="src\ctightdb.cpp" />
-    <ClCompile Include="src\Group.cpp" />
     <ClCompile Include="src\Index.cpp" />
     <ClCompile Include="src\utilities.cpp" />
-    <ClCompile Include="src\Table.cpp" />
     <ClCompile Include="test\large_tests\verified_integer.cpp">
       <Filter>large_tests</Filter>
     </ClCompile>
@@ -22,13 +15,10 @@
     <ClCompile Include="test\large_tests\test_column.cpp">
       <Filter>large_tests</Filter>
     </ClCompile>
-    <ClCompile Include="src\ColumnStringEnum.cpp" />
-    <ClCompile Include="src\ColumnTable.cpp" />
     <ClCompile Include="src\utf8.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c">
       <Filter>pthreads</Filter>
     </ClCompile>
-    <ClCompile Include="src\ColumnMixed.cpp" />
     <ClCompile Include="src\alloc_slab.cpp" />
     <ClCompile Include="src\group_writer.cpp" />
     <ClCompile Include="src\spec.cpp" />
@@ -70,6 +60,18 @@
     <ClCompile Include="test\main.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\tightdb\src\c-api\c-table.cpp">
+      <Filter>c-api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\table.cpp" />
+    <ClCompile Include="src\group.cpp" />
+    <ClCompile Include="src\column.cpp" />
+    <ClCompile Include="src\column_binary.cpp" />
+    <ClCompile Include="src\column_mixed.cpp" />
+    <ClCompile Include="src\column_string.cpp" />
+    <ClCompile Include="src\column_string_enum.cpp" />
+    <ClCompile Include="src\column_table.cpp" />
+    <ClCompile Include="src\array.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="test\large_tests\verified_integer.h">
@@ -78,26 +80,11 @@
     <ClInclude Include="test\large_tests\verified_string.h">
       <Filter>large_tests</Filter>
     </ClInclude>
-    <ClInclude Include="src\ColumnStringEnum.h" />
     <ClInclude Include="src\win32\pthread\pthread.h">
       <Filter>pthreads</Filter>
     </ClInclude>
     <ClInclude Include="src\alloc.hpp" />
-    <ClInclude Include="src\Array.hpp" />
-    <ClInclude Include="src\AllocSlab.hpp" />
-    <ClInclude Include="src\Column.hpp" />
-    <ClInclude Include="src\Column_tpl.hpp" />
-    <ClInclude Include="src\ColumnBinary.hpp" />
-    <ClInclude Include="src\ColumnMixed.hpp" />
-    <ClInclude Include="src\ColumnString.hpp" />
-    <ClInclude Include="src\ColumnStringEnum.hpp" />
-    <ClInclude Include="src\ColumnTable.hpp" />
-    <ClInclude Include="src\ColumnType.hpp" />
-    <ClInclude Include="src\ctightdb.h" />
-    <ClInclude Include="src\Group.hpp" />
     <ClInclude Include="src\Index.hpp" />
-    <ClInclude Include="src\Table.hpp" />
-    <ClInclude Include="src\TableRef.hpp" />
     <ClInclude Include="src\tightdb.hpp" />
     <ClInclude Include="src\utf8.hpp" />
     <ClInclude Include="src\utilities.hpp" />
@@ -119,6 +106,24 @@
     <ClInclude Include="src\array_blob.hpp" />
     <ClInclude Include="src\array_string.hpp" />
     <ClInclude Include="src\array_string_long.hpp" />
+    <ClInclude Include="..\tightdb\src\c-api\c-tightdb.h">
+      <Filter>c-api</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tightdb\src\c-api\c-table.h">
+      <Filter>c-api</Filter>
+    </ClInclude>
+    <ClInclude Include="src\group.hpp" />
+    <ClInclude Include="src\table.hpp" />
+    <ClInclude Include="src\column.hpp" />
+    <ClInclude Include="src\column_binary.hpp" />
+    <ClInclude Include="src\column_fwd.hpp" />
+    <ClInclude Include="src\column_mixed.hpp" />
+    <ClInclude Include="src\column_string.hpp" />
+    <ClInclude Include="src\column_string_enum.hpp" />
+    <ClInclude Include="src\column_table.hpp" />
+    <ClInclude Include="src\column_tpl.hpp" />
+    <ClInclude Include="src\column_type.hpp" />
+    <ClInclude Include="src\array.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">
@@ -129,6 +134,9 @@
     </Filter>
     <Filter Include="test">
       <UniqueIdentifier>{d65594c9-e911-48b1-9f60-693bab72c732}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="c-api">
+      <UniqueIdentifier>{a897f004-3d22-4052-a963-79f4901766ba}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

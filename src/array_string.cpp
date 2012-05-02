@@ -4,7 +4,7 @@
 #include <cstdio> // debug
 #include <iostream>
 #include "utilities.hpp"
-#include "Column.hpp"
+#include "column.hpp"
 #include "array_string.hpp"
 
 using namespace std;

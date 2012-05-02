@@ -23,71 +23,82 @@ using std::time_t;
  */
 class Table {
 public:
-    // Construct a new top-level table with an independent schema.
+    /**
+     * Construct a new top-level table with an independent schema.
+     */
     Table(Allocator& alloc = GetDefaultAllocator());
     ~Table();
 
-    // Schema handling (see also Spec.hpp)
-    Spec&       GetSpec();          
-    const Spec& GetSpec() const;
-    void        UpdateFromSpec(); // Must not be called for a table with shared schema
-                // Add a column dynamically
-    size_t      register_column(ColumnType type, const char* name);
-    
-    // Table size and deletion
-    bool        IsEmpty() const {return m_size == 0;}
-    size_t      GetSize() const {return m_size;}
-    void        clear();
+    TableRef GetTableRef() { return TableRef(this); }
+    ConstTableRef GetTableRef() const { return ConstTableRef(this); }
 
-    // Column information
-    size_t      GetColumnCount() const;
-    const char* GetColumnName(size_t column_ndx) const;
-    size_t      GetColumnIndex(const char* name) const;
-    ColumnType  GetColumnType(size_t column_ndx) const;
+    // Column meta info
+    size_t GetColumnCount() const;
+    const char* GetColumnName(size_t ndx) const;
+    size_t GetColumnIndex(const char* name) const;
+    ColumnType GetColumnType(size_t ndx) const;
+
+    // Schema handling
+    Spec& GetSpec();
+    const Spec& GetSpec() const;
+    size_t register_column(ColumnType type, const char* name);
+    void UpdateFromSpec(); /// Must not be called for a table with shared schema
+
+    bool IsEmpty() const {return m_size == 0;}
+    size_t GetSize() const {return m_size;}
 
     // Row handling
-    size_t      AddRow();
-    void        erase(size_t row_ndx);
-    void        pop_back() {if (!IsEmpty()) erase(m_size-1);}
+    size_t AddRow();
+    void clear();
+    void erase(size_t row_ndx);
+    void pop_back() {if (!IsEmpty()) erase(m_size-1);}
 
-    // Insert row
-    // NOTE: You have to insert values in ALL columns followed by InsertDone().
-    void InsertInt(size_t column_ndx, size_t row_ndx, int64_t value);
-    void InsertBool(size_t column_ndx, size_t row_ndx, bool value);
-    void InsertDate(size_t column_ndx, size_t row_ndx, time_t value);
-    template<class T> void InsertEnum(size_t column_ndx, size_t row_ndx, T value);
-    void InsertString(size_t column_ndx, size_t row_ndx, const char* value);
-    void InsertMixed(size_t column_ndx, size_t row_ndx, Mixed value);
-    void InsertBinary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
-    void InsertTable(size_t column_ndx, size_t row_ndx);
-    void InsertDone();
-
-    // Get cell values
-    int64_t     Get(size_t column_ndx, size_t row_ndx) const;
-    bool        GetBool(size_t column_ndx, size_t row_ndx) const;
-    time_t      GetDate(size_t column_ndx, size_t row_ndx) const;
-    const char* GetString(size_t column_ndx, size_t row_ndx) const;
-    BinaryData  GetBinary(size_t column_ndx, size_t row_ndx) const;
-    Mixed       GetMixed(size_t column_ndx, size_t row_ndx) const;
-    ColumnType  GetMixedType(size_t column_ndx, size_t row_ndx) const;
-
-    // Set cell values
+    // Getters and Setters
+    int64_t Get(size_t column_ndx, size_t row_ndx) const;
     void Set(size_t column_ndx, size_t row_ndx, int64_t value);
+    bool GetBool(size_t column_ndx, size_t row_ndx) const;
     void SetBool(size_t column_ndx, size_t row_ndx, bool value);
-    void SetDate(size_t column_ndx, size_t row_ndx, time_t value);
+    std::time_t GetDate(size_t column_ndx, size_t row_ndx) const;
+    void SetDate(size_t column_ndx, size_t row_ndx, std::time_t value);
+    const char* GetString(size_t column_ndx, size_t row_ndx) const;
     void SetString(size_t column_ndx, size_t row_ndx, const char* value);
+    BinaryData GetBinary(size_t column_ndx, size_t row_ndx) const;
     void SetBinary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+    Mixed GetMixed(size_t column_ndx, size_t row_ndx) const;
+    ColumnType GetMixedType(size_t column_ndx, size_t row_ndx) const;
     void SetMixed(size_t column_ndx, size_t row_ndx, Mixed value);
 
-    // Sub-tables (works both on table- and mixed columns)
-    TableRef        GetTable(size_t column_ndx, size_t row_ndx);
-    ConstTableRef   GetTable(size_t column_ndx, size_t row_ndx) const;
-    size_t          GetTableSize(size_t column_ndx, size_t row_ndx) const;
-    void            ClearTable(size_t column_ndx, size_t row_ndx);
+    // NOTE: Low-level insert functions. Always insert in all columns at once
+    // and call InsertDone after to avoid table getting un-balanced.
+    void InsertInt(size_t column_ndx, size_t row_ndx, int64_t value);
+    void InsertBool(size_t column_ndx, size_t row_ndx, bool value);
+    void InsertDate(size_t column_ndx, size_t row_ndx, std::time_t value);
+    template<class T> void InsertEnum(size_t column_ndx, size_t row_ndx, T value);
+    void InsertString(size_t column_ndx, size_t row_ndx, const char* value);
+    void InsertBinary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+    void InsertMixed(size_t column_ndx, size_t row_ndx, Mixed value);
+    void InsertDone();
 
-    // Indexing
-    bool HasIndex(size_t column_ndx) const;
-    void SetIndex(size_t column_ndx);
+    // Sub-tables (works both on table- and mixed columns)
+    TableRef GetTable(size_t column_ndx, size_t row_ndx);
+    ConstTableRef GetTable(size_t column_ndx, size_t row_ndx) const;
+    size_t GetTableSize(size_t column_ndx, size_t row_ndx) const;
+    void InsertTable(size_t column_ndx, size_t row_ndx);
+    void ClearTable(size_t column_ndx, size_t row_ndx);
+
+    // Direct Column access
+    Column& GetColumn(size_t ndx);
+    const Column& GetColumn(size_t ndx) const;
+    AdaptiveStringColumn& GetColumnString(size_t ndx);
+    const AdaptiveStringColumn& GetColumnString(size_t ndx) const;
+    ColumnBinary& GetColumnBinary(size_t ndx);
+    const ColumnBinary& GetColumnBinary(size_t ndx) const;
+    ColumnStringEnum& GetColumnStringEnum(size_t ndx);
+    const ColumnStringEnum& GetColumnStringEnum(size_t ndx) const;
+    ColumnTable& GetColumnTable(size_t ndx);
+    const ColumnTable& GetColumnTable(size_t ndx) const;
+    ColumnMixed& GetColumnMixed(size_t ndx);
+    const ColumnMixed& GetColumnMixed(size_t ndx) const;
 
     // Aggregate functions
     int64_t Sum(size_t column_ndx) const;
@@ -95,40 +106,24 @@ public:
     int64_t Min(size_t column_ndx) const;
 
     // Searching
-    size_t  Find(size_t column_ndx, int64_t value) const;
-    size_t  FindBool(size_t column_ndx, bool value) const;
-    size_t  FindString(size_t column_ndx, const char* value) const;
-    size_t  FindDate(size_t column_ndx, time_t value) const;
-    void    FindAll(TableView& tv, size_t column_ndx, int64_t value);
-    void    FindAllBool(TableView& tv, size_t column_ndx, bool value);
-    void    FindAllString(TableView& tv, size_t column_ndx, const char *value);
-    void    FindAllHamming(TableView& tv, size_t column_ndx, uint64_t value, size_t max);
+    size_t Find(size_t column_ndx, int64_t value) const;
+    size_t FindBool(size_t column_ndx, bool value) const;
+    size_t FindString(size_t column_ndx, const char* value) const;
+    size_t FindDate(size_t column_ndx, std::time_t value) const;
+    void FindAll(TableView& tv, size_t column_ndx, int64_t value);
+    void FindAllBool(TableView& tv, size_t column_ndx, bool value);
+    void FindAllString(TableView& tv, size_t column_ndx, const char *value);
+    void FindAllHamming(TableView& tv, size_t column_ndx, uint64_t value, size_t max);
+
+    // Indexing
+    bool HasIndex(size_t column_ndx) const;
+    void SetIndex(size_t column_ndx);
 
     // Optimizing
     void Optimize();
 
     // Conversion
     void to_json(std::ostream& out);
-
-    // Get a reference to this table
-    TableRef GetTableRef() { return TableRef(this); }
-    ConstTableRef GetTableRef() const { return ConstTableRef(this); } 
-
-// Internal / deprecate ------------------------------------
-
-    // Direct Column access
-    Column& GetColumn(size_t column_ndx);
-    const Column& GetColumn(size_t column_ndx) const;
-    AdaptiveStringColumn& GetColumnString(size_t column_ndx);
-    const AdaptiveStringColumn& GetColumnString(size_t column_ndx) const;
-    ColumnBinary& GetColumnBinary(size_t column_ndx);
-    const ColumnBinary& GetColumnBinary(size_t column_ndx) const;
-    ColumnStringEnum& GetColumnStringEnum(size_t column_ndx);
-    const ColumnStringEnum& GetColumnStringEnum(size_t column_ndx) const;
-    ColumnTable& GetColumnTable(size_t column_ndx);
-    const ColumnTable& GetColumnTable(size_t column_ndx) const;
-    ColumnMixed& GetColumnMixed(size_t column_ndx);
-    const ColumnMixed& GetColumnMixed(size_t column_ndx) const;
 
     // Debug
 #ifdef _DEBUG
@@ -140,16 +135,14 @@ public:
 #endif //_DEBUG
 
     // todo, note, these three functions have been protected
-    const ColumnBase& GetColumnBase(size_t column_ndx) const;
-    ColumnType GetRealColumnType(size_t column_ndx) const;
+    const ColumnBase& GetColumnBase(size_t ndx) const;
+    ColumnType GetRealColumnType(size_t ndx) const;
 
     class Parent;
 
 protected:
     friend class Group;
     friend class ColumnMixed;
-    friend Table* TableHelper_get_subtable_ptr(Table* t, size_t col_idx, size_t row_idx);
-    friend const Table* TableHelper_get_const_subtable_ptr(const Table* t, size_t col_idx, size_t row_idx);
 
     /**
      * Construct a top-level table with independent schema from ref.
@@ -231,13 +224,12 @@ private:
     template<class> struct Accessors { typedef void Row; }; // FIXME: Here to support BasicTableRef::operator[], but should be eliminated.
     template<class> friend class BasicTableRef;
     friend class ColumnSubtableParent;
-    friend void TableHelper_unbind(Table* t);
 
     mutable size_t m_ref_count;
     void bind_ref() const { ++m_ref_count; }
     void unbind_ref() const { if (--m_ref_count == 0) delete this; }
 
-    ColumnBase& GetColumnBase(size_t column_ndx);
+    ColumnBase& GetColumnBase(size_t ndx);
     void InstantiateBeforeChange();
 
     /**
@@ -269,7 +261,7 @@ inline void Table::InsertBool(size_t column_ndx, size_t row_ndx, bool value)
     InsertInt(column_ndx, row_ndx, value);
 }
 
-inline void Table::InsertDate(size_t column_ndx, size_t row_ndx, time_t value)
+inline void Table::InsertDate(size_t column_ndx, size_t row_ndx, std::time_t value)
 {
     InsertInt(column_ndx, row_ndx, value);
 }

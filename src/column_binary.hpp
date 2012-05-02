@@ -1,8 +1,8 @@
 #ifndef __TDB_COLUMN_BINARY__
 #define __TDB_COLUMN_BINARY__
 
-#include "Column.hpp"
-#include "ColumnType.hpp" // BinaryData
+#include "column.hpp"
+#include "column_type.hpp" // BinaryData
 #include "array_binary.hpp"
 
 namespace tightdb {

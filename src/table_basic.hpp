@@ -14,7 +14,7 @@
 #include <utility>
 
 #include "meta.hpp"
-#include "Table.hpp"
+#include "table.hpp"
 #include "query.hpp"
 
 namespace tightdb {
