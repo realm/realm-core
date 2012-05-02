@@ -405,8 +405,8 @@ template<int col_idx, class Type> class RegisterColumn {
 public:
     RegisterColumn(tightdb::Spec* spec, const char* column_name)
     {
-        assert(col_idx == spec->GetColumnCount());
-        spec->AddColumn(GetColumnTypeId<Type>::id, column_name);
+        assert(col_idx == spec->get_column_count());
+        spec->add_column(GetColumnTypeId<Type>::id, column_name);
     }
 };
 
@@ -415,8 +415,8 @@ template<int col_idx, class Subspec> class RegisterColumn<col_idx, BasicTable<Su
 public:
     RegisterColumn(tightdb::Spec* spec, const char* column_name)
     {
-        assert(col_idx == spec->GetColumnCount());
-        tightdb::Spec subspec = spec->AddColumnTable(column_name);
+        assert(col_idx == spec->get_column_count());
+        tightdb::Spec subspec = spec->add_subtable_column(column_name);
         typename Subspec::template Columns<tightdb::RegisterColumn, tightdb::Spec*> c(&subspec);
     }
 };

@@ -25,7 +25,7 @@ m_specSet(COLUMN_HASREFS, parent, pndx, alloc), m_spec(COLUMN_NORMAL, NULL, 0, a
 Spec::Spec(Allocator& alloc, size_t ref, ArrayParent* parent, size_t pndx):
 m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
 {
-    Create(ref, parent, pndx);
+    create(ref, parent, pndx);
 }
 
 Spec::Spec(const Spec& s):
@@ -35,11 +35,11 @@ m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator())
     const size_t ref    = s.m_specSet.GetRef();
     ArrayParent *parent = s.m_specSet.GetParent();
     const size_t pndx   = s.m_specSet.GetParentNdx();
-    
-    Create(ref, parent, pndx);
+
+    create(ref, parent, pndx);
 }
 
-void Spec::Create(size_t ref, ArrayParent* parent, size_t pndx)
+void Spec::create(size_t ref, ArrayParent* parent, size_t pndx)
 {
     m_specSet.UpdateRef(ref);
     m_specSet.SetParent(parent, pndx);
@@ -57,23 +57,23 @@ void Spec::Create(size_t ref, ArrayParent* parent, size_t pndx)
     }
 }
 
-void Spec::Destroy() {
+void Spec::destroy() {
     m_specSet.Destroy();
 }
 
-size_t Spec::GetRef() const {
+size_t Spec::get_ref() const {
     return m_specSet.GetRef();
 }
 
-void Spec::UpdateRef(size_t ref, ArrayParent* parent, size_t pndx) {
-    Create(ref, parent, pndx);
+void Spec::update_ref(size_t ref, ArrayParent* parent, size_t pndx) {
+    create(ref, parent, pndx);
 }
 
-void Spec::SetParent(ArrayParent* parent, size_t pndx) {
+void Spec::set_parent(ArrayParent* parent, size_t pndx) {
     m_specSet.SetParent(parent, pndx);
 }
 
-bool Spec::UpdateFromParent() {
+bool Spec::update_from_parent() {
     if (m_specSet.UpdateFromParent()) {
         m_spec.UpdateFromParent();
         m_names.UpdateFromParent();
@@ -85,7 +85,7 @@ bool Spec::UpdateFromParent() {
     else return false;
 }
 
-void Spec::AddColumn(ColumnType type, const char* name)
+void Spec::add_column(ColumnType type, const char* name)
 {
     assert(name);
     
@@ -117,15 +117,15 @@ void Spec::AddColumn(ColumnType type, const char* name)
     }
 }
 
-Spec Spec::AddColumnTable(const char* name)
+Spec Spec::add_subtable_column(const char* name)
 {
     const size_t column_id = m_names.Size();
-    AddColumn(COLUMN_TYPE_TABLE, name);
+    add_column(COLUMN_TYPE_TABLE, name);
     
-    return GetSpec(column_id);
+    return get_subspec(column_id);
 }
 
-Spec Spec::GetSpec(size_t column_id)
+Spec Spec::get_subspec(size_t column_id)
 {
     assert(column_id < m_spec.Size());
     assert((ColumnType)m_spec.Get(column_id) == COLUMN_TYPE_TABLE);
@@ -143,7 +143,7 @@ Spec Spec::GetSpec(size_t column_id)
     return Spec(alloc, ref, &m_subSpecs, pos);
 }
 
-const Spec Spec::GetSpec(size_t column_id) const
+const Spec Spec::get_subspec(size_t column_id) const
 {
     assert(column_id < m_spec.Size());
     assert((ColumnType)m_spec.Get(column_id) == COLUMN_TYPE_TABLE);
@@ -161,7 +161,7 @@ const Spec Spec::GetSpec(size_t column_id) const
     return Spec(alloc, ref, NULL, 0);
 }
 
-size_t Spec::GetSubSpecRef(std::size_t subtable_ndx) const {
+size_t Spec::get_subspec_ref(std::size_t subtable_ndx) const {
     assert(subtable_ndx < m_subSpecs.Size());
     
     // Note that this addresses subspecs directly, indexing
@@ -169,22 +169,22 @@ size_t Spec::GetSubSpecRef(std::size_t subtable_ndx) const {
     return m_subSpecs.GetAsRef(subtable_ndx);
 }
     
-size_t Spec::GetTypeAttrCount() const {
+size_t Spec::get_type_attr_count() const {
     return m_spec.Size();
 }
 
-ColumnType Spec::GetTypeAttr(size_t ndx) const {
+ColumnType Spec::get_type_attr(size_t ndx) const {
     return (ColumnType)m_spec.Get(ndx);
 }
 
-size_t Spec::GetColumnCount() const
+size_t Spec::get_column_count() const
 {
     return m_names.Size();
 }
 
-ColumnType Spec::GetRealColumnType(size_t ndx) const
+ColumnType Spec::get_real_column_type(size_t ndx) const
 {
-    assert(ndx < GetColumnCount());
+    assert(ndx < get_column_count());
     
     ColumnType type;
     size_t column_ndx = 0;
@@ -197,19 +197,19 @@ ColumnType Spec::GetRealColumnType(size_t ndx) const
     return type;
 }
 
-ColumnType Spec::GetColumnType(size_t ndx) const
+ColumnType Spec::get_column_type(size_t ndx) const
 {
-    assert(ndx < GetColumnCount());
+    assert(ndx < get_column_count());
     
-    const ColumnType type = GetRealColumnType(ndx);
+    const ColumnType type = get_real_column_type(ndx);
     
     // Hide internal types
     if (type == COLUMN_TYPE_STRING_ENUM) return COLUMN_TYPE_STRING;
     else return type;
 }
 
-void Spec::SetColumnType(std::size_t column_ndx, ColumnType type) {
-    assert(column_ndx < GetColumnCount());
+void Spec::set_column_type(std::size_t column_ndx, ColumnType type) {
+    assert(column_ndx < get_column_count());
     
     size_t type_ndx = 0;
     size_t column_count = 0;
@@ -229,9 +229,9 @@ void Spec::SetColumnType(std::size_t column_ndx, ColumnType type) {
     m_spec.Set(type_ndx, type);
 }
 
-ColumnType Spec::GetColumnAttr(size_t ndx) const
+ColumnType Spec::get_column_attr(size_t ndx) const
 {
-    assert(ndx < GetColumnCount());
+    assert(ndx < get_column_count());
     
     size_t column_ndx = 0;
     
@@ -247,9 +247,9 @@ ColumnType Spec::GetColumnAttr(size_t ndx) const
     return COLUMN_ATTR_NONE;
 }
 
-void Spec::SetColumnAttr(size_t ndx, ColumnType attr)
+void Spec::set_column_attr(size_t ndx, ColumnType attr)
 {
-    assert(ndx < GetColumnCount());
+    assert(ndx < get_column_count());
     assert(attr >= COLUMN_ATTR_INDEXED);
     
     size_t column_ndx = 0;
@@ -275,33 +275,33 @@ void Spec::SetColumnAttr(size_t ndx, ColumnType attr)
     }
 }
 
-const char* Spec::GetColumnName(size_t ndx) const
+const char* Spec::get_column_name(size_t ndx) const
 {
-    assert(ndx < GetColumnCount());
+    assert(ndx < get_column_count());
     return m_names.Get(ndx);
 }
 
-size_t Spec::GetColumnIndex(const char* name) const
+size_t Spec::get_column_index(const char* name) const
 {
     return m_names.Find(name);
 }
 
 #ifdef _DEBUG
 
-bool Spec::Compare(const Spec& spec) const {
+bool Spec::compare(const Spec& spec) const {
     if (!m_spec.Compare(spec.m_spec)) return false;
     if (!m_names.Compare(spec.m_names)) return false;
 
     return true;
 }
 
-void Spec::Verify() const {
-    const size_t column_count = GetColumnCount();
+void Spec::verify() const {
+    const size_t column_count = get_column_count();
     assert(column_count == m_names.Size());
     assert(column_count == m_spec.Size());
 }
 
-void Spec::ToDot(std::ostream& out, const char*) const
+void Spec::to_dot(std::ostream& out, const char*) const
 {
     const size_t ref = m_specSet.GetRef();
     
@@ -322,7 +322,7 @@ void Spec::ToDot(std::ostream& out, const char*) const
             const size_t ref = m_subSpecs.GetAsRef(i);
             const Spec s(alloc, ref, NULL, 0);
             
-            s.ToDot(out);
+            s.to_dot(out);
         }
     }
     

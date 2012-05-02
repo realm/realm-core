@@ -414,10 +414,10 @@ TEST(Group_Subtable)
     Group g;
     Table& table = g.get_table("test");
     Spec& s = table.GetSpec();
-    s.AddColumn(COLUMN_TYPE_INT, "foo");
-    Spec sub = s.AddColumnTable("sub");
-    sub.AddColumn(COLUMN_TYPE_INT, "bar");
-    s.AddColumn(COLUMN_TYPE_MIXED, "baz");
+    s.add_column(COLUMN_TYPE_INT, "foo");
+    Spec sub = s.add_subtable_column("sub");
+    sub.add_column(COLUMN_TYPE_INT, "bar");
+    s.add_column(COLUMN_TYPE_MIXED, "baz");
     table.UpdateFromSpec();
 
     for (int i=0; i<n; ++i) {
@@ -646,16 +646,16 @@ TEST(Group_MultiLevelSubtables)
         Table& table = g.get_table("test");
         {
             Spec& s = table.GetSpec();
-            s.AddColumn(COLUMN_TYPE_INT, "int");
+            s.add_column(COLUMN_TYPE_INT, "int");
             {
-                Spec sub = s.AddColumnTable("tab");
-                sub.AddColumn(COLUMN_TYPE_INT, "int");
+                Spec sub = s.add_subtable_column("tab");
+                sub.add_column(COLUMN_TYPE_INT, "int");
                 {
-                    Spec subsub = sub.AddColumnTable("tab");
-                    subsub.AddColumn(COLUMN_TYPE_INT, "int");
+                    Spec subsub = sub.add_subtable_column("tab");
+                    subsub.add_column(COLUMN_TYPE_INT, "int");
                 }
             }
-            s.AddColumn(COLUMN_TYPE_MIXED, "mix");
+            s.add_column(COLUMN_TYPE_MIXED, "mix");
             table.UpdateFromSpec();
         }
         table.AddRow();
@@ -670,8 +670,8 @@ TEST(Group_MultiLevelSubtables)
             TableRef a = table.GetTable(2, 0);
             {
                 Spec& s = a->GetSpec();
-                s.AddColumn(COLUMN_TYPE_INT, "int");
-                s.AddColumn(COLUMN_TYPE_MIXED, "mix");
+                s.add_column(COLUMN_TYPE_INT, "int");
+                s.add_column(COLUMN_TYPE_MIXED, "mix");
                 a->UpdateFromSpec();
             }
             a->AddRow();
@@ -679,7 +679,7 @@ TEST(Group_MultiLevelSubtables)
             TableRef b = a->GetTable(1, 0);
             {
                 Spec& s = b->GetSpec();
-                s.AddColumn(COLUMN_TYPE_INT, "int");
+                s.add_column(COLUMN_TYPE_INT, "int");
                 b->UpdateFromSpec();
             }
             b->AddRow();
@@ -786,17 +786,17 @@ TEST(Group_ToDot)
     // Create table with all column types
     Table& table = mygroup.get_table("test");
     Spec s = table.GetSpec();
-    s.AddColumn(COLUMN_TYPE_INT,    "int");
-    s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
-    s.AddColumn(COLUMN_TYPE_DATE,   "date");
-    s.AddColumn(COLUMN_TYPE_STRING, "string");
-    s.AddColumn(COLUMN_TYPE_STRING, "string_long");
-    s.AddColumn(COLUMN_TYPE_STRING, "string_enum"); // becomes ColumnStringEnum
-    s.AddColumn(COLUMN_TYPE_BINARY, "binary");
-    s.AddColumn(COLUMN_TYPE_MIXED,  "mixed");
-    Spec sub = s.AddColumnTable(    "tables");
-    sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
-    sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
+    s.add_column(COLUMN_TYPE_INT,    "int");
+    s.add_column(COLUMN_TYPE_BOOL,   "bool");
+    s.add_column(COLUMN_TYPE_DATE,   "date");
+    s.add_column(COLUMN_TYPE_STRING, "string");
+    s.add_column(COLUMN_TYPE_STRING, "string_long");
+    s.add_column(COLUMN_TYPE_STRING, "string_enum"); // becomes ColumnStringEnum
+    s.add_column(COLUMN_TYPE_BINARY, "binary");
+    s.add_column(COLUMN_TYPE_MIXED,  "mixed");
+    Spec sub = s.add_subtable_column("tables");
+    sub.add_column(COLUMN_TYPE_INT,  "sub_first");
+    sub.add_column(COLUMN_TYPE_STRING, "sub_second");
     table.UpdateFromSpec(s.GetRef());
 
     // Add some rows
@@ -848,8 +848,8 @@ TEST(Group_ToDot)
             Table subtable = table.GetMixedTable(7, i);
 
             Spec s = subtable.GetSpec();
-            s.AddColumn(COLUMN_TYPE_INT,    "first");
-            s.AddColumn(COLUMN_TYPE_STRING, "second");
+            s.add_column(COLUMN_TYPE_INT,    "first");
+            s.add_column(COLUMN_TYPE_STRING, "second");
             subtable.UpdateFromSpec(s.GetRef());
 
             subtable.InsertInt(0, 0, 42);

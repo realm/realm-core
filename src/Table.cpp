@@ -34,9 +34,9 @@ Table::Table(Allocator& alloc):
     m_spec_set(alloc, NULL, 0),
     m_ref_count(1)
 {
-    m_top.Add(m_spec_set.GetRef());
+    m_top.Add(m_spec_set.get_ref());
     m_top.Add(m_columns.GetRef());
-    m_spec_set.SetParent(&m_top, 0);
+    m_spec_set.set_parent(&m_top, 0);
     m_columns.SetParent(&m_top, 1);
 }
 
@@ -53,7 +53,7 @@ Table::Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_par
     const size_t columns_ref = m_top.GetAsRef(1);
 
     Create(schema_ref, columns_ref, &m_top, 1);
-    m_spec_set.SetParent(&m_top, 0);
+    m_spec_set.set_parent(&m_top, 0);
 }
 
 // Create attached table from ref
@@ -69,7 +69,7 @@ Table::Table(SubtableTag, Allocator& alloc, size_t top_ref, Parent* parent, size
     const size_t columns_ref = m_top.GetAsRef(1);
 
     Create(schema_ref, columns_ref, &m_top, 1);
-    m_spec_set.SetParent(&m_top, 0);
+    m_spec_set.set_parent(&m_top, 0);
 }
 
 // Create attached sub-table from ref and schema_ref
@@ -83,7 +83,7 @@ Table::Table(SubtableTag, Allocator& alloc, size_t schema_ref, size_t columns_re
 void Table::Create(size_t ref_specSet, size_t columns_ref,
                    ArrayParent *parent, size_t ndx_in_parent)
 {
-    m_spec_set.UpdateRef(ref_specSet);
+    m_spec_set.update_ref(ref_specSet);
 
     // A table instatiated with a zero-ref is just an empty table
     // but it will have to create itself on first modification
@@ -106,11 +106,11 @@ void Table::CreateColumns()
     size_t subtable_count = 0;
     ColumnType attr = COLUMN_ATTR_NONE;
     Allocator& alloc = m_columns.GetAllocator();
-    const size_t count = m_spec_set.GetTypeAttrCount();
+    const size_t count = m_spec_set.get_type_attr_count();
 
     // Add the newly defined columns
     for (size_t i = 0; i < count; ++i) {
-        const ColumnType type = m_spec_set.GetTypeAttr(i);
+        const ColumnType type = m_spec_set.get_type_attr(i);
         const size_t ref_pos =  m_columns.Size();
         ColumnBase* newColumn = NULL;
 
@@ -134,7 +134,7 @@ void Table::CreateColumns()
                 break;
             case COLUMN_TYPE_TABLE:
             {
-                const size_t subspec_ref = m_spec_set.GetSubSpecRef(subtable_count);
+                const size_t subspec_ref = m_spec_set.get_subspec_ref(subtable_count);
                 newColumn = new ColumnTable(subspec_ref, NULL, 0, alloc, this);
                 m_columns.Add(((ColumnTable*)newColumn)->GetRef());
                 ((ColumnTable*)newColumn)->SetParent(&m_columns, ref_pos);
@@ -197,12 +197,12 @@ void Table::CacheColumns()
     ColumnType attr = COLUMN_ATTR_NONE;
     size_t size = (size_t)-1;
     size_t column_ndx = 0;
-    const size_t count = m_spec_set.GetTypeAttrCount();
+    const size_t count = m_spec_set.get_type_attr_count();
     size_t subtable_count = 0;
 
     // Cache columns
     for (size_t i = 0; i < count; ++i) {
-        const ColumnType type = m_spec_set.GetTypeAttr(i);
+        const ColumnType type = m_spec_set.get_type_attr(i);
         const size_t ref = m_columns.GetAsRef(column_ndx);
 
         ColumnBase* newColumn = NULL;
@@ -232,7 +232,7 @@ void Table::CacheColumns()
             }
             case COLUMN_TYPE_TABLE:
             {
-                const size_t ref_specSet = m_spec_set.GetSubSpecRef(subtable_count);
+                const size_t ref_specSet = m_spec_set.get_subspec_ref(subtable_count);
 
                 newColumn = new ColumnTable(ref, ref_specSet, &m_columns, column_ndx, alloc, this);
                 colsize = ((ColumnTable*)newColumn)->Size();
@@ -331,30 +331,30 @@ Table::~Table()
     }
 
     assert(m_ref_count == 1);
-    m_spec_set.Destroy();
+    m_spec_set.destroy();
     m_columns.Destroy();
 }
 
 size_t Table::GetColumnCount() const
 {
-    return m_spec_set.GetColumnCount();
+    return m_spec_set.get_column_count();
 }
 
 const char* Table::GetColumnName(size_t ndx) const
 {
     assert(ndx < GetColumnCount());
-    return m_spec_set.GetColumnName(ndx);
+    return m_spec_set.get_column_name(ndx);
 }
 
 size_t Table::GetColumnIndex(const char* name) const
 {
-    return m_spec_set.GetColumnIndex(name);
+    return m_spec_set.get_column_index(name);
 }
 
 ColumnType Table::GetRealColumnType(size_t ndx) const
 {
     assert(ndx < GetColumnCount());
-    return m_spec_set.GetRealColumnType(ndx);
+    return m_spec_set.get_real_column_type(ndx);
 }
 
 ColumnType Table::GetColumnType(size_t ndx) const
@@ -362,19 +362,19 @@ ColumnType Table::GetColumnType(size_t ndx) const
     assert(ndx < GetColumnCount());
 
     // Hides internal types like COLUM_STRING_ENUM
-    return m_spec_set.GetColumnType(ndx);
+    return m_spec_set.get_column_type(ndx);
 }
 
 size_t Table::GetColumnRefPos(size_t column_ndx) const
 {
     size_t pos = 0;
     size_t current_column = 0;
-    const size_t count = m_spec_set.GetTypeAttrCount();
+    const size_t count = m_spec_set.get_type_attr_count();
 
     for (size_t i = 0; i < count; ++i) {
         if (current_column == column_ndx) return pos;
 
-        const ColumnType type = (ColumnType)m_spec_set.GetTypeAttr(i);
+        const ColumnType type = (ColumnType)m_spec_set.get_type_attr(i);
         if (type >= COLUMN_ATTR_INDEXED) continue; // ignore attributes
         if (type < COLUMN_TYPE_STRING_ENUM) ++pos;
         else pos += 2;
@@ -420,7 +420,7 @@ size_t Table::register_column(ColumnType type, const char* name)
         assert(false);
     }
 
-    m_spec_set.AddColumn(type, name);
+    m_spec_set.add_column(type, name);
     m_cols.Add((intptr_t)newColumn);
 
     return column_ndx;
@@ -1063,7 +1063,7 @@ void Table::Optimize()
             if (!res) continue;
 
             // Add to spec and column refs
-            m_spec_set.SetColumnType(i, COLUMN_TYPE_STRING_ENUM);
+            m_spec_set.set_column_type(i, COLUMN_TYPE_STRING_ENUM);
             const size_t column_ndx = GetColumnRefPos(i);
             m_columns.Set(column_ndx, ref_keys);
             m_columns.Insert(column_ndx+1, ref_values);
@@ -1096,7 +1096,7 @@ void Table::UpdateFromParent() {
         if (!m_top.UpdateFromParent()) return;
     }
     
-    m_spec_set.UpdateFromParent();
+    m_spec_set.update_from_parent();
     if (!m_columns.UpdateFromParent()) return;
     
     // Update cached columns
@@ -1250,7 +1250,7 @@ void Table::to_json(std::ostream& out)
 
 bool Table::Compare(const Table& c) const
 {
-    if (!m_spec_set.Compare(c.m_spec_set)) return false;
+    if (!m_spec_set.compare(c.m_spec_set)) return false;
 
     const size_t column_count = GetColumnCount();
     if (column_count != c.GetColumnCount()) return false;
@@ -1346,7 +1346,7 @@ void Table::verify() const
         }
     }
     
-    m_spec_set.Verify();
+    m_spec_set.verify();
 
     Allocator& alloc = m_columns.GetAllocator();
     alloc.Verify();
@@ -1361,7 +1361,7 @@ void Table::ToDot(std::ostream& out, const char* title) const
         out << "\";" << endl;
         m_top.ToDot(out, "table_top");
         const Spec& specset = GetSpec();
-        specset.ToDot(out);
+        specset.to_dot(out);
     }
     else {
         out << "subgraph cluster_table_"  << m_columns.GetRef() <<  " {" << endl;
@@ -1394,7 +1394,7 @@ void Table::Print() const
     cout << "Table: len(" << m_size << ")\n    ";
     const size_t column_count = GetColumnCount();
     for (size_t i = 0; i < column_count; ++i) {
-        const char* name = m_spec_set.GetColumnName(i);
+        const char* name = m_spec_set.get_column_name(i);
         cout << left << setw(10) << name << right << " ";
     }
 

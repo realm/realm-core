@@ -9,7 +9,7 @@ directiveStartToken = %
 #ifndef TIGHTDB_H
 #define TIGHTDB_H
 
-#include "basic_table.hpp"
+#include "table_basic.hpp"
 
 
 %for $i in range($max_cols)

@@ -154,17 +154,17 @@ TEST(Table_Delete_All_Types)
     // Create table with all column types
     Table table;
     Spec& s = table.GetSpec();
-    s.AddColumn(COLUMN_TYPE_INT,    "int");
-    s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
-    s.AddColumn(COLUMN_TYPE_DATE,   "date");
-    s.AddColumn(COLUMN_TYPE_STRING, "string");
-    s.AddColumn(COLUMN_TYPE_STRING, "string_long");
-    s.AddColumn(COLUMN_TYPE_STRING, "string_enum"); // becomes ColumnStringEnum
-    s.AddColumn(COLUMN_TYPE_BINARY, "binary");
-    s.AddColumn(COLUMN_TYPE_MIXED,  "mixed");
-    Spec sub = s.AddColumnTable(    "tables");
-    sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
-    sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
+    s.add_column(COLUMN_TYPE_INT,    "int");
+    s.add_column(COLUMN_TYPE_BOOL,   "bool");
+    s.add_column(COLUMN_TYPE_DATE,   "date");
+    s.add_column(COLUMN_TYPE_STRING, "string");
+    s.add_column(COLUMN_TYPE_STRING, "string_long");
+    s.add_column(COLUMN_TYPE_STRING, "string_enum"); // becomes ColumnStringEnum
+    s.add_column(COLUMN_TYPE_BINARY, "binary");
+    s.add_column(COLUMN_TYPE_MIXED,  "mixed");
+    Spec sub = s.add_subtable_column("tables");
+    sub.add_column(COLUMN_TYPE_INT,    "sub_first");
+    sub.add_column(COLUMN_TYPE_STRING, "sub_second");
     table.UpdateFromSpec();
 
     // Add some rows
@@ -536,11 +536,11 @@ TEST(Table_Spec)
 
     // Create specification with sub-table
     Spec& s = table.GetSpec();
-    s.AddColumn(COLUMN_TYPE_INT,    "first");
-    s.AddColumn(COLUMN_TYPE_STRING, "second");
-    Spec sub = s.AddColumnTable(    "third");
-        sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
-        sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
+    s.add_column(COLUMN_TYPE_INT,    "first");
+    s.add_column(COLUMN_TYPE_STRING, "second");
+    Spec sub = s.add_subtable_column("third");
+        sub.add_column(COLUMN_TYPE_INT,    "sub_first");
+        sub.add_column(COLUMN_TYPE_STRING, "sub_second");
     table.UpdateFromSpec();
 
     CHECK_EQUAL(3, table.GetColumnCount());

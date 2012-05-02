@@ -59,11 +59,11 @@ TEST(TestQuerySubtable)
 
     // Create specification with sub-table
     Spec& s = table.GetSpec();
-    s.AddColumn(COLUMN_TYPE_INT,    "first");
-    s.AddColumn(COLUMN_TYPE_STRING, "second");
-    Spec sub = s.AddColumnTable(    "third");
-        sub.AddColumn(COLUMN_TYPE_INT,    "sub_first");
-        sub.AddColumn(COLUMN_TYPE_STRING, "sub_second");
+    s.add_column(COLUMN_TYPE_INT,    "first");
+    s.add_column(COLUMN_TYPE_STRING, "second");
+    Spec sub = s.add_subtable_column("third");
+        sub.add_column(COLUMN_TYPE_INT,    "sub_first");
+        sub.add_column(COLUMN_TYPE_STRING, "sub_second");
     table.UpdateFromSpec();
 
     CHECK_EQUAL(3, table.GetColumnCount());
