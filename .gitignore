@@ -1,3 +1,7 @@
+*.tdb
+*.tightdb
+*.tbl
+
 *.ncb
 *.suo
 *.vcproj.*.user

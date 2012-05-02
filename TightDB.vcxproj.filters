@@ -2,10 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="src\Array.cpp" />
-    <ClCompile Include="src\ArrayBinary.cpp" />
-    <ClCompile Include="src\ArrayBlob.cpp" />
-    <ClCompile Include="src\ArrayString.cpp" />
-    <ClCompile Include="src\ArrayStringLong.cpp" />
     <ClCompile Include="src\Column.cpp" />
     <ClCompile Include="src\ColumnBinary.cpp" />
     <ClCompile Include="src\ColumnString.cpp" />
@@ -13,17 +9,7 @@
     <ClCompile Include="src\Group.cpp" />
     <ClCompile Include="src\Index.cpp" />
     <ClCompile Include="src\utilities.cpp" />
-    <ClCompile Include="test\main.cpp" />
     <ClCompile Include="src\Table.cpp" />
-    <ClCompile Include="test\testalloc.cpp" />
-    <ClCompile Include="test\testarray.cpp" />
-    <ClCompile Include="test\testarraystring.cpp" />
-    <ClCompile Include="test\testcolumn.cpp" />
-    <ClCompile Include="test\testcolumnstring.cpp" />
-    <ClCompile Include="test\testgroup.cpp" />
-    <ClCompile Include="test\testindex.cpp" />
-    <ClCompile Include="test\testtable.cpp" />
-    <ClCompile Include="test\testTableView.cpp" />
     <ClCompile Include="test\large_tests\verified_integer.cpp">
       <Filter>large_tests</Filter>
     </ClCompile>
@@ -38,7 +24,6 @@
     </ClCompile>
     <ClCompile Include="src\ColumnStringEnum.cpp" />
     <ClCompile Include="src\ColumnTable.cpp" />
-    <ClCompile Include="test\TestQuery.cpp" />
     <ClCompile Include="src\utf8.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c">
       <Filter>pthreads</Filter>
@@ -48,6 +33,43 @@
     <ClCompile Include="src\group_writer.cpp" />
     <ClCompile Include="src\spec.cpp" />
     <ClCompile Include="src\table_view.cpp" />
+    <ClCompile Include="src\array_binary.cpp" />
+    <ClCompile Include="src\array_blob.cpp" />
+    <ClCompile Include="src\array_string.cpp" />
+    <ClCompile Include="src\array_string_long.cpp" />
+    <ClCompile Include="test\testTableView.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testtable.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\TestQuery.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testindex.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testgroup.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testcolumnstring.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testcolumn.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testarraystring.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testarray.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testalloc.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\main.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="test\large_tests\verified_integer.h">
@@ -60,22 +82,9 @@
     <ClInclude Include="src\win32\pthread\pthread.h">
       <Filter>pthreads</Filter>
     </ClInclude>
-    <ClInclude Include="src\query\conditions.hpp">
-      <Filter>query</Filter>
-    </ClInclude>
-    <ClInclude Include="src\query\QueryEngine.hpp">
-      <Filter>query</Filter>
-    </ClInclude>
-    <ClInclude Include="src\query\QueryInterface.hpp">
-      <Filter>query</Filter>
-    </ClInclude>
     <ClInclude Include="src\alloc.hpp" />
     <ClInclude Include="src\Array.hpp" />
-    <ClInclude Include="src\ArrayBinary.hpp" />
-    <ClInclude Include="src\ArrayBlob.hpp" />
     <ClInclude Include="src\AllocSlab.hpp" />
-    <ClInclude Include="src\ArrayString.hpp" />
-    <ClInclude Include="src\ArrayStringLong.hpp" />
     <ClInclude Include="src\Column.hpp" />
     <ClInclude Include="src\Column_tpl.hpp" />
     <ClInclude Include="src\ColumnBinary.hpp" />
@@ -102,16 +111,24 @@
     <ClInclude Include="src\table_basic.hpp" />
     <ClInclude Include="src\table_ref.hpp" />
     <ClInclude Include="src\table_view.hpp" />
+    <ClInclude Include="src\query\conditions.hpp" />
+    <ClInclude Include="src\query.hpp" />
+    <ClInclude Include="src\query_conditions.hpp" />
+    <ClInclude Include="src\query_engine.hpp" />
+    <ClInclude Include="src\array_binary.hpp" />
+    <ClInclude Include="src\array_blob.hpp" />
+    <ClInclude Include="src\array_string.hpp" />
+    <ClInclude Include="src\array_string_long.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">
       <UniqueIdentifier>{3e451fa6-2e90-45e6-824f-68fe7042fbcf}</UniqueIdentifier>
     </Filter>
-    <Filter Include="query">
-      <UniqueIdentifier>{775025cf-a8a9-4cb2-a6fa-9e324b3c7f1d}</UniqueIdentifier>
-    </Filter>
     <Filter Include="pthreads">
       <UniqueIdentifier>{b4eeb124-957f-4448-b620-3662238e268a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="test">
+      <UniqueIdentifier>{d65594c9-e911-48b1-9f60-693bab72c732}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

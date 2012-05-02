@@ -360,10 +360,10 @@
     <ClCompile Include="src\Array.cpp">
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">EnableAllWarnings</WarningLevel>
     </ClCompile>
-    <ClCompile Include="src\ArrayBinary.cpp" />
-    <ClCompile Include="src\ArrayBlob.cpp" />
-    <ClCompile Include="src\ArrayString.cpp" />
-    <ClCompile Include="src\ArrayStringLong.cpp" />
+    <ClCompile Include="src\array_binary.cpp" />
+    <ClCompile Include="src\array_blob.cpp" />
+    <ClCompile Include="src\array_string.cpp" />
+    <ClCompile Include="src\array_string_long.cpp" />
     <ClCompile Include="src\Column.cpp" />
     <ClCompile Include="src\ColumnBinary.cpp" />
     <ClCompile Include="src\ColumnMixed.cpp" />
@@ -500,10 +500,10 @@
     <ClInclude Include="src\AllocSlab.hpp" />
     <ClInclude Include="src\alloc_slab.hpp" />
     <ClInclude Include="src\Array.hpp" />
-    <ClInclude Include="src\ArrayBinary.hpp" />
-    <ClInclude Include="src\ArrayBlob.hpp" />
-    <ClInclude Include="src\ArrayString.hpp" />
-    <ClInclude Include="src\ArrayStringLong.hpp" />
+    <ClInclude Include="src\array_binary.hpp" />
+    <ClInclude Include="src\array_blob.hpp" />
+    <ClInclude Include="src\array_string.hpp" />
+    <ClInclude Include="src\array_string_long.hpp" />
     <ClInclude Include="src\Column.hpp" />
     <ClInclude Include="src\ColumnBinary.hpp" />
     <ClInclude Include="src\ColumnMixed.hpp" />
@@ -520,9 +520,10 @@
     <ClInclude Include="src\Index.hpp" />
     <ClInclude Include="src\meta.hpp" />
     <ClInclude Include="src\mixed.hpp" />
+    <ClInclude Include="src\query.hpp" />
     <ClInclude Include="src\query\conditions.hpp" />
-    <ClInclude Include="src\query\QueryEngine.hpp" />
-    <ClInclude Include="src\query\QueryInterface.hpp" />
+    <ClInclude Include="src\query_conditions.hpp" />
+    <ClInclude Include="src\query_engine.hpp" />
     <ClInclude Include="src\spec.hpp" />
     <ClInclude Include="src\static_assert.hpp" />
     <ClInclude Include="src\Table.hpp" />

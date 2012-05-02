@@ -9,7 +9,7 @@
 #include <limits.h>
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
     #include "Win32/pthread/pthread.h"
-    #include "query/QueryEngine.hpp"
+    #include "query_engine.hpp"
 #else
     #include <pthread.h>
     #include "query_engine.hpp"
