@@ -35,7 +35,6 @@ public:
      * Construct a new top-level table with an independent schema.
      */
     Table(Allocator& alloc = GetDefaultAllocator());
-
     ~Table();
 
     TableRef GetTableRef() { return TableRef(this); }
@@ -47,27 +46,35 @@ public:
     std::size_t GetColumnIndex(const char* name) const;
     ColumnType GetColumnType(std::size_t ndx) const;
 
+    // Schema handling
     Spec& GetSpec();
     const Spec& GetSpec() const;
-
-    /// Must not be called for a table with shared schema
-    void UpdateFromSpec();
+    std::size_t register_column(ColumnType type, const char* name);
+    void UpdateFromSpec(); /// Must not be called for a table with shared schema
 
     bool IsEmpty() const {return m_size == 0;}
     std::size_t GetSize() const {return m_size;}
 
+    // Row handling
     std::size_t AddRow();
     void clear();
     void erase(std::size_t ndx);
     void pop_back() {if (!IsEmpty()) erase(m_size-1);}
 
-    // Adaptive ints
+    // Getters and Setters
     int64_t Get(std::size_t column_id, std::size_t ndx) const;
     void Set(std::size_t column_id, std::size_t ndx, int64_t value);
     bool GetBool(std::size_t column_id, std::size_t ndx) const;
     void SetBool(std::size_t column_id, std::size_t ndx, bool value);
     std::time_t GetDate(std::size_t column_id, std::size_t ndx) const;
     void SetDate(std::size_t column_id, std::size_t ndx, std::time_t value);
+    const char* GetString(std::size_t column_id, std::size_t ndx) const;
+    void SetString(std::size_t column_id, std::size_t ndx, const char* value);
+    BinaryData GetBinary(std::size_t column_id, std::size_t ndx) const;
+    void SetBinary(std::size_t column_id, std::size_t ndx, const char* value, std::size_t len);
+    Mixed GetMixed(std::size_t column_id, std::size_t ndx) const;
+    ColumnType GetMixedType(std::size_t column_id, std::size_t ndx) const;
+    void SetMixed(std::size_t column_id, std::size_t ndx, Mixed value);
 
     // NOTE: Low-level insert functions. Always insert in all columns at once
     // and call InsertDone after to avoid table getting un-balanced.
@@ -77,31 +84,17 @@ public:
     template<class T> void InsertEnum(std::size_t column_id, std::size_t ndx, T value);
     void InsertString(std::size_t column_id, std::size_t ndx, const char* value);
     void InsertBinary(std::size_t column_id, std::size_t ndx, const char* value, std::size_t len);
+    void InsertMixed(std::size_t column_id, std::size_t ndx, Mixed value);
     void InsertDone();
 
-    // Strings
-    const char* GetString(std::size_t column_id, std::size_t ndx) const;
-    void SetString(std::size_t column_id, std::size_t ndx, const char* value);
-
-    // Binary
-    BinaryData GetBinary(std::size_t column_id, std::size_t ndx) const;
-    void SetBinary(std::size_t column_id, std::size_t ndx, const char* value, std::size_t len);
-
-    // Sub-tables
+    // Sub-tables (works both on table- and mixed columns)
     TableRef GetTable(std::size_t column_id, std::size_t ndx);
     ConstTableRef GetTable(std::size_t column_id, std::size_t ndx) const;
     std::size_t GetTableSize(std::size_t column_id, std::size_t ndx) const;
-    void   InsertTable(std::size_t column_id, std::size_t ndx);
-    void   ClearTable(std::size_t column_id, std::size_t ndx);
+    void InsertTable(std::size_t column_id, std::size_t ndx);
+    void ClearTable(std::size_t column_id, std::size_t ndx);
 
-    // Mixed
-    Mixed GetMixed(std::size_t column_id, std::size_t ndx) const;
-    ColumnType GetMixedType(std::size_t column_id, std::size_t ndx) const;
-    void InsertMixed(std::size_t column_id, std::size_t ndx, Mixed value);
-    void SetMixed(std::size_t column_id, std::size_t ndx, Mixed value);
-
-    std::size_t register_column(ColumnType type, const char* name);
-
+    // Direct Column access
     Column& GetColumn(std::size_t ndx);
     const Column& GetColumn(std::size_t ndx) const;
     AdaptiveStringColumn& GetColumnString(std::size_t ndx);
