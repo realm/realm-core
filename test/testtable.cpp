@@ -528,7 +528,7 @@ TEST(Table_SlabAlloc)
 #endif //_DEBUG
 }
 
-#include "Group.hpp"
+#include "group.hpp"
 TEST(Table_Spec)
 {
     Group group;

@@ -1,5 +1,5 @@
 #include "group_writer.hpp"
-#include "Group.hpp"
+#include "group.hpp"
 #include "alloc_slab.hpp"
 
 using namespace tightdb;

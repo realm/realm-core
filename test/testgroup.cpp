@@ -1,4 +1,4 @@
-#include "Group.hpp"
+#include "group.hpp"
 #include "tightdb.hpp"
 #include <UnitTest++.h>
 

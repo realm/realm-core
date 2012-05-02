@@ -35,7 +35,7 @@
 		3647E1111420E69400D56FD7 /* testindex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04D14209CE600D56FD7 /* testindex.cpp */; };
 		3647E1121420E69400D56FD7 /* testtable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04E14209CE600D56FD7 /* testtable.cpp */; };
 		3672919C1471566800060DB2 /* libUnitTest++.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */; };
-		368063321445977300283774 /* Group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063311445977300283774 /* Group.cpp */; };
+		368063321445977300283774 /* group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063311445977300283774 /* group.cpp */; };
 		368063381445AF9B00283774 /* testgroup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063361445AD9200283774 /* testgroup.cpp */; };
 		3680633A1446D12B00283774 /* testalloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063391446D12A00283774 /* testalloc.cpp */; };
 		36DB875A153F02250096CF75 /* alloc_slab.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEEB14209C1200D56FD7 /* alloc_slab.cpp */; };
@@ -47,7 +47,7 @@
 		36DB8760153F02250096CF75 /* Index.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEF814209C1200D56FD7 /* Index.cpp */; };
 		36DB8761153F02250096CF75 /* Table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEFA14209C1200D56FD7 /* Table.cpp */; };
 		36DB8762153F02250096CF75 /* table_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DEFC14209C1200D56FD7 /* table_view.cpp */; };
-		36DB8763153F02250096CF75 /* Group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063311445977300283774 /* Group.cpp */; };
+		36DB8763153F02250096CF75 /* group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063311445977300283774 /* group.cpp */; };
 		36DB8764153F02250096CF75 /* ArrayBlob.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6088D1459E5DC00CCC3E8 /* ArrayBlob.cpp */; };
 		36DB8765153F02250096CF75 /* ArrayStringLong.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E60892145A88F800CCC3E8 /* ArrayStringLong.cpp */; };
 		36DB8766153F02250096CF75 /* ArrayBinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6089A145AE53500CCC3E8 /* ArrayBinary.cpp */; };
@@ -279,8 +279,8 @@
 		3647E0AF14209CE600D56FD7 /* XmlTestReporter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = XmlTestReporter.h; sourceTree = "<group>"; };
 		3647E0E714209E6B00D56FD7 /* libtightdb.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libtightdb.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		3647E1031420E4D800D56FD7 /* tightdb_unit_tests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tightdb_unit_tests; sourceTree = BUILT_PRODUCTS_DIR; };
-		368063311445977300283774 /* Group.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Group.cpp; sourceTree = "<group>"; };
-		368063341445979100283774 /* Group.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = Group.hpp; sourceTree = "<group>"; };
+		368063311445977300283774 /* group.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = group.cpp; sourceTree = "<group>"; };
+		368063341445979100283774 /* group.hpp */ = {isa = PBXFileReference; fileEncoding = 4; path = group.hpp; sourceTree = "<group>"; };
 		368063361445AD9200283774 /* testgroup.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testgroup.cpp; sourceTree = "<group>"; };
 		368063391446D12A00283774 /* testalloc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testalloc.cpp; sourceTree = "<group>"; };
 		36DB877E153F02250096CF75 /* libtightdb_ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libtightdb_ios.a; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -398,8 +398,8 @@
 				3647DEF614209C1200D56FD7 /* ctightdb.cpp */,
 				3647DEF714209C1200D56FD7 /* ctightdb.h */,
 				36DBF0EC1551766100CC12CC /* date.hpp */,
-				368063311445977300283774 /* Group.cpp */,
-				368063341445979100283774 /* Group.hpp */,
+				368063311445977300283774 /* group.cpp */,
+				368063341445979100283774 /* group.hpp */,
 				36DBF0D7154AC77A00CC12CC /* group_writer.cpp */,
 				36DBF0DA154AC79600CC12CC /* group_writer.hpp */,
 				3647DEF814209C1200D56FD7 /* Index.cpp */,
@@ -835,7 +835,7 @@
 				3647E0F914209EBB00D56FD7 /* Index.cpp in Sources */,
 				3647E0FB14209EBB00D56FD7 /* Table.cpp in Sources */,
 				3647E0FD14209EBB00D56FD7 /* table_view.cpp in Sources */,
-				368063321445977300283774 /* Group.cpp in Sources */,
+				368063321445977300283774 /* group.cpp in Sources */,
 				36E6088E1459E5DC00CCC3E8 /* ArrayBlob.cpp in Sources */,
 				36E60893145A88F900CCC3E8 /* ArrayStringLong.cpp in Sources */,
 				36E6089B145AE53500CCC3E8 /* ArrayBinary.cpp in Sources */,
@@ -886,7 +886,7 @@
 				36DB8760153F02250096CF75 /* Index.cpp in Sources */,
 				36DB8761153F02250096CF75 /* Table.cpp in Sources */,
 				36DB8762153F02250096CF75 /* table_view.cpp in Sources */,
-				36DB8763153F02250096CF75 /* Group.cpp in Sources */,
+				36DB8763153F02250096CF75 /* group.cpp in Sources */,
 				36DB8764153F02250096CF75 /* ArrayBlob.cpp in Sources */,
 				36DB8765153F02250096CF75 /* ArrayStringLong.cpp in Sources */,
 				36DB8766153F02250096CF75 /* ArrayBinary.cpp in Sources */,
