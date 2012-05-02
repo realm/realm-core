@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="src\alloc.cpp" />
     <ClCompile Include="src\Array.cpp" />
     <ClCompile Include="src\ArrayBinary.cpp" />
     <ClCompile Include="src\ArrayBlob.cpp" />
@@ -16,7 +15,6 @@
     <ClCompile Include="src\utilities.cpp" />
     <ClCompile Include="test\main.cpp" />
     <ClCompile Include="src\Table.cpp" />
-    <ClCompile Include="src\TableView.cpp" />
     <ClCompile Include="test\testalloc.cpp" />
     <ClCompile Include="test\testarray.cpp" />
     <ClCompile Include="test\testarraystring.cpp" />
@@ -46,6 +44,10 @@
       <Filter>pthreads</Filter>
     </ClCompile>
     <ClCompile Include="src\ColumnMixed.cpp" />
+    <ClCompile Include="src\alloc_slab.cpp" />
+    <ClCompile Include="src\group_writer.cpp" />
+    <ClCompile Include="src\spec.cpp" />
+    <ClCompile Include="src\table_view.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="test\large_tests\verified_integer.h">
@@ -90,6 +92,16 @@
     <ClInclude Include="src\tightdb.hpp" />
     <ClInclude Include="src\utf8.hpp" />
     <ClInclude Include="src\utilities.hpp" />
+    <ClInclude Include="src\alloc_slab.hpp" />
+    <ClInclude Include="src\date.hpp" />
+    <ClInclude Include="src\group_writer.hpp" />
+    <ClInclude Include="src\meta.hpp" />
+    <ClInclude Include="src\mixed.hpp" />
+    <ClInclude Include="src\spec.hpp" />
+    <ClInclude Include="src\static_assert.hpp" />
+    <ClInclude Include="src\table_basic.hpp" />
+    <ClInclude Include="src\table_ref.hpp" />
+    <ClInclude Include="src\table_view.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">

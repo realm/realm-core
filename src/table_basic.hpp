@@ -1,7 +1,12 @@
 #ifndef TIGHTDB_BASIC_TABLE_H
 #define TIGHTDB_BASIC_TABLE_H
 
-#include <stdint.h>
+#ifdef _MSC_VER
+#include "win32/stdint.h"
+#else
+#include <stdint.h> // unint8_t etc
+#endif
+
 #include <cassert>
 #include <cstddef>
 #include <cstring> // strcmp()

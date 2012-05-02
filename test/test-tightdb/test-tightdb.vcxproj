@@ -34,6 +34,56 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\alloc.cpp" />
+    <ClCompile Include="..\..\src\Array.cpp" />
+    <ClCompile Include="..\..\src\ArrayBinary.cpp" />
+    <ClCompile Include="..\..\src\ArrayBlob.cpp" />
+    <ClCompile Include="..\..\src\ArrayString.cpp" />
+    <ClCompile Include="..\..\src\ArrayStringLong.cpp" />
+    <ClCompile Include="..\..\src\Column.cpp" />
+    <ClCompile Include="..\..\src\ColumnBinary.cpp" />
+    <ClCompile Include="..\..\src\ColumnMixed.cpp" />
+    <ClCompile Include="..\..\src\ColumnString.cpp" />
+    <ClCompile Include="..\..\src\ColumnStringEnum.cpp" />
+    <ClCompile Include="..\..\src\ColumnTable.cpp" />
+    <ClCompile Include="..\..\src\ctightdb.cpp" />
+    <ClCompile Include="..\..\src\Group.cpp" />
+    <ClCompile Include="..\..\src\Index.cpp" />
+    <ClCompile Include="..\..\src\Table.cpp" />
+    <ClCompile Include="..\..\src\TableView.cpp" />
+    <ClCompile Include="..\..\src\utf8.cpp" />
+    <ClCompile Include="..\..\src\utilities.cpp" />
+    <ClCompile Include="..\Support\win32\mem.cpp" />
+    <ClCompile Include="..\UnitTest++\src\Win32\TimeHelpers.cpp" />
+    <ClCompile Include="test-tightdb.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\alloc.hpp" />
+    <ClInclude Include="..\..\src\AllocSlab.hpp" />
+    <ClInclude Include="..\..\src\Array.hpp" />
+    <ClInclude Include="..\..\src\ArrayBinary.hpp" />
+    <ClInclude Include="..\..\src\ArrayBlob.hpp" />
+    <ClInclude Include="..\..\src\ArrayString.hpp" />
+    <ClInclude Include="..\..\src\ArrayStringLong.hpp" />
+    <ClInclude Include="..\..\src\Column.hpp" />
+    <ClInclude Include="..\..\src\ColumnBinary.hpp" />
+    <ClInclude Include="..\..\src\ColumnMixed.hpp" />
+    <ClInclude Include="..\..\src\ColumnString.hpp" />
+    <ClInclude Include="..\..\src\ColumnStringEnum.hpp" />
+    <ClInclude Include="..\..\src\ColumnTable.hpp" />
+    <ClInclude Include="..\..\src\ColumnType.hpp" />
+    <ClInclude Include="..\..\src\Column_tpl.hpp" />
+    <ClInclude Include="..\..\src\ctightdb.h" />
+    <ClInclude Include="..\..\src\Group.hpp" />
+    <ClInclude Include="..\..\src\Index.hpp" />
+    <ClInclude Include="..\..\src\Table.hpp" />
+    <ClInclude Include="..\..\src\TableRef.hpp" />
+    <ClInclude Include="..\..\src\tightdb.hpp" />
+    <ClInclude Include="..\..\src\utf8.hpp" />
+    <ClInclude Include="..\..\src\utilities.hpp" />
+    <ClInclude Include="..\UnitTest++\src\Win32\TimeHelpers.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{6DF07480-ECC6-4116-860A-818B9D2BA7B3}</ProjectGuid>
     <RootNamespace>testtightdb</RootNamespace>
@@ -335,53 +385,6 @@
       <TargetMachine>MachineX64</TargetMachine>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\src\alloc.cpp" />
-    <ClCompile Include="..\..\src\Array.cpp" />
-    <ClCompile Include="..\..\src\ArrayBinary.cpp" />
-    <ClCompile Include="..\..\src\ArrayBlob.cpp" />
-    <ClCompile Include="..\..\src\ArrayString.cpp" />
-    <ClCompile Include="..\..\src\ArrayStringLong.cpp" />
-    <ClCompile Include="..\..\src\Column.cpp" />
-    <ClCompile Include="..\..\src\ColumnBinary.cpp" />
-    <ClCompile Include="..\..\src\ColumnString.cpp" />
-    <ClCompile Include="..\..\src\ColumnStringEnum.cpp" />
-    <ClCompile Include="..\..\src\ColumnTable.cpp" />
-    <ClCompile Include="..\..\src\ctightdb.cpp" />
-    <ClCompile Include="..\..\src\Group.cpp" />
-    <ClCompile Include="..\..\src\Index.cpp" />
-    <ClCompile Include="..\..\src\utilities.cpp" />
-    <ClCompile Include="..\Support\win32\mem.cpp" />
-    <ClCompile Include="..\..\src\Table.cpp" />
-    <ClCompile Include="..\..\src\TableView.cpp" />
-    <ClCompile Include="test-tightdb.cpp" />
-    <ClCompile Include="..\UnitTest++\src\Win32\TimeHelpers.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\src\alloc.h" />
-    <ClInclude Include="..\..\src\AllocSlab.h" />
-    <ClInclude Include="..\..\src\Array.h" />
-    <ClInclude Include="..\..\src\ArrayBinary.h" />
-    <ClInclude Include="..\..\src\ArrayBlob.h" />
-    <ClInclude Include="..\..\src\ArrayString.h" />
-    <ClInclude Include="..\..\src\ArrayStringLong.h" />
-    <ClInclude Include="..\..\src\Column.h" />
-    <ClInclude Include="..\..\src\ColumnBinary.h" />
-    <ClInclude Include="..\..\src\ColumnString.h" />
-    <ClInclude Include="..\..\src\ColumnStringEnum.h" />
-    <ClInclude Include="..\..\src\ColumnTable.h" />
-    <ClInclude Include="..\..\src\ColumnType.h" />
-    <ClInclude Include="..\..\src\Column_tpl.h" />
-    <ClInclude Include="..\..\src\ctightdb.h" />
-    <ClInclude Include="..\..\src\Group.h" />
-    <ClInclude Include="..\..\src\Index.h" />
-    <ClInclude Include="..\..\src\utilities.h" />
-    <ClInclude Include="..\Support\mem.h" />
-    <ClInclude Include="..\Support\number_names.h" />
-    <ClInclude Include="..\..\src\win32\stdint.h" />
-    <ClInclude Include="..\..\src\Table.h" />
-    <ClInclude Include="..\..\src\tightdb.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

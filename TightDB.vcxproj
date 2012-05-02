@@ -356,7 +356,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\alloc.cpp" />
+    <ClCompile Include="src\alloc_slab.cpp" />
     <ClCompile Include="src\Array.cpp">
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">EnableAllWarnings</WarningLevel>
     </ClCompile>
@@ -389,7 +389,10 @@
       <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <ClCompile Include="src\Group.cpp" />
+    <ClCompile Include="src\group_writer.cpp" />
     <ClCompile Include="src\Index.cpp" />
+    <ClCompile Include="src\spec.cpp" />
+    <ClCompile Include="src\table_view.cpp" />
     <ClCompile Include="src\utf8.cpp" />
     <ClCompile Include="src\utilities.cpp">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
@@ -431,7 +434,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="src\Table.cpp" />
-    <ClCompile Include="src\TableView.cpp" />
     <ClCompile Include="test\testalloc.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
@@ -496,6 +498,7 @@
   <ItemGroup>
     <ClInclude Include="src\alloc.hpp" />
     <ClInclude Include="src\AllocSlab.hpp" />
+    <ClInclude Include="src\alloc_slab.hpp" />
     <ClInclude Include="src\Array.hpp" />
     <ClInclude Include="src\ArrayBinary.hpp" />
     <ClInclude Include="src\ArrayBlob.hpp" />
@@ -511,13 +514,22 @@
     <ClInclude Include="src\ColumnType.hpp" />
     <ClInclude Include="src\Column_tpl.hpp" />
     <ClInclude Include="src\ctightdb.h" />
+    <ClInclude Include="src\date.hpp" />
     <ClInclude Include="src\Group.hpp" />
+    <ClInclude Include="src\group_writer.hpp" />
     <ClInclude Include="src\Index.hpp" />
+    <ClInclude Include="src\meta.hpp" />
+    <ClInclude Include="src\mixed.hpp" />
     <ClInclude Include="src\query\conditions.hpp" />
     <ClInclude Include="src\query\QueryEngine.hpp" />
     <ClInclude Include="src\query\QueryInterface.hpp" />
+    <ClInclude Include="src\spec.hpp" />
+    <ClInclude Include="src\static_assert.hpp" />
     <ClInclude Include="src\Table.hpp" />
     <ClInclude Include="src\TableRef.hpp" />
+    <ClInclude Include="src\table_basic.hpp" />
+    <ClInclude Include="src\table_ref.hpp" />
+    <ClInclude Include="src\table_view.hpp" />
     <ClInclude Include="src\tightdb.hpp" />
     <ClInclude Include="src\utf8.hpp" />
     <ClInclude Include="src\utilities.hpp" />

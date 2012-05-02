@@ -270,7 +270,7 @@ bool Group::Commit()
     return true;
 }
 
-size_t Group::GetFreeSpace(size_t len, size_t& filesize, bool testOnly, bool ensureRest)
+size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool ensureRest)
 {
     if (ensureRest) ++len;
     
@@ -305,12 +305,14 @@ size_t Group::GetFreeSpace(size_t len, size_t& filesize, bool testOnly, bool ens
     while (filesize < needed_size) {
         filesize += 1024*1024;
     }
-    
+
+#if !defined(_MSC_VER) // write persistence
     // Extend the file
     const int fd = m_alloc.GetFileDescriptor();
     lseek(fd, filesize-1, SEEK_SET);
     write(fd, "\0", 1);
-    
+#endif
+
     // Add new free space
     const size_t end  = old_filesize + len;
     const size_t rest = filesize - end;

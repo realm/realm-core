@@ -4,8 +4,9 @@
 
 using namespace tightdb;
 
+// todo, test (int) cast
 GroupWriter::GroupWriter(Group& group) :
-    m_group(group), m_alloc(group.GetAllocator()), m_len(m_alloc.GetFileLen()), m_fd(m_alloc.GetFileDescriptor())
+    m_group(group), m_alloc(group.GetAllocator()), m_len(m_alloc.GetFileLen()), m_fd((int)m_alloc.GetFileDescriptor())
 {
 }
 
@@ -30,7 +31,7 @@ void GroupWriter::Commit() {
     const size_t max_block = (top.Size() + fpositions.Size() + flengths.Size() + 6) * 8;
     
     // Ensure that we have room for max_block in file
-    m_group.GetFreeSpace(max_block, m_len, true);
+    m_group.get_free_space(max_block, m_len, true);
     
     // Update top and make sure that it is big enough to hold any position
     // the free lists can get
@@ -42,7 +43,7 @@ void GroupWriter::Commit() {
     
     // Reserve space for top
     const size_t top_size = top.GetByteSize();
-    const size_t top_pos = m_group.GetFreeSpace(top_size, m_len);
+    const size_t top_pos = m_group.get_free_space(top_size, m_len);
     
     //TODO: Consolidate free list
     
@@ -55,8 +56,8 @@ void GroupWriter::Commit() {
     // (ensure rest to avoid list changing size)
     const size_t fp_size = fpositions.GetByteSize();
     const size_t fl_size = flengths.GetByteSize();
-    const size_t fp_pos = m_group.GetFreeSpace(fp_size, m_len, false, true);
-    const size_t fl_pos = m_group.GetFreeSpace(fl_size, m_len, false, true);
+    const size_t fp_pos = m_group.get_free_space(fp_size, m_len, false, true);
+    const size_t fl_pos = m_group.get_free_space(fl_size, m_len, false, true);
     
     // Write free lists
     fpositions.WriteAt(fp_pos, *this);
@@ -80,8 +81,9 @@ void GroupWriter::Commit() {
 }
 
 size_t GroupWriter::write(const char* p, size_t n) {
+#if !defined(_MSC_VER) // write persistence
     // Get position of free space to write in (expanding file if needed)
-    const size_t pos = m_group.GetFreeSpace(n, m_len);
+    const size_t pos = m_group.get_free_space(n, m_len);
     
     // Write the block
     lseek(m_fd, pos, SEEK_SET);
@@ -89,17 +91,23 @@ size_t GroupWriter::write(const char* p, size_t n) {
     
     // return the position it was written
     return pos;
+#endif
+    return 0;
 }
 
 void GroupWriter::WriteAt(size_t pos, const char* p, size_t n) {
+#if !defined(_MSC_VER) // write persistence
     lseek(m_fd, pos, SEEK_SET);
     ::write(m_fd, p, n);
+#endif
 }
 
 void GroupWriter::DoCommit(uint64_t topPos)
 {
+#if !defined(_MSC_VER) // write persistence
     fsync(m_fd);
     lseek(m_fd, 0, SEEK_SET);
     ::write(m_fd, (const char*)&topPos, 8);
     fsync(m_fd); // Could be fdatasync on Linux
+#endif
 }
