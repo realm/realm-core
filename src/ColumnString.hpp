@@ -2,8 +2,8 @@
 #define __TDB_COLUMN_STRING__
 
 #include "Column.hpp"
-#include "ArrayString.hpp"
-#include "ArrayStringLong.hpp"
+#include "array_string.hpp"
+#include "array_string_long.hpp"
 
 namespace tightdb {
 

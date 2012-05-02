@@ -1,7 +1,7 @@
 #ifndef __TDB_ARRAY_STRING_LONG__
 #define __TDB_ARRAY_STRING_LONG__
 
-#include "ArrayBlob.hpp"
+#include "array_blob.hpp"
 
 namespace tightdb {
 
