@@ -6,7 +6,10 @@
 #include <iomanip>
 #include <fstream>
 #include "alloc_slab.hpp"
+#include "Column.hpp"
+#include "ColumnString.hpp"
 #include "ColumnStringEnum.hpp"
+#include "ColumnBinary.hpp"
 #include "ColumnTable.hpp"
 #include "ColumnMixed.hpp"
 

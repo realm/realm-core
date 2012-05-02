@@ -1,22 +1,13 @@
 #ifndef TIGHTDB_TABLE_H
 #define TIGHTDB_TABLE_H
 
-#include "Column.hpp"
-#include "ColumnString.hpp"
-#include "ColumnStringEnum.hpp"
-#include "ColumnBinary.hpp"
-#include "alloc.hpp"
+#include "column_fwd.hpp"
 #include "table_ref.hpp"
 #include "spec.hpp"
 #include "mixed.hpp"
 #include "table_view.hpp"
 
 namespace tightdb {
-
-
-class ColumnTable;
-class ColumnMixed;
-
 
 
 /**
