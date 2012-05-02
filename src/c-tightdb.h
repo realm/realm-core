@@ -2,7 +2,7 @@
 #define __C_TIGHTDB_H__
 
 #include "c-table.h"
-#include "query/QueryInterface.hpp"
+#include "query.hpp"
 
 
 #define TDB_TABLE_1(TableName, CType0, CName0) \

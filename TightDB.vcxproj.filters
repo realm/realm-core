@@ -1,8 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="src\Index.cpp" />
-    <ClCompile Include="src\utilities.cpp" />
     <ClCompile Include="test\large_tests\verified_integer.cpp">
       <Filter>large_tests</Filter>
     </ClCompile>
@@ -15,18 +13,6 @@
     <ClCompile Include="test\large_tests\test_column.cpp">
       <Filter>large_tests</Filter>
     </ClCompile>
-    <ClCompile Include="src\utf8.cpp" />
-    <ClCompile Include="src\win32\pthread\pthread.c">
-      <Filter>pthreads</Filter>
-    </ClCompile>
-    <ClCompile Include="src\alloc_slab.cpp" />
-    <ClCompile Include="src\group_writer.cpp" />
-    <ClCompile Include="src\spec.cpp" />
-    <ClCompile Include="src\table_view.cpp" />
-    <ClCompile Include="src\array_binary.cpp" />
-    <ClCompile Include="src\array_blob.cpp" />
-    <ClCompile Include="src\array_string.cpp" />
-    <ClCompile Include="src\array_string_long.cpp" />
     <ClCompile Include="test\testTableView.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -60,18 +46,30 @@
     <ClCompile Include="test\main.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="..\tightdb\src\c-api\c-table.cpp">
-      <Filter>c-api</Filter>
-    </ClCompile>
-    <ClCompile Include="src\table.cpp" />
     <ClCompile Include="src\group.cpp" />
+    <ClCompile Include="src\group_writer.cpp" />
+    <ClCompile Include="src\index.cpp" />
+    <ClCompile Include="src\spec.cpp" />
+    <ClCompile Include="src\table.cpp" />
+    <ClCompile Include="src\table_view.cpp" />
+    <ClCompile Include="src\utf8.cpp" />
+    <ClCompile Include="src\utilities.cpp" />
+    <ClCompile Include="src\alloc_slab.cpp" />
+    <ClCompile Include="src\array.cpp" />
+    <ClCompile Include="src\array_binary.cpp" />
+    <ClCompile Include="src\array_blob.cpp" />
+    <ClCompile Include="src\array_string.cpp" />
+    <ClCompile Include="src\array_string_long.cpp" />
     <ClCompile Include="src\column.cpp" />
     <ClCompile Include="src\column_binary.cpp" />
     <ClCompile Include="src\column_mixed.cpp" />
     <ClCompile Include="src\column_string.cpp" />
     <ClCompile Include="src\column_string_enum.cpp" />
     <ClCompile Include="src\column_table.cpp" />
-    <ClCompile Include="src\array.cpp" />
+    <ClCompile Include="src\c-table.cpp" />
+    <ClCompile Include="include\win32\pthread\pthread.c">
+      <Filter>pthreads</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="test\large_tests\verified_integer.h">
@@ -80,50 +78,95 @@
     <ClInclude Include="test\large_tests\verified_string.h">
       <Filter>large_tests</Filter>
     </ClInclude>
-    <ClInclude Include="src\win32\pthread\pthread.h">
-      <Filter>pthreads</Filter>
+    <ClInclude Include="include\impl\column_string_enum.hpp">
+      <Filter>user_include\impl</Filter>
     </ClInclude>
-    <ClInclude Include="src\alloc.hpp" />
-    <ClInclude Include="src\Index.hpp" />
-    <ClInclude Include="src\tightdb.hpp" />
-    <ClInclude Include="src\utf8.hpp" />
-    <ClInclude Include="src\utilities.hpp" />
-    <ClInclude Include="src\alloc_slab.hpp" />
-    <ClInclude Include="src\date.hpp" />
-    <ClInclude Include="src\group_writer.hpp" />
-    <ClInclude Include="src\meta.hpp" />
-    <ClInclude Include="src\mixed.hpp" />
-    <ClInclude Include="src\spec.hpp" />
-    <ClInclude Include="src\static_assert.hpp" />
-    <ClInclude Include="src\table_basic.hpp" />
-    <ClInclude Include="src\table_ref.hpp" />
-    <ClInclude Include="src\table_view.hpp" />
-    <ClInclude Include="src\query\conditions.hpp" />
-    <ClInclude Include="src\query.hpp" />
-    <ClInclude Include="src\query_conditions.hpp" />
-    <ClInclude Include="src\query_engine.hpp" />
+    <ClInclude Include="include\impl\meta.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\query_conditions.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\query_engine.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\utf8.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\utilities.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\alloc.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\alloc_slab.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\array.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\array_blob.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\array_string.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\array_string_long.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\column_fwd.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\impl\column_string.hpp">
+      <Filter>user_include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\column_type.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\date.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\group.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mixed.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\query.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\spec.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\table.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\table_basic.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\table_ref.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\table_view.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tightdb.hpp">
+      <Filter>user_include</Filter>
+    </ClInclude>
     <ClInclude Include="src\array_binary.hpp" />
-    <ClInclude Include="src\array_blob.hpp" />
-    <ClInclude Include="src\array_string.hpp" />
-    <ClInclude Include="src\array_string_long.hpp" />
-    <ClInclude Include="..\tightdb\src\c-api\c-tightdb.h">
-      <Filter>c-api</Filter>
-    </ClInclude>
-    <ClInclude Include="..\tightdb\src\c-api\c-table.h">
-      <Filter>c-api</Filter>
-    </ClInclude>
-    <ClInclude Include="src\group.hpp" />
-    <ClInclude Include="src\table.hpp" />
     <ClInclude Include="src\column.hpp" />
     <ClInclude Include="src\column_binary.hpp" />
-    <ClInclude Include="src\column_fwd.hpp" />
     <ClInclude Include="src\column_mixed.hpp" />
-    <ClInclude Include="src\column_string.hpp" />
-    <ClInclude Include="src\column_string_enum.hpp" />
     <ClInclude Include="src\column_table.hpp" />
     <ClInclude Include="src\column_tpl.hpp" />
-    <ClInclude Include="src\column_type.hpp" />
-    <ClInclude Include="src\array.hpp" />
+    <ClInclude Include="src\c-table.h" />
+    <ClInclude Include="src\c-tightdb.h" />
+    <ClInclude Include="src\group_writer.hpp" />
+    <ClInclude Include="src\index.hpp" />
+    <ClInclude Include="src\static_assert.hpp" />
+    <ClInclude Include="include\win32\pthread\pthread.h">
+      <Filter>pthreads</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">
@@ -132,11 +175,14 @@
     <Filter Include="pthreads">
       <UniqueIdentifier>{b4eeb124-957f-4448-b620-3662238e268a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="user_include">
+      <UniqueIdentifier>{efc02ae3-bdec-4ca7-b675-f17d63169548}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="user_include\impl">
+      <UniqueIdentifier>{3e54e172-c4b0-41df-8860-f39a912d83fd}</UniqueIdentifier>
+    </Filter>
     <Filter Include="test">
       <UniqueIdentifier>{d65594c9-e911-48b1-9f60-693bab72c732}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="c-api">
-      <UniqueIdentifier>{a897f004-3d22-4052-a963-79f4901766ba}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

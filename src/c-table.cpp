@@ -69,11 +69,6 @@ BinaryData mixed_get_binary(Mixed *mixed) {
     return mixed->GetBinary();
 }
 
-#if 0
-Table* mixed_get_table(Mixed *mixed) {
-    // ??? TODO return mixed->GetTable();
-}
-#endif
 
 /*** Spec ************************************/
 
@@ -82,37 +77,34 @@ void spec_delete(Spec* spec) {
 }
 
 void spec_add_column(Spec* spec, ColumnType type, const char* name) {
-    spec->AddColumn(type, name);
+    spec->add_column(type, name);
 }
 
 Spec* spec_add_column_table(Spec* spec, const char* name) {
-    return new Spec(spec->AddColumnTable(name));
+    return new Spec(spec->add_subtable_column(name));
 }
 
 Spec* spec_get_spec(Spec* spec, size_t column_id) {
-    return new Spec(spec->GetSpec(column_id));
+    return new Spec(spec->get_subspec(column_id));
 }
 
 size_t spec_get_column_count(Spec* spec) {
-    return spec->GetColumnCount();
+    return spec->get_column_count();
 }
 
 ColumnType spec_get_column_type(Spec* spec, size_t column_id) {
-    return spec->GetColumnType(column_id);
+    return spec->get_column_type(column_id);
 }
 
 const char* spec_get_column_name(Spec* spec, size_t column_id) {
-    return spec->GetColumnName(column_id);
+    return spec->get_column_name(column_id);
 }
 
 size_t spec_get_column_index(Spec* spec, const char* name) {
-    return spec->GetColumnIndex(name);
+    return spec->get_column_index(name);
 }
 
-size_t spec_get_ref(Spec* spec) {
-    return spec->GetRef();
-}
-
+// ??? get_subspec_ref ??
 
 /*** Table ************************************/
 
@@ -137,7 +129,7 @@ Spec* table_get_spec(Table* t) {
 }
 
 void table_update_from_spec(Table* t, size_t ref_specSet) {
-    t->UpdateFromSpec(ref_specSet);
+    t->UpdateFromSpec();
 }
 
 size_t table_register_column(Table* t, ColumnType type, const char* name) {

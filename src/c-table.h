@@ -15,7 +15,7 @@
 
 
 #ifdef _MSC_VER
-#include "../win32/stdint.h"
+#include "win32/stdint.h"
 #else
 #include <inttypes.h>
 #include <stdint.h>
@@ -23,7 +23,7 @@
 
 #include <time.h>
 #include <stdlib.h> // size_t
-#include "../ColumnType.hpp"
+#include "column_type.hpp"
 
 
 #ifdef __cplusplus

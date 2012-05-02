@@ -158,7 +158,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -180,7 +180,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -204,7 +204,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -230,7 +230,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -254,7 +254,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -278,7 +278,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;include\impl;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -305,7 +305,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -332,7 +332,7 @@
     <ClCompile>
       <Optimization>Full</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;include\impl;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>false</FunctionLevelLinking>
@@ -356,13 +356,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\tightdb\src\c-api\c-table.cpp" />
+    <ClCompile Include="include\win32\pthread\pthread.c" />
     <ClCompile Include="src\alloc_slab.cpp" />
     <ClCompile Include="src\array.cpp" />
     <ClCompile Include="src\array_binary.cpp" />
     <ClCompile Include="src\array_blob.cpp" />
     <ClCompile Include="src\array_string.cpp" />
     <ClCompile Include="src\array_string_long.cpp" />
+    <ClCompile Include="src\c-table.cpp" />
     <ClCompile Include="src\column.cpp" />
     <ClCompile Include="src\column_binary.cpp" />
     <ClCompile Include="src\column_mixed.cpp" />
@@ -371,19 +372,12 @@
     <ClCompile Include="src\column_table.cpp" />
     <ClCompile Include="src\group.cpp" />
     <ClCompile Include="src\group_writer.cpp" />
-    <ClCompile Include="src\Index.cpp" />
+    <ClCompile Include="src\index.cpp" />
     <ClCompile Include="src\spec.cpp" />
     <ClCompile Include="src\table.cpp" />
     <ClCompile Include="src\table_view.cpp" />
     <ClCompile Include="src\utf8.cpp" />
-    <ClCompile Include="src\utilities.cpp">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">CompileAsCpp</CompileAs>
-    </ClCompile>
-    <ClCompile Include="src\win32\pthread\pthread.c">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">CompileAsCpp</CompileAs>
-    </ClCompile>
+    <ClCompile Include="src\utilities.cpp" />
     <ClCompile Include="test\large_tests\test_column.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
@@ -477,44 +471,43 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\tightdb\src\c-api\c-table.h" />
-    <ClInclude Include="..\tightdb\src\c-api\c-tightdb.h" />
-    <ClInclude Include="src\alloc.hpp" />
-    <ClInclude Include="src\alloc_slab.hpp" />
-    <ClInclude Include="src\array.hpp" />
+    <ClInclude Include="include\column_type.hpp" />
+    <ClInclude Include="include\date.hpp" />
+    <ClInclude Include="include\group.hpp" />
+    <ClInclude Include="include\impl\alloc.hpp" />
+    <ClInclude Include="include\impl\alloc_slab.hpp" />
+    <ClInclude Include="include\impl\array.hpp" />
+    <ClInclude Include="include\impl\array_blob.hpp" />
+    <ClInclude Include="include\impl\array_string.hpp" />
+    <ClInclude Include="include\impl\array_string_long.hpp" />
+    <ClInclude Include="include\impl\column_fwd.hpp" />
+    <ClInclude Include="include\impl\column_string.hpp" />
+    <ClInclude Include="include\impl\column_string_enum.hpp" />
+    <ClInclude Include="include\impl\meta.hpp" />
+    <ClInclude Include="include\impl\query_conditions.hpp" />
+    <ClInclude Include="include\impl\query_engine.hpp" />
+    <ClInclude Include="include\impl\utf8.hpp" />
+    <ClInclude Include="include\impl\utilities.hpp" />
+    <ClInclude Include="include\mixed.hpp" />
+    <ClInclude Include="include\query.hpp" />
+    <ClInclude Include="include\spec.hpp" />
+    <ClInclude Include="include\table.hpp" />
+    <ClInclude Include="include\table_basic.hpp" />
+    <ClInclude Include="include\table_ref.hpp" />
+    <ClInclude Include="include\table_view.hpp" />
+    <ClInclude Include="include\tightdb.hpp" />
+    <ClInclude Include="include\win32\pthread\pthread.h" />
     <ClInclude Include="src\array_binary.hpp" />
-    <ClInclude Include="src\array_blob.hpp" />
-    <ClInclude Include="src\array_string.hpp" />
-    <ClInclude Include="src\array_string_long.hpp" />
+    <ClInclude Include="src\c-table.h" />
+    <ClInclude Include="src\c-tightdb.h" />
     <ClInclude Include="src\column.hpp" />
     <ClInclude Include="src\column_binary.hpp" />
-    <ClInclude Include="src\column_fwd.hpp" />
     <ClInclude Include="src\column_mixed.hpp" />
-    <ClInclude Include="src\column_string.hpp" />
-    <ClInclude Include="src\column_string_enum.hpp" />
     <ClInclude Include="src\column_table.hpp" />
     <ClInclude Include="src\column_tpl.hpp" />
-    <ClInclude Include="src\column_type.hpp" />
-    <ClInclude Include="src\date.hpp" />
-    <ClInclude Include="src\group.hpp" />
     <ClInclude Include="src\group_writer.hpp" />
-    <ClInclude Include="src\Index.hpp" />
-    <ClInclude Include="src\meta.hpp" />
-    <ClInclude Include="src\mixed.hpp" />
-    <ClInclude Include="src\query.hpp" />
-    <ClInclude Include="src\query\conditions.hpp" />
-    <ClInclude Include="src\query_conditions.hpp" />
-    <ClInclude Include="src\query_engine.hpp" />
-    <ClInclude Include="src\spec.hpp" />
+    <ClInclude Include="src\index.hpp" />
     <ClInclude Include="src\static_assert.hpp" />
-    <ClInclude Include="src\table.hpp" />
-    <ClInclude Include="src\table_basic.hpp" />
-    <ClInclude Include="src\table_ref.hpp" />
-    <ClInclude Include="src\table_view.hpp" />
-    <ClInclude Include="src\tightdb.hpp" />
-    <ClInclude Include="src\utf8.hpp" />
-    <ClInclude Include="src\utilities.hpp" />
-    <ClInclude Include="src\win32\pthread\pthread.h" />
     <ClInclude Include="test\large_tests\verified_integer.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
