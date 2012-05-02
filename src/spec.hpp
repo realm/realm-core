@@ -15,14 +15,6 @@ public:
     Spec(Allocator& alloc, std::size_t ref, ArrayParent *parent, std::size_t pndx);
     Spec(const Spec& s);
 
-private:
-    std::size_t get_ref() const;
-public:
-    void update_ref(size_t ref, ArrayParent* parent=NULL, size_t pndx=0);
-    void set_parent(ArrayParent* parent, size_t pndx);
-    bool update_from_parent();
-    void destroy();
-
     void add_column(ColumnType type, const char* name);
     Spec add_subtable_column(const char* name);
 
@@ -33,7 +25,7 @@ public:
     // Direct access to type and attribute list
     std::size_t get_type_attr_count() const;
     ColumnType get_type_attr(size_t ndx) const;
-    
+
     // Column info
     std::size_t get_column_count() const;
     ColumnType get_column_type(std::size_t ndx) const;
@@ -46,11 +38,6 @@ public:
     ColumnType get_column_attr(std::size_t ndx) const;
     void set_column_attr(std::size_t ndx, ColumnType attr);
 
-private:
-    // Serialization
-    template<class S> std::size_t write(S& out, std::size_t& pos) const;
-public:
-
 #ifdef _DEBUG
     bool compare(const Spec& spec) const;
     void verify() const;
@@ -61,6 +48,16 @@ private:
     friend class Table;
 
     void create(std::size_t ref, ArrayParent *parent, std::size_t pndx);
+    void destroy();
+
+    std::size_t get_ref() const;
+    void update_ref(size_t ref, ArrayParent* parent=NULL, size_t pndx=0);
+
+    bool update_from_parent();
+    void set_parent(ArrayParent* parent, size_t pndx);
+
+    // Serialization
+    template<class S> std::size_t write(S& out, std::size_t& pos) const;
 
     Array m_specSet;
     Array m_spec;
