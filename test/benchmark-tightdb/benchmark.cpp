@@ -11,7 +11,7 @@
 #include "../../src/win32/stdint.h"
 #include <map>
 
-//using namespace std;
+using namespace tightdb;
 
 
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
@@ -31,20 +31,15 @@ UnitTest::Timer timer;
 int ITEMS = 50000;
 int RANGE = 50000;
 
-void tightdb(void);
+//void tightdb(void);
 void stl(void);
 
 volatile uint64_t writethrough;
 
-void main(void)
-{
-    tightdb();
-//    getchar();
-}
 
 
 
-void tightdb(void)
+void tightdb2(void)
 {
     IntegerTable integers;
     volatile uint64_t force;
@@ -130,4 +125,12 @@ void tightdb(void)
         printf((indexed + "Delete: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
         printf("\n");
     }
+}
+
+
+
+void main(void)
+{
+    tightdb2();
+//    getchar();
 }

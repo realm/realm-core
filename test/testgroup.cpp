@@ -341,6 +341,8 @@ TEST(Group_Serialize_All)
 	CHECK_EQUAL(false, t.GetMixed(5, 0).GetBool());
 }
 
+#if !defined(_MSC_VER) // write persistence
+
 TEST(Group_Persist) {
 	// Delete old file if there
 	remove("testdb.tdb");
@@ -403,6 +405,7 @@ TEST(Group_Persist) {
 	CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(5, 0).GetType());
 	CHECK_EQUAL(false, table.GetMixed(5, 0).GetBool());
 }
+#endif
 
 TEST(Group_Subtable)
 {

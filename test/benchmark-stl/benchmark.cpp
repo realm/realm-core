@@ -11,7 +11,7 @@
 #include "../../src/win32/stdint.h"
 #include <map>
 
-//using namespace std;
+using namespace tightdb;
 
 
 
@@ -33,7 +33,7 @@ UnitTest::Timer timer;
 int ITEMS = 50000;
 int RANGE = 50000;
 
-void tightdb();
+//void tightdb();
 void stl();
 
 volatile uint64_t writethrough;
