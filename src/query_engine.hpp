@@ -1,5 +1,7 @@
 #include <string>
 #include "Table.hpp"
+#include "ColumnString.hpp"
+#include "ColumnStringEnum.hpp"
 
 #include "utf8.hpp"
 #include "query_conditions.hpp"

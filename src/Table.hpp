@@ -1,22 +1,13 @@
 #ifndef TIGHTDB_TABLE_H
 #define TIGHTDB_TABLE_H
 
-#include "Column.hpp"
-#include "ColumnString.hpp"
-#include "ColumnStringEnum.hpp"
-#include "ColumnBinary.hpp"
-#include "alloc.hpp"
+#include "column_fwd.hpp"
 #include "table_ref.hpp"
 #include "spec.hpp"
 #include "mixed.hpp"
 #include "table_view.hpp"
 
 namespace tightdb {
-
-
-class ColumnTable;
-class ColumnMixed;
-
 
 
 /**
@@ -57,9 +48,9 @@ public:
 
     // Row handling
     std::size_t AddRow();
-    void Clear();
-    void DeleteRow(std::size_t ndx);
-    void PopBack() {if (!IsEmpty()) DeleteRow(m_size-1);}
+    void clear();
+    void erase(std::size_t ndx);
+    void pop_back() {if (!IsEmpty()) erase(m_size-1);}
 
     // Getters and Setters
     int64_t Get(std::size_t column_id, std::size_t ndx) const;
@@ -107,6 +98,11 @@ public:
     const ColumnTable& GetColumnTable(std::size_t ndx) const;
     ColumnMixed& GetColumnMixed(std::size_t ndx);
     const ColumnMixed& GetColumnMixed(std::size_t ndx) const;
+
+    // Aggregate functions
+    int64_t Sum(std::size_t column_id) const;
+    int64_t Max(std::size_t column_id) const;
+    int64_t Min(std::size_t column_id) const;
 
     // Searching
     std::size_t Find(std::size_t column_id, int64_t value) const;

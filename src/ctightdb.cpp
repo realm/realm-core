@@ -55,12 +55,12 @@ size_t table_get_size(const Table* t)
 
 void table_clear(Table* t)
 {
-    t->Clear();
+    t->clear();
 }
 
 void table_delete_row(Table* t, size_t ndx)
 {
-    t->DeleteRow(ndx);
+    t->erase(ndx);
 }
 
 int64_t table_get_int(const Table* t, size_t column_id, size_t ndx)

@@ -146,6 +146,20 @@ const char* TableView::GetString(size_t column_id, size_t ndx) const
     return m_table.GetString(column_id, real_ndx);
 }
 
+BinaryData TableView::GetBinary(std::size_t column_id, std::size_t ndx) const
+{
+    assert(ndx < m_refs.Size());
+    const size_t real_ndx = m_refs.GetAsRef(ndx);
+    return m_table.GetBinary(column_id, real_ndx);
+}
+
+Mixed TableView::GetMixed(std::size_t column_id, std::size_t ndx) const
+{
+    assert(ndx < m_refs.Size());
+    const size_t real_ndx = m_refs.GetAsRef(ndx);
+    return m_table.GetMixed(column_id, real_ndx);
+}
+
 TableRef TableView::GetTable(size_t column_id, size_t ndx)
 {
     assert(column_id < m_table.GetColumnCount());
@@ -194,6 +208,20 @@ void TableView::SetString(size_t column_id, size_t ndx, const char* value)
 
     const size_t real_ndx = m_refs.GetAsRef(ndx);
     m_table.SetString(column_id, real_ndx, value);
+}
+
+void TableView::SetBinary(std::size_t column_id, std::size_t ndx, const char* value, std::size_t len)
+{
+    assert(ndx < m_refs.Size());
+    const size_t real_ndx = m_refs.GetAsRef(ndx);
+    m_table.SetBinary(column_id, real_ndx, value, len);
+}
+
+void TableView::SetMixed(std::size_t column_id, std::size_t ndx, Mixed value)
+{
+    assert(ndx < m_refs.Size());
+    const size_t real_ndx = m_refs.GetAsRef(ndx);
+    m_table.SetMixed(column_id, real_ndx, value);
 }
 
 
@@ -263,20 +291,20 @@ void TableView::Sort(size_t column, bool Ascending)
     result.Destroy();
 }
 
-void TableView::Delete(size_t ndx)
+void TableView::erase(size_t ndx)
 {
     assert(ndx < m_refs.Size());
 
     // Delete row in source table
     const size_t real_ndx = m_refs.GetAsRef(ndx);
-    m_table.DeleteRow(real_ndx);
+    m_table.erase(real_ndx);
 
     // Update refs
     m_refs.Delete(ndx);
     m_refs.IncrementIf(ndx, -1);
 }
 
-void TableView::Clear()
+void TableView::clear()
 {
     m_refs.Sort();
 
@@ -285,7 +313,7 @@ void TableView::Clear()
     const size_t count = m_refs.Size();
     for (size_t i = count; i; --i) {
         const size_t ndx = m_refs.GetAsRef(i-1);
-        m_table.DeleteRow(ndx);
+        m_table.erase(ndx);
     }
 
     m_refs.Clear();

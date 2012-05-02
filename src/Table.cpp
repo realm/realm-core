@@ -6,7 +6,10 @@
 #include <iomanip>
 #include <fstream>
 #include "alloc_slab.hpp"
+#include "Column.hpp"
+#include "ColumnString.hpp"
 #include "ColumnStringEnum.hpp"
+#include "ColumnBinary.hpp"
 #include "ColumnTable.hpp"
 #include "ColumnMixed.hpp"
 
@@ -554,7 +557,7 @@ size_t Table::AddRow()
     return m_size++;
 }
 
-void Table::Clear()
+void Table::clear()
 {
     const size_t count = GetColumnCount();
     for (size_t i = 0; i < count; ++i) {
@@ -564,7 +567,7 @@ void Table::Clear()
     m_size = 0;
 }
 
-void Table::DeleteRow(size_t ndx)
+void Table::erase(size_t ndx)
 {
     assert(ndx < m_size);
 
@@ -907,6 +910,46 @@ void Table::InsertDone()
 #ifdef _DEBUG
     verify();
 #endif //_DEBUG
+}
+
+int64_t Table::Sum(size_t column_id) const
+{
+    assert(column_id < GetColumnCount());
+    assert(GetColumnType(column_id) == COLUMN_TYPE_INT);
+    int64_t sum = 0;
+
+    for(size_t i = 0; i < GetSize(); ++i)
+        sum += Get(column_id, i);
+
+    return sum;
+}
+
+int64_t Table::Max(size_t column_id) const
+{
+    if (IsEmpty()) return 0;
+
+    int64_t mv = Get(column_id, 0);
+    for (size_t i = 1; i < GetSize(); ++i) {
+        const int64_t v = Get(column_id, i);
+        if (v > mv) {
+            mv = v;
+        }
+    }
+    return mv;
+}
+
+int64_t Table::Min(size_t column_id) const
+{
+    if (IsEmpty()) return 0;
+
+    int64_t mv = Get(column_id, 0);
+    for (size_t i = 1; i < GetSize(); ++i) {
+        const int64_t v = Get(column_id, i);
+        if (v < mv) {
+            mv = v;
+        }
+    }
+    return mv;
 }
 
 size_t Table::Find(size_t column_id, int64_t value) const

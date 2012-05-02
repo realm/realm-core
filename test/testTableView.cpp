@@ -229,7 +229,7 @@ TEST(TableViewDelete)
     TableView v = table.cols().first.FindAll(1);
     CHECK_EQUAL(3, v.GetSize());
 
-    v.Delete(1);
+    v.erase(1);
     CHECK_EQUAL(2, v.GetSize());
     CHECK_EQUAL(0, v.GetRef(0));
     CHECK_EQUAL(3, v.GetRef(1));
@@ -240,7 +240,7 @@ TEST(TableViewDelete)
     CHECK_EQUAL(3, table[2].first);
     CHECK_EQUAL(1, table[3].first);
 
-    v.Delete(0);
+    v.erase(0);
     CHECK_EQUAL(1, v.GetSize());
     CHECK_EQUAL(2, v.GetRef(0));
 
@@ -249,7 +249,7 @@ TEST(TableViewDelete)
     CHECK_EQUAL(3, table[1].first);
     CHECK_EQUAL(1, table[2].first);
 
-    v.Delete(0);
+    v.erase(0);
     CHECK_EQUAL(0, v.GetSize());
 
     CHECK_EQUAL(2, table.GetSize());
@@ -270,7 +270,7 @@ TEST(TableViewClear)
     TableView v = table.cols().first.FindAll(1);
     CHECK_EQUAL(3, v.GetSize());
 
-    v.Clear();
+    v.clear();
     CHECK_EQUAL(0, v.GetSize());
 
     CHECK_EQUAL(2, table.GetSize());
@@ -286,6 +286,6 @@ TEST(TableViewClearNone)
     TableView v = table.cols().first.FindAll(1);
     CHECK_EQUAL(0, v.GetSize());
 
-    v.Clear();
+    v.clear();
 
 }

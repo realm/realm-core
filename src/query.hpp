@@ -377,7 +377,7 @@ public:
             if (r == size_t(-1) || r == table.GetSize() || results == limit)
                 break;
             ++results;
-            table.DeleteRow(r);
+            table.erase(r);
         }
         return results;
     }
