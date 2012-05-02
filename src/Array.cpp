@@ -1256,6 +1256,9 @@ bool Array::CopyOnWrite()
     const MemRef mref = m_alloc.Alloc(new_len);
     if (!mref.pointer) return false;
     memcpy(mref.pointer, m_data-8, len);
+    
+    const size_t old_ref = m_ref;
+    void* const  old_ptr = m_data - 8;
 
     // Update internal data
     m_ref = mref.ref;
@@ -1266,6 +1269,10 @@ bool Array::CopyOnWrite()
     set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
 
     update_ref_in_parent(mref.ref);
+    
+    // Mark original as deleted, so that the space can be reclaimed in
+    // future commits, when no versions are using it anymore
+    m_alloc.Free(old_ref, old_ptr);
 
     return true;
 }
