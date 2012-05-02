@@ -9,7 +9,7 @@ namespace tightdb {
 class Date {
 public:
     Date(std::time_t d): m_date(d) {}
-    std::time_t GetDate() const { return m_date; }
+    std::time_t get_date() const { return m_date; }
 
 private:
     std::time_t m_date;

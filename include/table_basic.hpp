@@ -537,12 +537,12 @@ public:
         Base::m_table->SetMixed(col_idx, Base::m_row_idx, value);
         return *this;
     }
-    ColumnType GetType() const { return Base::m_table->GetMixedType(col_idx, Base::m_row_idx); }
-    int64_t GetInt() const { return Mixed(*this).GetInt(); }
-    bool GetBool() const { return Mixed(*this).GetBool(); }
-    std::time_t GetDate() const { return Mixed(*this).GetDate(); }
-    const char* GetString() const { return Mixed(*this).GetString(); }
-    BinaryData GetBinary() const { return Mixed(*this).GetBinary(); }
+    ColumnType get_type() const { return Base::m_table->GetMixedType(col_idx, Base::m_row_idx); }
+    int64_t get_int() const { return Mixed(*this).get_int(); }
+    bool get_bool() const { return Mixed(*this).get_bool(); }
+    std::time_t get_date() const { return Mixed(*this).get_date(); }
+    const char* get_string() const { return Mixed(*this).get_string(); }
+    BinaryData get_binary() const { return Mixed(*this).get_binary(); }
 };
 
 // Field accessor specialization for subtables

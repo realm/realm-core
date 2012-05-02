@@ -54,19 +54,19 @@ void mixed_delete(Mixed *mixed) {
 }
 
 int64_t mixed_get_int(Mixed *mixed) {
-    return mixed->GetInt(); 
+    return mixed->get_int(); 
 }
 bool mixed_get_bool(Mixed *mixed) {
-    return mixed->GetBool(); 
+    return mixed->get_bool(); 
 }
 time_t mixed_get_date(Mixed *mixed) {
-    return mixed->GetDate(); 
+    return mixed->get_date(); 
 }
 const char* mixed_get_string(Mixed *mixed) {
-    return mixed->GetString(); 
+    return mixed->get_string(); 
 }
 BinaryData mixed_get_binary(Mixed *mixed) {
-    return mixed->GetBinary();
+    return mixed->get_binary();
 }
 
 

@@ -608,8 +608,8 @@ TEST(Table_Mixed)
     table.SetMixed(1, ndx, true);
 
     CHECK_EQUAL(0, table.Get(0, 0));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(1, 0).GetType());
-    CHECK_EQUAL(true, table.GetMixed(1, 0).GetBool());
+    CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(1, 0).get_type());
+    CHECK_EQUAL(true, table.GetMixed(1, 0).get_bool());
 
     table.InsertInt(0, 1, 43);
     table.InsertMixed(1, 1, (int64_t)12);
@@ -617,10 +617,10 @@ TEST(Table_Mixed)
 
     CHECK_EQUAL(0,  table.Get(0, ndx));
     CHECK_EQUAL(43, table.Get(0, 1));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(1, 0).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_INT,  table.GetMixed(1, 1).GetType());
-    CHECK_EQUAL(true, table.GetMixed(1, 0).GetBool());
-    CHECK_EQUAL(12,   table.GetMixed(1, 1).GetInt());
+    CHECK_EQUAL(COLUMN_TYPE_BOOL, table.GetMixed(1, 0).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_INT,  table.GetMixed(1, 1).get_type());
+    CHECK_EQUAL(true, table.GetMixed(1, 0).get_bool());
+    CHECK_EQUAL(12,   table.GetMixed(1, 1).get_int());
 
     table.InsertInt(0, 2, 100);
     table.InsertMixed(1, 2, "test");
@@ -628,12 +628,12 @@ TEST(Table_Mixed)
 
     CHECK_EQUAL(0,  table.Get(0, 0));
     CHECK_EQUAL(43, table.Get(0, 1));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
-    CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
-    CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
-    CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
+    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).get_type());
+    CHECK_EQUAL(true,   table.GetMixed(1, 0).get_bool());
+    CHECK_EQUAL(12,     table.GetMixed(1, 1).get_int());
+    CHECK_EQUAL("test", table.GetMixed(1, 2).get_string());
 
     table.InsertInt(0, 3, 0);
     table.InsertMixed(1, 3, Date(324234));
@@ -642,14 +642,14 @@ TEST(Table_Mixed)
     CHECK_EQUAL(0,  table.Get(0, 0));
     CHECK_EQUAL(43, table.Get(0, 1));
     CHECK_EQUAL(0,  table.Get(0, 3));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).GetType());
-    CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
-    CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
-    CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
-    CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
+    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).get_type());
+    CHECK_EQUAL(true,   table.GetMixed(1, 0).get_bool());
+    CHECK_EQUAL(12,     table.GetMixed(1, 1).get_int());
+    CHECK_EQUAL("test", table.GetMixed(1, 2).get_string());
+    CHECK_EQUAL(324234, table.GetMixed(1, 3).get_date());
 
     table.InsertInt(0, 4, 43);
     table.InsertMixed(1, 4, Mixed("binary", 7));
@@ -659,17 +659,17 @@ TEST(Table_Mixed)
     CHECK_EQUAL(43, table.Get(0, 1));
     CHECK_EQUAL(0,  table.Get(0, 3));
     CHECK_EQUAL(43, table.Get(0, 4));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_BINARY, table.GetMixed(1, 4).GetType());
-    CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
-    CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
-    CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
-    CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
-    CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).GetBinary().pointer);
-    CHECK_EQUAL(7,      table.GetMixed(1, 4).GetBinary().len);
+    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_BINARY, table.GetMixed(1, 4).get_type());
+    CHECK_EQUAL(true,   table.GetMixed(1, 0).get_bool());
+    CHECK_EQUAL(12,     table.GetMixed(1, 1).get_int());
+    CHECK_EQUAL("test", table.GetMixed(1, 2).get_string());
+    CHECK_EQUAL(324234, table.GetMixed(1, 3).get_date());
+    CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).get_binary().pointer);
+    CHECK_EQUAL(7,      table.GetMixed(1, 4).get_binary().len);
 
     table.InsertInt(0, 5, 0);
     table.InsertMixed(1, 5, Mixed(COLUMN_TYPE_TABLE));
@@ -680,18 +680,18 @@ TEST(Table_Mixed)
     CHECK_EQUAL(0,  table.Get(0, 3));
     CHECK_EQUAL(43, table.Get(0, 4));
     CHECK_EQUAL(0,  table.Get(0, 5));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_BINARY, table.GetMixed(1, 4).GetType());
-    CHECK_EQUAL(COLUMN_TYPE_TABLE,  table.GetMixed(1, 5).GetType());
-    CHECK_EQUAL(true,   table.GetMixed(1, 0).GetBool());
-    CHECK_EQUAL(12,     table.GetMixed(1, 1).GetInt());
-    CHECK_EQUAL("test", table.GetMixed(1, 2).GetString());
-    CHECK_EQUAL(324234, table.GetMixed(1, 3).GetDate());
-    CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).GetBinary().pointer);
-    CHECK_EQUAL(7,      table.GetMixed(1, 4).GetBinary().len);
+    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.GetMixed(1, 0).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_INT,    table.GetMixed(1, 1).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_STRING, table.GetMixed(1, 2).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.GetMixed(1, 3).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_BINARY, table.GetMixed(1, 4).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_TABLE,  table.GetMixed(1, 5).get_type());
+    CHECK_EQUAL(true,   table.GetMixed(1, 0).get_bool());
+    CHECK_EQUAL(12,     table.GetMixed(1, 1).get_int());
+    CHECK_EQUAL("test", table.GetMixed(1, 2).get_string());
+    CHECK_EQUAL(324234, table.GetMixed(1, 3).get_date());
+    CHECK_EQUAL("binary", (const char*)table.GetMixed(1, 4).get_binary().pointer);
+    CHECK_EQUAL(7,      table.GetMixed(1, 4).get_binary().len);
 
     // Get table from mixed column and add schema and some values
     TableRef subtable = table.GetTable(1, 5);
@@ -726,13 +726,13 @@ TEST(Table_Mixed2)
     table.Add(Date(1234));
     table.Add("test");
 
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table[0].first.GetType());
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table[1].first.GetType());
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   table[2].first.GetType());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table[3].first.GetType());
+    CHECK_EQUAL(COLUMN_TYPE_INT,    table[0].first.get_type());
+    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table[1].first.get_type());
+    CHECK_EQUAL(COLUMN_TYPE_DATE,   table[2].first.get_type());
+    CHECK_EQUAL(COLUMN_TYPE_STRING, table[3].first.get_type());
 
-    CHECK_EQUAL(1,            table[0].first.GetInt());
-    CHECK_EQUAL(true,         table[1].first.GetBool());
-    CHECK_EQUAL(time_t(1234), table[2].first.GetDate());
-    CHECK_EQUAL("test",       table[3].first.GetString());
+    CHECK_EQUAL(1,            table[0].first.get_int());
+    CHECK_EQUAL(true,         table[1].first.get_bool());
+    CHECK_EQUAL(time_t(1234), table[2].first.get_date());
+    CHECK_EQUAL("test",       table[3].first.get_string());
 }

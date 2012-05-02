@@ -337,8 +337,8 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL("test", t->GetString(3, 0));
     CHECK_EQUAL(7, t->GetBinary(4, 0).len);
     CHECK_EQUAL("binary", (const char*)t->GetBinary(4, 0).pointer);
-    CHECK_EQUAL(COLUMN_TYPE_BOOL, t->GetMixed(5, 0).GetType());
-    CHECK_EQUAL(false, t->GetMixed(5, 0).GetBool());
+    CHECK_EQUAL(COLUMN_TYPE_BOOL, t->GetMixed(5, 0).get_type());
+    CHECK_EQUAL(false, t->GetMixed(5, 0).get_bool());
 }
 
 #if !defined(_MSC_VER) // write persistence
@@ -381,8 +381,8 @@ TEST(Group_Persist) {
     CHECK_EQUAL("test", table->GetString(3, 0));
     CHECK_EQUAL(7, table->GetBinary(4, 0).len);
     CHECK_EQUAL("binary", (const char*)table->GetBinary(4, 0).pointer);
-    CHECK_EQUAL(COLUMN_TYPE_BOOL, table->GetMixed(5, 0).GetType());
-    CHECK_EQUAL(false, table->GetMixed(5, 0).GetBool());
+    CHECK_EQUAL(COLUMN_TYPE_BOOL, table->GetMixed(5, 0).get_type());
+    CHECK_EQUAL(false, table->GetMixed(5, 0).get_bool());
 
     // Change a bit
     table->SetString(3, 0, "Changed!");
@@ -402,8 +402,8 @@ TEST(Group_Persist) {
     CHECK_EQUAL("Changed!", table->GetString(3, 0));
     CHECK_EQUAL(7, table->GetBinary(4, 0).len);
     CHECK_EQUAL("binary", (const char*)table->GetBinary(4, 0).pointer);
-    CHECK_EQUAL(COLUMN_TYPE_BOOL, table->GetMixed(5, 0).GetType());
-    CHECK_EQUAL(false, table->GetMixed(5, 0).GetBool());
+    CHECK_EQUAL(COLUMN_TYPE_BOOL, table->GetMixed(5, 0).get_type());
+    CHECK_EQUAL(false, table->GetMixed(5, 0).get_bool());
 }
 #endif
 

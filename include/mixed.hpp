@@ -26,19 +26,19 @@ public:
     }
 
     Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
-    Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.GetDate();}
+    Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.get_date();}
     Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
     Mixed(const char* v) {m_type = COLUMN_TYPE_STRING; m_str  = v;}
     Mixed(BinaryData v)  {m_type = COLUMN_TYPE_BINARY; m_str = v.pointer; m_len = v.len;}
     Mixed(const char* v, std::size_t len) {m_type = COLUMN_TYPE_BINARY; m_str = v; m_len = len;}
 
-    ColumnType GetType() const {return m_type;}
+    ColumnType get_type() const {return m_type;}
 
-    int64_t     GetInt()    const {assert(m_type == COLUMN_TYPE_INT);    return m_int;}
-    bool        GetBool()   const {assert(m_type == COLUMN_TYPE_BOOL);   return m_bool;}
-    std::time_t GetDate()   const {assert(m_type == COLUMN_TYPE_DATE);   return m_date;}
-    const char* GetString() const {assert(m_type == COLUMN_TYPE_STRING); return m_str;}
-    BinaryData  GetBinary() const {assert(m_type == COLUMN_TYPE_BINARY); BinaryData b = {m_str, m_len}; return b;}
+    int64_t     get_int()    const {assert(m_type == COLUMN_TYPE_INT);    return m_int;}
+    bool        get_bool()   const {assert(m_type == COLUMN_TYPE_BOOL);   return m_bool;}
+    std::time_t get_date()   const {assert(m_type == COLUMN_TYPE_DATE);   return m_date;}
+    const char* get_string() const {assert(m_type == COLUMN_TYPE_STRING); return m_str;}
+    BinaryData  get_binary() const {assert(m_type == COLUMN_TYPE_BINARY); BinaryData b = {m_str, m_len}; return b;}
 
 private:
     ColumnType m_type;
