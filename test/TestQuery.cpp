@@ -408,6 +408,28 @@ TEST(TestQueryLimit)
     CHECK_EQUAL(13, tv3.GetRef(0));
 }
 
+TEST(TestQueryFindNext)
+{
+    TupleTableType ttt;
+    
+    ttt.Add(1, "a");
+    ttt.Add(2, "a");
+    ttt.Add(3, "X");
+    ttt.Add(4, "a");
+    ttt.Add(5, "a");
+    ttt.Add(6, "X");
+    ttt.Add(7, "X");
+    
+    Query q1 = ttt.GetQuery().second.Equal("X").first.Greater(4);
+    
+    const size_t res1 = q1.FindNext(ttt);
+    const size_t res2 = q1.FindNext(ttt, res1);
+    const size_t res3 = q1.FindNext(ttt, res2);
+    
+    CHECK_EQUAL(5, res1);
+    CHECK_EQUAL(6, res2);
+    CHECK_EQUAL((size_t)-1, res3); // no more matches
+}
 
 TEST(TestQueryFindAll1)
 {

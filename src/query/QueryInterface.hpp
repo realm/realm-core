@@ -217,6 +217,15 @@ public:
         update_override.pop_back();
     };
 
+    size_t FindNext(Table& table, size_t lastmatch=-1) {
+        if (lastmatch == (size_t)-1) Init(table);
+        
+        const size_t end = table.GetSize();
+        const size_t res = first[0]->Find(lastmatch + 1, end);
+        
+        return (res == end) ? -1 : res;
+    }
+
     TableView FindAll(Table& table, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1))
     {
         TableView tv(table);
@@ -571,11 +580,12 @@ protected:
     } ts;
     pthread_t threads[MAX_THREADS];
 
-    mutable std::vector<ParentNode*>first;
-    std::vector<ParentNode**>update;
-    std::vector<ParentNode**>update_override;
-    std::vector<ParentNode**>subtables;
-    private:
+    mutable std::vector<ParentNode*> first;
+    std::vector<ParentNode**> update;
+    std::vector<ParentNode**> update_override;
+    std::vector<ParentNode**> subtables;
+
+private:
     size_t m_threadcount;
 };
 
