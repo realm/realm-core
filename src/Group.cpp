@@ -71,7 +71,7 @@ private:
     FILE*  m_file;
 };
 
-} //namespace
+} // namespace
 
 
 namespace tightdb {
@@ -80,7 +80,7 @@ Group::Group():
     m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
     m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc), m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc), m_isValid(true)
 {
-    Create();
+    create();
 }
 
 Group::Group(const char* filename, bool readOnly):
@@ -91,7 +91,7 @@ Group::Group(const char* filename, bool readOnly):
     // Memory map file
     m_isValid = m_alloc.SetShared(filename, readOnly);
 
-    if (m_isValid) CreateFromRef();
+    if (m_isValid) create_from_ref();
 }
 
 Group::Group(const char* buffer, size_t len):
@@ -102,10 +102,10 @@ Group::Group(const char* buffer, size_t len):
     // Memory map file
     m_isValid = m_alloc.SetSharedBuffer(buffer, len);
 
-    if (m_isValid) CreateFromRef();
+    if (m_isValid) create_from_ref();
 }
 
-void Group::Create()
+void Group::create()
 {
     m_tables.SetType(COLUMN_HASREFS);
     
@@ -121,7 +121,7 @@ void Group::Create()
     m_freeLengths.SetParent(&m_top, 3);
 }
 
-void Group::CreateFromRef()
+void Group::create_from_ref()
 {
     // Get ref for table top array
     const size_t top_ref = m_alloc.GetTopRef();
@@ -134,7 +134,7 @@ void Group::CreateFromRef()
         m_freePositions.SetType(COLUMN_NORMAL);
         m_freeLengths.SetType(COLUMN_NORMAL);
         
-        Create();
+        create();
         
         // Everything but header is free space
         m_freePositions.Add(8);
@@ -177,24 +177,24 @@ Group::~Group()
     m_top.Destroy();
 }
 
-size_t Group::GetTableCount() const
+size_t Group::get_table_count() const
 {
     return m_tableNames.Size();
 }
 
-const char* Group::GetTableName(size_t table_ndx) const
+const char* Group::get_table_name(size_t table_ndx) const
 {
     assert(table_ndx < m_tableNames.Size());
     return m_tableNames.Get(table_ndx);
 }
 
-bool Group::HasTable(const char* name) const
+bool Group::has_table(const char* name) const
 {
     const size_t n = m_tableNames.Find(name);
     return (n != (size_t)-1);
 }
 
-Table& Group::GetTable(const char* name)
+Table& Group::get_table(const char* name)
 {
     const size_t n = m_tableNames.Find(name);
 
@@ -211,11 +211,11 @@ Table& Group::GetTable(const char* name)
     }
     else {
         // Get table from cache if exists, else create
-        return GetTable(n);
+        return get_table(n);
     }
 }
 
-Table& Group::GetTable(size_t ndx)
+Table& Group::get_table(size_t ndx)
 {
     assert(ndx < m_tables.Size());
 
@@ -230,19 +230,19 @@ Table& Group::GetTable(size_t ndx)
 }
 
 
-bool Group::Write(const char* filepath)
+bool Group::write(const char* filepath)
 {
     assert(filepath);
 
     FileOStream out(filepath);
     if (!out.is_valid()) return false;
 
-    Write(out);
+    write(out);
 
     return true;
 }
 
-char* Group::WriteToMem(size_t& len)
+char* Group::write_to_mem(size_t& len)
 {
     // Get max possible size of buffer
     const size_t max_size = m_alloc.GetTotalSize();
@@ -250,11 +250,11 @@ char* Group::WriteToMem(size_t& len)
     MemoryOStream out(max_size);
     if (!out.is_valid()) return NULL; // alloc failed
 
-    len = Write(out);
+    len = write(out);
     return out.release_buffer();
 }
 
-bool Group::Commit()
+bool Group::commit()
 {
     if (!m_alloc.CanPersist()) return false;
     
@@ -310,7 +310,7 @@ size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool e
     // Extend the file
     const int fd = m_alloc.GetFileDescriptor();
     lseek(fd, filesize-1, SEEK_SET);
-    write(fd, "\0", 1);
+    ::write(fd, "\0", 1);
 #endif
 
     // Add new free space
@@ -322,7 +322,7 @@ size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool e
     return old_filesize;
 }
 
-void Group::ConnectFreeSpace(bool doConnect)
+void Group::connect_free_space(bool doConnect)
 {
     assert(m_top.Size() == 4);
 
@@ -341,7 +341,7 @@ void Group::ConnectFreeSpace(bool doConnect)
     }
 }
 
-void Group::UpdateRefs(size_t topRef)
+void Group::update_refs(size_t topRef)
 {
     // Update top with the new (persistent) ref
     m_top.UpdateRef(topRef);
@@ -367,7 +367,7 @@ void Group::UpdateRefs(size_t topRef)
 
 #ifdef _DEBUG
 
-void Group::Verify()
+void Group::verify()
 {
     for (size_t i = 0; i < m_tables.Size(); ++i) {
         // Get table from cache if exists, else create
@@ -381,7 +381,7 @@ void Group::Verify()
     }
 }
 
-MemStats Group::Stats()
+MemStats Group::stats()
 {
     MemStats stats;
     m_top.Stats(stats);
@@ -390,12 +390,12 @@ MemStats Group::Stats()
 }
 
 
-void Group::Print() const
+void Group::print() const
 {
     m_alloc.Print();
 }
 
-void Group::ToDot(std::ostream& out)
+void Group::to_dot(std::ostream& out)
 {
     out << "digraph G {" << endl;
 
@@ -408,8 +408,8 @@ void Group::ToDot(std::ostream& out)
 
     // Tables
     for (size_t i = 0; i < m_tables.Size(); ++i) {
-        const Table& table = GetTable(i);
-        const char* const name = GetTableName(i);
+        const Table& table = get_table(i);
+        const char* const name = get_table_name(i);
         table.ToDot(out, name);
     }
 

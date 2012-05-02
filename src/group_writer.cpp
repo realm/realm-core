@@ -6,7 +6,7 @@ using namespace tightdb;
 
 // todo, test (int) cast
 GroupWriter::GroupWriter(Group& group) :
-    m_group(group), m_alloc(group.GetAllocator()), m_len(m_alloc.GetFileLen()), m_fd((int)m_alloc.GetFileDescriptor())
+    m_group(group), m_alloc(group.get_allocator()), m_len(m_alloc.GetFileLen()), m_fd((int)m_alloc.GetFileDescriptor())
 {
 }
 
@@ -15,8 +15,9 @@ bool GroupWriter::IsValid() const
     return m_fd != 0;
 }
 
-void GroupWriter::Commit() {
-    Array& top        = m_group.GetTopArray();
+void GroupWriter::Commit()
+{
+    Array& top        = m_group.get_top_array();
     Array& fpositions = m_group.m_freePositions;
     Array& flengths   = m_group.m_freeLengths;
     
@@ -73,11 +74,11 @@ void GroupWriter::Commit() {
     
     // Clear old allocs
     // and remap if file size has changed
-    SlabAlloc& alloc = m_group.GetAllocator();
+    SlabAlloc& alloc = m_group.get_allocator();
     alloc.FreeAll(m_len);
     
     // Recusively update refs in all active tables (columns, arrays..)
-    m_group.UpdateRefs(top_pos);
+    m_group.update_refs(top_pos);
 }
 
 size_t GroupWriter::write(const char* p, size_t n) {

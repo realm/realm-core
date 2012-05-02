@@ -13,42 +13,42 @@ public:
     Group(const char* buffer, size_t len);
     ~Group();
 
-    bool IsValid() const {return m_isValid;}
+    bool is_valid() const {return m_isValid;}
 
-    size_t GetTableCount() const;
-    const char* GetTableName(size_t table_ndx) const;
-    bool HasTable(const char* name) const;
+    size_t get_table_count() const;
+    const char* get_table_name(size_t table_ndx) const;
+    bool has_table(const char* name) const;
 
-    Table& GetTable(const char* name);
-    template<class T> T& GetTable(const char* name);
+    Table& get_table(const char* name);
+    template<class T> T& get_table(const char* name);
 
     // Serialization
-    bool Write(const char* filepath);
-    char* WriteToMem(size_t& len);
+    bool write(const char* filepath);
+    char* write_to_mem(size_t& len);
     
-    bool Commit();
+    bool commit();
 
     // Conversion
     template<class S> void to_json(S& out);
 
 #ifdef _DEBUG
-    void Verify();
-    void Print() const;
-    MemStats Stats();
-    void EnableMemDiagnostics(bool enable=true) {m_alloc.EnableDebug(enable);}
-    void ToDot(std::ostream& out = std::cerr);
+    void verify();
+    void print() const;
+    MemStats stats();
+    void enable_mem_diagnostics(bool enable=true) {m_alloc.EnableDebug(enable);}
+    void to_dot(std::ostream& out = std::cerr);
 #endif //_DEBUG
 
 protected:
     friend class GroupWriter;
     
-    SlabAlloc& GetAllocator() {return m_alloc;}
+    SlabAlloc& get_allocator() {return m_alloc;}
     size_t get_free_space(size_t len, size_t& filesize, bool testOnly=false, bool ensureRest=false);
-    Array& GetTopArray() {return m_top;}
-    void ConnectFreeSpace(bool doConnect);
+    Array& get_top_array() {return m_top;}
+    void connect_free_space(bool doConnect);
     
     // Recursively update all internal refs after commit
-    void UpdateRefs(size_t TopRef);
+    void update_refs(size_t TopRef);
     
     // Overriding method in ArrayParent
     virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
@@ -65,12 +65,12 @@ protected:
         return m_tables.GetAsRef(subtable_ndx);
     }
 
-    void Create();
-    void CreateFromRef();
+    void create();
+    void create_from_ref();
 
-    Table& GetTable(size_t ndx);
+    Table& get_table(size_t ndx);
 
-    template<class S> size_t Write(S& out);
+    template<class S> size_t write(S& out);
 
     // Member variables
     SlabAlloc m_alloc;
@@ -87,7 +87,7 @@ protected:
 
 // Templates
 
-template<class T> T& Group::GetTable(const char* name)
+template<class T> T& Group::get_table(const char* name)
 {
     const size_t n = m_tableNames.Find(name);
     if (n == size_t(-1)) {
@@ -104,12 +104,12 @@ template<class T> T& Group::GetTable(const char* name)
     }
     else {
         // Get table from cache if exists, else create
-        return static_cast<T&>(GetTable(n));
+        return static_cast<T&>(get_table(n));
     }
 }
 
 template<class S>
-size_t Group::Write(S& out)
+size_t Group::write(S& out)
 {
     // Space for ref to top array
     out.write("\0\0\0\0\0\0\0\0", 8);
@@ -134,7 +134,7 @@ void Group::to_json(S& out)
 
     for (size_t i = 0; i < m_tables.Size(); ++i) {
         const char* const name = m_tableNames.Get(i);
-        Table& table = GetTable(i);
+        Table& table = get_table(i);
 
         if (i) out << ",";
         out << "\"" << name << "\"";
@@ -145,6 +145,6 @@ void Group::to_json(S& out)
     out << "}";
 }
 
-}
+} // namespace tightdb
 
 #endif //__TDB_GROUP__

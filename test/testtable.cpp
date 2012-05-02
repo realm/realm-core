@@ -532,7 +532,7 @@ TEST(Table_SlabAlloc)
 TEST(Table_Spec)
 {
     Group group;
-    Table& table = group.GetTable("test");
+    Table& table = group.get_table("test");
 
     // Create specification with sub-table
     Spec& s = table.GetSpec();
@@ -579,11 +579,11 @@ TEST(Table_Spec)
     }
 
     // Write the group to disk
-    group.Write("subtables.tightdb");
+    group.write("subtables.tightdb");
 
     // Read back tables
     Group fromDisk("subtables.tightdb");
-    Table& fromDiskTable = fromDisk.GetTable("test");
+    Table& fromDiskTable = fromDisk.get_table("test");
 
     TableRef subtable2 = fromDiskTable.GetTable(2, 0);
 

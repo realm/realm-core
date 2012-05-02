@@ -30,7 +30,7 @@ TEST(Group_Invalid1)
 
     // Try to open non-existing file
     Group fromDisk("table_test.tbl");
-    CHECK(!fromDisk.IsValid());
+    CHECK(!fromDisk.is_valid());
 }
 
 TEST(Group_Invalid2)
@@ -38,21 +38,21 @@ TEST(Group_Invalid2)
     // Try to open buffer with invalid data
     const char* const buffer = "invalid data";
     Group fromMen(buffer, strlen(buffer));
-    CHECK(!fromMen.IsValid());
+    CHECK(!fromMen.is_valid());
 }
 
 TEST(Group_Serialize0)
 {
     // Create empty group and serialize to disk
     Group toDisk;
-    toDisk.Write("table_test.tbl");
+    toDisk.write("table_test.tbl");
 
     // Load the group
     Group fromDisk("table_test.tbl");
-    CHECK(fromDisk.IsValid());
+    CHECK(fromDisk.is_valid());
 
     // Create new table in group
-    TestTableGroup& t = fromDisk.GetTable<TestTableGroup>("test");
+    TestTableGroup& t = fromDisk.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t.GetColumnCount());
     CHECK_EQUAL(0, t.GetSize());
@@ -71,14 +71,14 @@ TEST(Group_Read0)
     // Load the group and let it clean up without loading
     // any tables
     Group fromDisk("table_test.tbl");
-    CHECK(fromDisk.IsValid());
+    CHECK(fromDisk.is_valid());
 }
 
 TEST(Group_Serialize1)
 {
     // Create group with one table
     Group toDisk;
-    TestTableGroup& table = toDisk.GetTable<TestTableGroup>("test");
+    TestTableGroup& table = toDisk.get_table<TestTableGroup>("test");
     table.Add("",  1, true, Wed);
     table.Add("", 15, true, Wed);
     table.Add("", 10, true, Wed);
@@ -91,19 +91,19 @@ TEST(Group_Serialize1)
     table.Add("",  9, true, Wed);
 
 #ifdef _DEBUG
-    toDisk.Verify();
+    toDisk.verify();
 #endif //_DEBUG
 
     // Delete old file if there
     remove("table_test.tbl");
 
     // Serialize to disk
-    toDisk.Write("table_test.tbl");
+    toDisk.write("table_test.tbl");
 
     // Load the table
     Group fromDisk("table_test.tbl");
-    CHECK(fromDisk.IsValid());
-    TestTableGroup& t = fromDisk.GetTable<TestTableGroup>("test");
+    CHECK(fromDisk.is_valid());
+    TestTableGroup& t = fromDisk.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t.GetColumnCount());
     CHECK_EQUAL(10, t.GetSize());
@@ -124,8 +124,8 @@ TEST(Group_Serialize1)
 #ifdef _DEBUG
     // Verify that both changed correctly
     CHECK(table.Compare(t));
-    toDisk.Verify();
-    fromDisk.Verify();
+    toDisk.verify();
+    fromDisk.verify();
 #endif //_DEBUG
 }
 
@@ -134,37 +134,37 @@ TEST(Group_Read1)
     // Load the group and let it clean up without loading
     // any tables
     Group fromDisk("table_test.tbl");
-    CHECK(fromDisk.IsValid());
+    CHECK(fromDisk.is_valid());
 }
 
 TEST(Group_Serialize2)
 {
     // Create group with two tables
     Group toDisk;
-    TestTableGroup& table1 = toDisk.GetTable<TestTableGroup>("test1");
+    TestTableGroup& table1 = toDisk.get_table<TestTableGroup>("test1");
     table1.Add("",  1, true, Wed);
     table1.Add("", 15, true, Wed);
     table1.Add("", 10, true, Wed);
 
-    TestTableGroup& table2 = toDisk.GetTable<TestTableGroup>("test2");
+    TestTableGroup& table2 = toDisk.get_table<TestTableGroup>("test2");
     table2.Add("hey",  0, true, Tue);
     table2.Add("hello", 3232, false, Sun);
 
 #ifdef _DEBUG
-    toDisk.Verify();
+    toDisk.verify();
 #endif //_DEBUG
 
     // Delete old file if there
     remove("table_test.tbl");
 
     // Serialize to disk
-    toDisk.Write("table_test.tbl");
+    toDisk.write("table_test.tbl");
 
     // Load the tables
     Group fromDisk("table_test.tbl");
-    CHECK(fromDisk.IsValid());
-    TestTableGroup& t1 = fromDisk.GetTable<TestTableGroup>("test1");
-    TestTableGroup& t2 = fromDisk.GetTable<TestTableGroup>("test2");
+    CHECK(fromDisk.is_valid());
+    TestTableGroup& t1 = fromDisk.get_table<TestTableGroup>("test1");
+    TestTableGroup& t2 = fromDisk.get_table<TestTableGroup>("test2");
     (void)t2;
     (void)t1;
 
@@ -172,8 +172,8 @@ TEST(Group_Serialize2)
     // Verify that original values are there
     CHECK(table1.Compare(t1));
     CHECK(table2.Compare(t2));
-    toDisk.Verify();
-    fromDisk.Verify();
+    toDisk.verify();
+    fromDisk.verify();
 #endif //_DEBUG
 }
 
@@ -181,32 +181,32 @@ TEST(Group_Serialize3)
 {
     // Create group with one table (including long strings
     Group toDisk;
-    TestTableGroup& table = toDisk.GetTable<TestTableGroup>("test");
+    TestTableGroup& table = toDisk.get_table<TestTableGroup>("test");
     table.Add("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1",  1, true, Wed);
     table.Add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
 #ifdef _DEBUG
-    toDisk.Verify();
+    toDisk.verify();
 #endif //_DEBUG
 
     // Delete old file if there
     remove("table_test.tbl");
 
     // Serialize to disk
-    toDisk.Write("table_test.tbl");
+    toDisk.write("table_test.tbl");
 
     // Load the table
     Group fromDisk("table_test.tbl");
-    CHECK(fromDisk.IsValid());
-    TestTableGroup& t = fromDisk.GetTable<TestTableGroup>("test");
+    CHECK(fromDisk.is_valid());
+    TestTableGroup& t = fromDisk.get_table<TestTableGroup>("test");
     (void)t;
 
 
 #ifdef _DEBUG
     // Verify that original values are there
     CHECK(table.Compare(t));
-    toDisk.Verify();
-    fromDisk.Verify();
+    toDisk.verify();
+    fromDisk.verify();
 #endif //_DEBUG}
 }
 
@@ -214,7 +214,7 @@ TEST(Group_Serialize_Men)
 {
     // Create group with one table
     Group toMem;
-    TestTableGroup& table = toMem.GetTable<TestTableGroup>("test");
+    TestTableGroup& table = toMem.get_table<TestTableGroup>("test");
     table.Add("",  1, true, Wed);
     table.Add("", 15, true, Wed);
     table.Add("", 10, true, Wed);
@@ -227,17 +227,17 @@ TEST(Group_Serialize_Men)
     table.Add("",  9, true, Wed);
 
 #ifdef _DEBUG
-    toMem.Verify();
+    toMem.verify();
 #endif //_DEBUG
 
     // Serialize to memory (we now own the buffer)
     size_t len;
-    const char* const buffer = toMem.WriteToMem(len);
+    const char* const buffer = toMem.write_to_mem(len);
 
     // Load the table
     Group fromMem(buffer, len);
-    CHECK(fromMem.IsValid());
-    TestTableGroup& t = fromMem.GetTable<TestTableGroup>("test");
+    CHECK(fromMem.is_valid());
+    TestTableGroup& t = fromMem.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t.GetColumnCount());
     CHECK_EQUAL(10, t.GetSize());
@@ -246,8 +246,8 @@ TEST(Group_Serialize_Men)
 #ifdef _DEBUG
     // Verify that original values are there
     CHECK(table.Compare(t));
-    toMem.Verify();
-    fromMem.Verify();
+    toMem.verify();
+    fromMem.verify();
 #endif //_DEBUG
 }
 
@@ -255,7 +255,7 @@ TEST(Group_Serialize_Optimized)
 {
     // Create group with one table
     Group toMem;
-    TestTableGroup& table = toMem.GetTable<TestTableGroup>("test");
+    TestTableGroup& table = toMem.get_table<TestTableGroup>("test");
 
     for (size_t i = 0; i < 5; ++i) {
         table.Add("abd",     1, true, Mon);
@@ -268,17 +268,17 @@ TEST(Group_Serialize_Optimized)
     table.Optimize();
 
 #ifdef _DEBUG
-    toMem.Verify();
+    toMem.verify();
 #endif //_DEBUG
 
     // Serialize to memory (we now own the buffer)
     size_t len;
-    const char* const buffer = toMem.WriteToMem(len);
+    const char* const buffer = toMem.write_to_mem(len);
 
     // Load the table
     Group fromMem(buffer, len);
-    CHECK(fromMem.IsValid());
-    TestTableGroup& t = fromMem.GetTable<TestTableGroup>("test");
+    CHECK(fromMem.is_valid());
+    TestTableGroup& t = fromMem.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t.GetColumnCount());
 
@@ -294,8 +294,8 @@ TEST(Group_Serialize_Optimized)
     CHECK_EQUAL(table.GetSize()-1, res);
 
 #ifdef _DEBUG
-    toMem.Verify();
-    fromMem.Verify();
+    toMem.verify();
+    fromMem.verify();
 #endif //_DEBUG
 }
 
@@ -303,7 +303,7 @@ TEST(Group_Serialize_All)
 {
     // Create group with one table
     Group toMem;
-    Table& table = toMem.GetTable("test");
+    Table& table = toMem.get_table("test");
 
     table.register_column(COLUMN_TYPE_INT,    "int");
     table.register_column(COLUMN_TYPE_BOOL,   "bool");
@@ -322,12 +322,12 @@ TEST(Group_Serialize_All)
 
     // Serialize to memory (we now own the buffer)
     size_t len;
-    const char* const buffer = toMem.WriteToMem(len);
+    const char* const buffer = toMem.write_to_mem(len);
 
     // Load the table
     Group fromMem(buffer, len);
-    CHECK(fromMem.IsValid());
-    Table& t = fromMem.GetTable("test");
+    CHECK(fromMem.is_valid());
+    Table& t = fromMem.get_table("test");
 
     CHECK_EQUAL(6, t.GetColumnCount());
     CHECK_EQUAL(1, t.GetSize());
@@ -351,7 +351,7 @@ TEST(Group_Persist) {
 	Group db("testdb.tdb", false);
     
 	// Insert some data
-	Table& table = db.GetTable("test");
+	Table& table = db.get_table("test");
 	table.register_column(COLUMN_TYPE_INT,    "int");
 	table.register_column(COLUMN_TYPE_BOOL,   "bool");
 	table.register_column(COLUMN_TYPE_DATE,   "date");
@@ -367,10 +367,10 @@ TEST(Group_Persist) {
 	table.InsertDone();
     
 	// Write changes to file
-	db.Commit();
+	db.commit();
     
 #ifdef _DEBUG
-	db.Verify();
+	db.verify();
 #endif //_DEBUG
     
 	CHECK_EQUAL(6, table.GetColumnCount());
@@ -388,10 +388,10 @@ TEST(Group_Persist) {
 	table.SetString(3, 0, "Changed!");
     
 	// Write changes to file
-	db.Commit();
+	db.commit();
     
 #ifdef _DEBUG
-	db.Verify();
+	db.verify();
 #endif //_DEBUG
     
 	CHECK_EQUAL(6, table.GetColumnCount());
@@ -412,7 +412,7 @@ TEST(Group_Subtable)
     int n = 1;
 
     Group g;
-    Table& table = g.GetTable("test");
+    Table& table = g.get_table("test");
     Spec& s = table.GetSpec();
     s.AddColumn(COLUMN_TYPE_INT, "foo");
     Spec sub = s.AddColumnTable("sub");
@@ -498,11 +498,11 @@ TEST(Group_Subtable)
         }
     }
 
-    g.Write("subtables.tdb");
+    g.write("subtables.tdb");
 
     // Read back tables
     Group g2("subtables.tdb");
-    Table& table2 = g2.GetTable("test");
+    Table& table2 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
         CHECK_EQUAL(table2.Get(0, i), 100+i);
@@ -589,11 +589,11 @@ TEST(Group_Subtable)
         }
     }
 
-    g2.Write("subtables2.tdb");
+    g2.write("subtables2.tdb");
 
     // Read back tables
     Group g3("subtables2.tdb");
-    Table& table3 = g2.GetTable("test");
+    Table& table3 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
         CHECK_EQUAL(table3.Get(0, i), 100+i);
@@ -643,7 +643,7 @@ TEST(Group_MultiLevelSubtables)
 {
     {
         Group g;
-        Table& table = g.GetTable("test");
+        Table& table = g.get_table("test");
         {
             Spec& s = table.GetSpec();
             s.AddColumn(COLUMN_TYPE_INT, "int");
@@ -684,13 +684,13 @@ TEST(Group_MultiLevelSubtables)
             }
             b->AddRow();
         }
-        g.Write("subtables.tdb");
+        g.write("subtables.tdb");
     }
 
     // Non-mixed
     {
         Group g("subtables.tdb");
-        Table &table = g.GetTable("test");
+        Table &table = g.get_table("test");
         // Get A as subtable
         TableRef a = table.GetTable(1, 0);
         // Get B as subtable from A
@@ -707,11 +707,11 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->GetTable(1, 0), b);
         CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661012);
-        g.Write("subtables2.tdb");
+        g.write("subtables2.tdb");
     }
     {
         Group g("subtables2.tdb");
-        Table &table = g.GetTable("test");
+        Table &table = g.get_table("test");
         // Get A as subtable
         TableRef a = table.GetTable(1, 0);
         // Get B as subtable from A
@@ -726,13 +726,13 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->GetTable(1, 0);
         CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661013);
-        g.Write("subtables3.tdb");
+        g.write("subtables3.tdb");
     }
 
     // Mixed
     {
         Group g("subtables3.tdb");
-        Table &table = g.GetTable("test");
+        Table &table = g.get_table("test");
         // Get A as subtable
         TableRef a = table.GetTable(2, 0);
         // Get B as subtable from A
@@ -749,11 +749,11 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->GetTable(1, 0), b);
         CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661012);
-        g.Write("subtables4.tdb");
+        g.write("subtables4.tdb");
     }
     {
         Group g("subtables4.tdb");
-        Table &table = g.GetTable("test");
+        Table &table = g.get_table("test");
         // Get A as subtable
         TableRef a = table.GetTable(2, 0);
         // Get B as subtable from A
@@ -768,7 +768,7 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->GetTable(1, 0);
         CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661013);
-        g.Write("subtables5.tdb");
+        g.write("subtables5.tdb");
     }
 }
 
@@ -784,7 +784,7 @@ TEST(Group_ToDot)
     Group mygroup;
 
     // Create table with all column types
-    Table& table = mygroup.GetTable("test");
+    Table& table = mygroup.get_table("test");
     Spec s = table.GetSpec();
     s.AddColumn(COLUMN_TYPE_INT,    "int");
     s.AddColumn(COLUMN_TYPE_BOOL,   "bool");
@@ -877,7 +877,7 @@ TEST(Group_ToDot)
     // Write array graph to file in dot format
     std::ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
     if (!fs.is_open()) cout << "file open error " << strerror << endl;
-    mygroup.ToDot(fs);
+    mygroup.to_dot(fs);
     fs.close();
 }
 
