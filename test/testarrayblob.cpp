@@ -1,4 +1,4 @@
-#include "ArrayBlob.hpp"
+#include "array_blob.hpp"
 #include <UnitTest++.h>
 
 using namespace tightdb;

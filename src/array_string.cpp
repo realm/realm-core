@@ -5,7 +5,7 @@
 #include <iostream>
 #include "utilities.hpp"
 #include "Column.hpp"
-#include "ArrayString.hpp"
+#include "array_string.hpp"
 
 using namespace std;
 

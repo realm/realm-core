@@ -1,4 +1,4 @@
-#include "ArrayString.hpp"
+#include "array_string.hpp"
 #include "Column.hpp"
 #include <UnitTest++.h>
 

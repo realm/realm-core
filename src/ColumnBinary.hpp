@@ -3,7 +3,7 @@
 
 #include "Column.hpp"
 #include "ColumnType.hpp" // BinaryData
-#include "ArrayBinary.hpp"
+#include "array_binary.hpp"
 
 namespace tightdb {
 

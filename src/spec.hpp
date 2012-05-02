@@ -2,7 +2,7 @@
 #define TIGHTDB_SPEC_H
 
 #include "Array.hpp"
-#include "ArrayString.hpp"
+#include "array_string.hpp"
 #include "ColumnType.hpp"
 
 namespace tightdb {

@@ -1,5 +1,5 @@
-#include "ArrayStringLong.hpp"
-#include "ArrayBlob.hpp"
+#include "array_string_long.hpp"
+#include "array_blob.hpp"
 #include "Column.hpp"
 #include <assert.h>
 #include "win32/types.h" //ssize_t
