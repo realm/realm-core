@@ -12,7 +12,7 @@
     #include "query/QueryEngine.hpp"
 #else
     #include <pthread.h>
-    #include "QueryEngine.hpp"
+    #include "query_engine.hpp"
 #endif
 
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))

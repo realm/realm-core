@@ -1,8 +1,8 @@
 #include <string>
 #include "Table.hpp"
 
-#include "../utf8.hpp"
-#include "conditions.hpp"
+#include "utf8.hpp"
+#include "query_conditions.hpp"
 
 namespace tightdb {
 

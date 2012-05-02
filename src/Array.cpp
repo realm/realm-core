@@ -5,7 +5,8 @@
 #include "Array.hpp"
 #include "Column.hpp"
 #include "utilities.hpp"
-#include "query/QueryEngine.hpp"
+#include "query_conditions.hpp"
+
 #ifdef _MSC_VER
     #include "win32/types.h"
     #pragma warning (disable : 4127) // Condition is constant warning

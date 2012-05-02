@@ -64,8 +64,6 @@
 		36DB8773153F02250096CF75 /* ColumnString.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 360F1A36146BF71400EBB9C6 /* ColumnString.hpp */; };
 		36DB8774153F02250096CF75 /* ColumnStringEnum.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 363141F614751E8000ADD5AC /* ColumnStringEnum.hpp */; };
 		36DB8775153F02250096CF75 /* ColumnTable.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36E4755B14877FB8009FB135 /* ColumnTable.hpp */; };
-		36DB8776153F02250096CF75 /* QueryEngine.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36FD6F3914BDC965009E0003 /* QueryEngine.hpp */; };
-		36DB8777153F02250096CF75 /* QueryInterface.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36FD6F3A14BDC965009E0003 /* QueryInterface.hpp */; };
 		36DB8778153F02250096CF75 /* ColumnMixed.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3604594C14C96DA2008ACFFD /* ColumnMixed.hpp */; };
 		36DB8779153F02250096CF75 /* utf8.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 360BAE2F14FBB9FE00A28045 /* utf8.hpp */; };
 		36DB877A153F02250096CF75 /* utilities.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 360BAE3314FBBA2E00A28045 /* utilities.hpp */; };
@@ -83,6 +81,18 @@
 		36DBF0DC154AC79700CC12CC /* group_writer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0DA154AC79600CC12CC /* group_writer.hpp */; };
 		36DBF0DE154FD89700CC12CC /* spec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36DBF0DD154FD89700CC12CC /* spec.cpp */; };
 		36DBF0DF154FD89700CC12CC /* spec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36DBF0DD154FD89700CC12CC /* spec.cpp */; };
+		36DBF0E61551763400CC12CC /* query_conditions.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0E31551763200CC12CC /* query_conditions.hpp */; };
+		36DBF0E71551763400CC12CC /* query_conditions.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0E31551763200CC12CC /* query_conditions.hpp */; };
+		36DBF0E81551763400CC12CC /* query_engine.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0E41551763300CC12CC /* query_engine.hpp */; };
+		36DBF0E91551763400CC12CC /* query_engine.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0E41551763300CC12CC /* query_engine.hpp */; };
+		36DBF0EA1551763400CC12CC /* query.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0E51551763300CC12CC /* query.hpp */; };
+		36DBF0EB1551763400CC12CC /* query.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0E51551763300CC12CC /* query.hpp */; };
+		36DBF0EF1551766200CC12CC /* date.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0EC1551766100CC12CC /* date.hpp */; };
+		36DBF0F01551766200CC12CC /* date.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0EC1551766100CC12CC /* date.hpp */; };
+		36DBF0F11551766200CC12CC /* mixed.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0ED1551766200CC12CC /* mixed.hpp */; };
+		36DBF0F21551766200CC12CC /* mixed.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0ED1551766200CC12CC /* mixed.hpp */; };
+		36DBF0F31551766200CC12CC /* table_view.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0EE1551766200CC12CC /* table_view.hpp */; };
+		36DBF0F41551766200CC12CC /* table_view.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36DBF0EE1551766200CC12CC /* table_view.hpp */; };
 		36E4755914877FA4009FB135 /* ColumnTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E4755814877FA4009FB135 /* ColumnTable.cpp */; };
 		36E4755C14877FB9009FB135 /* ColumnTable.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36E4755B14877FB8009FB135 /* ColumnTable.hpp */; };
 		36E608681459976700CCC3E8 /* test-tightdb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E02214209CE600D56FD7 /* test-tightdb.cpp */; };
@@ -103,8 +113,6 @@
 		36E608A5145B006E00CCC3E8 /* testcolumnbinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E608A4145B006E00CCC3E8 /* testcolumnbinary.cpp */; };
 		36FD6F3614BDC61A009E0003 /* TestQuery.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36FD6F3414BDC61A009E0003 /* TestQuery.cpp */; };
 		36FD6F3714BDC61A009E0003 /* testTableView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36FD6F3514BDC61A009E0003 /* testTableView.cpp */; };
-		36FD6F3B14BDC965009E0003 /* QueryEngine.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36FD6F3914BDC965009E0003 /* QueryEngine.hpp */; };
-		36FD6F3C14BDC965009E0003 /* QueryInterface.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36FD6F3A14BDC965009E0003 /* QueryInterface.hpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -283,6 +291,12 @@
 		36DBF0D7154AC77A00CC12CC /* group_writer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = group_writer.cpp; sourceTree = "<group>"; };
 		36DBF0DA154AC79600CC12CC /* group_writer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = group_writer.hpp; sourceTree = "<group>"; };
 		36DBF0DD154FD89700CC12CC /* spec.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = spec.cpp; sourceTree = "<group>"; };
+		36DBF0E31551763200CC12CC /* query_conditions.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = query_conditions.hpp; sourceTree = "<group>"; };
+		36DBF0E41551763300CC12CC /* query_engine.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = query_engine.hpp; sourceTree = "<group>"; };
+		36DBF0E51551763300CC12CC /* query.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = query.hpp; sourceTree = "<group>"; };
+		36DBF0EC1551766100CC12CC /* date.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = date.hpp; sourceTree = "<group>"; };
+		36DBF0ED1551766200CC12CC /* mixed.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = mixed.hpp; sourceTree = "<group>"; };
+		36DBF0EE1551766200CC12CC /* table_view.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = table_view.hpp; sourceTree = "<group>"; };
 		36E4755814877FA4009FB135 /* ColumnTable.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ColumnTable.cpp; sourceTree = "<group>"; };
 		36E4755B14877FB8009FB135 /* ColumnTable.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = ColumnTable.hpp; sourceTree = "<group>"; };
 		36E608581458289F00CCC3E8 /* Column_tpl.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = Column_tpl.hpp; sourceTree = "<group>"; };
@@ -303,8 +317,6 @@
 		36E608A4145B006E00CCC3E8 /* testcolumnbinary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testcolumnbinary.cpp; sourceTree = "<group>"; };
 		36FD6F3414BDC61A009E0003 /* TestQuery.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TestQuery.cpp; sourceTree = "<group>"; };
 		36FD6F3514BDC61A009E0003 /* testTableView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testTableView.cpp; sourceTree = "<group>"; };
-		36FD6F3914BDC965009E0003 /* QueryEngine.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = QueryEngine.hpp; path = query/QueryEngine.hpp; sourceTree = "<group>"; };
-		36FD6F3A14BDC965009E0003 /* QueryInterface.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = QueryInterface.hpp; path = query/QueryInterface.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -385,6 +397,7 @@
 				3647DEF514209C1200D56FD7 /* ColumnType.hpp */,
 				3647DEF614209C1200D56FD7 /* ctightdb.cpp */,
 				3647DEF714209C1200D56FD7 /* ctightdb.h */,
+				36DBF0EC1551766100CC12CC /* date.hpp */,
 				368063311445977300283774 /* Group.cpp */,
 				368063341445979100283774 /* Group.hpp */,
 				36DBF0D7154AC77A00CC12CC /* group_writer.cpp */,
@@ -392,6 +405,7 @@
 				3647DEF814209C1200D56FD7 /* Index.cpp */,
 				3647DEF914209C1200D56FD7 /* Index.hpp */,
 				36DBF0C815498B4000CC12CC /* meta.hpp */,
+				36DBF0ED1551766200CC12CC /* mixed.hpp */,
 				36DBF0DD154FD89700CC12CC /* spec.cpp */,
 				36DBF0C915498B4000CC12CC /* spec.hpp */,
 				3647DEFA14209C1200D56FD7 /* Table.cpp */,
@@ -399,11 +413,13 @@
 				36DBF0C715498B4000CC12CC /* table_basic.hpp */,
 				36DBF0CB15498B4100CC12CC /* table_ref.hpp */,
 				3647DEFC14209C1200D56FD7 /* table_view.cpp */,
+				36DBF0EE1551766200CC12CC /* table_view.hpp */,
 				3647DEFD14209C1200D56FD7 /* tightdb.hpp */,
-				36FD6F3914BDC965009E0003 /* QueryEngine.hpp */,
-				36FD6F3A14BDC965009E0003 /* QueryInterface.hpp */,
 				360BAE2E14FBB9FE00A28045 /* utf8.cpp */,
 				360BAE2F14FBB9FE00A28045 /* utf8.hpp */,
+				36DBF0E31551763200CC12CC /* query_conditions.hpp */,
+				36DBF0E41551763300CC12CC /* query_engine.hpp */,
+				36DBF0E51551763300CC12CC /* query.hpp */,
 				360BAE3214FBBA2E00A28045 /* utilities.cpp */,
 				360BAE3314FBBA2E00A28045 /* utilities.hpp */,
 				3647DEFE14209C1200D56FD7 /* win32 */,
@@ -658,8 +674,6 @@
 				360F1A37146BF71500EBB9C6 /* ColumnString.hpp in Headers */,
 				363141F714751E8000ADD5AC /* ColumnStringEnum.hpp in Headers */,
 				36E4755C14877FB9009FB135 /* ColumnTable.hpp in Headers */,
-				36FD6F3B14BDC965009E0003 /* QueryEngine.hpp in Headers */,
-				36FD6F3C14BDC965009E0003 /* QueryInterface.hpp in Headers */,
 				3604594D14C96DA2008ACFFD /* ColumnMixed.hpp in Headers */,
 				360BAE3114FBB9FE00A28045 /* utf8.hpp in Headers */,
 				360BAE3514FBBA2E00A28045 /* utilities.hpp in Headers */,
@@ -668,6 +682,12 @@
 				36DBF0D015498B4100CC12CC /* spec.hpp in Headers */,
 				36DBF0D415498B4100CC12CC /* table_ref.hpp in Headers */,
 				36DBF0DB154AC79700CC12CC /* group_writer.hpp in Headers */,
+				36DBF0E61551763400CC12CC /* query_conditions.hpp in Headers */,
+				36DBF0E81551763400CC12CC /* query_engine.hpp in Headers */,
+				36DBF0EA1551763400CC12CC /* query.hpp in Headers */,
+				36DBF0EF1551766200CC12CC /* date.hpp in Headers */,
+				36DBF0F11551766200CC12CC /* mixed.hpp in Headers */,
+				36DBF0F31551766200CC12CC /* table_view.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -682,8 +702,6 @@
 				36DB8773153F02250096CF75 /* ColumnString.hpp in Headers */,
 				36DB8774153F02250096CF75 /* ColumnStringEnum.hpp in Headers */,
 				36DB8775153F02250096CF75 /* ColumnTable.hpp in Headers */,
-				36DB8776153F02250096CF75 /* QueryEngine.hpp in Headers */,
-				36DB8777153F02250096CF75 /* QueryInterface.hpp in Headers */,
 				36DB8778153F02250096CF75 /* ColumnMixed.hpp in Headers */,
 				36DB8779153F02250096CF75 /* utf8.hpp in Headers */,
 				36DB877A153F02250096CF75 /* utilities.hpp in Headers */,
@@ -692,6 +710,12 @@
 				36DBF0D115498B4100CC12CC /* spec.hpp in Headers */,
 				36DBF0D515498B4100CC12CC /* table_ref.hpp in Headers */,
 				36DBF0DC154AC79700CC12CC /* group_writer.hpp in Headers */,
+				36DBF0E71551763400CC12CC /* query_conditions.hpp in Headers */,
+				36DBF0E91551763400CC12CC /* query_engine.hpp in Headers */,
+				36DBF0EB1551763400CC12CC /* query.hpp in Headers */,
+				36DBF0F01551766200CC12CC /* date.hpp in Headers */,
+				36DBF0F21551766200CC12CC /* mixed.hpp in Headers */,
+				36DBF0F41551766200CC12CC /* table_view.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -5,7 +5,7 @@
 #include <climits> // size_t
 #include <iostream>
 #include <iomanip>
-#include "query/QueryEngine.hpp"
+
 #ifdef _MSC_VER
 #include "win32/stdint.h"
 #else
@@ -14,6 +14,7 @@
 
 #include "Column.hpp"
 #include "Index.hpp"
+#include "query_conditions.hpp"
 
 using namespace std;
 
