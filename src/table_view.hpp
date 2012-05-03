@@ -23,20 +23,20 @@ public:
 
     // Getting values
     int64_t Get(std::size_t column_id, std::size_t ndx) const;
-    bool GetBool(std::size_t column_id, std::size_t ndx) const;
-    std::time_t GetDate(std::size_t column_id, std::size_t ndx) const;
-    const char* GetString(std::size_t column_id, std::size_t ndx) const;
-    BinaryData GetBinary(std::size_t column_id, std::size_t ndx) const;
-    Mixed GetMixed(std::size_t column_id, std::size_t ndx) const;
+    bool get_bool(std::size_t column_id, std::size_t ndx) const;
+    std::time_t get_date(std::size_t column_id, std::size_t ndx) const;
+    const char* get_string(std::size_t column_id, std::size_t ndx) const;
+    BinaryData get_binary(std::size_t column_id, std::size_t ndx) const;
+    Mixed get_mixed(std::size_t column_id, std::size_t ndx) const;
     TableRef GetTable(std::size_t column_id, std::size_t ndx);
 
     // Setting values
     void Set(std::size_t column_id, std::size_t ndx, int64_t value);
-    void SetBool(std::size_t column_id, std::size_t ndx, bool value);
-    void SetDate(std::size_t column_id, std::size_t ndx, std::time_t value);
-    void SetString(std::size_t column_id, std::size_t ndx, const char* value);
-    void SetBinary(std::size_t column_id, std::size_t ndx, const char* value, std::size_t len);
-    void SetMixed(std::size_t column_id, std::size_t ndx, Mixed value);
+    void set_bool(std::size_t column_id, std::size_t ndx, bool value);
+    void set_date(std::size_t column_id, std::size_t ndx, std::time_t value);
+    void set_string(std::size_t column_id, std::size_t ndx, const char* value);
+    void set_binary(std::size_t column_id, std::size_t ndx, const char* value, std::size_t len);
+    void set_mixed(std::size_t column_id, std::size_t ndx, Mixed value);
 
     void Sort(std::size_t column, bool Ascending = true);
 

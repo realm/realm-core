@@ -203,9 +203,9 @@ TEST(TableViewFindAllString)
     table.Add("a");
 
     TableView v = table.cols().first.FindAll("a");
-    v.SetString(0, 0, "foo");
-    v.SetString(0, 1, "bar"); // match
-    v.SetString(0, 2, "bar"); // match
+    v.set_string(0, 0, "foo");
+    v.set_string(0, 1, "bar"); // match
+    v.set_string(0, 2, "bar"); // match
 
     // todo, add creation to wrapper function in table.h
     TableView *v2 = new TableView(*v.GetTable());

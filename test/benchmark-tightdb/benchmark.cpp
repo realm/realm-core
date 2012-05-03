@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "../../src/tightdb.hpp"
+#include "tightdb.hpp"
 #include "../../test/UnitTest++/src/UnitTest++.h"
 #include "../../test/UnitTest++/src/Win32/TimeHelpers.h"
 #include "../Support/mem.hpp"
@@ -70,7 +70,7 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (i + 1);
-            integers.InsertInt(0, p, (int64_t)rand2() % RANGE);
+            integers.insert_int(0, p, (int64_t)rand2() % RANGE);
         }
         printf((indexed + "Insert: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 

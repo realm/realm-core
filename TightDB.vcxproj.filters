@@ -1,18 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="test\large_tests\verified_integer.cpp">
-      <Filter>large_tests</Filter>
-    </ClCompile>
-    <ClCompile Include="test\large_tests\verified_string.cpp">
-      <Filter>large_tests</Filter>
-    </ClCompile>
-    <ClCompile Include="test\large_tests\test_strings.cpp">
-      <Filter>large_tests</Filter>
-    </ClCompile>
-    <ClCompile Include="test\large_tests\test_column.cpp">
-      <Filter>large_tests</Filter>
-    </ClCompile>
     <ClCompile Include="src\array_binary.cpp" />
     <ClCompile Include="src\array_blob.cpp" />
     <ClCompile Include="src\array_string.cpp" />
@@ -67,9 +55,6 @@
     <ClCompile Include="test\testindex.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\TestQuery.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="test\testtable.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -88,14 +73,23 @@
     <ClCompile Include="test\testarray.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="test\large_tests\test_strings.cpp">
+      <Filter>large_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="test\large_tests\verified_integer.cpp">
+      <Filter>large_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="test\large_tests\verified_string.cpp">
+      <Filter>large_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="test\large_tests\test_column.cpp">
+      <Filter>large_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testquery.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="test\large_tests\verified_integer.h">
-      <Filter>large_tests</Filter>
-    </ClInclude>
-    <ClInclude Include="test\large_tests\verified_string.h">
-      <Filter>large_tests</Filter>
-    </ClInclude>
     <ClInclude Include="include\group.hpp">
       <Filter>include</Filter>
     </ClInclude>
@@ -143,6 +137,12 @@
     </ClInclude>
     <ClInclude Include="test\testsettings.hpp">
       <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="test\large_tests\verified_integer.hpp">
+      <Filter>large_tests</Filter>
+    </ClInclude>
+    <ClInclude Include="test\large_tests\verified_string.hpp">
+      <Filter>large_tests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

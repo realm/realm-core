@@ -69,22 +69,22 @@ TEST(TestQuerySubtable)
     CHECK_EQUAL(3, table->get_column_count());
 
     // Main table
-    table->InsertInt(0, 0, 111);
+    table->insert_int(0, 0, 111);
     table->InsertString(1, 0, "this");
     table->InsertTable(2, 0);
     table->InsertDone();
 
-    table->InsertInt(0, 1, 222);
+    table->insert_int(0, 1, 222);
     table->InsertString(1, 1, "is");
     table->InsertTable(2, 1);
     table->InsertDone();
 
-    table->InsertInt(0, 2, 333);
+    table->insert_int(0, 2, 333);
     table->InsertString(1, 2, "a test");
     table->InsertTable(2, 2);
     table->InsertDone();
 
-    table->InsertInt(0, 3, 444);
+    table->insert_int(0, 3, 444);
     table->InsertString(1, 3, "of queries");
     table->InsertTable(2, 3);
     table->InsertDone();
@@ -92,25 +92,25 @@ TEST(TestQuerySubtable)
 
     // Sub tables
     TableRef subtable = table->GetTable(2, 0);
-    subtable->InsertInt(0, 0, 11);
+    subtable->insert_int(0, 0, 11);
     subtable->InsertString(1, 0, "a");
     subtable->InsertDone();
 
     subtable = table->GetTable(2, 1);
-    subtable->InsertInt(0, 0, 22);
+    subtable->insert_int(0, 0, 22);
     subtable->InsertString(1, 0, "b");
     subtable->InsertDone();
-    subtable->InsertInt(0, 1, 33);
+    subtable->insert_int(0, 1, 33);
     subtable->InsertString(1, 1, "c");
     subtable->InsertDone();
 
     subtable = table->GetTable(2, 2);
-    subtable->InsertInt(0, 0, 44);
+    subtable->insert_int(0, 0, 44);
     subtable->InsertString(1, 0, "d");
     subtable->InsertDone();
 
     subtable = table->GetTable(2, 3);
-    subtable->InsertInt(0, 0, 55);
+    subtable->insert_int(0, 0, 55);
     subtable->InsertString(1, 0, "e");
     subtable->InsertDone();
 
@@ -286,9 +286,9 @@ TEST(TestQuerySort_Dates)
     tv.Sort(0);
 
     CHECK(tv.size() == 3);
-    CHECK(tv.GetDate(0, 0) == 1000);
-    CHECK(tv.GetDate(0, 1) == 2000);
-    CHECK(tv.GetDate(0, 2) == 3000);
+    CHECK(tv.get_date(0, 0) == 1000);
+    CHECK(tv.get_date(0, 1) == 2000);
+    CHECK(tv.get_date(0, 2) == 3000);
 }
 
 
@@ -310,9 +310,9 @@ TEST(TestQuerySort_Bools)
     tv.Sort(0);
 
     CHECK(tv.size() == 3);
-    CHECK(tv.GetBool(0, 0) == false);
-    CHECK(tv.GetBool(0, 1) == true);
-    CHECK(tv.GetBool(0, 2) == true);
+    CHECK(tv.get_bool(0, 0) == false);
+    CHECK(tv.get_bool(0, 1) == true);
+    CHECK(tv.get_bool(0, 2) == true);
 }
 
 

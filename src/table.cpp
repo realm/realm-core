@@ -546,7 +546,7 @@ const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
     return *(const ColumnMixed* const)m_cols.Get(ndx);
 }
 
-size_t Table::AddRow()
+size_t Table::add_empty_row()
 {
     const size_t count = get_column_count();
     for (size_t i = 0; i < count; ++i) {
@@ -589,7 +589,7 @@ void Table::InsertTable(size_t column_id, size_t ndx)
     subtables.Insert(ndx);
 }
 
-void Table::ClearTable(size_t column_id, size_t ndx)
+void Table::clear_subtable(size_t column_id, size_t ndx)
 {
     assert(column_id < get_column_count());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
@@ -639,7 +639,7 @@ const Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx) const
     }
 }
 
-size_t Table::GetTableSize(size_t column_id, size_t ndx) const
+size_t Table::get_subtable_size(size_t column_id, size_t ndx) const
 {
     assert(column_id < get_column_count());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
@@ -647,7 +647,7 @@ size_t Table::GetTableSize(size_t column_id, size_t ndx) const
 
     // FIXME: Should also be made to work for ColumnMixed
     ColumnTable const &subtables = GetColumnTable(column_id);
-    return subtables.GetTableSize(ndx);
+    return subtables.get_subtable_size(ndx);
 }
 
 int64_t Table::Get(size_t column_id, size_t ndx) const
@@ -668,7 +668,7 @@ void Table::Set(size_t column_id, size_t ndx, int64_t value)
     column.Set(ndx, value);
 }
 
-bool Table::GetBool(size_t column_id, size_t ndx) const
+bool Table::get_bool(size_t column_id, size_t ndx) const
 {
     assert(column_id < get_column_count());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
@@ -678,7 +678,7 @@ bool Table::GetBool(size_t column_id, size_t ndx) const
     return column.Get(ndx) != 0;
 }
 
-void Table::SetBool(size_t column_id, size_t ndx, bool value)
+void Table::set_bool(size_t column_id, size_t ndx, bool value)
 {
     assert(column_id < get_column_count());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
@@ -688,7 +688,7 @@ void Table::SetBool(size_t column_id, size_t ndx, bool value)
     column.Set(ndx, value ? 1 : 0);
 }
 
-time_t Table::GetDate(size_t column_id, size_t ndx) const
+time_t Table::get_date(size_t column_id, size_t ndx) const
 {
     assert(column_id < get_column_count());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
@@ -698,7 +698,7 @@ time_t Table::GetDate(size_t column_id, size_t ndx) const
     return (time_t)column.Get(ndx);
 }
 
-void Table::SetDate(size_t column_id, size_t ndx, time_t value)
+void Table::set_date(size_t column_id, size_t ndx, time_t value)
 {
     assert(column_id < get_column_count());
     assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
@@ -708,7 +708,7 @@ void Table::SetDate(size_t column_id, size_t ndx, time_t value)
     column.Set(ndx, (int64_t)value);
 }
 
-void Table::InsertInt(size_t column_id, size_t ndx, int64_t value)
+void Table::insert_int(size_t column_id, size_t ndx, int64_t value)
 {
     assert(column_id < get_column_count());
     assert(ndx <= m_size);
@@ -717,7 +717,7 @@ void Table::InsertInt(size_t column_id, size_t ndx, int64_t value)
     column.Insert(ndx, value);
 }
 
-const char* Table::GetString(size_t column_id, size_t ndx) const
+const char* Table::get_string(size_t column_id, size_t ndx) const
 {
     assert(column_id < m_columns.Size());
     assert(ndx < m_size);
@@ -735,7 +735,7 @@ const char* Table::GetString(size_t column_id, size_t ndx) const
     }
 }
 
-void Table::SetString(size_t column_id, size_t ndx, const char* value)
+void Table::set_string(size_t column_id, size_t ndx, const char* value)
 {
     assert(column_id < get_column_count());
     assert(ndx < m_size);
@@ -771,7 +771,7 @@ void Table::InsertString(size_t column_id, size_t ndx, const char* value)
     }
 }
 
-BinaryData Table::GetBinary(size_t column_id, size_t ndx) const
+BinaryData Table::get_binary(size_t column_id, size_t ndx) const
 {
     assert(column_id < m_columns.Size());
     assert(ndx < m_size);
@@ -780,7 +780,7 @@ BinaryData Table::GetBinary(size_t column_id, size_t ndx) const
     return column.Get(ndx);
 }
 
-void Table::SetBinary(size_t column_id, size_t ndx, const char* value, size_t len)
+void Table::set_binary(size_t column_id, size_t ndx, const char* value, size_t len)
 {
     assert(column_id < get_column_count());
     assert(ndx < m_size);
@@ -798,7 +798,7 @@ void Table::InsertBinary(size_t column_id, size_t ndx, const char* value, size_t
     column.Insert(ndx, value, len);
 }
 
-Mixed Table::GetMixed(size_t column_id, size_t ndx) const
+Mixed Table::get_mixed(size_t column_id, size_t ndx) const
 {
     assert(column_id < m_columns.Size());
     assert(ndx < m_size);
@@ -810,13 +810,13 @@ Mixed Table::GetMixed(size_t column_id, size_t ndx) const
         case COLUMN_TYPE_INT:
             return Mixed(column.GetInt(ndx));
         case COLUMN_TYPE_BOOL:
-            return Mixed(column.GetBool(ndx));
+            return Mixed(column.get_bool(ndx));
         case COLUMN_TYPE_DATE:
-            return Mixed(Date(column.GetDate(ndx)));
+            return Mixed(Date(column.get_date(ndx)));
         case COLUMN_TYPE_STRING:
-            return Mixed(column.GetString(ndx));
+            return Mixed(column.get_string(ndx));
         case COLUMN_TYPE_BINARY:
-            return Mixed(column.GetBinary(ndx));
+            return Mixed(column.get_binary(ndx));
         case COLUMN_TYPE_TABLE:
             return Mixed(COLUMN_TYPE_TABLE);
         default:
@@ -825,7 +825,7 @@ Mixed Table::GetMixed(size_t column_id, size_t ndx) const
     }
 }
 
-ColumnType Table::GetMixedType(size_t column_id, size_t ndx) const
+ColumnType Table::get_mixed_type(size_t column_id, size_t ndx) const
 {
     assert(column_id < m_columns.Size());
     assert(ndx < m_size);
@@ -834,7 +834,7 @@ ColumnType Table::GetMixedType(size_t column_id, size_t ndx) const
     return column.GetType(ndx);
 }
 
-void Table::SetMixed(size_t column_id, size_t ndx, Mixed value)
+void Table::set_mixed(size_t column_id, size_t ndx, Mixed value)
 {
     assert(column_id < get_column_count());
     assert(ndx < m_size);
@@ -844,21 +844,21 @@ void Table::SetMixed(size_t column_id, size_t ndx, Mixed value)
 
     switch (type) {
         case COLUMN_TYPE_INT:
-            column.SetInt(ndx, value.get_int());
+            column.SetInt(ndx, value.Get());
             break;
         case COLUMN_TYPE_BOOL:
-            column.SetBool(ndx, value.get_bool());
+            column.set_bool(ndx, value.get_bool());
             break;
         case COLUMN_TYPE_DATE:
-            column.SetDate(ndx, value.get_date());
+            column.set_date(ndx, value.get_date());
             break;
         case COLUMN_TYPE_STRING:
-            column.SetString(ndx, value.get_string());
+            column.set_string(ndx, value.get_string());
             break;
         case COLUMN_TYPE_BINARY:
         {
             const BinaryData b = value.get_binary();
-            column.SetBinary(ndx, (const char*)b.pointer, b.len);
+            column.set_binary(ndx, (const char*)b.pointer, b.len);
             break;
         }
         case COLUMN_TYPE_TABLE:
@@ -878,7 +878,7 @@ void Table::InsertMixed(size_t column_id, size_t ndx, Mixed value) {
 
     switch (type) {
         case COLUMN_TYPE_INT:
-            column.InsertInt(ndx, value.get_int());
+            column.insert_int(ndx, value.Get());
             break;
         case COLUMN_TYPE_BOOL:
             column.InsertBool(ndx, value.get_bool());
@@ -1153,14 +1153,14 @@ void Table::to_json(std::ostream& out)
                     out << Get(i, r);
                     break;
                 case COLUMN_TYPE_BOOL:
-                    out << (GetBool(i, r) ? "true" : "false");
+                    out << (get_bool(i, r) ? "true" : "false");
                     break;
                 case COLUMN_TYPE_STRING:
-                    out << "\"" << GetString(i, r) << "\"";
+                    out << "\"" << get_string(i, r) << "\"";
                     break;
                 case COLUMN_TYPE_DATE:
                 {
-                    const time_t rawtime = GetDate(i, r);
+                    const time_t rawtime = get_date(i, r);
                     struct tm* const t = gmtime(&rawtime);
                     const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
                     if (!res) break;
@@ -1170,7 +1170,7 @@ void Table::to_json(std::ostream& out)
                 }
                 case COLUMN_TYPE_BINARY:
                 {
-                    const BinaryData bin = GetBinary(i, r);
+                    const BinaryData bin = get_binary(i, r);
                     const char* const p = (char*)bin.pointer;
 
                     out << "\"";
@@ -1188,15 +1188,15 @@ void Table::to_json(std::ostream& out)
                 }
                 case COLUMN_TYPE_MIXED:
                 {
-                    const ColumnType mtype = GetMixedType(i, r);
+                    const ColumnType mtype = get_mixed_type(i, r);
                     if (mtype == COLUMN_TYPE_TABLE) {
                         GetTable(i, r)->to_json(out);
                     }
                     else {
-                        const Mixed m = GetMixed(i, r);
+                        const Mixed m = get_mixed(i, r);
                         switch (mtype) {
                             case COLUMN_TYPE_INT:
-                                out << m.get_int();
+                                out << m.Get();
                                 break;
                             case COLUMN_TYPE_BOOL:
                                 out << m.get_bool();

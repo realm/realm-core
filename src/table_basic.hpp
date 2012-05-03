@@ -119,7 +119,7 @@ public:
         return ConstRowAccessor(std::make_pair(this, m_size+rel_idx));
     }
 
-    RowAccessor Add() { return RowAccessor(std::make_pair(this, AddRow())); }
+    RowAccessor Add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
 
     template<class T1>
     void Add(const T1& v1)
@@ -469,10 +469,10 @@ private:
 
 public:
     explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-    operator bool() const { return Base::m_table->GetBool(col_idx, Base::m_row_idx); }
+    operator bool() const { return Base::m_table->get_bool(col_idx, Base::m_row_idx); }
     const Field& operator=(bool value) const
     {
-        Base::m_table->SetBool(col_idx, Base::m_row_idx, value);
+        Base::m_table->set_bool(col_idx, Base::m_row_idx, value);
         return *this;
     }
 };
@@ -503,10 +503,10 @@ private:
 
 public:
     explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-    operator const char*() const { return Base::m_table->GetString(col_idx, Base::m_row_idx); }
+    operator const char*() const { return Base::m_table->get_string(col_idx, Base::m_row_idx); }
     const Field& operator=(const char* value) const
     {
-        Base::m_table->SetString(col_idx, Base::m_row_idx, value);
+        Base::m_table->set_string(col_idx, Base::m_row_idx, value);
         return *this;
     }
     // FIXME: Not good to define operator==() here, beacuse it does
@@ -518,7 +518,7 @@ public:
     // would probably be to define a special tightdb::String type.
     bool operator==(const char* value) const
     {
-        return std::strcmp(Base::m_table->GetString(col_idx, Base::m_row_idx), value) == 0;
+        return std::strcmp(Base::m_table->get_string(col_idx, Base::m_row_idx), value) == 0;
     }
 };
 
@@ -531,14 +531,14 @@ private:
 
 public:
     explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-    operator Mixed() const { return Base::m_table->GetMixed(col_idx, Base::m_row_idx); }
+    operator Mixed() const { return Base::m_table->get_mixed(col_idx, Base::m_row_idx); }
     const Field& operator=(const Mixed& value) const
     {
-        Base::m_table->SetMixed(col_idx, Base::m_row_idx, value);
+        Base::m_table->set_mixed(col_idx, Base::m_row_idx, value);
         return *this;
     }
-    ColumnType get_type() const { return Base::m_table->GetMixedType(col_idx, Base::m_row_idx); }
-    int64_t get_int() const { return Mixed(*this).get_int(); }
+    ColumnType get_type() const { return Base::m_table->get_mixed_type(col_idx, Base::m_row_idx); }
+    int64_t Get() const { return Mixed(*this).Get(); }
     bool get_bool() const { return Mixed(*this).get_bool(); }
     std::time_t get_date() const { return Mixed(*this).get_date(); }
     const char* get_string() const { return Mixed(*this).get_string(); }
@@ -625,7 +625,7 @@ public:
 
     void _insert(std::size_t row_idx, int64_t value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
     {
-        Base::m_table->InsertInt(col_idx, row_idx, value);
+        Base::m_table->insert_int(col_idx, row_idx, value);
     }
 };
 

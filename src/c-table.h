@@ -145,8 +145,8 @@ typedef struct Query Query;
 
 	/* Removing rows */
 	void table_clear(Table* t);
-	void table_delete_row(Table* t, size_t ndx);
-    void table_pop_back(Table* t);
+	void table_remove(Table* t, size_t ndx);
+    void table_remove_last(Table* t);
 
     /* Inserting values */
 	void table_add(Table* t, ...);
@@ -203,6 +203,7 @@ typedef struct Query Query;
     void table_insert_done(Table* t);
 
 /*** TableView ************************************/
+//???missing remove and remove_last
 
 	/* Creating and deleting tableviews */
 	void tableview_delete(TableView* t);

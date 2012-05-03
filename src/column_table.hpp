@@ -111,7 +111,7 @@ public:
                 ArrayParent* parent, std::size_t idx_in_parent,
                 Allocator& alloc, const Table* tab);
 
-    size_t GetTableSize(size_t ndx) const;
+    size_t get_subtable_size(size_t ndx) const;
 
     /**
      * The returned table pointer must always end up being wrapped in

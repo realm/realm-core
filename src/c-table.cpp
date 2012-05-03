@@ -57,7 +57,7 @@ void mixed_delete(Mixed *mixed) {
 }
 
 int64_t mixed_get_int(Mixed *mixed) {
-    return mixed->get_int(); 
+    return mixed->Get(); 
 }
 bool mixed_get_bool(Mixed *mixed) {
     return mixed->get_bool(); 
@@ -175,8 +175,8 @@ void table_delete_row(Table* t, size_t ndx) {
 	t->remove(ndx);
 }
 
-void table_pop_back(Table* t) {
-    t->pop_back();
+void table_remove_last(Table* t) {
+    t->remove_last();
 }
 
 
@@ -188,27 +188,27 @@ int64_t table_get_int(const Table* t, size_t column_id, size_t ndx) {
 }
 
 bool table_get_bool(const Table* t, size_t column_id, size_t ndx) {
-	return t->GetBool(column_id, ndx);
+	return t->get_bool(column_id, ndx);
 }
 
 time_t table_get_date(const Table* t, size_t column_id, size_t ndx) {
-	return t->GetDate(column_id, ndx);
+	return t->get_date(column_id, ndx);
 }
 
 const char* table_get_string(const Table* t, size_t column_id, size_t ndx) {
-	return t->GetString(column_id, ndx);
+	return t->get_string(column_id, ndx);
 }
 
 BinaryData table_get_binary(const Table* t, size_t column_id, size_t ndx) {
-	return t->GetBinary(column_id, ndx);
+	return t->get_binary(column_id, ndx);
 }
 
 Mixed* table_get_mixed(const Table* t, size_t column_id, size_t ndx) {
-	return new Mixed(t->GetMixed(column_id, ndx));
+	return new Mixed(t->get_mixed(column_id, ndx));
 }
 
 ColumnType table_get_mixed_type(const Table* t, size_t column_id, size_t ndx) {
-    return t->GetMixedType(column_id, ndx);
+    return t->get_mixed_type(column_id, ndx);
 }
 
 Table* table_get_table(Table* t, size_t column_id, size_t ndx) {
@@ -227,27 +227,27 @@ void table_set_int(Table* t, size_t column_id, size_t ndx, int64_t value) {
 }
 
 void table_set_bool(Table* t, size_t column_id, size_t ndx, bool value) {
-	t->SetBool(column_id, ndx, value);
+	t->set_bool(column_id, ndx, value);
 }
 
 void table_set_date(Table* t, size_t column_id, size_t ndx, time_t value) {
-	t->SetDate(column_id, ndx, value);
+	t->set_date(column_id, ndx, value);
 }
 
 void table_set_string(Table* t, size_t column_id, size_t ndx, const char* value) {
-	t->SetString(column_id, ndx, value);
+	t->set_string(column_id, ndx, value);
 }
 
 void table_set_binary(Table* t, size_t column_id, size_t ndx, const char *value, size_t len) {
-	t->SetBinary(column_id, ndx, value, len);
+	t->set_binary(column_id, ndx, value, len);
 }
 
 void table_set_mixed(Table* t, size_t column_id, size_t ndx, Mixed value) {
-	t->SetMixed(column_id, ndx, value);
+	t->set_mixed(column_id, ndx, value);
 }
 
 void table_clear_table(Table* t, size_t column_id, size_t ndx) {
-    t->ClearTable(column_id, ndx);
+    t->clear_subtable(column_id, ndx);
 }
 
 
@@ -262,7 +262,7 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap) {
 			{
 				// int values should always be cast to 64bit in args
 				const int64_t v = va_arg(ap, int64_t);
-				t->InsertInt(i, ndx, v);
+				t->insert_int(i, ndx, v);
 			}
 			break;
 		case COLUMN_TYPE_BOOL:
@@ -332,11 +332,11 @@ void table_insert(Table* t, size_t ndx, ...) {
 
 
 void table_insert_int(Table* t, size_t column_id, size_t ndx, int value) {
-    t->InsertInt(column_id, ndx, value);
+    t->insert_int(column_id, ndx, value);
 }
 
 void table_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value) {
-	t->InsertInt(column_id, ndx, value);
+	t->insert_int(column_id, ndx, value);
 }
 
 void table_insert_bool(Table* t, size_t column_id, size_t ndx, bool value) {
@@ -428,7 +428,7 @@ size_t tableview_get_size(const TableView* tv) {
 }
 /* ??? Implement
 size_t tableview_get_table_size(const TableView* tv, size_t column_id, size_t ndx) {
-    return tv->GetTableSize();
+    return tv->get_subtable_size();
 */
 
 
@@ -437,24 +437,24 @@ int64_t tableview_get_int(const TableView* tv, size_t column_id, size_t ndx) {
 }
 
 bool tableview_get_bool(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->GetBool(column_id, ndx);
+	return tv->get_bool(column_id, ndx);
 }
 
 time_t tableview_get_date(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->GetDate(column_id, ndx);
+	return tv->get_date(column_id, ndx);
 }
 
 const char* tableview_get_string(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->GetString(column_id, ndx);
+	return tv->get_string(column_id, ndx);
 }
 
 /* ??? Waiting for implementation
 BinaryData tableview_get_binary(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->GetBinary(column_id, ndx);
+	return tv->get_binary(column_id, ndx);
 }
 
 Mixed tableview_get_mixed(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->GetMixed(column_id, ndx);
+	return tv->get_mixed(column_id, ndx);
 }
 */
 
@@ -464,29 +464,29 @@ void tableview_set_int(TableView* tv, size_t column_id, size_t ndx, int64_t valu
 }
 
 void tableview_set_bool(TableView* tv, size_t column_id, size_t ndx, bool value) {
-	tv->SetBool(column_id, ndx, value);
+	tv->set_bool(column_id, ndx, value);
 }
 
 void tableview_set_date(TableView* tv, size_t column_id, size_t ndx, time_t value) {
-	tv->SetDate(column_id, ndx, value);
+	tv->set_date(column_id, ndx, value);
 }
 
 void tableview_set_string(TableView* tv, size_t column_id, size_t ndx, const char* value) {
-	tv->SetString(column_id, ndx, value);
+	tv->set_string(column_id, ndx, value);
 }
 
 /*
 //??? Waiting for implementation
 void tableview_set_binary(TableView* tv, size_t column_id, size_t ndx, const char* value, size_t len) {
-	tv->SetBinary(column_id, ndx, value, len);
+	tv->set_binary(column_id, ndx, value, len);
 }
 
 void tableview_set_mixed(TableView* tv, size_t column_id, size_t ndx, Mixed value) {
-	tv->SetMixed(column_id, ndx, value);
+	tv->set_mixed(column_id, ndx, value);
 }
 
 void tableview_clear_table(TableView* tv, size_t column_id, size_t ndx) {
-    tv->ClearTable(column_id, ndx);
+    tv->clear_subtable(column_id, ndx);
 }
 */
 
