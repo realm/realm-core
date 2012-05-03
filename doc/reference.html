@@ -168,7 +168,7 @@ var App = {};
 							</li>
 
                             <li data-section="tablecursor" class="major">
-							  <strong class="first"><a class="" href="#tablecursor">Cursor Class</a></strong>                                <ul style="display: block;">
+							  <strong class="first"><a class="" href="#tablecursor">Cursor Class</a></strong>                                   <ul style="display: block;">
                               </ul>
                             </li>
 
@@ -909,8 +909,8 @@ table.optimize();
 
                 <p><b>Example:</b></p>
       			<pre class="prettyprint"  lang-cpp>
-people_cursor pc = [people lastObject]; // pc is a cursor object
-pc.Name = "Hans"; // the name is updated
+people_cursor pc = people.back(); // pc is a cursor object
+pc.name = "Hans"; // the name is updated
                 </pre>
                 	
 

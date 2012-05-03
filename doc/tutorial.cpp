@@ -56,7 +56,7 @@ cout << table.size(); // => 5
 
 // @@Example: iteration @@
 for (size_t i = 0; i < table.size(); ++i) {
-    MyTable::Cursor row = table[i];
+    PeopleTable::Cursor row = table[i];
     cout << row.name << " is " << row.age << " years old." << endl;
 }
 // @@EndExample@@
