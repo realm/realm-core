@@ -118,8 +118,8 @@ TEST(Group_Serialize1)
     t[0].first = "test";
     table->Insert(5, "hello", 100, false, Mon);
     t->Insert(5, "hello", 100, false, Mon);
-    table->erase(1);
-    t->erase(1);
+    table->remove(1);
+    t->remove(1);
 
 #ifdef _DEBUG
     // Verify that both changed correctly

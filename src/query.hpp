@@ -375,7 +375,7 @@ public:
             if (r == size_t(-1) || r == table.size() || results == limit)
                 break;
             ++results;
-            table.erase(r);
+            table.remove(r);
         }
         return results;
     }

@@ -567,7 +567,7 @@ void Table::clear()
     m_size = 0;
 }
 
-void Table::erase(size_t ndx)
+void Table::remove(size_t ndx)
 {
     assert(ndx < m_size);
 

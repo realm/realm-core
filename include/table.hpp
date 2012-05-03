@@ -47,8 +47,8 @@ public:
 
     // Row handling
     size_t      AddRow();
-    void        erase(size_t row_ndx);
-    void        pop_back() {if (!is_empty()) erase(m_size-1);}
+    void        remove(size_t row_ndx);
+    void        pop_back() {if (!is_empty()) remove(m_size-1);}
 
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by InsertDone().

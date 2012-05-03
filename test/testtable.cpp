@@ -120,9 +120,9 @@ TEST(Table_Delete)
         table.Add(0, i, true, Wed);
     }
 
-    table.erase(0);
-    table.erase(4);
-    table.erase(7);
+    table.remove(0);
+    table.remove(4);
+    table.remove(7);
 
     CHECK_EQUAL(1, table[0].second);
     CHECK_EQUAL(2, table[1].second);
@@ -138,7 +138,7 @@ TEST(Table_Delete)
 
     // Delete all items one at a time
     for (size_t i = 0; i < 7; ++i) {
-        table.erase(0);
+        table.remove(0);
     }
 
     CHECK(table.is_empty());
@@ -238,9 +238,9 @@ TEST(Table_Delete_All_Types)
     table.optimize();
 
     // Test Deletes
-    table.erase(14);
-    table.erase(0);
-    table.erase(5);
+    table.remove(14);
+    table.remove(0);
+    table.remove(5);
 
     CHECK_EQUAL(12, table.size());
 
@@ -403,9 +403,9 @@ TEST(Table_Index_Int)
     CHECK_EQUAL(10, table.cols().second.Find(29));
 
     // Delete some values
-    table.erase(0);
-    table.erase(5);
-    table.erase(8);
+    table.remove(0);
+    table.remove(5);
+    table.remove(8);
 
     CHECK_EQUAL(0, table.cols().second.Find(15));
     CHECK_EQUAL(1, table.cols().second.Find(13));
@@ -520,8 +520,8 @@ TEST(Table_SlabAlloc)
     table.Add(5, 10, true, Wed);
 
     // Delete some rows
-    table.erase(2);
-    table.erase(4);
+    table.remove(2);
+    table.remove(4);
 
 #ifdef _DEBUG
     table.verify();

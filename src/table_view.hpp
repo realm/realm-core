@@ -42,8 +42,8 @@ public:
 
     // Deleting
     void clear();
-    void erase(std::size_t ndx);
-    void pop_back() { if (!is_empty()) erase(size()-1); }
+    void remove(std::size_t ndx);
+    void pop_back() { if (!is_empty()) remove(size()-1); }
 
     // Finding
     std::size_t Find(std::size_t column_id, int64_t value) const;

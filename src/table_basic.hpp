@@ -219,7 +219,7 @@ public:
 
     Query& EndGroup() { m_impl.RightParan(); return *this; }
 
-    std::size_t Delete(BasicTable<Spec>& table, size_t start = 0, size_t end = size_t(-1), // Should instead be 'table.erase(query);'
+    std::size_t Delete(BasicTable<Spec>& table, size_t start = 0, size_t end = size_t(-1), // Should instead be 'table.remove(query);'
                        size_t limit = size_t(-1)) const
     {
         return m_impl.Delete(table, start, end, limit);

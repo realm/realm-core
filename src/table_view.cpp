@@ -291,13 +291,13 @@ void TableView::Sort(size_t column, bool Ascending)
     result.Destroy();
 }
 
-void TableView::erase(size_t ndx)
+void TableView::remove(size_t ndx)
 {
     assert(ndx < m_refs.Size());
 
     // Delete row in source table
     const size_t real_ndx = m_refs.GetAsRef(ndx);
-    m_table.erase(real_ndx);
+    m_table.remove(real_ndx);
 
     // Update refs
     m_refs.Delete(ndx);
@@ -313,7 +313,7 @@ void TableView::clear()
     const size_t count = m_refs.Size();
     for (size_t i = count; i; --i) {
         const size_t ndx = m_refs.GetAsRef(i-1);
-        m_table.erase(ndx);
+        m_table.remove(ndx);
     }
 
     m_refs.Clear();

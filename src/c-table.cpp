@@ -172,7 +172,7 @@ void table_optimize(Table* t) {
 }
 
 void table_delete_row(Table* t, size_t ndx) {
-	t->erase(ndx);
+	t->remove(ndx);
 }
 
 void table_pop_back(Table* t) {
@@ -332,7 +332,8 @@ void table_insert(Table* t, size_t ndx, ...) {
 
 
 void table_insert_int(Table* t, size_t column_id, size_t ndx, int value) {
-	t->InsertInt(column_id, ndx, value);
+    min(
+    t->InsertInt(column_id, ndx, value);
 }
 
 void table_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value) {

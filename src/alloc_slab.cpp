@@ -101,7 +101,7 @@ MemRef SlabAlloc::Alloc(size_t size)
             const size_t rest = (size_t)r.size - size;
 
             // Update free list
-            if (rest == 0) m_freeSpace.erase(i);
+            if (rest == 0) m_freeSpace.remove(i);
             else {
                 r.size = rest;
                 r.ref += (unsigned int)size;
@@ -187,7 +187,7 @@ void SlabAlloc::Free(size_t ref, void* p)
             if (ref == end) {
                 if (isMerged) {
                     c.size += m_freeSpace[n].size;
-                    m_freeSpace.erase(n);
+                    m_freeSpace.remove(n);
                 }
                 else c.size += size;
 
