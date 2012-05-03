@@ -2,7 +2,7 @@
 #define __TIGHTDB_GROUP__
 
 #include "table.hpp"
-#include "alloc_slab.hpp"
+#include "../src/alloc_slab.hpp"
 
 namespace tightdb {
 

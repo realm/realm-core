@@ -1,11 +1,11 @@
 #ifndef __TIGHTDB_TABLE_H
 #define __TIGHTDB_TABLE_H
 
-#include "column_fwd.hpp"
-#include "table_ref.hpp"
-#include "spec.hpp"
-#include "mixed.hpp"
-#include "table_view.hpp"
+#include "../src/column_fwd.hpp"
+#include "../src/table_ref.hpp"
+#include "../src/spec.hpp"
+#include "../src/mixed.hpp"
+#include "../src/table_view.hpp"
 
 namespace tightdb {
 using std::size_t;

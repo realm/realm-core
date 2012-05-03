@@ -1,7 +1,7 @@
 #ifndef __TIGHTDB_H
 #define __TIGHTDB_H
 
-#include "table_basic.hpp"
+#include "../src/table_basic.hpp"
 
 
 #define TIGHTDB_TABLE_1(Table, name1, type1) \
@@ -194,6 +194,5 @@ struct Table##Spec: tightdb::SpecBase { \
     } \
 }; \
 typedef tightdb::BasicTable<Table##Spec> Table;
-
 
 #endif // __TIGHTDB_H
