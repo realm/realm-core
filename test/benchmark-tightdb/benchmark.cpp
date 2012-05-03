@@ -51,7 +51,7 @@ void tightdb2(void)
         std::string indexed;
         integers.Clear();
         if(index == 1) {
-            integers.SetIndex(0);
+            integers.set_index(0);
             indexed = "Indexed ";
         }
 
@@ -100,7 +100,7 @@ void tightdb2(void)
             // Sanity test to ensure that average distance between matches is the same as in the STL tests
 /*
             int j;
-            for(j = 0; j < integers.GetSize(); j++)
+            for(j = 0; j < integers.size(); j++)
                 if(integers.Get64(0, j) == f)
                     break;
             distance_sum += j;

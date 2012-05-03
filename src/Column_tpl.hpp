@@ -286,7 +286,7 @@ template<class C> bool ColumnBase::NodeAdd(size_t ref)
 
     assert(offsets.Size() < MAX_LIST_SIZE);
 
-    const int64_t newOffset = (offsets.IsEmpty() ? 0 : offsets.Back()) + col.Size();
+    const int64_t newOffset = (offsets.is_empty() ? 0 : offsets.Back()) + col.Size();
     if (!offsets.Add(newOffset)) return false;
     return refs.Add(ref);
 }
@@ -314,13 +314,13 @@ template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
         target.TreeDelete<T,C>(local_ndx);
 
         // Remove ref in node
-        if (target.IsEmpty()) {
+        if (target.is_empty()) {
             offsets.Delete(node_ndx);
             refs.Delete(node_ndx);
             target.Destroy();
         }
 
-        if (offsets.IsEmpty()) {
+        if (offsets.is_empty()) {
             // All items deleted, we can revert to being array
             static_cast<C*>(this)->Clear();
         }

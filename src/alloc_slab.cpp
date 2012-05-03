@@ -66,7 +66,7 @@ SlabAlloc::~SlabAlloc()
 #endif //_DEBUG
 
     // Release all allocated memory
-    for (size_t i = 0; i < m_slabs.GetSize(); ++i) {
+    for (size_t i = 0; i < m_slabs.size(); ++i) {
         void* p = (void*)(intptr_t)m_slabs[i].pointer;
         free(p);
     }
@@ -94,7 +94,7 @@ MemRef SlabAlloc::Alloc(size_t size)
     assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
     // Do we have a free space we can reuse?
-    for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
+    for (size_t i = 0; i < m_freeSpace.size(); ++i) {
         FreeSpace::Cursor r = m_freeSpace[i];
         if (r.size >= (int)size) {
             const size_t location = (size_t)r.ref;
@@ -120,9 +120,9 @@ MemRef SlabAlloc::Alloc(size_t size)
 
     // Else, allocate new slab
     const size_t multible = 256 * ((size / 256) + 1);
-    const size_t slabsBack = m_slabs.IsEmpty() ? m_baseline : m_slabs.Back().offset;
-    const size_t doubleLast = m_slabs.IsEmpty() ? 0 :
-        (slabsBack - ((m_slabs.GetSize() == 1) ? size_t(0) : m_slabs.Back(-2).offset)) * 2;
+    const size_t slabsBack = m_slabs.is_empty() ? m_baseline : m_slabs.Back().offset;
+    const size_t doubleLast = m_slabs.is_empty() ? 0 :
+        (slabsBack - ((m_slabs.size() == 1) ? size_t(0) : m_slabs.Back(-2).offset)) * 2;
     const size_t newsize = multible > doubleLast ? multible : doubleLast;
 
     // Allocate memory
@@ -177,7 +177,7 @@ void SlabAlloc::Free(size_t ref, void* p)
 
     // Check if we can merge with end of free block
     if (m_slabs.cols().offset.Find(ref) == (size_t)-1) { // avoid slab borders
-        const size_t count = m_freeSpace.GetSize();
+        const size_t count = m_freeSpace.size();
         for (size_t i = 0; i < count; ++i) {
             FreeSpace::Cursor c = m_freeSpace[i];
 
@@ -355,7 +355,7 @@ size_t SlabAlloc::GetTopRef() const
 
 size_t SlabAlloc::GetTotalSize() const
 {
-    if (m_slabs.IsEmpty()) {
+    if (m_slabs.is_empty()) {
         return m_baseline;
     }
     else {
@@ -387,7 +387,7 @@ void SlabAlloc::FreeAll(size_t filesize)
 
     // Rebuild free list to include all slabs
     size_t ref = m_baseline;
-    const size_t count = m_slabs.GetSize();
+    const size_t count = m_slabs.size();
     for (size_t i = 0; i < count; ++i) {
         const Slabs::Cursor c = m_slabs[i];
         const size_t size = c.offset - ref;
@@ -402,11 +402,11 @@ void SlabAlloc::FreeAll(size_t filesize)
 
 bool SlabAlloc::IsAllFree() const
 {
-    if (m_freeSpace.GetSize() != m_slabs.GetSize()) return false;
+    if (m_freeSpace.size() != m_slabs.size()) return false;
 
     // Verify that free space matches slabs
     size_t ref = m_baseline;
-    for (size_t i = 0; i < m_slabs.GetSize(); ++i) {
+    for (size_t i = 0; i < m_slabs.size(); ++i) {
         Slabs::ConstCursor c = m_slabs[i];
         const size_t size = TO_REF(c.offset) - ref;
 
@@ -422,7 +422,7 @@ bool SlabAlloc::IsAllFree() const
 void SlabAlloc::Verify() const
 {
     // Make sure that all free blocks fit within a slab
-    const size_t count = m_freeSpace.GetSize();
+    const size_t count = m_freeSpace.size();
     for (size_t i = 0; i < count; ++i) {
         FreeSpace::ConstCursor c = m_freeSpace[i];
         const size_t ref = TO_REF(c.ref);
@@ -439,10 +439,10 @@ void SlabAlloc::Verify() const
 
 void SlabAlloc::Print() const
 {
-    const size_t allocated = m_slabs.IsEmpty() ? 0 : (size_t)m_slabs[m_slabs.GetSize()-1].offset;
+    const size_t allocated = m_slabs.is_empty() ? 0 : (size_t)m_slabs[m_slabs.size()-1].offset;
 
     size_t free = 0;
-    for (size_t i = 0; i < m_freeSpace.GetSize(); ++i) {
+    for (size_t i = 0; i < m_freeSpace.size(); ++i) {
         free += TO_REF(m_freeSpace[i].size);
     }
 

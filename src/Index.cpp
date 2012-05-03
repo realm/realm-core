@@ -44,15 +44,15 @@ Index::Index(size_t ref): Column(ref) {}
 
 Index::Index(size_t ref, Array* parent, size_t pndx): Column(ref, parent, pndx) {}
 
-bool Index::IsEmpty() const
+bool Index::is_empty() const
 {
     const Array offsets = m_array->GetSubArray(0);
-    return offsets.IsEmpty();
+    return offsets.is_empty();
 }
 
 void Index::BuildIndex(const Column& src)
 {
-    //assert(IsEmpty());
+    //assert(is_empty());
 
     // Brute-force build-up
     // TODO: sort and merge
@@ -106,7 +106,7 @@ bool Index::DoDelete(size_t ndx, int64_t value)
             Index node = GetIndexFromRef(refs, pos);
             if (node.DoDelete(ndx, value)) {
                 // Update the ref
-                if (node.IsEmpty()) {
+                if (node.is_empty()) {
                     refs.Delete(pos);
                     node.Destroy();
                 }
@@ -204,7 +204,7 @@ bool Index::NodeAdd(size_t ref)
     assert(IsNode());
 
     const Index col(ref);
-    assert(!col.IsEmpty());
+    assert(!col.is_empty());
     const int64_t maxval = col.MaxValue();
 
     Array offsets = m_array->GetSubArray(0);
@@ -227,7 +227,7 @@ bool Index::NodeAdd(size_t ref)
 int64_t Index::MaxValue() const
 {
     const Array values = m_array->GetSubArray(0);
-    return values.IsEmpty() ? 0 : values.Back();
+    return values.is_empty() ? 0 : values.Back();
 }
 
 Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)

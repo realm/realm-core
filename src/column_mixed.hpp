@@ -45,7 +45,7 @@ public:
 
     ColumnType GetType(size_t ndx) const;
     size_t Size() const {return m_types->Size();}
-    bool IsEmpty() const {return m_types->IsEmpty();}
+    bool is_empty() const {return m_types->is_empty();}
 
     int64_t GetInt(size_t ndx) const;
     bool GetBool(size_t ndx) const;

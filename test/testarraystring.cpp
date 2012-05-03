@@ -230,7 +230,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringDeleteAll)
     c.Delete(0);
     c.Delete(0);
 
-    CHECK(c.IsEmpty());
+    CHECK(c.is_empty());
     CHECK_EQUAL(0, c.Size());
 }
 

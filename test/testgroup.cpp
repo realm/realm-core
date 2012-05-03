@@ -54,8 +54,8 @@ TEST(Group_Serialize0)
     // Create new table in group
     BasicTableRef<TestTableGroup> t = fromDisk.get_table<TestTableGroup>("test");
 
-    CHECK_EQUAL(4, t->GetColumnCount());
-    CHECK_EQUAL(0, t->GetSize());
+    CHECK_EQUAL(4, t->get_column_count());
+    CHECK_EQUAL(0, t->size());
 
     // Modify table
     t->Add("Test",  1, true, Wed);
@@ -105,8 +105,8 @@ TEST(Group_Serialize1)
     CHECK(fromDisk.is_valid());
     BasicTableRef<TestTableGroup> t = fromDisk.get_table<TestTableGroup>("test");
 
-    CHECK_EQUAL(4, t->GetColumnCount());
-    CHECK_EQUAL(10, t->GetSize());
+    CHECK_EQUAL(4, t->get_column_count());
+    CHECK_EQUAL(10, t->size());
 
 #ifdef _DEBUG
     // Verify that original values are there
@@ -239,8 +239,8 @@ TEST(Group_Serialize_Men)
     CHECK(fromMem.is_valid());
     BasicTableRef<TestTableGroup> t = fromMem.get_table<TestTableGroup>("test");
 
-    CHECK_EQUAL(4, t->GetColumnCount());
-    CHECK_EQUAL(10, t->GetSize());
+    CHECK_EQUAL(4, t->get_column_count());
+    CHECK_EQUAL(10, t->size());
 
 
 #ifdef _DEBUG
@@ -265,7 +265,7 @@ TEST(Group_Serialize_Optimized)
         table->Add("stuvxyz", 9, true, Fri);
     }
 
-    table->Optimize();
+    table->optimize();
 
 #ifdef _DEBUG
     toMem.verify();
@@ -280,7 +280,7 @@ TEST(Group_Serialize_Optimized)
     CHECK(fromMem.is_valid());
     BasicTableRef<TestTableGroup> t = fromMem.get_table<TestTableGroup>("test");
 
-    CHECK_EQUAL(4, t->GetColumnCount());
+    CHECK_EQUAL(4, t->get_column_count());
 
     // Verify that original values are there
 #ifdef _DEBUG
@@ -291,7 +291,7 @@ TEST(Group_Serialize_Optimized)
     table->Add("search_target", 9, true, Fri);
 
     const size_t res = table->cols().first.Find("search_target");
-    CHECK_EQUAL(table->GetSize()-1, res);
+    CHECK_EQUAL(table->size()-1, res);
 
 #ifdef _DEBUG
     toMem.verify();
@@ -329,8 +329,8 @@ TEST(Group_Serialize_All)
     CHECK(fromMem.is_valid());
     TableRef t = fromMem.get_table("test");
 
-    CHECK_EQUAL(6, t->GetColumnCount());
-    CHECK_EQUAL(1, t->GetSize());
+    CHECK_EQUAL(6, t->get_column_count());
+    CHECK_EQUAL(1, t->size());
     CHECK_EQUAL(12, t->Get(0, 0));
     CHECK_EQUAL(true, t->GetBool(1, 0));
     CHECK_EQUAL((time_t)12345, t->GetDate(2, 0));
@@ -373,8 +373,8 @@ TEST(Group_Persist) {
     db.verify();
 #endif //_DEBUG
 
-    CHECK_EQUAL(6, table->GetColumnCount());
-    CHECK_EQUAL(1, table->GetSize());
+    CHECK_EQUAL(6, table->get_column_count());
+    CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->Get(0, 0));
     CHECK_EQUAL(true, table->GetBool(1, 0));
     CHECK_EQUAL((time_t)12345, table->GetDate(2, 0));
@@ -394,8 +394,8 @@ TEST(Group_Persist) {
     db.verify();
 #endif //_DEBUG
 
-    CHECK_EQUAL(6, table->GetColumnCount());
-    CHECK_EQUAL(1, table->GetSize());
+    CHECK_EQUAL(6, table->get_column_count());
+    CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->Get(0, 0));
     CHECK_EQUAL(true, table->GetBool(1, 0));
     CHECK_EQUAL((time_t)12345, table->GetDate(2, 0));
@@ -413,12 +413,12 @@ TEST(Group_Subtable)
 
     Group g;
     TableRef table = g.get_table("test");
-    Spec& s = table->GetSpec();
+    Spec& s = table->get_spec();
     s.add_column(COLUMN_TYPE_INT, "foo");
     Spec sub = s.add_subtable_column("sub");
     sub.add_column(COLUMN_TYPE_INT, "bar");
     s.add_column(COLUMN_TYPE_MIXED, "baz");
-    table->UpdateFromSpec();
+    table->update_from_spec();
 
     for (int i=0; i<n; ++i) {
         table->AddRow();
@@ -437,23 +437,23 @@ TEST(Group_Subtable)
         }
     }
 
-    CHECK_EQUAL(table->GetSize(), n);
+    CHECK_EQUAL(table->size(), n);
 
     for (int i=0; i<n; ++i) {
         CHECK_EQUAL(table->Get(0, i), 100+i);
         {
             TableRef st = table->GetTable(1, i);
-            CHECK_EQUAL(st->GetSize(), i%2 == 0 ? 1 : 0);
+            CHECK_EQUAL(st->size(), i%2 == 0 ? 1 : 0);
             if (i%2 == 0) CHECK_EQUAL(st->Get(0,0), 200+i);
             if (i%3 == 0) {
                 st->AddRow();
-                st->Set(0, st->GetSize()-1, 300+i);
+                st->Set(0, st->size()-1, 300+i);
             }
         }
         CHECK_EQUAL(table->GetMixedType(2,i), i%3 == 1 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
         if (i%3 == 1) {
             TableRef st = table->GetTable(2, i);
-            CHECK_EQUAL(st->GetSize(), 1);
+            CHECK_EQUAL(st->size(), 1);
             CHECK_EQUAL(st->Get(0,0), 700+i);
         }
         if (i%8 == 3) {
@@ -461,7 +461,7 @@ TEST(Group_Subtable)
             TableRef st = table->GetTable(2, i);
             if (i%3 != 1) st->register_column(COLUMN_TYPE_INT, "banach");
             st->AddRow();
-            st->Set(0, st->GetSize()-1, 800+i);
+            st->Set(0, st->size()-1, 800+i);
         }
     }
 
@@ -470,7 +470,7 @@ TEST(Group_Subtable)
         {
             TableRef st = table->GetTable(1, i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
-            CHECK_EQUAL(st->GetSize(), expected_size);
+            CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
             if (i%2 == 0) {
                 CHECK_EQUAL(st->Get(0, idx), 200+i);
@@ -485,7 +485,7 @@ TEST(Group_Subtable)
         if (i%3 == 1 || i%8 == 3) {
             TableRef st = table->GetTable(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
-            CHECK_EQUAL(st->GetSize(), expected_size);
+            CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
             if (i%3 == 1) {
                 CHECK_EQUAL(st->Get(0, idx), 700+i);
@@ -509,7 +509,7 @@ TEST(Group_Subtable)
         {
             TableRef st = table2->GetTable(1, i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
-            CHECK_EQUAL(st->GetSize(), expected_size);
+            CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
             if (i%2 == 0) {
                 CHECK_EQUAL(st->Get(0, idx), 200+i);
@@ -521,14 +521,14 @@ TEST(Group_Subtable)
             }
             if (i%5 == 0) {
                 st->AddRow();
-                st->Set(0, st->GetSize()-1, 400+i);
+                st->Set(0, st->size()-1, 400+i);
             }
         }
         CHECK_EQUAL(table2->GetMixedType(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
         if (i%3 == 1 || i%8 == 3) {
             TableRef st = table2->GetTable(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
-            CHECK_EQUAL(st->GetSize(), expected_size);
+            CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
             if (i%3 == 1) {
                 CHECK_EQUAL(st->Get(0, idx), 700+i);
@@ -544,7 +544,7 @@ TEST(Group_Subtable)
             TableRef st = table2->GetTable(2, i);
             if (i%3 != 1 && i%8 != 3) st->register_column(COLUMN_TYPE_INT, "banach");
             st->AddRow();
-            st->Set(0, st->GetSize()-1, 900+i);
+            st->Set(0, st->size()-1, 900+i);
         }
     }
 
@@ -553,7 +553,7 @@ TEST(Group_Subtable)
         {
             TableRef st = table2->GetTable(1, i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
-            CHECK_EQUAL(st->GetSize(), expected_size);
+            CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
             if (i%2 == 0) {
                 CHECK_EQUAL(st->Get(0, idx), 200+i);
@@ -572,7 +572,7 @@ TEST(Group_Subtable)
         if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
             TableRef st = table2->GetTable(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
-            CHECK_EQUAL(st->GetSize(), expected_size);
+            CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
             if (i%3 == 1) {
                 CHECK_EQUAL(st->Get(0, idx), 700+i);
@@ -600,7 +600,7 @@ TEST(Group_Subtable)
         {
             TableRef st = table3->GetTable(1, i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
-            CHECK_EQUAL(st->GetSize(), expected_size);
+            CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
             if (i%2 == 0) {
                 CHECK_EQUAL(st->Get(0, idx), 200+i);
@@ -619,7 +619,7 @@ TEST(Group_Subtable)
         if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
             TableRef st = table3->GetTable(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
-            CHECK_EQUAL(st->GetSize(), expected_size);
+            CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
             if (i%3 == 1) {
                 CHECK_EQUAL(st->Get(0, idx), 700+i);
@@ -645,7 +645,7 @@ TEST(Group_MultiLevelSubtables)
         Group g;
         TableRef table = g.get_table("test");
         {
-            Spec& s = table->GetSpec();
+            Spec& s = table->get_spec();
             s.add_column(COLUMN_TYPE_INT, "int");
             {
                 Spec sub = s.add_subtable_column("tab");
@@ -656,7 +656,7 @@ TEST(Group_MultiLevelSubtables)
                 }
             }
             s.add_column(COLUMN_TYPE_MIXED, "mix");
-            table->UpdateFromSpec();
+            table->update_from_spec();
         }
         table->AddRow();
         {
@@ -669,18 +669,18 @@ TEST(Group_MultiLevelSubtables)
             table->SetMixed(2, 0, Mixed(COLUMN_TYPE_TABLE));
             TableRef a = table->GetTable(2, 0);
             {
-                Spec& s = a->GetSpec();
+                Spec& s = a->get_spec();
                 s.add_column(COLUMN_TYPE_INT, "int");
                 s.add_column(COLUMN_TYPE_MIXED, "mix");
-                a->UpdateFromSpec();
+                a->update_from_spec();
             }
             a->AddRow();
             a->SetMixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
             TableRef b = a->GetTable(1, 0);
             {
-                Spec& s = b->GetSpec();
+                Spec& s = b->get_spec();
                 s.add_column(COLUMN_TYPE_INT, "int");
-                b->UpdateFromSpec();
+                b->update_from_spec();
             }
             b->AddRow();
         }
@@ -785,7 +785,7 @@ TEST(Group_ToDot)
 
     // Create table with all column types
     TableRef table = mygroup.get_table("test");
-    Spec s = table->GetSpec();
+    Spec s = table->get_spec();
     s.add_column(COLUMN_TYPE_INT,    "int");
     s.add_column(COLUMN_TYPE_BOOL,   "bool");
     s.add_column(COLUMN_TYPE_DATE,   "date");
@@ -847,7 +847,7 @@ TEST(Group_ToDot)
             table->SetMixed(7, i, Mixed(COLUMN_TYPE_TABLE));
             Table subtable = table->GetMixedTable(7, i);
 
-            Spec s = subtable->GetSpec();
+            Spec s = subtable->get_spec();
             s.add_column(COLUMN_TYPE_INT,    "first");
             s.add_column(COLUMN_TYPE_STRING, "second");
             subtable->UpdateFromSpec(s.GetRef());
@@ -865,7 +865,7 @@ TEST(Group_ToDot)
     }
 
     // We also want ColumnStringEnum's
-    table->Optimize();
+    table->optimize();
 
 #if 1
     // Write array graph to cout

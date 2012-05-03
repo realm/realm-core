@@ -100,11 +100,11 @@ template<class T> BasicTableRef<T> Group::get_table(const char* name)
         m_tableNames.Add(name);
         m_cachedtables.Add(intptr_t(t));
 
-        return t->GetTableRef();
+        return t->get_table_ref();
     }
     else {
         // Get table from cache if exists, else create
-        return static_cast<T&>(get_table(n)).GetTableRef();
+        return static_cast<T&>(get_table(n)).get_table_ref();
     }
 }
 

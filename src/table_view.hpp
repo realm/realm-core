@@ -5,7 +5,8 @@
 #include "table_ref.hpp"
 
 namespace tightdb {
-
+using std::size_t;
+using std::time_t;
 
 class TableView {
 public:
@@ -17,8 +18,8 @@ public:
     Array& GetRefColumn() {return m_refs;}
     std::size_t GetRef(std::size_t ndx) const {return m_refs.GetAsRef(ndx);}
 
-    bool IsEmpty() const {return m_refs.IsEmpty();}
-    std::size_t GetSize() const {return m_refs.Size();}
+    bool is_empty() const {return m_refs.is_empty();}
+    std::size_t size() const {return m_refs.Size();}
 
     // Getting values
     int64_t Get(std::size_t column_id, std::size_t ndx) const;
@@ -42,7 +43,7 @@ public:
     // Deleting
     void clear();
     void erase(std::size_t ndx);
-    void pop_back() { if (!IsEmpty()) erase(GetSize()-1); }
+    void pop_back() { if (!is_empty()) erase(size()-1); }
 
     // Finding
     std::size_t Find(std::size_t column_id, int64_t value) const;
@@ -51,7 +52,7 @@ public:
     void FindAllString(TableView& tv, std::size_t column_id, const char *value);
 
     // Aggregate functions
-    int64_t Sum(std::size_t column_id) const;
+    int64_t sum(std::size_t column_id) const;
     int64_t Max(std::size_t column_id) const;
     int64_t Min(std::size_t column_id) const;
 

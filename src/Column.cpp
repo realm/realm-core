@@ -51,7 +51,7 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
 bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state)
 {
     (void)caller_base;
-    int64_t s = a->Sum(start, end);
+    int64_t s = a->sum(start, end);
     *(int64_t *)state += s;
     return true;
 }
@@ -152,7 +152,7 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
 // Merge two sorted arrays into a single sorted array
 void merge_core(const Array& a0, const Array& a1, Array& res)
 {
-    assert(res.IsEmpty());
+    assert(res.is_empty());
     
     size_t p0 = 0;
     size_t p1 = 0;
@@ -363,18 +363,18 @@ void Column::Destroy()
 }
 
 
-bool Column::IsEmpty() const
+bool Column::is_empty() const
 {
-    if (!IsNode()) return m_array->IsEmpty();
+    if (!IsNode()) return m_array->is_empty();
     const Array offsets = NodeGetOffsets();
-    return offsets.IsEmpty();
+    return offsets.is_empty();
 }
 
 size_t Column::Size() const
 {
     if (!IsNode()) return m_array->Size();
     const Array offsets = NodeGetOffsets();
-    return offsets.IsEmpty() ? 0 : size_t(offsets.Back());
+    return offsets.is_empty() ? 0 : size_t(offsets.Back());
 }
 
 size_t Column::get_size_from_ref(size_t ref, Allocator& alloc)
@@ -382,7 +382,7 @@ size_t Column::get_size_from_ref(size_t ref, Allocator& alloc)
     Array a(ref, NULL, 0, alloc);
     if (!a.IsNode()) return a.Size();
     Array offsets(a.Get(0), NULL, 0, alloc);
-    return offsets.IsEmpty() ? 0 : size_t(offsets.Back());
+    return offsets.is_empty() ? 0 : size_t(offsets.Back());
 }
 
 void Column::SetParent(ArrayParent* parent, size_t pndx)
@@ -475,7 +475,7 @@ bool Column::Insert(size_t ndx, int64_t value)
     return true;
 }
 
-int64_t Column::Sum(size_t start, size_t end) const
+int64_t Column::sum(size_t start, size_t end) const
 {
     int64_t sum = 0;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_sum, (void *)&sum);
@@ -643,7 +643,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const
 {
     assert(start <= Size());
     assert(end == (size_t)-1 || end <= Size());
-    if (IsEmpty()) return (size_t)-1;
+    if (is_empty()) return (size_t)-1;
     return TreeFind<int64_t, Column, EQUAL>(value, start, end);
 }
 
@@ -653,7 +653,7 @@ void Column::FindAll(Array& result, int64_t value, size_t caller_offset,
     (void)caller_offset;
     assert(start <= Size());
     assert(end == (size_t)-1 || end <= Size());
-    if (IsEmpty()) return;
+    if (is_empty()) return;
     TreeFindAll<int64_t, Column>(result, value, 0, start, end);
 }
 

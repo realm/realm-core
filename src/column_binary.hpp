@@ -18,7 +18,7 @@ public:
     bool IsBinaryColumn() const {return true;}
 
     size_t Size() const;
-    bool IsEmpty() const;
+    bool is_empty() const;
 
     BinaryData Get(size_t ndx) const;
     const char* GetData(size_t ndx) const;

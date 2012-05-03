@@ -72,7 +72,7 @@ private:
     struct SubtableMap {
         SubtableMap(Allocator& alloc): m_indices(alloc), m_wrappers(alloc) {}
         ~SubtableMap();
-        bool empty() const { return !m_indices.IsValid() || m_indices.IsEmpty(); }
+        bool empty() const { return !m_indices.IsValid() || m_indices.is_empty(); }
         Table* find(std::size_t subtable_ndx) const;
         void insert(std::size_t subtable_ndx, Table* wrapper);
         void remove(std::size_t subtable_ndx);
@@ -188,7 +188,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
 inline ColumnSubtableParent::SubtableMap::~SubtableMap()
 {
     if (m_indices.IsValid()) {
-        assert(m_indices.IsEmpty());
+        assert(m_indices.is_empty());
         m_indices.Destroy();
         m_wrappers.Destroy();
     }

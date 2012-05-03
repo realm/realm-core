@@ -29,7 +29,7 @@ TEST(TestQueryDelete)
     size_t r = q.Delete(ttt);
 
     CHECK_EQUAL(4, r);
-    CHECK_EQUAL(2, ttt.GetSize());
+    CHECK_EQUAL(2, ttt.size());
     CHECK_EQUAL(2, ttt[0].first);
     CHECK_EQUAL(4, ttt[1].first);
 }
@@ -47,7 +47,7 @@ TEST(TestQuerySimple)
     Query q1 = ttt.GetQuery().first.Equal(2);
 
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(1, tv1.GetSize());
+    CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1.GetRef(0));
 }
 
@@ -58,15 +58,15 @@ TEST(TestQuerySubtable)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    Spec& s = table->GetSpec();
+    Spec& s = table->get_spec();
     s.add_column(COLUMN_TYPE_INT,    "first");
     s.add_column(COLUMN_TYPE_STRING, "second");
     Spec sub = s.add_subtable_column("third");
         sub.add_column(COLUMN_TYPE_INT,    "sub_first");
         sub.add_column(COLUMN_TYPE_STRING, "sub_second");
-    table->UpdateFromSpec();
+    table->update_from_spec();
 
-    CHECK_EQUAL(3, table->GetColumnCount());
+    CHECK_EQUAL(3, table->get_column_count());
 
     // Main table
     table->InsertInt(0, 0, 111);
@@ -121,7 +121,7 @@ TEST(TestQuerySubtable)
     q1->Less(0, 50);
     q1->Parent();
     TableView t1 = q1->FindAll(*table, 0, (size_t)-1);
-    CHECK_EQUAL(2, t1.GetSize());
+    CHECK_EQUAL(2, t1.size());
     CHECK_EQUAL(1, t1.GetRef(0));
     CHECK_EQUAL(2, t1.GetRef(1));
     delete q1;
@@ -134,7 +134,7 @@ TEST(TestQuerySubtable)
     q2->Less(0, 20);
     q2->Parent();
     TableView t2 = q2->FindAll(*table, 0, (size_t)-1);
-    CHECK_EQUAL(2, t2.GetSize());
+    CHECK_EQUAL(2, t2.size());
     CHECK_EQUAL(0, t2.GetRef(0));
     CHECK_EQUAL(3, t2.GetRef(1));
     delete q2;
@@ -148,7 +148,7 @@ TEST(TestQuerySubtable)
     q3->Parent();
     q3->Less(0, 300);
     TableView t3 = q3->FindAll(*table, 0, (size_t)-1);
-    CHECK_EQUAL(1, t3.GetSize());
+    CHECK_EQUAL(1, t3.size());
     CHECK_EQUAL(0, t3.GetRef(0));
     delete q3;
 
@@ -165,7 +165,7 @@ TEST(TestQuerySubtable)
     delete q4;
 
 
-    CHECK_EQUAL(3, t4.GetSize());
+    CHECK_EQUAL(3, t4.size());
     CHECK_EQUAL(0, t4.GetRef(0));
     CHECK_EQUAL(2, t4.GetRef(1));
     CHECK_EQUAL(3, t4.GetRef(2));
@@ -196,7 +196,7 @@ TEST(TestQuerySort1)
     TableView tv = q.FindAll(ttt);
     tv.Sort(0);
 
-    CHECK(tv.GetSize() == 7);
+    CHECK(tv.size() == 7);
     CHECK(tv.Get(0, 0) == 1);
     CHECK(tv.Get(0, 1) == 1);
     CHECK(tv.Get(0, 2) == 3);
@@ -220,8 +220,8 @@ TEST(TestQuerySort_QuickSort)
     TableView tv = q.FindAll(ttt);
     tv.Sort(0);
 
-    CHECK(tv.GetSize() == 1000);
-    for(size_t t = 1; t < tv.GetSize(); t++) {
+    CHECK(tv.size() == 1000);
+    for(size_t t = 1; t < tv.size(); t++) {
         CHECK(tv.Get(0, t - 1) <= tv.Get(0, t - 1));
     }
 }
@@ -238,8 +238,8 @@ TEST(TestQuerySort_CountSort)
     TableView tv = q.FindAll(ttt);
     tv.Sort(0);
 
-    CHECK(tv.GetSize() == 1000);
-    for(size_t t = 1; t < tv.GetSize(); t++) {
+    CHECK(tv.size() == 1000);
+    for(size_t t = 1; t < tv.size(); t++) {
         CHECK(tv.Get(0, t - 1) <= tv.Get(0, t - 1));
     }
 }
@@ -256,8 +256,8 @@ TEST(TestQuerySort_Descending)
     TableView tv = q.FindAll(ttt);
     tv.Sort(0, false);
 
-    CHECK(tv.GetSize() == 1000);
-    for(size_t t = 1; t < tv.GetSize(); t++) {
+    CHECK(tv.size() == 1000);
+    for(size_t t = 1; t < tv.size(); t++) {
         CHECK(tv.Get(0, t - 1) >= tv.Get(0, t - 1));
     }
 }
@@ -278,14 +278,14 @@ TEST(TestQuerySort_Dates)
     Query *q = new Query();
     TableView tv = q->FindAll(table);
     delete q;
-    CHECK(tv.GetSize() == 3);
+    CHECK(tv.size() == 3);
     CHECK(tv.GetRef(0) == 0);
     CHECK(tv.GetRef(1) == 1);
     CHECK(tv.GetRef(2) == 2);
 
     tv.Sort(0);
 
-    CHECK(tv.GetSize() == 3);
+    CHECK(tv.size() == 3);
     CHECK(tv.GetDate(0, 0) == 1000);
     CHECK(tv.GetDate(0, 1) == 2000);
     CHECK(tv.GetDate(0, 2) == 3000);
@@ -309,7 +309,7 @@ TEST(TestQuerySort_Bools)
     delete q;
     tv.Sort(0);
 
-    CHECK(tv.GetSize() == 3);
+    CHECK(tv.size() == 3);
     CHECK(tv.GetBool(0, 0) == false);
     CHECK(tv.GetBool(0, 1) == true);
     CHECK(tv.GetBool(0, 2) == true);
@@ -340,7 +340,7 @@ TEST(TestQueryThreads)
     //q1.SetThreads(5);
     TableView tv = q1.FindAll(ttt);
 
-    CHECK_EQUAL(100, tv.GetSize());
+    CHECK_EQUAL(100, tv.size());
     for(int i = 0; i < 100; i++) {
         CHECK_EQUAL(i*7*10 + 14 + 1, tv.GetRef(i));
     }
@@ -364,7 +364,7 @@ TEST(TestQuerySimple2)
 
     Query q1 = ttt.GetQuery().first.Equal(2);
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(3, tv1.GetSize());
+    CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(1, tv1.GetRef(0));
     CHECK_EQUAL(4, tv1.GetRef(1));
     CHECK_EQUAL(7, tv1.GetRef(2));
@@ -394,17 +394,17 @@ TEST(TestQueryLimit)
     Query q1 = ttt.GetQuery().first.Equal(2);
 
     TableView tv1 = q1.FindAll(ttt, 0, (size_t)-1, 2);
-    CHECK_EQUAL(2, tv1.GetSize());
+    CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1.GetRef(0));
     CHECK_EQUAL(4, tv1.GetRef(1));
 
-    TableView tv2 = q1.FindAll(ttt, tv1.GetRef(tv1.GetSize() - 1) + 1, (size_t)-1, 2);
-    CHECK_EQUAL(2, tv2.GetSize());
+    TableView tv2 = q1.FindAll(ttt, tv1.GetRef(tv1.size() - 1) + 1, (size_t)-1, 2);
+    CHECK_EQUAL(2, tv2.size());
     CHECK_EQUAL(7, tv2.GetRef(0));
     CHECK_EQUAL(10, tv2.GetRef(1));
 
-    TableView tv3 = q1.FindAll(ttt, tv2.GetRef(tv2.GetSize() - 1) + 1, (size_t)-1, 2);
-    CHECK_EQUAL(1, tv3.GetSize());
+    TableView tv3 = q1.FindAll(ttt, tv2.GetRef(tv2.size() - 1) + 1, (size_t)-1, 2);
+    CHECK_EQUAL(1, tv3.size());
     CHECK_EQUAL(13, tv3.GetRef(0));
 }
 
@@ -521,7 +521,7 @@ TEST(TestQueryFindAll_Or)
     // first == 5 || second == X
     Query q1 = ttt.GetQuery().first.Equal(5).Or().second.Equal("X");
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(3, tv1.GetSize());
+    CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(2, tv1.GetRef(0));
     CHECK_EQUAL(4, tv1.GetRef(1));
     CHECK_EQUAL(6, tv1.GetRef(2));
@@ -543,7 +543,7 @@ TEST(TestQueryFindAll_Parans1)
     // first > 3 && (second == X)
     Query q1 = ttt.GetQuery().first.Greater(3).Group().second.Equal("X").EndGroup();
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(1, tv1.GetSize());
+    CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(6, tv1.GetRef(0));
 }
 
@@ -564,7 +564,7 @@ TEST(TestQueryFindAll_OrParan)
     // (first == 5 || second == X && first > 2)
     Query q1 = ttt.GetQuery().Group().first.Equal(5).Or().second.Equal("X").first.Greater(2).EndGroup();
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(3, tv1.GetSize());
+    CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(2, tv1.GetRef(0));
     CHECK_EQUAL(4, tv1.GetRef(1));
     CHECK_EQUAL(6, tv1.GetRef(2));
@@ -587,7 +587,7 @@ TEST(TestQueryFindAll_OrNested0)
     // first > 3 && (first == 5 || second == X)
     Query q1 = ttt.GetQuery().first.Greater(3).Group().first.Equal(5).Or().second.Equal("X").EndGroup();
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(2, tv1.GetSize());
+    CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(5, tv1.GetRef(0));
     CHECK_EQUAL(6, tv1.GetRef(1));
 }
@@ -644,7 +644,7 @@ TEST(TestQueryFindAll_Parans2)
     // ()((first > 3()) && (()))
     Query q1 = ttt.GetQuery().Group().EndGroup().Group().Group().first.Greater(3).Group().EndGroup().EndGroup().Group().Group().EndGroup().EndGroup().EndGroup();
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(3, tv1.GetSize());
+    CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(4, tv1.GetRef(0));
     CHECK_EQUAL(5, tv1.GetRef(1));
     CHECK_EQUAL(6, tv1.GetRef(2));
@@ -665,7 +665,7 @@ TEST(TestQueryFindAll_Parans4)
     // ()
     Query q1 = ttt.GetQuery().Group().EndGroup();
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(7, tv1.GetSize());
+    CHECK_EQUAL(7, tv1.size());
 }
 
 
@@ -699,7 +699,7 @@ TEST(TestQueryFindAll_Begins)
 
     Query q1 = ttt.GetQuery().second.BeginsWith("foo");
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(2, tv1.GetSize());
+    CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1.GetRef(0));
     CHECK_EQUAL(2, tv1.GetRef(1));
 }
@@ -714,7 +714,7 @@ TEST(TestQueryFindAll_Ends)
 
     Query q1 = ttt.GetQuery().second.EndsWith("foo");
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(1, tv1.GetSize());
+    CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1.GetRef(0));
 }
 
@@ -733,7 +733,7 @@ TEST(TestQueryFindAll_Contains)
 
     Query q1 = ttt.GetQuery().second.Contains("foo");
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(4, tv1.GetSize());
+    CHECK_EQUAL(4, tv1.size());
     CHECK_EQUAL(0, tv1.GetRef(0));
     CHECK_EQUAL(1, tv1.GetRef(1));
     CHECK_EQUAL(2, tv1.GetRef(2));
@@ -752,12 +752,12 @@ TEST(TestQueryEnums)
         table.Add(9, "stuvxyz");
     }
 
-    table.Optimize();
+    table.optimize();
 
     Query q1 = table.GetQuery().second.Equal("eftg");
     TableView tv1 = q1.FindAll(table);
 
-    CHECK_EQUAL(5, tv1.GetSize());
+    CHECK_EQUAL(5, tv1.size());
     CHECK_EQUAL(1, tv1.GetRef(0));
     CHECK_EQUAL(6, tv1.GetRef(1));
     CHECK_EQUAL(11, tv1.GetRef(2));
@@ -780,7 +780,7 @@ TEST(TestQueryCaseSensitivity)
 
     Query q1 = ttt.GetQuery().second.Equal("blaabaerGROED", false);
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(1, tv1.GetSize());
+    CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(0, tv1.GetRef(0));
 }
 
@@ -795,19 +795,19 @@ TEST(TestQueryUnicode2)
 
     Query q1 = ttt.GetQuery().second.Equal(uY, false);
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(2, tv1.GetSize());
+    CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(0, tv1.GetRef(0));
     CHECK_EQUAL(2, tv1.GetRef(1));
 
     Query q2 = ttt.GetQuery().second.Equal(uYd, false);
     TableView tv2 = q2.FindAll(ttt);
-    CHECK_EQUAL(2, tv2.GetSize());
+    CHECK_EQUAL(2, tv2.size());
     CHECK_EQUAL(1, tv2.GetRef(0));
     CHECK_EQUAL(3, tv2.GetRef(1));
 
     Query q3 = ttt.GetQuery().second.Equal(uYd, true);
     TableView tv3 = q3.FindAll(ttt);
-    CHECK_EQUAL(1, tv3.GetSize());
+    CHECK_EQUAL(1, tv3.size());
     CHECK_EQUAL(1, tv3.GetRef(0));
 }
 
@@ -827,26 +827,26 @@ TEST(TestQueryUnicode3)
 
     Query q1 = ttt.GetQuery().second.Equal(uA, false);
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(2, tv1.GetSize());
+    CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(0, tv1.GetRef(0));
     CHECK_EQUAL(2, tv1.GetRef(1));
 
     Query q2 = ttt.GetQuery().second.Equal(ua, false);
     TableView tv2 = q2.FindAll(ttt);
-    CHECK_EQUAL(2, tv2.GetSize());
+    CHECK_EQUAL(2, tv2.size());
     CHECK_EQUAL(0, tv2.GetRef(0));
     CHECK_EQUAL(2, tv2.GetRef(1));
 
 
     Query q3 = ttt.GetQuery().second.Equal(uad, false);
     TableView tv3 = q3.FindAll(ttt);
-    CHECK_EQUAL(2, tv3.GetSize());
+    CHECK_EQUAL(2, tv3.size());
     CHECK_EQUAL(1, tv3.GetRef(0));
     CHECK_EQUAL(3, tv3.GetRef(1));
 
     Query q4 = ttt.GetQuery().second.Equal(uad, true);
     TableView tv4 = q4.FindAll(ttt);
-    CHECK_EQUAL(1, tv4.GetSize());
+    CHECK_EQUAL(1, tv4.size());
     CHECK_EQUAL(3, tv4.GetRef(0));
 }
 
@@ -861,7 +861,7 @@ TEST(TestQueryFindAll_BeginsUNICODE)
 
     Query q1 = ttt.GetQuery().second.BeginsWith(uad "foo");
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(2, tv1.GetSize());
+    CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1.GetRef(0));
     CHECK_EQUAL(2, tv1.GetRef(1));
 }
@@ -877,12 +877,12 @@ TEST(TestQueryFindAll_EndsUNICODE)
 
     Query q1 = ttt.GetQuery().second.EndsWith("foo" uad);
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(1, tv1.GetSize());
+    CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1.GetRef(0));
 
     Query q2 = ttt.GetQuery().second.EndsWith("foo" uAd, false);
     TableView tv2 = q2.FindAll(ttt);
-    CHECK_EQUAL(1, tv2.GetSize());
+    CHECK_EQUAL(1, tv2.size());
     CHECK_EQUAL(1, tv2.GetRef(0));
 }
 
@@ -901,7 +901,7 @@ TEST(TestQueryFindAll_ContainsUNICODE)
 
     Query q1 = ttt.GetQuery().second.Contains(uad "foo");
     TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(4, tv1.GetSize());
+    CHECK_EQUAL(4, tv1.size());
     CHECK_EQUAL(0, tv1.GetRef(0));
     CHECK_EQUAL(1, tv1.GetRef(1));
     CHECK_EQUAL(2, tv1.GetRef(2));
@@ -909,7 +909,7 @@ TEST(TestQueryFindAll_ContainsUNICODE)
 
     Query q2 = ttt.GetQuery().second.Contains(uAd "foo", false);
     TableView tv2 = q1.FindAll(ttt);
-    CHECK_EQUAL(4, tv2.GetSize());
+    CHECK_EQUAL(4, tv2.size());
     CHECK_EQUAL(0, tv2.GetRef(0));
     CHECK_EQUAL(1, tv2.GetRef(1));
     CHECK_EQUAL(2, tv2.GetRef(2));

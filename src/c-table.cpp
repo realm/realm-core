@@ -125,11 +125,11 @@ void table_unbind(Table* t) {
 }
 
 Spec* table_get_spec(Table* t) {
-    return new Spec(t->GetSpec());
+    return new Spec(t->get_spec());
 }
 
 void table_update_from_spec(Table* t, size_t ref_specSet) {
-    t->UpdateFromSpec();
+    t->update_from_spec();
 }
 
 size_t table_register_column(Table* t, ColumnType type, const char* name) {
@@ -137,27 +137,27 @@ size_t table_register_column(Table* t, ColumnType type, const char* name) {
 }
 
 size_t table_get_column_count(const Table* t) {
-	return t->GetColumnCount();
+	return t->get_column_count();
 }
 
 const char* table_get_column_name(const Table* t, size_t ndx) {
-	return t->GetColumnName(ndx);
+	return t->get_column_name(ndx);
 }
 
 size_t table_get_column_index(const Table* t, const char* name) {
-	return t->GetColumnIndex(name);
+	return t->get_column_index(name);
 }
 
 ColumnType table_get_column_type(const Table* t, size_t ndx) {
-	return t->GetColumnType(ndx);
+	return t->get_column_type(ndx);
 }
 
 bool table_is_empty(const Table* t) {
-	return t->IsEmpty();
+	return t->is_empty();
 }
 
 size_t table_get_size(const Table* t) {
-	return t->GetSize();
+	return t->size();
 }
 
 void table_clear(Table* t) {
@@ -165,7 +165,7 @@ void table_clear(Table* t) {
 }
 
 void table_optimize(Table* t) {
-    t->Optimize();
+    t->optimize();
 }
 
 void table_delete_row(Table* t, size_t ndx) {
@@ -249,11 +249,11 @@ void table_clear_table(Table* t, size_t column_id, size_t ndx) {
 
 
 void table_insert_impl(Table* t, size_t ndx, va_list ap) {
-	assert(ndx <= t->GetSize());
+	assert(ndx <= t->size());
 
-	const size_t count = t->GetColumnCount();
+	const size_t count = t->get_column_count();
 	for (size_t i = 0; i < count; ++i) {
-		const ColumnType type = t->GetColumnType(i);
+		const ColumnType type = t->get_column_type(i);
 		switch (type) {
 		case COLUMN_TYPE_INT:
 			{
@@ -311,7 +311,7 @@ void table_add(Table* t,  ...) {
 	va_list ap;
 	va_start(ap, t);
 
-	table_insert_impl(t, t->GetSize(), ap);
+	table_insert_impl(t, t->size(), ap);
 
 	va_end(ap);
 }
@@ -369,11 +369,11 @@ void basictable_insert_done(Table* t) {
 
 
 bool table_has_index(const Table* t, size_t column_id) {
-	return t->HasIndex(column_id);
+	return t->has_index(column_id);
 }
 
 void table_set_index(Table* t, size_t column_id) {
-	return t->SetIndex(column_id);
+	return t->set_index(column_id);
 }
 
 size_t table_find_int(const Table* t, size_t column_id, int value) {
@@ -417,11 +417,11 @@ void tableview_delete(TableView* tv) {
 }
 
 bool tableview_is_empty(const TableView* tv) {
-	return tv->IsEmpty();
+	return tv->is_empty();
 }
 
 size_t tableview_get_size(const TableView* tv) {
-	return tv->GetSize();
+	return tv->size();
 }
 /* ??? Implement
 size_t tableview_get_table_size(const TableView* tv, size_t column_id, size_t ndx) {
@@ -511,7 +511,7 @@ void tableview_find_all_string(TableView* tv, size_t column_id, const char *valu
 
 /* Aggregation */
 int64_t tableview_sum(TableView* tv, size_t column_id) {
-    return tv->Sum(column_id);
+    return tv->sum(column_id);
 }
 
 int64_t tableview_min(TableView* tv, size_t column_id) {
@@ -702,12 +702,12 @@ int64_t  query_max_range(Query* q, const Table* t, size_t column_id, size_t* res
 }
 
 int64_t  query_sum(Query* q, const Table* t, size_t column_id, size_t* resultcount) {
-    return q->Sum(*t, column_id, resultcount, 0, size_t(-1), size_t(-1));
+    return q->sum(*t, column_id, resultcount, 0, size_t(-1), size_t(-1));
 }
 
 int64_t  query_sum_range(Query* q, const Table* t, size_t column_id, size_t* resultcount,
                          size_t start, size_t end, size_t limit){
-    return q->Sum(*t, column_id, resultcount, start, end, limit);
+    return q->sum(*t, column_id, resultcount, start, end, limit);
 }
 
 double  query_avg(Query* q, const Table* t, size_t column_id, size_t* resultcount) {

@@ -62,7 +62,7 @@ int64_t VerifiedInteger::Sum(size_t start, size_t end)
     for(size_t t = start; t < end; ++t)
         sum += v[t];
 
-    assert(sum == u.Sum(start, end));
+    assert(sum == u.sum(start, end));
     return sum;
 }
 

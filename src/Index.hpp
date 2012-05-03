@@ -12,7 +12,7 @@ public:
     Index(size_t ref);
     Index(size_t ref, Array* parent, size_t pndx);
 
-    bool IsEmpty() const;
+    bool is_empty() const;
 
     void BuildIndex(const Column& c);
 

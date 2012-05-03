@@ -46,7 +46,7 @@ TEST(Column_monkeytest2)
                 a.Find(rand2(current_bitwidth));
                 a.FindAll(res, rand2(current_bitwidth));
                 size_t start = rand2() % (a.Size() + 1);
-                a.Sum(start, start + rand2() % (a.Size() + 1 - start));
+                a.sum(start, start + rand2() % (a.Size() + 1 - start));
                 a.Max(start, start + rand2() % (a.Size() + 1 - start));
                 a.Min(start, start + rand2() % (a.Size() + 1 - start));
             }

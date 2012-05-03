@@ -144,7 +144,7 @@ TEST(Index_Delete)
 
     CHECK_EQUAL(-1, ndx.Find(3));
     CHECK_EQUAL(-1, ndx.Find(45));
-    CHECK_EQUAL(true, ndx.IsEmpty());
+    CHECK_EQUAL(true, ndx.is_empty());
 
     // Clean up
     col.Destroy();

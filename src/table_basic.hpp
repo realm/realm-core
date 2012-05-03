@@ -79,13 +79,13 @@ public:
 
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc)
     {
-        tightdb::Spec& spec = GetSpec();
+        tightdb::Spec& spec = get_spec();
         typename Spec::template Columns<RegisterColumn, tightdb::Spec*> c(&spec);
-        UpdateFromSpec();
+        update_from_spec();
     }
 
-    BasicTableRef<BasicTable> GetTableRef() { return BasicTableRef<BasicTable>(this); }
-    BasicTableRef<const BasicTable> GetTableRef() const { return BasicTableRef<const BasicTable>(this); }
+    BasicTableRef<BasicTable> get_table_ref() { return BasicTableRef<BasicTable>(this); }
+    BasicTableRef<const BasicTable> get_table_ref() const { return BasicTableRef<const BasicTable>(this); }
 
     ColsAccessor cols() { return ColsAccessor(this); }
 
@@ -107,7 +107,7 @@ public:
     /**
      * \param rel_idx The index of the row specified relative to the
      * end. Thus, <tt>table.Back(rel_idx)</tt> is the same as
-     * <tt>table[table.GetSize() + rel_idx]</tt>.
+     * <tt>table[table.size() + rel_idx]</tt>.
      */
     RowAccessor Back(int rel_idx = -1)
     {

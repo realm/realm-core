@@ -10,10 +10,10 @@ TEST(Table1)
     table.register_column(COLUMN_TYPE_INT, "first");
     table.register_column(COLUMN_TYPE_INT, "second");
 
-    CHECK_EQUAL(COLUMN_TYPE_INT, table.GetColumnType(0));
-    CHECK_EQUAL(COLUMN_TYPE_INT, table.GetColumnType(1));
-    CHECK_EQUAL("first", table.GetColumnName(0));
-    CHECK_EQUAL("second", table.GetColumnName(1));
+    CHECK_EQUAL(COLUMN_TYPE_INT, table.get_column_type(0));
+    CHECK_EQUAL(COLUMN_TYPE_INT, table.get_column_type(1));
+    CHECK_EQUAL("first", table.get_column_name(0));
+    CHECK_EQUAL("second", table.get_column_name(1));
 
     const size_t ndx = table.AddRow();
     table.Set(0, ndx, 0);
@@ -141,8 +141,8 @@ TEST(Table_Delete)
         table.erase(0);
     }
 
-    CHECK(table.IsEmpty());
-    CHECK_EQUAL(0, table.GetSize());
+    CHECK(table.is_empty());
+    CHECK_EQUAL(0, table.size());
 
 #ifdef _DEBUG
     table.verify();
@@ -153,7 +153,7 @@ TEST(Table_Delete_All_Types)
 {
     // Create table with all column types
     Table table;
-    Spec& s = table.GetSpec();
+    Spec& s = table.get_spec();
     s.add_column(COLUMN_TYPE_INT,    "int");
     s.add_column(COLUMN_TYPE_BOOL,   "bool");
     s.add_column(COLUMN_TYPE_DATE,   "date");
@@ -165,7 +165,7 @@ TEST(Table_Delete_All_Types)
     Spec sub = s.add_subtable_column("tables");
     sub.add_column(COLUMN_TYPE_INT,    "sub_first");
     sub.add_column(COLUMN_TYPE_STRING, "sub_second");
-    table.UpdateFromSpec();
+    table.update_from_spec();
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
@@ -235,14 +235,14 @@ TEST(Table_Delete_All_Types)
     }
 
     // We also want a ColumnStringEnum
-    table.Optimize();
+    table.optimize();
 
     // Test Deletes
     table.erase(14);
     table.erase(0);
     table.erase(5);
 
-    CHECK_EQUAL(12, table.GetSize());
+    CHECK_EQUAL(12, table.size());
 
 #ifdef _DEBUG
     table.verify();
@@ -250,7 +250,7 @@ TEST(Table_Delete_All_Types)
 
     // Test Clear
     table.clear();
-    CHECK_EQUAL(0, table.GetSize());
+    CHECK_EQUAL(0, table.size());
 
 #ifdef _DEBUG
     table.verify();
@@ -320,12 +320,12 @@ TEST(Table_FindAll_Int)
 
     // Search for a value that does not exits
     const TableView v0 = table.cols().second.FindAll(5);
-    CHECK_EQUAL(0, v0.GetSize());
+    CHECK_EQUAL(0, v0.size());
 
     // Search for a value with several matches
     const TableView v = table.cols().second.FindAll(20);
 
-    CHECK_EQUAL(5, v.GetSize());
+    CHECK_EQUAL(5, v.size());
     CHECK_EQUAL(1, v.GetRef(0));
     CHECK_EQUAL(3, v.GetRef(1));
     CHECK_EQUAL(5, v.GetRef(2));
@@ -353,7 +353,7 @@ TEST(Table_Index_Int)
     table.Add(0,  9, true, Wed);
 
     // Create index for column two
-    table.SetIndex(1);
+    table.set_index(1);
 
     // Search for a value that does not exits
     const size_t r1 = table.cols().second.Find(2);
@@ -439,7 +439,7 @@ TEST(TableAutoEnumeration)
         table.Add(9, "stuvxyz", true, Fri);
     }
 
-    table.Optimize();
+    table.optimize();
 
     for (size_t i = 0; i < 5; ++i) {
         const size_t n = i * 5;
@@ -484,13 +484,13 @@ TEST(TableAutoEnumerationFindFindAll)
         table.Add(9, "stuvxyz", true, Fri);
     }
 
-    table.Optimize();
+    table.optimize();
 
     size_t t = table.cols().second.Find("eftg");
     CHECK_EQUAL(1, t);
 
     TableView tv = table.cols().second.FindAll("eftg");
-    CHECK_EQUAL(5, tv.GetSize());
+    CHECK_EQUAL(5, tv.size());
     CHECK_EQUAL("eftg", tv.GetString(1, 0));
     CHECK_EQUAL("eftg", tv.GetString(1, 1));
     CHECK_EQUAL("eftg", tv.GetString(1, 2));
@@ -535,15 +535,15 @@ TEST(Table_Spec)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    Spec& s = table->GetSpec();
+    Spec& s = table->get_spec();
     s.add_column(COLUMN_TYPE_INT,    "first");
     s.add_column(COLUMN_TYPE_STRING, "second");
     Spec sub = s.add_subtable_column("third");
         sub.add_column(COLUMN_TYPE_INT,    "sub_first");
         sub.add_column(COLUMN_TYPE_STRING, "sub_second");
-    table->UpdateFromSpec();
+    table->update_from_spec();
 
-    CHECK_EQUAL(3, table->GetColumnCount());
+    CHECK_EQUAL(3, table->get_column_count());
 
     // Add a row
     table->InsertInt(0, 0, 4);
@@ -556,7 +556,7 @@ TEST(Table_Spec)
     // Get the sub-table
     {
         TableRef subtable = table->GetTable(2, 0);
-        CHECK(subtable->IsEmpty());
+        CHECK(subtable->is_empty());
 
         subtable->InsertInt(0, 0, 42);
         subtable->InsertString(1, 0, "test");
@@ -573,7 +573,7 @@ TEST(Table_Spec)
     {
         TableRef subtable = table->GetTable(2, 0);
 
-        CHECK_EQUAL(1,      subtable->GetSize());
+        CHECK_EQUAL(1,      subtable->size());
         CHECK_EQUAL(42,     subtable->Get(0, 0));
         CHECK_EQUAL("test", subtable->GetString(1, 0));
     }
@@ -587,7 +587,7 @@ TEST(Table_Spec)
 
     TableRef subtable2 = fromDiskTable->GetTable(2, 0);
 
-    CHECK_EQUAL(1,      subtable2->GetSize());
+    CHECK_EQUAL(1,      subtable2->size());
     CHECK_EQUAL(42,     subtable2->Get(0, 0));
     CHECK_EQUAL("test", subtable2->GetString(1, 0));
 }
@@ -598,10 +598,10 @@ TEST(Table_Mixed)
     table.register_column(COLUMN_TYPE_INT, "first");
     table.register_column(COLUMN_TYPE_MIXED, "second");
 
-    CHECK_EQUAL(COLUMN_TYPE_INT, table.GetColumnType(0));
-    CHECK_EQUAL(COLUMN_TYPE_MIXED, table.GetColumnType(1));
-    CHECK_EQUAL("first", table.GetColumnName(0));
-    CHECK_EQUAL("second", table.GetColumnName(1));
+    CHECK_EQUAL(COLUMN_TYPE_INT, table.get_column_type(0));
+    CHECK_EQUAL(COLUMN_TYPE_MIXED, table.get_column_type(1));
+    CHECK_EQUAL("first", table.get_column_name(0));
+    CHECK_EQUAL("second", table.get_column_name(1));
 
     const size_t ndx = table.AddRow();
     table.Set(0, ndx, 0);
@@ -704,7 +704,7 @@ TEST(Table_Mixed)
 
     // Get same table again and verify values
     TableRef subtable2 = table.GetTable(1, 5);
-    CHECK_EQUAL(1, subtable2->GetSize());
+    CHECK_EQUAL(1, subtable2->size());
     CHECK_EQUAL("John", subtable2->GetString(0, 0));
     CHECK_EQUAL(40, subtable2->Get(1, 0));
 

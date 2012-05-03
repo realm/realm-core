@@ -28,27 +28,27 @@ public:
     ~Table();
 
     // Schema handling (see also Spec.hpp)
-    Spec&       GetSpec();          
-    const Spec& GetSpec() const;
-    void        UpdateFromSpec(); // Must not be called for a table with shared schema
+    Spec&       get_spec();          
+    const Spec& get_spec() const;
+    void        update_from_spec(); // Must not be called for a table with shared schema
                 // Add a column dynamically
     size_t      register_column(ColumnType type, const char* name);
     
     // Table size and deletion
-    bool        IsEmpty() const {return m_size == 0;}
-    size_t      GetSize() const {return m_size;}
+    bool        is_empty() const {return m_size == 0;}
+    size_t      size() const {return m_size;}
     void        clear();
 
     // Column information
-    size_t      GetColumnCount() const;
-    const char* GetColumnName(size_t column_ndx) const;
-    size_t      GetColumnIndex(const char* name) const;
-    ColumnType  GetColumnType(size_t column_ndx) const;
+    size_t      get_column_count() const;
+    const char* get_column_name(size_t column_ndx) const;
+    size_t      get_column_index(const char* name) const;
+    ColumnType  get_column_type(size_t column_ndx) const;
 
     // Row handling
     size_t      AddRow();
     void        erase(size_t row_ndx);
-    void        pop_back() {if (!IsEmpty()) erase(m_size-1);}
+    void        pop_back() {if (!is_empty()) erase(m_size-1);}
 
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by InsertDone().
@@ -86,11 +86,11 @@ public:
     void            ClearTable(size_t column_ndx, size_t row_ndx);
 
     // Indexing
-    bool HasIndex(size_t column_ndx) const;
-    void SetIndex(size_t column_ndx);
+    bool has_index(size_t column_ndx) const;
+    void set_index(size_t column_ndx);
 
     // Aggregate functions
-    int64_t Sum(size_t column_ndx) const;
+    int64_t sum(size_t column_ndx) const;
     int64_t Max(size_t column_ndx) const;
     int64_t Min(size_t column_ndx) const;
 
@@ -105,14 +105,14 @@ public:
     void    FindAllHamming(TableView& tv, size_t column_ndx, uint64_t value, size_t max);
 
     // Optimizing
-    void Optimize();
+    void optimize();
 
     // Conversion
     void to_json(std::ostream& out);
 
     // Get a reference to this table
-    TableRef GetTableRef() { return TableRef(this); }
-    ConstTableRef GetTableRef() const { return ConstTableRef(this); } 
+    TableRef get_table_ref() { return TableRef(this); }
+    ConstTableRef get_table_ref() const { return ConstTableRef(this); } 
 
 // Internal / deprecate ------------------------------------
 

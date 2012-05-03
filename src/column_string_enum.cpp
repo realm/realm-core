@@ -31,9 +31,9 @@ size_t ColumnStringEnum::Size() const
     return Column::Size();
 }
 
-bool ColumnStringEnum::IsEmpty() const
+bool ColumnStringEnum::is_empty() const
 {
-    return Column::IsEmpty();
+    return Column::is_empty();
 }
 
 const char* ColumnStringEnum::Get(size_t ndx) const
