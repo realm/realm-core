@@ -218,7 +218,7 @@ public:
     size_t FindNext(Table& table, size_t lastmatch=-1) {
         if (lastmatch == (size_t)-1) Init(table);
         
-        const size_t end = table.GetSize();
+        const size_t end = table.size();
         const size_t res = first[0]->Find(lastmatch + 1, end);
         
         return (res == end) ? -1 : res;
@@ -237,7 +237,7 @@ public:
 
         size_t r  = start - 1;
         if(end == size_t(-1))
-            end = table.GetSize();
+            end = table.size();
 
         // User created query with no criteria; return everything
         if(first[0] == 0) {
@@ -250,19 +250,19 @@ public:
             return;
         }
         else {
-            const size_t table_size = table.GetSize();
+            const size_t table_size = table.size();
 
             // Use single threading
             for(;;) {
                 r = first[0]->Find(r + 1, table_size);
-                if (r == table_size || tv.GetSize() == limit)
+                if (r == table_size || tv.size() == limit)
                     break;
                 tv.GetRefColumn().Add(r);
             }
         }
     }
 
-    int64_t Sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1),
+    int64_t sum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1),
         size_t limit = size_t(-1)) const
     {
         Init(table);
@@ -272,7 +272,7 @@ public:
         int64_t sum = 0;
 
         const Column& c = table.GetColumn(column);
-        const size_t table_size = table.GetSize();
+        const size_t table_size = table.size();
 
         for (;;) {
             r = FindInternal(table, r + 1, end);
@@ -298,7 +298,7 @@ public:
 
         for (;;) {
             r = FindInternal(table, r + 1, end);
-            if (r == size_t(-1) || r == table.GetSize() || results == limit)
+            if (r == size_t(-1) || r == table.size() || results == limit)
                 break;
             const int64_t g = table.Get(column, r);
             if (results == 0 || g > max)
@@ -321,7 +321,7 @@ public:
 
         for (;;) {
             r = FindInternal(table, r + 1, end);
-            if (r == size_t(-1) || r == table.GetSize() || results == limit)
+            if (r == size_t(-1) || r == table.size() || results == limit)
                 break;
             const int64_t g = table.Get(column, r);
             if (results == 0 || g < min)
@@ -342,7 +342,7 @@ public:
 
         for(;;) {
             r = FindInternal(table, r + 1, end);
-            if (r == size_t(-1) || r == table.GetSize() || results == limit)
+            if (r == size_t(-1) || r == table.size() || results == limit)
                 break;
             ++results;
         }
@@ -355,12 +355,12 @@ public:
 
         size_t resultcount2;
 
-        const int64_t sum = Sum(table, column, &resultcount2, start, end, limit);
-        const double avg = (float)sum / (float)resultcount2;
+        const int64_t sum1 = sum(table, column, &resultcount2, start, end, limit);
+        const double avg1 = (float)sum1 / (float)resultcount2;
 
         if (resultcount != 0)
             *resultcount = resultcount2;
-        return avg;
+        return avg1;
     }
 
     // todo, not sure if start, end and limit could be useful for delete.
@@ -372,10 +372,10 @@ public:
 
         for (;;) {
             r = FindInternal(table, r + 1 - results, end);
-            if (r == size_t(-1) || r == table.GetSize() || results == limit)
+            if (r == size_t(-1) || r == table.size() || results == limit)
                 break;
             ++results;
-            table.erase(r);
+            table.remove(r);
         }
         return results;
     }
@@ -472,7 +472,7 @@ protected:
 
     size_t FindInternal(const Table& table, size_t start = 0, size_t end = size_t(-1)) const
     {
-        if (end == size_t(-1)) end = table.GetSize();
+        if (end == size_t(-1)) end = table.size();
         if (start == end) return size_t(-1);
 
         size_t r;
@@ -481,7 +481,7 @@ protected:
         else
             r = start; // user built an empty query; return any first
 
-        if (r == table.GetSize())
+        if (r == table.size())
             return size_t(-1);
         else
             return r;

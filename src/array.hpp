@@ -120,7 +120,7 @@ public:
     void Invalidate() const {m_data = NULL;}
 
     virtual size_t Size() const {return m_len;}
-    bool IsEmpty() const {return m_len == 0;}
+    bool is_empty() const {return m_len == 0;}
 
     bool Insert(size_t ndx, int64_t value);
     bool Add(int64_t value);
@@ -160,7 +160,7 @@ public:
     void Preset(size_t bitwidth, size_t count);
     void FindAll(Array& result, int64_t value, size_t offset=0, size_t start=0, size_t end=(size_t)-1) const;
     void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
-    int64_t Sum(size_t start = 0, size_t end = (size_t)-1) const;
+    int64_t sum(size_t start = 0, size_t end = (size_t)-1) const;
     bool Max(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
     bool Min(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
     template <class F> size_t Query(int64_t value, size_t start, size_t end);

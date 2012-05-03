@@ -16,7 +16,7 @@ Column db_setup::c;
 
 TEST_FIXTURE(db_setup, Column_IsEmpty)
 {
-    CHECK(c.IsEmpty());
+    CHECK(c.is_empty());
     CHECK_EQUAL(c.Size(), (size_t)0);
 }
 
@@ -287,7 +287,7 @@ TEST_FIXTURE(db_setup, Column_DeleteAll)
     c.Delete(0);
     c.Delete(0);
 
-    CHECK(c.IsEmpty());
+    CHECK(c.is_empty());
     CHECK_EQUAL(0, c.Size());
 }
 
@@ -532,11 +532,11 @@ TEST(Column_Sum)
     int64_t sum = 0;
 
     // Sum of 0 elements
-    CHECK_EQUAL(0, c.Sum());
+    CHECK_EQUAL(0, c.sum());
 
     // Sum of 1 elements
     c.Add(123);
-    CHECK_EQUAL(123, c.Sum());
+    CHECK_EQUAL(123, c.sum());
 
     c.Clear();
 
@@ -549,35 +549,35 @@ TEST(Column_Sum)
     for(int i = 0; i < 100; i++) {
         sum += c.Get(i);
     }
-    CHECK_EQUAL(sum, c.Sum());
+    CHECK_EQUAL(sum, c.sum());
 
     // Sum of entire range, given explicit range
     sum = 0;
     for(int i = 0; i < 100; i++) {
         sum += c.Get(i);
     }
-    CHECK_EQUAL(sum, c.Sum(0, 100));
+    CHECK_EQUAL(sum, c.sum(0, 100));
 
     // Start to N
     sum = 0;
     for(int i = 0; i < 63; i++) {
         sum += c.Get(i);
     }
-    CHECK_EQUAL(sum, c.Sum(0, 63));
+    CHECK_EQUAL(sum, c.sum(0, 63));
 
     // N to end
     sum = 0;
     for(int i = 47; i < 100; i++) {
         sum += c.Get(i);
     }
-    CHECK_EQUAL(sum, c.Sum(47, 100));
+    CHECK_EQUAL(sum, c.sum(47, 100));
 
     // N to M
     sum = 0;
     for(int i = 55; i < 79; i++) {
         sum += c.Get(i);
     }
-    CHECK_EQUAL(sum, c.Sum(55, 79));
+    CHECK_EQUAL(sum, c.sum(55, 79));
 
     c.Destroy();
 

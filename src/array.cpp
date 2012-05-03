@@ -725,7 +725,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
     if(start + 3 < end && (eq ? (Get(start + 3) == value)   :   (Get(start + 3) != value)))
         return start + 3;
 
-    if (IsEmpty()) return (size_t)-1;
+    if (is_empty()) return (size_t)-1;
     if (start >= end) return (size_t)-1;
 
     assert(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
@@ -849,7 +849,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 
 void Array::FindAll(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
 {
-    if (IsEmpty()) return;
+    if (is_empty()) return;
     if (end == (size_t)-1) end = m_len;
     if (start == end) return;
 
@@ -893,7 +893,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     if(start >= end)
         return (size_t)-1;
 
-    if (IsEmpty()) return (size_t)-1;
+    if (is_empty()) return (size_t)-1;
     if (start >= end) return (size_t)-1;
 
     assert(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
@@ -1084,9 +1084,9 @@ bool Array::Min(int64_t& result, size_t start, size_t end) const
 }
 
 
-int64_t Array::Sum(size_t start, size_t end) const
+int64_t Array::sum(size_t start, size_t end) const
 {
-    if (IsEmpty()) return 0;
+    if (is_empty()) return 0;
     if (end == (size_t)-1) end = m_len;
     if (start == end) return 0;
     assert(start < m_len && end <= m_len && start < end);

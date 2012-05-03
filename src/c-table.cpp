@@ -57,7 +57,7 @@ void mixed_delete(Mixed *mixed) {
 }
 
 int64_t mixed_get_int(Mixed *mixed) {
-    return mixed->get_int(); 
+    return mixed->Get(); 
 }
 bool mixed_get_bool(Mixed *mixed) {
     return mixed->get_bool(); 
@@ -128,11 +128,11 @@ void table_unbind(Table* t) {
 }
 
 Spec* table_get_spec(Table* t) {
-    return new Spec(t->GetSpec());
+    return new Spec(t->get_spec());
 }
 
 void table_update_from_spec(Table* t, size_t ref_specSet) {
-    t->UpdateFromSpec();
+    t->update_from_spec();
 }
 
 size_t table_register_column(Table* t, ColumnType type, const char* name) {
@@ -140,27 +140,27 @@ size_t table_register_column(Table* t, ColumnType type, const char* name) {
 }
 
 size_t table_get_column_count(const Table* t) {
-	return t->GetColumnCount();
+	return t->get_column_count();
 }
 
 const char* table_get_column_name(const Table* t, size_t ndx) {
-	return t->GetColumnName(ndx);
+	return t->get_column_name(ndx);
 }
 
 size_t table_get_column_index(const Table* t, const char* name) {
-	return t->GetColumnIndex(name);
+	return t->get_column_index(name);
 }
 
 ColumnType table_get_column_type(const Table* t, size_t ndx) {
-	return t->GetColumnType(ndx);
+	return t->get_column_type(ndx);
 }
 
 bool table_is_empty(const Table* t) {
-	return t->IsEmpty();
+	return t->is_empty();
 }
 
 size_t table_get_size(const Table* t) {
-	return t->GetSize();
+	return t->size();
 }
 
 void table_clear(Table* t) {
@@ -168,15 +168,15 @@ void table_clear(Table* t) {
 }
 
 void table_optimize(Table* t) {
-    t->Optimize();
+    t->optimize();
 }
 
 void table_delete_row(Table* t, size_t ndx) {
-	t->erase(ndx);
+	t->remove(ndx);
 }
 
-void table_pop_back(Table* t) {
-    t->pop_back();
+void table_remove_last(Table* t) {
+    t->remove_last();
 }
 
 
@@ -188,27 +188,27 @@ int64_t table_get_int(const Table* t, size_t column_id, size_t ndx) {
 }
 
 bool table_get_bool(const Table* t, size_t column_id, size_t ndx) {
-	return t->GetBool(column_id, ndx);
+	return t->get_bool(column_id, ndx);
 }
 
 time_t table_get_date(const Table* t, size_t column_id, size_t ndx) {
-	return t->GetDate(column_id, ndx);
+	return t->get_date(column_id, ndx);
 }
 
 const char* table_get_string(const Table* t, size_t column_id, size_t ndx) {
-	return t->GetString(column_id, ndx);
+	return t->get_string(column_id, ndx);
 }
 
 BinaryData table_get_binary(const Table* t, size_t column_id, size_t ndx) {
-	return t->GetBinary(column_id, ndx);
+	return t->get_binary(column_id, ndx);
 }
 
 Mixed* table_get_mixed(const Table* t, size_t column_id, size_t ndx) {
-	return new Mixed(t->GetMixed(column_id, ndx));
+	return new Mixed(t->get_mixed(column_id, ndx));
 }
 
 ColumnType table_get_mixed_type(const Table* t, size_t column_id, size_t ndx) {
-    return t->GetMixedType(column_id, ndx);
+    return t->get_mixed_type(column_id, ndx);
 }
 
 Table* table_get_table(Table* t, size_t column_id, size_t ndx) {
@@ -227,42 +227,42 @@ void table_set_int(Table* t, size_t column_id, size_t ndx, int64_t value) {
 }
 
 void table_set_bool(Table* t, size_t column_id, size_t ndx, bool value) {
-	t->SetBool(column_id, ndx, value);
+	t->set_bool(column_id, ndx, value);
 }
 
 void table_set_date(Table* t, size_t column_id, size_t ndx, time_t value) {
-	t->SetDate(column_id, ndx, value);
+	t->set_date(column_id, ndx, value);
 }
 
 void table_set_string(Table* t, size_t column_id, size_t ndx, const char* value) {
-	t->SetString(column_id, ndx, value);
+	t->set_string(column_id, ndx, value);
 }
 
 void table_set_binary(Table* t, size_t column_id, size_t ndx, const char *value, size_t len) {
-	t->SetBinary(column_id, ndx, value, len);
+	t->set_binary(column_id, ndx, value, len);
 }
 
 void table_set_mixed(Table* t, size_t column_id, size_t ndx, Mixed value) {
-	t->SetMixed(column_id, ndx, value);
+	t->set_mixed(column_id, ndx, value);
 }
 
 void table_clear_table(Table* t, size_t column_id, size_t ndx) {
-    t->ClearTable(column_id, ndx);
+    t->clear_subtable(column_id, ndx);
 }
 
 
 void table_insert_impl(Table* t, size_t ndx, va_list ap) {
-	assert(ndx <= t->GetSize());
+	assert(ndx <= t->size());
 
-	const size_t count = t->GetColumnCount();
+	const size_t count = t->get_column_count();
 	for (size_t i = 0; i < count; ++i) {
-		const ColumnType type = t->GetColumnType(i);
+		const ColumnType type = t->get_column_type(i);
 		switch (type) {
 		case COLUMN_TYPE_INT:
 			{
 				// int values should always be cast to 64bit in args
 				const int64_t v = va_arg(ap, int64_t);
-				t->InsertInt(i, ndx, v);
+				t->insert_int(i, ndx, v);
 			}
 			break;
 		case COLUMN_TYPE_BOOL:
@@ -314,7 +314,7 @@ void table_add(Table* t,  ...) {
 	va_list ap;
 	va_start(ap, t);
 
-	table_insert_impl(t, t->GetSize(), ap);
+	table_insert_impl(t, t->size(), ap);
 
 	va_end(ap);
 }
@@ -331,39 +331,39 @@ void table_insert(Table* t, size_t ndx, ...) {
 
 
 
-void basictable_insert_int(Table* t, size_t column_id, size_t ndx, int value) {
-	t->InsertInt(column_id, ndx, value);
+void table_insert_int(Table* t, size_t column_id, size_t ndx, int value) {
+    t->insert_int(column_id, ndx, value);
 }
 
-void basictable_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value) {
-	t->InsertInt(column_id, ndx, value);
+void table_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value) {
+	t->insert_int(column_id, ndx, value);
 }
 
-void basictable_insert_bool(Table* t, size_t column_id, size_t ndx, bool value) {
+void table_insert_bool(Table* t, size_t column_id, size_t ndx, bool value) {
 	t->InsertBool(column_id, ndx, value);
 }
 
-void basictable_insert_date(Table* t, size_t column_id, size_t ndx, time_t value) {
+void table_insert_date(Table* t, size_t column_id, size_t ndx, time_t value) {
 	t->InsertDate(column_id, ndx, value);
 }
 
-void basictable_insert_string(Table* t, size_t column_id, size_t ndx, const char* value) {
+void table_insert_string(Table* t, size_t column_id, size_t ndx, const char* value) {
 	t->InsertString(column_id, ndx, value);
 }
 
-void basictable_insert_binary(Table* t, size_t column_id, size_t ndx, const char* value, size_t len) {
+void table_insert_binary(Table* t, size_t column_id, size_t ndx, const char* value, size_t len) {
 	t->InsertBinary(column_id, ndx, value, len);
 }
 
-void basictable_insert_mixed(Table* t, size_t column_id, size_t ndx, Mixed value) {
+void table_insert_mixed(Table* t, size_t column_id, size_t ndx, Mixed value) {
 	t->InsertMixed(column_id, ndx, value);
 }
 
-void basictable_insert_table(Table* t, size_t column_id, size_t ndx) {
+void table_insert_table(Table* t, size_t column_id, size_t ndx) {
 	t->InsertTable(column_id, ndx);
 }
 
-void basictable_insert_done(Table* t) {
+void table_insert_done(Table* t) {
 	t->InsertDone();
 }
 
@@ -372,11 +372,11 @@ void basictable_insert_done(Table* t) {
 
 
 bool table_has_index(const Table* t, size_t column_id) {
-	return t->HasIndex(column_id);
+	return t->has_index(column_id);
 }
 
 void table_set_index(Table* t, size_t column_id) {
-	return t->SetIndex(column_id);
+	return t->set_index(column_id);
 }
 
 size_t table_find_int(const Table* t, size_t column_id, int value) {
@@ -420,15 +420,15 @@ void tableview_delete(TableView* tv) {
 }
 
 bool tableview_is_empty(const TableView* tv) {
-	return tv->IsEmpty();
+	return tv->is_empty();
 }
 
 size_t tableview_get_size(const TableView* tv) {
-	return tv->GetSize();
+	return tv->size();
 }
 /* ??? Implement
 size_t tableview_get_table_size(const TableView* tv, size_t column_id, size_t ndx) {
-    return tv->GetTableSize();
+    return tv->get_subtable_size();
 */
 
 
@@ -437,24 +437,24 @@ int64_t tableview_get_int(const TableView* tv, size_t column_id, size_t ndx) {
 }
 
 bool tableview_get_bool(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->GetBool(column_id, ndx);
+	return tv->get_bool(column_id, ndx);
 }
 
 time_t tableview_get_date(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->GetDate(column_id, ndx);
+	return tv->get_date(column_id, ndx);
 }
 
 const char* tableview_get_string(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->GetString(column_id, ndx);
+	return tv->get_string(column_id, ndx);
 }
 
 /* ??? Waiting for implementation
 BinaryData tableview_get_binary(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->GetBinary(column_id, ndx);
+	return tv->get_binary(column_id, ndx);
 }
 
 Mixed tableview_get_mixed(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->GetMixed(column_id, ndx);
+	return tv->get_mixed(column_id, ndx);
 }
 */
 
@@ -464,29 +464,29 @@ void tableview_set_int(TableView* tv, size_t column_id, size_t ndx, int64_t valu
 }
 
 void tableview_set_bool(TableView* tv, size_t column_id, size_t ndx, bool value) {
-	tv->SetBool(column_id, ndx, value);
+	tv->set_bool(column_id, ndx, value);
 }
 
 void tableview_set_date(TableView* tv, size_t column_id, size_t ndx, time_t value) {
-	tv->SetDate(column_id, ndx, value);
+	tv->set_date(column_id, ndx, value);
 }
 
 void tableview_set_string(TableView* tv, size_t column_id, size_t ndx, const char* value) {
-	tv->SetString(column_id, ndx, value);
+	tv->set_string(column_id, ndx, value);
 }
 
 /*
 //??? Waiting for implementation
 void tableview_set_binary(TableView* tv, size_t column_id, size_t ndx, const char* value, size_t len) {
-	tv->SetBinary(column_id, ndx, value, len);
+	tv->set_binary(column_id, ndx, value, len);
 }
 
 void tableview_set_mixed(TableView* tv, size_t column_id, size_t ndx, Mixed value) {
-	tv->SetMixed(column_id, ndx, value);
+	tv->set_mixed(column_id, ndx, value);
 }
 
 void tableview_clear_table(TableView* tv, size_t column_id, size_t ndx) {
-    tv->ClearTable(column_id, ndx);
+    tv->clear_subtable(column_id, ndx);
 }
 */
 
@@ -514,7 +514,7 @@ void tableview_find_all_string(TableView* tv, size_t column_id, const char *valu
 
 /* Aggregation */
 int64_t tableview_sum(TableView* tv, size_t column_id) {
-    return tv->Sum(column_id);
+    return tv->sum(column_id);
 }
 
 int64_t tableview_min(TableView* tv, size_t column_id) {
@@ -705,12 +705,12 @@ int64_t  query_max_range(Query* q, const Table* t, size_t column_id, size_t* res
 }
 
 int64_t  query_sum(Query* q, const Table* t, size_t column_id, size_t* resultcount) {
-    return q->Sum(*t, column_id, resultcount, 0, size_t(-1), size_t(-1));
+    return q->sum(*t, column_id, resultcount, 0, size_t(-1), size_t(-1));
 }
 
 int64_t  query_sum_range(Query* q, const Table* t, size_t column_id, size_t* resultcount,
                          size_t start, size_t end, size_t limit){
-    return q->Sum(*t, column_id, resultcount, start, end, limit);
+    return q->sum(*t, column_id, resultcount, start, end, limit);
 }
 
 double  query_avg(Query* q, const Table* t, size_t column_id, size_t* resultcount) {

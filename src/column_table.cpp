@@ -22,7 +22,7 @@ ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, ArrayParent *par
                          Allocator& alloc, Table const *tab):
     ColumnSubtableParent(ref_column, parent, pndx, alloc, tab), m_ref_specSet(ref_specSet) {}
 
-size_t ColumnTable::GetTableSize(size_t ndx) const
+size_t ColumnTable::get_subtable_size(size_t ndx) const
 {
     assert(ndx < Size());
 

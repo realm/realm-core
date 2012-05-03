@@ -90,7 +90,7 @@ public:
             const TableRef subtable = ((Table*)m_table)->GetTable(m_column, s);
 
             m_child->Init(*subtable);
-            const size_t subsize = subtable->GetSize();
+            const size_t subsize = subtable->size();
             const size_t sub = m_child->Find(0, subsize);
 
             if(sub != subsize) {

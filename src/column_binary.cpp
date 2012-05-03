@@ -64,14 +64,14 @@ void ColumnBinary::UpdateRef(size_t ref)
     }
 }
 
-bool ColumnBinary::IsEmpty() const
+bool ColumnBinary::is_empty() const
 {
     if (IsNode()) {
         const Array offsets = NodeGetOffsets();
-        return offsets.IsEmpty();
+        return offsets.is_empty();
     }
     else {
-        return ((ArrayBinary*)m_array)->IsEmpty();
+        return ((ArrayBinary*)m_array)->is_empty();
     }
 }
 
@@ -79,7 +79,7 @@ size_t ColumnBinary::Size() const
 {
     if (IsNode())  {
         const Array offsets = NodeGetOffsets();
-        const size_t size = offsets.IsEmpty() ? 0 : (size_t)offsets.Back();
+        const size_t size = offsets.is_empty() ? 0 : (size_t)offsets.Back();
         return size;
     }
     else {

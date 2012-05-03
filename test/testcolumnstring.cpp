@@ -267,7 +267,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll)
     c.Delete(0);
     CHECK_EQUAL(0, c.Size());
 
-    CHECK(c.IsEmpty());
+    CHECK(c.is_empty());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringInsert2)

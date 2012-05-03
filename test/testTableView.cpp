@@ -20,7 +20,7 @@ TEST(GetSetInteger)
 
     TableView v = table.cols().first.FindAll(2);
 
-    CHECK_EQUAL(2, v.GetSize());
+    CHECK_EQUAL(2, v.size());
 
     // Test of Get
     CHECK_EQUAL(2, v.Get(0, 0));
@@ -45,9 +45,9 @@ TEST(TableViewSum)
     table.Add(2);
 
     TableView v = table.cols().first.FindAll(2);
-    CHECK_EQUAL(5, v.GetSize());
+    CHECK_EQUAL(5, v.size());
 
-    int64_t sum = v.Sum(0);
+    int64_t sum = v.sum(0);
     CHECK_EQUAL(10, sum);
 
     //v.Destroy();
@@ -65,7 +65,7 @@ TEST(TableViewSumNegative)
     v.Set(0, 0, 11);
     v.Set(0, 2, -20);
 
-    int64_t sum = v.Sum(0);
+    int64_t sum = v.sum(0);
     CHECK_EQUAL(-9, sum);
 
     //v.Destroy();
@@ -203,9 +203,9 @@ TEST(TableViewFindAllString)
     table.Add("a");
 
     TableView v = table.cols().first.FindAll("a");
-    v.SetString(0, 0, "foo");
-    v.SetString(0, 1, "bar"); // match
-    v.SetString(0, 2, "bar"); // match
+    v.set_string(0, 0, "foo");
+    v.set_string(0, 1, "bar"); // match
+    v.set_string(0, 2, "bar"); // match
 
     // todo, add creation to wrapper function in table.h
     TableView *v2 = new TableView(*v.GetTable());
@@ -227,32 +227,32 @@ TEST(TableViewDelete)
     table.Add(1);
 
     TableView v = table.cols().first.FindAll(1);
-    CHECK_EQUAL(3, v.GetSize());
+    CHECK_EQUAL(3, v.size());
 
-    v.erase(1);
-    CHECK_EQUAL(2, v.GetSize());
+    v.remove(1);
+    CHECK_EQUAL(2, v.size());
     CHECK_EQUAL(0, v.GetRef(0));
     CHECK_EQUAL(3, v.GetRef(1));
 
-    CHECK_EQUAL(4, table.GetSize());
+    CHECK_EQUAL(4, table.size());
     CHECK_EQUAL(1, table[0].first);
     CHECK_EQUAL(2, table[1].first);
     CHECK_EQUAL(3, table[2].first);
     CHECK_EQUAL(1, table[3].first);
 
-    v.erase(0);
-    CHECK_EQUAL(1, v.GetSize());
+    v.remove(0);
+    CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(2, v.GetRef(0));
 
-    CHECK_EQUAL(3, table.GetSize());
+    CHECK_EQUAL(3, table.size());
     CHECK_EQUAL(2, table[0].first);
     CHECK_EQUAL(3, table[1].first);
     CHECK_EQUAL(1, table[2].first);
 
-    v.erase(0);
-    CHECK_EQUAL(0, v.GetSize());
+    v.remove(0);
+    CHECK_EQUAL(0, v.size());
 
-    CHECK_EQUAL(2, table.GetSize());
+    CHECK_EQUAL(2, table.size());
     CHECK_EQUAL(2, table[0].first);
     CHECK_EQUAL(3, table[1].first);
 }
@@ -268,12 +268,12 @@ TEST(TableViewClear)
     table.Add(1);
 
     TableView v = table.cols().first.FindAll(1);
-    CHECK_EQUAL(3, v.GetSize());
+    CHECK_EQUAL(3, v.size());
 
     v.clear();
-    CHECK_EQUAL(0, v.GetSize());
+    CHECK_EQUAL(0, v.size());
 
-    CHECK_EQUAL(2, table.GetSize());
+    CHECK_EQUAL(2, table.size());
     CHECK_EQUAL(2, table[0].first);
     CHECK_EQUAL(3, table[1].first);
 }
@@ -284,7 +284,7 @@ TEST(TableViewClearNone)
     TestTableInt table;
 
     TableView v = table.cols().first.FindAll(1);
-    CHECK_EQUAL(0, v.GetSize());
+    CHECK_EQUAL(0, v.size());
 
     v.clear();
 

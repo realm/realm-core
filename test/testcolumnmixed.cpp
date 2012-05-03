@@ -7,9 +7,9 @@ TEST(ColumnMixed_Int)
 {
     ColumnMixed c;
 
-    c.InsertInt(0,     2);
-    c.InsertInt(1,   100);
-    c.InsertInt(2, 20000);
+    c.insert_int(0,     2);
+    c.insert_int(1,   100);
+    c.insert_int(2, 20000);
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
@@ -49,22 +49,22 @@ TEST(ColumnMixed_Bool)
         CHECK_EQUAL(COLUMN_TYPE_BOOL, c.GetType(i));
     }
 
-    CHECK_EQUAL(true,  c.GetBool(0));
-    CHECK_EQUAL(false, c.GetBool(1));
-    CHECK_EQUAL(true,  c.GetBool(2));
+    CHECK_EQUAL(true,  c.get_bool(0));
+    CHECK_EQUAL(false, c.get_bool(1));
+    CHECK_EQUAL(true,  c.get_bool(2));
 
-    c.SetBool(0, false);
-    c.SetBool(1, true);
-    c.SetBool(2, false);
+    c.set_bool(0, false);
+    c.set_bool(1, true);
+    c.set_bool(2, false);
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
         CHECK_EQUAL(COLUMN_TYPE_BOOL, c.GetType(i));
     }
 
-    CHECK_EQUAL(false, c.GetBool(0));
-    CHECK_EQUAL(true,  c.GetBool(1));
-    CHECK_EQUAL(false, c.GetBool(2));
+    CHECK_EQUAL(false, c.get_bool(0));
+    CHECK_EQUAL(true,  c.get_bool(1));
+    CHECK_EQUAL(false, c.get_bool(2));
 
     c.Destroy();
 }
@@ -82,21 +82,21 @@ TEST(ColumnMixed_Date)
         CHECK_EQUAL(COLUMN_TYPE_DATE, c.GetType(i));
     }
 
-    CHECK_EQUAL(    2, c.GetDate(0));
-    CHECK_EQUAL(  100, c.GetDate(1));
-    CHECK_EQUAL(20000, c.GetDate(2));
+    CHECK_EQUAL(    2, c.get_date(0));
+    CHECK_EQUAL(  100, c.get_date(1));
+    CHECK_EQUAL(20000, c.get_date(2));
 
-    c.SetDate(0,   400);
-    c.SetDate(1,     0);
-    c.SetDate(2, 99999);
+    c.set_date(0,   400);
+    c.set_date(1,     0);
+    c.set_date(2, 99999);
 
     for (size_t i = 0; i < c.Size(); ++i) {
         CHECK_EQUAL(COLUMN_TYPE_DATE, c.GetType(i));
     }
 
-    CHECK_EQUAL(  400, c.GetDate(0));
-    CHECK_EQUAL(    0, c.GetDate(1));
-    CHECK_EQUAL(99999, c.GetDate(2));
+    CHECK_EQUAL(  400, c.get_date(0));
+    CHECK_EQUAL(    0, c.get_date(1));
+    CHECK_EQUAL(99999, c.get_date(2));
     CHECK_EQUAL(3, c.Size());
 
     c.Destroy();
@@ -115,22 +115,22 @@ TEST(ColumnMixed_String)
         CHECK_EQUAL(COLUMN_TYPE_STRING, c.GetType(i));
     }
 
-    CHECK_EQUAL("aaa",     c.GetString(0));
-    CHECK_EQUAL("bbbbb",   c.GetString(1));
-    CHECK_EQUAL("ccccccc", c.GetString(2));
+    CHECK_EQUAL("aaa",     c.get_string(0));
+    CHECK_EQUAL("bbbbb",   c.get_string(1));
+    CHECK_EQUAL("ccccccc", c.get_string(2));
 
-    c.SetString(0, "dd");
-    c.SetString(1, "");
-    c.SetString(2, "eeeeeeeee");
+    c.set_string(0, "dd");
+    c.set_string(1, "");
+    c.set_string(2, "eeeeeeeee");
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
         CHECK_EQUAL(COLUMN_TYPE_STRING, c.GetType(i));
     }
 
-    CHECK_EQUAL("dd",        c.GetString(0));
-    CHECK_EQUAL("",          c.GetString(1));
-    CHECK_EQUAL("eeeeeeeee", c.GetString(2));
+    CHECK_EQUAL("dd",        c.get_string(0));
+    CHECK_EQUAL("",          c.get_string(1));
+    CHECK_EQUAL("eeeeeeeee", c.get_string(2));
 
     c.Destroy();
 }
@@ -148,22 +148,22 @@ TEST(ColumnMixed_Binary)
         CHECK_EQUAL(COLUMN_TYPE_BINARY, c.GetType(i));
     }
 
-    CHECK_EQUAL("aaa",     (const char*)c.GetBinary(0).pointer);
-    CHECK_EQUAL("bbbbb",   (const char*)c.GetBinary(1).pointer);
-    CHECK_EQUAL("ccccccc", (const char*)c.GetBinary(2).pointer);
+    CHECK_EQUAL("aaa",     (const char*)c.get_binary(0).pointer);
+    CHECK_EQUAL("bbbbb",   (const char*)c.get_binary(1).pointer);
+    CHECK_EQUAL("ccccccc", (const char*)c.get_binary(2).pointer);
 
-    c.SetBinary(0, "dd", 3);
-    c.SetBinary(1, "", 1);
-    c.SetBinary(2, "eeeeeeeee", 10);
+    c.set_binary(0, "dd", 3);
+    c.set_binary(1, "", 1);
+    c.set_binary(2, "eeeeeeeee", 10);
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
         CHECK_EQUAL(COLUMN_TYPE_BINARY, c.GetType(i));
     }
 
-    CHECK_EQUAL("dd",        (const char*)c.GetBinary(0).pointer);
-    CHECK_EQUAL("",          (const char*)c.GetBinary(1).pointer);
-    CHECK_EQUAL("eeeeeeeee", (const char*)c.GetBinary(2).pointer);
+    CHECK_EQUAL("dd",        (const char*)c.get_binary(0).pointer);
+    CHECK_EQUAL("",          (const char*)c.get_binary(1).pointer);
+    CHECK_EQUAL("eeeeeeeee", (const char*)c.get_binary(2).pointer);
 
     c.Destroy();
 }
@@ -182,8 +182,8 @@ TEST(ColumnMixed_Table)
 
     Table* const t1 = c.get_subtable_ptr(0);
     Table* const t2 = c.get_subtable_ptr(1);
-    CHECK(t1->IsEmpty());
-    CHECK(t2->IsEmpty());
+    CHECK(t1->is_empty());
+    CHECK(t2->is_empty());
     delete t1;
     delete t2;
 
@@ -195,7 +195,7 @@ TEST(ColumnMixed_Mixed)
     ColumnMixed c;
 
     // Insert mixed types
-    c.InsertInt(0, 23);
+    c.insert_int(0, 23);
     c.InsertBool(0, false);
     c.InsertDate(0, 23423);
     c.InsertString(0, "Hello");
@@ -212,10 +212,10 @@ TEST(ColumnMixed_Mixed)
 
     // Change all entries to new types
     c.SetInt(0, 23);
-    c.SetBool(1, false);
-    c.SetDate(2, 23423);
-    c.SetString(3, "Hello");
-    c.SetBinary(4, "binary", 7);
+    c.set_bool(1, false);
+    c.set_date(2, 23423);
+    c.set_string(3, "Hello");
+    c.set_binary(4, "binary", 7);
     c.SetTable(5);
     CHECK_EQUAL(6, c.Size());
 

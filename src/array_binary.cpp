@@ -23,7 +23,7 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
 {
     assert(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
     assert(Array::Size() == 2);
-    assert(m_blob.Size() ==(size_t)(m_offsets.IsEmpty() ? 0 : m_offsets.Back()));
+    assert(m_blob.Size() ==(size_t)(m_offsets.is_empty() ? 0 : m_offsets.Back()));
 
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
@@ -34,9 +34,9 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
 
 ArrayBinary::~ArrayBinary() {}
 
-bool ArrayBinary::IsEmpty() const
+bool ArrayBinary::is_empty() const
 {
-    return m_offsets.IsEmpty();
+    return m_offsets.is_empty();
 }
 
 size_t ArrayBinary::Size() const
@@ -67,7 +67,7 @@ void ArrayBinary::Add(const char* value, size_t len)
     assert(len == 0 || value);
 
     m_blob.Add(value, len);
-    m_offsets.Add(m_offsets.IsEmpty() ? len : m_offsets.Back() + len);
+    m_offsets.Add(m_offsets.is_empty() ? len : m_offsets.Back() + len);
 }
 
 void ArrayBinary::Set(size_t ndx, const char* value, size_t len)

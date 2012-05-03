@@ -23,7 +23,7 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
 {
     assert(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
     assert(Array::Size() == 2);
-    assert(m_blob.Size() == (m_offsets.IsEmpty() ? 0 : (size_t)m_offsets.Back()));
+    assert(m_blob.Size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.Back()));
 
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
@@ -34,9 +34,9 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
 
 ArrayStringLong::~ArrayStringLong() {}
 
-bool ArrayStringLong::IsEmpty() const
+bool ArrayStringLong::is_empty() const
 {
-    return m_offsets.IsEmpty();
+    return m_offsets.is_empty();
 }
 size_t ArrayStringLong::Size() const
 {
@@ -62,7 +62,7 @@ void ArrayStringLong::Add(const char* value, size_t len)
 
     len += 1; // include trailing null byte
     m_blob.Add(value, len);
-    m_offsets.Add(m_offsets.IsEmpty() ? len : m_offsets.Back() + len);
+    m_offsets.Add(m_offsets.is_empty() ? len : m_offsets.Back() + len);
 }
 
 void ArrayStringLong::Set(size_t ndx, const char* value)

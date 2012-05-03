@@ -119,7 +119,7 @@ void stl()
     timer.Start();
     for (size_t i = 0; i < ITEMS; ++i) {
         size_t p = rand2() % (ITEMS - i);
-        integers.erase(integers.begin() + p);
+        integers.remove(integers.begin() + p);
     }
     printf("Delete: %dms\n", timer.GetTimeInMs());
     printf("\n");

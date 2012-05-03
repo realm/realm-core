@@ -45,13 +45,13 @@ public:
 
     ColumnType GetType(size_t ndx) const;
     size_t Size() const {return m_types->Size();}
-    bool IsEmpty() const {return m_types->IsEmpty();}
+    bool is_empty() const {return m_types->is_empty();}
 
     int64_t GetInt(size_t ndx) const;
-    bool GetBool(size_t ndx) const;
-    time_t GetDate(size_t ndx) const;
-    const char* GetString(size_t ndx) const;
-    BinaryData GetBinary(size_t ndx) const;
+    bool get_bool(size_t ndx) const;
+    time_t get_date(size_t ndx) const;
+    const char* get_string(size_t ndx) const;
+    BinaryData get_binary(size_t ndx) const;
 
     /**
      * The returned table pointer must always end up being wrapped in
@@ -60,13 +60,13 @@ public:
     Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
     void SetInt(size_t ndx, int64_t value);
-    void SetBool(size_t ndx, bool value);
-    void SetDate(size_t ndx, time_t value);
-    void SetString(size_t ndx, const char* value);
-    void SetBinary(size_t ndx, const char* value, size_t len);
+    void set_bool(size_t ndx, bool value);
+    void set_date(size_t ndx, time_t value);
+    void set_string(size_t ndx, const char* value);
+    void set_binary(size_t ndx, const char* value, size_t len);
     void SetTable(size_t ndx);
 
-    void InsertInt(size_t ndx, int64_t value);
+    void insert_int(size_t ndx, int64_t value);
     void InsertBool(size_t ndx, bool value);
     void InsertDate(size_t ndx, time_t value);
     void InsertString(size_t ndx, const char* value);

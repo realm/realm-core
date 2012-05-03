@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "../../src/tightdb.hpp"
+#include "tightdb.hpp"
 #include "../../test/UnitTest++/src/UnitTest++.h"
 #include "../../test/UnitTest++/src/Win32/TimeHelpers.h"
 #include "../Support/mem.hpp"
@@ -51,7 +51,7 @@ void tightdb2(void)
         std::string indexed;
         integers.Clear();
         if(index == 1) {
-            integers.SetIndex(0);
+            integers.set_index(0);
             indexed = "Indexed ";
         }
 
@@ -70,7 +70,7 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (i + 1);
-            integers.InsertInt(0, p, (int64_t)rand2() % RANGE);
+            integers.insert_int(0, p, (int64_t)rand2() % RANGE);
         }
         printf((indexed + "Insert: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 
@@ -100,7 +100,7 @@ void tightdb2(void)
             // Sanity test to ensure that average distance between matches is the same as in the STL tests
 /*
             int j;
-            for(j = 0; j < integers.GetSize(); j++)
+            for(j = 0; j < integers.size(); j++)
                 if(integers.Get64(0, j) == f)
                     break;
             distance_sum += j;

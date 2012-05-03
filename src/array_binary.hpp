@@ -12,7 +12,7 @@ public:
     //ArrayBinary(Allocator& alloc);
     ~ArrayBinary();
 
-    bool IsEmpty() const;
+    bool is_empty() const;
     size_t Size() const;
 
     const char* Get(size_t ndx) const;

@@ -13,7 +13,7 @@ public:
     void Destroy();
 
     size_t Size() const;
-    bool IsEmpty() const;
+    bool is_empty() const;
 
     const char* Get(size_t ndx) const;
     bool Add(const char* value);

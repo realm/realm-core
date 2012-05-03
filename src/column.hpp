@@ -121,7 +121,7 @@ public:
     void SetHasRefs();
 
     size_t Size() const;
-    bool IsEmpty() const;
+    bool is_empty() const;
 
     // Getting and setting values
     int64_t Get(size_t ndx) const;
@@ -131,7 +131,7 @@ public:
     bool Add() {return Add(0);}
     bool Add(int64_t value);
 
-    int64_t Sum(size_t start = 0, size_t end = -1) const;
+    int64_t sum(size_t start = 0, size_t end = -1) const;
     int64_t Max(size_t start = 0, size_t end = -1) const;
     int64_t Min(size_t start = 0, size_t end = -1) const;
     void Sort(size_t start, size_t end);

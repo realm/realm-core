@@ -323,7 +323,7 @@ TEST_FIXTURE(db_setup_array, Array_DeleteAll)
     c.Delete(0);
     c.Delete(0);
 
-    CHECK(c.IsEmpty());
+    CHECK(c.is_empty());
     CHECK_EQUAL(0, c.Size());
 }
 
@@ -784,7 +784,7 @@ TEST(Sum0)
     for(int i = 0; i < 64 + 7; i++) {
         a.Add(0);
     }
-    CHECK_EQUAL(0, a.Sum(0, a.Size()));
+    CHECK_EQUAL(0, a.sum(0, a.Size()));
     a.Destroy();
 }
 
@@ -798,12 +798,12 @@ TEST(Sum1)
     s1 = 0;
     for(int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.Sum(0, a.Size()));
+    CHECK_EQUAL(s1, a.sum(0, a.Size()));
 
     s1 = 0;
     for(int i = 3; i < 100; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.Sum(3, 100));
+    CHECK_EQUAL(s1, a.sum(3, 100));
 
     a.Destroy();
 }
@@ -818,12 +818,12 @@ TEST(Sum2)
     s1 = 0;
     for(int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.Sum(0, a.Size()));
+    CHECK_EQUAL(s1, a.sum(0, a.Size()));
 
     s1 = 0;
     for(int i = 3; i < 100; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.Sum(3, 100));
+    CHECK_EQUAL(s1, a.sum(3, 100));
 
     a.Destroy();
 }
@@ -839,12 +839,12 @@ TEST(Sum4)
     s1 = 0;
     for(int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.Sum(0, a.Size()));
+    CHECK_EQUAL(s1, a.sum(0, a.Size()));
 
     s1 = 0;
     for(int i = 3; i < 100; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.Sum(3, 100));
+    CHECK_EQUAL(s1, a.sum(3, 100));
 
     a.Destroy();
 }
@@ -859,12 +859,12 @@ TEST(Sum16)
     s1 = 0;
     for(int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.Sum(0, a.Size()));
+    CHECK_EQUAL(s1, a.sum(0, a.Size()));
 
     s1 = 0;
     for(int i = 3; i < 100; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.Sum(3, 100));
+    CHECK_EQUAL(s1, a.sum(3, 100));
 
     a.Destroy();
 }

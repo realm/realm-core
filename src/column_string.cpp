@@ -83,17 +83,17 @@ void AdaptiveStringColumn::UpdateRef(size_t ref)
     }
 }
 
-bool AdaptiveStringColumn::IsEmpty() const
+bool AdaptiveStringColumn::is_empty() const
 {
     if (IsNode()) {
         const Array offsets = NodeGetOffsets();
-        return offsets.IsEmpty();
+        return offsets.is_empty();
     }
     else if (IsLongStrings()) {
-        return ((ArrayStringLong*)m_array)->IsEmpty();
+        return ((ArrayStringLong*)m_array)->is_empty();
     }
     else {
-        return ((ArrayString*)m_array)->IsEmpty();
+        return ((ArrayString*)m_array)->is_empty();
     }
 }
 
@@ -101,7 +101,7 @@ size_t AdaptiveStringColumn::Size() const
 {
     if (IsNode())  {
         const Array offsets = NodeGetOffsets();
-        const size_t size = offsets.IsEmpty() ? 0 : (size_t)offsets.Back();
+        const size_t size = offsets.is_empty() ? 0 : (size_t)offsets.Back();
         return size;
     }
     else if (IsLongStrings()) {

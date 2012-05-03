@@ -134,7 +134,7 @@ int64_t ColumnMixed::GetInt(size_t ndx) const
     return value;
 }
 
-bool ColumnMixed::GetBool(size_t ndx) const
+bool ColumnMixed::get_bool(size_t ndx) const
 {
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_BOOL);
@@ -143,7 +143,7 @@ bool ColumnMixed::GetBool(size_t ndx) const
     return value;
 }
 
-time_t ColumnMixed::GetDate(size_t ndx) const
+time_t ColumnMixed::get_date(size_t ndx) const
 {
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_DATE);
@@ -152,7 +152,7 @@ time_t ColumnMixed::GetDate(size_t ndx) const
     return value;
 }
 
-const char* ColumnMixed::GetString(size_t ndx) const
+const char* ColumnMixed::get_string(size_t ndx) const
 {
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_STRING);
@@ -164,7 +164,7 @@ const char* ColumnMixed::GetString(size_t ndx) const
     return value;
 }
 
-BinaryData ColumnMixed::GetBinary(size_t ndx) const
+BinaryData ColumnMixed::get_binary(size_t ndx) const
 {
     assert(ndx < m_types->Size());
     assert(m_types->Get(ndx) == COLUMN_TYPE_BINARY);
@@ -175,7 +175,7 @@ BinaryData ColumnMixed::GetBinary(size_t ndx) const
     return m_data->Get(ref);
 }
 
-void ColumnMixed::InsertInt(size_t ndx, int64_t value)
+void ColumnMixed::insert_int(size_t ndx, int64_t value)
 {
     assert(ndx <= m_types->Size());
 
@@ -258,7 +258,7 @@ void ColumnMixed::SetInt(size_t ndx, int64_t value)
     m_refs->Set(ndx, v);
 }
 
-void ColumnMixed::SetBool(size_t ndx, bool value)
+void ColumnMixed::set_bool(size_t ndx, bool value)
 {
     assert(ndx < m_types->Size());
 
@@ -272,7 +272,7 @@ void ColumnMixed::SetBool(size_t ndx, bool value)
     m_refs->Set(ndx, v);
 }
 
-void ColumnMixed::SetDate(size_t ndx, time_t value)
+void ColumnMixed::set_date(size_t ndx, time_t value)
 {
     assert(ndx < m_types->Size());
 
@@ -286,7 +286,7 @@ void ColumnMixed::SetDate(size_t ndx, time_t value)
     m_refs->Set(ndx, v);
 }
 
-void ColumnMixed::SetString(size_t ndx, const char* value)
+void ColumnMixed::set_string(size_t ndx, const char* value)
 {
     assert(ndx < m_types->Size());
     InitDataColumn();
@@ -321,7 +321,7 @@ void ColumnMixed::SetString(size_t ndx, const char* value)
     }
 }
 
-void ColumnMixed::SetBinary(size_t ndx, const char* value, size_t len)
+void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
 {
     assert(ndx < m_types->Size());
     InitDataColumn();
@@ -373,7 +373,7 @@ void ColumnMixed::SetTable(size_t ndx)
 
 bool ColumnMixed::Add()
 {
-    InsertInt(Size(), 0);
+    insert_int(Size(), 0);
     return true;
 }
 
