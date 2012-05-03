@@ -69,14 +69,14 @@ TEST(Table3)
     }
 
     // Test column searching
-    CHECK_EQUAL(size_t(0),  table.cols().first.find_first_int(0));
-    CHECK_EQUAL(size_t(-1), table.cols().first.find_first_int(1));
-    CHECK_EQUAL(size_t(0),  table.cols().second.find_first_int(10));
-    CHECK_EQUAL(size_t(-1), table.cols().second.find_first_int(100));
-    CHECK_EQUAL(size_t(0),  table.cols().third.find_first_int(true));
-    CHECK_EQUAL(size_t(-1), table.cols().third.find_first_int(false));
-    CHECK_EQUAL(size_t(0) , table.cols().fourth.find_first_int(Wed));
-    CHECK_EQUAL(size_t(-1), table.cols().fourth.find_first_int(Mon));
+    CHECK_EQUAL(size_t(0),  table.cols().first.find_first(0));
+    CHECK_EQUAL(size_t(-1), table.cols().first.find_first(1));
+    CHECK_EQUAL(size_t(0),  table.cols().second.find_first(10));
+    CHECK_EQUAL(size_t(-1), table.cols().second.find_first(100));
+    CHECK_EQUAL(size_t(0),  table.cols().third.find_first(true));
+    CHECK_EQUAL(size_t(-1), table.cols().third.find_first(false));
+    CHECK_EQUAL(size_t(0) , table.cols().fourth.find_first(Wed));
+    CHECK_EQUAL(size_t(-1), table.cols().fourth.find_first(Mon));
 
     // Test column incrementing
     table.cols().first += 3;
@@ -104,8 +104,8 @@ TEST(Table4)
     CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello", (const char*)r.second);
 
     // Test string column searching
-    CHECK_EQUAL(size_t(1),  table.cols().second.find_first_int("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
-    CHECK_EQUAL(size_t(-1), table.cols().second.find_first_int("Foo"));
+    CHECK_EQUAL(size_t(1),  table.cols().second.find_first("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
+    CHECK_EQUAL(size_t(-1), table.cols().second.find_first("Foo"));
 
 #ifdef _DEBUG
     table.verify();
@@ -265,9 +265,9 @@ TEST(Table_Find_Int)
         table.add(0, i, true, Wed);
     }
 
-    CHECK_EQUAL(size_t(0),    table.cols().second.find_first_int(1000));
-    CHECK_EQUAL(size_t(1000), table.cols().second.find_first_int(0));
-    CHECK_EQUAL(size_t(-1),   table.cols().second.find_first_int(1001));
+    CHECK_EQUAL(size_t(0),    table.cols().second.find_first(1000));
+    CHECK_EQUAL(size_t(1000), table.cols().second.find_first(0));
+    CHECK_EQUAL(size_t(-1),   table.cols().second.find_first(1001));
 
 #ifdef _DEBUG
     table.verify();
@@ -292,8 +292,8 @@ TEST(Table6)
         second == str || second.MatchRegEx(".*");
     }};
 
-    //TestTableEnum result = table.find_all_int(TestQuery2(Mon, Tue, "Hello")).sort().Limit(10);
-    //size_t result2 = table.Range(10, 200).find_first_int(TestQuery());
+    //TestTableEnum result = table.find_all(TestQuery2(Mon, Tue, "Hello")).sort().Limit(10);
+    //size_t result2 = table.Range(10, 200).find_first(TestQuery());
     //CHECK_EQUAL((size_t)-1, result2);
 
 #ifdef _DEBUG
@@ -319,11 +319,11 @@ TEST(Table_FindAll_Int)
     table.add(0, 20, true, Wed);
 
     // Search for a value that does not exits
-    const TableView v0 = table.cols().second.find_all_int(5);
+    const TableView v0 = table.cols().second.find_all(5);
     CHECK_EQUAL(0, v0.size());
 
     // Search for a value with several matches
-    const TableView v = table.cols().second.find_all_int(20);
+    const TableView v = table.cols().second.find_all(20);
 
     CHECK_EQUAL(5, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
@@ -356,65 +356,65 @@ TEST(Table_Index_Int)
     table.set_index(1);
 
     // Search for a value that does not exits
-    const size_t r1 = table.cols().second.find_first_int(2);
+    const size_t r1 = table.cols().second.find_first(2);
     CHECK_EQUAL(-1, r1);
 
     // Find existing values
-    CHECK_EQUAL(0, table.cols().second.find_first_int(1));
-    CHECK_EQUAL(1, table.cols().second.find_first_int(15));
-    CHECK_EQUAL(2, table.cols().second.find_first_int(10));
-    CHECK_EQUAL(3, table.cols().second.find_first_int(20));
-    CHECK_EQUAL(4, table.cols().second.find_first_int(11));
-    CHECK_EQUAL(5, table.cols().second.find_first_int(45));
-    //CHECK_EQUAL(6, table.cols().second.find_first_int(10)); // only finds first match
-    CHECK_EQUAL(7, table.cols().second.find_first_int(0));
-    CHECK_EQUAL(8, table.cols().second.find_first_int(30));
-    CHECK_EQUAL(9, table.cols().second.find_first_int(9));
+    CHECK_EQUAL(0, table.cols().second.find_first(1));
+    CHECK_EQUAL(1, table.cols().second.find_first(15));
+    CHECK_EQUAL(2, table.cols().second.find_first(10));
+    CHECK_EQUAL(3, table.cols().second.find_first(20));
+    CHECK_EQUAL(4, table.cols().second.find_first(11));
+    CHECK_EQUAL(5, table.cols().second.find_first(45));
+    //CHECK_EQUAL(6, table.cols().second.find_first(10)); // only finds first match
+    CHECK_EQUAL(7, table.cols().second.find_first(0));
+    CHECK_EQUAL(8, table.cols().second.find_first(30));
+    CHECK_EQUAL(9, table.cols().second.find_first(9));
 
     // Change some values
     table[2].second = 13;
     table[9].second = 100;
 
-    CHECK_EQUAL(0, table.cols().second.find_first_int(1));
-    CHECK_EQUAL(1, table.cols().second.find_first_int(15));
-    CHECK_EQUAL(2, table.cols().second.find_first_int(13));
-    CHECK_EQUAL(3, table.cols().second.find_first_int(20));
-    CHECK_EQUAL(4, table.cols().second.find_first_int(11));
-    CHECK_EQUAL(5, table.cols().second.find_first_int(45));
-    CHECK_EQUAL(6, table.cols().second.find_first_int(10));
-    CHECK_EQUAL(7, table.cols().second.find_first_int(0));
-    CHECK_EQUAL(8, table.cols().second.find_first_int(30));
-    CHECK_EQUAL(9, table.cols().second.find_first_int(100));
+    CHECK_EQUAL(0, table.cols().second.find_first(1));
+    CHECK_EQUAL(1, table.cols().second.find_first(15));
+    CHECK_EQUAL(2, table.cols().second.find_first(13));
+    CHECK_EQUAL(3, table.cols().second.find_first(20));
+    CHECK_EQUAL(4, table.cols().second.find_first(11));
+    CHECK_EQUAL(5, table.cols().second.find_first(45));
+    CHECK_EQUAL(6, table.cols().second.find_first(10));
+    CHECK_EQUAL(7, table.cols().second.find_first(0));
+    CHECK_EQUAL(8, table.cols().second.find_first(30));
+    CHECK_EQUAL(9, table.cols().second.find_first(100));
 
     // Insert values
     table.add(0, 29, true, Wed);
     //TODO: More than add
 
-    CHECK_EQUAL(0, table.cols().second.find_first_int(1));
-    CHECK_EQUAL(1, table.cols().second.find_first_int(15));
-    CHECK_EQUAL(2, table.cols().second.find_first_int(13));
-    CHECK_EQUAL(3, table.cols().second.find_first_int(20));
-    CHECK_EQUAL(4, table.cols().second.find_first_int(11));
-    CHECK_EQUAL(5, table.cols().second.find_first_int(45));
-    CHECK_EQUAL(6, table.cols().second.find_first_int(10));
-    CHECK_EQUAL(7, table.cols().second.find_first_int(0));
-    CHECK_EQUAL(8, table.cols().second.find_first_int(30));
-    CHECK_EQUAL(9, table.cols().second.find_first_int(100));
-    CHECK_EQUAL(10, table.cols().second.find_first_int(29));
+    CHECK_EQUAL(0, table.cols().second.find_first(1));
+    CHECK_EQUAL(1, table.cols().second.find_first(15));
+    CHECK_EQUAL(2, table.cols().second.find_first(13));
+    CHECK_EQUAL(3, table.cols().second.find_first(20));
+    CHECK_EQUAL(4, table.cols().second.find_first(11));
+    CHECK_EQUAL(5, table.cols().second.find_first(45));
+    CHECK_EQUAL(6, table.cols().second.find_first(10));
+    CHECK_EQUAL(7, table.cols().second.find_first(0));
+    CHECK_EQUAL(8, table.cols().second.find_first(30));
+    CHECK_EQUAL(9, table.cols().second.find_first(100));
+    CHECK_EQUAL(10, table.cols().second.find_first(29));
 
     // Delete some values
     table.remove(0);
     table.remove(5);
     table.remove(8);
 
-    CHECK_EQUAL(0, table.cols().second.find_first_int(15));
-    CHECK_EQUAL(1, table.cols().second.find_first_int(13));
-    CHECK_EQUAL(2, table.cols().second.find_first_int(20));
-    CHECK_EQUAL(3, table.cols().second.find_first_int(11));
-    CHECK_EQUAL(4, table.cols().second.find_first_int(45));
-    CHECK_EQUAL(5, table.cols().second.find_first_int(0));
-    CHECK_EQUAL(6, table.cols().second.find_first_int(30));
-    CHECK_EQUAL(7, table.cols().second.find_first_int(100));
+    CHECK_EQUAL(0, table.cols().second.find_first(15));
+    CHECK_EQUAL(1, table.cols().second.find_first(13));
+    CHECK_EQUAL(2, table.cols().second.find_first(20));
+    CHECK_EQUAL(3, table.cols().second.find_first(11));
+    CHECK_EQUAL(4, table.cols().second.find_first(45));
+    CHECK_EQUAL(5, table.cols().second.find_first(0));
+    CHECK_EQUAL(6, table.cols().second.find_first(30));
+    CHECK_EQUAL(7, table.cols().second.find_first(100));
 
 #ifdef _DEBUG
     table.verify();
@@ -486,10 +486,10 @@ TEST(TableAutoEnumerationFindFindAll)
 
     table.optimize();
 
-    size_t t = table.cols().second.find_first_int("eftg");
+    size_t t = table.cols().second.find_first("eftg");
     CHECK_EQUAL(1, t);
 
-    TableView tv = table.cols().second.find_all_int("eftg");
+    TableView tv = table.cols().second.find_all("eftg");
     CHECK_EQUAL(5, tv.size());
     CHECK_EQUAL("eftg", tv.get_string(1, 0));
     CHECK_EQUAL("eftg", tv.get_string(1, 1));

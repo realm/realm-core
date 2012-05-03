@@ -30,8 +30,8 @@ public:
     void Clear();
     void Resize(size_t ndx);
 
-    size_t find_first_int(const char* value, size_t start=0 , size_t end=-1) const;
-    void find_all_int(Array& result, const char* value, size_t start = 0, size_t end = -1) const;
+    size_t find_first(const char* value, size_t start=0 , size_t end=-1) const;
+    void find_all(Array& result, const char* value, size_t start = 0, size_t end = -1) const;
 
     // Index
     bool HasIndex() const {return false;}

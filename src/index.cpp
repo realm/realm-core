@@ -314,7 +314,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
     }
 }
 
-size_t Index::find_first_int(int64_t value) const
+size_t Index::find_first(int64_t value) const
 {
     size_t ref = GetRef();
     for (;;) {
@@ -334,7 +334,7 @@ size_t Index::find_first_int(int64_t value) const
     }
 }
 
-bool Index::find_all_int(Column& result, int64_t value) const
+bool Index::find_all(Column& result, int64_t value) const
 {
     const Array values = m_array->GetSubArray(0);
     const Array refs = m_array->GetSubArray(1);
@@ -346,7 +346,7 @@ bool Index::find_all_int(Column& result, int64_t value) const
     if (m_array->IsNode()) {
         do {
             const Index node = GetIndexFromRef(refs, pos);
-            if (!node.find_all_int(result, value)) return false;
+            if (!node.find_all(result, value)) return false;
             ++pos;
         } while (pos < refs.Size());
     }

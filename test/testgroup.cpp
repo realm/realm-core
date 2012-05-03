@@ -290,7 +290,7 @@ TEST(Group_Serialize_Optimized)
     // Add a row with a known (but unique) value
     table->add("search_target", 9, true, Fri);
 
-    const size_t res = table->cols().first.find_first_int("search_target");
+    const size_t res = table->cols().first.find_first("search_target");
     CHECK_EQUAL(table->size()-1, res);
 
 #ifdef _DEBUG

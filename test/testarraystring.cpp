@@ -278,7 +278,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind1)
     c.add("d");
 
     // Search for last item (4 bytes width)
-    const size_t r = c.find_first_int("d");
+    const size_t r = c.find_first("d");
 
     CHECK_EQUAL(3, r);
 }
@@ -289,7 +289,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind2)
     c.add("eeeeee");
 
     // Search for last item
-    const size_t r = c.find_first_int("eeeeee");
+    const size_t r = c.find_first("eeeeee");
 
     CHECK_EQUAL(4, r);
 }
@@ -300,7 +300,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind3)
     c.add("ffffffffffff");
 
     // Search for last item
-    const size_t r = c.find_first_int("ffffffffffff");
+    const size_t r = c.find_first("ffffffffffff");
 
     CHECK_EQUAL(5, r);
 }
@@ -311,7 +311,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind4)
     c.add("gggggggggggggggggggggggg");
 
     // Search for last item
-    const size_t r = c.find_first_int("gggggggggggggggggggggggg");
+    const size_t r = c.find_first("gggggggggggggggggggggggg");
 
     CHECK_EQUAL(6, r);
 }
@@ -322,7 +322,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind5)
     c.add("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
 
     // Search for last item
-    const size_t r = c.find_first_int("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
+    const size_t r = c.find_first("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
 
     CHECK_EQUAL(7, r);
 }
@@ -339,7 +339,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFindAll)
     c.add("baz");
     c.add("foobar");
 
-    c.find_all_int(col, "foobar");
+    c.find_all(col, "foobar");
     CHECK_EQUAL(3, col.Size());
     CHECK_EQUAL(0, col.Get(0));
     CHECK_EQUAL(2, col.Get(1));

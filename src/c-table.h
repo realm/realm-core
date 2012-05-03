@@ -187,7 +187,6 @@ typedef struct Query Query;
 	size_t table_find_string(const Table* t, size_t column_ndx, const char* value);
 
 	TableView* table_find_all_int64(Table* t, size_t column_ndx, int64_t value);
-	TableView* table_find_all_hamming(Table* t, size_t column_ndx, uint64_t value, size_t max);
                 /* Remeber to call tableview_delete(tv) after use of the returned TableView */
 
 	/* NOTE: Low-level insert functions. Always insert in all columns at once

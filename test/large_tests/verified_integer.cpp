@@ -127,11 +127,11 @@ void VerifiedInteger::Clear()
     assert(ConditionalVerify());
 }
 
-size_t VerifiedInteger::find_first_int(int64_t value)
+size_t VerifiedInteger::find_first(int64_t value)
 {
     std::vector<int64_t>::iterator it = std::find(v.begin(), v.end(), value);
     size_t ndx = std::distance(v.begin(), it);
-    size_t index2 = u.find_first_int(value);
+    size_t index2 = u.find_first(value);
     assert(ndx == index2 || (it == v.end() && index2 == size_t(-1)));
     (void)index2;
     return ndx;
@@ -144,7 +144,7 @@ size_t VerifiedInteger::Size(void)
 }
 
 // todo/fixme, end ignored
-void VerifiedInteger::find_all_int(Array &c, int64_t value, size_t start, size_t end)
+void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end)
 {
     std::vector<int64_t>::iterator ita = v.begin() + start;
     std::vector<int64_t>::iterator itb = end == size_t(-1) ? v.end() : v.begin() + (end == size_t(-1) ? v.size() : end);;
@@ -160,7 +160,7 @@ void VerifiedInteger::find_all_int(Array &c, int64_t value, size_t start, size_t
 
     c.Clear();
 
-    u.find_all_int(c, value);
+    u.find_all(c, value);
     if (c.Size() != result.size())
         assert(false);
     for(size_t t = 0; t < result.size(); ++t) {

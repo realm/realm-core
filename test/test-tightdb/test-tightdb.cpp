@@ -64,7 +64,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.cols().fourth.find_first_int(Tue);
+            const size_t res = table.cols().fourth.find_first(Tue);
             if (res != size_t(-1)) {
                 printf("error");
             }
@@ -80,7 +80,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.cols().third.find_first_int(50);
+            const size_t res = table.cols().third.find_first(50);
             if (res != size_t(-1)) {
                 printf("error");
             }
@@ -96,7 +96,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.cols().second.find_first_int("abcde");
+            const size_t res = table.cols().second.find_first("abcde");
             if (res != 250000) {
                 printf("error");
             }
@@ -124,7 +124,7 @@ int main()
 
         for (size_t i = 0; i < 100000; ++i) {
             const size_t n = rand() % 1000;
-            const size_t res = table.cols().first.find_first_int(n);
+            const size_t res = table.cols().first.find_first(n);
             if (res == 2500002) { // to avoid above find being optimized away
                 printf("error");
             }

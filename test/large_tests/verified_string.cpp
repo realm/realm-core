@@ -75,11 +75,11 @@ void VerifiedString::Clear()
     assert(ConditionalVerify());
 }
 
-size_t VerifiedString::find_first_int(const char *value)
+size_t VerifiedString::find_first(const char *value)
 {
     std::vector<string>::iterator it = std::find(v.begin(), v.end(), value);
     size_t ndx = std::distance(v.begin(), it);
-    size_t index2 = u.find_first_int(value);
+    size_t index2 = u.find_first(value);
     (void)index2;
     assert(ndx == index2 || (it == v.end() && index2 == size_t(-1)));
     return ndx;
@@ -92,7 +92,7 @@ size_t VerifiedString::Size(void)
 }
 
 // todo/fixme, end ignored
-void VerifiedString::find_all_int(Array &c, const char *value, size_t start, size_t end)
+void VerifiedString::find_all(Array &c, const char *value, size_t start, size_t end)
 {
     std::vector<string>::iterator ita = v.begin() + start;
     std::vector<string>::iterator itb = v.begin() + (end == size_t(-1) ? v.size() : end);
@@ -108,7 +108,7 @@ void VerifiedString::find_all_int(Array &c, const char *value, size_t start, siz
 
     c.Clear();
 
-    u.find_all_int(c, value);
+    u.find_all(c, value);
     size_t cs = c.Size();
     if (cs != result.size())
         assert(false);

@@ -639,7 +639,7 @@ bool Column::Increment64(int64_t value, size_t start, size_t end)
     }
 }
 
-size_t Column::find_first_int(int64_t value, size_t start, size_t end) const
+size_t Column::find_first(int64_t value, size_t start, size_t end) const
 {
     assert(start <= Size());
     assert(end == (size_t)-1 || end <= Size());
@@ -647,7 +647,7 @@ size_t Column::find_first_int(int64_t value, size_t start, size_t end) const
     return TreeFind<int64_t, Column, EQUAL>(value, start, end);
 }
 
-void Column::find_all_int(Array& result, int64_t value, size_t caller_offset,
+void Column::find_all(Array& result, int64_t value, size_t caller_offset,
                      size_t start, size_t end) const
 {
     (void)caller_offset;
@@ -660,7 +660,7 @@ void Column::find_all_int(Array& result, int64_t value, size_t caller_offset,
 void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset,
                          size_t start, size_t end) const
 {
-    return m_array->find_all_int(result, value, add_offset, start, end);
+    return m_array->find_all(result, value, add_offset, start, end);
 }
 
 void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const
@@ -714,7 +714,7 @@ size_t Column::FindWithIndex(int64_t target) const
     assert(m_index);
     assert(m_index->Size() == Size());
 
-    return m_index->find_first_int(target);
+    return m_index->find_first(target);
 }
 
 Index& Column::GetIndex()

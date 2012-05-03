@@ -238,13 +238,13 @@ size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const
     return bytes_without_header / width;
 }
 
-size_t ArrayString::find_first_int(const char* value, size_t start, size_t end) const
+size_t ArrayString::find_first(const char* value, size_t start, size_t end) const
 {
     assert(value);
     return FindWithLen(value, strlen(value), start, end);
 }
 
-void ArrayString::find_all_int(Array& result, const char* value, size_t add_offset, size_t start, size_t end)
+void ArrayString::find_all(Array& result, const char* value, size_t add_offset, size_t start, size_t end)
 {
     assert(value);
 

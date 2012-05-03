@@ -19,7 +19,7 @@ Table* TableView::get_table()
 }
 
 // Searching
-size_t TableView::find_first_int(size_t column_ndx, int64_t value) const
+size_t TableView::find_first(size_t column_ndx, int64_t value) const
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
@@ -31,7 +31,7 @@ size_t TableView::find_first_int(size_t column_ndx, int64_t value) const
     return (size_t)-1;
 }
 
-void TableView::find_all_int(TableView& tv, size_t column_ndx, int64_t value)
+void TableView::find_all(TableView& tv, size_t column_ndx, int64_t value)
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
@@ -41,7 +41,7 @@ void TableView::find_all_int(TableView& tv, size_t column_ndx, int64_t value)
             tv.GetRefColumn().add(i);
 }
 
-size_t TableView::find_first_string(size_t column_ndx, const char* value) const
+size_t TableView::find_first(size_t column_ndx, const char* value) const
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_STRING);
@@ -54,7 +54,7 @@ size_t TableView::find_first_string(size_t column_ndx, const char* value) const
 }
 
 
-void TableView::find_all_string(TableView& tv, size_t column_ndx, const char* value)
+void TableView::find_all(TableView& tv, size_t column_ndx, const char* value)
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_STRING);

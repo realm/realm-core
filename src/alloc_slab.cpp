@@ -165,10 +165,10 @@ void SlabAlloc::Free(size_t ref, void* p)
 #endif //_DEBUG
 
     // Check if we can merge with start of free block
-    const size_t n = m_freeSpace.cols().ref.find_first_int(refEnd);
+    const size_t n = m_freeSpace.cols().ref.find_first(refEnd);
     if (n != (size_t)-1) {
         // No consolidation over slab borders
-        if (m_slabs.cols().offset.find_first_int(refEnd) == (size_t)-1) {
+        if (m_slabs.cols().offset.find_first(refEnd) == (size_t)-1) {
             m_freeSpace[n].ref = ref;
             m_freeSpace[n].size += size;
             isMerged = true;
@@ -176,7 +176,7 @@ void SlabAlloc::Free(size_t ref, void* p)
     }
 
     // Check if we can merge with end of free block
-    if (m_slabs.cols().offset.find_first_int(ref) == (size_t)-1) { // avoid slab borders
+    if (m_slabs.cols().offset.find_first(ref) == (size_t)-1) { // avoid slab borders
         const size_t count = m_freeSpace.size();
         for (size_t i = 0; i < count; ++i) {
             FreeSpace::Cursor c = m_freeSpace[i];
@@ -410,7 +410,7 @@ bool SlabAlloc::IsAllFree() const
         Slabs::ConstCursor c = m_slabs[i];
         const size_t size = TO_REF(c.offset) - ref;
 
-        const size_t r = m_freeSpace.cols().ref.find_first_int(ref);
+        const size_t r = m_freeSpace.cols().ref.find_first(ref);
         if (r == (size_t)-1) return false;
         if (size != (size_t)m_freeSpace[r].size) return false;
 

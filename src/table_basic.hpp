@@ -600,9 +600,9 @@ private:
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
 
-    std::size_t find_first_int(int64_t value) const
+    std::size_t find_first(int64_t value) const
     {
-        return Base::m_table->find_first_int(col_idx, value);
+        return Base::m_table->find_first(col_idx, value);
     }
 
     std::size_t FindPos(int64_t value) const
@@ -610,10 +610,10 @@ public:
         return Base::m_table->GetColumn(col_idx).FindPos(value);
     }
 
-    TableView find_all_int(int64_t value) const
+    TableView find_all(int64_t value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->find_all_int(tv, col_idx, value);
+        Base::m_table->find_all(tv, col_idx, value);
         return tv;
     }
 
@@ -639,15 +639,15 @@ private:
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
 
-    std::size_t find_first_int(bool value) const
+    std::size_t find_first(bool value) const
     {
-        return Base::m_table->find_first_bool(col_idx, value);
+        return Base::m_table->find_first(col_idx, value);
     }
 
-    TableView find_all_int(bool value) const
+    TableView find_all(bool value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->find_all_bool(tv, col_idx, value);
+        Base::m_table->find_all(tv, col_idx, value);
         return tv;
     }
 
@@ -667,15 +667,15 @@ private:
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
 
-    std::size_t find_first_int(E value) const
+    std::size_t find_first(E value) const
     {
-        return Base::m_table->find_first_int(col_idx, value);
+        return Base::m_table->find_first(col_idx, (int64_t)value);
     }
 
-    TableView find_all_int(E value) const
+    TableView find_all(E value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->find_all_int(tv, col_idx, value);
+        Base::m_table->find_all(tv, col_idx, (int64_t)value);
         return tv;
     }
 
@@ -695,15 +695,15 @@ private:
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
 
-    std::size_t find_first_int(const char* value) const
+    std::size_t find_first(const char* value) const
     {
-        return Base::m_table->find_first_string(col_idx, value);
+        return Base::m_table->find_first(col_idx, value);
     }
 
-    TableView find_all_int(const char* value) const
+    TableView find_all(const char* value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->find_all_string(tv, col_idx, value);
+        Base::m_table->find_all(tv, col_idx, value);
         return tv;
     }
 
