@@ -109,10 +109,10 @@ void Group::create()
 {
     m_tables.SetType(COLUMN_HASREFS);
     
-    m_top.Add(m_tableNames.GetRef());
-    m_top.Add(m_tables.GetRef());
-    m_top.Add(m_freePositions.GetRef());
-    m_top.Add(m_freeLengths.GetRef());
+    m_top.add(m_tableNames.GetRef());
+    m_top.add(m_tables.GetRef());
+    m_top.add(m_freePositions.GetRef());
+    m_top.add(m_freeLengths.GetRef());
     
     // Set parent info
     m_tableNames.SetParent(&m_top, 0);
@@ -137,8 +137,8 @@ void Group::create_from_ref()
         create();
         
         // Everything but header is free space
-        m_freePositions.Add(8);
-        m_freeLengths.Add(m_alloc.GetFileLen()-8);
+        m_freePositions.add(8);
+        m_freeLengths.add(m_alloc.GetFileLen()-8);
     }
     else {
         m_top.UpdateRef(top_ref);
@@ -160,7 +160,7 @@ void Group::create_from_ref()
         // Make room for pointers to cached tables
         const size_t count = m_tables.Size();
         for (size_t i = 0; i < count; ++i) {
-            m_cachedtables.Add(0);
+            m_cachedtables.add(0);
         }
     }
 }
@@ -203,9 +203,9 @@ TableRef Group::get_table(const char* name)
         Table* const t = new Table(m_alloc);
         t->m_top.SetParent(this, m_tables.Size());
 
-        m_tables.Add(t->m_top.GetRef());
-        m_tableNames.Add(name);
-        m_cachedtables.Add((intptr_t)t);
+        m_tables.add(t->m_top.GetRef());
+        m_tableNames.add(name);
+        m_cachedtables.add((intptr_t)t);
 
         return t->get_table_ref();
     }
@@ -316,8 +316,8 @@ size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool e
     // Add new free space
     const size_t end  = old_filesize + len;
     const size_t rest = filesize - end;
-    m_freePositions.Add(end);
-    m_freeLengths.Add(rest);
+    m_freePositions.add(end);
+    m_freeLengths.add(rest);
     
     return old_filesize;
 }

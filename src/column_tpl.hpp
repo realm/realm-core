@@ -194,7 +194,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         C newList(m_array->GetAllocator());
         if (m_array->HasRefs()) newList.SetHasRefs(); // all leafs should have same type
 
-        if (!newList.Add(value)) return NodeChange(NodeChange::CT_ERROR);
+        if (!newList.add(value)) return NodeChange(NodeChange::CT_ERROR);
 
         switch (ndx) {
         case 0:             // insert before
@@ -204,7 +204,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         default:            // split
             // Move items after split to new list
             for (size_t i = ndx; i < count; ++i) {
-                newList.Add(static_cast<C*>(this)->LeafGet(i));
+                newList.add(static_cast<C*>(this)->LeafGet(i));
             }
             static_cast<C*>(this)->Resize(ndx);
 
@@ -286,9 +286,9 @@ template<class C> bool ColumnBase::NodeAdd(size_t ref)
 
     assert(offsets.Size() < MAX_LIST_SIZE);
 
-    const int64_t newOffset = (offsets.is_empty() ? 0 : offsets.Back()) + col.Size();
-    if (!offsets.Add(newOffset)) return false;
-    return refs.Add(ref);
+    const int64_t newOffset = (offsets.is_empty() ? 0 : offsets.back()) + col.Size();
+    if (!offsets.add(newOffset)) return false;
+    return refs.add(ref);
 }
 
 template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)

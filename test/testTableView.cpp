@@ -11,23 +11,23 @@ TEST(GetSetInteger)
 {
     TestTableInt table;
 
-    table.Add(1);
-    table.Add(2);
-    table.Add(3);
-    table.Add(1);
-    table.Add(2);
+    table.add(1);
+    table.add(2);
+    table.add(3);
+    table.add(1);
+    table.add(2);
 
     TableView v = table.cols().first.FindAll(2);
 
     CHECK_EQUAL(2, v.size());
 
     // Test of Get
-    CHECK_EQUAL(2, v.Get(0, 0));
-    CHECK_EQUAL(2, v.Get(0, 1));
+    CHECK_EQUAL(2, v.get_int(0, 0));
+    CHECK_EQUAL(2, v.get_int(0, 1));
 
     // Test of Set
-    v.Set(0, 0, 123);
-    CHECK_EQUAL(123, v.Get(0, 0));
+    v.set_int(0, 0, 123);
+    CHECK_EQUAL(123, v.get_int(0, 0));
 
     //v.Destroy();
 }
@@ -37,11 +37,11 @@ TEST(TableViewSum)
 {
     TestTableInt table;
 
-    table.Add(2);
-    table.Add(2);
-    table.Add(2);
-    table.Add(2);
-    table.Add(2);
+    table.add(2);
+    table.add(2);
+    table.add(2);
+    table.add(2);
+    table.add(2);
 
     TableView v = table.cols().first.FindAll(2);
     CHECK_EQUAL(5, v.size());
@@ -56,13 +56,13 @@ TEST(TableViewSumNegative)
 {
     TestTableInt table;
 
-    table.Add(0);
-    table.Add(0);
-    table.Add(0);
+    table.add(0);
+    table.add(0);
+    table.add(0);
 
     TableView v = table.cols().first.FindAll(0);
-    v.Set(0, 0, 11);
-    v.Set(0, 2, -20);
+    v.set_int(0, 0, 11);
+    v.set_int(0, 2, -20);
 
     int64_t sum = v.sum(0);
     CHECK_EQUAL(-9, sum);
@@ -74,14 +74,14 @@ TEST(TableViewMax)
 {
     TestTableInt table;
 
-    table.Add(0);
-    table.Add(0);
-    table.Add(0);
+    table.add(0);
+    table.add(0);
+    table.add(0);
 
     TableView v = table.cols().first.FindAll(0);
-    v.Set(0, 0, -1);
-    v.Set(0, 1, 2);
-    v.Set(0, 2, 1);
+    v.set_int(0, 0, -1);
+    v.set_int(0, 1, 2);
+    v.set_int(0, 2, 1);
 
     int64_t max = v.maximum(0);
     CHECK_EQUAL(2, max);
@@ -94,14 +94,14 @@ TEST(TableViewMax2)
 {
     TestTableInt table;
 
-    table.Add(0);
-    table.Add(0);
-    table.Add(0);
+    table.add(0);
+    table.add(0);
+    table.add(0);
 
     TableView v = table.cols().first.FindAll(0);
-    v.Set(0, 0, -1);
-    v.Set(0, 1, -2);
-    v.Set(0, 2, -3);
+    v.set_int(0, 0, -1);
+    v.set_int(0, 1, -2);
+    v.set_int(0, 2, -3);
 
     int64_t max = v.maximum(0);
     CHECK_EQUAL(-1, max);
@@ -113,14 +113,14 @@ TEST(TableViewMin)
 {
     TestTableInt table;
 
-    table.Add(0);
-    table.Add(0);
-    table.Add(0);
+    table.add(0);
+    table.add(0);
+    table.add(0);
 
     TableView v = table.cols().first.FindAll(0);
-    v.Set(0, 0, -1);
-    v.Set(0, 1, 2);
-    v.Set(0, 2, 1);
+    v.set_int(0, 0, -1);
+    v.set_int(0, 1, 2);
+    v.set_int(0, 2, 1);
 
     int64_t min = v.minimum(0);
     CHECK_EQUAL(-1, min);
@@ -132,14 +132,14 @@ TEST(TableViewMin2)
 {
     TestTableInt table;
 
-    table.Add(0);
-    table.Add(0);
-    table.Add(0);
+    table.add(0);
+    table.add(0);
+    table.add(0);
 
     TableView v = table.cols().first.FindAll(0);
-    v.Set(0, 0, -1);
-    v.Set(0, 1, -2);
-    v.Set(0, 2, -3);
+    v.set_int(0, 0, -1);
+    v.set_int(0, 1, -2);
+    v.set_int(0, 2, -3);
 
     int64_t min = v.minimum(0);
     CHECK_EQUAL(-3, min);
@@ -152,14 +152,14 @@ TEST(TableViewFind)
 {
     TestTableInt table;
 
-    table.Add(0);
-    table.Add(0);
-    table.Add(0);
+    table.add(0);
+    table.add(0);
+    table.add(0);
 
     TableView v = table.cols().first.FindAll(0);
-    v.Set(0, 0, 5);
-    v.Set(0, 1, 4);
-    v.Set(0, 2, 4);
+    v.set_int(0, 0, 5);
+    v.set_int(0, 1, 4);
+    v.set_int(0, 2, 4);
 
     size_t r = v.Find(0, 4);
     CHECK_EQUAL(1, r);
@@ -171,17 +171,17 @@ TEST(TableViewFindAll)
 {
     TestTableInt table;
 
-    table.Add(0);
-    table.Add(0);
-    table.Add(0);
+    table.add(0);
+    table.add(0);
+    table.add(0);
 
     TableView v = table.cols().first.FindAll(0);
-    v.Set(0, 0, 5);
-    v.Set(0, 1, 4); // match
-    v.Set(0, 2, 4); // match
+    v.set_int(0, 0, 5);
+    v.set_int(0, 1, 4); // match
+    v.set_int(0, 2, 4); // match
 
     // todo, add creation to wrapper function in table.h
-    TableView *v2 = new TableView(*v.get_table());
+    TableView *v2 = new TableView(*v.get_subtable());
     v.FindAll(*v2, 0, 4);
     CHECK_EQUAL(1, v2->GetRef(0));
     CHECK_EQUAL(2, v2->GetRef(1));
@@ -196,9 +196,9 @@ TEST(TableViewFindAllString)
 {
     TestTableString table;
 
-    table.Add("a");
-    table.Add("a");
-    table.Add("a");
+    table.add("a");
+    table.add("a");
+    table.add("a");
 
     TableView v = table.cols().first.FindAll("a");
     v.set_string(0, 0, "foo");
@@ -206,7 +206,7 @@ TEST(TableViewFindAllString)
     v.set_string(0, 2, "bar"); // match
 
     // todo, add creation to wrapper function in table.h
-    TableView *v2 = new TableView(*v.get_table());
+    TableView *v2 = new TableView(*v.get_subtable());
     v.FindAllString(*v2, 0, "bar");
     CHECK_EQUAL(1, v2->GetRef(0));
     CHECK_EQUAL(2, v2->GetRef(1));
@@ -218,11 +218,11 @@ TEST(TableViewDelete)
 {
     TestTableInt table;
 
-    table.Add(1);
-    table.Add(2);
-    table.Add(1);
-    table.Add(3);
-    table.Add(1);
+    table.add(1);
+    table.add(2);
+    table.add(1);
+    table.add(3);
+    table.add(1);
 
     TableView v = table.cols().first.FindAll(1);
     CHECK_EQUAL(3, v.size());
@@ -259,11 +259,11 @@ TEST(TableViewClear)
 {
     TestTableInt table;
 
-    table.Add(1);
-    table.Add(2);
-    table.Add(1);
-    table.Add(3);
-    table.Add(1);
+    table.add(1);
+    table.add(2);
+    table.add(1);
+    table.add(3);
+    table.add(1);
 
     TableView v = table.cols().first.FindAll(1);
     CHECK_EQUAL(3, v.size());

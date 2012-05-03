@@ -12,12 +12,12 @@ ArrayString db_setup_string::c;
 
 TEST_FIXTURE(db_setup_string, ArrayStringMultiEmpty)
 {
-    c.Add("");
-    c.Add("");
-    c.Add("");
-    c.Add("");
-    c.Add("");
-    c.Add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
     CHECK_EQUAL(6, c.Size());
 
     CHECK_EQUAL("", c.Get(0));
@@ -57,14 +57,14 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetExpand8)
 TEST_FIXTURE(db_setup_string, ArrayArrayStringAdd0)
 {
     c.Clear();
-    c.Add();
+    c.add();
     CHECK_EQUAL("", c.Get(0));
     CHECK_EQUAL(1, c.Size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd1)
 {
-    c.Add("a");
+    c.add("a");
     CHECK_EQUAL("",  c.Get(0));
     CHECK_EQUAL("a", c.Get(1));
     CHECK_EQUAL(2, c.Size());
@@ -72,7 +72,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd1)
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd2)
 {
-    c.Add("bb");
+    c.add("bb");
     CHECK_EQUAL("",   c.Get(0));
     CHECK_EQUAL("a",  c.Get(1));
     CHECK_EQUAL("bb", c.Get(2));
@@ -81,7 +81,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd2)
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd3)
 {
-    c.Add("ccc");
+    c.add("ccc");
     CHECK_EQUAL("",    c.Get(0));
     CHECK_EQUAL("a",   c.Get(1));
     CHECK_EQUAL("bb",  c.Get(2));
@@ -91,7 +91,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd3)
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd4)
 {
-    c.Add("dddd");
+    c.add("dddd");
     CHECK_EQUAL("",     c.Get(0));
     CHECK_EQUAL("a",    c.Get(1));
     CHECK_EQUAL("bb",   c.Get(2));
@@ -102,7 +102,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd4)
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd8)
 {
-    c.Add("eeeeeeee");
+    c.add("eeeeeeee");
     CHECK_EQUAL("",     c.Get(0));
     CHECK_EQUAL("a",    c.Get(1));
     CHECK_EQUAL("bb",   c.Get(2));
@@ -114,7 +114,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd8)
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd16)
 {
-    c.Add("ffffffffffffffff");
+    c.add("ffffffffffffffff");
     CHECK_EQUAL("",     c.Get(0));
     CHECK_EQUAL("a",    c.Get(1));
     CHECK_EQUAL("bb",   c.Get(2));
@@ -127,7 +127,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd16)
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd32)
 {
-    c.Add("gggggggggggggggggggggggggggggggg");
+    c.add("gggggggggggggggggggggggggggggggg");
 
     CHECK_EQUAL("",     c.Get(0));
     CHECK_EQUAL("a",    c.Get(1));
@@ -238,10 +238,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert2)
 {
     // Create new list
     c.Clear();
-    c.Add("a");
-    c.Add("b");
-    c.Add("c");
-    c.Add("d");
+    c.add("a");
+    c.add("b");
+    c.add("c");
+    c.add("d");
 
     // Insert in top with expansion
     c.Insert(0, "xxxxx", 5);
@@ -272,10 +272,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind1)
 {
     // Create new list
     c.Clear();
-    c.Add("a");
-    c.Add("b");
-    c.Add("c");
-    c.Add("d");
+    c.add("a");
+    c.add("b");
+    c.add("c");
+    c.add("d");
 
     // Search for last item (4 bytes width)
     const size_t r = c.Find("d");
@@ -286,7 +286,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind1)
 TEST_FIXTURE(db_setup_string, ArrayStringFind2)
 {
     // Expand to 8 bytes width
-    c.Add("eeeeee");
+    c.add("eeeeee");
 
     // Search for last item
     const size_t r = c.Find("eeeeee");
@@ -297,7 +297,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind2)
 TEST_FIXTURE(db_setup_string, ArrayStringFind3)
 {
     // Expand to 16 bytes width
-    c.Add("ffffffffffff");
+    c.add("ffffffffffff");
 
     // Search for last item
     const size_t r = c.Find("ffffffffffff");
@@ -308,7 +308,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind3)
 TEST_FIXTURE(db_setup_string, ArrayStringFind4)
 {
     // Expand to 32 bytes width
-    c.Add("gggggggggggggggggggggggg");
+    c.add("gggggggggggggggggggggggg");
 
     // Search for last item
     const size_t r = c.Find("gggggggggggggggggggggggg");
@@ -319,7 +319,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind4)
 TEST_FIXTURE(db_setup_string, ArrayStringFind5)
 {
     // Expand to 64 bytes width
-    c.Add("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
+    c.add("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
 
     // Search for last item
     const size_t r = c.Find("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
@@ -333,11 +333,11 @@ TEST_FIXTURE(db_setup_string, ArrayStringFindAll)
     Array col;
 
     // first, middle and end
-    c.Add("foobar");
-    c.Add("bar abc");
-    c.Add("foobar");
-    c.Add("baz");
-    c.Add("foobar");
+    c.add("foobar");
+    c.add("bar abc");
+    c.add("foobar");
+    c.add("baz");
+    c.add("foobar");
 
     c.FindAll(col, "foobar");
     CHECK_EQUAL(3, col.Size());

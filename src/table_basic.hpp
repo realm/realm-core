@@ -21,7 +21,7 @@ namespace tightdb {
 
 
 template<class T> struct GetColumnTypeId;
-template<int col_idx, class Type> class RegisterColumn;
+template<int col_idx, class Type> class AddColumn;
 
 
 
@@ -72,7 +72,7 @@ private:
 public:
     class Query;
 
-    Query GetQuery() const { return Query(); } // FIXME: Bad thing to copy queries
+    Query where() const { return Query(); } // FIXME: Bad thing to copy queries
 
     typedef RowAccessor Cursor; // FIXME: Do we really neede a cursor
     typedef ConstRowAccessor ConstCursor; // FIXME: Do we really neede a cursor
@@ -80,7 +80,7 @@ public:
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc)
     {
         tightdb::Spec& spec = get_spec();
-        typename Spec::template Columns<RegisterColumn, tightdb::Spec*> c(&spec);
+        typename Spec::template Columns<AddColumn, tightdb::Spec*> c(&spec);
         update_from_spec();
     }
 
@@ -101,85 +101,85 @@ public:
         return ConstRowAccessor(std::make_pair(this, row_idx));
     }
 
-    RowAccessor Front() { return RowAccessor(std::make_pair(this, 0)); }
-    ConstRowAccessor Front() const { return ConstRowAccessor(std::make_pair(this, 0)); }
+    RowAccessor front() { return RowAccessor(std::make_pair(this, 0)); }
+    ConstRowAccessor front() const { return ConstRowAccessor(std::make_pair(this, 0)); }
 
     /**
      * \param rel_idx The index of the row specified relative to the
-     * end. Thus, <tt>table.Back(rel_idx)</tt> is the same as
+     * end. Thus, <tt>table.back(rel_idx)</tt> is the same as
      * <tt>table[table.size() + rel_idx]</tt>.
      */
-    RowAccessor Back(int rel_idx = -1)
+    RowAccessor back(int rel_idx = -1)
     {
         return RowAccessor(std::make_pair(this, m_size+rel_idx));
     }
 
-    ConstRowAccessor Back(int rel_idx = -1) const
+    ConstRowAccessor back(int rel_idx = -1) const
     {
         return ConstRowAccessor(std::make_pair(this, m_size+rel_idx));
     }
 
-    RowAccessor Add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
+    RowAccessor add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
 
     template<class T1>
-    void Add(const T1& v1)
+    void add(const T1& v1)
     {
         Spec::insert(m_size, cols(), v1);
         insert_done();
     }
 
     template<class T1, class T2>
-    void Add(const T1& v1, const T2& v2)
+    void add(const T1& v1, const T2& v2)
     {
         Spec::insert(m_size, cols(), v1, v2);
         insert_done();
     }
 
     template<class T1, class T2, class T3>
-    void Add(const T1& v1, const T2& v2, const T3& v3)
+    void add(const T1& v1, const T2& v2, const T3& v3)
     {
         Spec::insert(m_size, cols(), v1, v2, v3);
         insert_done();
     }
 
     template<class T1, class T2, class T3, class T4>
-    void Add(const T1& v1, const T2& v2, const T3& v3, const T4& v4)
+    void add(const T1& v1, const T2& v2, const T3& v3, const T4& v4)
     {
         Spec::insert(m_size, cols(), v1, v2, v3, v4);
         insert_done();
     }
 
-    // FIXME: Add remaining Add() methods up to 8 values.
+    // FIXME: Add remaining add() methods up to 8 values.
 
     template<class T1>
-    void Insert(std::size_t i, const T1& v1)
+    void insert(std::size_t i, const T1& v1)
     {
         Spec::insert(i, cols(), v1);
         insert_done();
     }
 
     template<class T1, class T2>
-    void Insert(std::size_t i, const T1& v1, const T2& v2)
+    void insert(std::size_t i, const T1& v1, const T2& v2)
     {
         Spec::insert(i, cols(), v1, v2);
         insert_done();
     }
 
     template<class T1, class T2, class T3>
-    void Insert(std::size_t i, const T1& v1, const T2& v2, const T3& v3)
+    void insert(std::size_t i, const T1& v1, const T2& v2, const T3& v3)
     {
         Spec::insert(i, cols(), v1, v2, v3);
         insert_done();
     }
 
     template<class T1, class T2, class T3, class T4>
-    void Insert(std::size_t i, const T1& v1, const T2& v2, const T3& v3, const T4& v4)
+    void insert(std::size_t i, const T1& v1, const T2& v2, const T3& v3, const T4& v4)
     {
         Spec::insert(i, cols(), v1, v2, v3, v4);
         insert_done();
     }
 
-    // FIXME: Add remaining Insert() methods up to 8 values.
+    // FIXME: Add remaining insert() methods up to 8 values.
 };
 
 
@@ -213,13 +213,13 @@ public:
     template<int, class> friend class QueryColumn;
     Query(): Spec::template Columns<QueryColumn, Query*>(this) {}
 
-    Query& Or() { m_impl.Or(); return *this; }
+    Query& or() { m_impl.or(); return *this; }
 
-    Query& Group() { m_impl.LeftParan(); return *this; }
+    Query& group() { m_impl.group(); return *this; }
 
-    Query& EndGroup() { m_impl.RightParan(); return *this; }
+    Query& end_group() { m_impl.end_group(); return *this; }
 
-    std::size_t Delete(BasicTable<Spec>& table, size_t start = 0, size_t end = size_t(-1), // Should instead be 'table.remove(query);'
+    std::size_t remove(BasicTable<Spec>& table, size_t start = 0, size_t end = size_t(-1), // Should instead be 'table.remove(query);'
                        size_t limit = size_t(-1)) const
     {
         return m_impl.Delete(table, start, end, limit);
@@ -240,15 +240,15 @@ protected:
     Query* const m_query;
     explicit QueryColumnBase(Query* q): m_query(q) {}
 
-    Query& Equal(const Type& value) const
+    Query& equal(const Type& value) const
     {
-        m_query->m_impl.Equal(col_idx, value);
+        m_query->m_impl.equal(col_idx, value);
         return *m_query;
     }
 
-    Query& NotEqual(const Type& value) const
+    Query& not_equal(const Type& value) const
     {
-        m_query->m_impl.NotEqual(col_idx, value);
+        m_query->m_impl.not_equal(col_idx, value);
         return *m_query;
     }
 };
@@ -262,36 +262,36 @@ private:
 
 public:
     explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
-    using Base::Equal;
-    using Base::NotEqual;
+    using Base::equal;
+    using Base::not_equal;
 
-    Query& Greater(int64_t value) const
+    Query& greater(int64_t value) const
     {
-        Base::m_query->m_impl.Greater(col_idx, value);
+        Base::m_query->m_impl.greater(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& GreaterEqual(int64_t value) const
+    Query& greater_equal(int64_t value) const
     {
-        Base::m_query->m_impl.GreaterEqual(col_idx, value);
+        Base::m_query->m_impl.greater_equal(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& Less(int64_t value) const
+    Query& less(int64_t value) const
     {
-        Base::m_query->m_impl.Less(col_idx, value);
+        Base::m_query->m_impl.less(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& LessEqual(int64_t value) const
+    Query& less_equal(int64_t value) const
     {
-        Base::m_query->m_impl.LessEqual(col_idx, value);
+        Base::m_query->m_impl.less_equal(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& Between(int64_t from, int64_t to) const
+    Query& between(int64_t from, int64_t to) const
     {
-        Base::m_query->m_impl.Between(col_idx, from, to);
+        Base::m_query->m_impl.between(col_idx, from, to);
         return *Base::m_query;
     };
 };
@@ -305,8 +305,8 @@ private:
 
 public:
     explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
-    using Base::Equal;
-    using Base::NotEqual;
+    using Base::equal;
+    using Base::not_equal;
 };
 
 // QueryColumn specialization for enumerations
@@ -319,8 +319,8 @@ private:
 
 public:
     explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
-    using Base::Equal;
-    using Base::NotEqual;
+    using Base::equal;
+    using Base::not_equal;
 };
 
 // QueryColumn specialization for strings
@@ -333,33 +333,33 @@ private:
 public:
     explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
 
-    Query& Equal(const char* value, bool case_sensitive=true) const
+    Query& equal(const char* value, bool case_sensitive=true) const
     {
-        Base::m_query->m_impl.Equal(col_idx, value, case_sensitive);
+        Base::m_query->m_impl.equal(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& NotEqual(const char* value, bool case_sensitive=true) const
+    Query& not_equal(const char* value, bool case_sensitive=true) const
     {
-        Base::m_query->m_impl.NotEqual(col_idx, value, case_sensitive);
+        Base::m_query->m_impl.not_equal(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& BeginsWith(const char* value, bool case_sensitive=true) const
+    Query& begins_with(const char* value, bool case_sensitive=true) const
     {
-        Base::m_query->m_impl.BeginsWith(col_idx, value, case_sensitive);
+        Base::m_query->m_impl.begins_with(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& EndsWith(const char* value, bool case_sensitive=true) const
+    Query& ends_with(const char* value, bool case_sensitive=true) const
     {
-        Base::m_query->m_impl.EndsWith(col_idx, value, case_sensitive);
+        Base::m_query->m_impl.ends_with(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& Contains(const char* value, bool case_sensitive=true) const
+    Query& contains(const char* value, bool case_sensitive=true) const
     {
-        Base::m_query->m_impl.Contains(col_idx, value, case_sensitive);
+        Base::m_query->m_impl.contains(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 };
@@ -405,9 +405,9 @@ template<> struct GetColumnTypeId<Mixed> {
 
 
 
-template<int col_idx, class Type> class RegisterColumn {
+template<int col_idx, class Type> class AddColumn {
 public:
-    RegisterColumn(tightdb::Spec* spec, const char* column_name)
+    AddColumn(tightdb::Spec* spec, const char* column_name)
     {
         assert(col_idx == spec->get_column_count());
         spec->add_column(GetColumnTypeId<Type>::id, column_name);
@@ -415,13 +415,13 @@ public:
 };
 
 // RegisterColumn specialization for subtables
-template<int col_idx, class Subspec> class RegisterColumn<col_idx, BasicTable<Subspec> > {
+template<int col_idx, class Subspec> class AddColumn<col_idx, BasicTable<Subspec> > {
 public:
-    RegisterColumn(tightdb::Spec* spec, const char* column_name)
+    AddColumn(tightdb::Spec* spec, const char* column_name)
     {
         assert(col_idx == spec->get_column_count());
         tightdb::Spec subspec = spec->add_subtable_column(column_name);
-        typename Subspec::template Columns<tightdb::RegisterColumn, tightdb::Spec*> c(&subspec);
+        typename Subspec::template Columns<tightdb::add_column, tightdb::Spec*> c(&subspec);
     }
 };
 
@@ -444,18 +444,18 @@ private:
 
 public:
     explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-    operator int64_t() const { return Base::m_table->Get(col_idx, Base::m_row_idx); }
+    operator int64_t() const { return Base::m_table->get_int(col_idx, Base::m_row_idx); }
     const Field& operator=(int64_t value) const
     {
-        Base::m_table->Set(col_idx, Base::m_row_idx, value);
+        Base::m_table->set_int(col_idx, Base::m_row_idx, value);
         return *this;
     }
     const Field& operator+=(int64_t value) const
     {
         // FIXME: Should be optimized (can be both optimized and
         // generalized by using a form of expression templates).
-        value = Base::m_table->Get(col_idx, Base::m_row_idx) + value;
-        Base::m_table->Set(col_idx, Base::m_row_idx, value);
+        value = Base::m_table->get_int(col_idx, Base::m_row_idx) + value;
+        Base::m_table->set_int(col_idx, Base::m_row_idx, value);
         return *this;
     }
 };
@@ -486,10 +486,10 @@ private:
 
 public:
     explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-    operator E() const { return static_cast<E>(Base::m_table->Get(col_idx, Base::m_row_idx)); }
+    operator E() const { return static_cast<E>(Base::m_table->get_int(col_idx, Base::m_row_idx)); }
     const Field& operator=(E value) const
     {
-        Base::m_table->Set(col_idx, Base::m_row_idx, value);
+        Base::m_table->set_int(col_idx, Base::m_row_idx, value);
         return *this;
     }
 };
@@ -538,7 +538,7 @@ public:
         return *this;
     }
     ColumnType get_type() const { return Base::m_table->get_mixed_type(col_idx, Base::m_row_idx); }
-    int64_t Get() const { return Mixed(*this).Get(); }
+    int64_t get_int() const { return Mixed(*this).get_int(); }
     bool get_bool() const { return Mixed(*this).get_bool(); }
     std::time_t get_date() const { return Mixed(*this).get_date(); }
     const char* get_string() const { return Mixed(*this).get_string(); }

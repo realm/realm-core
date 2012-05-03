@@ -7,11 +7,11 @@ TEST(Index_Test1)
 {
     // Create a column with random values
     Column col;
-    col.Add(3);
-    col.Add(100);
-    col.Add(10);
-    col.Add(45);
-    col.Add(0);
+    col.add(3);
+    col.add(100);
+    col.add(10);
+    col.add(45);
+    col.add(0);
 
     // Create a new index on column
     Index ndx;
@@ -32,14 +32,14 @@ TEST(Index_FindAll)
 {
     // Create a column with random values
     Column col;
-    col.Add(3);
-    col.Add(100);
-    col.Add(10);
-    col.Add(45);
-    col.Add(0);
-    col.Add(10);
-    col.Add(18);
-    col.Add(10);
+    col.add(3);
+    col.add(100);
+    col.add(10);
+    col.add(45);
+    col.add(0);
+    col.add(10);
+    col.add(18);
+    col.add(10);
 
     // Create a new index on column
     Index ndx;
@@ -67,14 +67,14 @@ TEST(Index_FindAllRange)
 {
     // Create a column with random values
     Column col;
-    col.Add(3);
-    col.Add(100);
-    col.Add(10);
-    col.Add(45);
-    col.Add(0);
-    col.Add(10);
-    col.Add(18);
-    col.Add(10);
+    col.add(3);
+    col.add(100);
+    col.add(10);
+    col.add(45);
+    col.add(0);
+    col.add(10);
+    col.add(18);
+    col.add(10);
 
     // Create a new index on column
     Index ndx;
@@ -104,11 +104,11 @@ TEST(Index_Delete)
 {
     // Create a column with random values
     Column col;
-    col.Add(3);
-    col.Add(100);
-    col.Add(10);
-    col.Add(45);
-    col.Add(0);
+    col.add(3);
+    col.add(100);
+    col.add(10);
+    col.add(45);
+    col.add(0);
 
     // Create a new index on column
     Index ndx;
@@ -155,11 +155,11 @@ TEST(Index_Insert)
 {
     // Create a column with random values
     Column col;
-    col.Add(3);
-    col.Add(100);
-    col.Add(10);
-    col.Add(45);
-    col.Add(1);
+    col.add(3);
+    col.add(100);
+    col.add(10);
+    col.add(45);
+    col.add(1);
 
     // Create a new index on column
     Index ndx;
@@ -207,11 +207,11 @@ TEST(Index_Set)
 {
     // Create a column with random values
     Column col;
-    col.Add(3);
-    col.Add(100);
-    col.Add(10);
-    col.Add(45);
-    col.Add(0);
+    col.add(3);
+    col.add(100);
+    col.add(10);
+    col.add(45);
+    col.add(0);
 
     // Create a new index on column
     Index ndx;

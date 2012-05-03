@@ -11,8 +11,8 @@ ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& al
     m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc)
 {
     // Add subarrays for long string
-    Array::Add(m_offsets.GetRef());
-    Array::Add(m_blob.GetRef());
+    Array::add(m_offsets.GetRef());
+    Array::add(m_blob.GetRef());
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
 }
@@ -23,7 +23,7 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
 {
     assert(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
     assert(Array::Size() == 2);
-    assert(m_blob.Size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.Back()));
+    assert(m_blob.Size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.back()));
 
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
@@ -51,18 +51,18 @@ const char* ArrayStringLong::Get(size_t ndx) const
     return (const char*)m_blob.Get(offset);
 }
 
-void ArrayStringLong::Add(const char* value)
+void ArrayStringLong::add(const char* value)
 {
-    Add(value, strlen(value));
+    add(value, strlen(value));
 }
 
-void ArrayStringLong::Add(const char* value, size_t len)
+void ArrayStringLong::add(const char* value, size_t len)
 {
     assert(value);
 
     len += 1; // include trailing null byte
-    m_blob.Add(value, len);
-    m_offsets.Add(m_offsets.is_empty() ? len : m_offsets.Back() + len);
+    m_blob.add(value, len);
+    m_offsets.add(m_offsets.is_empty() ? len : m_offsets.back() + len);
 }
 
 void ArrayStringLong::Set(size_t ndx, const char* value)
@@ -148,7 +148,7 @@ void ArrayStringLong::FindAll(Array& result, const char* value, size_t add_offse
     for (;;) {
         first = FindWithLen(value, len, first + 1, end);
         if (first != (size_t)-1)
-            result.Add(first + add_offset);
+            result.add(first + add_offset);
         else break;
     }
 }

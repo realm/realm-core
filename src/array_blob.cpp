@@ -30,7 +30,7 @@ const char* ArrayBlob::Get(size_t pos) const
     return reinterpret_cast<const char*>(m_data) + pos;
 }
 
-void ArrayBlob::Add(const char* data, size_t len)
+void ArrayBlob::add(const char* data, size_t len)
 {
     Replace(m_len, m_len, data, len);
 }

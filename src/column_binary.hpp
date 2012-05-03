@@ -24,8 +24,8 @@ public:
     const char* GetData(size_t ndx) const;
     size_t GetLen(size_t ndx) const;
 
-    bool Add() {Add(NULL, 0); return true;}
-    void Add(const char* value, size_t len);
+    bool add() {add(NULL, 0); return true;}
+    void add(const char* value, size_t len);
     void Set(size_t ndx, const char* value, size_t len);
     void Insert(size_t ndx, const char* value, size_t len);
     void Delete(size_t ndx);
@@ -49,7 +49,7 @@ public:
 protected:
     friend class ColumnBase;
 
-    bool Add(BinaryData bin);
+    bool add(BinaryData bin);
     bool Set(size_t ndx, BinaryData bin);
     bool Insert(size_t ndx, BinaryData bin);
 

@@ -120,9 +120,9 @@ MemRef SlabAlloc::Alloc(size_t size)
 
     // Else, allocate new slab
     const size_t multible = 256 * ((size / 256) + 1);
-    const size_t slabsBack = m_slabs.is_empty() ? m_baseline : m_slabs.Back().offset;
+    const size_t slabsBack = m_slabs.is_empty() ? m_baseline : m_slabs.back().offset;
     const size_t doubleLast = m_slabs.is_empty() ? 0 :
-        (slabsBack - ((m_slabs.size() == 1) ? size_t(0) : m_slabs.Back(-2).offset)) * 2;
+        (slabsBack - ((m_slabs.size() == 1) ? size_t(0) : m_slabs.back(-2).offset)) * 2;
     const size_t newsize = multible > doubleLast ? multible : doubleLast;
 
     // Allocate memory
@@ -130,13 +130,13 @@ MemRef SlabAlloc::Alloc(size_t size)
     if (!slab) return MemRef(NULL, 0);
 
     // Add to slab table
-    Slabs::Cursor s = m_slabs.Add();
+    Slabs::Cursor s = m_slabs.add();
     s.offset = slabsBack + newsize;
     s.pointer = (intptr_t)slab;
 
     // Update free list
     const size_t rest = newsize - size;
-    FreeSpace::Cursor f = m_freeSpace.Add();
+    FreeSpace::Cursor f = m_freeSpace.add();
     f.ref = slabsBack + size;
     f.size = rest;
 
@@ -197,7 +197,7 @@ void SlabAlloc::Free(size_t ref, void* p)
     }
 
     // Else just add to freelist
-    if (!isMerged) m_freeSpace.Add(ref, size);
+    if (!isMerged) m_freeSpace.add(ref, size);
 }
 
 MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
@@ -359,7 +359,7 @@ size_t SlabAlloc::GetTotalSize() const
         return m_baseline;
     }
     else {
-        return TO_REF(m_slabs.Back().offset);
+        return TO_REF(m_slabs.back().offset);
     }
 }
 
@@ -392,7 +392,7 @@ void SlabAlloc::FreeAll(size_t filesize)
         const Slabs::Cursor c = m_slabs[i];
         const size_t size = c.offset - ref;
 
-        m_freeSpace.Add(ref, size);
+        m_freeSpace.add(ref, size);
 
         ref = c.offset;
     }

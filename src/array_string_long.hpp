@@ -16,8 +16,8 @@ public:
     size_t Size() const;
 
     const char* Get(size_t ndx) const;
-    void Add(const char* value);
-    void Add(const char* value, size_t len);
+    void add(const char* value);
+    void add(const char* value, size_t len);
     void Set(size_t ndx, const char* value);
     void Set(size_t ndx, const char* value, size_t len);
     void Insert(size_t ndx, const char* value);

@@ -34,8 +34,8 @@ Table::Table(Allocator& alloc):
     m_spec_set(alloc, NULL, 0),
     m_ref_count(1)
 {
-    m_top.Add(m_spec_set.get_ref());
-    m_top.Add(m_columns.GetRef());
+    m_top.add(m_spec_set.get_ref());
+    m_top.add(m_columns.GetRef());
     m_spec_set.set_parent(&m_top, 0);
     m_columns.SetParent(&m_top, 1);
 }
@@ -119,31 +119,31 @@ void Table::CreateColumns()
             case COLUMN_TYPE_BOOL:
             case COLUMN_TYPE_DATE:
                 newColumn = new Column(COLUMN_NORMAL, alloc);
-                m_columns.Add(((Column*)newColumn)->GetRef());
+                m_columns.add(((Column*)newColumn)->GetRef());
                 ((Column*)newColumn)->SetParent(&m_columns, ref_pos);
                 break;
             case COLUMN_TYPE_STRING:
                 newColumn = new AdaptiveStringColumn(alloc);
-                m_columns.Add(((AdaptiveStringColumn*)newColumn)->GetRef());
+                m_columns.add(((AdaptiveStringColumn*)newColumn)->GetRef());
                 ((Column*)newColumn)->SetParent(&m_columns, ref_pos);
                 break;
             case COLUMN_TYPE_BINARY:
                 newColumn = new ColumnBinary(alloc);
-                m_columns.Add(((ColumnBinary*)newColumn)->GetRef());
+                m_columns.add(((ColumnBinary*)newColumn)->GetRef());
                 ((ColumnBinary*)newColumn)->SetParent(&m_columns, ref_pos);
                 break;
             case COLUMN_TYPE_TABLE:
             {
                 const size_t subspec_ref = m_spec_set.get_subspec_ref(subtable_count);
                 newColumn = new ColumnTable(subspec_ref, NULL, 0, alloc, this);
-                m_columns.Add(((ColumnTable*)newColumn)->GetRef());
+                m_columns.add(((ColumnTable*)newColumn)->GetRef());
                 ((ColumnTable*)newColumn)->SetParent(&m_columns, ref_pos);
                 ++subtable_count;
             }
                 break;
             case COLUMN_TYPE_MIXED:
                 newColumn = new ColumnMixed(alloc, this);
-                m_columns.Add(((ColumnMixed*)newColumn)->GetRef());
+                m_columns.add(((ColumnMixed*)newColumn)->GetRef());
                 ((ColumnMixed*)newColumn)->SetParent(&m_columns, ref_pos);
                 break;
 
@@ -161,13 +161,13 @@ void Table::CreateColumns()
         if (attr != COLUMN_ATTR_NONE) {
             assert(false); //TODO: 
             //const index_ref = newColumn->CreateIndex(attr);
-            //m_columns.Add(index_ref); 
+            //m_columns.add(index_ref); 
 
             attr = COLUMN_ATTR_NONE;
         }
 
         // Cache Columns
-        m_cols.Add((intptr_t)newColumn);
+        m_cols.add((intptr_t)newColumn);
     }
 }
 
@@ -254,7 +254,7 @@ void Table::CacheColumns()
                 assert(false);
         }
 
-        m_cols.Add((intptr_t)newColumn);
+        m_cols.add((intptr_t)newColumn);
 		
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
@@ -407,22 +407,22 @@ size_t Table::add_column(ColumnType type, const char* name)
     case COLUMN_TYPE_BOOL:
     case COLUMN_TYPE_DATE:
         newColumn = new Column(COLUMN_NORMAL, alloc);
-        m_columns.Add(((Column*)newColumn)->GetRef());
+        m_columns.add(((Column*)newColumn)->GetRef());
         ((Column*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
         break;
     case COLUMN_TYPE_STRING:
         newColumn = new AdaptiveStringColumn(alloc);
-        m_columns.Add(((AdaptiveStringColumn*)newColumn)->GetRef());
+        m_columns.add(((AdaptiveStringColumn*)newColumn)->GetRef());
         ((Column*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
         break;
     case COLUMN_TYPE_BINARY:
         newColumn = new ColumnBinary(alloc);
-        m_columns.Add(((ColumnBinary*)newColumn)->GetRef());
+        m_columns.add(((ColumnBinary*)newColumn)->GetRef());
         ((ColumnBinary*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
         break;
     case COLUMN_TYPE_MIXED:
         newColumn = new ColumnMixed(alloc, this);
-        m_columns.Add(((ColumnMixed*)newColumn)->GetRef());
+        m_columns.add(((ColumnMixed*)newColumn)->GetRef());
         ((ColumnMixed*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
         break;
     default:
@@ -430,7 +430,7 @@ size_t Table::add_column(ColumnType type, const char* name)
     }
 
     m_spec_set.add_column(type, name);
-    m_cols.Add((intptr_t)newColumn);
+    m_cols.add((intptr_t)newColumn);
 
     return column_ndx;
 }
@@ -453,7 +453,7 @@ void Table::set_index(size_t column_ndx)
         Column& c = static_cast<Column&>(col);
         Index* index = new Index();
         c.BuildIndex(*index);
-        m_columns.Add((intptr_t)index->GetRef());
+        m_columns.add((intptr_t)index->GetRef());
     }
     else {
         assert(false);
@@ -560,7 +560,7 @@ size_t Table::add_empty_row()
     const size_t count = get_column_count();
     for (size_t i = 0; i < count; ++i) {
         ColumnBase& column = GetColumnBase(i);
-        column.Add();
+        column.add();
     }
 
     return m_size++;
@@ -659,7 +659,7 @@ size_t Table::get_subtable_size(size_t column_ndx, size_t ndx) const
     return subtables.get_subtable_size(ndx);
 }
 
-int64_t Table::Get(size_t column_ndx, size_t ndx) const
+int64_t Table::get_int(size_t column_ndx, size_t ndx) const
 {
     assert(column_ndx < get_column_count());
     assert(ndx < m_size);
@@ -668,7 +668,7 @@ int64_t Table::Get(size_t column_ndx, size_t ndx) const
     return column.Get(ndx);
 }
 
-void Table::Set(size_t column_ndx, size_t ndx, int64_t value)
+void Table::set_int(size_t column_ndx, size_t ndx, int64_t value)
 {
     assert(column_ndx < get_column_count());
     assert(ndx < m_size);
@@ -853,7 +853,7 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
 
     switch (type) {
         case COLUMN_TYPE_INT:
-            column.SetInt(ndx, value.Get());
+            column.SetInt(ndx, value.get_int());
             break;
         case COLUMN_TYPE_BOOL:
             column.set_bool(ndx, value.get_bool());
@@ -887,7 +887,7 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
 
     switch (type) {
         case COLUMN_TYPE_INT:
-            column.insert_int(ndx, value.Get());
+            column.insert_int(ndx, value.get_int());
             break;
         case COLUMN_TYPE_BOOL:
             column.insert_bool(ndx, value.get_bool());
@@ -928,7 +928,7 @@ int64_t Table::sum(size_t column_ndx) const
     int64_t sum = 0;
 
     for(size_t i = 0; i < size(); ++i)
-        sum += Get(column_ndx, i);
+        sum += get_int(column_ndx, i);
 
     return sum;
 }
@@ -937,9 +937,9 @@ int64_t Table::maximum(size_t column_ndx) const
 {
     if (is_empty()) return 0;
 
-    int64_t mv = Get(column_ndx, 0);
+    int64_t mv = get_int(column_ndx, 0);
     for (size_t i = 1; i < size(); ++i) {
-        const int64_t v = Get(column_ndx, i);
+        const int64_t v = get_int(column_ndx, i);
         if (v > mv) {
             mv = v;
         }
@@ -951,9 +951,9 @@ int64_t Table::minimum(size_t column_ndx) const
 {
     if (is_empty()) return 0;
 
-    int64_t mv = Get(column_ndx, 0);
+    int64_t mv = get_int(column_ndx, 0);
     for (size_t i = 1; i < size(); ++i) {
-        const int64_t v = Get(column_ndx, i);
+        const int64_t v = get_int(column_ndx, i);
         if (v < mv) {
             mv = v;
         }
@@ -1159,7 +1159,7 @@ void Table::to_json(std::ostream& out)
             const ColumnType type = get_column_type(i);
             switch (type) {
                 case COLUMN_TYPE_INT:
-                    out << Get(i, r);
+                    out << get_int(i, r);
                     break;
                 case COLUMN_TYPE_BOOL:
                     out << (get_bool(i, r) ? "true" : "false");
@@ -1192,20 +1192,20 @@ void Table::to_json(std::ostream& out)
                 }
                 case COLUMN_TYPE_TABLE:
                 {
-                    get_table(i, r)->to_json(out);
+                    get_subtable(i, r)->to_json(out);
                     break;
                 }
                 case COLUMN_TYPE_MIXED:
                 {
                     const ColumnType mtype = get_mixed_type(i, r);
                     if (mtype == COLUMN_TYPE_TABLE) {
-                        get_table(i, r)->to_json(out);
+                        get_subtable(i, r)->to_json(out);
                     }
                     else {
                         const Mixed m = get_mixed(i, r);
                         switch (mtype) {
                             case COLUMN_TYPE_INT:
-                                out << m.Get();
+                                out << m.get_int();
                                 break;
                             case COLUMN_TYPE_BOOL:
                                 out << m.get_bool();

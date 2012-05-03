@@ -13,7 +13,7 @@ TableView::~TableView()
     m_refs.Destroy();
 }
 
-Table* TableView::get_table()
+Table* TableView::get_subtable()
 {
     return &m_table;
 }
@@ -25,7 +25,7 @@ size_t TableView::Find(size_t column_ndx, int64_t value) const
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
 
     for(size_t i = 0; i < m_refs.Size(); i++)
-        if(Get(column_ndx, i) == value)
+        if(get_int(column_ndx, i) == value)
             return i;
 
     return (size_t)-1;
@@ -37,8 +37,8 @@ void TableView::FindAll(TableView& tv, size_t column_ndx, int64_t value)
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
 
     for(size_t i = 0; i < m_refs.Size(); i++)
-        if(Get(column_ndx, i) == value)
-            tv.GetRefColumn().Add(i);
+        if(get_int(column_ndx, i) == value)
+            tv.GetRefColumn().add(i);
 }
 
 size_t TableView::FindString(size_t column_ndx, const char* value) const
@@ -61,7 +61,7 @@ void TableView::FindAllString(TableView& tv, size_t column_ndx, const char* valu
 
     for(size_t i = 0; i < m_refs.Size(); i++)
     if(strcmp(get_string(column_ndx, i), value) == 0)
-        tv.GetRefColumn().Add(i);
+        tv.GetRefColumn().add(i);
 }
 
 int64_t TableView::sum(size_t column_ndx) const
@@ -71,7 +71,7 @@ int64_t TableView::sum(size_t column_ndx) const
     int64_t sum = 0;
 
     for(size_t i = 0; i < m_refs.Size(); i++)
-        sum += Get(column_ndx, i);
+        sum += get_int(column_ndx, i);
 
     return sum;
 }
@@ -81,9 +81,9 @@ int64_t TableView::maximum(size_t column_ndx) const
     if (is_empty()) return 0;
     if (m_refs.Size() == 0) return 0;
 
-    int64_t mv = Get(column_ndx, 0);
+    int64_t mv = get_int(column_ndx, 0);
     for (size_t i = 1; i < m_refs.Size(); ++i) {
-        const int64_t v = Get(column_ndx, i);
+        const int64_t v = get_int(column_ndx, i);
         if (v > mv) {
             mv = v;
         }
@@ -96,9 +96,9 @@ int64_t TableView::minimum(size_t column_ndx) const
     if (is_empty()) return 0;
     if (m_refs.Size() == 0) return 0;
 
-    int64_t mv = Get(column_ndx, 0);
+    int64_t mv = get_int(column_ndx, 0);
     for (size_t i = 1; i < m_refs.Size(); ++i) {
-        const int64_t v = Get(column_ndx, i);
+        const int64_t v = get_int(column_ndx, i);
         if (v < mv) {
             mv = v;
         }
@@ -106,14 +106,14 @@ int64_t TableView::minimum(size_t column_ndx) const
     return mv;
 }
 
-int64_t TableView::Get(size_t column_ndx, size_t ndx) const
+int64_t TableView::get_int(size_t column_ndx, size_t ndx) const
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
     assert(ndx < m_refs.Size());
 
     const size_t real_ndx = m_refs.GetAsRef(ndx);
-    return m_table.Get(column_ndx, real_ndx);
+    return m_table.get_int(column_ndx, real_ndx);
 }
 
 bool TableView::get_bool(size_t column_ndx, size_t ndx) const
@@ -160,24 +160,24 @@ Mixed TableView::get_mixed(std::size_t column_ndx, std::size_t ndx) const
     return m_table.get_mixed(column_ndx, real_ndx);
 }
 
-TableRef TableView::get_table(size_t column_ndx, size_t ndx)
+TableRef TableView::get_subtable(size_t column_ndx, size_t ndx)
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_TABLE);
     assert(ndx < m_refs.Size());
 
     const size_t real_ndx = m_refs.GetAsRef(ndx);
-    return m_table.get_table(column_ndx, real_ndx);
+    return m_table.get_subtable(column_ndx, real_ndx);
 }
 
-void TableView::Set(size_t column_ndx, size_t ndx, int64_t value)
+void TableView::set_int(size_t column_ndx, size_t ndx, int64_t value)
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
     assert(ndx < m_refs.Size());
 
     const size_t real_ndx = m_refs.GetAsRef(ndx);
-    m_table.Set(column_ndx, real_ndx, value);
+    m_table.set_int(column_ndx, real_ndx, value);
 }
 
 void TableView::set_bool(size_t column_ndx, size_t ndx, bool value)
@@ -238,28 +238,28 @@ void TableView::Sort(size_t column, bool Ascending)
 
     //ref.Preset(0, m_refs.Size() - 1, m_refs.Size());
     for(size_t t = 0; t < m_refs.Size(); t++)
-        ref.Add(t);
+        ref.add(t);
 
     // Extract all values from the Column and put them in an Array because Array is much faster to operate on
     // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
     if(m_table.get_column_type(column) == COLUMN_TYPE_INT) {
         for(size_t t = 0; t < m_refs.Size(); t++) {
-            int64_t v = m_table.Get(column, m_refs.GetAsRef(t));
-            vals.Add(v);
+            int64_t v = m_table.get_int(column, m_refs.GetAsRef(t));
+            vals.add(v);
         }
     }
     else if(m_table.get_column_type(column) == COLUMN_TYPE_DATE) {
         for(size_t t = 0; t < m_refs.Size(); t++) {
             size_t idx = m_refs.GetAsRef(t);
             int64_t v = (int64_t)m_table.get_date(column, idx);
-            vals.Add(v);
+            vals.add(v);
         }
     }
     else if(m_table.get_column_type(column) == COLUMN_TYPE_BOOL) {
         for(size_t t = 0; t < m_refs.Size(); t++) {
             size_t idx = m_refs.GetAsRef(t);
             int64_t v = (int64_t)m_table.get_bool(column, idx);
-            vals.Add(v);
+            vals.add(v);
         }
     }
 
@@ -269,7 +269,7 @@ void TableView::Sort(size_t column, bool Ascending)
     for(size_t t = 0; t < m_refs.Size(); t++) {
         size_t r = ref.GetAsRef(t);
         size_t rr = m_refs.GetAsRef(r);
-        result.Add(rr);
+        result.add(rr);
     }
 
     ref.Destroy();
@@ -279,13 +279,13 @@ void TableView::Sort(size_t column, bool Ascending)
     if(Ascending) {
         for(size_t t = 0; t < ref.Size(); t++) {
             size_t v = result.GetAsRef(t);
-            m_refs.Add(v);
+            m_refs.add(v);
         }
     }
     else {
         for(size_t t = 0; t < ref.Size(); t++) {
             size_t v = result.GetAsRef(ref.Size() - t - 1);
-                m_refs.Add(v);
+                m_refs.add(v);
         }
     }
     result.Destroy();

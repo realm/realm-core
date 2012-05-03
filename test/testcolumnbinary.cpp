@@ -11,12 +11,12 @@ ColumnBinary db_setup_column_binary::c;
 
 TEST_FIXTURE(db_setup_column_binary, ColumnBinaryMultiEmpty)
 {
-    c.Add("", 0);
-    c.Add("", 0);
-    c.Add("", 0);
-    c.Add(NULL, 0);
-    c.Add(NULL, 0);
-    c.Add(NULL, 0);
+    c.add("", 0);
+    c.add("", 0);
+    c.add("", 0);
+    c.add(NULL, 0);
+    c.add(NULL, 0);
+    c.add(NULL, 0);
 
     CHECK_EQUAL(6, c.Size());
 
@@ -48,12 +48,12 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryAdd)
     c.Clear();
     CHECK_EQUAL(0, c.Size());
 
-    c.Add("abc", 4);
+    c.add("abc", 4);
     CHECK_EQUAL("abc", c.GetData(0)); // single
     CHECK_EQUAL(4, c.GetLen(0));
     CHECK_EQUAL(1, c.Size());
 
-    c.Add("defg", 5); //non-empty
+    c.add("defg", 5); //non-empty
     CHECK_EQUAL("abc", c.GetData(0));
     CHECK_EQUAL("defg", c.GetData(1));
     CHECK_EQUAL(4, c.GetLen(0));
@@ -66,7 +66,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2)
     // {shrink, grow} x {first, middle, last, single}
     c.Clear();
 
-    c.Add("abc", 4);
+    c.add("abc", 4);
     c.Set(0, "de", 3); // shrink single
     CHECK_EQUAL("de", c.GetData(0));
     CHECK_EQUAL(1, c.Size());
@@ -75,7 +75,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2)
     CHECK_EQUAL("abcd", c.GetData(0));
     CHECK_EQUAL(1, c.Size());
 
-    c.Add("efg", 4);
+    c.add("efg", 4);
     CHECK_EQUAL("abcd", c.GetData(0));
     CHECK_EQUAL("efg", c.GetData(1));
     CHECK_EQUAL(2, c.Size());
@@ -90,7 +90,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2)
     CHECK_EQUAL("jklmno", c.GetData(1));
     CHECK_EQUAL(2, c.Size());
 
-    c.Add("pq", 3);
+    c.add("pq", 3);
     c.Set(1, "efghijkl", 9); // grow middle
     CHECK_EQUAL("abcd", c.GetData(0));
     CHECK_EQUAL("efghijkl", c.GetData(1));
@@ -164,11 +164,11 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
 {
     c.Clear();
 
-    c.Add("a", 2);
-    c.Add("bc", 3);
-    c.Add("def", 4);
-    c.Add("ghij", 5);
-    c.Add("klmno", 6);
+    c.add("a", 2);
+    c.add("bc", 3);
+    c.add("def", 4);
+    c.add("ghij", 5);
+    c.add("klmno", 6);
 
     c.Delete(0); // first
     CHECK_EQUAL("bc", c.GetData(0));

@@ -14,7 +14,7 @@ public:
 
     const char* Get(size_t pos) const;
 
-    void Add(const char* data, size_t len);
+    void add(const char* data, size_t len);
     void Insert(size_t pos, const char* data, size_t len);
     void Replace(size_t start, size_t end, const char* data, size_t len);
     void Delete(size_t start, size_t end);

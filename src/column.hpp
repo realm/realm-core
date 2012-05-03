@@ -28,7 +28,7 @@ public:
     virtual bool IsStringColumn() const {return false;}
     virtual bool IsBinaryColumn() const {return false;}
 
-    virtual bool Add() = 0;
+    virtual bool add() = 0;
     virtual void Clear() = 0;
     virtual void Delete(size_t ndx) = 0;
     void Resize(size_t ndx) {m_array->Resize(ndx);}
@@ -128,8 +128,8 @@ public:
     size_t GetAsRef(size_t ndx) const;
     bool Set(size_t ndx, int64_t value);
     bool Insert(size_t ndx, int64_t value);
-    bool Add() {return Add(0);}
-    bool Add(int64_t value);
+    bool add() {return add(0);}
+    bool add(int64_t value);
 
     int64_t sum(size_t start = 0, size_t end = -1) const;
     int64_t maximum(size_t start = 0, size_t end = -1) const;

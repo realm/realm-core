@@ -34,7 +34,7 @@ public:
 
     ColumnType get_type() const {return m_type;}
 
-    int64_t     Get()    const {assert(m_type == COLUMN_TYPE_INT);    return m_int;}
+    int64_t     get_int()    const {assert(m_type == COLUMN_TYPE_INT);    return m_int;}
     bool        get_bool()   const {assert(m_type == COLUMN_TYPE_BOOL);   return m_bool;}
     std::time_t get_date()   const {assert(m_type == COLUMN_TYPE_DATE);   return m_date;}
     const char* get_string() const {assert(m_type == COLUMN_TYPE_STRING); return m_str;}

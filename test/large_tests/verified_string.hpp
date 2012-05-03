@@ -14,7 +14,7 @@ class VerifiedString {
     std::vector<std::string> v;
     tightdb::AdaptiveStringColumn u;
 public:
-    void Add(const char *value);
+    void add(const char *value);
     void Insert(std::size_t ndx, const char *value);
     const char *Get(std::size_t ndx);
     void Set(std::size_t ndx, const char *value);

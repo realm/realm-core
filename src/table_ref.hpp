@@ -18,8 +18,8 @@ namespace tightdb {
  *
  *   void func(Table& table)
  *   {
- *     Table& sub1 = *table.get_table(0,0); // INVALID! (sub1 becomes 'dangeling')
- *     TableRef sub2 = table.get_table(0,0); // Safe!
+ *     Table& sub1 = *table.get_subtable(0,0); // INVALID! (sub1 becomes 'dangeling')
+ *     TableRef sub2 = table.get_subtable(0,0); // Safe!
  *   }
  *
  * \endcode

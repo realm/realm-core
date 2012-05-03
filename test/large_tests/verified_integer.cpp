@@ -25,10 +25,10 @@ void VerifiedInteger::VerifyNeighbours(size_t ndx)
         assert(v[ndx + 1] == u.Get(ndx + 1));
 }
 
-void VerifiedInteger::Add(int64_t value)
+void VerifiedInteger::add(int64_t value)
 {
     v.push_back(value);
-    u.Add(value);
+    u.add(value);
     assert(v.size() == u.Size());
     VerifyNeighbours(v.size());
     assert(ConditionalVerify());

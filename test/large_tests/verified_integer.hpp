@@ -12,7 +12,7 @@ class VerifiedInteger {
     std::vector<int64_t> v;
     tightdb::Column u;
 public:
-    void Add(int64_t value);
+    void add(int64_t value);
     void Insert(std::size_t ndx, int64_t value);
     void Insert(std::size_t ndx, const char *value);
     int64_t Get(std::size_t ndx);

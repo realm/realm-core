@@ -73,7 +73,7 @@ public:
     void insert_binary(size_t ndx, const char* value, size_t len);
     void insert_table(size_t ndx);
 
-    bool Add();
+    bool add();
     void Clear();
     void Delete(size_t ndx);
 

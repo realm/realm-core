@@ -96,9 +96,9 @@ template<class T> BasicTableRef<T> Group::get_table(const char* name)
         t->m_top.SetParent(this, m_tables.Size());
 
         const size_t ref = t->m_top.GetRef();
-        m_tables.Add(ref);
-        m_tableNames.Add(name);
-        m_cachedtables.Add(intptr_t(t));
+        m_tables.add(ref);
+        m_tableNames.add(name);
+        m_cachedtables.add(intptr_t(t));
 
         return t->get_table_ref();
     }

@@ -43,7 +43,7 @@ const char* ColumnStringEnum::Get(size_t ndx) const
     return m_keys.Get(key_ndx);
 }
 
-bool ColumnStringEnum::Add(const char* value)
+bool ColumnStringEnum::add(const char* value)
 {
     return Insert(Column::Size(), value);
 }
@@ -123,7 +123,7 @@ size_t ColumnStringEnum::GetKeyNdxOrAdd(const char* value)
     else {
         // Add key if it does not exist
         const size_t pos = m_keys.Size();
-        m_keys.Add(value);
+        m_keys.add(value);
         return pos;
     }
 }

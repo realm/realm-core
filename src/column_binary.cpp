@@ -79,7 +79,7 @@ size_t ColumnBinary::Size() const
 {
     if (IsNode())  {
         const Array offsets = NodeGetOffsets();
-        const size_t size = offsets.is_empty() ? 0 : (size_t)offsets.Back();
+        const size_t size = offsets.is_empty() ? 0 : (size_t)offsets.back();
         return size;
     }
     else {
@@ -139,12 +139,12 @@ bool ColumnBinary::Set(size_t ndx, BinaryData bin)
     return TreeSet<BinaryData,ColumnBinary>(ndx, bin);
 }
 
-void ColumnBinary::Add(const char* value, size_t len)
+void ColumnBinary::add(const char* value, size_t len)
 {
     Insert(Size(), value, len);
 }
 
-bool ColumnBinary::Add(BinaryData bin)
+bool ColumnBinary::add(BinaryData bin)
 {
     return Insert(Size(), bin);
 }

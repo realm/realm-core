@@ -49,25 +49,25 @@ public:
         delete first[0];
     }
 
-    Query& Equal(size_t column_ndx, int64_t value)
+    Query& equal(size_t column_ndx, int64_t value)
     {
         ParentNode* const p = new NODE<int64_t, Column, EQUAL>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& NotEqual(size_t column_ndx, int64_t value)
+    Query& not_equal(size_t column_ndx, int64_t value)
     {
         ParentNode* const p = new NODE<int64_t, Column, NOTEQUAL>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& Greater(size_t column_ndx, int64_t value)
+    Query& greater(size_t column_ndx, int64_t value)
     {
         ParentNode* const p = new NODE<int64_t, Column, GREATER>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& GreaterEqual(size_t column_ndx, int64_t value)
+    Query& greater_equal(size_t column_ndx, int64_t value)
     {
         if(value > LLONG_MIN) {
             ParentNode* const p = new NODE<int64_t, Column, GREATER>(value - 1, column_ndx);
@@ -76,7 +76,7 @@ public:
         // field >= LLONG_MIN has no effect
         return *this;
     };
-    Query& LessEqual(size_t column_ndx, int64_t value)
+    Query& less_equal(size_t column_ndx, int64_t value)
     {
         if(value < LLONG_MAX) {
             ParentNode* const p = new NODE<int64_t, Column, LESS>(value + 1, column_ndx);
@@ -85,20 +85,20 @@ public:
         // field <= LLONG_MAX has no effect
         return *this;
     };
-    Query& Less(size_t column_ndx, int64_t value)
+    Query& less(size_t column_ndx, int64_t value)
     {
         ParentNode* const p = new NODE<int64_t, Column, LESS>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
 
-    Query& Between(size_t column_ndx, int64_t from, int64_t to)
+    Query& between(size_t column_ndx, int64_t from, int64_t to)
     {
-        GreaterEqual(column_ndx, from);
-        LessEqual(column_ndx, to);
+        greater_equal(column_ndx, from);
+        less_equal(column_ndx, to);
         return *this;
     };
-    Query& Equal(size_t column_ndx, bool value)
+    Query& equal(size_t column_ndx, bool value)
     {
         ParentNode* const p = new NODE<bool, Column, EQUAL>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
@@ -107,7 +107,7 @@ public:
 
 
     // STRINGS
-    Query& Equal(size_t column_ndx, const char* value, bool caseSensitive=true)
+    Query& equal(size_t column_ndx, const char* value, bool caseSensitive=true)
     {
         ParentNode* p;
         if(caseSensitive)
@@ -117,7 +117,7 @@ public:
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& BeginsWith(size_t column_ndx, const char* value, bool caseSensitive=true)
+    Query& begins_with(size_t column_ndx, const char* value, bool caseSensitive=true)
     {
         ParentNode* p;
         if(caseSensitive)
@@ -127,7 +127,7 @@ public:
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& EndsWith(size_t column_ndx, const char* value, bool caseSensitive=true)
+    Query& ends_with(size_t column_ndx, const char* value, bool caseSensitive=true)
     {
         ParentNode* p;
         if(caseSensitive)
@@ -137,7 +137,7 @@ public:
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& Contains(size_t column_ndx, const char* value, bool caseSensitive=true)
+    Query& contains(size_t column_ndx, const char* value, bool caseSensitive=true)
     {
         ParentNode* p;
         if(caseSensitive)
@@ -147,7 +147,7 @@ public:
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& NotEqual(size_t column_ndx, const char* value, bool caseSensitive=true)
+    Query& not_equal(size_t column_ndx, const char* value, bool caseSensitive=true)
     {
         ParentNode* p;
         if(caseSensitive)
@@ -158,13 +158,13 @@ public:
         return *this;
     };
 
-    void LeftParan()
+    void group()
     {
         update.push_back(0);
         update_override.push_back(0);
         first.push_back(0);
     };
-    void Or()
+    void or()
     {
         ParentNode* const o = new OR_NODE(first[first.size()-1]);
         first[first.size()-1] = o;
@@ -179,12 +179,12 @@ public:
         UpdatePointers(p, &p->m_child);
         // once subtable conditions have been evaluated, resume evaluation from m_child2
         subtables.push_back(&((SUBTABLE*)p)->m_child2);
-        LeftParan();
+        group();
     }
 
-    void Parent()
+    void parent()
     {
-        RightParan();
+        end_group();
 
         if (update[update.size()-1] != 0)
             update[update.size()-1] = subtables[subtables.size()-1];
@@ -192,7 +192,7 @@ public:
         subtables.pop_back();
     }
 
-    void RightParan()
+    void end_group()
     {
         if(first.size() < 2) {
             error_code = "Unbalanced blockBegin/blockEnd";
@@ -242,7 +242,7 @@ public:
         // User created query with no criteria; return everything
         if(first[0] == 0) {
             for(size_t i = start; i < end; i++)
-                tv.GetRefColumn().Add(i);
+                tv.GetRefColumn().add(i);
         }
         else if(m_threadcount > 0) {
             // Use multithreading
@@ -257,7 +257,7 @@ public:
                 r = first[0]->Find(r + 1, table_size);
                 if (r == table_size || tv.size() == limit)
                     break;
-                tv.GetRefColumn().Add(r);
+                tv.GetRefColumn().add(r);
             }
         }
     }
@@ -300,7 +300,7 @@ public:
             r = FindInternal(table, r + 1, end);
             if (r == size_t(-1) || r == table.size() || results == limit)
                 break;
-            const int64_t g = table.Get(column, r);
+            const int64_t g = table.get_int(column, r);
             if (results == 0 || g > max)
                 max = g;
             results++;
@@ -323,7 +323,7 @@ public:
             r = FindInternal(table, r + 1, end);
             if (r == size_t(-1) || r == table.size() || results == limit)
                 break;
-            const int64_t g = table.Get(column, r);
+            const int64_t g = table.get_int(column, r);
             if (results == 0 || g < min)
                 min = g;
             ++results;
@@ -410,7 +410,7 @@ public:
             size_t first = ts.chunks[i].second;
 
             while(first < ts.results.size() && ts.results[first] < upto && ts.results[first] >= from) {
-                tv.GetRefColumn().Add(ts.results[first]);
+                tv.GetRefColumn().add(ts.results[first]);
                 ++first;
             }
         }
