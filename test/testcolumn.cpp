@@ -22,14 +22,14 @@ TEST_FIXTURE(db_setup, Column_IsEmpty)
 
 TEST_FIXTURE(db_setup, Column_Add0)
 {
-    c.Add(0);
+    c.add(0);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Size(), (size_t)1);
 }
 
 TEST_FIXTURE(db_setup, Column_Add1)
 {
-    c.Add(1);
+    c.add(1);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Size(), 2);
@@ -37,7 +37,7 @@ TEST_FIXTURE(db_setup, Column_Add1)
 
 TEST_FIXTURE(db_setup, Column_Add2)
 {
-    c.Add(2);
+    c.add(2);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
@@ -46,7 +46,7 @@ TEST_FIXTURE(db_setup, Column_Add2)
 
 TEST_FIXTURE(db_setup, Column_Add3)
 {
-    c.Add(3);
+    c.add(3);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
@@ -56,7 +56,7 @@ TEST_FIXTURE(db_setup, Column_Add3)
 
 TEST_FIXTURE(db_setup, Column_Add4)
 {
-    c.Add(4);
+    c.add(4);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
@@ -67,7 +67,7 @@ TEST_FIXTURE(db_setup, Column_Add4)
 
 TEST_FIXTURE(db_setup, Column_Add5)
 {
-    c.Add(16);
+    c.add(16);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
@@ -79,7 +79,7 @@ TEST_FIXTURE(db_setup, Column_Add5)
 
 TEST_FIXTURE(db_setup, Column_Add6)
 {
-    c.Add(256);
+    c.add(256);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
@@ -92,7 +92,7 @@ TEST_FIXTURE(db_setup, Column_Add6)
 
 TEST_FIXTURE(db_setup, Column_Add7)
 {
-    c.Add(65536);
+    c.add(65536);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
@@ -106,7 +106,7 @@ TEST_FIXTURE(db_setup, Column_Add7)
 
 TEST_FIXTURE(db_setup, Column_Add8)
 {
-    c.Add(4294967296LL);
+    c.add(4294967296LL);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
@@ -122,7 +122,7 @@ TEST_FIXTURE(db_setup, Column_Add8)
 TEST_FIXTURE(db_setup, Column_AddNeg1)
 {
     c.Clear();
-    c.Add(-1);
+    c.add(-1);
 
     CHECK_EQUAL(c.Size(), 1);
     CHECK_EQUAL(c.Get(0), -1);
@@ -130,7 +130,7 @@ TEST_FIXTURE(db_setup, Column_AddNeg1)
 
 TEST_FIXTURE(db_setup, Column_AddNeg2)
 {
-    c.Add(-256);
+    c.add(-256);
 
     CHECK_EQUAL(c.Size(), 2);
     CHECK_EQUAL(c.Get(0), -1);
@@ -139,7 +139,7 @@ TEST_FIXTURE(db_setup, Column_AddNeg2)
 
 TEST_FIXTURE(db_setup, Column_AddNeg3)
 {
-    c.Add(-65536);
+    c.add(-65536);
 
     CHECK_EQUAL(c.Size(), 3);
     CHECK_EQUAL(c.Get(0), -1);
@@ -149,7 +149,7 @@ TEST_FIXTURE(db_setup, Column_AddNeg3)
 
 TEST_FIXTURE(db_setup, Column_AddNeg4)
 {
-    c.Add(-4294967296LL);
+    c.add(-4294967296LL);
 
     CHECK_EQUAL(c.Size(), 4);
     CHECK_EQUAL(c.Get(0), -1);
@@ -176,10 +176,10 @@ TEST_FIXTURE(db_setup, Column_Insert1)
 {
     // Set up some initial values
     c.Clear();
-    c.Add(0);
-    c.Add(1);
-    c.Add(2);
-    c.Add(3);
+    c.add(0);
+    c.add(1);
+    c.add(2);
+    c.add(3);
 
     // Insert in middle
     c.Insert(2, 16);
@@ -304,8 +304,8 @@ TEST_FIXTURE(db_setup, Column_Find2)
 {
     // zero-bit width
     c.Clear();
-    c.Add(0);
-    c.Add(0);
+    c.add(0);
+    c.add(0);
 
     size_t res = c.Find(0);
     CHECK_EQUAL(res, 0);
@@ -314,7 +314,7 @@ TEST_FIXTURE(db_setup, Column_Find2)
 TEST_FIXTURE(db_setup, Column_Find3)
 {
     // expand to 1-bit width
-    c.Add(1);
+    c.add(1);
 
     size_t res = c.Find(1);
     CHECK_EQUAL(res, 2);
@@ -323,7 +323,7 @@ TEST_FIXTURE(db_setup, Column_Find3)
 TEST_FIXTURE(db_setup, Column_Find4)
 {
     // expand to 2-bit width
-    c.Add(2);
+    c.add(2);
 
     size_t res = c.Find(2);
     CHECK_EQUAL(res, 3);
@@ -332,7 +332,7 @@ TEST_FIXTURE(db_setup, Column_Find4)
 TEST_FIXTURE(db_setup, Column_Find5)
 {
     // expand to 4-bit width
-    c.Add(4);
+    c.add(4);
 
     size_t res = c.Find(4);
     CHECK_EQUAL(res, 4);
@@ -341,12 +341,12 @@ TEST_FIXTURE(db_setup, Column_Find5)
 TEST_FIXTURE(db_setup, Column_Find6)
 {
     // expand to 8-bit width
-    c.Add(16);
+    c.add(16);
 
     // Add some more to make sure we
     // can search in 64bit chunks
-    c.Add(16);
-    c.Add(7);
+    c.add(16);
+    c.add(7);
 
     size_t res = c.Find(7);
     CHECK_EQUAL(7, res);
@@ -355,7 +355,7 @@ TEST_FIXTURE(db_setup, Column_Find6)
 TEST_FIXTURE(db_setup, Column_Find7)
 {
     // expand to 16-bit width
-    c.Add(256);
+    c.add(256);
 
     size_t res = c.Find(256);
     CHECK_EQUAL(8, res);
@@ -364,7 +364,7 @@ TEST_FIXTURE(db_setup, Column_Find7)
 TEST_FIXTURE(db_setup, Column_Find8)
 {
     // expand to 32-bit width
-    c.Add(65536);
+    c.add(65536);
 
     size_t res = c.Find(65536);
     CHECK_EQUAL(9, res);
@@ -373,7 +373,7 @@ TEST_FIXTURE(db_setup, Column_Find8)
 TEST_FIXTURE(db_setup, Column_Find9)
 {
     // expand to 64-bit width
-    c.Add(4294967296LL);
+    c.add(4294967296LL);
 
     size_t res = c.Find(4294967296LL);
     CHECK_EQUAL(10, res);
@@ -386,7 +386,7 @@ TEST_FIXTURE(db_setup, Column_PartialFind1)
     c.Clear();
 
     for (size_t i = 0; i < PARTIAL_COUNT; ++i) {
-        c.Add(i);
+        c.add(i);
     }
 
     CHECK_EQUAL(-1, c.Find(PARTIAL_COUNT+1, 0, PARTIAL_COUNT));
@@ -413,16 +413,16 @@ TEST(Column_Sort)
 {
     // Create Column with random values
     Column a;
-    a.Add(25);
-    a.Add(12);
-    a.Add(50);
-    a.Add(3);
-    a.Add(34);
-    a.Add(0);
-    a.Add(17);
-    a.Add(51);
-    a.Add(2);
-    a.Add(40);
+    a.add(25);
+    a.add(12);
+    a.add(50);
+    a.add(3);
+    a.add(34);
+    a.add(0);
+    a.add(17);
+    a.add(51);
+    a.add(2);
+    a.add(40);
 
     a.Sort();
 
@@ -455,7 +455,7 @@ TEST(Column_FindAll_IntMin)
     const int vReps = 5;
 
     for(int i = 0; i < vReps; i++){
-        c.Add(0);
+        c.add(0);
     }
 
     c.FindAll(r, value);
@@ -484,10 +484,10 @@ TEST(Column_FindAll_IntMax)
 
     for(int i = 0; i < vReps; i++){
         // 64 bitwidth
-        c.Add(4300000000ULL);
-        c.Add(4300000001ULL);
-        c.Add(4300000002ULL);
-        c.Add(4300000003ULL);
+        c.add(4300000000ULL);
+        c.add(4300000001ULL);
+        c.add(4300000002ULL);
+        c.add(4300000003ULL);
     }
 
     c.FindAll(r, value);
@@ -511,8 +511,8 @@ TEST(Column_FindHamming)
 {
     Column col;
     for (size_t i = 0; i < 10; ++i) {
-        col.Add(0x5555555555555555LL);
-        col.Add(0x3333333333333333LL);
+        col.add(0x5555555555555555LL);
+        col.add(0x3333333333333333LL);
     }
 
     Array res;
@@ -535,13 +535,13 @@ TEST(Column_Sum)
     CHECK_EQUAL(0, c.sum());
 
     // Sum of 1 elements
-    c.Add(123);
+    c.add(123);
     CHECK_EQUAL(123, c.sum());
 
     c.Clear();
 
     for(int i = 0; i < 100; i++) {
-        c.Add(i);
+        c.add(i);
     }
 
     // Sum of entire range, using default args
@@ -589,7 +589,7 @@ TEST(Column_Max)
     int64_t t = c.maximum();
     CHECK_EQUAL(0, t); // max on empty range returns zero
 
-    c.Add(1);
+    c.add(1);
     t = c.maximum();
     CHECK_EQUAL(1, t);
 
@@ -602,7 +602,7 @@ TEST(Column_Max2)
     Column c;
 
     for(int i = 0; i < 100; i++) {
-        c.Add(10);
+        c.add(10);
     }
     c.Set(20, 20);
     c.Set(50, 11); // Max must select *first* occurence of largest value
@@ -621,7 +621,7 @@ TEST(Column_Min)
     int64_t t = c.minimum();
     CHECK_EQUAL(0, t); // min on empty range returns zero
 
-    c.Add(1);
+    c.add(1);
     t = c.minimum();
     CHECK_EQUAL(1, t);
 
@@ -634,7 +634,7 @@ TEST(Column_Min2)
     Column c;
 
     for(int i = 0; i < 100; i++) {
-        c.Add(10);
+        c.add(10);
     }
     c.Set(20, 20);
     c.Set(50, 9); // Max must select *first* occurence of lowest value
@@ -653,7 +653,7 @@ TEST(Column_Sort2)
     Column c;
 
     for(size_t t = 0; t < 9*MAX_LIST_SIZE; t++)
-        c.Add(rand() % 300 - 100);
+        c.add(rand() % 300 - 100);
 
     c.Sort();
 

@@ -72,7 +72,7 @@ TEST(ColumnString_monkeytest2)
             }
             else {
                 // Add
-                a.Add(randstring().c_str());
+                a.add(randstring().c_str());
             }
         }
         else if(a.Size() > 0) {

@@ -16,7 +16,7 @@ public:
     bool is_empty() const;
 
     const char* Get(size_t ndx) const;
-    bool Add(const char* value);
+    bool add(const char* value);
     bool Set(size_t ndx, const char* value);
     bool Insert(size_t ndx, const char* value);
     void Delete(size_t ndx);

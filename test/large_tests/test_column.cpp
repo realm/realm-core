@@ -60,7 +60,7 @@ TEST(Column_monkeytest2)
                 }
                 else {
                     // Add
-                    a.Add(l);
+                    a.add(l);
                 }
             }
             else if(a.Size() > 0) {

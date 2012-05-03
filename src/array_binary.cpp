@@ -11,8 +11,8 @@ ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
     m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc)
 {
     // Add subarrays for long string
-    Array::Add(m_offsets.GetRef());
-    Array::Add(m_blob.GetRef());
+    Array::add(m_offsets.GetRef());
+    Array::add(m_blob.GetRef());
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
 }
@@ -23,7 +23,7 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
 {
     assert(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
     assert(Array::Size() == 2);
-    assert(m_blob.Size() ==(size_t)(m_offsets.is_empty() ? 0 : m_offsets.Back()));
+    assert(m_blob.Size() ==(size_t)(m_offsets.is_empty() ? 0 : m_offsets.back()));
 
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
@@ -62,12 +62,12 @@ size_t ArrayBinary::GetLen(size_t ndx) const
     return end - start;
 }
 
-void ArrayBinary::Add(const char* value, size_t len)
+void ArrayBinary::add(const char* value, size_t len)
 {
     assert(len == 0 || value);
 
-    m_blob.Add(value, len);
-    m_offsets.Add(m_offsets.is_empty() ? len : m_offsets.Back() + len);
+    m_blob.add(value, len);
+    m_offsets.add(m_offsets.is_empty() ? len : m_offsets.back() + len);
 }
 
 void ArrayBinary::Set(size_t ndx, const char* value, size_t len)

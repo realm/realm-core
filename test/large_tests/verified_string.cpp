@@ -24,10 +24,10 @@ void VerifiedString::VerifyNeighbours(size_t ndx)
         assert(v[ndx + 1] == u.Get(ndx + 1));
 }
 
-void VerifiedString::Add(const char * value)
+void VerifiedString::add(const char * value)
 {
     v.push_back(value);
-    u.Add(value);
+    u.add(value);
     assert(v.size() == u.Size());
     VerifyNeighbours(v.size());
     assert(ConditionalVerify());

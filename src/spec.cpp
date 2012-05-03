@@ -15,8 +15,8 @@ Spec::Spec(Allocator& alloc, ArrayParent* parent, size_t pndx):
 m_specSet(COLUMN_HASREFS, parent, pndx, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_names(NULL, 0, alloc), m_subSpecs(alloc)
 {
     // The SpecSet contains the specification (types and names) of all columns and sub-tables
-    m_specSet.Add(m_spec.GetRef());
-    m_specSet.Add(m_names.GetRef());
+    m_specSet.add(m_spec.GetRef());
+    m_specSet.add(m_names.GetRef());
     m_spec.SetParent(&m_specSet, 0);
     m_names.SetParent(&m_specSet, 1);
 }
@@ -89,8 +89,8 @@ void Spec::add_column(ColumnType type, const char* name)
 {
     assert(name);
     
-    m_names.Add(name);
-    m_spec.Add(type);
+    m_names.add(name);
+    m_spec.add(type);
     
     if (type == COLUMN_TYPE_TABLE) {
         // SubSpecs array is only there when there are subtables
@@ -98,7 +98,7 @@ void Spec::add_column(ColumnType type, const char* name)
             m_subSpecs.SetType(COLUMN_HASREFS);
             //m_subSpecs.SetType((ColumnDef)4);
             //return;
-            m_specSet.Add(m_subSpecs.GetRef());
+            m_specSet.add(m_subSpecs.GetRef());
             m_subSpecs.SetParent(&m_specSet, 2);
         }
         
@@ -108,12 +108,12 @@ void Spec::add_column(ColumnType type, const char* name)
         Array spec(COLUMN_NORMAL, NULL, 0, alloc);
         ArrayString names(NULL, 0, alloc);
         Array specSet(COLUMN_HASREFS, NULL, 0, alloc);
-        specSet.Add(spec.GetRef());
-        specSet.Add(names.GetRef());
+        specSet.add(spec.GetRef());
+        specSet.add(names.GetRef());
         
         // Add to list of subspecs
         const size_t ref = specSet.GetRef();
-        m_subSpecs.Add(ref);
+        m_subSpecs.add(ref);
     }
 }
 

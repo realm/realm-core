@@ -33,7 +33,7 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const
     return get_size_from_ref(ref_first_col, GetAllocator());
 }
 
-bool ColumnTable::Add()
+bool ColumnTable::add()
 {
     Insert(Size()); // zero-ref indicates empty table
     return true;

@@ -369,7 +369,7 @@ size_t Array::GetAsRef(size_t ndx) const
     return TO_REF(v);
 }
 
-int64_t Array::Back() const
+int64_t Array::back() const
 {
     assert(m_len);
     return (this->*m_getter)(m_len-1);
@@ -530,7 +530,7 @@ bool Array::Insert(size_t ndx, int64_t value)
 }
 
 
-bool Array::Add(int64_t value)
+bool Array::add(int64_t value)
 {
     return Insert(m_len, value);
 }
@@ -1572,7 +1572,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
 //      count.Preset(0, m_len, max - min + 1);
 
         for(int64_t t = 0; t < max - min + 1; t++)
-            count.Add(0);
+            count.add(0);
 
         // Count occurences of each value
         for(size_t t = 0; t < m_len; t++) {
@@ -1586,7 +1586,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
         }
 
         for(size_t t = 0; t < m_len; t++)
-            res.Add(0);
+            res.add(0);
 
         for(size_t t = m_len; t > 0; t--) {
             size_t v = TO_REF(Get<w>(t - 1) - min);
@@ -1847,7 +1847,7 @@ void Array::ToDot(std::ostream& out, const char* title) const
 void Array::Stats(MemStats& stats) const
 {
     const MemStats m(m_capacity, CalcByteLen(m_len, m_width), 1);
-    stats.Add(m);
+    stats.add(m);
     
     // Add stats for all sub-arrays
     if (m_hasRefs) {

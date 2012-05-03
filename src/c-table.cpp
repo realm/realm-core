@@ -57,7 +57,7 @@ void mixed_delete(Mixed *mixed) {
 }
 
 int64_t mixed_get_int(Mixed *mixed) {
-    return mixed->Get(); 
+    return mixed->get_int(); 
 }
 bool mixed_get_bool(Mixed *mixed) {
     return mixed->get_bool(); 
@@ -184,7 +184,7 @@ void table_remove_last(Table* t) {
 
 
 int64_t table_get_int(const Table* t, size_t column_ndx, size_t ndx) {
-	return t->Get(column_ndx, ndx);
+	return t->get_int(column_ndx, ndx);
 }
 
 bool table_get_bool(const Table* t, size_t column_ndx, size_t ndx) {
@@ -223,7 +223,7 @@ const Table* table_get_ctable(const Table* t, size_t column_ndx, size_t ndx) {
 
 
 void table_set_int(Table* t, size_t column_ndx, size_t ndx, int64_t value) {
-	t->Set(column_ndx, ndx, value);
+	t->set_int(column_ndx, ndx, value);
 }
 
 void table_set_bool(Table* t, size_t column_ndx, size_t ndx, bool value) {
@@ -433,7 +433,7 @@ size_t tableview_get_table_size(const TableView* tv, size_t column_ndx, size_t n
 
 
 int64_t tableview_get_int(const TableView* tv, size_t column_ndx, size_t ndx) {
-	return tv->Get(column_ndx, ndx);
+	return tv->get_int(column_ndx, ndx);
 }
 
 bool tableview_get_bool(const TableView* tv, size_t column_ndx, size_t ndx) {
@@ -460,7 +460,7 @@ Mixed tableview_get_mixed(const TableView* tv, size_t column_ndx, size_t ndx) {
 
 
 void tableview_set_int(TableView* tv, size_t column_ndx, size_t ndx, int64_t value) {
-	tv->Set(column_ndx, ndx, value);
+	tv->set_int(column_ndx, ndx, value);
 }
 
 void tableview_set_bool(TableView* tv, size_t column_ndx, size_t ndx, bool value) {
@@ -568,7 +568,7 @@ bool group_has_table(Group* group, const char* name) {
 ///???
 Table* group_get_table(Group* group, const char* name) {
     /*??? Waiting for removal of TopLevelTable*/
-    /* return group->get_table(name); */
+    /* return group->get_subtable(name); */
 }
 #endif	
 
@@ -595,14 +595,14 @@ void query_delete(Query* q) {
 }
 
 void query_group(Query* q) {
-    q->RightParan();
+    q->end_group();
 }
 
 void query_end_group(Query* q) {
-    q->LeftParan();
+    q->group();
 }
 void query_or(Query* q) {
-    q->Or();
+    q->or();
 }
 #if 1
 void query_subtable(Query* q, size_t column_ndx) {
@@ -610,54 +610,54 @@ void query_subtable(Query* q, size_t column_ndx) {
 }
 #endif
 void query_parent(Query* q) {
-    q->Parent();
+    q->parent();
 }
 
 Query* query_bool_equal(Query* q, size_t column_ndx, bool value) {
-    return new Query(q->Equal(column_ndx, value));
+    return new Query(q->equal(column_ndx, value));
 }
 
 Query* query_int_equal(Query* q, size_t column_ndx, int64_t value) {
-    return new Query(q->Equal(column_ndx, value));    
+    return new Query(q->equal(column_ndx, value));    
 }
 
 /* Integers */
 
 Query*  query_int_not_equal(Query* q, size_t column_ndx, int64_t value) {
-    return new Query(q->NotEqual(column_ndx, value));
+    return new Query(q->not_equal(column_ndx, value));
 }
 Query*  query_int_greater(Query* q, size_t column_ndx, int64_t value) {
-    return new Query(q->Greater(column_ndx, value));
+    return new Query(q->greater(column_ndx, value));
 }
 Query*  query_int_greater_or_equal(Query* q, size_t column_ndx, int64_t value) {
-    return new Query(q->GreaterEqual(column_ndx, value));
+    return new Query(q->greater_equal(column_ndx, value));
 }
 Query*  query_int_less(Query* q, size_t column_ndx, int64_t value) {
-    return new Query(q->Less(column_ndx, value));
+    return new Query(q->less(column_ndx, value));
 }
 Query*  query_int_less_or_equal(Query* q, size_t column_ndx, int64_t value) {
-    return new Query(q->LessEqual(column_ndx, value));
+    return new Query(q->less_equal(column_ndx, value));
 }
 Query*  query_int_between(Query* q, size_t column_ndx, int64_t from, int64_t to) {
-    return new Query(q->Between(column_ndx, from , to));
+    return new Query(q->between(column_ndx, from , to));
 }
 
 /* Strings */ 
 
 Query*  query_string_equal(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive) {
-    return new Query(q->Equal(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
+    return new Query(q->equal(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
 }
 Query*  query_string_not_equal(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive) {
-    return new Query(q->NotEqual(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
+    return new Query(q->not_equal(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
 }
 Query*  query_string_begins_with(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive) {
-    return new Query(q->BeginsWith(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
+    return new Query(q->begins_with(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
 }
 Query*  query_string_ends_with(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive) {
-    return new Query(q->EndsWith(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
+    return new Query(q->ends_with(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
 }
 Query*  query_string_contains(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive) {
-    return new Query(q->Contains(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
+    return new Query(q->contains(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
 }
 
 

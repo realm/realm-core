@@ -13,8 +13,8 @@ public:
     ~ArrayString();
 
     const char* Get(size_t ndx) const;
-    bool Add();
-    bool Add(const char* value);
+    bool add();
+    bool add(const char* value);
     bool Set(size_t ndx, const char* value);
     bool Set(size_t ndx, const char* value, size_t len);
     bool Insert(size_t ndx, const char* value);

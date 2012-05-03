@@ -50,9 +50,9 @@ int main()
         const size_t n = rand() % 1000;// * 10 + rand();
         const string s = number_name(n);
 
-        table.Add(n, s.c_str(), 100, Wed);
+        table.add(n, s.c_str(), 100, Wed);
     }
-    table.Add(0, "abcde", 100, Wed);
+    table.add(0, "abcde", 100, Wed);
 
     printf("Memory usage: %lld bytes\n", (long long)GetMemUsage()); // %zu doesn't work in vc
 

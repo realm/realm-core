@@ -101,7 +101,7 @@ size_t AdaptiveStringColumn::Size() const
 {
     if (IsNode())  {
         const Array offsets = NodeGetOffsets();
-        const size_t size = offsets.is_empty() ? 0 : (size_t)offsets.Back();
+        const size_t size = offsets.is_empty() ? 0 : (size_t)offsets.back();
         return size;
     }
     else if (IsLongStrings()) {
@@ -150,7 +150,7 @@ bool AdaptiveStringColumn::Set(size_t ndx, const char* value)
     return TreeSet<const char*, AdaptiveStringColumn>(ndx, value);
 }
 
-bool AdaptiveStringColumn::Add(const char* value)
+bool AdaptiveStringColumn::add(const char* value)
 {
     return Insert(Size(), value);
 }
@@ -208,7 +208,7 @@ bool AdaptiveStringColumn::LeafSet(size_t ndx, const char* value)
     // Copy strings to new array
     ArrayString* const oldarray = (ArrayString*)m_array;
     for (size_t i = 0; i < oldarray->Size(); ++i) {
-        newarray->Add(oldarray->Get(i));
+        newarray->add(oldarray->Get(i));
     }
     newarray->Set(ndx, value, len);
 
@@ -245,7 +245,7 @@ bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
     // Copy strings to new array
     ArrayString* const oldarray = (ArrayString*)m_array;
     for (size_t i = 0; i < oldarray->Size(); ++i) {
-        newarray->Add(oldarray->Get(i));
+        newarray->add(oldarray->Get(i));
     }
     newarray->Insert(ndx, value, len);
 
@@ -358,7 +358,7 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
         assert(res);
         (void)res;
 
-        values.Add(pos);
+        values.add(pos);
     }
 
     ref_keys   = keys.GetRef();

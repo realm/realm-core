@@ -116,7 +116,7 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
 
     for(;;) {
         if(v0 < v1) {
-            idxres->Add(i0);
+            idxres->add(i0);
             // Only check p0 if it has been modified :)
             if(p0 == s0)
                 break;
@@ -124,7 +124,7 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
             v0 = vals->Get(i0);
         }
         else {
-            idxres->Add(i1);
+            idxres->add(i1);
             if(p1 == s1)
                 break;
             i1 = idx1->GetAsRef(p1++);
@@ -139,11 +139,11 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
 
     while(p0 < s0) {
         i0 = idx0->GetAsRef(p0++);
-        idxres->Add(i0);
+        idxres->add(i0);
     }
     while(p1 < s1) {
         i1 = idx1->GetAsRef(p1++);
-        idxres->Add(i1);
+        idxres->add(i1);
     }
 
     assert(idxres->Size() == idx0->Size() + idx1->Size());
@@ -164,13 +164,13 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
 
     for (;;) {
         if (v0 < v1) {
-            res.Add(v0);
+            res.add(v0);
             if (p0 == s0)
                 break;
             v0 = a0.Get(p0++);
         }
         else {
-            res.Add(v1);
+            res.add(v1);
             if (p1 == s1)
                 break;
             v1 = a1.Get(p1++);
@@ -184,11 +184,11 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
 
     while (p0 < s0) {
         v0 = a0.Get(p0++);
-        res.Add(v0);
+        res.add(v0);
     }
     while (p1 < s1) {
         v1 = a1.Get(p1++);
-        res.Add(v1);
+        res.add(v1);
     }
 
     assert(res.Size() == a0.Size() + a1.Size());
@@ -207,9 +207,9 @@ Array* merge(const Array& arrayList)
     Array Left, Right;
     const size_t left = count / 2;
     for (size_t t = 0; t < left; ++t)
-        Left.Add(arrayList.Get(t));
+        Left.add(arrayList.Get(t));
     for (size_t t = left; t < count; ++t)
-        Right.Add(arrayList.Get(t));
+        Right.add(arrayList.Get(t));
 
     Array* l = NULL;
     Array* r = NULL;
@@ -261,12 +261,12 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
     Array LeftI, RightI;
     size_t left = indexlists->Size() / 2;
     for(size_t t = 0; t < left; t++) {
-        LeftV.Add(indexlists->Get(t));
-        LeftI.Add(indexlists->Get(t));
+        LeftV.add(indexlists->Get(t));
+        LeftI.add(indexlists->Get(t));
     }
     for(size_t t = left; t < indexlists->Size(); t++) {
-        RightV.Add(indexlists->Get(t));
-        RightI.Add(indexlists->Get(t));
+        RightV.add(indexlists->Get(t));
+        RightI.add(indexlists->Get(t));
     }
 
     Array *li;
@@ -290,7 +290,7 @@ bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, voi
     (void)caller_offset;
     Array* p = (Array*)state;
     const size_t ref = a->GetRef();
-    p->Add((int64_t)ref); // todo, check cast
+    p->add((int64_t)ref); // todo, check cast
     return true;
 }
 
@@ -334,8 +334,8 @@ void Column::Create()
     if (IsNode()) {
         const Array offsets(COLUMN_NORMAL, NULL, 0, m_array->GetAllocator());
         const Array refs(COLUMN_HASREFS, NULL, 0, m_array->GetAllocator());
-        m_array->Add(offsets.GetRef());
-        m_array->Add(refs.GetRef());
+        m_array->add(offsets.GetRef());
+        m_array->add(refs.GetRef());
     }
 }
 
@@ -374,7 +374,7 @@ size_t Column::Size() const
 {
     if (!IsNode()) return m_array->Size();
     const Array offsets = NodeGetOffsets();
-    return offsets.is_empty() ? 0 : size_t(offsets.Back());
+    return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
 
 size_t Column::get_size_from_ref(size_t ref, Allocator& alloc)
@@ -382,7 +382,7 @@ size_t Column::get_size_from_ref(size_t ref, Allocator& alloc)
     Array a(ref, NULL, 0, alloc);
     if (!a.IsNode()) return a.Size();
     Array offsets(a.Get(0), NULL, 0, alloc);
-    return offsets.is_empty() ? 0 : size_t(offsets.Back());
+    return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
 
 void Column::SetParent(ArrayParent* parent, size_t pndx)
@@ -450,7 +450,7 @@ bool Column::Set(size_t ndx, int64_t value)
     return true;
 }
 
-bool Column::Add(int64_t value)
+bool Column::add(int64_t value)
 {
     return Insert(Size(), value);
 }
@@ -537,12 +537,12 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
         size_t ref = values.GetAsRef(t);
         Array v(ref);
         for(size_t j = 0; j < v.Size(); j++)
-            all_values.Add(v.Get(j));
+            all_values.add(v.Get(j));
         v.ReferenceSort(*i);
         for(size_t n = 0; n < v.Size(); n++)
             i->Set(n, i->Get(n) + offset);
         offset += v.Size();
-        indexes.Add((int64_t)i);
+        indexes.add((int64_t)i);
     }
 
     Array *ResI;
@@ -550,7 +550,7 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
     merge_references(&all_values, &indexes, &ResI);
 
     for(size_t t = 0; t < ResI->Size(); t++)
-        ref.Add(ResI->Get(t));
+        ref.add(ResI->Get(t));
 }
 
 size_t ColumnBase::GetRefSize(size_t ref) const

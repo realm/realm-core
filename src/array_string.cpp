@@ -114,12 +114,12 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len)
     return true;
 }
 
-bool ArrayString::Add()
+bool ArrayString::add()
 {
     return Insert(m_len, "", 0);
 }
 
-bool ArrayString::Add(const char* value)
+bool ArrayString::add(const char* value)
 {
     return Insert(m_len, value, strlen(value));
 }
@@ -254,7 +254,7 @@ void ArrayString::FindAll(Array& result, const char* value, size_t add_offset, s
     for (;;) {
         first = FindWithLen(value, len, first + 1, end);
         if (first != (size_t)-1)
-            result.Add(first + add_offset);
+            result.add(first + add_offset);
         else break;
     }
 }

@@ -22,16 +22,16 @@ public:
     std::size_t size() const {return m_refs.Size();}
 
     // Getting values
-    int64_t Get(std::size_t column_ndx, std::size_t ndx) const;
+    int64_t get_int(std::size_t column_ndx, std::size_t ndx) const;
     bool get_bool(std::size_t column_ndx, std::size_t ndx) const;
     std::time_t get_date(std::size_t column_ndx, std::size_t ndx) const;
     const char* get_string(std::size_t column_ndx, std::size_t ndx) const;
     BinaryData get_binary(std::size_t column_ndx, std::size_t ndx) const;
     Mixed get_mixed(std::size_t column_ndx, std::size_t ndx) const;
-    TableRef get_table(std::size_t column_ndx, std::size_t ndx);
+    TableRef get_subtable(std::size_t column_ndx, std::size_t ndx);
 
     // Setting values
-    void Set(std::size_t column_ndx, std::size_t ndx, int64_t value);
+    void set_int(std::size_t column_ndx, std::size_t ndx, int64_t value);
     void set_bool(std::size_t column_ndx, std::size_t ndx, bool value);
     void set_date(std::size_t column_ndx, std::size_t ndx, std::time_t value);
     void set_string(std::size_t column_ndx, std::size_t ndx, const char* value);
@@ -43,7 +43,7 @@ public:
     // Deleting
     void clear();
     void remove(std::size_t ndx);
-    void pop_back() { if (!is_empty()) remove(size()-1); }
+    void remove_last() { if (!is_empty()) remove(size()-1); }
 
     // Finding
     std::size_t Find(std::size_t column_ndx, int64_t value) const;
@@ -56,7 +56,7 @@ public:
     int64_t maximum(std::size_t column_ndx) const;
     int64_t minimum(std::size_t column_ndx) const;
 
-    Table *get_table(); // todo, temporary for tests FIXME: Is this still needed????
+    Table *get_subtable(); // todo, temporary for tests FIXME: Is this still needed????
 
 private:
     // Don't allow copying

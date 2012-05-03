@@ -122,7 +122,7 @@ public:
         return ColumnSubtableParent::get_subtable_ptr(subtable_ndx, m_ref_specSet);
     }
 
-    bool Add();
+    bool add();
     void Insert(size_t ndx);
     void Delete(size_t ndx);
     void Clear(size_t ndx);
@@ -207,8 +207,8 @@ inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table
         m_indices.SetType(COLUMN_NORMAL);
         m_wrappers.SetType(COLUMN_NORMAL);
     }
-    m_indices.Add(subtable_ndx);
-    m_wrappers.Add(reinterpret_cast<unsigned long>(wrapper));
+    m_indices.add(subtable_ndx);
+    m_wrappers.add(reinterpret_cast<unsigned long>(wrapper));
 }
 
 inline void ColumnSubtableParent::SubtableMap::remove(size_t subtable_ndx)

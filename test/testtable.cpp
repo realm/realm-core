@@ -16,11 +16,11 @@ TEST(Table1)
     CHECK_EQUAL("second", table.get_column_name(1));
 
     const size_t ndx = table.add_empty_row();
-    table.Set(0, ndx, 0);
-    table.Set(1, ndx, 10);
+    table.set_int(0, ndx, 0);
+    table.set_int(1, ndx, 10);
 
-    CHECK_EQUAL(0, table.Get(0, ndx));
-    CHECK_EQUAL(10, table.Get(1, ndx));
+    CHECK_EQUAL(0, table.get_int(0, ndx));
+    CHECK_EQUAL(10, table.get_int(1, ndx));
 
 #ifdef _DEBUG
     table.verify();
@@ -47,8 +47,8 @@ TEST(Table2)
 {
     TestTable table;
 
-    table.Add(0, 10, true, Wed);
-    const TestTable::Cursor r = table.Back(); // last item
+    table.add(0, 10, true, Wed);
+    const TestTable::Cursor r = table.back(); // last item
 
     CHECK_EQUAL(0, r.first);
     CHECK_EQUAL(10, r.second);
@@ -65,7 +65,7 @@ TEST(Table3)
     TestTable table;
 
     for (size_t i = 0; i < 100; ++i) {
-        table.Add(0, 10, true, Wed);
+        table.add(0, 10, true, Wed);
     }
 
     // Test column searching
@@ -96,9 +96,9 @@ TEST(Table4)
 {
     TestTableEnum table;
 
-    table.Add(Mon, "Hello");
-    table.Add(Mon, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
-    const TestTableEnum::Cursor r = table.Back(); // last item
+    table.add(Mon, "Hello");
+    table.add(Mon, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
+    const TestTableEnum::Cursor r = table.back(); // last item
 
     CHECK_EQUAL(Mon, r.first);
     CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello", (const char*)r.second);
@@ -117,7 +117,7 @@ TEST(Table_Delete)
     TestTable table;
 
     for (size_t i = 0; i < 10; ++i) {
-        table.Add(0, i, true, Wed);
+        table.add(0, i, true, Wed);
     }
 
     table.remove(0);
@@ -219,7 +219,7 @@ TEST(Table_Delete_All_Types)
 
         // Add subtable to mixed column
         if (i % 4 == 3) {
-            TableRef subtable = table.get_table(7, i);
+            TableRef subtable = table.get_subtable(7, i);
             subtable->add_column(COLUMN_TYPE_INT,    "first");
             subtable->add_column(COLUMN_TYPE_STRING, "second");
             subtable->insert_int(0, 0, 42);
@@ -228,7 +228,7 @@ TEST(Table_Delete_All_Types)
         }
 
         // Add sub-tables to table column
-        TableRef subtable = table.get_table(8, i);
+        TableRef subtable = table.get_subtable(8, i);
         subtable->insert_int(0, 0, 42);
         subtable->insert_string(1, 0, "meaning");
         subtable->insert_done();
@@ -262,7 +262,7 @@ TEST(Table_Find_Int)
     TestTable table;
 
     for (int i = 1000; i >= 0; --i) {
-        table.Add(0, i, true, Wed);
+        table.add(0, i, true, Wed);
     }
 
     CHECK_EQUAL(size_t(0),    table.cols().second.Find(1000));
@@ -307,16 +307,16 @@ TEST(Table_FindAll_Int)
 {
     TestTable table;
 
-    table.Add(0, 10, true, Wed);
-    table.Add(0, 20, true, Wed);
-    table.Add(0, 10, true, Wed);
-    table.Add(0, 20, true, Wed);
-    table.Add(0, 10, true, Wed);
-    table.Add(0, 20, true, Wed);
-    table.Add(0, 10, true, Wed);
-    table.Add(0, 20, true, Wed);
-    table.Add(0, 10, true, Wed);
-    table.Add(0, 20, true, Wed);
+    table.add(0, 10, true, Wed);
+    table.add(0, 20, true, Wed);
+    table.add(0, 10, true, Wed);
+    table.add(0, 20, true, Wed);
+    table.add(0, 10, true, Wed);
+    table.add(0, 20, true, Wed);
+    table.add(0, 10, true, Wed);
+    table.add(0, 20, true, Wed);
+    table.add(0, 10, true, Wed);
+    table.add(0, 20, true, Wed);
 
     // Search for a value that does not exits
     const TableView v0 = table.cols().second.FindAll(5);
@@ -341,16 +341,16 @@ TEST(Table_Index_Int)
 {
     TestTable table;
 
-    table.Add(0,  1, true, Wed);
-    table.Add(0, 15, true, Wed);
-    table.Add(0, 10, true, Wed);
-    table.Add(0, 20, true, Wed);
-    table.Add(0, 11, true, Wed);
-    table.Add(0, 45, true, Wed);
-    table.Add(0, 10, true, Wed);
-    table.Add(0,  0, true, Wed);
-    table.Add(0, 30, true, Wed);
-    table.Add(0,  9, true, Wed);
+    table.add(0,  1, true, Wed);
+    table.add(0, 15, true, Wed);
+    table.add(0, 10, true, Wed);
+    table.add(0, 20, true, Wed);
+    table.add(0, 11, true, Wed);
+    table.add(0, 45, true, Wed);
+    table.add(0, 10, true, Wed);
+    table.add(0,  0, true, Wed);
+    table.add(0, 30, true, Wed);
+    table.add(0,  9, true, Wed);
 
     // Create index for column two
     table.set_index(1);
@@ -387,7 +387,7 @@ TEST(Table_Index_Int)
     CHECK_EQUAL(9, table.cols().second.Find(100));
 
     // Insert values
-    table.Add(0, 29, true, Wed);
+    table.add(0, 29, true, Wed);
     //TODO: More than add
 
     CHECK_EQUAL(0, table.cols().second.Find(1));
@@ -432,11 +432,11 @@ TEST(TableAutoEnumeration)
     TestTableAE table;
 
     for (size_t i = 0; i < 5; ++i) {
-        table.Add(1, "abd",     true, Mon);
-        table.Add(2, "eftg",    true, Tue);
-        table.Add(5, "hijkl",   true, Wed);
-        table.Add(8, "mnopqr",  true, Thu);
-        table.Add(9, "stuvxyz", true, Fri);
+        table.add(1, "abd",     true, Mon);
+        table.add(2, "eftg",    true, Tue);
+        table.add(5, "hijkl",   true, Wed);
+        table.add(8, "mnopqr",  true, Thu);
+        table.add(9, "stuvxyz", true, Fri);
     }
 
     table.optimize();
@@ -477,11 +477,11 @@ TEST(TableAutoEnumerationFindFindAll)
     TestTableAE table;
 
     for (size_t i = 0; i < 5; ++i) {
-        table.Add(1, "abd",     true, Mon);
-        table.Add(2, "eftg",    true, Tue);
-        table.Add(5, "hijkl",   true, Wed);
-        table.Add(8, "mnopqr",  true, Thu);
-        table.Add(9, "stuvxyz", true, Fri);
+        table.add(1, "abd",     true, Mon);
+        table.add(2, "eftg",    true, Tue);
+        table.add(5, "hijkl",   true, Wed);
+        table.add(8, "mnopqr",  true, Thu);
+        table.add(9, "stuvxyz", true, Fri);
     }
 
     table.optimize();
@@ -504,8 +504,8 @@ TEST(Table_SlabAlloc)
     SlabAlloc alloc;
     TestTable table(alloc);
 
-    table.Add(0, 10, true, Wed);
-    const TestTable::Cursor r = table.Back(); // last item
+    table.add(0, 10, true, Wed);
+    const TestTable::Cursor r = table.back(); // last item
 
     CHECK_EQUAL(   0, r.first);
     CHECK_EQUAL(  10, r.second);
@@ -513,11 +513,11 @@ TEST(Table_SlabAlloc)
     CHECK_EQUAL( Wed, r.fourth);
 
     // Add some more rows
-    table.Add(1, 10, true, Wed);
-    table.Add(2, 20, true, Wed);
-    table.Add(3, 10, true, Wed);
-    table.Add(4, 20, true, Wed);
-    table.Add(5, 10, true, Wed);
+    table.add(1, 10, true, Wed);
+    table.add(2, 20, true, Wed);
+    table.add(3, 10, true, Wed);
+    table.add(4, 20, true, Wed);
+    table.add(5, 10, true, Wed);
 
     // Delete some rows
     table.remove(2);
@@ -555,14 +555,14 @@ TEST(Table_Spec)
 
     // Get the sub-table
     {
-        TableRef subtable = table->get_table(2, 0);
+        TableRef subtable = table->get_subtable(2, 0);
         CHECK(subtable->is_empty());
 
         subtable->insert_int(0, 0, 42);
         subtable->insert_string(1, 0, "test");
         subtable->insert_done();
 
-        CHECK_EQUAL(42,     subtable->Get(0, 0));
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
         CHECK_EQUAL("test", subtable->get_string(1, 0));
     }
 
@@ -571,10 +571,10 @@ TEST(Table_Spec)
     // Get the sub-table again and see if the values
     // still match.
     {
-        TableRef subtable = table->get_table(2, 0);
+        TableRef subtable = table->get_subtable(2, 0);
 
         CHECK_EQUAL(1,      subtable->size());
-        CHECK_EQUAL(42,     subtable->Get(0, 0));
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
         CHECK_EQUAL("test", subtable->get_string(1, 0));
     }
 
@@ -585,10 +585,10 @@ TEST(Table_Spec)
     Group fromDisk("subtables.tightdb");
     TableRef fromDiskTable = fromDisk.get_table("test");
 
-    TableRef subtable2 = fromDiskTable->get_table(2, 0);
+    TableRef subtable2 = fromDiskTable->get_subtable(2, 0);
 
     CHECK_EQUAL(1,      subtable2->size());
-    CHECK_EQUAL(42,     subtable2->Get(0, 0));
+    CHECK_EQUAL(42,     subtable2->get_int(0, 0));
     CHECK_EQUAL("test", subtable2->get_string(1, 0));
 }
 
@@ -604,10 +604,10 @@ TEST(Table_Mixed)
     CHECK_EQUAL("second", table.get_column_name(1));
 
     const size_t ndx = table.add_empty_row();
-    table.Set(0, ndx, 0);
+    table.set_int(0, ndx, 0);
     table.set_mixed(1, ndx, true);
 
-    CHECK_EQUAL(0, table.Get(0, 0));
+    CHECK_EQUAL(0, table.get_int(0, 0));
     CHECK_EQUAL(COLUMN_TYPE_BOOL, table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
 
@@ -615,39 +615,39 @@ TEST(Table_Mixed)
     table.insert_mixed(1, 1, (int64_t)12);
     table.insert_done();
 
-    CHECK_EQUAL(0,  table.Get(0, ndx));
-    CHECK_EQUAL(43, table.Get(0, 1));
+    CHECK_EQUAL(0,  table.get_int(0, ndx));
+    CHECK_EQUAL(43, table.get_int(0, 1));
     CHECK_EQUAL(COLUMN_TYPE_BOOL, table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(COLUMN_TYPE_INT,  table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12,   table.get_mixed(1, 1).Get());
+    CHECK_EQUAL(12,   table.get_mixed(1, 1).get_int());
 
     table.insert_int(0, 2, 100);
     table.insert_mixed(1, 2, "test");
     table.insert_done();
 
-    CHECK_EQUAL(0,  table.Get(0, 0));
-    CHECK_EQUAL(43, table.Get(0, 1));
+    CHECK_EQUAL(0,  table.get_int(0, 0));
+    CHECK_EQUAL(43, table.get_int(0, 1));
     CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(COLUMN_TYPE_INT,    table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(COLUMN_TYPE_STRING, table.get_mixed(1, 2).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12,     table.get_mixed(1, 1).Get());
+    CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
 
     table.insert_int(0, 3, 0);
     table.insert_mixed(1, 3, Date(324234));
     table.insert_done();
 
-    CHECK_EQUAL(0,  table.Get(0, 0));
-    CHECK_EQUAL(43, table.Get(0, 1));
-    CHECK_EQUAL(0,  table.Get(0, 3));
+    CHECK_EQUAL(0,  table.get_int(0, 0));
+    CHECK_EQUAL(43, table.get_int(0, 1));
+    CHECK_EQUAL(0,  table.get_int(0, 3));
     CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(COLUMN_TYPE_INT,    table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(COLUMN_TYPE_STRING, table.get_mixed(1, 2).get_type());
     CHECK_EQUAL(COLUMN_TYPE_DATE,   table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12,     table.get_mixed(1, 1).Get());
+    CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
 
@@ -655,17 +655,17 @@ TEST(Table_Mixed)
     table.insert_mixed(1, 4, Mixed("binary", 7));
     table.insert_done();
 
-    CHECK_EQUAL(0,  table.Get(0, 0));
-    CHECK_EQUAL(43, table.Get(0, 1));
-    CHECK_EQUAL(0,  table.Get(0, 3));
-    CHECK_EQUAL(43, table.Get(0, 4));
+    CHECK_EQUAL(0,  table.get_int(0, 0));
+    CHECK_EQUAL(43, table.get_int(0, 1));
+    CHECK_EQUAL(0,  table.get_int(0, 3));
+    CHECK_EQUAL(43, table.get_int(0, 4));
     CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(COLUMN_TYPE_INT,    table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(COLUMN_TYPE_STRING, table.get_mixed(1, 2).get_type());
     CHECK_EQUAL(COLUMN_TYPE_DATE,   table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(COLUMN_TYPE_BINARY, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12,     table.get_mixed(1, 1).Get());
+    CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
     CHECK_EQUAL("binary", (const char*)table.get_mixed(1, 4).get_binary().pointer);
@@ -675,11 +675,11 @@ TEST(Table_Mixed)
     table.insert_mixed(1, 5, Mixed(COLUMN_TYPE_TABLE));
     table.insert_done();
 
-    CHECK_EQUAL(0,  table.Get(0, 0));
-    CHECK_EQUAL(43, table.Get(0, 1));
-    CHECK_EQUAL(0,  table.Get(0, 3));
-    CHECK_EQUAL(43, table.Get(0, 4));
-    CHECK_EQUAL(0,  table.Get(0, 5));
+    CHECK_EQUAL(0,  table.get_int(0, 0));
+    CHECK_EQUAL(43, table.get_int(0, 1));
+    CHECK_EQUAL(0,  table.get_int(0, 3));
+    CHECK_EQUAL(43, table.get_int(0, 4));
+    CHECK_EQUAL(0,  table.get_int(0, 5));
     CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(COLUMN_TYPE_INT,    table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(COLUMN_TYPE_STRING, table.get_mixed(1, 2).get_type());
@@ -687,14 +687,14 @@ TEST(Table_Mixed)
     CHECK_EQUAL(COLUMN_TYPE_BINARY, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(COLUMN_TYPE_TABLE,  table.get_mixed(1, 5).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12,     table.get_mixed(1, 1).Get());
+    CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
     CHECK_EQUAL("binary", (const char*)table.get_mixed(1, 4).get_binary().pointer);
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
 
     // Get table from mixed column and add schema and some values
-    TableRef subtable = table.get_table(1, 5);
+    TableRef subtable = table.get_subtable(1, 5);
     subtable->add_column(COLUMN_TYPE_STRING, "name");
     subtable->add_column(COLUMN_TYPE_INT,    "age");
 
@@ -703,10 +703,10 @@ TEST(Table_Mixed)
     subtable->insert_done();
 
     // Get same table again and verify values
-    TableRef subtable2 = table.get_table(1, 5);
+    TableRef subtable2 = table.get_subtable(1, 5);
     CHECK_EQUAL(1, subtable2->size());
     CHECK_EQUAL("John", subtable2->get_string(0, 0));
-    CHECK_EQUAL(40, subtable2->Get(1, 0));
+    CHECK_EQUAL(40, subtable2->get_int(1, 0));
 
 #ifdef _DEBUG
     table.verify();
@@ -721,17 +721,17 @@ TEST(Table_Mixed2)
 {
     TestTableMX table;
 
-    table.Add(int64_t(1));
-    table.Add(true);
-    table.Add(Date(1234));
-    table.Add("test");
+    table.add(int64_t(1));
+    table.add(true);
+    table.add(Date(1234));
+    table.add("test");
 
     CHECK_EQUAL(COLUMN_TYPE_INT,    table[0].first.get_type());
     CHECK_EQUAL(COLUMN_TYPE_BOOL,   table[1].first.get_type());
     CHECK_EQUAL(COLUMN_TYPE_DATE,   table[2].first.get_type());
     CHECK_EQUAL(COLUMN_TYPE_STRING, table[3].first.get_type());
 
-    CHECK_EQUAL(1,            table[0].first.Get());
+    CHECK_EQUAL(1,            table[0].first.get_int());
     CHECK_EQUAL(true,         table[1].first.get_bool());
     CHECK_EQUAL(time_t(1234), table[2].first.get_date());
     CHECK_EQUAL("test",       table[3].first.get_string());

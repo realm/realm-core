@@ -50,7 +50,7 @@ void GroupWriter::Commit()
     
     // The positions list could potentially expand width when we
     // reserve space, so we pre-expand it avoid this
-    fpositions.Add(max_pos);
+    fpositions.add(max_pos);
     fpositions.Delete(fpositions.Size()-1);
     
     // Reserve space for free lists

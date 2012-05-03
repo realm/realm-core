@@ -215,13 +215,13 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DUSE_SSE3 %(AdditionalOptions)</AdditionalOptions>
+      <CompileAsManaged>false</CompileAsManaged>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>x64\Debug\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>WS2_32.lib ;x64\Debug\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX64</TargetMachine>
-      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">

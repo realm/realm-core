@@ -34,8 +34,8 @@ Index::Index(): Column(COLUMN_HASREFS)
     // Add subcolumns for leafs
     const Array values(COLUMN_NORMAL);
     const Array refs(COLUMN_NORMAL); // we do not own these refs (to column positions), so no COLUMN_HASREF
-    m_array->Add((intptr_t)values.GetRef());
-    m_array->Add((intptr_t)refs.GetRef());
+    m_array->add((intptr_t)values.GetRef());
+    m_array->add((intptr_t)refs.GetRef());
 }
 
 Index::Index(ColumnDef type, Array* parent, size_t pndx): Column(type, parent, pndx) {}
@@ -187,8 +187,8 @@ bool Index::LeafInsert(size_t ref, int64_t value)
     const size_t ins_pos = values.FindPos2(value);
 
     if (ins_pos == (size_t)-1) {
-        values.Add(value);
-        refs.Add(ref);
+        values.add(value);
+        refs.add(ref);
     }
     else {
         values.Insert(ins_pos, value);
@@ -213,8 +213,8 @@ bool Index::NodeAdd(size_t ref)
     const size_t ins_pos = offsets.FindPos2(maxval);
 
     if (ins_pos == (size_t)-1) {
-        offsets.Add(maxval);
-        refs.Add(ref);
+        offsets.add(maxval);
+        refs.add(ref);
     }
     else {
         offsets.Insert(ins_pos, maxval);
@@ -227,7 +227,7 @@ bool Index::NodeAdd(size_t ref)
 int64_t Index::MaxValue() const
 {
     const Array values = m_array->GetSubArray(0);
-    return values.is_empty() ? 0 : values.Back();
+    return values.is_empty() ? 0 : values.back();
 }
 
 Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
@@ -305,7 +305,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         default:            // split
             // Move items below split to new list
             for (size_t i = ndx; i < m_array->Size(); ++i) {
-                newList.Add(m_array->Get(i));
+                newList.add(m_array->Get(i));
             }
             m_array->Resize(ndx);
 
@@ -353,7 +353,7 @@ bool Index::FindAll(Column& result, int64_t value) const
     else {
         do {
             if (values.Get(pos) == value) {
-                result.Add(refs.Get(pos));
+                result.add(refs.Get(pos));
                 ++pos;
             }
             else return false; // no more matches
@@ -383,7 +383,7 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const
         do {
             const int64_t v = values[pos];
             if (v >= start && v < end) {
-                result.Add(refs.Get(pos));
+                result.add(refs.Get(pos));
                 ++pos;
             }
             else return false; // no more matches

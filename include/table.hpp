@@ -63,7 +63,7 @@ public:
     void insert_done();
 
     // Get cell values
-    int64_t     Get(size_t column_ndx, size_t row_ndx) const;
+    int64_t     get_int(size_t column_ndx, size_t row_ndx) const;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const;
     time_t      get_date(size_t column_ndx, size_t row_ndx) const;
     const char* get_string(size_t column_ndx, size_t row_ndx) const;
@@ -72,7 +72,7 @@ public:
     ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
 
     // Set cell values
-    void Set(size_t column_ndx, size_t row_ndx, int64_t value);
+    void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_date(size_t column_ndx, size_t row_ndx, time_t value);
     void set_string(size_t column_ndx, size_t row_ndx, const char* value);
@@ -80,8 +80,8 @@ public:
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
 
     // Sub-tables (works both on table- and mixed columns)
-    TableRef        get_table(size_t column_ndx, size_t row_ndx);
-    ConstTableRef   get_table(size_t column_ndx, size_t row_ndx) const;
+    TableRef        get_subtable(size_t column_ndx, size_t row_ndx);
+    ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;
     void            clear_subtable(size_t column_ndx, size_t row_ndx);
 
@@ -279,12 +279,12 @@ template<class T> inline void Table::insert_enum(size_t column_ndx, size_t row_n
     insert_int(column_ndx, row_ndx, value);
 }
 
-inline TableRef Table::get_table(size_t column_ndx, size_t row_ndx)
+inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)
 {
     return TableRef(get_subtable_ptr(column_ndx, row_ndx));
 }
 
-inline ConstTableRef Table::get_table(size_t column_ndx, size_t row_ndx) const
+inline ConstTableRef Table::get_subtable(size_t column_ndx, size_t row_ndx) const
 {
     return ConstTableRef(get_subtable_ptr(column_ndx, row_ndx));
 }

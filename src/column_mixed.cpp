@@ -41,8 +41,8 @@ void ColumnMixed::Create(Allocator &alloc, Table const *tab)
     m_types = new Column(COLUMN_NORMAL, alloc);
     m_refs  = new RefsColumn(alloc, tab);
 
-    m_array->Add(m_types->GetRef());
-    m_array->Add(m_refs->GetRef());
+    m_array->add(m_types->GetRef());
+    m_array->add(m_refs->GetRef());
 
     m_types->SetParent(m_array, 0);
     m_refs->SetParent(m_array, 1);
@@ -79,7 +79,7 @@ void ColumnMixed::InitDataColumn()
     m_data = new ColumnBinary(m_array->GetAllocator());
     const size_t ref = m_data->GetRef();
 
-    m_array->Add(ref);
+    m_array->add(ref);
     m_data->SetParent(m_array, 2);
 }
 
@@ -218,7 +218,7 @@ void ColumnMixed::insert_string(size_t ndx, const char* value)
 
     const size_t len = strlen(value)+1;
     const size_t ref = m_data->Size();
-    m_data->Add(value, len);
+    m_data->add(value, len);
 
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
@@ -234,7 +234,7 @@ void ColumnMixed::insert_binary(size_t ndx, const char* value, size_t len)
     InitDataColumn();
 
     const size_t ref = m_data->Size();
-    m_data->Add(value, len);
+    m_data->add(value, len);
 
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
@@ -310,7 +310,7 @@ void ColumnMixed::set_string(size_t ndx, const char* value)
 
         // Add value to data column
         const size_t ref = m_data->Size();
-        m_data->Add(value, len);
+        m_data->add(value, len);
 
         // Shift value one bit and set lowest bit to indicate
         // that this is not a ref
@@ -344,7 +344,7 @@ void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
 
         // Add value to data column
         const size_t ref = m_data->Size();
-        m_data->Add(value, len);
+        m_data->add(value, len);
 
         // Shift value one bit and set lowest bit to indicate
         // that this is not a ref
@@ -371,7 +371,7 @@ void ColumnMixed::SetTable(size_t ndx)
     m_refs->Set(ndx, ref);
 }
 
-bool ColumnMixed::Add()
+bool ColumnMixed::add()
 {
     insert_int(Size(), 0);
     return true;

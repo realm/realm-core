@@ -61,7 +61,7 @@ public:
         used = m.used;
         array_count = m.array_count;
     }
-    void Add(const MemStats& m)
+    void add(const MemStats& m)
     {
         allocated += m.allocated;
         used += m.used;
@@ -123,14 +123,14 @@ public:
     bool is_empty() const {return m_len == 0;}
 
     bool Insert(size_t ndx, int64_t value);
-    bool Add(int64_t value);
+    bool add(int64_t value);
     bool Set(size_t ndx, int64_t value);
     template <size_t w> void Set(size_t ndx, int64_t value);
     int64_t Get(size_t ndx) const;
     size_t GetAsRef(size_t ndx) const;
     template <size_t w>int64_t Get(size_t ndx) const;
     int64_t operator[](size_t ndx) const {return Get(ndx);}
-    int64_t Back() const;
+    int64_t back() const;
     void Delete(size_t ndx);
     void Clear();
 
@@ -322,16 +322,16 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
             const size_t ref = GetAsRef(i);
             if (ref == 0 || ref & 0x1) {
                 // zero-refs and refs that are not 64-aligned do not point to sub-trees
-                newRefs.Add(ref);
+                newRefs.add(ref);
             }
             else if (persist && m_alloc.IsReadOnly(ref)) {
                 // Ignore un-changed arrays when persisting
-                newRefs.Add(ref);
+                newRefs.add(ref);
             }
             else {
                 const Array sub(ref, NULL, 0, GetAllocator());
                 const size_t sub_pos = sub.Write(out, true, persist);
-                newRefs.Add(sub_pos);
+                newRefs.add(sub_pos);
             }
         }
 

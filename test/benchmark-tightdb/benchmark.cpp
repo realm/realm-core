@@ -60,7 +60,7 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (i + 1);
-            integers.Add((int64_t)rand2() % RANGE);
+            integers.add((int64_t)rand2() % RANGE);
         }
 //      printf((indexed + "Memory usage: %lld bytes\n").c_str(), (int64_t)GetMemUsage()); // %zu doesn't work in vc
         printf((indexed + "Add: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
