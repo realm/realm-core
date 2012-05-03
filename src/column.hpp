@@ -202,6 +202,6 @@ private:
 }
 
 // Templates
-#include "Column_tpl.hpp"
+#include "column_tpl.hpp"
 
 #endif //__TDB_COLUMN__
