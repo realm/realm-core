@@ -961,7 +961,7 @@ int64_t Table::minimum(size_t column_ndx) const
     return mv;
 }
 
-size_t Table::find_first(size_t column_ndx, int64_t value) const
+size_t Table::find_first_int(size_t column_ndx, int64_t value) const
 {
     assert(column_ndx < m_columns.Size());
     assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_INT);
@@ -970,7 +970,7 @@ size_t Table::find_first(size_t column_ndx, int64_t value) const
     return column.find_first(value);
 }
 
-size_t Table::find_first(size_t column_ndx, bool value) const
+size_t Table::find_first_bool(size_t column_ndx, bool value) const
 {
     assert(column_ndx < m_columns.Size());
     assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_BOOL);
@@ -979,7 +979,16 @@ size_t Table::find_first(size_t column_ndx, bool value) const
     return column.find_first(value ? 1 : 0);
 }
 
-size_t Table::find_first(size_t column_ndx, const char* value) const
+size_t Table::find_first_date(size_t column_ndx, time_t value) const
+{
+    assert(column_ndx < m_columns.Size());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_DATE);
+    const Column& column = GetColumn(column_ndx);
+
+    return column.find_first((int64_t)value);
+}
+
+size_t Table::find_first_string(size_t column_ndx, const char* value) const
 {
     assert(column_ndx < m_columns.Size());
 
@@ -996,7 +1005,7 @@ size_t Table::find_first(size_t column_ndx, const char* value) const
     }
 }
 
-void Table::find_all(TableView& tv, size_t column_ndx, int64_t value)
+void Table::find_all_int(TableView& tv, size_t column_ndx, int64_t value)
 {
     assert(column_ndx < m_columns.Size());
     assert(&tv.get_parent() == this);
@@ -1006,7 +1015,7 @@ void Table::find_all(TableView& tv, size_t column_ndx, int64_t value)
     column.find_all(tv.get_ref_column(), value);
 }
 
-void Table::find_all(TableView& tv, size_t column_ndx, bool value)
+void Table::find_all_bool(TableView& tv, size_t column_ndx, bool value)
 {
     assert(column_ndx < m_columns.Size());
     assert(&tv.get_parent() == this);
@@ -1016,7 +1025,17 @@ void Table::find_all(TableView& tv, size_t column_ndx, bool value)
     column.find_all(tv.get_ref_column(), value ? 1 :0);
 }
 
-void Table::find_all(TableView& tv, size_t column_ndx, const char *value)
+void Table::find_all_date(TableView& tv, size_t column_ndx, time_t value)
+{
+    assert(column_ndx < m_columns.Size());
+    assert(&tv.get_parent() == this);
+
+    const Column& column = GetColumn(column_ndx);
+
+    column.find_all(tv.get_ref_column(), (int64_t)value);
+}
+
+void Table::find_all_string(TableView& tv, size_t column_ndx, const char *value)
 {
     assert(column_ndx < m_columns.Size());
     assert(&tv.get_parent() == this);

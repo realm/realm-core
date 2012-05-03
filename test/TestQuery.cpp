@@ -26,7 +26,7 @@ TEST(TestQueryDelete)
     ttt.add(6, "X");
 
     Query q = ttt.where().second.equal("X");
-    size_t r = q.Delete(ttt);
+    size_t r = q.remove(ttt);
 
     CHECK_EQUAL(4, r);
     CHECK_EQUAL(2, ttt.size());

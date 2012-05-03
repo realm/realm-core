@@ -234,7 +234,7 @@ void* SlabAlloc::Translate(size_t ref) const
 {
     if (ref < m_baseline) return m_shared + ref;
     else {
-        const size_t ndx = m_slabs.cols().offset.FindPos(ref);
+        const size_t ndx = m_slabs.cols().offset.find_pos(ref);
         assert(ndx != size_t(-1));
 
         const size_t offset = ndx ? m_slabs[ndx-1].offset : m_baseline;
@@ -427,7 +427,7 @@ void SlabAlloc::Verify() const
         FreeSpace::ConstCursor c = m_freeSpace[i];
         const size_t ref = TO_REF(c.ref);
 
-        const size_t ndx = m_slabs.cols().offset.FindPos(ref);
+        const size_t ndx = m_slabs.cols().offset.find_pos(ref);
         assert(ndx != size_t(-1));
 
         const size_t slab_end = TO_REF(m_slabs[ndx].offset);

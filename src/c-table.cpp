@@ -380,28 +380,28 @@ void table_set_index(Table* t, size_t column_ndx) {
 }
 
 size_t table_find_int(const Table* t, size_t column_ndx, int value) {
-	return t->find_first(column_ndx, (int64_t)value);
+	return t->find_first_int(column_ndx, (int64_t)value);
 }
 
 size_t table_find_int64(const Table* t, size_t column_ndx, int64_t value) {
-	return t->find_first(column_ndx, value);
+	return t->find_first_int(column_ndx, value);
 }
 
 size_t table_find_bool(const Table* t, size_t column_ndx, bool value) {
-	return t->find_first(column_ndx, value);
+	return t->find_first_bool(column_ndx, value);
 }
 
 size_t table_find_date(const Table* t, size_t column_ndx, time_t value) {
-	return t->find_first(column_ndx, value);
+	return t->find_first_date(column_ndx, value);
 }
 
 size_t table_find_string(const Table* t, size_t column_ndx, const char* value) {
-	return t->find_first(column_ndx, value);
+	return t->find_first_string(column_ndx, value);
 }
 
 TableView* table_find_all_int64(Table* t, size_t column_ndx, int64_t value) {
 	TableView* tv = new TableView(*t);
-	t->find_all(*tv, column_ndx, value);
+	t->find_all_int(*tv, column_ndx, value);
 	return tv;
 }
 
@@ -673,11 +673,11 @@ TableView*  query_find_all_range(Query* q, Table* t, size_t start, size_t end, s
 /* Aggregations */
 
 size_t query_count(Query* q, const Table* t) {
-    return q->Count(*t, 0U, (size_t)-1, (size_t)-1);
+    return q->count(*t, 0U, (size_t)-1, (size_t)-1);
 }
 
 size_t query_count_range(Query* q, const Table* t, size_t start, size_t end, size_t limit) {
-    return q->Count(*t, start, end, limit);
+    return q->count(*t, start, end, limit);
 }
 
 int64_t query_min(Query* q, const Table* t, size_t column_ndx, size_t* resultcount) {
@@ -708,12 +708,12 @@ int64_t  query_sum_range(Query* q, const Table* t, size_t column_ndx, size_t* re
 }
 
 double  query_avg(Query* q, const Table* t, size_t column_ndx, size_t* resultcount) {
-    return q->Avg(*t, column_ndx, resultcount, 0, size_t(-1), size_t(-1));
+    return q->average(*t, column_ndx, resultcount, 0, size_t(-1), size_t(-1));
 }
 
 double  query_avg_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
                          size_t start, size_t end, size_t limit) {
-    return q->Avg(*t, column_ndx, resultcount, start, end, limit);
+    return q->average(*t, column_ndx, resultcount, start, end, limit);
 }
 
 

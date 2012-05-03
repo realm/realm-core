@@ -222,7 +222,7 @@ public:
     std::size_t remove(BasicTable<Spec>& table, size_t start = 0, size_t end = size_t(-1),
                        size_t limit = size_t(-1)) const
     {
-        return m_impl.Delete(table, start, end, limit);
+        return m_impl.remove(table, start, end, limit);
     }
 
     operator typename tightdb::Query() const { return m_impl; } // FIXME: Bad thing to copy queries
@@ -602,18 +602,18 @@ public:
 
     std::size_t find_first(int64_t value) const
     {
-        return Base::m_table->find_first(col_idx, value);
+        return Base::m_table->find_first_int(col_idx, value);
     }
 
-    std::size_t FindPos(int64_t value) const
+    std::size_t find_pos(int64_t value) const
     {
-        return Base::m_table->GetColumn(col_idx).FindPos(value);
+        return Base::m_table->GetColumn(col_idx).find_pos(value);
     }
 
     TableView find_all(int64_t value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->find_all(tv, col_idx, value);
+        Base::m_table->find_all_int(tv, col_idx, value);
         return tv;
     }
 
@@ -641,13 +641,13 @@ public:
 
     std::size_t find_first(bool value) const
     {
-        return Base::m_table->find_first(col_idx, value);
+        return Base::m_table->find_first_bool(col_idx, value);
     }
 
     TableView find_all(bool value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->find_all(tv, col_idx, value);
+        Base::m_table->find_all_bool(tv, col_idx, value);
         return tv;
     }
 
@@ -669,13 +669,13 @@ public:
 
     std::size_t find_first(E value) const
     {
-        return Base::m_table->find_first(col_idx, (int64_t)value);
+        return Base::m_table->find_first_int(col_idx, (int64_t)value);
     }
 
     TableView find_all(E value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->find_all(tv, col_idx, (int64_t)value);
+        Base::m_table->find_all_int(tv, col_idx, (int64_t)value);
         return tv;
     }
 
@@ -697,13 +697,13 @@ public:
 
     std::size_t find_first(const char* value) const
     {
-        return Base::m_table->find_first(col_idx, value);
+        return Base::m_table->find_first_string(col_idx, value);
     }
 
     TableView find_all(const char* value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->find_all(tv, col_idx, value);
+        Base::m_table->find_all_string(tv, col_idx, value);
         return tv;
     }
 
