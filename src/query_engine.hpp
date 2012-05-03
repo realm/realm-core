@@ -376,4 +376,4 @@ public:
 
 }
 
-#endif __TIGHTDB_ENGINE_HPP
+#endif //__TIGHTDB_ENGINE_HPP
