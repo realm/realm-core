@@ -397,7 +397,7 @@
     <ClCompile Include="test\testindex.cpp" />
     <ClCompile Include="test\testquery.cpp" />
     <ClCompile Include="test\testtable.cpp" />
-    <ClCompile Include="test\testTableView.cpp" />
+    <ClCompile Include="test\testtableview.cpp" />
     <ClCompile Include="test\test_c_api.c" />
   </ItemGroup>
   <ItemGroup>
