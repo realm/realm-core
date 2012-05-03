@@ -356,7 +356,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="include\win32\pthread\pthread.c" />
     <ClCompile Include="src\alloc_slab.cpp" />
     <ClCompile Include="src\array.cpp" />
     <ClCompile Include="src\array_binary.cpp" />
@@ -378,6 +377,7 @@
     <ClCompile Include="src\table_view.cpp" />
     <ClCompile Include="src\utf8.cpp" />
     <ClCompile Include="src\utilities.cpp" />
+    <ClCompile Include="src\win32\pthread\pthread.c" />
     <ClCompile Include="test\large_tests\test_column.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
@@ -471,43 +471,43 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\column_type.hpp" />
-    <ClInclude Include="include\date.hpp" />
     <ClInclude Include="include\group.hpp" />
-    <ClInclude Include="include\impl\alloc.hpp" />
-    <ClInclude Include="include\impl\alloc_slab.hpp" />
-    <ClInclude Include="include\impl\array.hpp" />
-    <ClInclude Include="include\impl\array_blob.hpp" />
-    <ClInclude Include="include\impl\array_string.hpp" />
-    <ClInclude Include="include\impl\array_string_long.hpp" />
-    <ClInclude Include="include\impl\column_fwd.hpp" />
-    <ClInclude Include="include\impl\column_string.hpp" />
-    <ClInclude Include="include\impl\column_string_enum.hpp" />
-    <ClInclude Include="include\impl\meta.hpp" />
-    <ClInclude Include="include\impl\query_conditions.hpp" />
-    <ClInclude Include="include\impl\query_engine.hpp" />
-    <ClInclude Include="include\impl\utf8.hpp" />
-    <ClInclude Include="include\impl\utilities.hpp" />
-    <ClInclude Include="include\mixed.hpp" />
-    <ClInclude Include="include\query.hpp" />
-    <ClInclude Include="include\spec.hpp" />
     <ClInclude Include="include\table.hpp" />
-    <ClInclude Include="include\table_basic.hpp" />
-    <ClInclude Include="include\table_ref.hpp" />
-    <ClInclude Include="include\table_view.hpp" />
     <ClInclude Include="include\tightdb.hpp" />
-    <ClInclude Include="include\win32\pthread\pthread.h" />
+    <ClInclude Include="src\alloc.hpp" />
+    <ClInclude Include="src\alloc_slab.hpp" />
+    <ClInclude Include="src\array.hpp" />
     <ClInclude Include="src\array_binary.hpp" />
+    <ClInclude Include="src\array_blob.hpp" />
+    <ClInclude Include="src\array_string.hpp" />
+    <ClInclude Include="src\array_string_long.hpp" />
     <ClInclude Include="src\c-table.h" />
     <ClInclude Include="src\c-tightdb.h" />
     <ClInclude Include="src\column.hpp" />
     <ClInclude Include="src\column_binary.hpp" />
+    <ClInclude Include="src\column_fwd.hpp" />
     <ClInclude Include="src\column_mixed.hpp" />
+    <ClInclude Include="src\column_string.hpp" />
+    <ClInclude Include="src\column_string_enum.hpp" />
     <ClInclude Include="src\column_table.hpp" />
     <ClInclude Include="src\column_tpl.hpp" />
+    <ClInclude Include="src\column_type.hpp" />
+    <ClInclude Include="src\date.hpp" />
     <ClInclude Include="src\group_writer.hpp" />
     <ClInclude Include="src\index.hpp" />
+    <ClInclude Include="src\meta.hpp" />
+    <ClInclude Include="src\mixed.hpp" />
+    <ClInclude Include="src\query.hpp" />
+    <ClInclude Include="src\query_conditions.hpp" />
+    <ClInclude Include="src\query_engine.hpp" />
+    <ClInclude Include="src\spec.hpp" />
     <ClInclude Include="src\static_assert.hpp" />
+    <ClInclude Include="src\table_basic.hpp" />
+    <ClInclude Include="src\table_ref.hpp" />
+    <ClInclude Include="src\table_view.hpp" />
+    <ClInclude Include="src\utf8.hpp" />
+    <ClInclude Include="src\utilities.hpp" />
+    <ClInclude Include="src\win32\pthread\pthread.h" />
     <ClInclude Include="test\large_tests\verified_integer.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
