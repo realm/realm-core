@@ -380,34 +380,28 @@ void table_set_index(Table* t, size_t column_ndx) {
 }
 
 size_t table_find_int(const Table* t, size_t column_ndx, int value) {
-	return t->find_first_int(column_ndx, value);
+	return t->find_first(column_ndx, (int64_t)value);
 }
 
 size_t table_find_int64(const Table* t, size_t column_ndx, int64_t value) {
-	return t->find_first_int(column_ndx, value);
+	return t->find_first(column_ndx, value);
 }
 
 size_t table_find_bool(const Table* t, size_t column_ndx, bool value) {
-	return t->find_first_bool(column_ndx, value);
+	return t->find_first(column_ndx, value);
 }
 
 size_t table_find_date(const Table* t, size_t column_ndx, time_t value) {
-	return t->find_first_date(column_ndx, value);
+	return t->find_first(column_ndx, value);
 }
 
 size_t table_find_string(const Table* t, size_t column_ndx, const char* value) {
-	return t->find_first_string(column_ndx, value);
+	return t->find_first(column_ndx, value);
 }
 
 TableView* table_find_all_int64(Table* t, size_t column_ndx, int64_t value) {
 	TableView* tv = new TableView(*t);
-	t->find_all_int(*tv, column_ndx, value);
-	return tv;
-}
-
-TableView* table_find_all_hamming(Table* t, size_t column_ndx, uint64_t value, size_t max) {
-	TableView* tv = new TableView(*t);
-	t->find_all_hamming(*tv, column_ndx, value, max);
+	t->find_all(*tv, column_ndx, value);
 	return tv;
 }
 
@@ -493,22 +487,22 @@ void tableview_clear_table(TableView* tv, size_t column_ndx, size_t ndx) {
 /* Search and sort */
 
 size_t tableview_find(TableView* tv, size_t column_ndx, int64_t value) {
-    return tv->find_first_int(column_ndx, value);
+    return tv->find_first(column_ndx, value);
 }
 
 size_t tableview_find_string(TableView* tv, size_t column_ndx, const char* value) {
-    return tv->find_first_string(column_ndx, value);
+    return tv->find_first(column_ndx, value);
 }
 
 #if 0
 //??? Waiting for implementation
 void tableview_find_all(TableView* tv, size_t column_ndx, int64_t value) {
-    // ??? waiting for implementation: tv->find_all_int(*tv, column_ndx, value);
+    // ??? waiting for implementation: tv->find_all(*tv, column_ndx, value);
     assert(0);
 }
 
 void tableview_find_all_string(TableView* tv, size_t column_ndx, const char *value) {
-    tv->find_all_string(*tv, column_ndx, value);
+    tv->find_all(*tv, column_ndx, value);
 }
 #endif
 
@@ -666,13 +660,13 @@ Query*  query_string_contains(Query* q, size_t column_ndx, const char* value, Ca
 
 TableView*  query_find_all(Query* q, Table* t) {
     TableView* tv = new TableView(*t);
-    q->find_all_int(*t, *tv, 0, size_t(-1), size_t(-1));
+    q->find_all(*t, *tv, 0, size_t(-1), size_t(-1));
     return tv;
 }
 
 TableView*  query_find_all_range(Query* q, Table* t, size_t start, size_t end, size_t limit) {
     TableView* tv = new TableView(*t);
-    q->find_all_int(*t, *tv, start, end, limit);
+    q->find_all(*t, *tv, start, end, limit);
     return tv;
 }
 

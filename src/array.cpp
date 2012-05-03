@@ -621,7 +621,7 @@ size_t Array::FindPos2(int64_t target) const
 
 
 
-size_t Array::find_first_int(int64_t value, size_t start, size_t end) const
+size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
 #if defined(USE_SSE42) || defined(USE_SSE3)
     if(end == -1)
@@ -847,7 +847,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 }
 
 
-void Array::find_all_int(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
+void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
 {
     if (is_empty()) return;
     if (end == (size_t)-1) end = m_len;
@@ -862,7 +862,7 @@ void Array::find_all_int(Array& result, int64_t value, size_t colOffset, size_t 
 
     size_t f = start - 1;
     for(;;) {
-        f = find_first_int(value, f + 1, end);
+        f = find_first(value, f + 1, end);
         if (f == (size_t)-1)
             break;
         else

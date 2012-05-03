@@ -314,13 +314,13 @@ TEST(ColumnStringFind1)
     c.add("ghij");
     c.add("klmop");
 
-    size_t res1 = c.find_first_int("");
+    size_t res1 = c.find_first("");
     CHECK_EQUAL((size_t)-1, res1);
 
-    size_t res2 = c.find_first_int("xlmno hiuh iuh uih i huih i biuhui");
+    size_t res2 = c.find_first("xlmno hiuh iuh uih i huih i biuhui");
     CHECK_EQUAL((size_t)-1, res2);
 
-    size_t res3 = c.find_first_int("klmop");
+    size_t res3 = c.find_first("klmop");
     CHECK_EQUAL(4, res3);
 
     // Cleanup
@@ -340,16 +340,16 @@ TEST(ColumnStringFind2)
     // Add a string longer than 64 bytes to expand to long strings
     c.add("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx");
 
-    size_t res1 = c.find_first_int("");
+    size_t res1 = c.find_first("");
     CHECK_EQUAL((size_t)-1, res1);
 
-    size_t res2 = c.find_first_int("xlmno hiuh iuh uih i huih i biuhui");
+    size_t res2 = c.find_first("xlmno hiuh iuh uih i huih i biuhui");
     CHECK_EQUAL((size_t)-1, res2);
 
-    size_t res3 = c.find_first_int("klmop");
+    size_t res3 = c.find_first("klmop");
     CHECK_EQUAL(4, res3);
 
-    size_t res4 = c.find_first_int("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx");
+    size_t res4 = c.find_first("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx");
     CHECK_EQUAL(5, res4);
 
     // Cleanup
@@ -385,11 +385,11 @@ TEST(ColumnStringAutoEnumerate)
     }
 
     // Search for a value that does not exist
-    const size_t res1 = e.find_first_int("nonexist");
+    const size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL((size_t)-1, res1);
 
     // Search for an existing value
-    const size_t res2 = e.find_first_int("klmop");
+    const size_t res2 = e.find_first("klmop");
     CHECK_EQUAL(4, res2);
 
     // Cleanup
@@ -429,7 +429,7 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
     c.add("baz");
     c.add("foo");
 
-    c.find_all_int(col, "baz");
+    c.find_all(col, "baz");
 
     CHECK_EQUAL(2, col.Size());
 
@@ -448,7 +448,7 @@ TEST(AdaptiveStringColumnFindAllExpand)
     asc.add("sdfsd");
     asc.add("HEJ");
 
-    asc.find_all_int(c, "HEJ");
+    asc.find_all(c, "HEJ");
 
     CHECK_EQUAL(5, asc.Size());
     CHECK_EQUAL(3, c.Size());
@@ -465,7 +465,7 @@ TEST(AdaptiveStringColumnFindAllExpand)
 
     // Todo, should the API behaviour really require us to clear c manually?
     c.Clear();
-    asc.find_all_int(c, "HEJ");
+    asc.find_all(c, "HEJ");
 
     CHECK_EQUAL(10, asc.Size());
     CHECK_EQUAL(5, c.Size());
@@ -506,7 +506,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
     asc.add("HEJSA"); // 16
 
     c.Clear();
-    asc.find_all_int(c, "HEJSA", 0, 17);
+    asc.find_all(c, "HEJSA", 0, 17);
     CHECK_EQUAL(9, c.Size());
     CHECK_EQUAL(0, c.Get(0));
     CHECK_EQUAL(2, c.Get(1));
@@ -519,7 +519,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
     CHECK_EQUAL(16, c.Get(8));
 
     c.Clear();
-    asc.find_all_int(c, "HEJSA", 1, 16);
+    asc.find_all(c, "HEJSA", 1, 16);
     CHECK_EQUAL(7, c.Size());
     CHECK_EQUAL(2, c.Get(0));
     CHECK_EQUAL(4, c.Get(1));
@@ -560,7 +560,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
     asc.add("HEJSA"); // 16
 
     c.Clear();
-    asc.find_all_int(c, "HEJSA", 0, 17);
+    asc.find_all(c, "HEJSA", 0, 17);
     CHECK_EQUAL(9, c.Size());
     CHECK_EQUAL(0, c.Get(0));
     CHECK_EQUAL(2, c.Get(1));
@@ -573,7 +573,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
     CHECK_EQUAL(16, c.Get(8));
 
     c.Clear();
-    asc.find_all_int(c, "HEJSA", 1, 16);
+    asc.find_all(c, "HEJSA", 1, 16);
     CHECK_EQUAL(7, c.Size());
     CHECK_EQUAL(2, c.Get(0));
     CHECK_EQUAL(4, c.Get(1));

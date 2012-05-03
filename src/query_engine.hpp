@@ -13,7 +13,7 @@ public:
     ParentNode() : m_table(NULL) {}
     virtual ~ParentNode() {}
     virtual void Init(const Table& table) {m_table = &table; if (m_child) m_child->Init(table);}
-    virtual size_t find_first_int(size_t start, size_t end) = 0;
+    virtual size_t find_first(size_t start, size_t end) = 0;
 
     virtual std::string Verify(void)
     {
@@ -40,7 +40,7 @@ public:
     NODE(T v, size_t column) : m_value(v), m_column(column)  {m_child = 0;}
     ~NODE() {delete m_child; }
 
-    size_t find_first_int(size_t start, size_t end, const Table& table)
+    size_t find_first(size_t start, size_t end, const Table& table)
     {
         const C& column = (C&)(table.GetColumnBase(m_column));
         const F function = {};
@@ -50,7 +50,7 @@ public:
                 if (m_child == 0)
                     return s;
                 else {
-                    const size_t a = m_child->find_first_int(s, end, table);
+                    const size_t a = m_child->find_first(s, end, table);
                     if (s == a)
                         return s;
                     else
@@ -81,7 +81,7 @@ public:
         if (m_child2) m_child2->Init(table);
     }
 
-    size_t find_first_int(size_t start, size_t end)
+    size_t find_first(size_t start, size_t end)
     {
         assert(m_table);
         assert(m_child);
@@ -91,13 +91,13 @@ public:
 
             m_child->Init(*subtable);
             const size_t subsize = subtable->size();
-            const size_t sub = m_child->find_first_int(0, subsize);
+            const size_t sub = m_child->find_first(0, subsize);
 
             if(sub != subsize) {
                 if (m_child2 == 0)
                     return s;
                 else {
-                    const size_t a = m_child2->find_first_int(s, end);
+                    const size_t a = m_child2->find_first(s, end);
                     if (s == a)
                         return s;
                     else
@@ -126,7 +126,7 @@ public:
         if (m_child) m_child->Init(table);
     }
 
-    size_t find_first_int(size_t start, size_t end)
+    size_t find_first(size_t start, size_t end)
     {
         assert(m_table);
 
@@ -138,7 +138,7 @@ public:
             if (m_child == 0)
                 return s;
             else {
-                const size_t a = m_child->find_first_int(s, end);
+                const size_t a = m_child->find_first(s, end);
                 if (s == a)
                     return s;
                 else
@@ -183,7 +183,7 @@ public:
         if (m_child) m_child->Init(table);
     }
 
-    size_t find_first_int(size_t start, size_t end)
+    size_t find_first(size_t start, size_t end)
     {
         F function;// = {};
 
@@ -202,7 +202,7 @@ public:
                 if (m_child == 0)
                     return s;
                 else {
-                    const size_t a = m_child->find_first_int(s, end);
+                    const size_t a = m_child->find_first(s, end);
                     if (s == a)
                         return s;
                     else
@@ -246,19 +246,19 @@ public:
         if (m_child) m_child->Init(table);
     }
 
-    size_t find_first_int(size_t start, size_t end)
+    size_t find_first(size_t start, size_t end)
     {
         assert(m_table);
 
         for (size_t s = start; s < end; ++s) {
             // todo, can be optimized by placing outside loop
             if (m_column_type == COLUMN_TYPE_STRING)
-                s = ((const AdaptiveStringColumn*)m_column)->find_first_int(m_value, s, end);
+                s = ((const AdaptiveStringColumn*)m_column)->find_first(m_value, s, end);
             else {
                 if (m_key_ndx == size_t(-1)) s = end; // not in key set
                 else {
                     const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_column;
-                    s = cse->find_first_int(m_key_ndx, s, end);
+                    s = cse->find_first(m_key_ndx, s, end);
                 }
             }
 
@@ -268,7 +268,7 @@ public:
             if (m_child == 0)
                 return s;
             else {
-                const size_t a = m_child->find_first_int(s, end);
+                const size_t a = m_child->find_first(s, end);
                 if (s == a)
                     return s;
                 else
@@ -305,18 +305,18 @@ public:
         m_cond2->Init(table);
     }
 
-    size_t find_first_int(size_t start, size_t end)
+    size_t find_first(size_t start, size_t end)
     {
         for (size_t s = start; s < end; ++s) {
             // Todo, redundant searches can occur
-            const size_t f1 = m_cond1->find_first_int(s, end);
-            const size_t f2 = m_cond2->find_first_int(s, f1);
+            const size_t f1 = m_cond1->find_first(s, end);
+            const size_t f2 = m_cond2->find_first(s, f1);
             s = f1 < f2 ? f1 : f2;
 
             if (m_child == 0)
                 return s;
             else {
-                const size_t a = m_cond2->find_first_int(s, end);
+                const size_t a = m_cond2->find_first(s, end);
                 if (s == a)
                     return s;
                 else

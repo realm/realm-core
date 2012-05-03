@@ -20,8 +20,8 @@ public:
     void Set(std::size_t ndx, const char *value);
     void Delete(std::size_t ndx);
     void Clear();
-    std::size_t find_first_int(const char *value);
-    void find_all_int(tightdb::Array &c, const char *value, std::size_t start = 0, std::size_t end = -1);
+    std::size_t find_first(const char *value);
+    void find_all(tightdb::Array &c, const char *value, std::size_t start = 0, std::size_t end = -1);
     std::size_t Size(void);
     bool Verify(void);
     bool ConditionalVerify(void);

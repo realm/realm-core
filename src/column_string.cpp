@@ -167,14 +167,14 @@ void AdaptiveStringColumn::Delete(size_t ndx)
     TreeDelete<const char*, AdaptiveStringColumn>(ndx);
 }
 
-size_t AdaptiveStringColumn::find_first_int(const char* value, size_t start, size_t end) const
+size_t AdaptiveStringColumn::find_first(const char* value, size_t start, size_t end) const
 {
     assert(value);
     return TreeFind<const char*, AdaptiveStringColumn, EQUAL>(value, start, end);
 }
 
 
-void AdaptiveStringColumn::find_all_int(Array &result, const char* value, size_t start, size_t end) const
+void AdaptiveStringColumn::find_all(Array &result, const char* value, size_t start, size_t end) const
 {
     assert(value);
     TreeFindAll<const char*, AdaptiveStringColumn>(result, value, 0, start, end);
@@ -269,10 +269,10 @@ template<class F>size_t AdaptiveStringColumn::LeafFind(const char* value,
                                                        size_t start, size_t end) const
 {
         if (IsLongStrings()) {
-            return ((ArrayStringLong*)m_array)->find_first_int(value, start, end);
+            return ((ArrayStringLong*)m_array)->find_first(value, start, end);
         }
         else {
-            return ((ArrayString*)m_array)->find_first_int(value, start, end);
+            return ((ArrayString*)m_array)->find_first(value, start, end);
         }
 }
 
@@ -280,10 +280,10 @@ void AdaptiveStringColumn::LeafFindAll(Array &result, const char* value, size_t 
                                        size_t start, size_t end) const
 {
     if (IsLongStrings()) {
-        return ((ArrayStringLong*)m_array)->find_all_int(result, value, add_offset, start, end);
+        return ((ArrayStringLong*)m_array)->find_all(result, value, add_offset, start, end);
     }
     else {
-        return ((ArrayString*)m_array)->find_all_int(result, value, add_offset, start, end);
+        return ((ArrayString*)m_array)->find_all(result, value, add_offset, start, end);
     }
 }
 

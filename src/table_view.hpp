@@ -39,11 +39,11 @@ public:
     void remove(size_t ndx);
     void remove_last() { if (!is_empty()) remove(size()-1); }
 
-    // Finding
-    size_t  find_first_int(size_t column_ndx, int64_t value) const;
-    size_t  find_first_string(size_t column_ndx, const char* value) const;
-    void    find_all_int(TableView& tv, size_t column_ndx, int64_t value);
-    void    find_all_string(TableView& tv, size_t column_ndx, const char *value);
+    // Searching (Int and String)
+    size_t  find_first(size_t column_ndx, int64_t value) const;
+    size_t  find_first(size_t column_ndx, const char* value) const;
+    void    find_all(TableView& tv, size_t column_ndx, int64_t value);
+    void    find_all(TableView& tv, size_t column_ndx, const char *value);
 
     // Aggregate functions
     int64_t sum(size_t column_ndx) const;
@@ -52,17 +52,18 @@ public:
 
     void sort(size_t column, bool Ascending = true);
 
-    Table *get_table(); // todo, temporary for tests FIXME: Is this still needed????
+
 
     // Get row index in the source table this view is "looking" at.
     size_t get_source_ndx(size_t row_ndx) const {return m_refs.GetAsRef(row_ndx);}
 
 
-//protected:
+//protected: DON'T USE.
 //    friend Query;
 
-    Table& GetParent() {return m_table;}
-    Array& GetRefColumn() {return m_refs;}
+    Table *get_table(); // todo, temporary for tests FIXME: Is this still needed????
+    Table& get_parent() {return m_table;}
+    Array& get_ref_column() {return m_refs;}
     
 private:
     // Don't allow copying

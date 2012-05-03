@@ -193,13 +193,13 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind)
     c.add("ghij uihi i ih iu huih ui");
     c.add("klmno hiuh iuh uih i huih i biuhui");
 
-    size_t res1 = c.find_first_int("");
+    size_t res1 = c.find_first("");
     CHECK_EQUAL((size_t)-1, res1);
 
-    size_t res2 = c.find_first_int("xlmno hiuh iuh uih i huih i biuhui");
+    size_t res2 = c.find_first("xlmno hiuh iuh uih i huih i biuhui");
     CHECK_EQUAL((size_t)-1, res2);
 
-    size_t res3 = c.find_first_int("ghij uihi i ih iu huih ui");
+    size_t res3 = c.find_first("ghij uihi i ih iu huih ui");
     CHECK_EQUAL(3, res3);
 }
 

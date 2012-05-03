@@ -283,7 +283,7 @@ const char* Spec::get_column_name(size_t ndx) const
 
 size_t Spec::get_column_index(const char* name) const
 {
-    return m_names.find_first_int(name);
+    return m_names.find_first(name);
 }
 
 #ifdef _DEBUG
