@@ -46,9 +46,9 @@ TEST(TestQuerySimple)
 
     Query q1 = ttt.where().first.equal(2);
 
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(1, tv1.GetRef(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
 
 
@@ -117,58 +117,58 @@ TEST(TestQuerySubtable)
 
     Query *q1 = new Query;
     q1->greater(0, 200);
-    q1->Subtable(2);
+    q1->subtable(2);
     q1->less(0, 50);
     q1->parent();
-    TableView t1 = q1->FindAll(*table, 0, (size_t)-1);
+    TableView t1 = q1->find_all_int(*table, 0, (size_t)-1);
     CHECK_EQUAL(2, t1.size());
-    CHECK_EQUAL(1, t1.GetRef(0));
-    CHECK_EQUAL(2, t1.GetRef(1));
+    CHECK_EQUAL(1, t1.get_source_ndx(0));
+    CHECK_EQUAL(2, t1.get_source_ndx(1));
     delete q1;
 
 
     Query *q2 = new Query;
-    q2->Subtable(2);
+    q2->subtable(2);
     q2->greater(0, 50);
-    q2->or();
+    q2->Or();
     q2->less(0, 20);
     q2->parent();
-    TableView t2 = q2->FindAll(*table, 0, (size_t)-1);
+    TableView t2 = q2->find_all_int(*table, 0, (size_t)-1);
     CHECK_EQUAL(2, t2.size());
-    CHECK_EQUAL(0, t2.GetRef(0));
-    CHECK_EQUAL(3, t2.GetRef(1));
+    CHECK_EQUAL(0, t2.get_source_ndx(0));
+    CHECK_EQUAL(3, t2.get_source_ndx(1));
     delete q2;
 
 
     Query *q3 = new Query;
-    q3->Subtable(2);
+    q3->subtable(2);
     q3->greater(0, 50);
-    q3->or();
+    q3->Or();
     q3->less(0, 20);
     q3->parent();
     q3->less(0, 300);
-    TableView t3 = q3->FindAll(*table, 0, (size_t)-1);
+    TableView t3 = q3->find_all_int(*table, 0, (size_t)-1);
     CHECK_EQUAL(1, t3.size());
-    CHECK_EQUAL(0, t3.GetRef(0));
+    CHECK_EQUAL(0, t3.get_source_ndx(0));
     delete q3;
 
 
     Query *q4 = new Query;
     q4->equal(0, (int64_t)333);
-    q4->or();
-    q4->Subtable(2);
+    q4->Or();
+    q4->subtable(2);
     q4->greater(0, 50);
-    q4->or();
+    q4->Or();
     q4->less(0, 20);
     q4->parent();
-    TableView t4 = q4->FindAll(*table, 0, (size_t)-1);
+    TableView t4 = q4->find_all_int(*table, 0, (size_t)-1);
     delete q4;
 
 
     CHECK_EQUAL(3, t4.size());
-    CHECK_EQUAL(0, t4.GetRef(0));
-    CHECK_EQUAL(2, t4.GetRef(1));
-    CHECK_EQUAL(3, t4.GetRef(2));
+    CHECK_EQUAL(0, t4.get_source_ndx(0));
+    CHECK_EQUAL(2, t4.get_source_ndx(1));
+    CHECK_EQUAL(3, t4.get_source_ndx(2));
 }
 
 
@@ -188,13 +188,13 @@ TEST(TestQuerySort1)
     ttt.add(8, "a"); // 7
     ttt.add(7, "X"); // 8
 
-    // tv.GetRef()  = 0, 2, 3, 5, 6, 7, 8
+    // tv.get_source_ndx()  = 0, 2, 3, 5, 6, 7, 8
     // Vals         = 1, 3, 1, 3, 9, 8, 7
     // result       = 3, 0, 5, 2, 8, 7, 6
 
     Query q = ttt.where().first.not_equal(2);
-    TableView tv = q.FindAll(ttt);
-    tv.Sort(0);
+    TableView tv = q.find_all_int(ttt);
+    tv.sort(0);
 
     CHECK(tv.size() == 7);
     CHECK(tv.get_int(0, 0) == 1);
@@ -217,8 +217,8 @@ TEST(TestQuerySort_QuickSort)
         ttt.add(rand() % 1100, "a"); // 0
 
     Query q = ttt.where();
-    TableView tv = q.FindAll(ttt);
-    tv.Sort(0);
+    TableView tv = q.find_all_int(ttt);
+    tv.sort(0);
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
@@ -235,8 +235,8 @@ TEST(TestQuerySort_CountSort)
         ttt.add(rand() % 900, "a"); // 0
 
     Query q = ttt.where();
-    TableView tv = q.FindAll(ttt);
-    tv.Sort(0);
+    TableView tv = q.find_all_int(ttt);
+    tv.sort(0);
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
@@ -253,8 +253,8 @@ TEST(TestQuerySort_Descending)
         ttt.add(rand() % 1100, "a"); // 0
 
     Query q = ttt.where();
-    TableView tv = q.FindAll(ttt);
-    tv.Sort(0, false);
+    TableView tv = q.find_all_int(ttt);
+    tv.sort(0, false);
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
@@ -276,14 +276,14 @@ TEST(TestQuerySort_Dates)
     table.insert_done();
 
     Query *q = new Query();
-    TableView tv = q->FindAll(table);
+    TableView tv = q->find_all_int(table);
     delete q;
     CHECK(tv.size() == 3);
-    CHECK(tv.GetRef(0) == 0);
-    CHECK(tv.GetRef(1) == 1);
-    CHECK(tv.GetRef(2) == 2);
+    CHECK(tv.get_source_ndx(0) == 0);
+    CHECK(tv.get_source_ndx(1) == 1);
+    CHECK(tv.get_source_ndx(2) == 2);
 
-    tv.Sort(0);
+    tv.sort(0);
 
     CHECK(tv.size() == 3);
     CHECK(tv.get_date(0, 0) == 1000);
@@ -305,9 +305,9 @@ TEST(TestQuerySort_Bools)
     table.insert_done();
 
     Query *q = new Query();
-    TableView tv = q->FindAll(table);
+    TableView tv = q->find_all_int(table);
     delete q;
-    tv.Sort(0);
+    tv.sort(0);
 
     CHECK(tv.size() == 3);
     CHECK(tv.get_bool(0, 0) == false);
@@ -338,11 +338,11 @@ TEST(TestQueryThreads)
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
     //q1.SetThreads(5);
-    TableView tv = q1.FindAll(ttt);
+    TableView tv = q1.find_all_int(ttt);
 
     CHECK_EQUAL(100, tv.size());
     for(int i = 0; i < 100; i++) {
-        CHECK_EQUAL(i*7*10 + 14 + 1, tv.GetRef(i));
+        CHECK_EQUAL(i*7*10 + 14 + 1, tv.get_source_ndx(i));
     }
 }
 
@@ -363,11 +363,11 @@ TEST(TestQuerySimple2)
     ttt.add(3, "X");
 
     Query q1 = ttt.where().first.equal(2);
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(1, tv1.GetRef(0));
-    CHECK_EQUAL(4, tv1.GetRef(1));
-    CHECK_EQUAL(7, tv1.GetRef(2));
+    CHECK_EQUAL(1, tv1.get_source_ndx(0));
+    CHECK_EQUAL(4, tv1.get_source_ndx(1));
+    CHECK_EQUAL(7, tv1.get_source_ndx(2));
 }
 
 
@@ -393,19 +393,19 @@ TEST(TestQueryLimit)
 
     Query q1 = ttt.where().first.equal(2);
 
-    TableView tv1 = q1.FindAll(ttt, 0, (size_t)-1, 2);
+    TableView tv1 = q1.find_all_int(ttt, 0, (size_t)-1, 2);
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(1, tv1.GetRef(0));
-    CHECK_EQUAL(4, tv1.GetRef(1));
+    CHECK_EQUAL(1, tv1.get_source_ndx(0));
+    CHECK_EQUAL(4, tv1.get_source_ndx(1));
 
-    TableView tv2 = q1.FindAll(ttt, tv1.GetRef(tv1.size() - 1) + 1, (size_t)-1, 2);
+    TableView tv2 = q1.find_all_int(ttt, tv1.get_source_ndx(tv1.size() - 1) + 1, (size_t)-1, 2);
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(7, tv2.GetRef(0));
-    CHECK_EQUAL(10, tv2.GetRef(1));
+    CHECK_EQUAL(7, tv2.get_source_ndx(0));
+    CHECK_EQUAL(10, tv2.get_source_ndx(1));
 
-    TableView tv3 = q1.FindAll(ttt, tv2.GetRef(tv2.size() - 1) + 1, (size_t)-1, 2);
+    TableView tv3 = q1.find_all_int(ttt, tv2.get_source_ndx(tv2.size() - 1) + 1, (size_t)-1, 2);
     CHECK_EQUAL(1, tv3.size());
-    CHECK_EQUAL(13, tv3.GetRef(0));
+    CHECK_EQUAL(13, tv3.get_source_ndx(0));
 }
 
 TEST(TestQueryFindNext)
@@ -444,13 +444,13 @@ TEST(TestQueryFindAll1)
     ttt.add(7, "X");
 
     Query q1 = ttt.where().second.equal("a").first.greater(2).first.not_equal(4);
-    TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(4, tv1.GetRef(0));
+    TableView tv1 = q1.find_all_int(ttt);
+    CHECK_EQUAL(4, tv1.get_source_ndx(0));
 
     Query q2 = ttt.where().second.equal("X").first.greater(4);
-    TableView tv2 = q2.FindAll(ttt);
-    CHECK_EQUAL(5, tv2.GetRef(0));
-    CHECK_EQUAL(6, tv2.GetRef(1));
+    TableView tv2 = q2.find_all_int(ttt);
+    CHECK_EQUAL(5, tv2.get_source_ndx(0));
+    CHECK_EQUAL(6, tv2.get_source_ndx(1));
 
 }
 
@@ -467,8 +467,8 @@ TEST(TestQueryFindAll2)
     ttt.add(0, "X");
 
     Query q2 = ttt.where().second.not_equal("a").first.less(3);
-    TableView tv2 = q2.FindAll(ttt);
-    CHECK_EQUAL(6, tv2.GetRef(0));
+    TableView tv2 = q2.find_all_int(ttt);
+    CHECK_EQUAL(6, tv2.get_source_ndx(0));
 }
 
 TEST(TestQueryFindAllBetween)
@@ -484,11 +484,11 @@ TEST(TestQueryFindAllBetween)
     ttt.add(3, "X");
 
     Query q2 = ttt.where().first.between(3, 5);
-    TableView tv2 = q2.FindAll(ttt);
-    CHECK_EQUAL(2, tv2.GetRef(0));
-    CHECK_EQUAL(3, tv2.GetRef(1));
-    CHECK_EQUAL(4, tv2.GetRef(2));
-    CHECK_EQUAL(6, tv2.GetRef(3));
+    TableView tv2 = q2.find_all_int(ttt);
+    CHECK_EQUAL(2, tv2.get_source_ndx(0));
+    CHECK_EQUAL(3, tv2.get_source_ndx(1));
+    CHECK_EQUAL(4, tv2.get_source_ndx(2));
+    CHECK_EQUAL(6, tv2.get_source_ndx(3));
 }
 
 
@@ -501,8 +501,8 @@ TEST(TestQueryFindAll_Range)
     ttt.add(5, "a");
 
     Query q1 = ttt.where().second.equal("a").first.greater(2).first.not_equal(4);
-    TableView tv1 = q1.FindAll(ttt, 1, 2);
-    CHECK_EQUAL(1, tv1.GetRef(0));
+    TableView tv1 = q1.find_all_int(ttt, 1, 2);
+    CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
 
 
@@ -519,12 +519,12 @@ TEST(TestQueryFindAll_Or)
     ttt.add(7, "X");
 
     // first == 5 || second == X
-    Query q1 = ttt.where().first.equal(5).or().second.equal("X");
-    TableView tv1 = q1.FindAll(ttt);
+    Query q1 = ttt.where().first.equal(5).Or().second.equal("X");
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(2, tv1.GetRef(0));
-    CHECK_EQUAL(4, tv1.GetRef(1));
-    CHECK_EQUAL(6, tv1.GetRef(2));
+    CHECK_EQUAL(2, tv1.get_source_ndx(0));
+    CHECK_EQUAL(4, tv1.get_source_ndx(1));
+    CHECK_EQUAL(6, tv1.get_source_ndx(2));
 }
 
 
@@ -542,9 +542,9 @@ TEST(TestQueryFindAll_Parans1)
 
     // first > 3 && (second == X)
     Query q1 = ttt.where().first.greater(3).group().second.equal("X").end_group();
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(6, tv1.GetRef(0));
+    CHECK_EQUAL(6, tv1.get_source_ndx(0));
 }
 
 
@@ -562,12 +562,12 @@ TEST(TestQueryFindAll_OrParan)
     ttt.add(2, "X");
 
     // (first == 5 || second == X && first > 2)
-    Query q1 = ttt.where().group().first.equal(5).or().second.equal("X").first.greater(2).end_group();
-    TableView tv1 = q1.FindAll(ttt);
+    Query q1 = ttt.where().group().first.equal(5).Or().second.equal("X").first.greater(2).end_group();
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(2, tv1.GetRef(0));
-    CHECK_EQUAL(4, tv1.GetRef(1));
-    CHECK_EQUAL(6, tv1.GetRef(2));
+    CHECK_EQUAL(2, tv1.get_source_ndx(0));
+    CHECK_EQUAL(4, tv1.get_source_ndx(1));
+    CHECK_EQUAL(6, tv1.get_source_ndx(2));
 }
 
 
@@ -585,11 +585,11 @@ TEST(TestQueryFindAll_OrNested0)
     ttt.add(8, "Y");
 
     // first > 3 && (first == 5 || second == X)
-    Query q1 = ttt.where().first.greater(3).group().first.equal(5).or().second.equal("X").end_group();
-    TableView tv1 = q1.FindAll(ttt);
+    Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().second.equal("X").end_group();
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(5, tv1.GetRef(0));
-    CHECK_EQUAL(6, tv1.GetRef(1));
+    CHECK_EQUAL(5, tv1.get_source_ndx(0));
+    CHECK_EQUAL(6, tv1.get_source_ndx(1));
 }
 
 TEST(TestQueryFindAll_OrNested)
@@ -606,11 +606,11 @@ TEST(TestQueryFindAll_OrNested)
     ttt.add(8, "Y");
 
     // first > 3 && (first == 5 || (second == X || second == Y))
-    Query q1 = ttt.where().first.greater(3).group().first.equal(5).or().group().second.equal("X").or().second.equal("Y").end_group().end_group();
-    TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(5, tv1.GetRef(0));
-    CHECK_EQUAL(6, tv1.GetRef(1));
-    CHECK_EQUAL(7, tv1.GetRef(2));
+    Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().group().second.equal("X").Or().second.equal("Y").end_group().end_group();
+    TableView tv1 = q1.find_all_int(ttt);
+    CHECK_EQUAL(5, tv1.get_source_ndx(0));
+    CHECK_EQUAL(6, tv1.get_source_ndx(1));
+    CHECK_EQUAL(7, tv1.get_source_ndx(2));
 }
 
 TEST(TestQueryFindAll_OrPHP)
@@ -622,9 +622,9 @@ TEST(TestQueryFindAll_OrPHP)
     ttt.add(3, "Jim");
 
     // (second == Jim || second == Joe) && first = 1
-    Query q1 = ttt.where().group().second.equal("Jim").or().second.equal("Joe").end_group().first.equal(1);
-    TableView tv1 = q1.FindAll(ttt);
-    CHECK_EQUAL(0, tv1.GetRef(0));
+    Query q1 = ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(1);
+    TableView tv1 = q1.find_all_int(ttt);
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
 
 
@@ -643,11 +643,11 @@ TEST(TestQueryFindAll_Parans2)
 
     // ()((first > 3()) && (()))
     Query q1 = ttt.where().group().end_group().group().group().first.greater(3).group().end_group().end_group().group().group().end_group().end_group().end_group();
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(4, tv1.GetRef(0));
-    CHECK_EQUAL(5, tv1.GetRef(1));
-    CHECK_EQUAL(6, tv1.GetRef(2));
+    CHECK_EQUAL(4, tv1.get_source_ndx(0));
+    CHECK_EQUAL(5, tv1.get_source_ndx(1));
+    CHECK_EQUAL(6, tv1.get_source_ndx(2));
 }
 
 TEST(TestQueryFindAll_Parans4)
@@ -664,7 +664,7 @@ TEST(TestQueryFindAll_Parans4)
 
     // ()
     Query q1 = ttt.where().group().end_group();
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(7, tv1.size());
 }
 
@@ -679,14 +679,14 @@ TEST(TestQueryFindAll_Bool)
     btt.add(3, false);
 
     Query q1 = btt.where().second.equal(true);
-    TableView tv1 = q1.FindAll(btt);
-    CHECK_EQUAL(0, tv1.GetRef(0));
-    CHECK_EQUAL(2, tv1.GetRef(1));
+    TableView tv1 = q1.find_all_int(btt);
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(2, tv1.get_source_ndx(1));
 
     Query q2 = btt.where().second.equal(false);
-    TableView tv2 = q2.FindAll(btt);
-    CHECK_EQUAL(1, tv2.GetRef(0));
-    CHECK_EQUAL(3, tv2.GetRef(1));
+    TableView tv2 = q2.find_all_int(btt);
+    CHECK_EQUAL(1, tv2.get_source_ndx(0));
+    CHECK_EQUAL(3, tv2.get_source_ndx(1));
 }
 
 TEST(TestQueryFindAll_Begins)
@@ -698,10 +698,10 @@ TEST(TestQueryFindAll_Begins)
     ttt.add(0, "foobar");
 
     Query q1 = ttt.where().second.begins_with("foo");
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(1, tv1.GetRef(0));
-    CHECK_EQUAL(2, tv1.GetRef(1));
+    CHECK_EQUAL(1, tv1.get_source_ndx(0));
+    CHECK_EQUAL(2, tv1.get_source_ndx(1));
 }
 
 TEST(TestQueryFindAll_Ends)
@@ -713,9 +713,9 @@ TEST(TestQueryFindAll_Ends)
     ttt.add(0, "barfoobar");
 
     Query q1 = ttt.where().second.ends_with("foo");
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(1, tv1.GetRef(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
 
 
@@ -732,12 +732,12 @@ TEST(TestQueryFindAll_Contains)
     ttt.add(0, "barfo");
 
     Query q1 = ttt.where().second.contains("foo");
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(4, tv1.size());
-    CHECK_EQUAL(0, tv1.GetRef(0));
-    CHECK_EQUAL(1, tv1.GetRef(1));
-    CHECK_EQUAL(2, tv1.GetRef(2));
-    CHECK_EQUAL(3, tv1.GetRef(3));
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(1));
+    CHECK_EQUAL(2, tv1.get_source_ndx(2));
+    CHECK_EQUAL(3, tv1.get_source_ndx(3));
 }
 
 TEST(TestQueryEnums)
@@ -755,14 +755,14 @@ TEST(TestQueryEnums)
     table.optimize();
 
     Query q1 = table.where().second.equal("eftg");
-    TableView tv1 = q1.FindAll(table);
+    TableView tv1 = q1.find_all_int(table);
 
     CHECK_EQUAL(5, tv1.size());
-    CHECK_EQUAL(1, tv1.GetRef(0));
-    CHECK_EQUAL(6, tv1.GetRef(1));
-    CHECK_EQUAL(11, tv1.GetRef(2));
-    CHECK_EQUAL(16, tv1.GetRef(3));
-    CHECK_EQUAL(21, tv1.GetRef(4));
+    CHECK_EQUAL(1, tv1.get_source_ndx(0));
+    CHECK_EQUAL(6, tv1.get_source_ndx(1));
+    CHECK_EQUAL(11, tv1.get_source_ndx(2));
+    CHECK_EQUAL(16, tv1.get_source_ndx(3));
+    CHECK_EQUAL(21, tv1.get_source_ndx(4));
 }
 
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
@@ -779,9 +779,9 @@ TEST(TestQueryCaseSensitivity)
     ttt.add(1, "BLAAbaergroed");
 
     Query q1 = ttt.where().second.equal("blaabaerGROED", false);
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(0, tv1.GetRef(0));
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
 
 TEST(TestQueryUnicode2)
@@ -794,21 +794,21 @@ TEST(TestQueryUnicode2)
     ttt.add(1, uyd);
 
     Query q1 = ttt.where().second.equal(uY, false);
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(0, tv1.GetRef(0));
-    CHECK_EQUAL(2, tv1.GetRef(1));
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(2, tv1.get_source_ndx(1));
 
     Query q2 = ttt.where().second.equal(uYd, false);
-    TableView tv2 = q2.FindAll(ttt);
+    TableView tv2 = q2.find_all_int(ttt);
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(1, tv2.GetRef(0));
-    CHECK_EQUAL(3, tv2.GetRef(1));
+    CHECK_EQUAL(1, tv2.get_source_ndx(0));
+    CHECK_EQUAL(3, tv2.get_source_ndx(1));
 
     Query q3 = ttt.where().second.equal(uYd, true);
-    TableView tv3 = q3.FindAll(ttt);
+    TableView tv3 = q3.find_all_int(ttt);
     CHECK_EQUAL(1, tv3.size());
-    CHECK_EQUAL(1, tv3.GetRef(0));
+    CHECK_EQUAL(1, tv3.get_source_ndx(0));
 }
 
 #define uA  "\x0c3\x085"         // danish capital A with ring above (as in BLAABAERGROED)
@@ -826,28 +826,28 @@ TEST(TestQueryUnicode3)
     ttt.add(1, uad);
 
     Query q1 = ttt.where().second.equal(uA, false);
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(0, tv1.GetRef(0));
-    CHECK_EQUAL(2, tv1.GetRef(1));
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(2, tv1.get_source_ndx(1));
 
     Query q2 = ttt.where().second.equal(ua, false);
-    TableView tv2 = q2.FindAll(ttt);
+    TableView tv2 = q2.find_all_int(ttt);
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(0, tv2.GetRef(0));
-    CHECK_EQUAL(2, tv2.GetRef(1));
+    CHECK_EQUAL(0, tv2.get_source_ndx(0));
+    CHECK_EQUAL(2, tv2.get_source_ndx(1));
 
 
     Query q3 = ttt.where().second.equal(uad, false);
-    TableView tv3 = q3.FindAll(ttt);
+    TableView tv3 = q3.find_all_int(ttt);
     CHECK_EQUAL(2, tv3.size());
-    CHECK_EQUAL(1, tv3.GetRef(0));
-    CHECK_EQUAL(3, tv3.GetRef(1));
+    CHECK_EQUAL(1, tv3.get_source_ndx(0));
+    CHECK_EQUAL(3, tv3.get_source_ndx(1));
 
     Query q4 = ttt.where().second.equal(uad, true);
-    TableView tv4 = q4.FindAll(ttt);
+    TableView tv4 = q4.find_all_int(ttt);
     CHECK_EQUAL(1, tv4.size());
-    CHECK_EQUAL(3, tv4.GetRef(0));
+    CHECK_EQUAL(3, tv4.get_source_ndx(0));
 }
 
 
@@ -860,10 +860,10 @@ TEST(TestQueryFindAll_BeginsUNICODE)
     ttt.add(0, uad "foobar");
 
     Query q1 = ttt.where().second.begins_with(uad "foo");
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(1, tv1.GetRef(0));
-    CHECK_EQUAL(2, tv1.GetRef(1));
+    CHECK_EQUAL(1, tv1.get_source_ndx(0));
+    CHECK_EQUAL(2, tv1.get_source_ndx(1));
 }
 
 
@@ -876,14 +876,14 @@ TEST(TestQueryFindAll_EndsUNICODE)
     ttt.add(0, "barfoobar");
 
     Query q1 = ttt.where().second.ends_with("foo" uad);
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(1, tv1.GetRef(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(0));
 
     Query q2 = ttt.where().second.ends_with("foo" uAd, false);
-    TableView tv2 = q2.FindAll(ttt);
+    TableView tv2 = q2.find_all_int(ttt);
     CHECK_EQUAL(1, tv2.size());
-    CHECK_EQUAL(1, tv2.GetRef(0));
+    CHECK_EQUAL(1, tv2.get_source_ndx(0));
 }
 
 
@@ -900,20 +900,20 @@ TEST(TestQueryFindAll_ContainsUNICODE)
     ttt.add(0, uad "barfo");
 
     Query q1 = ttt.where().second.contains(uad "foo");
-    TableView tv1 = q1.FindAll(ttt);
+    TableView tv1 = q1.find_all_int(ttt);
     CHECK_EQUAL(4, tv1.size());
-    CHECK_EQUAL(0, tv1.GetRef(0));
-    CHECK_EQUAL(1, tv1.GetRef(1));
-    CHECK_EQUAL(2, tv1.GetRef(2));
-    CHECK_EQUAL(3, tv1.GetRef(3));
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(1));
+    CHECK_EQUAL(2, tv1.get_source_ndx(2));
+    CHECK_EQUAL(3, tv1.get_source_ndx(3));
 
     Query q2 = ttt.where().second.contains(uAd "foo", false);
-    TableView tv2 = q1.FindAll(ttt);
+    TableView tv2 = q1.find_all_int(ttt);
     CHECK_EQUAL(4, tv2.size());
-    CHECK_EQUAL(0, tv2.GetRef(0));
-    CHECK_EQUAL(1, tv2.GetRef(1));
-    CHECK_EQUAL(2, tv2.GetRef(2));
-    CHECK_EQUAL(3, tv2.GetRef(3));
+    CHECK_EQUAL(0, tv2.get_source_ndx(0));
+    CHECK_EQUAL(1, tv2.get_source_ndx(1));
+    CHECK_EQUAL(2, tv2.get_source_ndx(2));
+    CHECK_EQUAL(3, tv2.get_source_ndx(3));
 }
 
 #endif
@@ -935,11 +935,11 @@ TEST(TestQuerySyntaxCheck)
     s = q2.Verify();
     CHECK(s != "");
 
-    Query q3 = ttt.where().first.equal(2).or();
+    Query q3 = ttt.where().first.equal(2).Or();
     s = q3.Verify();
     CHECK(s != "");
 
-    Query q4 = ttt.where().or().first.equal(2);
+    Query q4 = ttt.where().Or().first.equal(2);
     s = q4.Verify();
     CHECK(s != "");
 

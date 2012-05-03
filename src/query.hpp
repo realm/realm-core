@@ -164,7 +164,7 @@ public:
         update_override.push_back(0);
         first.push_back(0);
     };
-    void or()
+    void Or()
     {
         ParentNode* const o = new OR_NODE(first[first.size()-1]);
         first[first.size()-1] = o;
@@ -172,7 +172,7 @@ public:
         update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
     };
 
-    void Subtable(size_t column)
+    void subtable(size_t column)
     {
 
         ParentNode* const p = new SUBTABLE(column);
@@ -219,19 +219,19 @@ public:
         if (lastmatch == (size_t)-1) Init(table);
         
         const size_t end = table.size();
-        const size_t res = first[0]->Find(lastmatch + 1, end);
+        const size_t res = first[0]->find_first_int(lastmatch + 1, end);
         
         return (res == end) ? -1 : res;
     }
 
-    TableView FindAll(Table& table, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1))
+    TableView find_all_int(Table& table, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1))
     {
         TableView tv(table);
-        FindAll(table, tv, start, end, limit);
+        find_all_int(table, tv, start, end, limit);
         return tv;
     }
 
-    void FindAll(Table& table, TableView& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1))
+    void find_all_int(Table& table, TableView& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1))
     {
         Init(table);
 
@@ -254,7 +254,7 @@ public:
 
             // Use single threading
             for(;;) {
-                r = first[0]->Find(r + 1, table_size);
+                r = first[0]->find_first_int(r + 1, table_size);
                 if (r == table_size || tv.size() == limit)
                     break;
                 tv.GetRefColumn().add(r);
@@ -477,7 +477,7 @@ protected:
 
         size_t r;
         if (first[0] != 0)
-            r = first[0]->Find(start, end);
+            r = first[0]->find_first_int(start, end);
         else
             r = start; // user built an empty query; return any first
 
@@ -532,7 +532,7 @@ protected:
 
                 // Execute job
                 for(;;) {
-                    r = ts->node->Find(r + 1, end);
+                    r = ts->node->find_first_int(r + 1, end);
                     if(r == end)
                         break;
                     res.push_back(r);

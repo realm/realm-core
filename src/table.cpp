@@ -961,34 +961,34 @@ int64_t Table::minimum(size_t column_ndx) const
     return mv;
 }
 
-size_t Table::Find(size_t column_ndx, int64_t value) const
+size_t Table::find_first_int(size_t column_ndx, int64_t value) const
 {
     assert(column_ndx < m_columns.Size());
     assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_INT);
     const Column& column = GetColumn(column_ndx);
 
-    return column.Find(value);
+    return column.find_first_int(value);
 }
 
-size_t Table::FindBool(size_t column_ndx, bool value) const
+size_t Table::find_first_bool(size_t column_ndx, bool value) const
 {
     assert(column_ndx < m_columns.Size());
     assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_BOOL);
     const Column& column = GetColumn(column_ndx);
 
-    return column.Find(value ? 1 : 0);
+    return column.find_first_int(value ? 1 : 0);
 }
 
-size_t Table::FindDate(size_t column_ndx, time_t value) const
+size_t Table::find_first_date(size_t column_ndx, time_t value) const
 {
     assert(column_ndx < m_columns.Size());
     assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_DATE);
     const Column& column = GetColumn(column_ndx);
 
-    return column.Find((int64_t)value);
+    return column.find_first_int((int64_t)value);
 }
 
-size_t Table::FindString(size_t column_ndx, const char* value) const
+size_t Table::find_first_string(size_t column_ndx, const char* value) const
 {
     assert(column_ndx < m_columns.Size());
 
@@ -996,36 +996,46 @@ size_t Table::FindString(size_t column_ndx, const char* value) const
 
     if (type == COLUMN_TYPE_STRING) {
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        return column.Find(value);
+        return column.find_first_int(value);
     }
     else {
         assert(type == COLUMN_TYPE_STRING_ENUM);
         const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        return column.Find(value);
+        return column.find_first_int(value);
     }
 }
 
-void Table::FindAll(TableView& tv, size_t column_ndx, int64_t value)
+void Table::find_all_int(TableView& tv, size_t column_ndx, int64_t value)
 {
     assert(column_ndx < m_columns.Size());
     assert(&tv.GetParent() == this);
 
     const Column& column = GetColumn(column_ndx);
 
-    column.FindAll(tv.GetRefColumn(), value);
+    column.find_all_int(tv.GetRefColumn(), value);
 }
 
-void Table::FindAllBool(TableView& tv, size_t column_ndx, bool value)
+void Table::find_all_bool(TableView& tv, size_t column_ndx, bool value)
 {
     assert(column_ndx < m_columns.Size());
     assert(&tv.GetParent() == this);
 
     const Column& column = GetColumn(column_ndx);
 
-    column.FindAll(tv.GetRefColumn(), value ? 1 :0);
+    column.find_all_int(tv.GetRefColumn(), value ? 1 :0);
 }
 
-void Table::FindAllString(TableView& tv, size_t column_ndx, const char *value)
+void Table::find_all_date(TableView& tv, size_t column_ndx, time_t value)
+{
+    assert(column_ndx < m_columns.Size());
+    assert(&tv.GetParent() == this);
+
+    const Column& column = GetColumn(column_ndx);
+
+    column.find_all_int(tv.GetRefColumn(), (int64_t)value);
+}
+
+void Table::find_all_string(TableView& tv, size_t column_ndx, const char *value)
 {
     assert(column_ndx < m_columns.Size());
     assert(&tv.GetParent() == this);
@@ -1034,25 +1044,25 @@ void Table::FindAllString(TableView& tv, size_t column_ndx, const char *value)
 
     if (type == COLUMN_TYPE_STRING) {
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        column.FindAll(tv.GetRefColumn(), value);
+        column.find_all_int(tv.GetRefColumn(), value);
     }
     else {
         assert(type == COLUMN_TYPE_STRING_ENUM);
         const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        column.FindAll(tv.GetRefColumn(), value);
+        column.find_all_int(tv.GetRefColumn(), value);
     }
 }
 
 
 
-void Table::FindAllHamming(TableView& tv, size_t column_ndx, uint64_t value, size_t max)
+void Table::find_all_hamming(TableView& tv, size_t column_ndx, uint64_t value, size_t max)
 {
     assert(column_ndx < m_columns.Size());
     assert(&tv.GetParent() == this);
 
     const Column& column = GetColumn(column_ndx);
 
-    column.FindAllHamming(tv.GetRefColumn(), value, max);
+    column.find_all_hamming(tv.GetRefColumn(), value, max);
 }
 
 void Table::optimize()

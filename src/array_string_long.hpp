@@ -26,8 +26,8 @@ public:
     void Resize(size_t ndx);
     void Clear();
 
-    size_t Find(const char* value, size_t start=0 , size_t end=-1) const;
-    void FindAll(Array &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+    size_t find_first_int(const char* value, size_t start=0 , size_t end=-1) const;
+    void find_all_int(Array &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
 #ifdef _DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;

@@ -330,7 +330,7 @@ TEST_FIXTURE(db_setup_array, Array_DeleteAll)
 TEST_FIXTURE(db_setup_array, Array_Find1)
 {
     // Look for a non-existing value
-    size_t res = c.Find(10);
+    size_t res = c.find_first_int(10);
 
     CHECK_EQUAL(res, -1);
 }
@@ -342,7 +342,7 @@ TEST_FIXTURE(db_setup_array, Array_Find2)
     c.add(0);
     c.add(0);
 
-    size_t res = c.Find(0);
+    size_t res = c.find_first_int(0);
     CHECK_EQUAL(res, 0);
 }
 
@@ -351,7 +351,7 @@ TEST_FIXTURE(db_setup_array, Array_Find3)
     // expand to 1-bit width
     c.add(1);
 
-    size_t res = c.Find(1);
+    size_t res = c.find_first_int(1);
     CHECK_EQUAL(res, 2);
 }
 
@@ -360,7 +360,7 @@ TEST_FIXTURE(db_setup_array, Array_Find4)
     // expand to 2-bit width
     c.add(2);
 
-    size_t res = c.Find(2);
+    size_t res = c.find_first_int(2);
     CHECK_EQUAL(res, 3);
 }
 
@@ -369,7 +369,7 @@ TEST_FIXTURE(db_setup_array, Array_Find5)
     // expand to 4-bit width
     c.add(4);
 
-    size_t res = c.Find(4);
+    size_t res = c.find_first_int(4);
     CHECK_EQUAL(res, 4);
 }
 
@@ -383,7 +383,7 @@ TEST_FIXTURE(db_setup_array, Array_Find6)
     c.add(16);
     c.add(7);
 
-    size_t res = c.Find(7);
+    size_t res = c.find_first_int(7);
     CHECK_EQUAL(7, res);
 }
 
@@ -392,7 +392,7 @@ TEST_FIXTURE(db_setup_array, Array_Find7)
     // expand to 16-bit width
     c.add(256);
 
-    size_t res = c.Find(256);
+    size_t res = c.find_first_int(256);
     CHECK_EQUAL(8, res);
 }
 
@@ -401,7 +401,7 @@ TEST_FIXTURE(db_setup_array, Array_Find8)
     // expand to 32-bit width
     c.add(65536);
 
-    size_t res = c.Find(65536);
+    size_t res = c.find_first_int(65536);
     CHECK_EQUAL(9, res);
 }
 
@@ -410,7 +410,7 @@ TEST_FIXTURE(db_setup_array, Array_Find9)
     // expand to 64-bit width
     c.add(4294967296LL);
 
-    size_t res = c.Find(4294967296LL);
+    size_t res = c.find_first_int(4294967296LL);
     CHECK_EQUAL(10, res);
 }
 
@@ -424,9 +424,9 @@ TEST_FIXTURE(db_setup_array, Array_PartialFind1)
         c.add(i);
     }
 
-    CHECK_EQUAL(-1, c.Find(PARTIAL_COUNT+1, 0, PARTIAL_COUNT));
-    CHECK_EQUAL(-1, c.Find(0, 1, PARTIAL_COUNT));
-    CHECK_EQUAL(PARTIAL_COUNT-1, c.Find(PARTIAL_COUNT-1, PARTIAL_COUNT-1, PARTIAL_COUNT));
+    CHECK_EQUAL(-1, c.find_first_int(PARTIAL_COUNT+1, 0, PARTIAL_COUNT));
+    CHECK_EQUAL(-1, c.find_first_int(0, 1, PARTIAL_COUNT));
+    CHECK_EQUAL(PARTIAL_COUNT-1, c.find_first_int(PARTIAL_COUNT-1, PARTIAL_COUNT-1, PARTIAL_COUNT));
 }
 */
 
@@ -451,7 +451,7 @@ TEST(Array_Sort)
     a.add(2);
     a.add(40);
 
-    a.Sort();
+    a.sort();
 
     CHECK_EQUAL(0, a.Get(0));
     CHECK_EQUAL(2, a.Get(1));
@@ -468,7 +468,7 @@ TEST(Array_Sort)
     a.Destroy();
 }
 
-/** FindAll() int tests spread out over bitwidth
+/** find_all_int() int tests spread out over bitwidth
  *
  */
 
@@ -485,7 +485,7 @@ TEST(findallint0)
         a.add(0);
     }
 
-    a.FindAll(r, value);
+    a.find_all_int(r, value);
     CHECK_EQUAL(vReps, r.Size());
 
     size_t i = 0;
@@ -516,7 +516,7 @@ TEST(findallint1)
         a.add(0);
     }
 
-    a.FindAll(r, value);
+    a.find_all_int(r, value);
     CHECK_EQUAL(vReps, r.Size());
 
     size_t i = 0;
@@ -547,7 +547,7 @@ TEST(findallint2)
         a.add(3);
     }
 
-    a.FindAll(r, value);
+    a.find_all_int(r, value);
     CHECK_EQUAL(vReps, r.Size());
 
     size_t i = 0;
@@ -578,7 +578,7 @@ TEST(findallint3)
         a.add(13);
     }
 
-    a.FindAll(r, value);
+    a.find_all_int(r, value);
     CHECK_EQUAL(vReps, r.Size());
 
     size_t i = 0;
@@ -610,7 +610,7 @@ TEST(findallint4)
         a.add(23);
     }
 
-    a.FindAll(r, value);
+    a.find_all_int(r, value);
     CHECK_EQUAL(vReps, r.Size());
 
     size_t i = 0;
@@ -642,7 +642,7 @@ TEST(findallint5)
         a.add(303);
     }
 
-    a.FindAll(r, value);
+    a.find_all_int(r, value);
     CHECK_EQUAL(vReps, r.Size());
 
     size_t i = 0;
@@ -674,7 +674,7 @@ TEST(findallint6)
         a.add(70003);
     }
 
-    a.FindAll(r, value);
+    a.find_all_int(r, value);
     CHECK_EQUAL(vReps, r.Size());
 
     size_t i = 0;
@@ -706,7 +706,7 @@ TEST(findallint7)
         a.add(4300000003ULL);
     }
 
-    a.FindAll(r, value);
+    a.find_all_int(r, value);
     CHECK_EQUAL(vReps, r.Size());
 
     size_t i = 0;
@@ -733,11 +733,11 @@ void hasZeroByte(int64_t value, size_t reps)
 
     a.add(0);
 
-    size_t t = a.Find(0);
+    size_t t = a.find_first_int(0);
     CHECK_EQUAL(a.Size() - 1, t);
 
     r.Clear();
-    a.FindAll(r, 0);
+    a.find_all_int(r, 0);
     CHECK_EQUAL(int64_t(a.Size() - 1), r.Get(0));
 
     // Cleanup
@@ -769,7 +769,7 @@ TEST(FindSSE)
 
     for(size_t i = 0; i < 100; i++) {
         a.Set(i, 123);
-        size_t t = a.Find(123);
+        size_t t = a.find_first_int(123);
         assert(t == i);
         a.Set(i, 10000);
         (void)t;
@@ -1119,7 +1119,7 @@ TEST(ArraySort)
         a.add(rand() % 300 - 100);
 
     size_t orig_size = a.Size();
-    a.Sort();
+    a.sort();
 
     CHECK(a.Size() == orig_size);
     for(size_t t = 1; t < a.Size(); t++)
@@ -1138,7 +1138,7 @@ TEST(ArraySort2)
         a.add((int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand());
 
     size_t orig_size = a.Size();
-    a.Sort();
+    a.sort();
 
     CHECK(a.Size() == orig_size);
     for(size_t t = 1; t < a.Size(); t++)
@@ -1156,7 +1156,7 @@ TEST(ArraySort3)
         a.add(rand());
 
     size_t orig_size = a.Size();
-    a.Sort();
+    a.sort();
 
     CHECK(a.Size() == orig_size);
     for(size_t t = 1; t < a.Size(); t++)
@@ -1175,7 +1175,7 @@ TEST(ArraySort4)
         a.add(0);
 
     size_t orig_size = a.Size();
-    a.Sort();
+    a.sort();
 
     CHECK(a.Size() == orig_size);
     for(size_t t = 1; t < a.Size(); t++)

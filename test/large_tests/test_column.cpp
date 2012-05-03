@@ -43,8 +43,8 @@ TEST(Column_monkeytest2)
 
             if (!(rand2() % (ITER_PER_BITWIDTH / 100))) {
                 trend = (unsigned int)rand2() % 10;
-                a.Find(rand2(current_bitwidth));
-                a.FindAll(res, rand2(current_bitwidth));
+                a.find_first_int(rand2(current_bitwidth));
+                a.find_all_int(res, rand2(current_bitwidth));
                 size_t start = rand2() % (a.Size() + 1);
                 a.sum(start, start + rand2() % (a.Size() + 1 - start));
                 a.maximum(start, start + rand2() % (a.Size() + 1 - start));

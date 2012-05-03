@@ -143,9 +143,9 @@ public:
 
     size_t FindPos(int64_t value) const;
     size_t FindPos2(int64_t value) const;
-    size_t Find(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
+    size_t find_first_int(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
 
-    template <class F> size_t Find(F function_, int64_t value, size_t start, size_t end) const
+    template <class F> size_t find_first_int(F function_, int64_t value, size_t start, size_t end) const
     {
         const F function = {};
         if(end == (size_t)-1)
@@ -158,14 +158,14 @@ public:
     }
     void Preset(int64_t min, int64_t max, size_t count);
     void Preset(size_t bitwidth, size_t count);
-    void FindAll(Array& result, int64_t value, size_t offset=0, size_t start=0, size_t end=(size_t)-1) const;
+    void find_all_int(Array& result, int64_t value, size_t offset=0, size_t start=0, size_t end=(size_t)-1) const;
     void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     int64_t sum(size_t start = 0, size_t end = (size_t)-1) const;
     bool maximum(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
     bool minimum(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
     template <class F> size_t Query(int64_t value, size_t start, size_t end);
 
-    void Sort(void);
+    void sort(void);
     void ReferenceSort(Array &ref);
     void Resize(size_t count);
 
@@ -208,7 +208,7 @@ private:
 #endif //USE_SSE
     template <bool eq>size_t CompareEquality(int64_t value, size_t start, size_t end) const;
     template <bool gt>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
-    template <size_t w> void Sort();
+    template <size_t w> void sort();
     template <size_t w>void ReferenceSort(Array &ref);
     void update_ref_in_parent(size_t ref);
 

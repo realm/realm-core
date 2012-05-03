@@ -60,8 +60,8 @@ TEST(ColumnString_monkeytest2)
         if (!(rand2() % (ITER / 100))) {
             trend = (unsigned int)rand2() % 10;
 
-            a.Find(randstring().c_str());
-            a.FindAll(res, randstring().c_str());
+            a.find_first_int(randstring().c_str());
+            a.find_all_int(res, randstring().c_str());
         }
 
         if (rand2() % 10 > trend && a.Size() < ITER / 100) {

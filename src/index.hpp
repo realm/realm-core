@@ -20,8 +20,8 @@ public:
     void Delete(size_t ndx, int64_t value, bool isLast=false);
     void Set(size_t ndx, int64_t oldValue, int64_t newValue);
 
-    size_t Find(int64_t value) const;
-    bool FindAll(Column& result, int64_t value) const;
+    size_t find_first_int(int64_t value) const;
+    bool find_all_int(Column& result, int64_t value) const;
     bool FindAllRange(Column& result, int64_t start, int64_t end) const;
 
 #ifdef _DEBUG

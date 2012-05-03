@@ -134,7 +134,7 @@ public:
     int64_t sum(size_t start = 0, size_t end = -1) const;
     int64_t maximum(size_t start = 0, size_t end = -1) const;
     int64_t minimum(size_t start = 0, size_t end = -1) const;
-    void Sort(size_t start, size_t end);
+    void sort(size_t start, size_t end);
     void ReferenceSort(size_t start, size_t end, Column &ref);
 
     intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
@@ -145,10 +145,10 @@ public:
     bool Reserve(size_t len, size_t width=8);
 
     bool Increment64(int64_t value, size_t start=0, size_t end=-1);
-    size_t Find(int64_t value, size_t start=0, size_t end=-1) const;
+    size_t find_first_int(int64_t value, size_t start=0, size_t end=-1) const;
 
-    void FindAll(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
-    void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
+    void find_all_int(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
+    void find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     size_t FindPos(int64_t value) const;
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
 
@@ -162,7 +162,7 @@ public:
     size_t GetRef() const {return m_array->GetRef();}
     Allocator& GetAllocator() const {return m_array->GetAllocator();}
 
-    void Sort();
+    void sort();
 
     // Debug
 #ifdef _DEBUG

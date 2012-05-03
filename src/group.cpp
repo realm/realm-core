@@ -190,13 +190,13 @@ const char* Group::get_table_name(size_t table_ndx) const
 
 bool Group::has_table(const char* name) const
 {
-    const size_t n = m_tableNames.Find(name);
+    const size_t n = m_tableNames.find_first_int(name);
     return (n != (size_t)-1);
 }
 
 TableRef Group::get_table(const char* name)
 {
-    const size_t n = m_tableNames.Find(name);
+    const size_t n = m_tableNames.find_first_int(name);
 
     if (n == size_t(-1)) {
         // Create new table

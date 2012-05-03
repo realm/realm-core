@@ -213,13 +213,13 @@ public:
     template<int, class> friend class QueryColumn;
     Query(): Spec::template Columns<QueryColumn, Query*>(this) {}
 
-    Query& or() { m_impl.or(); return *this; }
+    Query& Or() { m_impl.Or(); return *this; }
 
     Query& group() { m_impl.group(); return *this; }
 
     Query& end_group() { m_impl.end_group(); return *this; }
 
-    std::size_t remove(BasicTable<Spec>& table, size_t start = 0, size_t end = size_t(-1), // Should instead be 'table.remove(query);'
+    std::size_t remove(BasicTable<Spec>& table, size_t start = 0, size_t end = size_t(-1),
                        size_t limit = size_t(-1)) const
     {
         return m_impl.Delete(table, start, end, limit);
@@ -414,14 +414,14 @@ public:
     }
 };
 
-// RegisterColumn specialization for subtables
+// AddColumn specialization for subtables
 template<int col_idx, class Subspec> class AddColumn<col_idx, BasicTable<Subspec> > {
 public:
     AddColumn(tightdb::Spec* spec, const char* column_name)
     {
         assert(col_idx == spec->get_column_count());
         tightdb::Spec subspec = spec->add_subtable_column(column_name);
-        typename Subspec::template Columns<tightdb::add_column, tightdb::Spec*> c(&subspec);
+        typename Subspec::template Columns<tightdb::AddColumn, tightdb::Spec*> c(&subspec);
     }
 };
 
@@ -600,9 +600,9 @@ private:
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
 
-    std::size_t Find(int64_t value) const
+    std::size_t find_first_int(int64_t value) const
     {
-        return Base::m_table->Find(col_idx, value);
+        return Base::m_table->find_first_int(col_idx, value);
     }
 
     std::size_t FindPos(int64_t value) const
@@ -610,10 +610,10 @@ public:
         return Base::m_table->GetColumn(col_idx).FindPos(value);
     }
 
-    TableView FindAll(int64_t value) const
+    TableView find_all_int(int64_t value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->FindAll(tv, col_idx, value);
+        Base::m_table->find_all_int(tv, col_idx, value);
         return tv;
     }
 
@@ -639,15 +639,15 @@ private:
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
 
-    std::size_t Find(bool value) const
+    std::size_t find_first_int(bool value) const
     {
-        return Base::m_table->FindBool(col_idx, value);
+        return Base::m_table->find_first_bool(col_idx, value);
     }
 
-    TableView FindAll(bool value) const
+    TableView find_all_int(bool value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->FindAllBool(tv, col_idx, value);
+        Base::m_table->find_all_bool(tv, col_idx, value);
         return tv;
     }
 
@@ -667,15 +667,15 @@ private:
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
 
-    std::size_t Find(E value) const
+    std::size_t find_first_int(E value) const
     {
-        return Base::m_table->Find(col_idx, value);
+        return Base::m_table->find_first_int(col_idx, value);
     }
 
-    TableView FindAll(E value) const
+    TableView find_all_int(E value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->FindAll(tv, col_idx, value);
+        Base::m_table->find_all_int(tv, col_idx, value);
         return tv;
     }
 
@@ -695,15 +695,15 @@ private:
 public:
     explicit Column(Tab* t, const char* = 0): Base(t) {}
 
-    std::size_t Find(const char* value) const
+    std::size_t find_first_int(const char* value) const
     {
-        return Base::m_table->FindString(col_idx, value);
+        return Base::m_table->find_first_string(col_idx, value);
     }
 
-    TableView FindAll(const char* value) const
+    TableView find_all_int(const char* value) const
     {
         TableView tv(*Base::m_table);
-        Base::m_table->FindAllString(tv, col_idx, value);
+        Base::m_table->find_all_string(tv, col_idx, value);
         return tv;
     }
 

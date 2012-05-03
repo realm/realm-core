@@ -89,7 +89,7 @@ protected:
 
 template<class T> BasicTableRef<T> Group::get_table(const char* name)
 {
-    const size_t n = m_tableNames.Find(name);
+    const size_t n = m_tableNames.find_first_int(name);
     if (n == size_t(-1)) {
         // Create new table
         T* const t = new T(m_alloc);

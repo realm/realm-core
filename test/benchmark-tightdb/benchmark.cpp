@@ -95,7 +95,7 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             uint64_t f = rand2() % RANGE;
-            integers.first.Find(f);
+            integers.first.find_first_int(f);
 
             // Sanity test to ensure that average distance between matches is the same as in the STL tests
 /*
@@ -112,7 +112,7 @@ void tightdb2(void)
 
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
-            integers.first.FindAll(rand2() % RANGE);
+            integers.first.find_all_int(rand2() % RANGE);
         }
         printf((indexed + "FindAll: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 

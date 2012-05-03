@@ -13,13 +13,13 @@ TableView::~TableView()
     m_refs.Destroy();
 }
 
-Table* TableView::get_subtable()
+Table* TableView::get_table()
 {
     return &m_table;
 }
 
 // Searching
-size_t TableView::Find(size_t column_ndx, int64_t value) const
+size_t TableView::find_first_int(size_t column_ndx, int64_t value) const
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
@@ -31,7 +31,7 @@ size_t TableView::Find(size_t column_ndx, int64_t value) const
     return (size_t)-1;
 }
 
-void TableView::FindAll(TableView& tv, size_t column_ndx, int64_t value)
+void TableView::find_all_int(TableView& tv, size_t column_ndx, int64_t value)
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
@@ -41,7 +41,7 @@ void TableView::FindAll(TableView& tv, size_t column_ndx, int64_t value)
             tv.GetRefColumn().add(i);
 }
 
-size_t TableView::FindString(size_t column_ndx, const char* value) const
+size_t TableView::find_first_string(size_t column_ndx, const char* value) const
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_STRING);
@@ -54,7 +54,7 @@ size_t TableView::FindString(size_t column_ndx, const char* value) const
 }
 
 
-void TableView::FindAllString(TableView& tv, size_t column_ndx, const char* value)
+void TableView::find_all_string(TableView& tv, size_t column_ndx, const char* value)
 {
     assert(column_ndx < m_table.get_column_count());
     assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_STRING);
@@ -225,7 +225,7 @@ void TableView::set_mixed(std::size_t column_ndx, std::size_t ndx, Mixed value)
 }
 
 
-void TableView::Sort(size_t column, bool Ascending)
+void TableView::sort(size_t column, bool Ascending)
 {
     assert(m_table.get_column_type(column) == COLUMN_TYPE_INT || m_table.get_column_type(column) == COLUMN_TYPE_DATE || m_table.get_column_type(column) == COLUMN_TYPE_BOOL);
 
@@ -306,7 +306,7 @@ void TableView::remove(size_t ndx)
 
 void TableView::clear()
 {
-    m_refs.Sort();
+    m_refs.sort();
 
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)
