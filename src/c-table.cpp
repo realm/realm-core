@@ -332,7 +332,6 @@ void table_insert(Table* t, size_t ndx, ...) {
 
 
 void table_insert_int(Table* t, size_t column_id, size_t ndx, int value) {
-    min(
     t->InsertInt(column_id, ndx, value);
 }
 
