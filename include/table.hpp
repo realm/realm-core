@@ -95,14 +95,15 @@ public:
     int64_t minimum(size_t column_ndx) const;
 
     // Searching
-    size_t  Find(size_t column_ndx, int64_t value) const;
-    size_t  FindBool(size_t column_ndx, bool value) const;
-    size_t  FindString(size_t column_ndx, const char* value) const;
-    size_t  FindDate(size_t column_ndx, time_t value) const;
-    void    FindAll(TableView& tv, size_t column_ndx, int64_t value);
-    void    FindAllBool(TableView& tv, size_t column_ndx, bool value);
-    void    FindAllString(TableView& tv, size_t column_ndx, const char *value);
-    void    FindAllHamming(TableView& tv, size_t column_ndx, uint64_t value, size_t max);
+    size_t  find_first_int(size_t column_ndx, int64_t value) const;
+    size_t  find_first_bool(size_t column_ndx, bool value) const;
+    size_t  find_first_string(size_t column_ndx, const char* value) const;
+    size_t  find_first_date(size_t column_ndx, time_t value) const;
+    void    find_all_int(TableView& tv, size_t column_ndx, int64_t value);
+    void    find_all_bool(TableView& tv, size_t column_ndx, bool value);
+    void    find_all_date(TableView& tv, size_t column_ndx, time_t value);
+    void    find_all_string(TableView& tv, size_t column_ndx, const char *value);
+    void    find_all_hamming(TableView& tv, size_t column_ndx, uint64_t value, size_t max);
 
     // Optimizing
     void optimize();

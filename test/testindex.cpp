@@ -17,11 +17,11 @@ TEST(Index_Test1)
     Index ndx;
     ndx.BuildIndex(col);
 
-    CHECK_EQUAL(0, ndx.Find(3));
-    CHECK_EQUAL(1, ndx.Find(100));
-    CHECK_EQUAL(2, ndx.Find(10));
-    CHECK_EQUAL(3, ndx.Find(45));
-    CHECK_EQUAL(4, ndx.Find(0));
+    CHECK_EQUAL(0, ndx.find_first_int(3));
+    CHECK_EQUAL(1, ndx.find_first_int(100));
+    CHECK_EQUAL(2, ndx.find_first_int(10));
+    CHECK_EQUAL(3, ndx.find_first_int(45));
+    CHECK_EQUAL(4, ndx.find_first_int(0));
 
     // Clean up
     col.Destroy();
@@ -46,12 +46,12 @@ TEST(Index_FindAll)
     ndx.BuildIndex(col);
 
     Column result;
-    ndx.FindAll(result, 10);
+    ndx.find_all_int(result, 10);
 
     CHECK_EQUAL(3, result.Size());
 
     // we need the refs sorted to verify
-    result.Sort();
+    result.sort();
 
     CHECK_EQUAL(2, result.Get(0));
     CHECK_EQUAL(5, result.Get(1));
@@ -86,7 +86,7 @@ TEST(Index_FindAllRange)
     CHECK_EQUAL(5, result.Size());
 
     // we need the refs sorted to verify
-    result.Sort();
+    result.sort();
 
     CHECK_EQUAL(2, result.Get(0)); // 10
     CHECK_EQUAL(3, result.Get(1)); // 45
@@ -117,33 +117,33 @@ TEST(Index_Delete)
     // Delete first item (in index)
     ndx.Delete(4, 0, true); // opt for last item
 
-    CHECK_EQUAL(0, ndx.Find(3));
-    CHECK_EQUAL(1, ndx.Find(100));
-    CHECK_EQUAL(2, ndx.Find(10));
-    CHECK_EQUAL(3, ndx.Find(45));
-    CHECK_EQUAL(-1, ndx.Find(0));
+    CHECK_EQUAL(0, ndx.find_first_int(3));
+    CHECK_EQUAL(1, ndx.find_first_int(100));
+    CHECK_EQUAL(2, ndx.find_first_int(10));
+    CHECK_EQUAL(3, ndx.find_first_int(45));
+    CHECK_EQUAL(-1, ndx.find_first_int(0));
 
     // Delete last item (in index)
     ndx.Delete(1, 100);
 
-    CHECK_EQUAL(0, ndx.Find(3));
-    CHECK_EQUAL(1, ndx.Find(10));
-    CHECK_EQUAL(2, ndx.Find(45));
-    CHECK_EQUAL(-1, ndx.Find(100));
+    CHECK_EQUAL(0, ndx.find_first_int(3));
+    CHECK_EQUAL(1, ndx.find_first_int(10));
+    CHECK_EQUAL(2, ndx.find_first_int(45));
+    CHECK_EQUAL(-1, ndx.find_first_int(100));
 
     // Delete middle item (in index)
     ndx.Delete(1, 10);
 
-    CHECK_EQUAL(0, ndx.Find(3));
-    CHECK_EQUAL(1, ndx.Find(45));
-    CHECK_EQUAL(-1, ndx.Find(10));
+    CHECK_EQUAL(0, ndx.find_first_int(3));
+    CHECK_EQUAL(1, ndx.find_first_int(45));
+    CHECK_EQUAL(-1, ndx.find_first_int(10));
 
     // Delete all items
     ndx.Delete(1, 45);
     ndx.Delete(0, 3);
 
-    CHECK_EQUAL(-1, ndx.Find(3));
-    CHECK_EQUAL(-1, ndx.Find(45));
+    CHECK_EQUAL(-1, ndx.find_first_int(3));
+    CHECK_EQUAL(-1, ndx.find_first_int(45));
     CHECK_EQUAL(true, ndx.is_empty());
 
     // Clean up
@@ -168,35 +168,35 @@ TEST(Index_Insert)
     // Insert item in top of column
     ndx.Insert(0, 0);
 
-    CHECK_EQUAL(0, ndx.Find(0));
-    CHECK_EQUAL(1, ndx.Find(3));
-    CHECK_EQUAL(2, ndx.Find(100));
-    CHECK_EQUAL(3, ndx.Find(10));
-    CHECK_EQUAL(4, ndx.Find(45));
-    CHECK_EQUAL(5, ndx.Find(1));
+    CHECK_EQUAL(0, ndx.find_first_int(0));
+    CHECK_EQUAL(1, ndx.find_first_int(3));
+    CHECK_EQUAL(2, ndx.find_first_int(100));
+    CHECK_EQUAL(3, ndx.find_first_int(10));
+    CHECK_EQUAL(4, ndx.find_first_int(45));
+    CHECK_EQUAL(5, ndx.find_first_int(1));
 
     // Append item in end of column
     ndx.Insert(6, 300, true); // opt for last item
 
-    CHECK_EQUAL(0, ndx.Find(0));
-    CHECK_EQUAL(1, ndx.Find(3));
-    CHECK_EQUAL(2, ndx.Find(100));
-    CHECK_EQUAL(3, ndx.Find(10));
-    CHECK_EQUAL(4, ndx.Find(45));
-    CHECK_EQUAL(5, ndx.Find(1));
-    CHECK_EQUAL(6, ndx.Find(300));
+    CHECK_EQUAL(0, ndx.find_first_int(0));
+    CHECK_EQUAL(1, ndx.find_first_int(3));
+    CHECK_EQUAL(2, ndx.find_first_int(100));
+    CHECK_EQUAL(3, ndx.find_first_int(10));
+    CHECK_EQUAL(4, ndx.find_first_int(45));
+    CHECK_EQUAL(5, ndx.find_first_int(1));
+    CHECK_EQUAL(6, ndx.find_first_int(300));
 
     // Insert item in middle
     ndx.Insert(3, 15);
 
-    CHECK_EQUAL(0, ndx.Find(0));
-    CHECK_EQUAL(1, ndx.Find(3));
-    CHECK_EQUAL(2, ndx.Find(100));
-    CHECK_EQUAL(3, ndx.Find(15));
-    CHECK_EQUAL(4, ndx.Find(10));
-    CHECK_EQUAL(5, ndx.Find(45));
-    CHECK_EQUAL(6, ndx.Find(1));
-    CHECK_EQUAL(7, ndx.Find(300));
+    CHECK_EQUAL(0, ndx.find_first_int(0));
+    CHECK_EQUAL(1, ndx.find_first_int(3));
+    CHECK_EQUAL(2, ndx.find_first_int(100));
+    CHECK_EQUAL(3, ndx.find_first_int(15));
+    CHECK_EQUAL(4, ndx.find_first_int(10));
+    CHECK_EQUAL(5, ndx.find_first_int(45));
+    CHECK_EQUAL(6, ndx.find_first_int(1));
+    CHECK_EQUAL(7, ndx.find_first_int(300));
 
     // Clean up
     col.Destroy();
@@ -220,32 +220,32 @@ TEST(Index_Set)
     // Set top value
     ndx.Set(0, 3, 4);
 
-    CHECK_EQUAL(-1, ndx.Find(3));
-    CHECK_EQUAL(0, ndx.Find(4));
-    CHECK_EQUAL(1, ndx.Find(100));
-    CHECK_EQUAL(2, ndx.Find(10));
-    CHECK_EQUAL(3, ndx.Find(45));
-    CHECK_EQUAL(4, ndx.Find(0));
+    CHECK_EQUAL(-1, ndx.find_first_int(3));
+    CHECK_EQUAL(0, ndx.find_first_int(4));
+    CHECK_EQUAL(1, ndx.find_first_int(100));
+    CHECK_EQUAL(2, ndx.find_first_int(10));
+    CHECK_EQUAL(3, ndx.find_first_int(45));
+    CHECK_EQUAL(4, ndx.find_first_int(0));
 
     // Set bottom value
     ndx.Set(4, 0, 300);
 
-    CHECK_EQUAL(-1, ndx.Find(0));
-    CHECK_EQUAL(0, ndx.Find(4));
-    CHECK_EQUAL(1, ndx.Find(100));
-    CHECK_EQUAL(2, ndx.Find(10));
-    CHECK_EQUAL(3, ndx.Find(45));
-    CHECK_EQUAL(4, ndx.Find(300));
+    CHECK_EQUAL(-1, ndx.find_first_int(0));
+    CHECK_EQUAL(0, ndx.find_first_int(4));
+    CHECK_EQUAL(1, ndx.find_first_int(100));
+    CHECK_EQUAL(2, ndx.find_first_int(10));
+    CHECK_EQUAL(3, ndx.find_first_int(45));
+    CHECK_EQUAL(4, ndx.find_first_int(300));
 
     // Set middle value
     ndx.Set(2, 10, 200);
 
-    CHECK_EQUAL(-1, ndx.Find(10));
-    CHECK_EQUAL(0, ndx.Find(4));
-    CHECK_EQUAL(1, ndx.Find(100));
-    CHECK_EQUAL(2, ndx.Find(200));
-    CHECK_EQUAL(3, ndx.Find(45));
-    CHECK_EQUAL(4, ndx.Find(300));
+    CHECK_EQUAL(-1, ndx.find_first_int(10));
+    CHECK_EQUAL(0, ndx.find_first_int(4));
+    CHECK_EQUAL(1, ndx.find_first_int(100));
+    CHECK_EQUAL(2, ndx.find_first_int(200));
+    CHECK_EQUAL(3, ndx.find_first_int(45));
+    CHECK_EQUAL(4, ndx.find_first_int(300));
 
     // Clean up
     col.Destroy();

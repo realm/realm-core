@@ -197,7 +197,7 @@ inline ColumnSubtableParent::SubtableMap::~SubtableMap()
 inline Table* ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const
 {
     if (!m_indices.IsValid()) return 0;
-    size_t const pos = m_indices.Find(subtable_ndx);
+    size_t const pos = m_indices.find_first_int(subtable_ndx);
     return pos != size_t(-1) ? reinterpret_cast<Table *>(m_wrappers.Get(pos)) : 0;
 }
 
@@ -214,7 +214,7 @@ inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table
 inline void ColumnSubtableParent::SubtableMap::remove(size_t subtable_ndx)
 {
     assert(m_indices.IsValid());
-    const size_t pos = m_indices.Find(subtable_ndx);
+    const size_t pos = m_indices.find_first_int(subtable_ndx);
     assert(pos != size_t(-1));
     m_indices.Delete(pos);
     m_wrappers.Delete(pos);

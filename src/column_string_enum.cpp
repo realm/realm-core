@@ -78,47 +78,47 @@ void ColumnStringEnum::Clear()
     Column::Clear();
 }
 
-void ColumnStringEnum::FindAll(Array& res, const char* value, size_t start, size_t end) const
+void ColumnStringEnum::find_all_int(Array& res, const char* value, size_t start, size_t end) const
 {
-    const size_t key_ndx = m_keys.Find(value);
+    const size_t key_ndx = m_keys.find_first_int(value);
     if (key_ndx == (size_t)-1) return;
-    Column::FindAll(res, key_ndx, 0, start, end);
+    Column::find_all_int(res, key_ndx, 0, start, end);
     return;
 }
 
-void ColumnStringEnum::FindAll(Array& res, size_t key_ndx, size_t start, size_t end) const
+void ColumnStringEnum::find_all_int(Array& res, size_t key_ndx, size_t start, size_t end) const
 {
     if (key_ndx == (size_t)-1) return;
-    Column::FindAll(res, key_ndx, 0, start, end);
+    Column::find_all_int(res, key_ndx, 0, start, end);
     return;
 }
 
 
-size_t ColumnStringEnum::Find(size_t key_ndx, size_t start, size_t end) const
+size_t ColumnStringEnum::find_first_int(size_t key_ndx, size_t start, size_t end) const
 {
     // Find key
     if (key_ndx == (size_t)-1) return (size_t)-1;
 
-    return Column::Find(key_ndx, start, end);
+    return Column::find_first_int(key_ndx, start, end);
 }
 
-size_t ColumnStringEnum::Find(const char* value, size_t start, size_t end) const
+size_t ColumnStringEnum::find_first_int(const char* value, size_t start, size_t end) const
 {
     // Find key
-    const size_t key_ndx = m_keys.Find(value);
+    const size_t key_ndx = m_keys.find_first_int(value);
     if (key_ndx == (size_t)-1) return (size_t)-1;
 
-    return Column::Find(key_ndx, start, end);
+    return Column::find_first_int(key_ndx, start, end);
 }
 
 size_t ColumnStringEnum::GetKeyNdx(const char* value) const
 {
-    return m_keys.Find(value);
+    return m_keys.find_first_int(value);
 }
 
 size_t ColumnStringEnum::GetKeyNdxOrAdd(const char* value)
 {
-    const size_t res = m_keys.Find(value);
+    const size_t res = m_keys.find_first_int(value);
     if (res != (size_t)-1) return res;
     else {
         // Add key if it does not exist

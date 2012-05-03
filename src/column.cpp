@@ -496,14 +496,14 @@ int64_t Column::maximum(size_t start, size_t end) const
     return state.result; // will return zero for empty ranges
 }
 
-void Column::Sort(size_t start, size_t end)
+void Column::sort(size_t start, size_t end)
 {
     Array arr;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
     for (size_t t = 0; t < arr.Size(); t++) {
         const size_t ref = arr.GetAsRef(t);
         Array a(ref);
-        a.Sort();
+        a.sort();
     }
 
     Array* sorted = merge(arr);
@@ -639,7 +639,7 @@ bool Column::Increment64(int64_t value, size_t start, size_t end)
     }
 }
 
-size_t Column::Find(int64_t value, size_t start, size_t end) const
+size_t Column::find_first_int(int64_t value, size_t start, size_t end) const
 {
     assert(start <= Size());
     assert(end == (size_t)-1 || end <= Size());
@@ -647,7 +647,7 @@ size_t Column::Find(int64_t value, size_t start, size_t end) const
     return TreeFind<int64_t, Column, EQUAL>(value, start, end);
 }
 
-void Column::FindAll(Array& result, int64_t value, size_t caller_offset,
+void Column::find_all_int(Array& result, int64_t value, size_t caller_offset,
                      size_t start, size_t end) const
 {
     (void)caller_offset;
@@ -660,10 +660,10 @@ void Column::FindAll(Array& result, int64_t value, size_t caller_offset,
 void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset,
                          size_t start, size_t end) const
 {
-    return m_array->FindAll(result, value, add_offset, start, end);
+    return m_array->find_all_int(result, value, add_offset, start, end);
 }
 
-void Column::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const
+void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const
 {
     if (!IsNode()) {
         m_array->FindAllHamming(result, value, maxdist, offset);
@@ -676,7 +676,7 @@ void Column::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_
 
         for (size_t i = 0; i < count; ++i) {
             const Column col((size_t)refs.Get(i));
-            col.FindAllHamming(result, value, maxdist, offset);
+            col.find_all_hamming(result, value, maxdist, offset);
             offset += (size_t)offsets.Get(i);
         }
     }
@@ -714,7 +714,7 @@ size_t Column::FindWithIndex(int64_t target) const
     assert(m_index);
     assert(m_index->Size() == Size());
 
-    return m_index->Find(target);
+    return m_index->find_first_int(target);
 }
 
 Index& Column::GetIndex()
@@ -738,9 +738,9 @@ void Column::BuildIndex(Index& index)
     m_index = &index; // Keep ref to index
 }
 
-void Column::Sort()
+void Column::sort()
 {
-    Sort(0, Size());
+    sort(0, Size());
 }
 
 

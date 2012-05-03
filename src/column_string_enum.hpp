@@ -22,11 +22,11 @@ public:
     void Delete(size_t ndx);
     void Clear();
 
-    size_t Find(const char* value, size_t start=0, size_t end=-1) const;
-    void FindAll(Array& res, const char* value, size_t start=0, size_t end=-1) const;
+    size_t find_first_int(const char* value, size_t start=0, size_t end=-1) const;
+    void find_all_int(Array& res, const char* value, size_t start=0, size_t end=-1) const;
 
-    size_t Find(size_t key_index, size_t start=0, size_t end=-1) const;
-    void FindAll(Array& res, size_t key_index, size_t start=0, size_t end=-1) const;
+    size_t find_first_int(size_t key_index, size_t start=0, size_t end=-1) const;
+    void find_all_int(Array& res, size_t key_index, size_t start=0, size_t end=-1) const;
 
     void UpdateParentNdx(int diff);
     void  UpdateFromParent();

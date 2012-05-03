@@ -17,7 +17,7 @@ TEST(GetSetInteger)
     table.add(1);
     table.add(2);
 
-    TableView v = table.cols().first.FindAll(2);
+    TableView v = table.cols().first.find_all_int(2);
 
     CHECK_EQUAL(2, v.size());
 
@@ -43,7 +43,7 @@ TEST(TableViewSum)
     table.add(2);
     table.add(2);
 
-    TableView v = table.cols().first.FindAll(2);
+    TableView v = table.cols().first.find_all_int(2);
     CHECK_EQUAL(5, v.size());
 
     int64_t sum = v.sum(0);
@@ -60,7 +60,7 @@ TEST(TableViewSumNegative)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.FindAll(0);
+    TableView v = table.cols().first.find_all_int(0);
     v.set_int(0, 0, 11);
     v.set_int(0, 2, -20);
 
@@ -78,7 +78,7 @@ TEST(TableViewMax)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.FindAll(0);
+    TableView v = table.cols().first.find_all_int(0);
     v.set_int(0, 0, -1);
     v.set_int(0, 1, 2);
     v.set_int(0, 2, 1);
@@ -98,7 +98,7 @@ TEST(TableViewMax2)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.FindAll(0);
+    TableView v = table.cols().first.find_all_int(0);
     v.set_int(0, 0, -1);
     v.set_int(0, 1, -2);
     v.set_int(0, 2, -3);
@@ -117,7 +117,7 @@ TEST(TableViewMin)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.FindAll(0);
+    TableView v = table.cols().first.find_all_int(0);
     v.set_int(0, 0, -1);
     v.set_int(0, 1, 2);
     v.set_int(0, 2, 1);
@@ -136,7 +136,7 @@ TEST(TableViewMin2)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.FindAll(0);
+    TableView v = table.cols().first.find_all_int(0);
     v.set_int(0, 0, -1);
     v.set_int(0, 1, -2);
     v.set_int(0, 2, -3);
@@ -156,12 +156,12 @@ TEST(TableViewFind)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.FindAll(0);
+    TableView v = table.cols().first.find_all_int(0);
     v.set_int(0, 0, 5);
     v.set_int(0, 1, 4);
     v.set_int(0, 2, 4);
 
-    size_t r = v.Find(0, 4);
+    size_t r = v.find_first_int(0, 4);
     CHECK_EQUAL(1, r);
     //v.Destroy();
 }
@@ -175,16 +175,16 @@ TEST(TableViewFindAll)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.FindAll(0);
+    TableView v = table.cols().first.find_all_int(0);
     v.set_int(0, 0, 5);
     v.set_int(0, 1, 4); // match
     v.set_int(0, 2, 4); // match
 
     // todo, add creation to wrapper function in table.h
-    TableView *v2 = new TableView(*v.get_subtable());
-    v.FindAll(*v2, 0, 4);
-    CHECK_EQUAL(1, v2->GetRef(0));
-    CHECK_EQUAL(2, v2->GetRef(1));
+    TableView *v2 = new TableView(*v.get_table());
+    v.find_all_int(*v2, 0, 4);
+    CHECK_EQUAL(1, v2->get_source_ndx(0));
+    CHECK_EQUAL(2, v2->get_source_ndx(1));
     //v.Destroy();
     delete v2;
 }
@@ -200,16 +200,16 @@ TEST(TableViewFindAllString)
     table.add("a");
     table.add("a");
 
-    TableView v = table.cols().first.FindAll("a");
+    TableView v = table.cols().first.find_all_int("a");
     v.set_string(0, 0, "foo");
     v.set_string(0, 1, "bar"); // match
     v.set_string(0, 2, "bar"); // match
 
     // todo, add creation to wrapper function in table.h
-    TableView *v2 = new TableView(*v.get_subtable());
-    v.FindAllString(*v2, 0, "bar");
-    CHECK_EQUAL(1, v2->GetRef(0));
-    CHECK_EQUAL(2, v2->GetRef(1));
+    TableView *v2 = new TableView(*v.get_table());
+    v.find_all_string(*v2, 0, "bar");
+    CHECK_EQUAL(1, v2->get_source_ndx(0));
+    CHECK_EQUAL(2, v2->get_source_ndx(1));
     //v.Destroy();
     delete v2;
 }
@@ -224,13 +224,13 @@ TEST(TableViewDelete)
     table.add(3);
     table.add(1);
 
-    TableView v = table.cols().first.FindAll(1);
+    TableView v = table.cols().first.find_all_int(1);
     CHECK_EQUAL(3, v.size());
 
     v.remove(1);
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(0, v.GetRef(0));
-    CHECK_EQUAL(3, v.GetRef(1));
+    CHECK_EQUAL(0, v.get_source_ndx(0));
+    CHECK_EQUAL(3, v.get_source_ndx(1));
 
     CHECK_EQUAL(4, table.size());
     CHECK_EQUAL(1, table[0].first);
@@ -240,7 +240,7 @@ TEST(TableViewDelete)
 
     v.remove(0);
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.GetRef(0));
+    CHECK_EQUAL(2, v.get_source_ndx(0));
 
     CHECK_EQUAL(3, table.size());
     CHECK_EQUAL(2, table[0].first);
@@ -265,7 +265,7 @@ TEST(TableViewClear)
     table.add(3);
     table.add(1);
 
-    TableView v = table.cols().first.FindAll(1);
+    TableView v = table.cols().first.find_all_int(1);
     CHECK_EQUAL(3, v.size());
 
     v.clear();
@@ -281,7 +281,7 @@ TEST(TableViewClearNone)
 {
     TestTableInt table;
 
-    TableView v = table.cols().first.FindAll(1);
+    TableView v = table.cols().first.find_all_int(1);
     CHECK_EQUAL(0, v.size());
 
     v.clear();

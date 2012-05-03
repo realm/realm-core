@@ -131,13 +131,13 @@ void ArrayStringLong::Clear()
     m_offsets.Clear();
 }
 
-size_t ArrayStringLong::Find(const char* value, size_t start, size_t end) const
+size_t ArrayStringLong::find_first_int(const char* value, size_t start, size_t end) const
 {
     assert(value);
     return FindWithLen(value, strlen(value), start, end);
 }
 
-void ArrayStringLong::FindAll(Array& result, const char* value, size_t add_offset,
+void ArrayStringLong::find_all_int(Array& result, const char* value, size_t add_offset,
                               size_t start, size_t end) const
 {
     assert(value);
