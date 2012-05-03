@@ -1003,7 +1003,7 @@ void Table::find_all(TableView& tv, size_t column_ndx, int64_t value)
 
     const Column& column = GetColumn(column_ndx);
 
-    column.find_all(tv.GetRefColumn(), value);
+    column.find_all(tv.get_ref_column(), value);
 }
 
 void Table::find_all(TableView& tv, size_t column_ndx, bool value)
@@ -1013,7 +1013,7 @@ void Table::find_all(TableView& tv, size_t column_ndx, bool value)
 
     const Column& column = GetColumn(column_ndx);
 
-    column.find_all(tv.GetRefColumn(), value ? 1 :0);
+    column.find_all(tv.get_ref_column(), value ? 1 :0);
 }
 
 void Table::find_all(TableView& tv, size_t column_ndx, const char *value)
@@ -1025,12 +1025,12 @@ void Table::find_all(TableView& tv, size_t column_ndx, const char *value)
 
     if (type == COLUMN_TYPE_STRING) {
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        column.find_all(tv.GetRefColumn(), value);
+        column.find_all(tv.get_ref_column(), value);
     }
     else {
         assert(type == COLUMN_TYPE_STRING_ENUM);
         const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        column.find_all(tv.GetRefColumn(), value);
+        column.find_all(tv.get_ref_column(), value);
     }
 }
 
@@ -1043,7 +1043,7 @@ void Table::find_all_hamming(TableView& tv, size_t column_ndx, uint64_t value, s
 
     const Column& column = GetColumn(column_ndx);
 
-    column.find_all_hamming(tv.GetRefColumn(), value, max);
+    column.find_all_hamming(tv.get_ref_column(), value, max);
 }
 
 void Table::optimize()

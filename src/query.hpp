@@ -242,7 +242,7 @@ public:
         // User created query with no criteria; return everything
         if(first[0] == 0) {
             for(size_t i = start; i < end; i++)
-                tv.GetRefColumn().add(i);
+                tv.get_ref_column().add(i);
         }
         else if(m_threadcount > 0) {
             // Use multithreading
@@ -257,7 +257,7 @@ public:
                 r = first[0]->find_first(r + 1, table_size);
                 if (r == table_size || tv.size() == limit)
                     break;
-                tv.GetRefColumn().add(r);
+                tv.get_ref_column().add(r);
             }
         }
     }
@@ -410,7 +410,7 @@ public:
             size_t first = ts.chunks[i].second;
 
             while(first < ts.results.size() && ts.results[first] < upto && ts.results[first] >= from) {
-                tv.GetRefColumn().add(ts.results[first]);
+                tv.get_ref_column().add(ts.results[first]);
                 ++first;
             }
         }

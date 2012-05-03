@@ -38,7 +38,7 @@ void TableView::find_all(TableView& tv, size_t column_ndx, int64_t value)
 
     for(size_t i = 0; i < m_refs.Size(); i++)
         if(get_int(column_ndx, i) == value)
-            tv.GetRefColumn().add(i);
+            tv.get_ref_column().add(i);
 }
 
 size_t TableView::find_first(size_t column_ndx, const char* value) const
@@ -61,7 +61,7 @@ void TableView::find_all(TableView& tv, size_t column_ndx, const char* value)
 
     for(size_t i = 0; i < m_refs.Size(); i++)
     if(strcmp(get_string(column_ndx, i), value) == 0)
-        tv.GetRefColumn().add(i);
+        tv.get_ref_column().add(i);
 }
 
 int64_t TableView::sum(size_t column_ndx) const
