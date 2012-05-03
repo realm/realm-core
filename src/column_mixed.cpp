@@ -187,7 +187,7 @@ void ColumnMixed::insert_int(size_t ndx, int64_t value)
     m_refs->Insert(ndx, v);
 }
 
-void ColumnMixed::InsertBool(size_t ndx, bool value)
+void ColumnMixed::insert_bool(size_t ndx, bool value)
 {
     assert(ndx <= m_types->Size());
 
@@ -199,7 +199,7 @@ void ColumnMixed::InsertBool(size_t ndx, bool value)
     m_refs->Insert(ndx, v);
 }
 
-void ColumnMixed::InsertDate(size_t ndx, time_t value)
+void ColumnMixed::insert_date(size_t ndx, time_t value)
 {
     assert(ndx <= m_types->Size());
 
@@ -211,7 +211,7 @@ void ColumnMixed::InsertDate(size_t ndx, time_t value)
     m_refs->Insert(ndx, v);
 }
 
-void ColumnMixed::InsertString(size_t ndx, const char* value)
+void ColumnMixed::insert_string(size_t ndx, const char* value)
 {
     assert(ndx <= m_types->Size());
     InitDataColumn();
@@ -228,7 +228,7 @@ void ColumnMixed::InsertString(size_t ndx, const char* value)
     m_refs->Insert(ndx, v);
 }
 
-void ColumnMixed::InsertBinary(size_t ndx, const char* value, size_t len)
+void ColumnMixed::insert_binary(size_t ndx, const char* value, size_t len)
 {
     assert(ndx <= m_types->Size());
     InitDataColumn();
@@ -355,7 +355,7 @@ void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
     }
 }
 
-void ColumnMixed::InsertTable(size_t ndx)
+void ColumnMixed::insert_table(size_t ndx)
 {
     assert(ndx <= m_types->Size());
     const size_t ref = Table::create_table(m_array->GetAllocator());

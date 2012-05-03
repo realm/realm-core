@@ -69,7 +69,7 @@ bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* 
     AggregateState* p = (AggregateState*)state;
 
     int64_t res;
-    if (!a->Min(res, start, end)) return true;
+    if (!a->minimum(res, start, end)) return true;
 
     if (!p->isValid || (res < p->result)) {
         p->result  = res;
@@ -84,7 +84,7 @@ bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* 
     AggregateState* p = (AggregateState*)state;
 
     int64_t res;
-    if (!a->Max(res, start, end)) return true;
+    if (!a->maximum(res, start, end)) return true;
 
     if (!p->isValid || (res > p->result)) {
         p->result  = res;
@@ -482,14 +482,14 @@ int64_t Column::sum(size_t start, size_t end) const
     return sum;
 }
 
-int64_t Column::Min(size_t start, size_t end) const
+int64_t Column::minimum(size_t start, size_t end) const
 {
     AggregateState state;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_min, (void *)&state);
     return state.result; // will return zero for empty ranges
 }
 
-int64_t Column::Max(size_t start, size_t end) const
+int64_t Column::maximum(size_t start, size_t end) const
 {
     AggregateState state;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_max, (void *)&state);

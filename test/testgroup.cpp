@@ -14,11 +14,11 @@ enum Days {
     Sun
 };
 
-TDB_TABLE_4(TestTableGroup,
-            String,     first,
-            Int,        second,
-            Bool,       third,
-            Enum<Days>, fourth)
+TIGHTDB_TABLE_4(TestTableGroup,
+                first,  String,
+                second, Int,
+                third,  Bool,
+                fourth, Enum<Days>)
 
 // Windows version of serialization is not implemented yet
 #if 1 //_MSC_VER
@@ -305,20 +305,20 @@ TEST(Group_Serialize_All)
     Group toMem;
     TableRef table = toMem.get_table("test");
 
-    table->register_column(COLUMN_TYPE_INT,    "int");
-    table->register_column(COLUMN_TYPE_BOOL,   "bool");
-    table->register_column(COLUMN_TYPE_DATE,   "date");
-    table->register_column(COLUMN_TYPE_STRING, "string");
-    table->register_column(COLUMN_TYPE_BINARY, "binary");
-    table->register_column(COLUMN_TYPE_MIXED,  "mixed");
+    table->add_column(COLUMN_TYPE_INT,    "int");
+    table->add_column(COLUMN_TYPE_BOOL,   "bool");
+    table->add_column(COLUMN_TYPE_DATE,   "date");
+    table->add_column(COLUMN_TYPE_STRING, "string");
+    table->add_column(COLUMN_TYPE_BINARY, "binary");
+    table->add_column(COLUMN_TYPE_MIXED,  "mixed");
 
     table->insert_int(0, 0, 12);
-    table->InsertBool(1, 0, true);
-    table->InsertDate(2, 0, 12345);
-    table->InsertString(3, 0, "test");
-    table->InsertBinary(4, 0, "binary", 7);
-    table->InsertMixed(5, 0, false);
-    table->InsertDone();
+    table->insert_bool(1, 0, true);
+    table->insert_date(2, 0, 12345);
+    table->insert_string(3, 0, "test");
+    table->insert_binary(4, 0, "binary", 7);
+    table->insert_mixed(5, 0, false);
+    table->insert_done();
 
     // Serialize to memory (we now own the buffer)
     size_t len;
@@ -352,19 +352,19 @@ TEST(Group_Persist) {
 
     // Insert some data
     TableRef table = db.get_table("test");
-    table->register_column(COLUMN_TYPE_INT,    "int");
-    table->register_column(COLUMN_TYPE_BOOL,   "bool");
-    table->register_column(COLUMN_TYPE_DATE,   "date");
-    table->register_column(COLUMN_TYPE_STRING, "string");
-    table->register_column(COLUMN_TYPE_BINARY, "binary");
-    table->register_column(COLUMN_TYPE_MIXED,  "mixed");
+    table->add_column(COLUMN_TYPE_INT,    "int");
+    table->add_column(COLUMN_TYPE_BOOL,   "bool");
+    table->add_column(COLUMN_TYPE_DATE,   "date");
+    table->add_column(COLUMN_TYPE_STRING, "string");
+    table->add_column(COLUMN_TYPE_BINARY, "binary");
+    table->add_column(COLUMN_TYPE_MIXED,  "mixed");
     table->insert_int(0, 0, 12);
-    table->InsertBool(1, 0, true);
-    table->InsertDate(2, 0, 12345);
-    table->InsertString(3, 0, "test");
-    table->InsertBinary(4, 0, "binary", 7);
-    table->InsertMixed(5, 0, false);
-    table->InsertDone();
+    table->insert_bool(1, 0, true);
+    table->insert_date(2, 0, 12345);
+    table->insert_string(3, 0, "test");
+    table->insert_binary(4, 0, "binary", 7);
+    table->insert_mixed(5, 0, false);
+    table->insert_done();
 
     // Write changes to file
     db.commit();
@@ -424,14 +424,14 @@ TEST(Group_Subtable)
         table->add_empty_row();
         table->Set(0, i, 100+i);
         if (i%2 == 0) {
-            TableRef st = table->GetTable(1, i);
+            TableRef st = table->get_table(1, i);
             st->add_empty_row();
             st->Set(0, 0, 200+i);
         }
         if (i%3 == 1) {
             table->set_mixed(2, i, Mixed(COLUMN_TYPE_TABLE));
-            TableRef st = table->GetTable(2, i);
-            st->register_column(COLUMN_TYPE_INT, "banach");
+            TableRef st = table->get_table(2, i);
+            st->add_column(COLUMN_TYPE_INT, "banach");
             st->add_empty_row();
             st->Set(0, 0, 700+i);
         }
@@ -442,7 +442,7 @@ TEST(Group_Subtable)
     for (int i=0; i<n; ++i) {
         CHECK_EQUAL(table->Get(0, i), 100+i);
         {
-            TableRef st = table->GetTable(1, i);
+            TableRef st = table->get_table(1, i);
             CHECK_EQUAL(st->size(), i%2 == 0 ? 1 : 0);
             if (i%2 == 0) CHECK_EQUAL(st->Get(0,0), 200+i);
             if (i%3 == 0) {
@@ -452,14 +452,14 @@ TEST(Group_Subtable)
         }
         CHECK_EQUAL(table->get_mixed_type(2,i), i%3 == 1 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
         if (i%3 == 1) {
-            TableRef st = table->GetTable(2, i);
+            TableRef st = table->get_table(2, i);
             CHECK_EQUAL(st->size(), 1);
             CHECK_EQUAL(st->Get(0,0), 700+i);
         }
         if (i%8 == 3) {
             if (i%3 != 1) table->set_mixed(2, i, Mixed(COLUMN_TYPE_TABLE));
-            TableRef st = table->GetTable(2, i);
-            if (i%3 != 1) st->register_column(COLUMN_TYPE_INT, "banach");
+            TableRef st = table->get_table(2, i);
+            if (i%3 != 1) st->add_column(COLUMN_TYPE_INT, "banach");
             st->add_empty_row();
             st->Set(0, st->size()-1, 800+i);
         }
@@ -468,7 +468,7 @@ TEST(Group_Subtable)
     for (int i=0; i<n; ++i) {
         CHECK_EQUAL(table->Get(0, i), 100+i);
         {
-            TableRef st = table->GetTable(1, i);
+            TableRef st = table->get_table(1, i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
             CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
@@ -483,7 +483,7 @@ TEST(Group_Subtable)
         }
         CHECK_EQUAL(table->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
         if (i%3 == 1 || i%8 == 3) {
-            TableRef st = table->GetTable(2, i);
+            TableRef st = table->get_table(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
             CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
@@ -507,7 +507,7 @@ TEST(Group_Subtable)
     for (int i=0; i<n; ++i) {
         CHECK_EQUAL(table2->Get(0, i), 100+i);
         {
-            TableRef st = table2->GetTable(1, i);
+            TableRef st = table2->get_table(1, i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
             CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
@@ -526,7 +526,7 @@ TEST(Group_Subtable)
         }
         CHECK_EQUAL(table2->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
         if (i%3 == 1 || i%8 == 3) {
-            TableRef st = table2->GetTable(2, i);
+            TableRef st = table2->get_table(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
             CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
@@ -541,8 +541,8 @@ TEST(Group_Subtable)
         }
         if (i%7 == 4) {
             if (i%3 != 1 && i%8 != 3) table2->set_mixed(2, i, Mixed(COLUMN_TYPE_TABLE));
-            TableRef st = table2->GetTable(2, i);
-            if (i%3 != 1 && i%8 != 3) st->register_column(COLUMN_TYPE_INT, "banach");
+            TableRef st = table2->get_table(2, i);
+            if (i%3 != 1 && i%8 != 3) st->add_column(COLUMN_TYPE_INT, "banach");
             st->add_empty_row();
             st->Set(0, st->size()-1, 900+i);
         }
@@ -551,7 +551,7 @@ TEST(Group_Subtable)
     for (int i=0; i<n; ++i) {
         CHECK_EQUAL(table2->Get(0, i), 100+i);
         {
-            TableRef st = table2->GetTable(1, i);
+            TableRef st = table2->get_table(1, i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
             CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
@@ -570,7 +570,7 @@ TEST(Group_Subtable)
         }
         CHECK_EQUAL(table2->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
         if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
-            TableRef st = table2->GetTable(2, i);
+            TableRef st = table2->get_table(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
             CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
@@ -598,7 +598,7 @@ TEST(Group_Subtable)
     for (int i=0; i<n; ++i) {
         CHECK_EQUAL(table3->Get(0, i), 100+i);
         {
-            TableRef st = table3->GetTable(1, i);
+            TableRef st = table3->get_table(1, i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
             CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
@@ -617,7 +617,7 @@ TEST(Group_Subtable)
         }
         CHECK_EQUAL(table3->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
         if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
-            TableRef st = table3->GetTable(2, i);
+            TableRef st = table3->get_table(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
             CHECK_EQUAL(st->size(), expected_size);
             size_t idx = 0;
@@ -660,14 +660,14 @@ TEST(Group_MultiLevelSubtables)
         }
         table->add_empty_row();
         {
-            TableRef a = table->GetTable(1, 0);
+            TableRef a = table->get_table(1, 0);
             a->add_empty_row();
-            TableRef b = a->GetTable(1, 0);
+            TableRef b = a->get_table(1, 0);
             b->add_empty_row();
         }
         {
             table->set_mixed(2, 0, Mixed(COLUMN_TYPE_TABLE));
-            TableRef a = table->GetTable(2, 0);
+            TableRef a = table->get_table(2, 0);
             {
                 Spec& s = a->get_spec();
                 s.add_column(COLUMN_TYPE_INT, "int");
@@ -676,7 +676,7 @@ TEST(Group_MultiLevelSubtables)
             }
             a->add_empty_row();
             a->set_mixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
-            TableRef b = a->GetTable(1, 0);
+            TableRef b = a->get_table(1, 0);
             {
                 Spec& s = b->get_spec();
                 s.add_column(COLUMN_TYPE_INT, "int");
@@ -692,9 +692,9 @@ TEST(Group_MultiLevelSubtables)
         Group g("subtables.tdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
-        TableRef a = table->GetTable(1, 0);
+        TableRef a = table->get_table(1, 0);
         // Get B as subtable from A
-        TableRef b = a->GetTable(1, 0);
+        TableRef b = a->get_table(1, 0);
         // Modify B
         b->Set(0, 0, 6661012);
         // Modify A
@@ -702,30 +702,30 @@ TEST(Group_MultiLevelSubtables)
         // Modify top
         table->Set(0, 0, 6661010);
         // Get a second ref to A (compare)
-        CHECK_EQUAL(table->GetTable(1, 0), a);
-        CHECK_EQUAL(table->GetTable(1, 0)->Get(0,0), 6661011);
+        CHECK_EQUAL(table->get_table(1, 0), a);
+        CHECK_EQUAL(table->get_table(1, 0)->Get(0,0), 6661011);
         // get a second ref to B (compare)
-        CHECK_EQUAL(a->GetTable(1, 0), b);
-        CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661012);
+        CHECK_EQUAL(a->get_table(1, 0), b);
+        CHECK_EQUAL(a->get_table(1, 0)->Get(0,0), 6661012);
         g.write("subtables2.tdb");
     }
     {
         Group g("subtables2.tdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
-        TableRef a = table->GetTable(1, 0);
+        TableRef a = table->get_table(1, 0);
         // Get B as subtable from A
-        TableRef b = a->GetTable(1, 0);
+        TableRef b = a->get_table(1, 0);
         // Drop reference to A
         a = TableRef();
         // Modify B
         b->Set(0, 0, 6661013);
         // Get a third ref to A (compare)
-        a = table->GetTable(1, 0);
-        CHECK_EQUAL(table->GetTable(1, 0)->Get(0,0), 6661011);
+        a = table->get_table(1, 0);
+        CHECK_EQUAL(table->get_table(1, 0)->Get(0,0), 6661011);
         // Get third ref to B and verify last mod
-        b = a->GetTable(1, 0);
-        CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661013);
+        b = a->get_table(1, 0);
+        CHECK_EQUAL(a->get_table(1, 0)->Get(0,0), 6661013);
         g.write("subtables3.tdb");
     }
 
@@ -734,9 +734,9 @@ TEST(Group_MultiLevelSubtables)
         Group g("subtables3.tdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
-        TableRef a = table->GetTable(2, 0);
+        TableRef a = table->get_table(2, 0);
         // Get B as subtable from A
-        TableRef b = a->GetTable(1, 0);
+        TableRef b = a->get_table(1, 0);
         // Modify B
         b->Set(0, 0, 6661012);
         // Modify A
@@ -744,30 +744,30 @@ TEST(Group_MultiLevelSubtables)
         // Modify top
         table->Set(0, 0, 6661010);
         // Get a second ref to A (compare)
-        CHECK_EQUAL(table->GetTable(2, 0), a);
-        CHECK_EQUAL(table->GetTable(2, 0)->Get(0,0), 6661011);
+        CHECK_EQUAL(table->get_table(2, 0), a);
+        CHECK_EQUAL(table->get_table(2, 0)->Get(0,0), 6661011);
         // get a second ref to B (compare)
-        CHECK_EQUAL(a->GetTable(1, 0), b);
-        CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661012);
+        CHECK_EQUAL(a->get_table(1, 0), b);
+        CHECK_EQUAL(a->get_table(1, 0)->Get(0,0), 6661012);
         g.write("subtables4.tdb");
     }
     {
         Group g("subtables4.tdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
-        TableRef a = table->GetTable(2, 0);
+        TableRef a = table->get_table(2, 0);
         // Get B as subtable from A
-        TableRef b = a->GetTable(1, 0);
+        TableRef b = a->get_table(1, 0);
         // Drop reference to A
         a = TableRef();
         // Modify B
         b->Set(0, 0, 6661013);
         // Get a third ref to A (compare)
-        a = table->GetTable(2, 0);
-        CHECK_EQUAL(table->GetTable(2, 0)->Get(0,0), 6661011);
+        a = table->get_table(2, 0);
+        CHECK_EQUAL(table->get_table(2, 0)->Get(0,0), 6661011);
         // Get third ref to B and verify last mod
-        b = a->GetTable(1, 0);
-        CHECK_EQUAL(a->GetTable(1, 0)->Get(0,0), 6661013);
+        b = a->get_table(1, 0);
+        CHECK_EQUAL(a->get_table(1, 0)->Get(0,0), 6661013);
         g.write("subtables5.tdb");
     }
 }
@@ -802,44 +802,44 @@ TEST(Group_ToDot)
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
         table->insert_int(0, i, i);
-        table->InsertBool(1, i, (i % 2 ? true : false));
-        table->InsertDate(2, i, 12345);
+        table->insert_bool(1, i, (i % 2 ? true : false));
+        table->insert_date(2, i, 12345);
 
         std::stringstream ss;
         ss << "string" << i;
-        table->InsertString(3, i, ss.str().c_str());
+        table->insert_string(3, i, ss.str().c_str());
 
         ss << " very long string.........";
-        table->InsertString(4, i, ss.str().c_str());
+        table->insert_string(4, i, ss.str().c_str());
 
         switch (i % 3) {
             case 0:
-                table->InsertString(5, i, "test1");
+                table->insert_string(5, i, "test1");
                 break;
             case 1:
-                table->InsertString(5, i, "test2");
+                table->insert_string(5, i, "test2");
                 break;
             case 2:
-                table->InsertString(5, i, "test3");
+                table->insert_string(5, i, "test3");
                 break;
         }
 
-        table->InsertBinary(6, i, "binary", 7);
+        table->insert_binary(6, i, "binary", 7);
 
         switch (i % 3) {
             case 0:
-                table->InsertMixed(7, i, false);
+                table->insert_mixed(7, i, false);
                 break;
             case 1:
-                table->InsertMixed(7, i, (int64_t)i);
+                table->insert_mixed(7, i, (int64_t)i);
                 break;
             case 2:
-                table->InsertMixed(7, i, "string");
+                table->insert_mixed(7, i, "string");
                 break;
         }
 
-        table->InsertTable(8, i);
-        table->InsertDone();
+        table->insert_table(8, i);
+        table->insert_done();
 
         // Add sub-tables
         if (i == 2) {
@@ -853,14 +853,14 @@ TEST(Group_ToDot)
             subtable->UpdateFromSpec(s.GetRef());
 
             subtable->insert_int(0, 0, 42);
-            subtable->InsertString(1, 0, "meaning");
-            subtable->InsertDone();
+            subtable->insert_string(1, 0, "meaning");
+            subtable->insert_done();
 
             // To table column
-            Table subtable2 = table->GetTable(8, i);
+            Table subtable2 = table->get_table(8, i);
             subtable2->insert_int(0, 0, 42);
-            subtable2->InsertString(1, 0, "meaning");
-            subtable2->InsertDone();
+            subtable2->insert_string(1, 0, "meaning");
+            subtable2->insert_done();
         }
     }
 

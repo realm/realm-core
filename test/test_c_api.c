@@ -28,9 +28,9 @@ tdb_type_bool bool_data[TEST_DATA_ROWS];
 char str[20];
 
 
-TDB_TABLE_2(mytable, 
-            int,    MyInt, 
-            string, MyStr)
+TIGHTDB_TABLE_2(mytable, 
+                MyInt, int, 
+                MyStr, string)
 
 int c_test_1() {
     bool passed = true;

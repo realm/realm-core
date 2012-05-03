@@ -6,17 +6,17 @@ templateDef = """#slurp
 commentStartToken = %%
 directiveStartToken = %
 #end compiler-settings
-#ifndef TIGHTDB_H
-#define TIGHTDB_H
+#ifndef __TIGHTDB_H
+#define __TIGHTDB_H
 
 #include "table_basic.hpp"
 
 
 %for $i in range($max_cols)
 %set $num_cols = $i + 1
-#define TDB_TABLE_${num_cols}(Table%slurp
+#define TIGHTDB_TABLE_${num_cols}(Table%slurp
 %for $j in range($num_cols)
-, type${j+1}, name${j+1}%slurp
+, name${j+1}, type${j+1}%slurp
 %end for
 ) \\
 struct Table##Spec: tightdb::SpecBase { \\
@@ -56,7 +56,7 @@ typedef tightdb::BasicTable<Table##Spec> Table;
 
 
 %end for
-#endif // TIGHTDB_H
+#endif // __TIGHTDB_H
 """
 
 args = sys.argv[1:]

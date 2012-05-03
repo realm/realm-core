@@ -49,111 +49,111 @@ public:
         delete first[0];
     }
 
-    Query& Equal(size_t column_id, int64_t value)
+    Query& Equal(size_t column_ndx, int64_t value)
     {
-        ParentNode* const p = new NODE<int64_t, Column, EQUAL>(value, column_id);
+        ParentNode* const p = new NODE<int64_t, Column, EQUAL>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& NotEqual(size_t column_id, int64_t value)
+    Query& NotEqual(size_t column_ndx, int64_t value)
     {
-        ParentNode* const p = new NODE<int64_t, Column, NOTEQUAL>(value, column_id);
+        ParentNode* const p = new NODE<int64_t, Column, NOTEQUAL>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& Greater(size_t column_id, int64_t value)
+    Query& Greater(size_t column_ndx, int64_t value)
     {
-        ParentNode* const p = new NODE<int64_t, Column, GREATER>(value, column_id);
+        ParentNode* const p = new NODE<int64_t, Column, GREATER>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& GreaterEqual(size_t column_id, int64_t value)
+    Query& GreaterEqual(size_t column_ndx, int64_t value)
     {
         if(value > LLONG_MIN) {
-            ParentNode* const p = new NODE<int64_t, Column, GREATER>(value - 1, column_id);
+            ParentNode* const p = new NODE<int64_t, Column, GREATER>(value - 1, column_ndx);
             UpdatePointers(p, &p->m_child);
         }
         // field >= LLONG_MIN has no effect
         return *this;
     };
-    Query& LessEqual(size_t column_id, int64_t value)
+    Query& LessEqual(size_t column_ndx, int64_t value)
     {
         if(value < LLONG_MAX) {
-            ParentNode* const p = new NODE<int64_t, Column, LESS>(value + 1, column_id);
+            ParentNode* const p = new NODE<int64_t, Column, LESS>(value + 1, column_ndx);
             UpdatePointers(p, &p->m_child);
         }
         // field <= LLONG_MAX has no effect
         return *this;
     };
-    Query& Less(size_t column_id, int64_t value)
+    Query& Less(size_t column_ndx, int64_t value)
     {
-        ParentNode* const p = new NODE<int64_t, Column, LESS>(value, column_id);
+        ParentNode* const p = new NODE<int64_t, Column, LESS>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
 
-    Query& Between(size_t column_id, int64_t from, int64_t to)
+    Query& Between(size_t column_ndx, int64_t from, int64_t to)
     {
-        GreaterEqual(column_id, from);
-        LessEqual(column_id, to);
+        GreaterEqual(column_ndx, from);
+        LessEqual(column_ndx, to);
         return *this;
     };
-    Query& Equal(size_t column_id, bool value)
+    Query& Equal(size_t column_ndx, bool value)
     {
-        ParentNode* const p = new NODE<bool, Column, EQUAL>(value, column_id);
+        ParentNode* const p = new NODE<bool, Column, EQUAL>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
 
 
     // STRINGS
-    Query& Equal(size_t column_id, const char* value, bool caseSensitive=true)
+    Query& Equal(size_t column_ndx, const char* value, bool caseSensitive=true)
     {
         ParentNode* p;
         if(caseSensitive)
-            p = new STRINGNODE<EQUAL>(value, column_id);
+            p = new STRINGNODE<EQUAL>(value, column_ndx);
         else
-            p = new STRINGNODE<EQUAL_INS>(value, column_id);
+            p = new STRINGNODE<EQUAL_INS>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& BeginsWith(size_t column_id, const char* value, bool caseSensitive=true)
+    Query& BeginsWith(size_t column_ndx, const char* value, bool caseSensitive=true)
     {
         ParentNode* p;
         if(caseSensitive)
-            p = new STRINGNODE<BEGINSWITH>(value, column_id);
+            p = new STRINGNODE<BEGINSWITH>(value, column_ndx);
         else
-            p = new STRINGNODE<BEGINSWITH_INS>(value, column_id);
+            p = new STRINGNODE<BEGINSWITH_INS>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& EndsWith(size_t column_id, const char* value, bool caseSensitive=true)
+    Query& EndsWith(size_t column_ndx, const char* value, bool caseSensitive=true)
     {
         ParentNode* p;
         if(caseSensitive)
-            p = new STRINGNODE<ENDSWITH>(value, column_id);
+            p = new STRINGNODE<ENDSWITH>(value, column_ndx);
         else
-            p = new STRINGNODE<ENDSWITH_INS>(value, column_id);
+            p = new STRINGNODE<ENDSWITH_INS>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& Contains(size_t column_id, const char* value, bool caseSensitive=true)
+    Query& Contains(size_t column_ndx, const char* value, bool caseSensitive=true)
     {
         ParentNode* p;
         if(caseSensitive)
-            p = new STRINGNODE<CONTAINS>(value, column_id);
+            p = new STRINGNODE<CONTAINS>(value, column_ndx);
         else
-            p = new STRINGNODE<CONTAINS_INS>(value, column_id);
+            p = new STRINGNODE<CONTAINS_INS>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
-    Query& NotEqual(size_t column_id, const char* value, bool caseSensitive=true)
+    Query& NotEqual(size_t column_ndx, const char* value, bool caseSensitive=true)
     {
         ParentNode* p;
         if(caseSensitive)
-            p = new STRINGNODE<NOTEQUAL>(value, column_id);
+            p = new STRINGNODE<NOTEQUAL>(value, column_ndx);
         else
-            p = new STRINGNODE<NOTEQUAL_INS>(value, column_id);
+            p = new STRINGNODE<NOTEQUAL_INS>(value, column_ndx);
         UpdatePointers(p, &p->m_child);
         return *this;
     };
@@ -287,7 +287,7 @@ public:
         return sum;
     }
 
-    int64_t Max(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1),
+    int64_t maximum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1),
         size_t limit = size_t(-1)) const
     {
         Init(table);
@@ -311,7 +311,7 @@ public:
         return max;
     }
 
-    int64_t Min(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
+    int64_t minimum(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         Init(table);
 

@@ -47,12 +47,12 @@ public:
 
 private:
     // Define internal tables
-    TDB_TABLE_2(Slabs,
-                Int, offset,
-                Int, pointer)
-    TDB_TABLE_2(FreeSpace,
-                Int, ref,
-                Int, size)
+    TIGHTDB_TABLE_2(Slabs,
+                    offset,     Int,
+                    pointer,    Int)
+    TIGHTDB_TABLE_2(FreeSpace,
+                    ref,    Int,
+                    size,   Int)
 
     // Member variables
     char*     m_shared;

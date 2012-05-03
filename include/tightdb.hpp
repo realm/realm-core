@@ -1,10 +1,10 @@
-#ifndef TIGHTDB_H
-#define TIGHTDB_H
+#ifndef __TIGHTDB_H
+#define __TIGHTDB_H
 
 #include "table_basic.hpp"
 
 
-#define TDB_TABLE_1(Table, type1, name1) \
+#define TIGHTDB_TABLE_1(Table, name1, type1) \
 struct Table##Spec: tightdb::SpecBase { \
     template<template<int, class> class Column, class Init> \
     class Columns { \
@@ -21,7 +21,7 @@ struct Table##Spec: tightdb::SpecBase { \
 typedef tightdb::BasicTable<Table##Spec> Table;
 
 
-#define TDB_TABLE_2(Table, type1, name1, type2, name2) \
+#define TIGHTDB_TABLE_2(Table, name1, type1, name2, type2) \
 struct Table##Spec: tightdb::SpecBase { \
     template<template<int, class> class Column, class Init> \
     class Columns { \
@@ -40,7 +40,7 @@ struct Table##Spec: tightdb::SpecBase { \
 typedef tightdb::BasicTable<Table##Spec> Table;
 
 
-#define TDB_TABLE_3(Table, type1, name1, type2, name2, type3, name3) \
+#define TIGHTDB_TABLE_3(Table, name1, type1, name2, type2, name3, type3) \
 struct Table##Spec: tightdb::SpecBase { \
     template<template<int, class> class Column, class Init> \
     class Columns { \
@@ -61,7 +61,7 @@ struct Table##Spec: tightdb::SpecBase { \
 typedef tightdb::BasicTable<Table##Spec> Table;
 
 
-#define TDB_TABLE_4(Table, type1, name1, type2, name2, type3, name3, type4, name4) \
+#define TIGHTDB_TABLE_4(Table, name1, type1, name2, type2, name3, type3, name4, type4) \
 struct Table##Spec: tightdb::SpecBase { \
     template<template<int, class> class Column, class Init> \
     class Columns { \
@@ -84,7 +84,7 @@ struct Table##Spec: tightdb::SpecBase { \
 typedef tightdb::BasicTable<Table##Spec> Table;
 
 
-#define TDB_TABLE_5(Table, type1, name1, type2, name2, type3, name3, type4, name4, type5, name5) \
+#define TIGHTDB_TABLE_5(Table, name1, type1, name2, type2, name3, type3, name4, type4, name5, type5) \
 struct Table##Spec: tightdb::SpecBase { \
     template<template<int, class> class Column, class Init> \
     class Columns { \
@@ -109,7 +109,7 @@ struct Table##Spec: tightdb::SpecBase { \
 typedef tightdb::BasicTable<Table##Spec> Table;
 
 
-#define TDB_TABLE_6(Table, type1, name1, type2, name2, type3, name3, type4, name4, type5, name5, type6, name6) \
+#define TIGHTDB_TABLE_6(Table, name1, type1, name2, type2, name3, type3, name4, type4, name5, type5, name6, type6) \
 struct Table##Spec: tightdb::SpecBase { \
     template<template<int, class> class Column, class Init> \
     class Columns { \
@@ -136,7 +136,7 @@ struct Table##Spec: tightdb::SpecBase { \
 typedef tightdb::BasicTable<Table##Spec> Table;
 
 
-#define TDB_TABLE_7(Table, type1, name1, type2, name2, type3, name3, type4, name4, type5, name5, type6, name6, type7, name7) \
+#define TIGHTDB_TABLE_7(Table, name1, type1, name2, type2, name3, type3, name4, type4, name5, type5, name6, type6, name7, type7) \
 struct Table##Spec: tightdb::SpecBase { \
     template<template<int, class> class Column, class Init> \
     class Columns { \
@@ -165,7 +165,7 @@ struct Table##Spec: tightdb::SpecBase { \
 typedef tightdb::BasicTable<Table##Spec> Table;
 
 
-#define TDB_TABLE_8(Table, type1, name1, type2, name2, type3, name3, type4, name4, type5, name5, type6, name6, type7, name7, type8, name8) \
+#define TIGHTDB_TABLE_8(Table, name1, type1, name2, type2, name3, type3, name4, type4, name5, type5, name6, type6, name7, type7, name8, type8) \
 struct Table##Spec: tightdb::SpecBase { \
     template<template<int, class> class Column, class Init> \
     class Columns { \
@@ -196,4 +196,4 @@ struct Table##Spec: tightdb::SpecBase { \
 typedef tightdb::BasicTable<Table##Spec> Table;
 
 
-#endif // TIGHTDB_H
+#endif // __TIGHTDB_H

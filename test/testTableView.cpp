@@ -3,9 +3,8 @@
 
 using namespace tightdb;
 
-TDB_TABLE_1(TestTableInt,
-            Int,        first
-)
+TIGHTDB_TABLE_1(TestTableInt,
+                first, Int)
 
 
 TEST(GetSetInteger)
@@ -84,7 +83,7 @@ TEST(TableViewMax)
     v.Set(0, 1, 2);
     v.Set(0, 2, 1);
 
-    int64_t max = v.Max(0);
+    int64_t max = v.maximum(0);
     CHECK_EQUAL(2, max);
     //v.Destroy();
 }
@@ -104,7 +103,7 @@ TEST(TableViewMax2)
     v.Set(0, 1, -2);
     v.Set(0, 2, -3);
 
-    int64_t max = v.Max(0);
+    int64_t max = v.maximum(0);
     CHECK_EQUAL(-1, max);
     //v.Destroy();
 }
@@ -123,7 +122,7 @@ TEST(TableViewMin)
     v.Set(0, 1, 2);
     v.Set(0, 2, 1);
 
-    int64_t min = v.Min(0);
+    int64_t min = v.minimum(0);
     CHECK_EQUAL(-1, min);
     //v.Destroy();
 }
@@ -142,7 +141,7 @@ TEST(TableViewMin2)
     v.Set(0, 1, -2);
     v.Set(0, 2, -3);
 
-    int64_t min = v.Min(0);
+    int64_t min = v.minimum(0);
     CHECK_EQUAL(-3, min);
     //v.Destroy();
 }
@@ -182,7 +181,7 @@ TEST(TableViewFindAll)
     v.Set(0, 2, 4); // match
 
     // todo, add creation to wrapper function in table.h
-    TableView *v2 = new TableView(*v.GetTable());
+    TableView *v2 = new TableView(*v.get_table());
     v.FindAll(*v2, 0, 4);
     CHECK_EQUAL(1, v2->GetRef(0));
     CHECK_EQUAL(2, v2->GetRef(1));
@@ -190,9 +189,8 @@ TEST(TableViewFindAll)
     delete v2;
 }
 
-TDB_TABLE_1(TestTableString,
-            String,        first
-)
+TIGHTDB_TABLE_1(TestTableString,
+                first, String)
 
 TEST(TableViewFindAllString)
 {
@@ -208,7 +206,7 @@ TEST(TableViewFindAllString)
     v.set_string(0, 2, "bar"); // match
 
     // todo, add creation to wrapper function in table.h
-    TableView *v2 = new TableView(*v.GetTable());
+    TableView *v2 = new TableView(*v.get_table());
     v.FindAllString(*v2, 0, "bar");
     CHECK_EQUAL(1, v2->GetRef(0));
     CHECK_EQUAL(2, v2->GetRef(1));

@@ -108,7 +108,7 @@ typedef struct Query Query;
 	void        spec_add_column(Spec* spec, ColumnType type, const char* name);
 	Spec*       spec_add_column_table(Spec* spec, const char* name);
    
-    Spec*       spec_get_spec(Spec* spec, size_t column_id);
+    Spec*       spec_get_spec(Spec* spec, size_t column_ndx);
    
 	size_t      spec_get_column_count(Spec* spec);
 	ColumnType  spec_get_column_type(Spec* spec, size_t column_idx);
@@ -153,53 +153,53 @@ typedef struct Query Query;
 	void table_insert(Table* t, size_t ndx, ...);
 
 	/* Getting values */
-	int64_t     table_get_int(const Table* t, size_t column_id, size_t ndx);
-	bool        table_get_bool(const Table* t, size_t column_id, size_t ndx);
-	time_t      table_get_date(const Table* t, size_t column_id, size_t ndx);
-	const char* table_get_string(const Table* t, size_t column_id, size_t ndx);
-    BinaryData  table_get_binary(const Table* t, size_t column_id, size_t ndx);
-    Mixed*      table_get_mixed(const Table* t, size_t column_id, size_t ndx);
-    ColumnType  table_get_mixed_type(const Table* t, size_t column_id, size_t ndx);
+	int64_t     table_get_int(const Table* t, size_t column_ndx, size_t ndx);
+	bool        table_get_bool(const Table* t, size_t column_ndx, size_t ndx);
+	time_t      table_get_date(const Table* t, size_t column_ndx, size_t ndx);
+	const char* table_get_string(const Table* t, size_t column_ndx, size_t ndx);
+    BinaryData  table_get_binary(const Table* t, size_t column_ndx, size_t ndx);
+    Mixed*      table_get_mixed(const Table* t, size_t column_ndx, size_t ndx);
+    ColumnType  table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx);
 
-    Table*      table_get_table(Table* t, size_t column_id, size_t ndx);
-    const Table* table_get_ctable(const Table* t, size_t column_id, size_t ndx);
+    Table*      table_get_table(Table* t, size_t column_ndx, size_t ndx);
+    const Table* table_get_ctable(const Table* t, size_t column_ndx, size_t ndx);
                 /* Use table_unbind() to 'delete' the table after use */
 
     /* Setting values */
-	void table_set_int(Table* t, size_t column_id, size_t ndx, int64_t value);
-	void table_set_bool(Table* t, size_t column_id, size_t ndx, bool value);
-	void table_set_date(Table* t, size_t column_id, size_t ndx, time_t value);
-	void table_set_string(Table* t, size_t column_id, size_t ndx, const char* value);
-    void table_set_binary(Table* t, size_t column_id, size_t ndx, const char* value, size_t len);
-    void table_set_mixed(Table* t, size_t column_id, size_t ndx, Mixed value);
+	void table_set_int(Table* t, size_t column_ndx, size_t ndx, int64_t value);
+	void table_set_bool(Table* t, size_t column_ndx, size_t ndx, bool value);
+	void table_set_date(Table* t, size_t column_ndx, size_t ndx, time_t value);
+	void table_set_string(Table* t, size_t column_ndx, size_t ndx, const char* value);
+    void table_set_binary(Table* t, size_t column_ndx, size_t ndx, const char* value, size_t len);
+    void table_set_mixed(Table* t, size_t column_ndx, size_t ndx, Mixed value);
  
-    void table_clear_table(Table* t, size_t column_id, size_t ndx);
+    void table_clear_table(Table* t, size_t column_ndx, size_t ndx);
 
 	/* Indexing */
-	bool table_has_index(const Table* t, size_t column_id);
-	void table_set_index(Table* t, size_t column_id);
+	bool table_has_index(const Table* t, size_t column_ndx);
+	void table_set_index(Table* t, size_t column_ndx);
 
 	/* Searching */
-	size_t table_find_int(const Table* t, size_t column_id, int value);
-	size_t table_find_int64(const Table* t, size_t column_id, int64_t value);
-	size_t table_find_bool(const Table* t, size_t column_id, bool value);
-	size_t table_find_date(const Table* t, size_t column_id, time_t value);
-	size_t table_find_string(const Table* t, size_t column_id, const char* value);
+	size_t table_find_int(const Table* t, size_t column_ndx, int value);
+	size_t table_find_int64(const Table* t, size_t column_ndx, int64_t value);
+	size_t table_find_bool(const Table* t, size_t column_ndx, bool value);
+	size_t table_find_date(const Table* t, size_t column_ndx, time_t value);
+	size_t table_find_string(const Table* t, size_t column_ndx, const char* value);
 
-	TableView* table_find_all_int64(Table* t, size_t column_id, int64_t value);
-	TableView* table_find_all_hamming(Table* t, size_t column_id, uint64_t value, size_t max);
+	TableView* table_find_all_int64(Table* t, size_t column_ndx, int64_t value);
+	TableView* table_find_all_hamming(Table* t, size_t column_ndx, uint64_t value, size_t max);
                 /* Remeber to call tableview_delete(tv) after use of the returned TableView */
 
 	/* NOTE: Low-level insert functions. Always insert in all columns at once
 	** and call table_insert_done after to avoid table getting un-balanced. */
-	void table_insert_int(Table* t, size_t column_id, size_t ndx, int value);
-	void table_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value);
-	void table_insert_bool(Table* t, size_t column_id, size_t ndx, bool value);
-	void table_insert_date(Table* t, size_t column_id, size_t ndx, time_t value);
-	void table_insert_string(Table* t, size_t column_id, size_t ndx, const char* value);
-	void table_insert_binary(Table* t, size_t column_id, size_t ndx, const char* value, size_t len);
-	void table_insert_mixed(Table* t, size_t column_id, size_t ndx, Mixed value);
-    void table_insert_table(Table* t, size_t column_id, size_t ndx);
+	void table_insert_int(Table* t, size_t column_ndx, size_t ndx, int value);
+	void table_insert_int64(Table* t, size_t column_ndx, size_t ndx, int64_t value);
+	void table_insert_bool(Table* t, size_t column_ndx, size_t ndx, bool value);
+	void table_insert_date(Table* t, size_t column_ndx, size_t ndx, time_t value);
+	void table_insert_string(Table* t, size_t column_ndx, size_t ndx, const char* value);
+	void table_insert_binary(Table* t, size_t column_ndx, size_t ndx, const char* value, size_t len);
+	void table_insert_mixed(Table* t, size_t column_ndx, size_t ndx, Mixed value);
+    void table_insert_table(Table* t, size_t column_ndx, size_t ndx);
     void table_insert_done(Table* t);
 
 /*** TableView ************************************/
@@ -211,41 +211,41 @@ typedef struct Query Query;
 	/* TableView size */
 	bool    tableview_is_empty(const TableView* tv);
 	size_t  tableview_get_size(const TableView* tv);
-    size_t  tableview_get_table_size(size_t column_id, size_t ndx);
+    size_t  tableview_get_table_size(size_t column_ndx, size_t ndx);
 
 	/* Getting values */
-	int64_t     tableview_get_int(const TableView* tv, size_t column_id, size_t ndx);
-	bool        tableview_get_bool(const TableView* tv, size_t column_id, size_t ndx);
-	time_t      tableview_get_date(const TableView* tv, size_t column_id, size_t ndx);
-	const char* tableview_get_string(const TableView* tv, size_t column_id, size_t ndx);
-//???    BinaryData tableview_get_binary(const TableView* tv, size_t column_id, size_t ndx);
-//???    Mixed tableview_get_mixed(const TableView* tv, size_t column_id, size_t ndx);
+	int64_t     tableview_get_int(const TableView* tv, size_t column_ndx, size_t ndx);
+	bool        tableview_get_bool(const TableView* tv, size_t column_ndx, size_t ndx);
+	time_t      tableview_get_date(const TableView* tv, size_t column_ndx, size_t ndx);
+	const char* tableview_get_string(const TableView* tv, size_t column_ndx, size_t ndx);
+//???    BinaryData tableview_get_binary(const TableView* tv, size_t column_ndx, size_t ndx);
+//???    Mixed tableview_get_mixed(const TableView* tv, size_t column_ndx, size_t ndx);
     
-    Table*      tableview_get_table(const TableView* tv, size_t column_id, size_t ndx);
+    Table*      tableview_get_table(const TableView* tv, size_t column_ndx, size_t ndx);
     /* Use table_unbind() to 'delete' the table after use */
     
 	/* Setting values */
-	void tableview_set_int(TableView* tv, size_t column_id, size_t ndx, int64_t value);
-	void tableview_set_bool(TableView* tv, size_t column_id, size_t ndx, bool value);
-	void tableview_set_date(TableView* tv, size_t column_id, size_t ndx, time_t value);
-	void tableview_set_string(TableView* t, size_t column_id, size_t ndx, const char* value);
-//???    void tableview_set_binary(TableView* tv, size_t column_id, size_t ndx, const char* value, size_t len);
-//???    void tableview_set_mixed(TableView* tv, size_t column_id, size_t ndx, Mixed value);
+	void tableview_set_int(TableView* tv, size_t column_ndx, size_t ndx, int64_t value);
+	void tableview_set_bool(TableView* tv, size_t column_ndx, size_t ndx, bool value);
+	void tableview_set_date(TableView* tv, size_t column_ndx, size_t ndx, time_t value);
+	void tableview_set_string(TableView* t, size_t column_ndx, size_t ndx, const char* value);
+//???    void tableview_set_binary(TableView* tv, size_t column_ndx, size_t ndx, const char* value, size_t len);
+//???    void tableview_set_mixed(TableView* tv, size_t column_ndx, size_t ndx, Mixed value);
 
-//???    void tableview_clear_table(TableView* tv, size_t column_id, size_t ndx);
+//???    void tableview_clear_table(TableView* tv, size_t column_ndx, size_t ndx);
 
     /* Search and sort */
-    size_t  tableview_find(TableView* tv, size_t column_id, int64_t value);
-//???	void    tableview_find_all(TableView* tv, size_t column_id, int64_t value);
-	size_t  tableview_find_string(TableView* tv, size_t column_id, const char* value);
-//???	void    tableview_find_all_string(TableView* tv, size_t column_id, const char *value);
+    size_t  tableview_find(TableView* tv, size_t column_ndx, int64_t value);
+//???	void    tableview_find_all(TableView* tv, size_t column_ndx, int64_t value);
+	size_t  tableview_find_string(TableView* tv, size_t column_ndx, const char* value);
+//???	void    tableview_find_all_string(TableView* tv, size_t column_ndx, const char *value);
 
-    void    tableview_sort(TableView* tv, size_t column_id, bool ascending);
+    void    tableview_sort(TableView* tv, size_t column_ndx, bool ascending);
 
     /* Aggregation */
-    int64_t tableview_sum(TableView* tv, size_t column_id);
-    int64_t tableview_max(TableView* tv, size_t column_id);
-    int64_t tableview_min(TableView* tv, size_t column_id);
+    int64_t tableview_sum(TableView* tv, size_t column_ndx);
+    int64_t tableview_max(TableView* tv, size_t column_ndx);
+    int64_t tableview_min(TableView* tv, size_t column_ndx);
 
 
 /*** Group ************************************/
@@ -276,29 +276,29 @@ typedef struct Query Query;
     void    query_end_group(Query* q);
     void    query_or(Query* q);
 
-    void    query_subtable(Query* q, size_t column_id);
+    void    query_subtable(Query* q, size_t column_ndx);
     void    query_parent(Query* q);
 
-    Query*  query_bool_equal(Query* q, size_t column_id, bool value);
+    Query*  query_bool_equal(Query* q, size_t column_ndx, bool value);
 
-    Query*  query_int_equal(Query* q, size_t column_id, int64_t value);
+    Query*  query_int_equal(Query* q, size_t column_ndx, int64_t value);
 
-    Query*  query_int_not_equal(Query* q, size_t column_id, int64_t value);
-    Query*  query_int_greater(Query* q, size_t column_id, int64_t value);
-    Query*  query_int_greater_or_equal(Query* q, size_t column_id, int64_t value);
-    Query*  query_int_less(Query* q, size_t column_id, int64_t value);
-    Query*  query_int_less_or_equal(Query* q, size_t column_id, int64_t value);
-    Query*  query_int_between(Query* q, size_t column_id, int64_t from, int64_t to);
+    Query*  query_int_not_equal(Query* q, size_t column_ndx, int64_t value);
+    Query*  query_int_greater(Query* q, size_t column_ndx, int64_t value);
+    Query*  query_int_greater_or_equal(Query* q, size_t column_ndx, int64_t value);
+    Query*  query_int_less(Query* q, size_t column_ndx, int64_t value);
+    Query*  query_int_less_or_equal(Query* q, size_t column_ndx, int64_t value);
+    Query*  query_int_between(Query* q, size_t column_ndx, int64_t from, int64_t to);
 
     typedef enum {
         CASE_INSENSITIVE = 0,
         CASE_SENSITIVE   = 1
     } CaseSensitivity_t;
-    Query*  query_string_equal(Query* q, size_t column_id, const char* value, CaseSensitivity_t case_sensitive);
-    Query*  query_string_not_equal(Query* q, size_t column_id, const char* value, CaseSensitivity_t case_sensitive);
-    Query*  query_string_begins_with(Query* q, size_t column_id, const char* value, CaseSensitivity_t case_sensitive);
-    Query*  query_string_ends_with(Query* q, size_t column_id, const char* value, CaseSensitivity_t case_sensitive);
-    Query*  query_string_contains(Query* q, size_t column_id, const char* value, CaseSensitivity_t case_sensitive);
+    Query*  query_string_equal(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive);
+    Query*  query_string_not_equal(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive);
+    Query*  query_string_begins_with(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive);
+    Query*  query_string_ends_with(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive);
+    Query*  query_string_contains(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive);
     
 /* Currently missing support for Query on Mixed and Binary */
 
@@ -309,17 +309,17 @@ typedef struct Query Query;
     size_t   query_count(Query* q, const Table* t);
     size_t   query_count_range(Query* q, const Table* t,
                                size_t start, size_t end, size_t limit); 
-    int64_t  query_min(Query* q, const Table* t, size_t column_id, size_t* resultcount);
-    int64_t  query_min_range(Query* q, const Table* t, size_t column_id, size_t* resultcount,
+    int64_t  query_min(Query* q, const Table* t, size_t column_ndx, size_t* resultcount);
+    int64_t  query_min_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
                              size_t start, size_t end, size_t limit);
-    int64_t  query_max(Query* q, const Table* t, size_t column_id, size_t* resultcount);
-    int64_t  query_max_range(Query* q, const Table* t, size_t column_id, size_t* resultcount,
+    int64_t  query_max(Query* q, const Table* t, size_t column_ndx, size_t* resultcount);
+    int64_t  query_max_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
                              size_t start, size_t end, size_t limit);
-    int64_t  query_sum(Query* q, const Table* t, size_t column_id, size_t* resultcount);
-    int64_t  query_sum_range(Query* q, const Table* t, size_t column_id, size_t* resultcount,
+    int64_t  query_sum(Query* q, const Table* t, size_t column_ndx, size_t* resultcount);
+    int64_t  query_sum_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
                              size_t start, size_t end, size_t limit);
-    double   query_avg(Query* q, const Table* t, size_t column_id, size_t* resultcount);
-    double   query_avg_range(Query* q, const Table* t, size_t column_id, size_t* resultcount,
+    double   query_avg(Query* q, const Table* t, size_t column_ndx, size_t* resultcount);
+    double   query_avg_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
                              size_t start, size_t end, size_t limit);
 
 #ifdef __cplusplus

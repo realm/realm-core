@@ -1,5 +1,5 @@
-#ifndef TIGHTDB_TABLE_REF_H
-#define TIGHTDB_TABLE_REF_H
+#ifndef __TIGHTDB_TABLE_REF_H
+#define __TIGHTDB_TABLE_REF_H
 
 #include <cstddef>
 #include <algorithm>
@@ -18,8 +18,8 @@ namespace tightdb {
  *
  *   void func(Table& table)
  *   {
- *     Table& sub1 = *table.GetTable(0,0); // INVALID! (sub1 becomes 'dangeling')
- *     TableRef sub2 = table.GetTable(0,0); // Safe!
+ *     Table& sub1 = *table.get_table(0,0); // INVALID! (sub1 becomes 'dangeling')
+ *     TableRef sub2 = table.get_table(0,0); // Safe!
  *   }
  *
  * \endcode
@@ -220,4 +220,4 @@ std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const BasicTab
 
 }
 
-#endif // TIGHTDB_TABLE_REF_H
+#endif // __TIGHTDB_TABLE_REF_H

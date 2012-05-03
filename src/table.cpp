@@ -372,12 +372,16 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const
     const size_t count = m_spec_set.get_type_attr_count();
 
     for (size_t i = 0; i < count; ++i) {
-        if (current_column == column_ndx) return pos;
+        if (current_column == column_ndx) 
+            return pos;
 
         const ColumnType type = (ColumnType)m_spec_set.get_type_attr(i);
-        if (type >= COLUMN_ATTR_INDEXED) continue; // ignore attributes
-        if (type < COLUMN_TYPE_STRING_ENUM) ++pos;
-        else pos += 2;
+        if (type >= COLUMN_ATTR_INDEXED) 
+            continue; // ignore attributes
+        if (type < COLUMN_TYPE_STRING_ENUM) 
+            ++pos;
+        else
+            pos += 2;
 
         ++current_column;
     }
@@ -386,8 +390,13 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const
     return (size_t)-1;
 }
 
-size_t Table::register_column(ColumnType type, const char* name)
+size_t Table::add_column(ColumnType type, const char* name)
 {
+    // Currently it's not possible to dynamically add columns to a table with content.
+    assert(size() == 0);    
+    if (size() != 0)
+        return (size_t)-1;
+
     const size_t column_ndx = m_cols.Size();
 
     ColumnBase* newColumn = NULL;
@@ -426,19 +435,19 @@ size_t Table::register_column(ColumnType type, const char* name)
     return column_ndx;
 }
 
-bool Table::has_index(size_t column_id) const
+bool Table::has_index(size_t column_ndx) const
 {
-    assert(column_id < get_column_count());
-    const ColumnBase& col = GetColumnBase(column_id);
+    assert(column_ndx < get_column_count());
+    const ColumnBase& col = GetColumnBase(column_ndx);
     return col.HasIndex();
 }
 
-void Table::set_index(size_t column_id)
+void Table::set_index(size_t column_ndx)
 {
-    assert(column_id < get_column_count());
-    if (has_index(column_id)) return;
+    assert(column_ndx < get_column_count());
+    if (has_index(column_ndx)) return;
 
-    ColumnBase& col = GetColumnBase(column_id);
+    ColumnBase& col = GetColumnBase(column_ndx);
 
     if (col.IsIntColumn()) {
         Column& c = static_cast<Column&>(col);
@@ -579,23 +588,23 @@ void Table::remove(size_t ndx)
     --m_size;
 }
 
-void Table::InsertTable(size_t column_id, size_t ndx)
+void Table::insert_table(size_t column_ndx, size_t ndx)
 {
-    assert(column_id < get_column_count());
-    assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
+    assert(column_ndx < get_column_count());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_TABLE);
     assert(ndx <= m_size);
 
-    ColumnTable& subtables = GetColumnTable(column_id);
+    ColumnTable& subtables = GetColumnTable(column_ndx);
     subtables.Insert(ndx);
 }
 
-void Table::clear_subtable(size_t column_id, size_t ndx)
+void Table::clear_subtable(size_t column_ndx, size_t ndx)
 {
-    assert(column_id < get_column_count());
-    assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
+    assert(column_ndx < get_column_count());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_TABLE);
     assert(ndx <= m_size);
 
-    ColumnTable& subtables = GetColumnTable(column_id);
+    ColumnTable& subtables = GetColumnTable(column_ndx);
     subtables.Clear(ndx);
 }
 
@@ -639,171 +648,171 @@ const Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx) const
     }
 }
 
-size_t Table::get_subtable_size(size_t column_id, size_t ndx) const
+size_t Table::get_subtable_size(size_t column_ndx, size_t ndx) const
 {
-    assert(column_id < get_column_count());
-    assert(GetRealColumnType(column_id) == COLUMN_TYPE_TABLE);
+    assert(column_ndx < get_column_count());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_TABLE);
     assert(ndx < m_size);
 
     // FIXME: Should also be made to work for ColumnMixed
-    ColumnTable const &subtables = GetColumnTable(column_id);
+    ColumnTable const &subtables = GetColumnTable(column_ndx);
     return subtables.get_subtable_size(ndx);
 }
 
-int64_t Table::Get(size_t column_id, size_t ndx) const
+int64_t Table::Get(size_t column_ndx, size_t ndx) const
 {
-    assert(column_id < get_column_count());
+    assert(column_ndx < get_column_count());
     assert(ndx < m_size);
 
-    const Column& column = GetColumn(column_id);
+    const Column& column = GetColumn(column_ndx);
     return column.Get(ndx);
 }
 
-void Table::Set(size_t column_id, size_t ndx, int64_t value)
+void Table::Set(size_t column_ndx, size_t ndx, int64_t value)
 {
-    assert(column_id < get_column_count());
+    assert(column_ndx < get_column_count());
     assert(ndx < m_size);
 
-    Column& column = GetColumn(column_id);
+    Column& column = GetColumn(column_ndx);
     column.Set(ndx, value);
 }
 
-bool Table::get_bool(size_t column_id, size_t ndx) const
+bool Table::get_bool(size_t column_ndx, size_t ndx) const
 {
-    assert(column_id < get_column_count());
-    assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
+    assert(column_ndx < get_column_count());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_BOOL);
     assert(ndx < m_size);
 
-    const Column& column = GetColumn(column_id);
+    const Column& column = GetColumn(column_ndx);
     return column.Get(ndx) != 0;
 }
 
-void Table::set_bool(size_t column_id, size_t ndx, bool value)
+void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
 {
-    assert(column_id < get_column_count());
-    assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
+    assert(column_ndx < get_column_count());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_BOOL);
     assert(ndx < m_size);
 
-    Column& column = GetColumn(column_id);
+    Column& column = GetColumn(column_ndx);
     column.Set(ndx, value ? 1 : 0);
 }
 
-time_t Table::get_date(size_t column_id, size_t ndx) const
+time_t Table::get_date(size_t column_ndx, size_t ndx) const
 {
-    assert(column_id < get_column_count());
-    assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
+    assert(column_ndx < get_column_count());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_DATE);
     assert(ndx < m_size);
 
-    const Column& column = GetColumn(column_id);
+    const Column& column = GetColumn(column_ndx);
     return (time_t)column.Get(ndx);
 }
 
-void Table::set_date(size_t column_id, size_t ndx, time_t value)
+void Table::set_date(size_t column_ndx, size_t ndx, time_t value)
 {
-    assert(column_id < get_column_count());
-    assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
+    assert(column_ndx < get_column_count());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_DATE);
     assert(ndx < m_size);
 
-    Column& column = GetColumn(column_id);
+    Column& column = GetColumn(column_ndx);
     column.Set(ndx, (int64_t)value);
 }
 
-void Table::insert_int(size_t column_id, size_t ndx, int64_t value)
+void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
 {
-    assert(column_id < get_column_count());
+    assert(column_ndx < get_column_count());
     assert(ndx <= m_size);
 
-    Column& column = GetColumn(column_id);
+    Column& column = GetColumn(column_ndx);
     column.Insert(ndx, value);
 }
 
-const char* Table::get_string(size_t column_id, size_t ndx) const
+const char* Table::get_string(size_t column_ndx, size_t ndx) const
 {
-    assert(column_id < m_columns.Size());
+    assert(column_ndx < m_columns.Size());
     assert(ndx < m_size);
 
-    const ColumnType type = GetRealColumnType(column_id);
+    const ColumnType type = GetRealColumnType(column_ndx);
 
     if (type == COLUMN_TYPE_STRING) {
-        const AdaptiveStringColumn& column = GetColumnString(column_id);
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
         return column.Get(ndx);
     }
     else {
         assert(type == COLUMN_TYPE_STRING_ENUM);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_id);
+        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
         return column.Get(ndx);
     }
 }
 
-void Table::set_string(size_t column_id, size_t ndx, const char* value)
+void Table::set_string(size_t column_ndx, size_t ndx, const char* value)
 {
-    assert(column_id < get_column_count());
+    assert(column_ndx < get_column_count());
     assert(ndx < m_size);
 
-    const ColumnType type = GetRealColumnType(column_id);
+    const ColumnType type = GetRealColumnType(column_ndx);
 
     if (type == COLUMN_TYPE_STRING) {
-        AdaptiveStringColumn& column = GetColumnString(column_id);
+        AdaptiveStringColumn& column = GetColumnString(column_ndx);
         column.Set(ndx, value);
     }
     else {
         assert(type == COLUMN_TYPE_STRING_ENUM);
-        ColumnStringEnum& column = GetColumnStringEnum(column_id);
+        ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
         column.Set(ndx, value);
     }
 }
 
-void Table::InsertString(size_t column_id, size_t ndx, const char* value)
+void Table::insert_string(size_t column_ndx, size_t ndx, const char* value)
 {
-    assert(column_id < get_column_count());
+    assert(column_ndx < get_column_count());
     assert(ndx <= m_size);
 
-    const ColumnType type = GetRealColumnType(column_id);
+    const ColumnType type = GetRealColumnType(column_ndx);
 
     if (type == COLUMN_TYPE_STRING) {
-        AdaptiveStringColumn& column = GetColumnString(column_id);
+        AdaptiveStringColumn& column = GetColumnString(column_ndx);
         column.Insert(ndx, value);
     }
     else {
         assert(type == COLUMN_TYPE_STRING_ENUM);
-        ColumnStringEnum& column = GetColumnStringEnum(column_id);
+        ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
         column.Insert(ndx, value);
     }
 }
 
-BinaryData Table::get_binary(size_t column_id, size_t ndx) const
+BinaryData Table::get_binary(size_t column_ndx, size_t ndx) const
 {
-    assert(column_id < m_columns.Size());
+    assert(column_ndx < m_columns.Size());
     assert(ndx < m_size);
 
-    const ColumnBinary& column = GetColumnBinary(column_id);
+    const ColumnBinary& column = GetColumnBinary(column_ndx);
     return column.Get(ndx);
 }
 
-void Table::set_binary(size_t column_id, size_t ndx, const char* value, size_t len)
+void Table::set_binary(size_t column_ndx, size_t ndx, const char* value, size_t len)
 {
-    assert(column_id < get_column_count());
+    assert(column_ndx < get_column_count());
     assert(ndx < m_size);
 
-    ColumnBinary& column = GetColumnBinary(column_id);
+    ColumnBinary& column = GetColumnBinary(column_ndx);
     column.Set(ndx, value, len);
 }
 
-void Table::InsertBinary(size_t column_id, size_t ndx, const char* value, size_t len)
+void Table::insert_binary(size_t column_ndx, size_t ndx, const char* value, size_t len)
 {
-    assert(column_id < get_column_count());
+    assert(column_ndx < get_column_count());
     assert(ndx <= m_size);
 
-    ColumnBinary& column = GetColumnBinary(column_id);
+    ColumnBinary& column = GetColumnBinary(column_ndx);
     column.Insert(ndx, value, len);
 }
 
-Mixed Table::get_mixed(size_t column_id, size_t ndx) const
+Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const
 {
-    assert(column_id < m_columns.Size());
+    assert(column_ndx < m_columns.Size());
     assert(ndx < m_size);
 
-    const ColumnMixed& column = GetColumnMixed(column_id);
+    const ColumnMixed& column = GetColumnMixed(column_ndx);
     const ColumnType   type   = column.GetType(ndx);
 
     switch (type) {
@@ -825,21 +834,21 @@ Mixed Table::get_mixed(size_t column_id, size_t ndx) const
     }
 }
 
-ColumnType Table::get_mixed_type(size_t column_id, size_t ndx) const
+ColumnType Table::get_mixed_type(size_t column_ndx, size_t ndx) const
 {
-    assert(column_id < m_columns.Size());
+    assert(column_ndx < m_columns.Size());
     assert(ndx < m_size);
 
-    const ColumnMixed& column = GetColumnMixed(column_id);
+    const ColumnMixed& column = GetColumnMixed(column_ndx);
     return column.GetType(ndx);
 }
 
-void Table::set_mixed(size_t column_id, size_t ndx, Mixed value)
+void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
 {
-    assert(column_id < get_column_count());
+    assert(column_ndx < get_column_count());
     assert(ndx < m_size);
 
-    ColumnMixed& column = GetColumnMixed(column_id);
+    ColumnMixed& column = GetColumnMixed(column_ndx);
     const ColumnType type = value.get_type();
 
     switch (type) {
@@ -869,11 +878,11 @@ void Table::set_mixed(size_t column_id, size_t ndx, Mixed value)
     }
 }
 
-void Table::InsertMixed(size_t column_id, size_t ndx, Mixed value) {
-    assert(column_id < get_column_count());
+void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
+    assert(column_ndx < get_column_count());
     assert(ndx <= m_size);
 
-    ColumnMixed& column = GetColumnMixed(column_id);
+    ColumnMixed& column = GetColumnMixed(column_ndx);
     const ColumnType type = value.get_type();
 
     switch (type) {
@@ -881,29 +890,29 @@ void Table::InsertMixed(size_t column_id, size_t ndx, Mixed value) {
             column.insert_int(ndx, value.Get());
             break;
         case COLUMN_TYPE_BOOL:
-            column.InsertBool(ndx, value.get_bool());
+            column.insert_bool(ndx, value.get_bool());
             break;
         case COLUMN_TYPE_DATE:
-            column.InsertDate(ndx, value.get_date());
+            column.insert_date(ndx, value.get_date());
             break;
         case COLUMN_TYPE_STRING:
-            column.InsertString(ndx, value.get_string());
+            column.insert_string(ndx, value.get_string());
             break;
         case COLUMN_TYPE_BINARY:
         {
             const BinaryData b = value.get_binary();
-            column.InsertBinary(ndx, (const char*)b.pointer, b.len);
+            column.insert_binary(ndx, (const char*)b.pointer, b.len);
             break;
         }
         case COLUMN_TYPE_TABLE:
-            column.InsertTable(ndx);
+            column.insert_table(ndx);
             break;
         default:
             assert(false);
     }
 }
 
-void Table::InsertDone()
+void Table::insert_done()
 {
     ++m_size;
 
@@ -912,25 +921,25 @@ void Table::InsertDone()
 #endif //_DEBUG
 }
 
-int64_t Table::sum(size_t column_id) const
+int64_t Table::sum(size_t column_ndx) const
 {
-    assert(column_id < get_column_count());
-    assert(get_column_type(column_id) == COLUMN_TYPE_INT);
+    assert(column_ndx < get_column_count());
+    assert(get_column_type(column_ndx) == COLUMN_TYPE_INT);
     int64_t sum = 0;
 
     for(size_t i = 0; i < size(); ++i)
-        sum += Get(column_id, i);
+        sum += Get(column_ndx, i);
 
     return sum;
 }
 
-int64_t Table::Max(size_t column_id) const
+int64_t Table::maximum(size_t column_ndx) const
 {
     if (is_empty()) return 0;
 
-    int64_t mv = Get(column_id, 0);
+    int64_t mv = Get(column_ndx, 0);
     for (size_t i = 1; i < size(); ++i) {
-        const int64_t v = Get(column_id, i);
+        const int64_t v = Get(column_ndx, i);
         if (v > mv) {
             mv = v;
         }
@@ -938,13 +947,13 @@ int64_t Table::Max(size_t column_id) const
     return mv;
 }
 
-int64_t Table::Min(size_t column_id) const
+int64_t Table::minimum(size_t column_ndx) const
 {
     if (is_empty()) return 0;
 
-    int64_t mv = Get(column_id, 0);
+    int64_t mv = Get(column_ndx, 0);
     for (size_t i = 1; i < size(); ++i) {
-        const int64_t v = Get(column_id, i);
+        const int64_t v = Get(column_ndx, i);
         if (v < mv) {
             mv = v;
         }
@@ -952,96 +961,96 @@ int64_t Table::Min(size_t column_id) const
     return mv;
 }
 
-size_t Table::Find(size_t column_id, int64_t value) const
+size_t Table::Find(size_t column_ndx, int64_t value) const
 {
-    assert(column_id < m_columns.Size());
-    assert(GetRealColumnType(column_id) == COLUMN_TYPE_INT);
-    const Column& column = GetColumn(column_id);
+    assert(column_ndx < m_columns.Size());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_INT);
+    const Column& column = GetColumn(column_ndx);
 
     return column.Find(value);
 }
 
-size_t Table::FindBool(size_t column_id, bool value) const
+size_t Table::FindBool(size_t column_ndx, bool value) const
 {
-    assert(column_id < m_columns.Size());
-    assert(GetRealColumnType(column_id) == COLUMN_TYPE_BOOL);
-    const Column& column = GetColumn(column_id);
+    assert(column_ndx < m_columns.Size());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_BOOL);
+    const Column& column = GetColumn(column_ndx);
 
     return column.Find(value ? 1 : 0);
 }
 
-size_t Table::FindDate(size_t column_id, time_t value) const
+size_t Table::FindDate(size_t column_ndx, time_t value) const
 {
-    assert(column_id < m_columns.Size());
-    assert(GetRealColumnType(column_id) == COLUMN_TYPE_DATE);
-    const Column& column = GetColumn(column_id);
+    assert(column_ndx < m_columns.Size());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_DATE);
+    const Column& column = GetColumn(column_ndx);
 
     return column.Find((int64_t)value);
 }
 
-size_t Table::FindString(size_t column_id, const char* value) const
+size_t Table::FindString(size_t column_ndx, const char* value) const
 {
-    assert(column_id < m_columns.Size());
+    assert(column_ndx < m_columns.Size());
 
-    const ColumnType type = GetRealColumnType(column_id);
+    const ColumnType type = GetRealColumnType(column_ndx);
 
     if (type == COLUMN_TYPE_STRING) {
-        const AdaptiveStringColumn& column = GetColumnString(column_id);
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
         return column.Find(value);
     }
     else {
         assert(type == COLUMN_TYPE_STRING_ENUM);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_id);
+        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
         return column.Find(value);
     }
 }
 
-void Table::FindAll(TableView& tv, size_t column_id, int64_t value)
+void Table::FindAll(TableView& tv, size_t column_ndx, int64_t value)
 {
-    assert(column_id < m_columns.Size());
+    assert(column_ndx < m_columns.Size());
     assert(&tv.GetParent() == this);
 
-    const Column& column = GetColumn(column_id);
+    const Column& column = GetColumn(column_ndx);
 
     column.FindAll(tv.GetRefColumn(), value);
 }
 
-void Table::FindAllBool(TableView& tv, size_t column_id, bool value)
+void Table::FindAllBool(TableView& tv, size_t column_ndx, bool value)
 {
-    assert(column_id < m_columns.Size());
+    assert(column_ndx < m_columns.Size());
     assert(&tv.GetParent() == this);
 
-    const Column& column = GetColumn(column_id);
+    const Column& column = GetColumn(column_ndx);
 
     column.FindAll(tv.GetRefColumn(), value ? 1 :0);
 }
 
-void Table::FindAllString(TableView& tv, size_t column_id, const char *value)
+void Table::FindAllString(TableView& tv, size_t column_ndx, const char *value)
 {
-    assert(column_id < m_columns.Size());
+    assert(column_ndx < m_columns.Size());
     assert(&tv.GetParent() == this);
 
-    const ColumnType type = GetRealColumnType(column_id);
+    const ColumnType type = GetRealColumnType(column_ndx);
 
     if (type == COLUMN_TYPE_STRING) {
-        const AdaptiveStringColumn& column = GetColumnString(column_id);
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
         column.FindAll(tv.GetRefColumn(), value);
     }
     else {
         assert(type == COLUMN_TYPE_STRING_ENUM);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_id);
+        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
         column.FindAll(tv.GetRefColumn(), value);
     }
 }
 
 
 
-void Table::FindAllHamming(TableView& tv, size_t column_id, uint64_t value, size_t max)
+void Table::FindAllHamming(TableView& tv, size_t column_ndx, uint64_t value, size_t max)
 {
-    assert(column_id < m_columns.Size());
+    assert(column_ndx < m_columns.Size());
     assert(&tv.GetParent() == this);
 
-    const Column& column = GetColumn(column_id);
+    const Column& column = GetColumn(column_ndx);
 
     column.FindAllHamming(tv.GetRefColumn(), value, max);
 }
@@ -1183,14 +1192,14 @@ void Table::to_json(std::ostream& out)
                 }
                 case COLUMN_TYPE_TABLE:
                 {
-                    GetTable(i, r)->to_json(out);
+                    get_table(i, r)->to_json(out);
                     break;
                 }
                 case COLUMN_TYPE_MIXED:
                 {
                     const ColumnType mtype = get_mixed_type(i, r);
                     if (mtype == COLUMN_TYPE_TABLE) {
-                        GetTable(i, r)->to_json(out);
+                        get_table(i, r)->to_json(out);
                     }
                     else {
                         const Mixed m = get_mixed(i, r);

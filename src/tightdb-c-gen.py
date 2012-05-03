@@ -9,14 +9,14 @@ directiveStartToken = %
 #define __C_TIGHTDB_H__
 
 #include "c-table.hpp"
-#include "query_interface.h"
+#include "query.h"
 
 %for $col in range($max_cols)
 %set $num_cols = $col + 1
 
-#define TDB_TABLE_${num_cols}(TableName%slurp
+#define TIGHTSB_TABLE_${num_cols}(TableName%slurp
 %for $j in range($num_cols)
-, CType$j, CName$j%slurp
+, CName$j, CType$j%slurp
 %end for
 ) \\
 \\

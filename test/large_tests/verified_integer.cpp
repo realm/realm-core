@@ -66,7 +66,7 @@ int64_t VerifiedInteger::Sum(size_t start, size_t end)
     return sum;
 }
 
-int64_t VerifiedInteger::Max(size_t start, size_t end)
+int64_t VerifiedInteger::maximum(size_t start, size_t end)
 {
     if(end == size_t(-1))
         end = v.size();
@@ -80,11 +80,11 @@ int64_t VerifiedInteger::Max(size_t start, size_t end)
         if(v[t] > max)
             max = v[t];
 
-    assert(max == u.Max(start, end));
+    assert(max == u.maximum(start, end));
     return max;
 }
 
-int64_t VerifiedInteger::Min(size_t start, size_t end)
+int64_t VerifiedInteger::minimum(size_t start, size_t end)
 {
     if(end == size_t(-1))
         end = v.size();
@@ -98,7 +98,7 @@ int64_t VerifiedInteger::Min(size_t start, size_t end)
         if(v[t] < min)
             min = v[t];
 
-    assert(min == u.Min(start, end));
+    assert(min == u.minimum(start, end));
     return min;
 }
 

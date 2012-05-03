@@ -87,20 +87,20 @@ Spec* spec_add_column_table(Spec* spec, const char* name) {
     return new Spec(spec->add_subtable_column(name));
 }
 
-Spec* spec_get_spec(Spec* spec, size_t column_id) {
-    return new Spec(spec->get_subspec(column_id));
+Spec* spec_get_spec(Spec* spec, size_t column_ndx) {
+    return new Spec(spec->get_subspec(column_ndx));
 }
 
 size_t spec_get_column_count(Spec* spec) {
     return spec->get_column_count();
 }
 
-ColumnType spec_get_column_type(Spec* spec, size_t column_id) {
-    return spec->get_column_type(column_id);
+ColumnType spec_get_column_type(Spec* spec, size_t column_ndx) {
+    return spec->get_column_type(column_ndx);
 }
 
-const char* spec_get_column_name(Spec* spec, size_t column_id) {
-    return spec->get_column_name(column_id);
+const char* spec_get_column_name(Spec* spec, size_t column_ndx) {
+    return spec->get_column_name(column_ndx);
 }
 
 size_t spec_get_column_index(Spec* spec, const char* name) {
@@ -136,7 +136,7 @@ void table_update_from_spec(Table* t, size_t ref_specSet) {
 }
 
 size_t table_register_column(Table* t, ColumnType type, const char* name) {
-	return t->register_column(type, name);
+	return t->add_column(type, name);
 }
 
 size_t table_get_column_count(const Table* t) {
@@ -183,71 +183,71 @@ void table_remove_last(Table* t) {
 /*** Getters *******/
 
 
-int64_t table_get_int(const Table* t, size_t column_id, size_t ndx) {
-	return t->Get(column_id, ndx);
+int64_t table_get_int(const Table* t, size_t column_ndx, size_t ndx) {
+	return t->Get(column_ndx, ndx);
 }
 
-bool table_get_bool(const Table* t, size_t column_id, size_t ndx) {
-	return t->get_bool(column_id, ndx);
+bool table_get_bool(const Table* t, size_t column_ndx, size_t ndx) {
+	return t->get_bool(column_ndx, ndx);
 }
 
-time_t table_get_date(const Table* t, size_t column_id, size_t ndx) {
-	return t->get_date(column_id, ndx);
+time_t table_get_date(const Table* t, size_t column_ndx, size_t ndx) {
+	return t->get_date(column_ndx, ndx);
 }
 
-const char* table_get_string(const Table* t, size_t column_id, size_t ndx) {
-	return t->get_string(column_id, ndx);
+const char* table_get_string(const Table* t, size_t column_ndx, size_t ndx) {
+	return t->get_string(column_ndx, ndx);
 }
 
-BinaryData table_get_binary(const Table* t, size_t column_id, size_t ndx) {
-	return t->get_binary(column_id, ndx);
+BinaryData table_get_binary(const Table* t, size_t column_ndx, size_t ndx) {
+	return t->get_binary(column_ndx, ndx);
 }
 
-Mixed* table_get_mixed(const Table* t, size_t column_id, size_t ndx) {
-	return new Mixed(t->get_mixed(column_id, ndx));
+Mixed* table_get_mixed(const Table* t, size_t column_ndx, size_t ndx) {
+	return new Mixed(t->get_mixed(column_ndx, ndx));
 }
 
-ColumnType table_get_mixed_type(const Table* t, size_t column_id, size_t ndx) {
-    return t->get_mixed_type(column_id, ndx);
+ColumnType table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx) {
+    return t->get_mixed_type(column_ndx, ndx);
 }
 
-Table* table_get_table(Table* t, size_t column_id, size_t ndx) {
-    return TableHelper_get_subtable_ptr(t, column_id, ndx); 
+Table* table_get_table(Table* t, size_t column_ndx, size_t ndx) {
+    return TableHelper_get_subtable_ptr(t, column_ndx, ndx); 
 }
 
-const Table* table_get_ctable(const Table* t, size_t column_id, size_t ndx) {
-    return TableHelper_get_const_subtable_ptr(t, column_id, ndx); 
+const Table* table_get_ctable(const Table* t, size_t column_ndx, size_t ndx) {
+    return TableHelper_get_const_subtable_ptr(t, column_ndx, ndx); 
 }
 
 /*** Setters *******/
 
 
-void table_set_int(Table* t, size_t column_id, size_t ndx, int64_t value) {
-	t->Set(column_id, ndx, value);
+void table_set_int(Table* t, size_t column_ndx, size_t ndx, int64_t value) {
+	t->Set(column_ndx, ndx, value);
 }
 
-void table_set_bool(Table* t, size_t column_id, size_t ndx, bool value) {
-	t->set_bool(column_id, ndx, value);
+void table_set_bool(Table* t, size_t column_ndx, size_t ndx, bool value) {
+	t->set_bool(column_ndx, ndx, value);
 }
 
-void table_set_date(Table* t, size_t column_id, size_t ndx, time_t value) {
-	t->set_date(column_id, ndx, value);
+void table_set_date(Table* t, size_t column_ndx, size_t ndx, time_t value) {
+	t->set_date(column_ndx, ndx, value);
 }
 
-void table_set_string(Table* t, size_t column_id, size_t ndx, const char* value) {
-	t->set_string(column_id, ndx, value);
+void table_set_string(Table* t, size_t column_ndx, size_t ndx, const char* value) {
+	t->set_string(column_ndx, ndx, value);
 }
 
-void table_set_binary(Table* t, size_t column_id, size_t ndx, const char *value, size_t len) {
-	t->set_binary(column_id, ndx, value, len);
+void table_set_binary(Table* t, size_t column_ndx, size_t ndx, const char *value, size_t len) {
+	t->set_binary(column_ndx, ndx, value, len);
 }
 
-void table_set_mixed(Table* t, size_t column_id, size_t ndx, Mixed value) {
-	t->set_mixed(column_id, ndx, value);
+void table_set_mixed(Table* t, size_t column_ndx, size_t ndx, Mixed value) {
+	t->set_mixed(column_ndx, ndx, value);
 }
 
-void table_clear_table(Table* t, size_t column_id, size_t ndx) {
-    t->clear_subtable(column_id, ndx);
+void table_clear_table(Table* t, size_t column_ndx, size_t ndx) {
+    t->clear_subtable(column_ndx, ndx);
 }
 
 
@@ -268,37 +268,37 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap) {
 		case COLUMN_TYPE_BOOL:
 			{
 				const int v = va_arg(ap, int);
-				t->InsertBool(i, ndx, v != 0);
+				t->insert_bool(i, ndx, v != 0);
 			}
 			break;
 		case COLUMN_TYPE_DATE:
 			{
 				const time_t v = va_arg(ap, time_t);
-				t->InsertDate(i, ndx, v);
+				t->insert_date(i, ndx, v);
 			}
 			break;
 		case COLUMN_TYPE_STRING:
 			{
 				const char* v = va_arg(ap, const char*);
-				t->InsertString(i, ndx, v);
+				t->insert_string(i, ndx, v);
 			}
 			break;
 		case COLUMN_TYPE_MIXED:
 			{
 				Mixed* const v = va_arg(ap, Mixed*);
-				t->InsertMixed(i, ndx, v);
+				t->insert_mixed(i, ndx, v);
 			}
 			break;
 		case COLUMN_TYPE_BINARY:
 			{
 				const char* ptr = va_arg(ap, const char*);
                 size_t      len = va_arg(ap, size_t);
-				t->InsertBinary(i, ndx, ptr, len);
+				t->insert_binary(i, ndx, ptr, len);
 			}
 			break;
         case COLUMN_TYPE_TABLE:
 			{
-				t->InsertTable(i, ndx);
+				t->insert_table(i, ndx);
 			}
 			break;
         default:
@@ -306,7 +306,7 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap) {
 		}
 	}
 
-	t->InsertDone();
+	t->insert_done();
 }
 
 void table_add(Table* t,  ...) {
@@ -331,83 +331,83 @@ void table_insert(Table* t, size_t ndx, ...) {
 
 
 
-void table_insert_int(Table* t, size_t column_id, size_t ndx, int value) {
-    t->insert_int(column_id, ndx, value);
+void table_insert_int(Table* t, size_t column_ndx, size_t ndx, int value) {
+    t->insert_int(column_ndx, ndx, value);
 }
 
-void table_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value) {
-	t->insert_int(column_id, ndx, value);
+void table_insert_int64(Table* t, size_t column_ndx, size_t ndx, int64_t value) {
+	t->insert_int(column_ndx, ndx, value);
 }
 
-void table_insert_bool(Table* t, size_t column_id, size_t ndx, bool value) {
-	t->InsertBool(column_id, ndx, value);
+void table_insert_bool(Table* t, size_t column_ndx, size_t ndx, bool value) {
+	t->insert_bool(column_ndx, ndx, value);
 }
 
-void table_insert_date(Table* t, size_t column_id, size_t ndx, time_t value) {
-	t->InsertDate(column_id, ndx, value);
+void table_insert_date(Table* t, size_t column_ndx, size_t ndx, time_t value) {
+	t->insert_date(column_ndx, ndx, value);
 }
 
-void table_insert_string(Table* t, size_t column_id, size_t ndx, const char* value) {
-	t->InsertString(column_id, ndx, value);
+void table_insert_string(Table* t, size_t column_ndx, size_t ndx, const char* value) {
+	t->insert_string(column_ndx, ndx, value);
 }
 
-void table_insert_binary(Table* t, size_t column_id, size_t ndx, const char* value, size_t len) {
-	t->InsertBinary(column_id, ndx, value, len);
+void table_insert_binary(Table* t, size_t column_ndx, size_t ndx, const char* value, size_t len) {
+	t->insert_binary(column_ndx, ndx, value, len);
 }
 
-void table_insert_mixed(Table* t, size_t column_id, size_t ndx, Mixed value) {
-	t->InsertMixed(column_id, ndx, value);
+void table_insert_mixed(Table* t, size_t column_ndx, size_t ndx, Mixed value) {
+	t->insert_mixed(column_ndx, ndx, value);
 }
 
-void table_insert_table(Table* t, size_t column_id, size_t ndx) {
-	t->InsertTable(column_id, ndx);
+void table_insert_table(Table* t, size_t column_ndx, size_t ndx) {
+	t->insert_table(column_ndx, ndx);
 }
 
 void table_insert_done(Table* t) {
-	t->InsertDone();
+	t->insert_done();
 }
 
 
 /******* Index, Searching ******************************/
 
 
-bool table_has_index(const Table* t, size_t column_id) {
-	return t->has_index(column_id);
+bool table_has_index(const Table* t, size_t column_ndx) {
+	return t->has_index(column_ndx);
 }
 
-void table_set_index(Table* t, size_t column_id) {
-	return t->set_index(column_id);
+void table_set_index(Table* t, size_t column_ndx) {
+	return t->set_index(column_ndx);
 }
 
-size_t table_find_int(const Table* t, size_t column_id, int value) {
-	return t->Find(column_id, value);
+size_t table_find_int(const Table* t, size_t column_ndx, int value) {
+	return t->Find(column_ndx, value);
 }
 
-size_t table_find_int64(const Table* t, size_t column_id, int64_t value) {
-	return t->Find(column_id, value);
+size_t table_find_int64(const Table* t, size_t column_ndx, int64_t value) {
+	return t->Find(column_ndx, value);
 }
 
-size_t table_find_bool(const Table* t, size_t column_id, bool value) {
-	return t->FindBool(column_id, value);
+size_t table_find_bool(const Table* t, size_t column_ndx, bool value) {
+	return t->FindBool(column_ndx, value);
 }
 
-size_t table_find_date(const Table* t, size_t column_id, time_t value) {
-	return t->FindDate(column_id, value);
+size_t table_find_date(const Table* t, size_t column_ndx, time_t value) {
+	return t->FindDate(column_ndx, value);
 }
 
-size_t table_find_string(const Table* t, size_t column_id, const char* value) {
-	return t->FindString(column_id, value);
+size_t table_find_string(const Table* t, size_t column_ndx, const char* value) {
+	return t->FindString(column_ndx, value);
 }
 
-TableView* table_find_all_int64(Table* t, size_t column_id, int64_t value) {
+TableView* table_find_all_int64(Table* t, size_t column_ndx, int64_t value) {
 	TableView* tv = new TableView(*t);
-	t->FindAll(*tv, column_id, value);
+	t->FindAll(*tv, column_ndx, value);
 	return tv;
 }
 
-TableView* table_find_all_hamming(Table* t, size_t column_id, uint64_t value, size_t max) {
+TableView* table_find_all_hamming(Table* t, size_t column_ndx, uint64_t value, size_t max) {
 	TableView* tv = new TableView(*t);
-	t->FindAllHamming(*tv, column_id, value, max);
+	t->FindAllHamming(*tv, column_ndx, value, max);
 	return tv;
 }
 
@@ -427,106 +427,106 @@ size_t tableview_get_size(const TableView* tv) {
 	return tv->size();
 }
 /* ??? Implement
-size_t tableview_get_table_size(const TableView* tv, size_t column_id, size_t ndx) {
+size_t tableview_get_table_size(const TableView* tv, size_t column_ndx, size_t ndx) {
     return tv->get_subtable_size();
 */
 
 
-int64_t tableview_get_int(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->Get(column_id, ndx);
+int64_t tableview_get_int(const TableView* tv, size_t column_ndx, size_t ndx) {
+	return tv->Get(column_ndx, ndx);
 }
 
-bool tableview_get_bool(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->get_bool(column_id, ndx);
+bool tableview_get_bool(const TableView* tv, size_t column_ndx, size_t ndx) {
+	return tv->get_bool(column_ndx, ndx);
 }
 
-time_t tableview_get_date(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->get_date(column_id, ndx);
+time_t tableview_get_date(const TableView* tv, size_t column_ndx, size_t ndx) {
+	return tv->get_date(column_ndx, ndx);
 }
 
-const char* tableview_get_string(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->get_string(column_id, ndx);
+const char* tableview_get_string(const TableView* tv, size_t column_ndx, size_t ndx) {
+	return tv->get_string(column_ndx, ndx);
 }
 
 /* ??? Waiting for implementation
-BinaryData tableview_get_binary(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->get_binary(column_id, ndx);
+BinaryData tableview_get_binary(const TableView* tv, size_t column_ndx, size_t ndx) {
+	return tv->get_binary(column_ndx, ndx);
 }
 
-Mixed tableview_get_mixed(const TableView* tv, size_t column_id, size_t ndx) {
-	return tv->get_mixed(column_id, ndx);
+Mixed tableview_get_mixed(const TableView* tv, size_t column_ndx, size_t ndx) {
+	return tv->get_mixed(column_ndx, ndx);
 }
 */
 
 
-void tableview_set_int(TableView* tv, size_t column_id, size_t ndx, int64_t value) {
-	tv->Set(column_id, ndx, value);
+void tableview_set_int(TableView* tv, size_t column_ndx, size_t ndx, int64_t value) {
+	tv->Set(column_ndx, ndx, value);
 }
 
-void tableview_set_bool(TableView* tv, size_t column_id, size_t ndx, bool value) {
-	tv->set_bool(column_id, ndx, value);
+void tableview_set_bool(TableView* tv, size_t column_ndx, size_t ndx, bool value) {
+	tv->set_bool(column_ndx, ndx, value);
 }
 
-void tableview_set_date(TableView* tv, size_t column_id, size_t ndx, time_t value) {
-	tv->set_date(column_id, ndx, value);
+void tableview_set_date(TableView* tv, size_t column_ndx, size_t ndx, time_t value) {
+	tv->set_date(column_ndx, ndx, value);
 }
 
-void tableview_set_string(TableView* tv, size_t column_id, size_t ndx, const char* value) {
-	tv->set_string(column_id, ndx, value);
+void tableview_set_string(TableView* tv, size_t column_ndx, size_t ndx, const char* value) {
+	tv->set_string(column_ndx, ndx, value);
 }
 
 /*
 //??? Waiting for implementation
-void tableview_set_binary(TableView* tv, size_t column_id, size_t ndx, const char* value, size_t len) {
-	tv->set_binary(column_id, ndx, value, len);
+void tableview_set_binary(TableView* tv, size_t column_ndx, size_t ndx, const char* value, size_t len) {
+	tv->set_binary(column_ndx, ndx, value, len);
 }
 
-void tableview_set_mixed(TableView* tv, size_t column_id, size_t ndx, Mixed value) {
-	tv->set_mixed(column_id, ndx, value);
+void tableview_set_mixed(TableView* tv, size_t column_ndx, size_t ndx, Mixed value) {
+	tv->set_mixed(column_ndx, ndx, value);
 }
 
-void tableview_clear_table(TableView* tv, size_t column_id, size_t ndx) {
-    tv->clear_subtable(column_id, ndx);
+void tableview_clear_table(TableView* tv, size_t column_ndx, size_t ndx) {
+    tv->clear_subtable(column_ndx, ndx);
 }
 */
 
 /* Search and sort */
 
-size_t tableview_find(TableView* tv, size_t column_id, int64_t value) {
-    return tv->Find(column_id, value);
+size_t tableview_find(TableView* tv, size_t column_ndx, int64_t value) {
+    return tv->Find(column_ndx, value);
 }
 
-size_t tableview_find_string(TableView* tv, size_t column_id, const char* value) {
-    return tv->FindString(column_id, value);
+size_t tableview_find_string(TableView* tv, size_t column_ndx, const char* value) {
+    return tv->FindString(column_ndx, value);
 }
 
 #if 0
 //??? Waiting for implementation
-void tableview_find_all(TableView* tv, size_t column_id, int64_t value) {
-    // ??? waiting for implementation: tv->FindAll(*tv, column_id, value);
+void tableview_find_all(TableView* tv, size_t column_ndx, int64_t value) {
+    // ??? waiting for implementation: tv->FindAll(*tv, column_ndx, value);
     assert(0);
 }
 
-void tableview_find_all_string(TableView* tv, size_t column_id, const char *value) {
-    tv->FindAllString(*tv, column_id, value);
+void tableview_find_all_string(TableView* tv, size_t column_ndx, const char *value) {
+    tv->FindAllString(*tv, column_ndx, value);
 }
 #endif
 
 /* Aggregation */
-int64_t tableview_sum(TableView* tv, size_t column_id) {
-    return tv->sum(column_id);
+int64_t tableview_sum(TableView* tv, size_t column_ndx) {
+    return tv->sum(column_ndx);
 }
 
-int64_t tableview_min(TableView* tv, size_t column_id) {
-    return tv->Min(column_id);
+int64_t tableview_min(TableView* tv, size_t column_ndx) {
+    return tv->minimum(column_ndx);
 }
 
-int64_t tableview_max(TableView* tv, size_t column_id) {
-    return tv->Max(column_id);
+int64_t tableview_max(TableView* tv, size_t column_ndx) {
+    return tv->maximum(column_ndx);
 }
 
-void tableview_sort(TableView* tv, size_t column_id, bool ascending) {
-    tv->Sort(column_id, ascending);
+void tableview_sort(TableView* tv, size_t column_ndx, bool ascending) {
+    tv->Sort(column_ndx, ascending);
 }
 
 
@@ -568,7 +568,7 @@ bool group_has_table(Group* group, const char* name) {
 ///???
 Table* group_get_table(Group* group, const char* name) {
     /*??? Waiting for removal of TopLevelTable*/
-    /* return group->GetTable(name); */
+    /* return group->get_table(name); */
 }
 #endif	
 
@@ -605,59 +605,59 @@ void query_or(Query* q) {
     q->Or();
 }
 #if 1
-void query_subtable(Query* q, size_t column_id) {
-    q->Subtable(column_id);
+void query_subtable(Query* q, size_t column_ndx) {
+    q->Subtable(column_ndx);
 }
 #endif
 void query_parent(Query* q) {
     q->Parent();
 }
 
-Query* query_bool_equal(Query* q, size_t column_id, bool value) {
-    return new Query(q->Equal(column_id, value));
+Query* query_bool_equal(Query* q, size_t column_ndx, bool value) {
+    return new Query(q->Equal(column_ndx, value));
 }
 
-Query* query_int_equal(Query* q, size_t column_id, int64_t value) {
-    return new Query(q->Equal(column_id, value));    
+Query* query_int_equal(Query* q, size_t column_ndx, int64_t value) {
+    return new Query(q->Equal(column_ndx, value));    
 }
 
 /* Integers */
 
-Query*  query_int_not_equal(Query* q, size_t column_id, int64_t value) {
-    return new Query(q->NotEqual(column_id, value));
+Query*  query_int_not_equal(Query* q, size_t column_ndx, int64_t value) {
+    return new Query(q->NotEqual(column_ndx, value));
 }
-Query*  query_int_greater(Query* q, size_t column_id, int64_t value) {
-    return new Query(q->Greater(column_id, value));
+Query*  query_int_greater(Query* q, size_t column_ndx, int64_t value) {
+    return new Query(q->Greater(column_ndx, value));
 }
-Query*  query_int_greater_or_equal(Query* q, size_t column_id, int64_t value) {
-    return new Query(q->GreaterEqual(column_id, value));
+Query*  query_int_greater_or_equal(Query* q, size_t column_ndx, int64_t value) {
+    return new Query(q->GreaterEqual(column_ndx, value));
 }
-Query*  query_int_less(Query* q, size_t column_id, int64_t value) {
-    return new Query(q->Less(column_id, value));
+Query*  query_int_less(Query* q, size_t column_ndx, int64_t value) {
+    return new Query(q->Less(column_ndx, value));
 }
-Query*  query_int_less_or_equal(Query* q, size_t column_id, int64_t value) {
-    return new Query(q->LessEqual(column_id, value));
+Query*  query_int_less_or_equal(Query* q, size_t column_ndx, int64_t value) {
+    return new Query(q->LessEqual(column_ndx, value));
 }
-Query*  query_int_between(Query* q, size_t column_id, int64_t from, int64_t to) {
-    return new Query(q->Between(column_id, from , to));
+Query*  query_int_between(Query* q, size_t column_ndx, int64_t from, int64_t to) {
+    return new Query(q->Between(column_ndx, from , to));
 }
 
 /* Strings */ 
 
-Query*  query_string_equal(Query* q, size_t column_id, const char* value, CaseSensitivity_t case_sensitive) {
-    return new Query(q->Equal(column_id, value, (case_sensitive == CASE_SENSITIVE)));
+Query*  query_string_equal(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive) {
+    return new Query(q->Equal(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
 }
-Query*  query_string_not_equal(Query* q, size_t column_id, const char* value, CaseSensitivity_t case_sensitive) {
-    return new Query(q->NotEqual(column_id, value, (case_sensitive == CASE_SENSITIVE)));
+Query*  query_string_not_equal(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive) {
+    return new Query(q->NotEqual(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
 }
-Query*  query_string_begins_with(Query* q, size_t column_id, const char* value, CaseSensitivity_t case_sensitive) {
-    return new Query(q->BeginsWith(column_id, value, (case_sensitive == CASE_SENSITIVE)));
+Query*  query_string_begins_with(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive) {
+    return new Query(q->BeginsWith(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
 }
-Query*  query_string_ends_with(Query* q, size_t column_id, const char* value, CaseSensitivity_t case_sensitive) {
-    return new Query(q->EndsWith(column_id, value, (case_sensitive == CASE_SENSITIVE)));
+Query*  query_string_ends_with(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive) {
+    return new Query(q->EndsWith(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
 }
-Query*  query_string_contains(Query* q, size_t column_id, const char* value, CaseSensitivity_t case_sensitive) {
-    return new Query(q->Contains(column_id, value, (case_sensitive == CASE_SENSITIVE)));
+Query*  query_string_contains(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive) {
+    return new Query(q->Contains(column_ndx, value, (case_sensitive == CASE_SENSITIVE)));
 }
 
 
@@ -686,40 +686,40 @@ size_t query_count_range(Query* q, const Table* t, size_t start, size_t end, siz
     return q->Count(*t, start, end, limit);
 }
 
-int64_t query_min(Query* q, const Table* t, size_t column_id, size_t* resultcount) {
-    return q->Min(*t, column_id, resultcount, 0, size_t(-1), size_t(-1));
+int64_t query_min(Query* q, const Table* t, size_t column_ndx, size_t* resultcount) {
+    return q->minimum(*t, column_ndx, resultcount, 0, size_t(-1), size_t(-1));
 }
 
-int64_t query_min_range(Query* q, const Table* t, size_t column_id, size_t* resultcount,
+int64_t query_min_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
                          size_t start, size_t end, size_t limit) {
-    return q->Min(*t, column_id, resultcount, start, end, limit);
+    return q->minimum(*t, column_ndx, resultcount, start, end, limit);
 }
 
-int64_t  query_max(Query* q, const Table* t, size_t column_id, size_t* resultcount) {
-    return q->Max(*t, column_id, resultcount, 0, size_t(-1), size_t(-1));
+int64_t  query_max(Query* q, const Table* t, size_t column_ndx, size_t* resultcount) {
+    return q->maximum(*t, column_ndx, resultcount, 0, size_t(-1), size_t(-1));
 }
 
-int64_t  query_max_range(Query* q, const Table* t, size_t column_id, size_t* resultcount,
+int64_t  query_max_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
                          size_t start, size_t end, size_t limit){
-    return q->Max(*t, column_id, resultcount, start, end, limit);
+    return q->maximum(*t, column_ndx, resultcount, start, end, limit);
 }
 
-int64_t  query_sum(Query* q, const Table* t, size_t column_id, size_t* resultcount) {
-    return q->sum(*t, column_id, resultcount, 0, size_t(-1), size_t(-1));
+int64_t  query_sum(Query* q, const Table* t, size_t column_ndx, size_t* resultcount) {
+    return q->sum(*t, column_ndx, resultcount, 0, size_t(-1), size_t(-1));
 }
 
-int64_t  query_sum_range(Query* q, const Table* t, size_t column_id, size_t* resultcount,
+int64_t  query_sum_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
                          size_t start, size_t end, size_t limit){
-    return q->sum(*t, column_id, resultcount, start, end, limit);
+    return q->sum(*t, column_ndx, resultcount, start, end, limit);
 }
 
-double  query_avg(Query* q, const Table* t, size_t column_id, size_t* resultcount) {
-    return q->Avg(*t, column_id, resultcount, 0, size_t(-1), size_t(-1));
+double  query_avg(Query* q, const Table* t, size_t column_ndx, size_t* resultcount) {
+    return q->Avg(*t, column_ndx, resultcount, 0, size_t(-1), size_t(-1));
 }
 
-double  query_avg_range(Query* q, const Table* t, size_t column_id, size_t* resultcount,
+double  query_avg_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
                          size_t start, size_t end, size_t limit) {
-    return q->Avg(*t, column_id, resultcount, start, end, limit);
+    return q->Avg(*t, column_ndx, resultcount, start, end, limit);
 }
 
 

@@ -1,5 +1,5 @@
-#ifndef __TDB_GROUP__
-#define __TDB_GROUP__
+#ifndef __TIGHTDB_GROUP__
+#define __TIGHTDB_GROUP__
 
 #include "table.hpp"
 #include "alloc_slab.hpp"
@@ -148,4 +148,4 @@ void Group::to_json(S& out)
 
 } // namespace tightdb
 
-#endif //__TDB_GROUP__
+#endif //__TIGHTDB_GROUP__

@@ -586,11 +586,11 @@ TEST(Column_Sum)
 TEST(Column_Max)
 {
     Column c;
-    int64_t t = c.Max();
+    int64_t t = c.maximum();
     CHECK_EQUAL(0, t); // max on empty range returns zero
 
     c.Add(1);
-    t = c.Max();
+    t = c.maximum();
     CHECK_EQUAL(1, t);
 
     c.Destroy();
@@ -609,7 +609,7 @@ TEST(Column_Max2)
     c.Set(51, 11);
     c.Set(81, 20);
 
-    int64_t t = c.Max(51, 81);
+    int64_t t = c.maximum(51, 81);
     CHECK_EQUAL(11, t);
 
     c.Destroy();
@@ -618,11 +618,11 @@ TEST(Column_Max2)
 TEST(Column_Min)
 {
     Column c;
-    int64_t t = c.Min();
+    int64_t t = c.minimum();
     CHECK_EQUAL(0, t); // min on empty range returns zero
 
     c.Add(1);
-    t = c.Min();
+    t = c.minimum();
     CHECK_EQUAL(1, t);
 
     c.Destroy();
@@ -641,7 +641,7 @@ TEST(Column_Min2)
     c.Set(51, 9);
     c.Set(81, 20);
 
-    int64_t t = c.Min(51, 81);
+    int64_t t = c.minimum(51, 81);
     CHECK_EQUAL(9, t);
 
     c.Destroy();

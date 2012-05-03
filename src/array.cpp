@@ -1044,7 +1044,7 @@ template <> size_t Array::Query<LESS>(int64_t value, size_t start, size_t end)
 }
 
 
-bool Array::Max(int64_t& result, size_t start, size_t end) const
+bool Array::maximum(int64_t& result, size_t start, size_t end) const
 {
     if (end == (size_t)-1) end = m_len;
     if (start == end) return false;
@@ -1064,7 +1064,7 @@ bool Array::Max(int64_t& result, size_t start, size_t end) const
 }
 
 
-bool Array::Min(int64_t& result, size_t start, size_t end) const
+bool Array::minimum(int64_t& result, size_t start, size_t end) const
 {
     if (end == (size_t)-1) end = m_len;
     if (start == end) return false;

@@ -23,8 +23,8 @@ public:
     void FindAll(tightdb::Array &c, int64_t value, std::size_t start = 0, std::size_t end = -1);
     std::size_t Size(void);
     int64_t Sum(std::size_t start = 0, std::size_t end = -1);
-    int64_t Max(std::size_t start = 0, std::size_t end = -1);
-    int64_t Min(std::size_t start = 0, std::size_t end = -1);
+    int64_t maximum(std::size_t start = 0, std::size_t end = -1);
+    int64_t minimum(std::size_t start = 0, std::size_t end = -1);
     bool Verify(void);
     bool ConditionalVerify(void);
     void VerifyNeighbours(std::size_t ndx);

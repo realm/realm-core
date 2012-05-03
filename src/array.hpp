@@ -161,8 +161,8 @@ public:
     void FindAll(Array& result, int64_t value, size_t offset=0, size_t start=0, size_t end=(size_t)-1) const;
     void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     int64_t sum(size_t start = 0, size_t end = (size_t)-1) const;
-    bool Max(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
-    bool Min(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
+    bool maximum(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
+    bool minimum(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
     template <class F> size_t Query(int64_t value, size_t start, size_t end);
 
     void Sort(void);

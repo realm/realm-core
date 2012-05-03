@@ -18,11 +18,11 @@ uint64_t rand2()
     return seed * seed2 + seed2;
 }
 
-TDB_TABLE_1(IntegerTable,
-            Int,        first)
+TIGHTDB_TABLE_1(IntegerTable,
+                first, Int)
 
-TDB_TABLE_1(StringTable,
-            String,        first)
+TIGHTDB_TABLE_1(StringTable,
+                first, String)
 
 enum Days {
     Mon,
@@ -34,11 +34,11 @@ enum Days {
     Sun
 };
 
-TDB_TABLE_4(TestTable,
-            Int,        first,
-            String,     second,
-            Int,        third,
-            Enum<Days>, fourth)
+TIGHTDB_TABLE_4(TestTable,
+                first,  int,
+                second, string,
+                third,  int,
+                fourth, Enum<Days>)
 
 int main()
 {

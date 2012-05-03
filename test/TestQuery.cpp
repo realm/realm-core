@@ -4,13 +4,13 @@
 
 using namespace tightdb;
 
-TDB_TABLE_2(TupleTableType,
-    Int, first,
-    String, second)
+TIGHTDB_TABLE_2(TupleTableType,
+                first,  Int,
+                second, String)
 
-TDB_TABLE_2(BoolTupleTable,
-    Int, first,
-    Bool, second)
+TIGHTDB_TABLE_2(BoolTupleTable,
+                first,  Int,
+                second, Bool)
 
 
 
@@ -70,49 +70,49 @@ TEST(TestQuerySubtable)
 
     // Main table
     table->insert_int(0, 0, 111);
-    table->InsertString(1, 0, "this");
-    table->InsertTable(2, 0);
-    table->InsertDone();
+    table->insert_string(1, 0, "this");
+    table->insert_table(2, 0);
+    table->insert_done();
 
     table->insert_int(0, 1, 222);
-    table->InsertString(1, 1, "is");
-    table->InsertTable(2, 1);
-    table->InsertDone();
+    table->insert_string(1, 1, "is");
+    table->insert_table(2, 1);
+    table->insert_done();
 
     table->insert_int(0, 2, 333);
-    table->InsertString(1, 2, "a test");
-    table->InsertTable(2, 2);
-    table->InsertDone();
+    table->insert_string(1, 2, "a test");
+    table->insert_table(2, 2);
+    table->insert_done();
 
     table->insert_int(0, 3, 444);
-    table->InsertString(1, 3, "of queries");
-    table->InsertTable(2, 3);
-    table->InsertDone();
+    table->insert_string(1, 3, "of queries");
+    table->insert_table(2, 3);
+    table->insert_done();
 
 
     // Sub tables
-    TableRef subtable = table->GetTable(2, 0);
+    TableRef subtable = table->get_table(2, 0);
     subtable->insert_int(0, 0, 11);
-    subtable->InsertString(1, 0, "a");
-    subtable->InsertDone();
+    subtable->insert_string(1, 0, "a");
+    subtable->insert_done();
 
-    subtable = table->GetTable(2, 1);
+    subtable = table->get_table(2, 1);
     subtable->insert_int(0, 0, 22);
-    subtable->InsertString(1, 0, "b");
-    subtable->InsertDone();
+    subtable->insert_string(1, 0, "b");
+    subtable->insert_done();
     subtable->insert_int(0, 1, 33);
-    subtable->InsertString(1, 1, "c");
-    subtable->InsertDone();
+    subtable->insert_string(1, 1, "c");
+    subtable->insert_done();
 
-    subtable = table->GetTable(2, 2);
+    subtable = table->get_table(2, 2);
     subtable->insert_int(0, 0, 44);
-    subtable->InsertString(1, 0, "d");
-    subtable->InsertDone();
+    subtable->insert_string(1, 0, "d");
+    subtable->insert_done();
 
-    subtable = table->GetTable(2, 3);
+    subtable = table->get_table(2, 3);
     subtable->insert_int(0, 0, 55);
-    subtable->InsertString(1, 0, "e");
-    subtable->InsertDone();
+    subtable->insert_string(1, 0, "e");
+    subtable->insert_done();
 
 
     Query *q1 = new Query;
@@ -266,14 +266,14 @@ TEST(TestQuerySort_Descending)
 TEST(TestQuerySort_Dates)
 {
     Table table;
-    table.register_column(COLUMN_TYPE_DATE, "first");
+    table.add_column(COLUMN_TYPE_DATE, "first");
 
-    table.InsertDate(0, 0, 1000);
-    table.InsertDone();
-    table.InsertDate(0, 1, 3000);
-    table.InsertDone();
-    table.InsertDate(0, 2, 2000);
-    table.InsertDone();
+    table.insert_date(0, 0, 1000);
+    table.insert_done();
+    table.insert_date(0, 1, 3000);
+    table.insert_done();
+    table.insert_date(0, 2, 2000);
+    table.insert_done();
 
     Query *q = new Query();
     TableView tv = q->FindAll(table);
@@ -295,14 +295,14 @@ TEST(TestQuerySort_Dates)
 TEST(TestQuerySort_Bools)
 {
     Table table;
-    table.register_column(COLUMN_TYPE_BOOL, "first");
+    table.add_column(COLUMN_TYPE_BOOL, "first");
 
-    table.InsertBool(0, 0, true);
-    table.InsertDone();
-    table.InsertBool(0, 0, false);
-    table.InsertDone();
-    table.InsertBool(0, 0, true);
-    table.InsertDone();
+    table.insert_bool(0, 0, true);
+    table.insert_done();
+    table.insert_bool(0, 0, false);
+    table.insert_done();
+    table.insert_bool(0, 0, true);
+    table.insert_done();
 
     Query *q = new Query();
     TableView tv = q->FindAll(table);

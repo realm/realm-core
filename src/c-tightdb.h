@@ -5,7 +5,7 @@
 #include "query.hpp"
 
 
-#define TDB_TABLE_1(TableName, CType0, CName0) \
+#define TIGHTDB_TABLE_1(TableName, CType0, CName0) \
 \
 Table* TableName##_new(void) { \
     Table *tbl = table_new(); \
@@ -33,7 +33,7 @@ void TableName##_set_##CName0(Table* tbl, size_t row_ndx, tdb_type_##CType0 valu
 
 
 
-#define TDB_TABLE_2(TableName, CType0, CName0, CType1, CName1) \
+#define TIGHTDB_TABLE_2(TableName, CType0, CName0, CType1, CName1) \
 \
 Table* TableName##_new(void) { \
     Table *tbl = table_new(); \

@@ -1,5 +1,5 @@
-#ifndef TIGHTDB_TABLE_H
-#define TIGHTDB_TABLE_H
+#ifndef __TIGHTDB_TABLE_H
+#define __TIGHTDB_TABLE_H
 
 #include "column_fwd.hpp"
 #include "table_ref.hpp"
@@ -32,7 +32,7 @@ public:
     const Spec& get_spec() const;
     void        update_from_spec(); // Must not be called for a table with shared schema
                 // Add a column dynamically
-    size_t      register_column(ColumnType type, const char* name);
+    size_t      add_column(ColumnType type, const char* name);
     
     // Table size and deletion
     bool        is_empty() const {return m_size == 0;}
@@ -51,16 +51,16 @@ public:
     void        remove_last() {if (!is_empty()) remove(m_size-1);}
 
     // Insert row
-    // NOTE: You have to insert values in ALL columns followed by InsertDone().
+    // NOTE: You have to insert values in ALL columns followed by insert_done().
     void insert_int(size_t column_ndx, size_t row_ndx, int64_t value);
-    void InsertBool(size_t column_ndx, size_t row_ndx, bool value);
-    void InsertDate(size_t column_ndx, size_t row_ndx, time_t value);
-    template<class T> void InsertEnum(size_t column_ndx, size_t row_ndx, T value);
-    void InsertString(size_t column_ndx, size_t row_ndx, const char* value);
-    void InsertMixed(size_t column_ndx, size_t row_ndx, Mixed value);
-    void InsertBinary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
-    void InsertTable(size_t column_ndx, size_t row_ndx);
-    void InsertDone();
+    void insert_bool(size_t column_ndx, size_t row_ndx, bool value);
+    void insert_date(size_t column_ndx, size_t row_ndx, time_t value);
+    template<class T> void insert_enum(size_t column_ndx, size_t row_ndx, T value);
+    void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
+    void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
+    void insert_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+    void insert_table(size_t column_ndx, size_t row_ndx);
+    void insert_done();
 
     // Get cell values
     int64_t     Get(size_t column_ndx, size_t row_ndx) const;
@@ -80,8 +80,8 @@ public:
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
 
     // Sub-tables (works both on table- and mixed columns)
-    TableRef        GetTable(size_t column_ndx, size_t row_ndx);
-    ConstTableRef   GetTable(size_t column_ndx, size_t row_ndx) const;
+    TableRef        get_table(size_t column_ndx, size_t row_ndx);
+    ConstTableRef   get_table(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;
     void            clear_subtable(size_t column_ndx, size_t row_ndx);
 
@@ -91,8 +91,8 @@ public:
 
     // Aggregate functions
     int64_t sum(size_t column_ndx) const;
-    int64_t Max(size_t column_ndx) const;
-    int64_t Min(size_t column_ndx) const;
+    int64_t maximum(size_t column_ndx) const;
+    int64_t minimum(size_t column_ndx) const;
 
     // Searching
     size_t  Find(size_t column_ndx, int64_t value) const;
@@ -264,27 +264,27 @@ protected:
 
 // Implementation:
 
-inline void Table::InsertBool(size_t column_ndx, size_t row_ndx, bool value)
+inline void Table::insert_bool(size_t column_ndx, size_t row_ndx, bool value)
 {
     insert_int(column_ndx, row_ndx, value);
 }
 
-inline void Table::InsertDate(size_t column_ndx, size_t row_ndx, time_t value)
+inline void Table::insert_date(size_t column_ndx, size_t row_ndx, time_t value)
 {
     insert_int(column_ndx, row_ndx, value);
 }
 
-template<class T> inline void Table::InsertEnum(size_t column_ndx, size_t row_ndx, T value)
+template<class T> inline void Table::insert_enum(size_t column_ndx, size_t row_ndx, T value)
 {
     insert_int(column_ndx, row_ndx, value);
 }
 
-inline TableRef Table::GetTable(size_t column_ndx, size_t row_ndx)
+inline TableRef Table::get_table(size_t column_ndx, size_t row_ndx)
 {
     return TableRef(get_subtable_ptr(column_ndx, row_ndx));
 }
 
-inline ConstTableRef Table::GetTable(size_t column_ndx, size_t row_ndx) const
+inline ConstTableRef Table::get_table(size_t column_ndx, size_t row_ndx) const
 {
     return ConstTableRef(get_subtable_ptr(column_ndx, row_ndx));
 }

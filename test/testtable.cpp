@@ -7,8 +7,8 @@ using namespace tightdb;
 TEST(Table1)
 {
     Table table;
-    table.register_column(COLUMN_TYPE_INT, "first");
-    table.register_column(COLUMN_TYPE_INT, "second");
+    table.add_column(COLUMN_TYPE_INT, "first");
+    table.add_column(COLUMN_TYPE_INT, "second");
 
     CHECK_EQUAL(COLUMN_TYPE_INT, table.get_column_type(0));
     CHECK_EQUAL(COLUMN_TYPE_INT, table.get_column_type(1));
@@ -37,11 +37,11 @@ enum Days {
     Sun
 };
 
-TDB_TABLE_4(TestTable,
-            Int,        first,
-            Int,        second,
-            Bool,       third,
-            Enum<Days>, fourth)
+TIGHTDB_TABLE_4(TestTable,
+                first,  Int,
+                second, Int,
+                third,  Bool,
+                fourth, Enum<Days>)
 
 TEST(Table2)
 {
@@ -88,9 +88,9 @@ TEST(Table3)
 #endif //_DEBUG
 }
 
-TDB_TABLE_2(TestTableEnum,
-            Enum<Days>, first,
-            String, second)
+TIGHTDB_TABLE_2(TestTableEnum,
+                first,      Enum<Days>,
+                second,     String)
 
 TEST(Table4)
 {
@@ -170,68 +170,68 @@ TEST(Table_Delete_All_Types)
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
         table.insert_int(0, i, i);
-        table.InsertBool(1, i, (i % 2 ? true : false));
-        table.InsertDate(2, i, 12345);
+        table.insert_bool(1, i, (i % 2 ? true : false));
+        table.insert_date(2, i, 12345);
 
         std::stringstream ss;
         ss << "string" << i;
-        table.InsertString(3, i, ss.str().c_str());
+        table.insert_string(3, i, ss.str().c_str());
 
         ss << " very long string.........";
-        table.InsertString(4, i, ss.str().c_str());
+        table.insert_string(4, i, ss.str().c_str());
 
         switch (i % 3) {
             case 0:
-                table.InsertString(5, i, "test1");
+                table.insert_string(5, i, "test1");
                 break;
             case 1:
-                table.InsertString(5, i, "test2");
+                table.insert_string(5, i, "test2");
                 break;
             case 2:
-                table.InsertString(5, i, "test3");
+                table.insert_string(5, i, "test3");
                 break;
         }
 
-        table.InsertBinary(6, i, "binary", 7);
+        table.insert_binary(6, i, "binary", 7);
 
         switch (i % 4) {
             case 0:
-                table.InsertMixed(7, i, false);
+                table.insert_mixed(7, i, false);
                 break;
             case 1:
-                table.InsertMixed(7, i, (int64_t)i);
+                table.insert_mixed(7, i, (int64_t)i);
                 break;
             case 2:
-                table.InsertMixed(7, i, "string");
+                table.insert_mixed(7, i, "string");
                 break;
             case 3:
             {
                 // Add subtable to mixed column
                 // We can first set schema and contents when the entire
                 // row has been inserted
-                table.InsertMixed(7, i, Mixed(COLUMN_TYPE_TABLE));
+                table.insert_mixed(7, i, Mixed(COLUMN_TYPE_TABLE));
                 break;
             }
         }
 
-        table.InsertTable(8, i);
-        table.InsertDone();
+        table.insert_table(8, i);
+        table.insert_done();
 
         // Add subtable to mixed column
         if (i % 4 == 3) {
-            TableRef subtable = table.GetTable(7, i);
-            subtable->register_column(COLUMN_TYPE_INT,    "first");
-            subtable->register_column(COLUMN_TYPE_STRING, "second");
+            TableRef subtable = table.get_table(7, i);
+            subtable->add_column(COLUMN_TYPE_INT,    "first");
+            subtable->add_column(COLUMN_TYPE_STRING, "second");
             subtable->insert_int(0, 0, 42);
-            subtable->InsertString(1, 0, "meaning");
-            subtable->InsertDone();
+            subtable->insert_string(1, 0, "meaning");
+            subtable->insert_done();
         }
 
         // Add sub-tables to table column
-        TableRef subtable = table.GetTable(8, i);
+        TableRef subtable = table.get_table(8, i);
         subtable->insert_int(0, 0, 42);
-        subtable->InsertString(1, 0, "meaning");
-        subtable->InsertDone();
+        subtable->insert_string(1, 0, "meaning");
+        subtable->insert_done();
     }
 
     // We also want a ColumnStringEnum
@@ -421,11 +421,11 @@ TEST(Table_Index_Int)
 #endif //_DEBUG
 }
 
-TDB_TABLE_4(TestTableAE,
-            Int,        first,
-            String,     second,
-            Bool,       third,
-            Enum<Days>, fourth)
+TIGHTDB_TABLE_4(TestTableAE,
+                first,  Int,
+                second, String,
+                third,  Bool,
+                fourth, Enum<Days>)
 
 TEST(TableAutoEnumeration)
 {
@@ -547,20 +547,20 @@ TEST(Table_Spec)
 
     // Add a row
     table->insert_int(0, 0, 4);
-    table->InsertString(1, 0, "Hello");
-    table->InsertTable(2, 0);
-    table->InsertDone();
+    table->insert_string(1, 0, "Hello");
+    table->insert_table(2, 0);
+    table->insert_done();
 
     CHECK_EQUAL(0, table->get_subtable_size(2, 0));
 
     // Get the sub-table
     {
-        TableRef subtable = table->GetTable(2, 0);
+        TableRef subtable = table->get_table(2, 0);
         CHECK(subtable->is_empty());
 
         subtable->insert_int(0, 0, 42);
-        subtable->InsertString(1, 0, "test");
-        subtable->InsertDone();
+        subtable->insert_string(1, 0, "test");
+        subtable->insert_done();
 
         CHECK_EQUAL(42,     subtable->Get(0, 0));
         CHECK_EQUAL("test", subtable->get_string(1, 0));
@@ -571,7 +571,7 @@ TEST(Table_Spec)
     // Get the sub-table again and see if the values
     // still match.
     {
-        TableRef subtable = table->GetTable(2, 0);
+        TableRef subtable = table->get_table(2, 0);
 
         CHECK_EQUAL(1,      subtable->size());
         CHECK_EQUAL(42,     subtable->Get(0, 0));
@@ -585,7 +585,7 @@ TEST(Table_Spec)
     Group fromDisk("subtables.tightdb");
     TableRef fromDiskTable = fromDisk.get_table("test");
 
-    TableRef subtable2 = fromDiskTable->GetTable(2, 0);
+    TableRef subtable2 = fromDiskTable->get_table(2, 0);
 
     CHECK_EQUAL(1,      subtable2->size());
     CHECK_EQUAL(42,     subtable2->Get(0, 0));
@@ -595,8 +595,8 @@ TEST(Table_Spec)
 TEST(Table_Mixed)
 {
     Table table;
-    table.register_column(COLUMN_TYPE_INT, "first");
-    table.register_column(COLUMN_TYPE_MIXED, "second");
+    table.add_column(COLUMN_TYPE_INT, "first");
+    table.add_column(COLUMN_TYPE_MIXED, "second");
 
     CHECK_EQUAL(COLUMN_TYPE_INT, table.get_column_type(0));
     CHECK_EQUAL(COLUMN_TYPE_MIXED, table.get_column_type(1));
@@ -612,8 +612,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
 
     table.insert_int(0, 1, 43);
-    table.InsertMixed(1, 1, (int64_t)12);
-    table.InsertDone();
+    table.insert_mixed(1, 1, (int64_t)12);
+    table.insert_done();
 
     CHECK_EQUAL(0,  table.Get(0, ndx));
     CHECK_EQUAL(43, table.Get(0, 1));
@@ -623,8 +623,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL(12,   table.get_mixed(1, 1).Get());
 
     table.insert_int(0, 2, 100);
-    table.InsertMixed(1, 2, "test");
-    table.InsertDone();
+    table.insert_mixed(1, 2, "test");
+    table.insert_done();
 
     CHECK_EQUAL(0,  table.Get(0, 0));
     CHECK_EQUAL(43, table.Get(0, 1));
@@ -636,8 +636,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
 
     table.insert_int(0, 3, 0);
-    table.InsertMixed(1, 3, Date(324234));
-    table.InsertDone();
+    table.insert_mixed(1, 3, Date(324234));
+    table.insert_done();
 
     CHECK_EQUAL(0,  table.Get(0, 0));
     CHECK_EQUAL(43, table.Get(0, 1));
@@ -652,8 +652,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
 
     table.insert_int(0, 4, 43);
-    table.InsertMixed(1, 4, Mixed("binary", 7));
-    table.InsertDone();
+    table.insert_mixed(1, 4, Mixed("binary", 7));
+    table.insert_done();
 
     CHECK_EQUAL(0,  table.Get(0, 0));
     CHECK_EQUAL(43, table.Get(0, 1));
@@ -672,8 +672,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
 
     table.insert_int(0, 5, 0);
-    table.InsertMixed(1, 5, Mixed(COLUMN_TYPE_TABLE));
-    table.InsertDone();
+    table.insert_mixed(1, 5, Mixed(COLUMN_TYPE_TABLE));
+    table.insert_done();
 
     CHECK_EQUAL(0,  table.Get(0, 0));
     CHECK_EQUAL(43, table.Get(0, 1));
@@ -694,16 +694,16 @@ TEST(Table_Mixed)
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
 
     // Get table from mixed column and add schema and some values
-    TableRef subtable = table.GetTable(1, 5);
-    subtable->register_column(COLUMN_TYPE_STRING, "name");
-    subtable->register_column(COLUMN_TYPE_INT,    "age");
+    TableRef subtable = table.get_table(1, 5);
+    subtable->add_column(COLUMN_TYPE_STRING, "name");
+    subtable->add_column(COLUMN_TYPE_INT,    "age");
 
-    subtable->InsertString(0, 0, "John");
+    subtable->insert_string(0, 0, "John");
     subtable->insert_int(1, 0, 40);
-    subtable->InsertDone();
+    subtable->insert_done();
 
     // Get same table again and verify values
-    TableRef subtable2 = table.GetTable(1, 5);
+    TableRef subtable2 = table.get_table(1, 5);
     CHECK_EQUAL(1, subtable2->size());
     CHECK_EQUAL("John", subtable2->get_string(0, 0));
     CHECK_EQUAL(40, subtable2->Get(1, 0));
@@ -713,8 +713,8 @@ TEST(Table_Mixed)
 #endif //_DEBUG
 }
 
-TDB_TABLE_1(TestTableMX,
-            Mixed,  first)
+TIGHTDB_TABLE_1(TestTableMX,
+                first, Mixed)
 
 
 TEST(Table_Mixed2)

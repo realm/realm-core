@@ -87,7 +87,7 @@ public:
         assert(m_child);
 
         for (size_t s = start; s < end; ++s) {
-            const TableRef subtable = ((Table*)m_table)->GetTable(m_column, s);
+            const TableRef subtable = ((Table*)m_table)->get_table(m_column, s);
 
             m_child->Init(*subtable);
             const size_t subsize = subtable->size();

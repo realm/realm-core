@@ -132,8 +132,8 @@ public:
     bool Add(int64_t value);
 
     int64_t sum(size_t start = 0, size_t end = -1) const;
-    int64_t Max(size_t start = 0, size_t end = -1) const;
-    int64_t Min(size_t start = 0, size_t end = -1) const;
+    int64_t maximum(size_t start = 0, size_t end = -1) const;
+    int64_t minimum(size_t start = 0, size_t end = -1) const;
     void Sort(size_t start, size_t end);
     void ReferenceSort(size_t start, size_t end, Column &ref);
 

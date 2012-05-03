@@ -47,8 +47,8 @@ TEST(Column_monkeytest2)
                 a.FindAll(res, rand2(current_bitwidth));
                 size_t start = rand2() % (a.Size() + 1);
                 a.sum(start, start + rand2() % (a.Size() + 1 - start));
-                a.Max(start, start + rand2() % (a.Size() + 1 - start));
-                a.Min(start, start + rand2() % (a.Size() + 1 - start));
+                a.maximum(start, start + rand2() % (a.Size() + 1 - start));
+                a.minimum(start, start + rand2() % (a.Size() + 1 - start));
             }
 
             if (rand2() % 10 > trend && a.Size() < ITER_PER_BITWIDTH / 100) {

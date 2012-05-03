@@ -24,8 +24,8 @@ uint64_t rand2()
     return seed * seed2 + seed2;
 }
 
-TDB_TABLE_1(IntegerTable,
-            Int,        first)
+TIGHTDB_TABLE_1(IntegerTable,
+                first, Int)
 
 UnitTest::Timer timer;
 int ITEMS = 50000;

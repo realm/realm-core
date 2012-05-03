@@ -125,28 +125,28 @@ public:
     void Add(const T1& v1)
     {
         Spec::insert(m_size, cols(), v1);
-        InsertDone();
+        insert_done();
     }
 
     template<class T1, class T2>
     void Add(const T1& v1, const T2& v2)
     {
         Spec::insert(m_size, cols(), v1, v2);
-        InsertDone();
+        insert_done();
     }
 
     template<class T1, class T2, class T3>
     void Add(const T1& v1, const T2& v2, const T3& v3)
     {
         Spec::insert(m_size, cols(), v1, v2, v3);
-        InsertDone();
+        insert_done();
     }
 
     template<class T1, class T2, class T3, class T4>
     void Add(const T1& v1, const T2& v2, const T3& v3, const T4& v4)
     {
         Spec::insert(m_size, cols(), v1, v2, v3, v4);
-        InsertDone();
+        insert_done();
     }
 
     // FIXME: Add remaining Add() methods up to 8 values.
@@ -155,28 +155,28 @@ public:
     void Insert(std::size_t i, const T1& v1)
     {
         Spec::insert(i, cols(), v1);
-        InsertDone();
+        insert_done();
     }
 
     template<class T1, class T2>
     void Insert(std::size_t i, const T1& v1, const T2& v2)
     {
         Spec::insert(i, cols(), v1, v2);
-        InsertDone();
+        insert_done();
     }
 
     template<class T1, class T2, class T3>
     void Insert(std::size_t i, const T1& v1, const T2& v2, const T3& v3)
     {
         Spec::insert(i, cols(), v1, v2, v3);
-        InsertDone();
+        insert_done();
     }
 
     template<class T1, class T2, class T3, class T4>
     void Insert(std::size_t i, const T1& v1, const T2& v2, const T3& v3, const T4& v4)
     {
         Spec::insert(i, cols(), v1, v2, v3, v4);
-        InsertDone();
+        insert_done();
     }
 
     // FIXME: Add remaining Insert() methods up to 8 values.
@@ -186,7 +186,7 @@ public:
 
 
 // These types are meant to be used when specifying column types
-// directly of via the TDB_TABLE_* macros.
+// directly of via the TIGHTDB_TABLE_* macros.
 struct SpecBase {
     typedef int64_t         Int;
     typedef bool            Bool;
@@ -653,7 +653,7 @@ public:
 
     void _insert(std::size_t row_idx, bool value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
     {
-        Base::m_table->InsertBool(col_idx, row_idx, value);
+        Base::m_table->insert_bool(col_idx, row_idx, value);
     }
 };
 
@@ -681,7 +681,7 @@ public:
 
     void _insert(std::size_t row_idx, E value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
     {
-        Base::m_table->InsertEnum(col_idx, row_idx, value);
+        Base::m_table->insert_enum(col_idx, row_idx, value);
     }
 };
 
@@ -709,7 +709,7 @@ public:
 
     void _insert(std::size_t row_idx, const char* value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
     {
-        Base::m_table->InsertString(col_idx, row_idx, value);
+        Base::m_table->insert_string(col_idx, row_idx, value);
     }
 };
 
@@ -724,7 +724,7 @@ public:
 
     void _insert(std::size_t row_idx, const Mixed& value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
     {
-        Base::m_table->InsertMixed(col_idx, row_idx, value);
+        Base::m_table->insert_mixed(col_idx, row_idx, value);
     }
 };
 

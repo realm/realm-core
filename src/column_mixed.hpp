@@ -67,11 +67,11 @@ public:
     void SetTable(size_t ndx);
 
     void insert_int(size_t ndx, int64_t value);
-    void InsertBool(size_t ndx, bool value);
-    void InsertDate(size_t ndx, time_t value);
-    void InsertString(size_t ndx, const char* value);
-    void InsertBinary(size_t ndx, const char* value, size_t len);
-    void InsertTable(size_t ndx);
+    void insert_bool(size_t ndx, bool value);
+    void insert_date(size_t ndx, time_t value);
+    void insert_string(size_t ndx, const char* value);
+    void insert_binary(size_t ndx, const char* value, size_t len);
+    void insert_table(size_t ndx);
 
     bool Add();
     void Clear();

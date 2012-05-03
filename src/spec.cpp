@@ -119,21 +119,21 @@ void Spec::add_column(ColumnType type, const char* name)
 
 Spec Spec::add_subtable_column(const char* name)
 {
-    const size_t column_id = m_names.Size();
+    const size_t column_ndx = m_names.Size();
     add_column(COLUMN_TYPE_TABLE, name);
     
-    return get_subspec(column_id);
+    return get_subspec(column_ndx);
 }
 
-Spec Spec::get_subspec(size_t column_id)
+Spec Spec::get_subspec(size_t column_ndx)
 {
-    assert(column_id < m_spec.Size());
-    assert((ColumnType)m_spec.Get(column_id) == COLUMN_TYPE_TABLE);
+    assert(column_ndx < m_spec.Size());
+    assert((ColumnType)m_spec.Get(column_ndx) == COLUMN_TYPE_TABLE);
     
     // The subspec array only keep info for subtables
     // so we need to count up to it's position
     size_t pos = 0;
-    for (size_t i = 0; i < column_id; ++i) {
+    for (size_t i = 0; i < column_ndx; ++i) {
         if ((ColumnType)m_spec.Get(i) == COLUMN_TYPE_TABLE) ++pos;
     }
     
@@ -143,15 +143,15 @@ Spec Spec::get_subspec(size_t column_id)
     return Spec(alloc, ref, &m_subSpecs, pos);
 }
 
-const Spec Spec::get_subspec(size_t column_id) const
+const Spec Spec::get_subspec(size_t column_ndx) const
 {
-    assert(column_id < m_spec.Size());
-    assert((ColumnType)m_spec.Get(column_id) == COLUMN_TYPE_TABLE);
+    assert(column_ndx < m_spec.Size());
+    assert((ColumnType)m_spec.Get(column_ndx) == COLUMN_TYPE_TABLE);
     
     // The subspec array only keep info for subtables
     // so we need to count up to it's position
     size_t pos = 0;
-    for (size_t i = 0; i < column_id; ++i) {
+    for (size_t i = 0; i < column_ndx; ++i) {
         if ((ColumnType)m_spec.Get(i) == COLUMN_TYPE_TABLE) ++pos;
     }
     
