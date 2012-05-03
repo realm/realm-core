@@ -58,9 +58,6 @@
     <ClCompile Include="test\testtable.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testTableView.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="test\test_c_api.c">
       <Filter>test</Filter>
     </ClCompile>
@@ -86,6 +83,9 @@
       <Filter>large_tests</Filter>
     </ClCompile>
     <ClCompile Include="test\testquery.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testtableview.cpp">
       <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>

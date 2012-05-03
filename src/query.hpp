@@ -215,7 +215,7 @@ public:
         update_override.pop_back();
     };
 
-    size_t FindNext(Table& table, size_t lastmatch=-1) {
+    size_t find_next(Table& table, size_t lastmatch=-1) {
         if (lastmatch == (size_t)-1) Init(table);
         
         const size_t end = table.size();
@@ -333,7 +333,7 @@ public:
         return min;
     }
 
-    size_t Count(const Table& table, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
+    size_t count(const Table& table, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         Init(table);
 
@@ -349,22 +349,22 @@ public:
         return results;
     }
 
-    double Avg(const Table& table, size_t column, size_t *resultcount, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
+    double average(const Table& table, size_t column_ndx, size_t* resultcount = NULL, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         Init(table);
 
         size_t resultcount2;
 
-        const int64_t sum1 = sum(table, column, &resultcount2, start, end, limit);
+        const int64_t sum1 = sum(table, column_ndx, &resultcount2, start, end, limit);
         const double avg1 = (float)sum1 / (float)resultcount2;
 
-        if (resultcount != 0)
+        if (resultcount != NULL)
             *resultcount = resultcount2;
         return avg1;
     }
 
     // todo, not sure if start, end and limit could be useful for delete.
-    size_t Delete(Table& table, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
+    size_t remove(Table& table, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         size_t r = start - 1;
         size_t results = 0;

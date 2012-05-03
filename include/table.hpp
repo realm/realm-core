@@ -95,12 +95,14 @@ public:
     int64_t minimum(size_t column_ndx) const;
 
     // Searching
-    size_t  find_first(size_t column_ndx, int64_t value) const;
-    size_t  find_first(size_t column_ndx, bool value) const;
-    size_t  find_first(size_t column_ndx, const char* value) const;
-    void    find_all(TableView& tv, size_t column_ndx, int64_t value);
-    void    find_all(TableView& tv, size_t column_ndx, bool value);
-    void    find_all(TableView& tv, size_t column_ndx, const char *value);
+    size_t  find_first_int(size_t column_ndx, int64_t value) const;
+    size_t  find_first_bool(size_t column_ndx, bool value) const;
+    size_t  find_first_date(size_t column_ndx, time_t value) const;
+    size_t  find_first_string(size_t column_ndx, const char* value) const;
+    void    find_all_int(TableView& tv, size_t column_ndx, int64_t value);
+    void    find_all_bool(TableView& tv, size_t column_ndx, bool value);
+    void    find_all_date(TableView& tv, size_t column_ndx, time_t value);
+    void    find_all_string(TableView& tv, size_t column_ndx, const char *value);
     
     // Optimizing
     void optimize();

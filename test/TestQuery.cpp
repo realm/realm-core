@@ -26,7 +26,7 @@ TEST(TestQueryDelete)
     ttt.add(6, "X");
 
     Query q = ttt.where().second.equal("X");
-    size_t r = q.Delete(ttt);
+    size_t r = q.remove(ttt);
 
     CHECK_EQUAL(4, r);
     CHECK_EQUAL(2, ttt.size());
@@ -422,9 +422,9 @@ TEST(TestQueryFindNext)
     
     Query q1 = ttt.where().second.equal("X").first.greater(4);
     
-    const size_t res1 = q1.FindNext(ttt);
-    const size_t res2 = q1.FindNext(ttt, res1);
-    const size_t res3 = q1.FindNext(ttt, res2);
+    const size_t res1 = q1.find_next(ttt);
+    const size_t res2 = q1.find_next(ttt, res1);
+    const size_t res3 = q1.find_next(ttt, res2);
     
     CHECK_EQUAL(5, res1);
     CHECK_EQUAL(6, res2);

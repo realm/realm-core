@@ -682,7 +682,7 @@ void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, siz
     }
 }
 
-size_t Column::FindPos(int64_t target) const
+size_t Column::find_pos(int64_t target) const
 {
     // NOTE: Binary search only works if the column is sorted
 
