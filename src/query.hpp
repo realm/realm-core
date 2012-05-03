@@ -215,7 +215,7 @@ public:
         update_override.pop_back();
     };
 
-    size_t FindNext(Table& table, size_t lastmatch=-1) {
+    size_t find_next(Table& table, size_t lastmatch=-1) {
         if (lastmatch == (size_t)-1) Init(table);
         
         const size_t end = table.size();
