@@ -331,39 +331,39 @@ void table_insert(Table* t, size_t ndx, ...) {
 
 
 
-void basictable_insert_int(Table* t, size_t column_id, size_t ndx, int value) {
+void table_insert_int(Table* t, size_t column_id, size_t ndx, int value) {
 	t->InsertInt(column_id, ndx, value);
 }
 
-void basictable_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value) {
+void table_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value) {
 	t->InsertInt(column_id, ndx, value);
 }
 
-void basictable_insert_bool(Table* t, size_t column_id, size_t ndx, bool value) {
+void table_insert_bool(Table* t, size_t column_id, size_t ndx, bool value) {
 	t->InsertBool(column_id, ndx, value);
 }
 
-void basictable_insert_date(Table* t, size_t column_id, size_t ndx, time_t value) {
+void table_insert_date(Table* t, size_t column_id, size_t ndx, time_t value) {
 	t->InsertDate(column_id, ndx, value);
 }
 
-void basictable_insert_string(Table* t, size_t column_id, size_t ndx, const char* value) {
+void table_insert_string(Table* t, size_t column_id, size_t ndx, const char* value) {
 	t->InsertString(column_id, ndx, value);
 }
 
-void basictable_insert_binary(Table* t, size_t column_id, size_t ndx, const char* value, size_t len) {
+void table_insert_binary(Table* t, size_t column_id, size_t ndx, const char* value, size_t len) {
 	t->InsertBinary(column_id, ndx, value, len);
 }
 
-void basictable_insert_mixed(Table* t, size_t column_id, size_t ndx, Mixed value) {
+void table_insert_mixed(Table* t, size_t column_id, size_t ndx, Mixed value) {
 	t->InsertMixed(column_id, ndx, value);
 }
 
-void basictable_insert_table(Table* t, size_t column_id, size_t ndx) {
+void table_insert_table(Table* t, size_t column_id, size_t ndx) {
 	t->InsertTable(column_id, ndx);
 }
 
-void basictable_insert_done(Table* t) {
+void table_insert_done(Table* t) {
 	t->InsertDone();
 }
 

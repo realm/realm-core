@@ -182,8 +182,8 @@ TEST(ColumnMixed_Table)
 
     Table* const t1 = c.get_subtable_ptr(0);
     Table* const t2 = c.get_subtable_ptr(1);
-    CHECK(t1->IsEmpty());
-    CHECK(t2->IsEmpty());
+    CHECK(t1->is_empty());
+    CHECK(t2->is_empty());
     delete t1;
     delete t2;
 

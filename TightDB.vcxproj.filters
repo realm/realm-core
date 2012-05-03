@@ -13,39 +13,6 @@
     <ClCompile Include="test\large_tests\test_column.cpp">
       <Filter>large_tests</Filter>
     </ClCompile>
-    <ClCompile Include="test\testTableView.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\testtable.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\TestQuery.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\testindex.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\testgroup.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\testcolumnstring.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\testcolumn.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\testarraystring.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\testarray.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\testalloc.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\main.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="src\array_binary.cpp" />
     <ClCompile Include="src\array_blob.cpp" />
     <ClCompile Include="src\array_string.cpp" />
@@ -69,6 +36,57 @@
     <ClCompile Include="src\array.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c">
       <Filter>pthreads</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testarrayblob.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testarraystring.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testarraystringlong.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testcolumn.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testcolumnbinary.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testcolumnmixed.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testcolumnstring.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testearraybinary.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testgroup.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testindex.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\TestQuery.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testtable.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testTableView.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_c_api.c">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\main.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testalloc.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testarray.cpp">
+      <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -122,6 +140,9 @@
     <ClInclude Include="src\utilities.hpp" />
     <ClInclude Include="src\win32\pthread\pthread.h">
       <Filter>pthreads</Filter>
+    </ClInclude>
+    <ClInclude Include="test\testsettings.hpp">
+      <Filter>test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

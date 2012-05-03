@@ -25,7 +25,6 @@
 #include <stdlib.h> // size_t
 #include "column_type.hpp"
 
-
 #ifdef __cplusplus
 
 namespace tightdb {
@@ -193,15 +192,15 @@ typedef struct Query Query;
 
 	/* NOTE: Low-level insert functions. Always insert in all columns at once
 	** and call table_insert_done after to avoid table getting un-balanced. */
-	void basictable_insert_int(Table* t, size_t column_id, size_t ndx, int value);
-	void basictable_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value);
-	void basictable_insert_bool(Table* t, size_t column_id, size_t ndx, bool value);
-	void basictable_insert_date(Table* t, size_t column_id, size_t ndx, time_t value);
-	void basictable_insert_string(Table* t, size_t column_id, size_t ndx, const char* value);
-	void basictable_insert_binary(Table* t, size_t column_id, size_t ndx, const char* value, size_t len);
-	void basictable_insert_mixed(Table* t, size_t column_id, size_t ndx, Mixed value);
-    void basictable_insert_table(Table* t, size_t column_id, size_t ndx);
-    void basictable_insert_done(Table* t);
+	void table_insert_int(Table* t, size_t column_id, size_t ndx, int value);
+	void table_insert_int64(Table* t, size_t column_id, size_t ndx, int64_t value);
+	void table_insert_bool(Table* t, size_t column_id, size_t ndx, bool value);
+	void table_insert_date(Table* t, size_t column_id, size_t ndx, time_t value);
+	void table_insert_string(Table* t, size_t column_id, size_t ndx, const char* value);
+	void table_insert_binary(Table* t, size_t column_id, size_t ndx, const char* value, size_t len);
+	void table_insert_mixed(Table* t, size_t column_id, size_t ndx, Mixed value);
+    void table_insert_table(Table* t, size_t column_id, size_t ndx);
+    void table_insert_done(Table* t);
 
 /*** TableView ************************************/
 

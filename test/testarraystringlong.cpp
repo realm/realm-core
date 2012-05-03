@@ -180,7 +180,7 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete)
 
     c.Delete(0); // all
     CHECK_EQUAL(0, c.Size());
-    CHECK(c.IsEmpty());
+    CHECK(c.is_empty());
 }
 
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind)
