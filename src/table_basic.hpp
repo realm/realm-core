@@ -34,6 +34,7 @@
 
 #include "meta.hpp"
 #include "table.hpp"
+#include "column.hpp"
 #include "query.hpp"
 
 namespace tightdb {

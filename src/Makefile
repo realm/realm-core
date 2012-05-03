@@ -12,9 +12,9 @@ include $(CONFIG_MK)
 
 CXXFLAGS           ?= $(CXXFLAGS_COMMON)
 CXXFLAGS_COMMON_2   = -pthread -fPIC -DPIC $(CXXFLAGS)
-CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I.
-CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I.
-CXXFLAGS_COVERAGE  += $(CXXFLAGS_COMMON_2) -I$(abspath .)
+CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I. -I../include
+CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I. -I../include
+CXXFLAGS_COVERAGE  += $(CXXFLAGS_COMMON_2) -I$(abspath .) 
 
 GEN_HEADERS         = tightdb.hpp
 SOURCES             = $(wildcard *.cpp)
