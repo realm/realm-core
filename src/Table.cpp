@@ -1,17 +1,17 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include "Table.hpp"
+#include "table.hpp"
 #include <assert.h>
-#include "Index.hpp"
+#include "index.hpp"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
 #include "alloc_slab.hpp"
-#include "Column.hpp"
-#include "ColumnString.hpp"
-#include "ColumnStringEnum.hpp"
-#include "ColumnBinary.hpp"
-#include "ColumnTable.hpp"
-#include "ColumnMixed.hpp"
+#include "column.hpp"
+#include "column_string.hpp"
+#include "column_string_enum.hpp"
+#include "column_binary.hpp"
+#include "column_table.hpp"
+#include "column_mixed.hpp"
 
 using namespace std;
 
@@ -840,24 +840,24 @@ void Table::SetMixed(size_t column_id, size_t ndx, Mixed value)
     assert(ndx < m_size);
 
     ColumnMixed& column = GetColumnMixed(column_id);
-    const ColumnType type = value.GetType();
+    const ColumnType type = value.get_type();
 
     switch (type) {
         case COLUMN_TYPE_INT:
-            column.SetInt(ndx, value.GetInt());
+            column.SetInt(ndx, value.get_int());
             break;
         case COLUMN_TYPE_BOOL:
-            column.SetBool(ndx, value.GetBool());
+            column.SetBool(ndx, value.get_bool());
             break;
         case COLUMN_TYPE_DATE:
-            column.SetDate(ndx, value.GetDate());
+            column.SetDate(ndx, value.get_date());
             break;
         case COLUMN_TYPE_STRING:
-            column.SetString(ndx, value.GetString());
+            column.SetString(ndx, value.get_string());
             break;
         case COLUMN_TYPE_BINARY:
         {
-            const BinaryData b = value.GetBinary();
+            const BinaryData b = value.get_binary();
             column.SetBinary(ndx, (const char*)b.pointer, b.len);
             break;
         }
@@ -874,24 +874,24 @@ void Table::InsertMixed(size_t column_id, size_t ndx, Mixed value) {
     assert(ndx <= m_size);
 
     ColumnMixed& column = GetColumnMixed(column_id);
-    const ColumnType type = value.GetType();
+    const ColumnType type = value.get_type();
 
     switch (type) {
         case COLUMN_TYPE_INT:
-            column.InsertInt(ndx, value.GetInt());
+            column.InsertInt(ndx, value.get_int());
             break;
         case COLUMN_TYPE_BOOL:
-            column.InsertBool(ndx, value.GetBool());
+            column.InsertBool(ndx, value.get_bool());
             break;
         case COLUMN_TYPE_DATE:
-            column.InsertDate(ndx, value.GetDate());
+            column.InsertDate(ndx, value.get_date());
             break;
         case COLUMN_TYPE_STRING:
-            column.InsertString(ndx, value.GetString());
+            column.InsertString(ndx, value.get_string());
             break;
         case COLUMN_TYPE_BINARY:
         {
-            const BinaryData b = value.GetBinary();
+            const BinaryData b = value.get_binary();
             column.InsertBinary(ndx, (const char*)b.pointer, b.len);
             break;
         }
@@ -1196,17 +1196,17 @@ void Table::to_json(std::ostream& out)
                         const Mixed m = GetMixed(i, r);
                         switch (mtype) {
                             case COLUMN_TYPE_INT:
-                                out << m.GetInt();
+                                out << m.get_int();
                                 break;
                             case COLUMN_TYPE_BOOL:
-                                out << m.GetBool();
+                                out << m.get_bool();
                                 break;
                             case COLUMN_TYPE_STRING:
-                                out << "\"" << m.GetString() << "\"";
+                                out << "\"" << m.get_string() << "\"";
                                 break;
                             case COLUMN_TYPE_DATE:
                             {
-                                const time_t rawtime = m.GetDate();
+                                const time_t rawtime = m.get_date();
                                 struct tm* const t = gmtime(&rawtime);
                                 const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
                                 if (!res) break;
@@ -1216,7 +1216,7 @@ void Table::to_json(std::ostream& out)
                             }
                             case COLUMN_TYPE_BINARY:
                             {
-                                const BinaryData bin = m.GetBinary();
+                                const BinaryData bin = m.get_binary();
                                 const char* const p = (char*)bin.pointer;
 
                                 out << "\"";

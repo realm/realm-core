@@ -1,7 +1,7 @@
 #ifndef __TDB_GROUP__
 #define __TDB_GROUP__
 
-#include "Table.hpp"
+#include "table.hpp"
 #include "alloc_slab.hpp"
 
 namespace tightdb {

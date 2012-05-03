@@ -1,7 +1,7 @@
 #ifndef __TDB_COLUMN_STRING__
 #define __TDB_COLUMN_STRING__
 
-#include "Column.hpp"
+#include "column.hpp"
 #include "array_string.hpp"
 #include "array_string_long.hpp"
 

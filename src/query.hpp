@@ -1,6 +1,5 @@
-
-#ifndef Testing_Query_h
-#define Testing_Query_h
+#ifndef TIGHTDB_QUERY_HPP
+#define TIGHTDB_QUERY_HPP
 
 #include <string>
 #include <algorithm>
@@ -8,12 +7,11 @@
 #include <stdio.h>
 #include <limits.h>
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-    #include "Win32/pthread/pthread.h"
-    #include "query_engine.hpp"
+    #include "win32/pthread/pthread.h"    
 #else
     #include <pthread.h>
-    #include "query_engine.hpp"
 #endif
+#include "query_engine.hpp"
 
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
@@ -592,4 +590,4 @@ private:
 
 }
 
-#endif // Testing_Query_h
+#endif // TIGHTDB_QUERY_HPP

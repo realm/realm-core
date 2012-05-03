@@ -1,7 +1,7 @@
 #ifndef __TDB_COLUMN__
 #define __TDB_COLUMN__
 
-#include "Array.hpp"
+#include "array.hpp"
 
 #ifdef _MSC_VER
 #include "win32/stdint.h"

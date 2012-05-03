@@ -1,7 +1,7 @@
 #ifndef __TDB_ARRAY_BLOB__
 #define __TDB_ARRAY_BLOB__
 
-#include "Array.hpp"
+#include "array.hpp"
 
 namespace tightdb {
 

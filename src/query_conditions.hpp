@@ -1,5 +1,5 @@
-#ifndef CONDITIONS_H
-#define CONDITIONS_H
+#ifndef TIGHTDB_CONDITIONS_HPP
+#define TIGHTDB_CONDITIONS_HPP
 
 #include <string>
 #include "utf8.hpp"
@@ -128,4 +128,4 @@ struct GREATEREQUAL {
 
 }
 
-#endif
+#endif // TIGHTDB_CONDITIONS_HPP

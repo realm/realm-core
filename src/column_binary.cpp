@@ -1,4 +1,4 @@
-#include "ColumnBinary.hpp"
+#include "column_binary.hpp"
 
 namespace {
 

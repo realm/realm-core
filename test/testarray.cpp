@@ -1,5 +1,5 @@
-#include "Array.hpp"
-#include "Column.hpp"
+#include "array.hpp"
+#include "column.hpp"
 #include <UnitTest++.h>
 #include <vector>
 #include <algorithm>

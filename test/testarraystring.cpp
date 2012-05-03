@@ -1,5 +1,5 @@
 #include "array_string.hpp"
-#include "Column.hpp"
+#include "column.hpp"
 #include <UnitTest++.h>
 
 using namespace tightdb;

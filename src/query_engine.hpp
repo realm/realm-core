@@ -1,7 +1,7 @@
 #include <string>
-#include "Table.hpp"
-#include "ColumnString.hpp"
-#include "ColumnStringEnum.hpp"
+#include "table.hpp"
+#include "column_string.hpp"
+#include "column_string_enum.hpp"
 
 #include "utf8.hpp"
 #include "query_conditions.hpp"

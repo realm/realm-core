@@ -1,7 +1,7 @@
 #ifndef TIGHTDB_TABLE_VIEW_H
 #define TIGHTDB_TABLE_VIEW_H
 
-#include "Array.hpp"
+#include "array.hpp"
 #include "table_ref.hpp"
 
 namespace tightdb {

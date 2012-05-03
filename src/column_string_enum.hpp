@@ -1,7 +1,7 @@
 #ifndef __TDB_COLUMN_STRING_ENUM__
 #define __TDB_COLUMN_STRING_ENUM__
 
-#include "ColumnString.hpp"
+#include "column_string.hpp"
 
 namespace tightdb {
 

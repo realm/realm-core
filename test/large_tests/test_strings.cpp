@@ -2,7 +2,7 @@
 #include <UnitTest++.h>
 #include "../testsettings.hpp"
 #include "../Support/number_names.hpp"
-#include "Column.hpp"
+#include "column.hpp"
 
 #include "verified_string.hpp"
 

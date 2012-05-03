@@ -3,8 +3,8 @@
 
 #include <assert.h>
 
-#include "Array.hpp"
-#include "Column.hpp"
+#include "array.hpp"
+#include "column.hpp"
 
 #include <cstdlib>
 
