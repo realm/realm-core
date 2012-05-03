@@ -1,4 +1,4 @@
-#include "ColumnBinary.hpp"
+#include "column_binary.hpp"
 #include <UnitTest++.h>
 
 using namespace tightdb;
