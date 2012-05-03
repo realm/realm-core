@@ -1,10 +1,13 @@
 #include "c-table.h"
 
-#include "Table.hpp"
-#include "Group.hpp"
+#include "table.hpp"
+#include "group.hpp"
 #include "query.hpp"
+#include "date.hpp"
 #include <cstdarg>
 #include <assert.h>
+
+using tightdb::Date;
 
 /*
 C1X will be getting support for type generic expressions they look like this:
@@ -35,9 +38,9 @@ Mixed *mixed_new_bool(bool value) {
     return new Mixed(value);
 }
 Mixed *mixed_new_date(time_t value) {
-    return new Mixed(value);
+    return new Mixed(Date(value));
 }
-Mixed *mixed_new_int64(int64_t value) {
+Mixed *mixed_new_int(int64_t value) {
     return new Mixed(value);
 }
 Mixed *mixed_new_string(const char* value) {
@@ -282,7 +285,7 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap) {
 			break;
 		case COLUMN_TYPE_MIXED:
 			{
-				Mixed v = va_arg(ap, Mixed);
+				Mixed* const v = va_arg(ap, Mixed*);
 				t->InsertMixed(i, ndx, v);
 			}
 			break;
@@ -485,7 +488,7 @@ void tableview_set_mixed(TableView* tv, size_t column_id, size_t ndx, Mixed valu
 void tableview_clear_table(TableView* tv, size_t column_id, size_t ndx) {
     tv->ClearTable(column_id, ndx);
 }
-
+*/
 
 /* Search and sort */
 

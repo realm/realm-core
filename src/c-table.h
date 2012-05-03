@@ -42,6 +42,7 @@ using tightdb::Spec;
 using tightdb::Group;
 using tightdb::Query;
 using tightdb::Mixed;
+
 // FIXME: Add later: using tightdb::BinaryData;
 
 extern "C" {
@@ -123,7 +124,7 @@ typedef struct Query Query;
 	/* Creating and deleting tables */
 	Table*      table_new();
 	void        table_delete(Table* t);     /* Delete after use of table_new() */
-    void        table_unbind(Table* t);     /* Ref-count delete of table* from table_get_table(..)
+    void        table_unbind(Table* t);     /* Ref-count delete of table* from table_get_table(..) */
 	
 	/* Specify table */
     Spec*       table_get_spec(Table* t);     /* Use spec_delete() when done */
