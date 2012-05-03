@@ -171,7 +171,7 @@ void table_optimize(Table* t) {
     t->optimize();
 }
 
-void table_delete_row(Table* t, size_t ndx) {
+void table_remove(Table* t, size_t ndx) {
 	t->remove(ndx);
 }
 
