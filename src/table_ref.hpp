@@ -80,15 +80,7 @@ public:
      * Allow comparison between related reference types.
      */
     template<class U> bool operator==(const BasicTableRef<U>&) const;
-
-    /**
-     * Allow comparison between related reference types.
-     */
     template<class U> bool operator!=(const BasicTableRef<U>&) const;
-
-    /**
-     * Allow comparison between related reference types.
-     */
     template<class U> bool operator<(const BasicTableRef<U>&) const;
 
     /**
