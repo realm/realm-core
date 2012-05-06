@@ -88,6 +88,7 @@
     <ClCompile Include="test\testtableview.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="src\query.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\group.hpp">
@@ -116,7 +117,6 @@
     <ClInclude Include="src\column_tpl.hpp" />
     <ClInclude Include="src\column_type.hpp" />
     <ClInclude Include="src\c-table.h" />
-    <ClInclude Include="src\c-tightdb.h" />
     <ClInclude Include="src\date.hpp" />
     <ClInclude Include="src\group_writer.hpp" />
     <ClInclude Include="src\index.hpp" />
@@ -144,6 +144,7 @@
     <ClInclude Include="test\large_tests\verified_string.hpp">
       <Filter>large_tests</Filter>
     </ClInclude>
+    <ClInclude Include="src\tightdb-c.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">

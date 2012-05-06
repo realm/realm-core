@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "../../src/tightdb.hpp"
+#include "../../include/tightdb.hpp"
 #include "../../test/UnitTest++/src/UnitTest++.h"
 #include "../../test/UnitTest++/src/Win32/TimeHelpers.h"
 #include "../Support/mem.hpp"

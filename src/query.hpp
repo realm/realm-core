@@ -26,7 +26,8 @@
 #include <stdio.h>
 #include <limits.h>
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-    #include "win32/pthread/pthread.h"    
+    #include "win32/pthread/pthread.h"
+    #include "win32/stdint.h"
 #else
     #include <pthread.h>
 #endif
