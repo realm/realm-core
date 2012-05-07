@@ -11,9 +11,9 @@ CONFIG_MK = $(ROOT)/config.mk
 include $(CONFIG_MK)
 
 CXXFLAGS           ?= $(CXXFLAGS_COMMON)
-CXXFLAGS_COMMON_2   = -pthread $(CXXFLAGS) -I../UnitTest++/src
-CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src
-CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src
+CXXFLAGS_COMMON_2   = -pthread $(CXXFLAGS) -I../UnitTest++/src -I$(ROOT)/src -I$(ROOT)/include
+CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2)
+CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2)
 LDFLAGS             = -pthread -lproc -L../UnitTest++ -lUnitTest++
 
 SOURCES             = $(wildcard *.cpp)

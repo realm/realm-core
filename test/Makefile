@@ -12,9 +12,9 @@ include $(CONFIG_MK)
 
 CXXFLAGS           ?= $(CXXFLAGS_COMMON)
 CXXFLAGS_COMMON_2   = -pthread $(CXXFLAGS) -IUnitTest++/src
-CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src
-CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src
-CXXFLAGS_COVERAGE  += $(CXXFLAGS_COMMON_2) -I$(abspath $(ROOT)/src)
+CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src -I$(ROOT)/include
+CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src -I$(ROOT)/include
+CXXFLAGS_COVERAGE  += $(CXXFLAGS_COMMON_2) -I$(abspath $(ROOT)/src) -I$(abspath $(ROOT)/include)
 LDFLAGS             = -pthread -LUnitTest++ -lUnitTest++
 
 SOURCES             = $(wildcard *.cpp large_tests/*.cpp)
