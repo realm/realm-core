@@ -194,7 +194,7 @@ bool Group::has_table(const char* name) const
     return (n != (size_t)-1);
 }
 
-TableRef Group::get_table(const char* name)
+Table* Group::get_table_ptr(const char* name)
 {
     const size_t n = m_tableNames.find_first(name);
 
@@ -207,11 +207,11 @@ TableRef Group::get_table(const char* name)
         m_tableNames.add(name);
         m_cachedtables.add((intptr_t)t);
 
-        return t->get_table_ref();
+        return t;
     }
     else {
         // Get table from cache if exists, else create
-        return get_table(n).get_table_ref();
+        return &get_table(n);
     }
 }
 

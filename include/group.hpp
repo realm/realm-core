@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef __TIGHTDB_GROUP__
-#define __TIGHTDB_GROUP__
+#ifndef TIGHTDB_GROUP_H
+#define TIGHTDB_GROUP_H
 
 #include "table.hpp"
 #include "../src/alloc_slab.hpp"
@@ -101,13 +101,27 @@ protected:
     Array m_freeLengths;
     Array m_cachedtables;
     bool m_isValid;
+
+private:
+    Table* get_table_ptr(const char* name);
+    template<class T> T* get_table_ptr(const char* name);
 };
 
 
 
-// Templates
+// Implementation
 
-template<class T> BasicTableRef<T> Group::get_table(const char* name)
+inline TableRef Group::get_table(const char* name)
+{
+    return get_table_ptr(name)->get_table_ref();
+}
+
+template<class T> inline BasicTableRef<T> Group::get_table(const char* name)
+{
+    return get_table_ptr<T>(name)->get_table_ref();
+}
+
+template<class T> T* Group::get_table_ptr(const char* name)
 {
     const size_t n = m_tableNames.find_first(name);
     if (n == size_t(-1)) {
@@ -120,11 +134,11 @@ template<class T> BasicTableRef<T> Group::get_table(const char* name)
         m_tableNames.add(name);
         m_cachedtables.add(intptr_t(t));
 
-        return t->get_table_ref();
+        return t;
     }
     else {
         // Get table from cache if exists, else create
-        return static_cast<T&>(get_table(n)).get_table_ref();
+        return static_cast<T*>(&get_table(n));
     }
 }
 
@@ -168,4 +182,4 @@ void Group::to_json(S& out)
 
 } // namespace tightdb
 
-#endif //__TIGHTDB_GROUP__
+#endif // TIGHTDB_GROUP_H
