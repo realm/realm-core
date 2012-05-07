@@ -214,4 +214,5 @@ struct Table##Spec: tightdb::SpecBase { \
 }; \
 typedef tightdb::BasicTable<Table##Spec> Table;
 
+
 #endif // __TIGHTDB_H
