@@ -158,7 +158,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -180,7 +180,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -204,7 +204,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -230,7 +230,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -254,7 +254,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -278,7 +278,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>include;include\impl;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -297,6 +297,9 @@
       <TargetMachine>MachineX86</TargetMachine>
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <Lib>
+      <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Midl>
@@ -305,7 +308,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>include;include\impl;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -316,13 +319,13 @@
       <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>x64\Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>WS2_32.lib;x64\Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX64</TargetMachine>
-      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions> %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">
@@ -332,7 +335,7 @@
     <ClCompile>
       <Optimization>Full</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>include;include\impl;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>false</FunctionLevelLinking>
@@ -372,33 +375,88 @@
     <ClCompile Include="src\group.cpp" />
     <ClCompile Include="src\group_writer.cpp" />
     <ClCompile Include="src\index.cpp" />
+    <ClCompile Include="src\query.cpp" />
     <ClCompile Include="src\spec.cpp" />
     <ClCompile Include="src\table.cpp" />
     <ClCompile Include="src\table_view.cpp" />
     <ClCompile Include="src\utf8.cpp" />
     <ClCompile Include="src\utilities.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c" />
-    <ClCompile Include="test\large_tests\test_column.cpp" />
-    <ClCompile Include="test\large_tests\test_strings.cpp" />
-    <ClCompile Include="test\large_tests\verified_integer.cpp" />
-    <ClCompile Include="test\large_tests\verified_string.cpp" />
-    <ClCompile Include="test\main.cpp" />
-    <ClCompile Include="test\testalloc.cpp" />
-    <ClCompile Include="test\testarray.cpp" />
-    <ClCompile Include="test\testarrayblob.cpp" />
-    <ClCompile Include="test\testarraystring.cpp" />
-    <ClCompile Include="test\testarraystringlong.cpp" />
-    <ClCompile Include="test\testcolumn.cpp" />
-    <ClCompile Include="test\testcolumnbinary.cpp" />
-    <ClCompile Include="test\testcolumnmixed.cpp" />
-    <ClCompile Include="test\testcolumnstring.cpp" />
-    <ClCompile Include="test\testearraybinary.cpp" />
-    <ClCompile Include="test\testgroup.cpp" />
-    <ClCompile Include="test\testindex.cpp" />
-    <ClCompile Include="test\testquery.cpp" />
-    <ClCompile Include="test\testtable.cpp" />
-    <ClCompile Include="test\testtableview.cpp" />
-    <ClCompile Include="test\test_c_api.c" />
+    <ClCompile Include="test\large_tests\test_column.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\large_tests\test_strings.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\large_tests\verified_integer.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\large_tests\verified_string.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\main.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testalloc.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testarray.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testarrayblob.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testarraystring.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testarraystringlong.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testcolumn.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testcolumnbinary.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testcolumnmixed.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testcolumnstring.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testearraybinary.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testgroup.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testindex.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testquery.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testtable.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testtableview.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\test_c_api.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\group.hpp" />
@@ -412,7 +470,6 @@
     <ClInclude Include="src\array_string.hpp" />
     <ClInclude Include="src\array_string_long.hpp" />
     <ClInclude Include="src\c-table.h" />
-    <ClInclude Include="src\c-tightdb.h" />
     <ClInclude Include="src\column.hpp" />
     <ClInclude Include="src\column_binary.hpp" />
     <ClInclude Include="src\column_fwd.hpp" />
@@ -435,12 +492,25 @@
     <ClInclude Include="src\table_basic.hpp" />
     <ClInclude Include="src\table_ref.hpp" />
     <ClInclude Include="src\table_view.hpp" />
+    <ClInclude Include="src\tightdb-c.h" />
     <ClInclude Include="src\utf8.hpp" />
     <ClInclude Include="src\utilities.hpp" />
     <ClInclude Include="src\win32\pthread\pthread.h" />
-    <ClInclude Include="test\large_tests\verified_integer.hpp" />
-    <ClInclude Include="test\large_tests\verified_string.hpp" />
-    <ClInclude Include="test\testsettings.hpp" />
+    <ClInclude Include="test\large_tests\verified_integer.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="test\large_tests\verified_string.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="test\testsettings.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+    </ClInclude>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,8 +1,13 @@
 #define _CRT_SECURE_NO_WARNINGS
 
+#define TEST_PASSED 0
+#define TEST_FAILED -1
+
+#if 0
+
 #include <string.h>
 #include <cstdio>
-#include "c-tightdb.h"
+#include "../src/c-tightdb.h"
 
 
 #define TEST_DATA_ROWS 256     // Rows of test data
@@ -12,8 +17,6 @@
 #define BOOL_COL 1
 #define STRING_COL 2
 
-#define TEST_PASSED 0
-#define TEST_FAILED -1
 
 /****************************/
 // TODO Test all methods...
@@ -21,7 +24,7 @@
 // get/set for bool, date, binary, mixed (table)
 
 /***********************************************************/
-#if 0
+
 // Test data
 tdb_type_int int_data[TEST_DATA_ROWS];
 tdb_type_bool bool_data[TEST_DATA_ROWS];
@@ -29,8 +32,8 @@ char str[20];
 
 
 TIGHTDB_TABLE_2(mytable, 
-                MyInt, int, 
-                MyStr, string)
+                MyInt, Int, 
+                MyStr, String)
 
 int c_test_1() {
     bool passed = true;

@@ -21,9 +21,7 @@
 #define __TDB_CTABLE__
 
 /* TODO:
- rename .h ->.hpp
- 
- MyTable_(...)
+  MyTable_(...)
     setCOL, getCOL,
      queryCOL
  

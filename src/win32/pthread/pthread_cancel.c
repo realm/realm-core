@@ -194,7 +194,7 @@ pthread_cancel (pthread_t thread)
 	       * the threadH arg will be used.
 	       */
 //	      ptw32_register_cancelation (ptw32_cancel_callback, threadH, 0);
-		  assert(false);
+		  assert(0);
 	      (void) pthread_mutex_unlock (&tp->cancelLock);
 	      ResumeThread (threadH);
 	    }
