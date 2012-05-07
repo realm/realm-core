@@ -145,6 +145,7 @@
       <Filter>large_tests</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb-c.h" />
+    <ClInclude Include="src\api-helper.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="large_tests">

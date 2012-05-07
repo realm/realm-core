@@ -7,7 +7,7 @@
 #include <cstdarg>
 #include <assert.h>
 
-using tightdb::Date;
+using namespace tightdb;
 
 /*
 C1X will be getting support for type generic expressions they look like this:
@@ -16,19 +16,40 @@ C1X will be getting support for type generic expressions they look like this:
                               float: cbrtf)(X)
 */
 
-// Internal helper functions to gain access to protected/private methods in Table:
+// Internal helper functions to gain access to protected/private methods in Table/Group/TableView:
 namespace tightdb {
+
 void TableHelper_unbind(Table* t) {
    t->unbind_ref();
 }
-Table* TableHelper_get_subtable_ptr(Table* t, std::size_t col_idx, std::size_t row_idx) {
-    return t->get_subtable_ptr(col_idx, row_idx);
+void TableHelper_bind(Table* t) {
+   t->bind_ref();
 }
-const Table* TableHelper_get_const_subtable_ptr(const Table* t, std::size_t col_idx, std::size_t row_idx) {
-    return t->get_subtable_ptr(col_idx, row_idx);
+Table* TableHelper_get_subtable_ptr(Table* t, size_t column_ndx, size_t row_ndx) {
+    Table* tbl = t->get_subtable_ptr(column_ndx, row_ndx);
+    TableHelper_bind(tbl);
+    return tbl;
 }
 
+#if 0
+const Table* TableHelper_get_const_subtable_ptr(const Table* t, size_t column_ndx, size_t row_ndx) {
+    const Table* subtable = t->get_subtable_ptr(column_ndx, row_ndx);
+    TableHelper_bind(subtable);
+    return subtable;
 }
+#endif
+
+Table* ViewHelper_get_table_ptr(TableView* tv, size_t column_ndx, size_t row_ndx) {
+    return TableHelper_get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
+}
+
+Table* GroupHelper_get_table_ptr(Group* grp, const char* name) {
+    Table* tbl = grp->get_table_ptr(name);
+    TableHelper_bind(tbl);
+    return tbl;    
+}
+
+} // namespace tightdb
 
 extern "C" {
 
@@ -131,8 +152,7 @@ Spec* table_get_spec(Table* t) {
     return new Spec(t->get_spec());
 }
 
-void table_update_from_spec(Table* t, size_t ref_specSet) { // FIXME: Second argument is obsolete and should be removed
-    static_cast<void>(ref_specSet);
+void table_update_from_spec(Table* t) {
     t->update_from_spec();
 }
 
@@ -212,13 +232,13 @@ ColumnType table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx) {
     return t->get_mixed_type(column_ndx, ndx);
 }
 
-Table* table_get_table(Table* t, size_t column_ndx, size_t ndx) {
-    return TableHelper_get_subtable_ptr(t, column_ndx, ndx); 
+
+Table* table_get_subtable(Table* t, size_t col_idx, size_t row_idx)
+{
+    Table* subtable = TableHelper_get_subtable_ptr(t, col_idx, row_idx);
+    return subtable;
 }
 
-const Table* table_get_ctable(const Table* t, size_t column_ndx, size_t ndx) {
-    return TableHelper_get_const_subtable_ptr(t, column_ndx, ndx); 
-}
 
 /*** Setters *******/
 

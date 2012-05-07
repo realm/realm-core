@@ -144,7 +144,7 @@ typedef struct Query Query;
 	
 	/* Specify table */
     Spec*       table_get_spec(Table* t);     /* Use spec_delete() when done */
-    void        table_update_from_spec(Table* t, size_t ref_specSet);
+    void        table_update_from_spec(Table* t);
     size_t      table_register_column(Table* t, ColumnType type, const char* name);
 	
     /* Column meta information */

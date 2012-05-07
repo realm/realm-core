@@ -71,8 +71,6 @@ public:
 
     void sort(size_t column, bool Ascending = true);
 
-
-
     // Get row index in the source table this view is "looking" at.
     size_t get_source_ndx(size_t row_ndx) const {return m_refs.GetAsRef(row_ndx);}
 

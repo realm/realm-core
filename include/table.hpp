@@ -251,6 +251,7 @@ private:
     template<class> friend class BasicTableRef;
     friend class ColumnSubtableParent;
     friend void TableHelper_unbind(Table* t);
+    friend void TableHelper_bind(Table* t);
 
     mutable size_t m_ref_count;
     void bind_ref() const { ++m_ref_count; }

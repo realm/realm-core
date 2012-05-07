@@ -186,7 +186,8 @@ const Spec& Table::get_spec() const
 void Table::InstantiateBeforeChange()
 {
     // Empty (zero-ref'ed) tables need to be instantiated before first modification
-    if (!m_columns.IsValid()) CreateColumns();
+    if (!m_columns.IsValid()) 
+        CreateColumns();
 }
 
 void Table::CacheColumns()
@@ -233,7 +234,6 @@ void Table::CacheColumns()
             case COLUMN_TYPE_TABLE:
             {
                 const size_t ref_specSet = m_spec_set.get_subspec_ref(subtable_count);
-
                 newColumn = new ColumnTable(ref, ref_specSet, &m_columns, column_ndx, alloc, this);
                 colsize = ((ColumnTable*)newColumn)->Size();
                 ++subtable_count;
@@ -267,8 +267,10 @@ void Table::CacheColumns()
 
         // Set table size
         // (and verify that all column are same length)
-        if (size == (size_t)-1) size = colsize;
-        else assert(size == colsize);
+        if (size == (size_t)-1) 
+            size = colsize;
+        else 
+            assert(size == colsize);
 
         ++column_ndx;
     }
