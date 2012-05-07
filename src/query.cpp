@@ -39,19 +39,19 @@ Query& Query::equal(size_t column_ndx, int64_t value)
     ParentNode* const p = new NODE<int64_t, Column, EQUAL>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
-};
+}
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new NODE<int64_t, Column, NOTEQUAL>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
-};
+}
 Query& Query::greater(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new NODE<int64_t, Column, GREATER>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
-};
+}
 Query& Query::greater_equal(size_t column_ndx, int64_t value)
 {
     if(value > LLONG_MIN) {
@@ -60,7 +60,7 @@ Query& Query::greater_equal(size_t column_ndx, int64_t value)
     }
     // field >= LLONG_MIN has no effect
     return *this;
-};
+}
 Query& Query::less_equal(size_t column_ndx, int64_t value)
 {
     if(value < LLONG_MAX) {
@@ -69,26 +69,26 @@ Query& Query::less_equal(size_t column_ndx, int64_t value)
     }
     // field <= LLONG_MAX has no effect
     return *this;
-};
+}
 Query& Query::less(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new NODE<int64_t, Column, LESS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
-};
+}
 
 Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 {
     greater_equal(column_ndx, from);
     less_equal(column_ndx, to);
     return *this;
-};
+}
 Query& Query::equal(size_t column_ndx, bool value)
 {
     ParentNode* const p = new NODE<bool, Column, EQUAL>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
-};
+}
 
 
 // STRINGS
@@ -101,7 +101,7 @@ Query& Query::equal(size_t column_ndx, const char* value, bool caseSensitive)
         p = new STRINGNODE<EQUAL_INS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
-};
+}
 Query& Query::begins_with(size_t column_ndx, const char* value, bool caseSensitive)
 {
     ParentNode* p;
@@ -111,7 +111,7 @@ Query& Query::begins_with(size_t column_ndx, const char* value, bool caseSensiti
         p = new STRINGNODE<BEGINSWITH_INS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
-};
+}
 Query& Query::ends_with(size_t column_ndx, const char* value, bool caseSensitive)
 {
     ParentNode* p;
@@ -121,7 +121,7 @@ Query& Query::ends_with(size_t column_ndx, const char* value, bool caseSensitive
         p = new STRINGNODE<ENDSWITH_INS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
-};
+}
 Query& Query::contains(size_t column_ndx, const char* value, bool caseSensitive)
 {
     ParentNode* p;
@@ -131,7 +131,7 @@ Query& Query::contains(size_t column_ndx, const char* value, bool caseSensitive)
         p = new STRINGNODE<CONTAINS_INS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
-};
+}
 Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive)
 {
     ParentNode* p;
@@ -141,21 +141,21 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
         p = new STRINGNODE<NOTEQUAL_INS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
-};
+}
 
 void Query::group()
 {
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
-};
+}
 void Query::Or()
 {
     ParentNode* const o = new OR_NODE(first[first.size()-1]);
     first[first.size()-1] = o;
     update[update.size()-1] = &((OR_NODE*)o)->m_cond2;
     update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
-};
+}
 
 void Query::subtable(size_t column)
 {
@@ -198,7 +198,7 @@ void Query::end_group()
     first.pop_back();
     update.pop_back();
     update_override.pop_back();
-};
+}
 
 size_t Query::find_next(Table& table, size_t lastmatch) {
     if (lastmatch == (size_t)-1) Init(table);

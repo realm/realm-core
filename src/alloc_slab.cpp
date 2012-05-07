@@ -317,7 +317,7 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
         // pre-alloc initial space when mmapping
         len = 1024*1024;
         ftruncate(m_fd, len);
-	}
+    }
 
     // Verify that data is 64bit aligned
     if ((len & 0x7) != 0) return false;

@@ -131,7 +131,8 @@ Spec* table_get_spec(Table* t) {
     return new Spec(t->get_spec());
 }
 
-void table_update_from_spec(Table* t, size_t ref_specSet) {
+void table_update_from_spec(Table* t, size_t ref_specSet) { // FIXME: Second argument is obsolete and should be removed
+    static_cast<void>(ref_specSet);
     t->update_from_spec();
 }
 
