@@ -35,9 +35,9 @@ enum Days {
 };
 
 TIGHTDB_TABLE_4(TestTable,
-                first,  int,
-                second, string,
-                third,  int,
+                first,  Int,
+                second, String,
+                third,  Int,
                 fourth, Enum<Days>)
 
 int main()
