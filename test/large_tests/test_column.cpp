@@ -1,10 +1,11 @@
+#include "../testsettings.hpp"
+
 #if TEST_DURATION > 0
 
 #include "column.hpp"
 #include <UnitTest++.h>
 #include <vector>
 #include <algorithm>
-#include "../testsettings.hpp"
 #include "verified_integer.hpp"
 
 using namespace tightdb;
@@ -46,7 +47,7 @@ TEST(Column_monkeytest2)
                 a.find_first(rand2(current_bitwidth));
                 a.find_all(res, rand2(current_bitwidth));
                 size_t start = rand2() % (a.Size() + 1);
-                a.sum(start, start + rand2() % (a.Size() + 1 - start));
+                a.Sum(start, start + rand2() % (a.Size() + 1 - start));
                 a.maximum(start, start + rand2() % (a.Size() + 1 - start));
                 a.minimum(start, start + rand2() % (a.Size() + 1 - start));
             }
