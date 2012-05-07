@@ -10,7 +10,7 @@
 
 using namespace tightdb;
 
-string randstring(void);
+std::string randstring(void);
 
 namespace {
 
@@ -27,14 +27,14 @@ uint64_t rand2(int bitwidth = 64)
 
 }
 
-string randstring(void)
+std::string randstring(void)
 {
     // If there are in the order of MAX_LIST_SIZE different strings, then we'll get a good
     // distribution btw. arrays with no matches and arrays with multiple matches, when
     // testing Find/FindAll
     int64_t t = (rand() % 100) * 100;
     size_t len = (rand() % 10) * 100 + 1;
-    string s;
+    std::string s;
     while(s.length() < len)
         s += number_name(t);
 
