@@ -501,7 +501,7 @@ void Column::sort(size_t start, size_t end)
     Array arr;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
     for (size_t t = 0; t < arr.Size(); t++) {
-        const size_t ref = arr.GetAsRef(t);
+        const size_t ref = TO_REF(arr.Get(t));
         Array a(ref);
         a.sort();
     }
@@ -801,7 +801,7 @@ void Column::verify() const
             col.verify();
 
             off += col.Size();
-            const size_t node_off = offsets.GetAsRef(i);
+            const size_t node_off = (size_t)offsets.Get(i);
             if (node_off != off) {
                 assert(false);
             }
