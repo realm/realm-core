@@ -1065,6 +1065,22 @@ void Table::find_all_hamming(TableView& tv, size_t column_ndx, uint64_t value, s
     column.find_all_hamming(tv.get_ref_column(), value, max);
 }
 
+void Table::sorted(TableView& tv, size_t column_ndx, bool ascending) const
+{
+    assert(column_ndx < m_columns.Size());
+    assert(&tv.get_parent() == this);
+    
+    // Insert refs to all rows in table
+    Array& refs = tv.get_ref_column();
+    const size_t count = size();
+    for (size_t i = 0; i < count; ++i) {
+        refs.add(i);
+    }
+    
+    // Sort the refs based on the given column
+    tv.sort(column_ndx, ascending);
+}
+
 void Table::optimize()
 {
     const size_t column_count = get_column_count();
