@@ -122,6 +122,7 @@ public:
     void    find_all_bool(TableView& tv, size_t column_ndx, bool value);
     void    find_all_date(TableView& tv, size_t column_ndx, time_t value);
     void    find_all_string(TableView& tv, size_t column_ndx, const char *value);
+    void    sorted(TableView& tv, size_t column_ndx, bool ascending=true) const;
     
     // Optimizing
     void optimize();

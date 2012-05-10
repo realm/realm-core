@@ -144,10 +144,10 @@ public:
     bool Insert(size_t ndx, int64_t value);
     bool add(int64_t value);
     bool Set(size_t ndx, int64_t value);
-    template <size_t w> void Set(size_t ndx, int64_t value);
+    template<size_t w> void Set(size_t ndx, int64_t value);
     int64_t Get(size_t ndx) const;
     size_t GetAsRef(size_t ndx) const;
-    template <size_t w>int64_t Get(size_t ndx) const;
+    template<size_t w> int64_t Get(size_t ndx) const;
     int64_t operator[](size_t ndx) const {return Get(ndx);}
     int64_t back() const;
     void Delete(size_t ndx);
@@ -201,7 +201,7 @@ public:
     template<class S> size_t Write(S& target, bool recurse=true, bool persist=false) const;
     template<class S> void WriteAt(size_t pos, S& out) const;
     size_t GetByteSize() const {return CalcByteLen(m_len, m_width);}
-    std::vector<int64_t> ToVector(void);
+    std::vector<int64_t> ToVector(void) const;
 
     // Debug
     size_t GetBitWidth() const {return m_width;}
@@ -218,10 +218,10 @@ private:
     template <size_t w>bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max);
     Array& operator=(const Array&) {return *this;} // not allowed
     void SetBounds(size_t width);
-    template <size_t w>void QuickSort(size_t lo, size_t hi);
+    template<size_t w> void QuickSort(size_t lo, size_t hi);
     void QuickSort(size_t lo, size_t hi);
     void ReferenceQuickSort(Array &ref);
-    template <size_t w>void ReferenceQuickSort(size_t lo, size_t hi, Array &ref);
+    template<size_t w> void ReferenceQuickSort(size_t lo, size_t hi, Array &ref);
 #if defined(USE_SSE42) || defined(USE_SSE3)
     size_t FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const;
 #endif //USE_SSE
