@@ -22,24 +22,24 @@
 
 #include <stdlib.h>
 
-enum ColumnType {
+enum ColumnType {           // Can't change order or numbers for serialization compatibility
     // Single ref
-    COLUMN_TYPE_INT,
-    COLUMN_TYPE_BOOL,
-    COLUMN_TYPE_STRING,
-    COLUMN_TYPE_DATE,
-    COLUMN_TYPE_BINARY,
-    COLUMN_TYPE_TABLE,
-    COLUMN_TYPE_MIXED,
+    COLUMN_TYPE_INT         = 0,
+    COLUMN_TYPE_BOOL        = 1,
+    COLUMN_TYPE_STRING      = 2,
+    COLUMN_TYPE_DATE        = 3,
+    COLUMN_TYPE_BINARY      = 4,
+    COLUMN_TYPE_TABLE       = 5,
+    COLUMN_TYPE_MIXED       = 6,
 
     // Double refs
-    COLUMN_TYPE_STRING_ENUM,
+    COLUMN_TYPE_STRING_ENUM = 7,
 
     // Attributes
-    COLUMN_ATTR_INDEXED,
-    COLUMN_ATTR_UNIQUE,
-    COLUMN_ATTR_SORTED,
-    COLUMN_ATTR_NONE
+    COLUMN_ATTR_INDEXED     = 8,
+    COLUMN_ATTR_UNIQUE      = 9,
+    COLUMN_ATTR_SORTED      = 10,
+    COLUMN_ATTR_NONE        = 11
 };
 
 struct BinaryData {
