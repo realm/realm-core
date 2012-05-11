@@ -365,7 +365,8 @@ int64_t Array::Get(size_t ndx) const
 size_t Array::GetAsRef(size_t ndx) const
 {
     assert(ndx < m_len);
-    int64_t v = (this->*m_getter)(ndx);
+    assert(m_hasRefs);
+    const int64_t v = (this->*m_getter)(ndx);
     return TO_REF(v);
 }
 
@@ -1668,7 +1669,7 @@ void Array::ReferenceQuickSort(Array& ref)
 
 
 
-template <size_t w>void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref)
+template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref)
 {
     // Quicksort based on
     // http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
@@ -1701,17 +1702,18 @@ template <size_t w>void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& r
     // Templated get/set: 2.40 sec (todo, enable again)
     // comparison element x
     const size_t ndx = (lo + hi)/2;
-    const int64_t x = Get(ref.GetAsRef(ndx));
+    const size_t target_ndx = (size_t)ref.Get(ndx);
+    const int64_t x = Get(target_ndx);
 
     // partition
     do {
-        while (Get(ref.GetAsRef(i)) < x) i++;
-        while (Get(ref.GetAsRef(j)) > x) j--;
+        while (Get((size_t)ref.Get(i)) < x) ++i;
+        while (Get((size_t)ref.Get(j)) > x) --j;
         if (i <= j) {
-            size_t h = ref.GetAsRef(i);
+            const size_t h = (size_t)ref.Get(i);
             ref.Set(i, ref.Get(j));
             ref.Set(j, h);
-            i++; j--;
+            ++i; --j;
         }
     } while (i <= j);
 
@@ -1726,7 +1728,7 @@ void Array::QuickSort(size_t lo, size_t hi)
     TEMPEX(QuickSort, (lo, hi);)
 }
 
-template <size_t w>void Array::QuickSort(size_t lo, size_t hi) {
+template<size_t w> void Array::QuickSort(size_t lo, size_t hi) {
     // Quicksort based on
     // http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
     int i = (int)lo;
@@ -1738,13 +1740,13 @@ template <size_t w>void Array::QuickSort(size_t lo, size_t hi) {
 
     // partition
     do {
-        while (Get(i) < x) i++;
-        while (Get(j) > x) j--;
+        while (Get(i) < x) ++i;
+        while (Get(j) > x) --j;
         if (i <= j) {
             const int64_t h = Get(i);
             Set(i, Get(j));
             Set(j, h);
-            i++; j--;
+            ++i; --j;
         }
     } while (i <= j);
 
@@ -1753,9 +1755,10 @@ template <size_t w>void Array::QuickSort(size_t lo, size_t hi) {
     if (i < (int)hi) QuickSort(i, hi);
 }
 
-std::vector<int64_t> Array::ToVector(void) {
+std::vector<int64_t> Array::ToVector(void) const {
     std::vector<int64_t> v;
-    for(size_t t = 0; t < Size(); t++)
+    const size_t count = Size();
+    for(size_t t = 0; t < count; ++t)
         v.push_back(Get(t));
     return v;
 }

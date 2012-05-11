@@ -48,7 +48,7 @@ const char* ArrayBinary::Get(size_t ndx) const
 {
     assert(ndx < m_offsets.Size());
 
-    const size_t offset = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
+    const size_t offset = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     return m_blob.Get(offset);
 }
 
@@ -56,8 +56,8 @@ size_t ArrayBinary::GetLen(size_t ndx) const
 {
     assert(ndx < m_offsets.Size());
 
-    const size_t start = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
-    const size_t end = m_offsets.GetAsRef(ndx);
+    const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
+    const size_t end = (size_t)m_offsets.Get(ndx);
 
     return end - start;
 }
@@ -75,8 +75,8 @@ void ArrayBinary::Set(size_t ndx, const char* value, size_t len)
     assert(ndx < m_offsets.Size());
     assert(len == 0 || value);
 
-    const size_t start = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
-    const size_t current_end = m_offsets.GetAsRef(ndx);
+    const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
+    const size_t current_end = (size_t)m_offsets.Get(ndx);
     const ssize_t diff =  (start + len) - current_end;
 
     m_blob.Replace(start, current_end, value, len);
@@ -88,7 +88,7 @@ void ArrayBinary::Insert(size_t ndx, const char* value, size_t len)
     assert(ndx <= m_offsets.Size());
     assert(len == 0 || value);
 
-    const size_t pos = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
+    const size_t pos = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
 
     m_blob.Insert(pos, value, len);
     m_offsets.Insert(ndx, pos + len);
@@ -99,8 +99,8 @@ void ArrayBinary::Delete(size_t ndx)
 {
     assert(ndx < m_offsets.Size());
 
-    const size_t start = ndx ? m_offsets.GetAsRef(ndx-1) : 0;
-    const size_t end = m_offsets.GetAsRef(ndx);
+    const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
+    const size_t end = (size_t)m_offsets.Get(ndx);
 
     m_blob.Delete(start, end);
     m_offsets.Delete(ndx);
