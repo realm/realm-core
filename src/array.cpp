@@ -1243,6 +1243,49 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const
     return total_bits / width;
 }
 
+bool Array::Copy(const Array& a)
+{
+    // Calculate size in bytes (plus a bit of extra room for expansion)
+    size_t len = CalcByteLen(a.m_len, a.m_width);
+    const size_t rest = (~len & 0x7)+1;
+    if (rest < 8) len += rest; // 64bit blocks
+    const size_t new_len = len + 64;
+    
+    // Create new copy of array
+    const MemRef mref = m_alloc.Alloc(new_len);
+    if (!mref.pointer) return false;
+    memcpy(mref.pointer, a.m_data-8, len);
+    
+    // Clear old contents
+    Destroy();
+    
+    // Update internal data
+    UpdateRef(mref.ref);
+    set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
+    
+    // Copy sub-arrays as well
+    if (m_hasRefs) {
+        for (size_t i = 0; i < m_len; ++i) {
+            const size_t ref = (size_t)Get(i);
+            
+            // null-refs signify empty sub-trees
+            if (ref == 0) continue;
+            
+            // all refs are 64bit aligned, so the lowest bits
+            // cannot be set. If they are it means that it should
+            // not be interpreted as a ref
+            if (ref & 0x1) continue;
+            
+            const Array sub(ref, NULL, 0, a.m_alloc);
+            Array cp(m_alloc);
+            cp.SetParent(this, i);
+            cp.Copy(sub);
+        }
+    }
+    
+    return true;
+}
+
 bool Array::CopyOnWrite()
 {
     if (!m_alloc.IsReadOnly(m_ref)) return true;

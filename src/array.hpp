@@ -123,6 +123,7 @@ public:
     virtual ~Array();
 
     bool operator==(const Array& a) const;
+    bool Copy(const Array& a);
 
     void SetType(ColumnDef type);
     void UpdateRef(size_t ref);
