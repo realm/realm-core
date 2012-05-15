@@ -29,7 +29,7 @@
 
 // Has to be define to allow overload from build settings
 #ifndef MAX_LIST_SIZE
-#define MAX_LIST_SIZE 1000
+#define MAX_LIST_SIZE 10000
 #endif
 
 namespace tightdb {
@@ -175,7 +175,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         if (nc.type == NodeChange::CT_SPLIT) {
             // update offset for left node
             const size_t newsize = target.Size();
-            const size_t preoffset = node_ndx ? offsets.GetAsRef(node_ndx-1) : 0;
+            const size_t preoffset = node_ndx ? TO_REF(offsets.Get(node_ndx-1)) : 0;
             offsets.Set(node_ndx, preoffset + newsize);
 
             newNode.NodeAdd<C>(nc.ref2);
@@ -248,11 +248,11 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
     const C new_col(new_ref, NULL, 0, m_array->GetAllocator());
 
     // Update original size
-    const size_t offset = ndx ? offsets.GetAsRef(ndx-1) : 0;
+    const size_t offset = ndx ? TO_REF(offsets.Get(ndx-1)) : 0;
     const size_t newSize = orig_col.Size();
     const size_t newOffset = offset + newSize;
 #ifdef _DEBUG
-    const size_t oldSize = offsets.GetAsRef(ndx) - offset;
+    const size_t oldSize = TO_REF(offsets.Get(ndx)) - offset;
 #endif
     offsets.Set(ndx, newOffset);
 

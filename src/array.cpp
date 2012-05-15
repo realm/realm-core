@@ -749,7 +749,9 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
         return (size_t)-1;
 
     const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));
-    const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8) / 8) - 1;
+    const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8)) - 1;
+
+	assert((size_t)p / 8 * 8 == (size_t)p);
 
     // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
@@ -771,9 +773,9 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             const uint64_t v2 = *p ^ v; // zero matching bit segments
             const uint64_t hasZeroByte = (v2 - 0x5555555555555555ULL) & ~v2 & 0xAAAAAAAAAAAAAAAAULL;
             if( eq ?   hasZeroByte  :  !hasZeroByte     )
-                p++;
-            else
                 break;
+            else
+                p++;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
@@ -783,9 +785,9 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             const uint64_t v2 = *p ^ v; // zero matching bit segments
             const uint64_t hasZeroByte = (v2 - 0x1111111111111111ULL) & ~v2 & 0x8888888888888888ULL;
             if( eq ?   hasZeroByte  :  !hasZeroByte     )
-                p++;
-            else
                 break;
+            else
+                p++;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
@@ -795,9 +797,9 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             const uint64_t v2 = *p ^ v; // zero matching bit segments
             const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2 & 0x8080808080808080ULL;
             if( eq ?   hasZeroByte  :  !hasZeroByte     )
-                p++;
-            else
                 break;
+            else
+                p++;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
@@ -807,9 +809,9 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             const uint64_t v2 = *p ^ v; // zero matching bit segments
             const uint64_t hasZeroByte = (v2 - 0x0001000100010001ULL) & ~v2 & 0x8000800080008000ULL;
             if( eq ?   hasZeroByte  :  !hasZeroByte     )
-                p++;
-            else
                 break;
+            else
+                p++;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
@@ -819,9 +821,9 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             const uint64_t v2 = *p ^ v; // zero matching bit segments
             const uint64_t hasZeroByte = (v2 - 0x0000000100000001ULL) & ~v2 & 0x8000800080000000ULL;
             if( eq ?   hasZeroByte  :  !hasZeroByte     )
-                p++;
-            else
                 break;
+            else
+                p++;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
@@ -829,9 +831,9 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
         while(p < e) {
             int64_t v = *p;
             if( eq ?   (v == value) : (v != value))
-                p++;
-            else
                 break;
+            else
+                p++;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
@@ -912,7 +914,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
         return (size_t)-1;
 
     const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));
-    const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8) / 8) - 1;
+    const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8)) - 1;
 
     // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
@@ -934,31 +936,44 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
         }
     }
     else if (m_width == 2) {
-        int64_t constant = gt ? (~0ULL / 3 * (3 - value))   :  (   ~0UL / 3 * value );
-        while(p < e) {
-            int64_t v = *p;
-            if( gt ? (!(((v + constant) | v) & ~0ULL / 3 * 2))   :  ((v - constant) & ~v&~0UL/3*2)      )
-                p++;
-            else
-                break;
+        if(value <= 1) {
+            int64_t constant = gt ? (~0ULL / 3ULL * (3ULL - value))   :  (   ~0ULL / 3 * value );
+            while(p < e) {
+                int64_t v = *p;
+                if( gt ? (((v + constant) | v) & ~0ULL / 3ULL * 2ULL)   :  ((v - constant) & ~v&~0ULL/3ULL*2ULL)      )
+                    break;
+                else
+                    p++;
+            }
+            start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
         }
-        start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+        else {
+            while(start < end && gt ? (Get_2b(start) <= value) : (Get_2b(start) >= value))
+                start++;
+        }
     }
     else if (m_width == 4) {
-        int64_t constant = gt ? (~0ULL / 15 * (7 - value))  :   (   ~0UL / 15 * value )  ;
-        while(p < e) {
-            int64_t v = *p;
-            if(gt ? (!(((v + constant) | v) & ~0ULL / 15 * 8)) :     ((v - constant) & ~v&~0UL/15*8)    )
-                p++;
-            else
-                break;
+        if(value <= 7) {
+            int64_t constant = gt ? (~0ULL / 15ULL * (7ULL - value))  :   (   ~0ULL / 15ULL * value )  ;
+            while(p < e) {
+                int64_t v = *p;
+                int64_t yy = ((v - constant) & ~v&~0ULL/15ULL*8ULL);
+                if(gt ? (((v + constant) | v) & ~0ULL / 15ULL * 8ULL) :     ((v - constant) & ~v&~0ULL/15ULL*8ULL)    )
+                    break;
+                else
+                    p++;
+            }
+            start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
         }
-        start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+        else {
+            while(start < end && gt ? (Get_4b(start) <= value) : (Get_4b(start) >= value))
+                start++;
+        }
     }
     else if (m_width == 8) {
         // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
         if(value <= 127) {
-            int64_t constant = gt ? (~0ULL / 255 * (127 - value))   :   (        ~0UL / 255 * value           );
+            int64_t constant = gt ? (~0ULL / 255ULL * (127ULL - value))   :   (        ~0ULL / 255ULL * value           );
             while(p < e) {
                 int64_t v = *p;
                 // Bit hacks also only works for positive items in chunk, so test their sign bits
@@ -968,10 +983,10 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
                     ((char)(v>>0*8) < value || (char)(v>>1*8) < value || (char)(v>>2*8) < value || (char)(v>>3*8) < value || (char)(v>>4*8) < value || (char)(v>>5*8) < value || (char)(v>>6*8) < value || (char)(v>>7*8) < value))
                         break;
                 }
-                else if (gt ?  (!(((v + constant) | v) & ~0ULL / 255 * 128)) : (         (v - constant) & ~v&~0UL/255*128             ))
-                    p++;
-                else
+                else if (gt ?  (((v + constant) | v) & ~0ULL / 255ULL * 128ULL) : (         (v - constant) & ~v&~0ULL/255ULL*128ULL             ))
                     break;
+                else
+                    p++;
             }
             start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
         }
@@ -983,7 +998,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     }
     else if (m_width == 16) {
         if(value <= 32767) {
-            int64_t constant = gt ? (~0ULL / 65535 * (32767 - value))   :   ( ~0UL / 65535 * value);
+            int64_t constant = gt ? (~0ULL / 65535ULL * (32767ULL - value))   :   ( ~0ULL / 65535ULL * value);
             while(p < e) {
                 int64_t v = *p;
                 if(v & 0x8000800080008000ULL) {
@@ -991,10 +1006,10 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
                         ((int)(v>>0*16) < value || (int)(v>>1*16) < value || (int)(v>>2*16) < value || (int)(v>>3*16) < value))
                         break;
                 }
-                else if(gt ? (!(((v + constant) | v) & ~0ULL / 65535 * 32768)) : (!(         (v - constant) & ~v&~0UL/65535*32768        )))
-                    p++;
-                else
+                else if(gt ? (((v + constant) | v) & ~0ULL / 65535ULL * 32768ULL) : (         (v - constant) & ~v&~0ULL/65535ULL*32768ULL        ))
                     break;
+                else
+                    p++;
             }
             start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
         }
