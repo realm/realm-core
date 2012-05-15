@@ -23,7 +23,7 @@
     <ClCompile Include="src\alloc_slab.cpp" />
     <ClCompile Include="src\array.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c">
-      <Filter>pthreads</Filter>
+      <Filter>test\pthreads</Filter>
     </ClCompile>
     <ClCompile Include="test\testarrayblob.cpp">
       <Filter>test</Filter>
@@ -133,7 +133,7 @@
     <ClInclude Include="src\utf8.hpp" />
     <ClInclude Include="src\utilities.hpp" />
     <ClInclude Include="src\win32\pthread\pthread.h">
-      <Filter>pthreads</Filter>
+      <Filter>test\pthreads</Filter>
     </ClInclude>
     <ClInclude Include="test\testsettings.hpp">
       <Filter>test</Filter>
@@ -151,14 +151,14 @@
     <Filter Include="large_tests">
       <UniqueIdentifier>{3e451fa6-2e90-45e6-824f-68fe7042fbcf}</UniqueIdentifier>
     </Filter>
-    <Filter Include="pthreads">
-      <UniqueIdentifier>{b4eeb124-957f-4448-b620-3662238e268a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="test">
       <UniqueIdentifier>{d65594c9-e911-48b1-9f60-693bab72c732}</UniqueIdentifier>
     </Filter>
     <Filter Include="include">
       <UniqueIdentifier>{efc02ae3-bdec-4ca7-b675-f17d63169548}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="test\pthreads">
+      <UniqueIdentifier>{b4eeb124-957f-4448-b620-3662238e268a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

@@ -7,6 +7,7 @@
 #include <vector>
 #include <algorithm>
 #include "verified_integer.hpp"
+#include "query_conditions.hpp"
 
 using namespace tightdb;
 
@@ -24,6 +25,65 @@ uint64_t rand2(int bitwidth = 64)
 
 }
 
+TEST(LESS)
+{
+    const size_t LEN = 300;
+    Array a;
+    for(size_t t = 0; t < LEN; t++)
+        a.add(100);
+    
+    a.Set(132, 50);
+    size_t f = a.Query<LESS>(100, 0, 137);
+
+
+    for(size_t from = 0; from < LEN; from++) {
+        for(size_t to = from + 1; to <= LEN; to++) {
+            for(size_t match = 0; match < LEN; match++) { 
+                a.Set(match, 50);
+                size_t f = a.Query<LESS>(100, from, to);
+                a.Set(match, 100);
+                if(match >= from && match < to) {
+                    CHECK_EQUAL(match, f);
+                    assert(match == f);
+                }
+                else {
+                    CHECK_EQUAL(f, -1);
+                    assert(f == -1);
+                }
+            }
+        }    
+
+    }
+}
+
+
+
+TEST(Find1)
+{
+    const size_t LEN = 300;
+    Array a;
+    for(size_t t = 0; t < LEN; t++)
+        a.add(100);
+    
+    for(size_t from = 0; from < LEN; from++) {
+        for(size_t to = from + 1; to <= LEN; to++) {
+            for(size_t match = 0; match < LEN; match++) { 
+                a.Set(match, 200);
+                size_t f = a.find_first(200, from, to);
+                a.Set(match, 100);
+                if(match >= from && match < to) {
+                    CHECK_EQUAL(match, f);
+                    assert(match == f);
+                }
+                else {
+                    CHECK_EQUAL(f, -1);
+                    assert(f == -1);
+                }
+            }
+        }    
+
+    }
+}
 
 TEST(Column_monkeytest2)
 {
