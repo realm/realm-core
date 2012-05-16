@@ -2157,5 +2157,3 @@ const char* Array::ColumnStringGet(size_t ndx) const
         }
     }
 }
-
-}
