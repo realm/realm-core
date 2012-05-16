@@ -1,13 +1,15 @@
 #include "query.hpp"
 #include "query_engine.hpp"
 
+#define MULTITHREAD 1
+
 using namespace tightdb;
 
 const size_t THREAD_CHUNK_SIZE = 1000;
 
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
-
+ 
 Query::Query()
 {
     update.push_back(0);
@@ -29,8 +31,10 @@ Query::Query(const Query& copy)
 
 Query::~Query()
 {
+#if MULTITHREAD
     for(size_t i = 0; i < m_threadcount; i++)
         pthread_detach(threads[i]);
+#endif
     delete first[0];
 }
 
@@ -367,6 +371,7 @@ size_t Query::remove(Table& table, size_t start, size_t end, size_t limit) const
 
 void Query::FindAllMulti(Table& table, TableView& tv, size_t start, size_t end)
 {
+#if MULTITHREAD
     // Initialization
     Init(table);
     ts.next_job = start;
@@ -399,10 +404,12 @@ void Query::FindAllMulti(Table& table, TableView& tv, size_t start, size_t end)
             ++first;
         }
     }
+#endif
 }
 
 int Query::SetThreads(unsigned int threadcount)
 {
+#if MULTITHREAD
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
     pthread_win32_process_attach_np ();
 #endif
@@ -422,7 +429,7 @@ int Query::SetThreads(unsigned int threadcount)
         if(r != 0)
             assert(false); //todo
     }
-    
+#endif    
     m_threadcount = threadcount;
     return 0;
 }
@@ -482,8 +489,10 @@ bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, siz
     return a.first < b.first;
 }
 
+
 void* Query::query_thread(void* arg)
 {
+#if MULTITHREAD
     thread_state* ts = (thread_state*)arg;
     
     std::vector<size_t> res;
@@ -537,6 +546,7 @@ void* Query::query_thread(void* arg)
             
         }
     }
+#endif
     return 0;
 }
 

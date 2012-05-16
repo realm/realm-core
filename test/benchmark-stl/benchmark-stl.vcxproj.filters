@@ -1,59 +1,14 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Source Files">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="tightdb">
-      <UniqueIdentifier>{0851e238-9ace-4061-a164-00f260e5a427}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="benchmark.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\alloc.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\Array.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\ArrayBinary.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\ArrayBlob.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\ArrayString.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\ArrayStringLong.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\Column.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\ColumnBinary.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\ColumnString.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\ctightdb.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\Group.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\Index.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\Table.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\TableView.cpp">
-      <Filter>tightdb</Filter>
     </ClCompile>
     <ClCompile Include="..\UnitTest++\src\Win32\TimeHelpers.cpp">
       <Filter>Source Files</Filter>
@@ -61,97 +16,10 @@
     <ClCompile Include="..\Support\win32\mem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\ColumnTable.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\ColumnMixed.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\ColumnStringEnum.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\utf8.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\utilities.cpp">
-      <Filter>tightdb</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\AllocSlab.h">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ctightdb.h">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Support\mem.h">
+    <ClInclude Include="..\Support\mem.hpp">
       <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\alloc.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\AllocSlab.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\Array.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ArrayBinary.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ArrayBlob.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ArrayString.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ArrayStringLong.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\Column.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\Column_tpl.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ColumnBinary.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ColumnMixed.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ColumnString.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ColumnStringEnum.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ColumnTable.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ColumnType.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\Group.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\Index.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\Table.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\TableRef.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\tightdb.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\utf8.hpp">
-      <Filter>tightdb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\utilities.hpp">
-      <Filter>tightdb</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -162,6 +162,8 @@ int main()
     }
 
     sqlite3_close(db);
-
+#ifdef _MSC_VER
+    getchar();
+#endif
     return 0;
 }
