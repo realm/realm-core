@@ -151,8 +151,9 @@ MemRef SlabAlloc::Alloc(size_t size)
 
 void SlabAlloc::Free(size_t ref, void* p)
 {
-    if (IsReadOnly(ref)) return;
-
+    // Free space in read only segment is tracked separately
+    FreeSpace& freeSpace = IsReadOnly(ref) ? m_freeReadOnly : m_freeSpace;
+    
     // Get size from segment
     const size_t size = GetSizeFromHeader(p);
     const size_t refEnd = ref + size;
@@ -165,29 +166,29 @@ void SlabAlloc::Free(size_t ref, void* p)
 #endif //_DEBUG
 
     // Check if we can merge with start of free block
-    const size_t n = m_freeSpace.cols().ref.find_first(refEnd);
+    const size_t n = freeSpace.cols().ref.find_first(refEnd);
     if (n != (size_t)-1) {
         // No consolidation over slab borders
         if (m_slabs.cols().offset.find_first(refEnd) == (size_t)-1) {
-            m_freeSpace[n].ref = ref;
-            m_freeSpace[n].size += size;
+            freeSpace[n].ref = ref;
+            freeSpace[n].size += size;
             isMerged = true;
         }
     }
 
     // Check if we can merge with end of free block
     if (m_slabs.cols().offset.find_first(ref) == (size_t)-1) { // avoid slab borders
-        const size_t count = m_freeSpace.size();
+        const size_t count = freeSpace.size();
         for (size_t i = 0; i < count; ++i) {
-            FreeSpace::Cursor c = m_freeSpace[i];
+            FreeSpace::Cursor c = freeSpace[i];
 
         //  printf("%d %d", c.ref, c.size);
 
             const size_t end = TO_REF(c.ref + c.size);
             if (ref == end) {
                 if (isMerged) {
-                    c.size += m_freeSpace[n].size;
-                    m_freeSpace.remove(n);
+                    c.size += freeSpace[n].size;
+                    freeSpace.remove(n);
                 }
                 else c.size += size;
 
@@ -197,7 +198,7 @@ void SlabAlloc::Free(size_t ref, void* p)
     }
 
     // Else just add to freelist
-    if (!isMerged) m_freeSpace.add(ref, size);
+    if (!isMerged) freeSpace.add(ref, size);
 }
 
 MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)

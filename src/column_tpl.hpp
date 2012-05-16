@@ -175,7 +175,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         if (nc.type == NodeChange::CT_SPLIT) {
             // update offset for left node
             const size_t newsize = target.Size();
-            const size_t preoffset = node_ndx ? offsets.GetAsRef(node_ndx-1) : 0;
+            const size_t preoffset = node_ndx ? (size_t)offsets.Get(node_ndx-1) : 0;
             offsets.Set(node_ndx, preoffset + newsize);
 
             newNode.NodeAdd<C>(nc.ref2);
@@ -252,7 +252,7 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
     const size_t newSize = orig_col.Size();
     const size_t newOffset = offset + newSize;
 #ifdef _DEBUG
-    const size_t oldSize = offsets.GetAsRef(ndx) - offset;
+    const size_t oldSize = (size_t)offsets.Get(ndx) - offset;
 #endif
     offsets.Set(ndx, newOffset);
 

@@ -156,6 +156,7 @@ public:
 
     // Direct access methods
     int64_t ColumnGet(size_t ndx) const;
+    const char* ColumnStringGet(size_t ndx) const;
 
     bool Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
     bool IncrementIf(int64_t limit, int64_t value);

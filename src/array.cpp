@@ -1919,6 +1919,7 @@ namespace {
 
 // Pre-declarations
 bool get_header_isnode_direct(const uint8_t* const header);
+bool get_header_hasrefs_direct(const uint8_t* const header);
 unsigned int get_header_width_direct(const uint8_t* const header);
 size_t get_header_len_direct(const uint8_t* const header);
 int64_t GetDirect(const char* const data, size_t width, const size_t ndx);
@@ -1928,6 +1929,11 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 bool get_header_isnode_direct(const uint8_t* const header)
 {
     return (header[0] & 0x80) != 0;
+}
+
+bool get_header_hasrefs_direct(const uint8_t* const header)
+{
+    return (header[0] & 0x40) != 0;
 }
 
 unsigned int get_header_width_direct(const uint8_t* const header)
@@ -2082,6 +2088,72 @@ int64_t Array::ColumnGet(size_t ndx) const
         }
         else {
             return GetDirect(data, width, ndx);
+        }
+    }
+}
+    
+const char* Array::ColumnStringGet(size_t ndx) const
+{
+    const char* data   = (const char*)m_data;
+    const uint8_t* header = m_data - 8;
+    size_t width = m_width;
+    bool isNode = m_isNode;
+    
+    while (1) {
+        if (isNode) {
+            // Get subnode table
+            const size_t ref_offsets = GetDirect(data, width, 0);
+            const size_t ref_refs    = GetDirect(data, width, 1);
+            
+            // Find the subnode containing the item
+            const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+            const char* const offsets_data = (const char*)offsets_header + 8;
+            const size_t offsets_width  = get_header_width_direct(offsets_header);
+            const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
+            
+            // Calc index in subnode
+            const size_t offset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
+            ndx = ndx - offset; // local index
+            
+            // Get ref to array
+            const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+            const char* const refs_data = (const char*)refs_header + 8;
+            const size_t refs_width  = get_header_width_direct(refs_header);
+            const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
+            
+            // Set vars for next iteration
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+        }
+        else {
+            const bool hasRefs = get_header_hasrefs_direct(header);
+            if (hasRefs) {
+                // long strings
+                const size_t ref_offsets = GetDirect(data, width, 0);
+                const size_t ref_blob    = GetDirect(data, width, 1);
+                
+                size_t offset = 0;
+                if (ndx) {
+                    const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+                    const char* const offsets_data = (const char*)offsets_header + 8;
+                    const size_t offsets_width  = get_header_width_direct(offsets_header);
+                    
+                    offset = GetDirect(offsets_data, offsets_width, ndx-1);
+                }
+                
+                const uint8_t* const blob_header = (const uint8_t*)m_alloc.Translate(ref_blob);
+                const char* const blob_data = (const char*)blob_header + 8;
+                
+                return (const char*)blob_data + offset;
+            }
+            else {
+                // short strings
+                if (width == 0) return "";
+                else return (const char*)(data + (ndx * width));
+            }
+            }
         }
     }
 }
