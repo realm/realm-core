@@ -139,15 +139,15 @@ size_t spec_get_column_index(Spec* spec, const char* name)
 
 // Pre-declare local functions
 void table_insert_impl(Table* t, size_t ndx, va_list ap);
-	
+    
 Table* table_new()
 {
-	return new Table();
+    return new Table();
 }
 
 void table_delete(Table* t)
 {
-	delete t;
+    delete t;
 }
 
 void table_unbind(Table* t)
@@ -167,42 +167,42 @@ void table_update_from_spec(Table* t)
 
 size_t table_register_column(Table* t, ColumnType type, const char* name)
 {
-	return t->add_column(type, name);
+    return t->add_column(type, name);
 }
 
 size_t table_get_column_count(const Table* t)
 {
-	return t->get_column_count();
+    return t->get_column_count();
 }
 
 const char* table_get_column_name(const Table* t, size_t ndx)
 {
-	return t->get_column_name(ndx);
+    return t->get_column_name(ndx);
 }
 
 size_t table_get_column_index(const Table* t, const char* name)
 {
-	return t->get_column_index(name);
+    return t->get_column_index(name);
 }
 
 ColumnType table_get_column_type(const Table* t, size_t ndx)
 {
-	return t->get_column_type(ndx);
+    return t->get_column_type(ndx);
 }
 
 bool table_is_empty(const Table* t)
 {
-	return t->is_empty();
+    return t->is_empty();
 }
 
 size_t table_get_size(const Table* t)
 {
-	return t->size();
+    return t->size();
 }
 
 void table_clear(Table* t)
 {
-	t->clear();
+    t->clear();
 }
 
 void table_optimize(Table* t)
@@ -212,7 +212,7 @@ void table_optimize(Table* t)
 
 void table_remove(Table* t, size_t ndx)
 {
-	t->remove(ndx);
+    t->remove(ndx);
 }
 
 void table_remove_last(Table* t)
@@ -226,32 +226,32 @@ void table_remove_last(Table* t)
 
 int64_t table_get_int(const Table* t, size_t column_ndx, size_t ndx)
 {
-	return t->get_int(column_ndx, ndx);
+    return t->get_int(column_ndx, ndx);
 }
 
 bool table_get_bool(const Table* t, size_t column_ndx, size_t ndx)
 {
-	return t->get_bool(column_ndx, ndx);
+    return t->get_bool(column_ndx, ndx);
 }
 
 time_t table_get_date(const Table* t, size_t column_ndx, size_t ndx)
 {
-	return t->get_date(column_ndx, ndx);
+    return t->get_date(column_ndx, ndx);
 }
 
 const char* table_get_string(const Table* t, size_t column_ndx, size_t ndx)
 {
-	return t->get_string(column_ndx, ndx);
+    return t->get_string(column_ndx, ndx);
 }
 
 BinaryData table_get_binary(const Table* t, size_t column_ndx, size_t ndx)
 {
-	return t->get_binary(column_ndx, ndx);
+    return t->get_binary(column_ndx, ndx);
 }
 
 Mixed* table_get_mixed(const Table* t, size_t column_ndx, size_t ndx)
 {
-	return new Mixed(t->get_mixed(column_ndx, ndx));
+    return new Mixed(t->get_mixed(column_ndx, ndx));
 }
 
 ColumnType table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx)
@@ -274,32 +274,32 @@ const Table* table_get_ctable(const Table* t, size_t column_ndx, size_t ndx)
 
 void table_set_int(Table* t, size_t column_ndx, size_t ndx, int64_t value)
 {
-	t->set_int(column_ndx, ndx, value);
+    t->set_int(column_ndx, ndx, value);
 }
 
 void table_set_bool(Table* t, size_t column_ndx, size_t ndx, bool value)
 {
-	t->set_bool(column_ndx, ndx, value);
+    t->set_bool(column_ndx, ndx, value);
 }
 
 void table_set_date(Table* t, size_t column_ndx, size_t ndx, time_t value)
 {
-	t->set_date(column_ndx, ndx, value);
+    t->set_date(column_ndx, ndx, value);
 }
 
 void table_set_string(Table* t, size_t column_ndx, size_t ndx, const char* value)
 {
-	t->set_string(column_ndx, ndx, value);
+    t->set_string(column_ndx, ndx, value);
 }
 
 void table_set_binary(Table* t, size_t column_ndx, size_t ndx, const char *value, size_t len)
 {
-	t->set_binary(column_ndx, ndx, value, len);
+    t->set_binary(column_ndx, ndx, value, len);
 }
 
 void table_set_mixed(Table* t, size_t column_ndx, size_t ndx, Mixed value)
 {
-	t->set_mixed(column_ndx, ndx, value);
+    t->set_mixed(column_ndx, ndx, value);
 }
 
 void table_clear_table(Table* t, size_t column_ndx, size_t ndx)
@@ -672,7 +672,7 @@ Table* group_get_table(Group* group, const char* name)
     /*??? Waiting for removal of TopLevelTable*/
     /* return group->get_subtable(name); */
 }
-#endif	
+#endif  
 
 /* Serialization */
 void group_write(Group* group, const char* filepath)

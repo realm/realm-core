@@ -37,21 +37,21 @@ class GroupWriter {
 public:
     GroupWriter(Group& group);
     
-	bool IsValid() const;
+    bool IsValid() const;
     
-	void Commit();
+    void Commit();
     
     size_t write(const char* p, size_t n);
     void WriteAt(size_t pos, const char* p, size_t n);
     
 private:
-	void DoCommit(uint64_t topPos);
+    void DoCommit(uint64_t topPos);
     
-	// Member variables
-	Group&     m_group;
-	SlabAlloc& m_alloc;
-	size_t     m_len;
-	int        m_fd;
+    // Member variables
+    Group&     m_group;
+    SlabAlloc& m_alloc;
+    size_t     m_len;
+    int        m_fd;
 };
     
 } //namespace tightdb
