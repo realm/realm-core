@@ -319,11 +319,11 @@ TEST(Table_FindAll_Int)
     table.add(0, 20, true, Wed);
 
     // Search for a value that does not exits
-    const BasicTableView<TestTable> v0 = table.cols().second.find_all(5);
+    const TestTable::View v0 = table.cols().second.find_all(5);
     CHECK_EQUAL(0, v0.size());
 
     // Search for a value with several matches
-    const BasicTableView<TestTable> v = table.cols().second.find_all(20);
+    const TestTable::View v = table.cols().second.find_all(20);
 
     CHECK_EQUAL(5, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
@@ -525,7 +525,7 @@ TEST(TableAutoEnumerationFindFindAll)
     size_t t = table.cols().second.find_first("eftg");
     CHECK_EQUAL(1, t);
 
-    BasicTableView<TestTableAE> tv = table.cols().second.find_all("eftg");
+    TestTableAE::View tv = table.cols().second.find_all("eftg");
     CHECK_EQUAL(5, tv.size());
     CHECK_EQUAL("eftg", static_cast<const char*>(tv[0].second));
     CHECK_EQUAL("eftg", static_cast<const char*>(tv[1].second));

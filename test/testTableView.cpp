@@ -17,7 +17,7 @@ TEST(GetSetInteger)
     table.add(1);
     table.add(2);
 
-    BasicTableView<TestTableInt> v; // Test empty construction
+    TestTableInt::View v; // Test empty construction
     v = table.cols().first.find_all(2); // Test assignment
 
     CHECK_EQUAL(2, v.size());
@@ -42,7 +42,7 @@ TEST(TableViewSum)
     table.add(2);
     table.add(2);
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(2);
+    TestTableInt::View v = table.cols().first.find_all(2);
     CHECK_EQUAL(5, v.size());
 
     int64_t sum = v.cols().first.sum();
@@ -57,7 +57,7 @@ TEST(TableViewSumNegative)
     table.add(0);
     table.add(0);
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    TestTableInt::View v = table.cols().first.find_all(0);
     v[0].first = 11;
     v[2].first = -20;
 
@@ -73,7 +73,7 @@ TEST(TableViewMax)
     table.add(0);
     table.add(0);
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    TestTableInt::View v = table.cols().first.find_all(0);
     v[0].first = -1;
     v[1].first =  2;
     v[2].first =  1;
@@ -92,7 +92,7 @@ TEST(TableViewMax2)
     table.add(0);
     table.add(0);
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    TestTableInt::View v = table.cols().first.find_all(0);
     v[0].first = -1;
     v[1].first = -2;
     v[2].first = -3;
@@ -110,7 +110,7 @@ TEST(TableViewMin)
     table.add(0);
     table.add(0);
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    TestTableInt::View v = table.cols().first.find_all(0);
     v[0].first = -1;
     v[1].first =  2;
     v[2].first =  1;
@@ -128,7 +128,7 @@ TEST(TableViewMin2)
     table.add(0);
     table.add(0);
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    TestTableInt::View v = table.cols().first.find_all(0);
     v[0].first = -1;
     v[1].first = -2;
     v[2].first = -3;
@@ -147,7 +147,7 @@ TEST(TableViewFind)
     table.add(0);
     table.add(0);
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    TestTableInt::View v = table.cols().first.find_all(0);
     v[0].first = 5;
     v[1].first = 4;
     v[2].first = 4;
@@ -165,13 +165,13 @@ TEST(TableViewFindAll)
     table.add(0);
     table.add(0);
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    TestTableInt::View v = table.cols().first.find_all(0);
     v[0].first = 5;
     v[1].first = 4; // match
     v[2].first = 4; // match
 
     // todo, add creation to wrapper function in table.h
-    BasicTableView<TestTableInt> v2 = v.cols().first.find_all(4);
+    TestTableInt::View v2 = v.cols().first.find_all(4);
     CHECK_EQUAL(1, v2.get_source_ndx(0));
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
@@ -187,13 +187,13 @@ TEST(TableViewFindAllString)
     table.add("a");
     table.add("a");
 
-    BasicTableView<TestTableString> v = table.cols().first.find_all("a");
+    TestTableString::View v = table.cols().first.find_all("a");
     v[0].first = "foo";
     v[1].first = "bar"; // match
     v[2].first = "bar"; // match
 
     // todo, add creation to wrapper function in table.h
-    BasicTableView<TestTableString> v2 = v.cols().first.find_all("bar");
+    TestTableString::View v2 = v.cols().first.find_all("bar");
     CHECK_EQUAL(1, v2.get_source_ndx(0));
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
@@ -208,7 +208,7 @@ TEST(TableViewDelete)
     table.add(3);
     table.add(1);
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(1);
+    TestTableInt::View v = table.cols().first.find_all(1);
     CHECK_EQUAL(3, v.size());
 
     v.remove(1);
@@ -249,7 +249,7 @@ TEST(TableViewClear)
     table.add(3);
     table.add(1);
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(1);
+    TestTableInt::View v = table.cols().first.find_all(1);
     CHECK_EQUAL(3, v.size());
 
     v.clear();
@@ -265,7 +265,7 @@ TEST(TableViewClearNone)
 {
     TestTableInt table;
 
-    BasicTableView<TestTableInt> v = table.cols().first.find_all(1);
+    TestTableInt::View v = table.cols().first.find_all(1);
     CHECK_EQUAL(0, v.size());
 
     v.clear();

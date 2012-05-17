@@ -63,6 +63,12 @@ template<class Spec> class BasicTable: public Table { // FIXME: No derivation - 
 public:
     typedef Spec spec_type;
 
+    typedef BasicTableRef<BasicTable> Ref;
+    typedef BasicTableRef<const BasicTable> ConstRef;
+
+    typedef BasicTableView<BasicTable> View;
+    typedef BasicTableView<const BasicTable> ConstView;
+
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc)
     {
         tightdb::Spec& spec = get_spec();

@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_TABLE_VIEW_HPP
 #define TIGHTDB_TABLE_VIEW_HPP
 
+#include <iostream>
 #include "table.hpp"
 
 namespace tightdb {
@@ -86,6 +87,7 @@ protected:
     TableViewBase(const TableViewBase& tv): m_table(tv.m_table)
     {
         m_refs.Copy(tv.m_refs);
+std::cerr << "COPY" << std::endl;
     }
 
     /**

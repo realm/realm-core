@@ -52,7 +52,7 @@ TEST(Group_Serialize0)
     CHECK(fromDisk.is_valid());
 
     // Create new table in group
-    BasicTableRef<TestTableGroup> t = fromDisk.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(0, t->size());
@@ -78,7 +78,7 @@ TEST(Group_Serialize1)
 {
     // Create group with one table
     Group toDisk;
-    BasicTableRef<TestTableGroup> table = toDisk.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref table = toDisk.get_table<TestTableGroup>("test");
     table->add("",  1, true, Wed);
     table->add("", 15, true, Wed);
     table->add("", 10, true, Wed);
@@ -103,7 +103,7 @@ TEST(Group_Serialize1)
     // Load the table
     Group fromDisk("table_test.tbl");
     CHECK(fromDisk.is_valid());
-    BasicTableRef<TestTableGroup> t = fromDisk.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
@@ -141,12 +141,12 @@ TEST(Group_Serialize2)
 {
     // Create group with two tables
     Group toDisk;
-    BasicTableRef<TestTableGroup> table1 = toDisk.get_table<TestTableGroup>("test1");
+    TestTableGroup::Ref table1 = toDisk.get_table<TestTableGroup>("test1");
     table1->add("",  1, true, Wed);
     table1->add("", 15, true, Wed);
     table1->add("", 10, true, Wed);
 
-    BasicTableRef<TestTableGroup> table2 = toDisk.get_table<TestTableGroup>("test2");
+    TestTableGroup::Ref table2 = toDisk.get_table<TestTableGroup>("test2");
     table2->add("hey",  0, true, Tue);
     table2->add("hello", 3232, false, Sun);
 
@@ -163,8 +163,8 @@ TEST(Group_Serialize2)
     // Load the tables
     Group fromDisk("table_test.tbl");
     CHECK(fromDisk.is_valid());
-    BasicTableRef<TestTableGroup> t1 = fromDisk.get_table<TestTableGroup>("test1");
-    BasicTableRef<TestTableGroup> t2 = fromDisk.get_table<TestTableGroup>("test2");
+    TestTableGroup::Ref t1 = fromDisk.get_table<TestTableGroup>("test1");
+    TestTableGroup::Ref t2 = fromDisk.get_table<TestTableGroup>("test2");
     (void)t2;
     (void)t1;
 
@@ -181,7 +181,7 @@ TEST(Group_Serialize3)
 {
     // Create group with one table (including long strings
     Group toDisk;
-    BasicTableRef<TestTableGroup> table = toDisk.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref table = toDisk.get_table<TestTableGroup>("test");
     table->add("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1",  1, true, Wed);
     table->add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
@@ -198,7 +198,7 @@ TEST(Group_Serialize3)
     // Load the table
     Group fromDisk("table_test.tbl");
     CHECK(fromDisk.is_valid());
-    BasicTableRef<TestTableGroup> t = fromDisk.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
     (void)t;
 
 
@@ -214,7 +214,7 @@ TEST(Group_Serialize_Men)
 {
     // Create group with one table
     Group toMem;
-    BasicTableRef<TestTableGroup> table = toMem.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref table = toMem.get_table<TestTableGroup>("test");
     table->add("",  1, true, Wed);
     table->add("", 15, true, Wed);
     table->add("", 10, true, Wed);
@@ -237,7 +237,7 @@ TEST(Group_Serialize_Men)
     // Load the table
     Group fromMem(buffer, len);
     CHECK(fromMem.is_valid());
-    BasicTableRef<TestTableGroup> t = fromMem.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
@@ -255,7 +255,7 @@ TEST(Group_Serialize_Optimized)
 {
     // Create group with one table
     Group toMem;
-    BasicTableRef<TestTableGroup> table = toMem.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref table = toMem.get_table<TestTableGroup>("test");
 
     for (size_t i = 0; i < 5; ++i) {
         table->add("abd",     1, true, Mon);
@@ -278,7 +278,7 @@ TEST(Group_Serialize_Optimized)
     // Load the table
     Group fromMem(buffer, len);
     CHECK(fromMem.is_valid());
-    BasicTableRef<TestTableGroup> t = fromMem.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
 
