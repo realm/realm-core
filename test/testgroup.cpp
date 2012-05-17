@@ -60,7 +60,7 @@ TEST(Group_Serialize0)
     // Modify table
     t->add("Test",  1, true, Wed);
 
-    CHECK_EQUAL("Test", (const char*)t[0].first);
+    CHECK_EQUAL("Test", static_cast<const char*>(t[0].first));
     CHECK_EQUAL(1,      t[0].second);
     CHECK_EQUAL(true,   t[0].third);
     CHECK_EQUAL(Wed,    t[0].fourth);

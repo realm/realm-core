@@ -17,6 +17,7 @@ using namespace std;
 
 namespace tightdb {
 
+
 struct FakeParent: Table::Parent {
     virtual void update_child_ref(size_t, size_t) {} // Ignore
     virtual void child_destroyed(size_t) {} // Ignore
@@ -102,7 +103,7 @@ void Table::CreateColumns()
     if (!m_columns.IsValid()) {
         m_columns.SetType(COLUMN_HASREFS);
     }
-	
+
     size_t subtable_count = 0;
     ColumnType attr = COLUMN_ATTR_NONE;
     Allocator& alloc = m_columns.GetAllocator();
@@ -156,12 +157,12 @@ void Table::CreateColumns()
             default:
                 assert(false);
         }
-		
+
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
-            assert(false); //TODO: 
+            assert(false); //TODO:
             //const index_ref = newColumn->CreateIndex(attr);
-            //m_columns.add(index_ref); 
+            //m_columns.add(index_ref);
 
             attr = COLUMN_ATTR_NONE;
         }
@@ -243,7 +244,7 @@ void Table::CacheColumns()
                 newColumn = new ColumnMixed(ref, &m_columns, column_ndx, alloc, this);
                 colsize = ((ColumnMixed*)newColumn)->Size();
                 break;
-				
+
             // Attributes
             case COLUMN_ATTR_INDEXED:
             case COLUMN_ATTR_UNIQUE:
@@ -255,7 +256,7 @@ void Table::CacheColumns()
         }
 
         m_cols.add((intptr_t)newColumn);
-		
+
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
             const size_t index_ref = m_columns.GetAsRef(column_ndx+1);
@@ -372,13 +373,13 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const
     const size_t count = m_spec_set.get_type_attr_count();
 
     for (size_t i = 0; i < count; ++i) {
-        if (current_column == column_ndx) 
+        if (current_column == column_ndx)
             return pos;
 
         const ColumnType type = (ColumnType)m_spec_set.get_type_attr(i);
-        if (type >= COLUMN_ATTR_INDEXED) 
+        if (type >= COLUMN_ATTR_INDEXED)
             continue; // ignore attributes
-        if (type < COLUMN_TYPE_STRING_ENUM) 
+        if (type < COLUMN_TYPE_STRING_ENUM)
             ++pos;
         else
             pos += 2;
@@ -393,7 +394,7 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const
 size_t Table::add_column(ColumnType type, const char* name)
 {
     // Currently it's not possible to dynamically add columns to a table with content.
-    assert(size() == 0);    
+    assert(size() == 0);
     if (size() != 0)
         return (size_t)-1;
 
@@ -675,6 +676,11 @@ void Table::set_int(size_t column_ndx, size_t ndx, int64_t value)
 
     Column& column = GetColumn(column_ndx);
     column.Set(ndx, value);
+}
+
+void Table::add_int(size_t column_ndx, int64_t value)
+{
+    GetColumn(column_ndx).Increment64(value);
 }
 
 bool Table::get_bool(size_t column_ndx, size_t ndx) const
@@ -1005,43 +1011,84 @@ size_t Table::find_first_string(size_t column_ndx, const char* value) const
     }
 }
 
-void Table::find_all_int(TableView& tv, size_t column_ndx, int64_t value)
+size_t Table::find_pos_int(size_t column_ndx, int64_t value) const
+{
+    return GetColumn(column_ndx).find_pos(value);
+}
+
+TableView Table::find_all_int(size_t column_ndx, int64_t value)
 {
     assert(column_ndx < m_columns.Size());
-    assert(&tv.get_parent() == this);
 
     const Column& column = GetColumn(column_ndx);
 
+    TableView tv(*this);
     column.find_all(tv.get_ref_column(), value);
+    return move(tv);
 }
 
-void Table::find_all_bool(TableView& tv, size_t column_ndx, bool value)
+ConstTableView Table::find_all_int(size_t column_ndx, int64_t value) const
 {
     assert(column_ndx < m_columns.Size());
-    assert(&tv.get_parent() == this);
 
     const Column& column = GetColumn(column_ndx);
 
+    ConstTableView tv(*this);
+    column.find_all(tv.get_ref_column(), value);
+    return move(tv);
+}
+
+TableView Table::find_all_bool(size_t column_ndx, bool value)
+{
+    assert(column_ndx < m_columns.Size());
+
+    const Column& column = GetColumn(column_ndx);
+
+    TableView tv(*this);
     column.find_all(tv.get_ref_column(), value ? 1 :0);
+    return move(tv);
 }
 
-void Table::find_all_date(TableView& tv, size_t column_ndx, time_t value)
+ConstTableView Table::find_all_bool(size_t column_ndx, bool value) const
 {
     assert(column_ndx < m_columns.Size());
-    assert(&tv.get_parent() == this);
 
     const Column& column = GetColumn(column_ndx);
 
-    column.find_all(tv.get_ref_column(), (int64_t)value);
+    ConstTableView tv(*this);
+    column.find_all(tv.get_ref_column(), value ? 1 :0);
+    return move(tv);
 }
 
-void Table::find_all_string(TableView& tv, size_t column_ndx, const char *value)
+TableView Table::find_all_date(size_t column_ndx, time_t value)
 {
     assert(column_ndx < m_columns.Size());
-    assert(&tv.get_parent() == this);
+
+    const Column& column = GetColumn(column_ndx);
+
+    TableView tv(*this);
+    column.find_all(tv.get_ref_column(), int64_t(value));
+    return move(tv);
+}
+
+ConstTableView Table::find_all_date(size_t column_ndx, time_t value) const
+{
+    assert(column_ndx < m_columns.Size());
+
+    const Column& column = GetColumn(column_ndx);
+
+    ConstTableView tv(*this);
+    column.find_all(tv.get_ref_column(), int64_t(value));
+    return move(tv);
+}
+
+TableView Table::find_all_string(size_t column_ndx, const char *value)
+{
+    assert(column_ndx < m_columns.Size());
 
     const ColumnType type = GetRealColumnType(column_ndx);
 
+    TableView tv(*this);
     if (type == COLUMN_TYPE_STRING) {
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
         column.find_all(tv.get_ref_column(), value);
@@ -1051,34 +1098,88 @@ void Table::find_all_string(TableView& tv, size_t column_ndx, const char *value)
         const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
         column.find_all(tv.get_ref_column(), value);
     }
+    return move(tv);
+}
+
+ConstTableView Table::find_all_string(size_t column_ndx, const char *value) const
+{
+    assert(column_ndx < m_columns.Size());
+
+    const ColumnType type = GetRealColumnType(column_ndx);
+
+    ConstTableView tv(*this);
+    if (type == COLUMN_TYPE_STRING) {
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        column.find_all(tv.get_ref_column(), value);
+    }
+    else {
+        assert(type == COLUMN_TYPE_STRING_ENUM);
+        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+        column.find_all(tv.get_ref_column(), value);
+    }
+    return move(tv);
 }
 
 
 
-void Table::find_all_hamming(TableView& tv, size_t column_ndx, uint64_t value, size_t max)
+TableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max)
 {
     assert(column_ndx < m_columns.Size());
-    assert(&tv.get_parent() == this);
 
     const Column& column = GetColumn(column_ndx);
 
+    TableView tv(*this);
     column.find_all_hamming(tv.get_ref_column(), value, max);
+    return move(tv);
 }
 
-void Table::sorted(TableView& tv, size_t column_ndx, bool ascending) const
+ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const
 {
     assert(column_ndx < m_columns.Size());
-    assert(&tv.get_parent() == this);
-    
+
+    const Column& column = GetColumn(column_ndx);
+
+    ConstTableView tv(*this);
+    column.find_all_hamming(tv.get_ref_column(), value, max);
+    return move(tv);
+}
+
+TableView Table::sorted(size_t column_ndx, bool ascending)
+{
+    assert(column_ndx < m_columns.Size());
+
+    TableView tv(*this);
+
     // Insert refs to all rows in table
     Array& refs = tv.get_ref_column();
     const size_t count = size();
     for (size_t i = 0; i < count; ++i) {
         refs.add(i);
     }
-    
+
     // Sort the refs based on the given column
     tv.sort(column_ndx, ascending);
+
+    return move(tv);
+}
+
+ConstTableView Table::sorted(size_t column_ndx, bool ascending) const
+{
+    assert(column_ndx < m_columns.Size());
+
+    ConstTableView tv(*this);
+
+    // Insert refs to all rows in table
+    Array& refs = tv.get_ref_column();
+    const size_t count = size();
+    for (size_t i = 0; i < count; ++i) {
+        refs.add(i);
+    }
+
+    // Sort the refs based on the given column
+    tv.sort(column_ndx, ascending);
+
+    return move(tv);
 }
 
 void Table::optimize()
@@ -1124,16 +1225,16 @@ void Table::UpdateColumnRefs(size_t column_ndx, int diff)
         column->UpdateParentNdx(diff);
     }
 }
-    
+
 void Table::UpdateFromParent() {
     // There is no top for sub-tables sharing schema
     if (m_top.IsValid()) {
         if (!m_top.UpdateFromParent()) return;
     }
-    
+
     m_spec_set.update_from_parent();
     if (!m_columns.UpdateFromParent()) return;
-    
+
     // Update cached columns
     const size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
@@ -1380,7 +1481,7 @@ void Table::verify() const
             assert(false);
         }
     }
-    
+
     m_spec_set.verify();
 
     Allocator& alloc = m_columns.GetAllocator();
@@ -1493,4 +1594,5 @@ MemStats Table::Stats() const
 
 #endif //_DEBUG
 
-}
+
+} // namespace tightdb

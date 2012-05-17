@@ -319,11 +319,11 @@ TEST(Table_FindAll_Int)
     table.add(0, 20, true, Wed);
 
     // Search for a value that does not exits
-    const TableView v0 = table.cols().second.find_all(5);
+    const BasicTableView<TestTable> v0 = table.cols().second.find_all(5);
     CHECK_EQUAL(0, v0.size());
 
     // Search for a value with several matches
-    const TableView v = table.cols().second.find_all(20);
+    const BasicTableView<TestTable> v = table.cols().second.find_all(20);
 
     CHECK_EQUAL(5, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
@@ -340,7 +340,7 @@ TEST(Table_FindAll_Int)
 TEST(Table_Sorted_Int)
 {
     TestTable table;
-    
+
     table.add(0, 10, true, Wed); // 0: 4
     table.add(0, 20, true, Wed); // 1: 7
     table.add(0,  0, true, Wed); // 2: 0
@@ -351,12 +351,11 @@ TEST(Table_Sorted_Int)
     table.add(0,  4, true, Wed); // 7: 2
     table.add(0, 99, true, Wed); // 8: 9
     table.add(0,  2, true, Wed); // 9: 1
-    
+
     // Search for a value that does not exits
-    TableView v(table);
-    table.sorted(v, 1);
+    TableView v = table.sorted(1);
     CHECK_EQUAL(table.size(), v.size());
-    
+
     CHECK_EQUAL(2, v.get_source_ndx(0));
     CHECK_EQUAL(9, v.get_source_ndx(1));
     CHECK_EQUAL(7, v.get_source_ndx(2));
@@ -367,7 +366,7 @@ TEST(Table_Sorted_Int)
     CHECK_EQUAL(1, v.get_source_ndx(7));
     CHECK_EQUAL(3, v.get_source_ndx(8));
     CHECK_EQUAL(8, v.get_source_ndx(9));
-    
+
 #ifdef _DEBUG
     table.verify();
 #endif //_DEBUG
@@ -526,13 +525,13 @@ TEST(TableAutoEnumerationFindFindAll)
     size_t t = table.cols().second.find_first("eftg");
     CHECK_EQUAL(1, t);
 
-    TableView tv = table.cols().second.find_all("eftg");
+    BasicTableView<TestTableAE> tv = table.cols().second.find_all("eftg");
     CHECK_EQUAL(5, tv.size());
-    CHECK_EQUAL("eftg", tv.get_string(1, 0));
-    CHECK_EQUAL("eftg", tv.get_string(1, 1));
-    CHECK_EQUAL("eftg", tv.get_string(1, 2));
-    CHECK_EQUAL("eftg", tv.get_string(1, 3));
-    CHECK_EQUAL("eftg", tv.get_string(1, 4));
+    CHECK_EQUAL("eftg", static_cast<const char*>(tv[0].second));
+    CHECK_EQUAL("eftg", static_cast<const char*>(tv[1].second));
+    CHECK_EQUAL("eftg", static_cast<const char*>(tv[2].second));
+    CHECK_EQUAL("eftg", static_cast<const char*>(tv[3].second));
+    CHECK_EQUAL("eftg", static_cast<const char*>(tv[4].second));
 }
 
 #include "alloc_slab.hpp"

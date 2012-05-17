@@ -24,7 +24,12 @@
 #include <algorithm>
 #include <ostream>
 
+#include "meta.hpp"
+
 namespace tightdb {
+
+
+template<class> class BasicTable;
 
 
 /**
@@ -100,7 +105,15 @@ public:
 
 private:
     typedef T* BasicTableRef::*unspecified_bool_type;
-    typedef typename T::template Accessors<T>::Row RowAccessor;
+
+    template<class> struct GetRowAccType { typedef void type; };
+    template<class Spec> struct GetRowAccType<BasicTable<Spec> > {
+        typedef typename BasicTable<Spec>::RowAccessor type;
+    };
+    template<class Spec> struct GetRowAccType<const BasicTable<Spec> > {
+        typedef typename BasicTable<Spec>::ConstRowAccessor type;
+    };
+    typedef typename GetRowAccType<T>::type RowAccessor;
 
 public:
     /**
@@ -110,6 +123,9 @@ public:
      */
     operator unspecified_bool_type() const;
 
+    /**
+     * Same as (*this)[i].
+     */
     RowAccessor operator[](std::size_t i) const { return (*m_table)[i]; }
 
 private:

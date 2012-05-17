@@ -202,49 +202,47 @@ void Query::end_group()
 
 size_t Query::find_next(Table& table, size_t lastmatch) {
     if (lastmatch == (size_t)-1) Init(table);
-    
+
     const size_t end = table.size();
     const size_t res = first[0]->find_first(lastmatch + 1, end);
-    
+
     return (res == end) ? -1 : res;
 }
 
 TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
 {
-    TableView tv(table);
-    find_all(table, tv, start, end, limit);
-    return tv;
-}
-
-void Query::find_all(Table& table, TableView& tv, size_t start, size_t end, size_t limit)
-{
     Init(table);
-    
+
     size_t r  = start - 1;
     if(end == size_t(-1))
         end = table.size();
-    
+
+
     // User created query with no criteria; return everything
     if(first[0] == 0) {
+        TableView tv(table);
         for(size_t i = start; i < end; i++)
             tv.get_ref_column().add(i);
+        return move(tv);
     }
-    else if(m_threadcount > 0) {
+
+    if(m_threadcount > 0) {
         // Use multithreading
-        FindAllMulti(table, tv, start, end);
-        return;
+        return FindAllMulti(table, start, end);
     }
-    else {
-        const size_t table_size = table.size();
-        
-        // Use single threading
-        for(;;) {
-            r = first[0]->find_first(r + 1, table_size);
-            if (r == table_size || tv.size() == limit)
-                break;
-            tv.get_ref_column().add(r);
-        }
+
+    const size_t table_size = table.size();
+    TableView tv(table);
+
+    // Use single threading
+    for(;;) {
+        r = first[0]->find_first(r + 1, table_size);
+        if (r == table_size || tv.size() == limit)
+            break;
+        tv.get_ref_column().add(r);
     }
+
+    return move(tv);
 }
 
 int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end,
@@ -365,7 +363,7 @@ size_t Query::remove(Table& table, size_t start, size_t end, size_t limit) const
     return results;
 }
 
-void Query::FindAllMulti(Table& table, TableView& tv, size_t start, size_t end)
+TableView Query::FindAllMulti(Table& table, size_t start, size_t end)
 {
     // Initialization
     Init(table);
@@ -386,7 +384,9 @@ void Query::FindAllMulti(Table& table, TableView& tv, size_t start, size_t end)
         pthread_cond_wait(&ts.completed_cond, &ts.completed_mutex);
     pthread_mutex_lock(&ts.jobs_mutex);
     pthread_mutex_unlock(&ts.completed_mutex);
-    
+
+    TableView tv(table);
+
     // Sort search results because user expects ascending order
     std::sort (ts.chunks.begin(), ts.chunks.end(), &Query::comp);
     for (size_t i = 0; i < ts.chunks.size(); ++i) {
@@ -399,6 +399,8 @@ void Query::FindAllMulti(Table& table, TableView& tv, size_t start, size_t end)
             ++first;
         }
     }
+
+    return move(tv);
 }
 
 int Query::SetThreads(unsigned int threadcount)

@@ -17,19 +17,18 @@ TEST(GetSetInteger)
     table.add(1);
     table.add(2);
 
-    TableView v = table.cols().first.find_all(2);
+    BasicTableView<TestTableInt> v; // Test empty construction
+    v = table.cols().first.find_all(2); // Test assignment
 
     CHECK_EQUAL(2, v.size());
 
     // Test of Get
-    CHECK_EQUAL(2, v.get_int(0, 0));
-    CHECK_EQUAL(2, v.get_int(0, 1));
+    CHECK_EQUAL(2, v[0].first);
+    CHECK_EQUAL(2, v[1].first);
 
     // Test of Set
-    v.set_int(0, 0, 123);
-    CHECK_EQUAL(123, v.get_int(0, 0));
-
-    //v.Destroy();
+    v[0].first = 123;
+    CHECK_EQUAL(123, v[0].first);
 }
 
 
@@ -43,13 +42,11 @@ TEST(TableViewSum)
     table.add(2);
     table.add(2);
 
-    TableView v = table.cols().first.find_all(2);
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(2);
     CHECK_EQUAL(5, v.size());
 
-    int64_t sum = v.sum(0);
+    int64_t sum = v.cols().first.sum();
     CHECK_EQUAL(10, sum);
-
-    //v.Destroy();
 }
 
 TEST(TableViewSumNegative)
@@ -60,14 +57,12 @@ TEST(TableViewSumNegative)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.find_all(0);
-    v.set_int(0, 0, 11);
-    v.set_int(0, 2, -20);
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    v[0].first = 11;
+    v[2].first = -20;
 
-    int64_t sum = v.sum(0);
+    int64_t sum = v.cols().first.sum();
     CHECK_EQUAL(-9, sum);
-
-    //v.Destroy();
 }
 
 TEST(TableViewMax)
@@ -78,14 +73,13 @@ TEST(TableViewMax)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.find_all(0);
-    v.set_int(0, 0, -1);
-    v.set_int(0, 1, 2);
-    v.set_int(0, 2, 1);
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    v[0].first = -1;
+    v[1].first =  2;
+    v[2].first =  1;
 
-    int64_t max = v.maximum(0);
+    int64_t max = v.cols().first.maximum();
     CHECK_EQUAL(2, max);
-    //v.Destroy();
 }
 
 
@@ -98,14 +92,13 @@ TEST(TableViewMax2)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.find_all(0);
-    v.set_int(0, 0, -1);
-    v.set_int(0, 1, -2);
-    v.set_int(0, 2, -3);
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    v[0].first = -1;
+    v[1].first = -2;
+    v[2].first = -3;
 
-    int64_t max = v.maximum(0);
+    int64_t max = v.cols().first.maximum();
     CHECK_EQUAL(-1, max);
-    //v.Destroy();
 }
 
 
@@ -117,14 +110,13 @@ TEST(TableViewMin)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.find_all(0);
-    v.set_int(0, 0, -1);
-    v.set_int(0, 1, 2);
-    v.set_int(0, 2, 1);
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    v[0].first = -1;
+    v[1].first =  2;
+    v[2].first =  1;
 
-    int64_t min = v.minimum(0);
+    int64_t min = v.cols().first.minimum();
     CHECK_EQUAL(-1, min);
-    //v.Destroy();
 }
 
 
@@ -136,14 +128,13 @@ TEST(TableViewMin2)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.find_all(0);
-    v.set_int(0, 0, -1);
-    v.set_int(0, 1, -2);
-    v.set_int(0, 2, -3);
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    v[0].first = -1;
+    v[1].first = -2;
+    v[2].first = -3;
 
-    int64_t min = v.minimum(0);
+    int64_t min = v.cols().first.minimum();
     CHECK_EQUAL(-3, min);
-    //v.Destroy();
 }
 
 
@@ -156,14 +147,13 @@ TEST(TableViewFind)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.find_all(0);
-    v.set_int(0, 0, 5);
-    v.set_int(0, 1, 4);
-    v.set_int(0, 2, 4);
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    v[0].first = 5;
+    v[1].first = 4;
+    v[2].first = 4;
 
-    size_t r = v.find_first(0, 4);
+    size_t r = v.cols().first.find_first(4);
     CHECK_EQUAL(1, r);
-    //v.Destroy();
 }
 
 
@@ -175,18 +165,15 @@ TEST(TableViewFindAll)
     table.add(0);
     table.add(0);
 
-    TableView v = table.cols().first.find_all(0);
-    v.set_int(0, 0, 5);
-    v.set_int(0, 1, 4); // match
-    v.set_int(0, 2, 4); // match
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(0);
+    v[0].first = 5;
+    v[1].first = 4; // match
+    v[2].first = 4; // match
 
     // todo, add creation to wrapper function in table.h
-    TableView *v2 = new TableView(*v.get_table());
-    v.find_all(*v2, 0, 4);
-    CHECK_EQUAL(1, v2->get_source_ndx(0));
-    CHECK_EQUAL(2, v2->get_source_ndx(1));
-    //v.Destroy();
-    delete v2;
+    BasicTableView<TestTableInt> v2 = v.cols().first.find_all(4);
+    CHECK_EQUAL(1, v2.get_source_ndx(0));
+    CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
 
 TIGHTDB_TABLE_1(TestTableString,
@@ -200,18 +187,15 @@ TEST(TableViewFindAllString)
     table.add("a");
     table.add("a");
 
-    TableView v = table.cols().first.find_all("a");
-    v.set_string(0, 0, "foo");
-    v.set_string(0, 1, "bar"); // match
-    v.set_string(0, 2, "bar"); // match
+    BasicTableView<TestTableString> v = table.cols().first.find_all("a");
+    v[0].first = "foo";
+    v[1].first = "bar"; // match
+    v[2].first = "bar"; // match
 
     // todo, add creation to wrapper function in table.h
-    TableView *v2 = new TableView(*v.get_table());
-    v.find_all(*v2, 0, "bar");
-    CHECK_EQUAL(1, v2->get_source_ndx(0));
-    CHECK_EQUAL(2, v2->get_source_ndx(1));
-    //v.Destroy();
-    delete v2;
+    BasicTableView<TestTableString> v2 = v.cols().first.find_all("bar");
+    CHECK_EQUAL(1, v2.get_source_ndx(0));
+    CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
 
 TEST(TableViewDelete)
@@ -224,7 +208,7 @@ TEST(TableViewDelete)
     table.add(3);
     table.add(1);
 
-    TableView v = table.cols().first.find_all(1);
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(1);
     CHECK_EQUAL(3, v.size());
 
     v.remove(1);
@@ -265,7 +249,7 @@ TEST(TableViewClear)
     table.add(3);
     table.add(1);
 
-    TableView v = table.cols().first.find_all(1);
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(1);
     CHECK_EQUAL(3, v.size());
 
     v.clear();
@@ -281,9 +265,8 @@ TEST(TableViewClearNone)
 {
     TestTableInt table;
 
-    TableView v = table.cols().first.find_all(1);
+    BasicTableView<TestTableInt> v = table.cols().first.find_all(1);
     CHECK_EQUAL(0, v.size());
 
     v.clear();
-
 }

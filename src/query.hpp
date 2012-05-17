@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_QUERY_HPP
-#define __TIGHTDB_QUERY_HPP
+#ifndef TIGHTDB_QUERY_HPP
+#define TIGHTDB_QUERY_HPP
 
 #include <string>
 #include <algorithm>
@@ -32,12 +32,14 @@
     #include <pthread.h>
 #endif
 
+#include "table_view.hpp"
+
 namespace tightdb {
+
 
 // Pre-declarations
 class ParentNode;
 class Table;
-class TableView;
 
 const size_t MAX_THREADS = 128;
 
@@ -72,10 +74,10 @@ public:
     void Or();
 
     // Searching
-    size_t    find_next(Table& table, size_t lastmatch=-1);
-    TableView find_all(Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
-    void      find_all(Table& table, TableView& tv, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
-    
+    size_t         find_next(Table& table, size_t lastmatch=-1); // FIXME: Should this one not take a 'const Table' argument?
+    TableView      find_all(Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
+    ConstTableView find_all(const Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
+
     // Aggregates
     int64_t sum(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     int64_t maximum(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
@@ -87,8 +89,9 @@ public:
     size_t  remove(Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
     
     // Multi-threading
-    void FindAllMulti(Table& table, TableView& tv, size_t start=0, size_t end=size_t(-1));
-    int  SetThreads(unsigned int threadcount);
+    TableView      FindAllMulti(Table& table, size_t start=0, size_t end=size_t(-1));
+    ConstTableView FindAllMulti(const Table& table, size_t start=0, size_t end=size_t(-1));
+    int            SetThreads(unsigned int threadcount);
 
     std::string Verify();
     
@@ -132,6 +135,6 @@ private:
 };
 
 
-}
+} // namespace tightdb
 
-#endif // __TIGHTDB_QUERY_HPP
+#endif // TIGHTDB_QUERY_HPP

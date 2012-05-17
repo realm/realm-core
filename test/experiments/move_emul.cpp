@@ -1,58 +1,93 @@
 #include <iostream>
 using namespace std;
 
-// std::forward?
-// Move emul works in C++11?
-// Binding 'const A' to T in template<class T> foo(T&) C++03 / C++11?
-// C++11 decltype and auto gives access to private type through return of value of that type from method? Yes
-// Expand to const non-const parent scenario
-// How to also support proper copying?
 
-/*
-template<class T> class rv: public T {
-  rv();
-  ~rv();
-  rv(const rv&);
-  void operator=(const rv&);
-};
-*/
+namespace tightdb {
+
+    struct Data {
+        Data() { cout << "Data()\n"; }
+        ~Data() { cout << "~Data()\n"; }
+        Data* clone() const { return new Data(); }
+    };
 
 
-struct A {
-  A() {}
+    struct CopyAndMove {
+        CopyAndMove(): m_data(new Data()) {}
+        ~CopyAndMove() { delete m_data; }
 
-private:
-  struct move { A* a; move(A* a): a(a) {} };
-  struct copy { const A* a; copy(const A* a): a(a) {} };
+        CopyAndMove(const CopyAndMove& a): m_data(a.m_data->clone()) { cout << "Copy CopyAndMove (constructor)\n"; }
+        CopyAndMove& operator=(CopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; cout << "Move CopyAndMove (assign)\n"; return *this; }
 
-  int i;
+        friend CopyAndMove move(CopyAndMove& a) { Data* d = a.m_data; a.m_data = 0; cout << "Move CopyAndMove (move)\n"; return CopyAndMove(d); }
 
-public:
-  operator move() { return move(this); }
-  operator copy() const { return copy(this); }
-  A(move) { cout << "Move construct from non-const r-value\n"; }
-  A& operator=(move) { cout << "Move assign from non-const r-value\n"; return *this; }
-  A(A&) { cout << "Copy construct from non-const l-value\n"; }
-  A(copy) { cout << "Copy construct from const value\n"; }
-  A& operator=(A&) { cout << "Copy assign from non-const l-value\n"; return *this; }
-  A& operator=(copy) { cout << "Copy assign from const value\n"; return *this; }
+    private:
+        friend class ConstCopyAndMove;
 
-/*
-  A(rv<A>&) {}
-  A& operator=(rv<A>&) { return *this; }
-  operator rv<A>&() { return static_cast<rv<A>&>(*this); }
-*/
-};
+        Data* m_data;
+
+        CopyAndMove(Data* d): m_data(d) {}
+    };
 
 
-A func() { return A(); }
+    struct ConstCopyAndMove {
+        ConstCopyAndMove(): m_data(new Data()) {}
+        ~ConstCopyAndMove() { delete m_data; }
+
+        ConstCopyAndMove(const ConstCopyAndMove& a): m_data(a.m_data->clone()) { cout << "Copy ConstCopyAndMove (constructor)\n"; }
+        ConstCopyAndMove& operator=(ConstCopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; cout << "Move ConstCopyAndMove (assign)\n"; return *this; }
+
+        ConstCopyAndMove(CopyAndMove a): m_data(a.m_data) { a.m_data = 0; cout << "Move CopyAndMove to ConstCopyAndMove (constructor)\n"; }
+        ConstCopyAndMove& operator=(CopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; cout << "Move CopyAndMove to ConstCopyAndMove (assign)\n"; return *this; }
+
+        friend ConstCopyAndMove move(ConstCopyAndMove& a) { const Data* d = a.m_data; a.m_data = 0; cout << "Move ConstCopyAndMove (move)\n"; return ConstCopyAndMove(d); }
+
+    private:
+        const Data* m_data;
+
+        ConstCopyAndMove(const Data* d): m_data(d) {}
+    };
+
+} // namespace tightdb
+
+
+
+tightdb::CopyAndMove func(tightdb::CopyAndMove a) { return move(a); }
 
 int main()
 {
-  A a = func();
-cout << a.i << "A\n";
-  A b(a);
-cout << "B\n";
+    tightdb::CopyAndMove x1, x2;
+    cout << "---A---\n";
+    x2 = x1;
+    cout << "---B---\n";
+    x2 = move(x1);
 
-  return 0;
+    cout << "---0---\n";
+    tightdb::CopyAndMove a1;
+    cout << "---1---\n";
+    tightdb::CopyAndMove a2 = func(func(func(func(a1)))); // One genuine copy, and 'a1' is left untouched
+    cout << "---2---\n";
+    tightdb::CopyAndMove a3 = func(func(func(func(move(a2))))); // Zero genuine copies, and 'a2' is left truncated
+    cout << "---3---\n";
+    const tightdb::CopyAndMove a4(a3); // Copy
+    cout << "---4---\n";
+    tightdb::CopyAndMove a5(a4); // Copy from const
+    cout << "---5---\n";
+    static_cast<void>(a5);
+
+    tightdb::ConstCopyAndMove b1(a1); // One genuine copy
+    cout << "---6---\n";
+    tightdb::ConstCopyAndMove b2(move(a1)); // Zero genuine copies, and 'a1' is left truncated
+    cout << "---7---\n";
+    tightdb::ConstCopyAndMove b3(a4); // One genuine copy from const
+    cout << "---8---\n";
+    tightdb::ConstCopyAndMove b4(func(func(func(func(a3))))); // One genuine copy, and 'a3' is left untouched
+    cout << "---9---\n";
+    tightdb::ConstCopyAndMove b5(func(func(func(func(move(a3)))))); // Zero genuine copies, and 'a3' is left truncated
+    static_cast<void>(b1);
+    static_cast<void>(b2);
+    static_cast<void>(b3);
+    static_cast<void>(b4);
+    static_cast<void>(b5);
+
+    return 0;
 }

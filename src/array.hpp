@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_ARRAY__
-#define __TDB_ARRAY__
+#ifndef TIGHTDB_ARRAY_HPP
+#define TIGHTDB_ARRAY_HPP
 
 #ifdef _MSC_VER
 #include "win32/stdint.h"
@@ -114,19 +114,26 @@ protected:
 };
 
 
+/**
+ * An Array can be copied, but it will leave the source in a truncated
+ * (and therfore unusable) state.
+ *
+ * FIXME: Array should be endowed with proper copy and move semantics like TableView is.
+ */
 class Array: public ArrayParent {
 public:
     Array(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
     Array(ColumnDef type=COLUMN_NORMAL, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    Array(Allocator& alloc);
-    Array(const Array& a);
+    Array(Allocator& alloc); ///< Create an array in the invalid state (a null array).
+    Array(const Array& a); // FIXME: This is a moving copy and therfore it compromises constness.
     virtual ~Array();
 
     bool operator==(const Array& a) const;
-    bool Copy(const Array& a);
 
     void SetType(ColumnDef type);
     void UpdateRef(size_t ref);
+    bool Copy(const Array&); // Copy semantics for assignment
+    void move_assign(Array&); // Move semantics for assignment
 
     // Parent tracking
     bool HasParent() const {return m_parent != NULL;}
@@ -168,6 +175,7 @@ public:
 
     template <class F> size_t find_first(F function_, int64_t value, size_t start, size_t end) const
     {
+        static_cast<void>(function_); // FIXME: Why is this parameter never used?
         const F function = {};
         if(end == (size_t)-1)
             end = m_len;
@@ -316,7 +324,8 @@ protected:
 
 
 
-// Templates
+
+// Implementation:
 
 template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 {
@@ -386,7 +395,7 @@ template<class S> void Array::WriteAt(size_t pos, S& out) const
     // parse header
     size_t len          = get_header_len();
     const WidthType wt  = get_header_wtype();
-    
+
     // Adjust length to number of bytes
     if (wt == TDB_BITS) {
         const size_t bits = (len * m_width);
@@ -396,16 +405,23 @@ template<class S> void Array::WriteAt(size_t pos, S& out) const
     else if (wt == TDB_MULTIPLY) {
         len *= m_width;
     }
-    
+
     // TODO: replace capacity with checksum
-    
+
     // Calculate complete size
     len += 8; // include header in total
     const size_t rest = (~len & 0x7)+1; // CHECK
     if (rest < 8) len += rest; // Add padding for 64bit alignment
-    
+
     // Write array
     out.WriteAt(pos, (const char*)m_data-8, len);
+}
+
+inline void Array::move_assign(Array& a)
+{
+    Destroy();
+    UpdateRef(a.GetRef());
+    a.Invalidate();
 }
 
 inline void Array::update_ref_in_parent(size_t ref)
@@ -425,6 +441,7 @@ inline size_t Array::get_child_ref(size_t subtable_ndx) const
     return GetAsRef(subtable_ndx);
 }
 
-}
 
-#endif //__TDB_ARRAY__
+} // namespace tightdb
+
+#endif // TIGHTDB_ARRAY_HPP

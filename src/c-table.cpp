@@ -400,10 +400,9 @@ size_t table_find_string(const Table* t, size_t column_ndx, const char* value) {
 	return t->find_first_string(column_ndx, value);
 }
 
-TableView* table_find_all_int64(Table* t, size_t column_ndx, int64_t value) {
-	TableView* tv = new TableView(*t);
-	t->find_all_int(*tv, column_ndx, value);
-	return tv;
+TableView* table_find_all_int64(Table* t, size_t column_ndx, int64_t value)
+{
+    return new TableView(t->find_all_int(column_ndx, value));
 }
 
 
@@ -488,11 +487,11 @@ void tableview_clear_table(TableView* tv, size_t column_ndx, size_t ndx) {
 /* Search and sort */
 
 size_t tableview_find(TableView* tv, size_t column_ndx, int64_t value) {
-    return tv->find_first(column_ndx, value);
+    return tv->find_first_int(column_ndx, value);
 }
 
 size_t tableview_find_string(TableView* tv, size_t column_ndx, const char* value) {
-    return tv->find_first(column_ndx, value);
+    return tv->find_first_string(column_ndx, value);
 }
 
 #if 0
@@ -659,22 +658,20 @@ Query*  query_string_contains(Query* q, size_t column_ndx, const char* value, Ca
 /* ??? Currently missing support for Query on Mixed and Binary */
 
 
-TableView*  query_find_all(Query* q, Table* t) {
-    TableView* tv = new TableView(*t);
-    q->find_all(*t, *tv, 0, size_t(-1), size_t(-1));
-    return tv;
+TableView* query_find_all(Query* q, Table* t)
+{
+    return new TableView(q->find_all(*t, 0, size_t(-1), size_t(-1)));
 }
 
-TableView*  query_find_all_range(Query* q, Table* t, size_t start, size_t end, size_t limit) {
-    TableView* tv = new TableView(*t);
-    q->find_all(*t, *tv, start, end, limit);
-    return tv;
+TableView* query_find_all_range(Query* q, Table* t, size_t start, size_t end, size_t limit)
+{
+    return new TableView(q->find_all(*t, start, end, limit));
 }
 
 /* Aggregations */
 
 size_t query_count(Query* q, const Table* t) {
-    return q->count(*t, 0U, (size_t)-1, (size_t)-1);
+    return q->count(*t, 0U, size_t(-1), size_t(-1));
 }
 
 size_t query_count_range(Query* q, const Table* t, size_t start, size_t end, size_t limit) {
