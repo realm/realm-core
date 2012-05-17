@@ -153,7 +153,7 @@ void SlabAlloc::Free(size_t ref, void* p)
 {
     // Free space in read only segment is tracked separately
     FreeSpace& freeSpace = IsReadOnly(ref) ? m_freeReadOnly : m_freeSpace;
-    
+
     // Get size from segment
     const size_t size = GetSizeFromHeader(p);
     const size_t refEnd = ref + size;
@@ -368,7 +368,7 @@ void SlabAlloc::FreeAll(size_t filesize)
 {
     assert(filesize >= m_baseline);
     assert((filesize & 0x7) == 0); // 64bit alignment
-  
+
 #if !defined(_MSC_VER) // write persistence
     // If the file size have changed, we need to remap the readonly buffer
     if (filesize != m_baseline) {
@@ -376,7 +376,7 @@ void SlabAlloc::FreeAll(size_t filesize)
         munmap(m_shared, m_baseline);
         void* const p = mmap(0, filesize, PROT_READ, MAP_SHARED, m_fd, 0);
         assert(p);
-        
+
         m_shared   = (char*)p;
         m_baseline = filesize;
     }

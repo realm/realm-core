@@ -65,7 +65,7 @@ public:
     {
         fseek(m_file, pos, SEEK_SET);
     }
-    
+
 private:
     size_t m_pos;
     FILE*  m_file;
@@ -108,12 +108,12 @@ Group::Group(const char* buffer, size_t len):
 void Group::create()
 {
     m_tables.SetType(COLUMN_HASREFS);
-    
+
     m_top.add(m_tableNames.GetRef());
     m_top.add(m_tables.GetRef());
     m_top.add(m_freePositions.GetRef());
     m_top.add(m_freeLengths.GetRef());
-    
+
     // Set parent info
     m_tableNames.SetParent(&m_top, 0);
     m_tables.SetParent(&m_top, 1);
@@ -125,7 +125,7 @@ void Group::create_from_ref()
 {
     // Get ref for table top array
     const size_t top_ref = m_alloc.GetTopRef();
-    
+
     // Instantiate top arrays
     if (top_ref == 0) {
         m_top.SetType(COLUMN_HASREFS);
@@ -133,9 +133,9 @@ void Group::create_from_ref()
         m_tableNames.SetType(COLUMN_NORMAL);
         m_freePositions.SetType(COLUMN_NORMAL);
         m_freeLengths.SetType(COLUMN_NORMAL);
-        
+
         create();
-        
+
         // Everything but header is free space
         m_freePositions.add(8);
         m_freeLengths.add(m_alloc.GetFileLen()-8);
@@ -143,12 +143,12 @@ void Group::create_from_ref()
     else {
         m_top.UpdateRef(top_ref);
         assert(m_top.Size() >= 2);
-        
+
         m_tableNames.UpdateRef(m_top.Get(0));
         m_tables.UpdateRef(m_top.Get(1));
         m_tableNames.SetParent(&m_top, 0);
         m_tables.SetParent(&m_top, 1);
-        
+
         // Serialized files do not have free space markers
         if (m_top.Size() > 2) {
             m_freePositions.UpdateRef(m_top.Get(2));
@@ -156,7 +156,7 @@ void Group::create_from_ref()
             m_freePositions.SetParent(&m_top, 2);
             m_freeLengths.SetParent(&m_top, 3);
         }
-        
+
         // Make room for pointers to cached tables
         const size_t count = m_tables.Size();
         for (size_t i = 0; i < count; ++i) {
@@ -257,23 +257,23 @@ char* Group::write_to_mem(size_t& len)
 bool Group::commit()
 {
     if (!m_alloc.CanPersist()) return false;
-    
+
     // If we have an empty db file, we can just serialize directly
     //if (m_alloc.GetTopRef() == 0) {}
-    
+
     GroupWriter out(*this);
     if (!out.IsValid()) return false;
-    
+
     // Recursively write all changed arrays to end of file
     out.Commit();
-    
+
     return true;
 }
 
 size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool ensureRest)
 {
     if (ensureRest) ++len;
-    
+
     // Do we have a free space we can reuse?
     for (size_t i = 0; i < m_freeLengths.Size(); ++i) {
         const size_t free_len = m_freeLengths.Get(i);
@@ -281,7 +281,7 @@ size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool e
             const size_t location = m_freePositions.Get(i);
             if (testOnly) return location;
             if (ensureRest) --len;
-            
+
             // Update free list
             const size_t rest = free_len - len;
             if (rest == 0) {
@@ -292,11 +292,11 @@ size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool e
                 m_freeLengths.Set(i, rest);
                 m_freePositions.Set(i, location + len);
             }
-            
+
             return location;
         }
     }
-    
+
     // No free space, so we have to expand the file.
     // we always expand megabytes at a time, both for
     // performance and to avoid excess fragmentation
@@ -318,7 +318,7 @@ size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool e
     const size_t rest = filesize - end;
     m_freePositions.add(end);
     m_freeLengths.add(rest);
-    
+
     return old_filesize;
 }
 
@@ -337,7 +337,7 @@ void Group::connect_free_space(bool doConnect)
         m_top.Set(3, 0);
         m_freePositions.SetParent(NULL, 0);
         m_freeLengths.SetParent(NULL, 0);
-        
+
     }
 }
 
@@ -345,16 +345,16 @@ void Group::update_refs(size_t topRef)
 {
     // Update top with the new (persistent) ref
     m_top.UpdateRef(topRef);
-    
+
     // Now we can update it's child arrays
     m_tableNames.UpdateFromParent();
     //m_freePositions.UpdateFromParent();
     //m_freeLengths.UpdateFromParent();
-    
+
     // if the tables have not been modfied we don't
     // need to update cached tables
     if (!m_tables.UpdateFromParent()) return;
-    
+
     // Also update cached tables
     const size_t count = m_cachedtables.Size();
     for (size_t i = 0; i < count; ++i) {
@@ -385,7 +385,7 @@ MemStats Group::stats()
 {
     MemStats stats;
     m_top.Stats(stats);
-    
+
     return stats;
 }
 

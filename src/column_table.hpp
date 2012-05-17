@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -32,7 +32,7 @@ class ColumnSubtableParent: public Column, public Table::Parent
 {
 public:
     void UpdateFromParent();
-    
+
 protected:
     ColumnSubtableParent(ArrayParent* parent_array, std::size_t parent_ndx,
                          Allocator& alloc, const Table* tab);
@@ -162,7 +162,7 @@ protected:
 
 
 // Implementation
-    
+
 inline void ColumnSubtableParent::UpdateFromParent()
 {
     if (!m_array->UpdateFromParent()) return;
@@ -238,11 +238,11 @@ inline void ColumnSubtableParent::SubtableMap::remove(size_t subtable_ndx)
     m_indices.Delete(pos);
     m_wrappers.Delete(pos);
 }
-    
+
 inline void ColumnSubtableParent::SubtableMap::update_from_parents()
 {
     if (!m_indices.IsValid()) return;
-    
+
     const size_t count = m_wrappers.Size();
     for (size_t i = 0; i < count; ++i) {
         Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));

@@ -70,19 +70,19 @@ void mixed_delete(Mixed *mixed)
 
 int64_t mixed_get_int(Mixed *mixed)
 {
-    return mixed->get_int(); 
+    return mixed->get_int();
 }
 bool mixed_get_bool(Mixed *mixed)
 {
-    return mixed->get_bool(); 
+    return mixed->get_bool();
 }
 time_t mixed_get_date(Mixed *mixed)
 {
-    return mixed->get_date(); 
+    return mixed->get_date();
 }
 const char* mixed_get_string(Mixed *mixed)
 {
-    return mixed->get_string(); 
+    return mixed->get_string();
 }
 BinaryData mixed_get_binary(Mixed *mixed)
 {
@@ -139,7 +139,7 @@ size_t spec_get_column_index(Spec* spec, const char* name)
 
 // Pre-declare local functions
 void table_insert_impl(Table* t, size_t ndx, va_list ap);
-    
+
 Table* table_new()
 {
     return new Table();
@@ -261,12 +261,12 @@ ColumnType table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx)
 
 Table* table_get_table(Table* t, size_t column_ndx, size_t ndx)
 {
-    return TableHelper_get_subtable_ptr(t, column_ndx, ndx); 
+    return TableHelper_get_subtable_ptr(t, column_ndx, ndx);
 }
 
 const Table* table_get_ctable(const Table* t, size_t column_ndx, size_t ndx)
 {
-    return TableHelper_get_const_subtable_ptr(t, column_ndx, ndx); 
+    return TableHelper_get_const_subtable_ptr(t, column_ndx, ndx);
 }
 
 /*** Setters *******/
@@ -672,7 +672,7 @@ Table* group_get_table(Group* group, const char* name)
     /*??? Waiting for removal of TopLevelTable*/
     /* return group->get_subtable(name); */
 }
-#endif  
+#endif
 
 /* Serialization */
 void group_write(Group* group, const char* filepath)
@@ -731,7 +731,7 @@ Query* query_bool_equal(Query* q, size_t column_ndx, bool value)
 
 Query* query_int_equal(Query* q, size_t column_ndx, int64_t value)
 {
-    return new Query(q->equal(column_ndx, value));    
+    return new Query(q->equal(column_ndx, value));
 }
 
 /* Integers */
@@ -761,7 +761,7 @@ Query*  query_int_between(Query* q, size_t column_ndx, int64_t from, int64_t to)
     return new Query(q->between(column_ndx, from , to));
 }
 
-/* Strings */ 
+/* Strings */
 
 Query*  query_string_equal(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive)
 {

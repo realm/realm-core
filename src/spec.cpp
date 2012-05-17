@@ -88,10 +88,10 @@ bool Spec::update_from_parent() {
 void Spec::add_column(ColumnType type, const char* name)
 {
     assert(name);
-    
+
     m_names.add(name);
     m_spec.add(type);
-    
+
     if (type == COLUMN_TYPE_TABLE) {
         // SubSpecs array is only there when there are subtables
         if (m_specSet.Size() == 2) {
@@ -101,16 +101,16 @@ void Spec::add_column(ColumnType type, const char* name)
             m_specSet.add(m_subSpecs.GetRef());
             m_subSpecs.SetParent(&m_specSet, 2);
         }
-        
+
         Allocator& alloc = m_specSet.GetAllocator();
-        
+
         // Create spec for new subtable
         Array spec(COLUMN_NORMAL, NULL, 0, alloc);
         ArrayString names(NULL, 0, alloc);
         Array specSet(COLUMN_HASREFS, NULL, 0, alloc);
         specSet.add(spec.GetRef());
         specSet.add(names.GetRef());
-        
+
         // Add to list of subspecs
         const size_t ref = specSet.GetRef();
         m_subSpecs.add(ref);
@@ -121,7 +121,7 @@ Spec Spec::add_subtable_column(const char* name)
 {
     const size_t column_ndx = m_names.Size();
     add_column(COLUMN_TYPE_TABLE, name);
-    
+
     return get_subspec(column_ndx);
 }
 
@@ -129,17 +129,17 @@ Spec Spec::get_subspec(size_t column_ndx)
 {
     assert(column_ndx < m_spec.Size());
     assert((ColumnType)m_spec.Get(column_ndx) == COLUMN_TYPE_TABLE);
-    
+
     // The subspec array only keep info for subtables
     // so we need to count up to it's position
     size_t pos = 0;
     for (size_t i = 0; i < column_ndx; ++i) {
         if ((ColumnType)m_spec.Get(i) == COLUMN_TYPE_TABLE) ++pos;
     }
-    
+
     Allocator& alloc = m_specSet.GetAllocator();
     const size_t ref = m_subSpecs.GetAsRef(pos);
-    
+
     return Spec(alloc, ref, &m_subSpecs, pos);
 }
 
@@ -147,28 +147,28 @@ const Spec Spec::get_subspec(size_t column_ndx) const
 {
     assert(column_ndx < m_spec.Size());
     assert((ColumnType)m_spec.Get(column_ndx) == COLUMN_TYPE_TABLE);
-    
+
     // The subspec array only keep info for subtables
     // so we need to count up to it's position
     size_t pos = 0;
     for (size_t i = 0; i < column_ndx; ++i) {
         if ((ColumnType)m_spec.Get(i) == COLUMN_TYPE_TABLE) ++pos;
     }
-    
+
     Allocator& alloc = m_specSet.GetAllocator();
     const size_t ref = m_subSpecs.GetAsRef(pos);
-    
+
     return Spec(alloc, ref, NULL, 0);
 }
 
 size_t Spec::get_subspec_ref(std::size_t subtable_ndx) const {
     assert(subtable_ndx < m_subSpecs.Size());
-    
+
     // Note that this addresses subspecs directly, indexing
     // by number of sub-table columns
     return m_subSpecs.GetAsRef(subtable_ndx);
 }
-    
+
 size_t Spec::get_type_attr_count() const {
     return m_spec.Size();
 }
@@ -185,7 +185,7 @@ size_t Spec::get_column_count() const
 ColumnType Spec::get_real_column_type(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    
+
     ColumnType type;
     size_t column_ndx = 0;
     for (size_t i = 0; column_ndx <= ndx; ++i) {
@@ -193,16 +193,16 @@ ColumnType Spec::get_real_column_type(size_t ndx) const
         if (type >= COLUMN_ATTR_INDEXED) continue; // ignore attributes
         ++column_ndx;
     }
-    
+
     return type;
 }
 
 ColumnType Spec::get_column_type(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    
+
     const ColumnType type = get_real_column_type(ndx);
-    
+
     // Hide internal types
     if (type == COLUMN_TYPE_STRING_ENUM) return COLUMN_TYPE_STRING;
     else return type;
@@ -210,31 +210,31 @@ ColumnType Spec::get_column_type(size_t ndx) const
 
 void Spec::set_column_type(std::size_t column_ndx, ColumnType type) {
     assert(column_ndx < get_column_count());
-    
+
     size_t type_ndx = 0;
     size_t column_count = 0;
     const size_t count = m_spec.Size();
-    
+
     for (;type_ndx < count; ++type_ndx) {
         const size_t t = (ColumnType)m_spec.Get(type_ndx);
         if (t >= COLUMN_ATTR_INDEXED) continue; // ignore attributes
         if (column_count == column_ndx) break;
         ++column_count;
     }
-    
+
     // At this point we only support upgrading to string enum
     assert((ColumnType)m_spec.Get(type_ndx) == COLUMN_TYPE_STRING);
     assert(type == COLUMN_TYPE_STRING_ENUM);
-    
+
     m_spec.Set(type_ndx, type);
 }
 
 ColumnType Spec::get_column_attr(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    
+
     size_t column_ndx = 0;
-    
+
     // The attribute is an optional prefix for the type
     for (size_t i = 0; column_ndx <= ndx; ++i) {
         const ColumnType type = (ColumnType)m_spec.Get(i);
@@ -243,7 +243,7 @@ ColumnType Spec::get_column_attr(size_t ndx) const
         }
         else ++column_ndx;
     }
-    
+
     return COLUMN_ATTR_NONE;
 }
 
@@ -251,9 +251,9 @@ void Spec::set_column_attr(size_t ndx, ColumnType attr)
 {
     assert(ndx < get_column_count());
     assert(attr >= COLUMN_ATTR_INDEXED);
-    
+
     size_t column_ndx = 0;
-    
+
     for (size_t i = 0; column_ndx <= ndx; ++i) {
         const ColumnType type = (ColumnType)m_spec.Get(i);
         if (type >= COLUMN_ATTR_INDEXED) {
@@ -304,31 +304,31 @@ void Spec::verify() const {
 void Spec::to_dot(std::ostream& out, const char*) const
 {
     const size_t ref = m_specSet.GetRef();
-    
+
     out << "subgraph cluster_specset" << ref << " {" << endl;
     out << " label = \"specset\";" << endl;
-    
+
     m_specSet.ToDot(out);
     m_spec.ToDot(out, "spec");
     m_names.ToDot(out, "names");
     if (m_subSpecs.IsValid()) {
         m_subSpecs.ToDot(out, "subspecs");
-        
+
         const size_t count = m_subSpecs.Size();
         Allocator& alloc = m_specSet.GetAllocator();
-        
+
         // Write out subspecs
         for (size_t i = 0; i < count; ++i) {
             const size_t ref = m_subSpecs.GetAsRef(i);
             const Spec s(alloc, ref, NULL, 0);
-            
+
             s.to_dot(out);
         }
     }
-    
+
     out << "}" << endl;
 }
-    
+
 #endif //_DEBUG
 
 

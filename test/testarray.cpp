@@ -1192,35 +1192,35 @@ TEST(ArrayCopy)
     a.add(2);
     a.add(3);
     a.add(4);
-    
+
     Array b;
     b.Copy(a);
-    
+
 #ifdef _DEBUG
     b.Verify();
 #endif
-    
+
     CHECK_EQUAL(5, b.Size());
     CHECK_EQUAL(0, b.Get(0));
     CHECK_EQUAL(1, b.Get(1));
     CHECK_EQUAL(2, b.Get(2));
     CHECK_EQUAL(3, b.Get(3));
     CHECK_EQUAL(4, b.Get(4));
-    
+
     // With sub-arrays
     Array c(COLUMN_HASREFS);
     c.add(a.GetRef());
-    
+
     Array d;
     d.Copy(c);
-    
+
 #ifdef _DEBUG
     b.Verify();
 #endif
-    
+
     CHECK(d.HasRefs());
     CHECK_EQUAL(1, d.Size());
-    
+
     const Array e = d.GetSubArray(0);
     CHECK_EQUAL(5, e.Size());
     CHECK_EQUAL(0, e.Get(0));
@@ -1228,7 +1228,7 @@ TEST(ArrayCopy)
     CHECK_EQUAL(2, e.Get(2));
     CHECK_EQUAL(3, e.Get(3));
     CHECK_EQUAL(4, e.Get(4));
-    
+
     //a.Destroy() // will be destroyed as sub-array by c
     b.Destroy();
     c.Destroy();

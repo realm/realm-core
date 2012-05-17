@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -24,7 +24,7 @@
   MyTable_(...)
     setCOL, getCOL,
      queryCOL
- 
+
  Test
  Document
 
@@ -99,7 +99,7 @@ typedef struct Query Query;
 
 
 /*** Mixed ************************************/
-    
+
     /* Allocate new Mixed type */
     Mixed   *mixed_new_bool(bool value);
     Mixed   *mixed_new_int(int64_t value);
@@ -116,17 +116,17 @@ typedef struct Query Query;
     const char* mixed_get_string(Mixed* mixed);
     BinaryData  mixed_get_binary(Mixed* mixed);
 //??? Wait for implementation:
-//    Table*        mixed_get_table(Mixed* mixed); 
+//    Table*        mixed_get_table(Mixed* mixed);
 
 
 /*** Spec ************************************/
-    
+
     size_t      spec_get_ref(Spec* spec);
     void        spec_add_column(Spec* spec, ColumnType type, const char* name);
     Spec*       spec_add_column_table(Spec* spec, const char* name);
-   
+
     Spec*       spec_get_spec(Spec* spec, size_t column_ndx);
-   
+
     size_t      spec_get_column_count(Spec* spec);
     ColumnType  spec_get_column_type(Spec* spec, size_t column_idx);
     const char* spec_get_column_name(Spec* spec, size_t column_idx);
@@ -141,12 +141,12 @@ typedef struct Query Query;
     Table*      table_new();
     void        table_delete(Table* t);     /* Delete after use of table_new() */
     void        table_unbind(Table* t);     /* Ref-count delete of table* from table_get_table(..) */
-    
+
     /* Specify table */
     Spec*       table_get_spec(Table* t);     /* Use spec_delete() when done */
     void        table_update_from_spec(Table* t);
     size_t      table_register_column(Table* t, ColumnType type, const char* name);
-    
+
     /* Column meta information */
     size_t      table_get_column_count(const Table* t);
     size_t      table_get_column_index(const Table* t, const char* name);
@@ -189,7 +189,7 @@ typedef struct Query Query;
     void table_set_string(Table* t, size_t column_ndx, size_t ndx, const char* value);
     void table_set_binary(Table* t, size_t column_ndx, size_t ndx, const char* value, size_t len);
     void table_set_mixed(Table* t, size_t column_ndx, size_t ndx, Mixed value);
- 
+
     void table_clear_table(Table* t, size_t column_ndx, size_t ndx);
 
     /* Indexing */
@@ -223,7 +223,7 @@ typedef struct Query Query;
 
     /* Creating and deleting tableviews */
     void tableview_delete(TableView* t);
-    
+
     /* TableView size */
     bool    tableview_is_empty(const TableView* tv);
     size_t  tableview_get_size(const TableView* tv);
@@ -236,10 +236,10 @@ typedef struct Query Query;
     const char* tableview_get_string(const TableView* tv, size_t column_ndx, size_t ndx);
 //???    BinaryData tableview_get_binary(const TableView* tv, size_t column_ndx, size_t ndx);
 //???    Mixed tableview_get_mixed(const TableView* tv, size_t column_ndx, size_t ndx);
-    
+
     Table*      tableview_get_table(const TableView* tv, size_t column_ndx, size_t ndx);
     /* Use table_unbind() to 'delete' the table after use */
-    
+
     /* Setting values */
     void tableview_set_int(TableView* tv, size_t column_ndx, size_t ndx, int64_t value);
     void tableview_set_bool(TableView* tv, size_t column_ndx, size_t ndx, bool value);
@@ -270,19 +270,19 @@ typedef struct Query Query;
     Group*      group_new_file(const char* filename);
     Group*      group_new_mem(const char* buffer, size_t len);
     void        group_delete(Group* group);
-    
+
     bool        group_is_valid(Group* group);
     size_t      group_get_table_count(Group* group);
     const char* group_get_table_name(Group* group, size_t table_ndx);
     bool        group_has_table(Group* group, const char* name);
-    
+
     Table*      group_get_table(Group* group, const char* name);
-    
+
     // Serialization
     void        group_write(Group* group, const char* filepath);
     char*       group_write_to_mem(Group* group, size_t* len);
 
-    
+
 /*** Query ************************************/
 
     Query*  query_new();
@@ -315,7 +315,7 @@ typedef struct Query Query;
     Query*  query_string_begins_with(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive);
     Query*  query_string_ends_with(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive);
     Query*  query_string_contains(Query* q, size_t column_ndx, const char* value, CaseSensitivity_t case_sensitive);
-    
+
 /* Currently missing support for Query on Mixed and Binary */
 
     TableView*  query_find_all(Query* q, Table* t);
@@ -324,7 +324,7 @@ typedef struct Query Query;
 
     size_t   query_count(Query* q, const Table* t);
     size_t   query_count_range(Query* q, const Table* t,
-                               size_t start, size_t end, size_t limit); 
+                               size_t start, size_t end, size_t limit);
     int64_t  query_min(Query* q, const Table* t, size_t column_ndx, size_t* resultcount);
     int64_t  query_min_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
                              size_t start, size_t end, size_t limit);

@@ -31,8 +31,8 @@ tdb_type_bool bool_data[TEST_DATA_ROWS];
 char str[20];
 
 
-TIGHTDB_TABLE_2(mytable, 
-                MyInt, Int, 
+TIGHTDB_TABLE_2(mytable,
+                MyInt, Int,
                 MyStr, String)
 
 int c_test_1() {
@@ -52,7 +52,7 @@ int c_test_1() {
     mytable_insert(tbl, 55, 123456789, "123456789");
     if (strcmp(mytable_get_MyStr(tbl, 55), "123456789") != 0)
         passed = false;
-    
+
     table_delete_row(tbl, 55);
     table_delete_row(tbl, 7);
     if (table_get_size(tbl) != TEST_DATA_ROWS)
@@ -73,7 +73,7 @@ int c_test_1() {
 }
 
 
-int c_test_2() 
+int c_test_2()
 {
     // Test data
     int int_data[TEST_DATA_ROWS];
