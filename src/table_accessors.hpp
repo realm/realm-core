@@ -341,7 +341,7 @@ public:
 
     std::size_t find_pos(int64_t value) const
     {
-        return Base::m_table->get_impl()->find_pos_int(col_idx, value); // FIXME: No TableView::find_pos_int(col_idx, value)
+        return Base::m_table->get_impl()->find_pos_int(col_idx, value);
     }
 
     BasicTableView<typename Base::RealTable> find_all(int64_t value) const
@@ -366,7 +366,7 @@ public:
 
     const ColumnAccessor& operator+=(int64_t value) const
     {
-        Base::m_table->get_impl()->add_int(col_idx, value); // FIXME: No TableView::add_int(col_idx, value)
+        Base::m_table->get_impl()->add_int(col_idx, value);
         return *this;
     }
 

@@ -94,7 +94,7 @@ public:
     int            SetThreads(unsigned int threadcount);
 
 #ifdef _DEBUG
-    std::string Verify();
+    std::string verify();
 #endif
 
     std::string error_code;

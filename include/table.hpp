@@ -148,11 +148,11 @@ public:
 
     // Debug
 #ifdef _DEBUG
-    bool Compare(const Table& c) const;
+    bool compare(const Table& c) const;
     void verify() const;
-    void ToDot(std::ostream& out, const char* title=NULL) const;
-    void Print() const;
-    MemStats Stats() const;
+    void to_dot(std::ostream& out, const char* title=NULL) const;
+    void print() const;
+    MemStats stats() const;
 #endif //_DEBUG
 
     // todo, note, these three functions have been protected

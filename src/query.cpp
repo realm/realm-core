@@ -430,7 +430,7 @@ int Query::SetThreads(unsigned int threadcount)
 }
 
 #ifdef _DEBUG
-std::string Query::Verify()
+std::string Query::verify()
 {
     if(first.size() == 0)
         return "";

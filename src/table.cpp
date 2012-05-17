@@ -1384,7 +1384,7 @@ void Table::to_json(std::ostream& out)
 
 #ifdef _DEBUG
 
-bool Table::Compare(const Table& c) const
+bool Table::compare(const Table& c) const
 {
     if (!m_spec_set.compare(c.m_spec_set)) return false;
 
@@ -1488,7 +1488,7 @@ void Table::verify() const
     alloc.Verify();
 }
 
-void Table::ToDot(std::ostream& out, const char* title) const
+void Table::to_dot(std::ostream& out, const char* title) const
 {
     if (m_top.IsValid()) {
         out << "subgraph cluster_topleveltable" << m_top.GetRef() << " {" << endl;
@@ -1524,7 +1524,7 @@ void Table::ToDotInternal(std::ostream& out) const
     }
 }
 
-void Table::Print() const
+void Table::print() const
 {
     // Table header
     cout << "Table: len(" << m_size << ")\n    ";
@@ -1584,7 +1584,7 @@ void Table::Print() const
     cout << "\n";
 }
 
-MemStats Table::Stats() const
+MemStats Table::stats() const
 {
     MemStats stats;
     m_top.Stats(stats);

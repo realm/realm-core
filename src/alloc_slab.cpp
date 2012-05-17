@@ -59,8 +59,8 @@ SlabAlloc::~SlabAlloc()
 {
 #ifdef _DEBUG
     if (!IsAllFree()) {
-        m_slabs.Print();
-        m_freeSpace.Print();
+        m_slabs.print();
+        m_freeSpace.print();
         assert(false);
     }
 #endif //_DEBUG

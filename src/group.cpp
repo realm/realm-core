@@ -410,7 +410,7 @@ void Group::to_dot(std::ostream& out)
     for (size_t i = 0; i < m_tables.Size(); ++i) {
         const Table& table = get_table(i);
         const char* const name = get_table_name(i);
-        table.ToDot(out, name);
+        table.to_dot(out, name);
     }
 
     out << "}" << endl;

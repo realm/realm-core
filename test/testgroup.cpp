@@ -110,7 +110,7 @@ TEST(Group_Serialize1)
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table->Compare(*t));
+    CHECK(table->compare(*t));
 #endif
 
     // Modify both tables
@@ -123,7 +123,7 @@ TEST(Group_Serialize1)
 
 #ifdef _DEBUG
     // Verify that both changed correctly
-    CHECK(table->Compare(*t));
+    CHECK(table->compare(*t));
     toDisk.verify();
     fromDisk.verify();
 #endif //_DEBUG
@@ -170,8 +170,8 @@ TEST(Group_Serialize2)
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table1->Compare(*t1));
-    CHECK(table2->Compare(*t2));
+    CHECK(table1->compare(*t1));
+    CHECK(table2->compare(*t2));
     toDisk.verify();
     fromDisk.verify();
 #endif //_DEBUG
@@ -204,7 +204,7 @@ TEST(Group_Serialize3)
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table->Compare(*t));
+    CHECK(table->compare(*t));
     toDisk.verify();
     fromDisk.verify();
 #endif //_DEBUG}
@@ -245,7 +245,7 @@ TEST(Group_Serialize_Men)
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table->Compare(*t));
+    CHECK(table->compare(*t));
     toMem.verify();
     fromMem.verify();
 #endif //_DEBUG
@@ -284,7 +284,7 @@ TEST(Group_Serialize_Optimized)
 
     // Verify that original values are there
 #ifdef _DEBUG
-    CHECK(table->Compare(*t));
+    CHECK(table->compare(*t));
 #endif
 
     // Add a row with a known (but unique) value

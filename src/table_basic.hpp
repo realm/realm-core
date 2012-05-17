@@ -230,8 +230,8 @@ public:
 
 #ifdef _DEBUG
     using Table::verify;
-    using Table::Print;
-    bool Compare(const BasicTable& c) const { return Table::Compare(c); }
+    using Table::print;
+    bool compare(const BasicTable& c) const { return Table::compare(c); }
 #endif
 
 private:
@@ -309,7 +309,7 @@ public:
     }
 
 #ifdef _DEBUG
-    std::string Verify() { return m_impl.Verify(); }
+    std::string verify() { return m_impl.verify(); }
 #endif
 
 //    operator typename tightdb::Query() const { return m_impl; } // FIXME: Bad thing to copy queries
