@@ -312,8 +312,6 @@ public:
     std::string verify() { return m_impl.verify(); }
 #endif
 
-//    operator typename tightdb::Query() const { return m_impl; } // FIXME: Bad thing to copy queries
-
 private:
     tightdb::Query m_impl;
 };
