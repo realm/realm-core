@@ -74,7 +74,7 @@ public:
     void Or();
 
     // Searching
-    size_t         find_next(Table& table, size_t lastmatch=-1); // FIXME: Should this one not take a 'const Table' argument?
+    size_t         find_next(const Table& table, size_t lastmatch=-1);
     TableView      find_all(Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
     ConstTableView find_all(const Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
 
@@ -84,19 +84,21 @@ public:
     int64_t minimum(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     double  average(const Table& table, size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
     size_t  count(const Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
-    
+
     // Deletion
     size_t  remove(Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
-    
+
     // Multi-threading
     TableView      FindAllMulti(Table& table, size_t start=0, size_t end=size_t(-1));
     ConstTableView FindAllMulti(const Table& table, size_t start=0, size_t end=size_t(-1));
     int            SetThreads(unsigned int threadcount);
 
+#ifdef _DEBUG
     std::string Verify();
-    
+#endif
+
     std::string error_code;
-    
+
 protected:
     friend class XQueryAccessorInt;
     friend class XQueryAccessorString;
@@ -104,7 +106,7 @@ protected:
     void   Init(const Table& table) const;
     size_t FindInternal(const Table& table, size_t start=0, size_t end=size_t(-1)) const;
     void   UpdatePointers(ParentNode* p, ParentNode** newnode);
-    
+
     static bool  comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
     static void* query_thread(void* arg);
 

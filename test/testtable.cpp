@@ -353,7 +353,7 @@ TEST(Table_Sorted_Int)
     table.add(0,  2, true, Wed); // 9: 1
 
     // Search for a value that does not exits
-    TableView v = table.sorted(1);
+    TestTable::View v = table.cols().second.sorted();
     CHECK_EQUAL(table.size(), v.size());
 
     CHECK_EQUAL(2, v.get_source_ndx(0));
@@ -389,7 +389,7 @@ TEST(Table_Index_Int)
     table.add(0,  9, true, Wed);
 
     // Create index for column two
-    table.set_index(1);
+    table.cols().second.set_index();
 
     // Search for a value that does not exits
     const size_t r1 = table.cols().second.find_first(2);

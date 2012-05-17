@@ -297,15 +297,26 @@ template<class Tab, int col_idx, class Type> class ColumnAccessor;
  * Commmon base class for all column accessor specializations.
  */
 template<class Tab, int col_idx, class Type> class ColumnAccessorBase {
+protected:
+    typedef typename GetTableFromView<Tab>::type RealTable;
+
 public:
     FieldAccessor<Tab, col_idx, Type> operator[](std::size_t row_idx) const
     {
         return FieldAccessor<Tab, col_idx, Type>(std::make_pair(m_table, row_idx));
     }
 
-protected:
-    typedef typename GetTableFromView<Tab>::type RealTable;
+    bool has_index() const { return m_table->get_impl()->has_index(col_idx); }
+    void set_index() const { m_table->get_impl()->set_index(col_idx); }
 
+    BasicTableView<RealTable> sorted(bool ascending=true) const
+    {
+        return m_table->get_impl()->sorted(col_idx, ascending);
+    }
+
+    void sort(bool ascending = true) const { m_table->get_impl()->sort(col_idx, ascending); }
+
+protected:
     Tab* const m_table;
 
     explicit ColumnAccessorBase(Tab* t): m_table(t) {}
@@ -601,7 +612,7 @@ template<class Tab, int col_idx>
 class QueryColumn<Tab, col_idx, const char*>: public QueryColumnBase<Tab, col_idx, const char*> {
 private:
     typedef QueryColumnBase<Tab, col_idx, const char*> Base;
-    typedef typename Base::Query Query;
+    typedef typename Tab::Query Query;
 
 public:
     explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
@@ -654,12 +665,20 @@ public:
  * QueryColumn specialization for subtables.
  */
 template<class Tab, int col_idx, class Subspec>
-class QueryColumn<Tab, col_idx, BasicTable<Subspec> > {
+class QueryColumn<Tab, col_idx, BasicTable<Subspec> >:
+    public QueryColumnBase<Tab, col_idx, BasicTable<Subspec> > {
 private:
+    typedef QueryColumnBase<Tab, col_idx, const char*> Base;
     typedef typename Tab::Query Query;
 
 public:
-    explicit QueryColumn(Query*, const char* = 0) {}
+    explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
+
+    Query& subtable()
+    {
+        Base::m_query->m_impl.subtable(col_idx);
+        return *Base::m_query;
+    }
 };
 
 

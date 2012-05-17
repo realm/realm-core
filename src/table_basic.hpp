@@ -57,9 +57,11 @@ namespace _impl {
  * an instance of any variation of this class, and therefore it is
  * valid to cast a pointer from Table to BasicTable<Spec> even when
  * the instance is constructed as a Table. Of couse, this also assumes
- * that Table is non-polymorphic.
+ * that Table is non-polymorphic. Further more, accessing the Table
+ * via a poiter or reference to a BasicTable is not in violation of
+ * the strict aliasing rule.
  */
-template<class Spec> class BasicTable: public Table { // FIXME: No derivation - make it a member as in BasicTableView.
+template<class Spec> class BasicTable: private Table {
 public:
     typedef Spec spec_type;
 
@@ -69,12 +71,20 @@ public:
     typedef BasicTableView<BasicTable> View;
     typedef BasicTableView<const BasicTable> ConstView;
 
+    using Table::is_empty;
+    using Table::size;
+    using Table::clear;
+    using Table::remove;
+    using Table::optimize;
+
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc)
     {
         tightdb::Spec& spec = get_spec();
         typename Spec::template Columns<AddCol, tightdb::Spec*> c(&spec);
         update_from_spec();
     }
+
+    static int get_column_count() { return TypeCount<typename Spec::ColTypes>::value; }
 
     BasicTableRef<BasicTable> get_table_ref()
     {
@@ -87,7 +97,7 @@ public:
     }
 
 private:
-    template<int col_idx> struct Col { // FIXME: Rename to just Col
+    template<int col_idx> struct Col {
         typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<BasicTable, col_idx, value_type> type;
     };
@@ -218,12 +228,19 @@ public:
 
     // FIXME: Add remaining insert() methods up to 8 values.
 
+#ifdef _DEBUG
+    using Table::verify;
+    using Table::Print;
+    bool Compare(const BasicTable& c) const { return Table::Compare(c); }
+#endif
+
 private:
     template<class> friend class BasicTable;
     friend class BasicTableRef<BasicTable>;
-//    friend class BasicTableView<BasicTable>; // FIXME: Is it needed?
     template<class, int, class> friend class _impl::FieldAccessor;
+    template<class, int, class> friend class _impl::ColumnAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessor;
+    friend class Group;
 
     template<int col_idx> struct AddCol {
         typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
@@ -250,19 +267,52 @@ public:
 
     Query(): Spec::template Columns<QueryCol, Query*>(this) {}
 
-    Query& Or() { m_impl.Or(); return *this; }
-
     Query& group() { m_impl.group(); return *this; }
 
     Query& end_group() { m_impl.end_group(); return *this; }
 
-    std::size_t remove(BasicTable<Spec>& table, size_t start = 0, size_t end = size_t(-1),
-                       size_t limit = size_t(-1)) const
+    Query& parent() { m_impl.parent(); return *this; }
+
+    Query& Or() { m_impl.Or(); return *this; }
+
+    std::size_t find_next(const BasicTable<Spec>& table, std::size_t lastmatch=std::size_t(-1))
+    {
+        return m_impl.find_next(table, lastmatch);
+    }
+
+    typename BasicTable<Spec>::View find_all(BasicTable<Spec>& table, std::size_t start=0,
+                                             std::size_t end=std::size_t(-1),
+                                             std::size_t limit=std::size_t(-1))
+    {
+        return m_impl.find_all(table, start, end, limit);
+    }
+
+    typename BasicTable<Spec>::ConstView find_all(const BasicTable<Spec>& table,
+                                                  std::size_t start=0,
+                                                  std::size_t end=std::size_t(-1),
+                                                  std::size_t limit=std::size_t(-1))
+    {
+        return m_impl.find_all(table, start, end, limit);
+    }
+
+    std::size_t count(const BasicTable<Spec>& table, std::size_t start=0,
+                      std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return m_impl.count(table, start, end, limit);
+    }
+
+    std::size_t remove(BasicTable<Spec>& table, std::size_t start = 0,
+                       std::size_t end = std::size_t(-1),
+                       std::size_t limit = std::size_t(-1)) const
     {
         return m_impl.remove(table, start, end, limit);
     }
 
-    operator typename tightdb::Query() const { return m_impl; } // FIXME: Bad thing to copy queries
+#ifdef _DEBUG
+    std::string Verify() { return m_impl.Verify(); }
+#endif
+
+//    operator typename tightdb::Query() const { return m_impl; } // FIXME: Bad thing to copy queries
 
 private:
     tightdb::Query m_impl;

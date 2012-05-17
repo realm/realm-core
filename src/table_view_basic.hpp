@@ -134,7 +134,9 @@ public:
     void remove_last() { Base::m_impl.remove_last(); }
 
 private:
+    template<class, int, class> friend class _impl::ColumnAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessor;
+    friend class Tab::Query;
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
     BasicTableView(TableView tv): Base(move(tv)) {}
 };
@@ -170,7 +172,9 @@ public:
     }
 
 private:
+    template<class, int, class> friend class _impl::ColumnAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessor;
+    friend class Tab::Query;
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
     BasicTableView(ConstTableView tv): Base(move(tv)) {}
 };
