@@ -26,7 +26,7 @@ all: $(TARGET)
 .PHONY: all
 
 sqlite3.o: sqlite3.c
-	$(CC_STATIC) $(CFLAGS) -Wno-unused-but-set-variable -Wno-strict-overflow -Wno-uninitialized $(INC_FLAGS) -MMD -MP -c $< -o $@
+	gcc -O3 -MMD -MP -c $< -o $@
 
 
 
