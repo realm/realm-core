@@ -270,6 +270,6 @@ inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const
     return Get(subtable_ndx);
 }
 
-}
+} // namespace tightdb
 
 #endif //__TDB_COLUMN_TABLE__

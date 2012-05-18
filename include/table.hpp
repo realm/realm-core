@@ -103,7 +103,7 @@ public:
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void add_int(size_t column_ndx, int64_t value);
 
-    // Sub-tables (works both on table- and mixed columns)
+    // Sub-tables (works on columns whose type is either 'subtable' or 'mixed', for a value in a mixed column that is not a subtable, get_subtable() returns null, get_subtable_size() returns zero, and clear_subtable() does nothing.)
     TableRef        get_subtable(size_t column_ndx, size_t row_ndx);
     ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;

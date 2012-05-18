@@ -7,29 +7,19 @@
 #
 
 ROOT = ..
-CONFIG_MK = $(ROOT)/config.mk
-include $(CONFIG_MK)
 
-CXXFLAGS           ?= $(CXXFLAGS_COMMON)
-CXXFLAGS_COMMON_2   = -pthread $(CXXFLAGS) -IUnitTest++/src
-CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src -I$(ROOT)/include
-CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I$(ROOT)/src -I$(ROOT)/include
-CXXFLAGS_COVERAGE  += $(CXXFLAGS_COMMON_2) -I$(abspath $(ROOT)/src) -I$(abspath $(ROOT)/include)
-LDFLAGS             = -pthread -LUnitTest++ -lUnitTest++
+INC_FLAGS     = -I$(ROOT)/src -I$(ROOT)/include -IUnitTest++/src
+INC_FLAGS_ABS = -I$(abspath $(ROOT)/src) -I$(abspath $(ROOT)/include) -IUnitTest++/src
+LIB_FLAGS     = -LUnitTest++ -lUnitTest++
 
-SOURCES             = $(wildcard *.cpp large_tests/*.cpp)
+SOURCES             = $(wildcard *.c *.cpp large_tests/*.cpp)
 LIBTIGHTDB          = $(ROOT)/src/libtightdb.a
 LIBTIGHTDB_DEBUG    = $(ROOT)/src/libtightdb_d.a
 LIBTIGHTDB_COVERAGE = $(ROOT)/src/libtightdb_c.a
 TARGET              = tightdb-tests
 DEBUG_TARGET        = tightdb-tests-debug
-COVER_TARGET        = tightdb-tests-cover
-
-
-OBJECTS = $(SOURCES:.cpp=.o)
-DEBUG_OBJECTS = $(SOURCES:.cpp=.dbg.o)
-COVER_OBJECTS = $(SOURCES:.cpp=.cov.o)
-
+COVERAGE_TARGET     = tightdb-tests-cover
+TARGETS = $(TARGET) $(DEBUG_TARGET) $(COVERAGE_TARGET)
 
 all: $(TARGET)
 .PHONY: all
@@ -37,18 +27,8 @@ all: $(TARGET)
 debug: $(DEBUG_TARGET)
 .PHONY: debug
 
-cover: $(COVER_TARGET)
+cover: $(COVERAGE_TARGET)
 .PHONY: cover
-
-CLEAN_EXTRA = clean/UnitTest++ clean/test-tightdb clean/test-sqlite3 clean/test-stl
-clean: clean/local $(CLEAN_EXTRA)
-clean/local:
-	$(RM) *.d *.o *.gcno *.gcda $(TARGET) $(DEBUG_TARGET) $(COVER_TARGET)
-	$(RM) large_tests/*.d large_tests/*.o large_tests/*.gcno large_tests/*.gcda
-$(CLEAN_EXTRA): clean/%:
-	@$(MAKE) -C $* clean
-.PHONY: clean clean/local $(CLEAN_EXTRA)
-
 
 test: debug
 	./tightdb-tests-debug
@@ -72,37 +52,71 @@ test-tightdb test-sqlite3 test-stl: UnitTest++
 	@$(MAKE) -C $@
 .PHONY: benchmark test-tightdb test-sqlite3 test-stl
 
-
 UnitTest++:
-	$(MAKE) -C UnitTest++ >/dev/null
+	$(MAKE) -C UnitTest++ CXX=g++ CXXFLAGS=-g -Wall -W -ansi LDFLAGS= >/dev/null
 .PHONY: UnitTest++
-$(TARGET) $(DEBUG_TARGET) $(COVER_TARGET): | UnitTest++
+$(TARGETS): | UnitTest++
 
 
-$(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): Makefile $(CONFIG_MK)
+
+CONFIG_MK = $(ROOT)/config.mk
+include $(CONFIG_MK)
+
+STATIC_OBJECTS = $(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(SOURCES)))
+SHARED_OBJECTS   = $(STATIC_OBJECTS:.o=.dyn.o)
+DEBUG_OBJECTS    = $(STATIC_OBJECTS:.o=.dbg.o)
+COVERAGE_OBJECTS = $(STATIC_OBJECTS:.o=.cov.o)
+OBJECTS = $(STATIC_OBJECTS) $(SHARED_OBJECTS) $(DEBUG_OBJECTS) $(COVERAGE_OBJECTS)
+
+$(OBJECTS): Makefile $(CONFIG_MK)
+
+
+CLEAN_EXTRA = clean/UnitTest++ clean/test-tightdb clean/test-sqlite3 clean/test-stl
+clean: clean/local $(CLEAN_EXTRA)
+clean/local:
+	$(RM) *.d *.o *.gcno *.gcda $(TARGETS)
+	$(RM) large_tests/*.d large_tests/*.o large_tests/*.gcno large_tests/*.gcda
+$(CLEAN_EXTRA): clean/%:
+	@$(MAKE) -C $* clean
+.PHONY: clean clean/local $(CLEAN_EXTRA)
 
 
 # Linking
 
-$(TARGET): $(OBJECTS) $(LIBTIGHTDB)
-	$(CXX) $(OBJECTS) $(LIBTIGHTDB) $(LDFLAGS) -o $@
+$(TARGET): $(STATIC_OBJECTS) $(LIBTIGHTDB)
+	$(LD_STATIC) $(STATIC_OBJECTS) $(LIBTIGHTDB) $(LDFLAGS) $(LIB_FLAGS) -o $@
 
 $(DEBUG_TARGET): $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG)
-	$(CXX) $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG) $(LDFLAGS) -o $@
+	$(LD_DEBUG) $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG) $(LDFLAGS) $(LIB_FLAGS) -o $@
 
-$(COVER_TARGET): $(COVER_OBJECTS) $(LIBTIGHTDB_COVERAGE)
-	$(CXX) --coverage $(COVER_OBJECTS) $(LIBTIGHTDB_COVERAGE) $(LDFLAGS) -o $@
+$(COVERAGE_TARGET): $(COVERAGE_OBJECTS) $(LIBTIGHTDB_COVERAGE)
+	$(LD_COVERAGE) $(COVERAGE_OBJECTS) $(LIBTIGHTDB_COVERAGE) $(LDFLAGS) $(LIB_FLAGS) -o $@
 
 
-# Compiling + dependency generation
+# Compiling + automatic dependencies
+
+%.o: %.c
+	$(CC_STATIC) $(CFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@
+	$(CXX_STATIC) $(CXXFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
+
+%.dyn.o: %.c
+	$(CC_SHARED) $(CFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
+
+%.dyn.o: %.cpp
+	$(CXX_SHARED) $(CXXFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
+
+%.dbg.o: %.c
+	$(CC_DEBUG) $(CFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
 
 %.dbg.o: %.cpp
-	$(CXX) $(CXXFLAGS_DEBUG) -MMD -MP -c $< -o $@
+	$(CXX_DEBUG) $(CXXFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
+
+%.cov.o: %.c
+	$(CC_COVERAGE) $(CFLAGS) $(INC_FLAGS_ABS) -MMD -MP -c $(abspath $<) -o $(abspath $@)
 
 %.cov.o: %.cpp
-	$(CXX) --coverage $(CXXFLAGS_COVERAGE) -MMD -MP -c $(abspath $<) -o $(abspath $@)
+	$(CXX_COVERAGE) $(CXXFLAGS) $(INC_FLAGS_ABS) -MMD -MP -c $(abspath $<) -o $(abspath $@)
 
--include $(SOURCES:.cpp=.d) $(SOURCES:.cpp=.dbg.d) $(SOURCES:.cpp=.cov.d)
+-include $(OBJECTS:.o=.d)

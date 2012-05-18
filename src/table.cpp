@@ -649,15 +649,24 @@ const Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx) const
     }
 }
 
-size_t Table::get_subtable_size(size_t column_ndx, size_t ndx) const
+size_t Table::get_subtable_size(size_t col_idx, size_t row_idx) const
 {
-    assert(column_ndx < get_column_count());
-    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_TABLE);
-    assert(ndx < m_size);
+    assert(col_idx < get_column_count());
+    assert(row_idx < m_size);
 
-    // FIXME: Should also be made to work for ColumnMixed
-    ColumnTable const &subtables = GetColumnTable(column_ndx);
-    return subtables.get_subtable_size(ndx);
+    const ColumnType type = GetRealColumnType(col_idx);
+    if (type == COLUMN_TYPE_TABLE) {
+        const ColumnTable& subtables = GetColumnTable(col_idx);
+        return subtables.get_subtable_size(row_idx);
+    }
+    else if (type == COLUMN_TYPE_MIXED) {
+        const ColumnMixed& subtables = GetColumnMixed(col_idx);
+        return subtables.get_subtable_size(row_idx);
+    }
+    else {
+        assert(false);
+        return 0;
+    }
 }
 
 int64_t Table::get_int(size_t column_ndx, size_t ndx) const

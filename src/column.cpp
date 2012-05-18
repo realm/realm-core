@@ -299,6 +299,14 @@ bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, voi
 
 namespace tightdb {
 
+size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc)
+{
+    Array a(ref, NULL, 0, alloc);
+    if (!a.IsNode()) return a.Size();
+    Array offsets(a.Get(0), NULL, 0, alloc);
+    return offsets.is_empty() ? 0 : size_t(offsets.back());
+}
+
 Column::Column(Allocator& alloc): m_index(NULL)
 {
     m_array = new Array(COLUMN_NORMAL, NULL, 0, alloc);
@@ -374,14 +382,6 @@ size_t Column::Size() const
 {
     if (!IsNode()) return m_array->Size();
     const Array offsets = NodeGetOffsets();
-    return offsets.is_empty() ? 0 : size_t(offsets.back());
-}
-
-size_t Column::get_size_from_ref(size_t ref, Allocator& alloc)
-{
-    Array a(ref, NULL, 0, alloc);
-    if (!a.IsNode()) return a.Size();
-    Array offsets(a.Get(0), NULL, 0, alloc);
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
 

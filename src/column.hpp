@@ -117,6 +117,8 @@ protected:
 
     // Member variables
     mutable Array* m_array;
+
+    static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
 };
 
 class Column : public ColumnBase {
@@ -210,8 +212,6 @@ protected:
 
     // Member variables
     Index* m_index;
-
-    static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
 
 private:
     Column &operator=(Column const &); // not allowed

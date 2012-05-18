@@ -108,4 +108,4 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const
 
 #endif //_DEBUG
 
-}
+} // namespace tightdb

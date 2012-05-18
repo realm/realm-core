@@ -110,7 +110,7 @@ int main()
     {
         timer.Start();
 
-        table.set_index(0);
+        table.cols().first.set_index();
 
         const int search_time = timer.GetTimeInMs();
         printf("Add index: %dms\n", search_time);
