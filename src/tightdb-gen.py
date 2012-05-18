@@ -25,8 +25,8 @@ directiveStartToken = %
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_HPP
-#define TIGHTDB_HPP
+#ifndef TIGHTDB_TIGHTDB_HPP
+#define TIGHTDB_TIGHTDB_HPP
 
 #include "../src/table_basic.hpp"
 
@@ -90,7 +90,7 @@ typedef tightdb::BasicTable<Table##Spec> Table;
 
 
 %end for
-#endif // TIGHTDB_HPP
+#endif // TIGHTDB_TIGHTDB_HPP
 """
 
 args = sys.argv[1:]
