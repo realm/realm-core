@@ -30,14 +30,6 @@ debug: $(LIB_DEBUG)
 cover: $(LIB_COVERAGE)
 .PHONY: cover
 
-# Code generation
-TIGHTDB_HPP = ../include/tightdb.hpp
-$(TIGHTDB_HPP): Makefile $(CONFIG_MK)
-# FIXME: Is this really necessary?
-$(OBJECTS): $(TIGHTDB_HPP)
-$(TIGHTDB_HPP): tightdb-gen.sh tightdb-gen.py
-	$(SHELL) tightdb-gen.sh $(TIGHTDB_HPP)
-
 
 
 CONFIG_MK = $(ROOT)/config.mk
@@ -50,6 +42,15 @@ COVERAGE_OBJECTS = $(STATIC_OBJECTS:.o=.cov.o)
 OBJECTS = $(STATIC_OBJECTS) $(SHARED_OBJECTS) $(DEBUG_OBJECTS) $(COVERAGE_OBJECTS)
 
 $(OBJECTS): Makefile $(CONFIG_MK)
+
+
+
+# Code generation
+TIGHTDB_HPP = ../include/tightdb.hpp
+$(TIGHTDB_HPP): tightdb-gen.sh tightdb-gen.py Makefile $(CONFIG_MK)
+	$(SHELL) tightdb-gen.sh $(TIGHTDB_HPP)
+$(OBJECTS): $(TIGHTDB_HPP)
+
 
 
 clean:

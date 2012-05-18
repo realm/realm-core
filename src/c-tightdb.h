@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __C_TIGHTDB_H__
-#define __C_TIGHTDB_H__
+#ifndef TIGHTDB_C_TIGHTDB_H
+#define TIGHTDB_C_TIGHTDB_H
 
 #include "c-table.h"
 #include "query.hpp"
@@ -87,4 +87,4 @@ void TableName##_set_##CName1(Table* tbl, size_t row_ndx, tdb_type_##CType1 valu
 
 
 
-#endif //__C_TIGHTDB_H__
+#endif /* TIGHTDB_C_TIGHTDB_H */

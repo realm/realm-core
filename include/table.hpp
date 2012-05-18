@@ -260,7 +260,6 @@ private:
     Table(Table const &); // Disable copy construction
     Table &operator=(Table const &); // Disable copying assignment
 
-//    template<class> struct Accessors { typedef void Row; }; // FIXME: Here to support BasicTableRef::operator[], but should be eliminated.
     template<class> friend class BasicTableRef;
     friend class ColumnSubtableParent;
     friend void TableHelper_unbind(Table* t);

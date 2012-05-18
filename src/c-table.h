@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_CTABLE__
-#define __TDB_CTABLE__
+#ifndef TIGHTDB_C_TABLE_H
+#define TIGHTDB_C_TABLE_H
 
 /* TODO:
   MyTable_(...)
@@ -342,4 +342,4 @@ typedef struct Query Query;
 } //extern "C"
 #endif
 
-#endif /*__TDB_CTABLE__*/
+#endif /* TIGHTDB_C_TABLE_H */
