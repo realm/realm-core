@@ -24,8 +24,8 @@
 
 
 #define TIGHTDB_TABLE_1(Table, name1, type1) \
-struct Table##Spec: tightdb::SpecBase { \
-    typedef tightdb::TypeAppend< void,     type1 >::type Columns; \
+struct Table##Spec: ::tightdb::SpecBase { \
+    typedef ::tightdb::TypeAppend< void,     type1 >::type Columns; \
  \
     template<template<int> class Col, class Init> struct ColNames { \
         typename Col<0>::type name1; \
@@ -44,13 +44,13 @@ struct Table##Spec: tightdb::SpecBase { \
         cols.name1._insert(i, v1); \
     } \
 }; \
-typedef tightdb::BasicTable<Table##Spec> Table;
+typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 #define TIGHTDB_TABLE_2(Table, name1, type1, name2, type2) \
-struct Table##Spec: tightdb::SpecBase { \
-    typedef tightdb::TypeAppend< void,     type1 >::type Columns1; \
-    typedef tightdb::TypeAppend< Columns1, type2 >::type Columns; \
+struct Table##Spec: ::tightdb::SpecBase { \
+    typedef ::tightdb::TypeAppend< void,     type1 >::type Columns1; \
+    typedef ::tightdb::TypeAppend< Columns1, type2 >::type Columns; \
  \
     template<template<int> class Col, class Init> struct ColNames { \
         typename Col<0>::type name1; \
@@ -71,14 +71,14 @@ struct Table##Spec: tightdb::SpecBase { \
         cols.name2._insert(i, v2); \
     } \
 }; \
-typedef tightdb::BasicTable<Table##Spec> Table;
+typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 #define TIGHTDB_TABLE_3(Table, name1, type1, name2, type2, name3, type3) \
-struct Table##Spec: tightdb::SpecBase { \
-    typedef tightdb::TypeAppend< void,     type1 >::type Columns1; \
-    typedef tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
-    typedef tightdb::TypeAppend< Columns2, type3 >::type Columns; \
+struct Table##Spec: ::tightdb::SpecBase { \
+    typedef ::tightdb::TypeAppend< void,     type1 >::type Columns1; \
+    typedef ::tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
+    typedef ::tightdb::TypeAppend< Columns2, type3 >::type Columns; \
  \
     template<template<int> class Col, class Init> struct ColNames { \
         typename Col<0>::type name1; \
@@ -101,15 +101,15 @@ struct Table##Spec: tightdb::SpecBase { \
         cols.name3._insert(i, v3); \
     } \
 }; \
-typedef tightdb::BasicTable<Table##Spec> Table;
+typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 #define TIGHTDB_TABLE_4(Table, name1, type1, name2, type2, name3, type3, name4, type4) \
-struct Table##Spec: tightdb::SpecBase { \
-    typedef tightdb::TypeAppend< void,     type1 >::type Columns1; \
-    typedef tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
-    typedef tightdb::TypeAppend< Columns2, type3 >::type Columns3; \
-    typedef tightdb::TypeAppend< Columns3, type4 >::type Columns; \
+struct Table##Spec: ::tightdb::SpecBase { \
+    typedef ::tightdb::TypeAppend< void,     type1 >::type Columns1; \
+    typedef ::tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
+    typedef ::tightdb::TypeAppend< Columns2, type3 >::type Columns3; \
+    typedef ::tightdb::TypeAppend< Columns3, type4 >::type Columns; \
  \
     template<template<int> class Col, class Init> struct ColNames { \
         typename Col<0>::type name1; \
@@ -134,16 +134,16 @@ struct Table##Spec: tightdb::SpecBase { \
         cols.name4._insert(i, v4); \
     } \
 }; \
-typedef tightdb::BasicTable<Table##Spec> Table;
+typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 #define TIGHTDB_TABLE_5(Table, name1, type1, name2, type2, name3, type3, name4, type4, name5, type5) \
-struct Table##Spec: tightdb::SpecBase { \
-    typedef tightdb::TypeAppend< void,     type1 >::type Columns1; \
-    typedef tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
-    typedef tightdb::TypeAppend< Columns2, type3 >::type Columns3; \
-    typedef tightdb::TypeAppend< Columns3, type4 >::type Columns4; \
-    typedef tightdb::TypeAppend< Columns4, type5 >::type Columns; \
+struct Table##Spec: ::tightdb::SpecBase { \
+    typedef ::tightdb::TypeAppend< void,     type1 >::type Columns1; \
+    typedef ::tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
+    typedef ::tightdb::TypeAppend< Columns2, type3 >::type Columns3; \
+    typedef ::tightdb::TypeAppend< Columns3, type4 >::type Columns4; \
+    typedef ::tightdb::TypeAppend< Columns4, type5 >::type Columns; \
  \
     template<template<int> class Col, class Init> struct ColNames { \
         typename Col<0>::type name1; \
@@ -170,17 +170,17 @@ struct Table##Spec: tightdb::SpecBase { \
         cols.name5._insert(i, v5); \
     } \
 }; \
-typedef tightdb::BasicTable<Table##Spec> Table;
+typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 #define TIGHTDB_TABLE_6(Table, name1, type1, name2, type2, name3, type3, name4, type4, name5, type5, name6, type6) \
-struct Table##Spec: tightdb::SpecBase { \
-    typedef tightdb::TypeAppend< void,     type1 >::type Columns1; \
-    typedef tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
-    typedef tightdb::TypeAppend< Columns2, type3 >::type Columns3; \
-    typedef tightdb::TypeAppend< Columns3, type4 >::type Columns4; \
-    typedef tightdb::TypeAppend< Columns4, type5 >::type Columns5; \
-    typedef tightdb::TypeAppend< Columns5, type6 >::type Columns; \
+struct Table##Spec: ::tightdb::SpecBase { \
+    typedef ::tightdb::TypeAppend< void,     type1 >::type Columns1; \
+    typedef ::tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
+    typedef ::tightdb::TypeAppend< Columns2, type3 >::type Columns3; \
+    typedef ::tightdb::TypeAppend< Columns3, type4 >::type Columns4; \
+    typedef ::tightdb::TypeAppend< Columns4, type5 >::type Columns5; \
+    typedef ::tightdb::TypeAppend< Columns5, type6 >::type Columns; \
  \
     template<template<int> class Col, class Init> struct ColNames { \
         typename Col<0>::type name1; \
@@ -209,18 +209,18 @@ struct Table##Spec: tightdb::SpecBase { \
         cols.name6._insert(i, v6); \
     } \
 }; \
-typedef tightdb::BasicTable<Table##Spec> Table;
+typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 #define TIGHTDB_TABLE_7(Table, name1, type1, name2, type2, name3, type3, name4, type4, name5, type5, name6, type6, name7, type7) \
-struct Table##Spec: tightdb::SpecBase { \
-    typedef tightdb::TypeAppend< void,     type1 >::type Columns1; \
-    typedef tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
-    typedef tightdb::TypeAppend< Columns2, type3 >::type Columns3; \
-    typedef tightdb::TypeAppend< Columns3, type4 >::type Columns4; \
-    typedef tightdb::TypeAppend< Columns4, type5 >::type Columns5; \
-    typedef tightdb::TypeAppend< Columns5, type6 >::type Columns6; \
-    typedef tightdb::TypeAppend< Columns6, type7 >::type Columns; \
+struct Table##Spec: ::tightdb::SpecBase { \
+    typedef ::tightdb::TypeAppend< void,     type1 >::type Columns1; \
+    typedef ::tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
+    typedef ::tightdb::TypeAppend< Columns2, type3 >::type Columns3; \
+    typedef ::tightdb::TypeAppend< Columns3, type4 >::type Columns4; \
+    typedef ::tightdb::TypeAppend< Columns4, type5 >::type Columns5; \
+    typedef ::tightdb::TypeAppend< Columns5, type6 >::type Columns6; \
+    typedef ::tightdb::TypeAppend< Columns6, type7 >::type Columns; \
  \
     template<template<int> class Col, class Init> struct ColNames { \
         typename Col<0>::type name1; \
@@ -251,19 +251,19 @@ struct Table##Spec: tightdb::SpecBase { \
         cols.name7._insert(i, v7); \
     } \
 }; \
-typedef tightdb::BasicTable<Table##Spec> Table;
+typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 #define TIGHTDB_TABLE_8(Table, name1, type1, name2, type2, name3, type3, name4, type4, name5, type5, name6, type6, name7, type7, name8, type8) \
-struct Table##Spec: tightdb::SpecBase { \
-    typedef tightdb::TypeAppend< void,     type1 >::type Columns1; \
-    typedef tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
-    typedef tightdb::TypeAppend< Columns2, type3 >::type Columns3; \
-    typedef tightdb::TypeAppend< Columns3, type4 >::type Columns4; \
-    typedef tightdb::TypeAppend< Columns4, type5 >::type Columns5; \
-    typedef tightdb::TypeAppend< Columns5, type6 >::type Columns6; \
-    typedef tightdb::TypeAppend< Columns6, type7 >::type Columns7; \
-    typedef tightdb::TypeAppend< Columns7, type8 >::type Columns; \
+struct Table##Spec: ::tightdb::SpecBase { \
+    typedef ::tightdb::TypeAppend< void,     type1 >::type Columns1; \
+    typedef ::tightdb::TypeAppend< Columns1, type2 >::type Columns2; \
+    typedef ::tightdb::TypeAppend< Columns2, type3 >::type Columns3; \
+    typedef ::tightdb::TypeAppend< Columns3, type4 >::type Columns4; \
+    typedef ::tightdb::TypeAppend< Columns4, type5 >::type Columns5; \
+    typedef ::tightdb::TypeAppend< Columns5, type6 >::type Columns6; \
+    typedef ::tightdb::TypeAppend< Columns6, type7 >::type Columns7; \
+    typedef ::tightdb::TypeAppend< Columns7, type8 >::type Columns; \
  \
     template<template<int> class Col, class Init> struct ColNames { \
         typename Col<0>::type name1; \
@@ -296,7 +296,7 @@ struct Table##Spec: tightdb::SpecBase { \
         cols.name8._insert(i, v8); \
     } \
 }; \
-typedef tightdb::BasicTable<Table##Spec> Table;
+typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 #endif // TIGHTDB_TIGHTDB_HPP

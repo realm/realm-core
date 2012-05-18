@@ -38,9 +38,9 @@ directiveStartToken = %
 , name${j+1}, type${j+1}%slurp
 %end for
 ) \\
-struct Table##Spec: tightdb::SpecBase { \\
+struct Table##Spec: ::tightdb::SpecBase { \\
 %for $j in range($num_cols)
-    typedef tightdb::TypeAppend< %slurp
+    typedef ::tightdb::TypeAppend< %slurp
 %if $j == 0
 void,     %slurp
 %else
@@ -97,7 +97,7 @@ name${j+1}%slurp
 %end for
     } \\
 }; \\
-typedef tightdb::BasicTable<Table##Spec> Table;
+typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 %end for
