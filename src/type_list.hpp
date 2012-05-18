@@ -108,11 +108,17 @@ template<class List, template<class T, int i> class Op, int i=0> struct ForEachT
         Op<typename List::head, i>::exec(a,b);
         ForEachType<typename List::tail, Op, i+1>::exec(a,b);
     }
+    template<class A, class B, class C> static void exec(const A& a, const B& b, const C& c)
+    {
+        Op<typename List::head, i>::exec(a,b,c);
+        ForEachType<typename List::tail, Op, i+1>::exec(a,b,c);
+    }
 };
 template<template<class T, int i> class Op, int i> struct ForEachType<void, Op, i> {
     static void exec() {}
     template<class A> static void exec(const A&) {}
     template<class A, class B> static void exec(const A&, const B&) {}
+    template<class A, class B, class C> static void exec(const A&, const B&, const C&) {}
 };
 
 

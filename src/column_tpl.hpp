@@ -57,7 +57,7 @@ template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const
 
         // Get item
         const C target = GetColumnFromRef<C>(refs, node_ndx);
-        return target.TreeGet<T,C>(local_ndx);
+        return target.template TreeGet<T,C>(local_ndx);
     }
     else {
         return static_cast<const C*>(this)->LeafGet(ndx);
@@ -155,7 +155,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         C target = GetColumnFromRef<C>(refs, node_ndx);
 
         // Insert item
-        const NodeChange nc = target.DoInsert<T, C>(local_ndx, value);
+        const NodeChange nc = target.template DoInsert<T, C>(local_ndx, value);
         if (nc.type ==  NodeChange::CT_ERROR) return NodeChange(NodeChange::CT_ERROR); // allocation error
         else if (nc.type ==  NodeChange::CT_NONE) {
             offsets.Increment(1, node_ndx);  // update offsets
@@ -330,7 +330,7 @@ template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
 
         // Get sublist
         C target = GetColumnFromRef<C>(refs, node_ndx);
-        target.TreeDelete<T,C>(local_ndx);
+        target.template TreeDelete<T,C>(local_ndx);
 
         // Remove ref in node
         if (target.is_empty()) {
@@ -371,7 +371,7 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
         if (start == 0 && end == size_t(-1)) {
             for (size_t i = 0; i < count; ++i) {
                 const C col(size_t(refs.Get(i)), NULL, 0, m_array->GetAllocator());
-                const size_t ndx = col.TreeFind<T, C, F>(value, 0, size_t(-1));
+                const size_t ndx = col.template TreeFind<T, C, F>(value, 0, size_t(-1));
                 if (ndx != size_t(-1)) {
                     const size_t offset = i ? TO_REF(offsets.Get(i-1)) : 0;
                     return offset + ndx;
@@ -388,7 +388,7 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
             for (;;) {
                 const C col(size_t(refs.Get(i)), NULL, 0, m_array->GetAllocator());
 
-                const size_t ndx = col.TreeFind<T, C, F>(value, s, e);
+                const size_t ndx = col.template TreeFind<T, C, F>(value, s, e);
                 if (ndx != size_t(-1)) {
                     const size_t offset = i ? TO_REF(offsets.Get(i-1)) : 0;
                     return offset + ndx;
@@ -440,7 +440,7 @@ void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset,
 
             size_t add = i ? TO_REF(offsets.Get(i-1)) : 0;
             add += add_offset;
-            col.TreeFindAll<T, C>(result, value, add, s, e);
+            col.template TreeFindAll<T, C>(result, value, add, s, e);
             ++i;
             if (i >= count) break;
 
@@ -487,7 +487,7 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
 
             size_t add = i ? TO_REF(offsets.Get(i-1)) : 0;
             add += caller_offset;
-            col.TreeVisitLeafs<T, C>(s, e, add, call, state);
+            col.template TreeVisitLeafs<T, C>(s, e, add, call, state);
             ++i;
             if (i >= count) break;
 

@@ -28,8 +28,14 @@ namespace tightdb {
 
 
 /**
- * These types are meant to be used when specifying column types
- * directly of via the TIGHTDB_TABLE_* macros.
+ * A convenience base class for Spec classes that are to be used with
+ * BasicTable.
+ *
+ * There are two reasons why you might want to derive your spec class
+ * from this one. First, it offers short hand names for each of the
+ * available column types. Second, it makes it easier when you do not
+ * want to specify colum names or convenience methods, since suitable
+ * fallbacks are defined here.
  */
 struct SpecBase {
     typedef int64_t         Int;
@@ -44,6 +50,54 @@ struct SpecBase {
         operator E() const { return m_value; }
     private:
         E m_value;
+    };
+
+    /**
+     * By default, there are no static column names defined for a
+     * BasicTable. One may define a set of column mames as follows:
+     *
+     * <pre>
+     *
+     *   struct MyTableSpec {
+     *     typedef tightdb::TypeAppend<void, int>::type Columns1;
+     *     typedef tightdb::TypeAppend<Columns1, bool>::type Columns;
+     *
+     *     template<template<int> class Col, class Init> struct ColNames {
+     *       typename Col<0>::type foo;
+     *       typename Col<1>::type bar;
+     *       ColNames(Init i): foo(i), bar(i) {}
+     *     };
+     *   };
+     *
+     * </pre>
+     *
+     * Note that 'i' in Col<i> links the name that you specify to a
+     * particular column index. You may specify the column names in
+     * any order. Multiple names may refer to the same column, and you
+     * do not have to specify a name for every column.
+     */
+    template<template<int> class Col, class Init> struct ColNames { ColNames(Init) {} };
+
+    /**
+     *
+     */
+    static const char* const* dyn_col_names() { return 0; }
+
+    /**
+     * This is the fallback class that is used when no convenience
+     * methods are specified in the users Spec class.
+     *
+     * If you would like to add a convenient add() method, here is how
+     * you could do it:
+     */
+    struct ConvenienceMethods {
+/*
+        void add(int foo, bool bar)
+        {
+            BasicTable<SpecBase>* t = static_cast<BasicTable<SpecBase>*>(this);
+            t->add((::tightdb::tuple(), foo, bar));
+        }
+*/
     };
 };
 
@@ -193,7 +247,7 @@ public:
     // if we choose to keep it, we should also have all the other
     // comparison operators, and many other operators need to be
     // disabled such that e.g. 't.foo - 10' is no longer possible (it
-    // is now due to the conversion operator). A much better approach
+    // is now, due to the conversion operator). A much better approach
     // would probably be to define a special tightdb::String type.
     bool operator==(const char* value) const
     {

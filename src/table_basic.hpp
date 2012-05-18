@@ -32,8 +32,9 @@
 #include <ctime>
 #include <utility>
 
+#include "static_assert.hpp"
 #include "meta.hpp"
-#include "type_list.hpp"
+#include "tuple.hpp"
 #include "table.hpp"
 #include "column.hpp"
 #include "query.hpp"
@@ -44,7 +45,8 @@ namespace tightdb {
 
 
 namespace _impl {
-    template<class Type, int col_idx> struct AddColumn;
+    template<class Type, int col_idx> struct AddCol;
+    template<class Type, int col_idx> struct InsertIntoCol;
 }
 
 
@@ -61,9 +63,10 @@ namespace _impl {
  * via a poiter or reference to a BasicTable is not in violation of
  * the strict aliasing rule.
  */
-template<class Spec> class BasicTable: private Table {
+template<class Spec> class BasicTable: private Table, public Spec::ConvenienceMethods {
 public:
     typedef Spec spec_type;
+    typedef typename Spec::Columns Columns;
 
     typedef BasicTableRef<BasicTable> Ref;
     typedef BasicTableRef<const BasicTable> ConstRef;
@@ -80,7 +83,7 @@ public:
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc)
     {
         tightdb::Spec& spec = get_spec();
-        ForEachType<typename Spec::Columns, _impl::AddColumn>::exec(&spec, Spec::dyn_col_names());
+        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&spec, Spec::dyn_col_names());
         update_from_spec();
     }
 
@@ -143,8 +146,10 @@ public:
     ConstRowAccessor front() const { return ConstRowAccessor(std::make_pair(this, 0)); }
 
     /**
-     * \param rel_idx The index of the row specified relative to the
-     * end. Thus, <tt>table.back(rel_idx)</tt> is the same as
+     * Access the last row, or one of its predecessors.
+     *
+     * \param rel_idx An optional index of the row specified relative
+     * to the end. Thus, <tt>table.back(rel_idx)</tt> is the same as
      * <tt>table[table.size() + rel_idx]</tt>.
      */
     RowAccessor back(int rel_idx = -1)
@@ -159,6 +164,14 @@ public:
 
     RowAccessor add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
 
+    // FIXME: Also insert() and set()
+    template<class L> void add(const Tuple<L>& tuple)
+    {
+        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value);
+        ForEachType<Columns, _impl::InsertIntoCol>::exec(this, size(), tuple);
+        insert_done();
+    }
+
     typedef RowAccessor Cursor; // FIXME: A cursor must be a distinct class that can be constructed from a RowAccessor
     typedef ConstRowAccessor ConstCursor;
 
@@ -168,6 +181,7 @@ public:
     Query where() const { return Query(); } // FIXME: Bad thing to copy queries
 
 
+    // FIXME: Get rid of all these!
     template<class T1>
     void add(const T1& v1)
     {
@@ -334,7 +348,7 @@ namespace _impl
     };
 
 
-    template<class Type, int col_idx> struct AddColumn {
+    template<class Type, int col_idx> struct AddCol {
         static void exec(Spec* spec, const char* const* col_names)
         {
             assert(col_idx == spec->get_column_count());
@@ -342,14 +356,14 @@ namespace _impl
         }
     };
 
-    // AddColumn specialization for subtables
-    template<class Subspec, int col_idx> struct AddColumn<BasicTable<Subspec>, col_idx> {
+    // AddCol specialization for subtables
+    template<class Subspec, int col_idx> struct AddCol<BasicTable<Subspec>, col_idx> {
         static void exec(Spec* spec, const char* const* col_names)
         {
             assert(col_idx == spec->get_column_count());
             typedef typename Subspec::Columns SubcolTypes;
             Spec subspec = spec->add_subtable_column(col_names[col_idx]);
-            ForEachType<SubcolTypes, _impl::AddColumn>::exec(&subspec, Subspec::dyn_col_names());
+            ForEachType<SubcolTypes, _impl::AddCol>::exec(&subspec, Subspec::dyn_col_names());
         }
     };
 }
