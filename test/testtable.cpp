@@ -772,3 +772,65 @@ TEST(Table_Mixed2)
     CHECK_EQUAL(time_t(1234), table[2].first.get_date());
     CHECK_EQUAL("test",       table[3].first.get_string());
 }
+
+
+TEST(Table_SubtableSizeAndClear)
+{
+    Table table;
+    Spec& spec = table.get_spec();
+    {
+        Spec subspec = spec.add_subtable_column("subtab");
+        subspec.add_column(COLUMN_TYPE_INT, "int");
+    }
+    spec.add_column(COLUMN_TYPE_MIXED, "mixed");
+    table.update_from_spec();
+
+    table.insert_table(0, 0);
+    table.insert_mixed(1, 0, false);
+    table.insert_done();
+
+    table.insert_table(0, 1);
+    table.insert_mixed(1, 1, Mixed(COLUMN_TYPE_TABLE));
+    table.insert_done();
+
+    CHECK_EQUAL(table.get_subtable_size(0,0), 0); // Subtable column
+    CHECK_EQUAL(table.get_subtable_size(1,0), 0); // Mixed column, bool value
+    CHECK_EQUAL(table.get_subtable_size(1,1), 0); // Mixed column, table value
+
+    CHECK(table.get_subtable(0, 0));  // Subtable column
+    CHECK(!table.get_subtable(1, 0)); // Mixed column, bool value, must return NULL
+    CHECK(table.get_subtable(1, 1));  // Mixed column, table value
+
+    table.set_mixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
+    table.set_mixed(1, 1, false);
+    CHECK(table.get_subtable(1, 0));
+    CHECK(!table.get_subtable(1, 1));
+
+    TableRef subtab1 = table.get_subtable(0, 0);
+    TableRef subtab2 = table.get_subtable(1, 0);
+    {
+        Spec& subspec = subtab2->get_spec();
+        subspec.add_column(COLUMN_TYPE_INT, "int");
+        subtab2->update_from_spec();
+    }
+
+    CHECK_EQUAL(table.get_subtable_size(1, 0), 0);
+    CHECK(table.get_subtable(1, 0));
+
+    subtab1->insert_int(0, 0, 0);
+    subtab1->insert_done();
+
+    subtab2->insert_int(0, 0, 0);
+    subtab2->insert_done();
+
+    CHECK_EQUAL(table.get_subtable_size(0,0), 1);
+    CHECK_EQUAL(table.get_subtable_size(1,0), 1);
+
+    table.clear_subtable(0, 0);
+    table.clear_subtable(1, 0);
+
+    CHECK_EQUAL(table.get_subtable_size(0,0), 0);
+    CHECK_EQUAL(table.get_subtable_size(1,0), 0);
+
+    CHECK(table.get_subtable(1, 0));
+}

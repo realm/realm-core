@@ -599,16 +599,6 @@ void Table::insert_table(size_t column_ndx, size_t ndx)
     subtables.Insert(ndx);
 }
 
-void Table::clear_subtable(size_t column_ndx, size_t ndx)
-{
-    assert(column_ndx < get_column_count());
-    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_TABLE);
-    assert(ndx <= m_size);
-
-    ColumnTable& subtables = GetColumnTable(column_ndx);
-    subtables.Clear(ndx);
-}
-
 Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx)
 {
     assert(col_idx < get_column_count());
@@ -619,14 +609,12 @@ Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx)
         ColumnTable& subtables = GetColumnTable(col_idx);
         return subtables.get_subtable_ptr(row_idx);
     }
-    else if (type == COLUMN_TYPE_MIXED) {
+    if (type == COLUMN_TYPE_MIXED) {
         ColumnMixed& subtables = GetColumnMixed(col_idx);
         return subtables.get_subtable_ptr(row_idx);
     }
-    else {
-        assert(false);
-        return 0;
-    }
+    assert(false);
+    return 0;
 }
 
 const Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx) const
@@ -639,14 +627,12 @@ const Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx) const
         const ColumnTable& subtables = GetColumnTable(col_idx);
         return subtables.get_subtable_ptr(row_idx);
     }
-    else if (type == COLUMN_TYPE_MIXED) {
+    if (type == COLUMN_TYPE_MIXED) {
         const ColumnMixed& subtables = GetColumnMixed(col_idx);
         return subtables.get_subtable_ptr(row_idx);
     }
-    else {
-        assert(false);
-        return 0;
-    }
+    assert(false);
+    return 0;
 }
 
 size_t Table::get_subtable_size(size_t col_idx, size_t row_idx) const
@@ -659,13 +645,30 @@ size_t Table::get_subtable_size(size_t col_idx, size_t row_idx) const
         const ColumnTable& subtables = GetColumnTable(col_idx);
         return subtables.get_subtable_size(row_idx);
     }
-    else if (type == COLUMN_TYPE_MIXED) {
+    if (type == COLUMN_TYPE_MIXED) {
         const ColumnMixed& subtables = GetColumnMixed(col_idx);
         return subtables.get_subtable_size(row_idx);
     }
+    assert(false);
+    return 0;
+}
+
+void Table::clear_subtable(size_t col_idx, size_t row_idx)
+{
+    assert(col_idx < get_column_count());
+    assert(row_idx <= m_size);
+
+    const ColumnType type = GetRealColumnType(col_idx);
+    if (type == COLUMN_TYPE_TABLE) {
+        ColumnTable& subtables = GetColumnTable(col_idx);
+        subtables.Clear(row_idx);
+    }
+    else if (type == COLUMN_TYPE_MIXED) {
+        ColumnMixed& subtables = GetColumnMixed(col_idx);
+        subtables.SetTable(row_idx);
+    }
     else {
         assert(false);
-        return 0;
     }
 }
 

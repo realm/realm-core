@@ -24,6 +24,9 @@ ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, ArrayParent *par
 
 size_t ColumnTable::get_subtable_size(size_t ndx) const
 {
+    // FIXME: If the table object is cached, it is possible to get the
+    // size from it. Maybe it is faster in general to check for the
+    // presence of the cached object and use it when available.
     assert(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);
