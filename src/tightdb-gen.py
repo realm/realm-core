@@ -42,33 +42,44 @@ struct Table##Spec: tightdb::SpecBase { \\
 %for $j in range($num_cols)
     typedef tightdb::TypeAppend< %slurp
 %if $j == 0
-void%slurp
+void,     %slurp
 %else
-ColTypes$j%slurp
+Columns$j, %slurp
 %end if
-, type${j+1} >::type %slurp
+type${j+1} >::type Columns%slurp
 %if $j < $num_cols-1
-ColTypes${j+1}%slurp
-%else
-ColTypes%slurp
+${j+1}%slurp
 %end if
 ; \\
 %end for
  \\
-    template<template<int> class Col, class Init> struct Columns { \\
+    template<template<int> class Col, class Init> struct ColNames { \\
 %for $j in range($num_cols)
         typename Col<$j>::type name${j+1}; \\
 %end for
-        Columns(Init i): %slurp
+        ColNames(Init i): %slurp
 %for $j in range($num_cols)
 %if 0 < $j
 , %slurp
 %end if
 name${j+1}%slurp
-(i, #name${j+1})%slurp
+(i)%slurp
 %end for
  {} \\
     }; \\
+ \\
+    static const char* const* dyn_col_names() \\
+    { \\
+        static const char* names[] = { %slurp
+%for $j in range($num_cols)
+%if 0 < $j
+, %slurp
+%end if
+#name${j+1}%slurp
+%end for
+ }; \\
+        return names; \\
+    } \\
  \\
     template<class C%slurp
 %for $j in range($num_cols)

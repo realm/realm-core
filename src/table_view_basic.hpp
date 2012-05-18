@@ -48,16 +48,16 @@ private:
     typedef typename Tab::spec_type Spec;
 
     template<int col_idx> struct Col {
-        typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<View, col_idx, value_type> type;
     };
-    typedef typename Spec::template Columns<Col, View*> ColsAccessor;
+    typedef typename Spec::template ColNames<Col, View*> ColsAccessor;
 
     template<int col_idx> struct ConstCol {
-        typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<const View, col_idx, value_type> type;
     };
-    typedef typename Spec::template Columns<ConstCol, const View*> ConstColsAccessor;
+    typedef typename Spec::template ColNames<ConstCol, const View*> ConstColsAccessor;
 
 public:
     ColsAccessor cols() { return ColsAccessor(static_cast<View*>(this)); }
@@ -66,18 +66,18 @@ public:
 
 private:
     template<int col_idx> struct Field {
-        typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<View, col_idx, value_type> type;
     };
     typedef std::pair<View*, std::size_t> FieldInit;
-    typedef typename Spec::template Columns<Field, FieldInit> RowAccessor;
+    typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
 
     template<int col_idx> struct ConstField {
-        typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<const View, col_idx, value_type> type;
     };
     typedef std::pair<const View*, std::size_t> ConstFieldInit;
-    typedef typename Spec::template Columns<ConstField, ConstFieldInit> ConstRowAccessor;
+    typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
 public:
     RowAccessor operator[](std::size_t row_idx)

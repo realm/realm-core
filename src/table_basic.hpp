@@ -44,7 +44,7 @@ namespace tightdb {
 
 
 namespace _impl {
-    template<int col_idx, class Type> class AddColumn;
+    template<class Type, int col_idx> struct AddColumn;
 }
 
 
@@ -80,11 +80,11 @@ public:
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc)
     {
         tightdb::Spec& spec = get_spec();
-        typename Spec::template Columns<AddCol, tightdb::Spec*> c(&spec);
+        ForEachType<typename Spec::Columns, _impl::AddColumn>::exec(&spec, Spec::dyn_col_names());
         update_from_spec();
     }
 
-    static int get_column_count() { return TypeCount<typename Spec::ColTypes>::value; }
+    static int get_column_count() { return TypeCount<typename Spec::Columns>::value; }
 
     BasicTableRef<BasicTable> get_table_ref()
     {
@@ -98,16 +98,16 @@ public:
 
 private:
     template<int col_idx> struct Col {
-        typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<BasicTable, col_idx, value_type> type;
     };
-    typedef typename Spec::template Columns<Col, BasicTable*> ColsAccessor;
+    typedef typename Spec::template ColNames<Col, BasicTable*> ColsAccessor;
 
     template<int col_idx> struct ConstCol {
-        typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<const BasicTable, col_idx, value_type> type;
     };
-    typedef typename Spec::template Columns<ConstCol, const BasicTable*> ConstColsAccessor;
+    typedef typename Spec::template ColNames<ConstCol, const BasicTable*> ConstColsAccessor;
 
 public:
     ColsAccessor cols() { return ColsAccessor(this); }
@@ -115,18 +115,18 @@ public:
 
 private:
     template<int col_idx> struct Field {
-        typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<BasicTable, col_idx, value_type> type;
     };
     typedef std::pair<BasicTable*, std::size_t> FieldInit;
-    typedef typename Spec::template Columns<Field, FieldInit> RowAccessor;
+    typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
 
     template<int col_idx> struct ConstField {
-        typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<const BasicTable, col_idx, value_type> type;
     };
     typedef std::pair<const BasicTable*, std::size_t> ConstFieldInit;
-    typedef typename Spec::template Columns<ConstField, ConstFieldInit> ConstRowAccessor;
+    typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
 public:
     RowAccessor operator[](std::size_t row_idx)
@@ -242,13 +242,8 @@ private:
     template<class, int, class> friend class _impl::ColumnAccessor;
     friend class Group;
 
-    template<int col_idx> struct AddCol {
-        typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
-        typedef _impl::AddColumn<col_idx, value_type> type;
-    };
-
     template<int col_idx> struct QueryCol {
-        typedef typename TypeAt<typename Spec::ColTypes, col_idx>::type value_type;
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::QueryColumn<BasicTable, col_idx, value_type> type;
     };
 
@@ -260,12 +255,12 @@ private:
 
 
 template<class Spec> class BasicTable<Spec>::Query:
-    public Spec::template Columns<QueryCol, Query*> {
+    public Spec::template ColNames<QueryCol, Query*> {
 public:
     template<class, int, class> friend class _impl::QueryColumnBase;
     template<class, int, class> friend class _impl::QueryColumn;
 
-    Query(): Spec::template Columns<QueryCol, Query*>(this) {}
+    Query(): Spec::template ColNames<QueryCol, Query*>(this) {}
 
     Query& group() { m_impl.group(); return *this; }
 
@@ -339,23 +334,22 @@ namespace _impl
     };
 
 
-    template<int col_idx, class Type> class AddColumn {
-    public:
-        AddColumn(tightdb::Spec* spec, const char* column_name)
+    template<class Type, int col_idx> struct AddColumn {
+        static void exec(Spec* spec, const char* const* col_names)
         {
             assert(col_idx == spec->get_column_count());
-            spec->add_column(GetColumnTypeId<Type>::id, column_name);
+            spec->add_column(GetColumnTypeId<Type>::id, col_names[col_idx]);
         }
     };
 
     // AddColumn specialization for subtables
-    template<int col_idx, class Subspec> class AddColumn<col_idx, BasicTable<Subspec> > {
-    public:
-        AddColumn(tightdb::Spec* spec, const char* column_name)
+    template<class Subspec, int col_idx> struct AddColumn<BasicTable<Subspec>, col_idx> {
+        static void exec(Spec* spec, const char* const* col_names)
         {
             assert(col_idx == spec->get_column_count());
-            tightdb::Spec subspec = spec->add_subtable_column(column_name);
-            typename Subspec::template Columns<_impl::AddColumn, tightdb::Spec*> c(&subspec);
+            typedef typename Subspec::Columns SubcolTypes;
+            Spec subspec = spec->add_subtable_column(col_names[col_idx]);
+            ForEachType<SubcolTypes, _impl::AddColumn>::exec(&subspec, Subspec::dyn_col_names());
         }
     };
 }

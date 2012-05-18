@@ -94,7 +94,7 @@ private:
     typedef FieldAccessorBase<Tab> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i, const char* = 0): Base(i) {}
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 
     operator int64_t() const
     {
@@ -127,7 +127,7 @@ private:
     typedef FieldAccessorBase<Tab> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i, const char* = 0): Base(i) {}
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 
     operator bool() const
     {
@@ -151,7 +151,7 @@ private:
     typedef FieldAccessorBase<Tab> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i, const char* = 0): Base(i) {}
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 
     operator E() const
     {
@@ -175,7 +175,7 @@ private:
     typedef FieldAccessorBase<Tab> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i, const char* = 0): Base(i) {}
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 
     operator const char*() const
     {
@@ -212,7 +212,7 @@ private:
     typedef FieldAccessorBase<Tab> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i, const char* = 0): Base(i) {}
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 
     operator Mixed() const
     {
@@ -264,7 +264,7 @@ private:
     };
 
 public:
-    explicit FieldAccessor(typename Base::Init i, const char* = 0): Base(i) {}
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 
     BasicTableRef<Subtab> operator->() const
     {
@@ -332,7 +332,7 @@ private:
     typedef ColumnAccessorBase<Tab, col_idx, int64_t> Base;
 
 public:
-    explicit ColumnAccessor(Tab* t, const char* = 0): Base(t) {}
+    explicit ColumnAccessor(Tab* t): Base(t) {}
 
     std::size_t find_first(int64_t value) const
     {
@@ -386,7 +386,7 @@ private:
     typedef ColumnAccessorBase<Tab, col_idx, bool> Base;
 
 public:
-    explicit ColumnAccessor(Tab* t, const char* = 0): Base(t) {}
+    explicit ColumnAccessor(Tab* t): Base(t) {}
 
     std::size_t find_first(bool value) const
     {
@@ -415,7 +415,7 @@ private:
     typedef ColumnAccessorBase<Tab, col_idx, SpecBase::Enum<E> > Base;
 
 public:
-    explicit ColumnAccessor(Tab* t, const char* = 0): Base(t) {}
+    explicit ColumnAccessor(Tab* t): Base(t) {}
 
     std::size_t find_first(E value) const
     {
@@ -444,7 +444,7 @@ private:
     typedef ColumnAccessorBase<Tab, col_idx, const char*> Base;
 
 public:
-    explicit ColumnAccessor(Tab* t, const char* = 0): Base(t) {}
+    explicit ColumnAccessor(Tab* t): Base(t) {}
 
     std::size_t find_first(const char* value) const
     {
@@ -472,7 +472,7 @@ private:
     typedef ColumnAccessorBase<Tab, col_idx, Mixed> Base;
 
 public:
-    explicit ColumnAccessor(Tab* t, const char* = 0): Base(t) {}
+    explicit ColumnAccessor(Tab* t): Base(t) {}
 
     void _insert(std::size_t row_idx, const Mixed& value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
     {
@@ -491,7 +491,7 @@ private:
     typedef ColumnAccessorBase<Tab, col_idx, BasicTable<Subspec> > Base;
 
 public:
-    explicit ColumnAccessor(Tab* t, const char* = 0): Base(t) {}
+    explicit ColumnAccessor(Tab* t): Base(t) {}
 };
 
 
@@ -536,7 +536,7 @@ private:
     typedef typename Tab::Query Query;
 
 public:
-    explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
+    explicit QueryColumn(Query* q): Base(q) {}
     using Base::equal;
     using Base::not_equal;
 
@@ -582,7 +582,7 @@ private:
     typedef typename Tab::Query Query;
 
 public:
-    explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
+    explicit QueryColumn(Query* q): Base(q) {}
     using Base::equal;
     using Base::not_equal;
 };
@@ -599,7 +599,7 @@ private:
     typedef typename Tab::Query Query;
 
 public:
-    explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
+    explicit QueryColumn(Query* q): Base(q) {}
     using Base::equal;
     using Base::not_equal;
 };
@@ -615,7 +615,7 @@ private:
     typedef typename Tab::Query Query;
 
 public:
-    explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
+    explicit QueryColumn(Query* q): Base(q) {}
 
     Query& equal(const char* value, bool case_sensitive=true) const
     {
@@ -657,7 +657,7 @@ private:
     typedef typename Tab::Query Query;
 
 public:
-    explicit QueryColumn(Query*, const char* = 0) {}
+    explicit QueryColumn(Query*) {}
 };
 
 
@@ -672,7 +672,7 @@ private:
     typedef typename Tab::Query Query;
 
 public:
-    explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
+    explicit QueryColumn(Query* q): Base(q) {}
 
     Query& subtable()
     {

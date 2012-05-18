@@ -36,8 +36,8 @@ namespace tightdb {
  * Note that 'void' is considered as a zero-length list.
  */
 template<class H, class T> struct TypeCons {
-  typedef H head;
-  typedef T tail;
+    typedef H head;
+    typedef T tail;
 };
 
 
@@ -51,10 +51,10 @@ template<class H, class T> struct TypeCons {
  * \tparam T The new type to be appended.
  */
 template<class List, class T> struct TypeAppend {
-  typedef TypeCons<typename List::head, typename TypeAppend<typename List::tail, T>::type> type;
+    typedef TypeCons<typename List::head, typename TypeAppend<typename List::tail, T>::type> type;
 };
 template<class T> struct TypeAppend<void, T> {
-  typedef TypeCons<T, void> type;
+    typedef TypeCons<T, void> type;
 };
 
 
@@ -68,7 +68,7 @@ template<class T> struct TypeAppend<void, T> {
  * \tparam i The index of the list element to get.
  */
 template<class List, int i> struct TypeAt {
-  typedef typename TypeAt<typename List::tail, i-1>::type type;
+    typedef typename TypeAt<typename List::tail, i-1>::type type;
 };
 template<class List> struct TypeAt<List, 0> { typedef typename List::head type; };
 
@@ -81,7 +81,7 @@ template<class List> struct TypeAt<List, 0> { typedef typename List::head type; 
  * that 'void' is considered as a zero-length list.
  */
 template<class List> struct TypeCount {
-  static const int value = 1 + TypeCount<typename List::tail>::value;
+    static const int value = 1 + TypeCount<typename List::tail>::value;
 };
 template<> struct TypeCount<void> { static const int value = 0; };
 
@@ -92,21 +92,27 @@ template<> struct TypeCount<void> { static const int value = 0; };
  * \tparam List The list of types constructed using TypeCons<>. Note
  * that 'void' is considered as a zero-length list.
  */
-template<class List, int i=0> struct ForEachType {
-  template<class Op> static void exec(Op& o)
-  {
-    o.template exec<typename List::head, i>();
-    ForEachType<typename List::tail, i+1>::exec(o);
-  }
-  template<class Op> static void exec(const Op& o)
-  {
-    o.template exec<typename List::head, i>();
-    ForEachType<typename List::tail, i+1>::exec(o);
-  }
+template<class List, template<class T, int i> class Op, int i=0> struct ForEachType {
+    static void exec()
+    {
+        Op<typename List::head, i>::exec();
+        ForEachType<typename List::tail, Op, i+1>::exec();
+    }
+    template<class A> static void exec(const A& a)
+    {
+        Op<typename List::head, i>::exec(a);
+        ForEachType<typename List::tail, Op, i+1>::exec(a);
+    }
+    template<class A, class B> static void exec(const A& a, const B& b)
+    {
+        Op<typename List::head, i>::exec(a,b);
+        ForEachType<typename List::tail, Op, i+1>::exec(a,b);
+    }
 };
-template<int i> struct ForEachType<void, i> {
-  template<class Op> static void exec(Op&) {}
-  template<class Op> static void exec(const Op&) {}
+template<template<class T, int i> class Op, int i> struct ForEachType<void, Op, i> {
+    static void exec() {}
+    template<class A> static void exec(const A&) {}
+    template<class A, class B> static void exec(const A&, const B&) {}
 };
 
 
