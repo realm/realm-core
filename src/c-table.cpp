@@ -19,10 +19,6 @@ C1X will be getting support for type generic expressions they look like this:
 // Internal helper functions to gain access to protected/private methods in Table:
 namespace tightdb {
 
-inline void TableHelper_unbind(Table* t)
-{
-   t->unbind_ref();
-}
 inline Table* TableHelper_get_subtable_ptr(Table* t, std::size_t col_idx, std::size_t row_idx)
 {
     return t->get_subtable_ptr(col_idx, row_idx);
@@ -30,6 +26,10 @@ inline Table* TableHelper_get_subtable_ptr(Table* t, std::size_t col_idx, std::s
 inline const Table* TableHelper_get_const_subtable_ptr(const Table* t, std::size_t col_idx, std::size_t row_idx)
 {
     return t->get_subtable_ptr(col_idx, row_idx);
+}
+inline void TableHelper_unbind(const Table* t)
+{
+   t->unbind_ref();
 }
 
 } // namespace tightdb
@@ -150,7 +150,7 @@ void table_delete(Table* t)
     delete t;
 }
 
-void table_unbind(Table* t)
+void table_unbind(const Table* t)
 {
     TableHelper_unbind(t);
 }

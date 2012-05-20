@@ -270,3 +270,142 @@ TEST(TableViewClearNone)
 
     v.clear();
 }
+
+
+
+namespace
+{
+    TIGHTDB_TABLE_1(MyTable1,
+                    val, Int)
+
+    TIGHTDB_TABLE_2(MyTable2,
+                    val, Int,
+                    subtab, Subtable<MyTable1>)
+
+    TIGHTDB_TABLE_2(MyTable3,
+                    val, Int,
+                    subtab, Subtable<MyTable2>)
+}
+
+TEST(TableView_HighLevelSubtables)
+{
+    MyTable3 t;
+    const MyTable3& ct = t;
+
+    t.add();
+    MyTable3::View v = t.cols().val.find_all(0);
+    MyTable3::ConstView cv = ct.cols().val.find_all(0);
+
+    {
+        MyTable3::View v2 = v.cols().val.find_all(0);
+        MyTable3::ConstView cv2 = cv.cols().val.find_all(0);
+
+        MyTable3::ConstView cv3 = t.cols().val.find_all(0);
+        MyTable3::ConstView cv4 = v.cols().val.find_all(0);
+
+        // Also test assigment that converts to const
+        cv3 = t.cols().val.find_all(0);
+        cv4 = v.cols().val.find_all(0);
+
+        static_cast<void>(v2);
+        static_cast<void>(cv2);
+        static_cast<void>(cv3);
+        static_cast<void>(cv4);
+    }
+
+    {
+        MyTable2::Ref       s1 = v[0].subtab;
+        MyTable2::ConstRef  s2 = v[0].subtab;
+        MyTable2::Ref       s3 = v[0].subtab->get_table_ref();
+        MyTable2::ConstRef  s4 = v[0].subtab->get_table_ref();
+        MyTable2::Ref       s5 = v.cols().subtab[0];
+        MyTable2::ConstRef  s6 = v.cols().subtab[0];
+        MyTable2::Ref       s7 = v.cols().subtab[0]->get_table_ref();
+        MyTable2::ConstRef  s8 = v.cols().subtab[0]->get_table_ref();
+        MyTable2::ConstRef cs1 = cv[0].subtab;
+        MyTable2::ConstRef cs2 = cv[0].subtab->get_table_ref();
+        MyTable2::ConstRef cs3 = cv.cols().subtab[0];
+        MyTable2::ConstRef cs4 = cv.cols().subtab[0]->get_table_ref();
+        static_cast<void>(s1);
+        static_cast<void>(s2);
+        static_cast<void>(s3);
+        static_cast<void>(s4);
+        static_cast<void>(s5);
+        static_cast<void>(s6);
+        static_cast<void>(s7);
+        static_cast<void>(s8);
+        static_cast<void>(cs1);
+        static_cast<void>(cs2);
+        static_cast<void>(cs3);
+        static_cast<void>(cs4);
+    }
+
+    t[0].subtab->add();
+    {
+        MyTable1::Ref       s1 = v[0].subtab[0].subtab;
+        MyTable1::ConstRef  s2 = v[0].subtab[0].subtab;
+        MyTable1::Ref       s3 = v[0].subtab[0].subtab->get_table_ref();
+        MyTable1::ConstRef  s4 = v[0].subtab[0].subtab->get_table_ref();
+        MyTable1::Ref       s5 = v.cols().subtab[0]->cols().subtab[0];
+        MyTable1::ConstRef  s6 = v.cols().subtab[0]->cols().subtab[0];
+        MyTable1::Ref       s7 = v.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        MyTable1::ConstRef  s8 = v.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        MyTable1::ConstRef cs1 = cv[0].subtab[0].subtab;
+        MyTable1::ConstRef cs2 = cv[0].subtab[0].subtab->get_table_ref();
+        MyTable1::ConstRef cs3 = cv.cols().subtab[0]->cols().subtab[0];
+        MyTable1::ConstRef cs4 = cv.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        static_cast<void>(s1);
+        static_cast<void>(s2);
+        static_cast<void>(s3);
+        static_cast<void>(s4);
+        static_cast<void>(s5);
+        static_cast<void>(s6);
+        static_cast<void>(s7);
+        static_cast<void>(s8);
+        static_cast<void>(cs1);
+        static_cast<void>(cs2);
+        static_cast<void>(cs3);
+        static_cast<void>(cs4);
+    }
+
+    v[0].subtab[0].val = 1;
+    CHECK_EQUAL(v[0].subtab[0].val,                 1);
+    CHECK_EQUAL(v.cols().subtab[0]->cols().val[0],  1);
+    CHECK_EQUAL(v[0].subtab->cols().val[0],         1);
+    CHECK_EQUAL(v.cols().subtab[0][0].val,          1);
+
+    v.cols().subtab[0]->cols().val[0] = 2;
+    CHECK_EQUAL(v[0].subtab[0].val,                 2);
+    CHECK_EQUAL(v.cols().subtab[0]->cols().val[0],  2);
+    CHECK_EQUAL(v[0].subtab->cols().val[0],         2);
+    CHECK_EQUAL(v.cols().subtab[0][0].val,          2);
+
+    v[0].subtab->cols().val[0] = 3;
+    CHECK_EQUAL(v[0].subtab[0].val,                 3);
+    CHECK_EQUAL(v.cols().subtab[0]->cols().val[0],  3);
+    CHECK_EQUAL(v[0].subtab->cols().val[0],         3);
+    CHECK_EQUAL(v.cols().subtab[0][0].val,          3);
+
+    v.cols().subtab[0][0].val = 4;
+    CHECK_EQUAL(v[0].subtab[0].val,                 4);
+    CHECK_EQUAL(v.cols().subtab[0]->cols().val[0],  4);
+    CHECK_EQUAL(v[0].subtab->cols().val[0],         4);
+    CHECK_EQUAL(v.cols().subtab[0][0].val,          4);
+    CHECK_EQUAL(cv[0].subtab[0].val,                4);
+    CHECK_EQUAL(cv.cols().subtab[0]->cols().val[0], 4);
+    CHECK_EQUAL(cv[0].subtab->cols().val[0],        4);
+    CHECK_EQUAL(cv.cols().subtab[0][0].val,         4);
+
+    v[0].subtab[0].subtab->add();
+    v[0].subtab[0].subtab[0].val = 5;
+    CHECK_EQUAL(v[0].subtab[0].subtab[0].val,                         5);
+    CHECK_EQUAL(v.cols().subtab[0]->cols().subtab[0]->cols().val[0],  5);
+    CHECK_EQUAL(cv[0].subtab[0].subtab[0].val,                        5);
+    CHECK_EQUAL(cv.cols().subtab[0]->cols().subtab[0]->cols().val[0], 5);
+
+    v.cols().subtab[0]->cols().subtab[0]->cols().val[0] = 6;
+    CHECK_EQUAL(v[0].subtab[0].subtab[0].val,                         6);
+    CHECK_EQUAL(v.cols().subtab[0]->cols().subtab[0]->cols().val[0],  6);
+    CHECK_EQUAL(cv[0].subtab[0].subtab[0].val,                        6);
+    CHECK_EQUAL(cv.cols().subtab[0]->cols().subtab[0]->cols().val[0], 6);
+}

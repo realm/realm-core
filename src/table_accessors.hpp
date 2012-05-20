@@ -51,6 +51,13 @@ struct SpecBase {
     private:
         E m_value;
     };
+    template<class T> class Subtable {
+    public:
+        Subtable(T* t) : m_table(t) {};
+        operator T*() const { return m_table; }
+    private:
+        T *m_table;
+    };
 
     /**
      * By default, there are no static column names defined for a
@@ -109,31 +116,61 @@ namespace _impl {
 
 
 /**
- * If T is BasicTableView<T2>, then return T2, else simply return T.
+ * Get the const qualified type of the table being accessed.
+ *
+ * If T matches 'BasicTableView<T2>' or 'const BasicTableView<T2>',
+ * then return T2, else simply return T.
  */
-template<class T> struct GetTableFromView { typedef T type; };
-template<class T> struct GetTableFromView<BasicTableView<T> > { typedef T type; };
-template<class T> struct GetTableFromView<const BasicTableView<T> > { typedef T type; };
+template<class Tab> struct GetTableFromView { typedef Tab type; };
+template<class Tab> struct GetTableFromView<BasicTableView<Tab> > { typedef Tab type; };
+template<class Tab> struct GetTableFromView<const BasicTableView<Tab> > { typedef Tab type; };
 
+
+/**
+ * Determine whether an accessor has const-only access to a table, so
+ * that it is not allowed to modify fields, nor return non-const
+ * subtable references.
+ *
+ * Note that for Taboid = 'BasicTableView<const Tab>', a column
+ * accessor is still allowed to reorder the rows of the view, as long
+ * as it does not modify the contents of the table.
+ */
+template<class Taboid> struct TableIsConst { static const bool value = false; };
+template<class Taboid> struct TableIsConst<const Taboid> { static const bool value = true; };
+template<class Tab> struct TableIsConst<BasicTableView<const Tab> > {
+    static const bool value = true;
+};
 
 
 
 /**
- * This class gives access to a field of a row of a table.
+ * This class gives access to a field of a row of a table, or a table
+ * view.
  *
- * \tparam Tab Either a table or a table view. Constness of access is
- * controlled by what is allowed to be done with/on a 'Tab*'.
+ * \tparam Taboid Either a table or a table view, that is, any of
+ * 'BasicTable<S>', 'const BasicTable<S>',
+ * 'BasicTableView<BasicTable<S> >', 'const
+ * BasicTableView<BasicTable<S> >', 'BasicTableView<const
+ * BasicTable<S> >', or 'const BasicTableView<const BasicTable<S>
+ * >'. Note that the term 'taboid' is used here for something that is
+ * table-like, i.e., either a table of a table view.
+ *
+ * \tparam const_tab Indicates whether the accessor has const-only
+ * access to the field, that is, if, and only if Taboid matches 'const T'
+ * or 'BasicTableView<const T>' for any T. This argument should never
+ * be specified explicitely.
  */
-template<class Tab, int col_idx, class Type> class FieldAccessor;
+template<class Taboid, int col_idx, class Type,
+         bool const_tab = TableIsConst<Taboid>::value> class FieldAccessor;
 
 
 /**
  * Commmon base class for all field accessor specializations.
  */
-template<class Tab> class FieldAccessorBase {
+template<class Taboid> class FieldAccessorBase {
 protected:
-    typedef std::pair<Tab*, std::size_t> Init;
-    Tab* const m_table;
+    typedef std::pair<Taboid*, std::size_t> Init;
+    Taboid* const m_table;
     const std::size_t m_row_idx;
     FieldAccessorBase(Init i): m_table(i.first), m_row_idx(i.second) {}
 };
@@ -142,10 +179,10 @@ protected:
 /**
  * Field accessor specialization for integers.
  */
-template<class Tab, int col_idx>
-class FieldAccessor<Tab, col_idx, int64_t>: public FieldAccessorBase<Tab> {
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, int64_t, const_tab>: public FieldAccessorBase<Taboid> {
 private:
-    typedef FieldAccessorBase<Tab> Base;
+    typedef FieldAccessorBase<Taboid> Base;
 
 public:
     explicit FieldAccessor(typename Base::Init i): Base(i) {}
@@ -175,10 +212,10 @@ public:
 /**
  * Field accessor specialization for booleans.
  */
-template<class Tab, int col_idx>
-class FieldAccessor<Tab, col_idx, bool>: public FieldAccessorBase<Tab> {
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, bool, const_tab>: public FieldAccessorBase<Taboid> {
 private:
-    typedef FieldAccessorBase<Tab> Base;
+    typedef FieldAccessorBase<Taboid> Base;
 
 public:
     explicit FieldAccessor(typename Base::Init i): Base(i) {}
@@ -199,10 +236,11 @@ public:
 /**
  * Field accessor specialization for enumerations.
  */
-template<class Tab, int col_idx, class E>
-class FieldAccessor<Tab, col_idx, SpecBase::Enum<E> >: public FieldAccessorBase<Tab> {
+template<class Taboid, int col_idx, class E, bool const_tab>
+class FieldAccessor<Taboid, col_idx, SpecBase::Enum<E>, const_tab>:
+    public FieldAccessorBase<Taboid> {
 private:
-    typedef FieldAccessorBase<Tab> Base;
+    typedef FieldAccessorBase<Taboid> Base;
 
 public:
     explicit FieldAccessor(typename Base::Init i): Base(i) {}
@@ -223,10 +261,10 @@ public:
 /**
  * Field accessor specialization for strings.
  */
-template<class Tab, int col_idx>
-class FieldAccessor<Tab, col_idx, const char*>: public FieldAccessorBase<Tab> {
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, const char*, const_tab>: public FieldAccessorBase<Taboid> {
 private:
-    typedef FieldAccessorBase<Tab> Base;
+    typedef FieldAccessorBase<Taboid> Base;
 
 public:
     explicit FieldAccessor(typename Base::Init i): Base(i) {}
@@ -260,10 +298,10 @@ public:
 /**
  * Field accessor specialization for mixed type.
  */
-template<class Tab, int col_idx>
-class FieldAccessor<Tab, col_idx, Mixed>: public FieldAccessorBase<Tab> {
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, Mixed, const_tab>: public FieldAccessorBase<Taboid> {
 private:
-    typedef FieldAccessorBase<Tab> Base;
+    typedef FieldAccessorBase<Taboid> Base;
 
 public:
     explicit FieldAccessor(typename Base::Init i): Base(i) {}
@@ -299,39 +337,102 @@ public:
 
 
 /**
- * Field accessor specialization for subtables.
+ * Field accessor specialization for non-const subtables.
  */
-template<class Tab, int col_idx, class Subspec>
-class FieldAccessor<Tab, col_idx, BasicTable<Subspec> >: public FieldAccessorBase<Tab> {
+template<class Taboid, int col_idx, class Subtab>
+class FieldAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>, false>:
+    public FieldAccessorBase<Taboid> {
 private:
-    typedef FieldAccessorBase<Tab> Base;
-    typedef typename GetTableFromView<Tab>::type RealTable;
-    typedef typename CopyConstness<RealTable, BasicTable<Subspec> >::type Subtab;
+    typedef FieldAccessorBase<Taboid> Base;
+    // FIXME: Dangerous slicing posibility as long as Cursor is same as RowAccessor.
+    // FIXME: Accessors must to be publicly copyable. This requires that Spec::ColNames is made a friend of BasicTable.
+    // FIXME: Need BasicTableView::Cursor and BasicTableView::ConstCursor if Cursors should exist at all.
     struct SubtabRowAccessor: Subtab::RowAccessor {
     public:
-        SubtabRowAccessor(Tab* subtab, std::size_t row_idx):
+        SubtabRowAccessor(Subtab* subtab, std::size_t row_idx):
             Subtab::RowAccessor(std::make_pair(subtab, row_idx)),
-            m_owner(Table::make_ref(subtab)) {}
+            m_owner(subtab->get_table_ref()) {}
 
     private:
-        BasicTableRef<Tab> const m_owner;
+        typename Subtab::Ref const m_owner;
     };
 
 public:
     explicit FieldAccessor(typename Base::Init i): Base(i) {}
 
-    BasicTableRef<Subtab> operator->() const
+    operator typename Subtab::Ref() const
     {
-        Subtab* subtab = static_cast<Subtab*>(Base::m_table->get_impl()->
-                                              get_subtable_ptr(col_idx, Base::m_row_idx));
-        return Table::make_ref(subtab);
+        Subtab* subtab =
+            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        return subtab->get_table_ref();
+    }
+
+    operator typename Subtab::ConstRef() const
+    {
+        const Subtab* subtab =
+            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        return subtab->get_table_ref();
+    }
+
+    typename Subtab::Ref operator->() const
+    {
+        Subtab* subtab =
+            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        return subtab->get_table_ref();
     }
 
     SubtabRowAccessor operator[](std::size_t row_idx) const
     {
-        Subtab* subtab = static_cast<Subtab*>(Base::m_table->get_impl()->
-                                              get_subtable_ptr(col_idx, Base::m_row_idx));
-        return RowAccessor(subtab, row_idx);
+        Subtab* subtab =
+            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        return SubtabRowAccessor(subtab, row_idx);
+    }
+};
+
+
+
+
+/**
+ * Field accessor specialization for const subtables.
+ */
+template<class Taboid, int col_idx, class Subtab>
+class FieldAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>, true>:
+    public FieldAccessorBase<Taboid> {
+private:
+    typedef FieldAccessorBase<Taboid> Base;
+    // FIXME: Dangerous slicing posibility as long as Cursor is same as RowAccessor.
+    struct SubtabRowAccessor: Subtab::ConstRowAccessor {
+    public:
+        SubtabRowAccessor(const Subtab* subtab, std::size_t row_idx):
+            Subtab::ConstRowAccessor(std::make_pair(subtab, row_idx)),
+            m_owner(subtab->get_table_ref()) {}
+
+    private:
+        typename Subtab::ConstRef const m_owner;
+    };
+
+public:
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
+
+    operator typename Subtab::ConstRef() const
+    {
+        const Subtab* subtab =
+            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        return subtab->get_table_ref();
+    }
+
+    typename Subtab::ConstRef operator->() const
+    {
+        const Subtab* subtab =
+            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        return subtab->get_table_ref();
+    }
+
+    SubtabRowAccessor operator[](std::size_t row_idx) const
+    {
+        const Subtab* subtab =
+            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        return SubtabRowAccessor(subtab, row_idx);
     }
 };
 
@@ -341,23 +442,23 @@ public:
 /**
  * This class gives access to a column of a table.
  *
- * \tparam Tab Either a table or a table view. Constness of access is
- * controlled by what is allowed to be done with/on a 'Tab*'.
+ * \tparam Taboid Either a table or a table view. Constness of access is
+ * controlled by what is allowed to be done with/on a 'Taboid*'.
  */
-template<class Tab, int col_idx, class Type> class ColumnAccessor;
+template<class Taboid, int col_idx, class Type> class ColumnAccessor;
 
 
 /**
  * Commmon base class for all column accessor specializations.
  */
-template<class Tab, int col_idx, class Type> class ColumnAccessorBase {
+template<class Taboid, int col_idx, class Type> class ColumnAccessorBase {
 protected:
-    typedef typename GetTableFromView<Tab>::type RealTable;
+    typedef typename GetTableFromView<Taboid>::type RealTable;
 
 public:
-    FieldAccessor<Tab, col_idx, Type> operator[](std::size_t row_idx) const
+    FieldAccessor<Taboid, col_idx, Type> operator[](std::size_t row_idx) const
     {
-        return FieldAccessor<Tab, col_idx, Type>(std::make_pair(m_table, row_idx));
+        return FieldAccessor<Taboid, col_idx, Type>(std::make_pair(m_table, row_idx));
     }
 
     bool has_index() const { return m_table->get_impl()->has_index(col_idx); }
@@ -371,22 +472,23 @@ public:
     void sort(bool ascending = true) const { m_table->get_impl()->sort(col_idx, ascending); }
 
 protected:
-    Tab* const m_table;
+    Taboid* const m_table;
 
-    explicit ColumnAccessorBase(Tab* t): m_table(t) {}
+    explicit ColumnAccessorBase(Taboid* t): m_table(t) {}
 };
 
 
 /**
  * Column accessor specialization for integers.
  */
-template<class Tab, int col_idx>
-class ColumnAccessor<Tab, col_idx, int64_t>: public ColumnAccessorBase<Tab, col_idx, int64_t> {
+template<class Taboid, int col_idx>
+class ColumnAccessor<Taboid, col_idx, int64_t>:
+    public ColumnAccessorBase<Taboid, col_idx, int64_t> {
 private:
-    typedef ColumnAccessorBase<Tab, col_idx, int64_t> Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, int64_t> Base;
 
 public:
-    explicit ColumnAccessor(Tab* t): Base(t) {}
+    explicit ColumnAccessor(Taboid* t): Base(t) {}
 
     std::size_t find_first(int64_t value) const
     {
@@ -434,13 +536,13 @@ public:
 /**
  * Column accessor specialization for booleans.
  */
-template<class Tab, int col_idx>
-class ColumnAccessor<Tab, col_idx, bool>: public ColumnAccessorBase<Tab, col_idx, bool> {
+template<class Taboid, int col_idx>
+class ColumnAccessor<Taboid, col_idx, bool>: public ColumnAccessorBase<Taboid, col_idx, bool> {
 private:
-    typedef ColumnAccessorBase<Tab, col_idx, bool> Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, bool> Base;
 
 public:
-    explicit ColumnAccessor(Tab* t): Base(t) {}
+    explicit ColumnAccessor(Taboid* t): Base(t) {}
 
     std::size_t find_first(bool value) const
     {
@@ -462,14 +564,14 @@ public:
 /**
  * Column accessor specialization for enumerations.
  */
-template<class Tab, int col_idx, class E>
-class ColumnAccessor<Tab, col_idx, SpecBase::Enum<E> >:
-    public ColumnAccessorBase<Tab, col_idx, SpecBase::Enum<E> > {
+template<class Taboid, int col_idx, class E>
+class ColumnAccessor<Taboid, col_idx, SpecBase::Enum<E> >:
+    public ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E> > {
 private:
-    typedef ColumnAccessorBase<Tab, col_idx, SpecBase::Enum<E> > Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E> > Base;
 
 public:
-    explicit ColumnAccessor(Tab* t): Base(t) {}
+    explicit ColumnAccessor(Taboid* t): Base(t) {}
 
     std::size_t find_first(E value) const
     {
@@ -491,14 +593,14 @@ public:
 /**
  * Column accessor specialization for strings.
  */
-template<class Tab, int col_idx>
-class ColumnAccessor<Tab, col_idx, const char*>:
-    public ColumnAccessorBase<Tab, col_idx, const char*> {
+template<class Taboid, int col_idx>
+class ColumnAccessor<Taboid, col_idx, const char*>:
+    public ColumnAccessorBase<Taboid, col_idx, const char*> {
 private:
-    typedef ColumnAccessorBase<Tab, col_idx, const char*> Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, const char*> Base;
 
 public:
-    explicit ColumnAccessor(Tab* t): Base(t) {}
+    explicit ColumnAccessor(Taboid* t): Base(t) {}
 
     std::size_t find_first(const char* value) const
     {
@@ -520,13 +622,13 @@ public:
 /**
  * Column accessor specialization for mixed type.
  */
-template<class Tab, int col_idx>
-class ColumnAccessor<Tab, col_idx, Mixed>: public ColumnAccessorBase<Tab, col_idx, Mixed> {
+template<class Taboid, int col_idx>
+class ColumnAccessor<Taboid, col_idx, Mixed>: public ColumnAccessorBase<Taboid, col_idx, Mixed> {
 private:
-    typedef ColumnAccessorBase<Tab, col_idx, Mixed> Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, Mixed> Base;
 
 public:
-    explicit ColumnAccessor(Tab* t): Base(t) {}
+    explicit ColumnAccessor(Taboid* t): Base(t) {}
 
     void _insert(std::size_t row_idx, const Mixed& value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
     {
@@ -538,14 +640,14 @@ public:
 /**
  * Column accessor specialization for subtables.
  */
-template<class Tab, int col_idx, class Subspec>
-class ColumnAccessor<Tab, col_idx, BasicTable<Subspec> >:
-    public ColumnAccessorBase<Tab, col_idx, BasicTable<Subspec> > {
+template<class Taboid, int col_idx, class Subtab>
+class ColumnAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab> >:
+    public ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab> > {
 private:
-    typedef ColumnAccessorBase<Tab, col_idx, BasicTable<Subspec> > Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab> > Base;
 
 public:
-    explicit ColumnAccessor(Tab* t): Base(t) {}
+    explicit ColumnAccessor(Taboid* t): Base(t) {}
 };
 
 
@@ -553,16 +655,18 @@ public:
 
 /**
  * This class implements a column of a table as used in a table query.
+ *
+ * FIXME: These do not belong in this file!
  */
-template<class Tab, int col_idx, class Type> class QueryColumn;
+template<class Taboid, int col_idx, class Type> class QueryColumn;
 
 
 /**
  * Commmon base class for all query column specializations.
  */
-template<class Tab, int col_idx, class Type> class QueryColumnBase {
+template<class Taboid, int col_idx, class Type> class QueryColumnBase {
 protected:
-    typedef typename Tab::Query Query;
+    typedef typename Taboid::Query Query;
     Query* const m_query;
     explicit QueryColumnBase(Query* q): m_query(q) {}
 
@@ -583,11 +687,11 @@ protected:
 /**
  * QueryColumn specialization for integers.
  */
-template<class Tab, int col_idx>
-class QueryColumn<Tab, col_idx, int64_t>: public QueryColumnBase<Tab, col_idx, int64_t> {
+template<class Taboid, int col_idx>
+class QueryColumn<Taboid, col_idx, int64_t>: public QueryColumnBase<Taboid, col_idx, int64_t> {
 private:
-    typedef QueryColumnBase<Tab, col_idx, int64_t> Base;
-    typedef typename Tab::Query Query;
+    typedef QueryColumnBase<Taboid, col_idx, int64_t> Base;
+    typedef typename Taboid::Query Query;
 
 public:
     explicit QueryColumn(Query* q): Base(q) {}
@@ -629,11 +733,11 @@ public:
 /**
  * QueryColumn specialization for booleans.
  */
-template<class Tab, int col_idx>
-class QueryColumn<Tab, col_idx, bool>: public QueryColumnBase<Tab, col_idx, bool> {
+template<class Taboid, int col_idx>
+class QueryColumn<Taboid, col_idx, bool>: public QueryColumnBase<Taboid, col_idx, bool> {
 private:
-    typedef QueryColumnBase<Tab, col_idx, bool> Base;
-    typedef typename Tab::Query Query;
+    typedef QueryColumnBase<Taboid, col_idx, bool> Base;
+    typedef typename Taboid::Query Query;
 
 public:
     explicit QueryColumn(Query* q): Base(q) {}
@@ -645,12 +749,12 @@ public:
 /**
  * QueryColumn specialization for enumerations.
  */
-template<class Tab, int col_idx, class E>
-class QueryColumn<Tab, col_idx, SpecBase::Enum<E> >:
-    public QueryColumnBase<Tab, col_idx, SpecBase::Enum<E> > {
+template<class Taboid, int col_idx, class E>
+class QueryColumn<Taboid, col_idx, SpecBase::Enum<E> >:
+    public QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E> > {
 private:
-    typedef QueryColumnBase<Tab, col_idx, SpecBase::Enum<E> > Base;
-    typedef typename Tab::Query Query;
+    typedef QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E> > Base;
+    typedef typename Taboid::Query Query;
 
 public:
     explicit QueryColumn(Query* q): Base(q) {}
@@ -662,11 +766,12 @@ public:
 /**
  * QueryColumn specialization for strings.
  */
-template<class Tab, int col_idx>
-class QueryColumn<Tab, col_idx, const char*>: public QueryColumnBase<Tab, col_idx, const char*> {
+template<class Taboid, int col_idx>
+class QueryColumn<Taboid, col_idx, const char*>:
+    public QueryColumnBase<Taboid, col_idx, const char*> {
 private:
-    typedef QueryColumnBase<Tab, col_idx, const char*> Base;
-    typedef typename Tab::Query Query;
+    typedef QueryColumnBase<Taboid, col_idx, const char*> Base;
+    typedef typename Taboid::Query Query;
 
 public:
     explicit QueryColumn(Query* q): Base(q) {}
@@ -706,9 +811,9 @@ public:
 /**
  * QueryColumn specialization for mixed type.
  */
-template<class Tab, int col_idx> class QueryColumn<Tab, col_idx, Mixed> {
+template<class Taboid, int col_idx> class QueryColumn<Taboid, col_idx, Mixed> {
 private:
-    typedef typename Tab::Query Query;
+    typedef typename Taboid::Query Query;
 
 public:
     explicit QueryColumn(Query*) {}
@@ -718,12 +823,12 @@ public:
 /**
  * QueryColumn specialization for subtables.
  */
-template<class Tab, int col_idx, class Subspec>
-class QueryColumn<Tab, col_idx, BasicTable<Subspec> >:
-    public QueryColumnBase<Tab, col_idx, BasicTable<Subspec> > {
+template<class Taboid, int col_idx, class Subspec>
+class QueryColumn<Taboid, col_idx, BasicTable<Subspec> >:
+    public QueryColumnBase<Taboid, col_idx, BasicTable<Subspec> > {
 private:
-    typedef QueryColumnBase<Tab, col_idx, const char*> Base;
-    typedef typename Tab::Query Query;
+    typedef QueryColumnBase<Taboid, col_idx, const char*> Base;
+    typedef typename Taboid::Query Query;
 
 public:
     explicit QueryColumn(Query* q): Base(q) {}

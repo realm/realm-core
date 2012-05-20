@@ -249,20 +249,42 @@ public:
 #endif
 
 private:
-    template<class> friend class BasicTable;
-    friend class BasicTableRef<BasicTable>;
-    template<class, int, class> friend class _impl::FieldAccessor;
-    template<class, int, class> friend class _impl::ColumnAccessorBase;
-    template<class, int, class> friend class _impl::ColumnAccessor;
-    friend class Group;
-
     template<int col_idx> struct QueryCol {
         typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::QueryColumn<BasicTable, col_idx, value_type> type;
     };
 
+    // These are intende to be used only by accessor classes
     Table* get_impl() { return this; }
     const Table* get_impl() const { return this; }
+
+    template<class Subtab> Subtab* get_subtable_ptr(int col_idx, std::size_t row_idx)
+    {
+        return static_cast<Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
+    }
+
+    template<class Subtab> const Subtab* get_subtable_ptr(int col_idx, std::size_t row_idx) const
+    {
+        return static_cast<const Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
+    }
+
+    // This one allows a BasicTable to know that BasicTables with
+    // other Specs are also derived from Table.
+    template<class> friend class BasicTable;
+
+    // These allow BasicTableRef to refer to RowAccessor and
+    // ConstRowAccessor.
+    friend class BasicTableRef<BasicTable>;
+    friend class BasicTableRef<const BasicTable>;
+
+    // These allow BasicTableView to call get_subtable_ptr().
+    friend class BasicTableView<BasicTable>;
+    friend class BasicTableView<const BasicTable>;
+
+    template<class, int, class> friend class _impl::FieldAccessor;
+    template<class, int, class> friend class _impl::ColumnAccessorBase;
+    template<class, int, class> friend class _impl::ColumnAccessor;
+    friend class Group; // FIXME: Probably only one method in Group
 };
 
 
@@ -357,13 +379,14 @@ namespace _impl
     };
 
     // AddCol specialization for subtables
-    template<class Subspec, int col_idx> struct AddCol<BasicTable<Subspec>, col_idx> {
+    template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
         static void exec(Spec* spec, const char* const* col_names)
         {
             assert(col_idx == spec->get_column_count());
-            typedef typename Subspec::Columns SubcolTypes;
+            typedef typename Subtab::Columns Subcolumns;
             Spec subspec = spec->add_subtable_column(col_names[col_idx]);
-            ForEachType<SubcolTypes, _impl::AddCol>::exec(&subspec, Subspec::dyn_col_names());
+            const char* const* const subcol_names = Subtab::spec_type::dyn_col_names();
+            ForEachType<Subcolumns, _impl::AddCol>::exec(&subspec, subcol_names);
         }
     };
 }

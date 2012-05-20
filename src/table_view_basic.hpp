@@ -42,8 +42,6 @@ public:
     // Get row index in the source table this view is "looking" at.
     size_t get_source_ndx(size_t row_ndx) const { return m_impl.get_source_ndx(row_ndx); }
 
-    table_type& get_parent() const { return static_cast<table_type&>(m_impl.get_parent()); }
-
 private:
     typedef typename Tab::spec_type Spec;
 
@@ -107,16 +105,32 @@ protected:
 
 /**
  * A BasicTableView wraps a TableView and provides a type and
- * structure safe set of access methods. The TableView methods are no
- * available through a BasicTableView.
+ * structure safe set of access methods. The TableView methods are not
+ * visible through a BasicTableView. A BasicTableView is used
+ * essentially the same way as a BasicTable.
+ *
+ * Note that this class is specialized for const-qualified parent
+ * tables.
+ *
+ * There are three levels of consteness to consider. A 'const
+ * BasicTableView<Tab>' prohibits any modification of the table as
+ * well as any modification of the table view, regardless of whether
+ * Tab is const-qualified or not.
+ *
+ * A non-const 'BasicTableView<Tab>' where Tab is const-qualified,
+ * still does not allow any modification of the parent table. However,
+ * the view itself may be modified, for example, by reordering its
+ * rows.
+ *
+ * A non-const 'BasicTableView<Tab>' where Tab is not const-qualified,
+ * gives full modification access to both the parent table and the
+ * view.
  *
  * Just like TableView, a BasicTableView has both copy and move
  * semantics. See TableView for more on this.
  *
- * \tparam Tab The parent table type. This will in general be an
- * instance of the BasicTable template. If the specified table type is
- * 'const' then this class only gives read access to the underlying
- * table.
+ * \tparam Tab The possibly const-qualified parent table type. This
+ * must always be an instance of the BasicTable template.
  */
 template<class Tab>
 class BasicTableView: public BasicTableViewBase<Tab, BasicTableView<Tab>, TableView> {
@@ -133,19 +147,37 @@ public:
     void remove(size_t ndx) { Base::m_impl.remove(ndx); }
     void remove_last() { Base::m_impl.remove_last(); }
 
+    Tab& get_parent() { return static_cast<Tab&>(Base::m_impl.get_parent()); }
+    const Tab& get_parent() const { return static_cast<const Tab&>(Base::m_impl.get_parent()); }
+
 private:
+    BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
+    BasicTableView(TableView tv): Base(move(tv)) {}
+
+    template<class Subtab> Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx)
+    {
+        return get_parent().template
+            get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
+    }
+
+    template<class Subtab> const Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx) const
+    {
+        return get_parent().template
+            get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
+    }
+
+    friend class BasicTableView<const Tab>;
+    template<class, int, class> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::ColumnAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessor;
     friend class Tab::Query;
-    BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
-    BasicTableView(TableView tv): Base(move(tv)) {}
 };
 
 
 
 
 /**
- * Specialization for const access to parent table.
+ * Specialization for 'const' access to parent table.
  */
 template<class Tab> class BasicTableView<const Tab>:
     public BasicTableViewBase<const Tab, BasicTableView<const Tab>, ConstTableView> {
@@ -171,12 +203,22 @@ public:
         return *this;
     }
 
+    const Tab& get_parent() const { return static_cast<const Tab&>(Base::m_impl.get_parent()); }
+
 private:
+    BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
+    BasicTableView(ConstTableView tv): Base(move(tv)) {}
+
+    template<class Subtab> const Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx) const
+    {
+        return get_parent().template
+            get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
+    }
+
+    template<class, int, class> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::ColumnAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessor;
     friend class Tab::Query;
-    BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
-    BasicTableView(ConstTableView tv): Base(move(tv)) {}
 };
 
 

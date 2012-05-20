@@ -162,7 +162,8 @@ public:
     class Parent;
 
 protected:
-     // Direct Column access
+    // FIXME: Most of the things that are protected here, could instead be private
+    // Direct Column access
     Column& GetColumn(size_t column_ndx);
     const Column& GetColumn(size_t column_ndx) const;
     AdaptiveStringColumn& GetColumnString(size_t column_ndx);
@@ -176,12 +177,6 @@ protected:
     ColumnMixed& GetColumnMixed(size_t column_ndx);
     const ColumnMixed& GetColumnMixed(size_t column_ndx) const;
 
-
-    friend class Group;
-    friend class Query;
-    friend class ColumnMixed;
-    friend Table* TableHelper_get_subtable_ptr(Table* t, size_t col_idx, size_t row_idx);
-    friend const Table* TableHelper_get_const_subtable_ptr(const Table* t, size_t col_idx, size_t row_idx);
 
     /**
      * Construct a top-level table with independent schema from ref.
@@ -254,15 +249,9 @@ protected:
      */
     const Table *get_subtable_ptr(size_t col_idx, size_t row_idx) const;
 
-    template<class T> static BasicTableRef<T> make_ref(T* p) { return BasicTableRef<T>(p); }
-
 private:
     Table(Table const &); // Disable copy construction
     Table &operator=(Table const &); // Disable copying assignment
-
-    template<class> friend class BasicTableRef;
-    friend class ColumnSubtableParent;
-    friend void TableHelper_unbind(Table* t);
 
     mutable size_t m_ref_count;
     void bind_ref() const { ++m_ref_count; }
@@ -280,6 +269,17 @@ private:
     // Experimental
     TableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max);
     ConstTableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const;
+
+    friend class Group;
+    friend class Query;
+    friend class ColumnMixed;
+    template<class> friend class BasicTableRef; // FIXME: Only BasicTableRef<T>::bind() and BasicTableRef<T>::unbind()
+    friend class ColumnSubtableParent;
+
+    // These are used in the C API to gain access to the raw table pointers of subtables.
+    friend Table* TableHelper_get_subtable_ptr(Table* t, size_t col_idx, size_t row_idx);
+    friend const Table* TableHelper_get_const_subtable_ptr(const Table* t, size_t col_idx, size_t row_idx);
+    friend void TableHelper_unbind(const Table* t);
 };
 
 

@@ -48,9 +48,9 @@ template<class> class BasicTable;
  *
  * \endcode
  *
- * \note When a top-level table is destroyed, all "smart" table
- * references obtained from it, or from any of its subtables, are
- * invalidated.
+ * \note A top-level table (explicitely created or obtained from a
+ * group) may not be destroyed until all "smart" table references
+ * obtained from it, or from any of its subtables, are destroyed.
  */
 template<class T> class BasicTableRef {
 public:
@@ -131,13 +131,9 @@ public:
 private:
     friend class ColumnSubtableParent;
     friend class Table;
-    template<class> friend class BasicTable;
-    template<class> friend class BasicTableRef;
+    template<class> friend class BasicTable; // FIXME: Only BasicTable<T::Spec>;
+    template<class> friend class BasicTableRef; // FIXME: Only BasicTableRef<const T>;
 
-    template<class U, class V> friend
-    BasicTableRef<U> static_table_cast(const BasicTableRef<V>&);
-    template<class U, class V> friend
-    BasicTableRef<U> dynamic_table_cast(const BasicTableRef<V>&);
     template<class C, class U, class V> friend
     std::basic_ostream<C,U>& operator<<(std::basic_ostream<C,U>&, const BasicTableRef<V>&);
 
@@ -156,10 +152,6 @@ private:
  * in particular, its reference count.
  */
 template<class T> inline void swap(BasicTableRef<T>&, BasicTableRef<T>&);
-
-template<class T, class U> BasicTableRef<T> static_table_cast(const BasicTableRef<U>&);
-
-template<class T, class U> BasicTableRef<T> dynamic_table_cast(const BasicTableRef<U>&);
 
 template<class C, class T, class U>
 std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BasicTableRef<U>&);
@@ -226,16 +218,6 @@ template<class T> inline void BasicTableRef<T>::unbind()
 template<class T> inline void swap(BasicTableRef<T>& r, BasicTableRef<T>& s)
 {
     r.swap(s);
-}
-
-template<class T, class U> BasicTableRef<T> static_table_cast(const BasicTableRef<U>& t)
-{
-    return BasicTableRef<T>(static_cast<T*>(t.m_table));
-}
-
-template<class T, class U> BasicTableRef<T> dynamic_table_cast(const BasicTableRef<U>& t)
-{
-    return BasicTableRef<T>(dynamic_cast<T*>(t.m_table));
 }
 
 template<class C, class T, class U>

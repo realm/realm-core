@@ -834,3 +834,150 @@ TEST(Table_SubtableSizeAndClear)
 
     CHECK(table.get_subtable(1, 0));
 }
+
+
+
+namespace
+{
+    TIGHTDB_TABLE_1(MyTable1,
+                    val, Int)
+
+    TIGHTDB_TABLE_2(MyTable2,
+                    val, Int,
+                    subtab, Subtable<MyTable1>)
+
+    TIGHTDB_TABLE_1(MyTable3,
+                    subtab, Subtable<MyTable2>)
+}
+
+TEST(Table_HighLevelSubtables)
+{
+    MyTable3 t;
+    {
+        MyTable3::Ref r1 = t.get_table_ref();
+        MyTable3::ConstRef r2 = t.get_table_ref();
+        MyTable3::ConstRef r3 = r2->get_table_ref();
+        r3 = t.get_table_ref(); // Also test assigment that converts to const
+        static_cast<void>(r1);
+        static_cast<void>(r3);
+    }
+
+    t.add();
+    const MyTable3& ct = t;
+    {
+        MyTable2::Ref       s1 = t[0].subtab;
+        MyTable2::ConstRef  s2 = t[0].subtab;
+        MyTable2::Ref       s3 = t[0].subtab->get_table_ref();
+        MyTable2::ConstRef  s4 = t[0].subtab->get_table_ref();
+        MyTable2::Ref       s5 = t.cols().subtab[0];
+        MyTable2::ConstRef  s6 = t.cols().subtab[0];
+        MyTable2::Ref       s7 = t.cols().subtab[0]->get_table_ref();
+        MyTable2::ConstRef  s8 = t.cols().subtab[0]->get_table_ref();
+        MyTable2::ConstRef cs1 = ct[0].subtab;
+        MyTable2::ConstRef cs2 = ct[0].subtab->get_table_ref();
+        MyTable2::ConstRef cs3 = ct.cols().subtab[0];
+        MyTable2::ConstRef cs4 = ct.cols().subtab[0]->get_table_ref();
+        s1 = t[0].subtab;
+        s2 = t[0].subtab; // Also test assigment that converts to const
+        static_cast<void>(s1);
+        static_cast<void>(s2);
+        static_cast<void>(s3);
+        static_cast<void>(s4);
+        static_cast<void>(s5);
+        static_cast<void>(s6);
+        static_cast<void>(s7);
+        static_cast<void>(s8);
+        static_cast<void>(cs1);
+        static_cast<void>(cs2);
+        static_cast<void>(cs3);
+        static_cast<void>(cs4);
+    }
+
+    t[0].subtab->add();
+    {
+        MyTable1::Ref       s1 = t[0].subtab[0].subtab;
+        MyTable1::ConstRef  s2 = t[0].subtab[0].subtab;
+        MyTable1::Ref       s3 = t[0].subtab[0].subtab->get_table_ref();
+        MyTable1::ConstRef  s4 = t[0].subtab[0].subtab->get_table_ref();
+        MyTable1::Ref       s5 = t.cols().subtab[0]->cols().subtab[0];
+        MyTable1::ConstRef  s6 = t.cols().subtab[0]->cols().subtab[0];
+        MyTable1::Ref       s7 = t.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        MyTable1::ConstRef  s8 = t.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        MyTable1::ConstRef cs1 = ct[0].subtab[0].subtab;
+        MyTable1::ConstRef cs2 = ct[0].subtab[0].subtab->get_table_ref();
+        MyTable1::ConstRef cs3 = ct.cols().subtab[0]->cols().subtab[0];
+        MyTable1::ConstRef cs4 = ct.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        s1 = t[0].subtab[0].subtab;
+        s2 = t[0].subtab[0].subtab; // Also test assigment that converts to const
+        static_cast<void>(s1);
+        static_cast<void>(s2);
+        static_cast<void>(s3);
+        static_cast<void>(s4);
+        static_cast<void>(s5);
+        static_cast<void>(s6);
+        static_cast<void>(s7);
+        static_cast<void>(s8);
+        static_cast<void>(cs1);
+        static_cast<void>(cs2);
+        static_cast<void>(cs3);
+        static_cast<void>(cs4);
+    }
+
+    t[0].subtab[0].val = 1;
+    CHECK_EQUAL(t[0].subtab[0].val,                 1);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  1);
+    CHECK_EQUAL(t[0].subtab->cols().val[0],         1);
+    CHECK_EQUAL(t.cols().subtab[0][0].val,          1);
+
+    t.cols().subtab[0]->cols().val[0] = 2;
+    CHECK_EQUAL(t[0].subtab[0].val,                 2);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  2);
+    CHECK_EQUAL(t[0].subtab->cols().val[0],         2);
+    CHECK_EQUAL(t.cols().subtab[0][0].val,          2);
+
+    t[0].subtab->cols().val[0] = 3;
+    CHECK_EQUAL(t[0].subtab[0].val,                 3);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  3);
+    CHECK_EQUAL(t[0].subtab->cols().val[0],         3);
+    CHECK_EQUAL(t.cols().subtab[0][0].val,          3);
+
+    t.cols().subtab[0][0].val = 4;
+    CHECK_EQUAL(t[0].subtab[0].val,                 4);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  4);
+    CHECK_EQUAL(t[0].subtab->cols().val[0],         4);
+    CHECK_EQUAL(t.cols().subtab[0][0].val,          4);
+    CHECK_EQUAL(ct[0].subtab[0].val,                4);
+    CHECK_EQUAL(ct.cols().subtab[0]->cols().val[0], 4);
+    CHECK_EQUAL(ct[0].subtab->cols().val[0],        4);
+    CHECK_EQUAL(ct.cols().subtab[0][0].val,         4);
+
+    t[0].subtab[0].subtab->add();
+    t[0].subtab[0].subtab[0].val = 5;
+    CHECK_EQUAL(t[0].subtab[0].subtab[0].val,                         5);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().subtab[0]->cols().val[0],  5);
+    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                        5);
+    CHECK_EQUAL(ct.cols().subtab[0]->cols().subtab[0]->cols().val[0], 5);
+
+    t.cols().subtab[0]->cols().subtab[0]->cols().val[0] = 6;
+    CHECK_EQUAL(t[0].subtab[0].subtab[0].val,                         6);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().subtab[0]->cols().val[0],  6);
+    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                        6);
+    CHECK_EQUAL(ct.cols().subtab[0]->cols().subtab[0]->cols().val[0], 6);
+
+    // FIXME: Same thing for BasicTable::View
+
+/*
+  Idea for compile time failure tests:
+
+    const MyTable2 t;
+#if    TEST_INDEX == 0
+    t[0].val = 7;
+#elsif TEST_INDEX == 1
+    t.cols().val[0] = 7;
+#elsif TEST_INDEX == 2
+    t[0].subtab[0].val = 7;
+#elsif TEST_INDEX == 3
+    t[0].subtab->cols().val[0] = 7;
+#endif
+*/
+}

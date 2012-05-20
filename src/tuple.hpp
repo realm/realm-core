@@ -83,7 +83,7 @@ namespace _impl {
         out << t.m_head;
     }
     template<class Ch, class Tr>
-    inline void write(std::basic_ostream<Ch, Tr>& out, const Tuple<void>&) {}
+    inline void write(std::basic_ostream<Ch, Tr>&, const Tuple<void>&) {}
     template<class Ch, class Tr, class L>
     inline void write(std::basic_ostream<Ch, Tr>& out, const Tuple<L>& t)
     {
