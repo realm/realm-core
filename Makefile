@@ -39,9 +39,14 @@ clean/test:
 .PHONY: clean clean/test
 
 
-# Run the unit tests after building everything
+# Run the unit tests after building everything in debug mode
 test: debug
 	@$(MAKE) -C test test
+.PHONY: test
+
+# Run the unit tests after building everything in release mode
+test-release: static
+	@$(MAKE) -C test test-release
 .PHONY: test
 
 # Run valgrind on the unit tests after building everything

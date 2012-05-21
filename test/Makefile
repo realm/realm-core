@@ -34,6 +34,10 @@ test: debug
 	./tightdb-tests-debug
 .PHONY: test
 
+test-release: all
+	./tightdb-tests
+.PHONY: test
+
 memtest: debug
 	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./tightdb-tests-debug --no-error-exit-staus
 .PHONY: test
