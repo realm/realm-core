@@ -465,13 +465,13 @@ ColumnBase& Table::GetColumnBase(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
-    return *(ColumnBase* const)m_cols.Get(ndx);
+    return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
 }
 
 const ColumnBase& Table::GetColumnBase(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    return *(const ColumnBase* const)m_cols.Get(ndx);
+    return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
 }
 
 Column& Table::GetColumn(size_t ndx)
@@ -507,13 +507,13 @@ ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
-    return *(ColumnStringEnum* const)m_cols.Get(ndx);
+    return *reinterpret_cast<ColumnStringEnum*>(m_cols.Get(ndx));
 }
 
 const ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    return *(const ColumnStringEnum* const)m_cols.Get(ndx);
+    return *reinterpret_cast<ColumnStringEnum*>(m_cols.Get(ndx));
 }
 
 ColumnBinary& Table::GetColumnBinary(size_t ndx)
@@ -534,26 +534,26 @@ ColumnTable &Table::GetColumnTable(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
-    return *reinterpret_cast<ColumnTable *>(m_cols.Get(ndx));
+    return *reinterpret_cast<ColumnTable*>(m_cols.Get(ndx));
 }
 
 ColumnTable const &Table::GetColumnTable(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    return *reinterpret_cast<ColumnTable *>(m_cols.Get(ndx));
+    return *reinterpret_cast<ColumnTable*>(m_cols.Get(ndx));
 }
 
 ColumnMixed& Table::GetColumnMixed(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
-    return *(ColumnMixed* const)m_cols.Get(ndx);
+    return *reinterpret_cast<ColumnMixed*>(m_cols.Get(ndx));
 }
 
 const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    return *(const ColumnMixed* const)m_cols.Get(ndx);
+    return *reinterpret_cast<ColumnMixed*>(m_cols.Get(ndx));
 }
 
 size_t Table::add_empty_row()

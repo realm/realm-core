@@ -525,11 +525,6 @@ public:
         Base::m_table->get_impl()->add_int(col_idx, value);
         return *this;
     }
-
-    void _insert(std::size_t row_idx, int64_t value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
-    {
-        Base::m_table->get_impl()->insert_int(col_idx, row_idx, value);
-    }
 };
 
 
@@ -552,11 +547,6 @@ public:
     BasicTableView<typename Base::RealTable> find_all(bool value) const
     {
         return Base::m_table->get_impl()->find_all_bool(col_idx, value);
-    }
-
-    void _insert(std::size_t row_idx, bool value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
-    {
-        Base::m_table->get_impl()->insert_bool(col_idx, row_idx, value);
     }
 };
 
@@ -582,11 +572,6 @@ public:
     {
         return Base::m_table->get_impl()->find_all_int(col_idx, int64_t(value));
     }
-
-    void _insert(std::size_t row_idx, E value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
-    {
-        Base::m_table->get_impl()->insert_enum(col_idx, row_idx, value);
-    }
 };
 
 
@@ -611,11 +596,6 @@ public:
     {
         return Base::m_table->get_impl()->find_all_string(col_idx, value);
     }
-
-    void _insert(std::size_t row_idx, const char* value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
-    {
-        Base::m_table->get_impl()->insert_string(col_idx, row_idx, value);
-    }
 };
 
 
@@ -629,11 +609,6 @@ private:
 
 public:
     explicit ColumnAccessor(Taboid* t): Base(t) {}
-
-    void _insert(std::size_t row_idx, const Mixed& value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
-    {
-        Base::m_table->get_impl()->insert_mixed(col_idx, row_idx, value);
-    }
 };
 
 

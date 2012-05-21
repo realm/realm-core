@@ -38,11 +38,20 @@ struct Table##Spec: ::tightdb::SpecBase { \
         return names; \
     } \
  \
-    template<class C, class T1> \
-    static void insert(std::size_t i, const C& cols, const T1& v1) \
-    { \
-        cols.name1._insert(i, v1); \
-    } \
+    struct ConvenienceMethods { \
+        void add(type1 name1) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->add((::tightdb::tuple(), name1)); \
+        } \
+        void insert(std::size_t _i, type1 name1) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->insert(_i, (::tightdb::tuple(), name1)); \
+        } \
+    }; \
 }; \
 typedef ::tightdb::BasicTable<Table##Spec> Table;
 
@@ -64,12 +73,20 @@ struct Table##Spec: ::tightdb::SpecBase { \
         return names; \
     } \
  \
-    template<class C, class T1, class T2> \
-    static void insert(std::size_t i, const C& cols, const T1& v1, const T2& v2) \
-    { \
-        cols.name1._insert(i, v1); \
-        cols.name2._insert(i, v2); \
-    } \
+    struct ConvenienceMethods { \
+        void add(type1 name1, type2 name2) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->add((::tightdb::tuple(), name1, name2)); \
+        } \
+        void insert(std::size_t _i, type1 name1, type2 name2) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->insert(_i, (::tightdb::tuple(), name1, name2)); \
+        } \
+    }; \
 }; \
 typedef ::tightdb::BasicTable<Table##Spec> Table;
 
@@ -93,13 +110,20 @@ struct Table##Spec: ::tightdb::SpecBase { \
         return names; \
     } \
  \
-    template<class C, class T1, class T2, class T3> \
-    static void insert(std::size_t i, const C& cols, const T1& v1, const T2& v2, const T3& v3) \
-    { \
-        cols.name1._insert(i, v1); \
-        cols.name2._insert(i, v2); \
-        cols.name3._insert(i, v3); \
-    } \
+    struct ConvenienceMethods { \
+        void add(type1 name1, type2 name2, type3 name3) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->add((::tightdb::tuple(), name1, name2, name3)); \
+        } \
+        void insert(std::size_t _i, type1 name1, type2 name2, type3 name3) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->insert(_i, (::tightdb::tuple(), name1, name2, name3)); \
+        } \
+    }; \
 }; \
 typedef ::tightdb::BasicTable<Table##Spec> Table;
 
@@ -125,14 +149,20 @@ struct Table##Spec: ::tightdb::SpecBase { \
         return names; \
     } \
  \
-    template<class C, class T1, class T2, class T3, class T4> \
-    static void insert(std::size_t i, const C& cols, const T1& v1, const T2& v2, const T3& v3, const T4& v4) \
-    { \
-        cols.name1._insert(i, v1); \
-        cols.name2._insert(i, v2); \
-        cols.name3._insert(i, v3); \
-        cols.name4._insert(i, v4); \
-    } \
+    struct ConvenienceMethods { \
+        void add(type1 name1, type2 name2, type3 name3, type4 name4) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->add((::tightdb::tuple(), name1, name2, name3, name4)); \
+        } \
+        void insert(std::size_t _i, type1 name1, type2 name2, type3 name3, type4 name4) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->insert(_i, (::tightdb::tuple(), name1, name2, name3, name4)); \
+        } \
+    }; \
 }; \
 typedef ::tightdb::BasicTable<Table##Spec> Table;
 
@@ -160,15 +190,20 @@ struct Table##Spec: ::tightdb::SpecBase { \
         return names; \
     } \
  \
-    template<class C, class T1, class T2, class T3, class T4, class T5> \
-    static void insert(std::size_t i, const C& cols, const T1& v1, const T2& v2, const T3& v3, const T4& v4, const T5& v5) \
-    { \
-        cols.name1._insert(i, v1); \
-        cols.name2._insert(i, v2); \
-        cols.name3._insert(i, v3); \
-        cols.name4._insert(i, v4); \
-        cols.name5._insert(i, v5); \
-    } \
+    struct ConvenienceMethods { \
+        void add(type1 name1, type2 name2, type3 name3, type4 name4, type5 name5) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->add((::tightdb::tuple(), name1, name2, name3, name4, name5)); \
+        } \
+        void insert(std::size_t _i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->insert(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5)); \
+        } \
+    }; \
 }; \
 typedef ::tightdb::BasicTable<Table##Spec> Table;
 
@@ -198,16 +233,20 @@ struct Table##Spec: ::tightdb::SpecBase { \
         return names; \
     } \
  \
-    template<class C, class T1, class T2, class T3, class T4, class T5, class T6> \
-    static void insert(std::size_t i, const C& cols, const T1& v1, const T2& v2, const T3& v3, const T4& v4, const T5& v5, const T6& v6) \
-    { \
-        cols.name1._insert(i, v1); \
-        cols.name2._insert(i, v2); \
-        cols.name3._insert(i, v3); \
-        cols.name4._insert(i, v4); \
-        cols.name5._insert(i, v5); \
-        cols.name6._insert(i, v6); \
-    } \
+    struct ConvenienceMethods { \
+        void add(type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->add((::tightdb::tuple(), name1, name2, name3, name4, name5, name6)); \
+        } \
+        void insert(std::size_t _i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->insert(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5, name6)); \
+        } \
+    }; \
 }; \
 typedef ::tightdb::BasicTable<Table##Spec> Table;
 
@@ -239,17 +278,20 @@ struct Table##Spec: ::tightdb::SpecBase { \
         return names; \
     } \
  \
-    template<class C, class T1, class T2, class T3, class T4, class T5, class T6, class T7> \
-    static void insert(std::size_t i, const C& cols, const T1& v1, const T2& v2, const T3& v3, const T4& v4, const T5& v5, const T6& v6, const T7& v7) \
-    { \
-        cols.name1._insert(i, v1); \
-        cols.name2._insert(i, v2); \
-        cols.name3._insert(i, v3); \
-        cols.name4._insert(i, v4); \
-        cols.name5._insert(i, v5); \
-        cols.name6._insert(i, v6); \
-        cols.name7._insert(i, v7); \
-    } \
+    struct ConvenienceMethods { \
+        void add(type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->add((::tightdb::tuple(), name1, name2, name3, name4, name5, name6, name7)); \
+        } \
+        void insert(std::size_t _i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->insert(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5, name6, name7)); \
+        } \
+    }; \
 }; \
 typedef ::tightdb::BasicTable<Table##Spec> Table;
 
@@ -283,18 +325,20 @@ struct Table##Spec: ::tightdb::SpecBase { \
         return names; \
     } \
  \
-    template<class C, class T1, class T2, class T3, class T4, class T5, class T6, class T7, class T8> \
-    static void insert(std::size_t i, const C& cols, const T1& v1, const T2& v2, const T3& v3, const T4& v4, const T5& v5, const T6& v6, const T7& v7, const T8& v8) \
-    { \
-        cols.name1._insert(i, v1); \
-        cols.name2._insert(i, v2); \
-        cols.name3._insert(i, v3); \
-        cols.name4._insert(i, v4); \
-        cols.name5._insert(i, v5); \
-        cols.name6._insert(i, v6); \
-        cols.name7._insert(i, v7); \
-        cols.name8._insert(i, v8); \
-    } \
+    struct ConvenienceMethods { \
+        void add(type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->add((::tightdb::tuple(), name1, name2, name3, name4, name5, name6, name7, name8)); \
+        } \
+        void insert(std::size_t _i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->insert(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5, name6, name7, name8)); \
+        } \
+    }; \
 }; \
 typedef ::tightdb::BasicTable<Table##Spec> Table;
 

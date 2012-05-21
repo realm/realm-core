@@ -70,7 +70,7 @@ namespace _impl {
     template<class L, int i> struct TupleAt {
         static typename TypeAt<L,i>::type exec(const Tuple<L>& t)
         {
-            return TupleAt<typename L::tail, i-1>(t.m_tail);
+            return TupleAt<typename L::tail, i-1>::exec(t.m_tail);
         }
     };
     template<class L> struct TupleAt<L,0> {

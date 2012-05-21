@@ -81,21 +81,39 @@ name${j+1}%slurp
         return names; \\
     } \\
  \\
-    template<class C%slurp
+    struct ConvenienceMethods { \\
+        void add(%slurp
 %for $j in range($num_cols)
-, class T${j+1}%slurp
-%end for
-> \\
-    static void insert(std::size_t i, const C& cols%slurp
-%for $j in range($num_cols)
-, const T${j+1}& v${j+1}%slurp
+%if 0 < $j
+, %slurp
+%end if
+type${j+1} name${j+1}%slurp
 %end for
 ) \\
-    { \\
+        { \\
+            ::tightdb::BasicTable<Table##Spec>* const t = \\
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \\
+            t->add((::tightdb::tuple()%slurp
 %for $j in range($num_cols)
-        cols.name${j+1}._insert(i, v${j+1}); \\
+, name${j+1}%slurp
 %end for
-    } \\
+)); \\
+        } \\
+        void insert(std::size_t _i%slurp
+%for $j in range($num_cols)
+, type${j+1} name${j+1}%slurp
+%end for
+) \\
+        { \\
+            ::tightdb::BasicTable<Table##Spec>* const t = \\
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \\
+            t->insert(_i, (::tightdb::tuple()%slurp
+%for $j in range($num_cols)
+, name${j+1}%slurp
+%end for
+)); \\
+        } \\
+    }; \\
 }; \\
 typedef ::tightdb::BasicTable<Table##Spec> Table;
 

@@ -164,13 +164,23 @@ public:
 
     RowAccessor add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
 
-    // FIXME: Also insert() and set()
     template<class L> void add(const Tuple<L>& tuple)
     {
         TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value);
-        ForEachType<Columns, _impl::InsertIntoCol>::exec(this, size(), tuple);
+        ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), size(), tuple);
         insert_done();
     }
+
+    // FIXME: Also set()
+    template<class L> void insert(std::size_t i, const Tuple<L>& tuple)
+    {
+        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value);
+        ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), i, tuple);
+        insert_done();
+    }
+
+    using Spec::ConvenienceMethods::add; // FIXME: This probably fails if Spec::ConvenienceMethods has no add().
+    using Spec::ConvenienceMethods::insert; // FIXME: This probably fails if Spec::ConvenienceMethods has no insert().
 
     typedef RowAccessor Cursor; // FIXME: A cursor must be a distinct class that can be constructed from a RowAccessor
     typedef ConstRowAccessor ConstCursor;
@@ -179,68 +189,6 @@ public:
     class Query;
 
     Query where() const { return Query(); } // FIXME: Bad thing to copy queries
-
-
-    // FIXME: Get rid of all these!
-    template<class T1>
-    void add(const T1& v1)
-    {
-        Spec::insert(m_size, cols(), v1);
-        insert_done();
-    }
-
-    template<class T1, class T2>
-    void add(const T1& v1, const T2& v2)
-    {
-        Spec::insert(m_size, cols(), v1, v2);
-        insert_done();
-    }
-
-    template<class T1, class T2, class T3>
-    void add(const T1& v1, const T2& v2, const T3& v3)
-    {
-        Spec::insert(m_size, cols(), v1, v2, v3);
-        insert_done();
-    }
-
-    template<class T1, class T2, class T3, class T4>
-    void add(const T1& v1, const T2& v2, const T3& v3, const T4& v4)
-    {
-        Spec::insert(m_size, cols(), v1, v2, v3, v4);
-        insert_done();
-    }
-
-    // FIXME: Add remaining add() methods up to 8 values.
-
-    template<class T1>
-    void insert(std::size_t i, const T1& v1)
-    {
-        Spec::insert(i, cols(), v1);
-        insert_done();
-    }
-
-    template<class T1, class T2>
-    void insert(std::size_t i, const T1& v1, const T2& v2)
-    {
-        Spec::insert(i, cols(), v1, v2);
-        insert_done();
-    }
-
-    template<class T1, class T2, class T3>
-    void insert(std::size_t i, const T1& v1, const T2& v2, const T3& v3)
-    {
-        Spec::insert(i, cols(), v1, v2, v3);
-        insert_done();
-    }
-
-    template<class T1, class T2, class T3, class T4>
-    void insert(std::size_t i, const T1& v1, const T2& v2, const T3& v3, const T4& v4)
-    {
-        Spec::insert(i, cols(), v1, v2, v3, v4);
-        insert_done();
-    }
-
-    // FIXME: Add remaining insert() methods up to 8 values.
 
 #ifdef _DEBUG
     using Table::verify;
@@ -387,6 +335,56 @@ namespace _impl
             Spec subspec = spec->add_subtable_column(col_names[col_idx]);
             const char* const* const subcol_names = Subtab::spec_type::dyn_col_names();
             ForEachType<Subcolumns, _impl::AddCol>::exec(&subspec, subcol_names);
+        }
+    };
+
+
+    // InsertIntoCol specialization for integers
+    template<int col_idx> struct InsertIntoCol<int64_t, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_int(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for booleans
+    template<int col_idx> struct InsertIntoCol<bool, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_bool(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for enumerations
+    template<class E, int col_idx> struct InsertIntoCol<SpecBase::Enum<E>, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_enum(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for strings
+    template<int col_idx> struct InsertIntoCol<const char*, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_string(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for mixed type
+    template<int col_idx> struct InsertIntoCol<Mixed, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_mixed(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for subtables
+    template<class T, int col_idx> struct InsertIntoCol<SpecBase::Subtable<T>, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_table(col_idx, row_idx);
+            assert(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
         }
     };
 }
