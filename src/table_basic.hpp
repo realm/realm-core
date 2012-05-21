@@ -385,6 +385,7 @@ namespace _impl
         {
             t->insert_table(col_idx, row_idx);
             assert(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
+            static_cast<void>(tuple);
         }
     };
 }

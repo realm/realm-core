@@ -97,15 +97,7 @@ struct SpecBase {
      * If you would like to add a convenient add() method, here is how
      * you could do it:
      */
-    struct ConvenienceMethods {
-/*
-        void add(int foo, bool bar)
-        {
-            BasicTable<SpecBase>* t = static_cast<BasicTable<SpecBase>*>(this);
-            t->add((::tightdb::tuple(), foo, bar));
-        }
-*/
-    };
+    struct ConvenienceMethods {};
 };
 
 
