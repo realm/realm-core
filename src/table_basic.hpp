@@ -229,7 +229,7 @@ private:
     friend class BasicTableView<BasicTable>;
     friend class BasicTableView<const BasicTable>;
 
-    template<class, int, class> friend class _impl::FieldAccessor;
+    template<class, int, class, bool> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::ColumnAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessor;
     friend class Group; // FIXME: Probably only one method in Group

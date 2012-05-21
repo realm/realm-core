@@ -89,7 +89,7 @@ public:
     }
 
 protected:
-    template<class, int, class> friend class _impl::FieldAccessor;
+    template<class, int, class, bool> friend class _impl::FieldAccessor;
 
     Impl m_impl;
 
@@ -167,7 +167,7 @@ private:
     }
 
     friend class BasicTableView<const Tab>;
-    template<class, int, class> friend class _impl::FieldAccessor;
+    template<class, int, class, bool> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::ColumnAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessor;
     friend class Tab::Query;
@@ -215,7 +215,7 @@ private:
             get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
     }
 
-    template<class, int, class> friend class _impl::FieldAccessor;
+    template<class, int, class, bool> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::ColumnAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessor;
     friend class Tab::Query;
