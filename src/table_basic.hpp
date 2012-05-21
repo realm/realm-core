@@ -206,12 +206,12 @@ private:
     Table* get_impl() { return this; }
     const Table* get_impl() const { return this; }
 
-    template<class Subtab> Subtab* get_subtable_ptr(int col_idx, std::size_t row_idx)
+    template<class Subtab> Subtab* get_subtable_ptr(size_t col_idx, std::size_t row_idx)
     {
         return static_cast<Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
     }
 
-    template<class Subtab> const Subtab* get_subtable_ptr(int col_idx, std::size_t row_idx) const
+    template<class Subtab> const Subtab* get_subtable_ptr(size_t col_idx, std::size_t row_idx) const
     {
         return static_cast<const Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
     }
