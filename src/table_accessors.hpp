@@ -623,6 +623,9 @@ public:
 /**
  * This class implements a column of a table as used in a table query.
  *
+ * \tparam Taboid Matches either 'BasicTable<Spec>' or
+ * 'BasicTableView<Tab>'. Neither may be const-qualified.
+ *
  * FIXME: These do not belong in this file!
  */
 template<class Taboid, int col_idx, class Type> class QueryColumn;
@@ -694,6 +697,30 @@ public:
         Base::m_query->m_impl.between(col_idx, from, to);
         return *Base::m_query;
     };
+
+    int64_t sum(const Taboid& tab, size_t* resultcount=NULL, size_t start=0,
+                size_t end = size_t(-1), size_t limit=size_t(-1)) const
+    {
+        return Base::m_query->m_impl.sum(tab, col_idx, resultcount, start, end, limit);
+    }
+
+    int64_t maximum(const Taboid& tab, size_t* resultcount=NULL, size_t start=0,
+                    size_t end = size_t(-1), size_t limit=size_t(-1)) const
+    {
+        return Base::m_query->m_impl.maximum(tab, col_idx, resultcount, start, end, limit);
+    }
+
+    int64_t minimum(const Taboid& tab, size_t* resultcount=NULL, size_t start=0,
+                    size_t end = size_t(-1), size_t limit=size_t(-1)) const
+    {
+        return Base::m_query->m_impl.minimum(tab, col_idx, resultcount, start, end, limit);
+    }
+
+    double average(const Taboid& tab, size_t* resultcount=NULL, size_t start=0,
+                   size_t end=size_t(-1), size_t limit=size_t(-1)) const
+    {
+        return Base::m_query->m_impl.average(tab, col_idx, resultcount, start, end, limit);
+    }
 };
 
 

@@ -969,3 +969,17 @@ TEST(TestQuerySyntaxCheck)
     CHECK(s != "");
 #endif
 }
+
+
+TEST(TestQuery_sum_min_max_avg)
+{
+    TupleTableType t;
+    t.add(1, "a");
+    t.add(2, "b");
+    t.add(3, "c");
+
+    CHECK_EQUAL(t.where().first.sum(t),     6);
+    CHECK_EQUAL(t.where().first.minimum(t), 1);
+    CHECK_EQUAL(t.where().first.maximum(t), 3);
+    CHECK_EQUAL(t.where().first.average(t), 2);
+}
