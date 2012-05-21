@@ -293,7 +293,7 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
     m_mapfile = hMapFile;
 #else
     // Open file
-    m_fd = open(path, readOnly ? O_RDONLY : O_RDWR|O_CREAT);
+    m_fd = open(path, readOnly ? O_RDONLY : O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return false;
 
     // Get size

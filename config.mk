@@ -26,7 +26,7 @@ CFLAGS          = -ansi -pedantic -Wall -Wextra -Wno-long-long
 CXXFLAGS        = $(CFLAGS)
 
 # These compiler flags are those that are special to each build mode.
-CFLAGS_OPTIMIZE = -O3 -msse4.2 -DUSE_SSE -DNDEBUG
+CFLAGS_OPTIMIZE = -ggdb3 -O3 -msse4.2 -DUSE_SSE -DNDEBUG
 # Note: '-fno-elide-constructors' currently causes failure in TightDB
 #CFLAGS_DEBUG    = -ggdb3 -fno-elide-constructors -D_DEBUG -DMAX_LIST_SIZE=4
 CFLAGS_DEBUG    = -ggdb3 -D_DEBUG -DMAX_LIST_SIZE=4
