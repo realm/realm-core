@@ -295,7 +295,7 @@ bool Spec::compare(const Spec& spec) const {
     return true;
 }
 
-void Spec::verify() const {
+void Spec::Verify() const {
     const size_t column_count = get_column_count();
     assert(column_count == m_names.Size());
     assert(column_count == m_spec.Size());

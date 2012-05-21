@@ -111,7 +111,7 @@ public:
     size_t GetRef() const {return m_array->GetRef();}
 
 #ifdef _DEBUG
-    void verify() const;
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void ToDot(std::ostream& out, const char* title) const;
 #endif //_DEBUG
 

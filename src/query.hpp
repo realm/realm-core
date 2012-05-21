@@ -94,7 +94,7 @@ public:
     int            SetThreads(unsigned int threadcount);
 
 #ifdef _DEBUG
-    std::string verify();
+    std::string Verify(); // Must be upper case to avoid conflict with macro in ObjC
 #endif
 
     std::string error_code;

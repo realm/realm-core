@@ -84,16 +84,16 @@ void ColumnTable::Clear(size_t ndx)
 
 #ifdef _DEBUG
 
-void ColumnTable::verify() const
+void ColumnTable::Verify() const
 {
-    Column::verify();
+    Column::Verify();
 
     // Verify each sub-table
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
         if (GetAsRef(i) == 0) continue;
         const ConstTableRef subtable = get_subtable(i, m_ref_specSet);
-        subtable->verify();
+        subtable->Verify();
     }
 }
 

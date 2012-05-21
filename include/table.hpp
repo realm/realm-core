@@ -149,7 +149,7 @@ public:
     // Debug
 #ifdef _DEBUG
     bool compare(const Table& c) const;
-    void verify() const;
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream& out, const char* title=NULL) const;
     void print() const;
     MemStats stats() const;

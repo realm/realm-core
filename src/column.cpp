@@ -469,7 +469,7 @@ bool Column::Insert(size_t ndx, int64_t value)
     }
 
 #ifdef _DEBUG
-    verify();
+    Verify();
 #endif //DEBUG
 
     return true;
@@ -779,7 +779,7 @@ void Column::Print() const
     }
 }
 
-void Column::verify() const
+void Column::Verify() const
 {
     if (IsNode()) {
         assert(m_array->Size() == 2);
@@ -798,7 +798,7 @@ void Column::verify() const
             assert(ref);
 
             const Column col(ref, NULL, 0, m_array->GetAllocator());
-            col.verify();
+            col.Verify();
 
             off += col.Size();
             const size_t node_off = (size_t)offsets.Get(i);

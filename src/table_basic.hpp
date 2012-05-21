@@ -191,7 +191,7 @@ public:
     Query where() const { return Query(); } // FIXME: Bad thing to copy queries
 
 #ifdef _DEBUG
-    using Table::verify;
+    using Table::Verify;
     using Table::print;
     bool compare(const BasicTable& c) const { return Table::compare(c); }
 #endif
@@ -288,7 +288,7 @@ public:
     }
 
 #ifdef _DEBUG
-    std::string verify() { return m_impl.verify(); }
+    std::string Verify() { return m_impl.Verify(); }
 #endif
 
 private:

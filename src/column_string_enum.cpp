@@ -143,10 +143,10 @@ bool ColumnStringEnum::Compare(const ColumnStringEnum& c) const
     return true;
 }
 
-void ColumnStringEnum::verify() const
+void ColumnStringEnum::Verify() const
 {
-    m_keys.verify();
-    Column::verify();
+    m_keys.Verify();
+    Column::Verify();
 }
 
 void ColumnStringEnum::ToDot(std::ostream& out, const char* title) const

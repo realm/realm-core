@@ -23,7 +23,7 @@ TEST(Table1)
     CHECK_EQUAL(10, table.get_int(1, ndx));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -56,7 +56,7 @@ TEST(Table2)
     CHECK_EQUAL(Wed, r.fourth);
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -84,7 +84,7 @@ TEST(Table3)
     CHECK_EQUAL(3, table[99].first);
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -108,7 +108,7 @@ TEST(Table4)
     CHECK_EQUAL(size_t(-1), table.cols().second.find_first("Foo"));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -133,7 +133,7 @@ TEST(Table_Delete)
     CHECK_EQUAL(8, table[6].second);
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 
     // Delete all items one at a time
@@ -145,7 +145,7 @@ TEST(Table_Delete)
     CHECK_EQUAL(0, table.size());
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -245,7 +245,7 @@ TEST(Table_Delete_All_Types)
     CHECK_EQUAL(12, table.size());
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 
     // Test Clear
@@ -253,7 +253,7 @@ TEST(Table_Delete_All_Types)
     CHECK_EQUAL(0, table.size());
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -270,7 +270,7 @@ TEST(Table_Find_Int)
     CHECK_EQUAL(size_t(-1),   table.cols().second.find_first(1001));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -297,7 +297,7 @@ TEST(Table6)
     //CHECK_EQUAL((size_t)-1, result2);
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 */
@@ -333,7 +333,7 @@ TEST(Table_FindAll_Int)
     CHECK_EQUAL(9, v.get_source_ndx(4));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -368,7 +368,7 @@ TEST(Table_Sorted_Int)
     CHECK_EQUAL(8, v.get_source_ndx(9));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -453,7 +453,7 @@ TEST(Table_Index_Int)
     CHECK_EQUAL(7, table.cols().second.find_first(100));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -560,7 +560,7 @@ TEST(Table_SlabAlloc)
     table.remove(4);
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -745,7 +745,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(40, subtable2->get_int(1, 0));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 

@@ -66,7 +66,7 @@ public:
 
 #ifdef _DEBUG
     bool Compare(const AdaptiveStringColumn& c) const;
-    void verify() const {};
+    void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif //_DEBUG
 
 protected:

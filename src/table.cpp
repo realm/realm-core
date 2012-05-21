@@ -935,7 +935,7 @@ void Table::insert_done()
     ++m_size;
 
 #ifdef _DEBUG
-    verify();
+    Verify();
 #endif //_DEBUG
 }
 
@@ -1437,7 +1437,7 @@ bool Table::compare(const Table& c) const
     return true;
 }
 
-void Table::verify() const
+void Table::Verify() const
 {
     const size_t column_count = get_column_count();
     assert(column_count == m_cols.Size());
@@ -1451,42 +1451,42 @@ void Table::verify() const
             {
                 const Column& column = GetColumn(i);
                 assert(column.Size() == m_size);
-                column.verify();
+                column.Verify();
             }
             break;
         case COLUMN_TYPE_STRING:
             {
                 const AdaptiveStringColumn& column = GetColumnString(i);
                 assert(column.Size() == m_size);
-                column.verify();
+                column.Verify();
             }
             break;
         case COLUMN_TYPE_STRING_ENUM:
             {
                 const ColumnStringEnum& column = GetColumnStringEnum(i);
                 assert(column.Size() == m_size);
-                column.verify();
+                column.Verify();
             }
             break;
         case COLUMN_TYPE_BINARY:
             {
                 const ColumnBinary& column = GetColumnBinary(i);
                 assert(column.Size() == m_size);
-                column.verify();
+                column.Verify();
             }
             break;
         case COLUMN_TYPE_TABLE:
             {
                 const ColumnTable& column = GetColumnTable(i);
                 assert(column.Size() == m_size);
-                column.verify();
+                column.Verify();
             }
             break;
         case COLUMN_TYPE_MIXED:
             {
                 const ColumnMixed& column = GetColumnMixed(i);
                 assert(column.Size() == m_size);
-                column.verify();
+                column.Verify();
             }
             break;
         default:
@@ -1494,7 +1494,7 @@ void Table::verify() const
         }
     }
 
-    m_spec_set.verify();
+    m_spec_set.Verify();
 
     Allocator& alloc = m_columns.GetAllocator();
     alloc.Verify();

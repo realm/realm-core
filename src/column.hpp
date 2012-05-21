@@ -63,7 +63,7 @@ public:
     virtual void UpdateFromParent() {m_array->UpdateFromParent();}
 
 #ifdef _DEBUG
-    virtual void verify() const = 0;
+    virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in ObjC
     virtual void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 
@@ -188,7 +188,7 @@ public:
 #ifdef _DEBUG
     bool Compare(const Column& c) const;
     void Print() const;
-    void verify() const;
+    virtual void Verify() const;
     MemStats Stats() const;
 #endif //_DEBUG
 

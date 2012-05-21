@@ -62,7 +62,7 @@ public:
     void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
 #ifdef _DEBUG
-    void verify() const {};
+    void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif //_DEBUG
 
 protected:

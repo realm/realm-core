@@ -147,7 +147,7 @@ public:
     void Clear(size_t ndx);
 
 #ifdef _DEBUG
-    void verify() const;
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
 #endif //_DEBUG
 
 protected:

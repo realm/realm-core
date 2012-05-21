@@ -367,7 +367,7 @@ void Group::update_refs(size_t topRef)
 
 #ifdef _DEBUG
 
-void Group::verify()
+void Group::Verify()
 {
     for (size_t i = 0; i < m_tables.Size(); ++i) {
         // Get table from cache if exists, else create
@@ -377,7 +377,7 @@ void Group::verify()
             t = new Table(m_alloc, ref, this, i);
             m_cachedtables.Set(i, intptr_t(t));
         }
-        t->verify();
+        t->Verify();
     }
 }
 

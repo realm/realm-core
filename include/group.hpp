@@ -52,7 +52,7 @@ public:
     template<class S> void to_json(S& out);
 
 #ifdef _DEBUG
-    void verify();
+    void Verify(); // Must be upper case to avoid conflict with macro in ObjC
     void print() const;
     MemStats stats();
     void enable_mem_diagnostics(bool enable=true) {m_alloc.EnableDebug(enable);}

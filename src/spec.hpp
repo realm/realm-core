@@ -59,7 +59,7 @@ public:
 
 #ifdef _DEBUG
     bool compare(const Spec& spec) const;
-    void verify() const;
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 

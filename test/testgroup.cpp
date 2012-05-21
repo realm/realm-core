@@ -91,7 +91,7 @@ TEST(Group_Serialize1)
     table->add("",  9, true, Wed);
 
 #ifdef _DEBUG
-    toDisk.verify();
+    toDisk.Verify();
 #endif //_DEBUG
 
     // Delete old file if there
@@ -124,8 +124,8 @@ TEST(Group_Serialize1)
 #ifdef _DEBUG
     // Verify that both changed correctly
     CHECK(table->compare(*t));
-    toDisk.verify();
-    fromDisk.verify();
+    toDisk.Verify();
+    fromDisk.Verify();
 #endif //_DEBUG
 }
 
@@ -151,7 +151,7 @@ TEST(Group_Serialize2)
     table2->add("hello", 3232, false, Sun);
 
 #ifdef _DEBUG
-    toDisk.verify();
+    toDisk.Verify();
 #endif //_DEBUG
 
     // Delete old file if there
@@ -172,8 +172,8 @@ TEST(Group_Serialize2)
     // Verify that original values are there
     CHECK(table1->compare(*t1));
     CHECK(table2->compare(*t2));
-    toDisk.verify();
-    fromDisk.verify();
+    toDisk.Verify();
+    fromDisk.Verify();
 #endif //_DEBUG
 }
 
@@ -186,7 +186,7 @@ TEST(Group_Serialize3)
     table->add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
 #ifdef _DEBUG
-    toDisk.verify();
+    toDisk.Verify();
 #endif //_DEBUG
 
     // Delete old file if there
@@ -205,8 +205,8 @@ TEST(Group_Serialize3)
 #ifdef _DEBUG
     // Verify that original values are there
     CHECK(table->compare(*t));
-    toDisk.verify();
-    fromDisk.verify();
+    toDisk.Verify();
+    fromDisk.Verify();
 #endif //_DEBUG}
 }
 
@@ -227,7 +227,7 @@ TEST(Group_Serialize_Men)
     table->add("",  9, true, Wed);
 
 #ifdef _DEBUG
-    toMem.verify();
+    toMem.Verify();
 #endif //_DEBUG
 
     // Serialize to memory (we now own the buffer)
@@ -246,8 +246,8 @@ TEST(Group_Serialize_Men)
 #ifdef _DEBUG
     // Verify that original values are there
     CHECK(table->compare(*t));
-    toMem.verify();
-    fromMem.verify();
+    toMem.Verify();
+    fromMem.Verify();
 #endif //_DEBUG
 }
 
@@ -268,7 +268,7 @@ TEST(Group_Serialize_Optimized)
     table->optimize();
 
 #ifdef _DEBUG
-    toMem.verify();
+    toMem.Verify();
 #endif //_DEBUG
 
     // Serialize to memory (we now own the buffer)
@@ -294,8 +294,8 @@ TEST(Group_Serialize_Optimized)
     CHECK_EQUAL(table->size()-1, res);
 
 #ifdef _DEBUG
-    toMem.verify();
-    fromMem.verify();
+    toMem.Verify();
+    fromMem.Verify();
 #endif //_DEBUG
 }
 
@@ -370,7 +370,7 @@ TEST(Group_Persist) {
     db.commit();
 
 #ifdef _DEBUG
-    db.verify();
+    db.Verify();
 #endif //_DEBUG
 
     CHECK_EQUAL(6, table->get_column_count());
@@ -391,7 +391,7 @@ TEST(Group_Persist) {
     db.commit();
 
 #ifdef _DEBUG
-    db.verify();
+    db.Verify();
 #endif //_DEBUG
 
     CHECK_EQUAL(6, table->get_column_count());

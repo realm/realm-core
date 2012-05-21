@@ -929,43 +929,43 @@ TEST(TestQuerySyntaxCheck)
 
     TupleTableType::Query q1 = ttt.where().first.equal(2).end_group();
 #ifdef _DEBUG
-    s = q1.verify();
+    s = q1.Verify();
     CHECK(s != "");
 #endif
 
     TupleTableType::Query q2 = ttt.where().group().group().first.equal(2).end_group();
 #ifdef _DEBUG
-    s = q2.verify();
+    s = q2.Verify();
     CHECK(s != "");
 #endif
 
     TupleTableType::Query q3 = ttt.where().first.equal(2).Or();
 #ifdef _DEBUG
-    s = q3.verify();
+    s = q3.Verify();
     CHECK(s != "");
 #endif
 
     TupleTableType::Query q4 = ttt.where().Or().first.equal(2);
 #ifdef _DEBUG
-    s = q4.verify();
+    s = q4.Verify();
     CHECK(s != "");
 #endif
 
     TupleTableType::Query q5 = ttt.where().first.equal(2);
 #ifdef _DEBUG
-    s = q5.verify();
+    s = q5.Verify();
     CHECK(s == "");
 #endif
 
     TupleTableType::Query q6 = ttt.where().group().first.equal(2);
 #ifdef _DEBUG
-    s = q6.verify();
+    s = q6.Verify();
     CHECK(s != "");
 
 #endif
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
 #ifdef _DEBUG
-    s = q7.verify();
+    s = q7.Verify();
     CHECK(s != "");
 #endif
 }
