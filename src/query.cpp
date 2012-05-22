@@ -1,7 +1,7 @@
 #include "query.hpp"
 #include "query_engine.hpp"
 
-#define MULTITHREAD 1
+#define MULTITHREAD 0
 
 using namespace tightdb;
 
