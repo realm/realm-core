@@ -13,6 +13,53 @@ TIGHTDB_TABLE_2(BoolTupleTable,
                 second, Bool)
 
 
+TEST(TestQueryFindAll_range1)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "a");
+    ttt.add(4, "a");
+    ttt.add(7, "a");
+    ttt.add(10, "a");
+    ttt.add(1, "a");
+    ttt.add(4, "a");
+    ttt.add(7, "a");
+    ttt.add(10, "a");
+    ttt.add(1, "a");
+    ttt.add(4, "a");
+    ttt.add(7, "a");
+    ttt.add(10, "a");
+
+    Query q1 = ttt.where().second.equal("a");
+    TableView tv1 = q1.find_all(ttt, 4, 10);
+    CHECK_EQUAL(6, tv1.size());
+}
+
+TEST(TestQueryFindAll_range_or)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "b");
+    ttt.add(2, "a"); //// match
+    ttt.add(3, "b"); //
+    ttt.add(1, "a"); //// match
+    ttt.add(2, "b"); //// match
+    ttt.add(3, "a");
+    ttt.add(1, "b");
+    ttt.add(2, "a"); //// match
+    ttt.add(3, "b"); //
+
+    Query q1 = ttt.where().group().first.greater(1).Or().second.equal("a").end_group().first.less(3);
+    TableView tv1 = q1.find_all(ttt, 1, 8);
+    CHECK_EQUAL(4, tv1.size());
+
+    TableView tv2 = q1.find_all(ttt, 2, 8);
+    CHECK_EQUAL(3, tv2.size());
+
+    TableView tv3 = q1.find_all(ttt, 1, 7);
+    CHECK_EQUAL(3, tv3.size());
+}
+
 
 TEST(TestQueryDelete)
 {
@@ -627,7 +674,23 @@ TEST(TestQueryFindAll_OrPHP)
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
 
+TEST(TestQueryFindAllOr)
+{
+    TupleTableType ttt;
 
+    ttt.add(1, "Joe");
+    ttt.add(2, "Sara");
+    ttt.add(3, "Jim");
+
+    // (second == Jim || second == Joe) && first = 1
+    Query q1 = ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(3);
+    TableView tv1 = q1.find_all(ttt);
+    CHECK_EQUAL(2, tv1.get_source_ndx(0));
+}
+
+
+
+ 
 
 TEST(TestQueryFindAll_Parans2)
 {

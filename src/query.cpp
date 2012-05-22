@@ -235,12 +235,10 @@ void Query::find_all(Table& table, TableView& tv, size_t start, size_t end, size
         return;
     }
     else {
-        const size_t table_size = table.size();
-        
         // Use single threading
         for(;;) {
-            r = first[0]->find_first(r + 1, table_size);
-            if (r == table_size || tv.size() == limit)
+            r = first[0]->find_first(r + 1, end);
+            if (r == end || tv.size() == limit)
                 break;
             tv.get_ref_column().add(r);
         }

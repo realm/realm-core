@@ -145,7 +145,7 @@ public:
         m_table = &table;
         m_column = (C*)&table.GetColumnBase(m_column_id);
 
-        if (m_child) m_child->Init(table);
+        if (m_child)m_child->Init(table);
     }
 
     size_t find_first(size_t start, size_t end)
@@ -325,8 +325,14 @@ public:
     {
         m_cond1->Init(table);
         m_cond2->Init(table);
+        if(m_child)
+            m_child->Init(table);
+
+        last1 = -1;
+        last2 = -1;
     }
 
+#if 0
     size_t find_first(size_t start, size_t end)
     {
         for (size_t s = start; s < end; ++s) {
@@ -338,7 +344,7 @@ public:
             if (m_child == 0)
                 return s;
             else {
-                const size_t a = m_cond2->find_first(s, end);
+                const size_t a = m_child->find_first(s, end);
                 if (s == a)
                     return s;
                 else
@@ -347,6 +353,42 @@ public:
         }
         return end;
     }
+#else
+    size_t find_first(size_t start, size_t end)
+    {
+        for (size_t s = start; s < end; ++s) {
+            size_t f1;
+            size_t f2;
+            
+            if(last1 >= s && last1 != -1)
+                f1 = last1;
+            else {
+                f1 = m_cond1->find_first(s, end);
+                last1 = f1;
+            }
+    
+            if(last2 >= s && last2 != -1)
+                f2 = last2;
+            else {
+                f2 = m_cond2->find_first(s, f1);
+                last2 = f2;
+            }
+            s = f1 < f2 ? f1 : f2;
+
+            if (m_child == 0)
+                return s;
+            else {
+                const size_t a = m_child->find_first(s, end);
+                if (s == a)
+                    return s;
+                else
+                    s = a - 1;
+            }
+        }
+        return end;
+    }
+#endif
+
 
     virtual std::string Verify(void)
     {
@@ -372,6 +414,9 @@ public:
 
     ParentNode* m_cond1;
     ParentNode* m_cond2;
+private:
+    size_t last1;
+    size_t last2;
 };
 
 }
