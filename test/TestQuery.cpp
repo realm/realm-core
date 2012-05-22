@@ -4,6 +4,10 @@
 
 using namespace tightdb;
 
+TIGHTDB_TABLE_2(TwoIntTable,
+                first,  Int,
+                second, Int)
+
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
@@ -34,6 +38,49 @@ TEST(TestQueryFindAll_range1)
     TupleTableType::View tv1 = q1.find_all(ttt, 4, 10);
     CHECK_EQUAL(6, tv1.size());
 }
+
+
+TEST(TestQueryFindAll_range_or_monkey2)
+{
+    const size_t ROWS = 100;
+    const size_t ITER = 1000;
+
+    for(size_t u = 0; u < ITER; u++)
+    {
+        TwoIntTable tit;
+        Array a;
+        size_t start = rand() % (ROWS + 1);
+        size_t end = start + rand() % (ROWS + 1);
+
+        if(end > ROWS)
+            end = ROWS;
+
+        for(size_t t = 0; t < ROWS; t++) {
+            tit.add(rand() % 10, rand() % ROWS);
+        }
+
+        TwoIntTable::Query q1 = tit.where().group().first.equal(3).Or().first.equal(7).end_group().second.greater(5);
+        TwoIntTable::View tv1 = q1.find_all(tit, start, end);
+
+        for(size_t t = start; t < end; t++) {
+            if((tit[t].first == 3 || tit[t].first == 7) && tit[t].second > 5) {
+                a.add(t);
+            }
+        }
+        size_t s1 = a.Size();
+        size_t s2 = tv1.size();
+
+        CHECK_EQUAL(s1, s2);
+        for(size_t t = 0; t < a.Size(); t++) {
+            size_t i1 = a.Get(t);
+            size_t i2 = tv1.get_source_ndx(t);
+            CHECK_EQUAL(i1, i2);
+        }
+    }
+
+}
+
+
 
 TEST(TestQueryFindAll_range_or)
 {

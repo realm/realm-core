@@ -1,7 +1,5 @@
 #include "query.hpp"
 #include "query_engine.hpp"
-#include <algorithm>
-#include <iostream>
 
 using namespace tightdb;
 
