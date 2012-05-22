@@ -162,6 +162,7 @@ public:
     void Clear();
 
     // Direct access methods
+    void GetBlock(size_t ndx, Array& arr, size_t& off) const;
     int64_t ColumnGet(size_t ndx) const;
     const char* ColumnStringGet(size_t ndx) const;
 
@@ -245,6 +246,7 @@ protected:
     bool AddPositiveLocal(int64_t value);
 
     void Create(size_t ref);
+    void CreateFromHeader(uint8_t* header, size_t ref=0);
 
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t(Array::*Getter)(size_t) const;
