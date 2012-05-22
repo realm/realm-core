@@ -152,7 +152,10 @@ void Array::Create(size_t ref)
 {
     assert(ref);
     uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
+    CreateFromHeader(header, ref);
+}
 
+void Array::CreateFromHeader(uint8_t* header, size_t ref) {
     // Parse header
     m_isNode   = get_header_isnode(header);
     m_hasRefs  = get_header_hasrefs(header);
@@ -168,6 +171,7 @@ void Array::Create(size_t ref)
 
     SetWidth(m_width);
 }
+
 
 void Array::SetType(ColumnDef type)
 {
@@ -1243,6 +1247,49 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const
     return total_bits / width;
 }
 
+bool Array::Copy(const Array& a)
+{
+    // Calculate size in bytes (plus a bit of extra room for expansion)
+    size_t len = CalcByteLen(a.m_len, a.m_width);
+    const size_t rest = (~len & 0x7)+1;
+    if (rest < 8) len += rest; // 64bit blocks
+    const size_t new_len = len + 64;
+
+    // Create new copy of array
+    const MemRef mref = m_alloc.Alloc(new_len);
+    if (!mref.pointer) return false;
+    memcpy(mref.pointer, a.m_data-8, len);
+
+    // Clear old contents
+    Destroy();
+
+    // Update internal data
+    UpdateRef(mref.ref);
+    set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
+
+    // Copy sub-arrays as well
+    if (m_hasRefs) {
+        for (size_t i = 0; i < m_len; ++i) {
+            const size_t ref = (size_t)Get(i);
+
+            // null-refs signify empty sub-trees
+            if (ref == 0) continue;
+
+            // all refs are 64bit aligned, so the lowest bits
+            // cannot be set. If they are it means that it should
+            // not be interpreted as a ref
+            if (ref & 0x1) continue;
+
+            const Array sub(ref, NULL, 0, a.m_alloc);
+            Array cp(m_alloc);
+            cp.SetParent(this, i);
+            cp.Copy(sub);
+        }
+    }
+
+    return true;
+}
+
 bool Array::CopyOnWrite()
 {
     if (!m_alloc.IsReadOnly(m_ref)) return true;
@@ -1257,7 +1304,7 @@ bool Array::CopyOnWrite()
     const MemRef mref = m_alloc.Alloc(new_len);
     if (!mref.pointer) return false;
     memcpy(mref.pointer, m_data-8, len);
-    
+
     const size_t old_ref = m_ref;
     void* const  old_ptr = m_data - 8;
 
@@ -1270,7 +1317,7 @@ bool Array::CopyOnWrite()
     set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
 
     update_ref_in_parent(mref.ref);
-    
+
     // Mark original as deleted, so that the space can be reclaimed in
     // future commits, when no versions are using it anymore
     m_alloc.Free(old_ref, old_ptr);
@@ -1851,18 +1898,18 @@ void Array::Stats(MemStats& stats) const
 {
     const MemStats m(m_capacity, CalcByteLen(m_len, m_width), 1);
     stats.add(m);
-    
+
     // Add stats for all sub-arrays
     if (m_hasRefs) {
         for (size_t i = 0; i < m_len; ++i) {
             const size_t ref = GetAsRef(i);
             if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
-            
+
             const Array sub(ref, NULL, 0, GetAllocator());
             sub.Stats(stats);
         }
     }
-    
+
 }
 
 #endif //_DEBUG
@@ -1876,6 +1923,7 @@ namespace {
 
 // Pre-declarations
 bool get_header_isnode_direct(const uint8_t* const header);
+bool get_header_hasrefs_direct(const uint8_t* const header);
 unsigned int get_header_width_direct(const uint8_t* const header);
 size_t get_header_len_direct(const uint8_t* const header);
 int64_t GetDirect(const char* const data, size_t width, const size_t ndx);
@@ -1885,6 +1933,11 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 bool get_header_isnode_direct(const uint8_t* const header)
 {
     return (header[0] & 0x80) != 0;
+}
+
+bool get_header_hasrefs_direct(const uint8_t* const header)
+{
+    return (header[0] & 0x40) != 0;
 }
 
 unsigned int get_header_width_direct(const uint8_t* const header)
@@ -2001,6 +2054,54 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 
 namespace tightdb {
 
+// Get containing array block direct through column b-tree
+// without instatiating any Arrays.
+void Array::GetBlock(size_t ndx, Array& arr, size_t& off) const
+{
+    char* data = (char*)m_data;
+    uint8_t* header = (uint8_t*)data-8;
+    size_t width  = m_width;
+    bool isNode   = m_isNode;
+    size_t offset = 0;
+    
+    while (1) {
+        if (isNode) {
+            // Get subnode table
+            const size_t ref_offsets = GetDirect(data, width, 0);
+            const size_t ref_refs    = GetDirect(data, width, 1);
+            
+            // Find the subnode containing the item
+            const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+            const char* const offsets_data = (const char*)offsets_header + 8;
+            const size_t offsets_width  = get_header_width_direct(offsets_header);
+            const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
+            
+            // Calc index in subnode
+            const size_t localoffset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
+            ndx -= localoffset; // local index
+            offset += localoffset;
+            
+            // Get ref to array
+            const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+            const char* const refs_data = (const char*)refs_header + 8;
+            const size_t refs_width  = get_header_width_direct(refs_header);
+            const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
+            
+            // Set vars for next iteration
+            header = (uint8_t*)m_alloc.Translate(ref);
+            data   = (char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+        }
+        else {
+            arr.CreateFromHeader(header);
+            off = offset;
+            return;
+        }
+    }
+}
+
+
 // Get value direct through column b-tree without instatiating any Arrays.
 int64_t Array::ColumnGet(size_t ndx) const
 {
@@ -2043,4 +2144,68 @@ int64_t Array::ColumnGet(size_t ndx) const
     }
 }
 
+const char* Array::ColumnStringGet(size_t ndx) const
+{
+    const char* data   = (const char*)m_data;
+    const uint8_t* header = m_data - 8;
+    size_t width = m_width;
+    bool isNode = m_isNode;
+
+    while (1) {
+        if (isNode) {
+            // Get subnode table
+            const size_t ref_offsets = GetDirect(data, width, 0);
+            const size_t ref_refs    = GetDirect(data, width, 1);
+
+            // Find the subnode containing the item
+            const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+            const char* const offsets_data = (const char*)offsets_header + 8;
+            const size_t offsets_width  = get_header_width_direct(offsets_header);
+            const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
+
+            // Calc index in subnode
+            const size_t offset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
+            ndx = ndx - offset; // local index
+
+            // Get ref to array
+            const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+            const char* const refs_data = (const char*)refs_header + 8;
+            const size_t refs_width  = get_header_width_direct(refs_header);
+            const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
+
+            // Set vars for next iteration
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+        }
+        else {
+            const bool hasRefs = get_header_hasrefs_direct(header);
+            if (hasRefs) {
+                // long strings
+                const size_t ref_offsets = GetDirect(data, width, 0);
+                const size_t ref_blob    = GetDirect(data, width, 1);
+
+                size_t offset = 0;
+                if (ndx) {
+                    const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+                    const char* const offsets_data = (const char*)offsets_header + 8;
+                    const size_t offsets_width  = get_header_width_direct(offsets_header);
+
+                    offset = GetDirect(offsets_data, offsets_width, ndx-1);
+                }
+
+                const uint8_t* const blob_header = (const uint8_t*)m_alloc.Translate(ref_blob);
+                const char* const blob_data = (const char*)blob_header + 8;
+
+                return (const char*)blob_data + offset;
+            }
+            else {
+                // short strings
+                if (width == 0) return "";
+                else return (const char*)(data + (ndx * width));
+            }
+            }
+        }
+    }
 }

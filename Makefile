@@ -9,6 +9,7 @@
 SUBDIRS = src
 
 
+# Build optimized shared library
 all: $(SUBDIRS)
 .PHONY: all
 
@@ -16,10 +17,17 @@ install: SUBDIRS_MODE = install
 install: all
 .PHONY: install
 
+# Build optimized static library
+static: SUBDIRS_MODE = static
+static: all
+.PHONY: static
+
+# Build static library compiled for debugging
 debug: SUBDIRS_MODE = debug
 debug: all
 .PHONY: debug
 
+# Build static library compiled for coverage analysis
 cover: SUBDIRS_MODE = cover
 cover: all
 .PHONY: cover
@@ -31,18 +39,27 @@ clean/test:
 .PHONY: clean clean/test
 
 
+# Run the unit tests after building everything in debug mode
 test: debug
 	@$(MAKE) -C test test
 .PHONY: test
 
+# Run the unit tests after building everything in release mode
+test-release: static
+	@$(MAKE) -C test test-release
+.PHONY: test
+
+# Run valgrind on the unit tests after building everything
 memtest: debug
 	@$(MAKE) -C test memtest
 .PHONY: test
 
-benchmark: all
+# Run the benchmarking progrems after building everything
+benchmark: static
 	@$(MAKE) -C test benchmark
 .PHONY: benchmark
 
+# Run coverage analysis after building everything, this time using LCOV
 lcov: cover
 	@$(MAKE) -C test cover
 	find -name '*.gcda' -delete
@@ -53,6 +70,7 @@ lcov: cover
 	genhtml --prefix $(abspath .) --output-directory cover_html /tmp/tightdb-clean.lcov
 .PHONY: lcov
 
+# Run coverage analysis after building everything, this time using GCOVR
 gcovr: cover
 	@$(MAKE) -C test cover
 	find -name '*.gcda' -delete

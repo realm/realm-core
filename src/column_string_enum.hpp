@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -52,7 +52,7 @@ public:
 
 #ifdef _DEBUG
     bool Compare(const ColumnStringEnum& c) const;
-    void verify() const;
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void ToDot(std::ostream& out, const char* title) const;
 #endif // _DEBUG
 

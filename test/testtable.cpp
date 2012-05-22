@@ -15,25 +15,15 @@ TEST(Table1)
     CHECK_EQUAL("first", table.get_column_name(0));
     CHECK_EQUAL("second", table.get_column_name(1));
 
-    size_t ndx = table.add_empty_row();
+    const size_t ndx = table.add_empty_row();
     table.set_int(0, ndx, 0);
     table.set_int(1, ndx, 10);
 
     CHECK_EQUAL(0, table.get_int(0, ndx));
     CHECK_EQUAL(10, table.get_int(1, ndx));
 
-    // Test add_empty_row(7)
-    ndx = table.add_empty_row(7);
-    for (size_t i=ndx; i<7; i++) {
-        table.set_int(0, i, 2*i);
-        table.set_int(1, i, 20*i);
-    }
-    for (size_t i=ndx; i<7; i++) {
-        CHECK_EQUAL(2*i, table.get_int(0, i));
-        CHECK_EQUAL(20*i, table.get_int(1, i));
-    }
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -66,7 +56,7 @@ TEST(Table2)
     CHECK_EQUAL(Wed, r.fourth);
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -94,7 +84,7 @@ TEST(Table3)
     CHECK_EQUAL(3, table[99].first);
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -118,7 +108,7 @@ TEST(Table4)
     CHECK_EQUAL(size_t(-1), table.cols().second.find_first("Foo"));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -143,7 +133,7 @@ TEST(Table_Delete)
     CHECK_EQUAL(8, table[6].second);
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 
     // Delete all items one at a time
@@ -155,7 +145,7 @@ TEST(Table_Delete)
     CHECK_EQUAL(0, table.size());
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -255,7 +245,7 @@ TEST(Table_Delete_All_Types)
     CHECK_EQUAL(12, table.size());
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 
     // Test Clear
@@ -263,7 +253,7 @@ TEST(Table_Delete_All_Types)
     CHECK_EQUAL(0, table.size());
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -280,7 +270,7 @@ TEST(Table_Find_Int)
     CHECK_EQUAL(size_t(-1),   table.cols().second.find_first(1001));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -307,7 +297,7 @@ TEST(Table6)
     //CHECK_EQUAL((size_t)-1, result2);
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 */
@@ -329,11 +319,11 @@ TEST(Table_FindAll_Int)
     table.add(0, 20, true, Wed);
 
     // Search for a value that does not exits
-    const TableView v0 = table.cols().second.find_all(5);
+    const TestTable::View v0 = table.cols().second.find_all(5);
     CHECK_EQUAL(0, v0.size());
 
     // Search for a value with several matches
-    const TableView v = table.cols().second.find_all(20);
+    const TestTable::View v = table.cols().second.find_all(20);
 
     CHECK_EQUAL(5, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
@@ -343,14 +333,14 @@ TEST(Table_FindAll_Int)
     CHECK_EQUAL(9, v.get_source_ndx(4));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
 TEST(Table_Sorted_Int)
 {
     TestTable table;
-    
+
     table.add(0, 10, true, Wed); // 0: 4
     table.add(0, 20, true, Wed); // 1: 7
     table.add(0,  0, true, Wed); // 2: 0
@@ -361,12 +351,11 @@ TEST(Table_Sorted_Int)
     table.add(0,  4, true, Wed); // 7: 2
     table.add(0, 99, true, Wed); // 8: 9
     table.add(0,  2, true, Wed); // 9: 1
-    
+
     // Search for a value that does not exits
-    TableView v(table);
-    table.sorted(v, 1);
+    TestTable::View v = table.cols().second.sorted();
     CHECK_EQUAL(table.size(), v.size());
-    
+
     CHECK_EQUAL(2, v.get_source_ndx(0));
     CHECK_EQUAL(9, v.get_source_ndx(1));
     CHECK_EQUAL(7, v.get_source_ndx(2));
@@ -377,9 +366,9 @@ TEST(Table_Sorted_Int)
     CHECK_EQUAL(1, v.get_source_ndx(7));
     CHECK_EQUAL(3, v.get_source_ndx(8));
     CHECK_EQUAL(8, v.get_source_ndx(9));
-    
+
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -400,7 +389,7 @@ TEST(Table_Index_Int)
     table.add(0,  9, true, Wed);
 
     // Create index for column two
-    table.set_index(1);
+    table.cols().second.set_index();
 
     // Search for a value that does not exits
     const size_t r1 = table.cols().second.find_first(2);
@@ -464,7 +453,7 @@ TEST(Table_Index_Int)
     CHECK_EQUAL(7, table.cols().second.find_first(100));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -536,13 +525,13 @@ TEST(TableAutoEnumerationFindFindAll)
     size_t t = table.cols().second.find_first("eftg");
     CHECK_EQUAL(1, t);
 
-    TableView tv = table.cols().second.find_all("eftg");
+    TestTableAE::View tv = table.cols().second.find_all("eftg");
     CHECK_EQUAL(5, tv.size());
-    CHECK_EQUAL("eftg", tv.get_string(1, 0));
-    CHECK_EQUAL("eftg", tv.get_string(1, 1));
-    CHECK_EQUAL("eftg", tv.get_string(1, 2));
-    CHECK_EQUAL("eftg", tv.get_string(1, 3));
-    CHECK_EQUAL("eftg", tv.get_string(1, 4));
+    CHECK_EQUAL("eftg", static_cast<const char*>(tv[0].second));
+    CHECK_EQUAL("eftg", static_cast<const char*>(tv[1].second));
+    CHECK_EQUAL("eftg", static_cast<const char*>(tv[2].second));
+    CHECK_EQUAL("eftg", static_cast<const char*>(tv[3].second));
+    CHECK_EQUAL("eftg", static_cast<const char*>(tv[4].second));
 }
 
 #include "alloc_slab.hpp"
@@ -571,7 +560,7 @@ TEST(Table_SlabAlloc)
     table.remove(4);
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -756,7 +745,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(40, subtable2->get_int(1, 0));
 
 #ifdef _DEBUG
-    table.verify();
+    table.Verify();
 #endif //_DEBUG
 }
 
@@ -782,4 +771,213 @@ TEST(Table_Mixed2)
     CHECK_EQUAL(true,         table[1].first.get_bool());
     CHECK_EQUAL(time_t(1234), table[2].first.get_date());
     CHECK_EQUAL("test",       table[3].first.get_string());
+}
+
+
+TEST(Table_SubtableSizeAndClear)
+{
+    Table table;
+    Spec& spec = table.get_spec();
+    {
+        Spec subspec = spec.add_subtable_column("subtab");
+        subspec.add_column(COLUMN_TYPE_INT, "int");
+    }
+    spec.add_column(COLUMN_TYPE_MIXED, "mixed");
+    table.update_from_spec();
+
+    table.insert_table(0, 0);
+    table.insert_mixed(1, 0, false);
+    table.insert_done();
+
+    table.insert_table(0, 1);
+    table.insert_mixed(1, 1, Mixed(COLUMN_TYPE_TABLE));
+    table.insert_done();
+
+    CHECK_EQUAL(table.get_subtable_size(0,0), 0); // Subtable column
+    CHECK_EQUAL(table.get_subtable_size(1,0), 0); // Mixed column, bool value
+    CHECK_EQUAL(table.get_subtable_size(1,1), 0); // Mixed column, table value
+
+    CHECK(table.get_subtable(0, 0));  // Subtable column
+    CHECK(!table.get_subtable(1, 0)); // Mixed column, bool value, must return NULL
+    CHECK(table.get_subtable(1, 1));  // Mixed column, table value
+
+    table.set_mixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
+    table.set_mixed(1, 1, false);
+    CHECK(table.get_subtable(1, 0));
+    CHECK(!table.get_subtable(1, 1));
+
+    TableRef subtab1 = table.get_subtable(0, 0);
+    TableRef subtab2 = table.get_subtable(1, 0);
+    {
+        Spec& subspec = subtab2->get_spec();
+        subspec.add_column(COLUMN_TYPE_INT, "int");
+        subtab2->update_from_spec();
+    }
+
+    CHECK_EQUAL(table.get_subtable_size(1, 0), 0);
+    CHECK(table.get_subtable(1, 0));
+
+    subtab1->insert_int(0, 0, 0);
+    subtab1->insert_done();
+
+    subtab2->insert_int(0, 0, 0);
+    subtab2->insert_done();
+
+    CHECK_EQUAL(table.get_subtable_size(0,0), 1);
+    CHECK_EQUAL(table.get_subtable_size(1,0), 1);
+
+    table.clear_subtable(0, 0);
+    table.clear_subtable(1, 0);
+
+    CHECK_EQUAL(table.get_subtable_size(0,0), 0);
+    CHECK_EQUAL(table.get_subtable_size(1,0), 0);
+
+    CHECK(table.get_subtable(1, 0));
+}
+
+
+
+namespace
+{
+    TIGHTDB_TABLE_1(MyTable1,
+                    val, Int)
+
+    TIGHTDB_TABLE_2(MyTable2,
+                    val, Int,
+                    subtab, Subtable<MyTable1>)
+
+    TIGHTDB_TABLE_1(MyTable3,
+                    subtab, Subtable<MyTable2>)
+}
+
+TEST(Table_HighLevelSubtables)
+{
+    MyTable3 t;
+    {
+        MyTable3::Ref r1 = t.get_table_ref();
+        MyTable3::ConstRef r2 = t.get_table_ref();
+        MyTable3::ConstRef r3 = r2->get_table_ref();
+        r3 = t.get_table_ref(); // Also test assigment that converts to const
+        static_cast<void>(r1);
+        static_cast<void>(r3);
+    }
+
+    t.add();
+    const MyTable3& ct = t;
+    {
+        MyTable2::Ref       s1 = t[0].subtab;
+        MyTable2::ConstRef  s2 = t[0].subtab;
+        MyTable2::Ref       s3 = t[0].subtab->get_table_ref();
+        MyTable2::ConstRef  s4 = t[0].subtab->get_table_ref();
+        MyTable2::Ref       s5 = t.cols().subtab[0];
+        MyTable2::ConstRef  s6 = t.cols().subtab[0];
+        MyTable2::Ref       s7 = t.cols().subtab[0]->get_table_ref();
+        MyTable2::ConstRef  s8 = t.cols().subtab[0]->get_table_ref();
+        MyTable2::ConstRef cs1 = ct[0].subtab;
+        MyTable2::ConstRef cs2 = ct[0].subtab->get_table_ref();
+        MyTable2::ConstRef cs3 = ct.cols().subtab[0];
+        MyTable2::ConstRef cs4 = ct.cols().subtab[0]->get_table_ref();
+        s1 = t[0].subtab;
+        s2 = t[0].subtab; // Also test assigment that converts to const
+        static_cast<void>(s1);
+        static_cast<void>(s2);
+        static_cast<void>(s3);
+        static_cast<void>(s4);
+        static_cast<void>(s5);
+        static_cast<void>(s6);
+        static_cast<void>(s7);
+        static_cast<void>(s8);
+        static_cast<void>(cs1);
+        static_cast<void>(cs2);
+        static_cast<void>(cs3);
+        static_cast<void>(cs4);
+    }
+
+    t[0].subtab->add();
+    {
+        MyTable1::Ref       s1 = t[0].subtab[0].subtab;
+        MyTable1::ConstRef  s2 = t[0].subtab[0].subtab;
+        MyTable1::Ref       s3 = t[0].subtab[0].subtab->get_table_ref();
+        MyTable1::ConstRef  s4 = t[0].subtab[0].subtab->get_table_ref();
+        MyTable1::Ref       s5 = t.cols().subtab[0]->cols().subtab[0];
+        MyTable1::ConstRef  s6 = t.cols().subtab[0]->cols().subtab[0];
+        MyTable1::Ref       s7 = t.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        MyTable1::ConstRef  s8 = t.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        MyTable1::ConstRef cs1 = ct[0].subtab[0].subtab;
+        MyTable1::ConstRef cs2 = ct[0].subtab[0].subtab->get_table_ref();
+        MyTable1::ConstRef cs3 = ct.cols().subtab[0]->cols().subtab[0];
+        MyTable1::ConstRef cs4 = ct.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        s1 = t[0].subtab[0].subtab;
+        s2 = t[0].subtab[0].subtab; // Also test assigment that converts to const
+        static_cast<void>(s1);
+        static_cast<void>(s2);
+        static_cast<void>(s3);
+        static_cast<void>(s4);
+        static_cast<void>(s5);
+        static_cast<void>(s6);
+        static_cast<void>(s7);
+        static_cast<void>(s8);
+        static_cast<void>(cs1);
+        static_cast<void>(cs2);
+        static_cast<void>(cs3);
+        static_cast<void>(cs4);
+    }
+
+    t[0].subtab[0].val = 1;
+    CHECK_EQUAL(t[0].subtab[0].val,                 1);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  1);
+    CHECK_EQUAL(t[0].subtab->cols().val[0],         1);
+    CHECK_EQUAL(t.cols().subtab[0][0].val,          1);
+
+    t.cols().subtab[0]->cols().val[0] = 2;
+    CHECK_EQUAL(t[0].subtab[0].val,                 2);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  2);
+    CHECK_EQUAL(t[0].subtab->cols().val[0],         2);
+    CHECK_EQUAL(t.cols().subtab[0][0].val,          2);
+
+    t[0].subtab->cols().val[0] = 3;
+    CHECK_EQUAL(t[0].subtab[0].val,                 3);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  3);
+    CHECK_EQUAL(t[0].subtab->cols().val[0],         3);
+    CHECK_EQUAL(t.cols().subtab[0][0].val,          3);
+
+    t.cols().subtab[0][0].val = 4;
+    CHECK_EQUAL(t[0].subtab[0].val,                 4);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  4);
+    CHECK_EQUAL(t[0].subtab->cols().val[0],         4);
+    CHECK_EQUAL(t.cols().subtab[0][0].val,          4);
+    CHECK_EQUAL(ct[0].subtab[0].val,                4);
+    CHECK_EQUAL(ct.cols().subtab[0]->cols().val[0], 4);
+    CHECK_EQUAL(ct[0].subtab->cols().val[0],        4);
+    CHECK_EQUAL(ct.cols().subtab[0][0].val,         4);
+
+    t[0].subtab[0].subtab->add();
+    t[0].subtab[0].subtab[0].val = 5;
+    CHECK_EQUAL(t[0].subtab[0].subtab[0].val,                         5);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().subtab[0]->cols().val[0],  5);
+    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                        5);
+    CHECK_EQUAL(ct.cols().subtab[0]->cols().subtab[0]->cols().val[0], 5);
+
+    t.cols().subtab[0]->cols().subtab[0]->cols().val[0] = 6;
+    CHECK_EQUAL(t[0].subtab[0].subtab[0].val,                         6);
+    CHECK_EQUAL(t.cols().subtab[0]->cols().subtab[0]->cols().val[0],  6);
+    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                        6);
+    CHECK_EQUAL(ct.cols().subtab[0]->cols().subtab[0]->cols().val[0], 6);
+
+    // FIXME: Same thing for BasicTable::View
+
+/*
+  Idea for compile time failure tests:
+
+    const MyTable2 t;
+#if    TEST_INDEX == 0
+    t[0].val = 7;
+#elsif TEST_INDEX == 1
+    t.cols().val[0] = 7;
+#elsif TEST_INDEX == 2
+    t[0].subtab[0].val = 7;
+#elsif TEST_INDEX == 3
+    t[0].subtab->cols().val[0] = 7;
+#endif
+*/
 }

@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -29,25 +29,25 @@
 Table* TableName##_new(void) { \
     Table *tbl = table_new(); \
     Spec* spec = table_get_spec(tbl); \
-	spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
+    spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
     table_update_from_spec(tbl, spec_get_ref(spec)); \
     spec_delete(spec); \
     return tbl; \
 } \
 \
 void TableName##_add(Table* tbl, tdb_type_##CType0 value0) { \
-	table_add(tbl, value0); \
+    table_add(tbl, value0); \
 } \
 \
 void TableName##_insert(Table* tbl, size_t row_ndx, tdb_type_##CType0 value0) { \
-	table_insert(tbl, row_ndx, value0); \
+    table_insert(tbl, row_ndx, value0); \
 } \
 \
 tdb_type_##CType0 TableName##_get_##CName0(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType0(tbl, 0, row_ndx); \
+    return table_get_##CType0(tbl, 0, row_ndx); \
 } \
 void TableName##_set_##CName0(Table* tbl, size_t row_ndx, tdb_type_##CType0 value) { \
-	return table_set_##CType0(tbl, 0, row_ndx, value); \
+    return table_set_##CType0(tbl, 0, row_ndx, value); \
 } \
 
 
@@ -57,32 +57,32 @@ void TableName##_set_##CName0(Table* tbl, size_t row_ndx, tdb_type_##CType0 valu
 Table* TableName##_new(void) { \
     Table *tbl = table_new(); \
     Spec* spec = table_get_spec(tbl); \
-	spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
-	spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
+    spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
+    spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
     table_update_from_spec(tbl, spec_get_ref(spec)); \
     spec_delete(spec); \
     return tbl; \
 } \
 \
 void TableName##_add(Table* tbl, tdb_type_##CType0 value0, tdb_type_##CType1 value1) { \
-	table_add(tbl, value0, value1); \
+    table_add(tbl, value0, value1); \
 } \
 \
 void TableName##_insert(Table* tbl, size_t row_ndx, tdb_type_##CType0 value0, tdb_type_##CType1 value1) { \
-	table_insert(tbl, row_ndx, value0, value1); \
+    table_insert(tbl, row_ndx, value0, value1); \
 } \
 \
 tdb_type_##CType0 TableName##_get_##CName0(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType0(tbl, 0, row_ndx); \
+    return table_get_##CType0(tbl, 0, row_ndx); \
 } \
 void TableName##_set_##CName0(Table* tbl, size_t row_ndx, tdb_type_##CType0 value) { \
-	return table_set_##CType0(tbl, 0, row_ndx, value); \
+    return table_set_##CType0(tbl, 0, row_ndx, value); \
 } \
 tdb_type_##CType1 TableName##_get_##CName1(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType1(tbl, 1, row_ndx); \
+    return table_get_##CType1(tbl, 1, row_ndx); \
 } \
 void TableName##_set_##CName1(Table* tbl, size_t row_ndx, tdb_type_##CType1 value) { \
-	return table_set_##CType1(tbl, 1, row_ndx, value); \
+    return table_set_##CType1(tbl, 1, row_ndx, value); \
 } \
 
 
@@ -92,39 +92,39 @@ void TableName##_set_##CName1(Table* tbl, size_t row_ndx, tdb_type_##CType1 valu
 Table* TableName##_new(void) { \
     Table *tbl = table_new(); \
     Spec* spec = table_get_spec(tbl); \
-	spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
-	spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
-	spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
+    spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
+    spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
+    spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
     table_update_from_spec(tbl, spec_get_ref(spec)); \
     spec_delete(spec); \
     return tbl; \
 } \
 \
 void TableName##_add(Table* tbl, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2) { \
-	table_add(tbl, value0, value1, value2); \
+    table_add(tbl, value0, value1, value2); \
 } \
 \
 void TableName##_insert(Table* tbl, size_t row_ndx, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2) { \
-	table_insert(tbl, row_ndx, value0, value1, value2); \
+    table_insert(tbl, row_ndx, value0, value1, value2); \
 } \
 \
 tdb_type_##CType0 TableName##_get_##CName0(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType0(tbl, 0, row_ndx); \
+    return table_get_##CType0(tbl, 0, row_ndx); \
 } \
 void TableName##_set_##CName0(Table* tbl, size_t row_ndx, tdb_type_##CType0 value) { \
-	return table_set_##CType0(tbl, 0, row_ndx, value); \
+    return table_set_##CType0(tbl, 0, row_ndx, value); \
 } \
 tdb_type_##CType1 TableName##_get_##CName1(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType1(tbl, 1, row_ndx); \
+    return table_get_##CType1(tbl, 1, row_ndx); \
 } \
 void TableName##_set_##CName1(Table* tbl, size_t row_ndx, tdb_type_##CType1 value) { \
-	return table_set_##CType1(tbl, 1, row_ndx, value); \
+    return table_set_##CType1(tbl, 1, row_ndx, value); \
 } \
 tdb_type_##CType2 TableName##_get_##CName2(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType2(tbl, 2, row_ndx); \
+    return table_get_##CType2(tbl, 2, row_ndx); \
 } \
 void TableName##_set_##CName2(Table* tbl, size_t row_ndx, tdb_type_##CType2 value) { \
-	return table_set_##CType2(tbl, 2, row_ndx, value); \
+    return table_set_##CType2(tbl, 2, row_ndx, value); \
 } \
 
 
@@ -134,46 +134,46 @@ void TableName##_set_##CName2(Table* tbl, size_t row_ndx, tdb_type_##CType2 valu
 Table* TableName##_new(void) { \
     Table *tbl = table_new(); \
     Spec* spec = table_get_spec(tbl); \
-	spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
-	spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
-	spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
-	spec_add_column(spec, COLUMN_TYPE_##CType3, #CName3); \
+    spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
+    spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
+    spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
+    spec_add_column(spec, COLUMN_TYPE_##CType3, #CName3); \
     table_update_from_spec(tbl, spec_get_ref(spec)); \
     spec_delete(spec); \
     return tbl; \
 } \
 \
 void TableName##_add(Table* tbl, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2, tdb_type_##CType3 value3) { \
-	table_add(tbl, value0, value1, value2, value3); \
+    table_add(tbl, value0, value1, value2, value3); \
 } \
 \
 void TableName##_insert(Table* tbl, size_t row_ndx, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2, tdb_type_##CType3 value3) { \
-	table_insert(tbl, row_ndx, value0, value1, value2, value3); \
+    table_insert(tbl, row_ndx, value0, value1, value2, value3); \
 } \
 \
 tdb_type_##CType0 TableName##_get_##CName0(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType0(tbl, 0, row_ndx); \
+    return table_get_##CType0(tbl, 0, row_ndx); \
 } \
 void TableName##_set_##CName0(Table* tbl, size_t row_ndx, tdb_type_##CType0 value) { \
-	return table_set_##CType0(tbl, 0, row_ndx, value); \
+    return table_set_##CType0(tbl, 0, row_ndx, value); \
 } \
 tdb_type_##CType1 TableName##_get_##CName1(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType1(tbl, 1, row_ndx); \
+    return table_get_##CType1(tbl, 1, row_ndx); \
 } \
 void TableName##_set_##CName1(Table* tbl, size_t row_ndx, tdb_type_##CType1 value) { \
-	return table_set_##CType1(tbl, 1, row_ndx, value); \
+    return table_set_##CType1(tbl, 1, row_ndx, value); \
 } \
 tdb_type_##CType2 TableName##_get_##CName2(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType2(tbl, 2, row_ndx); \
+    return table_get_##CType2(tbl, 2, row_ndx); \
 } \
 void TableName##_set_##CName2(Table* tbl, size_t row_ndx, tdb_type_##CType2 value) { \
-	return table_set_##CType2(tbl, 2, row_ndx, value); \
+    return table_set_##CType2(tbl, 2, row_ndx, value); \
 } \
 tdb_type_##CType3 TableName##_get_##CName3(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType3(tbl, 3, row_ndx); \
+    return table_get_##CType3(tbl, 3, row_ndx); \
 } \
 void TableName##_set_##CName3(Table* tbl, size_t row_ndx, tdb_type_##CType3 value) { \
-	return table_set_##CType3(tbl, 3, row_ndx, value); \
+    return table_set_##CType3(tbl, 3, row_ndx, value); \
 } \
 
 
@@ -183,53 +183,53 @@ void TableName##_set_##CName3(Table* tbl, size_t row_ndx, tdb_type_##CType3 valu
 Table* TableName##_new(void) { \
     Table *tbl = table_new(); \
     Spec* spec = table_get_spec(tbl); \
-	spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
-	spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
-	spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
-	spec_add_column(spec, COLUMN_TYPE_##CType3, #CName3); \
-	spec_add_column(spec, COLUMN_TYPE_##CType4, #CName4); \
+    spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
+    spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
+    spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
+    spec_add_column(spec, COLUMN_TYPE_##CType3, #CName3); \
+    spec_add_column(spec, COLUMN_TYPE_##CType4, #CName4); \
     table_update_from_spec(tbl, spec_get_ref(spec)); \
     spec_delete(spec); \
     return tbl; \
 } \
 \
 void TableName##_add(Table* tbl, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2, tdb_type_##CType3 value3, tdb_type_##CType4 value4) { \
-	table_add(tbl, value0, value1, value2, value3, value4); \
+    table_add(tbl, value0, value1, value2, value3, value4); \
 } \
 \
 void TableName##_insert(Table* tbl, size_t row_ndx, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2, tdb_type_##CType3 value3, tdb_type_##CType4 value4) { \
-	table_insert(tbl, row_ndx, value0, value1, value2, value3, value4); \
+    table_insert(tbl, row_ndx, value0, value1, value2, value3, value4); \
 } \
 \
 tdb_type_##CType0 TableName##_get_##CName0(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType0(tbl, 0, row_ndx); \
+    return table_get_##CType0(tbl, 0, row_ndx); \
 } \
 void TableName##_set_##CName0(Table* tbl, size_t row_ndx, tdb_type_##CType0 value) { \
-	return table_set_##CType0(tbl, 0, row_ndx, value); \
+    return table_set_##CType0(tbl, 0, row_ndx, value); \
 } \
 tdb_type_##CType1 TableName##_get_##CName1(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType1(tbl, 1, row_ndx); \
+    return table_get_##CType1(tbl, 1, row_ndx); \
 } \
 void TableName##_set_##CName1(Table* tbl, size_t row_ndx, tdb_type_##CType1 value) { \
-	return table_set_##CType1(tbl, 1, row_ndx, value); \
+    return table_set_##CType1(tbl, 1, row_ndx, value); \
 } \
 tdb_type_##CType2 TableName##_get_##CName2(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType2(tbl, 2, row_ndx); \
+    return table_get_##CType2(tbl, 2, row_ndx); \
 } \
 void TableName##_set_##CName2(Table* tbl, size_t row_ndx, tdb_type_##CType2 value) { \
-	return table_set_##CType2(tbl, 2, row_ndx, value); \
+    return table_set_##CType2(tbl, 2, row_ndx, value); \
 } \
 tdb_type_##CType3 TableName##_get_##CName3(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType3(tbl, 3, row_ndx); \
+    return table_get_##CType3(tbl, 3, row_ndx); \
 } \
 void TableName##_set_##CName3(Table* tbl, size_t row_ndx, tdb_type_##CType3 value) { \
-	return table_set_##CType3(tbl, 3, row_ndx, value); \
+    return table_set_##CType3(tbl, 3, row_ndx, value); \
 } \
 tdb_type_##CType4 TableName##_get_##CName4(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType4(tbl, 4, row_ndx); \
+    return table_get_##CType4(tbl, 4, row_ndx); \
 } \
 void TableName##_set_##CName4(Table* tbl, size_t row_ndx, tdb_type_##CType4 value) { \
-	return table_set_##CType4(tbl, 4, row_ndx, value); \
+    return table_set_##CType4(tbl, 4, row_ndx, value); \
 } \
 
 
@@ -239,60 +239,60 @@ void TableName##_set_##CName4(Table* tbl, size_t row_ndx, tdb_type_##CType4 valu
 Table* TableName##_new(void) { \
     Table *tbl = table_new(); \
     Spec* spec = table_get_spec(tbl); \
-	spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
-	spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
-	spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
-	spec_add_column(spec, COLUMN_TYPE_##CType3, #CName3); \
-	spec_add_column(spec, COLUMN_TYPE_##CType4, #CName4); \
-	spec_add_column(spec, COLUMN_TYPE_##CType5, #CName5); \
+    spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
+    spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
+    spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
+    spec_add_column(spec, COLUMN_TYPE_##CType3, #CName3); \
+    spec_add_column(spec, COLUMN_TYPE_##CType4, #CName4); \
+    spec_add_column(spec, COLUMN_TYPE_##CType5, #CName5); \
     table_update_from_spec(tbl, spec_get_ref(spec)); \
     spec_delete(spec); \
     return tbl; \
 } \
 \
 void TableName##_add(Table* tbl, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2, tdb_type_##CType3 value3, tdb_type_##CType4 value4, tdb_type_##CType5 value5) { \
-	table_add(tbl, value0, value1, value2, value3, value4, value5); \
+    table_add(tbl, value0, value1, value2, value3, value4, value5); \
 } \
 \
 void TableName##_insert(Table* tbl, size_t row_ndx, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2, tdb_type_##CType3 value3, tdb_type_##CType4 value4, tdb_type_##CType5 value5) { \
-	table_insert(tbl, row_ndx, value0, value1, value2, value3, value4, value5); \
+    table_insert(tbl, row_ndx, value0, value1, value2, value3, value4, value5); \
 } \
 \
 tdb_type_##CType0 TableName##_get_##CName0(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType0(tbl, 0, row_ndx); \
+    return table_get_##CType0(tbl, 0, row_ndx); \
 } \
 void TableName##_set_##CName0(Table* tbl, size_t row_ndx, tdb_type_##CType0 value) { \
-	return table_set_##CType0(tbl, 0, row_ndx, value); \
+    return table_set_##CType0(tbl, 0, row_ndx, value); \
 } \
 tdb_type_##CType1 TableName##_get_##CName1(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType1(tbl, 1, row_ndx); \
+    return table_get_##CType1(tbl, 1, row_ndx); \
 } \
 void TableName##_set_##CName1(Table* tbl, size_t row_ndx, tdb_type_##CType1 value) { \
-	return table_set_##CType1(tbl, 1, row_ndx, value); \
+    return table_set_##CType1(tbl, 1, row_ndx, value); \
 } \
 tdb_type_##CType2 TableName##_get_##CName2(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType2(tbl, 2, row_ndx); \
+    return table_get_##CType2(tbl, 2, row_ndx); \
 } \
 void TableName##_set_##CName2(Table* tbl, size_t row_ndx, tdb_type_##CType2 value) { \
-	return table_set_##CType2(tbl, 2, row_ndx, value); \
+    return table_set_##CType2(tbl, 2, row_ndx, value); \
 } \
 tdb_type_##CType3 TableName##_get_##CName3(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType3(tbl, 3, row_ndx); \
+    return table_get_##CType3(tbl, 3, row_ndx); \
 } \
 void TableName##_set_##CName3(Table* tbl, size_t row_ndx, tdb_type_##CType3 value) { \
-	return table_set_##CType3(tbl, 3, row_ndx, value); \
+    return table_set_##CType3(tbl, 3, row_ndx, value); \
 } \
 tdb_type_##CType4 TableName##_get_##CName4(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType4(tbl, 4, row_ndx); \
+    return table_get_##CType4(tbl, 4, row_ndx); \
 } \
 void TableName##_set_##CName4(Table* tbl, size_t row_ndx, tdb_type_##CType4 value) { \
-	return table_set_##CType4(tbl, 4, row_ndx, value); \
+    return table_set_##CType4(tbl, 4, row_ndx, value); \
 } \
 tdb_type_##CType5 TableName##_get_##CName5(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType5(tbl, 5, row_ndx); \
+    return table_get_##CType5(tbl, 5, row_ndx); \
 } \
 void TableName##_set_##CName5(Table* tbl, size_t row_ndx, tdb_type_##CType5 value) { \
-	return table_set_##CType5(tbl, 5, row_ndx, value); \
+    return table_set_##CType5(tbl, 5, row_ndx, value); \
 } \
 
 
@@ -302,67 +302,67 @@ void TableName##_set_##CName5(Table* tbl, size_t row_ndx, tdb_type_##CType5 valu
 Table* TableName##_new(void) { \
     Table *tbl = table_new(); \
     Spec* spec = table_get_spec(tbl); \
-	spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
-	spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
-	spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
-	spec_add_column(spec, COLUMN_TYPE_##CType3, #CName3); \
-	spec_add_column(spec, COLUMN_TYPE_##CType4, #CName4); \
-	spec_add_column(spec, COLUMN_TYPE_##CType5, #CName5); \
-	spec_add_column(spec, COLUMN_TYPE_##CType6, #CName6); \
+    spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
+    spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
+    spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
+    spec_add_column(spec, COLUMN_TYPE_##CType3, #CName3); \
+    spec_add_column(spec, COLUMN_TYPE_##CType4, #CName4); \
+    spec_add_column(spec, COLUMN_TYPE_##CType5, #CName5); \
+    spec_add_column(spec, COLUMN_TYPE_##CType6, #CName6); \
     table_update_from_spec(tbl, spec_get_ref(spec)); \
     spec_delete(spec); \
     return tbl; \
 } \
 \
 void TableName##_add(Table* tbl, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2, tdb_type_##CType3 value3, tdb_type_##CType4 value4, tdb_type_##CType5 value5, tdb_type_##CType6 value6) { \
-	table_add(tbl, value0, value1, value2, value3, value4, value5, value6); \
+    table_add(tbl, value0, value1, value2, value3, value4, value5, value6); \
 } \
 \
 void TableName##_insert(Table* tbl, size_t row_ndx, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2, tdb_type_##CType3 value3, tdb_type_##CType4 value4, tdb_type_##CType5 value5, tdb_type_##CType6 value6) { \
-	table_insert(tbl, row_ndx, value0, value1, value2, value3, value4, value5, value6); \
+    table_insert(tbl, row_ndx, value0, value1, value2, value3, value4, value5, value6); \
 } \
 \
 tdb_type_##CType0 TableName##_get_##CName0(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType0(tbl, 0, row_ndx); \
+    return table_get_##CType0(tbl, 0, row_ndx); \
 } \
 void TableName##_set_##CName0(Table* tbl, size_t row_ndx, tdb_type_##CType0 value) { \
-	return table_set_##CType0(tbl, 0, row_ndx, value); \
+    return table_set_##CType0(tbl, 0, row_ndx, value); \
 } \
 tdb_type_##CType1 TableName##_get_##CName1(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType1(tbl, 1, row_ndx); \
+    return table_get_##CType1(tbl, 1, row_ndx); \
 } \
 void TableName##_set_##CName1(Table* tbl, size_t row_ndx, tdb_type_##CType1 value) { \
-	return table_set_##CType1(tbl, 1, row_ndx, value); \
+    return table_set_##CType1(tbl, 1, row_ndx, value); \
 } \
 tdb_type_##CType2 TableName##_get_##CName2(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType2(tbl, 2, row_ndx); \
+    return table_get_##CType2(tbl, 2, row_ndx); \
 } \
 void TableName##_set_##CName2(Table* tbl, size_t row_ndx, tdb_type_##CType2 value) { \
-	return table_set_##CType2(tbl, 2, row_ndx, value); \
+    return table_set_##CType2(tbl, 2, row_ndx, value); \
 } \
 tdb_type_##CType3 TableName##_get_##CName3(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType3(tbl, 3, row_ndx); \
+    return table_get_##CType3(tbl, 3, row_ndx); \
 } \
 void TableName##_set_##CName3(Table* tbl, size_t row_ndx, tdb_type_##CType3 value) { \
-	return table_set_##CType3(tbl, 3, row_ndx, value); \
+    return table_set_##CType3(tbl, 3, row_ndx, value); \
 } \
 tdb_type_##CType4 TableName##_get_##CName4(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType4(tbl, 4, row_ndx); \
+    return table_get_##CType4(tbl, 4, row_ndx); \
 } \
 void TableName##_set_##CName4(Table* tbl, size_t row_ndx, tdb_type_##CType4 value) { \
-	return table_set_##CType4(tbl, 4, row_ndx, value); \
+    return table_set_##CType4(tbl, 4, row_ndx, value); \
 } \
 tdb_type_##CType5 TableName##_get_##CName5(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType5(tbl, 5, row_ndx); \
+    return table_get_##CType5(tbl, 5, row_ndx); \
 } \
 void TableName##_set_##CName5(Table* tbl, size_t row_ndx, tdb_type_##CType5 value) { \
-	return table_set_##CType5(tbl, 5, row_ndx, value); \
+    return table_set_##CType5(tbl, 5, row_ndx, value); \
 } \
 tdb_type_##CType6 TableName##_get_##CName6(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType6(tbl, 6, row_ndx); \
+    return table_get_##CType6(tbl, 6, row_ndx); \
 } \
 void TableName##_set_##CName6(Table* tbl, size_t row_ndx, tdb_type_##CType6 value) { \
-	return table_set_##CType6(tbl, 6, row_ndx, value); \
+    return table_set_##CType6(tbl, 6, row_ndx, value); \
 } \
 
 
@@ -372,74 +372,74 @@ void TableName##_set_##CName6(Table* tbl, size_t row_ndx, tdb_type_##CType6 valu
 Table* TableName##_new(void) { \
     Table *tbl = table_new(); \
     Spec* spec = table_get_spec(tbl); \
-	spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
-	spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
-	spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
-	spec_add_column(spec, COLUMN_TYPE_##CType3, #CName3); \
-	spec_add_column(spec, COLUMN_TYPE_##CType4, #CName4); \
-	spec_add_column(spec, COLUMN_TYPE_##CType5, #CName5); \
-	spec_add_column(spec, COLUMN_TYPE_##CType6, #CName6); \
-	spec_add_column(spec, COLUMN_TYPE_##CType7, #CName7); \
+    spec_add_column(spec, COLUMN_TYPE_##CType0, #CName0); \
+    spec_add_column(spec, COLUMN_TYPE_##CType1, #CName1); \
+    spec_add_column(spec, COLUMN_TYPE_##CType2, #CName2); \
+    spec_add_column(spec, COLUMN_TYPE_##CType3, #CName3); \
+    spec_add_column(spec, COLUMN_TYPE_##CType4, #CName4); \
+    spec_add_column(spec, COLUMN_TYPE_##CType5, #CName5); \
+    spec_add_column(spec, COLUMN_TYPE_##CType6, #CName6); \
+    spec_add_column(spec, COLUMN_TYPE_##CType7, #CName7); \
     table_update_from_spec(tbl, spec_get_ref(spec)); \
     spec_delete(spec); \
     return tbl; \
 } \
 \
 void TableName##_add(Table* tbl, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2, tdb_type_##CType3 value3, tdb_type_##CType4 value4, tdb_type_##CType5 value5, tdb_type_##CType6 value6, tdb_type_##CType7 value7) { \
-	table_add(tbl, value0, value1, value2, value3, value4, value5, value6, value7); \
+    table_add(tbl, value0, value1, value2, value3, value4, value5, value6, value7); \
 } \
 \
 void TableName##_insert(Table* tbl, size_t row_ndx, tdb_type_##CType0 value0, tdb_type_##CType1 value1, tdb_type_##CType2 value2, tdb_type_##CType3 value3, tdb_type_##CType4 value4, tdb_type_##CType5 value5, tdb_type_##CType6 value6, tdb_type_##CType7 value7) { \
-	table_insert(tbl, row_ndx, value0, value1, value2, value3, value4, value5, value6, value7); \
+    table_insert(tbl, row_ndx, value0, value1, value2, value3, value4, value5, value6, value7); \
 } \
 \
 tdb_type_##CType0 TableName##_get_##CName0(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType0(tbl, 0, row_ndx); \
+    return table_get_##CType0(tbl, 0, row_ndx); \
 } \
 void TableName##_set_##CName0(Table* tbl, size_t row_ndx, tdb_type_##CType0 value) { \
-	return table_set_##CType0(tbl, 0, row_ndx, value); \
+    return table_set_##CType0(tbl, 0, row_ndx, value); \
 } \
 tdb_type_##CType1 TableName##_get_##CName1(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType1(tbl, 1, row_ndx); \
+    return table_get_##CType1(tbl, 1, row_ndx); \
 } \
 void TableName##_set_##CName1(Table* tbl, size_t row_ndx, tdb_type_##CType1 value) { \
-	return table_set_##CType1(tbl, 1, row_ndx, value); \
+    return table_set_##CType1(tbl, 1, row_ndx, value); \
 } \
 tdb_type_##CType2 TableName##_get_##CName2(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType2(tbl, 2, row_ndx); \
+    return table_get_##CType2(tbl, 2, row_ndx); \
 } \
 void TableName##_set_##CName2(Table* tbl, size_t row_ndx, tdb_type_##CType2 value) { \
-	return table_set_##CType2(tbl, 2, row_ndx, value); \
+    return table_set_##CType2(tbl, 2, row_ndx, value); \
 } \
 tdb_type_##CType3 TableName##_get_##CName3(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType3(tbl, 3, row_ndx); \
+    return table_get_##CType3(tbl, 3, row_ndx); \
 } \
 void TableName##_set_##CName3(Table* tbl, size_t row_ndx, tdb_type_##CType3 value) { \
-	return table_set_##CType3(tbl, 3, row_ndx, value); \
+    return table_set_##CType3(tbl, 3, row_ndx, value); \
 } \
 tdb_type_##CType4 TableName##_get_##CName4(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType4(tbl, 4, row_ndx); \
+    return table_get_##CType4(tbl, 4, row_ndx); \
 } \
 void TableName##_set_##CName4(Table* tbl, size_t row_ndx, tdb_type_##CType4 value) { \
-	return table_set_##CType4(tbl, 4, row_ndx, value); \
+    return table_set_##CType4(tbl, 4, row_ndx, value); \
 } \
 tdb_type_##CType5 TableName##_get_##CName5(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType5(tbl, 5, row_ndx); \
+    return table_get_##CType5(tbl, 5, row_ndx); \
 } \
 void TableName##_set_##CName5(Table* tbl, size_t row_ndx, tdb_type_##CType5 value) { \
-	return table_set_##CType5(tbl, 5, row_ndx, value); \
+    return table_set_##CType5(tbl, 5, row_ndx, value); \
 } \
 tdb_type_##CType6 TableName##_get_##CName6(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType6(tbl, 6, row_ndx); \
+    return table_get_##CType6(tbl, 6, row_ndx); \
 } \
 void TableName##_set_##CName6(Table* tbl, size_t row_ndx, tdb_type_##CType6 value) { \
-	return table_set_##CType6(tbl, 6, row_ndx, value); \
+    return table_set_##CType6(tbl, 6, row_ndx, value); \
 } \
 tdb_type_##CType7 TableName##_get_##CName7(Table* tbl, size_t row_ndx) { \
-	return table_get_##CType7(tbl, 7, row_ndx); \
+    return table_get_##CType7(tbl, 7, row_ndx); \
 } \
 void TableName##_set_##CName7(Table* tbl, size_t row_ndx, tdb_type_##CType7 value) { \
-	return table_set_##CType7(tbl, 7, row_ndx, value); \
+    return table_set_##CType7(tbl, 7, row_ndx, value); \
 } \
 
 

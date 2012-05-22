@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -24,7 +24,12 @@
 #include <algorithm>
 #include <ostream>
 
+#include "meta.hpp"
+
 namespace tightdb {
+
+
+template<class> class BasicTable;
 
 
 /**
@@ -43,9 +48,9 @@ namespace tightdb {
  *
  * \endcode
  *
- * \note When a top-level table is destroyed, all "smart" table
- * references obtained from it, or from any of its subtables, are
- * invalidated.
+ * \note A top-level table (explicitely created or obtained from a
+ * group) may not be destroyed until all "smart" table references
+ * obtained from it, or from any of its subtables, are destroyed.
  */
 template<class T> class BasicTableRef {
 public:
@@ -100,7 +105,15 @@ public:
 
 private:
     typedef T* BasicTableRef::*unspecified_bool_type;
-    typedef typename T::template Accessors<T>::Row RowAccessor;
+
+    template<class> struct GetRowAccType { typedef void type; };
+    template<class Spec> struct GetRowAccType<BasicTable<Spec> > {
+        typedef typename BasicTable<Spec>::RowAccessor type;
+    };
+    template<class Spec> struct GetRowAccType<const BasicTable<Spec> > {
+        typedef typename BasicTable<Spec>::ConstRowAccessor type;
+    };
+    typedef typename GetRowAccType<T>::type RowAccessor;
 
 public:
     /**
@@ -110,18 +123,17 @@ public:
      */
     operator unspecified_bool_type() const;
 
+    /**
+     * Same as (*this)[i].
+     */
     RowAccessor operator[](std::size_t i) const { return (*m_table)[i]; }
 
 private:
     friend class ColumnSubtableParent;
     friend class Table;
-    template<class> friend class BasicTable;
-    template<class> friend class BasicTableRef;
+    template<class> friend class BasicTable; // FIXME: Only BasicTable<T::Spec>;
+    template<class> friend class BasicTableRef; // FIXME: Only BasicTableRef<const T>;
 
-    template<class U, class V> friend
-    BasicTableRef<U> static_table_cast(const BasicTableRef<V>&);
-    template<class U, class V> friend
-    BasicTableRef<U> dynamic_table_cast(const BasicTableRef<V>&);
     template<class C, class U, class V> friend
     std::basic_ostream<C,U>& operator<<(std::basic_ostream<C,U>&, const BasicTableRef<V>&);
 
@@ -140,10 +152,6 @@ private:
  * in particular, its reference count.
  */
 template<class T> inline void swap(BasicTableRef<T>&, BasicTableRef<T>&);
-
-template<class T, class U> BasicTableRef<T> static_table_cast(const BasicTableRef<U>&);
-
-template<class T, class U> BasicTableRef<T> dynamic_table_cast(const BasicTableRef<U>&);
 
 template<class C, class T, class U>
 std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BasicTableRef<U>&);
@@ -210,16 +218,6 @@ template<class T> inline void BasicTableRef<T>::unbind()
 template<class T> inline void swap(BasicTableRef<T>& r, BasicTableRef<T>& s)
 {
     r.swap(s);
-}
-
-template<class T, class U> BasicTableRef<T> static_table_cast(const BasicTableRef<U>& t)
-{
-    return BasicTableRef<T>(static_cast<T*>(t.m_table));
-}
-
-template<class T, class U> BasicTableRef<T> dynamic_table_cast(const BasicTableRef<U>& t)
-{
-    return BasicTableRef<T>(dynamic_cast<T*>(t.m_table));
 }
 
 template<class C, class T, class U>

@@ -141,7 +141,8 @@ void AdaptiveStringColumn::Resize(size_t ndx)
 const char* AdaptiveStringColumn::Get(size_t ndx) const
 {
     assert(ndx < Size());
-    return TreeGet<const char*, AdaptiveStringColumn>(ndx);
+    return m_array->ColumnStringGet(ndx);
+    //return TreeGet<const char*, AdaptiveStringColumn>(ndx);
 }
 
 bool AdaptiveStringColumn::Set(size_t ndx, const char* value)

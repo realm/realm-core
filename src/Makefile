@@ -7,85 +7,97 @@
 #
 
 ROOT = ..
+
+INC_FLAGS     = -I. -I../include
+INC_FLAGS_ABS = -I$(abspath .) -I$(abspath ../include)
+
+SOURCES      = $(wildcard *.c *.cpp)
+LIB_SHARED   = libtightdb.so
+LIB_STATIC   = libtightdb.a
+LIB_DEBUG    = libtightdb_d.a
+LIB_COVERAGE = libtightdb_c.a
+TARGETS = $(LIB_STATIC) $(LIB_SHARED) $(LIB_DEBUG) $(LIB_COVERAGE)
+
+all: $(LIB_SHARED)
+.PHONY: all
+
+static: $(LIB_STATIC)
+.PHONY: static
+
+debug: $(LIB_DEBUG)
+.PHONY: debug
+
+cover: $(LIB_COVERAGE)
+.PHONY: cover
+
+
+
 CONFIG_MK = $(ROOT)/config.mk
 include $(CONFIG_MK)
 
-CXXFLAGS           ?= $(CXXFLAGS_COMMON)
-CXXFLAGS_COMMON_2   = -pthread -fPIC -DPIC $(CXXFLAGS)
-CXXFLAGS_OPTIMIZE  += $(CXXFLAGS_COMMON_2) -I. -I../include
-CXXFLAGS_DEBUG     += $(CXXFLAGS_COMMON_2) -I. -I../include
-CXXFLAGS_COVERAGE  += $(CXXFLAGS_COMMON_2) -I$(abspath .)  -I$(abspath ../include)
+STATIC_OBJECTS = $(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(SOURCES)))
+SHARED_OBJECTS   = $(STATIC_OBJECTS:.o=.dyn.o)
+DEBUG_OBJECTS    = $(STATIC_OBJECTS:.o=.dbg.o)
+COVERAGE_OBJECTS = $(STATIC_OBJECTS:.o=.cov.o)
+OBJECTS = $(STATIC_OBJECTS) $(SHARED_OBJECTS) $(DEBUG_OBJECTS) $(COVERAGE_OBJECTS)
 
-GEN_HEADERS         = ../include/tightdb.hpp
-SOURCES             = $(wildcard *.cpp)
-LIB_SHARED          = libtightdb.so
-LIB_STATIC          = libtightdb.a
-LIB_STATIC_DEBUG    = libtightdb_d.a
-LIB_STATIC_COVERAGE = libtightdb_c.a
+$(OBJECTS): Makefile $(CONFIG_MK)
 
-
-TARGETS = $(LIB_SHARED) $(LIB_STATIC)
-DEBUG_TARGETS = $(LIB_STATIC_DEBUG)
-COVER_TARGETS = $(LIB_STATIC_COVERAGE)
-
-OBJECTS = $(SOURCES:.cpp=.o)
-DEBUG_OBJECTS = $(SOURCES:.cpp=.dbg.o)
-COVER_OBJECTS = $(SOURCES:.cpp=.cov.o)
-
-
-all: $(TARGETS) $(GEN_HEADERS)
-.PHONY: all
-
-debug: $(DEBUG_TARGETS) $(GEN_HEADERS)
-.PHONY: debug
-
-cover: $(COVER_TARGETS) $(GEN_HEADERS)
-.PHONY: cover
-
-clean:
-	$(RM) *.d *.o *.gcno *.gcda $(TARGETS) $(DEBUG_TARGETS) $(COVER_TARGETS)
-.PHONY: clean
-
-
-$(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): Makefile $(CONFIG_MK)
-
-$(GEN_HEADERS): Makefile $(CONFIG_MK)
-$(OBJECTS) $(DEBUG_OBJECTS) $(COVER_OBJECTS): $(GEN_HEADERS)
 
 
 # Code generation
-../include/tightdb.hpp: tightdb-gen.sh tightdb-gen.py
-	$(SHELL) tightdb-gen.sh ../include/tightdb.hpp
+TIGHTDB_HPP = ../include/tightdb.hpp
+$(TIGHTDB_HPP): tightdb-gen.sh tightdb-gen.py Makefile $(CONFIG_MK)
+	$(SHELL) tightdb-gen.sh $(TIGHTDB_HPP)
+$(OBJECTS): $(TIGHTDB_HPP)
 
 
-# Shared library
 
-$(LIB_SHARED): $(OBJECTS)
-# FIXME: add -Wl,-soname and -Wl,-rpath
-	$(CXX) -shared $(OBJECTS) -o $@
-
-
-# Static library
-
-$(LIB_STATIC): $(OBJECTS)
-	ar crs $@ $(OBJECTS)
-
-$(LIB_STATIC_DEBUG): $(DEBUG_OBJECTS)
-	ar crs $@ $(DEBUG_OBJECTS)
-
-$(LIB_STATIC_COVERAGE): $(COVER_OBJECTS)
-	ar crs $@ $(COVER_OBJECTS)
+clean:
+	$(RM) *.d *.o *.gcno *.gcda $(TARGETS)
+.PHONY: clean
 
 
-# Compiling + dependency generation
+# Library creation
+
+$(LIB_STATIC): $(STATIC_OBJECTS)
+	$(AR) $(ARFLAGS) $@ $(STATIC_OBJECTS)
+
+$(LIB_SHARED): $(SHARED_OBJECTS)
+        # FIXME: add -Wl,-soname and -Wl,-rpath
+	$(LD_SHARED) $(SHARED_OBJECTS) -o $@
+
+$(LIB_DEBUG): $(DEBUG_OBJECTS)
+	$(AR) $(ARFLAGS) $@ $(DEBUG_OBJECTS)
+
+$(LIB_COVERAGE): $(COVERAGE_OBJECTS)
+	$(AR) $(ARFLAGS) $@ $(COVERAGE_OBJECTS)
+
+
+# Compiling + automatic dependencies
+
+%.o: %.c
+	$(CC_STATIC) $(CFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS_OPTIMIZE) -MMD -MP -c $< -o $@
+	$(CXX_STATIC) $(CXXFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
+
+%.dyn.o: %.c
+	$(CC_SHARED) $(CFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
+
+%.dyn.o: %.cpp
+	$(CXX_SHARED) $(CXXFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
+
+%.dbg.o: %.c
+	$(CC_DEBUG) $(CFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
 
 %.dbg.o: %.cpp
-	$(CXX) $(CXXFLAGS_DEBUG) -MMD -MP -c $< -o $@
+	$(CXX_DEBUG) $(CXXFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
+
+%.cov.o: %.c
+	$(CC_COVERAGE) $(CFLAGS) $(INC_FLAGS_ABS) -MMD -MP -c $(abspath $<) -o $(abspath $@)
 
 %.cov.o: %.cpp
-	$(CXX) --coverage $(CXXFLAGS_COVERAGE) -MMD -MP -c $(abspath $<) -o $(abspath $@)
+	$(CXX_COVERAGE) $(CXXFLAGS) $(INC_FLAGS_ABS) -MMD -MP -c $(abspath $<) -o $(abspath $@)
 
--include $(SOURCES:.cpp=.d) $(SOURCES:.cpp=.dbg.d) $(SOURCES:.cpp=.cov.d)
+-include $(OBJECTS:.o=.d)

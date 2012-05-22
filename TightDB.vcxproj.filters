@@ -258,6 +258,21 @@
     <ClInclude Include="src\utilities.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
+    <ClInclude Include="src\c-tightdb.h">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\table_accessors.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\table_view_basic.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tuple.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\type_list.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">

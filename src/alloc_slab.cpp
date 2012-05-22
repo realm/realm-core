@@ -59,8 +59,8 @@ SlabAlloc::~SlabAlloc()
 {
 #ifdef _DEBUG
     if (!IsAllFree()) {
-        m_slabs.Print();
-        m_freeSpace.Print();
+        m_slabs.print();
+        m_freeSpace.print();
         assert(false);
     }
 #endif //_DEBUG
@@ -151,7 +151,8 @@ MemRef SlabAlloc::Alloc(size_t size)
 
 void SlabAlloc::Free(size_t ref, void* p)
 {
-    if (IsReadOnly(ref)) return;
+    // Free space in read only segment is tracked separately
+    FreeSpace& freeSpace = IsReadOnly(ref) ? m_freeReadOnly : m_freeSpace;
 
     // Get size from segment
     const size_t size = GetSizeFromHeader(p);
@@ -165,29 +166,29 @@ void SlabAlloc::Free(size_t ref, void* p)
 #endif //_DEBUG
 
     // Check if we can merge with start of free block
-    const size_t n = m_freeSpace.cols().ref.find_first(refEnd);
+    const size_t n = freeSpace.cols().ref.find_first(refEnd);
     if (n != (size_t)-1) {
         // No consolidation over slab borders
         if (m_slabs.cols().offset.find_first(refEnd) == (size_t)-1) {
-            m_freeSpace[n].ref = ref;
-            m_freeSpace[n].size += size;
+            freeSpace[n].ref = ref;
+            freeSpace[n].size += size;
             isMerged = true;
         }
     }
 
     // Check if we can merge with end of free block
     if (m_slabs.cols().offset.find_first(ref) == (size_t)-1) { // avoid slab borders
-        const size_t count = m_freeSpace.size();
+        const size_t count = freeSpace.size();
         for (size_t i = 0; i < count; ++i) {
-            FreeSpace::Cursor c = m_freeSpace[i];
+            FreeSpace::Cursor c = freeSpace[i];
 
         //  printf("%d %d", c.ref, c.size);
 
             const size_t end = TO_REF(c.ref + c.size);
             if (ref == end) {
                 if (isMerged) {
-                    c.size += m_freeSpace[n].size;
-                    m_freeSpace.remove(n);
+                    c.size += freeSpace[n].size;
+                    freeSpace.remove(n);
                 }
                 else c.size += size;
 
@@ -197,7 +198,7 @@ void SlabAlloc::Free(size_t ref, void* p)
     }
 
     // Else just add to freelist
-    if (!isMerged) m_freeSpace.add(ref, size);
+    if (!isMerged) freeSpace.add(ref, size);
 }
 
 MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
@@ -292,7 +293,7 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
     m_mapfile = hMapFile;
 #else
     // Open file
-    m_fd = open(path, readOnly ? O_RDONLY : O_RDWR|O_CREAT);
+    m_fd = open(path, readOnly ? O_RDONLY : O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return false;
 
     // Get size
@@ -367,7 +368,7 @@ void SlabAlloc::FreeAll(size_t filesize)
 {
     assert(filesize >= m_baseline);
     assert((filesize & 0x7) == 0); // 64bit alignment
-  
+
 #if !defined(_MSC_VER) // write persistence
     // If the file size have changed, we need to remap the readonly buffer
     if (filesize != m_baseline) {
@@ -375,7 +376,7 @@ void SlabAlloc::FreeAll(size_t filesize)
         munmap(m_shared, m_baseline);
         void* const p = mmap(0, filesize, PROT_READ, MAP_SHARED, m_fd, 0);
         assert(p);
-        
+
         m_shared   = (char*)p;
         m_baseline = filesize;
     }

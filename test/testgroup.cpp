@@ -52,7 +52,7 @@ TEST(Group_Serialize0)
     CHECK(fromDisk.is_valid());
 
     // Create new table in group
-    BasicTableRef<TestTableGroup> t = fromDisk.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(0, t->size());
@@ -60,7 +60,7 @@ TEST(Group_Serialize0)
     // Modify table
     t->add("Test",  1, true, Wed);
 
-    CHECK_EQUAL("Test", (const char*)t[0].first);
+    CHECK_EQUAL("Test", static_cast<const char*>(t[0].first));
     CHECK_EQUAL(1,      t[0].second);
     CHECK_EQUAL(true,   t[0].third);
     CHECK_EQUAL(Wed,    t[0].fourth);
@@ -78,7 +78,7 @@ TEST(Group_Serialize1)
 {
     // Create group with one table
     Group toDisk;
-    BasicTableRef<TestTableGroup> table = toDisk.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref table = toDisk.get_table<TestTableGroup>("test");
     table->add("",  1, true, Wed);
     table->add("", 15, true, Wed);
     table->add("", 10, true, Wed);
@@ -91,7 +91,7 @@ TEST(Group_Serialize1)
     table->add("",  9, true, Wed);
 
 #ifdef _DEBUG
-    toDisk.verify();
+    toDisk.Verify();
 #endif //_DEBUG
 
     // Delete old file if there
@@ -103,14 +103,14 @@ TEST(Group_Serialize1)
     // Load the table
     Group fromDisk("table_test.tbl");
     CHECK(fromDisk.is_valid());
-    BasicTableRef<TestTableGroup> t = fromDisk.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table->Compare(*t));
+    CHECK(table->compare(*t));
 #endif
 
     // Modify both tables
@@ -123,9 +123,9 @@ TEST(Group_Serialize1)
 
 #ifdef _DEBUG
     // Verify that both changed correctly
-    CHECK(table->Compare(*t));
-    toDisk.verify();
-    fromDisk.verify();
+    CHECK(table->compare(*t));
+    toDisk.Verify();
+    fromDisk.Verify();
 #endif //_DEBUG
 }
 
@@ -141,17 +141,17 @@ TEST(Group_Serialize2)
 {
     // Create group with two tables
     Group toDisk;
-    BasicTableRef<TestTableGroup> table1 = toDisk.get_table<TestTableGroup>("test1");
+    TestTableGroup::Ref table1 = toDisk.get_table<TestTableGroup>("test1");
     table1->add("",  1, true, Wed);
     table1->add("", 15, true, Wed);
     table1->add("", 10, true, Wed);
 
-    BasicTableRef<TestTableGroup> table2 = toDisk.get_table<TestTableGroup>("test2");
+    TestTableGroup::Ref table2 = toDisk.get_table<TestTableGroup>("test2");
     table2->add("hey",  0, true, Tue);
     table2->add("hello", 3232, false, Sun);
 
 #ifdef _DEBUG
-    toDisk.verify();
+    toDisk.Verify();
 #endif //_DEBUG
 
     // Delete old file if there
@@ -163,17 +163,17 @@ TEST(Group_Serialize2)
     // Load the tables
     Group fromDisk("table_test.tbl");
     CHECK(fromDisk.is_valid());
-    BasicTableRef<TestTableGroup> t1 = fromDisk.get_table<TestTableGroup>("test1");
-    BasicTableRef<TestTableGroup> t2 = fromDisk.get_table<TestTableGroup>("test2");
+    TestTableGroup::Ref t1 = fromDisk.get_table<TestTableGroup>("test1");
+    TestTableGroup::Ref t2 = fromDisk.get_table<TestTableGroup>("test2");
     (void)t2;
     (void)t1;
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table1->Compare(*t1));
-    CHECK(table2->Compare(*t2));
-    toDisk.verify();
-    fromDisk.verify();
+    CHECK(table1->compare(*t1));
+    CHECK(table2->compare(*t2));
+    toDisk.Verify();
+    fromDisk.Verify();
 #endif //_DEBUG
 }
 
@@ -181,12 +181,12 @@ TEST(Group_Serialize3)
 {
     // Create group with one table (including long strings
     Group toDisk;
-    BasicTableRef<TestTableGroup> table = toDisk.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref table = toDisk.get_table<TestTableGroup>("test");
     table->add("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1",  1, true, Wed);
     table->add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
 #ifdef _DEBUG
-    toDisk.verify();
+    toDisk.Verify();
 #endif //_DEBUG
 
     // Delete old file if there
@@ -198,15 +198,15 @@ TEST(Group_Serialize3)
     // Load the table
     Group fromDisk("table_test.tbl");
     CHECK(fromDisk.is_valid());
-    BasicTableRef<TestTableGroup> t = fromDisk.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
     (void)t;
 
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table->Compare(*t));
-    toDisk.verify();
-    fromDisk.verify();
+    CHECK(table->compare(*t));
+    toDisk.Verify();
+    fromDisk.Verify();
 #endif //_DEBUG}
 }
 
@@ -214,7 +214,7 @@ TEST(Group_Serialize_Men)
 {
     // Create group with one table
     Group toMem;
-    BasicTableRef<TestTableGroup> table = toMem.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref table = toMem.get_table<TestTableGroup>("test");
     table->add("",  1, true, Wed);
     table->add("", 15, true, Wed);
     table->add("", 10, true, Wed);
@@ -227,7 +227,7 @@ TEST(Group_Serialize_Men)
     table->add("",  9, true, Wed);
 
 #ifdef _DEBUG
-    toMem.verify();
+    toMem.Verify();
 #endif //_DEBUG
 
     // Serialize to memory (we now own the buffer)
@@ -237,7 +237,7 @@ TEST(Group_Serialize_Men)
     // Load the table
     Group fromMem(buffer, len);
     CHECK(fromMem.is_valid());
-    BasicTableRef<TestTableGroup> t = fromMem.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
@@ -245,9 +245,9 @@ TEST(Group_Serialize_Men)
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table->Compare(*t));
-    toMem.verify();
-    fromMem.verify();
+    CHECK(table->compare(*t));
+    toMem.Verify();
+    fromMem.Verify();
 #endif //_DEBUG
 }
 
@@ -255,7 +255,7 @@ TEST(Group_Serialize_Optimized)
 {
     // Create group with one table
     Group toMem;
-    BasicTableRef<TestTableGroup> table = toMem.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref table = toMem.get_table<TestTableGroup>("test");
 
     for (size_t i = 0; i < 5; ++i) {
         table->add("abd",     1, true, Mon);
@@ -268,7 +268,7 @@ TEST(Group_Serialize_Optimized)
     table->optimize();
 
 #ifdef _DEBUG
-    toMem.verify();
+    toMem.Verify();
 #endif //_DEBUG
 
     // Serialize to memory (we now own the buffer)
@@ -278,13 +278,13 @@ TEST(Group_Serialize_Optimized)
     // Load the table
     Group fromMem(buffer, len);
     CHECK(fromMem.is_valid());
-    BasicTableRef<TestTableGroup> t = fromMem.get_table<TestTableGroup>("test");
+    TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
 
     // Verify that original values are there
 #ifdef _DEBUG
-    CHECK(table->Compare(*t));
+    CHECK(table->compare(*t));
 #endif
 
     // Add a row with a known (but unique) value
@@ -294,8 +294,8 @@ TEST(Group_Serialize_Optimized)
     CHECK_EQUAL(table->size()-1, res);
 
 #ifdef _DEBUG
-    toMem.verify();
-    fromMem.verify();
+    toMem.Verify();
+    fromMem.Verify();
 #endif //_DEBUG
 }
 
@@ -370,7 +370,7 @@ TEST(Group_Persist) {
     db.commit();
 
 #ifdef _DEBUG
-    db.verify();
+    db.Verify();
 #endif //_DEBUG
 
     CHECK_EQUAL(6, table->get_column_count());
@@ -391,7 +391,7 @@ TEST(Group_Persist) {
     db.commit();
 
 #ifdef _DEBUG
-    db.verify();
+    db.Verify();
 #endif //_DEBUG
 
     CHECK_EQUAL(6, table->get_column_count());

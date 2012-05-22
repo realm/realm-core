@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,27 +17,31 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_TABLE_H
-#define __TIGHTDB_TABLE_H
+#ifndef TIGHTDB_TABLE_HPP
+#define TIGHTDB_TABLE_HPP
 
 #include "../src/column_fwd.hpp"
 #include "../src/table_ref.hpp"
 #include "../src/spec.hpp"
 #include "../src/mixed.hpp"
-#include "../src/table_view.hpp"
 
 namespace tightdb {
+
 using std::size_t;
 using std::time_t;
+
+class TableView;
+class ConstTableView;
+
 
 /**
  * The Table class is non-polymorphic, that is, it has no virtual
  * functions. This is important because it ensures that there is no
  * run-time distinction between a Table instance and an instance of
- * any variation of basic_table<T>, and this, in turn, makes it valid
- * to cast a pointer from Table to basic_table<T> even when the
+ * any variation of BasicTable<T>, and this, in turn, makes it valid
+ * to cast a pointer from Table to BasicTable<T> even when the
  * instance is constructed as a Table. Of couse, this also assumes
- * that basic_table<> is non-polymorphic, has no destructor, and adds
+ * that BasicTable<> is non-polymorphic, has no destructor, and adds
  * no extra data members.
  */
 class Table {
@@ -47,12 +51,12 @@ public:
     ~Table();
 
     // Schema handling (see also Spec.hpp)
-    Spec&       get_spec();          
+    Spec&       get_spec();
     const Spec& get_spec() const;
     void        update_from_spec(); // Must not be called for a table with shared schema
                 // Add a column dynamically
     size_t      add_column(ColumnType type, const char* name);
-    
+
     // Table size and deletion
     bool        is_empty() const {return m_size == 0;}
     size_t      size() const {return m_size;}
@@ -65,7 +69,7 @@ public:
     ColumnType  get_column_type(size_t column_ndx) const;
 
     // Row handling
-    size_t      add_empty_row(size_t num_of_rows = 1);
+    size_t      add_empty_row();
     void        remove(size_t row_ndx);
     void        remove_last() {if (!is_empty()) remove(m_size-1);}
 
@@ -97,8 +101,9 @@ public:
     void set_string(size_t column_ndx, size_t row_ndx, const char* value);
     void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
+    void add_int(size_t column_ndx, int64_t value);
 
-    // Sub-tables (works both on table- and mixed columns)
+    // Sub-tables (works on columns whose type is either 'subtable' or 'mixed', for a value in a mixed column that is not a subtable, get_subtable() returns null, get_subtable_size() returns zero, and clear_subtable() does nothing.)
     TableRef        get_subtable(size_t column_ndx, size_t row_ndx);
     ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;
@@ -114,16 +119,23 @@ public:
     int64_t minimum(size_t column_ndx) const;
 
     // Searching
-    size_t  find_first_int(size_t column_ndx, int64_t value) const;
-    size_t  find_first_bool(size_t column_ndx, bool value) const;
-    size_t  find_first_date(size_t column_ndx, time_t value) const;
-    size_t  find_first_string(size_t column_ndx, const char* value) const;
-    void    find_all_int(TableView& tv, size_t column_ndx, int64_t value);
-    void    find_all_bool(TableView& tv, size_t column_ndx, bool value);
-    void    find_all_date(TableView& tv, size_t column_ndx, time_t value);
-    void    find_all_string(TableView& tv, size_t column_ndx, const char *value);
-    void    sorted(TableView& tv, size_t column_ndx, bool ascending=true) const;
-    
+    size_t         find_first_int(size_t column_ndx, int64_t value) const;
+    size_t         find_first_bool(size_t column_ndx, bool value) const;
+    size_t         find_first_date(size_t column_ndx, time_t value) const;
+    size_t         find_first_string(size_t column_ndx, const char* value) const;
+    size_t         find_pos_int(size_t column_ndx, int64_t value) const;
+    TableView      find_all_int(size_t column_ndx, int64_t value);
+    ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
+    TableView      find_all_bool(size_t column_ndx, bool value);
+    ConstTableView find_all_bool(size_t column_ndx, bool value) const;
+    TableView      find_all_date(size_t column_ndx, time_t value);
+    ConstTableView find_all_date(size_t column_ndx, time_t value) const;
+    TableView      find_all_string(size_t column_ndx, const char* value);
+    ConstTableView find_all_string(size_t column_ndx, const char* value) const;
+
+    TableView      sorted(size_t column_ndx, bool ascending=true);
+    ConstTableView sorted(size_t column_ndx, bool ascending=true) const;
+
     // Optimizing
     void optimize();
 
@@ -132,15 +144,15 @@ public:
 
     // Get a reference to this table
     TableRef get_table_ref() { return TableRef(this); }
-    ConstTableRef get_table_ref() const { return ConstTableRef(this); } 
+    ConstTableRef get_table_ref() const { return ConstTableRef(this); }
 
     // Debug
 #ifdef _DEBUG
-    bool Compare(const Table& c) const;
-    void verify() const;
-    void ToDot(std::ostream& out, const char* title=NULL) const;
-    void Print() const;
-    MemStats Stats() const;
+    bool compare(const Table& c) const;
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void to_dot(std::ostream& out, const char* title=NULL) const;
+    void print() const;
+    MemStats stats() const;
 #endif //_DEBUG
 
     // todo, note, these three functions have been protected
@@ -150,7 +162,8 @@ public:
     class Parent;
 
 protected:
-     // Direct Column access
+    // FIXME: Most of the things that are protected here, could instead be private
+    // Direct Column access
     Column& GetColumn(size_t column_ndx);
     const Column& GetColumn(size_t column_ndx) const;
     AdaptiveStringColumn& GetColumnString(size_t column_ndx);
@@ -164,12 +177,6 @@ protected:
     ColumnMixed& GetColumnMixed(size_t column_ndx);
     const ColumnMixed& GetColumnMixed(size_t column_ndx) const;
 
-
-    friend class Group;
-    friend class Query;
-    friend class ColumnMixed;
-    friend Table* TableHelper_get_subtable_ptr(Table* t, size_t col_idx, size_t row_idx);
-    friend const Table* TableHelper_get_const_subtable_ptr(const Table* t, size_t col_idx, size_t row_idx);
 
     /**
      * Construct a top-level table with independent schema from ref.
@@ -242,17 +249,9 @@ protected:
      */
     const Table *get_subtable_ptr(size_t col_idx, size_t row_idx) const;
 
-    template<class T> static BasicTableRef<T> make_ref(T* p) { return BasicTableRef<T>(p); }
-
 private:
     Table(Table const &); // Disable copy construction
     Table &operator=(Table const &); // Disable copying assignment
-
-    template<class> struct Accessors { typedef void Row; }; // FIXME: Here to support BasicTableRef::operator[], but should be eliminated.
-    template<class> friend class BasicTableRef;
-    friend class ColumnSubtableParent;
-    friend void TableHelper_unbind(Table* t);
-    friend void TableHelper_bind(Table* t);
 
     mutable size_t m_ref_count;
     void bind_ref() const { ++m_ref_count; }
@@ -268,7 +267,19 @@ private:
     static size_t create_table(Allocator&);
 
     // Experimental
-    void    find_all_hamming(TableView& tv, size_t column_ndx, uint64_t value, size_t max);
+    TableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max);
+    ConstTableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const;
+
+    friend class Group;
+    friend class Query;
+    friend class ColumnMixed;
+    template<class> friend class BasicTableRef; // FIXME: Only BasicTableRef<T>::bind() and BasicTableRef<T>::unbind()
+    friend class ColumnSubtableParent;
+
+    // These are used in the C API to gain access to the raw table pointers of subtables.
+    friend Table* TableHelper_get_subtable_ptr(Table* t, size_t col_idx, size_t row_idx);
+    friend const Table* TableHelper_get_const_subtable_ptr(const Table* t, size_t col_idx, size_t row_idx);
+    friend void TableHelper_unbind(const Table* t);
 };
 
 
@@ -316,4 +327,4 @@ inline ConstTableRef Table::get_subtable(size_t column_ndx, size_t row_ndx) cons
 
 } // namespace tightdb
 
-#endif // TIGHTDB_TABLE_H
+#endif // TIGHTDB_TABLE_HPP

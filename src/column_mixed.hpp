@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -73,10 +73,17 @@ public:
     BinaryData get_binary(size_t ndx) const;
 
     /**
-     * The returned table pointer must always end up being wrapped in
-     * an instance of BasicTableRef.
+     * The returned size is zero if the specified row does not contain
+     * a subtable.
      */
-    Table* get_subtable_ptr(std::size_t subtable_ndx) const;
+    size_t get_subtable_size(std::size_t row_idx) const;
+
+    /**
+     * Returns null if the specified row does not contain a subtable,
+     * otherwise the returned table pointer must end up being wrapped
+     * by an instance of BasicTableRef.
+     */
+    Table* get_subtable_ptr(std::size_t row_idx) const;
 
     void SetInt(size_t ndx, int64_t value);
     void set_bool(size_t ndx, bool value);
@@ -104,7 +111,7 @@ public:
     size_t GetRef() const {return m_array->GetRef();}
 
 #ifdef _DEBUG
-    void verify() const;
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void ToDot(std::ostream& out, const char* title) const;
 #endif //_DEBUG
 
@@ -153,13 +160,28 @@ inline ColumnMixed::ColumnMixed(size_t ref, ArrayParent* parent, size_t pndx,
     Create(ref, parent, pndx, alloc, tab);
 }
 
-inline Table* ColumnMixed::get_subtable_ptr(size_t subtable_ndx) const
+inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const
 {
-    assert(subtable_ndx < m_types->Size());
-    assert(m_types->Get(subtable_ndx) == COLUMN_TYPE_TABLE);
-    return m_refs->get_subtable_ptr(subtable_ndx);
+    // FIXME: If the table object is cached, it is possible to get the
+    // size from it. Maybe it is faster in general to check for the
+    // the presence of the cached object and use it when available.
+    assert(row_idx < m_types->Size());
+    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
+    const size_t top_ref = m_refs->GetAsRef(row_idx);
+    const size_t columns_ref = Array(top_ref, NULL, 0, m_refs->GetAllocator()).GetAsRef(1);
+    const Array columns(columns_ref, NULL, 0, m_refs->GetAllocator());
+    if (columns.is_empty()) return 0;
+    const size_t first_col_ref = columns.GetAsRef(0);
+    return get_size_from_ref(first_col_ref, m_refs->GetAllocator());
 }
 
+inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
+{
+    assert(row_idx < m_types->Size());
+    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
+    return m_refs->get_subtable_ptr(row_idx);
 }
+
+} // namespace tightdb
 
 #endif //__TDB_COLUMN_MIXED__

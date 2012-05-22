@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -35,26 +35,26 @@ public:
     SlabAlloc();
     ~SlabAlloc();
 
-    bool SetShared(const char* path, bool readOnly=true);
-    bool SetSharedBuffer(const char* buffer, size_t len);
+    bool   SetShared(const char* path, bool readOnly=true);
+    bool   SetSharedBuffer(const char* buffer, size_t len);
 
     MemRef Alloc(size_t size);
     MemRef ReAlloc(size_t ref, void* p, size_t size);
-    void Free(size_t ref, void* p);
-    void* Translate(size_t ref) const;
+    void   Free(size_t ref, void* p);
+    void*  Translate(size_t ref) const;
 
-    bool IsReadOnly(size_t ref) const;
+    bool   IsReadOnly(size_t ref) const;
     size_t GetTopRef() const;
     size_t GetTotalSize() const;
 
-    bool CanPersist() const;
+    bool   CanPersist() const;
     size_t GetFileLen() const {return m_baseline;}
-    void FreeAll(size_t filesize);
+    void   FreeAll(size_t filesize);
 
 #ifndef _MSC_VER
-    int GetFileDescriptor() {return m_fd;}
+    int    GetFileDescriptor() {return m_fd;}
 #else
-    void* GetFileDescriptor() {return m_fd;}
+    void*  GetFileDescriptor() {return m_fd;}
 #endif
 
 #ifdef _DEBUG
@@ -79,6 +79,7 @@ private:
     size_t    m_baseline;
     Slabs     m_slabs;
     FreeSpace m_freeSpace;
+    FreeSpace m_freeReadOnly;
 
 #ifndef _MSC_VER
     int       m_fd;

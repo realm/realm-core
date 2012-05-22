@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -137,13 +137,14 @@ public:
 
 template <class T, class C, class F> class NODE: public ParentNode {
 public:
-    NODE(T v, size_t column) : m_value(v), m_column_id(column) {m_child = 0;}
+    NODE(T v, size_t column) : m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v), m_column_id(column) {m_child = 0;}
     ~NODE() {delete m_child; }
 
     void Init(const Table& table)
     {
         m_table = &table;
         m_column = (C*)&table.GetColumnBase(m_column_id);
+        m_leaf_end = 0;
 
         if (m_child)m_child->Init(table);
     }
@@ -153,9 +154,24 @@ public:
         assert(m_table);
 
         for (size_t s = start; s < end; ++s) {
-            s = m_column->template TreeFind<T, C, F>(m_value, s, end);
-            if (s == (size_t)-1)
-                s = end;
+            // Cache internal leafs
+            if (s >= m_leaf_end) {
+                m_column->GetBlock(s, m_array, m_leaf_start);
+                const size_t leaf_size = m_array.Size();
+                m_leaf_end = m_leaf_start + leaf_size;
+                const size_t e = end - m_leaf_start;
+                m_local_end = leaf_size < e ? leaf_size : e;
+            }
+
+            // Do search directly on cached leaf array
+            s = m_array.Query<F>(m_value, s - m_leaf_start, m_local_end);
+
+            if (s == (size_t)-1) {
+                s = m_leaf_end;
+                continue;
+            }
+            else
+                s += m_leaf_start;
 
             if (m_child == 0)
                 return s;
@@ -172,10 +188,13 @@ public:
 
 protected:
     C* m_column;
+    Array m_array;
+    size_t m_leaf_start;
+    size_t m_leaf_end;
+    size_t m_local_end;
     T m_value;
     size_t m_column_id;
 };
-
 
 
 template <class F> class STRINGNODE: public ParentNode {
@@ -313,7 +332,7 @@ private:
 
 class OR_NODE: public ParentNode {
 public:
-    OR_NODE(ParentNode* p1) {m_child = 0; m_cond1 = p1; m_cond2 = 0;};
+    OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond1 = p1; m_cond2 = NULL;};
     ~OR_NODE()
     {
         delete m_cond1;
@@ -325,11 +344,14 @@ public:
     {
         m_cond1->Init(table);
         m_cond2->Init(table);
+
         if(m_child)
             m_child->Init(table);
 
         last1 = -1;
         last2 = -1;
+
+        m_table = &table;
     }
 
 #if 0
@@ -337,6 +359,10 @@ public:
     {
         for (size_t s = start; s < end; ++s) {
             // Todo, redundant searches can occur
+            // We have to init here to reset nodes internal
+            // leaf cache (since we may go backwards)
+            m_cond1->Init(*m_table);
+            m_cond2->Init(*m_table);
             const size_t f1 = m_cond1->find_first(s, end);
             const size_t f2 = m_cond2->find_first(s, f1);
             s = f1 < f2 ? f1 : f2;
@@ -370,7 +396,7 @@ public:
             if(last2 >= s && last2 != -1)
                 f2 = last2;
             else {
-                f2 = m_cond2->find_first(s, f1);
+                f2 = m_cond2->find_first(s, end);
                 last2 = f2;
             }
             s = f1 < f2 ? f1 : f2;
@@ -417,6 +443,7 @@ public:
 private:
     size_t last1;
     size_t last2;
+    const Table* m_table;
 };
 
 }
