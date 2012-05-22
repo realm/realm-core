@@ -149,11 +149,9 @@ template<class Tab> struct TableIsConst<BasicTableView<const Tab> > {
  *
  * \tparam const_tab Indicates whether the accessor has const-only
  * access to the field, that is, if, and only if Taboid matches 'const T'
- * or 'BasicTableView<const T>' for any T. This argument should never
- * be specified explicitely.
+ * or 'BasicTableView<const T>' for any T.
  */
-template<class Taboid, int col_idx, class Type,
-         bool const_tab = TableIsConst<Taboid>::value> class FieldAccessor;
+template<class Taboid, int col_idx, class Type, bool const_tab> class FieldAccessor;
 
 
 /**
@@ -446,11 +444,12 @@ template<class Taboid, int col_idx, class Type> class ColumnAccessor;
 template<class Taboid, int col_idx, class Type> class ColumnAccessorBase {
 protected:
     typedef typename GetTableFromView<Taboid>::type RealTable;
+    typedef FieldAccessor<Taboid, col_idx, Type, TableIsConst<Taboid>::value> Field;
 
 public:
-    FieldAccessor<Taboid, col_idx, Type> operator[](std::size_t row_idx) const
+    Field operator[](std::size_t row_idx) const
     {
-        return FieldAccessor<Taboid, col_idx, Type>(std::make_pair(m_table, row_idx));
+        return Field(std::make_pair(m_table, row_idx));
     }
 
     bool has_index() const { return m_table->get_impl()->has_index(col_idx); }

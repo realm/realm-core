@@ -119,14 +119,14 @@ public:
 private:
     template<int col_idx> struct Field {
         typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
-        typedef _impl::FieldAccessor<BasicTable, col_idx, value_type> type;
+        typedef _impl::FieldAccessor<BasicTable, col_idx, value_type, false> type;
     };
     typedef std::pair<BasicTable*, std::size_t> FieldInit;
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
 
     template<int col_idx> struct ConstField {
         typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
-        typedef _impl::FieldAccessor<const BasicTable, col_idx, value_type> type;
+        typedef _impl::FieldAccessor<const BasicTable, col_idx, value_type, true> type;
     };
     typedef std::pair<const BasicTable*, std::size_t> ConstFieldInit;
     typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
