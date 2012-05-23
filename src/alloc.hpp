@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_ALLOC__
-#define __TDB_ALLOC__
+#ifndef TIGHTDB_ALLOC_HPP
+#define TIGHTDB_ALLOC_HPP
 
 #include <stdlib.h>
 
@@ -55,6 +55,7 @@ public:
 
 Allocator& GetDefaultAllocator();
 
-}
 
-#endif //__TDB_ALLOC__
+} // namespace tightdb
+
+#endif // TIGHTDB_ALLOC_HPP

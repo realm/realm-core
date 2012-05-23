@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_BASIC_TABLE_VIEW_HPP
-#define TIGHTDB_BASIC_TABLE_VIEW_HPP
+#ifndef TIGHTDB_TABLE_VIEW_BASIC_HPP
+#define TIGHTDB_TABLE_VIEW_BASIC_HPP
 
 #include "meta.hpp"
 #include "table_view.hpp"
@@ -224,4 +224,4 @@ private:
 
 } // namespace tightdb
 
-#endif // TIGHTDB_BASIC_TABLE_VIEW_HPP
+#endif // TIGHTDB_TABLE_VIEW_BASIC_HPP

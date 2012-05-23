@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMNTYPE__
-#define __TDB_COLUMNTYPE__
+#ifndef TIGHTDB_COLUMN_TYPE_HPP
+#define TIGHTDB_COLUMN_TYPE_HPP
 
 #include <stdlib.h>
 
@@ -47,4 +47,4 @@ struct BinaryData {
     size_t len;
 };
 
-#endif //__TDB_COLUMNTYPE__
+#endif // TIGHTDB_COLUMN_TYPE_HPP

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMN_MIXED__
-#define __TDB_COLUMN_MIXED__
+#ifndef TIGHTDB_COLUMN_MIXED_HPP
+#define TIGHTDB_COLUMN_MIXED_HPP
 
 #include "column.hpp"
 #include "column_type.hpp"
@@ -27,6 +27,7 @@
 #include "index.hpp"
 
 namespace tightdb {
+
 
 // Pre-declarations
 class ColumnBinary;
@@ -182,6 +183,7 @@ inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
     return m_refs->get_subtable_ptr(row_idx);
 }
 
+
 } // namespace tightdb
 
-#endif //__TDB_COLUMN_MIXED__
+#endif // TIGHTDB_COLUMN_MIXED_HPP

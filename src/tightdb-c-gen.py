@@ -24,8 +24,8 @@ directiveStartToken = %
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __C_TIGHTDB_H__
-#define __C_TIGHTDB_H__
+#ifndef TIGHTDB_TIGHTDB_C_H
+#define TIGHTDB_TIGHTDB_C_H
 
 #include "c-table.hpp"
 #include "query.h"
@@ -33,7 +33,7 @@ directiveStartToken = %
 %for $col in range($max_cols)
 %set $num_cols = $col + 1
 
-#define TIGHTSB_TABLE_${num_cols}(TableName%slurp
+#define TIGHTDB_TABLE_${num_cols}(TableName%slurp
 %for $j in range($num_cols)
 , CName$j, CType$j%slurp
 %end for
@@ -98,7 +98,7 @@ void TableName##_set_##CName${j}(Table* tbl, size_t row_ndx, tdb_type_##CType$j 
 
 %end for
 
-#endif //__C_TIGHTDB_H__
+#endif // TIGHTDB_TIGHTDB_C_H
 """
 
 args = sys.argv[1:]

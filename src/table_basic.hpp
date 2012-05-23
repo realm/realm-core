@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_BASIC_TABLE_HPP
-#define TIGHTDB_BASIC_TABLE_HPP
+#ifndef TIGHTDB_TABLE_BASIC_HPP
+#define TIGHTDB_TABLE_BASIC_HPP
 
 #ifdef _MSC_VER
 #include "win32/stdint.h"
@@ -394,4 +394,4 @@ namespace _impl
 
 } // namespace tightdb
 
-#endif // TIGHTDB_BASIC_TABLE_HPP
+#endif // TIGHTDB_TABLE_BASIC_HPP

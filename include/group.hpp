@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef TIGHTDB_GROUP_H
-#define TIGHTDB_GROUP_H
+#ifndef TIGHTDB_GROUP_HPP
+#define TIGHTDB_GROUP_HPP
 
 #include "table.hpp"
 #include "../src/alloc_slab.hpp"
@@ -182,4 +182,4 @@ void Group::to_json(S& out)
 
 } // namespace tightdb
 
-#endif // TIGHTDB_GROUP_H
+#endif // TIGHTDB_GROUP_HPP

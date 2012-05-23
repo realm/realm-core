@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_GROUP_WRITER__
-#define __TDB_GROUP_WRITER__
+#ifndef TIGHTDB_GROUP_WRITER_HPP
+#define TIGHTDB_GROUP_WRITER_HPP
 
 #ifdef _MSC_VER
 #include "win32/stdint.h"
@@ -54,6 +54,7 @@ private:
     int        m_fd;
 };
 
-} //namespace tightdb
 
-#endif //__TDB_GROUP_WRITER__
+} // namespace tightdb
+
+#endif // TIGHTDB_GROUP_WRITER_HPP

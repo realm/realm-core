@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_ARRAY_STRING__
-#define __TDB_ARRAY_STRING__
+#ifndef TIGHTDB_ARRAY_STRING_HPP
+#define TIGHTDB_ARRAY_STRING_HPP
 
 #include "array.hpp"
 
@@ -57,6 +57,7 @@ private:
     virtual WidthType GetWidthType() const {return TDB_MULTIPLY;}
 };
 
-}
 
-#endif //__TDB_ARRAY__
+} // namespace tightdb
+
+#endif // TIGHTDB_ARRAY_STRING_HPP

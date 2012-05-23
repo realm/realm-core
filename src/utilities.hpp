@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_UTILITIES_HPP
-#define __TIGHTDB_UTILITIES_HPP
+#ifndef TIGHTDB_UTILITIES_HPP
+#define TIGHTDB_UTILITIES_HPP
 
 #include <cstdlib>
 #ifdef _MSC_VER
@@ -67,5 +67,5 @@ void checksum_init(checksum_t* t);
 
 }
 
-#endif // __TIGHTDB_UTILITIES_HPP
+#endif // TIGHTDB_UTILITIES_HPP
 

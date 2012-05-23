@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_MIXED_H
-#define __TIGHTDB_MIXED_H
+#ifndef TIGHTDB_MIXED_HPP
+#define TIGHTDB_MIXED_HPP
 
 #ifndef _MSC_VER
 #include <stdint.h> // int64_t - not part of C++03
@@ -73,4 +73,4 @@ private:
 
 } // namespace tightdb
 
-#endif // __TIGHTDB_MIXED_H
+#endif // TIGHTDB_MIXED_HPP

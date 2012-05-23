@@ -1,5 +1,3 @@
-#ifndef __TDB_COLUMN__
-#define __TDB_COLUMN__
 /*************************************************************************
  *
  * TIGHTDB CONFIDENTIAL
@@ -19,6 +17,9 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
+#ifndef TIGHTDB_COLUMN_HPP
+#define TIGHTDB_COLUMN_HPP
+
 #include "array.hpp"
 
 #ifdef _MSC_VER
@@ -31,6 +32,7 @@
 #include <assert.h>
 
 namespace tightdb {
+
 
 // Pre-definitions
 class Column;
@@ -222,9 +224,10 @@ private:
     Column &operator=(Column const &); // not allowed
 };
 
-}
+
+} // namespace tightdb
 
 // Templates
 #include "column_tpl.hpp"
 
-#endif //__TDB_COLUMN__
+#endif // TIGHTDB_COLUMN_HPP

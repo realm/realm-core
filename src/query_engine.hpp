@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_ENGINE_HPP
-#define __TIGHTDB_ENGINE_HPP
+#ifndef TIGHTDB_QUERY_ENGINE_HPP
+#define TIGHTDB_QUERY_ENGINE_HPP
 
 #include <string>
 #include "table.hpp"
@@ -29,6 +29,7 @@
 #include "query_conditions.hpp"
 
 namespace tightdb {
+
 
 class ParentNode {
 public:
@@ -399,6 +400,7 @@ public:
     const Table* m_table;
 };
 
-}
 
-#endif //__TIGHTDB_ENGINE_HPP
+} // namespace tightdb
+
+#endif // TIGHTDB_QUERY_ENGINE_HPP
