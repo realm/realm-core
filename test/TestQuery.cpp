@@ -342,7 +342,9 @@ TEST(TestQueryThreads)
 
     CHECK_EQUAL(100, tv.size());
     for(int i = 0; i < 100; i++) {
-        CHECK_EQUAL(i*7*10 + 14 + 1, tv.get_source_ndx(i));
+        const size_t expected = i*7*10 + 14 + 1;
+        const size_t actual   = tv.get_source_ndx(i);
+        CHECK_EQUAL(expected, actual);
     }
 }
 

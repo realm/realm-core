@@ -170,7 +170,12 @@ public:
     void find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
     void find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     size_t find_pos(int64_t value) const;
+
+    // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
+    void GetBlock(size_t ndx, Array& arr, size_t& off) const {
+        m_array->GetBlock(ndx, arr, off);
+    }
 
     // Index
     bool HasIndex() const {return m_index != NULL;}

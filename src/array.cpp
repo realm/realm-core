@@ -152,7 +152,10 @@ void Array::Create(size_t ref)
 {
     assert(ref);
     uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
+    CreateFromHeader(header, ref);
+}
 
+void Array::CreateFromHeader(uint8_t* header, size_t ref) {
     // Parse header
     m_isNode   = get_header_isnode(header);
     m_hasRefs  = get_header_hasrefs(header);
@@ -168,6 +171,7 @@ void Array::Create(size_t ref)
 
     SetWidth(m_width);
 }
+
 
 void Array::SetType(ColumnDef type)
 {
@@ -2049,6 +2053,54 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 
 
 namespace tightdb {
+
+// Get containing array block direct through column b-tree
+// without instatiating any Arrays.
+void Array::GetBlock(size_t ndx, Array& arr, size_t& off) const
+{
+    char* data = (char*)m_data;
+    uint8_t* header = (uint8_t*)data-8;
+    size_t width  = m_width;
+    bool isNode   = m_isNode;
+    size_t offset = 0;
+    
+    while (1) {
+        if (isNode) {
+            // Get subnode table
+            const size_t ref_offsets = GetDirect(data, width, 0);
+            const size_t ref_refs    = GetDirect(data, width, 1);
+            
+            // Find the subnode containing the item
+            const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+            const char* const offsets_data = (const char*)offsets_header + 8;
+            const size_t offsets_width  = get_header_width_direct(offsets_header);
+            const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
+            
+            // Calc index in subnode
+            const size_t localoffset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
+            ndx -= localoffset; // local index
+            offset += localoffset;
+            
+            // Get ref to array
+            const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+            const char* const refs_data = (const char*)refs_header + 8;
+            const size_t refs_width  = get_header_width_direct(refs_header);
+            const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
+            
+            // Set vars for next iteration
+            header = (uint8_t*)m_alloc.Translate(ref);
+            data   = (char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+        }
+        else {
+            arr.CreateFromHeader(header);
+            off = offset;
+            return;
+        }
+    }
+}
+
 
 // Get value direct through column b-tree without instatiating any Arrays.
 int64_t Array::ColumnGet(size_t ndx) const
