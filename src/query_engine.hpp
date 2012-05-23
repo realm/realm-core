@@ -354,7 +354,7 @@ public:
         m_table = &table;
     }
 
-#if 1
+#if 0
     size_t find_first(size_t start, size_t end)
     {
         for (size_t s = start; s < end; ++s) {
