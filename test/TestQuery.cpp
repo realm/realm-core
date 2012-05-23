@@ -56,7 +56,9 @@ TEST(TestQueryFindAll_range_or_monkey2)
             end = ROWS;
 
         for(size_t t = 0; t < ROWS; t++) {
-            tit.add(rand() % 10, rand() % ROWS);
+            int64_t r1 = rand() % 10;
+            int64_t r2 = rand() % 10;
+            tit.add(r1, r2);
         }
 
         TwoIntTable::Query q1 = tit.where().group().first.equal(3).Or().first.equal(7).end_group().second.greater(5);

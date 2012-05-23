@@ -167,7 +167,7 @@ public:
             s = m_array.Query<F>(m_value, s - m_leaf_start, m_local_end);
 
             if (s == (size_t)-1) {
-                s = m_leaf_end;
+                s = m_leaf_end - 1;
                 continue;
             }
             else
@@ -364,7 +364,7 @@ public:
             m_cond1->Init(*m_table);
             m_cond2->Init(*m_table);
             const size_t f1 = m_cond1->find_first(s, end);
-            const size_t f2 = m_cond2->find_first(s, f1);
+            const size_t f2 = m_cond2->find_first(s, end);
             s = f1 < f2 ? f1 : f2;
 
             if (m_child == 0)
