@@ -355,7 +355,7 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap)
             break;
         case COLUMN_TYPE_TABLE:
             {
-                t->insert_table(i, ndx);
+                t->insert_subtable(i, ndx);
             }
             break;
         default:
@@ -427,7 +427,7 @@ void table_insert_mixed(Table* t, size_t column_ndx, size_t ndx, Mixed value)
 
 void table_insert_table(Table* t, size_t column_ndx, size_t ndx)
 {
-    t->insert_table(column_ndx, ndx);
+    t->insert_subtable(column_ndx, ndx);
 }
 
 void table_insert_done(Table* t)

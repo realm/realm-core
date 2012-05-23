@@ -214,7 +214,7 @@ TEST(Table_Delete_All_Types)
             }
         }
 
-        table.insert_table(8, i);
+        table.insert_subtable(8, i);
         table.insert_done();
 
         // Add subtable to mixed column
@@ -584,7 +584,7 @@ TEST(Table_Spec)
     // Add a row
     table->insert_int(0, 0, 4);
     table->insert_string(1, 0, "Hello");
-    table->insert_table(2, 0);
+    table->insert_subtable(2, 0);
     table->insert_done();
 
     CHECK_EQUAL(0, table->get_subtable_size(2, 0));
@@ -785,11 +785,11 @@ TEST(Table_SubtableSizeAndClear)
     spec.add_column(COLUMN_TYPE_MIXED, "mixed");
     table.update_from_spec();
 
-    table.insert_table(0, 0);
+    table.insert_subtable(0, 0);
     table.insert_mixed(1, 0, false);
     table.insert_done();
 
-    table.insert_table(0, 1);
+    table.insert_subtable(0, 1);
     table.insert_mixed(1, 1, Mixed(COLUMN_TYPE_TABLE));
     table.insert_done();
 
@@ -836,11 +836,11 @@ TEST(Table_SubtableSizeAndClear)
 }
 
 
-
 namespace
 {
-    TIGHTDB_TABLE_1(MyTable1,
-                    val, Int)
+    TIGHTDB_TABLE_2(MyTable1,
+                    val, Int,
+                    val2, Int)
 
     TIGHTDB_TABLE_2(MyTable2,
                     val, Int,
@@ -849,6 +849,19 @@ namespace
     TIGHTDB_TABLE_1(MyTable3,
                     subtab, Subtable<MyTable2>)
 }
+
+
+TEST(Table_SetMethod)
+{
+    MyTable1 t;
+    t.add(8, 9);
+    CHECK_EQUAL(t[0].val,  8);
+    CHECK_EQUAL(t[0].val2, 9);
+    t.set(0, 2, 4);
+    CHECK_EQUAL(t[0].val,  2);
+    CHECK_EQUAL(t[0].val2, 4);
+}
+
 
 TEST(Table_HighLevelSubtables)
 {

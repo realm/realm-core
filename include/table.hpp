@@ -78,11 +78,10 @@ public:
     void insert_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void insert_bool(size_t column_ndx, size_t row_ndx, bool value);
     void insert_date(size_t column_ndx, size_t row_ndx, time_t value);
-    template<class T> void insert_enum(size_t column_ndx, size_t row_ndx, T value);
+    template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
     void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
     void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void insert_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
-    void insert_table(size_t column_ndx, size_t row_ndx);
     void insert_done();
 
     // Get cell values
@@ -98,6 +97,7 @@ public:
     void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_date(size_t column_ndx, size_t row_ndx, time_t value);
+    template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_string(size_t column_ndx, size_t row_ndx, const char* value);
     void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
@@ -108,6 +108,7 @@ public:
     ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;
     void            clear_subtable(size_t column_ndx, size_t row_ndx);
+    void            insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
 
     // Indexing
     bool has_index(size_t column_ndx) const;
@@ -309,9 +310,14 @@ inline void Table::insert_date(size_t column_ndx, size_t row_ndx, time_t value)
     insert_int(column_ndx, row_ndx, value);
 }
 
-template<class T> inline void Table::insert_enum(size_t column_ndx, size_t row_ndx, T value)
+template<class E> inline void Table::insert_enum(size_t column_ndx, size_t row_ndx, E value)
 {
     insert_int(column_ndx, row_ndx, value);
+}
+
+template<class E> inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
+{
+    set_int(column_ndx, row_ndx, value);
 }
 
 inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)

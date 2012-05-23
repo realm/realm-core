@@ -589,7 +589,7 @@ void Table::remove(size_t ndx)
     --m_size;
 }
 
-void Table::insert_table(size_t column_ndx, size_t ndx)
+void Table::insert_subtable(size_t column_ndx, size_t ndx)
 {
     assert(column_ndx < get_column_count());
     assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_TABLE);

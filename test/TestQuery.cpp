@@ -71,22 +71,22 @@ TEST(TestQuerySubtable)
     // Main table
     table->insert_int(0, 0, 111);
     table->insert_string(1, 0, "this");
-    table->insert_table(2, 0);
+    table->insert_subtable(2, 0);
     table->insert_done();
 
     table->insert_int(0, 1, 222);
     table->insert_string(1, 1, "is");
-    table->insert_table(2, 1);
+    table->insert_subtable(2, 1);
     table->insert_done();
 
     table->insert_int(0, 2, 333);
     table->insert_string(1, 2, "a test");
-    table->insert_table(2, 2);
+    table->insert_subtable(2, 2);
     table->insert_done();
 
     table->insert_int(0, 3, 444);
     table->insert_string(1, 3, "of queries");
-    table->insert_table(2, 3);
+    table->insert_subtable(2, 3);
     table->insert_done();
 
 
