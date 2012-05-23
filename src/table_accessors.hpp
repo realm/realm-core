@@ -332,6 +332,9 @@ public:
         Base::m_table->get_impl()->set_binary(col_idx, Base::m_row_idx, value.pointer, value.len);
         return *this;
     }
+
+    const char* get_pointer() const { return BinaryData(*this).pointer; }
+    std::size_t get_len() const { return BinaryData(*this).len; }
 };
 
 
@@ -963,7 +966,7 @@ public:
 
 
 /**
- * QueryColumn specialization for binary_data.
+ * QueryColumn specialization for binary data.
  */
 template<class Taboid, int col_idx>
 class QueryColumn<Taboid, col_idx, BinaryData>:

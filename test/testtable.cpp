@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <sstream>
 #include "tightdb.hpp"
 #include <UnitTest++.h>
@@ -1011,4 +1012,7 @@ TEST(Table_DateAndBinary)
     char data[size];
     for (size_t i=0; i<size; ++i) data[i] = i;
     t.add(8, BinaryData(data, size));
+    CHECK_EQUAL(t[0].date, 8);
+    CHECK_EQUAL(t[0].bin.get_len(), size);
+    CHECK(std::equal(t[0].bin.get_pointer(), t[0].bin.get_pointer()+size, data));
 }
