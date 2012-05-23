@@ -21,7 +21,7 @@
 #define TIGHTDB_COLUMN_BINARY_HPP
 
 #include "column.hpp"
-#include "column_type.hpp" // BinaryData
+#include "binary_data.hpp"
 #include "array_binary.hpp"
 
 namespace tightdb {

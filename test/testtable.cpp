@@ -994,3 +994,21 @@ TEST(Table_HighLevelSubtables)
 #endif
 */
 }
+
+
+namespace
+{
+    TIGHTDB_TABLE_2(TableDateAndBinary,
+                    date, Date,
+                    bin, Binary)
+}
+
+TEST(Table_DateAndBinary)
+{
+    TableDateAndBinary t;
+
+    const size_t size = 10;
+    char data[size];
+    for (size_t i=0; i<size; ++i) data[i] = i;
+    t.add(8, BinaryData(data, size));
+}

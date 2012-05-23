@@ -129,8 +129,7 @@ size_t ColumnBinary::GetLen(size_t ndx) const
 void ColumnBinary::Set(size_t ndx, const char* value, size_t len)
 {
     assert(ndx < Size());
-    const BinaryData bin = {value, len};
-    Set(ndx, bin);
+    Set(ndx, BinaryData(value, len));
 }
 
 bool ColumnBinary::Set(size_t ndx, BinaryData bin)
@@ -152,8 +151,7 @@ bool ColumnBinary::add(BinaryData bin)
 void ColumnBinary::Insert(size_t ndx, const char* value, size_t len)
 {
     assert(ndx <= Size());
-    const BinaryData bin = {value, len};
-    Insert(ndx, bin);
+    Insert(ndx, BinaryData(value, len));
 }
 
 bool ColumnBinary::Insert(size_t ndx, BinaryData bin)
@@ -178,8 +176,7 @@ void ColumnBinary::Resize(size_t ndx)
 BinaryData ColumnBinary::LeafGet(size_t ndx) const
 {
     const ArrayBinary* const array = static_cast<ArrayBinary*>(m_array);
-    const BinaryData bin = {array->Get(ndx), array->GetLen(ndx)};
-    return bin;
+    return BinaryData(array->Get(ndx), array->GetLen(ndx));
 }
 
 bool ColumnBinary::LeafSet(size_t ndx, BinaryData value)

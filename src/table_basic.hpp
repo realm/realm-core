@@ -315,11 +315,17 @@ namespace _impl
     template<> struct GetColumnTypeId<bool> {
         static const ColumnType id = COLUMN_TYPE_BOOL;
     };
+    template<> struct GetColumnTypeId<const char*> {
+        static const ColumnType id = COLUMN_TYPE_STRING;
+    };
     template<class E> struct GetColumnTypeId<SpecBase::Enum<E> > {
         static const ColumnType id = COLUMN_TYPE_INT;
     };
-    template<> struct GetColumnTypeId<const char*> {
-        static const ColumnType id = COLUMN_TYPE_STRING;
+    template<> struct GetColumnTypeId<Date> {
+        static const ColumnType id = COLUMN_TYPE_DATE;
+    };
+    template<> struct GetColumnTypeId<BinaryData> {
+        static const ColumnType id = COLUMN_TYPE_BINARY;
     };
     template<> struct GetColumnTypeId<Mixed> {
         static const ColumnType id = COLUMN_TYPE_MIXED;
@@ -347,6 +353,7 @@ namespace _impl
     };
 
 
+
     // InsertIntoCol specialization for integers
     template<int col_idx> struct InsertIntoCol<int64_t, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
@@ -363,14 +370,6 @@ namespace _impl
         }
     };
 
-    // InsertIntoCol specialization for enumerations
-    template<class E, int col_idx> struct InsertIntoCol<SpecBase::Enum<E>, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
-        {
-            t->insert_enum(col_idx, row_idx, at<col_idx>(tuple));
-        }
-    };
-
     // InsertIntoCol specialization for strings
     template<int col_idx> struct InsertIntoCol<const char*, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
@@ -379,11 +378,29 @@ namespace _impl
         }
     };
 
-    // InsertIntoCol specialization for mixed type
-    template<int col_idx> struct InsertIntoCol<Mixed, col_idx> {
+    // InsertIntoCol specialization for enumerations
+    template<class E, int col_idx> struct InsertIntoCol<SpecBase::Enum<E>, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            t->insert_mixed(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_enum(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for dates
+    template<int col_idx> struct InsertIntoCol<Date, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            const Date d(at<col_idx>(tuple));
+            t->insert_date(col_idx, row_idx, d.get_date());
+        }
+    };
+
+    // InsertIntoCol specialization for binary data
+    template<int col_idx> struct InsertIntoCol<BinaryData, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            const BinaryData b(at<col_idx>(tuple));
+            t->insert_binary(col_idx, row_idx, b.pointer, b.len);
         }
     };
 
@@ -396,6 +413,15 @@ namespace _impl
             static_cast<void>(tuple);
         }
     };
+
+    // InsertIntoCol specialization for mixed type
+    template<int col_idx> struct InsertIntoCol<Mixed, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_mixed(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
 
 
     // AssignIntoCol specialization for integers
@@ -414,14 +440,6 @@ namespace _impl
         }
     };
 
-    // AssignIntoCol specialization for enumerations
-    template<class E, int col_idx> struct AssignIntoCol<SpecBase::Enum<E>, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
-        {
-            t->set_enum(col_idx, row_idx, at<col_idx>(tuple));
-        }
-    };
-
     // AssignIntoCol specialization for strings
     template<int col_idx> struct AssignIntoCol<const char*, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
@@ -430,11 +448,29 @@ namespace _impl
         }
     };
 
-    // AssignIntoCol specialization for mixed type
-    template<int col_idx> struct AssignIntoCol<Mixed, col_idx> {
+    // AssignIntoCol specialization for enumerations
+    template<class E, int col_idx> struct AssignIntoCol<SpecBase::Enum<E>, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            t->set_mixed(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_enum(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // AssignIntoCol specialization for dates
+    template<int col_idx> struct AssignIntoCol<Date, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            const Date d(at<col_idx>(tuple));
+            t->set_date(col_idx, row_idx, d.get_date());
+        }
+    };
+
+    // AssignIntoCol specialization for binary data
+    template<int col_idx> struct AssignIntoCol<BinaryData, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            const BinaryData b(at<col_idx>(tuple));
+            t->set_binary(col_idx, row_idx, b.pointer, b.len);
         }
     };
 
@@ -445,6 +481,14 @@ namespace _impl
             t->clear_subtable(col_idx, row_idx);
             assert(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
             static_cast<void>(tuple);
+        }
+    };
+
+    // AssignIntoCol specialization for mixed type
+    template<int col_idx> struct AssignIntoCol<Mixed, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->set_mixed(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 }

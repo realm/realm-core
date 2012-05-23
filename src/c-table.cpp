@@ -7,8 +7,6 @@
 #include <cstdarg>
 #include <assert.h>
 
-using tightdb::Date;
-
 /*
 C1X will be getting support for type generic expressions they look like this:
 #define cbrt(X) _Generic((X), long double: cbrtl, \
@@ -45,7 +43,7 @@ Mixed *mixed_new_bool(bool value)
 }
 Mixed *mixed_new_date(time_t value)
 {
-    return new Mixed(Date(value));
+    return new Mixed(tightdb::Date(value));
 }
 Mixed *mixed_new_int(int64_t value)
 {
@@ -61,7 +59,7 @@ Mixed *mixed_new_binary(const char* value, size_t len)
 }
 Mixed *mixed_new_table(void)
 {
-    return new Mixed(COLUMN_TYPE_TABLE);
+    return new Mixed(tightdb::COLUMN_TYPE_TABLE);
 }
 void mixed_delete(Mixed *mixed)
 {
@@ -97,7 +95,7 @@ void spec_delete(Spec* spec)
     delete spec;
 }
 
-void spec_add_column(Spec* spec, ColumnType type, const char* name)
+void spec_add_column(Spec* spec, TightdbColumnType type, const char* name)
 {
     spec->add_column(type, name);
 }
@@ -117,7 +115,7 @@ size_t spec_get_column_count(Spec* spec)
     return spec->get_column_count();
 }
 
-ColumnType spec_get_column_type(Spec* spec, size_t column_ndx)
+TightdbColumnType spec_get_column_type(Spec* spec, size_t column_ndx)
 {
     return spec->get_column_type(column_ndx);
 }
@@ -165,7 +163,7 @@ void table_update_from_spec(Table* t)
     t->update_from_spec();
 }
 
-size_t table_register_column(Table* t, ColumnType type, const char* name)
+size_t table_register_column(Table* t, TightdbColumnType type, const char* name)
 {
     return t->add_column(type, name);
 }
@@ -185,7 +183,7 @@ size_t table_get_column_index(const Table* t, const char* name)
     return t->get_column_index(name);
 }
 
-ColumnType table_get_column_type(const Table* t, size_t ndx)
+TightdbColumnType table_get_column_type(const Table* t, size_t ndx)
 {
     return t->get_column_type(ndx);
 }
@@ -254,7 +252,7 @@ Mixed* table_get_mixed(const Table* t, size_t column_ndx, size_t ndx)
     return new Mixed(t->get_mixed(column_ndx, ndx));
 }
 
-ColumnType table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx)
+TightdbColumnType table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx)
 {
     return t->get_mixed_type(column_ndx, ndx);
 }
@@ -313,47 +311,47 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap)
 
     const size_t count = t->get_column_count();
     for (size_t i = 0; i < count; ++i) {
-        const ColumnType type = t->get_column_type(i);
+        const tightdb::ColumnType type = t->get_column_type(i);
         switch (type) {
-        case COLUMN_TYPE_INT:
+        case tightdb::COLUMN_TYPE_INT:
             {
                 // int values should always be cast to 64bit in args
                 const int64_t v = va_arg(ap, int64_t);
                 t->insert_int(i, ndx, v);
             }
             break;
-        case COLUMN_TYPE_BOOL:
+        case tightdb::COLUMN_TYPE_BOOL:
             {
                 const int v = va_arg(ap, int);
                 t->insert_bool(i, ndx, v != 0);
             }
             break;
-        case COLUMN_TYPE_DATE:
+        case tightdb::COLUMN_TYPE_DATE:
             {
                 const time_t v = va_arg(ap, time_t);
                 t->insert_date(i, ndx, v);
             }
             break;
-        case COLUMN_TYPE_STRING:
+        case tightdb::COLUMN_TYPE_STRING:
             {
                 const char* v = va_arg(ap, const char*);
                 t->insert_string(i, ndx, v);
             }
             break;
-        case COLUMN_TYPE_MIXED:
+        case tightdb::COLUMN_TYPE_MIXED:
             {
                 Mixed* const v = va_arg(ap, Mixed*);
                 t->insert_mixed(i, ndx, v);
             }
             break;
-        case COLUMN_TYPE_BINARY:
+        case tightdb::COLUMN_TYPE_BINARY:
             {
                 const char* ptr = va_arg(ap, const char*);
                 size_t      len = va_arg(ap, size_t);
                 t->insert_binary(i, ndx, ptr, len);
             }
             break;
-        case COLUMN_TYPE_TABLE:
+        case tightdb::COLUMN_TYPE_TABLE:
             {
                 t->insert_subtable(i, ndx);
             }

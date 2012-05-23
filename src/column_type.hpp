@@ -20,31 +20,42 @@
 #ifndef TIGHTDB_COLUMN_TYPE_HPP
 #define TIGHTDB_COLUMN_TYPE_HPP
 
-#include <stdlib.h>
+#ifdef __cplusplus
+#define TIGHTDB_QAUL_CC(name) name
+#define TIGHTDB_QAUL_UC(name) name
+#else
+#define TIGHTDB_QAUL_CC(name) Tightdb##name
+#define TIGHTDB_QAUL_UC(name) TIGHTDB_##name
+#endif
 
-enum ColumnType {
+#ifdef __cplusplus
+namespace tightdb {
+#endif
+
+
+enum TIGHTDB_QAUL_CC(ColumnType) {
     // Single ref
-    COLUMN_TYPE_INT,
-    COLUMN_TYPE_BOOL,
-    COLUMN_TYPE_STRING,
-    COLUMN_TYPE_DATE,
-    COLUMN_TYPE_BINARY,
-    COLUMN_TYPE_TABLE,
-    COLUMN_TYPE_MIXED,
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_INT),
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_BOOL),
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_STRING),
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_DATE), // FIXME: Why do we need a special column type for dates, can we not just use 'int'
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_BINARY),
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_TABLE),
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_MIXED),
 
     // Double refs
-    COLUMN_TYPE_STRING_ENUM,
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_STRING_ENUM),
 
     // Attributes
-    COLUMN_ATTR_INDEXED,
-    COLUMN_ATTR_UNIQUE,
-    COLUMN_ATTR_SORTED,
-    COLUMN_ATTR_NONE
+    TIGHTDB_QAUL_UC(COLUMN_ATTR_INDEXED),
+    TIGHTDB_QAUL_UC(COLUMN_ATTR_UNIQUE),
+    TIGHTDB_QAUL_UC(COLUMN_ATTR_SORTED),
+    TIGHTDB_QAUL_UC(COLUMN_ATTR_NONE)
 };
 
-struct BinaryData {
-    const char* pointer;
-    size_t len;
-};
+
+#ifdef __cplusplus
+} // namespace tightdb
+#endif
 
 #endif // TIGHTDB_COLUMN_TYPE_HPP
