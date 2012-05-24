@@ -133,6 +133,7 @@
 		36E608A5145B006E00CCC3E8 /* testcolumnbinary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E608A4145B006E00CCC3E8 /* testcolumnbinary.cpp */; };
 		36FD6F3614BDC61A009E0003 /* TestQuery.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36FD6F3414BDC61A009E0003 /* TestQuery.cpp */; };
 		36FD6F3714BDC61A009E0003 /* testTableView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36FD6F3514BDC61A009E0003 /* testTableView.cpp */; };
+		410B4DEA156E96130048E4C8 /* binary_data.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 410B4DE9156E96130048E4C8 /* binary_data.hpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -340,6 +341,7 @@
 		36E608A4145B006E00CCC3E8 /* testcolumnbinary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testcolumnbinary.cpp; sourceTree = "<group>"; };
 		36FD6F3414BDC61A009E0003 /* TestQuery.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TestQuery.cpp; sourceTree = "<group>"; };
 		36FD6F3514BDC61A009E0003 /* testTableView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testTableView.cpp; sourceTree = "<group>"; };
+		410B4DE9156E96130048E4C8 /* binary_data.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = binary_data.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -391,6 +393,7 @@
 		3647DEEA14209C1200D56FD7 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				410B4DE9156E96130048E4C8 /* binary_data.hpp */,
 				3647DEEC14209C1200D56FD7 /* alloc.hpp */,
 				3647DEEB14209C1200D56FD7 /* alloc_slab.cpp */,
 				3647DEED14209C1200D56FD7 /* alloc_slab.hpp */,
@@ -723,6 +726,7 @@
 				36DBF10F15527CCE00CC12CC /* column_tpl.hpp in Headers */,
 				36DBF11A15527DEE00CC12CC /* index.hpp in Headers */,
 				36DBF11D1552939700CC12CC /* column.hpp in Headers */,
+				410B4DEA156E96130048E4C8 /* binary_data.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -87,7 +87,6 @@ protected:
     TableViewBase(const TableViewBase& tv): m_table(tv.m_table)
     {
         m_refs.Copy(tv.m_refs);
-std::cerr << "COPY" << std::endl;
     }
 
     /**

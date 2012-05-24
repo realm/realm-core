@@ -28,6 +28,7 @@ struct BinaryData {
     const char* pointer;
     std::size_t len;
     BinaryData(const char* p, std::size_t l): pointer(p), len(l) {}
+    BinaryData() {}
 };
 
 } // namespace tightdb
