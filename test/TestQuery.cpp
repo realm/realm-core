@@ -985,3 +985,35 @@ TEST(TestQuery_sum_min_max_avg)
     CHECK_EQUAL(t.where().first.maximum(t), 3);
     CHECK_EQUAL(t.where().first.average(t), 2);
 }
+
+TEST(TestQuery_OfByOne)
+{
+    TupleTableType t;
+    for (size_t i = 0; i < MAX_LIST_SIZE * 2; ++i) {
+        t.add(1, "a");
+    }
+    
+    // Top
+    t[0].first = 0;
+    size_t res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(0, res);
+    t[0].first = 1; // reset
+    
+    // Before split
+    t[MAX_LIST_SIZE-1].first = 0;
+    res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(MAX_LIST_SIZE-1, res);
+    t[MAX_LIST_SIZE-1].first = 1; // reset
+    
+    // After split
+    t[MAX_LIST_SIZE].first = 0;
+    res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(MAX_LIST_SIZE, res);
+    t[MAX_LIST_SIZE].first = 1; // reset
+    
+    // Before end
+    const size_t last_pos = (MAX_LIST_SIZE*2)-1;
+    t[last_pos].first = 0;
+    res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(last_pos, res);
+}

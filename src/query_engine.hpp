@@ -167,7 +167,7 @@ public:
             s = m_array.Query<F>(m_value, s - m_leaf_start, m_local_end);
 
             if (s == (size_t)-1) {
-                s = m_leaf_end;
+                s = m_leaf_end-1;
                 continue;
             }
             else
