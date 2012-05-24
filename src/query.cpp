@@ -231,7 +231,6 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
         return FindAllMulti(table, start, end);
     }
 
-    const size_t table_size = table.size();
     TableView tv(table);
 
     // Use single threading

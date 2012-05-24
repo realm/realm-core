@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_INDEX__
-#define __TDB_INDEX__
+#ifndef TIGHTDB_INDEX_HPP
+#define TIGHTDB_INDEX_HPP
 
 #include "column.hpp"
 
@@ -63,6 +63,6 @@ protected:
     size_t MaxRef() const;
 };
 
-}
+} // namespace tightdb
 
-#endif //__TDB_INDEX__
+#endif // TIGHTDB_INDEX_HPP

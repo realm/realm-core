@@ -17,44 +17,19 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_GROUP_WRITER_HPP
-#define TIGHTDB_GROUP_WRITER_HPP
+#ifndef TIGHTDB_BINARY_DATA_HPP
+#define TIGHTDB_BINARY_DATA_HPP
 
-#ifdef _MSC_VER
-#include "win32/stdint.h"
-#else
-#include <stdint.h> // unint8_t etc
-#endif
-#include <cstdlib> // size_t
+#include <cstddef>
 
 namespace tightdb {
 
-// Pre-declarations
-class Group;
-class SlabAlloc;
-
-class GroupWriter {
-public:
-    GroupWriter(Group& group);
-
-    bool IsValid() const;
-
-    void Commit();
-
-    size_t write(const char* p, size_t n);
-    void WriteAt(size_t pos, const char* p, size_t n);
-
-private:
-    void DoCommit(uint64_t topPos);
-
-    // Member variables
-    Group&     m_group;
-    SlabAlloc& m_alloc;
-    size_t     m_len;
-    int        m_fd;
+struct BinaryData {
+    const char* pointer;
+    std::size_t len;
+    BinaryData(const char* p, std::size_t l): pointer(p), len(l) {}
 };
-
 
 } // namespace tightdb
 
-#endif // TIGHTDB_GROUP_WRITER_HPP
+#endif // TIGHTDB_BINARY_DATA_HPP

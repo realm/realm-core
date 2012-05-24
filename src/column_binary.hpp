@@ -17,14 +17,15 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMN_BINARY__
-#define __TDB_COLUMN_BINARY__
+#ifndef TIGHTDB_COLUMN_BINARY_HPP
+#define TIGHTDB_COLUMN_BINARY_HPP
 
 #include "column.hpp"
-#include "column_type.hpp" // BinaryData
+#include "binary_data.hpp"
 #include "array_binary.hpp"
 
 namespace tightdb {
+
 
 class ColumnBinary : public ColumnBase {
 public:
@@ -84,6 +85,7 @@ protected:
 #endif //_DEBUG
 };
 
-}
 
-#endif //__TDB_COLUMN_BINARY__
+} // namespace tightdb
+
+#endif // TIGHTDB_COLUMN_BINARY_HPP

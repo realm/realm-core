@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_TABLE_REF_H
-#define __TIGHTDB_TABLE_REF_H
+#ifndef TIGHTDB_TABLE_REF_HPP
+#define TIGHTDB_TABLE_REF_HPP
 
 #include <cstddef>
 #include <algorithm>
@@ -229,4 +229,4 @@ std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const BasicTab
 
 }
 
-#endif // __TIGHTDB_TABLE_REF_H
+#endif // TIGHTDB_TABLE_REF_HPP

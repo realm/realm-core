@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_ENGINE_HPP
-#define __TIGHTDB_ENGINE_HPP
+#ifndef TIGHTDB_QUERY_ENGINE_HPP
+#define TIGHTDB_QUERY_ENGINE_HPP
 
 #include <string>
 #include "table.hpp"
@@ -29,6 +29,7 @@
 #include "query_conditions.hpp"
 
 namespace tightdb {
+
 
 class ParentNode {
 public:
@@ -142,10 +143,8 @@ public:
 
 template <class T, class C, class F> class NODE: public ParentNode {
 public:
-    NODE(T v, size_t column) : m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v), m_column_id(column), m_array(GetDefaultAllocator()) {m_child = 0;}
-    ~NODE() {
-        delete m_child; 
-    }
+    NODE(T v, size_t column) : m_array(GetDefaultAllocator()), m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v), m_column_id(column) {m_child = 0;}
+    ~NODE() {delete m_child; }
 
     void Init(const Table& table)
     {
@@ -174,7 +173,7 @@ public:
             s = m_array.Query<F>(m_value, s - m_leaf_start, m_local_end);
 
             if (s == (size_t)-1) {
-                s = m_leaf_end - 1;
+                s = m_leaf_end-1;
                 continue;
             }
             else
@@ -355,12 +354,13 @@ public:
         if(m_child)
             m_child->Init(table);
 
-        last1 = -1;
-        last2 = -1;
+        m_last1 = -1;
+        m_last2 = -1;
 
         m_table = &table;
     }
 
+// Keep old un-optimized or code until new has been sufficiently tested
 #if 0
     size_t find_first(size_t start, size_t end)
     {
@@ -393,18 +393,18 @@ public:
             size_t f1;
             size_t f2;
             
-            if(last1 >= s && last1 != -1)
-                f1 = last1;
+            if (m_last1 >= s && m_last1 != (size_t)-1)
+                f1 = m_last1;
             else {
                 f1 = m_cond1->find_first(s, end);
-                last1 = f1;
+                m_last1 = f1;
             }
     
-            if(last2 >= s && last2 != -1)
-                f2 = last2;
+            if (m_last2 >= s && m_last2 != (size_t)-1)
+                f2 = m_last2;
             else {
                 f2 = m_cond2->find_first(s, end);
-                last2 = f2;
+                m_last2 = f2;
             }
             s = f1 < f2 ? f1 : f2;
 
@@ -448,11 +448,12 @@ public:
     ParentNode* m_cond1;
     ParentNode* m_cond2;
 private:
-    size_t last1;
-    size_t last2;
+    size_t m_last1;
+    size_t m_last2;
     const Table* m_table;
 };
 
-}
 
-#endif //__TIGHTDB_ENGINE_HPP
+} // namespace tightdb
+
+#endif // TIGHTDB_QUERY_ENGINE_HPP

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_SPEC_H
-#define __TIGHTDB_SPEC_H
+#ifndef TIGHTDB_SPEC_HPP
+#define TIGHTDB_SPEC_HPP
 
 #include "array.hpp"
 #include "array_string.hpp"
@@ -87,4 +87,4 @@ private:
 
 } // namespace tightdb
 
-#endif // __TIGHTDB_SPEC_H
+#endif // TIGHTDB_SPEC_HPP

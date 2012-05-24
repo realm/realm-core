@@ -17,34 +17,45 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMNTYPE__
-#define __TDB_COLUMNTYPE__
+#ifndef TIGHTDB_COLUMN_TYPE_HPP
+#define TIGHTDB_COLUMN_TYPE_HPP
 
-#include <stdlib.h>
+#ifdef __cplusplus
+#define TIGHTDB_QAUL_CC(name) name
+#define TIGHTDB_QAUL_UC(name) name
+#else
+#define TIGHTDB_QAUL_CC(name) Tightdb##name
+#define TIGHTDB_QAUL_UC(name) TIGHTDB_##name
+#endif
 
-enum ColumnType {           // Can't change order or numbers for serialization compatibility
+#ifdef __cplusplus
+namespace tightdb {
+#endif
+
+
+enum TIGHTDB_QAUL_CC(ColumnType) {
     // Single ref
-    COLUMN_TYPE_INT         = 0,
-    COLUMN_TYPE_BOOL        = 1,
-    COLUMN_TYPE_STRING      = 2,
-    COLUMN_TYPE_DATE        = 3,
-    COLUMN_TYPE_BINARY      = 4,
-    COLUMN_TYPE_TABLE       = 5,
-    COLUMN_TYPE_MIXED       = 6,
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_INT)    = 0,
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_BOOL)   = 1,
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_STRING) = 2,
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_DATE)   = 3, // FIXME: Why do we need a special column type for dates, can we not just use 'int'
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_BINARY) = 4,
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_TABLE)  = 5,
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_MIXED)  = 6,
 
     // Double refs
-    COLUMN_TYPE_STRING_ENUM = 7,
+    TIGHTDB_QAUL_UC(COLUMN_TYPE_STRING_ENUM) = 7,
 
     // Attributes
-    COLUMN_ATTR_INDEXED     = 8,
-    COLUMN_ATTR_UNIQUE      = 9,
-    COLUMN_ATTR_SORTED      = 10,
-    COLUMN_ATTR_NONE        = 11
+    TIGHTDB_QAUL_UC(COLUMN_ATTR_INDEXED) = 8,
+    TIGHTDB_QAUL_UC(COLUMN_ATTR_UNIQUE)  = 9,
+    TIGHTDB_QAUL_UC(COLUMN_ATTR_SORTED)  = 10,
+    TIGHTDB_QAUL_UC(COLUMN_ATTR_NONE)    = 11
 };
 
-struct BinaryData {
-    const char* pointer;
-    size_t len;
-};
 
-#endif //__TDB_COLUMNTYPE__
+#ifdef __cplusplus
+} // namespace tightdb
+#endif
+
+#endif // TIGHTDB_COLUMN_TYPE_HPP

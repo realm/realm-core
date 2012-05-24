@@ -78,6 +78,7 @@ TEST(TestQueryFindAll_range_or_monkey2)
             size_t i2 = tv1.get_source_ndx(t);
             CHECK_EQUAL(i1, i2);
         }
+        a.Destroy();
     }
 
 }
@@ -167,22 +168,22 @@ TEST(TestQuerySubtable)
     // Main table
     table->insert_int(0, 0, 111);
     table->insert_string(1, 0, "this");
-    table->insert_table(2, 0);
+    table->insert_subtable(2, 0);
     table->insert_done();
 
     table->insert_int(0, 1, 222);
     table->insert_string(1, 1, "is");
-    table->insert_table(2, 1);
+    table->insert_subtable(2, 1);
     table->insert_done();
 
     table->insert_int(0, 2, 333);
     table->insert_string(1, 2, "a test");
-    table->insert_table(2, 2);
+    table->insert_subtable(2, 2);
     table->insert_done();
 
     table->insert_int(0, 3, 444);
     table->insert_string(1, 3, "of queries");
-    table->insert_table(2, 3);
+    table->insert_subtable(2, 3);
     table->insert_done();
 
 
@@ -1096,4 +1097,36 @@ TEST(TestQuery_sum_min_max_avg)
     CHECK_EQUAL(t.where().first.minimum(t), 1);
     CHECK_EQUAL(t.where().first.maximum(t), 3);
     CHECK_EQUAL(t.where().first.average(t), 2);
+}
+
+TEST(TestQuery_OfByOne)
+{
+    TupleTableType t;
+    for (size_t i = 0; i < MAX_LIST_SIZE * 2; ++i) {
+        t.add(1, "a");
+    }
+    
+    // Top
+    t[0].first = 0;
+    size_t res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(0, res);
+    t[0].first = 1; // reset
+    
+    // Before split
+    t[MAX_LIST_SIZE-1].first = 0;
+    res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(MAX_LIST_SIZE-1, res);
+    t[MAX_LIST_SIZE-1].first = 1; // reset
+    
+    // After split
+    t[MAX_LIST_SIZE].first = 0;
+    res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(MAX_LIST_SIZE, res);
+    t[MAX_LIST_SIZE].first = 1; // reset
+    
+    // Before end
+    const size_t last_pos = (MAX_LIST_SIZE*2)-1;
+    t[last_pos].first = 0;
+    res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(last_pos, res);
 }

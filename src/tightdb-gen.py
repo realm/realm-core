@@ -113,6 +113,20 @@ type${j+1} name${j+1}%slurp
 %end for
 )); \\
         } \\
+        void set(std::size_t _i%slurp
+%for $j in range($num_cols)
+, type${j+1} name${j+1}%slurp
+%end for
+) \\
+        { \\
+            ::tightdb::BasicTable<Table##Spec>* const t = \\
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \\
+            t->set(_i, (::tightdb::tuple()%slurp
+%for $j in range($num_cols)
+, name${j+1}%slurp
+%end for
+)); \\
+        } \\
     }; \\
 }; \\
 typedef ::tightdb::BasicTable<Table##Spec> Table;

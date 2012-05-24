@@ -17,13 +17,14 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_CONDITIONS_HPP
-#define __TIGHTDB_CONDITIONS_HPP
+#ifndef TIGHTDB_QUERY_CONDITIONS_HPP
+#define TIGHTDB_QUERY_CONDITIONS_HPP
 
 #include <string>
 #include "utf8.hpp"
 
 namespace tightdb {
+
 
 struct CONTAINS {
     CONTAINS() {};
@@ -145,6 +146,7 @@ struct GREATEREQUAL {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
 };
 
-}
 
-#endif // TIGHTDB_CONDITIONS_HPP
+} // namespace tightdb
+
+#endif // TIGHTDB_QUERY_CONDITIONS_HPP

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMN_TEMPLATES__
-#define __TDB_COLUMN_TEMPLATES__
+#ifndef TIGHTDB_COLUMN_TPL_HPP
+#define TIGHTDB_COLUMN_TPL_HPP
 
 #include <assert.h>
 
@@ -506,6 +506,7 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
     return;
 }
 
-}
 
-#endif //__TDB_COLUMN_TEMPLATES__
+} // namespace tightdb
+
+#endif // TIGHTDB_COLUMN_TPL_HPP

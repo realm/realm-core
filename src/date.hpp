@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_DATE_H
-#define TIGHTDB_DATE_H
+#ifndef TIGHTDB_DATE_HPP
+#define TIGHTDB_DATE_HPP
 
 #include <ctime>
 
@@ -37,4 +37,4 @@ private:
 
 } // namespace tightdb
 
-#endif // TIGHTDB_DATE_H
+#endif // TIGHTDB_DATE_HPP
