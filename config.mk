@@ -98,8 +98,3 @@ LD_COVERAGE     = $(LD) --coverage $(LDFLAGS_PTHREAD)
 
 endif
 endif
-
-
-
-
-# clang -Weverything -Wno-missing-prototypes -Wno-shorten-64-to-32 -Wno-padded -Wno-exit-time-destructors -Wno-weak-vtables -std=c++03 foo.cpp -lstdc++
