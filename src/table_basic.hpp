@@ -188,7 +188,9 @@ public:
 
     class Query;
 
-    Query where() const { return Query(); } // FIXME: Bad thing to copy queries
+    Query where() const { 
+        return Query(); 
+    } // FIXME: Bad thing to copy queries
 
 #ifdef _DEBUG
     using Table::Verify;

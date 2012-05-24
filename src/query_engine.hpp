@@ -33,7 +33,9 @@ namespace tightdb {
 class ParentNode {
 public:
     ParentNode() : m_table(NULL) {}
-    virtual ~ParentNode() {}
+    virtual ~ParentNode() {
+
+    }
     virtual void Init(const Table& table) {m_table = &table; if (m_child) m_child->Init(table);}
     virtual size_t find_first(size_t start, size_t end) = 0;
 
@@ -94,7 +96,10 @@ class SUBTABLE: public ParentNode {
 public:
     SUBTABLE(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
     SUBTABLE() {};
-
+    ~SUBTABLE() {
+        delete m_child; 
+        delete m_child2; 
+    }
     void Init(const Table& table)
     {
         m_table = &table;
@@ -137,8 +142,10 @@ public:
 
 template <class T, class C, class F> class NODE: public ParentNode {
 public:
-    NODE(T v, size_t column) : m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v), m_column_id(column) {m_child = 0;}
-    ~NODE() {delete m_child; }
+    NODE(T v, size_t column) : m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v), m_column_id(column), m_array(GetDefaultAllocator()) {m_child = 0;}
+    ~NODE() {
+        delete m_child; 
+    }
 
     void Init(const Table& table)
     {
