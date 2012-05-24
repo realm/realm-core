@@ -149,6 +149,8 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalOptions>msvcrt.lib kernel32.lib psapi.lib %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>tightdb32d.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\lib\</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">
@@ -179,6 +181,8 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalOptions> psapi.lib %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>tightdb64d.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\lib\</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">
@@ -213,6 +217,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalOptions>msvcrt.lib kernel32.lib psapi.lib %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>tightdb32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\lib\</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">
@@ -251,6 +257,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalOptions>msvcrt.lib kernel32.lib psapi.lib %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>tightdb64.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\lib\</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">
@@ -273,54 +281,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\alloc.cpp" />
-    <ClCompile Include="..\..\src\Array.cpp" />
-    <ClCompile Include="..\..\src\ArrayBinary.cpp" />
-    <ClCompile Include="..\..\src\ArrayBlob.cpp" />
-    <ClCompile Include="..\..\src\ArrayString.cpp" />
-    <ClCompile Include="..\..\src\ArrayStringLong.cpp" />
-    <ClCompile Include="..\..\src\Column.cpp" />
-    <ClCompile Include="..\..\src\ColumnBinary.cpp" />
-    <ClCompile Include="..\..\src\ColumnMixed.cpp" />
-    <ClCompile Include="..\..\src\ColumnString.cpp" />
-    <ClCompile Include="..\..\src\ColumnStringEnum.cpp" />
-    <ClCompile Include="..\..\src\ColumnTable.cpp" />
-    <ClCompile Include="..\..\src\ctightdb.cpp" />
-    <ClCompile Include="..\..\src\Group.cpp" />
-    <ClCompile Include="..\..\src\Index.cpp" />
-    <ClCompile Include="..\..\src\Table.cpp" />
-    <ClCompile Include="..\..\src\TableView.cpp" />
-    <ClCompile Include="..\..\src\utf8.cpp" />
-    <ClCompile Include="..\..\src\utilities.cpp" />
     <ClCompile Include="..\Support\win32\mem.cpp" />
     <ClCompile Include="..\UnitTest++\src\Win32\TimeHelpers.cpp" />
     <ClCompile Include="benchmark.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\alloc.hpp" />
-    <ClInclude Include="..\..\src\AllocSlab.hpp" />
-    <ClInclude Include="..\..\src\Array.hpp" />
-    <ClInclude Include="..\..\src\ArrayBinary.hpp" />
-    <ClInclude Include="..\..\src\ArrayBlob.hpp" />
-    <ClInclude Include="..\..\src\ArrayString.hpp" />
-    <ClInclude Include="..\..\src\ArrayStringLong.hpp" />
-    <ClInclude Include="..\..\src\Column.hpp" />
-    <ClInclude Include="..\..\src\ColumnBinary.hpp" />
-    <ClInclude Include="..\..\src\ColumnMixed.hpp" />
-    <ClInclude Include="..\..\src\ColumnString.hpp" />
-    <ClInclude Include="..\..\src\ColumnStringEnum.hpp" />
-    <ClInclude Include="..\..\src\ColumnTable.hpp" />
-    <ClInclude Include="..\..\src\ColumnType.hpp" />
-    <ClInclude Include="..\..\src\Column_tpl.hpp" />
-    <ClInclude Include="..\..\src\ctightdb.h" />
-    <ClInclude Include="..\..\src\Group.hpp" />
-    <ClInclude Include="..\..\src\Index.hpp" />
-    <ClInclude Include="..\..\src\Table.hpp" />
-    <ClInclude Include="..\..\src\TableRef.hpp" />
-    <ClInclude Include="..\..\src\tightdb.hpp" />
-    <ClInclude Include="..\..\src\utf8.hpp" />
-    <ClInclude Include="..\..\src\utilities.hpp" />
-    <ClInclude Include="..\Support\mem.h" />
+    <ClInclude Include="..\Support\mem.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

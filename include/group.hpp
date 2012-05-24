@@ -103,6 +103,8 @@ protected:
     bool m_isValid;
 
 private:
+    friend Table* GroupHelper_get_table_ptr(Group* grp, const char* name);
+
     Table* get_table_ptr(const char* name);
     template<class T> T* get_table_ptr(const char* name);
 };

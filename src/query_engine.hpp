@@ -146,7 +146,7 @@ public:
         m_column = (C*)&table.GetColumnBase(m_column_id);
         m_leaf_end = 0;
 
-        if (m_child) m_child->Init(table);
+        if (m_child)m_child->Init(table);
     }
 
     size_t find_first(size_t start, size_t end)
@@ -344,9 +344,18 @@ public:
     {
         m_cond1->Init(table);
         m_cond2->Init(table);
+
+        if(m_child)
+            m_child->Init(table);
+
+        m_last1 = -1;
+        m_last2 = -1;
+
         m_table = &table;
     }
 
+// Keep old un-optimized or code until new has been sufficiently tested
+#if 0
     size_t find_first(size_t start, size_t end)
     {
         for (size_t s = start; s < end; ++s) {
@@ -356,13 +365,13 @@ public:
             m_cond1->Init(*m_table);
             m_cond2->Init(*m_table);
             const size_t f1 = m_cond1->find_first(s, end);
-            const size_t f2 = m_cond2->find_first(s, f1);
+            const size_t f2 = m_cond2->find_first(s, end);
             s = f1 < f2 ? f1 : f2;
 
             if (m_child == 0)
                 return s;
             else {
-                const size_t a = m_cond2->find_first(s, end);
+                const size_t a = m_child->find_first(s, end);
                 if (s == a)
                     return s;
                 else
@@ -371,6 +380,42 @@ public:
         }
         return end;
     }
+#else
+    size_t find_first(size_t start, size_t end)
+    {
+        for (size_t s = start; s < end; ++s) {
+            size_t f1;
+            size_t f2;
+            
+            if (m_last1 >= s && m_last1 != (size_t)-1)
+                f1 = m_last1;
+            else {
+                f1 = m_cond1->find_first(s, end);
+                m_last1 = f1;
+            }
+    
+            if (m_last2 >= s && m_last2 != (size_t)-1)
+                f2 = m_last2;
+            else {
+                f2 = m_cond2->find_first(s, end);
+                m_last2 = f2;
+            }
+            s = f1 < f2 ? f1 : f2;
+
+            if (m_child == 0)
+                return s;
+            else {
+                const size_t a = m_child->find_first(s, end);
+                if (s == a)
+                    return s;
+                else
+                    s = a - 1;
+            }
+        }
+        return end;
+    }
+#endif
+
 
     virtual std::string Verify(void)
     {
@@ -396,6 +441,9 @@ public:
 
     ParentNode* m_cond1;
     ParentNode* m_cond2;
+private:
+    size_t m_last1;
+    size_t m_last2;
     const Table* m_table;
 };
 
