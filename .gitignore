@@ -43,3 +43,4 @@ _ReSharper*/
 Static library*/
 *.opensdf
 *.sdf
+/tightdb.xcodeproj
