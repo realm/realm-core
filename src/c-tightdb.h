@@ -21,7 +21,7 @@
 #define TIGHTDB_C_TIGHTDB_H
 
 #include "c-table.h"
-#include "query.hpp"
+#include "query.hpp" // FIXME: Cannot include C++ header in C header.
 
 
 #define TIGHTDB_TABLE_1(TableName, CType0, CName0) \

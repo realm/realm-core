@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_ALLOC_SLAB__
-#define __TDB_ALLOC_SLAB__
+#ifndef TIGHTDB_ALLOC_SLAB_HPP
+#define TIGHTDB_ALLOC_SLAB_HPP
 
 #include "tightdb.hpp"
 
@@ -29,6 +29,7 @@
 #endif
 
 namespace tightdb {
+
 
 class SlabAlloc : public Allocator {
 public:
@@ -94,6 +95,7 @@ private:
 #endif //_DEBUG
 };
 
-}
 
-#endif //__TDB_ALLOC_SLAB__
+} // namespace tightdb
+
+#endif // TIGHTDB_ALLOC_SLAB_HPP

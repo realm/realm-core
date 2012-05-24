@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_FWD_H
-#define TIGHTDB_COLUMN_FWD_H
+#ifndef TIGHTDB_COLUMN_FWD_HPP
+#define TIGHTDB_COLUMN_FWD_HPP
 
 namespace tightdb {
 
@@ -34,4 +34,4 @@ class ColumnMixed;
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_FWD_H
+#endif // TIGHTDB_COLUMN_FWD_HPP

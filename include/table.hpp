@@ -69,7 +69,7 @@ public:
     ColumnType  get_column_type(size_t column_ndx) const;
 
     // Row handling
-    size_t      add_empty_row();
+    size_t      add_empty_row(size_t num_of_rows = 1);
     void        remove(size_t row_ndx);
     void        remove_last() {if (!is_empty()) remove(m_size-1);}
 
@@ -78,11 +78,10 @@ public:
     void insert_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void insert_bool(size_t column_ndx, size_t row_ndx, bool value);
     void insert_date(size_t column_ndx, size_t row_ndx, time_t value);
-    template<class T> void insert_enum(size_t column_ndx, size_t row_ndx, T value);
+    template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
     void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
     void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void insert_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
-    void insert_table(size_t column_ndx, size_t row_ndx);
     void insert_done();
 
     // Get cell values
@@ -98,6 +97,7 @@ public:
     void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_date(size_t column_ndx, size_t row_ndx, time_t value);
+    template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_string(size_t column_ndx, size_t row_ndx, const char* value);
     void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
@@ -108,6 +108,7 @@ public:
     ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;
     void            clear_subtable(size_t column_ndx, size_t row_ndx);
+    void            insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
 
     // Indexing
     bool has_index(size_t column_ndx) const;
@@ -123,6 +124,7 @@ public:
     size_t         find_first_bool(size_t column_ndx, bool value) const;
     size_t         find_first_date(size_t column_ndx, time_t value) const;
     size_t         find_first_string(size_t column_ndx, const char* value) const;
+    // FIXME: Need: size_t find_first_binary(size_t column_ndx, const char* value, size_t len) const;
     size_t         find_pos_int(size_t column_ndx, int64_t value) const;
     TableView      find_all_int(size_t column_ndx, int64_t value);
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
@@ -132,6 +134,8 @@ public:
     ConstTableView find_all_date(size_t column_ndx, time_t value) const;
     TableView      find_all_string(size_t column_ndx, const char* value);
     ConstTableView find_all_string(size_t column_ndx, const char* value) const;
+    // FIXME: Need: TableView find_all_binary(size_t column_ndx, const char* value, size_t len);
+    // FIXME: Need: ConstTableView find_all_binary(size_t column_ndx, const char* value, size_t len) const;
 
     TableView      sorted(size_t column_ndx, bool ascending=true);
     ConstTableView sorted(size_t column_ndx, bool ascending=true) const;
@@ -275,11 +279,7 @@ private:
     friend class ColumnMixed;
     template<class> friend class BasicTableRef; // FIXME: Only BasicTableRef<T>::bind() and BasicTableRef<T>::unbind()
     friend class ColumnSubtableParent;
-
-    // These are used in the C API to gain access to the raw table pointers of subtables.
-    friend Table* TableHelper_get_subtable_ptr(Table* t, size_t col_idx, size_t row_idx);
-    friend const Table* TableHelper_get_const_subtable_ptr(const Table* t, size_t col_idx, size_t row_idx);
-    friend void TableHelper_unbind(const Table* t);
+    friend class LangBindHelper;
 };
 
 
@@ -309,9 +309,14 @@ inline void Table::insert_date(size_t column_ndx, size_t row_ndx, time_t value)
     insert_int(column_ndx, row_ndx, value);
 }
 
-template<class T> inline void Table::insert_enum(size_t column_ndx, size_t row_ndx, T value)
+template<class E> inline void Table::insert_enum(size_t column_ndx, size_t row_ndx, E value)
 {
     insert_int(column_ndx, row_ndx, value);
+}
+
+template<class E> inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
+{
+    set_int(column_ndx, row_ndx, value);
 }
 
 inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)

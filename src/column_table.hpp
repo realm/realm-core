@@ -17,13 +17,14 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMN_TABLE__
-#define __TDB_COLUMN_TABLE__
+#ifndef TIGHTDB_COLUMN_TABLE_HPP
+#define TIGHTDB_COLUMN_TABLE_HPP
 
 #include "column.hpp"
 #include "table.hpp"
 
 namespace tightdb {
+
 
 /**
  * Base class for any column that can contain subtables.
@@ -270,6 +271,7 @@ inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const
     return Get(subtable_ndx);
 }
 
+
 } // namespace tightdb
 
-#endif //__TDB_COLUMN_TABLE__
+#endif // TIGHTDB_COLUMN_TABLE_HPP

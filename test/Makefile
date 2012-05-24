@@ -36,11 +36,11 @@ test: debug
 
 test-release: all
 	./tightdb-tests
-.PHONY: test
+.PHONY: test-release
 
 memtest: debug
 	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./tightdb-tests-debug --no-error-exit-staus
-.PHONY: test
+.PHONY: memtest
 
 benchmark: test-tightdb test-sqlite3 test-stl
 	@echo ""

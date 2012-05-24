@@ -1,0 +1,10 @@
+/*.d
+/*.o
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/test-tightdb
+/test-tightdb-debug
+/test-tightdb-cover

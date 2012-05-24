@@ -75,6 +75,7 @@ int main()
 {
     vector<TestTable> table;
 
+    printf("create random content\n");
     for (size_t i = 0; i < 250000; ++i) {
         // create random string
         const int n = rand() % 1000;// * 10 + rand();
@@ -176,6 +177,8 @@ int main()
         const int search_time = timer.GetTimeInMs();
         printf("Search index: %dms\n", search_time);
     }
-
+#ifdef _MSC_VER
+    getchar();
+#endif
     return 0;
 }

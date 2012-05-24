@@ -17,14 +17,15 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMN_STRING__
-#define __TDB_COLUMN_STRING__
+#ifndef TIGHTDB_COLUMN_STRING_HPP
+#define TIGHTDB_COLUMN_STRING_HPP
 
 #include "column.hpp"
 #include "array_string.hpp"
 #include "array_string_long.hpp"
 
 namespace tightdb {
+
 
 class AdaptiveStringColumn : public ColumnBase {
 public:
@@ -90,6 +91,7 @@ protected:
 #endif //_DEBUG
 };
 
-}
 
-#endif //__TDB_COLUMN_STRING__
+} // namespace tightdb
+
+#endif // TIGHTDB_COLUMN_STRING_HPP

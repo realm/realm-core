@@ -133,6 +133,8 @@ int main()
         const int search_time = timer.GetTimeInMs();
         printf("Search index: %dms\n", search_time);
     }
-
+#ifdef _MSC_VER
+    getchar();
+#endif
     return 0;
 }

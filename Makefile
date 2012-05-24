@@ -47,12 +47,12 @@ test: debug
 # Run the unit tests after building everything in release mode
 test-release: static
 	@$(MAKE) -C test test-release
-.PHONY: test
+.PHONY: test-release
 
 # Run valgrind on the unit tests after building everything
 memtest: debug
 	@$(MAKE) -C test memtest
-.PHONY: test
+.PHONY: memtest
 
 # Run the benchmarking progrems after building everything
 benchmark: static

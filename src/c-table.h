@@ -20,6 +20,13 @@
 #ifndef TIGHTDB_C_TABLE_H
 #define TIGHTDB_C_TABLE_H
 
+
+/* FIXME: Every function here should be qualified with a 'tightdb_'
+ * prefix, and every type with 'Tightdb' prefix. Otherwise, the
+ * customer risks name conflicts. Too many that came before us, have
+ * made this mistake. */
+
+
 /* TODO:
   MyTable_(...)
     setCOL, getCOL,
@@ -44,6 +51,8 @@
 
 #ifdef __cplusplus
 
+typedef tightdb::ColumnType TightdbColumnType;
+
 namespace tightdb {
     class Table;
     class TableView;
@@ -51,6 +60,7 @@ namespace tightdb {
     class Group;
     class Query;
     class Mixed;
+    struct BinaryData;
 }
 using tightdb::Table;
 using tightdb::TableView;
@@ -58,8 +68,7 @@ using tightdb::Spec;
 using tightdb::Group;
 using tightdb::Query;
 using tightdb::Mixed;
-
-// FIXME: Add later: using tightdb::BinaryData;
+using tightdb::BinaryData;
 
 extern "C" {
 
@@ -70,8 +79,9 @@ typedef enum bool_enum {false = 0, true = 1} bool;
 #else
 #include <stdbool.h>
 #endif
-typedef enum ColumnType ColumnType;
+typedef enum TightdbColumnType TightdbColumnType;
 
+/* From the point of view of C, these are all opaque structures */
 typedef struct BinaryData BinaryData;
 typedef struct Mixed Mixed;
 typedef struct Table Table;
@@ -82,7 +92,7 @@ typedef struct Query Query;
 
 #endif // __cplusplus
 
-
+/*
 #define tdb_type_int          int64_t
 #define tdb_type_bool         bool
 #define tdb_type_string       const char*
@@ -96,6 +106,7 @@ typedef struct Query Query;
 #define COLUMN_TYPE_date    COLUMN_TYPE_DATE
 #define COLUMN_TYPE_binary  COLUMN_TYPE_BINARY
 #define COLUMN_TYPE_mixed   COLUMN_TYPE_MIXED
+*/
 
 
 /*** Mixed ************************************/
@@ -122,13 +133,13 @@ typedef struct Query Query;
 /*** Spec ************************************/
 
     size_t      spec_get_ref(Spec* spec);
-    void        spec_add_column(Spec* spec, ColumnType type, const char* name);
+    void        spec_add_column(Spec* spec,  TightdbColumnType type, const char* name);
     Spec*       spec_add_column_table(Spec* spec, const char* name);
 
     Spec*       spec_get_spec(Spec* spec, size_t column_ndx);
 
     size_t      spec_get_column_count(Spec* spec);
-    ColumnType  spec_get_column_type(Spec* spec, size_t column_idx);
+    TightdbColumnType spec_get_column_type(Spec* spec, size_t column_idx);
     const char* spec_get_column_name(Spec* spec, size_t column_idx);
     size_t      spec_get_column_index(Spec* spec, const char* name);
 
@@ -145,13 +156,13 @@ typedef struct Query Query;
     /* Specify table */
     Spec*       table_get_spec(Table* t);     /* Use spec_delete() when done */
     void        table_update_from_spec(Table* t);
-    size_t      table_register_column(Table* t, ColumnType type, const char* name);
+    size_t      table_register_column(Table* t,  TightdbColumnType type, const char* name);
 
     /* Column meta information */
     size_t      table_get_column_count(const Table* t);
     size_t      table_get_column_index(const Table* t, const char* name);
     const char* table_get_column_name(const Table* t, size_t ndx);
-    ColumnType  table_get_column_type(const Table* t, size_t ndx);
+    TightdbColumnType table_get_column_type(const Table* t, size_t ndx);
 
     /* Table size */
     bool        table_is_empty(const Table* t);
@@ -176,10 +187,10 @@ typedef struct Query Query;
     const char* table_get_string(const Table* t, size_t column_ndx, size_t ndx);
     BinaryData  table_get_binary(const Table* t, size_t column_ndx, size_t ndx);
     Mixed*      table_get_mixed(const Table* t, size_t column_ndx, size_t ndx);
-    ColumnType  table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx);
+    TightdbColumnType table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx);
 
-    Table*      table_get_table(Table* t, size_t column_ndx, size_t ndx);
-    const Table* table_get_ctable(const Table* t, size_t column_ndx, size_t ndx);
+    Table*      table_get_subtable(Table* t, size_t column_ndx, size_t ndx);
+    const Table* table_get_const_subtable(const Table* t, size_t column_ndx, size_t ndx);
                 /* Use table_unbind() to 'delete' the table after use */
 
     /* Setting values */

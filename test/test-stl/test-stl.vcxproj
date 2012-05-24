@@ -341,8 +341,8 @@
     <ClCompile Include="..\UnitTest++\src\Win32\TimeHelpers.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\Support\mem.h" />
-    <ClInclude Include="..\Support\number_names.h" />
+    <ClInclude Include="..\Support\mem.hpp" />
+    <ClInclude Include="..\Support\number_names.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

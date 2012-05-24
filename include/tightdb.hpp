@@ -51,6 +51,12 @@ struct Table##Spec: ::tightdb::SpecBase { \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
             t->insert(_i, (::tightdb::tuple(), name1)); \
         } \
+        void set(std::size_t _i, type1 name1) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->set(_i, (::tightdb::tuple(), name1)); \
+        } \
     }; \
 }; \
 typedef ::tightdb::BasicTable<Table##Spec> Table;
@@ -85,6 +91,12 @@ struct Table##Spec: ::tightdb::SpecBase { \
             ::tightdb::BasicTable<Table##Spec>* const t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
             t->insert(_i, (::tightdb::tuple(), name1, name2)); \
+        } \
+        void set(std::size_t _i, type1 name1, type2 name2) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->set(_i, (::tightdb::tuple(), name1, name2)); \
         } \
     }; \
 }; \
@@ -122,6 +134,12 @@ struct Table##Spec: ::tightdb::SpecBase { \
             ::tightdb::BasicTable<Table##Spec>* const t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
             t->insert(_i, (::tightdb::tuple(), name1, name2, name3)); \
+        } \
+        void set(std::size_t _i, type1 name1, type2 name2, type3 name3) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->set(_i, (::tightdb::tuple(), name1, name2, name3)); \
         } \
     }; \
 }; \
@@ -161,6 +179,12 @@ struct Table##Spec: ::tightdb::SpecBase { \
             ::tightdb::BasicTable<Table##Spec>* const t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
             t->insert(_i, (::tightdb::tuple(), name1, name2, name3, name4)); \
+        } \
+        void set(std::size_t _i, type1 name1, type2 name2, type3 name3, type4 name4) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->set(_i, (::tightdb::tuple(), name1, name2, name3, name4)); \
         } \
     }; \
 }; \
@@ -202,6 +226,12 @@ struct Table##Spec: ::tightdb::SpecBase { \
             ::tightdb::BasicTable<Table##Spec>* const t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
             t->insert(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5)); \
+        } \
+        void set(std::size_t _i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->set(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5)); \
         } \
     }; \
 }; \
@@ -245,6 +275,12 @@ struct Table##Spec: ::tightdb::SpecBase { \
             ::tightdb::BasicTable<Table##Spec>* const t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
             t->insert(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5, name6)); \
+        } \
+        void set(std::size_t _i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->set(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5, name6)); \
         } \
     }; \
 }; \
@@ -290,6 +326,12 @@ struct Table##Spec: ::tightdb::SpecBase { \
             ::tightdb::BasicTable<Table##Spec>* const t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
             t->insert(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5, name6, name7)); \
+        } \
+        void set(std::size_t _i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->set(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5, name6, name7)); \
         } \
     }; \
 }; \
@@ -337,6 +379,12 @@ struct Table##Spec: ::tightdb::SpecBase { \
             ::tightdb::BasicTable<Table##Spec>* const t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
             t->insert(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5, name6, name7, name8)); \
+        } \
+        void set(std::size_t _i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8) \
+        { \
+            ::tightdb::BasicTable<Table##Spec>* const t = \
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
+            t->set(_i, (::tightdb::tuple(), name1, name2, name3, name4, name5, name6, name7, name8)); \
         } \
     }; \
 }; \

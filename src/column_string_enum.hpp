@@ -17,12 +17,13 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMN_STRING_ENUM__
-#define __TDB_COLUMN_STRING_ENUM__
+#ifndef TIGHTDB_COLUMN_STRING_ENUM_HPP
+#define TIGHTDB_COLUMN_STRING_ENUM_HPP
 
 #include "column_string.hpp"
 
 namespace tightdb {
+
 
 class ColumnStringEnum : public Column {
 public:
@@ -65,6 +66,7 @@ private:
     AdaptiveStringColumn m_keys;
 };
 
-}
 
-#endif //__TDB_COLUMN_STRING_ENUM__
+} // namespace tightdb
+
+#endif // TIGHTDB_COLUMN_STRING_ENUM_HPP

@@ -17,13 +17,13 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-
-#ifndef __TDB_ARRAY_BINARY__
-#define __TDB_ARRAY_BINARY__
+#ifndef TIGHTDB_ARRAY_BINARY_HPP
+#define TIGHTDB_ARRAY_BINARY_HPP
 
 #include "array_blob.hpp"
 
 namespace tightdb {
+
 
 class ArrayBinary : public Array {
 public:
@@ -54,6 +54,7 @@ private:
     ArrayBlob m_blob;
 };
 
-}
 
-#endif //__TDB_ARRAY_BINARY__
+} // namespace tightdb
+
+#endif // TIGHTDB_ARRAY_BINARY_HPP
