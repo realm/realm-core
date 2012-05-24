@@ -69,7 +69,7 @@ public:
     ColumnType  get_column_type(size_t column_ndx) const;
 
     // Row handling
-    size_t      add_empty_row();
+    size_t      add_empty_row(size_t num_of_rows = 1);
     void        remove(size_t row_ndx);
     void        remove_last() {if (!is_empty()) remove(m_size-1);}
 

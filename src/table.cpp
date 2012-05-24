@@ -556,15 +556,21 @@ const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
     return *reinterpret_cast<ColumnMixed*>(m_cols.Get(ndx));
 }
 
-size_t Table::add_empty_row()
+size_t Table::add_empty_row(size_t num_of_rows)
 {
-    const size_t count = get_column_count();
-    for (size_t i = 0; i < count; ++i) {
-        ColumnBase& column = GetColumnBase(i);
-        column.add();
+    const size_t col_count = get_column_count();
+    
+    for (size_t row = 0; row < num_of_rows; ++row) {
+        for (size_t i = 0; i < col_count; ++i) {
+            ColumnBase& column = GetColumnBase(i);
+            column.add();
+        }
     }
 
-    return m_size++;
+    // Return index of first new added row
+    size_t new_ndx = m_size;
+    m_size += num_of_rows;
+    return new_ndx;
 }
 
 void Table::clear()
