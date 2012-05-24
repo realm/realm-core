@@ -1,9 +1,7 @@
 #include "c-table.h"
 
-#include "table.hpp"
-#include "group.hpp"
+#include "lang_bind_helper.hpp"
 #include "query.hpp"
-#include "date.hpp"
 #include <cstdarg>
 #include <assert.h>
 
@@ -14,23 +12,6 @@ C1X will be getting support for type generic expressions they look like this:
                               float: cbrtf)(X)
 */
 
-// Internal helper functions to gain access to protected/private methods in Table:
-namespace tightdb {
-
-inline Table* TableHelper_get_subtable_ptr(Table* t, std::size_t col_idx, std::size_t row_idx)
-{
-    return t->get_subtable_ptr(col_idx, row_idx);
-}
-inline const Table* TableHelper_get_const_subtable_ptr(const Table* t, std::size_t col_idx, std::size_t row_idx)
-{
-    return t->get_subtable_ptr(col_idx, row_idx);
-}
-inline void TableHelper_unbind(const Table* t)
-{
-   t->unbind_ref();
-}
-
-} // namespace tightdb
 
 
 extern "C" {
@@ -150,7 +131,7 @@ void table_delete(Table* t)
 
 void table_unbind(const Table* t)
 {
-    TableHelper_unbind(t);
+    tightdb::LangBindHelper::unbind_table_ref(t);
 }
 
 Spec* table_get_spec(Table* t)
@@ -257,14 +238,14 @@ TightdbColumnType table_get_mixed_type(const Table* t, size_t column_ndx, size_t
     return t->get_mixed_type(column_ndx, ndx);
 }
 
-Table* table_get_table(Table* t, size_t column_ndx, size_t ndx)
+Table* table_get_subtable(Table* t, size_t column_ndx, size_t ndx)
 {
-    return TableHelper_get_subtable_ptr(t, column_ndx, ndx);
+    return tightdb::LangBindHelper::get_subtable_ptr(t, column_ndx, ndx);
 }
 
-const Table* table_get_ctable(const Table* t, size_t column_ndx, size_t ndx)
+const Table* table_get_const_subtable(const Table* t, size_t column_ndx, size_t ndx)
 {
-    return TableHelper_get_const_subtable_ptr(t, column_ndx, ndx);
+    return tightdb::LangBindHelper::get_subtable_ptr(t, column_ndx, ndx);
 }
 
 /*** Setters *******/

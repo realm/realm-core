@@ -103,6 +103,8 @@ protected:
     bool m_isValid;
 
 private:
+    friend class LangBindHelper;
+
     Table* get_table_ptr(const char* name);
     template<class T> T* get_table_ptr(const char* name);
 };

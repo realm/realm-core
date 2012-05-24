@@ -4,6 +4,10 @@
 
 using namespace tightdb;
 
+TIGHTDB_TABLE_2(TwoIntTable,
+                first,  Int,
+                second, Int)
+
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
@@ -12,6 +16,98 @@ TIGHTDB_TABLE_2(BoolTupleTable,
                 first,  Int,
                 second, Bool)
 
+
+TEST(TestQueryFindAll_range1)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "a");
+    ttt.add(4, "a");
+    ttt.add(7, "a");
+    ttt.add(10, "a");
+    ttt.add(1, "a");
+    ttt.add(4, "a");
+    ttt.add(7, "a");
+    ttt.add(10, "a");
+    ttt.add(1, "a");
+    ttt.add(4, "a");
+    ttt.add(7, "a");
+    ttt.add(10, "a");
+
+    TupleTableType::Query q1 = ttt.where().second.equal("a");
+    TupleTableType::View tv1 = q1.find_all(ttt, 4, 10);
+    CHECK_EQUAL(6, tv1.size());
+}
+
+
+TEST(TestQueryFindAll_range_or_monkey2)
+{
+    const size_t ROWS = 20;
+    const size_t ITER = 1000;
+
+    for(size_t u = 0; u < ITER; u++)
+    {
+        TwoIntTable tit;
+        Array a;
+        size_t start = rand() % (ROWS + 1);
+        size_t end = start + rand() % (ROWS + 1);
+
+        if(end > ROWS)
+            end = ROWS;
+
+        for(size_t t = 0; t < ROWS; t++) {
+            int64_t r1 = rand() % 10;
+            int64_t r2 = rand() % 10;
+            tit.add(r1, r2);
+        }
+
+        TwoIntTable::Query q1 = tit.where().group().first.equal(3).Or().first.equal(7).end_group().second.greater(5);
+        TwoIntTable::View tv1 = q1.find_all(tit, start, end);
+
+        for(size_t t = start; t < end; t++) {
+            if((tit[t].first == 3 || tit[t].first == 7) && tit[t].second > 5) {
+                a.add(t);
+            }
+        }
+        size_t s1 = a.Size();
+        size_t s2 = tv1.size();
+
+        CHECK_EQUAL(s1, s2);
+        for(size_t t = 0; t < a.Size(); t++) {
+            size_t i1 = a.Get(t);
+            size_t i2 = tv1.get_source_ndx(t);
+            CHECK_EQUAL(i1, i2);
+        }
+    }
+
+}
+
+
+
+TEST(TestQueryFindAll_range_or)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "b");
+    ttt.add(2, "a"); //// match
+    ttt.add(3, "b"); //
+    ttt.add(1, "a"); //// match
+    ttt.add(2, "b"); //// match
+    ttt.add(3, "a");
+    ttt.add(1, "b");
+    ttt.add(2, "a"); //// match
+    ttt.add(3, "b"); //
+
+    TupleTableType::Query q1 = ttt.where().group().first.greater(1).Or().second.equal("a").end_group().first.less(3);
+    TupleTableType::View tv1 = q1.find_all(ttt, 1, 8);
+    CHECK_EQUAL(4, tv1.size());
+
+    TupleTableType::View tv2 = q1.find_all(ttt, 2, 8);
+    CHECK_EQUAL(3, tv2.size());
+
+    TupleTableType::View tv3 = q1.find_all(ttt, 1, 7);
+    CHECK_EQUAL(3, tv3.size());
+}
 
 
 TEST(TestQueryDelete)
@@ -556,11 +652,11 @@ TEST(TestQueryFindAll_OrParan)
 
     ttt.add(1, "a");
     ttt.add(2, "a");
-    ttt.add(3, "X");
+    ttt.add(3, "X"); //
     ttt.add(4, "a");
-    ttt.add(5, "a");
+    ttt.add(5, "a"); //
     ttt.add(6, "a");
-    ttt.add(7, "X");
+    ttt.add(7, "X"); //
     ttt.add(2, "X");
 
     // (first == 5 || second == X && first > 2)
@@ -629,7 +725,23 @@ TEST(TestQueryFindAll_OrPHP)
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
 
+TEST(TestQueryFindAllOr)
+{
+    TupleTableType ttt;
 
+    ttt.add(1, "Joe");
+    ttt.add(2, "Sara");
+    ttt.add(3, "Jim");
+
+    // (second == Jim || second == Joe) && first = 1
+    TupleTableType::Query q1 = ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(3);
+    TupleTableType::View tv1 = q1.find_all(ttt);
+    CHECK_EQUAL(2, tv1.get_source_ndx(0));
+}
+
+
+
+ 
 
 TEST(TestQueryFindAll_Parans2)
 {
@@ -984,4 +1096,36 @@ TEST(TestQuery_sum_min_max_avg)
     CHECK_EQUAL(t.where().first.minimum(t), 1);
     CHECK_EQUAL(t.where().first.maximum(t), 3);
     CHECK_EQUAL(t.where().first.average(t), 2);
+}
+
+TEST(TestQuery_OfByOne)
+{
+    TupleTableType t;
+    for (size_t i = 0; i < MAX_LIST_SIZE * 2; ++i) {
+        t.add(1, "a");
+    }
+    
+    // Top
+    t[0].first = 0;
+    size_t res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(0, res);
+    t[0].first = 1; // reset
+    
+    // Before split
+    t[MAX_LIST_SIZE-1].first = 0;
+    res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(MAX_LIST_SIZE-1, res);
+    t[MAX_LIST_SIZE-1].first = 1; // reset
+    
+    // After split
+    t[MAX_LIST_SIZE].first = 0;
+    res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(MAX_LIST_SIZE, res);
+    t[MAX_LIST_SIZE].first = 1; // reset
+    
+    // Before end
+    const size_t last_pos = (MAX_LIST_SIZE*2)-1;
+    t[last_pos].first = 0;
+    res = t.where().first.equal(0).find_next(t);
+    CHECK_EQUAL(last_pos, res);
 }

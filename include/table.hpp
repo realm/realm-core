@@ -69,7 +69,7 @@ public:
     ColumnType  get_column_type(size_t column_ndx) const;
 
     // Row handling
-    size_t      add_empty_row();
+    size_t      add_empty_row(size_t num_of_rows = 1);
     void        remove(size_t row_ndx);
     void        remove_last() {if (!is_empty()) remove(m_size-1);}
 
@@ -279,11 +279,7 @@ private:
     friend class ColumnMixed;
     template<class> friend class BasicTableRef; // FIXME: Only BasicTableRef<T>::bind() and BasicTableRef<T>::unbind()
     friend class ColumnSubtableParent;
-
-    // These are used in the C API to gain access to the raw table pointers of subtables.
-    friend Table* TableHelper_get_subtable_ptr(Table* t, size_t col_idx, size_t row_idx);
-    friend const Table* TableHelper_get_const_subtable_ptr(const Table* t, size_t col_idx, size_t row_idx);
-    friend void TableHelper_unbind(const Table* t);
+    friend class LangBindHelper;
 };
 
 

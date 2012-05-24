@@ -1679,7 +1679,7 @@ template <size_t w> void Array::sort()
         // If range isn't suited for CountSort, it's *probably* discovered very early, within first few values,
         // in most practical cases, and won't add much wasted work. Max wasted work is O(n) which isn't much
         // compared to QuickSort.
-        b = MinMax<w>(lo, hi, m_len, &min, &max);
+        b = MinMax<w>(lo, hi + 1, m_len, &min, &max);
     }
 
     if(b) {

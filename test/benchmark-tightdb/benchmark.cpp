@@ -37,8 +37,6 @@ void stl(void);
 volatile uint64_t writethrough;
 
 
-
-
 void tightdb2(void)
 {
     IntegerTable integers;
@@ -49,7 +47,7 @@ void tightdb2(void)
 
     for(int index = 0; index < 2; index++) {
         std::string indexed;
-        integers.Clear();
+        integers.clear();
         if(index == 1) {
             integers.set_index(0);
             indexed = "Indexed ";
@@ -66,7 +64,7 @@ void tightdb2(void)
         printf((indexed + "Add: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 
 
-        //integers.Clear();
+        //integers.clear();
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (i + 1);
@@ -95,7 +93,7 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             uint64_t f = rand2() % RANGE;
-            integers.first.find_first(f);
+            integers.cols().first.find_first(f);
 
             // Sanity test to ensure that average distance between matches is the same as in the STL tests
 /*
@@ -112,7 +110,7 @@ void tightdb2(void)
 
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
-            integers.first.find_all(rand2() % RANGE);
+            integers.cols().first.find_all(rand2() % RANGE);
         }
         printf((indexed + "FindAll: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 
@@ -120,7 +118,7 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (ITEMS - i);
-            integers.DeleteRow(p);
+            integers.remove(p);
         }
         printf((indexed + "Delete: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
         printf("\n");
@@ -132,5 +130,7 @@ void tightdb2(void)
 void main(void)
 {
     tightdb2();
-//    getchar();
+#ifdef _MSC_VER
+    getchar();
+#endif
 }

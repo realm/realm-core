@@ -16,13 +16,29 @@ TEST(Table1)
     CHECK_EQUAL("first", table.get_column_name(0));
     CHECK_EQUAL("second", table.get_column_name(1));
 
-    const size_t ndx = table.add_empty_row();
+    // Test adding a single empty row
+    // and filling it with values
+    size_t ndx = table.add_empty_row();
     table.set_int(0, ndx, 0);
     table.set_int(1, ndx, 10);
 
     CHECK_EQUAL(0, table.get_int(0, ndx));
     CHECK_EQUAL(10, table.get_int(1, ndx));
-
+    
+    // Test adding multiple rows
+    ndx = table.add_empty_row(7);
+    for (size_t i = ndx; i < 7; ++i) {
+        table.set_int(0, i, 2*i);
+        table.set_int(1, i, 20*i);
+    }
+    
+    for (size_t i = ndx; i < 7; ++i) {
+        const int64_t v1 = 2 * i;
+        const int64_t v2 = 20 * i;
+        CHECK_EQUAL(v1, table.get_int(0, i));
+        CHECK_EQUAL(v2, table.get_int(1, i));
+    }
+    
 #ifdef _DEBUG
     table.Verify();
 #endif //_DEBUG

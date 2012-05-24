@@ -60,7 +60,7 @@ namespace tightdb {
     class Group;
     class Query;
     class Mixed;
-    class BinaryData;
+    struct BinaryData;
 }
 using tightdb::Table;
 using tightdb::TableView;
