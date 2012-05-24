@@ -189,8 +189,8 @@ typedef struct Query Query;
     Mixed*      table_get_mixed(const Table* t, size_t column_ndx, size_t ndx);
     TightdbColumnType table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx);
 
-    Table*      table_get_table(Table* t, size_t column_ndx, size_t ndx);
-    const Table* table_get_ctable(const Table* t, size_t column_ndx, size_t ndx);
+    Table*      table_get_subtable(Table* t, size_t column_ndx, size_t ndx);
+    const Table* table_get_const_subtable(const Table* t, size_t column_ndx, size_t ndx);
                 /* Use table_unbind() to 'delete' the table after use */
 
     /* Setting values */

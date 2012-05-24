@@ -1026,7 +1026,7 @@ TEST(Table_DateAndBinary)
 
     const size_t size = 10;
     char data[size];
-    for (size_t i=0; i<size; ++i) data[i] = i;
+    for (size_t i=0; i<size; ++i) data[i] = (char)i;
     t.add(8, BinaryData(data, size));
     CHECK_EQUAL(t[0].date, 8);
     CHECK_EQUAL(t[0].bin.get_len(), size);
