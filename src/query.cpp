@@ -35,17 +35,11 @@ Query::~Query()
     for(size_t i = 0; i < m_threadcount; i++)
         pthread_detach(threads[i]);
 
-    if(do_delete) 
-    {
-        Array deleted;
+    if(do_delete) {
         for(size_t t = 0; t < all_nodes.size(); t++) {
             ParentNode *p = all_nodes[t];
-            if(deleted.find_first((int64_t)p == -1)) {
-                delete p;
-                deleted.add((int64_t)p);
-            }
+            delete p;
         }
-        deleted.Destroy();
     }
     do_delete = true;
 }
