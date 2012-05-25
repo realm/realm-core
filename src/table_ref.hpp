@@ -223,7 +223,7 @@ template<class T> inline void swap(BasicTableRef<T>& r, BasicTableRef<T>& s)
 template<class C, class T, class U>
 std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const BasicTableRef<U>& t)
 {
-    out << static_cast<void*>(t.m_table);
+    out << static_cast<const void*>(t.m_table);
     return out;
 }
 
