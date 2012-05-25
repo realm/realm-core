@@ -98,8 +98,8 @@ public:
     SUBTABLE(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
     SUBTABLE() {};
     ~SUBTABLE() {
-        delete m_child; 
-        delete m_child2; 
+    //    delete m_child; 
+    //    delete m_child2; 
     }
     void Init(const Table& table)
     {
@@ -144,7 +144,9 @@ public:
 template <class T, class C, class F> class NODE: public ParentNode {
 public:
     NODE(T v, size_t column) : m_array(GetDefaultAllocator()), m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v), m_column_id(column) {m_child = 0;}
-    ~NODE() {delete m_child; }
+    ~NODE() {
+    //    delete m_child; 
+    }
 
     void Init(const Table& table)
     {
@@ -219,7 +221,10 @@ public:
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(m_value);
     }
-    ~STRINGNODE() {delete m_child; free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase); }
+    ~STRINGNODE() {
+   //     delete m_child; 
+        free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase);
+    }
 
     void Init(const Table& table)
     {
@@ -278,7 +283,10 @@ public:
         m_value = (char *)malloc(strlen(v)*6);
         memcpy(m_value, v, strlen(v) + 1);
     }
-    ~STRINGNODE() {delete m_child; free((void*)m_value); }
+    ~STRINGNODE() {
+    //    delete m_child; 
+        free((void*)m_value); 
+    }
 
     void Init(const Table& table)
     {
@@ -341,9 +349,9 @@ public:
     OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond1 = p1; m_cond2 = NULL;};
     ~OR_NODE()
     {
-        delete m_cond1;
-        delete m_cond2;
-        delete m_child;
+//        delete m_cond1;
+//        delete m_cond2;
+//        delete m_child;
     }
 
     void Init(const Table& table)

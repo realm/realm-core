@@ -157,11 +157,12 @@ protected:
     } ts;
     pthread_t threads[MAX_THREADS];
 
-    mutable std::vector<ParentNode*> first;
+    std::vector<ParentNode*> first;
     std::vector<ParentNode**> update;
     std::vector<ParentNode**> update_override;
     std::vector<ParentNode**> subtables;
-
+    std::vector<ParentNode*> all_nodes;
+    mutable bool do_delete;
 private:
     size_t m_threadcount;
 };
