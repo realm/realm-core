@@ -28,6 +28,7 @@ Query::Query(const Query& copy)
     m_threadcount = copy.m_threadcount;
 //    copy.first[0] = 0;
     copy.do_delete = false;
+    do_delete = true;
 }
 
 Query::~Query()
@@ -41,7 +42,6 @@ Query::~Query()
             delete p;
         }
     }
-    do_delete = true;
 }
 
 Query& Query::equal(size_t column_ndx, int64_t value)
