@@ -14,24 +14,40 @@ Query::Query()
     update_override.push_back(0);
     first.push_back(0);
     m_threadcount = 0;
+    do_delete = true;
 }
 
 // FIXME: Try to remove this
 Query::Query(const Query& copy)
 {
+    all_nodes = copy.all_nodes;
     update = copy.update;
     update_override = copy.update_override;
     first = copy.first;
     error_code = copy.error_code;
     m_threadcount = copy.m_threadcount;
-    copy.first[0] = 0;
+//    copy.first[0] = 0;
+    copy.do_delete = false;
 }
 
 Query::~Query()
 {
     for(size_t i = 0; i < m_threadcount; i++)
         pthread_detach(threads[i]);
-    delete first[0];
+
+    if(do_delete) 
+    {
+        Array deleted;
+        for(size_t t = 0; t < all_nodes.size(); t++) {
+            ParentNode *p = all_nodes[t];
+            if(deleted.find_first((int64_t)p == -1)) {
+                delete p;
+                deleted.add((int64_t)p);
+            }
+        }
+        deleted.Destroy();
+    }
+    do_delete = true;
 }
 
 Query& Query::equal(size_t column_ndx, int64_t value)
@@ -152,6 +168,8 @@ void Query::group()
 void Query::Or()
 {
     ParentNode* const o = new OR_NODE(first[first.size()-1]);
+    all_nodes.push_back(o);
+
     first[first.size()-1] = o;
     update[update.size()-1] = &((OR_NODE*)o)->m_cond2;
     update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
@@ -472,6 +490,7 @@ size_t Query::FindInternal(const Table& table, size_t start, size_t end) const
 
 void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 {
+    all_nodes.push_back(p);
     if(first[first.size()-1] == 0)
         first[first.size()-1] = p;
 
