@@ -54,6 +54,11 @@ memtest: debug
 	@$(MAKE) -C test memtest
 .PHONY: memtest
 
+# Run valgrind on the unit tests after building everything in release mode
+memtest-release: static
+	@$(MAKE) -C test memtest-release
+.PHONY: memtest-release
+
 # Run the benchmarking progrems after building everything
 benchmark: static
 	@$(MAKE) -C test benchmark

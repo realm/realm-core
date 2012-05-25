@@ -42,6 +42,10 @@ memtest: debug
 	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./tightdb-tests-debug --no-error-exit-staus
 .PHONY: memtest
 
+memtest-release: all
+	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./tightdb-tests --no-error-exit-staus
+.PHONY: memtest-release
+
 benchmark: test-tightdb test-sqlite3 test-stl
 	@echo ""
 	@echo ".:: TightDB ::."
