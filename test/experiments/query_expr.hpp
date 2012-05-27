@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <ostream>
 
+#include "static_assert.hpp"
+#include "meta.hpp"
+#include "tuple.hpp"
+
 
 // WHY ARE THE STATIC ASSERTS NEVER TRIGGERED?
 
@@ -14,7 +18,6 @@
 
 // ToDo: Subtables???????
 // ToDo: Column/B-tree iterator
-// ToDo: Type tuple for prettier spec (better def in C++11).
 // ToDo: Unary operators +, -, ~, *
 // ToDo: Binary operators %, <<, >>, &, ^, |
 // GOOD: Refer to any regular variable in context
@@ -30,208 +33,12 @@
 // schema compatibility, which might be simply a comparison of integer
 // identifiers.
 
-// Spec::ColTypes should be Spec::Columns since it defines the set of columns in the table.
 // Optional static column names
 // Optional dynamic column names
 // Optional custom methods
 
 
-
-#define TIGHTDB_STATIC_ASSERT(assertion) typedef \
-  tightdb::static_assert_dummy<sizeof(tightdb::STATIC_ASSERTION_FAILURE<static_cast<bool>(assertion)>)> \
-  tightdb_static_assert_##__LINE__
-
-
 namespace tightdb {
-
-
-template<bool> struct STATIC_ASSERTION_FAILURE;
-template<> struct STATIC_ASSERTION_FAILURE<true> {};
-
-template<int> struct static_assert_dummy {};
-
-
-
-struct EmptyType {};
-
-
-template<bool cond, class A, class B> struct CondType { typedef A type; };
-template<class A, class B> struct CondType<false, A, B> { typedef B type; };
-
-
-template<class T, class A, class B> struct EitherTypeIs { static const bool value = false; };
-template<class T, class A> struct EitherTypeIs<T,T,A> { static const bool value = true; };
-template<class T, class A> struct EitherTypeIs<T,A,T> { static const bool value = true; };
-template<class T> struct EitherTypeIs<T,T,T> { static const bool value = true; };
-
-
-/**
- * Determine the type resulting from integral promotion.
- *
- * \note Enum types are not supported.
- */
-template<class T> struct IntegralPromote;
-
-template<> struct IntegralPromote<bool> { typedef int type; };
-template<> struct IntegralPromote<char> {
-    typedef CondType<INT_MIN <= CHAR_MIN && CHAR_MAX <= INT_MAX, int, unsigned>::type type;
-};
-template<> struct IntegralPromote<signed char> {
-    typedef CondType<INT_MIN <= SCHAR_MIN && SCHAR_MAX <= INT_MAX, int, unsigned>::type type;
-};
-template<> struct IntegralPromote<unsigned char> {
-    typedef CondType<UCHAR_MAX <= INT_MAX, int, unsigned>::type type;
-};
-template<> struct IntegralPromote<wchar_t> {
-private:
-    typedef CondType<LLONG_MIN <= WCHAR_MIN && WCHAR_MAX <= LLONG_MAX, long long, unsigned long long>::type type_1;
-    typedef CondType<0 <= WCHAR_MIN && WCHAR_MAX <= ULONG_MAX, unsigned long, type_1>::type type_2;
-    typedef CondType<LONG_MIN <= WCHAR_MIN && WCHAR_MAX <= LONG_MAX, long, type_2>::type type_3;
-    typedef CondType<0 <= WCHAR_MIN && WCHAR_MAX <= UINT_MAX, unsigned, type_3>::type type_4;
-public:
-    typedef CondType<INT_MIN <= WCHAR_MIN && WCHAR_MAX <= INT_MAX, int, type_4>::type type;
-};
-template<> struct IntegralPromote<short> {
-    typedef CondType<INT_MIN <= SHRT_MIN && SHRT_MAX <= INT_MAX, int, unsigned>::type type;
-};
-template<> struct IntegralPromote<unsigned short> {
-    typedef CondType<USHRT_MAX <= INT_MAX, int, unsigned>::type type;
-};
-template<> struct IntegralPromote<int> { typedef int type; };
-template<> struct IntegralPromote<unsigned> { typedef unsigned type; };
-template<> struct IntegralPromote<long> { typedef long type; };
-template<> struct IntegralPromote<unsigned long> { typedef unsigned long type; };
-template<> struct IntegralPromote<long long> { typedef long long type; };
-template<> struct IntegralPromote<unsigned long long> { typedef unsigned long long type; };
-template<> struct IntegralPromote<float> { typedef float type; };
-template<> struct IntegralPromote<double> { typedef double type; };
-template<> struct IntegralPromote<long double> { typedef long double type; };
-
-
-
-/**
- * Determine type of the result of an arithmetic operation (+, -, *,
- * /, %, |, &, ^). The type of the result of a shift operation (<<,
- * >>) can instead be found as the type resulting from integral
- * promotion of the left operand.
- *
- * \note Enum types are not supported.
-
- */
-template<class A, class B> struct ArithBinOpType {
-private:
-    typedef typename IntegralPromote<A>::type A2;
-    typedef typename IntegralPromote<B>::type B2;
-
-    typedef typename CondType<UINT_MAX <= LONG_MAX, long, unsigned long>::type type_l_u;
-    typedef typename CondType<EitherTypeIs<unsigned, A2, B2>::value, type_l_u, long>::type type_l;
-
-    typedef typename CondType<UINT_MAX <= LLONG_MAX, long long, unsigned long long>::type type_ll_u;
-    typedef typename CondType<ULONG_MAX <= LLONG_MAX, long long, unsigned long long>::type type_ll_ul;
-    typedef typename CondType<EitherTypeIs<unsigned, A2, B2>::value, type_ll_u, long long>::type type_ll_1;
-    typedef typename CondType<EitherTypeIs<unsigned long, A2, B2>::value, type_ll_ul, type_ll_1>::type type_ll;
-
-    typedef typename CondType<EitherTypeIs<unsigned, A2, B2>::value, unsigned, int>::type type_1;
-    typedef typename CondType<EitherTypeIs<long, A2, B2>::value, type_l, type_1>::type type_2;
-    typedef typename CondType<EitherTypeIs<unsigned long, A2, B2>::value, unsigned long, type_2>::type type_3;
-    typedef typename CondType<EitherTypeIs<long long, A2, B2>::value, type_ll, type_3>::type type_4;
-    typedef typename CondType<EitherTypeIs<unsigned long long, A2, B2>::value, unsigned long long, type_4>::type type_5;
-    typedef typename CondType<EitherTypeIs<float, A, B>::value, float, type_5>::type type_6;
-    typedef typename CondType<EitherTypeIs<double, A, B>::value, double, type_6>::type type_7;
-public:
-    typedef typename CondType<EitherTypeIs<long double, A, B>::value, long double, type_7>::type type;
-
-};
-
-
-
-
-/**
- * The 'cons' operator for building lists of types.
- *
- * \tparam H The head of the list, that is, the first type in the
- * list.
- *
- * \tparam T The tail of the list, that is, the list of types
- * following the head. It is 'void' if nothing follows the head,
- * otherwise it matches TypeCons<H2,T2>.
- *
- * Note that 'void' is considered as a zero-length list.
- */
-template<class H, class T> struct TypeCons {
-  typedef H head;
-  typedef T tail;
-};
-
-
-/**
- * Append a type the the end of a type list. The resulting type list
- * is available as TypeAppend<List, T>::type.
- *
- * \tparam List A list of types constructed using TypeCons<>. Note
- * that 'void' is considered as a zero-length list.
- *
- * \tparam T The new type to be appended.
- */
-template<class List, class T> struct TypeAppend {
-  typedef TypeCons<typename List::head, typename TypeAppend<typename List::tail, T>::type> type;
-};
-template<class T> struct TypeAppend<void, T> {
-  typedef TypeCons<T, void> type;
-};
-
-
-/**
- * Get an element from the specified list of types. The
- * result is available as TypeAt<List, i>::type.
- *
- * \tparam List A list of types constructed using TypeCons<>. Note
- * that 'void' is considered as a zero-length list.
- *
- * \tparam i The index of the list element to get.
- */
-template<class List, int i> struct TypeAt {
-  typedef typename TypeAt<typename List::tail, i-1>::type type;
-};
-template<class List> struct TypeAt<List, 0> { typedef typename List::head type; };
-
-
-/**
- * Count the number of elements in the specified list of types. The
- * result is available as TypeCount<List>::value.
- *
- * \tparam List The list of types constructed using TypeCons<>. Note
- * that 'void' is considered as a zero-length list.
- */
-template<class List> struct TypeCount {
-  static const int value = 1 + TypeCount<typename List::tail>::value;
-};
-template<> struct TypeCount<void> { static const int value = 0; };
-
-
-/**
- * Execute an action for each element in the specified list of types.
- *
- * \tparam List The list of types constructed using TypeCons<>. Note
- * that 'void' is considered as a zero-length list.
- */
-template<class List, int i=0> struct ForEachType {
-  template<class Op> static void exec(Op& o)
-  {
-    o.template exec<typename List::head, i>();
-    ForEachType<typename List::tail, i+1>::exec(o);
-  }
-  template<class Op> static void exec(const Op& o)
-  {
-    o.template exec<typename List::head, i>();
-    ForEachType<typename List::tail, i+1>::exec(o);
-  }
-};
-template<int i> struct ForEachType<void, i> {
-  template<class Op> static void exec(Op&) {}
-  template<class Op> static void exec(const Op&) {}
-};
-
 
 
 
@@ -240,6 +47,15 @@ template<class Spec> class BasicTable;
 
 namespace query
 {
+    struct EmptyType {};
+
+    template<class T> struct IsSubtable { static const bool value = false; };
+    template<class T> struct IsSubtable<SpecBase::Subtable<T> > {
+        static const bool value = false;
+    };
+
+
+
     template<class Tab, int col_idx, class Type> struct ColRef {};
 
     template<class Op, class A> struct UnOp {
@@ -805,12 +621,6 @@ Then reconsider AND changes for improved optimization
 
 
 
-    template<class T> struct IsBasicTable { static const bool value = false; };
-    template<class Spec> struct IsBasicTable<BasicTable<Spec> > {
-        static const bool value = false;
-    };
-
-
 
     /**
      * Handles the evaluation of a query expression based on a
@@ -827,14 +637,14 @@ Then reconsider AND changes for improved optimization
 
         Type operator()(const ColRef<Tab, col_idx, Type>&, std::size_t i) const
         {
-            TIGHTDB_STATIC_ASSERT(!IsBasicTable<Type>::value);
+            TIGHTDB_STATIC_ASSERT(!IsSubtable<Type>::value);
             return static_cast<const Type*>(m_column)[i];
         }
 
         template<int col_idx2, class Type2>
         Type2 operator()(const ColRef<Tab, col_idx2, Type2>&, std::size_t i) const
         {
-            TIGHTDB_STATIC_ASSERT(!IsBasicTable<Type2>::value);
+            TIGHTDB_STATIC_ASSERT(!IsSubtable<Type2>::value);
             return m_table->template get<col_idx2, Type2>(i);
         }
 
@@ -916,12 +726,12 @@ private:
      * appropriate query expression type.
      */
     template<int col_idx> struct QueryCol {
-        typedef typename TypeSubscr<typename Spec::ColTypes, col_idx>::type val_type;
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type val_type;
         typedef query::ColRef<BasicTable, col_idx, val_type> expr_type;
         typedef query::Expr<expr_type> type;
     };
 
-    typedef typename Spec::template Columns<QueryCol, EmptyType> QueryRowBase;
+    typedef typename Spec::template ColNames<QueryCol, query::EmptyType> QueryRowBase;
 
 public:
     // FIXME: Make private
@@ -941,11 +751,11 @@ public:
     BasicTable(): m_size(0)
     {
         m_size = 256;
-        m_cols = new void*[TypeCount<typename Spec::ColTypes>::value];
-        ForEachType<typename Spec::ColTypes>::exec(MakeCol(this));
+        m_cols = new void*[TypeCount<typename Spec::Columns>::value];
+        ForEachType<typename Spec::Columns, MakeCol>::exec(this);
     }
 
-    struct QueryRow: QueryRowBase { QueryRow(): QueryRowBase(EmptyType()) {} };
+    struct QueryRow: QueryRowBase { QueryRow(): QueryRowBase(query::EmptyType()) {} };
 
     template<class Query> bool exists(const Query& q) const
     {
@@ -961,18 +771,11 @@ private:
     std::size_t m_size;
     void** m_cols;
 
-    struct MakeCol {
-        BasicTable* m_table;
-        MakeCol(BasicTable* t): m_table(t) {}
-        template<class Type, int col_idx> void exec() const
-        {
-            if (query::IsBasicTable<Type>::value) {
-                m_table->m_cols[col_idx] = new Type*[m_table->m_size];
-            }
-            else {
-                m_table->m_cols[col_idx] = new Type[m_table->m_size];
-            }
-        }
+    template<class Type, int col_idx> struct MakeCol {
+        static void exec(BasicTable* t) { t->m_cols[col_idx] = new Type[t->m_size]; }
+    };
+    template<class T, int col_idx> struct MakeCol<SpecBase::Subtable<T>, col_idx> {
+        static void exec(BasicTable* t) { t->m_cols[col_idx] = new T*[t->m_size]; }
     };
 
     template<class T> bool _exists(const T& q) const

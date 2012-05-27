@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_TABLE_ACCESSORS_HPP
 #define TIGHTDB_TABLE_ACCESSORS_HPP
 
+#include <cstring>
 #include <utility>
 
 #include "mixed.hpp"
@@ -65,11 +66,11 @@ struct SpecBase {
      * By default, there are no static column names defined for a
      * BasicTable. One may define a set of column mames as follows:
      *
-     * <pre>
+     * \code{.cpp}
      *
      *   struct MyTableSpec {
-     *     typedef tightdb::TypeAppend<void, int>::type Columns1;
-     *     typedef tightdb::TypeAppend<Columns1, bool>::type Columns;
+     *     typedef TypeAppend<void, int>::type Columns1;
+     *     typedef TypeAppend<Columns1, bool>::type Columns;
      *
      *     template<template<int> class Col, class Init> struct ColNames {
      *       typename Col<0>::type foo;
@@ -78,7 +79,7 @@ struct SpecBase {
      *     };
      *   };
      *
-     * </pre>
+     * \endcode
      *
      * Note that 'i' in Col<i> links the name that you specify to a
      * particular column index. You may specify the column names in
@@ -88,7 +89,8 @@ struct SpecBase {
     template<template<int> class Col, class Init> struct ColNames { ColNames(Init) {} };
 
     /**
-     *
+     * FIXME: Currently we do not support absence of dynamic column
+     * names.
      */
     static const char* const* dyn_col_names() { return 0; }
 
@@ -96,14 +98,43 @@ struct SpecBase {
      * This is the fallback class that is used when no convenience
      * methods are specified in the users Spec class.
      *
-     * If you would like to add a convenient add() method, here is how
-     * you could do it:
+     * If you would like to add a more convenient add() method, here
+     * is how you could do it:
+     *
+     * \code{.cpp}
+     *
+     *   struct MyTableSpec {
+     *     typedef tightdb::TypeAppend<void, int>::type Columns1;
+     *     typedef tightdb::TypeAppend<Columns1, bool>::type Columns;
+     *
+     *     struct ConvenienceMethods {
+     *       void add(int foo, bool bar)
+     *       {
+     *         BasicTable<MyTableSpec>* const t = static_cast<BasicTable<MyTableSpec>*>(this);
+     *         t->add((tuple(), name1, name2));
+     *       }
+     *     };
+     *   };
+     *
+     * \endcode
+     *
+     * FIXME: Note: Users ConvenienceMethods may not contain any
+     * virtual methods, nor may it contain any data memebers. We might
+     * want to check this by TIGHTDB_STATIC_ASSERT(sizeof(Derivative
+     * of ConvenienceMethods) == 1)), however, this would not be
+     * guaranteed by the standard, since even an empty class may add
+     * to the size of the derived class. Fortunately, as long as
+     * ConvenienceMethods is derived from, by BasicTable, after
+     * deriving from Table, this cannot become a problem, nor would it
+     * lead to a violation of the strict aliasing rule of C++03 or
+     * C++11.
      */
     struct ConvenienceMethods {};
 };
 
 
-template<class T> class BasicTableView;
+template<class> class BasicTable;
+template<class> class BasicTableView;
 
 
 namespace _impl {

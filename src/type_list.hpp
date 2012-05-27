@@ -33,7 +33,7 @@ namespace tightdb {
  * following the head. It is 'void' if nothing follows the head,
  * otherwise it matches TypeCons<H2,T2>.
  *
- * Note that 'void' is considered as a zero-length list.
+ * Note that 'void' is interpreted as a zero-length list.
  */
 template<class H, class T> struct TypeCons {
     typedef H head;
@@ -46,7 +46,7 @@ template<class H, class T> struct TypeCons {
  * is available as TypeAppend<List, T>::type.
  *
  * \tparam List A list of types constructed using TypeCons<>. Note
- * that 'void' is considered as a zero-length list.
+ * that 'void' is interpreted as a zero-length list.
  *
  * \tparam T The new type to be appended.
  */
@@ -63,7 +63,7 @@ template<class T> struct TypeAppend<void, T> {
  * result is available as TypeAt<List, i>::type.
  *
  * \tparam List A list of types constructed using TypeCons<>. Note
- * that 'void' is considered as a zero-length list.
+ * that 'void' is interpreted as a zero-length list.
  *
  * \tparam i The index of the list element to get.
  */
@@ -78,7 +78,7 @@ template<class List> struct TypeAt<List, 0> { typedef typename List::head type; 
  * result is available as TypeCount<List>::value.
  *
  * \tparam List The list of types constructed using TypeCons<>. Note
- * that 'void' is considered as a zero-length list.
+ * that 'void' is interpreted as a zero-length list.
  */
 template<class List> struct TypeCount {
     static const int value = 1 + TypeCount<typename List::tail>::value;
@@ -90,7 +90,7 @@ template<> struct TypeCount<void> { static const int value = 0; };
  * Execute an action for each element in the specified list of types.
  *
  * \tparam List The list of types constructed using TypeCons<>. Note
- * that 'void' is considered as a zero-length list.
+ * that 'void' is interpreted as a zero-length list.
  */
 template<class List, template<class T, int i> class Op, int i=0> struct ForEachType {
     static void exec()

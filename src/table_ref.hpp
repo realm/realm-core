@@ -227,6 +227,7 @@ std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const BasicTab
     return out;
 }
 
-}
+
+} // namespace tightdb
 
 #endif // TIGHTDB_TABLE_REF_HPP
