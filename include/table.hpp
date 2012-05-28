@@ -277,7 +277,7 @@ private:
     friend class Group;
     friend class Query;
     friend class ColumnMixed;
-    template<class> friend class BasicTableRef; // FIXME: Only BasicTableRef<T>::bind() and BasicTableRef<T>::unbind()
+    template<class> friend class bind_ptr;
     friend class ColumnSubtableParent;
     friend class LangBindHelper;
 };

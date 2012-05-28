@@ -39,7 +39,8 @@ namespace tightdb {
  * called to decrement the reference count when it no longer needs
  * access to that table.
  */
-struct LangBindHelper {
+class LangBindHelper {
+public:
     static Table* get_subtable_ptr(Table*, size_t column_ndx, size_t row_ndx);
     static const Table* get_subtable_ptr(const Table*, size_t column_ndx, size_t row_ndx);
 

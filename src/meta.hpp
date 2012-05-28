@@ -21,6 +21,9 @@
 #define TIGHTDB_META_HPP
 
 #include <climits>
+#include <cwchar>
+
+#include "config.h"
 
 namespace tightdb {
 
@@ -54,10 +57,13 @@ template<class T> struct DerefType<T*> { typedef T type; };
 /**
  * Determine the type resulting from integral promotion.
  *
- * \note Enum types are not supported.
+ * \note Enum types are supported only when the compiler supports the
+ * C++11 'decltype' feature.
  */
+#ifdef TIGHTDB_HAVE_CXX11_DECLTYPE
+template<class T> struct IntegralPromote { typedef decltype(+T()) type; };
+#else // !TIGHTDB_HAVE_CXX11_DECLTYPE
 template<class T> struct IntegralPromote;
-
 template<> struct IntegralPromote<bool> { typedef int type; };
 template<> struct IntegralPromote<char> {
     typedef CondType<INT_MIN <= CHAR_MIN && CHAR_MAX <= INT_MAX, int, unsigned>::type type;
@@ -92,6 +98,7 @@ template<> struct IntegralPromote<unsigned long long> { typedef unsigned long lo
 template<> struct IntegralPromote<float> { typedef float type; };
 template<> struct IntegralPromote<double> { typedef double type; };
 template<> struct IntegralPromote<long double> { typedef long double type; };
+#endif // !TIGHTDB_HAVE_CXX11_DECLTYPE
 
 
 
@@ -101,8 +108,12 @@ template<> struct IntegralPromote<long double> { typedef long double type; };
  * >>) can instead be found as the type resulting from integral
  * promotion of the left operand.
  *
- * \note Enum types are not supported.
+ * \note Enum types are supported only when the compiler supports the
+ * C++11 'decltype' feature.
  */
+#ifdef TIGHTDB_HAVE_CXX11_DECLTYPE
+template<class A, class B> struct ArithBinOpType { typedef decltype(A()+B()) type; };
+#else // !TIGHTDB_HAVE_CXX11_DECLTYPE
 template<class A, class B> struct ArithBinOpType {
 private:
     typedef typename IntegralPromote<A>::type A2;
@@ -127,6 +138,7 @@ private:
 public:
     typedef typename CondType<EitherTypeIs<long double, A, B>::value, long double, type_7>::type type;
 };
+#endif // !TIGHTDB_HAVE_CXX11_DECLTYPE
 
 
 } // namespace tightdb

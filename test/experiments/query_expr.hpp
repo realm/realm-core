@@ -114,7 +114,7 @@ namespace query
     };
 
     /// Encoding of unary prefix 'plus' operator, which applies
-    /// arithmetic promotion to its argument, but otherwise does
+    /// integral promotion to its argument, but otherwise does
     /// nothing.
     struct Pos {
         static const char* sym() { return "+"; }

@@ -421,6 +421,11 @@ template<class S> void Array::WriteAt(size_t pos, S& out) const
 
 inline void Array::move_assign(Array& a)
 {
+    // FIXME: It will likely be a lot better for the optimizer if we
+    // did a member-wise copy, rather than recreating the state from
+    // the referenced data. This is important because TableView, for
+    // example, relies on long chains of moves to be optimized away
+    // completely. This change should be a 'no-brainer'.
     Destroy();
     UpdateRef(a.GetRef());
     a.Invalidate();

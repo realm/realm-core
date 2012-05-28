@@ -167,21 +167,24 @@ public:
 
     template<class L> void add(const Tuple<L>& tuple)
     {
-        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value);
+        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
+                              "Wrong number of tuple elements");
         ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), size(), tuple);
         insert_done();
     }
 
     template<class L> void insert(std::size_t i, const Tuple<L>& tuple)
     {
-        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value);
+        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
+                              "Wrong number of tuple elements");
         ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), i, tuple);
         insert_done();
     }
 
     template<class L> void set(std::size_t i, const Tuple<L>& tuple)
     {
-        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value);
+        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
+                              "Wrong number of tuple elements");
         ForEachType<Columns, _impl::AssignIntoCol>::exec(static_cast<Table*>(this), i, tuple);
     }
 
@@ -195,8 +198,8 @@ public:
 
     class Query;
 
-    Query where() const { 
-        return Query(); 
+    Query where() const {
+        return Query();
     } // FIXME: Bad thing to copy queries
 
 #ifdef _DEBUG
@@ -228,6 +231,11 @@ private:
     // This one allows a BasicTable to know that BasicTables with
     // other Specs are also derived from Table.
     template<class> friend class BasicTable;
+
+    // These allow bind_ptr to know that this class is derived from
+    // Table.
+    friend class bind_ptr<BasicTable>;
+    friend class bind_ptr<const BasicTable>;
 
     // These allow BasicTableRef to refer to RowAccessor and
     // ConstRowAccessor.
