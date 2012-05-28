@@ -8,18 +8,23 @@
 #include "tuple.hpp"
 
 
-// WHY ARE THE STATIC ASSERTS NEVER TRIGGERED?
-
 // Check that Inlining is still perfect when referring to context variables whose value are not known to be constant (e.g. a function argument)
 //   Optimization is not perfect - consider evaluating logical operators before COUNT/EXISTS operation.
 
 // table.count(t.foo || t.bar) is also not perfectly optimized - again consider evaluating logical operators before COUNT/EXISTS operation.
 
 
-// ToDo: Subtables???????
+
+/* Maybe:
+Rename Canonicalize to MoveNot, then do ConstFold
+Then reconsider AND changes for improved optimization
+*/
+
+
+
+
+// ToDo: Optimization issues
 // ToDo: Column/B-tree iterator
-// ToDo: Unary operators +, -, ~, *
-// ToDo: Binary operators %, <<, >>, &, ^, |
 // GOOD: Refer to any regular variable in context
 // GOOD: Use any arithemtic, comparison, or conditional operator
 // GOOD: No restrictions on mixing of types (except that it is not allowed to use enums in arithmetic operations that involve column references)
@@ -33,9 +38,7 @@
 // fast check on schema compatibility, which might be simply a
 // comparison of integer identifiers.
 
-// Optional static column names
-// Optional dynamic column names
-// Optional custom methods
+// Optional dynamic column names in table spec
 
 
 namespace tightdb {
@@ -96,12 +99,44 @@ namespace query
 
 
 
+    /// Encoding of logical negation.
     struct Not {
         static const char* sym() { return "!"; }
-        template<class A> struct Result { typedef bool type; };
+        template<class> struct Result { typedef bool type; };
         template<class A> static bool eval(const A& a) { return !a; }
     };
 
+    /// Encoding of bitwise complementation.
+    struct Compl {
+        static const char* sym() { return "~"; }
+        template<class A> struct Result { typedef typename IntegralPromote<A>::type type; };
+        template<class A> static typename Result<A>::type eval(const A& a) { return ~a; }
+    };
+
+    /// Encoding of unary prefix 'plus' operator, which applies
+    /// arithmetic promotion to its argument, but otherwise does
+    /// nothing.
+    struct Pos {
+        static const char* sym() { return "+"; }
+        template<class A> struct Result { typedef typename IntegralPromote<A>::type type; };
+        template<class A> static typename Result<A>::type eval(const A& a) { return +a; }
+    };
+
+    /// Encoding of arithmetic negation.
+    struct Neg {
+        static const char* sym() { return "-"; }
+        template<class A> struct Result { typedef typename IntegralPromote<A>::type type; };
+        template<class A> static typename Result<A>::type eval(const A& a) { return -a; }
+    };
+
+    /// Encoding of pointer dereferencing operation.
+    struct Deref {
+        static const char* sym() { return "*"; }
+        template<class A> struct Result { typedef typename DerefType<A>::type type; };
+        template<class A> static typename Result<A>::type eval(const A& a) { return *a; }
+    };
+
+    /// Encoding of multiplication.
     struct Mul {
         static const char* sym() { return "*"; }
         template<class A, class B>
@@ -110,6 +145,7 @@ namespace query
         static typename Result<A,B>::type eval(const A& a, const B& b) { return a * b; }
     };
 
+    /// Encoding of division.
     struct Div {
         static const char* sym() { return "/"; }
         template<class A, class B>
@@ -118,6 +154,16 @@ namespace query
         static typename Result<A,B>::type eval(const A& a, const B& b) { return a / b; }
     };
 
+    /// Encoding of modulus operation (remainder of integer division).
+    struct Mod {
+        static const char* sym() { return "%"; }
+        template<class A, class B>
+        struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+        template<class A, class B>
+        static typename Result<A,B>::type eval(const A& a, const B& b) { return a % b; }
+    };
+
+    /// Encoding of addition.
     struct Add {
         static const char* sym() { return "+"; }
         template<class A, class B>
@@ -126,6 +172,7 @@ namespace query
         static typename Result<A,B>::type eval(const A& a, const B& b) { return a + b; }
     };
 
+    /// Encoding of subtraction.
     struct Sub {
         static const char* sym() { return "-"; }
         template<class A, class B>
@@ -134,53 +181,105 @@ namespace query
         static typename Result<A,B>::type eval(const A& a, const B& b) { return a - b; }
     };
 
+    /// Encoding of 'shift left' operation.
+    struct Shl {
+        static const char* sym() { return "<<"; }
+        template<class A, class> struct Result { typedef typename IntegralPromote<A>::type type; };
+        template<class A, class B>
+        static typename Result<A,B>::type eval(const A& a, const B& b) { return a << b; }
+    };
+
+    /// Encoding of 'shift right' operation.
+    struct Shr {
+        static const char* sym() { return ">>"; }
+        template<class A, class> struct Result { typedef typename IntegralPromote<A>::type type; };
+        template<class A, class B>
+        static typename Result<A,B>::type eval(const A& a, const B& b) { return a >> b; }
+    };
+
+    /// Encoding of equality comparison operation.
     struct Eq {
         static const char* sym() { return "=="; }
         template<class, class> struct Result { typedef bool type; };
         template<class A, class B> static bool eval(const A& a, const B& b) { return a == b; }
     };
 
+    /// Encoding of 'not equal' comparison operation.
     struct Ne {
         static const char* sym() { return "!="; }
         template<class, class> struct Result { typedef bool type; };
         template<class A, class B> static bool eval(const A& a, const B& b) { return a != b; }
     };
 
+    /// Encoding of 'less than' comparison operation.
     struct Lt {
         static const char* sym() { return "<"; }
         template<class, class> struct Result { typedef bool type; };
         template<class A, class B> static bool eval(const A& a, const B& b) { return a < b; }
     };
 
+    /// Encoding of 'greater than' comparison operation.
     struct Gt {
         static const char* sym() { return ">"; }
         template<class, class> struct Result { typedef bool type; };
         template<class A, class B> static bool eval(const A& a, const B& b) { return a > b; }
     };
 
+    /// Encoding of 'less than or equal' comparison operation.
     struct Le {
         static const char* sym() { return "<="; }
         template<class, class> struct Result { typedef bool type; };
         template<class A, class B> static bool eval(const A& a, const B& b) { return a <= b; }
     };
 
+    /// Encoding of 'greater than or equal' comparison operation.
     struct Ge {
         static const char* sym() { return ">="; }
         template<class, class> struct Result { typedef bool type; };
         template<class A, class B> static bool eval(const A& a, const B& b) { return a >= b; }
     };
 
+    /// Encoding of bitwise 'and' operation.
     struct And {
+        static const char* sym() { return "&"; }
+        template<class A, class B>
+        struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+        template<class A, class B>
+        static typename Result<A,B>::type eval(const A& a, const B& b) { return a & b; }
+    };
+
+    /// Encoding of bitwise 'exclusiv or' operation.
+    struct Xor {
+        static const char* sym() { return "^"; }
+        template<class A, class B>
+        struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+        template<class A, class B>
+        static typename Result<A,B>::type eval(const A& a, const B& b) { return a ^ b; }
+    };
+
+    /// Encoding of bitwise 'or' operation.
+    struct Or {
+        static const char* sym() { return "|"; }
+        template<class A, class B>
+        struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+        template<class A, class B>
+        static typename Result<A,B>::type eval(const A& a, const B& b) { return a | b; }
+    };
+
+    /// Encoding of logical conjunction.
+    struct Conj {
         static const char* sym() { return "&&"; }
         template<class, class> struct Result { typedef bool type; };
         template<class A, class B> static bool eval(const A& a, const B& b) { return a && b; }
     };
 
-    struct Or {
+    /// Encoding of logical disjunction.
+    struct Disj {
         static const char* sym() { return "||"; }
         template<class, class> struct Result { typedef bool type; };
         template<class A, class B> static bool eval(const A& a, const B& b) { return a || b; }
     };
+
 
     struct Exists {
         static const char* name() { return "exists"; }
@@ -229,6 +328,26 @@ namespace query
         return expr(unop<Not>(q.value));
     }
 
+    template<class Q> inline Expr<UnOp<Compl, Q> > operator~(const Expr<Q>& q)
+    {
+        return expr(unop<Compl>(q.value));
+    }
+
+    template<class Q> inline Expr<UnOp<Pos, Q> > operator+(const Expr<Q>& q)
+    {
+        return expr(unop<Pos>(q.value));
+    }
+
+    template<class Q> inline Expr<UnOp<Neg, Q> > operator-(const Expr<Q>& q)
+    {
+        return expr(unop<Neg>(q.value));
+    }
+
+    template<class Q> inline Expr<UnOp<Deref, Q> > operator*(const Expr<Q>& q)
+    {
+        return expr(unop<Deref>(q.value));
+    }
+
 
     template<class A, class B>
     inline Expr<BinOp<Mul, A, B> > operator*(const Expr<A>& a, const Expr<B>& b)
@@ -269,6 +388,25 @@ namespace query
 
 
     template<class A, class B>
+    inline Expr<BinOp<Mod, A, B> > operator%(const Expr<A>& a, const Expr<B>& b)
+    {
+        return expr(binop<Mod>(a.value, b.value));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Mod, A, B> > operator%(const Expr<A>& a, const B& b)
+    {
+        return expr(binop<Mod>(a.value, b));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Mod, A, B> > operator%(const A& a, const Expr<B>& b)
+    {
+        return expr(binop<Mod>(a, b.value));
+    }
+
+
+    template<class A, class B>
     inline Expr<BinOp<Add, A, B> > operator+(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Add>(a.value, b.value));
@@ -303,6 +441,44 @@ namespace query
     inline Expr<BinOp<Sub, A, B> > operator-(const A& a, const Expr<B>& b)
     {
         return expr(binop<Sub>(a, b.value));
+    }
+
+
+    template<class A, class B>
+    inline Expr<BinOp<Shl, A, B> > operator<<(const Expr<A>& a, const Expr<B>& b)
+    {
+        return expr(binop<Shl>(a.value, b.value));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Shl, A, B> > operator<<(const Expr<A>& a, const B& b)
+    {
+        return expr(binop<Shl>(a.value, b));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Shl, A, B> > operator<<(const A& a, const Expr<B>& b)
+    {
+        return expr(binop<Shl>(a, b.value));
+    }
+
+
+    template<class A, class B>
+    inline Expr<BinOp<Shr, A, B> > operator>>(const Expr<A>& a, const Expr<B>& b)
+    {
+        return expr(binop<Shr>(a.value, b.value));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Shr, A, B> > operator>>(const Expr<A>& a, const B& b)
+    {
+        return expr(binop<Shr>(a.value, b));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Shr, A, B> > operator>>(const A& a, const Expr<B>& b)
+    {
+        return expr(binop<Shr>(a, b.value));
     }
 
 
@@ -421,40 +597,97 @@ namespace query
 
 
     template<class A, class B>
-    inline Expr<BinOp<And, A, B> > operator&&(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<And, A, B> > operator&(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<And>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<And, A, B> > operator&&(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<And, A, B> > operator&(const Expr<A>& a, const B& b)
     {
         return expr(binop<And>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<And, A, B> > operator&&(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<And, A, B> > operator&(const A& a, const Expr<B>& b)
     {
         return expr(binop<And>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Or, A, B> > operator||(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Xor, A, B> > operator^(const Expr<A>& a, const Expr<B>& b)
+    {
+        return expr(binop<Xor>(a.value, b.value));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Xor, A, B> > operator^(const Expr<A>& a, const B& b)
+    {
+        return expr(binop<Xor>(a.value, b));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Xor, A, B> > operator^(const A& a, const Expr<B>& b)
+    {
+        return expr(binop<Xor>(a, b.value));
+    }
+
+
+    template<class A, class B>
+    inline Expr<BinOp<Or, A, B> > operator|(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Or>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Or, A, B> > operator||(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Or, A, B> > operator|(const Expr<A>& a, const B& b)
     {
         return expr(binop<Or>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Or, A, B> > operator||(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Or, A, B> > operator|(const A& a, const Expr<B>& b)
     {
         return expr(binop<Or>(a, b.value));
+    }
+
+
+    template<class A, class B>
+    inline Expr<BinOp<Conj, A, B> > operator&&(const Expr<A>& a, const Expr<B>& b)
+    {
+        return expr(binop<Conj>(a.value, b.value));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Conj, A, B> > operator&&(const Expr<A>& a, const B& b)
+    {
+        return expr(binop<Conj>(a.value, b));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Conj, A, B> > operator&&(const A& a, const Expr<B>& b)
+    {
+        return expr(binop<Conj>(a, b.value));
+    }
+
+
+    template<class A, class B>
+    inline Expr<BinOp<Disj, A, B> > operator||(const Expr<A>& a, const Expr<B>& b)
+    {
+        return expr(binop<Disj>(a.value, b.value));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Disj, A, B> > operator||(const Expr<A>& a, const B& b)
+    {
+        return expr(binop<Disj>(a.value, b));
+    }
+
+    template<class A, class B>
+    inline Expr<BinOp<Disj, A, B> > operator||(const A& a, const Expr<B>& b)
+    {
+        return expr(binop<Disj>(a, b.value));
     }
 
 
@@ -575,7 +808,7 @@ namespace query
     }
 
     // Canonicalization of a query expression involves elimination of
-    // cases where NOT is applied to AND and OR operations. This is
+    // cases where NOT is applied to AND or OR operations. This is
     // because we can evaluate the query expression more efficiently
     // when the AND and OR operations are close to the root.
     template<class Query> struct Canonicalize {
@@ -593,37 +826,29 @@ namespace query
         static Result exec(const UnOp<Not, UnOp<Not, Q> >& q) { return canon(q.arg.arg); }
     };
     // Rewrite (!(a || b)) to (!a && !b) (De Morgan's law)
-    template<class A, class B> struct Canonicalize<UnOp<Not, BinOp<Or, A, B> > > {
+    template<class A, class B> struct Canonicalize<UnOp<Not, BinOp<Disj, A, B> > > {
     private:
         typedef typename Canonicalize<UnOp<Not, A> >::Result A2;
         typedef typename Canonicalize<UnOp<Not, B> >::Result B2;
     public:
-        typedef BinOp<And, A2, B2> Result;
-        static Result exec(const UnOp<Not, BinOp<Or, A, B> >& q)
+        typedef BinOp<Conj, A2, B2> Result;
+        static Result exec(const UnOp<Not, BinOp<Disj, A, B> >& q)
         {
-            return binop<And>(canon(unop<Not>(q.arg.left)), canon(unop<Not>(q.arg.right)));
+            return binop<Conj>(canon(unop<Not>(q.arg.left)), canon(unop<Not>(q.arg.right)));
         }
     };
     // Rewrite (!(a && b)) to (!a || !b) (De Morgan's law)
-    template<class A, class B> struct Canonicalize<UnOp<Not, BinOp<And, A, B> > > {
+    template<class A, class B> struct Canonicalize<UnOp<Not, BinOp<Conj, A, B> > > {
     private:
         typedef typename Canonicalize<UnOp<Not, A> >::Result A2;
         typedef typename Canonicalize<UnOp<Not, B> >::Result B2;
     public:
-        typedef BinOp<Or, A2, B2> Result;
-        static Result exec(const UnOp<Not, BinOp<And, A, B> >& q)
+        typedef BinOp<Disj, A2, B2> Result;
+        static Result exec(const UnOp<Not, BinOp<Conj, A, B> >& q)
         {
-            return binop<Or>(canon(unop<Not>(q.arg.left)), canon(unop<Not>(q.arg.right)));
+            return binop<Disj>(canon(unop<Not>(q.arg.left)), canon(unop<Not>(q.arg.right)));
         }
     };
-
-
-
-/*
-Rename Canonicalize to MoveNot, then do ConstFold
-Then reconsider AND changes for improved optimization
-*/
-
 
 
 
@@ -726,6 +951,8 @@ Then reconsider AND changes for improved optimization
 
 
 
+
+
 template<class Spec> class BasicTable {
 private:
     /**
@@ -810,12 +1037,12 @@ private:
 
 
 
-    template<class A, class B> std::size_t _find(const query::BinOp<query::Or, A, B>& q, std::size_t begin, std::size_t end) const
+    template<class A, class B> std::size_t _find(const query::BinOp<query::Disj, A, B>& q, std::size_t begin, std::size_t end) const
     {
         return Find_OR<query::HasCol<A>::value, query::HasCol<B>::value, A, B>::find(this, q.left, q.right, begin, end);
     }
 
-    template<class A, class B> std::size_t _find(const query::BinOp<query::And, A, B>& q, std::size_t begin, std::size_t end) const
+    template<class A, class B> std::size_t _find(const query::BinOp<query::Conj, A, B>& q, std::size_t begin, std::size_t end) const
     {
 /*
         return Find_AND<query::HasCol<A>::value, query::HasCol<B>::value, A, B>::find(this, q.left, q.right, begin, end);
@@ -828,7 +1055,7 @@ private:
         }
     }
 
-    template<class A, class B> std::size_t _find_AND(const query::BinOp<query::And, A, B>& q, std::size_t begin, std::size_t end) const
+    template<class A, class B> std::size_t _find_AND(const query::BinOp<query::Conj, A, B>& q, std::size_t begin, std::size_t end) const
     {
         begin = _find_AND(q.left,  begin, end);
         begin = _find_AND(q.right, begin, end);
@@ -884,14 +1111,14 @@ private:
     template<class A, class B> struct Find_OR<false, true, A, B> {
         static std::size_t find(const BasicTable* t, const A& a, const B& b, std::size_t begin, std::size_t end)
         {
-            if (a) return begin; // (true || x) is aways true
+            if (a) return begin; // because (true || x) is aways true
             return t->_find(b, begin, end);
         }
     };
     template<class A, class B> struct Find_OR<true, false, A, B> {
         static std::size_t find(const BasicTable* t, const A& a, const B& b, std::size_t begin, std::size_t end)
         {
-            if (b) return begin; // (x || true) is aways true
+            if (b) return begin; // because (x || true) is aways true
             return t->_find(a, begin, end);
         }
     };
@@ -911,14 +1138,14 @@ private:
     template<class A, class B> struct Find_AND<false, true, A, B> {
         static std::size_t find(const BasicTable* t, const A& a, const B& b, std::size_t begin, std::size_t end)
         {
-            if (!a) return begin; // (false && x) is aways false
+            if (!a) return begin; // because (false && x) is aways false
             return t->_find(b, begin, end);
         }
     };
     template<class A, class B> struct Find_AND<true, false, A, B> {
         static std::size_t find(const BasicTable* t, const A& a, const B& b, std::size_t begin, std::size_t end)
         {
-            if (!b) return begin; // (x && false) is aways false
+            if (!b) return begin; // because (x && false) is aways false
             return t->_find(a, begin, end);
         }
     };

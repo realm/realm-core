@@ -46,6 +46,9 @@ template<class T> struct IsConst<const T> { static const bool value = true;  };
 template<class From, class To> struct CopyConstness                 { typedef       To type; };
 template<class From, class To> struct CopyConstness<const From, To> { typedef const To type; };
 
+template<class T> struct DerefType {};
+template<class T> struct DerefType<T*> { typedef T type; };
+
 
 
 /**

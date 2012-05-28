@@ -59,7 +59,7 @@ size_t my_count(const MyTable& table)
 //    return table.count(exists(t.baz, s.alpha < 7));
 //    return table.count(!(!t.foo || false));
 //    return table.count(t.foo > 1111);
-    return table.exists(t.baz > 1111);
+    return table.exists(t.foo % t.bar > 1111);
 }
 
 size_t my_exists(const MyTable& table)

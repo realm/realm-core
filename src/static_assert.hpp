@@ -28,9 +28,9 @@
 
 #else // !TIGHTDB_HAVE_CXX11_STATIC_ASSERT
 
-#define TIGHTDB_STATIC_ASSERT(assertion, message) typedef                       \
-    tightdb::static_assert_dummy<sizeof(tightdb::STATIC_ASSERTION_FAILURE<static_cast<bool>(assertion)>)> \
-    tightdb_static_assert_##__LINE__
+#define TIGHTDB_STATIC_ASSERT(assertion, message) typedef \
+    tightdb::static_assert_dummy<sizeof(tightdb::STATIC_ASSERTION_FAILURE<bool(assertion)>)> \
+    _tightdb_static_assert_##__LINE__
 
 namespace tightdb {
     template<bool> struct STATIC_ASSERTION_FAILURE;
@@ -39,5 +39,6 @@ namespace tightdb {
 } // namespace tightdb
 
 #endif // !TIGHTDB_HAVE_CXX11_STATIC_ASSERT
+
 
 #endif // TIGHTDB_STATIC_ASSERT_HPP
