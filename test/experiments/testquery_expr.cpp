@@ -55,10 +55,11 @@ typedef tightdb::BasicTable<MyTableSpec> MyTable;
 size_t my_count(const MyTable& table)
 {
     MyTable::QueryRow t;
-//  MySubtable::QueryRow s;
-//  return table.count(exists(t.baz, s.alpha < 7));
+//    MySubtable::QueryRow s;
+//    return table.count(exists(t.baz, s.alpha < 7));
 //    return table.count(!(!t.foo || false));
-    return table.count(t.foo > 1111);
+//    return table.count(t.foo > 1111);
+    return table.exists(t.baz > 1111);
 }
 
 size_t my_exists(const MyTable& table)

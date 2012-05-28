@@ -48,6 +48,7 @@ struct SpecBase {
 
     template<class E> class Enum {
     public:
+        typedef E enum_type;
         Enum(E v) : m_value(v) {};
         operator E() const { return m_value; }
     private:
@@ -56,6 +57,7 @@ struct SpecBase {
 
     template<class T> class Subtable {
     public:
+        typedef T table_type;
         Subtable(T* t) : m_table(t) {};
         operator T*() const { return m_table; }
     private:

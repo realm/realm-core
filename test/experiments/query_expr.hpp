@@ -29,9 +29,9 @@
 // CAVEAT: Cannot currently do subtable queries in mixed columns.
 
 // Consider: For subtables in mixed columns, one must check for each
-// row that the schema matches. That would require a fast check on
-// schema compatibility, which might be simply a comparison of integer
-// identifiers.
+// row that matches the schema of the query row. That would require a
+// fast check on schema compatibility, which might be simply a
+// comparison of integer identifiers.
 
 // Optional static column names
 // Optional dynamic column names
@@ -51,12 +51,15 @@ namespace query
 
     template<class T> struct IsSubtable { static const bool value = false; };
     template<class T> struct IsSubtable<SpecBase::Subtable<T> > {
-        static const bool value = false;
+        static const bool value = true;
     };
 
 
 
-    template<class Tab, int col_idx, class Type> struct ColRef {};
+    template<class Tab, int col_idx, class Type> struct ColRef
+    {
+        typedef Type column_type;
+    };
 
     template<class Op, class A> struct UnOp {
         A arg;
@@ -214,6 +217,8 @@ namespace query
     template<class Op, class Col, class Query>
     inline Subquery<Op, Col, Query> subquery(const Col& c, const Query& q)
     {
+        TIGHTDB_STATIC_ASSERT(IsSubtable<typename Col::column_type>::value,
+                              "A subtable column is required at this point");
         return Subquery<Op, Col, Query>(c,q);
     }
 
@@ -637,14 +642,16 @@ Then reconsider AND changes for improved optimization
 
         Type operator()(const ColRef<Tab, col_idx, Type>&, std::size_t i) const
         {
-            TIGHTDB_STATIC_ASSERT(!IsSubtable<Type>::value);
+            TIGHTDB_STATIC_ASSERT(!IsSubtable<Type>::value,
+                                  "A subtable column not acceptable at this point"); // FIXME: Why is this never triggered?
             return static_cast<const Type*>(m_column)[i];
         }
 
         template<int col_idx2, class Type2>
         Type2 operator()(const ColRef<Tab, col_idx2, Type2>&, std::size_t i) const
         {
-            TIGHTDB_STATIC_ASSERT(!IsSubtable<Type2>::value);
+            TIGHTDB_STATIC_ASSERT(!IsSubtable<Type2>::value,
+                                  "A subtable column not acceptable at this point"); // FIXME: Why is this never triggered?
             return m_table->template get<col_idx2, Type2>(i);
         }
 
@@ -664,24 +671,24 @@ Then reconsider AND changes for improved optimization
         template<class Op, class Col, class Query>
         typename Op::ResultType operator()(const Subquery<Op, Col, Query>& s, std::size_t i) const
         {
-            // FIXME: Try to find a way to avoid instantiation of a
-            // full table instance.
-            return Op::eval(subtable(s.col, i), s.query);
+            typedef typename Col::column_type::table_type Subtab;
+            return Op::eval(subtable<Subtab>(s.col, i), s.query);
         }
 
     private:
         const void* const m_column;
         const Tab* m_table;
 
-        const Type* subtable(const ColRef<Tab, col_idx, Type>&, std::size_t i) const
+        template<class Subtab> const Subtab*
+        subtable(const ColRef<Tab, col_idx, Type>&, std::size_t i) const
         {
-            return static_cast<const Type* const*>(m_column)[i];
+            return static_cast<const Subtab* const*>(m_column)[i];
         }
 
-        template<int col_idx2, class Type2>
-        const Type2* subtable(const ColRef<Tab, col_idx2, Type2>&, std::size_t i) const
+        template<class Subtab, int col_idx2, class Type2> const Subtab*
+        subtable(const ColRef<Tab, col_idx2, Type2>&, std::size_t i) const
         {
-            return m_table->template get<col_idx2, const Type2*>(i);
+            return m_table->template get<col_idx2, const Subtab*>(i);
         }
     };
 
