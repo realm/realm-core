@@ -1033,8 +1033,8 @@ TEST(Table_DateAndBinary)
     CHECK(std::equal(t[0].bin.get_pointer(), t[0].bin.get_pointer()+size, data));
 }
 
-
-TEST(Table_Spec_MINE)
+// Test for a specific bug found: Calling clear on a group with a table with a subtable
+TEST(Table_Test_Clear_With_Subtable_AND_Group)
 {
     Group group;
     TableRef table = group.get_table("test");

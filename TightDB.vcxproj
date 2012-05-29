@@ -378,6 +378,12 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="src\column.cpp" />
     <ClCompile Include="src\column_binary.cpp" />
@@ -528,12 +534,13 @@
     <ClInclude Include="include\tightdb.hpp" />
     <ClInclude Include="src\alloc.hpp" />
     <ClInclude Include="src\alloc_slab.hpp" />
-    <ClInclude Include="src\api-helper.h" />
     <ClInclude Include="src\array.hpp" />
     <ClInclude Include="src\array_binary.hpp" />
     <ClInclude Include="src\array_blob.hpp" />
     <ClInclude Include="src\array_string.hpp" />
     <ClInclude Include="src\array_string_long.hpp" />
+    <ClInclude Include="src\binary_data.hpp" />
+    <ClInclude Include="src\bind_ptr.hpp" />
     <ClInclude Include="src\c-table.h" />
     <ClInclude Include="src\c-tightdb.h" />
     <ClInclude Include="src\column.hpp" />
@@ -545,9 +552,11 @@
     <ClInclude Include="src\column_table.hpp" />
     <ClInclude Include="src\column_tpl.hpp" />
     <ClInclude Include="src\column_type.hpp" />
+    <ClInclude Include="src\config.h" />
     <ClInclude Include="src\date.hpp" />
     <ClInclude Include="src\group_writer.hpp" />
     <ClInclude Include="src\index.hpp" />
+    <ClInclude Include="src\lang_bind_helper.hpp" />
     <ClInclude Include="src\meta.hpp" />
     <ClInclude Include="src\mixed.hpp" />
     <ClInclude Include="src\query.hpp" />

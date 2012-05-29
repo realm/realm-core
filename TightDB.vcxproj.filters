@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="src\win32\pthread\pthread.c">
@@ -156,13 +156,79 @@
     <ClInclude Include="test\large_tests\verified_string.hpp">
       <Filter>test\large_tests</Filter>
     </ClInclude>
+    <ClInclude Include="src\c-table.h">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\c-tightdb.h">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\date.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\group_writer.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\index.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lang_bind_helper.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\meta.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mixed.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\query.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\query_conditions.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\query_engine.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\spec.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\static_assert.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\table_accessors.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\table_basic.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\table_ref.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\table_view.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\table_view_basic.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb-c.h">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tuple.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\type_list.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utf8.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utilities.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
     <ClInclude Include="src\alloc.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\alloc_slab.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\api-helper.h">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\array.hpp">
@@ -180,7 +246,10 @@
     <ClInclude Include="src\array_string_long.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\c-table.h">
+    <ClInclude Include="src\binary_data.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\bind_ptr.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\column.hpp">
@@ -210,67 +279,7 @@
     <ClInclude Include="src\column_type.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\date.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\group_writer.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\index.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\meta.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\mixed.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\query.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\query_conditions.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\query_engine.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\spec.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\static_assert.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\table_basic.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\table_ref.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\table_view.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tightdb-c.h">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\utf8.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\utilities.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\c-tightdb.h">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\table_accessors.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\table_view_basic.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tuple.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\type_list.hpp">
+    <ClInclude Include="src\config.h">
       <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
