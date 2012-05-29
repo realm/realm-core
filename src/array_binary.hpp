@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,13 +17,13 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-
-#ifndef __TDB_ARRAY_BINARY__
-#define __TDB_ARRAY_BINARY__
+#ifndef TIGHTDB_ARRAY_BINARY_HPP
+#define TIGHTDB_ARRAY_BINARY_HPP
 
 #include "array_blob.hpp"
 
 namespace tightdb {
+
 
 class ArrayBinary : public Array {
 public:
@@ -54,6 +54,7 @@ private:
     ArrayBlob m_blob;
 };
 
-}
 
-#endif //__TDB_ARRAY_BINARY__
+} // namespace tightdb
+
+#endif // TIGHTDB_ARRAY_BINARY_HPP

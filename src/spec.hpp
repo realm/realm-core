@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_SPEC_H
-#define __TIGHTDB_SPEC_H
+#ifndef TIGHTDB_SPEC_HPP
+#define TIGHTDB_SPEC_HPP
 
 #include "array.hpp"
 #include "array_string.hpp"
@@ -59,7 +59,7 @@ public:
 
 #ifdef _DEBUG
     bool compare(const Spec& spec) const;
-    void verify() const;
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 
@@ -87,4 +87,4 @@ private:
 
 } // namespace tightdb
 
-#endif // __TIGHTDB_SPEC_H
+#endif // TIGHTDB_SPEC_HPP

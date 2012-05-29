@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_ALLOC__
-#define __TDB_ALLOC__
+#ifndef TIGHTDB_ALLOC_HPP
+#define TIGHTDB_ALLOC_HPP
 
 #include <stdlib.h>
 
@@ -55,6 +55,7 @@ public:
 
 Allocator& GetDefaultAllocator();
 
-}
 
-#endif //__TDB_ALLOC__
+} // namespace tightdb
+
+#endif // TIGHTDB_ALLOC_HPP

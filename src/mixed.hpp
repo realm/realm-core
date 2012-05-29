@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_MIXED_H
-#define __TIGHTDB_MIXED_H
+#ifndef TIGHTDB_MIXED_HPP
+#define TIGHTDB_MIXED_HPP
 
 #ifndef _MSC_VER
 #include <stdint.h> // int64_t - not part of C++03
@@ -31,6 +31,7 @@
 
 #include "column_type.hpp"
 #include "date.hpp"
+#include "binary_data.hpp"
 
 namespace tightdb {
 
@@ -53,11 +54,11 @@ public:
 
     ColumnType get_type() const {return m_type;}
 
-    int64_t     get_int()    const {assert(m_type == COLUMN_TYPE_INT);    return m_int;}
-    bool        get_bool()   const {assert(m_type == COLUMN_TYPE_BOOL);   return m_bool;}
-    std::time_t get_date()   const {assert(m_type == COLUMN_TYPE_DATE);   return m_date;}
-    const char* get_string() const {assert(m_type == COLUMN_TYPE_STRING); return m_str;}
-    BinaryData  get_binary() const {assert(m_type == COLUMN_TYPE_BINARY); BinaryData b = {m_str, m_len}; return b;}
+    int64_t     get_int()    const { assert(m_type == COLUMN_TYPE_INT);    return m_int; }
+    bool        get_bool()   const { assert(m_type == COLUMN_TYPE_BOOL);   return m_bool; }
+    std::time_t get_date()   const { assert(m_type == COLUMN_TYPE_DATE);   return m_date; }
+    const char* get_string() const { assert(m_type == COLUMN_TYPE_STRING); return m_str; }
+    BinaryData  get_binary() const { assert(m_type == COLUMN_TYPE_BINARY); return BinaryData(m_str, m_len); }
 
 private:
     ColumnType m_type;
@@ -73,4 +74,4 @@ private:
 
 } // namespace tightdb
 
-#endif // __TIGHTDB_MIXED_H
+#endif // TIGHTDB_MIXED_HPP

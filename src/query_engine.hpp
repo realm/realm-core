@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_ENGINE_HPP
-#define __TIGHTDB_ENGINE_HPP
+#ifndef TIGHTDB_QUERY_ENGINE_HPP
+#define TIGHTDB_QUERY_ENGINE_HPP
 
 #include <string>
 #include "table.hpp"
@@ -30,10 +30,13 @@
 
 namespace tightdb {
 
+
 class ParentNode {
 public:
     ParentNode() : m_table(NULL) {}
-    virtual ~ParentNode() {}
+    virtual ~ParentNode() {
+
+    }
     virtual void Init(const Table& table) {m_table = &table; if (m_child) m_child->Init(table);}
     virtual size_t find_first(size_t start, size_t end) = 0;
 
@@ -94,7 +97,10 @@ class SUBTABLE: public ParentNode {
 public:
     SUBTABLE(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
     SUBTABLE() {};
-
+    ~SUBTABLE() {
+    //    delete m_child; 
+    //    delete m_child2; 
+    }
     void Init(const Table& table)
     {
         m_table = &table;
@@ -137,15 +143,18 @@ public:
 
 template <class T, class C, class F> class NODE: public ParentNode {
 public:
-    NODE(T v, size_t column) : m_value(v), m_column_id(column) {m_child = 0;}
-    ~NODE() {delete m_child; }
+    NODE(T v, size_t column) : m_array(GetDefaultAllocator()), m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v), m_column_id(column) {m_child = 0;}
+    ~NODE() {
+    //    delete m_child; 
+    }
 
     void Init(const Table& table)
     {
         m_table = &table;
         m_column = (C*)&table.GetColumnBase(m_column_id);
+        m_leaf_end = 0;
 
-        if (m_child) m_child->Init(table);
+        if (m_child)m_child->Init(table);
     }
 
     size_t find_first(size_t start, size_t end)
@@ -153,9 +162,24 @@ public:
         assert(m_table);
 
         for (size_t s = start; s < end; ++s) {
-            s = m_column->template TreeFind<T, C, F>(m_value, s, end);
-            if (s == (size_t)-1)
-                s = end;
+            // Cache internal leafs
+            if (s >= m_leaf_end) {
+                m_column->GetBlock(s, m_array, m_leaf_start);
+                const size_t leaf_size = m_array.Size();
+                m_leaf_end = m_leaf_start + leaf_size;
+                const size_t e = end - m_leaf_start;
+                m_local_end = leaf_size < e ? leaf_size : e;
+            }
+
+            // Do search directly on cached leaf array
+            s = m_array.Query<F>(m_value, s - m_leaf_start, m_local_end);
+
+            if (s == (size_t)-1) {
+                s = m_leaf_end-1;
+                continue;
+            }
+            else
+                s += m_leaf_start;
 
             if (m_child == 0)
                 return s;
@@ -172,10 +196,13 @@ public:
 
 protected:
     C* m_column;
+    Array m_array;
+    size_t m_leaf_start;
+    size_t m_leaf_end;
+    size_t m_local_end;
     T m_value;
     size_t m_column_id;
 };
-
 
 
 template <class F> class STRINGNODE: public ParentNode {
@@ -194,7 +221,10 @@ public:
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(m_value);
     }
-    ~STRINGNODE() {delete m_child; free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase); }
+    ~STRINGNODE() {
+   //     delete m_child; 
+        free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase);
+    }
 
     void Init(const Table& table)
     {
@@ -253,7 +283,10 @@ public:
         m_value = (char *)malloc(strlen(v)*6);
         memcpy(m_value, v, strlen(v) + 1);
     }
-    ~STRINGNODE() {delete m_child; free((void*)m_value); }
+    ~STRINGNODE() {
+    //    delete m_child; 
+        free((void*)m_value); 
+    }
 
     void Init(const Table& table)
     {
@@ -313,32 +346,46 @@ private:
 
 class OR_NODE: public ParentNode {
 public:
-    OR_NODE(ParentNode* p1) {m_child = 0; m_cond1 = p1; m_cond2 = 0;};
+    OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond1 = p1; m_cond2 = NULL;};
     ~OR_NODE()
     {
-        delete m_cond1;
-        delete m_cond2;
-        delete m_child;
+//        delete m_cond1;
+//        delete m_cond2;
+//        delete m_child;
     }
 
     void Init(const Table& table)
     {
         m_cond1->Init(table);
         m_cond2->Init(table);
+
+        if(m_child)
+            m_child->Init(table);
+
+        m_last1 = -1;
+        m_last2 = -1;
+
+        m_table = &table;
     }
 
+// Keep old un-optimized or code until new has been sufficiently tested
+#if 0
     size_t find_first(size_t start, size_t end)
     {
         for (size_t s = start; s < end; ++s) {
             // Todo, redundant searches can occur
+            // We have to init here to reset nodes internal
+            // leaf cache (since we may go backwards)
+            m_cond1->Init(*m_table);
+            m_cond2->Init(*m_table);
             const size_t f1 = m_cond1->find_first(s, end);
-            const size_t f2 = m_cond2->find_first(s, f1);
+            const size_t f2 = m_cond2->find_first(s, end);
             s = f1 < f2 ? f1 : f2;
 
             if (m_child == 0)
                 return s;
             else {
-                const size_t a = m_cond2->find_first(s, end);
+                const size_t a = m_child->find_first(s, end);
                 if (s == a)
                     return s;
                 else
@@ -347,6 +394,42 @@ public:
         }
         return end;
     }
+#else
+    size_t find_first(size_t start, size_t end)
+    {
+        for (size_t s = start; s < end; ++s) {
+            size_t f1;
+            size_t f2;
+            
+            if (m_last1 >= s && m_last1 != (size_t)-1)
+                f1 = m_last1;
+            else {
+                f1 = m_cond1->find_first(s, end);
+                m_last1 = f1;
+            }
+    
+            if (m_last2 >= s && m_last2 != (size_t)-1)
+                f2 = m_last2;
+            else {
+                f2 = m_cond2->find_first(s, end);
+                m_last2 = f2;
+            }
+            s = f1 < f2 ? f1 : f2;
+
+            if (m_child == 0)
+                return s;
+            else {
+                const size_t a = m_child->find_first(s, end);
+                if (s == a)
+                    return s;
+                else
+                    s = a - 1;
+            }
+        }
+        return end;
+    }
+#endif
+
 
     virtual std::string Verify(void)
     {
@@ -372,8 +455,13 @@ public:
 
     ParentNode* m_cond1;
     ParentNode* m_cond2;
+private:
+    size_t m_last1;
+    size_t m_last2;
+    const Table* m_table;
 };
 
-}
 
-#endif //__TIGHTDB_ENGINE_HPP
+} // namespace tightdb
+
+#endif // TIGHTDB_QUERY_ENGINE_HPP

@@ -7,13 +7,13 @@ commentStartToken = %%
 directiveStartToken = %
 #end compiler-settings
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -25,8 +25,8 @@ directiveStartToken = %
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_H
-#define __TIGHTDB_H
+#ifndef TIGHTDB_TIGHTDB_HPP
+#define TIGHTDB_TIGHTDB_HPP
 
 #include "../src/table_basic.hpp"
 
@@ -38,44 +38,102 @@ directiveStartToken = %
 , name${j+1}, type${j+1}%slurp
 %end for
 ) \\
-struct Table##Spec: tightdb::SpecBase { \\
-    template<template<int, class> class Column, class Init> \\
-    class Columns { \\
-    public: \\
+struct Table##Spec: ::tightdb::SpecBase { \\
 %for $j in range($num_cols)
-        Column<$j, type${j+1}> name${j+1}; \\
+    typedef ::tightdb::TypeAppend< %slurp
+%if $j == 0
+void,     %slurp
+%else
+Columns$j, %slurp
+%end if
+type${j+1} >::type Columns%slurp
+%if $j < $num_cols-1
+${j+1}%slurp
+%end if
+; \\
 %end for
-        Columns(Init i): %slurp
+ \\
+    template<template<int> class Col, class Init> struct ColNames { \\
+%for $j in range($num_cols)
+        typename Col<$j>::type name${j+1}; \\
+%end for
+        ColNames(Init i): %slurp
 %for $j in range($num_cols)
 %if 0 < $j
 , %slurp
 %end if
 name${j+1}%slurp
-(i, #name${j+1})%slurp
+(i)%slurp
 %end for
  {} \\
     }; \\
-    template<class C%slurp
+ \\
+    static const char* const* dyn_col_names() \\
+    { \\
+        static const char* names[] = { %slurp
 %for $j in range($num_cols)
-, class T${j+1}%slurp
+%if 0 < $j
+, %slurp
+%end if
+#name${j+1}%slurp
 %end for
-> \\
-    static void insert(std::size_t i, const C& cols%slurp
+ }; \\
+        return names; \\
+    } \\
+ \\
+    struct ConvenienceMethods { \\
+        void add(%slurp
 %for $j in range($num_cols)
-, const T${j+1}& v${j+1}%slurp
+%if 0 < $j
+, %slurp
+%end if
+type${j+1} name${j+1}%slurp
 %end for
 ) \\
-    { \\
+        { \\
+            ::tightdb::BasicTable<Table##Spec>* const t = \\
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \\
+            t->add((::tightdb::tuple()%slurp
 %for $j in range($num_cols)
-        cols.name${j+1}._insert(i, v${j+1}); \\
+, name${j+1}%slurp
 %end for
-    } \\
+)); \\
+        } \\
+        void insert(std::size_t _i%slurp
+%for $j in range($num_cols)
+, type${j+1} name${j+1}%slurp
+%end for
+) \\
+        { \\
+            ::tightdb::BasicTable<Table##Spec>* const t = \\
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \\
+            t->insert(_i, (::tightdb::tuple()%slurp
+%for $j in range($num_cols)
+, name${j+1}%slurp
+%end for
+)); \\
+        } \\
+        void set(std::size_t _i%slurp
+%for $j in range($num_cols)
+, type${j+1} name${j+1}%slurp
+%end for
+) \\
+        { \\
+            ::tightdb::BasicTable<Table##Spec>* const t = \\
+                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \\
+            t->set(_i, (::tightdb::tuple()%slurp
+%for $j in range($num_cols)
+, name${j+1}%slurp
+%end for
+)); \\
+        } \\
+    }; \\
 }; \\
-typedef tightdb::BasicTable<Table##Spec> Table;
+typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 %end for
-#endif // __TIGHTDB_H
+#endif // TIGHTDB_TIGHTDB_HPP
 """
 
 args = sys.argv[1:]

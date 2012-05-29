@@ -1,13 +1,11 @@
-#ifndef __TDB_COLUMN__
-#define __TDB_COLUMN__
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -19,6 +17,9 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
+#ifndef TIGHTDB_COLUMN_HPP
+#define TIGHTDB_COLUMN_HPP
+
 #include "array.hpp"
 
 #ifdef _MSC_VER
@@ -31,6 +32,7 @@
 #include <assert.h>
 
 namespace tightdb {
+
 
 // Pre-definitions
 class Column;
@@ -63,7 +65,7 @@ public:
     virtual void UpdateFromParent() {m_array->UpdateFromParent();}
 
 #ifdef _DEBUG
-    virtual void verify() const = 0;
+    virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in ObjC
     virtual void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG
 
@@ -117,6 +119,8 @@ protected:
 
     // Member variables
     mutable Array* m_array;
+
+    static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
 };
 
 class Column : public ColumnBase {
@@ -168,7 +172,12 @@ public:
     void find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
     void find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     size_t find_pos(int64_t value) const;
+
+    // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
+    void GetBlock(size_t ndx, Array& arr, size_t& off) const {
+        m_array->GetBlock(ndx, arr, off);
+    }
 
     // Index
     bool HasIndex() const {return m_index != NULL;}
@@ -186,7 +195,7 @@ public:
 #ifdef _DEBUG
     bool Compare(const Column& c) const;
     void Print() const;
-    void verify() const;
+    virtual void Verify() const;
     MemStats Stats() const;
 #endif //_DEBUG
 
@@ -211,15 +220,14 @@ protected:
     // Member variables
     Index* m_index;
 
-    static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
-
 private:
     Column &operator=(Column const &); // not allowed
 };
 
-}
+
+} // namespace tightdb
 
 // Templates
 #include "column_tpl.hpp"
 
-#endif //__TDB_COLUMN__
+#endif // TIGHTDB_COLUMN_HPP

@@ -153,7 +153,7 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
 void merge_core(const Array& a0, const Array& a1, Array& res)
 {
     assert(res.is_empty());
-    
+
     size_t p0 = 0;
     size_t p1 = 0;
     const size_t s0 = a0.Size();
@@ -201,7 +201,7 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
 Array* merge(const Array& arrayList)
 {
     const size_t count = arrayList.Size();
-    
+
     if (count == 1) return NULL; // already sorted
 
     Array Left, Right;
@@ -231,7 +231,7 @@ Array* merge(const Array& arrayList)
         Array l0(ref, NULL);
         merge_core(l0, *r, *res);
     }
-    
+
     // Clean-up
     Left.Destroy();
     Right.Destroy();
@@ -239,7 +239,7 @@ Array* merge(const Array& arrayList)
     if (r) r->Destroy();
     delete l;
     delete r;
-    
+
     return res; // receiver now own the array, and has to delete it when done
 }
 
@@ -298,6 +298,14 @@ bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, voi
 
 
 namespace tightdb {
+
+size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc)
+{
+    Array a(ref, NULL, 0, alloc);
+    if (!a.IsNode()) return a.Size();
+    Array offsets(a.Get(0), NULL, 0, alloc);
+    return offsets.is_empty() ? 0 : size_t(offsets.back());
+}
 
 Column::Column(Allocator& alloc): m_index(NULL)
 {
@@ -374,14 +382,6 @@ size_t Column::Size() const
 {
     if (!IsNode()) return m_array->Size();
     const Array offsets = NodeGetOffsets();
-    return offsets.is_empty() ? 0 : size_t(offsets.back());
-}
-
-size_t Column::get_size_from_ref(size_t ref, Allocator& alloc)
-{
-    Array a(ref, NULL, 0, alloc);
-    if (!a.IsNode()) return a.Size();
-    Array offsets(a.Get(0), NULL, 0, alloc);
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
 
@@ -469,7 +469,7 @@ bool Column::Insert(size_t ndx, int64_t value)
     }
 
 #ifdef _DEBUG
-    verify();
+    Verify();
 #endif //DEBUG
 
     return true;
@@ -513,11 +513,11 @@ void Column::sort(size_t start, size_t end)
         for(size_t t = 0; t < count; ++t) {
             Set(t, sorted->Get(t));
         }
-        
+
         sorted->Destroy();
         delete sorted;
     }
-    
+
     // Clean-up
     arr.Destroy();
 }
@@ -779,7 +779,7 @@ void Column::Print() const
     }
 }
 
-void Column::verify() const
+void Column::Verify() const
 {
     if (IsNode()) {
         assert(m_array->Size() == 2);
@@ -798,7 +798,7 @@ void Column::verify() const
             assert(ref);
 
             const Column col(ref, NULL, 0, m_array->GetAllocator());
-            col.verify();
+            col.Verify();
 
             off += col.Size();
             const size_t node_off = (size_t)offsets.Get(i);

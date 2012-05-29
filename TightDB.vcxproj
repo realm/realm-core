@@ -158,6 +158,8 @@
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">$(ProjectName)64</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">$(ProjectName)32d</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">$(ProjectName)32</TargetName>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\include;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -372,7 +374,11 @@
     <ClCompile Include="src\array_blob.cpp" />
     <ClCompile Include="src\array_string.cpp" />
     <ClCompile Include="src\array_string_long.cpp" />
-    <ClCompile Include="src\c-table.cpp" />
+    <ClCompile Include="src\c-table.cpp">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="src\column.cpp" />
     <ClCompile Include="src\column_binary.cpp" />
     <ClCompile Include="src\column_mixed.cpp" />
@@ -529,6 +535,7 @@
     <ClInclude Include="src\array_string.hpp" />
     <ClInclude Include="src\array_string_long.hpp" />
     <ClInclude Include="src\c-table.h" />
+    <ClInclude Include="src\c-tightdb.h" />
     <ClInclude Include="src\column.hpp" />
     <ClInclude Include="src\column_binary.hpp" />
     <ClInclude Include="src\column_fwd.hpp" />
@@ -548,10 +555,14 @@
     <ClInclude Include="src\query_engine.hpp" />
     <ClInclude Include="src\spec.hpp" />
     <ClInclude Include="src\static_assert.hpp" />
+    <ClInclude Include="src\table_accessors.hpp" />
     <ClInclude Include="src\table_basic.hpp" />
     <ClInclude Include="src\table_ref.hpp" />
     <ClInclude Include="src\table_view.hpp" />
+    <ClInclude Include="src\table_view_basic.hpp" />
     <ClInclude Include="src\tightdb-c.h" />
+    <ClInclude Include="src\tuple.hpp" />
+    <ClInclude Include="src\type_list.hpp" />
     <ClInclude Include="src\utf8.hpp" />
     <ClInclude Include="src\utilities.hpp" />
     <ClInclude Include="src\win32\pthread\pthread.h" />

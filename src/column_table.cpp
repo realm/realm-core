@@ -24,6 +24,9 @@ ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, ArrayParent *par
 
 size_t ColumnTable::get_subtable_size(size_t ndx) const
 {
+    // FIXME: If the table object is cached, it is possible to get the
+    // size from it. Maybe it is faster in general to check for the
+    // presence of the cached object and use it when available.
     assert(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);
@@ -81,16 +84,16 @@ void ColumnTable::Clear(size_t ndx)
 
 #ifdef _DEBUG
 
-void ColumnTable::verify() const
+void ColumnTable::Verify() const
 {
-    Column::verify();
+    Column::Verify();
 
     // Verify each sub-table
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
         if (GetAsRef(i) == 0) continue;
         const ConstTableRef subtable = get_subtable(i, m_ref_specSet);
-        subtable->verify();
+        subtable->Verify();
     }
 }
 
@@ -102,10 +105,10 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const
     for (size_t i = 0; i < count; ++i) {
         if (array.GetAsRef(i) == 0) continue;
         const ConstTableRef subtable = get_subtable(i, m_ref_specSet);
-        subtable->ToDot(out);
+        subtable->to_dot(out);
     }
 }
 
 #endif //_DEBUG
 
-}
+} // namespace tightdb

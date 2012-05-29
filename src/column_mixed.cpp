@@ -5,6 +5,7 @@ using namespace std;
 
 namespace tightdb {
 
+
 ColumnMixed::~ColumnMixed()
 {
     delete m_types;
@@ -27,7 +28,7 @@ void ColumnMixed::SetParent(ArrayParent *parent, size_t pndx)
 void ColumnMixed::UpdateFromParent()
 {
     if (!m_array->UpdateFromParent()) return;
-    
+
     m_types->UpdateFromParent();
     m_refs->UpdateFromParent();
     if (m_data) m_data->UpdateFromParent();
@@ -398,12 +399,12 @@ void ColumnMixed::Clear()
 
 #ifdef _DEBUG
 
-void ColumnMixed::verify() const
+void ColumnMixed::Verify() const
 {
     m_array->Verify();
-    m_types->verify();
-    m_refs->verify();
-    if (m_data) m_data->verify();
+    m_types->Verify();
+    m_refs->Verify();
+    if (m_data) m_data->Verify();
 
     // types and refs should be in sync
     const size_t types_len = m_types->Size();
@@ -416,7 +417,7 @@ void ColumnMixed::verify() const
         const size_t tref = m_refs->GetAsRef(i);
         if (tref == 0 || tref & 0x1) continue;
         ConstTableRef subtable = m_refs->get_subtable(i);
-        subtable->verify();
+        subtable->Verify();
     }
 }
 
@@ -437,7 +438,7 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const
         const ColumnType type = (ColumnType)m_types->Get(i);
         if (type != COLUMN_TYPE_TABLE) continue;
         ConstTableRef subtable = m_refs->get_subtable(i);
-        subtable->ToDot(out);
+        subtable->to_dot(out);
     }
 
     m_types->ToDot(out, "types");
@@ -452,4 +453,4 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const
 
 #endif //_DEBUG
 
-}
+} // namespace tightdb

@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_INDEX__
-#define __TDB_INDEX__
+#ifndef TIGHTDB_INDEX_HPP
+#define TIGHTDB_INDEX_HPP
 
 #include "column.hpp"
 
@@ -63,6 +63,6 @@ protected:
     size_t MaxRef() const;
 };
 
-}
+} // namespace tightdb
 
-#endif //__TDB_INDEX__
+#endif // TIGHTDB_INDEX_HPP

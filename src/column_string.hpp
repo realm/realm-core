@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,14 +17,15 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMN_STRING__
-#define __TDB_COLUMN_STRING__
+#ifndef TIGHTDB_COLUMN_STRING_HPP
+#define TIGHTDB_COLUMN_STRING_HPP
 
 #include "column.hpp"
 #include "array_string.hpp"
 #include "array_string_long.hpp"
 
 namespace tightdb {
+
 
 class AdaptiveStringColumn : public ColumnBase {
 public:
@@ -66,7 +67,7 @@ public:
 
 #ifdef _DEBUG
     bool Compare(const AdaptiveStringColumn& c) const;
-    void verify() const {};
+    void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif //_DEBUG
 
 protected:
@@ -90,6 +91,7 @@ protected:
 #endif //_DEBUG
 };
 
-}
 
-#endif //__TDB_COLUMN_STRING__
+} // namespace tightdb
+
+#endif // TIGHTDB_COLUMN_STRING_HPP

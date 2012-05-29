@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef UTF8_H
-#define UTF8_H
+#ifndef TIGHTDB_UTF8_HPP
+#define TIGHTDB_UTF8_HPP
 
 #include <string>
 #include <memory.h>
@@ -37,6 +37,6 @@ size_t sequence_length(const char* lead);
 size_t comparechars(const char* c1, const char* c2);
 bool utf8case_single(const char* source, char* destination, int upper);
 
-}
+} // namespace tightdb
 
-#endif
+#endif // TIGHTDB_UTF8_HPP

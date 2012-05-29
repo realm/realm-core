@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,14 +17,15 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMN_BINARY__
-#define __TDB_COLUMN_BINARY__
+#ifndef TIGHTDB_COLUMN_BINARY_HPP
+#define TIGHTDB_COLUMN_BINARY_HPP
 
 #include "column.hpp"
-#include "column_type.hpp" // BinaryData
+#include "binary_data.hpp"
 #include "array_binary.hpp"
 
 namespace tightdb {
+
 
 class ColumnBinary : public ColumnBase {
 public:
@@ -62,7 +63,7 @@ public:
     void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
 #ifdef _DEBUG
-    void verify() const {};
+    void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif //_DEBUG
 
 protected:
@@ -84,6 +85,7 @@ protected:
 #endif //_DEBUG
 };
 
-}
 
-#endif //__TDB_COLUMN_BINARY__
+} // namespace tightdb
+
+#endif // TIGHTDB_COLUMN_BINARY_HPP

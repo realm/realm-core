@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef TIGHTDB_GROUP_H
-#define TIGHTDB_GROUP_H
+#ifndef TIGHTDB_GROUP_HPP
+#define TIGHTDB_GROUP_HPP
 
 #include "table.hpp"
 #include "../src/alloc_slab.hpp"
@@ -52,7 +52,7 @@ public:
     template<class S> void to_json(S& out);
 
 #ifdef _DEBUG
-    void verify();
+    void Verify(); // Must be upper case to avoid conflict with macro in ObjC
     void print() const;
     MemStats stats();
     void enable_mem_diagnostics(bool enable=true) {m_alloc.EnableDebug(enable);}
@@ -103,7 +103,7 @@ protected:
     bool m_isValid;
 
 private:
-    friend Table* GroupHelper_get_table_ptr(Group* grp, const char* name);
+    friend class LangBindHelper;
 
     Table* get_table_ptr(const char* name);
     template<class T> T* get_table_ptr(const char* name);
@@ -184,4 +184,4 @@ void Group::to_json(S& out)
 
 } // namespace tightdb
 
-#endif // TIGHTDB_GROUP_H
+#endif // TIGHTDB_GROUP_HPP

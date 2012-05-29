@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_FWD_H
-#define TIGHTDB_COLUMN_FWD_H
+#ifndef TIGHTDB_COLUMN_FWD_HPP
+#define TIGHTDB_COLUMN_FWD_HPP
 
 namespace tightdb {
 
@@ -34,4 +34,4 @@ class ColumnMixed;
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_FWD_H
+#endif // TIGHTDB_COLUMN_FWD_HPP

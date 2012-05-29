@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,29 +17,29 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
+#ifndef TIGHTDB_STATIC_ASSERT_HPP
+#define TIGHTDB_STATIC_ASSERT_HPP
 
-#ifndef TIGHTDB_STATIC_ASSERT_H
-#define TIGHTDB_STATIC_ASSERT_H
+#include "config.h"
 
 
-#define TIGHTDB_STATIC_ASSERT(assertion) typedef \
-  tightdb::static_assert_dummy<sizeof(tightdb::STATIC_ASSERTION_FAILURE<static_cast<bool>(assertion)>)> \
-  TIGHTDB_ADD_LINENO_TO_NAME(tightdb_static_assert_)
+#ifdef TIGHTDB_HAVE_CXX11_STATIC_ASSERT
 
-#define TIGHTDB_ADD_LINENO_TO_NAME_3(x,y) x##y
-#define TIGHTDB_ADD_LINENO_TO_NAME_2(x,y) TIGHTDB_ADD_LINENO_TO_NAME_3(x,y)
-#define TIGHTDB_ADD_LINENO_TO_NAME(x) TIGHTDB_ADD_LINENO_TO_NAME_2(x, __LINE__)
+#define TIGHTDB_STATIC_ASSERT(assertion, message) static_assert(assertion, message)
 
+#else // !TIGHTDB_HAVE_CXX11_STATIC_ASSERT
+
+#define TIGHTDB_STATIC_ASSERT(assertion, message) typedef \
+    tightdb::static_assert_dummy<sizeof(tightdb::STATIC_ASSERTION_FAILURE<bool(assertion)>)> \
+    _tightdb_static_assert_##__LINE__
 
 namespace tightdb {
-
-
-template<bool> struct STATIC_ASSERTION_FAILURE;
-template<> struct STATIC_ASSERTION_FAILURE<true> {};
-
-template<int> struct static_assert_dummy {};
-
-
+    template<bool> struct STATIC_ASSERTION_FAILURE;
+    template<> struct STATIC_ASSERTION_FAILURE<true> {};
+    template<int> struct static_assert_dummy {};
 } // namespace tightdb
 
-#endif // TIGHTDB_STATIC_ASSERT_H
+#endif // !TIGHTDB_HAVE_CXX11_STATIC_ASSERT
+
+
+#endif // TIGHTDB_STATIC_ASSERT_HPP

@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,13 +17,14 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_COLUMN_TABLE__
-#define __TDB_COLUMN_TABLE__
+#ifndef TIGHTDB_COLUMN_TABLE_HPP
+#define TIGHTDB_COLUMN_TABLE_HPP
 
 #include "column.hpp"
 #include "table.hpp"
 
 namespace tightdb {
+
 
 /**
  * Base class for any column that can contain subtables.
@@ -32,7 +33,7 @@ class ColumnSubtableParent: public Column, public Table::Parent
 {
 public:
     void UpdateFromParent();
-    
+
 protected:
     ColumnSubtableParent(ArrayParent* parent_array, std::size_t parent_ndx,
                          Allocator& alloc, const Table* tab);
@@ -147,7 +148,7 @@ public:
     void Clear(size_t ndx);
 
 #ifdef _DEBUG
-    void verify() const;
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
 #endif //_DEBUG
 
 protected:
@@ -162,7 +163,7 @@ protected:
 
 
 // Implementation
-    
+
 inline void ColumnSubtableParent::UpdateFromParent()
 {
     if (!m_array->UpdateFromParent()) return;
@@ -238,11 +239,11 @@ inline void ColumnSubtableParent::SubtableMap::remove(size_t subtable_ndx)
     m_indices.Delete(pos);
     m_wrappers.Delete(pos);
 }
-    
+
 inline void ColumnSubtableParent::SubtableMap::update_from_parents()
 {
     if (!m_indices.IsValid()) return;
-    
+
     const size_t count = m_wrappers.Size();
     for (size_t i = 0; i < count; ++i) {
         Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));
@@ -270,6 +271,7 @@ inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const
     return Get(subtable_ndx);
 }
 
-}
 
-#endif //__TDB_COLUMN_TABLE__
+} // namespace tightdb
+
+#endif // TIGHTDB_COLUMN_TABLE_HPP

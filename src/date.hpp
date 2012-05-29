@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_DATE_H
-#define TIGHTDB_DATE_H
+#ifndef TIGHTDB_DATE_HPP
+#define TIGHTDB_DATE_HPP
 
 #include <ctime>
 
@@ -37,4 +37,4 @@ private:
 
 } // namespace tightdb
 
-#endif // TIGHTDB_DATE_H
+#endif // TIGHTDB_DATE_HPP

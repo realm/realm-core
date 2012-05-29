@@ -1,11 +1,11 @@
 /*************************************************************************
- * 
+ *
  * TIGHTDB CONFIDENTIAL
  * __________________
- * 
+ *
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
- * 
+ *
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TIGHTDB_BASIC_TABLE_H
-#define __TIGHTDB_BASIC_TABLE_H
+#ifndef TIGHTDB_TABLE_BASIC_HPP
+#define TIGHTDB_TABLE_BASIC_HPP
 
 #ifdef _MSC_VER
 #include "win32/stdint.h"
@@ -32,16 +32,23 @@
 #include <ctime>
 #include <utility>
 
+#include "static_assert.hpp"
 #include "meta.hpp"
+#include "tuple.hpp"
 #include "table.hpp"
 #include "column.hpp"
 #include "query.hpp"
+#include "table_accessors.hpp"
+#include "table_view_basic.hpp"
 
 namespace tightdb {
 
 
-template<class T> struct GetColumnTypeId;
-template<int col_idx, class Type> class AddColumn;
+namespace _impl {
+    template<class Type, int col_idx> struct AddCol;
+    template<class Type, int col_idx> struct InsertIntoCol;
+    template<class Type, int col_idx> struct AssignIntoCol;
+}
 
 
 
@@ -51,66 +58,81 @@ template<int col_idx, class Type> class AddColumn;
  * data-members. These properties are important, because it ensures
  * that there is no run-time distinction between a Table instance and
  * an instance of any variation of this class, and therefore it is
- * valid to cast a pointer from Table to basic_table<T> even when the
- * instance is constructed as a Table. Of couse, this also assumes
- * that Table is non-polymorphic.
+ * valid to cast a pointer from Table to BasicTable<Spec> even when
+ * the instance is constructed as a Table. Of couse, this also assumes
+ * that Table is non-polymorphic. Further more, accessing the Table
+ * via a poiter or reference to a BasicTable is not in violation of
+ * the strict aliasing rule.
  */
-template<class Spec> class BasicTable: public Table {
-private:
-    template<class> friend class BasicTable;
-    friend class BasicTableRef<BasicTable>;
-
-    template<class Tab> class Accessors {
-    public:
-        class FieldBase;
-        template<int col_idx, class Type> class Field;
-        typedef std::pair<Tab*, std::size_t> FieldInit;
-        typedef typename Spec::template Columns<Field, FieldInit> Row;
-
-        template<int col_idx, class Type> class ColumnBase;
-        template<int col_idx, class Type> class Column;
-        typedef Tab* ColumnInit;
-        typedef typename Spec::template Columns<Column, ColumnInit> Cols;
-
-        class SubtabRow;
-    };
-
-    typedef BasicTable<Spec> ThisTable;
-
-    typedef Accessors<ThisTable> Acc;
-    typedef Accessors<const ThisTable> ConstAcc;
-
-    typedef typename Acc::Cols ColsAccessor;
-    typedef typename ConstAcc::Cols ConstColsAccessor;
-
-    typedef typename Acc::Row RowAccessor;
-    typedef typename ConstAcc::Row ConstRowAccessor;
-
-    template<int col_idx, class Type> class QueryColumnBase;
-    template<int col_idx, class Type> class QueryColumn;
-
+template<class Spec> class BasicTable: private Table, public Spec::ConvenienceMethods {
 public:
-    class Query;
+    typedef Spec spec_type;
+    typedef typename Spec::Columns Columns;
 
-    Query where() const { return Query(); } // FIXME: Bad thing to copy queries
+    typedef BasicTableRef<BasicTable> Ref;
+    typedef BasicTableRef<const BasicTable> ConstRef;
 
-    typedef RowAccessor Cursor; // FIXME: Do we really neede a cursor
-    typedef ConstRowAccessor ConstCursor; // FIXME: Do we really neede a cursor
+    typedef BasicTableView<BasicTable> View;
+    typedef BasicTableView<const BasicTable> ConstView;
+
+    using Table::is_empty;
+    using Table::size;
+    using Table::clear;
+    using Table::remove;
+    using Table::optimize;
 
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc)
     {
         tightdb::Spec& spec = get_spec();
-        typename Spec::template Columns<AddColumn, tightdb::Spec*> c(&spec);
+        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&spec, Spec::dyn_col_names());
         update_from_spec();
     }
 
-    BasicTableRef<BasicTable> get_table_ref() { return BasicTableRef<BasicTable>(this); }
-    BasicTableRef<const BasicTable> get_table_ref() const { return BasicTableRef<const BasicTable>(this); }
+    static int get_column_count() { return TypeCount<typename Spec::Columns>::value; }
 
+    BasicTableRef<BasicTable> get_table_ref()
+    {
+        return BasicTableRef<BasicTable>(this);
+    }
+
+    BasicTableRef<const BasicTable> get_table_ref() const
+    {
+        return BasicTableRef<const BasicTable>(this);
+    }
+
+private:
+    template<int col_idx> struct Col {
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef _impl::ColumnAccessor<BasicTable, col_idx, value_type> type;
+    };
+    typedef typename Spec::template ColNames<Col, BasicTable*> ColsAccessor;
+
+    template<int col_idx> struct ConstCol {
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef _impl::ColumnAccessor<const BasicTable, col_idx, value_type> type;
+    };
+    typedef typename Spec::template ColNames<ConstCol, const BasicTable*> ConstColsAccessor;
+
+public:
     ColsAccessor cols() { return ColsAccessor(this); }
-
     ConstColsAccessor cols() const { return ConstColsAccessor(this); }
 
+private:
+    template<int col_idx> struct Field {
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef _impl::FieldAccessor<BasicTable, col_idx, value_type, false> type;
+    };
+    typedef std::pair<BasicTable*, std::size_t> FieldInit;
+    typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
+
+    template<int col_idx> struct ConstField {
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef _impl::FieldAccessor<const BasicTable, col_idx, value_type, true> type;
+    };
+    typedef std::pair<const BasicTable*, std::size_t> ConstFieldInit;
+    typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
+
+public:
     RowAccessor operator[](std::size_t row_idx)
     {
         return RowAccessor(std::make_pair(this, row_idx));
@@ -125,8 +147,10 @@ public:
     ConstRowAccessor front() const { return ConstRowAccessor(std::make_pair(this, 0)); }
 
     /**
-     * \param rel_idx The index of the row specified relative to the
-     * end. Thus, <tt>table.back(rel_idx)</tt> is the same as
+     * Access the last row, or one of its predecessors.
+     *
+     * \param rel_idx An optional index of the row specified relative
+     * to the end. Thus, <tt>table.back(rel_idx)</tt> is the same as
      * <tt>table[table.size() + rel_idx]</tt>.
      */
     RowAccessor back(int rel_idx = -1)
@@ -141,111 +165,149 @@ public:
 
     RowAccessor add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
 
-    template<class T1>
-    void add(const T1& v1)
+    template<class L> void add(const Tuple<L>& tuple)
     {
-        Spec::insert(m_size, cols(), v1);
+        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
+                              "Wrong number of tuple elements");
+        ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), size(), tuple);
         insert_done();
     }
 
-    template<class T1, class T2>
-    void add(const T1& v1, const T2& v2)
+    template<class L> void insert(std::size_t i, const Tuple<L>& tuple)
     {
-        Spec::insert(m_size, cols(), v1, v2);
+        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
+                              "Wrong number of tuple elements");
+        ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), i, tuple);
         insert_done();
     }
 
-    template<class T1, class T2, class T3>
-    void add(const T1& v1, const T2& v2, const T3& v3)
+    template<class L> void set(std::size_t i, const Tuple<L>& tuple)
     {
-        Spec::insert(m_size, cols(), v1, v2, v3);
-        insert_done();
+        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
+                              "Wrong number of tuple elements");
+        ForEachType<Columns, _impl::AssignIntoCol>::exec(static_cast<Table*>(this), i, tuple);
     }
 
-    template<class T1, class T2, class T3, class T4>
-    void add(const T1& v1, const T2& v2, const T3& v3, const T4& v4)
-    {
-        Spec::insert(m_size, cols(), v1, v2, v3, v4);
-        insert_done();
-    }
+    using Spec::ConvenienceMethods::add; // FIXME: This probably fails if Spec::ConvenienceMethods has no add().
+    using Spec::ConvenienceMethods::insert; // FIXME: This probably fails if Spec::ConvenienceMethods has no insert().
+    using Spec::ConvenienceMethods::set; // FIXME: This probably fails if Spec::ConvenienceMethods has no set().
 
-    // FIXME: Add remaining add() methods up to 8 values.
-
-    template<class T1>
-    void insert(std::size_t i, const T1& v1)
-    {
-        Spec::insert(i, cols(), v1);
-        insert_done();
-    }
-
-    template<class T1, class T2>
-    void insert(std::size_t i, const T1& v1, const T2& v2)
-    {
-        Spec::insert(i, cols(), v1, v2);
-        insert_done();
-    }
-
-    template<class T1, class T2, class T3>
-    void insert(std::size_t i, const T1& v1, const T2& v2, const T3& v3)
-    {
-        Spec::insert(i, cols(), v1, v2, v3);
-        insert_done();
-    }
-
-    template<class T1, class T2, class T3, class T4>
-    void insert(std::size_t i, const T1& v1, const T2& v2, const T3& v3, const T4& v4)
-    {
-        Spec::insert(i, cols(), v1, v2, v3, v4);
-        insert_done();
-    }
-
-    // FIXME: Add remaining insert() methods up to 8 values.
-};
+    typedef RowAccessor Cursor; // FIXME: A cursor must be a distinct class that can be constructed from a RowAccessor
+    typedef ConstRowAccessor ConstCursor;
 
 
+    class Query;
 
+    Query where() const {
+        return Query();
+    } // FIXME: Bad thing to copy queries
 
-// These types are meant to be used when specifying column types
-// directly of via the TIGHTDB_TABLE_* macros.
-struct SpecBase {
-    typedef int64_t         Int;
-    typedef bool            Bool;
-    typedef const char*     String;
-    typedef std::time_t     Date;
-//    typedef tightdb::Binary Binary; // FIXME: Use tightdb::BinaryData here?
-    typedef tightdb::Mixed  Mixed;
-    template<class E> class Enum {
-    public:
-        Enum(E v) : m_value(v) {};
-        operator E() const { return m_value; }
-    private:
-        E m_value;
+#ifdef _DEBUG
+    using Table::Verify;
+    using Table::print;
+    bool compare(const BasicTable& c) const { return Table::compare(c); }
+#endif
+
+private:
+    template<int col_idx> struct QueryCol {
+        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef _impl::QueryColumn<BasicTable, col_idx, value_type> type;
     };
+
+    // These are intende to be used only by accessor classes
+    Table* get_impl() { return this; }
+    const Table* get_impl() const { return this; }
+
+    template<class Subtab> Subtab* get_subtable_ptr(size_t col_idx, std::size_t row_idx)
+    {
+        return static_cast<Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
+    }
+
+    template<class Subtab> const Subtab* get_subtable_ptr(size_t col_idx, std::size_t row_idx) const
+    {
+        return static_cast<const Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
+    }
+
+    // This one allows a BasicTable to know that BasicTables with
+    // other Specs are also derived from Table.
+    template<class> friend class BasicTable;
+
+    // These allow bind_ptr to know that this class is derived from
+    // Table.
+    friend class bind_ptr<BasicTable>;
+    friend class bind_ptr<const BasicTable>;
+
+    // These allow BasicTableRef to refer to RowAccessor and
+    // ConstRowAccessor.
+    friend class BasicTableRef<BasicTable>;
+    friend class BasicTableRef<const BasicTable>;
+
+    // These allow BasicTableView to call get_subtable_ptr().
+    friend class BasicTableView<BasicTable>;
+    friend class BasicTableView<const BasicTable>;
+
+    template<class, int, class, bool> friend class _impl::FieldAccessor;
+    template<class, int, class> friend class _impl::ColumnAccessorBase;
+    template<class, int, class> friend class _impl::ColumnAccessor;
+    template<class, int, class> friend class _impl::QueryColumn;
+    friend class Group; // FIXME: Probably only one method in Group
 };
 
 
 
 
 template<class Spec> class BasicTable<Spec>::Query:
-    public Spec::template Columns<QueryColumn, Query*> {
+    public Spec::template ColNames<QueryCol, Query*> {
 public:
-    template<int, class> friend class QueryColumnBase;
-    template<int, class> friend class QueryColumn;
-    Query(): Spec::template Columns<QueryColumn, Query*>(this) {}
+    template<class, int, class> friend class _impl::QueryColumnBase;
+    template<class, int, class> friend class _impl::QueryColumn;
 
-    Query& Or() { m_impl.Or(); return *this; }
+    Query(): Spec::template ColNames<QueryCol, Query*>(this) {}
 
     Query& group() { m_impl.group(); return *this; }
 
     Query& end_group() { m_impl.end_group(); return *this; }
 
-    std::size_t remove(BasicTable<Spec>& table, size_t start = 0, size_t end = size_t(-1),
-                       size_t limit = size_t(-1)) const
+    Query& parent() { m_impl.parent(); return *this; }
+
+    Query& Or() { m_impl.Or(); return *this; }
+
+    std::size_t find_next(const BasicTable<Spec>& table, std::size_t lastmatch=std::size_t(-1))
+    {
+        return m_impl.find_next(table, lastmatch);
+    }
+
+    typename BasicTable<Spec>::View find_all(BasicTable<Spec>& table, std::size_t start=0,
+                                             std::size_t end=std::size_t(-1),
+                                             std::size_t limit=std::size_t(-1))
+    {
+        return m_impl.find_all(table, start, end, limit);
+    }
+
+    typename BasicTable<Spec>::ConstView find_all(const BasicTable<Spec>& table,
+                                                  std::size_t start=0,
+                                                  std::size_t end=std::size_t(-1),
+                                                  std::size_t limit=std::size_t(-1))
+    {
+        return m_impl.find_all(table, start, end, limit);
+    }
+
+    std::size_t count(const BasicTable<Spec>& table, std::size_t start=0,
+                      std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return m_impl.count(table, start, end, limit);
+    }
+
+    std::size_t remove(BasicTable<Spec>& table, std::size_t start = 0,
+                       std::size_t end = std::size_t(-1),
+                       std::size_t limit = std::size_t(-1)) const
     {
         return m_impl.remove(table, start, end, limit);
     }
 
-    operator typename tightdb::Query() const { return m_impl; } // FIXME: Bad thing to copy queries
+#ifdef _DEBUG
+    std::string Verify() { return m_impl.Verify(); }
+#endif
 
 private:
     tightdb::Query m_impl;
@@ -254,525 +316,194 @@ private:
 
 
 
-template<class Spec> template<int col_idx, class Type> class BasicTable<Spec>::QueryColumnBase {
-protected:
-    typedef typename BasicTable<Spec>::Query Query;
-    Query* const m_query;
-    explicit QueryColumnBase(Query* q): m_query(q) {}
-
-    Query& equal(const Type& value) const
-    {
-        m_query->m_impl.equal(col_idx, value);
-        return *m_query;
-    }
-
-    Query& not_equal(const Type& value) const
-    {
-        m_query->m_impl.not_equal(col_idx, value);
-        return *m_query;
-    }
-};
-
-// QueryColumn specialization for integers
-template<class Spec> template<int col_idx>
-class BasicTable<Spec>::QueryColumn<col_idx, int64_t>: public QueryColumnBase<col_idx, int64_t> {
-private:
-    typedef typename BasicTable<Spec>::template QueryColumnBase<col_idx, int64_t> Base;
-    typedef typename Base::Query Query;
-
-public:
-    explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
-    using Base::equal;
-    using Base::not_equal;
-
-    Query& greater(int64_t value) const
-    {
-        Base::m_query->m_impl.greater(col_idx, value);
-        return *Base::m_query;
-    }
-
-    Query& greater_equal(int64_t value) const
-    {
-        Base::m_query->m_impl.greater_equal(col_idx, value);
-        return *Base::m_query;
-    }
-
-    Query& less(int64_t value) const
-    {
-        Base::m_query->m_impl.less(col_idx, value);
-        return *Base::m_query;
-    }
-
-    Query& less_equal(int64_t value) const
-    {
-        Base::m_query->m_impl.less_equal(col_idx, value);
-        return *Base::m_query;
-    }
-
-    Query& between(int64_t from, int64_t to) const
-    {
-        Base::m_query->m_impl.between(col_idx, from, to);
-        return *Base::m_query;
+namespace _impl
+{
+    template<class T> struct GetColumnTypeId;
+    template<> struct GetColumnTypeId<int64_t> {
+        static const ColumnType id = COLUMN_TYPE_INT;
     };
-};
-
-// QueryColumn specialization for booleans
-template<class Spec> template<int col_idx>
-class BasicTable<Spec>::QueryColumn<col_idx, bool>: public QueryColumnBase<col_idx, bool> {
-private:
-    typedef typename BasicTable<Spec>::template QueryColumnBase<col_idx, bool> Base;
-    typedef typename Base::Query Query;
-
-public:
-    explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
-    using Base::equal;
-    using Base::not_equal;
-};
-
-// QueryColumn specialization for enumerations
-template<class Spec> template<int col_idx, class E>
-class BasicTable<Spec>::QueryColumn<col_idx, SpecBase::Enum<E> >:
-    public QueryColumnBase<col_idx, SpecBase::Enum<E> > {
-private:
-    typedef typename BasicTable<Spec>::template QueryColumnBase<col_idx, SpecBase::Enum<E> > Base;
-    typedef typename Base::Query Query;
-
-public:
-    explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
-    using Base::equal;
-    using Base::not_equal;
-};
-
-// QueryColumn specialization for strings
-template<class Spec> template<int col_idx>
-class BasicTable<Spec>::QueryColumn<col_idx, const char*>: public QueryColumnBase<col_idx, const char*> {
-private:
-    typedef typename BasicTable<Spec>::template QueryColumnBase<col_idx, const char*> Base;
-    typedef typename Base::Query Query;
-
-public:
-    explicit QueryColumn(Query* q, const char* = 0): Base(q) {}
-
-    Query& equal(const char* value, bool case_sensitive=true) const
-    {
-        Base::m_query->m_impl.equal(col_idx, value, case_sensitive);
-        return *Base::m_query;
-    }
-
-    Query& not_equal(const char* value, bool case_sensitive=true) const
-    {
-        Base::m_query->m_impl.not_equal(col_idx, value, case_sensitive);
-        return *Base::m_query;
-    }
-
-    Query& begins_with(const char* value, bool case_sensitive=true) const
-    {
-        Base::m_query->m_impl.begins_with(col_idx, value, case_sensitive);
-        return *Base::m_query;
-    }
-
-    Query& ends_with(const char* value, bool case_sensitive=true) const
-    {
-        Base::m_query->m_impl.ends_with(col_idx, value, case_sensitive);
-        return *Base::m_query;
-    }
-
-    Query& contains(const char* value, bool case_sensitive=true) const
-    {
-        Base::m_query->m_impl.contains(col_idx, value, case_sensitive);
-        return *Base::m_query;
-    }
-};
-
-// QueryColumn specialization for mixed type
-template<class Spec> template<int col_idx> class BasicTable<Spec>::QueryColumn<col_idx, Mixed> {
-private:
-    typedef typename BasicTable<Spec>::Query Query;
-
-public:
-    explicit QueryColumn(Query*, const char* = 0) {}
-};
-
-// QueryColumn specialization for subtables
-template<class Spec> template<int col_idx, class Subspec>
-class BasicTable<Spec>::QueryColumn<col_idx, BasicTable<Subspec> > {
-private:
-    typedef typename BasicTable<Spec>::Query Query;
-
-public:
-    explicit QueryColumn(Query*, const char* = 0) {}
-};
-
-
-
-
-template<> struct GetColumnTypeId<int64_t> {
-    static const ColumnType id = COLUMN_TYPE_INT;
-};
-template<> struct GetColumnTypeId<bool> {
-    static const ColumnType id = COLUMN_TYPE_BOOL;
-};
-template<class E> struct GetColumnTypeId<SpecBase::Enum<E> > {
-    static const ColumnType id = COLUMN_TYPE_INT;
-};
-template<> struct GetColumnTypeId<const char*> {
-    static const ColumnType id = COLUMN_TYPE_STRING;
-};
-template<> struct GetColumnTypeId<Mixed> {
-    static const ColumnType id = COLUMN_TYPE_MIXED;
-};
-
-
-
-
-template<int col_idx, class Type> class AddColumn {
-public:
-    AddColumn(tightdb::Spec* spec, const char* column_name)
-    {
-        assert(col_idx == spec->get_column_count());
-        spec->add_column(GetColumnTypeId<Type>::id, column_name);
-    }
-};
-
-// AddColumn specialization for subtables
-template<int col_idx, class Subspec> class AddColumn<col_idx, BasicTable<Subspec> > {
-public:
-    AddColumn(tightdb::Spec* spec, const char* column_name)
-    {
-        assert(col_idx == spec->get_column_count());
-        tightdb::Spec subspec = spec->add_subtable_column(column_name);
-        typename Subspec::template Columns<tightdb::AddColumn, tightdb::Spec*> c(&subspec);
-    }
-};
-
-
-
-
-template<class Spec> template<class Tab> class BasicTable<Spec>::Accessors<Tab>::FieldBase {
-protected:
-    Tab* const m_table;
-    const std::size_t m_row_idx;
-    FieldBase(FieldInit i): m_table(i.first), m_row_idx(i.second) {}
-};
-
-// Field accessor specialization for integers
-template<class Spec> template<class Tab> template<int col_idx>
-class BasicTable<Spec>::Accessors<Tab>::Field<col_idx, int64_t>: public FieldBase {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab> Acc;
-    typedef typename Acc::FieldBase Base;
-
-public:
-    explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-    operator int64_t() const { return Base::m_table->get_int(col_idx, Base::m_row_idx); }
-    const Field& operator=(int64_t value) const
-    {
-        Base::m_table->set_int(col_idx, Base::m_row_idx, value);
-        return *this;
-    }
-    const Field& operator+=(int64_t value) const
-    {
-        // FIXME: Should be optimized (can be both optimized and
-        // generalized by using a form of expression templates).
-        value = Base::m_table->get_int(col_idx, Base::m_row_idx) + value;
-        Base::m_table->set_int(col_idx, Base::m_row_idx, value);
-        return *this;
-    }
-};
-
-// Field accessor specialization for booleans
-template<class Spec> template<class Tab> template<int col_idx>
-class BasicTable<Spec>::Accessors<Tab>::Field<col_idx, bool>: public FieldBase {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab> Acc;
-    typedef typename Acc::FieldBase Base;
-
-public:
-    explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-    operator bool() const { return Base::m_table->get_bool(col_idx, Base::m_row_idx); }
-    const Field& operator=(bool value) const
-    {
-        Base::m_table->set_bool(col_idx, Base::m_row_idx, value);
-        return *this;
-    }
-};
-
-// Field accessor specialization for enumerations
-template<class Spec> template<class Tab> template<int col_idx, class E>
-class BasicTable<Spec>::Accessors<Tab>::Field<col_idx, SpecBase::Enum<E> >: public FieldBase {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab> Acc;
-    typedef typename Acc::FieldBase Base;
-
-public:
-    explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-    operator E() const { return static_cast<E>(Base::m_table->get_int(col_idx, Base::m_row_idx)); }
-    const Field& operator=(E value) const
-    {
-        Base::m_table->set_int(col_idx, Base::m_row_idx, value);
-        return *this;
-    }
-};
-
-// Field accessor specialization for strings
-template<class Spec> template<class Tab> template<int col_idx>
-class BasicTable<Spec>::Accessors<Tab>::Field<col_idx, const char*>: public FieldBase {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab> Acc;
-    typedef typename Acc::FieldBase Base;
-
-public:
-    explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-    operator const char*() const { return Base::m_table->get_string(col_idx, Base::m_row_idx); }
-    const Field& operator=(const char* value) const
-    {
-        Base::m_table->set_string(col_idx, Base::m_row_idx, value);
-        return *this;
-    }
-    // FIXME: Not good to define operator==() here, beacuse it does
-    // not have this semantic for char pointers in general. However,
-    // if we choose to keep it, we should also have all the other
-    // comparison operators, and many other operators need to be
-    // disabled such that e.g. 't.foo - 10' is no longer possible (it
-    // is now due to the conversion operator). A much better approach
-    // would probably be to define a special tightdb::String type.
-    bool operator==(const char* value) const
-    {
-        return std::strcmp(Base::m_table->get_string(col_idx, Base::m_row_idx), value) == 0;
-    }
-};
-
-// Field accessor specialization for mixed type
-template<class Spec> template<class Tab> template<int col_idx>
-class BasicTable<Spec>::Accessors<Tab>::Field<col_idx, Mixed>: public FieldBase {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab> Acc;
-    typedef typename Acc::FieldBase Base;
-
-public:
-    explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-    operator Mixed() const { return Base::m_table->get_mixed(col_idx, Base::m_row_idx); }
-    const Field& operator=(const Mixed& value) const
-    {
-        Base::m_table->set_mixed(col_idx, Base::m_row_idx, value);
-        return *this;
-    }
-    ColumnType get_type() const { return Base::m_table->get_mixed_type(col_idx, Base::m_row_idx); }
-    int64_t get_int() const { return Mixed(*this).get_int(); }
-    bool get_bool() const { return Mixed(*this).get_bool(); }
-    std::time_t get_date() const { return Mixed(*this).get_date(); }
-    const char* get_string() const { return Mixed(*this).get_string(); }
-    BinaryData get_binary() const { return Mixed(*this).get_binary(); }
-};
-
-// Field accessor specialization for subtables
-template<class Spec> template<class Tab> template<int col_idx, class Subspec>
-class BasicTable<Spec>::Accessors<Tab>::Field<col_idx, BasicTable<Subspec> >: public FieldBase {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab> Acc;
-    typedef typename Acc::FieldBase Base;
-    typedef typename CopyConstness<Tab, BasicTable<Subspec> >::type Subtab;
-    typedef typename BasicTable<Subspec>::template Accessors<Subtab> SubtabAcc;
-    typedef typename SubtabAcc::SubtabRow RowAccessor;
-
-public:
-    explicit Field(typename Acc::FieldInit i, const char* = 0): Base(i) {}
-
-    BasicTableRef<Subtab> operator->() const
-    {
-        Subtab* subtab =
-            static_cast<Subtab*>(Base::m_table->get_subtable_ptr(col_idx, Base::m_row_idx));
-        return Table::make_ref(subtab);
-    }
-
-    RowAccessor operator[](std::size_t row_idx) const
-    {
-        Subtab* subtab =
-            static_cast<Subtab*>(Base::m_table->get_subtable_ptr(col_idx, Base::m_row_idx));
-        return RowAccessor(subtab, row_idx);
-    }
-};
-
-
-
-
-template<class Spec> template<class Tab> template<int col_idx, class Type>
-class BasicTable<Spec>::Accessors<Tab>::ColumnBase {
-public:
-    explicit ColumnBase(Tab* t): m_table(t) {}
-
-    Field<col_idx, Type> operator[](std::size_t row_idx) const
-    {
-        return Field<col_idx, Type>(std::make_pair(m_table, row_idx));
-    }
-
-protected:
-    Tab* const m_table;
-};
-
-// Column accessor specialization for integers
-template<class Spec> template<class Tab> template<int col_idx>
-class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, int64_t>:
-    public ColumnBase<col_idx, int64_t> {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, int64_t> Base;
-
-public:
-    explicit Column(Tab* t, const char* = 0): Base(t) {}
-
-    std::size_t find_first(int64_t value) const
-    {
-        return Base::m_table->find_first_int(col_idx, value);
-    }
-
-    std::size_t find_pos(int64_t value) const
-    {
-        return Base::m_table->GetColumn(col_idx).find_pos(value);
-    }
-
-    TableView find_all(int64_t value) const
-    {
-        TableView tv(*Base::m_table);
-        Base::m_table->find_all_int(tv, col_idx, value);
-        return tv;
-    }
-
-    const Column& operator+=(int64_t value) const
-    {
-        Base::m_table->GetColumn(col_idx).Increment64(value);
-        return *this;
-    }
-
-    void _insert(std::size_t row_idx, int64_t value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
-    {
-        Base::m_table->insert_int(col_idx, row_idx, value);
-    }
-};
-
-// Column accessor specialization for booleans
-template<class Spec> template<class Tab> template<int col_idx>
-class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, bool>:
-    public ColumnBase<col_idx, bool> {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, bool> Base;
-
-public:
-    explicit Column(Tab* t, const char* = 0): Base(t) {}
-
-    std::size_t find_first(bool value) const
-    {
-        return Base::m_table->find_first_bool(col_idx, value);
-    }
-
-    TableView find_all(bool value) const
-    {
-        TableView tv(*Base::m_table);
-        Base::m_table->find_all_bool(tv, col_idx, value);
-        return tv;
-    }
-
-    void _insert(std::size_t row_idx, bool value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
-    {
-        Base::m_table->insert_bool(col_idx, row_idx, value);
-    }
-};
-
-// Column accessor specialization for enumerations
-template<class Spec> template<class Tab> template<int col_idx, class E>
-class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, SpecBase::Enum<E> >:
-    public ColumnBase<col_idx, SpecBase::Enum<E> > {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, SpecBase::Enum<E> > Base;
-
-public:
-    explicit Column(Tab* t, const char* = 0): Base(t) {}
-
-    std::size_t find_first(E value) const
-    {
-        return Base::m_table->find_first_int(col_idx, (int64_t)value);
-    }
-
-    TableView find_all(E value) const
-    {
-        TableView tv(*Base::m_table);
-        Base::m_table->find_all_int(tv, col_idx, (int64_t)value);
-        return tv;
-    }
-
-    void _insert(std::size_t row_idx, E value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
-    {
-        Base::m_table->insert_enum(col_idx, row_idx, value);
-    }
-};
-
-// Column accessor specialization for strings
-template<class Spec> template<class Tab> template<int col_idx>
-class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, const char*>:
-    public ColumnBase<col_idx, const char*> {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, const char*> Base;
-
-public:
-    explicit Column(Tab* t, const char* = 0): Base(t) {}
-
-    std::size_t find_first(const char* value) const
-    {
-        return Base::m_table->find_first_string(col_idx, value);
-    }
-
-    TableView find_all(const char* value) const
-    {
-        TableView tv(*Base::m_table);
-        Base::m_table->find_all_string(tv, col_idx, value);
-        return tv;
-    }
-
-    void _insert(std::size_t row_idx, const char* value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
-    {
-        Base::m_table->insert_string(col_idx, row_idx, value);
-    }
-};
-
-// Column accessor specialization for mixed type
-template<class Spec> template<class Tab> template<int col_idx>
-class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, Mixed>: public ColumnBase<col_idx, Mixed> {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, Mixed> Base;
-
-public:
-    explicit Column(Tab* t, const char* = 0): Base(t) {}
-
-    void _insert(std::size_t row_idx, const Mixed& value) const // FIXME: Should not be public (maybe send specialized columns accessor to Spec::insert(), then in Spec::insert() do 'op(cols.name1, v1)')
-    {
-        Base::m_table->insert_mixed(col_idx, row_idx, value);
-    }
-};
-
-// Column accessor specialization for subtables
-template<class Spec> template<class Tab> template<int col_idx, class Subspec>
-class BasicTable<Spec>::Accessors<Tab>::Column<col_idx, BasicTable<Subspec> >:
-    public ColumnBase<col_idx, BasicTable<Subspec> > {
-private:
-    typedef typename BasicTable<Spec>::template Accessors<Tab>::template ColumnBase<col_idx, BasicTable<Subspec> > Base;
-
-public:
-    explicit Column(Tab* t, const char* = 0): Base(t) {}
-};
-
-
-
-
-template<class Spec> template<class Tab>
-class BasicTable<Spec>::Accessors<Tab>::SubtabRow: public Row {
-public:
-    SubtabRow(Tab* subtab, std::size_t row_idx):
-        Row(std::make_pair(subtab, row_idx)), m_owner(Table::make_ref(subtab)) {}
-
-private:
-    BasicTableRef<Tab> const m_owner;
-};
+    template<> struct GetColumnTypeId<bool> {
+        static const ColumnType id = COLUMN_TYPE_BOOL;
+    };
+    template<> struct GetColumnTypeId<const char*> {
+        static const ColumnType id = COLUMN_TYPE_STRING;
+    };
+    template<class E> struct GetColumnTypeId<SpecBase::Enum<E> > {
+        static const ColumnType id = COLUMN_TYPE_INT;
+    };
+    template<> struct GetColumnTypeId<Date> {
+        static const ColumnType id = COLUMN_TYPE_DATE;
+    };
+    template<> struct GetColumnTypeId<BinaryData> {
+        static const ColumnType id = COLUMN_TYPE_BINARY;
+    };
+    template<> struct GetColumnTypeId<Mixed> {
+        static const ColumnType id = COLUMN_TYPE_MIXED;
+    };
+
+
+    template<class Type, int col_idx> struct AddCol {
+        static void exec(Spec* spec, const char* const* col_names)
+        {
+            assert(col_idx == spec->get_column_count());
+            spec->add_column(GetColumnTypeId<Type>::id, col_names[col_idx]);
+        }
+    };
+
+    // AddCol specialization for subtables
+    template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
+        static void exec(Spec* spec, const char* const* col_names)
+        {
+            assert(col_idx == spec->get_column_count());
+            typedef typename Subtab::Columns Subcolumns;
+            Spec subspec = spec->add_subtable_column(col_names[col_idx]);
+            const char* const* const subcol_names = Subtab::spec_type::dyn_col_names();
+            ForEachType<Subcolumns, _impl::AddCol>::exec(&subspec, subcol_names);
+        }
+    };
+
+
+
+    // InsertIntoCol specialization for integers
+    template<int col_idx> struct InsertIntoCol<int64_t, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_int(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for booleans
+    template<int col_idx> struct InsertIntoCol<bool, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_bool(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for strings
+    template<int col_idx> struct InsertIntoCol<const char*, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_string(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for enumerations
+    template<class E, int col_idx> struct InsertIntoCol<SpecBase::Enum<E>, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_enum(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for dates
+    template<int col_idx> struct InsertIntoCol<Date, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            const Date d(at<col_idx>(tuple));
+            t->insert_date(col_idx, row_idx, d.get_date());
+        }
+    };
+
+    // InsertIntoCol specialization for binary data
+    template<int col_idx> struct InsertIntoCol<BinaryData, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            const BinaryData b(at<col_idx>(tuple));
+            t->insert_binary(col_idx, row_idx, b.pointer, b.len);
+        }
+    };
+
+    // InsertIntoCol specialization for subtables
+    template<class T, int col_idx> struct InsertIntoCol<SpecBase::Subtable<T>, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_subtable(col_idx, row_idx);
+            assert(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
+            static_cast<void>(tuple);
+        }
+    };
+
+    // InsertIntoCol specialization for mixed type
+    template<int col_idx> struct InsertIntoCol<Mixed, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_mixed(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+
+
+    // AssignIntoCol specialization for integers
+    template<int col_idx> struct AssignIntoCol<int64_t, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->set_int(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // AssignIntoCol specialization for booleans
+    template<int col_idx> struct AssignIntoCol<bool, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->set_bool(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // AssignIntoCol specialization for strings
+    template<int col_idx> struct AssignIntoCol<const char*, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->set_string(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // AssignIntoCol specialization for enumerations
+    template<class E, int col_idx> struct AssignIntoCol<SpecBase::Enum<E>, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->set_enum(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // AssignIntoCol specialization for dates
+    template<int col_idx> struct AssignIntoCol<Date, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            const Date d(at<col_idx>(tuple));
+            t->set_date(col_idx, row_idx, d.get_date());
+        }
+    };
+
+    // AssignIntoCol specialization for binary data
+    template<int col_idx> struct AssignIntoCol<BinaryData, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            const BinaryData b(at<col_idx>(tuple));
+            t->set_binary(col_idx, row_idx, b.pointer, b.len);
+        }
+    };
+
+    // AssignIntoCol specialization for subtables
+    template<class T, int col_idx> struct AssignIntoCol<SpecBase::Subtable<T>, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->clear_subtable(col_idx, row_idx);
+            assert(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
+            static_cast<void>(tuple);
+        }
+    };
+
+    // AssignIntoCol specialization for mixed type
+    template<int col_idx> struct AssignIntoCol<Mixed, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->set_mixed(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+}
 
 
 } // namespace tightdb
 
-#endif // __TIGHTDB_BASIC_TABLE_H
+#endif // TIGHTDB_TABLE_BASIC_HPP

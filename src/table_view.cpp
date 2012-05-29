@@ -1,73 +1,127 @@
-#include "table.hpp"
+#include "table_view.hpp"
 #include "column.hpp"
-#include <assert.h>
 
 namespace tightdb {
 
-TableView::TableView(Table& source): m_table(source) {}
-
-TableView::TableView(const TableView& v): m_table(v.m_table), m_refs(v.m_refs) {}
-
-TableView::~TableView()
-{
-    m_refs.Destroy();
-}
-
-Table* TableView::get_table()
-{
-    return &m_table;
-}
 
 // Searching
-size_t TableView::find_first(size_t column_ndx, int64_t value) const
+size_t TableViewBase::find_first_int(size_t column_ndx, int64_t value) const
 {
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
+    assert(m_table);
+    assert(column_ndx < m_table->get_column_count());
+    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
 
     for(size_t i = 0; i < m_refs.Size(); i++)
         if(get_int(column_ndx, i) == value)
             return i;
 
-    return (size_t)-1;
+    return size_t(-1);
 }
 
-void TableView::find_all(TableView& tv, size_t column_ndx, int64_t value)
-{
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
 
-    for(size_t i = 0; i < m_refs.Size(); i++)
-        if(get_int(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
-}
-
-size_t TableView::find_first(size_t column_ndx, const char* value) const
+size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) const
 {
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_STRING);
+    assert(m_table);
+    assert(column_ndx < m_table->get_column_count());
+    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
 
     for(size_t i = 0; i < m_refs.Size(); i++)
     if(strcmp(get_string(column_ndx, i), value) == 0)
         return i;
 
-    return (size_t)-1;
+    return size_t(-1);
 }
 
 
-void TableView::find_all(TableView& tv, size_t column_ndx, const char* value)
+TableView TableView::find_all_int(size_t column_ndx, int64_t value)
 {
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_STRING);
+    assert(m_table);
+    assert(column_ndx < m_table->get_column_count());
+    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
 
+    TableView tv(*m_table);
+    for(size_t i = 0; i < m_refs.Size(); i++)
+        if(get_int(column_ndx, i) == value)
+            tv.get_ref_column().add(i);
+    return move(tv);
+}
+
+
+ConstTableView TableView::find_all_int(size_t column_ndx, int64_t value) const
+{
+    assert(m_table);
+    assert(column_ndx < m_table->get_column_count());
+    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
+
+    ConstTableView tv(*m_table);
+    for(size_t i = 0; i < m_refs.Size(); i++)
+        if(get_int(column_ndx, i) == value)
+            tv.get_ref_column().add(i);
+    return move(tv);
+}
+
+
+ConstTableView ConstTableView::find_all_int(size_t column_ndx, int64_t value) const
+{
+    assert(m_table);
+    assert(column_ndx < m_table->get_column_count());
+    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
+
+    ConstTableView tv(*m_table);
+    for(size_t i = 0; i < m_refs.Size(); i++)
+        if(get_int(column_ndx, i) == value)
+            tv.get_ref_column().add(i);
+    return move(tv);
+}
+
+
+TableView TableView::find_all_string(size_t column_ndx, const char* value)
+{
+    assert(m_table);
+    assert(column_ndx < m_table->get_column_count());
+    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
+
+    TableView tv(*m_table);
     for(size_t i = 0; i < m_refs.Size(); i++)
     if(strcmp(get_string(column_ndx, i), value) == 0)
         tv.get_ref_column().add(i);
+    return move(tv);
 }
 
-int64_t TableView::sum(size_t column_ndx) const
+
+ConstTableView TableView::find_all_string(size_t column_ndx, const char* value) const
 {
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
+    assert(m_table);
+    assert(column_ndx < m_table->get_column_count());
+    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
+
+    ConstTableView tv(*m_table);
+    for(size_t i = 0; i < m_refs.Size(); i++)
+    if(strcmp(get_string(column_ndx, i), value) == 0)
+        tv.get_ref_column().add(i);
+    return move(tv);
+}
+
+
+ConstTableView ConstTableView::find_all_string(size_t column_ndx, const char* value) const
+{
+    assert(m_table);
+    assert(column_ndx < m_table->get_column_count());
+    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
+
+    ConstTableView tv(*m_table);
+    for(size_t i = 0; i < m_refs.Size(); i++)
+    if(strcmp(get_string(column_ndx, i), value) == 0)
+        tv.get_ref_column().add(i);
+    return move(tv);
+}
+
+
+int64_t TableViewBase::sum(size_t column_ndx) const
+{
+    assert(m_table);
+    assert(column_ndx < m_table->get_column_count());
+    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
     int64_t sum = 0;
 
     for(size_t i = 0; i < m_refs.Size(); i++)
@@ -76,8 +130,10 @@ int64_t TableView::sum(size_t column_ndx) const
     return sum;
 }
 
-int64_t TableView::maximum(size_t column_ndx) const
+
+int64_t TableViewBase::maximum(size_t column_ndx) const
 {
+    assert(m_table);
     if (is_empty()) return 0;
     if (m_refs.Size() == 0) return 0;
 
@@ -91,8 +147,10 @@ int64_t TableView::maximum(size_t column_ndx) const
     return mv;
 }
 
-int64_t TableView::minimum(size_t column_ndx) const
+
+int64_t TableViewBase::minimum(size_t column_ndx) const
 {
+    assert(m_table);
     if (is_empty()) return 0;
     if (m_refs.Size() == 0) return 0;
 
@@ -106,128 +164,13 @@ int64_t TableView::minimum(size_t column_ndx) const
     return mv;
 }
 
-int64_t TableView::get_int(size_t column_ndx, size_t ndx) const
+
+void TableViewBase::sort(size_t column, bool Ascending)
 {
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
-    assert(ndx < m_refs.Size());
-
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    return m_table.get_int(column_ndx, real_ndx);
-}
-
-bool TableView::get_bool(size_t column_ndx, size_t ndx) const
-{
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_BOOL);
-    assert(ndx < m_refs.Size());
-
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    return m_table.get_bool(column_ndx, real_ndx);
-}
-
-time_t TableView::get_date(size_t column_ndx, size_t ndx) const
-{
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_DATE);
-    assert(ndx < m_refs.Size());
-
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    return m_table.get_date(column_ndx, real_ndx);
-}
-
-const char* TableView::get_string(size_t column_ndx, size_t ndx) const
-{
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_STRING);
-    assert(ndx < m_refs.Size());
-
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    return m_table.get_string(column_ndx, real_ndx);
-}
-
-BinaryData TableView::get_binary(std::size_t column_ndx, std::size_t ndx) const
-{
-    assert(ndx < m_refs.Size());
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    return m_table.get_binary(column_ndx, real_ndx);
-}
-
-Mixed TableView::get_mixed(std::size_t column_ndx, std::size_t ndx) const
-{
-    assert(ndx < m_refs.Size());
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    return m_table.get_mixed(column_ndx, real_ndx);
-}
-
-TableRef TableView::get_subtable(size_t column_ndx, size_t ndx)
-{
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_TABLE);
-    assert(ndx < m_refs.Size());
-
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    return m_table.get_subtable(column_ndx, real_ndx);
-}
-
-void TableView::set_int(size_t column_ndx, size_t ndx, int64_t value)
-{
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_INT);
-    assert(ndx < m_refs.Size());
-
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    m_table.set_int(column_ndx, real_ndx, value);
-}
-
-void TableView::set_bool(size_t column_ndx, size_t ndx, bool value)
-{
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_BOOL);
-    assert(ndx < m_refs.Size());
-
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    m_table.set_bool(column_ndx, real_ndx, value);
-}
-
-void TableView::set_date(size_t column_ndx, size_t ndx, time_t value)
-{
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_DATE);
-    assert(ndx < m_refs.Size());
-
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    m_table.set_date(column_ndx, real_ndx, value);
-}
-
-void TableView::set_string(size_t column_ndx, size_t ndx, const char* value)
-{
-    assert(column_ndx < m_table.get_column_count());
-    assert(m_table.get_column_type(column_ndx) == COLUMN_TYPE_STRING);
-    assert(ndx < m_refs.Size());
-
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    m_table.set_string(column_ndx, real_ndx, value);
-}
-
-void TableView::set_binary(std::size_t column_ndx, std::size_t ndx, const char* value, std::size_t len)
-{
-    assert(ndx < m_refs.Size());
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    m_table.set_binary(column_ndx, real_ndx, value, len);
-}
-
-void TableView::set_mixed(std::size_t column_ndx, std::size_t ndx, Mixed value)
-{
-    assert(ndx < m_refs.Size());
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    m_table.set_mixed(column_ndx, real_ndx, value);
-}
-
-
-void TableView::sort(size_t column, bool Ascending)
-{
-    assert(m_table.get_column_type(column) == COLUMN_TYPE_INT || m_table.get_column_type(column) == COLUMN_TYPE_DATE || m_table.get_column_type(column) == COLUMN_TYPE_BOOL);
+    assert(m_table);
+    assert(m_table->get_column_type(column) == COLUMN_TYPE_INT ||
+           m_table->get_column_type(column) == COLUMN_TYPE_DATE ||
+           m_table->get_column_type(column) == COLUMN_TYPE_BOOL);
 
     if(m_refs.Size() == 0)
         return;
@@ -242,23 +185,23 @@ void TableView::sort(size_t column, bool Ascending)
 
     // Extract all values from the Column and put them in an Array because Array is much faster to operate on
     // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
-    if(m_table.get_column_type(column) == COLUMN_TYPE_INT) {
+    if(m_table->get_column_type(column) == COLUMN_TYPE_INT) {
         for(size_t t = 0; t < m_refs.Size(); t++) {
-            const int64_t v = m_table.get_int(column, (size_t)m_refs.Get(t));
+            const int64_t v = m_table->get_int(column, size_t(m_refs.Get(t)));
             vals.add(v);
         }
     }
-    else if(m_table.get_column_type(column) == COLUMN_TYPE_DATE) {
+    else if(m_table->get_column_type(column) == COLUMN_TYPE_DATE) {
         for(size_t t = 0; t < m_refs.Size(); t++) {
-            const size_t idx = (size_t)m_refs.Get(t);
-            const int64_t v = (int64_t)m_table.get_date(column, idx);
+            const size_t idx = size_t(m_refs.Get(t));
+            const int64_t v = int64_t(m_table->get_date(column, idx));
             vals.add(v);
         }
     }
-    else if(m_table.get_column_type(column) == COLUMN_TYPE_BOOL) {
+    else if(m_table->get_column_type(column) == COLUMN_TYPE_BOOL) {
         for(size_t t = 0; t < m_refs.Size(); t++) {
-            const size_t idx = (size_t)m_refs.Get(t);
-            const int64_t v = (int64_t)m_table.get_bool(column, idx);
+            const size_t idx = size_t(m_refs.Get(t));
+            const int64_t v = int64_t(m_table->get_bool(column, idx));
             vals.add(v);
         }
     }
@@ -291,32 +234,37 @@ void TableView::sort(size_t column, bool Ascending)
     result.Destroy();
 }
 
+
 void TableView::remove(size_t ndx)
 {
+    assert(m_table);
     assert(ndx < m_refs.Size());
 
     // Delete row in source table
-    const size_t real_ndx = (size_t)m_refs.Get(ndx);
-    m_table.remove(real_ndx);
+    const size_t real_ndx = size_t(m_refs.Get(ndx));
+    m_table->remove(real_ndx);
 
     // Update refs
     m_refs.Delete(ndx);
     m_refs.IncrementIf(ndx, -1);
 }
 
+
 void TableView::clear()
 {
+    assert(m_table);
     m_refs.sort();
 
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)
     const size_t count = m_refs.Size();
     for (size_t i = count; i; --i) {
-        const size_t ndx = (size_t)m_refs.Get(i-1);
-        m_table.remove(ndx);
+        const size_t ndx = size_t(m_refs.Get(i-1));
+        m_table->remove(ndx);
     }
 
     m_refs.Clear();
 }
 
-}
+
+} // namespace tightdb
