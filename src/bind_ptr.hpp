@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_BIND_PTR_HPP
 #define TIGHTDB_BIND_PTR_HPP
 
+#include <algorithm>
 #include <ostream>
 
 #include "config.h"

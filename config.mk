@@ -54,8 +54,7 @@ ifneq ($(filter clang%,$(CC)),)
 ifneq ($(filter clang%,$(CXX)),)
 
 # These compiler flags are those that are common to all build modes
-# (STATIC, SHARED, DEBUG, and COVERAGE). Note: '-ansi' implies C++03
-# for modern versions of GCC.
+# (STATIC, SHARED, DEBUG, and COVERAGE).
 CFLAGS          = -Weverything -Wno-long-long -Wno-sign-conversion -Wno-cast-align -Wno-shadow -Wno-unreachable-code -Wno-overloaded-virtual -Wno-unused-macros -Wno-conditional-uninitialized -Wno-global-constructors -Wno-missing-prototypes -Wno-shorten-64-to-32 -Wno-padded -Wno-exit-time-destructors -Wno-weak-vtables -Wno-unused-member-function
 CXXFLAGS        = $(CFLAGS) -std=c++03
 LDFLAGS         = -lstdc++
