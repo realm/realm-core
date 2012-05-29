@@ -317,7 +317,7 @@ void Array::Clear()
             const size_t ref = GetAsRef(i);
             if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
-            Array sub(ref, this, i);
+            Array sub(ref, this, i, m_alloc);
             sub.Destroy();
         }
     }

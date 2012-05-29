@@ -24,21 +24,21 @@ TEST(Table1)
 
     CHECK_EQUAL(0, table.get_int(0, ndx));
     CHECK_EQUAL(10, table.get_int(1, ndx));
-    
+
     // Test adding multiple rows
     ndx = table.add_empty_row(7);
     for (size_t i = ndx; i < 7; ++i) {
         table.set_int(0, i, 2*i);
         table.set_int(1, i, 20*i);
     }
-    
+
     for (size_t i = ndx; i < 7; ++i) {
         const int64_t v1 = 2 * i;
         const int64_t v2 = 20 * i;
         CHECK_EQUAL(v1, table.get_int(0, i));
         CHECK_EQUAL(v2, table.get_int(1, i));
     }
-    
+
 #ifdef _DEBUG
     table.Verify();
 #endif //_DEBUG
@@ -1031,4 +1031,42 @@ TEST(Table_DateAndBinary)
     CHECK_EQUAL(t[0].date, 8);
     CHECK_EQUAL(t[0].bin.get_len(), size);
     CHECK(std::equal(t[0].bin.get_pointer(), t[0].bin.get_pointer()+size, data));
+}
+
+
+TEST(Table_Spec_MINE)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    Spec& s = table->get_spec();
+    s.add_column(COLUMN_TYPE_STRING, "name");
+    Spec sub = s.add_subtable_column("sub");
+        sub.add_column(COLUMN_TYPE_INT, "num");
+    table->update_from_spec();
+
+    CHECK_EQUAL(2, table->get_column_count());
+
+    // Add a row
+    table->insert_string(0, 0, "Foo");
+    table->insert_subtable(1, 0);
+    table->insert_done();
+
+    CHECK_EQUAL(0, table->get_subtable_size(1, 0));
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(1, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_int(0, 0, 123);
+        subtable->insert_done();
+
+        CHECK_EQUAL(123, subtable->get_int(0, 0));
+    }
+
+    CHECK_EQUAL(1, table->get_subtable_size(1, 0));
+
+    table->clear();
 }
