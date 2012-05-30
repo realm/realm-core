@@ -629,30 +629,30 @@ size_t Array::FindPos2(int64_t target) const
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
 #if defined(USE_SSE42) || defined(USE_SSE3)
-    if(end == -1)
+    if (end == (size_t)-1)
         end = m_len;
 
 #if defined(USE_SSE42)
-    if(end - start < sizeof(__m128i) || m_width < 8)
+    if (end - start < sizeof(__m128i) || m_width < 8)
         return CompareEquality<true>(value, start, end);
 #elif defined(USE_SSE3)
-    if(end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) // 64 bit not supported by sse3
+    if (end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) // 64 bit not supported by sse3
         return CompareEquality<true>(value, start, end);
 #endif
 
     // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
-    __m128i *a = (__m128i *)round_up(m_data + start * m_width / 8, sizeof(__m128i));
-    __m128i *b = (__m128i *)round_down(m_data + end * m_width / 8, sizeof(__m128i));
+    __m128i* const a = (__m128i *)round_up(m_data + start * m_width / 8, sizeof(__m128i));
+    __m128i* const b = (__m128i *)round_down(m_data + end * m_width / 8, sizeof(__m128i));
     size_t t = 0;
 
     t = CompareEquality<true>(value, start, ((unsigned char *)a - m_data) * 8 / m_width);
-    if(t != -1)
+    if (t != (size_t)-1)
         return t;
 
     // Search aligned area with SSE
-    if(b > a) {
+    if (b > a) {
         t = FindSSE(value, a, m_width / 8, b - a);
-        if(t != -1) {
+        if (t != (size_t)-1) {
             // FindSSE returns SSE chunk number, so we use CompareEquality() to find packed position
             t = CompareEquality<true>(value, t * sizeof(__m128i) * 8 / m_width  +  (((unsigned char *)a - m_data) * 8 / m_width), end);
             return t;
@@ -676,31 +676,31 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
     __m128i search = {0}, next, compare = {1};
     size_t i = 0;
 
-    for(int j = 0; j < sizeof(__m128i) / bytewidth; j++)
+    for (int j = 0; j < (int)(sizeof(__m128i) / bytewidth); ++j)
         memcpy((char *)&search + j * bytewidth, &value, bytewidth);
 
-    if(bytewidth == 1) {
-        for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
+    if (bytewidth == 1) {
+        for (i = 0; i < items && _mm_movemask_epi8(compare) == 0; ++i) {
             next = _mm_load_si128(&data[i]);
             compare = _mm_cmpeq_epi8(search, next);
         }
     }
-    else if(bytewidth == 2) {
-        for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
+    else if (bytewidth == 2) {
+        for (i = 0; i < items && _mm_movemask_epi8(compare) == 0; ++i) {
             next = _mm_load_si128(&data[i]);
             compare = _mm_cmpeq_epi16(search, next);
         }
     }
-    else if(bytewidth == 4) {
-        for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
+    else if (bytewidth == 4) {
+        for (i = 0; i < items && _mm_movemask_epi8(compare) == 0; ++i) {
             next = _mm_load_si128(&data[i]);
             compare = _mm_cmpeq_epi32(search, next);
         }
     }
 #if defined(USE_SSE42)
-    else if(bytewidth == 8) {
+    else if (bytewidth == 8) {
         // Only supported by SSE 4.1 because of _mm_cmpeq_epi64().
-        for(i = 0; i < items && _mm_movemask_epi8(compare) == 0; i++) {
+        for (i = 0; i < items && _mm_movemask_epi8(compare) == 0; ++i) {
             next = _mm_load_si128(&data[i]);
             compare = _mm_cmpeq_epi64(search, next);
         }
@@ -718,8 +718,9 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, size_t end) const
 {
     if (end == (size_t)-1) end = m_len;
+    assert(start <= m_len && end <= m_len && start <= end);
 
-    // When starting from beggining of array the data is always 64bit aligned
+    // When starting from beginning of array the data is always 64bit aligned
     // but otherwise we have to ensure alignment.
     if (start != 0) {
         // Test 4 items with zero latency for cases where match frequency is high, such
@@ -732,12 +733,6 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             return start + 2;
         if (start + 3 < end && (eq ? (Get(start + 3) == value)   :   (Get(start + 3) != value)))
             return start + 3;
-
-        if (is_empty()) return (size_t)-1;
-        if (start >= end) return (size_t)-1;
-
-        assert(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
-
         start += 4;
 
         if (start >= end)
@@ -748,7 +743,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
         // Also stop at a 64-bit aligned position so we can do aligned chunk reads in later linear test
         size_t ee = round_up(start, 64);// + 64;
         ee = ee > end ? end : ee;
-        for (; start < ee; start++)
+        for (; start < ee; ++start)
             if (eq ? (Get(start) == value) : (Get(start) != value))
                 return start;
     }
@@ -785,7 +780,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             else
                 ++p;
         }
-        start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+        start = (p - (int64_t *)m_data) * 8 * 8 / 2;
     }
     else if (m_width == 4) {
         const int64_t v = ~0ULL/0xF * value;
@@ -797,7 +792,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             else
                 ++p;
         }
-        start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+        start = (p - (int64_t *)m_data) * 8 * 8 / 4;
     }
     else if (m_width == 8) {
         const int64_t v = ~0ULL/0xFF * value;
@@ -809,7 +804,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             else
                 ++p;
         }
-        start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+        start = (p - (int64_t *)m_data) * 8 * 8 / 8;
     }
     else if (m_width == 16) {
         const int64_t v = ~0ULL/0xFFFF * value;
@@ -821,7 +816,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             else
                 ++p;
         }
-        start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+        start = (p - (int64_t *)m_data) * 8 * 8 / 16;
     }
     else if (m_width == 32) {
         const int64_t v = ~0ULL/0xFFFFFFFF * value;
@@ -833,7 +828,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             else
                 ++p;
         }
-        start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+        start = (p - (int64_t *)m_data) * 8 * 8 / 32;
     }
     else if (m_width == 64) {
         while (p < e) {
@@ -843,7 +838,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             else
                 ++p;
         }
-        start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
+        start = (p - (int64_t *)m_data) * 8 * 8 / 64;
     }
 
     // Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
