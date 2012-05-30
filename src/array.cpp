@@ -719,35 +719,39 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
 {
     if (end == (size_t)-1) end = m_len;
 
-    // Test 4 items with zero latency for cases where match frequency is high, such
-    // as 2-bit values
-    if(start + 0 < end && (eq ? (Get(start + 0) == value)   :   (Get(start + 0) != value)))
-        return start + 0;
-    if(start + 1 < end && (eq ? (Get(start + 1) == value)   :   (Get(start + 1) != value)))
-        return start + 1;
-    if(start + 2 < end && (eq ? (Get(start + 2) == value)   :   (Get(start + 2) != value)))
-        return start + 2;
-    if(start + 3 < end && (eq ? (Get(start + 3) == value)   :   (Get(start + 3) != value)))
-        return start + 3;
+    // When starting from beggining of array the data is always 64bit aligned
+    // but otherwise we have to ensure alignment.
+    if (start != 0) {
+        // Test 4 items with zero latency for cases where match frequency is high, such
+        // as 2-bit values
+        if (start + 0 < end && (eq ? (Get(start + 0) == value)   :   (Get(start + 0) != value)))
+            return start + 0;
+        if (start + 1 < end && (eq ? (Get(start + 1) == value)   :   (Get(start + 1) != value)))
+            return start + 1;
+        if (start + 2 < end && (eq ? (Get(start + 2) == value)   :   (Get(start + 2) != value)))
+            return start + 2;
+        if (start + 3 < end && (eq ? (Get(start + 3) == value)   :   (Get(start + 3) != value)))
+            return start + 3;
 
-    if (is_empty()) return (size_t)-1;
-    if (start >= end) return (size_t)-1;
+        if (is_empty()) return (size_t)-1;
+        if (start >= end) return (size_t)-1;
 
-    assert(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
+        assert(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
 
-    start += 4;
+        start += 4;
 
-    if(start >= end)
-        return (size_t)-1;
+        if (start >= end)
+            return (size_t)-1;
 
-    // Test 64 items with no latency for cases where the first few 64-bit chunks are likely to
-    // contain one or more matches (because the linear test we use later cannot extract the position)
-    // Also stop at a 64-bit aligned position so we can do aligned chunk reads in later linear test
-    size_t ee = round_up(start, 64) + 64;
-    ee = ee > end ? end : ee;
-    for(; start < ee; start++)
-        if(eq ? (Get(start) == value)  :   (Get(start) != value))
-            return start;
+        // Test 64 items with no latency for cases where the first few 64-bit chunks are likely to
+        // contain one or more matches (because the linear test we use later cannot extract the position)
+        // Also stop at a 64-bit aligned position so we can do aligned chunk reads in later linear test
+        size_t ee = round_up(start, 64);// + 64;
+        ee = ee > end ? end : ee;
+        for (; start < ee; start++)
+            if (eq ? (Get(start) == value) : (Get(start) != value))
+                return start;
+    }
 
     if(start >= end)
         return (size_t)-1;
@@ -763,94 +767,93 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
     }
     else if (m_width == 1) {
         if(eq) {
-            while(*p == 0)
-                p++;
+            while (*p == 0)
+                ++p;
         }
         else {
-            while(*p == -1)
-                p++;
+            while (*p == -1)
+                ++p;
         }
     }
     else if (m_width == 2) {
         const int64_t v = ~0ULL/0x3 * value;
-        while(p < e) {
+        while (p < e) {
             const uint64_t v2 = *p ^ v; // zero matching bit segments
             const uint64_t hasZeroByte = (v2 - 0x5555555555555555ULL) & ~v2 & 0xAAAAAAAAAAAAAAAAULL;
-            if( eq ?   hasZeroByte  :  !hasZeroByte     )
+            if(eq ? hasZeroByte : !hasZeroByte)
                 break;
             else
-                p++;
+                ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
     else if (m_width == 4) {
         const int64_t v = ~0ULL/0xF * value;
-        while(p < e) {
+        while (p < e) {
             const uint64_t v2 = *p ^ v; // zero matching bit segments
             const uint64_t hasZeroByte = (v2 - 0x1111111111111111ULL) & ~v2 & 0x8888888888888888ULL;
-            if( eq ?   hasZeroByte  :  !hasZeroByte     )
+            if (eq ? hasZeroByte : !hasZeroByte)
                 break;
             else
-                p++;
+                ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
     else if (m_width == 8) {
         const int64_t v = ~0ULL/0xFF * value;
-        while(p < e) {
+        while (p < e) {
             const uint64_t v2 = *p ^ v; // zero matching bit segments
             const uint64_t hasZeroByte = (v2 - 0x0101010101010101ULL) & ~v2 & 0x8080808080808080ULL;
-            if( eq ?   hasZeroByte  :  !hasZeroByte     )
+            if (eq ? hasZeroByte : !hasZeroByte)
                 break;
             else
-                p++;
+                ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
     else if (m_width == 16) {
         const int64_t v = ~0ULL/0xFFFF * value;
-        while(p < e) {
+        while (p < e) {
             const uint64_t v2 = *p ^ v; // zero matching bit segments
             const uint64_t hasZeroByte = (v2 - 0x0001000100010001ULL) & ~v2 & 0x8000800080008000ULL;
-            if( eq ?   hasZeroByte  :  !hasZeroByte     )
+            if (eq ? hasZeroByte : !hasZeroByte)
                 break;
             else
-                p++;
+                ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
     else if (m_width == 32) {
         const int64_t v = ~0ULL/0xFFFFFFFF * value;
-        while(p < e) {
+        while (p < e) {
             const uint64_t v2 = *p ^ v; // zero matching bit segments
             const uint64_t hasZeroByte = (v2 - 0x0000000100000001ULL) & ~v2 & 0x8000800080000000ULL;
-            if( eq ?   hasZeroByte  :  !hasZeroByte     )
+            if (eq ? hasZeroByte : !hasZeroByte)
                 break;
             else
-                p++;
+                ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
     else if (m_width == 64) {
-        while(p < e) {
-            int64_t v = *p;
-            if( eq ?   (v == value) : (v != value))
+        while (p < e) {
+            const int64_t v = *p;
+            if (eq ? (v == value) : (v != value))
                 break;
             else
-                p++;
+                ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
     }
 
     // Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
-    while(start < end)
-        if(eq ? Get(start) == value : Get(start) != value)
+    while (start < end)
+        if (eq ? Get(start) == value : Get(start) != value)
             return start;
         else
-            start++;
+            ++start;
 
     return (size_t)-1;
-
 }
 
 
@@ -886,18 +889,18 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
 
     // Test 4 items with zero latency for cases where match frequency is high, such
     // as 2-bit values where each second item is greater on average
-    if(start + 0 < end && (gt ? (Get(start + 0) > value)   :   (Get(start + 0) < value)))
+    if (start + 0 < end && (gt ? (Get(start + 0) > value)   :   (Get(start + 0) < value)))
         return start + 0;
-    if(start + 1 < end && (gt ? (Get(start + 1) > value)   :   (Get(start + 1) < value)))
+    if (start + 1 < end && (gt ? (Get(start + 1) > value)   :   (Get(start + 1) < value)))
         return start + 1;
-    if(start + 2 < end && (gt ? (Get(start + 2) > value)   :   (Get(start + 2) < value)))
+    if (start + 2 < end && (gt ? (Get(start + 2) > value)   :   (Get(start + 2) < value)))
         return start + 2;
-    if(start + 3 < end && (gt ? (Get(start + 3) > value)   :   (Get(start + 3) < value)))
+    if (start + 3 < end && (gt ? (Get(start + 3) > value)   :   (Get(start + 3) < value)))
         return start + 3;
 
     start += 4;
 
-    if(start >= end)
+    if (start >= end)
         return (size_t)-1;
 
     if (is_empty()) return (size_t)-1;
@@ -910,8 +913,8 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     // Also stop at a 64-bit aligned position so we can do aligned chunk reads in later linear test
     size_t ee = round_up(start, 64) + 64;
     ee = ee > end ? end : ee;
-    for(; start < ee; start++)
-        if(gt ? (Get(start) > value)  :   (Get(start) < value))
+    for (; start < ee; start++)
+        if (gt ? (Get(start) > value)  :   (Get(start) < value))
             return start;
 
     if(start >= end)
@@ -930,42 +933,41 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
                 return (size_t)-1;
             else
                 while(*p == 0)
-                    p++;
+                    ++p;
         } else {
             if(value == 0)
                 return (size_t)-1;
             else
                 while(*p == -1)
-                    p++;
+                    ++p;
         }
     }
     else if (m_width == 2) {
         if(value <= 1) {
-            int64_t constant = gt ? (~0ULL / 3ULL * (3ULL - value))   :  (   ~0ULL / 3 * value );
+            const int64_t constant = gt ? (~0ULL / 3ULL * (3ULL - value))   :  (   ~0ULL / 3 * value );
             while(p < e) {
                 int64_t v = *p;
                 if( gt ? (((v + constant) | v) & ~0ULL / 3ULL * 2ULL)   :  ((v - constant) & ~v&~0ULL/3ULL*2ULL)      )
                     break;
                 else
-                    p++;
+                    ++p;
             }
             start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
         }
         else {
             while(start < end && gt ? (Get_2b(start) <= value) : (Get_2b(start) >= value))
-                start++;
+                ++start;
         }
     }
     else if (m_width == 4) {
         if(value <= 7) {
-            int64_t constant = gt ? (~0ULL / 15ULL * (7ULL - value))  :   (   ~0ULL / 15ULL * value )  ;
+            const int64_t constant = gt ? (~0ULL / 15ULL * (7ULL - value))  :   (   ~0ULL / 15ULL * value )  ;
             while(p < e) {
-                int64_t v = *p;
-                int64_t yy = ((v - constant) & ~v&~0ULL/15ULL*8ULL);
+                const int64_t v = *p;
                 if(gt ? (((v + constant) | v) & ~0ULL / 15ULL * 8ULL) :     ((v - constant) & ~v&~0ULL/15ULL*8ULL)    )
                     break;
                 else
-                    p++;
+                    ++p;
             }
             start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
         }
@@ -977,9 +979,9 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     else if (m_width == 8) {
         // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
         if(value <= 127) {
-            int64_t constant = gt ? (~0ULL / 255ULL * (127ULL - value))   :   (        ~0ULL / 255ULL * value           );
-            while(p < e) {
-                int64_t v = *p;
+            const int64_t constant = gt ? (~0ULL / 255ULL * (127ULL - value))   :   (        ~0ULL / 255ULL * value           );
+            while (p < e) {
+                const int64_t v = *p;
                 // Bit hacks also only works for positive items in chunk, so test their sign bits
                 if(v & 0x8080808080808080ULL) {
                     if (gt ? ((char)(v>>0*8) > value || (char)(v>>1*8) > value || (char)(v>>2*8) > value || (char)(v>>3*8) > value || (char)(v>>4*8) > value || (char)(v>>5*8) > value || (char)(v>>6*8) > value || (char)(v>>7*8) > value)
@@ -990,36 +992,36 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
                 else if (gt ?  (((v + constant) | v) & ~0ULL / 255ULL * 128ULL) : (         (v - constant) & ~v&~0ULL/255ULL*128ULL             ))
                     break;
                 else
-                    p++;
+                    ++p;
             }
             start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
         }
         else {
-            while(start < end && gt ? (Get_8b(start) <= value) : (Get_8b(start) >= value))
-                start++;
+            while (start < end && gt ? (Get_8b(start) <= value) : (Get_8b(start) >= value))
+                ++start;
         }
 
     }
     else if (m_width == 16) {
-        if(value <= 32767) {
-            int64_t constant = gt ? (~0ULL / 65535ULL * (32767ULL - value))   :   ( ~0ULL / 65535ULL * value);
+        if (value <= 32767) {
+            const int64_t constant = gt ? (~0ULL / 65535ULL * (32767ULL - value))   :   ( ~0ULL / 65535ULL * value);
             while(p < e) {
-                int64_t v = *p;
-                if(v & 0x8000800080008000ULL) {
+                const int64_t v = *p;
+                if (v & 0x8000800080008000ULL) {
                     if (gt ? ((int)(v>>0*16) > value || (int)(v>>1*16) > value || (int)(v>>2*16) > value || (int)(v>>3*16) > value) :
                         ((int)(v>>0*16) < value || (int)(v>>1*16) < value || (int)(v>>2*16) < value || (int)(v>>3*16) < value))
                         break;
                 }
-                else if(gt ? (((v + constant) | v) & ~0ULL / 65535ULL * 32768ULL) : (         (v - constant) & ~v&~0ULL/65535ULL*32768ULL        ))
+                else if (gt ? (((v + constant) | v) & ~0ULL / 65535ULL * 32768ULL) : (         (v - constant) & ~v&~0ULL/65535ULL*32768ULL        ))
                     break;
                 else
-                    p++;
+                    ++p;
             }
             start = (p - (int64_t *)m_data) * 8 * 8 / m_width;
         }
         else {
-            while(start < end && gt ? (Get_16b(start) <= value)  :  (false))
-                start++;
+            while (start < end && gt ? (Get_16b(start) <= value)  :  (false))
+                ++start;
         }
 
 
@@ -1027,20 +1029,20 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     else if (m_width == 32) {
         // extra logic in SIMD no longer pays off because we have just 2 elements
         // Faster than below version
-        while(start < end && gt ? (Get_32b(start) <= value) : (Get_32b(start) >= value) )
-            start++;
+        while (start < end && gt ? (Get_32b(start) <= value) : (Get_32b(start) >= value) )
+            ++start;
     }
     else if (m_width == 64) {
-        while(start < end && gt ? (Get_64b(start) <= value) : (Get_64b(start) >= value))
-            start++;
+        while (start < end && gt ? (Get_64b(start) <= value) : (Get_64b(start) >= value))
+            ++start;
     }
 
     // Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
-    while(start < end)
-        if(gt ? Get(start) > value : Get(start) < value)
+    while (start < end)
+        if (gt ? Get(start) > value : Get(start) < value)
             return start;
         else
-            start++;
+            ++start;
 
     return (size_t)-1;
 }
