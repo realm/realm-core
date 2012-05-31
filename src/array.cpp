@@ -154,6 +154,18 @@ void Array::Create(size_t ref)
     uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
     CreateFromHeader(header, ref);
 }
+    
+void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref) {
+    // Parse header
+    // We only need limited info for direct read-only use
+    m_width    = get_header_width(header);
+    m_len      = get_header_len(header);
+    
+    m_ref = ref;
+    m_data = header + 8;
+    
+    SetWidth(m_width);
+}
 
 void Array::CreateFromHeader(uint8_t* header, size_t ref) {
     // Parse header
@@ -379,46 +391,6 @@ int64_t Array::back() const
     assert(m_len);
     return (this->*m_getter)(m_len-1);
 }
-
-
-
-void Array::SetBounds(size_t width)
-{
-    if(width == 0) {
-        m_lbound = 0;
-        m_ubound = 0;
-    }
-    else if(width == 1) {
-        m_lbound = 0;
-        m_ubound = 1;
-    }
-    else if(width == 2) {
-        m_lbound = 0;
-        m_ubound = 3;
-    }
-    else if(width == 4) {
-        m_lbound = 0;
-        m_ubound = 15;
-    }
-    else if(width == 8) {
-        m_lbound = -0x80LL;
-        m_ubound =  0x7FLL;
-    }
-    else if(width == 16) {
-        m_lbound = -0x8000LL;
-        m_ubound =  0x7FFFLL;
-    }
-    else if(width == 32) {
-        m_lbound = -0x80000000LL;
-        m_ubound =  0x7FFFFFFFLL;
-    }
-    else if(width == 64) {
-        m_lbound = -0x8000000000000000LL;
-        m_ubound =  0x7FFFFFFFFFFFFFFFLL;
-    }
-}
-
-
 
 bool Array::Set(size_t ndx, int64_t value)
 {
@@ -759,6 +731,10 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
     // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
     if (m_width == 0) {
+        if (eq ? (value == 0) : (value != 0))
+            return start;
+        else
+            return not_found;
     }
     else if (m_width == 1) {
         if(eq) {
@@ -769,6 +745,14 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             while (*p == -1)
                 ++p;
         }
+        start = (p - (int64_t *)m_data) * 8 * 8;
+        
+        while (start < end)
+            if (eq ? Get_1b(start) == value : Get_1b(start) != value)
+                return start;
+            else
+                ++start;
+
     }
     else if (m_width == 2) {
         const int64_t v = ~0ULL/0x3 * value;
@@ -781,6 +765,12 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 2;
+        
+        while (start < end)
+            if (eq ? Get_2b(start) == value : Get_2b(start) != value)
+                return start;
+            else
+                ++start;
     }
     else if (m_width == 4) {
         const int64_t v = ~0ULL/0xF * value;
@@ -793,6 +783,12 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 4;
+        
+        while (start < end)
+            if (eq ? Get_4b(start) == value : Get_4b(start) != value)
+                return start;
+            else
+                ++start;
     }
     else if (m_width == 8) {
         const int64_t v = ~0ULL/0xFF * value;
@@ -805,6 +801,12 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 8;
+        
+        while (start < end)
+            if (eq ? Get_8b(start) == value : Get_8b(start) != value)
+                return start;
+            else
+                ++start;
     }
     else if (m_width == 16) {
         const int64_t v = ~0ULL/0xFFFF * value;
@@ -817,6 +819,12 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 16;
+        
+        while (start < end)
+            if (eq ? Get_16b(start) == value : Get_16b(start) != value)
+                return start;
+            else
+                ++start;
     }
     else if (m_width == 32) {
         const int64_t v = ~0ULL/0xFFFFFFFF * value;
@@ -829,6 +837,12 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 32;
+        
+        while (start < end)
+            if (eq ? Get_32b(start) == value : Get_32b(start) != value)
+                return start;
+            else
+                ++start;
     }
     else if (m_width == 64) {
         while (p < e) {
@@ -839,16 +853,15 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 64;
+        
+        while (start < end)
+            if (eq ? Get_64b(start) == value : Get_64b(start) != value)
+                return start;
+            else
+                ++start;
     }
 
-    // Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
-    while (start < end)
-        if (eq ? Get(start) == value : Get(start) != value)
-            return start;
-        else
-            ++start;
-
-    return (size_t)-1;
+    return not_found;
 }
 
 
@@ -1391,43 +1404,66 @@ void Array::SetWidth(size_t width)
     if (width == 0) {
         m_getter = &Array::Get_0b;
         m_setter = &Array::Set_0b;
+        
+        m_lbound = 0;
+        m_ubound = 0;
     }
     else if (width == 1) {
         m_getter = &Array::Get_1b;
         m_setter = &Array::Set_1b;
+        
+        m_lbound = 0;
+        m_ubound = 1;
     }
     else if (width == 2) {
         m_getter = &Array::Get_2b;
         m_setter = &Array::Set_2b;
+        
+        m_lbound = 0;
+        m_ubound = 3;
     }
     else if (width == 4) {
         m_getter = &Array::Get_4b;
         m_setter = &Array::Set_4b;
+        
+        m_lbound = 0;
+        m_ubound = 15;
     }
     else if (width == 8) {
         m_getter = &Array::Get_8b;
         m_setter = &Array::Set_8b;
+        
+        m_lbound = -0x80LL;
+        m_ubound =  0x7FLL;
     }
     else if (width == 16) {
         m_getter = &Array::Get_16b;
         m_setter = &Array::Set_16b;
+        
+        m_lbound = -0x8000LL;
+        m_ubound =  0x7FFFLL;
     }
     else if (width == 32) {
         m_getter = &Array::Get_32b;
         m_setter = &Array::Set_32b;
+        
+        m_lbound = -0x80000000LL;
+        m_ubound =  0x7FFFFFFFLL;
     }
     else if (width == 64) {
         m_getter = &Array::Get_64b;
         m_setter = &Array::Set_64b;
+        
+        m_lbound = -0x8000000000000000LL;
+        m_ubound =  0x7FFFFFFFFFFFFFFFLL;
     }
     else {
         assert(false);
     }
 //  printf("%d ", width);
-    SetBounds(width);
+
     m_width = width;
 }
-
 
 template <size_t w>int64_t Array::Get(size_t ndx) const
 {
@@ -2106,7 +2142,7 @@ void Array::GetBlock(size_t ndx, Array& arr, size_t& off) const
             isNode = get_header_isnode_direct(header);
         }
         else {
-            arr.CreateFromHeader(header);
+            arr.CreateFromHeaderDirect(header);
             off = offset;
             return;
         }
@@ -2217,7 +2253,52 @@ const char* Array::ColumnStringGet(size_t ndx) const
                 if (width == 0) return "";
                 else return (const char*)(data + (ndx * width));
             }
-            }
         }
     }
 }
+
+// Find value direct through column b-tree without instatiating any Arrays.
+size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
+{
+    uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
+    const bool isNode = get_header_isnode_direct(header);
+        
+    if (isNode) {
+        const char* const data = (const char*)header + 8;
+        const size_t width = get_header_width_direct(header);
+        
+        // Get subnode table
+        const size_t ref_offsets = GetDirect(data, width, 0);
+        const size_t ref_refs    = GetDirect(data, width, 1);
+        
+        const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+        const char* const offsets_data = (const char*)offsets_header + 8;
+        const size_t offsets_width  = get_header_width_direct(offsets_header);
+        const size_t offsets_len = get_header_len_direct(offsets_header);
+        
+        const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+        const char* const refs_data = (const char*)refs_header + 8;
+        const size_t refs_width  = get_header_width_direct(refs_header);
+        
+        // Iterate over nodes until we find a match
+        size_t offset = 0;
+        for (size_t i = 0; i < offsets_len; ++i) {
+            const size_t ref = GetDirect(refs_data, refs_width, i);
+            const size_t result = ColumnFind(target, ref, cache);
+            if (result != not_found)
+                return offset + result;
+            
+            const size_t off = GetDirect(offsets_data, offsets_width, i);
+            offset = off;
+        }
+        
+        // if we get to here there is no match
+        return not_found;
+    }
+    else {
+        cache.CreateFromHeaderDirect(header);
+        return cache.CompareEquality<true>(target, 0, -1);
+    }
+}
+
+} //namespace tightdb
