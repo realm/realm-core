@@ -726,6 +726,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
     const int64_t* p = (const int64_t*)(m_data + (start * m_width / 8));
     const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8)) - 1;
 
+    // Test if p is aligned
 	assert((size_t)p / 8 * 8 == (size_t)p);
 
     // Matches are rare enough to setup fast linear search for remaining items. We use
@@ -737,14 +738,24 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             return not_found;
     }
     else if (m_width == 1) {
-        if(eq) {
-            while (*p == 0)
-                ++p;
+
+        if(value == 0) {
+            while (p < e)
+                if(eq ? *p != -1 : *p != 0)
+                    break;
+                else
+                    ++p;
         }
-        else {
-            while (*p == -1)
-                ++p;
+        else if (value == 1) {
+            while (p < e)
+                if(eq ? *p != 0 : *p != -1)
+                    break;
+                else
+                    ++p;
         }
+        else
+            return not_found;
+
         start = (p - (int64_t *)m_data) * 8 * 8;
         
         while (start < end)
@@ -752,7 +763,6 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 return start;
             else
                 ++start;
-
     }
     else if (m_width == 2) {
         const int64_t v = ~0ULL/0x3 * value;
