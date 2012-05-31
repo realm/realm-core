@@ -385,11 +385,14 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 
         // Calculate complete size
         len += 8; // include header in total
-        const size_t rest = (~len & 0x7)+1; // CHECK
-        if (rest < 8) len += rest; // Add padding for 64bit alignment
 
         // Write array
         const size_t array_pos = out.write((const char*)m_data-8, len);
+
+        // Add padding for 64bit alignment
+        const size_t rest = (~len & 0x7)+1;
+        if (rest < 8)
+            out.write("\0\0\0\0\0\0\0\0", rest);
 
         return array_pos; // Return position of this array
     }
