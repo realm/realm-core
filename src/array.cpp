@@ -648,22 +648,34 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
     __m128i search = {0}, next, compare = {1};
     size_t i = 0;
 
-    for (int j = 0; j < (int)(sizeof(__m128i) / bytewidth); ++j)
-        memcpy((char *)&search + j * bytewidth, &value, bytewidth);
+//    for (int j = 0; j < (int)(sizeof(__m128i) / bytewidth); ++j)
+//        memcpy((char *)&search + j * bytewidth, &value, bytewidth);
+
+    // The loops that initialie '__m128i search' are made simple so that compilers unroll or optimize them
+    // automatically (VC and gcc converts the case bytewidth == 1 to memset(), and unrolls the remaining cases fully).
 
     if (bytewidth == 1) {
+        for(size_t t = 0; t < 16; t++)
+            *(((char*)&search) + t) = value;
+
         for (i = 0; i < items && _mm_movemask_epi8(compare) == 0; ++i) {
             next = _mm_load_si128(&data[i]);
             compare = _mm_cmpeq_epi8(search, next);
         }
     }
     else if (bytewidth == 2) {
+        for(size_t t = 0; t < 8; t++)
+            *(((short int*)&search) + t) = value;
+
         for (i = 0; i < items && _mm_movemask_epi8(compare) == 0; ++i) {
             next = _mm_load_si128(&data[i]);
             compare = _mm_cmpeq_epi16(search, next);
         }
     }
     else if (bytewidth == 4) {
+        for(size_t t = 0; t < 4; t++)
+            *(((int*)&search) + t) = value;
+
         for (i = 0; i < items && _mm_movemask_epi8(compare) == 0; ++i) {
             next = _mm_load_si128(&data[i]);
             compare = _mm_cmpeq_epi32(search, next);
@@ -671,6 +683,9 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
     }
 #if defined(USE_SSE42)
     else if (bytewidth == 8) {
+        for(size_t t = 0; t < 2; t++)
+            *(((int64_t*)&search) + t) = value;
+
         // Only supported by SSE 4.1 because of _mm_cmpeq_epi64().
         for (i = 0; i < items && _mm_movemask_epi8(compare) == 0; ++i) {
             next = _mm_load_si128(&data[i]);
@@ -680,7 +695,7 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 #endif
     else
         assert(true);
-    return _mm_movemask_epi8(compare) == 0 ? (size_t)-1 : i - 1;
+    return _mm_movemask_epi8(compare) == 0 ? not_found : i - 1;
 }
 #endif //USE_SSE
 
@@ -929,7 +944,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     // Test 64 items with no latency for cases where the first few 64-bit chunks are likely to
     // contain one or more matches (because the linear test we use later cannot extract the position)
     // Also stop at a 64-bit aligned position so we can do aligned chunk reads in later linear test
-    size_t ee = round_up(start, 64) + 64;
+    size_t ee = round_up(start, 64);
     ee = ee > end ? end : ee;
     for (; start < ee; start++)
         if (gt ? (Get(start) > value)  :   (Get(start) < value))
@@ -944,21 +959,37 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
     if (m_width == 0) {
+        if(gt && value >= 0 || !gt && value <= 0)
+            return not_found;
     }
     else if (m_width == 1) {
-        if(gt) {
-            if(value == 1)
-                return (size_t)-1;
-            else
-                while(*p == 0)
-                    ++p;
-        } else {
-            if(value == 0)
-                return (size_t)-1;
-            else
-                while(*p == -1)
+
+        if ((value > 1 && gt) || (value < 0 && !gt)) {
+            return not_found;
+        }
+        else if(value == 0 && gt) {
+            while (p < e)
+                if(*p != 0)
+                    break;
+                else
                     ++p;
         }
+        else if (value == 1 && !gt) {
+            while (p < e)
+                if(*p != -1)
+                    break;
+                else
+                    ++p;
+        }
+
+        start = (p - (int64_t *)m_data) * 8 * 8;
+        
+        while (start < end) 
+            if (gt ? Get_1b(start) > value : Get_1b(start) < value)
+                return start;
+            else
+                ++start;
+
     }
     else if (m_width == 2) {
         if(value <= 1) {
@@ -1470,7 +1501,6 @@ void Array::SetWidth(size_t width)
     else {
         assert(false);
     }
-//  printf("%d ", width);
 
     m_width = width;
 }
