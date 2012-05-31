@@ -379,6 +379,40 @@ TEST_FIXTURE(db_setup, Column_Find9)
     CHECK_EQUAL(10, res);
 }
 
+TEST_FIXTURE(db_setup, Column_FindLeafs)
+{
+    Column a;
+
+    // Create values that span multible leafs (3)
+    for (size_t i = 0; i < MAX_LIST_SIZE*3; ++i) {
+        a.add(0);
+    }
+
+    // Set sentinel values at before and after each break
+    a.Set(0, 1);
+    a.Set(MAX_LIST_SIZE-1, 2);
+    a.Set(MAX_LIST_SIZE, 3);
+    a.Set(MAX_LIST_SIZE*2-1, 4);
+    a.Set(MAX_LIST_SIZE*2, 5);
+    a.Set(MAX_LIST_SIZE*3-1, 6);
+
+    const size_t res1 = a.find_first(1);
+    const size_t res2 = a.find_first(2);
+    const size_t res3 = a.find_first(3);
+    const size_t res4 = a.find_first(4);
+    const size_t res5 = a.find_first(5);
+    const size_t res6 = a.find_first(6);
+
+    CHECK_EQUAL(0, res1);
+    CHECK_EQUAL(MAX_LIST_SIZE-1, res2);
+    CHECK_EQUAL(MAX_LIST_SIZE, res3);
+    CHECK_EQUAL(MAX_LIST_SIZE*2-1, res4);
+    CHECK_EQUAL(MAX_LIST_SIZE*2, res5);
+    CHECK_EQUAL(MAX_LIST_SIZE*3-1, res6);
+
+    a.Destroy();
+}
+
 /* Partial find is not fully implemented yet
 #define PARTIAL_COUNT 100
 TEST_FIXTURE(db_setup, Column_PartialFind1)
