@@ -2152,7 +2152,7 @@ void Array::GetBlock(size_t ndx, Array& arr, size_t& off) const
             isNode = get_header_isnode_direct(header);
         }
         else {
-            arr.CreateFromHeader(header);
+            arr.CreateFromHeaderDirect(header);
             off = offset;
             return;
         }
@@ -2299,7 +2299,7 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
                 return offset + result;
             
             const size_t off = GetDirect(offsets_data, offsets_width, i);
-            offset += off;
+            offset = off;
         }
         
         // if we get to here there is no match
