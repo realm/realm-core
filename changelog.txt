@@ -1,0 +1,18 @@
+Tightdb Changelog:
+==================
+
+Format:
+
+2012-mm-dd
+----------
+! Fixed bug [github issuenr]: .... 		(user visible bug fixed       - passed on to release notes)
++ Added feature ....				(user visible new feature     - passed on to release notes)
+- Removed/deprecated feature/method ....	(user visible removed feature - passed on to release notes)
+. Any other notes .... 				(internal changes)
+
+==================
+
+
+2012-06-??
+----------
+??
