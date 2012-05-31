@@ -65,6 +65,8 @@
 
 namespace tightdb {
 
+static const size_t not_found = (size_t)-1;
+
 // Pre-definitions
 class Array;
 
