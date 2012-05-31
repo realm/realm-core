@@ -2142,7 +2142,7 @@ void Array::GetBlock(size_t ndx, Array& arr, size_t& off) const
             isNode = get_header_isnode_direct(header);
         }
         else {
-            arr.CreateFromHeader(header);
+            arr.CreateFromHeaderDirect(header);
             off = offset;
             return;
         }
