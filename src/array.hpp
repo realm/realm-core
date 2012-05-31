@@ -167,6 +167,7 @@ public:
     void GetBlock(size_t ndx, Array& arr, size_t& off) const;
     int64_t ColumnGet(size_t ndx) const;
     const char* ColumnStringGet(size_t ndx) const;
+    size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
 
     bool Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
     bool IncrementIf(int64_t limit, int64_t value);
@@ -230,7 +231,6 @@ public:
 private:
     template <size_t w>bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max);
     Array& operator=(const Array&) {return *this;} // not allowed
-    void SetBounds(size_t width);
     template<size_t w> void QuickSort(size_t lo, size_t hi);
     void QuickSort(size_t lo, size_t hi);
     void ReferenceQuickSort(Array &ref);
@@ -249,6 +249,7 @@ protected:
 
     void Create(size_t ref);
     void CreateFromHeader(uint8_t* header, size_t ref=0);
+    void CreateFromHeaderDirect(uint8_t* header, size_t ref=0);
 
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t(Array::*Getter)(size_t) const;

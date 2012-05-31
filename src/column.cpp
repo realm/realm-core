@@ -643,8 +643,16 @@ size_t Column::find_first(int64_t value, size_t start, size_t end) const
 {
     assert(start <= Size());
     assert(end == (size_t)-1 || end <= Size());
-    if (is_empty()) return (size_t)-1;
-    return TreeFind<int64_t, Column, EQUAL>(value, start, end);
+    
+    if (start == 0 && end == (size_t)-1) {
+        Array cache(m_array->GetAllocator());
+        const size_t ref = m_array->GetRef();
+        
+        return m_array->ColumnFind(value, ref, cache);
+    }
+    else {
+        return TreeFind<int64_t, Column, EQUAL>(value, start, end);
+    }
 }
 
 void Column::find_all(Array& result, int64_t value, size_t caller_offset,
