@@ -759,6 +759,10 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
     // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
     if (m_width == 0) {
+        if (eq ? (value == 0) : (value != 0))
+            return start;
+        else
+            return not_found;
     }
     else if (m_width == 1) {
         if(eq) {
@@ -769,6 +773,14 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             while (*p == -1)
                 ++p;
         }
+        start = (p - (int64_t *)m_data) * 8 * 8;
+        
+        while (start < end)
+            if (eq ? Get_1b(start) == value : Get_1b(start) != value)
+                return start;
+            else
+                ++start;
+
     }
     else if (m_width == 2) {
         const int64_t v = ~0ULL/0x3 * value;
@@ -781,6 +793,12 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 2;
+        
+        while (start < end)
+            if (eq ? Get_2b(start) == value : Get_2b(start) != value)
+                return start;
+            else
+                ++start;
     }
     else if (m_width == 4) {
         const int64_t v = ~0ULL/0xF * value;
@@ -793,6 +811,12 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 4;
+        
+        while (start < end)
+            if (eq ? Get_4b(start) == value : Get_4b(start) != value)
+                return start;
+            else
+                ++start;
     }
     else if (m_width == 8) {
         const int64_t v = ~0ULL/0xFF * value;
@@ -805,6 +829,12 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 8;
+        
+        while (start < end)
+            if (eq ? Get_8b(start) == value : Get_8b(start) != value)
+                return start;
+            else
+                ++start;
     }
     else if (m_width == 16) {
         const int64_t v = ~0ULL/0xFFFF * value;
@@ -817,6 +847,12 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 16;
+        
+        while (start < end)
+            if (eq ? Get_16b(start) == value : Get_16b(start) != value)
+                return start;
+            else
+                ++start;
     }
     else if (m_width == 32) {
         const int64_t v = ~0ULL/0xFFFFFFFF * value;
@@ -829,6 +865,12 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 32;
+        
+        while (start < end)
+            if (eq ? Get_32b(start) == value : Get_32b(start) != value)
+                return start;
+            else
+                ++start;
     }
     else if (m_width == 64) {
         while (p < e) {
@@ -839,16 +881,15 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 64;
+        
+        while (start < end)
+            if (eq ? Get_64b(start) == value : Get_64b(start) != value)
+                return start;
+            else
+                ++start;
     }
 
-    // Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
-    while (start < end)
-        if (eq ? Get(start) == value : Get(start) != value)
-            return start;
-        else
-            ++start;
-
-    return (size_t)-1;
+    return not_found;
 }
 
 
