@@ -110,6 +110,7 @@ void Array::set_header_capacity(size_t value, void* header)
     header2[4] = (value >> 16) & 0x000000FF;
     header2[5] = (value >> 8) & 0x000000FF;
     header2[6] = value & 0x000000FF;
+    header2[7] = 0; // zero reserved
 }
 
 bool Array::get_header_isnode(const void* header) const
