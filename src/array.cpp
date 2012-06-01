@@ -6,6 +6,7 @@
 #include "column.hpp"
 #include "utilities.hpp"
 #include "query_conditions.hpp"
+#include "static_assert.hpp"
 
 #ifdef _MSC_VER
     #include "win32/types.h"
@@ -110,7 +111,6 @@ void Array::set_header_capacity(size_t value, void* header)
     header2[4] = (value >> 16) & 0x000000FF;
     header2[5] = (value >> 8) & 0x000000FF;
     header2[6] = value & 0x000000FF;
-    header2[7] = 0; // zero reserved
 }
 
 bool Array::get_header_isnode(const void* header) const
@@ -1421,6 +1421,16 @@ bool Array::Alloc(size_t count, size_t width)
 
             // Create header
             if (isFirst) {
+                // Note: Since the header layout contains unallocated
+                // bit and/or bytes, it is important that we put the
+                // entire 8 byte header into a well defined state
+                // initially. Note also: The C++ standard does not
+                // guarantee that int64_t is extactly 8 bytes wide. It
+                // may be more, and it may be less. That is why we
+                // need the statinc assert.
+                TIGHTDB_STATIC_ASSERT(sizeof(int64_t) == 8,
+                                      "Trouble if int64_t is not 8 bytes wide");
+                *reinterpret_cast<int64_t*>(mref.pointer) = 0;
                 set_header_isnode(m_isNode);
                 set_header_hasrefs(m_hasRefs);
                 set_header_wtype(GetWidthType());

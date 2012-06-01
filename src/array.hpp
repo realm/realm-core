@@ -31,7 +31,8 @@
 #include <iostream>
 #include "utilities.hpp"
 #include <vector>
-#include <assert.h>
+#include <string>
+#include <cassert>
 
 #define TEMPEX(fun, arg) \
     if(m_width == 0) {fun<0> arg;} \
@@ -62,6 +63,8 @@
 #ifdef _DEBUG
 #include <stdio.h>
 #endif
+
+using namespace std;
 
 namespace tightdb {
 
@@ -215,7 +218,7 @@ public:
     template<class S> size_t Write(S& target, bool recurse=true, bool persist=false) const;
     template<class S> void WriteAt(size_t pos, S& out) const;
     size_t GetByteSize() const {return CalcByteLen(m_len, m_width);}
-    std::vector<int64_t> ToVector(void) const;
+    vector<int64_t> ToVector(void) const;
 
     // Debug
     size_t GetBitWidth() const {return m_width;}
@@ -223,7 +226,7 @@ public:
     bool Compare(const Array& c) const;
     void Print() const;
     void Verify() const;
-    void ToDot(std::ostream& out, const char* title=NULL) const;
+    void ToDot(ostream& out, const char* title=NULL) const;
     void Stats(MemStats& stats) const;
 #endif //_DEBUG
     mutable unsigned char* m_data; // FIXME: Should be 'char' not 'unsigned char'
@@ -334,19 +337,7 @@ protected:
 
 template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 {
-    // parse header
-    size_t len          = get_header_len();
-    const WidthType wt  = get_header_wtype();
-
-    // Adjust length to number of bytes
-    if (wt == TDB_BITS) {
-        const size_t bits = (len * m_width);
-        len = bits / 8;
-        if (bits & 0x7) ++len; // include partial bytes
-    }
-    else if (wt == TDB_MULTIPLY) {
-        len *= m_width;
-    }
+    assert(IsValid());
 
     if (recurse && m_hasRefs) {
         // Temp array for updated refs
@@ -380,26 +371,54 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 
         return refs_pos; // Return position
     }
-    else {
-        // TODO: replace capacity with checksum
 
-        // Calculate complete size
-        len += 8; // include header in total
+    // parse header
+    size_t len          = get_header_len();
+    const WidthType wt  = get_header_wtype();
+    int bits_in_partial_byte = 0;
 
-        // Write array
-        const size_t array_pos = out.write((const char*)m_data-8, len);
-
-        // Add padding for 64bit alignment
-        const size_t rest = (~len & 0x7)+1;
-        if (rest < 8)
-            out.write("\0\0\0\0\0\0\0\0", rest);
-
-        return array_pos; // Return position of this array
+    // Adjust length to number of bytes
+    if (wt == TDB_BITS) {
+        const size_t bits = (len * m_width);
+        len = bits / 8;
+        bits_in_partial_byte = bits & 0x7;
     }
+    else if (wt == TDB_MULTIPLY) {
+        len *= m_width;
+    }
+
+    // TODO: replace capacity with checksum
+
+    // Calculate complete size
+    len += 8; // include header in total
+
+    // Write array
+    const char* const data = reinterpret_cast<const char*>(m_data-8);
+    const size_t array_pos = out.write(data, len);
+
+    // Write last partial byte. Note: Since the memory is not
+    // explicitely cleared initially, we cannot rely on the unused
+    // bits to be in a well defined state here.
+    if (bits_in_partial_byte != 0) {
+        char_traits<char>::int_type i = char_traits<char>::to_int_type(data[len]);
+        i &= (1 << bits_in_partial_byte) - 1;
+        char b = char_traits<char>::to_char_type(i);
+        out.write(&b, 1);
+        ++len;
+    }
+
+    // Add padding for 64bit alignment
+    const size_t rest = (~len & 0x7)+1;
+    if (rest < 8)
+        out.write("\0\0\0\0\0\0\0\0", rest);
+
+    return array_pos; // Return position of this array
 }
 
 template<class S> void Array::WriteAt(size_t pos, S& out) const
 {
+    assert(IsValid());
+
     // parse header
     size_t len          = get_header_len();
     const WidthType wt  = get_header_wtype();
