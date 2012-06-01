@@ -422,12 +422,13 @@ template<class S> void Array::WriteAt(size_t pos, S& out) const
     // parse header
     size_t len          = get_header_len();
     const WidthType wt  = get_header_wtype();
+    int bits_in_partial_byte = 0;
 
     // Adjust length to number of bytes
     if (wt == TDB_BITS) {
         const size_t bits = (len * m_width);
         len = bits / 8;
-        if (bits & 0x7) ++len; // include partial bytes
+        bits_in_partial_byte = bits & 0x7;
     }
     else if (wt == TDB_MULTIPLY) {
         len *= m_width;
@@ -437,11 +438,26 @@ template<class S> void Array::WriteAt(size_t pos, S& out) const
 
     // Calculate complete size
     len += 8; // include header in total
-    const size_t rest = (~len & 0x7)+1; // CHECK
-    if (rest < 8) len += rest; // Add padding for 64bit alignment
 
     // Write array
-    out.WriteAt(pos, (const char*)m_data-8, len);
+    const char* const data = reinterpret_cast<const char*>(m_data-8);
+    out.WriteAt(pos, data, len);
+
+    // Write last partial byte. Note: Since the memory is not
+    // explicitely cleared initially, we cannot rely on the unused
+    // bits to be in a well defined state here.
+    if (bits_in_partial_byte != 0) {
+        char_traits<char>::int_type i = char_traits<char>::to_int_type(data[len]);
+        i &= (1 << bits_in_partial_byte) - 1;
+        char b = char_traits<char>::to_char_type(i);
+        out.WriteAt(pos+len, &b, 1);
+        ++len;
+    }
+
+    // Add padding for 64bit alignment
+    const size_t rest = (~len & 0x7)+1;
+    if (rest < 8)
+        out.WriteAt(pos+len, "\0\0\0\0\0\0\0\0", rest);
 }
 
 inline void Array::move_assign(Array& a)
