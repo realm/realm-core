@@ -151,7 +151,6 @@ size_t Group::write(S& out)
     out.write("\0\0\0\0\0\0\0\0", 8);
 
     // Recursively write all arrays
-    // FIXME: 'valgrind' says this writes uninitialized bytes to the file/stream
     const uint64_t topPos = m_top.Write(out);
     const size_t byte_size = out.getpos();
 
