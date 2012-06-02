@@ -310,7 +310,8 @@ size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool e
     // Extend the file
     const int fd = m_alloc.GetFileDescriptor();
     lseek(fd, filesize-1, SEEK_SET);
-    ::write(fd, "\0", 1);
+    ssize_t r = ::write(fd, "\0", 1);
+    static_cast<void>(r); // FIXME: We should probably check for error here!
 #endif
 
     // Add new free space

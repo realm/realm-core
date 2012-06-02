@@ -88,7 +88,8 @@ size_t GroupWriter::write(const char* p, size_t n) {
 
     // Write the block
     lseek(m_fd, pos, SEEK_SET);
-    ::write(m_fd, p, n);
+    ssize_t r = ::write(m_fd, p, n);
+    static_cast<void>(r); // FIXME: We should probably check for error here!
 
     // return the position it was written
     return pos;
@@ -99,7 +100,8 @@ size_t GroupWriter::write(const char* p, size_t n) {
 void GroupWriter::WriteAt(size_t pos, const char* p, size_t n) {
 #if !defined(_MSC_VER) // write persistence
     lseek(m_fd, pos, SEEK_SET);
-    ::write(m_fd, p, n);
+    ssize_t r = ::write(m_fd, p, n);
+    static_cast<void>(r); // FIXME: We should probably check for error here!
 #endif
 }
 
@@ -108,7 +110,8 @@ void GroupWriter::DoCommit(uint64_t topPos)
 #if !defined(_MSC_VER) // write persistence
     fsync(m_fd);
     lseek(m_fd, 0, SEEK_SET);
-    ::write(m_fd, (const char*)&topPos, 8);
+    ssize_t r = ::write(m_fd, (const char*)&topPos, 8);
+    static_cast<void>(r); // FIXME: We should probably check for error here!
     fsync(m_fd); // Could be fdatasync on Linux
 #endif
 }

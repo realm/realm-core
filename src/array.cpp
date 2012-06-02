@@ -960,7 +960,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
     if (m_width == 0) {
-        if(gt && value >= 0 || !gt && value <= 0)
+        if ((gt && value >= 0) || (!gt && value <= 0))
             return not_found;
     }
     else if (m_width == 1) {

@@ -313,11 +313,13 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
     // Handle empty files (new database)
     if (len == 0) {
         if (readOnly) return false;
-        write(m_fd, "\0\0\0\0\0\0\0\0", 8); // write top-ref
+        ssize_t r = write(m_fd, "\0\0\0\0\0\0\0\0", 8); // write top-ref
+	static_cast<void>(r); // FIXME: We should probably check for error here!
 
         // pre-alloc initial space when mmapping
         len = 1024*1024;
-        ftruncate(m_fd, len);
+        int r2 = ftruncate(m_fd, len);
+        static_cast<void>(r2); // FIXME: We should probably check for error here!
     }
 
     // Verify that data is 64bit aligned
