@@ -94,3 +94,17 @@ LD_COVERAGE     = $(LD) --coverage $(LDFLAGS_PTHREAD)
 
 CFLAGS         += $(EXTRA_CFLAGS)
 CXXFLAGS       += $(EXTRA_CXXFLAGS)
+
+
+# Installation
+prefix      = /usr/local
+exec_prefix = $(prefix)
+includedir  = $(prefix)/include
+bindir      = $(exec_prefix)/bin
+libdir      = $(exec_prefix)/lib
+INSTALL         = install
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA    = $(INSTALL) -m 644
+INSTALL_HEADER  = $(INSTALL_DATA)
+INSTALL_LIB     = $(INSTALL)
+INSTALL_DIR     = $(INSTALL) -d

@@ -8,6 +8,14 @@ install: SUBDIRS_MODE = install
 install: all
 .PHONY: install
 
+uninstall: SUBDIRS_MODE = uninstall
+uninstall: all
+.PHONY: uninstall
+
+shared: SUBDIRS_MODE = shared
+shared: all
+.PHONY: shared
+
 static: SUBDIRS_MODE = static
 static: all
 .PHONY: static

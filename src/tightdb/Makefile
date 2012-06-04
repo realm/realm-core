@@ -11,15 +11,36 @@ ROOT = ../..
 INC_FLAGS     = -I$(ROOT)/src
 INC_FLAGS_ABS = -I$(abspath $(ROOT)/src)
 
-SOURCES      = $(wildcard *.c *.cpp)
+SOURCES           = $(wildcard *.c *.cpp)
+INSTALLED_HEADERS = $(wildcard *.h *.hpp)
 LIB_SHARED   = libtightdb.so
 LIB_STATIC   = libtightdb.a
 LIB_DEBUG    = libtightdb_d.a
 LIB_COVERAGE = libtightdb_c.a
 TARGETS = $(LIB_STATIC) $(LIB_SHARED) $(LIB_DEBUG) $(LIB_COVERAGE)
 
-all: $(LIB_SHARED)
+all: shared
 .PHONY: all
+
+install: shared static installdirs
+	$(INSTALL_LIB) $(LIB_SHARED) $(LIB_STATIC) $(DESTDIR)$(libdir)/
+	$(INSTALL_HEADER) $(INSTALLED_HEADERS) $(DESTDIR)$(includedir)/tightdb/
+.PHONY: install
+
+installdirs:
+	$(INSTALL_DIR) $(DESTDIR)$(libdir)/ $(DESTDIR)$(includedir)/tightdb/
+.PHONY: installdirs
+
+uninstall:
+	rm -f $(DESTDIR)$(includedir)/tightdb/*.hpp
+	rm -f $(DESTDIR)$(includedir)/tightdb/*.h
+	rmdir $(DESTDIR)$(includedir)/tightdb
+	rm -f $(DESTDIR)$(libdir)/$(LIB_SHARED)
+	rm -f $(DESTDIR)$(libdir)/$(LIB_STATIC)
+.PHONY: uninstall
+
+shared: $(LIB_SHARED)
+.PHONY: shared
 
 static: $(LIB_STATIC)
 .PHONY: static
