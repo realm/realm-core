@@ -42,8 +42,10 @@ public:
     const char* get_table_name(size_t table_ndx) const;
     bool has_table(const char* name) const;
 
-    TableRef get_table(const char* name);
-    template<class T> BasicTableRef<T> get_table(const char* name);
+    TableRef      get_table(const char* name);
+    ConstTableRef get_table(const char* name) const;
+    template<class T> BasicTableRef<T>       get_table(const char* name);
+    template<class T> BasicTableRef<const T> get_table(const char* name) const;
 
     // Serialization
     bool write(const char* filepath);
@@ -112,7 +114,9 @@ private:
     friend class LangBindHelper;
 
     Table* get_table_ptr(const char* name);
+    const Table* get_table_ptr(const char* name) const;
     template<class T> T* get_table_ptr(const char* name);
+    template<class T> const T* get_table_ptr(const char* name) const;
 };
 
 
@@ -124,9 +128,29 @@ inline TableRef Group::get_table(const char* name)
     return get_table_ptr(name)->get_table_ref();
 }
 
+inline ConstTableRef Group::get_table(const char* name) const
+{
+    return get_table_ptr(name)->get_table_ref();
+}
+
 template<class T> inline BasicTableRef<T> Group::get_table(const char* name)
 {
     return get_table_ptr<T>(name)->get_table_ref();
+}
+
+template<class T> inline BasicTableRef<const T> Group::get_table(const char* name) const
+{
+    return get_table_ptr<T>(name)->get_table_ref();
+}
+
+inline const Table* Group::get_table_ptr(const char* name) const
+{
+    return const_cast<Group*>(this)->get_table_ptr(name);
+}
+
+template<class T> inline const T* Group::get_table_ptr(const char* name) const
+{
+    return const_cast<Group*>(this)->get_table_ptr<T>(name);
 }
 
 template<class T> T* Group::get_table_ptr(const char* name)

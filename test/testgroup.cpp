@@ -19,6 +19,18 @@ TIGHTDB_TABLE_4(TestTableGroup,
                 third,  Bool,
                 fourth, Enum<Days>)
 
+TEST(Group_GetTable)
+{
+    Group g;
+    const Group &cg = g;
+    TableRef t1 = g.get_table("alpha");
+    ConstTableRef t2 = cg.get_table("alpha");
+    CHECK_EQUAL(t1, t2);
+    TestTableGroup::Ref t3 = g.get_table<TestTableGroup>("beta");
+    TestTableGroup::ConstRef t4 = cg.get_table<TestTableGroup>("beta");
+    CHECK_EQUAL(t3, t4);
+}
+
 // Windows version of serialization is not implemented yet
 #if 1 //_MSC_VER
 
