@@ -32,10 +32,10 @@ TEST(Shared1)
     SharedGroup shared2("test_shared.tdb");
     CHECK(shared2.is_valid());
     {
-        Group& g2 = shared2.start_read();
+        const Group& g2 = shared2.start_read();
         
         // Verify that last set of changes are commited
-        TestTableShared::Ref t2 = g2.get_table<TestTableShared>("test");
+        TestTableShared::ConstRef t2 = g2.get_table<TestTableShared>("test");
         CHECK(t2->size() == 1);
         CHECK_EQUAL(1, t2[0].first);
         CHECK_EQUAL(2, t2[0].second);
@@ -65,8 +65,8 @@ TEST(Shared1)
 
     // Start a new read transaction and verify that it can now see the changes
     {
-        Group& g3 = shared2.start_read();
-        TestTableShared::Ref t3 = g3.get_table<TestTableShared>("test");
+        const Group& g3 = shared2.start_read();
+        TestTableShared::ConstRef t3 = g3.get_table<TestTableShared>("test");
         
         CHECK(t3->size() == 2);
         CHECK_EQUAL(1, t3[0].first);

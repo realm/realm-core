@@ -90,7 +90,7 @@ SharedGroup::~SharedGroup()
     }
 }
 
-Group& SharedGroup::start_read()
+const Group& SharedGroup::start_read()
 {
     size_t new_topref = 0;
     size_t new_filesize = 0;

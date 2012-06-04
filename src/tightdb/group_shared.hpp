@@ -35,7 +35,7 @@ public:
     
     bool is_valid() const {return m_isValid;}
 
-    Group& start_read();
+    const Group& start_read();
     void end_read();
     
     Group& start_write();
