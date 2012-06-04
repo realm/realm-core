@@ -1,7 +1,10 @@
 #include <assert.h>
 #include "array_binary.hpp"
 #include "array_blob.hpp"
+
+#ifdef _MSC_VER
 #include <win32/types.h>
+#endif
 
 namespace tightdb {
 
