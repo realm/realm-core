@@ -51,6 +51,7 @@ public:
     bool   CanPersist() const;
     size_t GetFileLen() const {return m_baseline;}
     void   FreeAll(size_t filesize);
+    void   ReMap(size_t filesize);
 
 #ifndef _MSC_VER
     int    GetFileDescriptor() {return m_fd;}

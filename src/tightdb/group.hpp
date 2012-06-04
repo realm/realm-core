@@ -26,6 +26,9 @@
 
 namespace tightdb {
 
+// Pre-declarations
+class SharedGroup;
+
 class Group: private Table::Parent {
 public:
     Group();
@@ -61,6 +64,7 @@ public:
 
 protected:
     friend class GroupWriter;
+    friend class SharedGroup;
 
     SlabAlloc& get_allocator() {return m_alloc;}
     size_t get_free_space(size_t len, size_t& filesize, bool testOnly=false, bool ensureRest=false);
@@ -68,7 +72,9 @@ protected:
     void connect_free_space(bool doConnect);
 
     // Recursively update all internal refs after commit
-    void update_refs(size_t TopRef);
+    void update_refs(size_t top_ref);
+    
+    void update_from_shared(size_t top_ref, size_t len);
 
     // Overriding method in ArrayParent
     virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)

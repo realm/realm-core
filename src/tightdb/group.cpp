@@ -164,7 +164,7 @@ void Group::create_from_ref()
         }
     }
 }
-
+    
 Group::~Group()
 {
     for (size_t i = 0; i < m_tables.Size(); ++i) {
@@ -349,8 +349,10 @@ void Group::update_refs(size_t topRef)
 
     // Now we can update it's child arrays
     m_tableNames.UpdateFromParent();
-    //m_freePositions.UpdateFromParent();
-    //m_freeLengths.UpdateFromParent();
+    if (m_top.Size() > 2) {
+        m_freePositions.UpdateFromParent();
+        m_freeLengths.UpdateFromParent();
+    }
 
     // if the tables have not been modfied we don't
     // need to update cached tables
@@ -365,6 +367,55 @@ void Group::update_refs(size_t topRef)
         }
     }
 }
+    
+void Group::update_from_shared(size_t top_ref, size_t len)
+{
+    if (top_ref == m_top.GetRef()) return; // already up-to-date
+    
+    // Update memory mapping if needed
+    m_alloc.ReMap(len);
+    
+    // Update group arrays
+    m_top.UpdateRef(top_ref);
+    assert(m_top.Size() >= 2);
+    const bool nameschanged = !m_tableNames.UpdateFromParent();
+    m_tables.UpdateFromParent();
+    if (m_top.Size() > 2) {
+        m_freePositions.UpdateFromParent();
+        m_freeLengths.UpdateFromParent();
+    }
+    
+    // If the names of the the tables in the group has not
+    // changed we know that it still contains the same tables
+    // so we can reuse the cached versions
+    if (nameschanged) {
+        // Clear old cached state
+        const size_t count = m_cachedtables.Size();
+        for (size_t i = 0; i < count; ++i) {
+            Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
+            delete t;
+        }
+        m_cachedtables.Clear();
+    
+        // Make room for new pointers to cached tables
+        const size_t table_count = m_tables.Size();
+        for (size_t i = 0; i < table_count; ++i) {
+            m_cachedtables.add(0);
+        }
+    }
+    else {
+        // Update cached tables
+        //TODO: account for changed spec
+        const size_t count = m_cachedtables.Size();
+        for (size_t i = 0; i < count; ++i) {
+            Table* const t = (Table*)m_cachedtables.Get(i);
+            if (t) {
+                t->UpdateFromParent();
+            }
+        }
+    }
+}
+
 
 #ifdef _DEBUG
 
