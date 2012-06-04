@@ -1,6 +1,9 @@
 #include <UnitTest++.h>
 #include "tightdb.hpp"
-#include "group_shared.hpp"
+#include "tightdb/group_shared.hpp"
+
+// Does not work for windows yet
+#ifndef _MSC_VER
 
 using namespace tightdb;
 
@@ -83,3 +86,5 @@ TEST(Shared1)
     
     shared.test_ringbuf();
 }
+
+#endif //_MSV_VER

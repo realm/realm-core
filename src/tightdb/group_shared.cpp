@@ -30,6 +30,9 @@ struct tightdb::SharedInfo {
     ReadCount readers[32]; // has to be power of two
 };
 
+// Does not work for windows yet
+#ifndef _MSC_VER
+
 SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_info(NULL), m_isValid(false), m_version(-1)
 {
     if (!m_group.is_valid()) return;
@@ -288,7 +291,7 @@ void SharedGroup::test_ringbuf()
     
 }
 
-
+#endif //_MSV_VER
 
 // Support methods
 char* concat_strings(const char* str1, const char* str2) {
