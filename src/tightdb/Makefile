@@ -8,25 +8,27 @@
 
 ROOT = ../..
 
-INC_FLAGS     = -I$(ROOT)/src -I../UnitTest++/src
-INC_FLAGS_ABS = -I$(abspath $(ROOT)/src) -I../UnitTest++/src
-LIB_FLAGS     = -lproc -ldl -L../UnitTest++ -lUnitTest++
+INC_FLAGS     = -I$(ROOT)/src
+INC_FLAGS_ABS = -I$(abspath $(ROOT)/src)
 
-SOURCES       = sqlite3.c $(wildcard *.cpp)
-TARGET        = test-sqlite3
-TARGETS       = $(TARGET)
+SOURCES      = $(wildcard *.c *.cpp)
+LIB_SHARED   = libtightdb.so
+LIB_STATIC   = libtightdb.a
+LIB_DEBUG    = libtightdb_d.a
+LIB_COVERAGE = libtightdb_c.a
+TARGETS = $(LIB_STATIC) $(LIB_SHARED) $(LIB_DEBUG) $(LIB_COVERAGE)
 
-ifeq ($(MSYSTEM), MINGW32)
-	SOURCES += ../Support/win32/mem.cpp
-else
-	SOURCES += ../Support/posix/mem.cpp
-endif
-
-all: $(TARGET)
+all: $(LIB_SHARED)
 .PHONY: all
 
-sqlite3.o: sqlite3.c
-	gcc -O3 -MMD -MP -c $< -o $@
+static: $(LIB_STATIC)
+.PHONY: static
+
+debug: $(LIB_DEBUG)
+.PHONY: debug
+
+cover: $(LIB_COVERAGE)
+.PHONY: cover
 
 
 
@@ -41,15 +43,35 @@ OBJECTS = $(STATIC_OBJECTS) $(SHARED_OBJECTS) $(DEBUG_OBJECTS) $(COVERAGE_OBJECT
 
 $(OBJECTS): Makefile $(CONFIG_MK)
 
+
+
+# Code generation
+TIGHTDB_HPP = tightdb.hpp
+$(TIGHTDB_HPP): tightdb-gen.sh tightdb-gen.py Makefile $(CONFIG_MK)
+	$(SHELL) tightdb-gen.sh $(TIGHTDB_HPP)
+$(OBJECTS): $(TIGHTDB_HPP)
+
+
+
 clean:
 	$(RM) *.d *.o *.gcno *.gcda $(TARGETS)
 .PHONY: clean
 
 
-# Linking
+# Library creation
 
-$(TARGET): $(STATIC_OBJECTS)
-	$(LD_STATIC) $(STATIC_OBJECTS) $(LDFLAGS) $(LIB_FLAGS) -o $@
+$(LIB_STATIC): $(STATIC_OBJECTS)
+	$(AR) $(ARFLAGS) $@ $(STATIC_OBJECTS)
+
+$(LIB_SHARED): $(SHARED_OBJECTS)
+        # FIXME: add -Wl,-soname and -Wl,-rpath
+	$(LD_SHARED) $(SHARED_OBJECTS) -o $@
+
+$(LIB_DEBUG): $(DEBUG_OBJECTS)
+	$(AR) $(ARFLAGS) $@ $(DEBUG_OBJECTS)
+
+$(LIB_COVERAGE): $(COVERAGE_OBJECTS)
+	$(AR) $(ARFLAGS) $@ $(COVERAGE_OBJECTS)
 
 
 # Compiling + automatic dependencies

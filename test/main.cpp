@@ -2,7 +2,7 @@
 #include <cstring>
 #include <string>
 #include <math.h>
-#include "column.hpp"
+#include <tightdb/column.hpp>
 #if defined(_MSC_VER) && defined(_DEBUG)
     #include <vld.h>
 #endif

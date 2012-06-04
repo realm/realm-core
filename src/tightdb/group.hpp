@@ -22,7 +22,7 @@
 #define TIGHTDB_GROUP_HPP
 
 #include "table.hpp"
-#include "../src/alloc_slab.hpp"
+#include "alloc_slab.hpp"
 
 namespace tightdb {
 

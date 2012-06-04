@@ -20,10 +20,10 @@
 #ifndef TIGHTDB_TABLE_HPP
 #define TIGHTDB_TABLE_HPP
 
-#include "../src/column_fwd.hpp"
-#include "../src/table_ref.hpp"
-#include "../src/spec.hpp"
-#include "../src/mixed.hpp"
+#include "column_fwd.hpp"
+#include "table_ref.hpp"
+#include "spec.hpp"
+#include "mixed.hpp"
 
 namespace tightdb {
 

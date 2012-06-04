@@ -2,7 +2,7 @@
 #include "array_blob.hpp"
 #include "column.hpp"
 #include <assert.h>
-#include "win32/types.h" //ssize_t
+#include <win32/types.h> //ssize_t
 
 namespace tightdb {
 

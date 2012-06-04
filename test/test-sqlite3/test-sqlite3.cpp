@@ -1,7 +1,7 @@
 #include <stdio.h>
+#include <string>
 #include <UnitTest++.h>
 #include "sqlite3.h"
-#include <string>
 #include "../Support/mem.hpp"
 #include "../Support/number_names.hpp"
 using namespace std;

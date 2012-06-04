@@ -23,7 +23,7 @@
 #ifndef _MSC_VER
 #include <stdint.h> // int64_t - not part of C++03
 #else
-#include "win32/stdint.h"
+#include <win32/stdint.h>
 #endif
 
 #include <cassert>

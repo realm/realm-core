@@ -10,7 +10,7 @@
 #ifndef _MSC_VER
 #include <stdint.h>
 #else
-#include "../../src/win32/stdint.h"
+#include <win32/stdint.h>
 #endif
 
 using namespace std;

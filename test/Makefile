@@ -8,14 +8,14 @@
 
 ROOT = ..
 
-INC_FLAGS     = -I$(ROOT)/src -I$(ROOT)/include -IUnitTest++/src
-INC_FLAGS_ABS = -I$(abspath $(ROOT)/src) -I$(abspath $(ROOT)/include) -IUnitTest++/src
+INC_FLAGS     = -I$(ROOT)/src -IUnitTest++/src
+INC_FLAGS_ABS = -I$(abspath $(ROOT)/src) -IUnitTest++/src
 LIB_FLAGS     = -LUnitTest++ -lUnitTest++
 
 SOURCES             = $(wildcard *.c *.cpp large_tests/*.cpp)
-LIBTIGHTDB          = $(ROOT)/src/libtightdb.a
-LIBTIGHTDB_DEBUG    = $(ROOT)/src/libtightdb_d.a
-LIBTIGHTDB_COVERAGE = $(ROOT)/src/libtightdb_c.a
+LIBTIGHTDB          = $(ROOT)/src/tightdb/libtightdb.a
+LIBTIGHTDB_DEBUG    = $(ROOT)/src/tightdb/libtightdb_d.a
+LIBTIGHTDB_COVERAGE = $(ROOT)/src/tightdb/libtightdb_c.a
 TARGET              = tightdb-tests
 DEBUG_TARGET        = tightdb-tests-debug
 COVERAGE_TARGET     = tightdb-tests-cover

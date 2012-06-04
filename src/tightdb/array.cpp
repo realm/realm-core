@@ -9,7 +9,7 @@
 #include "static_assert.hpp"
 
 #ifdef _MSC_VER
-    #include "win32/types.h"
+    #include <win32/types.h>
     #pragma warning (disable : 4127) // Condition is constant warning
 #endif
 

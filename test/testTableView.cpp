@@ -1,5 +1,5 @@
-#include "tightdb.hpp"
 #include <UnitTest++.h>
+#include <tightdb/tightdb.hpp>
 
 using namespace tightdb;
 
