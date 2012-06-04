@@ -47,8 +47,8 @@ $(OBJECTS): Makefile $(CONFIG_MK)
 
 # Code generation
 TABLE_MACROS_HPP = table_macros.hpp
-$(TABLE_MACROS_HPP): table_macros-gen.sh table_macros-gen.py Makefile $(CONFIG_MK)
-	$(SHELL) table_macros-gen.sh $(TABLE_MACROS_HPP)
+$(TABLE_MACROS_HPP): build/table_macros.hpp.sh build/table_macros.hpp.py Makefile $(CONFIG_MK)
+	$(SHELL) build/table_macros.hpp.sh $(TABLE_MACROS_HPP)
 $(OBJECTS): $(TABLE_MACROS_HPP)
 
 
