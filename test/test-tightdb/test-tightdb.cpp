@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <UnitTest++.h>
-#include <tightdb/tightdb.hpp>
+#include <tightdb/table_macros.hpp>
 #include "../Support/mem.hpp"
 #include "../Support/number_names.hpp"
 

@@ -46,10 +46,10 @@ $(OBJECTS): Makefile $(CONFIG_MK)
 
 
 # Code generation
-TIGHTDB_HPP = tightdb.hpp
-$(TIGHTDB_HPP): tightdb-gen.sh tightdb-gen.py Makefile $(CONFIG_MK)
-	$(SHELL) tightdb-gen.sh $(TIGHTDB_HPP)
-$(OBJECTS): $(TIGHTDB_HPP)
+TABLE_MACROS_HPP = table_macros.hpp
+$(TABLE_MACROS_HPP): table_macros-gen.sh table_macros-gen.py Makefile $(CONFIG_MK)
+	$(SHELL) table_macros-gen.sh $(TABLE_MACROS_HPP)
+$(OBJECTS): $(TABLE_MACROS_HPP)
 
 
 

@@ -1,5 +1,5 @@
 #include <UnitTest++.h>
-#include <tightdb/tightdb.hpp>
+#include <tightdb/table_macros.hpp>
 
 using namespace tightdb;
 

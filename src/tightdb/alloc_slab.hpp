@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_ALLOC_SLAB_HPP
 #define TIGHTDB_ALLOC_SLAB_HPP
 
-#include "tightdb.hpp"
+#include "table_macros.hpp"
 
 #ifdef _MSC_VER
 #include <win32/stdint.h>

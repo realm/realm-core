@@ -21,6 +21,6 @@
 #define TIGHTDB_HPP
 
 #include <tightdb/group.hpp>
-#include <tightdb/tightdb.hpp>
+#include <tightdb/table_macros.hpp>
 
 #endif // TIGHTDB_HPP
