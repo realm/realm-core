@@ -83,8 +83,10 @@ TEST(Shared1)
         
         shared2.end_read();
     }
-    
+
+#ifdef _DEBUG
     shared.test_ringbuf();
+#endif
 }
 
 #endif //_MSV_VER
