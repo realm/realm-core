@@ -20,10 +20,10 @@
 #ifndef TIGHTDB_ALLOC_SLAB_HPP
 #define TIGHTDB_ALLOC_SLAB_HPP
 
-#include "tightdb.hpp"
+#include "table_macros.hpp"
 
 #ifdef _MSC_VER
-#include "win32/stdint.h"
+#include <win32/stdint.h>
 #else
 #include <stdint.h> // unint8_t etc
 #endif
@@ -51,6 +51,7 @@ public:
     bool   CanPersist() const;
     size_t GetFileLen() const {return m_baseline;}
     void   FreeAll(size_t filesize);
+    void   ReMap(size_t filesize);
 
 #ifndef _MSC_VER
     int    GetFileDescriptor() {return m_fd;}

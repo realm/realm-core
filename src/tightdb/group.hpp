@@ -22,9 +22,12 @@
 #define TIGHTDB_GROUP_HPP
 
 #include "table.hpp"
-#include "../src/alloc_slab.hpp"
+#include "alloc_slab.hpp"
 
 namespace tightdb {
+
+// Pre-declarations
+class SharedGroup;
 
 class Group: private Table::Parent {
 public:
@@ -39,8 +42,10 @@ public:
     const char* get_table_name(size_t table_ndx) const;
     bool has_table(const char* name) const;
 
-    TableRef get_table(const char* name);
-    template<class T> BasicTableRef<T> get_table(const char* name);
+    TableRef      get_table(const char* name);
+    ConstTableRef get_table(const char* name) const;
+    template<class T> BasicTableRef<T>       get_table(const char* name);
+    template<class T> BasicTableRef<const T> get_table(const char* name) const;
 
     // Serialization
     bool write(const char* filepath);
@@ -61,6 +66,7 @@ public:
 
 protected:
     friend class GroupWriter;
+    friend class SharedGroup;
 
     SlabAlloc& get_allocator() {return m_alloc;}
     size_t get_free_space(size_t len, size_t& filesize, bool testOnly=false, bool ensureRest=false);
@@ -68,7 +74,9 @@ protected:
     void connect_free_space(bool doConnect);
 
     // Recursively update all internal refs after commit
-    void update_refs(size_t TopRef);
+    void update_refs(size_t top_ref);
+    
+    void update_from_shared(size_t top_ref, size_t len);
 
     // Overriding method in ArrayParent
     virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
@@ -106,7 +114,9 @@ private:
     friend class LangBindHelper;
 
     Table* get_table_ptr(const char* name);
+    const Table* get_table_ptr(const char* name) const;
     template<class T> T* get_table_ptr(const char* name);
+    template<class T> const T* get_table_ptr(const char* name) const;
 };
 
 
@@ -118,9 +128,29 @@ inline TableRef Group::get_table(const char* name)
     return get_table_ptr(name)->get_table_ref();
 }
 
+inline ConstTableRef Group::get_table(const char* name) const
+{
+    return get_table_ptr(name)->get_table_ref();
+}
+
 template<class T> inline BasicTableRef<T> Group::get_table(const char* name)
 {
     return get_table_ptr<T>(name)->get_table_ref();
+}
+
+template<class T> inline BasicTableRef<const T> Group::get_table(const char* name) const
+{
+    return get_table_ptr<T>(name)->get_table_ref();
+}
+
+inline const Table* Group::get_table_ptr(const char* name) const
+{
+    return const_cast<Group*>(this)->get_table_ptr(name);
+}
+
+template<class T> inline const T* Group::get_table_ptr(const char* name) const
+{
+    return const_cast<Group*>(this)->get_table_ptr<T>(name);
 }
 
 template<class T> T* Group::get_table_ptr(const char* name)
@@ -151,7 +181,6 @@ size_t Group::write(S& out)
     out.write("\0\0\0\0\0\0\0\0", 8);
 
     // Recursively write all arrays
-    // FIXME: 'valgrind' says this writes uninitialized bytes to the file/stream
     const uint64_t topPos = m_top.Write(out);
     const size_t byte_size = out.getpos();
 

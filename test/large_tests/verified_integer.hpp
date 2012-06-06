@@ -1,12 +1,11 @@
-
 #include <vector>
 #include <string>
 #include <algorithm>
 #ifdef _MSC_VER
-    #include "win32\stdint.h"
+    #include <win32\stdint.h>
 #endif
 #include <stdio.h>
-#include "column.hpp"
+#include <tightdb/column.hpp>
 
 class VerifiedInteger {
     std::vector<int64_t> v;

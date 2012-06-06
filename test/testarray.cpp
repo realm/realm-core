@@ -1,12 +1,12 @@
-#include "array.hpp"
-#include "column.hpp"
-#include <UnitTest++.h>
-#include <vector>
-#include <algorithm>
-#include "testsettings.hpp"
 #include <map>
 #include <string>
-#include "query_conditions.hpp"
+#include <vector>
+#include <algorithm>
+#include <UnitTest++.h>
+#include <tightdb/array.hpp>
+#include <tightdb/column.hpp>
+#include <tightdb/query_conditions.hpp>
+#include "testsettings.hpp"
 
 using namespace tightdb;
 

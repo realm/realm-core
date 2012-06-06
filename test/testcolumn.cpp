@@ -1,7 +1,7 @@
-#include "column.hpp"
-#include <UnitTest++.h>
 #include <vector>
 #include <algorithm>
+#include <UnitTest++.h>
+#include <tightdb/column.hpp>
 #include "testsettings.hpp"
 
 using namespace tightdb;

@@ -5,7 +5,7 @@
 #include <cstdio> // debug
 #include "query_conditions.hpp"
 #ifdef _MSC_VER
-    #include "win32\types.h"
+    #include <win32\types.h>
 #endif
 
 #include "column_string.hpp"

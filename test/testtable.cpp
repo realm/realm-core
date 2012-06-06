@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <sstream>
-#include "tightdb.hpp"
 #include <UnitTest++.h>
+#include <tightdb/table_macros.hpp>
 
 using namespace tightdb;
 
@@ -551,7 +551,7 @@ TEST(TableAutoEnumerationFindFindAll)
     CHECK_EQUAL("eftg", static_cast<const char*>(tv[4].second));
 }
 
-#include "alloc_slab.hpp"
+#include <tightdb/alloc_slab.hpp>
 TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;
@@ -581,7 +581,7 @@ TEST(Table_SlabAlloc)
 #endif //_DEBUG
 }
 
-#include "group.hpp"
+#include <tightdb/group.hpp>
 TEST(Table_Spec)
 {
     Group group;

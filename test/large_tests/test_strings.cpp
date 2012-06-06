@@ -1,9 +1,7 @@
-
 #include <UnitTest++.h>
+#include <tightdb/column.hpp>
 #include "../testsettings.hpp"
 #include "../Support/number_names.hpp"
-#include "column.hpp"
-
 #include "verified_string.hpp"
 
 #if TEST_DURATION > 0

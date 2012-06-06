@@ -23,7 +23,7 @@
 #include "array.hpp"
 
 #ifdef _MSC_VER
-#include "win32/stdint.h"
+#include <win32/stdint.h>
 #else
 #include <stdint.h> // unint8_t etc
 #endif
@@ -48,6 +48,8 @@ public:
     virtual bool IsStringColumn() const {return false;}
     virtual bool IsBinaryColumn() const {return false;}
 
+    virtual size_t Size() const = 0;
+    
     virtual bool add() = 0;
     virtual void Clear() = 0;
     virtual void Delete(size_t ndx) = 0;

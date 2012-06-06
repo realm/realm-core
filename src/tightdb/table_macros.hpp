@@ -17,10 +17,10 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TIGHTDB_HPP
-#define TIGHTDB_TIGHTDB_HPP
+#ifndef TIGHTDB_TABLE_MACROS_HPP
+#define TIGHTDB_TABLE_MACROS_HPP
 
-#include "../src/table_basic.hpp"
+#include "table_basic.hpp"
 
 
 #define TIGHTDB_TABLE_1(Table, name1, type1) \
@@ -391,4 +391,4 @@ struct Table##Spec: ::tightdb::SpecBase { \
 typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
-#endif // TIGHTDB_TIGHTDB_HPP
+#endif // TIGHTDB_TABLE_MACROS_HPP

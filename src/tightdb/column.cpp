@@ -7,7 +7,7 @@
 #include <iomanip>
 
 #ifdef _MSC_VER
-#include "win32/stdint.h"
+#include <win32/stdint.h>
 #else
 #include <stdint.h> // unint8_t etc
 #endif

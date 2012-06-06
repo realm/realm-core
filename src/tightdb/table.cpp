@@ -1259,6 +1259,15 @@ void Table::UpdateFromParent() {
         ColumnBase* const column = (ColumnBase*)m_cols.Get(i);
         column->UpdateFromParent();
     }
+    
+    // Size may have changed
+    if (column_count == 0) {
+        m_size = 0;
+    }
+    else {
+        const ColumnBase* const column = (ColumnBase*)m_cols.Get(0);
+        m_size = column->Size();
+    }
 }
 
 

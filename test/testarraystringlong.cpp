@@ -1,5 +1,5 @@
-#include "array_string_long.hpp"
 #include <UnitTest++.h>
+#include <tightdb/array_string_long.hpp>
 
 using namespace tightdb;
 

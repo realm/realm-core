@@ -1,6 +1,6 @@
-#include "column_string.hpp"
-#include "column_string_enum.hpp"
 #include <UnitTest++.h>
+#include <tightdb/column_string.hpp>
+#include <tightdb/column_string_enum.hpp>
 
 using namespace tightdb;
 

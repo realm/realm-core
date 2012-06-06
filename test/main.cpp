@@ -1,11 +1,10 @@
-
 #include <UnitTest++.h>
 #include <cstring>
 #include <string>
 #include <math.h>
-#include "column.hpp"
+#include <tightdb/column.hpp>
 #if defined(_MSC_VER) && defined(_DEBUG)
-    #include <vld.h> 
+    #include <vld.h>
 #endif
 
 int main(int argc, char const *const argv[])

@@ -22,8 +22,8 @@
 
 #include <cstdlib>
 #ifdef _MSC_VER
-    #include "win32/types.h"
-    #include "win32/stdint.h"
+    #include <win32/types.h>
+    #include <win32/stdint.h>
 #endif
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
