@@ -63,9 +63,9 @@ const char* mixed_get_string(Mixed *mixed)
 {
     return mixed->get_string();
 }
-BinaryData mixed_get_binary(Mixed *mixed)
+BinaryData* mixed_get_binary(Mixed *mixed)
 {
-    return mixed->get_binary();
+    return new BinaryData(mixed->get_binary());
 }
 
 
@@ -223,9 +223,9 @@ const char* table_get_string(const Table* t, size_t column_ndx, size_t ndx)
     return t->get_string(column_ndx, ndx);
 }
 
-BinaryData table_get_binary(const Table* t, size_t column_ndx, size_t ndx)
+BinaryData* table_get_binary(const Table* t, size_t column_ndx, size_t ndx)
 {
-    return t->get_binary(column_ndx, ndx);
+    return new BinaryData(t->get_binary(column_ndx, ndx));
 }
 
 Mixed* table_get_mixed(const Table* t, size_t column_ndx, size_t ndx)
@@ -322,7 +322,7 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap)
         case tightdb::COLUMN_TYPE_MIXED:
             {
                 Mixed* const v = va_arg(ap, Mixed*);
-                t->insert_mixed(i, ndx, v);
+                t->insert_mixed(i, ndx, *v);
             }
             break;
         case tightdb::COLUMN_TYPE_BINARY:

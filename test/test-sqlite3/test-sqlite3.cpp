@@ -8,6 +8,9 @@ using namespace std;
 
 int main()
 {
+    const size_t ROWS = 250000;
+    const size_t TESTS = 100;
+
     // Open sqlite in-memory db
     sqlite3 *db = NULL;
     int rc = sqlite3_open(":memory:", &db);
@@ -32,8 +35,10 @@ int main()
         fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
     }
 
+    printf("Create random content with %d rows.\n\n", ROWS);
+
     // Fill with data
-    for (size_t i = 0; i < 250000; ++i) {
+    for (size_t i = 0; i < ROWS; ++i) {
         // create random string
         const size_t n = rand() % 1000;// * 10 + rand();
         const string s = number_name(n);
@@ -52,7 +57,7 @@ int main()
     sqlite3_finalize(ppStmt); // Cleanup
 
     const size_t memUsed = GetMemUsage();
-    printf("Memory usage: %ld bytes\n", long(memUsed));
+    printf("Memory usage:\t\t%5ld bytes\n", long(memUsed));
 
     UnitTest::Timer timer;
 
@@ -67,7 +72,7 @@ int main()
         timer.Start();
 
         // Do a search over entire column (value not found)
-        for (size_t i = 0; i < 100; ++i) {
+        for (size_t i = 0; i < TESTS; ++i) {
             sqlite3_reset(ppStmt);
             rc = sqlite3_step(ppStmt);
             if (rc != SQLITE_DONE) {
@@ -77,7 +82,7 @@ int main()
         }
 
         const int search_time = timer.GetTimeInMs();
-        printf("Search (small integer): %dms\n", search_time);
+        printf("Search (small integer):\t%5d ms\n", search_time);
 
         sqlite3_finalize(ppStmt); // Cleanup
     }
@@ -93,7 +98,7 @@ int main()
         timer.Start();
 
         // Do a search over entire column (value not found)
-        for (size_t i = 0; i < 100; ++i) {
+        for (size_t i = 0; i < TESTS; ++i) {
             rc = sqlite3_step(ppStmt);
             if (rc != SQLITE_DONE) {
                 fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -102,7 +107,7 @@ int main()
         }
 
         const int search_time = timer.GetTimeInMs();
-        printf("Search (string): %dms\n", search_time);
+        printf("Search (string):\t%5d ms\n", search_time);
 
         sqlite3_finalize(ppStmt); // Cleanup
     }
@@ -125,17 +130,17 @@ int main()
         }
 
         const int search_time = timer.GetTimeInMs();
-        printf("Add index: %dms\n", search_time);
+        printf("\nAdd index:\t\t%5d ms\n", search_time);
 
         sqlite3_finalize(ppStmt); // Cleanup
     }
 
-    printf("Memory usage2: %ld bytes\n", long(GetMemUsage()));
+    printf("Memory usage2:\t\t%5ld bytes\n", long(GetMemUsage()));
 
     // Search with index
     {
         // Prepare select statement
-        rc = sqlite3_prepare(db, "SELECT * FROM t1 WHERE fourth=?1;", -1, &ppStmt, NULL);
+        rc = sqlite3_prepare(db, "SELECT * FROM t1 WHERE first=?1;", -1, &ppStmt, NULL);
         if (rc != SQLITE_OK) {
             fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
         }
@@ -143,7 +148,7 @@ int main()
         timer.Start();
 
         // Do a search over entire column
-        for (size_t i = 0; i < 100; ++i) {
+        for (size_t i = 0; i < TESTS*10; ++i) {
             const size_t n = rand() % 1000;
 
             sqlite3_reset(ppStmt);
@@ -156,12 +161,13 @@ int main()
         }
 
         const int search_time = timer.GetTimeInMs();
-        printf("Search index: %dms\n", search_time);
+        printf("Search index:\t\t%5d ms\n", search_time);
 
         sqlite3_finalize(ppStmt); // Cleanup
     }
 
     sqlite3_close(db);
+    printf("\nDone.");
 #ifdef _MSC_VER
     getchar();
 #endif

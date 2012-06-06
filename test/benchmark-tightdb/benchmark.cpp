@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "../../include/tightdb.hpp"
+#include "../../src/tightdb.hpp"
 #include "../../test/UnitTest++/src/UnitTest++.h"
 #include "../../test/UnitTest++/src/Win32/TimeHelpers.h"
 #include "../Support/mem.hpp"
@@ -49,7 +49,7 @@ void tightdb2(void)
         std::string indexed;
         integers.clear();
         if(index == 1) {
-            integers.set_index(0);
+            integers.cols().first.set_index();
             indexed = "Indexed ";
         }
 
@@ -68,7 +68,7 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (i + 1);
-            integers.insert_int(0, p, (int64_t)rand2() % RANGE);
+            integers.insert(p, (int64_t)rand2() % RANGE);
         }
         printf((indexed + "Insert: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 

@@ -85,9 +85,6 @@
     <ClCompile Include="src\tightdb\column_table.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\c-table.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\tightdb\group.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -134,6 +131,9 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\array_string_long.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\c-table.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
