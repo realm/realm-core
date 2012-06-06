@@ -369,38 +369,38 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\alloc_slab.cpp" />
-    <ClCompile Include="src\array.cpp" />
-    <ClCompile Include="src\array_binary.cpp" />
-    <ClCompile Include="src\array_blob.cpp" />
-    <ClCompile Include="src\array_string.cpp" />
-    <ClCompile Include="src\array_string_long.cpp" />
-    <ClCompile Include="src\c-table.cpp">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
+    <ClCompile Include="src\tightdb\alloc_slab.cpp" />
+    <ClCompile Include="src\tightdb\array.cpp" />
+    <ClCompile Include="src\tightdb\array_binary.cpp" />
+    <ClCompile Include="src\tightdb\array_blob.cpp" />
+    <ClCompile Include="src\tightdb\array_string.cpp" />
+    <ClCompile Include="src\tightdb\array_string_long.cpp" />
+    <ClCompile Include="src\tightdb\c-table.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="src\column.cpp" />
-    <ClCompile Include="src\column_binary.cpp" />
-    <ClCompile Include="src\column_mixed.cpp" />
-    <ClCompile Include="src\column_string.cpp" />
-    <ClCompile Include="src\column_string_enum.cpp" />
-    <ClCompile Include="src\column_table.cpp" />
-    <ClCompile Include="src\group.cpp" />
-    <ClCompile Include="src\group_writer.cpp" />
-    <ClCompile Include="src\index.cpp" />
-    <ClCompile Include="src\query.cpp" />
-    <ClCompile Include="src\spec.cpp" />
-    <ClCompile Include="src\table.cpp" />
-    <ClCompile Include="src\table_view.cpp" />
-    <ClCompile Include="src\utf8.cpp" />
-    <ClCompile Include="src\utilities.cpp" />
+    <ClCompile Include="src\tightdb\column.cpp" />
+    <ClCompile Include="src\tightdb\column_binary.cpp" />
+    <ClCompile Include="src\tightdb\column_mixed.cpp" />
+    <ClCompile Include="src\tightdb\column_string.cpp" />
+    <ClCompile Include="src\tightdb\column_string_enum.cpp" />
+    <ClCompile Include="src\tightdb\column_table.cpp" />
+    <ClCompile Include="src\tightdb\group.cpp" />
+    <ClCompile Include="src\tightdb\group_shared.cpp" />
+    <ClCompile Include="src\tightdb\group_writer.cpp" />
+    <ClCompile Include="src\tightdb\index.cpp" />
+    <ClCompile Include="src\tightdb\query.cpp" />
+    <ClCompile Include="src\tightdb\spec.cpp" />
+    <ClCompile Include="src\tightdb\table.cpp" />
+    <ClCompile Include="src\tightdb\table_view.cpp" />
+    <ClCompile Include="src\tightdb\utf8.cpp" />
+    <ClCompile Include="src\tightdb\utilities.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c" />
     <ClCompile Include="test\large_tests\test_column.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
@@ -530,51 +530,53 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\group.hpp" />
-    <ClInclude Include="include\table.hpp" />
-    <ClInclude Include="include\tightdb.hpp" />
-    <ClInclude Include="src\alloc.hpp" />
-    <ClInclude Include="src\alloc_slab.hpp" />
-    <ClInclude Include="src\array.hpp" />
-    <ClInclude Include="src\array_binary.hpp" />
-    <ClInclude Include="src\array_blob.hpp" />
-    <ClInclude Include="src\array_string.hpp" />
-    <ClInclude Include="src\array_string_long.hpp" />
-    <ClInclude Include="src\binary_data.hpp" />
-    <ClInclude Include="src\bind_ptr.hpp" />
-    <ClInclude Include="src\c-table.h" />
-    <ClInclude Include="src\c-tightdb.h" />
-    <ClInclude Include="src\column.hpp" />
-    <ClInclude Include="src\column_binary.hpp" />
-    <ClInclude Include="src\column_fwd.hpp" />
-    <ClInclude Include="src\column_mixed.hpp" />
-    <ClInclude Include="src\column_string.hpp" />
-    <ClInclude Include="src\column_string_enum.hpp" />
-    <ClInclude Include="src\column_table.hpp" />
-    <ClInclude Include="src\column_tpl.hpp" />
-    <ClInclude Include="src\column_type.hpp" />
-    <ClInclude Include="src\config.h" />
-    <ClInclude Include="src\date.hpp" />
-    <ClInclude Include="src\group_writer.hpp" />
-    <ClInclude Include="src\index.hpp" />
-    <ClInclude Include="src\lang_bind_helper.hpp" />
-    <ClInclude Include="src\meta.hpp" />
-    <ClInclude Include="src\mixed.hpp" />
-    <ClInclude Include="src\query.hpp" />
-    <ClInclude Include="src\query_conditions.hpp" />
-    <ClInclude Include="src\query_engine.hpp" />
-    <ClInclude Include="src\spec.hpp" />
-    <ClInclude Include="src\static_assert.hpp" />
-    <ClInclude Include="src\table_accessors.hpp" />
-    <ClInclude Include="src\table_basic.hpp" />
-    <ClInclude Include="src\table_ref.hpp" />
-    <ClInclude Include="src\table_view.hpp" />
-    <ClInclude Include="src\table_view_basic.hpp" />
-    <ClInclude Include="src\tightdb-c.h" />
-    <ClInclude Include="src\tuple.hpp" />
-    <ClInclude Include="src\type_list.hpp" />
-    <ClInclude Include="src\utf8.hpp" />
-    <ClInclude Include="src\utilities.hpp" />
+    <ClInclude Include="src\tightdb.hpp" />
+    <ClInclude Include="src\tightdb\alloc.hpp" />
+    <ClInclude Include="src\tightdb\alloc_slab.hpp" />
+    <ClInclude Include="src\tightdb\array.hpp" />
+    <ClInclude Include="src\tightdb\array_binary.hpp" />
+    <ClInclude Include="src\tightdb\array_blob.hpp" />
+    <ClInclude Include="src\tightdb\array_string.hpp" />
+    <ClInclude Include="src\tightdb\array_string_long.hpp" />
+    <ClInclude Include="src\tightdb\binary_data.hpp" />
+    <ClInclude Include="src\tightdb\bind_ptr.hpp" />
+    <ClInclude Include="src\tightdb\c-table.h" />
+    <ClInclude Include="src\tightdb\c-tightdb.h" />
+    <ClInclude Include="src\tightdb\column.hpp" />
+    <ClInclude Include="src\tightdb\column_binary.hpp" />
+    <ClInclude Include="src\tightdb\column_fwd.hpp" />
+    <ClInclude Include="src\tightdb\column_mixed.hpp" />
+    <ClInclude Include="src\tightdb\column_string.hpp" />
+    <ClInclude Include="src\tightdb\column_string_enum.hpp" />
+    <ClInclude Include="src\tightdb\column_table.hpp" />
+    <ClInclude Include="src\tightdb\column_tpl.hpp" />
+    <ClInclude Include="src\tightdb\column_type.hpp" />
+    <ClInclude Include="src\tightdb\config.h" />
+    <ClInclude Include="src\tightdb\date.hpp" />
+    <ClInclude Include="src\tightdb\group.hpp" />
+    <ClInclude Include="src\tightdb\group_shared.hpp" />
+    <ClInclude Include="src\tightdb\group_writer.hpp" />
+    <ClInclude Include="src\tightdb\index.hpp" />
+    <ClInclude Include="src\tightdb\lang_bind_helper.hpp" />
+    <ClInclude Include="src\tightdb\meta.hpp" />
+    <ClInclude Include="src\tightdb\mixed.hpp" />
+    <ClInclude Include="src\tightdb\query.hpp" />
+    <ClInclude Include="src\tightdb\query_conditions.hpp" />
+    <ClInclude Include="src\tightdb\query_engine.hpp" />
+    <ClInclude Include="src\tightdb\spec.hpp" />
+    <ClInclude Include="src\tightdb\static_assert.hpp" />
+    <ClInclude Include="src\tightdb\table.hpp" />
+    <ClInclude Include="src\tightdb\table_accessors.hpp" />
+    <ClInclude Include="src\tightdb\table_basic.hpp" />
+    <ClInclude Include="src\tightdb\table_macros.hpp" />
+    <ClInclude Include="src\tightdb\table_ref.hpp" />
+    <ClInclude Include="src\tightdb\table_view.hpp" />
+    <ClInclude Include="src\tightdb\table_view_basic.hpp" />
+    <ClInclude Include="src\tightdb\tightdb-c.h" />
+    <ClInclude Include="src\tightdb\tuple.hpp" />
+    <ClInclude Include="src\tightdb\type_list.hpp" />
+    <ClInclude Include="src\tightdb\utf8.hpp" />
+    <ClInclude Include="src\tightdb\utilities.hpp" />
     <ClInclude Include="src\win32\pthread\pthread.h" />
     <ClInclude Include="test\large_tests\verified_integer.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>

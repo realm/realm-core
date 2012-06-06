@@ -1,6 +1,9 @@
 #include "group_shared.hpp"
 #include <cassert>
 
+// Does not work for windows yet
+#ifndef _MSC_VER
+
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -29,9 +32,6 @@ struct tightdb::SharedInfo {
     uint32_t get_pos;
     ReadCount readers[32]; // has to be power of two
 };
-
-// Does not work for windows yet
-#ifndef _MSC_VER
 
 SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_info(NULL), m_isValid(false), m_version(-1)
 {
