@@ -100,7 +100,8 @@ public:
     void insert_binary(size_t ndx, const char* value, size_t len);
     void insert_table(size_t ndx);
 
-    bool add();
+    virtual bool add() { insert_int(Size(), 0); return true; }
+    virtual void insert(size_t ndx) { insert_int(ndx, 0); }
     void Clear();
     void Delete(size_t ndx);
 

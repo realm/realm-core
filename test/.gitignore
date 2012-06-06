@@ -20,6 +20,7 @@
 /subtables*.tdb
 /subtables.tightdb
 /table_test.tbl
+/*.lock
 
 /benchmark/x64
 /benchmark

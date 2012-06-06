@@ -44,9 +44,10 @@ public:
     const char* GetData(size_t ndx) const;
     size_t GetLen(size_t ndx) const;
 
-    bool add() {add(NULL, 0); return true;}
+    virtual bool add() { add(NULL, 0); return true; }
     void add(const char* value, size_t len);
     void Set(size_t ndx, const char* value, size_t len);
+    virtual void insert(size_t ndx) { Insert(ndx, 0, 0); }
     void Insert(size_t ndx, const char* value, size_t len);
     void Delete(size_t ndx);
     void Resize(size_t ndx);

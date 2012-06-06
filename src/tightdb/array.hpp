@@ -123,6 +123,10 @@ protected:
  * An Array can be copied, but it will leave the source in a truncated
  * (and therfore unusable) state.
  *
+ * \note The parent information in an array ('pointer to parent' and
+ * 'index in parent') may be valid even when the array is not valid,
+ * that is IsValid() returns false.
+ *
  * FIXME: Array should be endowed with proper copy and move semantics like TableView is.
  */
 class Array: public ArrayParent {

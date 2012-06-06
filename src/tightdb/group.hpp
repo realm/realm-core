@@ -75,7 +75,7 @@ protected:
 
     // Recursively update all internal refs after commit
     void update_refs(size_t top_ref);
-    
+
     void update_from_shared(size_t top_ref, size_t len);
 
     // Overriding method in ArrayParent

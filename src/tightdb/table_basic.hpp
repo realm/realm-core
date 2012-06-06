@@ -173,6 +173,8 @@ public:
         insert_done();
     }
 
+    void insert(std::size_t i) { insert_empty_row(i); }
+
     template<class L> void insert(std::size_t i, const Tuple<L>& tuple)
     {
         TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,

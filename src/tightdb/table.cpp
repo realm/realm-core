@@ -559,7 +559,7 @@ const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
 size_t Table::add_empty_row(size_t num_of_rows)
 {
     const size_t col_count = get_column_count();
-    
+
     for (size_t row = 0; row < num_of_rows; ++row) {
         for (size_t i = 0; i < col_count; ++i) {
             ColumnBase& column = GetColumnBase(i);
@@ -571,6 +571,18 @@ size_t Table::add_empty_row(size_t num_of_rows)
     size_t new_ndx = m_size;
     m_size += num_of_rows;
     return new_ndx;
+}
+
+void Table::insert_empty_row(size_t ndx, size_t num_of_rows)
+{
+    const size_t col_count = get_column_count();
+
+    for (size_t row = 0; row < num_of_rows; ++row) {
+        for (size_t i = 0; i < col_count; ++i) {
+            ColumnBase& column = GetColumnBase(i);
+            column.insert(ndx+i); // FIXME: This should be optimized by passing 'num_of_rows' to column.insert()
+        }
+    }
 }
 
 void Table::clear()
@@ -1259,7 +1271,7 @@ void Table::UpdateFromParent() {
         ColumnBase* const column = (ColumnBase*)m_cols.Get(i);
         column->UpdateFromParent();
     }
-    
+
     // Size may have changed
     if (column_count == 0) {
         m_size = 0;
@@ -1454,58 +1466,62 @@ bool Table::compare(const Table& c) const
 
 void Table::Verify() const
 {
-    const size_t column_count = get_column_count();
-    assert(column_count == m_cols.Size());
+    if (m_top.IsValid()) m_top.Verify();
+    m_columns.Verify();
+    if (m_columns.IsValid()) {
+        const size_t column_count = get_column_count();
+        assert(column_count == m_cols.Size());
 
-    for (size_t i = 0; i < column_count; ++i) {
-        const ColumnType type = GetRealColumnType(i);
-        switch (type) {
-        case COLUMN_TYPE_INT:
-        case COLUMN_TYPE_BOOL:
-        case COLUMN_TYPE_DATE:
-            {
-                const Column& column = GetColumn(i);
-                assert(column.Size() == m_size);
-                column.Verify();
+        for (size_t i = 0; i < column_count; ++i) {
+            const ColumnType type = GetRealColumnType(i);
+            switch (type) {
+            case COLUMN_TYPE_INT:
+            case COLUMN_TYPE_BOOL:
+            case COLUMN_TYPE_DATE:
+                {
+                    const Column& column = GetColumn(i);
+                    assert(column.Size() == m_size);
+                    column.Verify();
+                }
+                break;
+            case COLUMN_TYPE_STRING:
+                {
+                    const AdaptiveStringColumn& column = GetColumnString(i);
+                    assert(column.Size() == m_size);
+                    column.Verify();
+                }
+                break;
+            case COLUMN_TYPE_STRING_ENUM:
+                {
+                    const ColumnStringEnum& column = GetColumnStringEnum(i);
+                    assert(column.Size() == m_size);
+                    column.Verify();
+                }
+                break;
+            case COLUMN_TYPE_BINARY:
+                {
+                    const ColumnBinary& column = GetColumnBinary(i);
+                    assert(column.Size() == m_size);
+                    column.Verify();
+                }
+                break;
+            case COLUMN_TYPE_TABLE:
+                {
+                    const ColumnTable& column = GetColumnTable(i);
+                    assert(column.Size() == m_size);
+                    column.Verify();
+                }
+                break;
+            case COLUMN_TYPE_MIXED:
+                {
+                    const ColumnMixed& column = GetColumnMixed(i);
+                    assert(column.Size() == m_size);
+                    column.Verify();
+                }
+                break;
+            default:
+                assert(false);
             }
-            break;
-        case COLUMN_TYPE_STRING:
-            {
-                const AdaptiveStringColumn& column = GetColumnString(i);
-                assert(column.Size() == m_size);
-                column.Verify();
-            }
-            break;
-        case COLUMN_TYPE_STRING_ENUM:
-            {
-                const ColumnStringEnum& column = GetColumnStringEnum(i);
-                assert(column.Size() == m_size);
-                column.Verify();
-            }
-            break;
-        case COLUMN_TYPE_BINARY:
-            {
-                const ColumnBinary& column = GetColumnBinary(i);
-                assert(column.Size() == m_size);
-                column.Verify();
-            }
-            break;
-        case COLUMN_TYPE_TABLE:
-            {
-                const ColumnTable& column = GetColumnTable(i);
-                assert(column.Size() == m_size);
-                column.Verify();
-            }
-            break;
-        case COLUMN_TYPE_MIXED:
-            {
-                const ColumnMixed& column = GetColumnMixed(i);
-                assert(column.Size() == m_size);
-                column.Verify();
-            }
-            break;
-        default:
-            assert(false);
         }
     }
 
