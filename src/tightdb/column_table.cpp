@@ -91,7 +91,8 @@ void ColumnTable::Verify() const
     // Verify each sub-table
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
-        if (GetAsRef(i) == 0) continue;
+        // We want to verify any cached table instance so we do not
+        // want to skip null refs here.
         const ConstTableRef subtable = get_subtable(i, m_ref_specSet);
         subtable->Verify();
     }

@@ -49,8 +49,9 @@ public:
     virtual bool IsBinaryColumn() const {return false;}
 
     virtual size_t Size() const = 0;
-    
+
     virtual bool add() = 0;
+    virtual void insert(size_t ndx) = 0;
     virtual void Clear() = 0;
     virtual void Delete(size_t ndx) = 0;
     void Resize(size_t ndx) {m_array->Resize(ndx);}
@@ -151,8 +152,9 @@ public:
     int64_t Get(size_t ndx) const;
     size_t GetAsRef(size_t ndx) const;
     bool Set(size_t ndx, int64_t value);
+    virtual void insert(size_t ndx) { Insert(ndx, 0); } // FIXME: Ignoring boolean return value here!
     bool Insert(size_t ndx, int64_t value);
-    bool add() {return add(0);}
+    virtual bool add() {return add(0);}
     bool add(int64_t value);
 
     int64_t sum(size_t start = 0, size_t end = -1) const;

@@ -372,12 +372,6 @@ void ColumnMixed::SetTable(size_t ndx)
     m_refs->Set(ndx, ref);
 }
 
-bool ColumnMixed::add()
-{
-    insert_int(Size(), 0);
-    return true;
-}
-
 void ColumnMixed::Delete(size_t ndx)
 {
     assert(ndx < m_types->Size());
