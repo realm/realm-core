@@ -40,9 +40,11 @@ public:
     
     Group& start_write();
     void end_write();
-    
+
+#ifdef _DEBUG
     void test_ringbuf();
-    
+#endif
+
 private:
     // Ring buffer managment
     bool       ringbuf_is_empty() const;

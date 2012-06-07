@@ -56,8 +56,11 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
     if (len == 0) {
         // Create new file
         len = sizeof(SharedInfo);
-        int r = ftruncate(fd, len);
-        static_cast<void>(r); // FIXME: We should probably check for error here!
+        const int r = ftruncate(fd, len);
+        if (r != 0) {
+            close(fd);
+            return;
+        }
         needInit = true;
     }
     
@@ -265,6 +268,8 @@ size_t SharedGroup::ringbuf_find(uint32_t version) const
     return (size_t)-1;
 }
 
+#ifdef _DEBUG
+
 void SharedGroup::test_ringbuf()
 {
     assert(ringbuf_is_empty());
@@ -286,12 +291,14 @@ void SharedGroup::test_ringbuf()
     for (size_t i = 0; i < 32; ++i) {
         const ReadCount& r = ringbuf_get_first();
         assert(r.count == i);
-        static_cast<void>(r);
+
         ringbuf_remove_first();
     }
     assert(ringbuf_is_empty());
     
 }
+
+#endif //_DEBUG
 
 #endif //_MSV_VER
 
