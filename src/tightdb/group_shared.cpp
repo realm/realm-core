@@ -54,6 +54,13 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
     // Handle empty files (first user)
     bool needInit = false;
     if (len == 0) {
+        // Lock file so we do not have anyone else reading
+        // it while it is uninitialized
+        if (flock(fd, LOCK_EX) != 0) {
+            close(fd);
+            return;
+        }
+
         // Create new file
         len = sizeof(SharedInfo);
         const int r = ftruncate(fd, len);
@@ -72,19 +79,25 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
     m_info = (SharedInfo*)p;
     
     if (needInit) {
-        pthread_mutex_lock(&m_info->readmutex);
-        {
-            const SlabAlloc& alloc = m_group.get_allocator();
-            
-            m_info->filesize = alloc.GetFileLen();
-            m_info->infosize = (uint32_t)len;
-            m_info->current_top = alloc.GetTopRef();;
-            m_info->current_version = 0;
-            m_info->capacity = 32-1; 
-            m_info->put_pos = 0;
-            m_info->get_pos = 0;
-        }
-        pthread_mutex_unlock(&m_info->readmutex);
+        // Initialize mutexes so that they can be shared between processes
+        pthread_mutexattr_t mattr;
+        pthread_mutexattr_init(&mattr);
+        pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+        pthread_mutex_init(&m_info->readmutex, &mattr);
+        pthread_mutex_init(&m_info->writemutex, &mattr);
+
+        // Set initial values
+        const SlabAlloc& alloc = m_group.get_allocator();
+        m_info->filesize = alloc.GetFileLen();
+        m_info->infosize = (uint32_t)len;
+        m_info->current_top = alloc.GetTopRef();;
+        m_info->current_version = 0;
+        m_info->capacity = 32-1; 
+        m_info->put_pos = 0;
+        m_info->get_pos = 0;
+
+        // Release file lock
+        flock(fd, LOCK_UN);
     }
     
     m_isValid = true;
