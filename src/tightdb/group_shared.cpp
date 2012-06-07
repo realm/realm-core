@@ -73,8 +73,10 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
     
     // Map to memory
     void* const p = mmap(0, len, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd); // no loner need file discriptor
-    if (p == (void*)-1) return;
+    if (p == (void*)-1) {
+        close(fd);
+        return;
+    }
 
     m_info = (SharedInfo*)p;
     
@@ -100,6 +102,7 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
         flock(fd, LOCK_UN);
     }
     
+    close(fd); // no longer need file descriptor
     m_isValid = true;
 }
 
