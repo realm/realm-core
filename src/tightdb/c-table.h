@@ -125,7 +125,7 @@ typedef struct Query Query;
     int64_t     mixed_get_int(Mixed* mixed);
     time_t      mixed_get_date(Mixed* mixed);
     const char* mixed_get_string(Mixed* mixed);
-    BinaryData  mixed_get_binary(Mixed* mixed);
+    BinaryData* mixed_get_binary(Mixed* mixed);
 //??? Wait for implementation:
 //    Table*        mixed_get_table(Mixed* mixed);
 
@@ -185,7 +185,7 @@ typedef struct Query Query;
     bool        table_get_bool(const Table* t, size_t column_ndx, size_t ndx);
     time_t      table_get_date(const Table* t, size_t column_ndx, size_t ndx);
     const char* table_get_string(const Table* t, size_t column_ndx, size_t ndx);
-    BinaryData  table_get_binary(const Table* t, size_t column_ndx, size_t ndx);
+    BinaryData* table_get_binary(const Table* t, size_t column_ndx, size_t ndx);
     Mixed*      table_get_mixed(const Table* t, size_t column_ndx, size_t ndx);
     TightdbColumnType table_get_mixed_type(const Table* t, size_t column_ndx, size_t ndx);
 
