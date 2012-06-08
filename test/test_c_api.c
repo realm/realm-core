@@ -7,7 +7,7 @@
 
 #include <string.h>
 #include <cstdio>
-#include "../src/c-tightdb.h"
+#include <tightdb/c-tightdb.h>
 
 
 #define TEST_DATA_ROWS 256     // Rows of test data
