@@ -34,20 +34,23 @@ struct tightdb::SharedInfo {
     ReadCount readers[32]; // has to be power of two
 };
 
-SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_info(NULL), m_isValid(false), m_version(-1)
+SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_info(NULL), m_isValid(false), m_version(-1), m_lockfile_path(NULL)
 {
     if (!m_group.is_valid()) return;
     
     // Open shared coordination buffer
-    const char* const path = concat_strings(filename, ".lock");
-    const int fd = open(path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-    free((void*)path); 
-    if (fd < 0) return;
+    m_lockfile_path = concat_strings(filename, ".lock");
+    m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (m_fd < 0) return;
+
+    // Take shared lock so that the file does not get deleted
+    // by other processes
+    flock(m_fd, LOCK_SH);
     
     // Get size
     struct stat statbuf;
-    if (fstat(fd, &statbuf) < 0) {
-        close(fd);
+    if (fstat(m_fd, &statbuf) < 0) {
+        close(m_fd);
         return;
     }
     size_t len = statbuf.st_size;
@@ -55,27 +58,27 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
     // Handle empty files (first user)
     bool needInit = false;
     if (len == 0) {
-        // Lock file so we do not have anyone else reading
-        // it while it is uninitialized
-        if (flock(fd, LOCK_EX) != 0) {
-            close(fd);
+        // Upgrade file lock to exclusive, so we do not have
+        // anyone else reading it while it is uninitialized
+        if (flock(m_fd, LOCK_EX) != 0) {
+            close(m_fd);
             return;
         }
 
         // Create new file
         len = sizeof(SharedInfo);
-        const int r = ftruncate(fd, len);
+        const int r = ftruncate(m_fd, len);
         if (r != 0) {
-            close(fd);
+            close(m_fd);
             return;
         }
         needInit = true;
     }
     
     // Map to memory
-    void* const p = mmap(0, len, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    void* const p = mmap(0, len, PROT_READ|PROT_WRITE, MAP_SHARED, m_fd, 0);
     if (p == (void*)-1) {
-        close(fd);
+        close(m_fd);
         return;
     }
 
@@ -99,19 +102,34 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
         m_info->put_pos = 0;
         m_info->get_pos = 0;
 
-        // Release file lock
-        flock(fd, LOCK_UN);
+        // Downgrade lock to shared now that it is initialized,
+        // so that other processes can share it as well
+        flock(m_fd, LOCK_SH);
     }
     
-    close(fd); // no longer need file descriptor
     m_isValid = true;
 }
 
 SharedGroup::~SharedGroup()
 {
     if (m_info) {
-        munmap((void*)m_info, m_info->infosize); 
+        munmap((void*)m_info, m_info->infosize);
+
+        // If we can get an exclusive lock on the file
+        // we know that we are the only user (since all
+        // users take at least shared locks on the file.
+        // So that means that we have to delete it when done
+        // (to avoid someone later opening a stale file
+        // with uinitialized mutexes)
+        if (flock(m_fd, LOCK_EX|LOCK_NB) == 0) {
+            remove(m_lockfile_path);
+        }
+
+        close(m_fd); // also releases lock
     }
+
+    if (m_lockfile_path)
+        free((void*)m_lockfile_path);
 }
 
 const Group& SharedGroup::start_read()

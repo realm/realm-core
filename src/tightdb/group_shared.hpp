@@ -64,6 +64,8 @@ private:
     size_t      m_info_len;
     bool        m_isValid;
     uint32_t    m_version;
+    int         m_fd;
+    const char* m_lockfile_path;
 };
 
 } //namespace tightdb
