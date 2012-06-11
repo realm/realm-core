@@ -40,7 +40,8 @@ TEST(Group_Invalid1)
     remove("table_test.tbl");
 
     // Try to open non-existing file
-    Group fromDisk("table_test.tbl");
+    // (read-only files have to exists to before opening)
+    Group fromDisk("table_test.tbl", GROUP_READONLY);
     CHECK(!fromDisk.is_valid());
 }
 
@@ -59,7 +60,7 @@ TEST(Group_Serialize0)
     toDisk.write("table_test.tbl");
 
     // Load the group
-    Group fromDisk("table_test.tbl");
+    Group fromDisk("table_test.tbl", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
 
     // Create new table in group
@@ -81,7 +82,7 @@ TEST(Group_Read0)
 {
     // Load the group and let it clean up without loading
     // any tables
-    Group fromDisk("table_test.tbl");
+    Group fromDisk("table_test.tbl", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
 }
 
@@ -112,7 +113,7 @@ TEST(Group_Serialize1)
     toDisk.write("table_test.tbl");
 
     // Load the table
-    Group fromDisk("table_test.tbl");
+    Group fromDisk("table_test.tbl", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
 
@@ -144,7 +145,7 @@ TEST(Group_Read1)
 {
     // Load the group and let it clean up without loading
     // any tables
-    Group fromDisk("table_test.tbl");
+    Group fromDisk("table_test.tbl", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
 }
 
@@ -172,7 +173,7 @@ TEST(Group_Serialize2)
     toDisk.write("table_test.tbl");
 
     // Load the tables
-    Group fromDisk("table_test.tbl");
+    Group fromDisk("table_test.tbl", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
     TestTableGroup::Ref t1 = fromDisk.get_table<TestTableGroup>("test1");
     TestTableGroup::Ref t2 = fromDisk.get_table<TestTableGroup>("test2");
@@ -207,7 +208,7 @@ TEST(Group_Serialize3)
     toDisk.write("table_test.tbl");
 
     // Load the table
-    Group fromDisk("table_test.tbl");
+    Group fromDisk("table_test.tbl", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
     (void)t;
@@ -359,7 +360,7 @@ TEST(Group_Persist) {
     remove("testdb.tdb");
 
     // Create new database
-    Group db("testdb.tdb", false);
+    Group db("testdb.tdb");
 
     // Insert some data
     TableRef table = db.get_table("test");

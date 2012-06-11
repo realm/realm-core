@@ -107,6 +107,16 @@ void GroupWriter::WriteAt(size_t pos, const char* p, size_t n) {
 
 void GroupWriter::DoCommit(uint64_t topPos)
 {
+    // In swap-only mode, we just use the file as backing for the shared
+    // memory. So we never actually flush the data to disk (the OS may do
+    // so for swapping though). Note that this means that the file on disk
+    // may very likely be in an invalid state.
+    //
+    // In async mode, the file is persisted in regular intervals. This means
+    // that the file on disk will always be in a valid state, but it may be
+    // slightly out of sync with the latest changes.
+    //if (isSwapOnly || isAsync) return;
+
 #if !defined(_MSC_VER) // write persistence
     fsync(m_fd);
     lseek(m_fd, 0, SEEK_SET);

@@ -34,7 +34,7 @@ struct tightdb::SharedInfo {
     ReadCount readers[32]; // has to be power of two
 };
 
-SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_info(NULL), m_isValid(false), m_version(-1), m_lockfile_path(NULL)
+SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED), m_info(NULL), m_isValid(false), m_version(-1), m_lockfile_path(NULL)
 {
     if (!m_group.is_valid()) return;
     

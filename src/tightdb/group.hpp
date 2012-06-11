@@ -29,10 +29,19 @@ namespace tightdb {
 // Pre-declarations
 class SharedGroup;
 
+enum GroupMode {
+    GROUP_DEFAULT  =  0,
+    GROUP_READONLY =  1,
+    GROUP_SHARED   =  2,
+    GROUP_APPEND   =  4,
+    GROUP_ASYNC    =  8,
+    GROUP_SWAPONLY = 16
+};
+
 class Group: private Table::Parent {
 public:
     Group();
-    Group(const char* filename, bool readOnly=true);
+    Group(const char* filename, GroupMode mode=GROUP_DEFAULT);
     Group(const char* buffer, size_t len);
     ~Group();
 

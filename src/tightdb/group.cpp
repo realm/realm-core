@@ -83,12 +83,13 @@ Group::Group():
     create();
 }
 
-Group::Group(const char* filename, bool readOnly):
+Group::Group(const char* filename, GroupMode mode):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_isValid(false)
 {
     assert(filename);
 
     // Memory map file
+    const bool readOnly = mode & GROUP_READONLY;
     m_isValid = m_alloc.SetShared(filename, readOnly);
 
     if (m_isValid) create_from_ref();
