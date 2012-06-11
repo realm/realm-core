@@ -42,37 +42,47 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
     m_lockfile_path = concat_strings(filename, ".lock");
     m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return;
-
-    // Take shared lock so that the file does not get deleted
-    // by other processes
-    flock(m_fd, LOCK_SH);
     
-    // Get size
-    struct stat statbuf;
-    if (fstat(m_fd, &statbuf) < 0) {
-        close(m_fd);
-        return;
-    }
-    size_t len = statbuf.st_size;
-    
-    // Handle empty files (first user)
     bool needInit = false;
-    if (len == 0) {
-        // Upgrade file lock to exclusive, so we do not have
-        // anyone else reading it while it is uninitialized
-        if (flock(m_fd, LOCK_EX) != 0) {
+    size_t len    = 0;
+    struct stat statbuf;
+    
+    // If we can get an exclusive lock we know that the file is
+    // either new (empty) or a leftover from a previous
+    // crashed process (needing re-initialization)
+    if (flock(m_fd, LOCK_EX|LOCK_NB) == 0) {
+        // Get size
+        if (fstat(m_fd, &statbuf) < 0) {
             close(m_fd);
             return;
         }
+        len = statbuf.st_size;
 
-        // Create new file
-        len = sizeof(SharedInfo);
-        const int r = ftruncate(m_fd, len);
-        if (r != 0) {
-            close(m_fd);
-            return;
+        // Handle empty files (first user)
+        if (len == 0) {
+            // Create new file
+            len = sizeof(SharedInfo);
+            const int r = ftruncate(m_fd, len);
+            if (r != 0) {
+                close(m_fd);
+                return;
+            }
         }
         needInit = true;
+    }
+    else if (flock(m_fd, LOCK_SH) == 0) {
+        // Get size
+        if (fstat(m_fd, &statbuf) < 0) {
+            close(m_fd);
+            return;
+        }
+        len = statbuf.st_size;
+    }
+    else {
+        // We needed a shared lock so that the file would not
+        // get deleted by other processes
+        close(m_fd);
+        return;
     }
     
     // Map to memory
@@ -81,7 +91,6 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
         close(m_fd);
         return;
     }
-
     m_info = (SharedInfo*)p;
     
     if (needInit) {
@@ -91,19 +100,23 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
         pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
         pthread_mutex_init(&m_info->readmutex, &mattr);
         pthread_mutex_init(&m_info->writemutex, &mattr);
+        pthread_mutexattr_destroy(&mattr);
+
+        const SlabAlloc& alloc = m_group.get_allocator();
 
         // Set initial values
-        const SlabAlloc& alloc = m_group.get_allocator();
         m_info->filesize = alloc.GetFileLen();
         m_info->infosize = (uint32_t)len;
-        m_info->current_top = alloc.GetTopRef();;
+        m_info->current_top = alloc.GetTopRef();
         m_info->current_version = 0;
         m_info->capacity = 32-1; 
         m_info->put_pos = 0;
         m_info->get_pos = 0;
 
+        //TODO: Reset version tracking in group
+
         // Downgrade lock to shared now that it is initialized,
-        // so that other processes can share it as well
+        // so other processes can share it as well
         flock(m_fd, LOCK_SH);
     }
     
@@ -113,8 +126,6 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
 SharedGroup::~SharedGroup()
 {
     if (m_info) {
-        munmap((void*)m_info, m_info->infosize);
-
         // If we can get an exclusive lock on the file
         // we know that we are the only user (since all
         // users take at least shared locks on the file.
@@ -122,7 +133,15 @@ SharedGroup::~SharedGroup()
         // (to avoid someone later opening a stale file
         // with uinitialized mutexes)
         if (flock(m_fd, LOCK_EX|LOCK_NB) == 0) {
+            pthread_mutex_destroy(&m_info->readmutex);
+            pthread_mutex_destroy(&m_info->writemutex);
+
+            munmap((void*)m_info, m_info->infosize);
+
             remove(m_lockfile_path);
+        }
+        else {
+            munmap((void*)m_info, m_info->infosize);
         }
 
         close(m_fd); // also releases lock
