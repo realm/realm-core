@@ -51,11 +51,13 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
     // either new (empty) or a leftover from a previous
     // crashed process (needing re-initialization)
     if (flock(m_fd, LOCK_EX|LOCK_NB) == 0) {
-        // Get size
-        if (fstat(m_fd, &statbuf) < 0) {
+        // There is a slight window between opening the file and getting the
+        // lock where another process could have deleted the file
+        if (fstat(m_fd, &statbuf) < 0 || statbuf.st_nlink == 0) {
             close(m_fd);
             return;
         }
+        // Get size
         len = statbuf.st_size;
 
         // Handle empty files (first user)
