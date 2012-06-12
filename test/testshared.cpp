@@ -53,7 +53,7 @@ TEST(Shared1)
             t1->add(2, 3, true, "more test");
             shared.end_write();
         }
-    
+
         // Verify that that the read transaction does not see
         // the change yet (is isolated)
         CHECK(t2->size() == 1);
@@ -62,6 +62,23 @@ TEST(Shared1)
         CHECK_EQUAL(false, t2[0].third);
         CHECK_EQUAL("test", (const char*)t2[0].fourth);
         
+        // Do one more new change while stil having current read transaction open
+        // so we know that it does not overwrite data held by
+        {
+            Group& g1 = shared.start_write();
+            TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            t1->add(0, 1, false, "even more test");
+            shared.end_write();
+        }
+
+        // Verify that that the read transaction does still not see
+        // the change yet (is isolated)
+        CHECK(t2->size() == 1);
+        CHECK_EQUAL(1, t2[0].first);
+        CHECK_EQUAL(2, t2[0].second);
+        CHECK_EQUAL(false, t2[0].third);
+        CHECK_EQUAL("test", (const char*)t2[0].fourth);
+
         // Close read transaction
         shared2.end_read();
     }
@@ -71,7 +88,7 @@ TEST(Shared1)
         const Group& g3 = shared2.start_read();
         TestTableShared::ConstRef t3 = g3.get_table<TestTableShared>("test");
         
-        CHECK(t3->size() == 2);
+        CHECK(t3->size() == 3);
         CHECK_EQUAL(1, t3[0].first);
         CHECK_EQUAL(2, t3[0].second);
         CHECK_EQUAL(false, t3[0].third);
@@ -80,6 +97,10 @@ TEST(Shared1)
         CHECK_EQUAL(3, t3[1].second);
         CHECK_EQUAL(true, t3[1].third);
         CHECK_EQUAL("more test", (const char*)t3[1].fourth);
+        CHECK_EQUAL(0, t3[2].first);
+        CHECK_EQUAL(1, t3[2].second);
+        CHECK_EQUAL(false, t3[2].third);
+        CHECK_EQUAL("even more test", (const char*)t3[2].fourth);
         
         shared2.end_read();
     }

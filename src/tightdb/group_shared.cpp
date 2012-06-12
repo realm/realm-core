@@ -11,8 +11,22 @@
 
 using namespace tightdb;
 
+namespace {
+
 // Pre-declare local functions
 char* concat_strings(const char* str1, const char* str2);
+
+// Support methods
+char* concat_strings(const char* str1, const char* str2) {
+    const size_t len1 = strlen(str1);
+    const size_t len2 = strlen(str2) + 1; // includes terminating null
+
+    char* const s = (char*)malloc(len1 + len2);
+    memcpy(s, str1, len1);
+    memcpy(s + len1, str2, len2);
+
+    return s;
+}
 
 struct tightdb::ReadCount {
     uint32_t version;
@@ -33,6 +47,8 @@ struct tightdb::SharedInfo {
     uint32_t get_pos;
     ReadCount readers[32]; // has to be power of two
 };
+
+} //namespace
 
 SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED), m_info(NULL), m_isValid(false), m_version(-1), m_lockfile_path(NULL)
 {
@@ -114,8 +130,6 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED)
         m_info->capacity = 32-1; 
         m_info->put_pos = 0;
         m_info->get_pos = 0;
-
-        //TODO: Reset version tracking in group
 
         // Downgrade lock to shared now that it is initialized,
         // so other processes can share it as well
@@ -238,9 +252,32 @@ Group& SharedGroup::start_write()
 
 void SharedGroup::end_write()
 {
-    m_group.commit();
+    // Get version info
+    size_t current_version;
+    size_t readlock_version;
+    pthread_mutex_lock(&m_info->readmutex);
+    {
+        current_version = m_info->current_version + 1;
+
+        if (ringbuf_is_empty())
+            readlock_version = current_version;
+        else {
+            const ReadCount& r = ringbuf_get_first();
+            readlock_version = r.version;
+        }
+    }
+    pthread_mutex_unlock(&m_info->readmutex);
     
-    // Get the current top ref
+    // Reset version tracking in group if we are
+    // starting from a new lock file
+    if (current_version == 1) {
+        m_group.init_shared();
+    }
+
+    // Do the actual commit
+    m_group.commit(current_version, readlock_version);
+
+    // Get the new top ref
     const SlabAlloc& alloc = m_group.get_allocator();
     const size_t new_topref   = alloc.GetTopRef();
     const size_t new_filesize = alloc.GetFileLen();
@@ -357,15 +394,3 @@ void SharedGroup::test_ringbuf()
 #endif //_DEBUG
 
 #endif //_MSV_VER
-
-// Support methods
-char* concat_strings(const char* str1, const char* str2) {
-    const size_t len1 = strlen(str1);
-    const size_t len2 = strlen(str2) + 1; // includes terminating null
-    
-    char* const s = (char*)malloc(len1 + len2);
-    memcpy(s, str1, len1);
-    memcpy(s + len1, str2, len2); 
-    
-    return s;
-}
