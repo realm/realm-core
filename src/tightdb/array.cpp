@@ -524,6 +524,17 @@ void Array::Resize(size_t count)
     set_header_len(m_len);
 }
 
+void Array::SetAllToZero()
+{
+    CopyOnWrite();
+
+    m_capacity = CalcItemCount(get_header_capacity(), 0);
+    SetWidth(0);
+
+    // Update header
+    set_header_width(0);
+}
+
 bool Array::Increment(int64_t value, size_t start, size_t end)
 {
     if (end == (size_t)-1) end = m_len;
@@ -1295,6 +1306,15 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
         ++p;
     }
     */
+}
+
+size_t Array::GetByteSize(bool align) const {
+    size_t len = CalcByteLen(m_len, m_width);
+    if (align) {
+        const size_t rest = (~len & 0x7)+1;
+        if (rest < 8) len += rest; // 64bit blocks
+    }
+    return len;
 }
 
 size_t Array::CalcByteLen(size_t count, size_t width) const

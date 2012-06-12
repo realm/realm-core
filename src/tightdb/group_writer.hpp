@@ -38,6 +38,7 @@ public:
     GroupWriter(Group& group);
 
     bool IsValid() const;
+    void SetVersions(size_t current, size_t readlock);
 
     void Commit();
 
@@ -50,6 +51,8 @@ private:
     // Member variables
     Group&     m_group;
     SlabAlloc& m_alloc;
+    size_t     m_current_version;
+    size_t     m_readlock_version;
     size_t     m_len;
     int        m_fd;
 };

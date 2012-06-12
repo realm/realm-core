@@ -78,13 +78,13 @@ namespace tightdb {
 
 Group::Group():
     m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
-    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc), m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc), m_isValid(true)
+    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc), m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc), m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_persistMode(0), m_isValid(true)
 {
     create();
 }
 
-Group::Group(const char* filename, GroupMode mode):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_isValid(false)
+Group::Group(const char* filename, int mode):
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(mode), m_isValid(false)
 {
     assert(filename);
 
@@ -96,7 +96,7 @@ Group::Group(const char* filename, GroupMode mode):
 }
 
 Group::Group(const char* buffer, size_t len):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_isValid(false)
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
 {
     assert(buffer);
 
@@ -120,6 +120,11 @@ void Group::create()
     m_tables.SetParent(&m_top, 1);
     m_freePositions.SetParent(&m_top, 2);
     m_freeLengths.SetParent(&m_top, 3);
+
+    if (m_freeVersions.IsValid()) {
+        m_top.add(m_freeVersions.GetRef());
+        m_freeVersions.SetParent(&m_top, 4);
+    }
 }
 
 void Group::create_from_ref()
@@ -134,16 +139,22 @@ void Group::create_from_ref()
         m_tableNames.SetType(COLUMN_NORMAL);
         m_freePositions.SetType(COLUMN_NORMAL);
         m_freeLengths.SetType(COLUMN_NORMAL);
+        if (is_shared()) {
+            m_freeVersions.SetType(COLUMN_NORMAL);
+        }
 
         create();
 
         // Everything but header is free space
         m_freePositions.add(8);
         m_freeLengths.add(m_alloc.GetFileLen()-8);
+        if (is_shared())
+            m_freeVersions.add(0);
     }
     else {
         m_top.UpdateRef(top_ref);
-        assert(m_top.Size() >= 2);
+        const size_t top_size = m_top.Size();
+        assert(top_size >= 2);
 
         m_tableNames.UpdateRef(m_top.Get(0));
         m_tables.UpdateRef(m_top.Get(1));
@@ -151,17 +162,55 @@ void Group::create_from_ref()
         m_tables.SetParent(&m_top, 1);
 
         // Serialized files do not have free space markers
-        if (m_top.Size() > 2) {
+        // at all, and files that are not shared does not
+        // need version info for free space.
+        if (top_size == 4) {
             m_freePositions.UpdateRef(m_top.Get(2));
             m_freeLengths.UpdateRef(m_top.Get(3));
             m_freePositions.SetParent(&m_top, 2);
             m_freeLengths.SetParent(&m_top, 3);
+        }
+        if (top_size == 5) {
+            m_freeVersions.UpdateRef(m_top.Get(4));
+            m_freeVersions.SetParent(&m_top, 4);
         }
 
         // Make room for pointers to cached tables
         const size_t count = m_tables.Size();
         for (size_t i = 0; i < count; ++i) {
             m_cachedtables.add(0);
+        }
+    }
+}
+
+void Group::init_shared() {
+    if (m_freeVersions.IsValid()) {
+        // If free space tracking is enabled
+        // we just have to reset it
+        m_freeVersions.SetAllToZero();
+    }
+    else {
+        // Serialized files have no free space tracking
+        // at all so we have to add the basic free lists
+        if (m_top.Size() == 2) {
+            m_freePositions.SetType(COLUMN_NORMAL);
+            m_freeLengths.SetType(COLUMN_NORMAL);
+            m_top.add(m_freePositions.GetRef());
+            m_top.add(m_freeLengths.GetRef());
+            m_freePositions.SetParent(&m_top, 2);
+            m_freeLengths.SetParent(&m_top, 3);
+        }
+
+        // Files that have only been used in single thread
+        // mode do not have version tracking for the free lists
+        if (m_top.Size() == 4) {
+            const size_t count = m_freePositions.Size();
+            m_freeVersions.SetType(COLUMN_NORMAL);
+            for (size_t i = 0; i < count; ++i) {
+                m_freeVersions.add(0);
+            }
+            m_top.add(m_freeVersions.GetRef());
+            m_freeVersions.SetParent(&m_top, 4);
         }
     }
 }
@@ -257,6 +306,13 @@ char* Group::write_to_mem(size_t& len)
 
 bool Group::commit()
 {
+    return commit(-1, -1);
+}
+
+bool Group::commit(size_t current_version, size_t readlock_version)
+{
+    assert(readlock_version <= current_version);
+
     if (!m_alloc.CanPersist()) return false;
 
     // If we have an empty db file, we can just serialize directly
@@ -265,29 +321,41 @@ bool Group::commit()
     GroupWriter out(*this);
     if (!out.IsValid()) return false;
 
+    if (is_shared()) {
+        m_readlock_version = readlock_version;
+        out.SetVersions(current_version, readlock_version);
+    }
+
     // Recursively write all changed arrays to end of file
     out.Commit();
 
     return true;
 }
 
-size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool ensureRest)
+size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly)
 {
-    if (ensureRest) ++len;
-
     // Do we have a free space we can reuse?
-    for (size_t i = 0; i < m_freeLengths.Size(); ++i) {
+    const size_t count = m_freeLengths.Size();
+    for (size_t i = 0; i < count; ++i) {
         const size_t free_len = m_freeLengths.Get(i);
         if (len <= free_len) {
+            // Only blocks that are not occupied by current
+            // readers are allowed to be used.
+            if (is_shared()) {
+                const size_t v = m_freeVersions.Get(i);
+                if (v >= m_readlock_version) continue;
+            }
+
             const size_t location = m_freePositions.Get(i);
             if (testOnly) return location;
-            if (ensureRest) --len;
 
             // Update free list
             const size_t rest = free_len - len;
             if (rest == 0) {
                 m_freePositions.Delete(i);
                 m_freeLengths.Delete(i);
+                if (is_shared())
+                    m_freeVersions.Delete(i);
             }
             else {
                 m_freeLengths.Set(i, rest);
@@ -304,7 +372,12 @@ size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool e
     const size_t old_filesize = filesize;
     const size_t needed_size = old_filesize + len;
     while (filesize < needed_size) {
+#ifdef _DEBUG
+        // in debug, increase in small intervals to force overwriting
+        filesize += 10;
+#else
         filesize += 1024*1024;
+#endif
     }
 
 #if !defined(_MSC_VER) // write persistence
@@ -320,39 +393,36 @@ size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly, bool e
     const size_t rest = filesize - end;
     m_freePositions.add(end);
     m_freeLengths.add(rest);
+    if (is_shared())
+        m_freeVersions.add(0); // new space is always free for writing
 
     return old_filesize;
-}
-
-void Group::connect_free_space(bool doConnect)
-{
-    assert(m_top.Size() == 4);
-
-    if (doConnect) {
-        m_top.Set(2, m_freePositions.GetRef());
-        m_top.Set(3, m_freeLengths.GetRef());
-        m_freePositions.SetParent(&m_top, 2);
-        m_freeLengths.SetParent(&m_top, 3);
-    }
-    else {
-        m_top.Set(2, 0);
-        m_top.Set(3, 0);
-        m_freePositions.SetParent(NULL, 0);
-        m_freeLengths.SetParent(NULL, 0);
-
-    }
 }
 
 void Group::update_refs(size_t topRef)
 {
     // Update top with the new (persistent) ref
     m_top.UpdateRef(topRef);
+    assert(m_top.Size() >= 2);
 
     // Now we can update it's child arrays
     m_tableNames.UpdateFromParent();
-    if (m_top.Size() > 2) {
+
+    // No free-info in serialized databases
+    // and version info is only in shared,
+    if (m_top.Size() >= 4) {
         m_freePositions.UpdateFromParent();
         m_freeLengths.UpdateFromParent();
+    }
+    else {
+        m_freePositions.Invalidate();
+        m_freeLengths.Invalidate();
+    }
+    if (m_top.Size() == 5) {
+        m_freeVersions.UpdateFromParent();
+    }
+    else {
+        m_freeVersions.Invalidate();
     }
 
     // if the tables have not been modfied we don't
