@@ -28,6 +28,9 @@ char* concat_strings(const char* str1, const char* str2) {
     return s;
 }
 
+} // anonymous namespace
+
+
 struct tightdb::ReadCount {
     uint32_t version;
     uint32_t count;
@@ -48,7 +51,6 @@ struct tightdb::SharedInfo {
     ReadCount readers[32]; // has to be power of two
 };
 
-} //namespace
 
 SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED), m_info(NULL), m_isValid(false), m_version(-1), m_lockfile_path(NULL)
 {
