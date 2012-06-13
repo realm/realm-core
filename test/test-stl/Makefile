@@ -8,8 +8,8 @@
 
 ROOT = ../..
 
-INC_FLAGS     = -I$(ROOT)/src -I$(ROOT)/include -I../UnitTest++/src
-INC_FLAGS_ABS = -I$(abspath $(ROOT)/src) -I$(abspath $(ROOT)/include) -I../UnitTest++/src
+INC_FLAGS     = -I$(ROOT)/src -I../UnitTest++/src
+INC_FLAGS_ABS = -I$(abspath $(ROOT)/src) -I../UnitTest++/src
 LIB_FLAGS     = -lproc -L../UnitTest++ -lUnitTest++
 
 SOURCES       = $(wildcard *.c *.cpp)

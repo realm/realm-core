@@ -5,10 +5,10 @@
 #include <string>
 #include <algorithm>
 #ifdef _MSC_VER
-    #include "win32\stdint.h"
+    #include <win32\stdint.h>
 #endif
 #include <stdio.h>
-#include "column_string.hpp"
+#include <tightdb/column_string.hpp>
 
 class VerifiedString {
     std::vector<std::string> v;

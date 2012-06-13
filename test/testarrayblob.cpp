@@ -1,5 +1,5 @@
-#include "array_blob.hpp"
 #include <UnitTest++.h>
+#include <tightdb/array_blob.hpp>
 
 using namespace tightdb;
 

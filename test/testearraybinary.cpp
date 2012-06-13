@@ -1,5 +1,5 @@
-#include "array_binary.hpp"
 #include <UnitTest++.h>
+#include <tightdb/array_binary.hpp>
 
 using namespace tightdb;
 

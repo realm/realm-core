@@ -1,5 +1,5 @@
-#include "column_binary.hpp"
 #include <UnitTest++.h>
+#include <tightdb/column_binary.hpp>
 
 using namespace tightdb;
 

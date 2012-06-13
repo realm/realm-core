@@ -9,13 +9,21 @@
 SUBDIRS = src
 
 
-# Build optimized shared library
 all: $(SUBDIRS)
 .PHONY: all
 
 install: SUBDIRS_MODE = install
 install: all
 .PHONY: install
+
+uninstall: SUBDIRS_MODE = uninstall
+uninstall: all
+.PHONY: uninstall
+
+# Build optimized shared library
+shared: SUBDIRS_MODE = shared
+shared: all
+.PHONY: shared
 
 # Build optimized static library
 static: SUBDIRS_MODE = static

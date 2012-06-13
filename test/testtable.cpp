@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <sstream>
-#include "tightdb.hpp"
 #include <UnitTest++.h>
+#include <tightdb/table_macros.hpp>
 
 using namespace tightdb;
 
@@ -551,7 +551,7 @@ TEST(TableAutoEnumerationFindFindAll)
     CHECK_EQUAL("eftg", static_cast<const char*>(tv[4].second));
 }
 
-#include "alloc_slab.hpp"
+#include <tightdb/alloc_slab.hpp>
 TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;
@@ -581,7 +581,7 @@ TEST(Table_SlabAlloc)
 #endif //_DEBUG
 }
 
-#include "group.hpp"
+#include <tightdb/group.hpp>
 TEST(Table_Spec)
 {
     Group group;
@@ -994,8 +994,6 @@ TEST(Table_HighLevelSubtables)
     CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                        6);
     CHECK_EQUAL(ct.cols().subtab[0]->cols().subtab[0]->cols().val[0], 6);
 
-    // FIXME: Same thing for BasicTable::View
-
 /*
   Idea for compile time failure tests:
 
@@ -1070,3 +1068,55 @@ TEST(Table_Test_Clear_With_Subtable_AND_Group)
 
     table->clear();
 }
+
+
+/*
+TEST(Table_SubtableWithParentChange)
+{
+FIXME: Two problems:
+- When new rows are inserted in parent table before a subtable, then the 'index in parent' property of the top level array of the subtable is not adjusted as it should be. Also, the indices, that are used as keys in the subtable instance cache of a subtable column, are not updated as they should be.
+- When a subtable ref exists and the row that contains the subtable is removed - ouch!
+
+    MyTable3 table;
+    table.add();
+    table.add();
+    MyTable2::Ref subtab = table[1].subtab;
+    subtab->add(7, 0);
+    cout << "N:1:" << subtab->size() << endl;
+    cout << "IIP:1:" << subtab->_get_index_in_parent() << endl;
+//    CHECK_EQUAL(subtab, MyTable2::Ref(table[1].subtab));
+//    CHECK_EQUAL(table[1].subtab[0].val, 7);
+//    CHECK_EQUAL(subtab[0].val, 7);
+#ifdef _DEBUG
+    table.Verify();
+    subtab->Verify();
+#endif // _DEBUG
+    table.insert(0, 0);
+    cout << "N:2:" << subtab->size() << endl;
+    cout << "IIP:2:" << subtab->_get_index_in_parent() << endl;
+//    CHECK_EQUAL(subtab, MyTable2::Ref(table[2].subtab));
+//    CHECK_EQUAL(table[2].subtab[0].val, 7);
+//    CHECK_EQUAL(subtab[0].val, 7);
+#ifdef _DEBUG
+    table.Verify();
+    subtab->Verify();
+#endif // _DEBUG
+    table.remove(1);
+    cout << "N:3:" << subtab->size() << endl;
+    cout << "IIP:3:" << subtab->_get_index_in_parent() << endl;
+//    CHECK_EQUAL(table[1].subtab[0].val, 7);
+//    CHECK_EQUAL(subtab[0].val, 7);
+#ifdef _DEBUG
+//    table.Verify();
+//    subtab->Verify();
+#endif // _DEBUG
+    table.remove(1);
+    cout << "N:4:" << subtab->size() << endl;
+    cout << "IIP:4:" << subtab->_get_index_in_parent() << endl;
+//    CHECK_EQUAL(subtab[0].val, 7);
+#ifdef _DEBUG
+//    table.Verify();
+//    subtab->Verify();
+#endif // _DEBUG
+}
+*/

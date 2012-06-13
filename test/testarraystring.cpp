@@ -1,6 +1,6 @@
-#include "array_string.hpp"
-#include "column.hpp"
 #include <UnitTest++.h>
+#include <tightdb/array_string.hpp>
+#include <tightdb/column.hpp>
 
 using namespace tightdb;
 
