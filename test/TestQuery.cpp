@@ -337,7 +337,7 @@ TEST(TestQuerySort_QuickSort)
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t-1].first <= tv[t-1].first); // FIXME: Something is wrong here - not testing anything!
+        CHECK(tv[t].first >= tv[t-1].first);
     }
 }
 
@@ -355,7 +355,7 @@ TEST(TestQuerySort_CountSort)
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t-1].first <= tv[t-1].first); // FIXME: Something is wrong here - not testing anything!
+        CHECK(tv[t].first >= tv[t-1].first);
     }
 }
 
@@ -373,7 +373,7 @@ TEST(TestQuerySort_Descending)
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t-1].first >= tv[t-1].first); // FIXME: Something is wrong here - not testing anything!
+        CHECK(tv[t].first <= tv[t-1].first);
     }
 }
 
