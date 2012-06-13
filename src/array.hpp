@@ -33,17 +33,6 @@
 #include <vector>
 #include <assert.h>
 
-#define TEMPEX(fun, arg) \
-    if(m_width == 0) {fun<0> arg;} \
-    else if (m_width == 1) {fun<1> arg;} \
-    else if (m_width == 2) {fun<2> arg;} \
-    else if (m_width == 4) {fun<4> arg;} \
-    else if (m_width == 8) {fun<8> arg;} \
-    else if (m_width == 16) {fun<16> arg;} \
-    else if (m_width == 32) {fun<32> arg;} \
-    else if (m_width == 64) {fun<64> arg;}
-
-#ifdef USE_SSE42
 /*
     MMX: mmintrin.h
     SSE: xmmintrin.h
@@ -54,7 +43,8 @@
     SSE4.1: smmintrin.h
     SSE4.2: nmmintrin.h
 */
-    #include <nmmintrin.h> // __SSE42__
+#ifdef USE_SSE42
+    #include <pmmintrin.h> // __SSE42__
 #elif defined (USE_SSE3)
     #include <pmmintrin.h> // __SSE3__
 #endif
@@ -63,9 +53,8 @@
 #include <stdio.h>
 #endif
 
-namespace tightdb {
-
-static const size_t not_found = (size_t)-1;
+namespace tightdb {    
+    static const size_t not_found = (size_t)-1;
 
 // Pre-definitions
 class Array;
@@ -155,9 +144,12 @@ public:
     bool add(int64_t value);
     bool Set(size_t ndx, int64_t value);
     template<size_t w> void Set(size_t ndx, int64_t value);
+
     int64_t Get(size_t ndx) const;
-    size_t GetAsRef(size_t ndx) const;
     template<size_t w> int64_t Get(size_t ndx) const;
+
+    size_t GetAsRef(size_t ndx) const;
+
     int64_t operator[](size_t ndx) const {return Get(ndx);}
     int64_t back() const;
     void Delete(size_t ndx);
@@ -171,24 +163,12 @@ public:
 
     bool Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
     bool IncrementIf(int64_t limit, int64_t value);
+    template <size_t w> void Adjust(size_t start, int64_t diff);
     void Adjust(size_t start, int64_t diff);
-
+    template <size_t w> bool Increment(int64_t value, size_t start, size_t end);
     size_t FindPos(int64_t value) const;
     size_t FindPos2(int64_t value) const;
     size_t find_first(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
-
-    template <class F> size_t find_first(F function_, int64_t value, size_t start, size_t end) const
-    {
-        static_cast<void>(function_); // FIXME: Why is this parameter never used?
-        const F function = {};
-        if(end == (size_t)-1)
-            end = m_len;
-        for(size_t s = start; s < end; s++) {
-            if(function(value, Get(s)))
-                return s;
-        }
-        return (size_t)-1;
-    }
     void Preset(int64_t min, int64_t max, size_t count);
     void Preset(size_t bitwidth, size_t count);
     void find_all(Array& result, int64_t value, size_t offset=0, size_t start=0, size_t end=(size_t)-1) const;
@@ -236,13 +216,15 @@ private:
     void ReferenceQuickSort(Array &ref);
     template<size_t w> void ReferenceQuickSort(size_t lo, size_t hi, Array &ref);
 #if defined(USE_SSE42) || defined(USE_SSE3)
-    size_t FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t items) const;
+    template <int C, size_t width>  size_t FindSSE(int64_t value, __m128i *data, size_t items) const;
 #endif //USE_SSE
-    template <bool eq>size_t CompareEquality(int64_t value, size_t start, size_t end) const;
-    template <bool gt>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
     template <size_t w> void sort();
     template <size_t w>void ReferenceSort(Array &ref);
     void update_ref_in_parent(size_t ref);
+
+    template <size_t width> void find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const;
+    template <size_t w> size_t sum(size_t start, size_t end) const;
+    template <size_t w> size_t FindPos(int64_t target) const;
 
 protected:
     bool AddPositiveLocal(int64_t value);
@@ -254,22 +236,7 @@ protected:
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t(Array::*Getter)(size_t) const;
     typedef void(Array::*Setter)(size_t, int64_t);
-    int64_t Get_0b(size_t ndx) const;
-    int64_t Get_1b(size_t ndx) const;
-    int64_t Get_2b(size_t ndx) const;
-    int64_t Get_4b(size_t ndx) const;
-    int64_t Get_8b(size_t ndx) const;
-    int64_t Get_16b(size_t ndx) const;
-    int64_t Get_32b(size_t ndx) const;
-    int64_t Get_64b(size_t ndx) const;
-    void Set_0b(size_t ndx, int64_t value);
-    void Set_1b(size_t ndx, int64_t value);
-    void Set_2b(size_t ndx, int64_t value);
-    void Set_4b(size_t ndx, int64_t value);
-    void Set_8b(size_t ndx, int64_t value);
-    void Set_16b(size_t ndx, int64_t value);
-    void Set_32b(size_t ndx, int64_t value);
-    void Set_64b(size_t ndx, int64_t value);
+    typedef size_t (Array::*Finder)(int64_t, size_t, size_t) const;
 
     enum WidthType {
         TDB_BITS     = 0,
@@ -294,6 +261,7 @@ protected:
     size_t get_header_len(const void* header=NULL) const;
     size_t get_header_capacity(const void* header=NULL) const;
 
+    template <size_t width> void SetWidth(void);
     void SetWidth(size_t width);
     bool Alloc(size_t count, size_t width);
     bool CopyOnWrite();
@@ -301,9 +269,16 @@ protected:
     // Member variables
     Getter m_getter;
     Setter m_setter;
+    Finder m_finder[4]; // one for each COND_XXX enum
 
 private:
     size_t m_ref;
+    template <int cond, size_t bitwidth>size_t Compare(int64_t value, size_t start, size_t end) const;
+    template <bool eq, size_t width> inline size_t CompareEquality(int64_t value, size_t start, size_t end) const;
+    template <bool gt, size_t width>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
+    template <bool max, size_t w> bool minmax(int64_t& result, size_t start, size_t end) const;
+    template <int C, size_t bitwidth>size_t find_first(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
+    template <int C>size_t find_first(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
 
 protected:
     size_t m_len;

@@ -85,6 +85,33 @@ TEST(Find1)
     }
 }
 
+
+TEST(MinMax)
+{
+    const size_t LEN = 300;
+    Array a;
+    for(size_t t = 0; t < LEN; t++)
+        a.add(100);
+    
+    for(size_t from = 0; from < LEN; from++) {
+        for(size_t to = from + 1; to <= LEN; to++) {
+            for(size_t match = 0; match < LEN; match++) {
+                int64_t val = 0;
+                a.Set(match, 200);
+                bool b = a.maximum(val, from, to);
+                a.Set(match, 100);
+                CHECK_EQUAL(true, b);
+                if(match >= from && match < to)
+                    assert(val == 200);
+                else
+                    assert(val == 100);
+            }
+        }    
+
+    }
+}
+
+
 TEST(Column_monkeytest2)
 {
     const uint64_t ITER_PER_BITWIDTH = 16 * 1000 * TEST_DURATION * TEST_DURATION * TEST_DURATION;

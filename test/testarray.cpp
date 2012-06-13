@@ -570,7 +570,7 @@ TEST(findallint3)
 
     const int value = 10;
     const int vReps = 5;
-
+    // 0, 4, 8
     for(int i = 0; i < vReps; i++){
         a.add(10);
         a.add(11);
@@ -1110,6 +1110,142 @@ TEST(Less)
     a.Destroy();
 }
 
+
+TEST(NotEqual1)
+{
+    Array a;
+    
+    a.Clear();
+    for(size_t i = 0; i < 100; i++) {
+        a.add(0x33);
+    }
+    a.Set(50, 0x44);
+    size_t t = a.Query<NOTEQUAL>(0x33, 0, (size_t)-1);
+    CHECK_EQUAL(50, t);
+
+}
+
+TEST(NotEqual)
+{
+    Array a;
+
+    size_t items = 400;
+
+    for(items = 2; items < 200; items += 7)
+    {
+        a.Clear();
+        for(size_t i = 0; i < items; i++) {
+            a.add(0);
+        }
+        size_t t = a.Query<NOTEQUAL>(0, 0, (size_t)-1);
+        CHECK_EQUAL(-1, t);
+
+
+        a.Clear();
+        for(size_t i = 0; i < items; i++) {
+            a.add(0);
+        }
+        for(size_t i = 0; i < items; i++) {
+            a.Set(i, 1);
+            size_t t = a.Query<NOTEQUAL>(0, 0, (size_t)-1);
+            CHECK_EQUAL(i, t);
+            a.Set(i, 0);
+        }
+
+        a.Clear();
+        for(size_t i = 0; i < items; i++) {
+            a.add(2);
+        }
+        for(size_t i = 0; i < items; i++) {
+            a.Set(i, 3);
+            size_t t = a.Query<NOTEQUAL>(2, 0, (size_t)-1);
+            CHECK_EQUAL(i, t);
+            a.Set(i, 2);
+        }
+
+        a.Clear();
+        for(size_t i = 0; i < items; i++) {
+            a.add(10);
+        }
+        for(size_t i = 0; i < items; i++) {
+            a.Set(i, 11);
+            size_t t = a.Query<NOTEQUAL>(10, 0, (size_t)-1);
+            CHECK_EQUAL(i, t);
+            a.Set(i, 10);
+        }
+
+        a.Clear();
+        for(size_t i = 0; i < items; i++) {
+            a.add(100);
+        }
+        for(size_t i = 0; i < items; i++) {
+            a.Set(i, 110);
+            size_t t = a.Query<NOTEQUAL>(100, 0, (size_t)-1);
+            CHECK_EQUAL(i, t);
+            a.Set(i, 100);
+        }
+        a.Clear();
+        for(size_t i = 0; i < items; i++) {
+            a.add(200);
+        }
+        for(size_t i = 0; i < items; i++) {
+            a.Set(i, 210);
+            size_t t = a.Query<NOTEQUAL>(200, 0, (size_t)-1);
+            CHECK_EQUAL(i, t);
+            a.Set(i, 200);
+        }
+
+        a.Clear();
+        for(size_t i = 0; i < items; i++) {
+            a.add(10000);
+        }
+        for(size_t i = 0; i < items; i++) {
+            a.Set(i, 11000);
+            size_t t = a.Query<NOTEQUAL>(10000, 0, (size_t)-1);
+            CHECK_EQUAL(i, t);
+            a.Set(i, 10000);
+        }
+        a.Clear();
+        for(size_t i = 0; i < items; i++) {
+            a.add(40000);
+        }
+
+        for(size_t i = 0; i < items; i++) {
+            a.Set(i, 41000);
+            size_t t = a.Query<NOTEQUAL>(40000, 0, (size_t)-1);
+            CHECK_EQUAL(i, t);
+            a.Set(i, 40000);
+        }
+
+        a.Clear();
+        for(size_t i = 0; i < items; i++) {
+            a.add(1000000);
+        }
+        for(size_t i = 0; i < items; i++) {
+            a.Set(i, 1100000);
+            size_t t = a.Query<NOTEQUAL>(1000000, 0, (size_t)-1);
+            CHECK_EQUAL(i, t);
+            a.Set(i, 1000000);
+        }
+
+        a.Clear();
+        for(size_t i = 0; i < items; i++) {
+            a.add(1000ULL*1000ULL*1000ULL*1000ULL);
+        }
+        for(size_t i = 0; i < items; i++) {
+            a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
+            size_t t = a.Query<NOTEQUAL>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
+            CHECK_EQUAL(i, t);
+            a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+        }
+
+    }
+    a.Destroy();
+}
+
+
+
+
 TEST(ArraySort)
 {
     // negative values
@@ -1235,3 +1371,4 @@ TEST(ArrayCopy)
     d.Destroy();
     //e.Destroy() // will be destroyed as sub-array by d
 }
+
