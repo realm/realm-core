@@ -188,6 +188,15 @@ void Array::CreateFromHeader(uint8_t* header, size_t ref) {
 
 void Array::SetType(ColumnDef type)
 {
+    // If we are reviving an invalidated array
+    // we need to reset state first
+    if (!m_data) {
+        m_ref = 0;
+        m_capacity = 0;
+        m_len = 0;
+        m_width = (size_t)-1;
+    }
+
     if (m_ref) CopyOnWrite();
 
     if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;

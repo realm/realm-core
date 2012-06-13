@@ -13,6 +13,25 @@ TIGHTDB_TABLE_4(TestTableShared,
                 third,  Bool,
                 fourth, String)
 
+TEST(Shared_Initial)
+{
+    // Delete old files if there
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock"); // also the info file
+
+    // Create a new shared db
+    SharedGroup shared("test_shared.tdb");
+    CHECK(shared.is_valid());
+
+    // Verify that new group is empty
+    {
+        const Group& g1 = shared.begin_read();
+        CHECK(g1.is_valid());
+        CHECK(g1.is_empty());
+        shared.end_read();
+    }
+}
+
 TEST(Shared1)
 {
     // Delete old files if there
@@ -108,6 +127,72 @@ TEST(Shared1)
 #ifdef _DEBUG
     shared.test_ringbuf();
 #endif
+}
+
+TEST(Shared_rollback)
+{
+    // Delete old files if there
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock"); // also the info file
+
+    // Create a new shared db
+    SharedGroup shared("test_shared.tdb");
+    CHECK(shared.is_valid());
+
+    // Create first table in group (but rollback)
+    {
+        Group& g1 = shared.begin_write();
+        TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+        t1->add(1, 2, false, "test");
+        shared.rollback();
+    }
+
+    // Verify that no changes were made
+    {
+        const Group& g1 = shared.begin_read();
+        CHECK_EQUAL(false, g1.has_table("test"));
+        shared.end_read();
+    }
+
+    // Really create first table in group
+    {
+        Group& g1 = shared.begin_write();
+        TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+        t1->add(1, 2, false, "test");
+        shared.commit();
+    }
+
+    // Verify that the changes were made
+    {
+        const Group& g1 = shared.begin_read();
+        TestTableShared::ConstRef t = g1.get_table<TestTableShared>("test");
+        CHECK(t->size() == 1);
+        CHECK_EQUAL(1, t[0].first);
+        CHECK_EQUAL(2, t[0].second);
+        CHECK_EQUAL(false, t[0].third);
+        CHECK_EQUAL("test", (const char*)t[0].fourth);
+        shared.end_read();
+    }
+
+    // Greate more changes (but rollback)
+    {
+        Group& g1 = shared.begin_write();
+        TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+        t1->add(0, 0, true, "more test");
+        shared.rollback();
+    }
+
+    // Verify that no changes were made
+    {
+        const Group& g1 = shared.begin_read();
+        TestTableShared::ConstRef t = g1.get_table<TestTableShared>("test");
+        CHECK(t->size() == 1);
+        CHECK_EQUAL(1, t[0].first);
+        CHECK_EQUAL(2, t[0].second);
+        CHECK_EQUAL(false, t[0].third);
+        CHECK_EQUAL("test", (const char*)t[0].fourth);
+        shared.end_read();
+    }
 }
 
 #endif //_MSV_VER

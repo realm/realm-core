@@ -139,10 +139,16 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED)
     }
     
     m_isValid = true;
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_READY;
+#endif
 }
 
 SharedGroup::~SharedGroup()
 {
+    assert(m_state == SHARED_STATE_READY);
+
     if (m_info) {
         // If we can get an exclusive lock on the file
         // we know that we are the only user (since all
@@ -171,6 +177,9 @@ SharedGroup::~SharedGroup()
 
 const Group& SharedGroup::begin_read()
 {
+    assert(m_state == SHARED_STATE_READY);
+    assert(m_group.get_allocator().IsAllFree());
+
     size_t new_topref = 0;
     size_t new_filesize = 0;
     
@@ -199,15 +208,24 @@ const Group& SharedGroup::begin_read()
     pthread_mutex_unlock(&m_info->readmutex);
     
     // Make sure the group is up-to-date
-    m_group.update_from_shared(new_topref, new_filesize);
+    // zero ref means that the file has just been created
+    if (new_topref == 0)
+        m_group.reset_to_new(); // there might have been a rollback
+    else
+        m_group.update_from_shared(new_topref, new_filesize);
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_READING;
+#endif
     
     return m_group;
 }
 
 void SharedGroup::end_read()
 {
+    assert(m_state == SHARED_STATE_READING);
     assert(m_version != (uint32_t)-1);
-    
+
     pthread_mutex_lock(&m_info->readmutex);
     {
         // Find entry for current version
@@ -230,10 +248,17 @@ void SharedGroup::end_read()
     pthread_mutex_unlock(&m_info->readmutex);
     
     m_version = (uint32_t)-1;
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_READY;
+#endif
 }
 
 Group& SharedGroup::begin_write()
 {
+    assert(m_state == SHARED_STATE_READY);
+    assert(m_group.get_allocator().IsAllFree());
+
     // Get write lock
     // Note that this will not get released until we call
     // end_write().
@@ -245,15 +270,24 @@ Group& SharedGroup::begin_write()
     
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
-    if (new_topref != 0) {
-        m_group.update_from_shared(new_topref, new_filesize);
+    if (new_topref == 0) {
+        m_group.reset_to_new(); // may have been a rollback
+        m_group.create_from_ref();
     }
+    else
+        m_group.update_from_shared(new_topref, new_filesize);
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_WRITING;
+#endif
     
     return m_group;
 }
 
 void SharedGroup::commit()
 {
+    assert(m_state == SHARED_STATE_WRITING);
+
     // Get version info
     size_t current_version;
     size_t readlock_version;
@@ -295,6 +329,25 @@ void SharedGroup::commit()
     
     // Release write lock
     pthread_mutex_unlock(&m_info->writemutex);
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_READY;
+#endif
+}
+
+void SharedGroup::rollback()
+{
+    assert(m_state == SHARED_STATE_WRITING);
+
+    // Clear all changes made during transaction
+    m_group.rollback();
+
+    // Release write lock
+    pthread_mutex_unlock(&m_info->writemutex);
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_READY;
+#endif
 }
 
 bool SharedGroup::ringbuf_is_empty() const
