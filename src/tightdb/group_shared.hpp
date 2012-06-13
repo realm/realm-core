@@ -35,11 +35,11 @@ public:
     
     bool is_valid() const {return m_isValid;}
 
-    const Group& start_read();
+    const Group& begin_read();
     void end_read();
     
-    Group& start_write();
-    void end_write();
+    Group& begin_write();
+    void commit();
 
 #ifdef _DEBUG
     void test_ringbuf();

@@ -25,17 +25,17 @@ TEST(Shared1)
     
     // Create first table in group
     {
-        Group& g1 = shared.start_write();
+        Group& g1 = shared.begin_write();
         TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
         t1->add(1, 2, false, "test");
-        shared.end_write();
+        shared.commit();
     }
     
     // Open same db again
     SharedGroup shared2("test_shared.tdb");
     CHECK(shared2.is_valid());
     {
-        const Group& g2 = shared2.start_read();
+        const Group& g2 = shared2.begin_read();
         
         // Verify that last set of changes are commited
         TestTableShared::ConstRef t2 = g2.get_table<TestTableShared>("test");
@@ -48,10 +48,10 @@ TEST(Shared1)
     
         // Do a new change while stil having current read transaction open
         {
-            Group& g1 = shared.start_write();
+            Group& g1 = shared.begin_write();
             TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
             t1->add(2, 3, true, "more test");
-            shared.end_write();
+            shared.commit();
         }
 
         // Verify that that the read transaction does not see
@@ -65,10 +65,10 @@ TEST(Shared1)
         // Do one more new change while stil having current read transaction open
         // so we know that it does not overwrite data held by
         {
-            Group& g1 = shared.start_write();
+            Group& g1 = shared.begin_write();
             TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
             t1->add(0, 1, false, "even more test");
-            shared.end_write();
+            shared.commit();
         }
 
         // Verify that that the read transaction does still not see
@@ -85,7 +85,7 @@ TEST(Shared1)
 
     // Start a new read transaction and verify that it can now see the changes
     {
-        const Group& g3 = shared2.start_read();
+        const Group& g3 = shared2.begin_read();
         TestTableShared::ConstRef t3 = g3.get_table<TestTableShared>("test");
         
         CHECK(t3->size() == 3);

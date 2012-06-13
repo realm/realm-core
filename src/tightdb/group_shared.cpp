@@ -169,7 +169,7 @@ SharedGroup::~SharedGroup()
         free((void*)m_lockfile_path);
 }
 
-const Group& SharedGroup::start_read()
+const Group& SharedGroup::begin_read()
 {
     size_t new_topref = 0;
     size_t new_filesize = 0;
@@ -232,7 +232,7 @@ void SharedGroup::end_read()
     m_version = (uint32_t)-1;
 }
 
-Group& SharedGroup::start_write()
+Group& SharedGroup::begin_write()
 {
     // Get write lock
     // Note that this will not get released until we call
@@ -252,7 +252,7 @@ Group& SharedGroup::start_write()
     return m_group;
 }
 
-void SharedGroup::end_write()
+void SharedGroup::commit()
 {
     // Get version info
     size_t current_version;
