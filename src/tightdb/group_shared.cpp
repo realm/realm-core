@@ -11,8 +11,25 @@
 
 using namespace tightdb;
 
+namespace {
+
 // Pre-declare local functions
 char* concat_strings(const char* str1, const char* str2);
+
+// Support methods
+char* concat_strings(const char* str1, const char* str2) {
+    const size_t len1 = strlen(str1);
+    const size_t len2 = strlen(str2) + 1; // includes terminating null
+
+    char* const s = (char*)malloc(len1 + len2);
+    memcpy(s, str1, len1);
+    memcpy(s + len1, str2, len2);
+
+    return s;
+}
+
+} // anonymous namespace
+
 
 struct tightdb::ReadCount {
     uint32_t version;
@@ -34,7 +51,8 @@ struct tightdb::SharedInfo {
     ReadCount readers[32]; // has to be power of two
 };
 
-SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_info(NULL), m_isValid(false), m_version(-1), m_lockfile_path(NULL)
+
+SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED), m_info(NULL), m_isValid(false), m_version(-1), m_lockfile_path(NULL)
 {
     if (!m_group.is_valid()) return;
     
@@ -42,37 +60,49 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
     m_lockfile_path = concat_strings(filename, ".lock");
     m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return;
-
-    // Take shared lock so that the file does not get deleted
-    // by other processes
-    flock(m_fd, LOCK_SH);
     
-    // Get size
-    struct stat statbuf;
-    if (fstat(m_fd, &statbuf) < 0) {
-        close(m_fd);
-        return;
-    }
-    size_t len = statbuf.st_size;
-    
-    // Handle empty files (first user)
     bool needInit = false;
-    if (len == 0) {
-        // Upgrade file lock to exclusive, so we do not have
-        // anyone else reading it while it is uninitialized
-        if (flock(m_fd, LOCK_EX) != 0) {
+    size_t len    = 0;
+    struct stat statbuf;
+    
+    // If we can get an exclusive lock we know that the file is
+    // either new (empty) or a leftover from a previous
+    // crashed process (needing re-initialization)
+    if (flock(m_fd, LOCK_EX|LOCK_NB) == 0) {
+        // There is a slight window between opening the file and getting the
+        // lock where another process could have deleted the file
+        if (fstat(m_fd, &statbuf) < 0 || statbuf.st_nlink == 0) {
             close(m_fd);
             return;
         }
+        // Get size
+        len = statbuf.st_size;
 
-        // Create new file
-        len = sizeof(SharedInfo);
-        const int r = ftruncate(m_fd, len);
-        if (r != 0) {
-            close(m_fd);
-            return;
+        // Handle empty files (first user)
+        if (len == 0) {
+            // Create new file
+            len = sizeof(SharedInfo);
+            const int r = ftruncate(m_fd, len);
+            if (r != 0) {
+                close(m_fd);
+                return;
+            }
         }
         needInit = true;
+    }
+    else if (flock(m_fd, LOCK_SH) == 0) {
+        // Get size
+        if (fstat(m_fd, &statbuf) < 0) {
+            close(m_fd);
+            return;
+        }
+        len = statbuf.st_size;
+    }
+    else {
+        // We needed a shared lock so that the file would not
+        // get deleted by other processes
+        close(m_fd);
+        return;
     }
     
     // Map to memory
@@ -81,7 +111,6 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
         close(m_fd);
         return;
     }
-
     m_info = (SharedInfo*)p;
     
     if (needInit) {
@@ -91,30 +120,36 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, false), m_inf
         pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
         pthread_mutex_init(&m_info->readmutex, &mattr);
         pthread_mutex_init(&m_info->writemutex, &mattr);
+        pthread_mutexattr_destroy(&mattr);
+
+        const SlabAlloc& alloc = m_group.get_allocator();
 
         // Set initial values
-        const SlabAlloc& alloc = m_group.get_allocator();
         m_info->filesize = alloc.GetFileLen();
         m_info->infosize = (uint32_t)len;
-        m_info->current_top = alloc.GetTopRef();;
+        m_info->current_top = alloc.GetTopRef();
         m_info->current_version = 0;
         m_info->capacity = 32-1; 
         m_info->put_pos = 0;
         m_info->get_pos = 0;
 
         // Downgrade lock to shared now that it is initialized,
-        // so that other processes can share it as well
+        // so other processes can share it as well
         flock(m_fd, LOCK_SH);
     }
     
     m_isValid = true;
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_READY;
+#endif
 }
 
 SharedGroup::~SharedGroup()
 {
-    if (m_info) {
-        munmap((void*)m_info, m_info->infosize);
+    assert(m_state == SHARED_STATE_READY);
 
+    if (m_info) {
         // If we can get an exclusive lock on the file
         // we know that we are the only user (since all
         // users take at least shared locks on the file.
@@ -122,7 +157,15 @@ SharedGroup::~SharedGroup()
         // (to avoid someone later opening a stale file
         // with uinitialized mutexes)
         if (flock(m_fd, LOCK_EX|LOCK_NB) == 0) {
+            pthread_mutex_destroy(&m_info->readmutex);
+            pthread_mutex_destroy(&m_info->writemutex);
+
+            munmap((void*)m_info, m_info->infosize);
+
             remove(m_lockfile_path);
+        }
+        else {
+            munmap((void*)m_info, m_info->infosize);
         }
 
         close(m_fd); // also releases lock
@@ -132,8 +175,11 @@ SharedGroup::~SharedGroup()
         free((void*)m_lockfile_path);
 }
 
-const Group& SharedGroup::start_read()
+const Group& SharedGroup::begin_read()
 {
+    assert(m_state == SHARED_STATE_READY);
+    assert(m_group.get_allocator().IsAllFree());
+
     size_t new_topref = 0;
     size_t new_filesize = 0;
     
@@ -162,15 +208,24 @@ const Group& SharedGroup::start_read()
     pthread_mutex_unlock(&m_info->readmutex);
     
     // Make sure the group is up-to-date
-    m_group.update_from_shared(new_topref, new_filesize);
+    // zero ref means that the file has just been created
+    if (new_topref == 0)
+        m_group.reset_to_new(); // there might have been a rollback
+    else
+        m_group.update_from_shared(new_topref, new_filesize);
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_READING;
+#endif
     
     return m_group;
 }
 
 void SharedGroup::end_read()
 {
+    assert(m_state == SHARED_STATE_READING);
     assert(m_version != (uint32_t)-1);
-    
+
     pthread_mutex_lock(&m_info->readmutex);
     {
         // Find entry for current version
@@ -193,10 +248,17 @@ void SharedGroup::end_read()
     pthread_mutex_unlock(&m_info->readmutex);
     
     m_version = (uint32_t)-1;
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_READY;
+#endif
 }
 
-Group& SharedGroup::start_write()
+Group& SharedGroup::begin_write()
 {
+    assert(m_state == SHARED_STATE_READY);
+    assert(m_group.get_allocator().IsAllFree());
+
     // Get write lock
     // Note that this will not get released until we call
     // end_write().
@@ -208,18 +270,50 @@ Group& SharedGroup::start_write()
     
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
-    if (new_topref != 0) {
-        m_group.update_from_shared(new_topref, new_filesize);
+    if (new_topref == 0) {
+        m_group.reset_to_new(); // may have been a rollback
+        m_group.create_from_ref();
     }
+    else
+        m_group.update_from_shared(new_topref, new_filesize);
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_WRITING;
+#endif
     
     return m_group;
 }
 
-void SharedGroup::end_write()
+void SharedGroup::commit()
 {
-    m_group.commit();
+    assert(m_state == SHARED_STATE_WRITING);
+
+    // Get version info
+    size_t current_version;
+    size_t readlock_version;
+    pthread_mutex_lock(&m_info->readmutex);
+    {
+        current_version = m_info->current_version + 1;
+
+        if (ringbuf_is_empty())
+            readlock_version = current_version;
+        else {
+            const ReadCount& r = ringbuf_get_first();
+            readlock_version = r.version;
+        }
+    }
+    pthread_mutex_unlock(&m_info->readmutex);
     
-    // Get the current top ref
+    // Reset version tracking in group if we are
+    // starting from a new lock file
+    if (current_version == 1) {
+        m_group.init_shared();
+    }
+
+    // Do the actual commit
+    m_group.commit(current_version, readlock_version);
+
+    // Get the new top ref
     const SlabAlloc& alloc = m_group.get_allocator();
     const size_t new_topref   = alloc.GetTopRef();
     const size_t new_filesize = alloc.GetFileLen();
@@ -235,6 +329,25 @@ void SharedGroup::end_write()
     
     // Release write lock
     pthread_mutex_unlock(&m_info->writemutex);
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_READY;
+#endif
+}
+
+void SharedGroup::rollback()
+{
+    assert(m_state == SHARED_STATE_WRITING);
+
+    // Clear all changes made during transaction
+    m_group.rollback();
+
+    // Release write lock
+    pthread_mutex_unlock(&m_info->writemutex);
+
+#ifdef _DEBUG
+    m_state = SHARED_STATE_READY;
+#endif
 }
 
 bool SharedGroup::ringbuf_is_empty() const
@@ -336,15 +449,3 @@ void SharedGroup::test_ringbuf()
 #endif //_DEBUG
 
 #endif //_MSV_VER
-
-// Support methods
-char* concat_strings(const char* str1, const char* str2) {
-    const size_t len1 = strlen(str1);
-    const size_t len2 = strlen(str2) + 1; // includes terminating null
-    
-    char* const s = (char*)malloc(len1 + len2);
-    memcpy(s, str1, len1);
-    memcpy(s + len1, str2, len2); 
-    
-    return s;
-}

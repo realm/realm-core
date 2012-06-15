@@ -582,6 +582,9 @@ TEST(Table_SlabAlloc)
 }
 
 #include <tightdb/group.hpp>
+
+#ifndef _MSC_VER
+
 TEST(Table_Spec)
 {
     Group group;
@@ -635,15 +638,19 @@ TEST(Table_Spec)
     group.write("subtables.tightdb");
 
     // Read back tables
-    Group fromDisk("subtables.tightdb");
-    TableRef fromDiskTable = fromDisk.get_table("test");
+    {
+        Group fromDisk("subtables.tightdb");
+        TableRef fromDiskTable = fromDisk.get_table("test");
 
-    TableRef subtable2 = fromDiskTable->get_subtable(2, 0);
+        TableRef subtable2 = fromDiskTable->get_subtable(2, 0);
 
-    CHECK_EQUAL(1,      subtable2->size());
-    CHECK_EQUAL(42,     subtable2->get_int(0, 0));
-    CHECK_EQUAL("test", subtable2->get_string(1, 0));
+        CHECK_EQUAL(1,      subtable2->size());
+        CHECK_EQUAL(42,     subtable2->get_int(0, 0));
+        CHECK_EQUAL("test", subtable2->get_string(1, 0));
+    }
 }
+
+#endif
 
 TEST(Table_Mixed)
 {

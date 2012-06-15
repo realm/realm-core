@@ -29,14 +29,25 @@ namespace tightdb {
 // Pre-declarations
 class SharedGroup;
 
+enum GroupMode {
+    GROUP_DEFAULT  =  0,
+    GROUP_READONLY =  1,
+    GROUP_SHARED   =  2,
+    GROUP_APPEND   =  4,
+    GROUP_ASYNC    =  8,
+    GROUP_SWAPONLY = 16
+};
+
 class Group: private Table::Parent {
 public:
     Group();
-    Group(const char* filename, bool readOnly=true);
+    Group(const char* filename, int mode=GROUP_DEFAULT);
     Group(const char* buffer, size_t len);
     ~Group();
 
     bool is_valid() const {return m_isValid;}
+    bool is_shared() const {return m_persistMode & GROUP_SHARED;}
+    bool is_empty() const;
 
     size_t get_table_count() const;
     const char* get_table_name(size_t table_ndx) const;
@@ -68,15 +79,19 @@ protected:
     friend class GroupWriter;
     friend class SharedGroup;
 
+    void init_shared();
+    bool commit(size_t current_version, size_t readlock_version);
+    void rollback();
+
     SlabAlloc& get_allocator() {return m_alloc;}
-    size_t get_free_space(size_t len, size_t& filesize, bool testOnly=false, bool ensureRest=false);
+    size_t get_free_space(size_t len, size_t& filesize, bool testOnly=false);
     Array& get_top_array() {return m_top;}
-    void connect_free_space(bool doConnect);
 
     // Recursively update all internal refs after commit
     void update_refs(size_t top_ref);
 
     void update_from_shared(size_t top_ref, size_t len);
+    void reset_to_new();
 
     // Overriding method in ArrayParent
     virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
@@ -107,7 +122,10 @@ protected:
     ArrayString m_tableNames;
     Array m_freePositions;
     Array m_freeLengths;
+    Array m_freeVersions;
     Array m_cachedtables;
+    uint32_t m_persistMode;
+    size_t m_readlock_version;
     bool m_isValid;
 
 private:
@@ -125,31 +143,38 @@ private:
 
 inline TableRef Group::get_table(const char* name)
 {
+    assert(m_top.IsValid());
     return get_table_ptr(name)->get_table_ref();
 }
 
 inline ConstTableRef Group::get_table(const char* name) const
 {
+    assert(m_top.IsValid());
     return get_table_ptr(name)->get_table_ref();
 }
 
 template<class T> inline BasicTableRef<T> Group::get_table(const char* name)
 {
+    assert(m_top.IsValid());
     return get_table_ptr<T>(name)->get_table_ref();
 }
 
 template<class T> inline BasicTableRef<const T> Group::get_table(const char* name) const
 {
+    assert(m_top.IsValid());
+    assert(has_table(name));
     return get_table_ptr<T>(name)->get_table_ref();
 }
 
 inline const Table* Group::get_table_ptr(const char* name) const
 {
+    assert(has_table(name));
     return const_cast<Group*>(this)->get_table_ptr(name);
 }
 
 template<class T> inline const T* Group::get_table_ptr(const char* name) const
 {
+    assert(has_table(name));
     return const_cast<Group*>(this)->get_table_ptr<T>(name);
 }
 
@@ -180,13 +205,25 @@ size_t Group::write(S& out)
     // Space for ref to top array
     out.write("\0\0\0\0\0\0\0\0", 8);
 
+    // When serializing to disk we dont want
+    // to include free space tracking as serialized
+    // files are written without any free space.
+    Array top(COLUMN_HASREFS, NULL, 0, m_alloc);
+    top.add(m_top.Get(0));
+    top.add(m_top.Get(1));
+
     // Recursively write all arrays
-    const uint64_t topPos = m_top.Write(out);
+    const uint64_t topPos = top.Write(out);
     const size_t byte_size = out.getpos();
 
     // top ref
     out.seek(0);
     out.write((const char*)&topPos, 8);
+
+    // Clean up temporary top
+    top.Set(0, 0); // reset to avoid recursive delete
+    top.Set(1, 0); // reset to avoid recursive delete
+    top.Destroy();
 
     // return bytes written
     return byte_size;
@@ -195,6 +232,11 @@ size_t Group::write(S& out)
 template<class S>
 void Group::to_json(S& out)
 {
+    if (!m_top.IsValid()) {
+        out << "{}";
+        return;
+    }
+
     out << "{";
 
     for (size_t i = 0; i < m_tables.Size(); ++i) {

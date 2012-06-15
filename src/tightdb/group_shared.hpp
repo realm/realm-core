@@ -35,11 +35,14 @@ public:
     
     bool is_valid() const {return m_isValid;}
 
-    const Group& start_read();
+    // Read transactions
+    const Group& begin_read();
     void end_read();
     
-    Group& start_write();
-    void end_write();
+    // Write transactions
+    Group& begin_write();
+    void commit();
+    void rollback();
 
 #ifdef _DEBUG
     void test_ringbuf();
@@ -66,6 +69,16 @@ private:
     uint32_t    m_version;
     int         m_fd;
     const char* m_lockfile_path;
+
+#ifdef _DEBUG
+    // In debug mode we want to track state
+    enum SharedState {
+        SHARED_STATE_READY,
+        SHARED_STATE_READING,
+        SHARED_STATE_WRITING
+    };
+    SharedState m_state;
+#endif
 };
 
 } //namespace tightdb

@@ -221,6 +221,15 @@ void Array::CreateFromHeader(uint8_t* header, size_t ref) {
 
 void Array::SetType(ColumnDef type)
 {
+    // If we are reviving an invalidated array
+    // we need to reset state first
+    if (!m_data) {
+        m_ref = 0;
+        m_capacity = 0;
+        m_len = 0;
+        m_width = (size_t)-1;
+    }
+
     if (m_ref) CopyOnWrite();
 
     if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
@@ -611,6 +620,16 @@ void Array::Resize(size_t count)
     set_header_len(m_len);
 }
 
+void Array::SetAllToZero()
+{
+    CopyOnWrite();
+
+    m_capacity = CalcItemCount(get_header_capacity(), 0);
+    SetWidth(0);
+
+    // Update header
+    set_header_width(0);
+}
 
 bool Array::Increment(int64_t value, size_t start, size_t end)
 {
@@ -1455,6 +1474,15 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
     (void)offset;
 }
 
+size_t Array::GetByteSize(bool align) const {
+    size_t len = CalcByteLen(m_len, m_width);
+    if (align) {
+        const size_t rest = (~len & 0x7)+1;
+        if (rest < 8) len += rest; // 64bit blocks
+    }
+    return len;
+}
+
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
     const size_t bits = (count * width);
@@ -1681,7 +1709,7 @@ template <size_t w>int64_t Array::Get(size_t ndx) const
 	return GetUniversal<w>((const char *)m_data, ndx);
 }
 
-#ifdef __MSVCRT__
+#ifdef _MSC_VER
 #pragma warning (disable : 4127)
 #endif
 template <size_t w> void Array::Set(size_t ndx, int64_t value)

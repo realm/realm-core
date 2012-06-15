@@ -169,6 +169,7 @@ public:
     const char* ColumnStringGet(size_t ndx) const;
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
 
+    void SetAllToZero();
     bool Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
     bool IncrementIf(int64_t limit, int64_t value);
     template <size_t w> void Adjust(size_t start, int64_t diff);
@@ -202,7 +203,7 @@ public:
     // Serialization
     template<class S> size_t Write(S& target, bool recurse=true, bool persist=false) const;
     template<class S> void WriteAt(size_t pos, S& out) const;
-    size_t GetByteSize() const {return CalcByteLen(m_len, m_width);}
+    size_t GetByteSize(bool align=false) const;
     vector<int64_t> ToVector(void) const;
 
     // Debug
@@ -319,6 +320,9 @@ protected:
 template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 {
     assert(IsValid());
+
+    // Ignore un-changed arrays when persisting
+    if (persist && m_alloc.IsReadOnly(m_ref)) return m_ref;
 
     if (recurse && m_hasRefs) {
         // Temp array for updated refs
