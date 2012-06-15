@@ -45,7 +45,7 @@
     SSE4.2: nmmintrin.h
 */
 #ifdef USE_SSE42
-    #include <pmmintrin.h> // __SSE42__
+    #include <nmmintrin.h> // __SSE42__
 #elif defined (USE_SSE3)
     #include <pmmintrin.h> // __SSE3__
 #endif
@@ -233,6 +233,7 @@ private:
     template <size_t width> void find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const;
     template <size_t w> size_t sum(size_t start, size_t end) const;
     template <size_t w> size_t FindPos(int64_t target) const;
+	template<size_t w> int64_t GetUniversal(const char* const data, const size_t ndx) const;
 
 protected:
     bool AddPositiveLocal(int64_t value);

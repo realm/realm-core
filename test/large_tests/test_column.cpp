@@ -2,12 +2,12 @@
 
 #if TEST_DURATION > 0
 
-#include "column.hpp"
+#include "tightdb/column.hpp"
 #include <UnitTest++.h>
 #include <vector>
 #include <algorithm>
 #include "verified_integer.hpp"
-#include "query_conditions.hpp"
+#include "tightdb/query_conditions.hpp"
 
 using namespace tightdb;
 
@@ -27,89 +27,76 @@ uint64_t rand2(int bitwidth = 64)
 
 TEST(LESS)
 {
-    const size_t LEN = 300;
-    Array a;
-    for(size_t t = 0; t < LEN; t++)
-        a.add(100);
-    
-    a.Set(132, 50);
-    size_t f = a.Query<LESS>(100, 0, 137);
+    int64_t v[13] = {0, 1, 3, 15, 100, 30000, 1000000LL, 1000LL*1000LL*1000LL*1000LL, -15, -100, -30000, -1000000ULL, -1000ULL*1000LL*1000LL*1000LL};
+
+    for (size_t w = 0; w < 13; w++) {
+        const size_t LEN = 64 * 8; // to create at least 64 bytes of data (2 * 128-bit SSE chunks + 64 bit chunk before and after + some unaligned data before and after)
+        Array a;
+        for(size_t t = 0; t < LEN; t++)
+            a.add(v[w]);
+
+        size_t LEN2 = 64 * 8 / (a.GetBitWidth() == 0 ? 1 : a.GetBitWidth());
+
+        for(size_t from = 0; from < LEN2; from++) {
+            for(size_t to = from + 1; to <= LEN2; to++) {
+                for(size_t match = 0; match < LEN2; match++) { 
+
+                    // LESS
+                    a.Set(match, v[w] - 1);
+                    size_t f = a.Query<LESS>(v[w], from, to);
+                    a.Set(match, v[w]);
+                    if(match >= from && match < to) {
+                        assert(match == f);
+                    }
+                    else {
+                        assert(f == -1);
+                    }
+
+                    if(to == 9 && match == 1)
+                        printf("");
+
+                    // FIND
+                    a.Set(match, v[w]-1);
+                    f = a.find_first(v[w]-1, from, to);
+                    a.Set(match, v[w]);
+                    if(match >= from && match < to) {
+                        assert(match == f);
+                    }
+                    else {
+                        assert(f == -1);
+                    }
+
+                    // MIN
+                    int64_t val = 0;
+                    a.Set(match, v[w]-1);
+                    bool b = a.minimum(val, from, to);
+                    a.Set(match, v[w]);
+                    CHECK_EQUAL(true, b);
+                    if(match >= from && match < to)
+                        assert(val == v[w]-1);
+                    else
+                        assert(val == v[w]);
 
 
-    for(size_t from = 0; from < LEN; from++) {
-        for(size_t to = from + 1; to <= LEN; to++) {
-            for(size_t match = 0; match < LEN; match++) { 
-                a.Set(match, 50);
-                size_t f = a.Query<LESS>(100, from, to);
-                a.Set(match, 100);
-                if(match >= from && match < to) {
-                    CHECK_EQUAL(match, f);
-                    assert(match == f);
+                    // MAX
+                    a.Set(match, v[w]+1);
+                    b = a.maximum(val, from, to);
+                    a.Set(match, v[w]);
+                    CHECK_EQUAL(true, b);
+                    if(match >= from && match < to)
+                        assert(val == v[w]+1);
+                    else
+                        assert(val == v[w]);
+
                 }
-                else {
-                    CHECK_EQUAL(f, -1);
-                    assert(f == -1);
-                }
-            }
-        }    
+            }    
 
+        }
+        a.Destroy();
     }
 }
 
 
-
-TEST(Find1)
-{
-    const size_t LEN = 300;
-    Array a;
-    for(size_t t = 0; t < LEN; t++)
-        a.add(100);
-    
-    for(size_t from = 0; from < LEN; from++) {
-        for(size_t to = from + 1; to <= LEN; to++) {
-            for(size_t match = 0; match < LEN; match++) { 
-                a.Set(match, 200);
-                size_t f = a.find_first(200, from, to);
-                a.Set(match, 100);
-                if(match >= from && match < to) {
-                    CHECK_EQUAL(match, f);
-                    assert(match == f);
-                }
-                else {
-                    CHECK_EQUAL(f, -1);
-                    assert(f == -1);
-                }
-            }
-        }    
-
-    }
-}
-
-
-TEST(MinMax)
-{
-    const size_t LEN = 300;
-    Array a;
-    for(size_t t = 0; t < LEN; t++)
-        a.add(100);
-    
-    for(size_t from = 0; from < LEN; from++) {
-        for(size_t to = from + 1; to <= LEN; to++) {
-            for(size_t match = 0; match < LEN; match++) {
-                int64_t val = 0;
-                a.Set(match, 200);
-                bool b = a.maximum(val, from, to);
-                a.Set(match, 100);
-                CHECK_EQUAL(true, b);
-                if(match >= from && match < to)
-                    assert(val == 200);
-                else
-                    assert(val == 100);
-            }
-        }    
-
-    }
-}
 
 
 TEST(Column_monkeytest2)

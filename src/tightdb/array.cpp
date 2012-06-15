@@ -15,6 +15,14 @@
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
+#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
+	#define X86X64
+#endif
+
+#if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
+	#define PTR_64
+#endif
+
  /* wid == 16/32 likely when accessing offsets in B tree */
 #define TEMPEX(fun, wid, arg) \
     if(wid == 16) {fun<16> arg;} \
@@ -398,6 +406,44 @@ void Array::Delete(size_t ndx)
     set_header_len(m_len);
 }
 
+template<size_t w> int64_t Array::GetUniversal(const char* const data, const size_t ndx) const
+{
+    if(w == 0) {
+        return 0;
+    }
+    else if(w == 1) {
+        const size_t offset = ndx >> 3;
+        return (data[offset] >> (ndx & 7)) & 0x01;
+    }
+    else if(w == 2) {
+        const size_t offset = ndx >> 2;
+        return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
+    }
+    else if(w == 4) {
+        const size_t offset = ndx >> 1;
+        return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
+    }
+    else if(w == 8) {
+        return *((const signed char*)(data + ndx));
+    }
+    if(w == 16) {
+        const size_t offset = ndx * 2;
+        return *(const int16_t*)(data + offset);
+    }
+    else if(w == 32) {
+        const size_t offset = ndx * 4;
+        return *(const int32_t*)(data + offset);
+    }
+    else if(w == 64) {
+        const size_t offset = ndx * 8;
+        return *(const int64_t*)(data + offset);
+    }
+    else {
+        assert(true);
+        return 0;
+    }
+}
+
 int64_t Array::Get(size_t ndx) const
 {
     assert(ndx < m_len);
@@ -683,9 +729,45 @@ template <size_t width> inline bool TestZero(uint64_t value) {
     return hasZeroByte != 0;
 }
 
-size_t SELF(size_t value) 
+template <bool eq, size_t width>size_t FindZero(uint64_t v)
 {
-    return value;
+    size_t start = 0;
+    uint64_t hasZeroByte;
+
+    // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay off because 
+    // the work done by TestZero() is wasted for the cases where the value exists in first half, but useful if it exists in last 
+    // half. Sweet spot turns out to be the widths and partitions below.
+    if(width <= 8) {
+        hasZeroByte = TestZero<width>(v | 0xffffffff00000000ULL);
+        if(eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
+            // 00?? -> increasing
+            start += 64 / (width == 0 ? 1 : width) / 2;
+            if(width <= 4) {
+                hasZeroByte = TestZero<width>(v | 0xffff000000000000ULL);
+                if(eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
+                    // 000?
+                    start += 64 / (width == 0 ? 1 : width) / 4;
+                }
+            }
+        }
+        else {
+            if(width <= 4) {
+                // ??00
+                hasZeroByte = TestZero<width>(v | 0xffffffffffff0000ULL);
+                if(eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
+                    // 0?00
+                    start += 64 / (width == 0 ? 1 : width) / 4;
+                }
+            }
+        }
+    }
+
+    uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
+    while(eq  ==    (((v >> (width * start)) & mask) != 0)    ) {
+        start++;
+    }
+
+    return start;
 }
 
 // Not meant to be called from outside Array.cpp
@@ -703,7 +785,7 @@ template <bool eq, size_t width> inline size_t Array::CompareEquality(int64_t va
     // When starting from beginning of array the data is always 64bit aligned
     // but otherwise we have to ensure alignment.
     if (start != 0) {
-        size_t ee = round_up(start, 64 / SELF(width));
+        size_t ee = round_up(start, 64 / (width == 0 ? 1 : width));
         ee = ee > end ? end : ee;
         for (; start < ee; ++start)
             if (eq ? (Get<width>(start) == value) : (Get<width>(start) != value))
@@ -721,11 +803,11 @@ template <bool eq, size_t width> inline size_t Array::CompareEquality(int64_t va
     }
 
     if(width != 32 && width != 64) {
-
         const int64_t* p = (const int64_t*)(m_data + (start * width / 8));
         const int64_t* const e = (int64_t*)(m_data + (end * width / 8)) - 1;
-
-        const uint64_t valuemask = ~0ULL / ((1ULL << SELF(width)) - 1ULL) * value;
+		const uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
+        const uint64_t valuemask = ~0ULL / (mask == 0 ? 1 : mask) * (value & mask); // the "== ? :" is to avoid division by 0 compiler error
+ 
         uint64_t hasZeroByte;
 
         while (p < e) {
@@ -735,37 +817,10 @@ template <bool eq, size_t width> inline size_t Array::CompareEquality(int64_t va
             hasZeroByte = TestZero<width>(v2);
 
             if(eq ? hasZeroByte : v2) {
-                // Value exists in current chunk, perform one or 2 binary search iterations. More partions do NOT pay off because the work done by TestZero() is wasted 
-                // for the cases where the value exists in first half, but useful if it exists in last half. Sweet spot turns out to be the widths and partitions below.
-                start = (p - (int64_t *)m_data) * 8 * 8 / SELF(width);
-#if 1
-                // Bisection optimization, speeds up small bitwidths with high match frequency
-                if(width <= 8) {
-                    hasZeroByte = TestZero<width>(v2 | 0xffffffff00000000ULL);
-                    if(eq ? !hasZeroByte : (v2 & 0x00000000ffffffffULL) == 0) {
-                        // 00?? -> increasing
-                        start += 64 / SELF(width) / 2;
-                        if(width <= 4) {
-                            hasZeroByte = TestZero<width>(v2 | 0xffff000000000000ULL);
-                            if(eq ? !hasZeroByte : (v2 & 0x0000ffffffffffffULL) == 0) {
-                                // 000?
-                                start += 64 / SELF(width) / 4;
-                            }
-                        }
-                    }
-                    else {
-                        if(width <= 4) {
-                            // ??00
-                            hasZeroByte = TestZero<width>(v2 | 0xffffffffffff0000ULL);
-                            if(eq ? !hasZeroByte : (v2 & 0x000000000000ffffULL) == 0) {
-                                // 0?00
-                                start += 64 / SELF(width) / 4;
-                            }
-                        }
-                    }
-                }
-#endif
-                goto breakout;
+                start = (p - (int64_t *)m_data) * 8 * 8 / (width == 0 ? 1 : width);
+                size_t t = FindZero<eq, width>(v2);
+                start += t;
+                return start < end ? start : not_found;
             }
             else {
                 ++p;
@@ -774,10 +829,9 @@ template <bool eq, size_t width> inline size_t Array::CompareEquality(int64_t va
 
         // Loop ended because we are near end of array. No need to optimize search in remainder in this case because end of array means that
         // lots of search work has taken place prior to ending here. So time spent searching remainder is relatively tiny
-        start = (p - (int64_t *)m_data) * 8 * 8 / SELF(width);
+        start = (p - (int64_t *)m_data) * 8 * 8 / (width == 0 ? 1 : width);
     }
 
-breakout:
     while (start < end)
         if (eq ? Get<width>(start) == value : Get<width>(start) != value)
             return start;
@@ -792,35 +846,42 @@ template <int cond, size_t bitwidth> size_t Array::find_first(int64_t value, siz
     if (end == (size_t)-1) end = m_len;
     assert(start <= m_len && end <= m_len && start <= end);
 
+#if defined(USE_SSE42) || defined(USE_SSE3)
+
 #if defined(USE_SSE42)
     if (end - start < sizeof(__m128i) || m_width < 8) {
-        size_t r = Compare<cond, bitwidth>(value, start, end); 
+#elif defined(USE_SSE3)
+    if (cond != COND_EQUAL || end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) {
+#endif
+		size_t r = Compare<cond, bitwidth>(value, start, end); 
         return r; 
     }
 
     // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
-    __m128i* const a = (__m128i *)round_up(m_data + start * m_width / 8, sizeof(__m128i));
-    __m128i* const b = (__m128i *)round_down(m_data + end * m_width / 8, sizeof(__m128i));
+    __m128i* const a = (__m128i *)round_up(m_data + start * bitwidth / 8, sizeof(__m128i));
+    __m128i* const b = (__m128i *)round_down(m_data + end * bitwidth / 8, sizeof(__m128i));
 
     size_t t = 0;
 
-    t = Compare<cond, bitwidth>(value, start, ((unsigned char *)a - m_data) * 8 / bitwidth);
+    t = Compare<cond, bitwidth>(value, start, ((unsigned char *)a - m_data) * 8 / (bitwidth == 0 ? 1 : bitwidth));
     if (t != (size_t)-1)
         return t;
 
     // Search aligned area with SSE
     if (b > a) {
-
-          t = FindSSE<cond, bitwidth>(value, a, b - a);
-
+#if defined(USE_SSE42)
+		t = FindSSE<cond, bitwidth>(value, a, b - a);
+#elif defined(USE_SSE3)
+		t = FindSSE<COND_EQUAL, bitwidth>(value, a, b - a);
+#endif
         if (t != (size_t)-1) {
-            t += (((unsigned char *)a - m_data) * 8 / bitwidth);
+            t += (((unsigned char *)a - m_data) * 8 / (bitwidth == 0 ? 1 : bitwidth));
             return t;
         }
     }
 
     // Search remainder with CompareEquality()
-    t = Compare<cond, bitwidth>(value, ((unsigned char *)b - m_data) * 8 / bitwidth, end);
+    t = Compare<cond, bitwidth>(value, ((unsigned char *)b - m_data) * 8 / (bitwidth == 0 ? 1 : bitwidth), end);
     return t;
 #else
     return Compare<cond, bitwidth>(value, start, end);
@@ -878,7 +939,7 @@ template <int cond, size_t width> size_t Array::FindSSE(int64_t value, __m128i *
 
     // The loop is made simple so that compilers unrolls or optimizes it automatically (VC and gcc converts the 
     // case width == 8 to a memset(), and unrolls the remaining cases fully). 
-    for(size_t t = 0; t < 16 * 8 / SELF(width); t++) {
+    for(size_t t = 0; t < 16 * 8 / (width == 0 ? 1 : width); t++) {
         if(width == 8)
             *(((char*)&search) + t) = (char)value;
         else if(width == 16)
@@ -899,9 +960,15 @@ template <int cond, size_t width> size_t Array::FindSSE(int64_t value, __m128i *
                 compare = _mm_cmpeq_epi16(data[i], search);
             if(width == 32)
                 compare = _mm_cmpeq_epi32(data[i], search);
-            if(width == 64)
+            if(width == 64) {
+#ifdef USE_SSE42
                 compare = _mm_cmpeq_epi64(data[i], search);
+#else
+				assert(true);
+#endif
+			}
         }
+#ifdef USE_SSE42
         // greater
         else if(cond == COND_GREATER) {
             if(width == 8)
@@ -924,11 +991,10 @@ template <int cond, size_t width> size_t Array::FindSSE(int64_t value, __m128i *
             if(width == 64){
                 // There exists no _mm_cmplt_epi64 instruction, so emulate it. _mm_set1_epi8(0xff) is pre-calculated by compiler.
                 compare = _mm_cmpeq_epi64(data[i], search);
-                __m128i compare2 = _mm_cmpgt_epi64(data[i], search);
-                __m128i res1 = _mm_and_si128(compare, compare2);
-                compare = _mm_andnot_si128(compare, _mm_set1_epi32(0xffffffffULL));
+                compare = _mm_andnot_si128(compare, _mm_set1_epi32(0xffffffff));
             }
         }
+#endif
         resmask = _mm_movemask_epi8(compare);
 
         if(cond == COND_NOTEQUAL)
@@ -941,8 +1007,8 @@ template <int cond, size_t width> size_t Array::FindSSE(int64_t value, __m128i *
     if(i == items)
         return not_found;
 
-    size_t idx = FirstSetBit(resmask) / (SELF(width) / 8);
-    idx += i * sizeof(__m128i) / (SELF(width) / 8);
+    size_t idx = FirstSetBit(resmask) * 8 / (width == 0 ? 1 : width);
+    idx += i * sizeof(__m128i) * 8 / (width == 0 ? 1 : width);
 
     return idx; 
 }
@@ -1004,7 +1070,7 @@ template <bool gt, size_t bitwidth>size_t Array::CompareRelation(int64_t value, 
     // When starting from beginning of array the data is always 64bit aligned
     // but otherwise we have to ensure alignment.
     if(start != 0) {
-        size_t ee = round_up(start, 64 / SELF(bitwidth));
+        size_t ee = round_up(start, 64 / (bitwidth == 0 ? 1 : bitwidth));
         ee = ee > end ? end : ee;
         for (; start < ee; start++)
             if (gt ? (Get<bitwidth>(start) > value)  :   (Get<bitwidth>(start) < value))
@@ -1064,7 +1130,7 @@ template <bool gt, size_t bitwidth>size_t Array::CompareRelation(int64_t value, 
                 else
                     ++p;
             }
-            start = (p - (int64_t *)m_data) * 8 * 8 / bitwidth;
+            start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
         }
         else {
             while(start < end && gt ? (Get<2>(start) <= value) : (Get<2>(start) >= value))
@@ -1081,7 +1147,7 @@ template <bool gt, size_t bitwidth>size_t Array::CompareRelation(int64_t value, 
                 else
                     ++p;
             }
-            start = (p - (int64_t *)m_data) * 8 * 8 / bitwidth;
+            start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
         }
         else {
             while(start < end && gt ? (Get<4>(start) <= value) : (Get<4>(start) >= value))
@@ -1106,7 +1172,7 @@ template <bool gt, size_t bitwidth>size_t Array::CompareRelation(int64_t value, 
                 else
                     ++p;
             }
-            start = (p - (int64_t *)m_data) * 8 * 8 / bitwidth;
+            start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
         }
         else {
             while (start < end && gt ? (Get<8>(start) <= value) : (Get<8>(start) >= value))
@@ -1129,7 +1195,7 @@ template <bool gt, size_t bitwidth>size_t Array::CompareRelation(int64_t value, 
                 else
                     ++p;
             }
-            start = (p - (int64_t *)m_data) * 8 * 8 / bitwidth;
+            start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
         }
         else {
             while (start < end && gt ? (Get<16>(start) <= value)  :  (false))
@@ -1182,14 +1248,15 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
     int64_t m = Get<w>(start);
     ++start;
 
+#ifdef USE_SSE42
+
     // Test manually until 128 bit aligned
-    for(; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (sizeof(__m128i) * 8) != 0); start++) {
+    for(; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
         if (max ? Get<w>(start) > m : Get<w>(start) < m)
             m = Get<w>(start);
     }
 
-#ifdef USE_SSE42
-    if((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / SELF(w)) {
+	if((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / (w == 0 ? 1 : w)) {
         __m128i *data = (__m128i *)(m_data + start * w / 8);
         __m128i state = data[0];
         __m128i state2;
@@ -1203,13 +1270,13 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
             else if(w == 32)
                 state = max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
 
-            start += sizeof(__m128i) * 8 / SELF(w);
+            start += sizeof(__m128i) * 8 / (w == 0 ? 1 : w);
         }
         
         // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
         state2 = state; 
-        for (size_t t = 0; t < sizeof(__m128i) * 8 / SELF(w); ++t) {
-            const int64_t v = GetDirect<w>(((const char *)&state2), t);
+        for (size_t t = 0; t < sizeof(__m128i) * 8 / (w == 0 ? 1 : w); ++t) {
+            const int64_t v = GetUniversal<w>(((const char *)&state2), t);
             if (max ? v > m : v < m) {
                 m = v;
             }
@@ -1251,7 +1318,7 @@ template <size_t w> size_t Array::sum(size_t start, size_t end) const
     int64_t s = 0;
 
     // Sum manually until 128 bit aligned
-    for(; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (sizeof(__m128i) * 8) != 0); start++) {
+    for(; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % 128 != 0); start++) {
         s += Get<w>(start);
     }
 
@@ -1261,7 +1328,6 @@ template <size_t w> size_t Array::sum(size_t start, size_t end) const
         // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 
         // staiic values needed for fast sums
-        const uint64_t m1  = 0x5555555555555555ULL;
         const uint64_t m2  = 0x3333333333333333ULL;
         const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
         const uint64_t h01 = 0x0101010101010101ULL;
@@ -1271,11 +1337,13 @@ template <size_t w> size_t Array::sum(size_t start, size_t end) const
 
         for(size_t t = 0; t < chunks; t++) {
             if (w == 1) {
-#ifdef USE_SSE42                    
+#if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
                     s += __popcnt64(data[t]);
+#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
+					s += __builtin_popcountll(data[t]);
 #else
                     uint64_t a = data[t];
-
+					const uint64_t m1  = 0x5555555555555555ULL; 
                     a -= (a >> 1) & m1;
                     a = (a & m2) + ((a >> 2) & m2);
                     a = (a + (a >> 4)) & m4;
@@ -1303,7 +1371,7 @@ template <size_t w> size_t Array::sum(size_t start, size_t end) const
                     s += a;
                 }
             }
-            start += sizeof(int64_t) * 8 / SELF(w) * chunks;
+            start += sizeof(int64_t) * 8 / (w == 0 ? 1 : w) * chunks;
         }
 
 #ifdef USE_SSE42
@@ -1311,7 +1379,7 @@ template <size_t w> size_t Array::sum(size_t start, size_t end) const
     // SSE:                    391 371 374
     // Naive, templated Get<>:  97 148 282
 
-    if((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / SELF(w)) {
+    if((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / (w == 0 ? 1 : w)) {
         __m128i *data = (__m128i *)(m_data + start * w / 8);
         __m128i sum = {0};
         __m128i sum2;
@@ -1361,12 +1429,12 @@ template <size_t w> size_t Array::sum(size_t start, size_t end) const
                 */
             }
         }
-        start += sizeof(__m128i) * 8 / SELF(w) * chunks;
+        start += sizeof(__m128i) * 8 / (w == 0 ? 1 : w) * chunks;
 
         // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
         sum2 = sum; 
         for (size_t t = 0; t < sizeof(__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
-            int64_t v = GetDirect<(w == 8 || w == 16) ? 32 : 64>(((const char *)&sum2), t);
+            int64_t v = GetUniversal<(w == 8 || w == 16) ? 32 : 64>(((const char *)&sum2), t);
             s += v;
         }
     }
@@ -1610,36 +1678,7 @@ template <size_t width> void Array::SetWidth(void)
 
 template <size_t w>int64_t Array::Get(size_t ndx) const
 {
-    if(w == 0) {
-        return 0;   
-    }
-    else if(w == 1) {
-        const size_t offset = ndx >> 3;
-        return (m_data[offset] >> (ndx & 7)) & 0x01;        
-    }
-    else if(w == 2) {
-        const size_t offset = ndx >> 2;
-        return (m_data[offset] >> ((ndx & 3) << 1)) & 0x03;
-    }
-    else if(w == 4) {
-        const size_t offset = ndx >> 1;
-        return (m_data[offset] >> ((ndx & 1) << 2)) & 0x0F;
-    }
-    else if(w == 8) {
-         return *((const signed char*)(m_data + ndx));   
-    }
-    else if(w == 16) {
-        const size_t offset = ndx * 2;
-        return *(const int16_t*)(m_data + offset);        
-    }
-    else if(w == 32) {
-        const size_t offset = ndx * 4;
-        return *(const int32_t*)(m_data + offset);
-    }
-    else if(w == 64) {
-        const size_t offset = ndx * 8;
-        return *(const int64_t*)(m_data + offset);   
-    }
+	return GetUniversal<w>((const char *)m_data, ndx);
 }
 
 #ifdef __MSVCRT__
