@@ -37,7 +37,7 @@ TEST(LESS)
 
         size_t LEN2 = 64 * 8 / (a.GetBitWidth() == 0 ? 1 : a.GetBitWidth());
 
-        for(size_t from = 0; from < LEN2; from++) {
+        for(size_t from = 0; from < 16*8 + 1; from++) {
             for(size_t to = from + 1; to <= LEN2; to++) {
                 for(size_t match = 0; match < LEN2; match++) { 
 
@@ -51,6 +51,19 @@ TEST(LESS)
                     else {
                         assert(f == -1);
                     }
+
+
+                    // GREATER
+                    a.Set(match, v[w] + 1);
+                    f = a.Query<GREATER>(v[w], from, to);
+                    a.Set(match, v[w]);
+                    if(match >= from && match < to) {
+                        assert(match == f);
+                    }
+                    else {
+                        assert(f == -1);
+                    }
+
 
                     if(to == 9 && match == 1)
                         printf("");
