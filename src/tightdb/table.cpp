@@ -174,7 +174,7 @@ void Table::CreateColumns()
 
 Spec& Table::get_spec()
 {
-    assert(m_top.IsValid()); // you can only change specs on top-level tablesu
+    assert(m_top.IsValid()); // you can only change specs on top-level tables
     return m_spec_set;
 }
 
