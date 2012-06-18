@@ -95,7 +95,14 @@ Group::Group(const char* filename, int mode):
     const bool readOnly = mode & GROUP_READONLY;
     m_isValid = m_alloc.SetShared(filename, readOnly);
 
-    if (m_isValid) create_from_ref();
+    if (m_isValid) {
+        // if we just created shared group, we have to wait with
+        // actually creating it's datastructures until first write
+        if (m_persistMode == GROUP_SHARED && m_alloc.GetTopRef() == 0)
+            return;
+        else
+            create_from_ref();
+    }
 }
 
 Group::Group(const char* buffer, size_t len):
@@ -218,9 +225,51 @@ void Group::init_shared() {
     }
 }
     
+void Group::reset_to_new()
+{
+    assert(m_alloc.GetTopRef() == 0);
+    if (!m_top.IsValid()) return; // already in new state
+
+    // A shared group that has just been created and not yet
+    // written to does not have any internal structures yet
+    // (we may have to re-create this after a rollback)
+
+    // Clear old cached state
+    const size_t count = m_cachedtables.Size();
+    for (size_t i = 0; i < count; ++i) {
+        Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
+        delete t;
+    }
+    m_cachedtables.Clear();
+
+    m_top.Invalidate();
+    m_tables.Invalidate();
+    m_tableNames.Invalidate();
+    m_freePositions.Invalidate();
+    m_freeLengths.Invalidate();
+    m_freeVersions.Invalidate();
+
+    m_tableNames.SetParent(NULL, 0);
+    m_tables.SetParent(NULL, 0);
+    m_freePositions.SetParent(NULL, 0);
+    m_freeLengths.SetParent(NULL, 0);
+    m_freeVersions.SetParent(NULL, 0);
+}
+
+void Group::rollback()
+{
+    assert(is_shared());
+
+    // Clear all changes made during transaction
+    m_alloc.FreeAll();
+}
+
 Group::~Group()
 {
-    for (size_t i = 0; i < m_tables.Size(); ++i) {
+    if (!m_top.IsValid()) return; // nothing to clean up in new state
+
+    const size_t count = m_tables.Size();
+    for (size_t i = 0; i < count; ++i) {
         Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
         delete t;
     }
@@ -230,19 +279,32 @@ Group::~Group()
     m_top.Destroy();
 }
 
+bool Group::is_empty() const
+{
+    if (!m_top.IsValid()) return true;
+
+    return m_tableNames.is_empty();
+}
+
 size_t Group::get_table_count() const
 {
+    if (!m_top.IsValid()) return 0;
+
     return m_tableNames.Size();
 }
 
 const char* Group::get_table_name(size_t table_ndx) const
 {
+    assert(m_top.IsValid());
     assert(table_ndx < m_tableNames.Size());
+
     return m_tableNames.Get(table_ndx);
 }
 
 bool Group::has_table(const char* name) const
 {
+    if (!m_top.IsValid()) return false;
+
     const size_t n = m_tableNames.find_first(name);
     return (n != (size_t)-1);
 }
@@ -270,6 +332,7 @@ Table* Group::get_table_ptr(const char* name)
 
 Table& Group::get_table(size_t ndx)
 {
+    assert(m_top.IsValid());
     assert(ndx < m_tables.Size());
 
     // Get table from cache if exists, else create
@@ -286,6 +349,7 @@ Table& Group::get_table(size_t ndx)
 bool Group::write(const char* filepath)
 {
     assert(filepath);
+    assert(m_top.IsValid());
 
     FileOStream out(filepath);
     if (!out.is_valid()) return false;
@@ -297,6 +361,8 @@ bool Group::write(const char* filepath)
 
 char* Group::write_to_mem(size_t& len)
 {
+    assert(m_top.IsValid());
+
     // Get max possible size of buffer
     const size_t max_size = m_alloc.GetTotalSize();
 
@@ -314,6 +380,7 @@ bool Group::commit()
 
 bool Group::commit(size_t current_version, size_t readlock_version)
 {
+    assert(m_top.IsValid());
     assert(readlock_version <= current_version);
 
     if (!m_alloc.CanPersist()) return false;
@@ -444,6 +511,7 @@ void Group::update_refs(size_t topRef)
     
 void Group::update_from_shared(size_t top_ref, size_t len)
 {
+    if (top_ref == 0) return;              // just created
     if (top_ref == m_top.GetRef()) return; // already up-to-date
     
     // Update memory mapping if needed
