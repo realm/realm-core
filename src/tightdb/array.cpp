@@ -791,7 +791,6 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v)
 
 // Not meant to be called from outside Array.cpp
 template <bool eq, size_t width> inline size_t Array::CompareEquality(int64_t value, size_t start, size_t end) const {
-    if (end == (size_t)-1) end = m_len;
     assert(start <= m_len && end <= m_len && start <= end);
 
     if (width == 0) {
@@ -818,7 +817,7 @@ template <bool eq, size_t width> inline size_t Array::CompareEquality(int64_t va
         if(eq)
             return not_found;
         else
-            return 0;
+            return start;
     }
 
     if(width != 32 && width != 64) {
@@ -1076,11 +1075,10 @@ template <size_t width> void Array::find_all(Array& result, int64_t value, size_
 // If gt = false: Find first element which is smaller than value
 template <bool gt, size_t bitwidth>size_t Array::CompareRelation(int64_t value, size_t start, size_t end) const
 {
-    if (end == (size_t)-1) end = m_len;
     assert(start <= m_len && end <= m_len && start <= end);
 
     if (bitwidth == 0) {
-        if (gt ? (value > 0 && start < end) : (value < 0 && start < end))
+        if (gt ? (value < 0 && start < end) : (value > 0 && start < end))
             return start;
         else
             return not_found;
@@ -1101,9 +1099,9 @@ template <bool gt, size_t bitwidth>size_t Array::CompareRelation(int64_t value, 
 
     if (value < m_lbound || value > m_ubound) {
         if(gt)
-            return value > m_ubound ? 0 : not_found;
+            return value > m_ubound ? not_found : start;
         else
-            return value < m_lbound ? 0 : not_found;
+            return value < m_lbound ? not_found : start;
     }
 
     const int64_t* p = (const int64_t*)(m_data + (start * bitwidth / 8));
