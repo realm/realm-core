@@ -70,6 +70,7 @@ public:
 #ifdef _DEBUG
     void Verify(); // Must be upper case to avoid conflict with macro in ObjC
     void print() const;
+    void print_free() const;
     MemStats stats();
     void enable_mem_diagnostics(bool enable=true) {m_alloc.EnableDebug(enable);}
     void to_dot(std::ostream& out = std::cerr);

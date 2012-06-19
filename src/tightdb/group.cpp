@@ -171,7 +171,7 @@ void Group::create_from_ref()
         // Serialized files do not have free space markers
         // at all, and files that are not shared does not
         // need version info for free space.
-        if (top_size == 4) {
+        if (top_size >= 4) {
             m_freePositions.UpdateRef(m_top.Get(2));
             m_freeLengths.UpdateRef(m_top.Get(3));
             m_freePositions.SetParent(&m_top, 2);
@@ -441,7 +441,7 @@ size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly)
     while (filesize < needed_size) {
 #ifdef _DEBUG
         // in debug, increase in small intervals to force overwriting
-        filesize += 10;
+        filesize += 64;
 #else
         filesize += 1024*1024;
 #endif
@@ -522,6 +522,9 @@ void Group::update_from_shared(size_t top_ref, size_t len)
     if (m_top.Size() > 2) {
         m_freePositions.UpdateFromParent();
         m_freeLengths.UpdateFromParent();
+        if (m_top.Size() > 4) {
+            m_freeVersions.UpdateFromParent();
+        }
     }
     
     // If the names of the the tables in the group has not
@@ -584,6 +587,29 @@ MemStats Group::stats()
 void Group::print() const
 {
     m_alloc.Print();
+}
+
+void Group::print_free() const
+{
+    if (!m_freePositions.IsValid()) {
+        printf("none\n");
+        return;
+    }
+    const bool hasVersions = m_freeVersions.IsValid();
+
+    const size_t count = m_freePositions.Size();
+    for (size_t i = 0; i < count; ++i) {
+        const size_t pos  = m_freePositions[i];
+        const size_t size = m_freeLengths[i];
+        printf("%d: %d %d", (int)i, (int)pos, (int)size);
+
+        if (hasVersions) {
+            const size_t version = m_freeVersions[i];
+            printf(" %d", (int)version);
+        }
+        printf("\n");
+    }
+    printf("\n");
 }
 
 void Group::to_dot(std::ostream& out)

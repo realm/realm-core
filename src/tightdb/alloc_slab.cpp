@@ -30,11 +30,30 @@ using namespace tightdb;
 
 // Support function
 // todo, fixme: use header function in array instead!
-size_t GetSizeFromHeader(void* p)
+size_t GetCapacityFromHeader(void* p)
 {
     // parse the capacity part of 8byte header
     const uint8_t* const header = (uint8_t*)p;
     return (header[4] << 16) + (header[5] << 8) + header[6];
+}
+
+size_t GetSizeFromHeader(void* p)
+{
+    // parse width and count from 8byte header
+    const uint8_t* const header = (uint8_t*)p;
+    const size_t width = (1 << (header[0] & 0x07)) >> 1;
+    const size_t count = (header[1] << 16) + (header[2] << 8) + header[3];
+
+    // Calculate bytes used by array
+    const size_t bits = (count * width);
+    size_t bytes = (bits / 8) + 8; // add room for 8 byte header
+    if (bits & 0x7) ++bytes;       // include partial bytes
+
+    // Arrays are always padded to 64 bit alignment
+    const size_t rest = (~bytes & 0x7)+1;
+    if (rest < 8) bytes += rest; // 64bit blocks
+
+    return bytes;
 }
 
 }
@@ -94,7 +113,8 @@ MemRef SlabAlloc::Alloc(size_t size)
     assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
     // Do we have a free space we can reuse?
-    for (size_t i = 0; i < m_freeSpace.size(); ++i) {
+    const size_t count = m_freeSpace.size();
+    for (size_t i = 0; i < count; ++i) {
         FreeSpace::Cursor r = m_freeSpace[i];
         if (r.size >= (int)size) {
             const size_t location = (size_t)r.ref;
@@ -113,7 +133,7 @@ MemRef SlabAlloc::Alloc(size_t size)
             }
 #endif //_DEBUG
 
-            void* pointer = Translate(location);
+            void* const pointer = Translate(location);
             return MemRef(pointer, location);
         }
     }
@@ -152,10 +172,11 @@ MemRef SlabAlloc::Alloc(size_t size)
 void SlabAlloc::Free(size_t ref, void* p)
 {
     // Free space in read only segment is tracked separately
-    FreeSpace& freeSpace = IsReadOnly(ref) ? m_freeReadOnly : m_freeSpace;
+    const bool isReadOnly = IsReadOnly(ref);
+    FreeSpace& freeSpace = isReadOnly ? m_freeReadOnly : m_freeSpace;
 
     // Get size from segment
-    const size_t size = GetSizeFromHeader(p);
+    const size_t size = isReadOnly ? GetSizeFromHeader(p) : GetCapacityFromHeader(p);
     const size_t refEnd = ref + size;
     bool isMerged = false;
 
@@ -213,7 +234,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
 
     /*if (doCopy) {*/  //TODO: allow realloc without copying
         // Get size of old segment
-        const size_t oldsize = GetSizeFromHeader(p);
+        const size_t oldsize = GetCapacityFromHeader(p);
 
         // Copy existing segment
         memcpy(space.pointer, p, oldsize);
@@ -373,12 +394,8 @@ void SlabAlloc::FreeAll(size_t filesize)
 
     // Free all scratch space (done after all data has
     // been commited to persistent space)
-    m_freeSpace.clear();
     m_freeReadOnly.clear();
-    
-    // If the file size have changed, we need to remap the readonly buffer
-    if (filesize != (size_t)-1)
-        ReMap(filesize);
+    m_freeSpace.clear();
 
     // Rebuild free list to include all slabs
     size_t ref = m_baseline;
@@ -392,15 +409,20 @@ void SlabAlloc::FreeAll(size_t filesize)
         ref = c.offset;
     }
 
+    // If the file size have changed, we need to remap the readonly buffer
+    if (filesize != (size_t)-1)
+        ReMap(filesize);
+
     assert(IsAllFree());
 }
    
-void SlabAlloc::ReMap(size_t filesize)
+bool SlabAlloc::ReMap(size_t filesize)
 {
     assert(m_freeReadOnly.is_empty());
+    assert(m_slabs.size() == m_freeSpace.size());
     
     // If the file size have changed, we need to remap the readonly buffer
-    if (filesize == m_baseline) return;
+    if (filesize == m_baseline) return false;
     
     assert(filesize >= m_baseline);
     assert((filesize & 0x7) == 0); // 64bit alignment
@@ -414,6 +436,19 @@ void SlabAlloc::ReMap(size_t filesize)
     m_shared   = (char*)p;
     m_baseline = filesize;
 #endif
+
+    // Rebase slabs and free list
+    size_t new_offset = filesize;
+    const size_t count = m_slabs.size();
+    for (size_t i = 0; i < count; ++i) {
+        FreeSpace::Cursor c = m_freeSpace[i];
+        c.ref = new_offset;
+        new_offset += c.size;
+
+        m_slabs[i].offset = new_offset;
+    }
+
+    return true;
 }
 
 #ifdef _DEBUG
