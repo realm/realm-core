@@ -258,19 +258,37 @@ TEST(Shared_Writes)
 
 namespace  {
 
-void* IncrementEntry(void*);
+void* IncrementEntry(void* arg);
 
-void* IncrementEntry(void*)
+void* IncrementEntry(void* arg )
 {
+    const size_t row_id = (size_t)arg;
+
     // Open shared db
     SharedGroup shared("test_shared.tdb");
     CHECK(shared.is_valid());
 
     for (size_t i = 0; i < 100; ++i) {
-        Group& g1 = shared.begin_write();
-        TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
-        t1[0].first += 1;
-        shared.commit();
+        // Increment cell
+        {
+            Group& g1 = shared.begin_write();
+            TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            t1[row_id].first += 1;
+            shared.commit();
+        }
+
+        // Verify in new transaction so that we interleave
+        // read and write transactions
+        {
+            const Group& g1 = shared.begin_read();
+            TestTableShared::ConstRef t = g1.get_table<TestTableShared>("test");
+
+            const int64_t v = t[row_id].first;
+            const int64_t expected = i+1;
+            CHECK_EQUAL(expected, v);
+
+            shared.end_read();
+        }
     }
     return NULL;
 }
@@ -288,20 +306,23 @@ TEST(Shared_WriterThreads)
         SharedGroup shared("test_shared.tdb");
         CHECK(shared.is_valid());
 
+        const size_t thread_count = 10;
+
         // Create first table in group
         {
             Group& g1 = shared.begin_write();
             TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
-            t1->add(0, 2, false, "test");
+            for (size_t i = 0; i < thread_count; ++i) {
+                t1->add(0, 2, false, "test");
+            }
             shared.commit();
         }
 
-        const size_t thread_count = 10;
         pthread_t threads[thread_count];
 
         // Create all threads
         for (size_t i = 0; i < thread_count; ++i) {
-            const int rc = pthread_create(&threads[i], NULL, IncrementEntry, NULL);
+            const int rc = pthread_create(&threads[i], NULL, IncrementEntry, (void*)i);
             CHECK_EQUAL(0, rc);
         }
 
@@ -315,9 +336,11 @@ TEST(Shared_WriterThreads)
         {
             const Group& g1 = shared.begin_read();
             TestTableShared::ConstRef t = g1.get_table<TestTableShared>("test");
-            const int64_t v = t[0].first;
-            const int64_t expected = 100 * thread_count;
-            CHECK_EQUAL(expected, v);
+
+            for (size_t i = 0; i < thread_count; ++i) {
+                const int64_t v = t[i].first;
+                CHECK_EQUAL(100, v);
+            }
             shared.end_read();
         }
     }
