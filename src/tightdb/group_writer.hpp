@@ -36,6 +36,7 @@ class SlabAlloc;
 class GroupWriter {
 public:
     GroupWriter(Group& group);
+    ~GroupWriter();
 
     bool IsValid() const;
     void SetVersions(size_t current, size_t readlock);
@@ -45,8 +46,13 @@ public:
     size_t write(const char* p, size_t n);
     void WriteAt(size_t pos, const char* p, size_t n);
 
+#ifdef _DEBUG
+    void ZeroFreeSpace();
+#endif
+
 private:
     void DoCommit(uint64_t topPos);
+    size_t get_free_space(size_t len, size_t& filesize);
 
     // Member variables
     Group&     m_group;
@@ -54,7 +60,7 @@ private:
     size_t     m_current_version;
     size_t     m_readlock_version;
     size_t     m_len;
-    int        m_fd;
+    char*      m_data;
 };
 
 

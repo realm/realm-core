@@ -399,73 +399,6 @@ bool Group::commit(size_t current_version, size_t readlock_version)
     return true;
 }
 
-size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly)
-{
-    // Do we have a free space we can reuse?
-    const size_t count = m_freeLengths.Size();
-    for (size_t i = 0; i < count; ++i) {
-        const size_t free_len = m_freeLengths.Get(i);
-        if (len <= free_len) {
-            // Only blocks that are not occupied by current
-            // readers are allowed to be used.
-            if (is_shared()) {
-                const size_t v = m_freeVersions.Get(i);
-                if (v >= m_readlock_version) continue;
-            }
-
-            const size_t location = m_freePositions.Get(i);
-            if (testOnly) return location;
-
-            // Update free list
-            const size_t rest = free_len - len;
-            if (rest == 0) {
-                m_freePositions.Delete(i);
-                m_freeLengths.Delete(i);
-                if (is_shared())
-                    m_freeVersions.Delete(i);
-            }
-            else {
-                m_freeLengths.Set(i, rest);
-                m_freePositions.Set(i, location + len);
-            }
-
-            return location;
-        }
-    }
-
-    // No free space, so we have to expand the file.
-    // we always expand megabytes at a time, both for
-    // performance and to avoid excess fragmentation
-    const size_t old_filesize = filesize;
-    const size_t needed_size = old_filesize + len;
-    while (filesize < needed_size) {
-#ifdef _DEBUG
-        // in debug, increase in small intervals to force overwriting
-        filesize += 64;
-#else
-        filesize += 1024*1024;
-#endif
-    }
-
-#if !defined(_MSC_VER) // write persistence
-    // Extend the file
-    const int fd = m_alloc.GetFileDescriptor();
-    lseek(fd, filesize-1, SEEK_SET);
-    ssize_t r = ::write(fd, "\0", 1);
-    static_cast<void>(r); // FIXME: We should probably check for error here!
-#endif
-
-    // Add new free space
-    const size_t end  = old_filesize + len;
-    const size_t rest = filesize - end;
-    m_freePositions.add(end);
-    m_freeLengths.add(rest);
-    if (is_shared())
-        m_freeVersions.add(0); // new space is always free for writing
-
-    return old_filesize;
-}
-
 void Group::update_refs(size_t topRef)
 {
     // Update top with the new (persistent) ref
@@ -632,6 +565,35 @@ void Group::to_dot(std::ostream& out)
 
     out << "}" << endl;
     out << "}" << endl;
+}
+
+#include <sys/mman.h>
+
+void Group::zero_free_space(size_t file_size, size_t readlock_version)
+{
+    if (!is_shared()) return;
+
+#if !defined(_MSC_VER)
+    const int fd = m_alloc.GetFileDescriptor();
+
+    // Map to memory
+    void* const p = mmap(0, file_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if (p == (void*)-1) return;
+
+    const size_t count = m_freePositions.Size();
+    for (size_t i = 0; i < count; ++i) {
+        const size_t v = m_freeVersions.Get(i);
+        if (v >= m_readlock_version) continue;
+
+        const size_t pos = m_freePositions.Get(i);
+        const size_t len = m_freeLengths.Get(i);
+
+        memset((char*)p+pos, 0, len);
+    }
+
+    munmap(p, file_size);
+
+#endif
 }
 
 #endif //_DEBUG
