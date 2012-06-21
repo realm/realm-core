@@ -121,11 +121,12 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap);
 
 Table* table_new()
 {
-    return new Table();
+    return tightdb::LangBindHelper::new_table();
 }
 
 void table_delete(Table* t)
 {
+    tightdb::LangBindHelper::unbind_table_ref(t);
     delete t;
 }
 
