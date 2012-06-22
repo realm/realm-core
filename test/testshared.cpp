@@ -7,6 +7,8 @@
 
 using namespace tightdb;
 
+namespace {
+
 TIGHTDB_TABLE_4(TestTableShared,
                 first,  Int,
                 second, Int,
@@ -42,6 +44,8 @@ TEST(Shared_Initial)
     const int rc = access("test_shared.tdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
+
+} // anonymous namespace
 
 TEST(Shared1)
 {
@@ -293,7 +297,7 @@ void* IncrementEntry(void* arg )
     return NULL;
 }
 
-} // namespace
+} // anonymous namespace
 
 TEST(Shared_WriterThreads)
 {
