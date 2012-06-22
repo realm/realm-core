@@ -339,14 +339,14 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
         // Insert keys in sorted order, ignoring duplicates
         size_t pos;
         if (!keys.FindKeyPos(v, pos)) {
+            // Don't bother auto enumerating if there are too few duplicates
+            if (keys.Size() > (count / 2)) {
+                keys.Destroy(); // cleanup
+                return false;
+            }
+
             keys.Insert(pos, v);
         }
-    }
-
-    // Don't bpther auto enumerating if there are too few duplicates
-    if (keys.Size() > (count / 2)) {
-        keys.Destroy(); // cleanup
-        return false;
     }
 
     // Generate enumerated list of entries
