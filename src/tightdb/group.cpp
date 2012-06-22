@@ -441,11 +441,13 @@ void Group::update_refs(size_t topRef)
     
 void Group::update_from_shared(size_t top_ref, size_t len)
 {
-    if (top_ref == 0) return;              // just created
-    if (top_ref == m_top.GetRef()) return; // already up-to-date
+    if (top_ref == 0) return; // just created
     
     // Update memory mapping if needed
-    m_alloc.ReMap(len);
+    const bool isRemapped = m_alloc.ReMap(len);
+
+    // If the top has not changed, everything is up-to-date
+    if (!isRemapped && top_ref == m_top.GetRef()) return;
     
     // Update group arrays
     m_top.UpdateRef(top_ref);

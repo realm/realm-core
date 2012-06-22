@@ -421,7 +421,8 @@ bool SlabAlloc::ReMap(size_t filesize)
     assert(m_freeReadOnly.is_empty());
     assert(m_slabs.size() == m_freeSpace.size());
     
-    // If the file size have changed, we need to remap the readonly buffer
+    // We only need to remap the readonly buffer
+    // if the file size have changed.
     if (filesize == m_baseline) return false;
     
     assert(filesize >= m_baseline);
