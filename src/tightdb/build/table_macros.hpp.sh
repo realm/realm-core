@@ -2,7 +2,7 @@ DIR="$(dirname "$0")"
 
 TABLE_MACROS_HPP="$1"
 
-if python "$DIR/table_macros.hpp.py" 8 >/tmp/table_macros.hpp; then
+if python "$DIR/table_macros.hpp.py" 15 >/tmp/table_macros.hpp; then
     mv /tmp/table_macros.hpp "$TABLE_MACROS_HPP"
 else
     if [ -e "$TABLE_MACROS_HPP" ]; then
