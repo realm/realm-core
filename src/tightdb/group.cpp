@@ -567,6 +567,11 @@ void Group::to_dot(std::ostream& out)
     out << "}" << endl;
 }
 
+void Group::to_dot()
+{
+    to_dot(std::cerr);
+}
+
 #include <sys/mman.h>
 
 void Group::zero_free_space(size_t file_size, size_t readlock_version)
