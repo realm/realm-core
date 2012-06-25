@@ -718,6 +718,35 @@ size_t Array::FindPos2(int64_t target) const
     else return (size_t)high;
 }
 
+size_t FirstSetBit(unsigned int v) 
+{
+    // find the number of trailing zeros in 32-bit v 
+    int r;           // result goes here
+    static const int MultiplyDeBruijnBitPosition[32] = 
+    {
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
+        31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+    };
+
+    r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
+    return r;
+}
+
+size_t FirstSetBit64(int64_t v) 
+{
+    unsigned int v0 = (unsigned int)v;
+    unsigned int v1 = (unsigned int)(v >> 32);
+    size_t r;
+
+    if(v0 != 0)
+        r = FirstSetBit(v0);
+    else
+        r = FirstSetBit(v1) + 32;
+
+    return r;
+}
+
+
 template <size_t width> inline int64_t LowerBits(void) 
 {
     if(width == 1)
@@ -782,16 +811,139 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v)
     }
 
     uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
-    while(eq  ==    (((v >> (width * start)) & mask) != 0)    ) {
+    while(eq == (((v >> (width * start)) & mask) != 0)) {
         start++;
     }
 
     return start;
 }
 
+
+template <bool gt, size_t width>size_t FindGTLT_Magic(int64_t v)
+{
+    uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
+    uint64_t mask2 = mask1 >> 1;
+    uint64_t magic = gt ? (~0ULL / mask1 * (mask2 - v)) : (~0ULL / mask1 * v);
+    return magic;
+}
+
+template <bool gt, size_t width>size_t FindGTLT_Limited(int64_t v, uint64_t chunk, uint64_t magic)
+{
+    uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
+    uint64_t mask2 = mask1 >> 1;
+    uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / mask1 * (mask2 + 1)) : ((chunk - magic) & ~chunk&~0ULL/mask1*(mask2+1));
+    if(m) {
+        size_t t = FirstSetBit64(m) / (width == 0 ? 1 : width);
+        return t;
+    }
+    return -1;
+}
+
+
+
+// template <bool gt, size_t width>size_t __forceinline FindGTLT(int64_t v, uint64_t chunk) // fixme, __forceinline makes it crash, find out why
+template <bool gt, size_t width>size_t FindGTLT(int64_t v, uint64_t chunk)
+{
+    if(width == 1) {
+        if(gt ? (v == 0 && chunk != 0) : (v == 1 && chunk != 0xffffffffffffffffULL)) {
+            return FirstSetBit64(gt ? chunk : ~chunk);
+        }
+    }
+    else if(width == 2) {
+        // Alot (50% +) faster than loop/compiler-unrolled loop
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 0;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 1;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 2;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 3;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 4;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 5;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 6;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 7;
+
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 8;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 9;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 10;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 11;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 12;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 13;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 14;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 15;
+
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 16;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 17;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 18;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 19;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 20;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 21;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 22;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 23;
+
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 24;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 25;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 26;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 27;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 28;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 29;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 30;
+        if(gt ? (int64_t)(chunk & 0x3) <= v : (int64_t)(chunk & 0x3) >= v) chunk >>= 2; else return 31;
+    }
+    else if(width == 4) {
+        // 128 ms:
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 0;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 1;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 2;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 3;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 4;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 5;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 6;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 7;
+
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 8;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 9;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 10;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 11;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 12;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 13;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 14;
+        if(gt ? (int64_t)(chunk & 0xf) <= v : (int64_t)(chunk & 0xf) >= v) chunk >>= 4; else return 15;
+
+        // 187 ms:
+        // if(gt ? (int64_t)(chunk >> 0*4) & 0xf > v : (int64_t)(chunk >> 0*4) & 0xf < v) return 0;
+    }
+    else if(width == 8) {
+        // 88 ms:
+        if(gt ? (char)chunk <= v : (char)chunk >= v) chunk >>= 8; else return 0;
+        if(gt ? (char)chunk <= v : (char)chunk >= v) chunk >>= 8; else return 1;
+        if(gt ? (char)chunk <= v : (char)chunk >= v) chunk >>= 8; else return 2;
+        if(gt ? (char)chunk <= v : (char)chunk >= v) chunk >>= 8; else return 3;
+        if(gt ? (char)chunk <= v : (char)chunk >= v) chunk >>= 8; else return 4;
+        if(gt ? (char)chunk <= v : (char)chunk >= v) chunk >>= 8; else return 5;
+        if(gt ? (char)chunk <= v : (char)chunk >= v) chunk >>= 8; else return 6;
+        if(gt ? (char)chunk <= v : (char)chunk >= v) chunk >>= 8; else return 7;
+       
+        //97 ms ms:
+        // if(gt ? (char)(chunk >> 0*8) > v : (char)(chunk >> 0*8) < v) return 0;
+    }
+    else if(width == 16) {      
+        if(gt ? (short int)chunk <= v : (short int)chunk >= v) chunk >>= 16; else return 0;
+        if(gt ? (short int)chunk <= v : (short int)chunk >= v) chunk >>= 16; else return 1;
+        if(gt ? (short int)chunk <= v : (short int)chunk >= v) chunk >>= 16; else return 2;
+        if(gt ? (short int)chunk <= v : (short int)chunk >= v) chunk >>= 16; else return 3;
+    }
+    else if(width == 32) {
+        if(gt ? (int)chunk >= v : (int)chunk >= v) chunk >>= 32; else return 0;
+        if(gt ? (int)chunk >= v : (int)chunk >= v) chunk >>= 32; else return 1;
+    }
+    else if(width == 64) {
+        if(gt ? (int64_t)v > v : (int64_t)(v) < v) return 0;
+    }
+
+    return -1;
+}
+
 // Not meant to be called from outside Array.cpp
 template <bool eq, size_t width> inline size_t Array::CompareEquality(int64_t value, size_t start, size_t end) const {
-    assert(start <= m_len && end <= m_len && start <= end);
+    assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
 
     if (width == 0) {
         if (eq ? (value == 0 && start < end) : (value != 0 && start < end))
@@ -800,16 +952,12 @@ template <bool eq, size_t width> inline size_t Array::CompareEquality(int64_t va
             return not_found;
     }
 
-    // When starting from beginning of array the data is always 64bit aligned
-    // but otherwise we have to ensure alignment.
-    if (start != 0) {
-        size_t ee = round_up(start, 64 / (width == 0 ? 1 : width));
-        ee = ee > end ? end : ee;
-        for (; start < ee; ++start)
-            if (eq ? (Get<width>(start) == value) : (Get<width>(start) != value))
-                    return start;
-    }
-
+    size_t ee = round_up(start, 64 / (width == 0 ? 1 : width));
+    ee = ee > end ? end : ee;
+    for (; start < ee; ++start)
+        if (eq ? (Get<width>(start) == value) : (Get<width>(start) != value))
+                return start;
+    
     if(start >= end)
         return not_found;
 
@@ -845,7 +993,7 @@ template <bool eq, size_t width> inline size_t Array::CompareEquality(int64_t va
             }
         }
 
-        // Loop ended because we are near end of array. No need to optimize search in remainder in this case because end of array means that
+        // Loop ended because we are near end or end of array. No need to optimize search in remainder in this case because end of array means that
         // lots of search work has taken place prior to ending here. So time spent searching remainder is relatively tiny
         start = (p - (int64_t *)m_data) * 8 * 8 / (width == 0 ? 1 : width);
     }
@@ -861,8 +1009,16 @@ template <bool eq, size_t width> inline size_t Array::CompareEquality(int64_t va
 
 template <int cond, size_t bitwidth> size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
+    assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
+    
+    if(m_len > start && ((cond == COND_EQUAL && Get<bitwidth>(start) == value) || (cond == COND_NOTEQUAL && Get<bitwidth>(start) != value) || (cond == COND_LESS && Get<bitwidth>(start) < value) || (cond == COND_GREATER && Get<bitwidth>(start) > value)) && start < end) return start; else ++start;
+    if(m_len > start && ((cond == COND_EQUAL && Get<bitwidth>(start) == value) || (cond == COND_NOTEQUAL && Get<bitwidth>(start) != value) || (cond == COND_LESS && Get<bitwidth>(start) < value) || (cond == COND_GREATER && Get<bitwidth>(start) > value)) && start < end) return start; else ++start;
+    if(m_len > start && ((cond == COND_EQUAL && Get<bitwidth>(start) == value) || (cond == COND_NOTEQUAL && Get<bitwidth>(start) != value) || (cond == COND_LESS && Get<bitwidth>(start) < value) || (cond == COND_GREATER && Get<bitwidth>(start) > value)) && start < end) return start; else ++start;
+    if(m_len > start && ((cond == COND_EQUAL && Get<bitwidth>(start) == value) || (cond == COND_NOTEQUAL && Get<bitwidth>(start) != value) || (cond == COND_LESS && Get<bitwidth>(start) < value) || (cond == COND_GREATER && Get<bitwidth>(start) > value)) && start < end) return start; else ++start;
+    if(!(m_len > start && start < end))
+        return not_found;
+
     if (end == (size_t)-1) end = m_len;
-    assert(start <= m_len && end <= m_len && start <= end);
 
 #if defined(USE_SSE42) || defined(USE_SSE3)
 
@@ -904,12 +1060,13 @@ template <int cond, size_t bitwidth> size_t Array::find_first(int64_t value, siz
 #else
     return Compare<cond, bitwidth>(value, start, end);
 #endif
-
 }
 
 // Not meant to be called from outside Array.cpp
 template <int cond> size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
+    assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
+
     Finder finder = m_finder[cond];
     size_t i = (this->*finder)(value, start, end);
     return i;
@@ -921,19 +1078,6 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
     return find_first<COND_EQUAL>(value, start, end);
 }
 
-size_t FirstSetBit(unsigned int v) 
-{
-    // find the number of trailing zeros in 32-bit v 
-    int r;           // result goes here
-    static const int MultiplyDeBruijnBitPosition[32] = 
-    {
-        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
-        31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
-    };
-
-    r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
-    return r;
-}
 
 #if defined(USE_SSE42) || defined(USE_SSE3)
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
@@ -1075,7 +1219,7 @@ template <size_t width> void Array::find_all(Array& result, int64_t value, size_
 // If gt = false: Find first element which is smaller than value
 template <bool gt, size_t bitwidth>size_t Array::CompareRelation(int64_t value, size_t start, size_t end) const
 {
-    assert(start <= m_len && end <= m_len && start <= end);
+    assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
 
     if (bitwidth == 0) {
         if (gt ? (value < 0 && start < end) : (value > 0 && start < end))
@@ -1084,15 +1228,11 @@ template <bool gt, size_t bitwidth>size_t Array::CompareRelation(int64_t value, 
             return not_found;
     }
     
-    // When starting from beginning of array the data is always 64bit aligned
-    // but otherwise we have to ensure alignment.
-    if(start != 0) {
-        size_t ee = round_up(start, 64 / (bitwidth == 0 ? 1 : bitwidth));
-        ee = ee > end ? end : ee;
-        for (; start < ee; start++)
-            if (gt ? (Get<bitwidth>(start) > value)  :   (Get<bitwidth>(start) < value))
-                return start;
-    }
+    size_t ee = round_up(start, 64 / (bitwidth == 0 ? 1 : bitwidth));
+    ee = ee > end ? end : ee;
+    for (; start < ee; start++)
+        if (gt ? (Get<bitwidth>(start) > value) : (Get<bitwidth>(start) < value))
+            return start;
 
     if(start >= end)
         return (size_t)-1;
@@ -1109,127 +1249,50 @@ template <bool gt, size_t bitwidth>size_t Array::CompareRelation(int64_t value, 
 
     // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
-    if (bitwidth == 1) {
-        if ((value > 1 && gt) || (value < 0 && !gt)) {
-            return not_found;
-        }
-        else if(value == 0 && gt) {
-            while (p < e)
-                if(*p != 0)
-                    break;
-                else
-                    ++p;
-        }
-        else if (value == 1 && !gt) {
-            while (p < e)
-                if(*p != -1)
-                    break;
-                else
-                    ++p;
-        }
 
-        start = (p - (int64_t *)m_data) * 8 * 8;
-        
-        while (start < end) 
-            if (gt ? Get<1>(start) > value : Get<1>(start) < value)
-                return start;
-            else
-                ++start;
+    if (bitwidth == 1 || bitwidth == 2 || bitwidth == 4 || bitwidth == 8 || bitwidth == 16) {
+        // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than' 
+        if(value >= 0 && bitwidth != 1 && (bitwidth == 4 ? value <= (gt ? 7 : 8) : true) && (bitwidth == 2 ? value <= (gt ? 1 : 2) : true)) {
+            // 15 ms
+            uint64_t magic = FindGTLT_Magic<gt, bitwidth>(value);
 
-    }
-    else if (bitwidth == 2) {
-        if(value <= 1) {
-            const int64_t constant = gt ? (~0ULL / 3ULL * (3ULL - value))   :  (   ~0ULL / 3 * value );
+            while (p < e) {
+                uint64_t upper = LowerBits<bitwidth>() * 1ULL << (bitwidth == 0 ? 0 : (bitwidth - 1ULL));
+                const int64_t v = *p;
+                size_t idx;
+                // Bit hacks also only works for positive items in chunk, so test their sign bits
+                if((bitwidth == 8 || bitwidth == 16) ? upper : false)
+                    idx = FindGTLT<gt, bitwidth>(value, v);
+                else
+                    idx = FindGTLT_Limited<gt, bitwidth>(value, v, magic); 
+
+                if(idx != not_found) {
+                    start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
+                    return start + idx;
+                }
+
+                ++p;
+            }
+        }
+        else {
+            // 24 ms
             while(p < e) {
                 int64_t v = *p;
-                if( gt ? (((v + constant) | v) & ~0ULL / 3ULL * 2ULL)   :  ((v - constant) & ~v&~0ULL/3ULL*2ULL)      )
-                    break;
-                else
-                    ++p;
-            }
-            start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
-        }
-        else {
-            while(start < end && gt ? (Get<2>(start) <= value) : (Get<2>(start) >= value))
-                ++start;
-        }
-    }
-    else if (bitwidth == 4) {
-        if(value <= 7) {
-            const int64_t constant = gt ? (~0ULL / 15ULL * (7ULL - value))  :   (   ~0ULL / 15ULL * value )  ;
-            while(p < e) {
-                const int64_t v = *p;
-                if(gt ? (((v + constant) | v) & ~0ULL / 15ULL * 8ULL) :     ((v - constant) & ~v&~0ULL/15ULL*8ULL)    )
-                    break;
-                else
-                    ++p;
-            }
-            start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
-        }
-        else {
-            while(start < end && gt ? (Get<4>(start) <= value) : (Get<4>(start) >= value))
-                start++;
-        }
-    }
-    else if (bitwidth == 8) {
-        // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
-        if(value <= 127) {
-            const int64_t constant = gt ? (~0ULL / 255ULL * (127ULL - value))   :   (        ~0ULL / 255ULL * value           );
-            while (p < e) {
-                const int64_t v = *p;
-                // Bit hacks also only works for positive items in chunk, so test their sign bits
-                if(v & 0x8080808080808080ULL) {
-                    if (gt ? ((char)(v>>0*8) > value || (char)(v>>1*8) > value || (char)(v>>2*8) > value || (char)(v>>3*8) > value || (char)(v>>4*8) > value || (char)(v>>5*8) > value || (char)(v>>6*8) > value || (char)(v>>7*8) > value)
-                      :
-                    ((char)(v>>0*8) < value || (char)(v>>1*8) < value || (char)(v>>2*8) < value || (char)(v>>3*8) < value || (char)(v>>4*8) < value || (char)(v>>5*8) < value || (char)(v>>6*8) < value || (char)(v>>7*8) < value))
-                        break;
+                size_t idx = FindGTLT<gt, bitwidth>(value, v);
+                if(idx != not_found) {
+                    start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
+                    return start + idx;                    
                 }
-                else if (gt ?  (((v + constant) | v) & ~0ULL / 255ULL * 128ULL) : (         (v - constant) & ~v&~0ULL/255ULL*128ULL             ))
-                    break;
                 else
                     ++p;
             }
-            start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
         }
-        else {
-            while (start < end && gt ? (Get<8>(start) <= value) : (Get<8>(start) >= value))
-                ++start;
-        }
-
-    }
-    else if (bitwidth == 16) {
-        if (value <= 32767) {
-            const int64_t constant = gt ? (~0ULL / 65535ULL * (32767ULL - value))   :   ( ~0ULL / 65535ULL * value);
-            while(p < e) {
-                const int64_t v = *p;
-                if (v & 0x8000800080008000ULL) {
-                    if (gt ? ((int)(v>>0*16) > value || (int)(v>>1*16) > value || (int)(v>>2*16) > value || (int)(v>>3*16) > value) :
-                        ((int)(v>>0*16) < value || (int)(v>>1*16) < value || (int)(v>>2*16) < value || (int)(v>>3*16) < value))
-                        break;
-                }
-                else if (gt ? (((v + constant) | v) & ~0ULL / 65535ULL * 32768ULL) : (         (v - constant) & ~v&~0ULL/65535ULL*32768ULL        ))
-                    break;
-                else
-                    ++p;
-            }
-            start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
-        }
-        else {
-            while (start < end && gt ? (Get<16>(start) <= value)  :  (false))
-                ++start;
-        }
-    }
-    else if (bitwidth == 32) {
-        // extra logic in SIMD no longer pays off because we have just 2 elements
-        while (start < end && gt ? (Get<32>(start) <= value) : (Get<32>(start) >= value) )
-            ++start;
-    }
-    else if (bitwidth == 64) {
-        while (start < end && gt ? (Get<64>(start) <= value) : (Get<64>(start) >= value))
-            ++start;
+        start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
     }
 
-    // Above 'SIMD' search cannot tell the position of the match inside a chunk, so test remainder manually
+    // extra logic in SIMD no longer pays off for 32/64 bit ints because we have just 4/2 elements
+
+    // Test unaligned end manually
     while (start < end)
         if (gt ? Get<bitwidth>(start) > value : Get<bitwidth>(start) < value)
             return start;

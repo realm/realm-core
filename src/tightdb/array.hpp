@@ -287,8 +287,8 @@ private:
     template <bool eq, size_t width> inline size_t CompareEquality(int64_t value, size_t start, size_t end) const;
     template <bool gt, size_t width>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
     template <bool max, size_t w> bool minmax(int64_t& result, size_t start, size_t end) const;
-    template <int C, size_t bitwidth>size_t find_first(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
-    template <int C>size_t find_first(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
+    template <int C, size_t bitwidth>size_t find_first(int64_t value, size_t start, size_t end) const;
+    template <int C>size_t find_first(int64_t value, size_t start, size_t end) const;
 
 protected:
     size_t m_len;
