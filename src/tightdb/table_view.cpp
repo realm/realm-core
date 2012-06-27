@@ -25,9 +25,9 @@ size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) co
     assert(column_ndx < m_table->get_column_count());
     assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
 
-    for(size_t i = 0; i < m_refs.Size(); i++)
-    if(strcmp(get_string(column_ndx, i), value) == 0)
-        return i;
+    for (size_t i = 0; i < m_refs.Size(); i++)
+        if (strcmp(get_string(column_ndx, i), value) == 0)
+            return i;
 
     return size_t(-1);
 }
@@ -40,8 +40,8 @@ TableView TableView::find_all_int(size_t column_ndx, int64_t value)
     assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
 
     TableView tv(*m_table);
-    for(size_t i = 0; i < m_refs.Size(); i++)
-        if(get_int(column_ndx, i) == value)
+    for (size_t i = 0; i < m_refs.Size(); i++)
+        if (get_int(column_ndx, i) == value)
             tv.get_ref_column().add(i);
     return move(tv);
 }
@@ -54,8 +54,8 @@ ConstTableView TableView::find_all_int(size_t column_ndx, int64_t value) const
     assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
 
     ConstTableView tv(*m_table);
-    for(size_t i = 0; i < m_refs.Size(); i++)
-        if(get_int(column_ndx, i) == value)
+    for (size_t i = 0; i < m_refs.Size(); i++)
+        if (get_int(column_ndx, i) == value)
             tv.get_ref_column().add(i);
     return move(tv);
 }
@@ -68,8 +68,8 @@ ConstTableView ConstTableView::find_all_int(size_t column_ndx, int64_t value) co
     assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
 
     ConstTableView tv(*m_table);
-    for(size_t i = 0; i < m_refs.Size(); i++)
-        if(get_int(column_ndx, i) == value)
+    for (size_t i = 0; i < m_refs.Size(); i++)
+        if (get_int(column_ndx, i) == value)
             tv.get_ref_column().add(i);
     return move(tv);
 }
@@ -82,9 +82,9 @@ TableView TableView::find_all_string(size_t column_ndx, const char* value)
     assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
 
     TableView tv(*m_table);
-    for(size_t i = 0; i < m_refs.Size(); i++)
-    if(strcmp(get_string(column_ndx, i), value) == 0)
-        tv.get_ref_column().add(i);
+    for (size_t i = 0; i < m_refs.Size(); i++)
+        if (strcmp(get_string(column_ndx, i), value) == 0)
+            tv.get_ref_column().add(i);
     return move(tv);
 }
 
@@ -96,9 +96,9 @@ ConstTableView TableView::find_all_string(size_t column_ndx, const char* value) 
     assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
 
     ConstTableView tv(*m_table);
-    for(size_t i = 0; i < m_refs.Size(); i++)
-    if(strcmp(get_string(column_ndx, i), value) == 0)
-        tv.get_ref_column().add(i);
+    for (size_t i = 0; i < m_refs.Size(); i++)
+        if (strcmp(get_string(column_ndx, i), value) == 0)
+            tv.get_ref_column().add(i);
     return move(tv);
 }
 
@@ -110,9 +110,9 @@ ConstTableView ConstTableView::find_all_string(size_t column_ndx, const char* va
     assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
 
     ConstTableView tv(*m_table);
-    for(size_t i = 0; i < m_refs.Size(); i++)
-    if(strcmp(get_string(column_ndx, i), value) == 0)
-        tv.get_ref_column().add(i);
+    for (size_t i = 0; i < m_refs.Size(); i++)
+        if (strcmp(get_string(column_ndx, i), value) == 0)
+            tv.get_ref_column().add(i);
     return move(tv);
 }
 
@@ -124,7 +124,7 @@ int64_t TableViewBase::sum(size_t column_ndx) const
     assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
     int64_t sum = 0;
 
-    for(size_t i = 0; i < m_refs.Size(); i++)
+    for (size_t i = 0; i < m_refs.Size(); i++)
         sum += get_int(column_ndx, i);
 
     return sum;
@@ -180,26 +180,26 @@ void TableViewBase::sort(size_t column, bool Ascending)
     Array result;
 
     //ref.Preset(0, m_refs.Size() - 1, m_refs.Size());
-    for(size_t t = 0; t < m_refs.Size(); t++)
+    for (size_t t = 0; t < m_refs.Size(); t++)
         ref.add(t);
 
     // Extract all values from the Column and put them in an Array because Array is much faster to operate on
     // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
-    if(m_table->get_column_type(column) == COLUMN_TYPE_INT) {
-        for(size_t t = 0; t < m_refs.Size(); t++) {
+    if (m_table->get_column_type(column) == COLUMN_TYPE_INT) {
+        for (size_t t = 0; t < m_refs.Size(); t++) {
             const int64_t v = m_table->get_int(column, size_t(m_refs.Get(t)));
             vals.add(v);
         }
     }
-    else if(m_table->get_column_type(column) == COLUMN_TYPE_DATE) {
-        for(size_t t = 0; t < m_refs.Size(); t++) {
+    else if (m_table->get_column_type(column) == COLUMN_TYPE_DATE) {
+        for (size_t t = 0; t < m_refs.Size(); t++) {
             const size_t idx = size_t(m_refs.Get(t));
             const int64_t v = int64_t(m_table->get_date(column, idx));
             vals.add(v);
         }
     }
-    else if(m_table->get_column_type(column) == COLUMN_TYPE_BOOL) {
-        for(size_t t = 0; t < m_refs.Size(); t++) {
+    else if (m_table->get_column_type(column) == COLUMN_TYPE_BOOL) {
+        for (size_t t = 0; t < m_refs.Size(); t++) {
             const size_t idx = size_t(m_refs.Get(t));
             const int64_t v = int64_t(m_table->get_bool(column, idx));
             vals.add(v);
@@ -209,7 +209,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
     vals.ReferenceSort(ref);
     vals.Destroy();
 
-    for(size_t t = 0; t < m_refs.Size(); t++) {
+    for (size_t t = 0; t < m_refs.Size(); t++) {
         const size_t r  = (size_t)ref.Get(t);
         const size_t rr = (size_t)m_refs.Get(r);
         result.add(rr);
@@ -219,14 +219,14 @@ void TableViewBase::sort(size_t column, bool Ascending)
 
     // Copy result to m_refs (todo, there might be a shortcut)
     m_refs.Clear();
-    if(Ascending) {
-        for(size_t t = 0; t < ref.Size(); t++) {
+    if (Ascending) {
+        for (size_t t = 0; t < ref.Size(); t++) {
             const size_t v = (size_t)result.Get(t);
             m_refs.add(v);
         }
     }
     else {
-        for(size_t t = 0; t < ref.Size(); t++) {
+        for (size_t t = 0; t < ref.Size(); t++) {
             const size_t v = (size_t)result.Get(ref.Size() - t - 1);
             m_refs.add(v);
         }

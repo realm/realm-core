@@ -572,7 +572,9 @@ void Group::to_dot(std::ostream& out)
     out << "}" << endl;
 }
 
+#if !defined(_MSC_VER)
 #include <sys/mman.h>
+#endif
 
 void Group::zero_free_space(size_t file_size, size_t readlock_version)
 {
