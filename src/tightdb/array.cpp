@@ -237,6 +237,15 @@ bool Array::UpdateFromParent() {
         Create(new_ref);
         return true;
     }
+    else {
+        // If the file has been remapped it might have
+        // moved to a new location
+        unsigned char* const m = (unsigned char*)m_alloc.Translate(m_ref);
+        if (m_data-8 != m) {
+            m_data = m + 8;
+            return true;
+        }
+    }
 
     return false; // not modified
 }

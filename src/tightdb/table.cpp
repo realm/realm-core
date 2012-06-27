@@ -961,12 +961,9 @@ int64_t Table::sum(size_t column_ndx) const
 {
     assert(column_ndx < get_column_count());
     assert(get_column_type(column_ndx) == COLUMN_TYPE_INT);
-    int64_t sum = 0;
 
-    for(size_t i = 0; i < size(); ++i)
-        sum += get_int(column_ndx, i);
-
-    return sum;
+    const Column& column = GetColumn(column_ndx);
+    return column.sum();
 }
 
 int64_t Table::maximum(size_t column_ndx) const

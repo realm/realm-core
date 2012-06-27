@@ -46,6 +46,7 @@ public:
 
 #ifdef _DEBUG
     void test_ringbuf();
+    void zero_free_space();
 #endif
 
 private:

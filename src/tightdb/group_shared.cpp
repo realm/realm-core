@@ -446,6 +446,29 @@ void SharedGroup::test_ringbuf()
     
 }
 
+void SharedGroup::zero_free_space()
+{
+    // Get version info
+    size_t current_version;
+    size_t readlock_version;
+    size_t file_size;
+    pthread_mutex_lock(&m_info->readmutex);
+    {
+        current_version = m_info->current_version + 1;
+        file_size = m_info->filesize;
+
+        if (ringbuf_is_empty())
+            readlock_version = current_version;
+        else {
+            const ReadCount& r = ringbuf_get_first();
+            readlock_version = r.version;
+        }
+    }
+    pthread_mutex_unlock(&m_info->readmutex);
+
+    m_group.zero_free_space(file_size, readlock_version);
+}
+
 #endif //_DEBUG
 
 #endif //_MSV_VER

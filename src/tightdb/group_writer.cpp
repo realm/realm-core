@@ -2,17 +2,31 @@
 #include "group.hpp"
 #include "alloc_slab.hpp"
 
+#include <sys/mman.h>
+
 using namespace tightdb;
 
 // todo, test (int) cast
 GroupWriter::GroupWriter(Group& group) :
-    m_group(group), m_alloc(group.get_allocator()), m_len(m_alloc.GetFileLen()), m_fd((int)m_alloc.GetFileDescriptor())
+    m_group(group), m_alloc(group.get_allocator()), m_len(m_alloc.GetFileLen()), m_data((char*)-1)
 {
+#if !defined(_MSC_VER)
+    const int fd = m_alloc.GetFileDescriptor();
+    m_data = (char*)mmap(0, m_len, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+#endif
+}
+
+GroupWriter::~GroupWriter()
+{
+#if !defined(_MSC_VER)
+    if (m_data != (char*)-1)
+        munmap(m_data, m_len);
+#endif
 }
 
 bool GroupWriter::IsValid() const
 {
-    return m_fd != 0;
+    return m_data != (char*)-1;
 }
 
 void GroupWriter::SetVersions(size_t current, size_t readlock) {
@@ -60,10 +74,10 @@ void GroupWriter::Commit()
     // Reserve space for each block. We explicitly ask for a bigger space than
     // the block can occupy, so that we know that we will have to add the rest
     // space later
-    const size_t top_pos = m_group.get_free_space(top_max_size, m_len);
-    const size_t fp_pos  = m_group.get_free_space(flist_max_size, m_len);
-    const size_t fl_pos  = m_group.get_free_space(flist_max_size, m_len);
-    const size_t fv_pos  = isShared ? m_group.get_free_space(flist_max_size, m_len) : 0;
+    const size_t top_pos = get_free_space(top_max_size, m_len);
+    const size_t fp_pos  = get_free_space(flist_max_size, m_len);
+    const size_t fl_pos  = get_free_space(flist_max_size, m_len);
+    const size_t fv_pos  = isShared ? get_free_space(flist_max_size, m_len) : 0;
 
     // Update top and make sure that it is big enough to hold any position
     // the free lists can get
@@ -133,27 +147,25 @@ void GroupWriter::Commit()
 }
 
 size_t GroupWriter::write(const char* p, size_t n) {
-#if !defined(_MSC_VER) // write persistence
     // Get position of free space to write in (expanding file if needed)
-    const size_t pos = m_group.get_free_space(n, m_len);
+    const size_t pos = get_free_space(n, m_len);
 
     // Write the block
-    lseek(m_fd, pos, SEEK_SET);
-    ssize_t r = ::write(m_fd, p, n);
-    static_cast<void>(r); // FIXME: We should probably check for error here!
+    char* const dest = m_data + pos;
+    memcpy(dest, p, n);
 
     // return the position it was written
     return pos;
-#endif
-    return 0;
 }
 
 void GroupWriter::WriteAt(size_t pos, const char* p, size_t n) {
-#if !defined(_MSC_VER) // write persistence
-    lseek(m_fd, pos, SEEK_SET);
-    ssize_t r = ::write(m_fd, p, n);
-    static_cast<void>(r); // FIXME: We should probably check for error here!
-#endif
+    char* const dest = m_data + pos;
+
+    char* const mmap_end = m_data + m_len;
+    char* const copy_end = dest + n;
+    assert(copy_end <= mmap_end);
+
+    memcpy(dest, p, n);
 }
 
 void GroupWriter::DoCommit(uint64_t topPos)
@@ -169,10 +181,98 @@ void GroupWriter::DoCommit(uint64_t topPos)
     //if (isSwapOnly || isAsync) return;
 
 #if !defined(_MSC_VER) // write persistence
-    fsync(m_fd);
-    lseek(m_fd, 0, SEEK_SET);
-    ssize_t r = ::write(m_fd, (const char*)&topPos, 8);
-    static_cast<void>(r); // FIXME: We should probably check for error here!
-    fsync(m_fd); // Could be fdatasync on Linux
+    // Write data
+    msync(m_data, m_len, MS_SYNC);
+
+    // Write top pointer
+    memcpy(m_data, (const char*)&topPos, 8);
+    msync(m_data, m_len, MS_SYNC);
 #endif
 }
+
+size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
+{
+    Array& fpositions   = m_group.m_freePositions;
+    Array& flengths     = m_group.m_freeLengths;
+    Array& fversions    = m_group.m_freeVersions;
+    const bool isShared = m_group.is_shared();
+
+    // Do we have a free space we can reuse?
+    const size_t count = flengths.Size();
+    for (size_t i = 0; i < count; ++i) {
+        const size_t free_len = flengths.Get(i);
+        if (len <= free_len) {
+            // Only blocks that are not occupied by current
+            // readers are allowed to be used.
+            if (isShared) {
+                const size_t v = fversions.Get(i);
+                if (v >= m_readlock_version) continue;
+            }
+
+            const size_t location = fpositions.Get(i);
+
+            // Update free list
+            const size_t rest = free_len - len;
+            if (rest == 0) {
+                fpositions.Delete(i);
+                flengths.Delete(i);
+                if (isShared)
+                    fversions.Delete(i);
+            }
+            else {
+                flengths.Set(i, rest);
+                fpositions.Set(i, location + len);
+            }
+
+            return location;
+        }
+    }
+
+    // No free space, so we have to expand the file.
+    // we always expand megabytes at a time, both for
+    // performance and to avoid excess fragmentation
+    const size_t old_filesize = filesize;
+    const size_t needed_size = old_filesize + len;
+    while (filesize < needed_size) {
+#ifdef _DEBUG
+        // in debug, increase in small intervals to force overwriting
+        filesize += 64;
+#else
+        filesize += 1024*1024;
+#endif
+    }
+
+#if !defined(_MSC_VER) // write persistence
+    // Extend the file
+    const int fd = m_alloc.GetFileDescriptor();
+    lseek(fd, filesize-1, SEEK_SET);
+    ssize_t r = ::write(fd, "\0", 1);
+    static_cast<void>(r); // FIXME: We should probably check for error here!
+    fsync(fd);
+
+    // ReMap
+    //void* const p = mremap(m_shared, m_baseline, filesize); // linux only
+    munmap(m_data, old_filesize);
+    m_data = (char*)mmap(0, filesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    assert(m_data != (char*)-1);
+#endif
+
+    // Add new free space
+    const size_t end  = old_filesize + len;
+    const size_t rest = filesize - end;
+    fpositions.add(end);
+    flengths.add(rest);
+    if (isShared)
+        fversions.add(0); // new space is always free for writing
+
+    return old_filesize;
+}
+
+
+#ifdef _DEBUG
+
+void GroupWriter::ZeroFreeSpace()
+{
+}
+
+#endif
