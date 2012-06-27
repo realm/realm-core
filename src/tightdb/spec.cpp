@@ -1,18 +1,23 @@
 #include "spec.hpp"
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+#include <tightdb/replication.hpp>
+#endif
+
 using namespace std;
 
 namespace tightdb {
 
 // Uninitialized Spec (call UpdateRef to init)
-Spec::Spec(Allocator& alloc):
-m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
+Spec::Spec(const Table* table, Allocator& alloc):
+    m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
 {
 }
 
 // Create a new Spec
-Spec::Spec(Allocator& alloc, ArrayParent* parent, size_t pndx):
-m_specSet(COLUMN_HASREFS, parent, pndx, alloc), m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_names(NULL, 0, alloc), m_subSpecs(alloc)
+Spec::Spec(const Table* table, Allocator& alloc, ArrayParent* parent, size_t pndx):
+    m_table(table), m_specSet(COLUMN_HASREFS, parent, pndx, alloc),
+    m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_names(NULL, 0, alloc), m_subSpecs(alloc)
 {
     // The SpecSet contains the specification (types and names) of all columns and sub-tables
     m_specSet.add(m_spec.GetRef());
@@ -22,21 +27,29 @@ m_specSet(COLUMN_HASREFS, parent, pndx, alloc), m_spec(COLUMN_NORMAL, NULL, 0, a
 }
 
 // Create Spec from ref
-Spec::Spec(Allocator& alloc, size_t ref, ArrayParent* parent, size_t pndx):
-m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
+Spec::Spec(const Table* table, Allocator& alloc, size_t ref, ArrayParent* parent, size_t pndx):
+    m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
 {
     create(ref, parent, pndx);
 }
 
 Spec::Spec(const Spec& s):
-m_specSet(s.m_specSet.GetAllocator()), m_spec(s.m_specSet.GetAllocator()),
-m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator())
+    m_table(s.m_table), m_specSet(s.m_specSet.GetAllocator()), m_spec(s.m_specSet.GetAllocator()),
+    m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator())
 {
     const size_t ref    = s.m_specSet.GetRef();
     ArrayParent *parent = s.m_specSet.GetParent();
     const size_t pndx   = s.m_specSet.GetParentNdx();
 
     create(ref, parent, pndx);
+}
+
+Spec::~Spec()
+{
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    Replication* repl = m_specSet.GetAllocator().get_replication();
+    if (repl) repl->on_spec_destroyed(this);
+#endif
 }
 
 void Spec::create(size_t ref, ArrayParent* parent, size_t pndx)
@@ -115,6 +128,11 @@ void Spec::add_column(ColumnType type, const char* name)
         const size_t ref = specSet.GetRef();
         m_subSpecs.add(ref);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    Replication* repl = m_specSet.GetAllocator().get_replication();
+    if (repl) repl->add_column(m_table, this, type, name);
+#endif
 }
 
 Spec Spec::add_subtable_column(const char* name)
@@ -140,7 +158,7 @@ Spec Spec::get_subspec(size_t column_ndx)
     Allocator& alloc = m_specSet.GetAllocator();
     const size_t ref = m_subSpecs.GetAsRef(pos);
 
-    return Spec(alloc, ref, &m_subSpecs, pos);
+    return Spec(m_table, alloc, ref, &m_subSpecs, pos);
 }
 
 const Spec Spec::get_subspec(size_t column_ndx) const
@@ -158,7 +176,7 @@ const Spec Spec::get_subspec(size_t column_ndx) const
     Allocator& alloc = m_specSet.GetAllocator();
     const size_t ref = m_subSpecs.GetAsRef(pos);
 
-    return Spec(alloc, ref, NULL, 0);
+    return Spec(m_table, alloc, ref, NULL, 0);
 }
 
 size_t Spec::get_subspec_ref(std::size_t subtable_ndx) const {
@@ -286,6 +304,22 @@ size_t Spec::get_column_index(const char* name) const
     return m_names.find_first(name);
 }
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+size_t* Spec::record_subspec_path(const ArrayParent* root, size_t* begin, size_t* end) const
+{
+    const Array* spec_set = &m_specSet;
+    for (;;) {
+        *begin = spec_set->GetParentNdx();
+        if (++begin == end) return 0; // Error, not enough space in buffer
+        const ArrayParent* parent = spec_set->GetParent();
+        if (parent == root) break;
+        const Array* subspecs = static_cast<const Array*>(parent);
+        spec_set = static_cast<const Array*>(subspecs->GetParent());
+    }
+    return begin;
+}
+#endif // TIGHTDB_ENABLE_REPLICATION
+
 #ifdef _DEBUG
 
 bool Spec::compare(const Spec& spec) const {
@@ -320,7 +354,7 @@ void Spec::to_dot(std::ostream& out, const char*) const
         // Write out subspecs
         for (size_t i = 0; i < count; ++i) {
             const size_t ref = m_subSpecs.GetAsRef(i);
-            const Spec s(alloc, ref, NULL, 0);
+            const Spec s(m_table, alloc, ref, NULL, 0);
 
             s.to_dot(out);
         }

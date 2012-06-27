@@ -41,10 +41,10 @@ struct tightdb::SharedInfo {
     pthread_mutex_t writemutex;
     uint64_t filesize;
     uint32_t infosize;
-    
+
     uint64_t current_top;
     uint32_t current_version;
-    
+
     uint32_t capacity; // -1 so it can also be used as mask
     uint32_t put_pos;
     uint32_t get_pos;
@@ -52,19 +52,43 @@ struct tightdb::SharedInfo {
 };
 
 
-SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED), m_info(NULL), m_isValid(false), m_version(-1), m_lockfile_path(NULL)
+SharedGroup::SharedGroup(const char* path_to_database_file):
+    m_group(path_to_database_file, GROUP_SHARED), m_info(NULL), m_isValid(false), m_version(-1),
+    m_lockfile_path(NULL)
+{
+    init(path_to_database_file);
+}
+
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+SharedGroup::SharedGroup(replication_tag):
+    m_group(Replication::get_path_to_database_file(), GROUP_SHARED), m_info(NULL),
+    m_isValid(false), m_version(-1), m_lockfile_path(NULL)
+{
+    error_code err = m_replication.init();
+    if (err) return; // FIXME: Reveal the error code somehow
+    m_group.set_replication(&m_replication);
+
+    init(Replication::get_path_to_database_file());
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
+
+void SharedGroup::init(const char* path_to_database_file)
 {
     if (!m_group.is_valid()) return;
-    
+
     // Open shared coordination buffer
-    m_lockfile_path = concat_strings(filename, ".lock");
+    m_lockfile_path = concat_strings(path_to_database_file, ".lock");
     m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return;
-    
+
     bool needInit = false;
     size_t len    = 0;
     struct stat statbuf;
-    
+
     // If we can get an exclusive lock we know that the file is
     // either new (empty) or a leftover from a previous
     // crashed process (needing re-initialization)
@@ -104,7 +128,7 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED)
         close(m_fd);
         return;
     }
-    
+
     // Map to memory
     void* const p = mmap(0, len, PROT_READ|PROT_WRITE, MAP_SHARED, m_fd, 0);
     if (p == (void*)-1) {
@@ -112,7 +136,7 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED)
         return;
     }
     m_info = (SharedInfo*)p;
-    
+
     if (needInit) {
         // Initialize mutexes so that they can be shared between processes
         pthread_mutexattr_t mattr;
@@ -137,13 +161,14 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED)
         // so other processes can share it as well
         flock(m_fd, LOCK_SH);
     }
-    
+
     m_isValid = true;
 
 #ifdef _DEBUG
     m_state = SHARED_STATE_READY;
 #endif
 }
+
 
 SharedGroup::~SharedGroup()
 {
@@ -259,6 +284,13 @@ Group& SharedGroup::begin_write()
     assert(m_state == SHARED_STATE_READY);
     assert(m_group.get_allocator().IsAllFree());
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (m_replication) {
+        error_code err = m_replication.acquire_write_access();
+        if (err) TIGHTDB_TERMINATE("ABORTED"); // FIXME: Termination is not the right way to handle this.
+    }
+#endif
+
     // Get write lock
     // Note that this will not get released until we call
     // end_write().
@@ -333,6 +365,10 @@ void SharedGroup::commit()
 #ifdef _DEBUG
     m_state = SHARED_STATE_READY;
 #endif
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (m_replication) m_replication.release_write_access(false);
+#endif
 }
 
 void SharedGroup::rollback()
@@ -347,6 +383,10 @@ void SharedGroup::rollback()
 
 #ifdef _DEBUG
     m_state = SHARED_STATE_READY;
+#endif
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (m_replication) m_replication.release_write_access(true);
 #endif
 }
 

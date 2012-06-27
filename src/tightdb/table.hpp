@@ -25,6 +25,10 @@
 #include "spec.hpp"
 #include "mixed.hpp"
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+#include <tightdb/replication.hpp>
+#endif
+
 namespace tightdb {
 
 using std::size_t;
@@ -32,6 +36,11 @@ using std::time_t;
 
 class TableView;
 class ConstTableView;
+
+
+// FIXME: Table copying (from any group to any group) could be made aliasing safe as follows: Start by cloning source table into target allocator. On success, assign, and then deallocate any previous structure at the target.
+
+// FIXME: It might be desirable to have a 'table move' feature between two places inside the same group (say from a subtable or a mixed column to group level). This could be done in a very efficient manner.
 
 
 /**
@@ -46,6 +55,7 @@ class ConstTableView;
  */
 class Table {
 public:
+    // FIXME: Generally use the word 'spec' instead of 'schema'
     // Construct a new top-level table with an independent schema.
     Table(Allocator& alloc = GetDefaultAllocator());
     ~Table();
@@ -69,8 +79,8 @@ public:
     ColumnType  get_column_type(size_t column_ndx) const;
 
     // Row handling
-    size_t      add_empty_row(size_t num_of_rows = 1);
-    void        insert_empty_row(size_t row_ndx, size_t num_of_rows = 1);
+    size_t      add_empty_row(size_t num_rows = 1);
+    void        insert_empty_row(size_t row_ndx, size_t num_rows = 1);
     void        remove(size_t row_ndx);
     void        remove_last() {if (!is_empty()) remove(m_size-1);}
 
@@ -275,6 +285,14 @@ private:
     TableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max);
     ConstTableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const;
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    struct LocalTransactLog;
+    LocalTransactLog get_local_transact_log();
+    size_t* record_subspec_path(const Spec*, size_t* begin, size_t* end) const;
+    size_t* record_subtable_path(size_t* begin, size_t* end) const;
+    friend class Replication;
+#endif
+
     friend class Group;
     friend class Query;
     friend class ColumnMixed;
@@ -293,12 +311,112 @@ protected:
      * Must be called whenever a child Table is destroyed.
      */
     virtual void child_destroyed(size_t child_ndx) = 0;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    virtual size_t* record_subtable_path(size_t* begin, size_t* end);
+#endif
 };
 
 
 
 
+
 // Implementation:
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+struct Table::LocalTransactLog {
+    template<class T> void set_value(size_t column_ndx, size_t row_ndx, const T& value)
+    {
+        if (m_repl) m_repl->set_value(m_table, column_ndx, row_ndx, value);
+    }
+
+    template<class T> void insert_value(size_t column_ndx, size_t row_ndx, const T& value)
+    {
+        if (m_repl) m_repl->insert_value(m_table, column_ndx, row_ndx, value);
+    }
+
+    void row_insert_complete()
+    {
+        if (m_repl) m_repl->row_insert_complete(m_table);
+    }
+
+    void insert_empty_rows(std::size_t row_ndx, std::size_t num_rows)
+    {
+        if (m_repl) m_repl->insert_empty_rows(m_table, row_ndx, num_rows);
+    }
+
+    void remove_row(std::size_t row_ndx)
+    {
+        if (m_repl) m_repl->remove_row(m_table, row_ndx);
+    }
+
+    void add_int_to_column(std::size_t column_ndx, int64_t value)
+    {
+        if (m_repl) m_repl->add_int_to_column(m_table, column_ndx, value);
+    }
+
+    void add_index_to_column(std::size_t column_ndx)
+    {
+        if (m_repl) m_repl->add_index_to_column(m_table, column_ndx);
+    }
+
+    void clear_table()
+    {
+        if (m_repl) m_repl->clear_table(m_table);
+    }
+
+    void optimize_table()
+    {
+        if (m_repl) m_repl->optimize_table(m_table);
+    }
+
+    void on_table_destroyed()
+    {
+        if (m_repl) m_repl->on_table_destroyed(m_table);
+    }
+
+    void add_column(ColumnType type, const char* name)
+    {
+        if (m_repl) m_repl->add_column(m_table, &m_table->m_spec_set, type, name);
+    }
+
+private:
+    Replication* const m_repl;
+    Table* const m_table;
+    LocalTransactLog(Replication* r, Table* t): m_repl(r), m_table(t) {}
+    friend class Table;
+};
+
+inline Table::LocalTransactLog Table::get_local_transact_log()
+{
+    return LocalTransactLog(m_top.GetAllocator().get_replication(), this);
+}
+
+inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin, size_t* end) const
+{
+    return spec->record_subspec_path(&m_top, begin, end);
+}
+
+inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const
+{
+    const Array& real_top = m_top.IsValid() ? m_top : m_columns;
+    const size_t index_in_parent = real_top.GetParentNdx();
+    *begin = index_in_parent;
+    if (++begin == end) return 0; // Error, not enough space in buffer
+    ArrayParent* parent = real_top.GetParent();
+    assert(parent);
+    assert(dynamic_cast<Parent*>(parent));
+    return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
+}
+
+inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*)
+{
+    return begin;
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
 
 inline void Table::insert_bool(size_t column_ndx, size_t row_ndx, bool value)
 {

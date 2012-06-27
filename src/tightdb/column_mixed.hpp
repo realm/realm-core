@@ -91,7 +91,7 @@ public:
     void set_date(size_t ndx, time_t value);
     void set_string(size_t ndx, const char* value);
     void set_binary(size_t ndx, const char* value, size_t len);
-    void SetTable(size_t ndx);
+    void SetTable(size_t ndx); // FIXME: Rename to set_subtable()
 
     void insert_int(size_t ndx, int64_t value);
     void insert_bool(size_t ndx, bool value);

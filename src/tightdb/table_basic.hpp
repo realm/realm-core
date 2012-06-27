@@ -81,12 +81,7 @@ public:
     using Table::remove;
     using Table::optimize;
 
-    BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc)
-    {
-        tightdb::Spec& spec = get_spec();
-        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&spec, Spec::dyn_col_names());
-        update_from_spec();
-    }
+    BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc) { set_dynamic_spec(); }
 
     static int get_column_count() { return TypeCount<typename Spec::Columns>::value; }
 
@@ -228,6 +223,13 @@ private:
     template<class Subtab> const Subtab* get_subtable_ptr(size_t col_idx, std::size_t row_idx) const
     {
         return static_cast<const Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
+    }
+
+    void set_dynamic_spec()
+    {
+        tightdb::Spec& spec = get_spec();
+        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&spec, Spec::dyn_col_names());
+        update_from_spec();
     }
 
     // This one allows a BasicTable to know that BasicTables with

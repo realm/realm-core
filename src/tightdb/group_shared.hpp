@@ -22,6 +22,10 @@
 
 #include "group.hpp"
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+#include <tightdb/replication.hpp>
+#endif
+
 namespace tightdb {
 
 // Pre-declarations
@@ -30,9 +34,14 @@ struct SharedInfo;
 
 class SharedGroup {
 public:
-    SharedGroup(const char* filename);
+    SharedGroup(const char* path_to_database_file);
     ~SharedGroup();
-    
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    struct replication_tag {};
+    SharedGroup(replication_tag);
+#endif
+
     bool is_valid() const {return m_isValid;}
 
     // Read transactions
@@ -80,8 +89,14 @@ private:
     };
     SharedState m_state;
 #endif
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    Replication m_replication;
+#endif
+
+    void init(const char* path_to_database_file);
 };
 
-} //namespace tightdb
+} // namespace tightdb
 
-#endif //TIGHTDB_GROUP_SHARED_HPP
+#endif // TIGHTDB_GROUP_SHARED_HPP

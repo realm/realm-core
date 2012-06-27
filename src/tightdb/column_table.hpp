@@ -29,8 +29,7 @@ namespace tightdb {
 /**
  * Base class for any column that can contain subtables.
  */
-class ColumnSubtableParent: public Column, public Table::Parent
-{
+class ColumnSubtableParent: public Column, public Table::Parent {
 public:
     void UpdateFromParent();
 
@@ -87,6 +86,17 @@ protected:
 
     // Overriding method in Table::Parent
     virtual void child_destroyed(std::size_t subtable_ndx);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    // Overriding method in Table::Parent
+    virtual size_t* record_subtable_path(size_t* begin, size_t* end)
+    {
+        const size_t column_index = m_array->GetParentNdx();
+        *begin = column_index;
+        if (++begin == end) return 0; // Error, not enough space in buffer
+        return m_table->record_subtable_path(begin, end);
+    }
+#endif // TIGHTDB_ENABLE_REPLICATION
 
 private:
     struct SubtableMap {

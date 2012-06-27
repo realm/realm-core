@@ -41,8 +41,8 @@ namespace tightdb {
 struct SpecBase {
     typedef int64_t             Int;
     typedef bool                Bool;
-    typedef const char*         String;
     typedef tightdb::Date       Date;
+    typedef const char*         String;
     typedef tightdb::BinaryData Binary;
     typedef tightdb::Mixed      Mixed;
 
@@ -259,43 +259,6 @@ public:
 
 
 /**
- * Field accessor specialization for strings.
- */
-template<class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, const char*, const_tab>: public FieldAccessorBase<Taboid> {
-private:
-    typedef FieldAccessorBase<Taboid> Base;
-
-public:
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
-
-    operator const char*() const
-    {
-        return Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx);
-    }
-
-    const FieldAccessor& operator=(const char* value) const
-    {
-        Base::m_table->get_impl()->set_string(col_idx, Base::m_row_idx, value);
-        return *this;
-    }
-
-    // FIXME: Not good to define operator==() here, beacuse it does
-    // not have this semantic for char pointers in general. However,
-    // if we choose to keep it, we should also have all the other
-    // comparison operators, and many other operators need to be
-    // disabled such that e.g. 't.foo - 10' is no longer possible (it
-    // is now, due to the conversion operator). A much better approach
-    // would probably be to define a special tightdb::String type.
-    bool operator==(const char* value) const
-    {
-        const char* const v = Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx);
-        return std::strcmp(v, value) == 0;
-    }
-};
-
-
-/**
  * Field accessor specialization for enumerations.
  */
 template<class Taboid, int col_idx, class E, bool const_tab>
@@ -340,6 +303,43 @@ public:
     {
         Base::m_table->get_impl()->set_date(col_idx, Base::m_row_idx, value);
         return *this;
+    }
+};
+
+
+/**
+ * Field accessor specialization for strings.
+ */
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, const char*, const_tab>: public FieldAccessorBase<Taboid> {
+private:
+    typedef FieldAccessorBase<Taboid> Base;
+
+public:
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
+
+    operator const char*() const
+    {
+        return Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx);
+    }
+
+    const FieldAccessor& operator=(const char* value) const
+    {
+        Base::m_table->get_impl()->set_string(col_idx, Base::m_row_idx, value);
+        return *this;
+    }
+
+    // FIXME: Not good to define operator==() here, beacuse it does
+    // not have this semantic for char pointers in general. However,
+    // if we choose to keep it, we should also have all the other
+    // comparison operators, and many other operators need to be
+    // disabled such that e.g. 't.foo - 10' is no longer possible (it
+    // is now, due to the conversion operator). A much better approach
+    // would probably be to define a special tightdb::String type.
+    bool operator==(const char* value) const
+    {
+        const char* const v = Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx);
+        return std::strcmp(v, value) == 0;
     }
 };
 
@@ -506,6 +506,8 @@ public:
     const char* get_string() const { return Mixed(*this).get_string(); }
 
     BinaryData get_binary() const { return Mixed(*this).get_binary(); }
+
+    // FIXME: Add methods get_subtable(), get_subtable<MyTable>(), set_subtable(), set_subtable<MyTable>(), is_subtable(), is_subtable<MyTable>(). Be carefull about consness in getters (see subtable field accessor for hints). See also Group::get_table<MyTable>() for hints on setting up the spec.
 };
 
 
@@ -625,30 +627,6 @@ public:
 
 
 /**
- * Column accessor specialization for strings.
- */
-template<class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, const char*>:
-    public ColumnAccessorBase<Taboid, col_idx, const char*> {
-private:
-    typedef ColumnAccessorBase<Taboid, col_idx, const char*> Base;
-
-public:
-    explicit ColumnAccessor(Taboid* t): Base(t) {}
-
-    std::size_t find_first(const char* value) const
-    {
-        return Base::m_table->get_impl()->find_first_string(col_idx, value);
-    }
-
-    BasicTableView<typename Base::RealTable> find_all(const char* value) const
-    {
-        return Base::m_table->get_impl()->find_all_string(col_idx, value);
-    }
-};
-
-
-/**
  * Column accessor specialization for enumerations.
  */
 template<class Taboid, int col_idx, class E>
@@ -691,6 +669,30 @@ public:
     BasicTableView<typename Base::RealTable> find_all(std::time_t value) const
     {
         return Base::m_table->get_impl()->find_all_date(col_idx, value);
+    }
+};
+
+
+/**
+ * Column accessor specialization for strings.
+ */
+template<class Taboid, int col_idx>
+class ColumnAccessor<Taboid, col_idx, const char*>:
+    public ColumnAccessorBase<Taboid, col_idx, const char*> {
+private:
+    typedef ColumnAccessorBase<Taboid, col_idx, const char*> Base;
+
+public:
+    explicit ColumnAccessor(Taboid* t): Base(t) {}
+
+    std::size_t find_first(const char* value) const
+    {
+        return Base::m_table->get_impl()->find_first_string(col_idx, value);
+    }
+
+    BasicTableView<typename Base::RealTable> find_all(const char* value) const
+    {
+        return Base::m_table->get_impl()->find_all_string(col_idx, value);
     }
 };
 
@@ -869,51 +871,6 @@ public:
 
 
 /**
- * QueryColumn specialization for strings.
- */
-template<class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, const char*>:
-    public QueryColumnBase<Taboid, col_idx, const char*> {
-private:
-    typedef QueryColumnBase<Taboid, col_idx, const char*> Base;
-    typedef typename Taboid::Query Query;
-
-public:
-    explicit QueryColumn(Query* q): Base(q) {}
-
-    Query& equal(const char* value, bool case_sensitive=true) const
-    {
-        Base::m_query->m_impl.equal(col_idx, value, case_sensitive);
-        return *Base::m_query;
-    }
-
-    Query& not_equal(const char* value, bool case_sensitive=true) const
-    {
-        Base::m_query->m_impl.not_equal(col_idx, value, case_sensitive);
-        return *Base::m_query;
-    }
-
-    Query& begins_with(const char* value, bool case_sensitive=true) const
-    {
-        Base::m_query->m_impl.begins_with(col_idx, value, case_sensitive);
-        return *Base::m_query;
-    }
-
-    Query& ends_with(const char* value, bool case_sensitive=true) const
-    {
-        Base::m_query->m_impl.ends_with(col_idx, value, case_sensitive);
-        return *Base::m_query;
-    }
-
-    Query& contains(const char* value, bool case_sensitive=true) const
-    {
-        Base::m_query->m_impl.contains(col_idx, value, case_sensitive);
-        return *Base::m_query;
-    }
-};
-
-
-/**
  * QueryColumn specialization for enumerations.
  */
 template<class Taboid, int col_idx, class E>
@@ -994,6 +951,51 @@ public:
                         std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
         return Base::m_query->m_impl.minimum_date(tab, col_idx, resultcount, start, end, limit);
+    }
+};
+
+
+/**
+ * QueryColumn specialization for strings.
+ */
+template<class Taboid, int col_idx>
+class QueryColumn<Taboid, col_idx, const char*>:
+    public QueryColumnBase<Taboid, col_idx, const char*> {
+private:
+    typedef QueryColumnBase<Taboid, col_idx, const char*> Base;
+    typedef typename Taboid::Query Query;
+
+public:
+    explicit QueryColumn(Query* q): Base(q) {}
+
+    Query& equal(const char* value, bool case_sensitive=true) const
+    {
+        Base::m_query->m_impl.equal(col_idx, value, case_sensitive);
+        return *Base::m_query;
+    }
+
+    Query& not_equal(const char* value, bool case_sensitive=true) const
+    {
+        Base::m_query->m_impl.not_equal(col_idx, value, case_sensitive);
+        return *Base::m_query;
+    }
+
+    Query& begins_with(const char* value, bool case_sensitive=true) const
+    {
+        Base::m_query->m_impl.begins_with(col_idx, value, case_sensitive);
+        return *Base::m_query;
+    }
+
+    Query& ends_with(const char* value, bool case_sensitive=true) const
+    {
+        Base::m_query->m_impl.ends_with(col_idx, value, case_sensitive);
+        return *Base::m_query;
+    }
+
+    Query& contains(const char* value, bool case_sensitive=true) const
+    {
+        Base::m_query->m_impl.contains(col_idx, value, case_sensitive);
+        return *Base::m_query;
     }
 };
 

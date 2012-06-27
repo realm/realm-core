@@ -32,7 +32,7 @@ Table::Table(Allocator& alloc):
     m_size(0),
     m_top(COLUMN_HASREFS, NULL, 0, alloc),
     m_columns(COLUMN_HASREFS, NULL, 0, alloc),
-    m_spec_set(alloc, NULL, 0),
+    m_spec_set(this, alloc, NULL, 0),
     m_ref_count(1)
 {
     m_top.add(m_spec_set.get_ref());
@@ -43,7 +43,7 @@ Table::Table(Allocator& alloc):
 
 // Create Table from ref
 Table::Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(alloc), m_ref_count(1)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1)
 {
     // Load from allocated memory
     m_top.UpdateRef(top_ref);
@@ -59,7 +59,7 @@ Table::Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_par
 
 // Create attached table from ref
 Table::Table(SubtableTag, Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(alloc), m_ref_count(0)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
 {
     // Load from allocated memory
     m_top.UpdateRef(top_ref);
@@ -76,7 +76,7 @@ Table::Table(SubtableTag, Allocator& alloc, size_t top_ref, Parent* parent, size
 // Create attached sub-table from ref and schema_ref
 Table::Table(SubtableTag, Allocator& alloc, size_t schema_ref, size_t columns_ref,
              Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(alloc), m_ref_count(0)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
 {
     Create(schema_ref, columns_ref, parent, ndx_in_parent);
 }
@@ -298,6 +298,10 @@ void Table::ClearCachedColumns()
 
 Table::~Table()
 {
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().on_table_destroyed();
+#endif
+
     // Delete cached columns
     ClearCachedColumns();
 
@@ -307,10 +311,10 @@ Table::~Table()
         // responsibility of this destructor to deallocate all the
         // memory chunks that make up the entire hierarchy of
         // arrays. Otherwise we must notify our parent.
-        if (ArrayParent *parent = m_top.GetParent()) {
+        if (ArrayParent* parent = m_top.GetParent()) {
             assert(m_ref_count == 0 || m_ref_count == 1);
-            assert(dynamic_cast<Parent *>(parent));
-            static_cast<Parent *>(parent)->child_destroyed(m_top.GetParentNdx());
+            assert(dynamic_cast<Parent*>(parent));
+            static_cast<Parent*>(parent)->child_destroyed(m_top.GetParentNdx());
             return;
         }
 
@@ -324,10 +328,10 @@ Table::~Table()
     // responsibility of this destructor to deallocate all the memory
     // chunks that make up the entire hierarchy of arrays. Otherwise
     // we must notify our parent.
-    if (ArrayParent *parent = m_columns.GetParent()) {
+    if (ArrayParent* parent = m_columns.GetParent()) {
         assert(m_ref_count == 0 || m_ref_count == 1);
-        assert(dynamic_cast<Parent *>(parent));
-        static_cast<Parent *>(parent)->child_destroyed(m_columns.GetParentNdx());
+        assert(dynamic_cast<Parent*>(parent));
+        static_cast<Parent*>(parent)->child_destroyed(m_columns.GetParentNdx());
         return;
     }
 
@@ -433,6 +437,10 @@ size_t Table::add_column(ColumnType type, const char* name)
     m_spec_set.add_column(type, name);
     m_cols.add((intptr_t)newColumn);
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().add_column(type, name);
+#endif
+
     return column_ndx;
 }
 
@@ -459,6 +467,10 @@ void Table::set_index(size_t column_ndx)
     else {
         assert(false);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().add_index_to_column(column_ndx);
+#endif
 }
 
 ColumnBase& Table::GetColumnBase(size_t ndx)
@@ -556,33 +568,41 @@ const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
     return *reinterpret_cast<ColumnMixed*>(m_cols.Get(ndx));
 }
 
-size_t Table::add_empty_row(size_t num_of_rows)
+size_t Table::add_empty_row(size_t num_rows)
 {
     const size_t col_count = get_column_count();
 
-    for (size_t row = 0; row < num_of_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         for (size_t i = 0; i < col_count; ++i) {
             ColumnBase& column = GetColumnBase(i);
             column.add();
         }
     }
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().insert_empty_rows(size(), 1);
+#endif
+
     // Return index of first new added row
     size_t new_ndx = m_size;
-    m_size += num_of_rows;
+    m_size += num_rows;
     return new_ndx;
 }
 
-void Table::insert_empty_row(size_t ndx, size_t num_of_rows)
+void Table::insert_empty_row(size_t ndx, size_t num_rows)
 {
     const size_t col_count = get_column_count();
 
-    for (size_t row = 0; row < num_of_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         for (size_t i = 0; i < col_count; ++i) {
             ColumnBase& column = GetColumnBase(i);
-            column.insert(ndx+i); // FIXME: This should be optimized by passing 'num_of_rows' to column.insert()
+            column.insert(ndx+i); // FIXME: This should be optimized by passing 'num_rows' to column.insert()
         }
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().insert_empty_rows(ndx, num_rows);
+#endif
 }
 
 void Table::clear()
@@ -593,6 +613,10 @@ void Table::clear()
         column.Clear();
     }
     m_size = 0;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().clear_table();
+#endif
 }
 
 void Table::remove(size_t ndx)
@@ -605,6 +629,10 @@ void Table::remove(size_t ndx)
         column.Delete(ndx);
     }
     --m_size;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().remove_row(ndx);
+#endif
 }
 
 void Table::insert_subtable(size_t column_ndx, size_t ndx)
@@ -615,6 +643,10 @@ void Table::insert_subtable(size_t column_ndx, size_t ndx)
 
     ColumnTable& subtables = GetColumnTable(column_ndx);
     subtables.Insert(ndx);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().insert_value(column_ndx, ndx, Replication::SubtableTag());
+#endif
 }
 
 Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx)
@@ -688,6 +720,10 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     else {
         assert(false);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().set_value(col_idx, row_idx, Replication::SubtableTag());
+#endif
 }
 
 int64_t Table::get_int(size_t column_ndx, size_t ndx) const
@@ -706,11 +742,19 @@ void Table::set_int(size_t column_ndx, size_t ndx, int64_t value)
 
     Column& column = GetColumn(column_ndx);
     column.Set(ndx, value);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().set_value(column_ndx, ndx, value);
+#endif
 }
 
 void Table::add_int(size_t column_ndx, int64_t value)
 {
     GetColumn(column_ndx).Increment64(value);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().add_int_to_column(column_ndx, value);
+#endif
 }
 
 bool Table::get_bool(size_t column_ndx, size_t ndx) const
@@ -731,6 +775,10 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
 
     Column& column = GetColumn(column_ndx);
     column.Set(ndx, value ? 1 : 0);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().set_value(column_ndx, ndx, int(value));
+#endif
 }
 
 time_t Table::get_date(size_t column_ndx, size_t ndx) const
@@ -751,6 +799,10 @@ void Table::set_date(size_t column_ndx, size_t ndx, time_t value)
 
     Column& column = GetColumn(column_ndx);
     column.Set(ndx, (int64_t)value);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().set_value(column_ndx, ndx, value);
+#endif
 }
 
 void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
@@ -760,6 +812,10 @@ void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
 
     Column& column = GetColumn(column_ndx);
     column.Insert(ndx, value);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().insert_value(column_ndx, ndx, value);
+#endif
 }
 
 const char* Table::get_string(size_t column_ndx, size_t ndx) const
@@ -796,6 +852,10 @@ void Table::set_string(size_t column_ndx, size_t ndx, const char* value)
         ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
         column.Set(ndx, value);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().set_value(column_ndx, ndx, BinaryData(value, std::strlen(value)));
+#endif
 }
 
 void Table::insert_string(size_t column_ndx, size_t ndx, const char* value)
@@ -814,6 +874,10 @@ void Table::insert_string(size_t column_ndx, size_t ndx, const char* value)
         ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
         column.Insert(ndx, value);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().insert_value(column_ndx, ndx, BinaryData(value, std::strlen(value)));
+#endif
 }
 
 BinaryData Table::get_binary(size_t column_ndx, size_t ndx) const
@@ -825,22 +889,30 @@ BinaryData Table::get_binary(size_t column_ndx, size_t ndx) const
     return column.Get(ndx);
 }
 
-void Table::set_binary(size_t column_ndx, size_t ndx, const char* value, size_t len)
+void Table::set_binary(size_t column_ndx, size_t ndx, const char* data, size_t size)
 {
     assert(column_ndx < get_column_count());
     assert(ndx < m_size);
 
     ColumnBinary& column = GetColumnBinary(column_ndx);
-    column.Set(ndx, value, len);
+    column.Set(ndx, data, size);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().set_value(column_ndx, ndx, BinaryData(data, size));
+#endif
 }
 
-void Table::insert_binary(size_t column_ndx, size_t ndx, const char* value, size_t len)
+void Table::insert_binary(size_t column_ndx, size_t ndx, const char* data, size_t size)
 {
     assert(column_ndx < get_column_count());
     assert(ndx <= m_size);
 
     ColumnBinary& column = GetColumnBinary(column_ndx);
-    column.Insert(ndx, value, len);
+    column.Insert(ndx, data, size);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().insert_value(column_ndx, ndx, BinaryData(data, size));
+#endif
 }
 
 Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const
@@ -912,6 +984,10 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
         default:
             assert(false);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().set_value(column_ndx, ndx, value);
+#endif
 }
 
 void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
@@ -946,6 +1022,10 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
         default:
             assert(false);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().insert_value(column_ndx, ndx, value);
+#endif
 }
 
 void Table::insert_done()
@@ -955,6 +1035,10 @@ void Table::insert_done()
 #ifdef _DEBUG
     Verify();
 #endif //_DEBUG
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().row_insert_complete();
+#endif
 }
 
 int64_t Table::sum(size_t column_ndx) const
@@ -1243,6 +1327,10 @@ void Table::optimize()
             delete &column;
         }
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().optimize_table();
+#endif
 }
 
 void Table::UpdateColumnRefs(size_t column_ndx, int diff)

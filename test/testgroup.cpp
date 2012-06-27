@@ -3,6 +3,8 @@
 
 using namespace tightdb;
 
+namespace {
+
 enum Days {
     Mon,
     Tue,
@@ -18,6 +20,8 @@ TIGHTDB_TABLE_4(TestTableGroup,
                 second, Int,
                 third,  Bool,
                 fourth, Enum<Days>)
+
+} // Anonymous namespace
 
 TEST(Group_GetTable)
 {

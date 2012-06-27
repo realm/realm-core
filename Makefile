@@ -1,11 +1,3 @@
-# Note:
-# $@  The name of the target file (the one before the colon)
-# $<  The name of the first (or only) prerequisite file
-#     (the first one after the colon)
-# $^  The names of all the prerequisite files (space separated)
-# $*  The stem (the bit which matches the % wildcard in the rule definition.
-#
-
 SUBDIRS = src
 
 
@@ -67,7 +59,7 @@ memtest-release: static
 	@$(MAKE) -C test memtest-release
 .PHONY: memtest-release
 
-# Run the benchmarking progrems after building everything
+# Run the benchmarking programs after building everything
 benchmark: static
 	@$(MAKE) -C test benchmark
 .PHONY: benchmark

@@ -71,20 +71,23 @@ private:
     FILE*  m_file;
 };
 
-} // namespace
+} // anonymous namespace
 
 
 namespace tightdb {
 
 Group::Group():
     m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
-    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc), m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc), m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_persistMode(0), m_isValid(true)
+    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc),
+    m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc),
+    m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_persistMode(0), m_isValid(true)
 {
     create();
 }
 
 Group::Group(const char* filename, int mode):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(mode), m_isValid(false)
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(mode), m_isValid(false)
 {
     assert(filename);
 
@@ -103,7 +106,8 @@ Group::Group(const char* filename, int mode):
 }
 
 Group::Group(const char* buffer, size_t len):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
 {
     assert(buffer);
 
@@ -306,40 +310,46 @@ bool Group::has_table(const char* name) const
     return (n != (size_t)-1);
 }
 
-Table* Group::get_table_ptr(const char* name)
+Table* Group::create_new_table(const char* name)
 {
-    const size_t n = m_tableNames.find_first(name);
-
-    if (n == size_t(-1)) {
-        // Create new table
-        Table* const t = new Table(m_alloc);
-        t->m_top.SetParent(this, m_tables.Size());
-
-        m_tables.add(t->m_top.GetRef());
-        m_tableNames.add(name);
-        m_cachedtables.add((intptr_t)t);
-
-        return t;
+    const size_t ref = Table::create_table(m_alloc);
+    m_tables.add(ref);
+    m_tableNames.add(name);
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    Replication* repl = m_alloc.get_replication();
+    if (repl) repl->new_top_level_table(name);
+#endif
+    Table* table = new Table(m_alloc, ref, this, m_tables.Size()-1); // FIXME: Risk of exception
+    try {
+        m_cachedtables.add(intptr_t(table)); // FIXME: intptr_t is not guaranteed to exists - even in C++11
     }
-    else {
-        // Get table from cache if exists, else create
-        return &get_table(n);
+    catch (...) {
+        delete table;
+        // FIXME: Should also remove table
+        throw;
     }
+    return table;
 }
 
-Table& Group::get_table(size_t ndx)
+Table* Group::get_table_ptr(size_t ndx)
 {
     assert(m_top.IsValid());
     assert(ndx < m_tables.Size());
 
     // Get table from cache if exists, else create
-    Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(ndx));
-    if (!t) {
+    Table* table = reinterpret_cast<Table*>(m_cachedtables.Get(ndx));
+    if (!table) {
         const size_t ref = m_tables.GetAsRef(ndx);
-        t = new Table(m_alloc, ref, this, ndx);
-        m_cachedtables.Set(ndx, intptr_t(t));
+        table = new Table(m_alloc, ref, this, ndx);
+        try {
+            m_cachedtables.Set(ndx, intptr_t(table)); // FIXME: intptr_t is not guaranteed to exists - even in C++11
+        }
+        catch (...) {
+            delete table;
+            throw;
+        }
     }
-    return *t;
+    return table;
 }
 
 
@@ -547,7 +557,7 @@ void Group::print_free() const
     printf("\n");
 }
 
-void Group::to_dot(std::ostream& out)
+void Group::to_dot(std::ostream& out) const
 {
     out << "digraph G {" << endl;
 
@@ -560,16 +570,16 @@ void Group::to_dot(std::ostream& out)
 
     // Tables
     for (size_t i = 0; i < m_tables.Size(); ++i) {
-        const Table& table = get_table(i);
+        const Table* table = get_table_ptr(i);
         const char* const name = get_table_name(i);
-        table.to_dot(out, name);
+        table->to_dot(out, name);
     }
 
     out << "}" << endl;
     out << "}" << endl;
 }
 
-void Group::to_dot()
+void Group::to_dot() const
 {
     to_dot(std::cerr);
 }
