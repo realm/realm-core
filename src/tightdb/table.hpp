@@ -126,6 +126,7 @@ public:
     size_t         find_first_date(size_t column_ndx, time_t value) const;
     size_t         find_first_string(size_t column_ndx, const char* value) const;
     // FIXME: Need: size_t find_first_binary(size_t column_ndx, const char* value, size_t len) const;
+    // FIXME: Keep find_pos_int() or private?
     size_t         find_pos_int(size_t column_ndx, int64_t value) const;
     TableView      find_all_int(size_t column_ndx, int64_t value);
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;

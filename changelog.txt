@@ -5,14 +5,19 @@ Format:
 
 2012-mm-dd
 ----------
-! Fixed bug [github issuenr]: .... 		(user visible bug fixed       - passed on to release notes)
-+ Added feature ....				(user visible new feature     - passed on to release notes)
-- Removed/deprecated feature/method ....	(user visible removed feature - passed on to release notes)
-. Any other notes .... 				(internal changes)
+! Fixed bug [github issuenr]: .... 		 (user visible bug fixed       - passed on to release notes)
++ Added feature ....				     (user visible new feature     - passed on to release notes)
+- Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
+. Any other notes .... 				     (internal changes)
 
 ==================
 
-
-2012-06-??
+2012-??-??
 ----------
-??
+
+
+2012-06-27
+----------
++ Added a the following methods to a TableView:    
+	ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
+	size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const;
