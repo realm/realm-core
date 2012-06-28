@@ -5,125 +5,34 @@ namespace tightdb {
 
 
 // Searching
-size_t TableViewBase::find_first_int(size_t column_ndx, int64_t value) const
+
+// find_*_integer() methods are used for all "kinds" of integer values (bool, int, Date)
+
+size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 {
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
-
-    for(size_t i = 0; i < m_refs.Size(); i++)
-        if(get_int(column_ndx, i) == value)
+    for (size_t i = 0; i < m_refs.Size(); i++)
+        if (get_int(column_ndx, i) == value)
             return i;
-
     return size_t(-1);
 }
 
 
 size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) const
 {
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, COLUMN_TYPE_STRING);
 
     for (size_t i = 0; i < m_refs.Size(); i++)
         if (strcmp(get_string(column_ndx, i), value) == 0)
             return i;
-
     return size_t(-1);
-}
-
-
-TableView TableView::find_all_int(size_t column_ndx, int64_t value)
-{
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
-
-    TableView tv(*m_table);
-    for (size_t i = 0; i < m_refs.Size(); i++)
-        if (get_int(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
-    return move(tv);
-}
-
-
-ConstTableView TableView::find_all_int(size_t column_ndx, int64_t value) const
-{
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
-
-    ConstTableView tv(*m_table);
-    for (size_t i = 0; i < m_refs.Size(); i++)
-        if (get_int(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
-    return move(tv);
-}
-
-
-ConstTableView ConstTableView::find_all_int(size_t column_ndx, int64_t value) const
-{
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
-
-    ConstTableView tv(*m_table);
-    for (size_t i = 0; i < m_refs.Size(); i++)
-        if (get_int(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
-    return move(tv);
-}
-
-
-TableView TableView::find_all_string(size_t column_ndx, const char* value)
-{
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
-
-    TableView tv(*m_table);
-    for (size_t i = 0; i < m_refs.Size(); i++)
-        if (strcmp(get_string(column_ndx, i), value) == 0)
-            tv.get_ref_column().add(i);
-    return move(tv);
-}
-
-
-ConstTableView TableView::find_all_string(size_t column_ndx, const char* value) const
-{
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
-
-    ConstTableView tv(*m_table);
-    for (size_t i = 0; i < m_refs.Size(); i++)
-        if (strcmp(get_string(column_ndx, i), value) == 0)
-            tv.get_ref_column().add(i);
-    return move(tv);
-}
-
-
-ConstTableView ConstTableView::find_all_string(size_t column_ndx, const char* value) const
-{
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
-
-    ConstTableView tv(*m_table);
-    for (size_t i = 0; i < m_refs.Size(); i++)
-        if (strcmp(get_string(column_ndx, i), value) == 0)
-            tv.get_ref_column().add(i);
-    return move(tv);
 }
 
 
 int64_t TableViewBase::sum(size_t column_ndx) const
 {
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
-    int64_t sum = 0;
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, COLUMN_TYPE_INT);
 
+    int64_t sum = 0;
     for (size_t i = 0; i < m_refs.Size(); i++)
         sum += get_int(column_ndx, i);
 

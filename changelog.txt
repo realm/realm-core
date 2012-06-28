@@ -21,3 +21,14 @@ Format:
 + Added a the following methods to a TableView:    
 	ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
 	size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const;
+	void        clear_subtable(size_t column_ndx, size_t row_ndx);
+	size_t      find_first_bool(size_t column_ndx, bool value) const;
+    size_t      find_first_date(size_t column_ndx, time_t value) const;
+	void		add_int(size_t column_ndx, int64_t value);
+	TableView      find_all_bool(size_t column_ndx, bool value);
+    ConstTableView find_all_bool(size_t column_ndx, bool value) const; (for class TableView and ConstTableView)
+    TableView      find_all_date(size_t column_ndx, time_t value);
+    ConstTableView find_all_date(size_t column_ndx, time_t value) const; (for class TableView and ConstTableView)
+	
+	TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
+	ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const; (for class TableView and ConstTableView)
