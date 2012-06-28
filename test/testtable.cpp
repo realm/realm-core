@@ -636,7 +636,7 @@ TEST(Table_Spec)
 
     // Read back tables
     {
-        Group fromDisk("subtables.tightdb");
+        Group fromDisk("subtables.tightdb", GROUP_READONLY);
         TableRef fromDiskTable = fromDisk.get_table("test");
 
         TableRef subtable2 = fromDiskTable->get_subtable(2, 0);
