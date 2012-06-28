@@ -370,7 +370,7 @@ TEST(Table_Sorted_Int)
     table.add(0,  2, true, Wed); // 9: 1
 
     // Search for a value that does not exits
-    TestTable::View v = table.cols().second.sorted();
+    TestTable::View v = table.cols().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v.size());
 
     CHECK_EQUAL(2, v.get_source_ndx(0));
