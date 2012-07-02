@@ -2,7 +2,9 @@
 #include "group.hpp"
 #include "alloc_slab.hpp"
 
+#if !defined(_MSC_VER)
 #include <sys/mman.h>
+#endif
 
 using namespace tightdb;
 
