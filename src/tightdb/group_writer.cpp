@@ -149,6 +149,7 @@ void GroupWriter::Commit()
 size_t GroupWriter::write(const char* p, size_t n) {
     // Get position of free space to write in (expanding file if needed)
     const size_t pos = get_free_space(n, m_len);
+    assert((pos & 0x7) == 0); // Write position should always be 64bit aligned
 
     // Write the block
     char* const dest = m_data + pos;
@@ -192,6 +193,9 @@ void GroupWriter::DoCommit(uint64_t topPos)
 
 size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
 {
+    assert((len & 0x7) == 0); // 64bit alignment
+    assert((filesize & 0x7) == 0); // 64bit alignment
+
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;

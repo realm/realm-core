@@ -498,6 +498,23 @@ void Group::update_from_shared(size_t top_ref, size_t len)
 
 void Group::Verify()
 {
+    // Verify free lists
+    if (m_freePositions.IsValid()) {
+        assert(m_freeLengths.IsValid());
+
+        const size_t count_p = m_freePositions.Size();
+        const size_t count_l = m_freeLengths.Size();
+        assert(count_p == count_l);
+
+        for (size_t i = 0; i < count_p; ++i) {
+            const size_t p = m_freePositions.Get(i);
+            const size_t l = m_freeLengths.Get(i);
+            assert((p & 0x7) == 0); // 64bit alignment
+            assert((l & 0x7) == 0); // 64bit alignment
+        }
+    }
+
+    // Verify tables
     for (size_t i = 0; i < m_tables.Size(); ++i) {
         // Get table from cache if exists, else create
         Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(i));

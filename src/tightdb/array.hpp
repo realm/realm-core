@@ -352,7 +352,8 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
         Array newRefs(m_isNode ? COLUMN_NODE : COLUMN_HASREFS);
 
         // First write out all sub-arrays
-        for (size_t i = 0; i < Size(); ++i) {
+        const size_t count = Size();
+        for (size_t i = 0; i < count; ++i) {
             const size_t ref = GetAsRef(i);
             if (ref == 0 || ref & 0x1) {
                 // zero-refs and refs that are not 64-aligned do not point to sub-trees
@@ -365,6 +366,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
             else {
                 const Array sub(ref, NULL, 0, GetAllocator());
                 const size_t sub_pos = sub.Write(out, true, persist);
+                assert((sub_pos & 0x7) == 0); // 64bit alignment
                 newRefs.add(sub_pos);
             }
         }
@@ -380,45 +382,32 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
         return refs_pos; // Return position
     }
 
-    // parse header
-    size_t len          = get_header_len();
+    // TODO: replace capacity with checksum
+
+    // Calculate full lenght of array in bytes, including padding
+    // for 64bit alignment (that may be composed of random bits)
+    size_t len          = m_len;
     const WidthType wt  = get_header_wtype();
-    int bits_in_partial_byte = 0;
 
     // Adjust length to number of bytes
     if (wt == TDB_BITS) {
         const size_t bits = (len * m_width);
         len = bits / 8;
-        bits_in_partial_byte = bits & 0x7;
+        if (bits & 0x7) ++len;
     }
     else if (wt == TDB_MULTIPLY) {
         len *= m_width;
     }
 
-    // TODO: replace capacity with checksum
-
-    // Calculate complete size
+    // Add bytes used for padding
+    const size_t rest = (~len & 0x7)+1;
+    if (rest < 8) len += rest; // 64bit blocks
     len += 8; // include header in total
 
     // Write array
     const char* const data = reinterpret_cast<const char*>(m_data-8);
     const size_t array_pos = out.write(data, len);
-
-    // Write last partial byte. Note: Since the memory is not
-    // explicitely cleared initially, we cannot rely on the unused
-    // bits to be in a well defined state here.
-    if (bits_in_partial_byte != 0) {
-        char_traits<char>::int_type i = char_traits<char>::to_int_type(data[len]);
-        i &= (1 << bits_in_partial_byte) - 1;
-        char b = char_traits<char>::to_char_type(i);
-        out.write(&b, 1);
-        ++len;
-    }
-
-    // Add padding for 64bit alignment
-    const size_t rest = (~len & 0x7)+1;
-    if (rest < 8)
-        out.write("\0\0\0\0\0\0\0\0", rest);
+    assert((array_pos & 0x7) == 0); /// 64bit alignment
 
     return array_pos; // Return position of this array
 }
@@ -427,45 +416,31 @@ template<class S> void Array::WriteAt(size_t pos, S& out) const
 {
     assert(IsValid());
 
-    // parse header
-    size_t len          = get_header_len();
+    // TODO: replace capacity with checksum
+
+    // Calculate full lenght of array in bytes, including padding
+    // for 64bit alignment (that may be composed of random bits)
+    size_t len          = m_len;
     const WidthType wt  = get_header_wtype();
-    int bits_in_partial_byte = 0;
 
     // Adjust length to number of bytes
     if (wt == TDB_BITS) {
         const size_t bits = (len * m_width);
         len = bits / 8;
-        bits_in_partial_byte = bits & 0x7;
+        if (bits & 0x7) ++len;
     }
     else if (wt == TDB_MULTIPLY) {
         len *= m_width;
     }
 
-    // TODO: replace capacity with checksum
-
-    // Calculate complete size
+    // Add bytes used for padding
+    const size_t rest = (~len & 0x7)+1;
+    if (rest < 8) len += rest; // 64bit blocks
     len += 8; // include header in total
 
     // Write array
     const char* const data = reinterpret_cast<const char*>(m_data-8);
     out.WriteAt(pos, data, len);
-
-    // Write last partial byte. Note: Since the memory is not
-    // explicitely cleared initially, we cannot rely on the unused
-    // bits to be in a well defined state here.
-    if (bits_in_partial_byte != 0) {
-        char_traits<char>::int_type i = char_traits<char>::to_int_type(data[len]);
-        i &= (1 << bits_in_partial_byte) - 1;
-        char b = char_traits<char>::to_char_type(i);
-        out.WriteAt(pos+len, &b, 1);
-        ++len;
-    }
-
-    // Add padding for 64bit alignment
-    const size_t rest = (~len & 0x7)+1;
-    if (rest < 8)
-        out.WriteAt(pos+len, "\0\0\0\0\0\0\0\0", rest);
 }
 
 inline void Array::move_assign(Array& a)
