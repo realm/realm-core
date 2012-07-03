@@ -591,7 +591,7 @@ inline void TableView::set_date(size_t column_ndx, size_t row_ndx, time_t value)
 template<class E> inline void TableView::set_enum(size_t column_ndx, size_t row_ndx, E value)
 {
     const size_t real_ndx = size_t(m_refs.Get(row_ndx));
-    m_table->set_int(column_ndx, row_ndx, value);
+    m_table->set_int(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_string(size_t column_ndx, size_t row_ndx, const char* value)

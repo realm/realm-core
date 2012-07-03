@@ -73,7 +73,8 @@ public:
     void print_free() const;
     MemStats stats();
     void enable_mem_diagnostics(bool enable=true) {m_alloc.EnableDebug(enable);}
-    void to_dot(std::ostream& out = std::cerr);
+    void to_dot(std::ostream& out);
+    void to_dot(); // For GDB
     void zero_free_space(size_t file_size, size_t readlock_version);
 #endif //_DEBUG
 

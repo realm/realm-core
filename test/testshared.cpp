@@ -7,6 +7,8 @@
 
 using namespace tightdb;
 
+namespace {
+
 TIGHTDB_TABLE_4(TestTableShared,
                 first,  Int,
                 second, Int,
@@ -42,6 +44,8 @@ TEST(Shared_Initial)
     const int rc = access("test_shared.tdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
+
+} // anonymous namespace
 
 TEST(Shared1)
 {
@@ -256,6 +260,54 @@ TEST(Shared_Writes)
     CHECK_EQUAL(-1, rc);
 }
 
+namespace {
+
+TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
+
+} // anonymous namespace
+
+TEST(Shared_Writes_SpecialOrder)
+{
+    remove("test.tightdb");
+    remove("test.tightdb.lock");
+
+    SharedGroup db("test.tightdb");
+    CHECK(db.is_valid());
+
+    const int num_rows = 5; // FIXME: Should be strictly greater than MAX_LIST_SIZE, but that takes a loooooong time!
+    const int num_reps = 25;
+
+    {
+        Group& group = db.begin_write();
+        MyTable_SpecialOrder::Ref table = group.get_table<MyTable_SpecialOrder>("test");
+        for (int i=0; i<num_rows; ++i) {
+            table->add(0);
+        }
+    }
+    db.commit();
+
+    for (int i=0; i<num_rows; ++i) {
+        for (int j=0; j<num_reps; ++j) {
+            {
+                Group& group = db.begin_write();
+                MyTable_SpecialOrder::Ref table = group.get_table<MyTable_SpecialOrder>("test");
+                CHECK_EQUAL(j, table[i].first);
+                table[i].first = table[i].first + 1;
+            }
+            db.commit();
+        }
+    }
+
+    {
+        const Group& group = db.begin_read();
+        MyTable_SpecialOrder::ConstRef table = group.get_table<MyTable_SpecialOrder>("test");
+        for (int i=0; i<num_rows; ++i) {
+            CHECK_EQUAL(num_reps, table[i].first);
+        }
+    }
+    db.end_read();
+}
+
 namespace  {
 
 void* IncrementEntry(void* arg);
@@ -293,7 +345,7 @@ void* IncrementEntry(void* arg )
     return NULL;
 }
 
-} // namespace
+} // anonymous namespace
 
 TEST(Shared_WriterThreads)
 {
