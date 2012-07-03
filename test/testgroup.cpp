@@ -517,7 +517,7 @@ TEST(Group_Subtable)
     g.write("subtables.tdb");
 
     // Read back tables
-    Group g2("subtables.tdb");
+    Group g2("subtables.tdb", GROUP_READONLY);
     TableRef table2 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -608,7 +608,7 @@ TEST(Group_Subtable)
     g2.write("subtables2.tdb");
 
     // Read back tables
-    Group g3("subtables2.tdb");
+    Group g3("subtables2.tdb", GROUP_READONLY);
     TableRef table3 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -705,7 +705,7 @@ TEST(Group_MultiLevelSubtables)
 
     // Non-mixed
     {
-        Group g("subtables.tdb");
+        Group g("subtables.tdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -726,7 +726,7 @@ TEST(Group_MultiLevelSubtables)
         g.write("subtables2.tdb");
     }
     {
-        Group g("subtables2.tdb");
+        Group g("subtables2.tdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -747,7 +747,7 @@ TEST(Group_MultiLevelSubtables)
 
     // Mixed
     {
-        Group g("subtables3.tdb");
+        Group g("subtables3.tdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -768,7 +768,7 @@ TEST(Group_MultiLevelSubtables)
         g.write("subtables4.tdb");
     }
     {
-        Group g("subtables4.tdb");
+        Group g("subtables4.tdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);

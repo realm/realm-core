@@ -174,7 +174,7 @@ void Table::CreateColumns()
 
 Spec& Table::get_spec()
 {
-    assert(m_top.IsValid()); // you can only change specs on top-level tablesu
+    assert(m_top.IsValid()); // you can only change specs on top-level tables
     return m_spec_set;
 }
 
@@ -750,6 +750,8 @@ void Table::set_int(size_t column_ndx, size_t ndx, int64_t value)
 
 void Table::add_int(size_t column_ndx, int64_t value)
 {
+    assert(column_ndx < get_column_count());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_INT);
     GetColumn(column_ndx).Increment64(value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1255,7 +1257,7 @@ ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t
     return move(tv);
 }
 
-TableView Table::sorted(size_t column_ndx, bool ascending)
+TableView Table::get_sorted_view(size_t column_ndx, bool ascending)
 {
     assert(column_ndx < m_columns.Size());
 
@@ -1274,7 +1276,7 @@ TableView Table::sorted(size_t column_ndx, bool ascending)
     return move(tv);
 }
 
-ConstTableView Table::sorted(size_t column_ndx, bool ascending) const
+ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
 {
     assert(column_ndx < m_columns.Size());
 

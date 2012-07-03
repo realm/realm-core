@@ -49,7 +49,7 @@ public:
     ~Group();
 
     bool is_valid() const {return m_isValid;}
-    bool is_shared() const {return m_persistMode & GROUP_SHARED;}
+    bool is_shared() const {return (m_persistMode & GROUP_SHARED) != 0;}
     bool is_empty() const;
 
     size_t get_table_count() const;

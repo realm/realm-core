@@ -1,5 +1,8 @@
 #include "group.hpp"
 #include <assert.h>
+#ifdef WIN32
+#define _CRT_SECURE_NO_WARNINGS
+#endif
 #include <iostream>
 #include <fstream>
 #include "group_writer.hpp"
@@ -63,7 +66,7 @@ public:
 
     void seek(size_t pos)
     {
-        fseek(m_file, pos, SEEK_SET);
+        fseek(m_file, static_cast<long>(pos), SEEK_SET);
     }
 
 private:
@@ -601,7 +604,9 @@ void Group::to_dot() const
     to_dot(std::cerr);
 }
 
+#if !defined(_MSC_VER)
 #include <sys/mman.h>
+#endif
 
 void Group::zero_free_space(size_t file_size, size_t readlock_version)
 {
