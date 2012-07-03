@@ -42,7 +42,8 @@ int64_t TableViewBase::sum(size_t column_ndx) const
 
 int64_t TableViewBase::maximum(size_t column_ndx) const
 {
-    assert(m_table);
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, COLUMN_TYPE_INT);
+
     if (is_empty()) return 0;
     if (m_refs.Size() == 0) return 0;
 
@@ -59,7 +60,8 @@ int64_t TableViewBase::maximum(size_t column_ndx) const
 
 int64_t TableViewBase::minimum(size_t column_ndx) const
 {
-    assert(m_table);
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, COLUMN_TYPE_INT);
+
     if (is_empty()) return 0;
     if (m_refs.Size() == 0) return 0;
 

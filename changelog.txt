@@ -18,7 +18,11 @@ Format:
 
 2012-06-27
 ----------
-+ Added a the following methods to a TableView:    
+-+ Table::sorted(...) changed name to get_sorted_view(...)
+- Removed Table::find_pos_int(...) from public API
+
++ Added a the following methods to a TableView:  
+	template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
 	ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
 	size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const;
 	void        clear_subtable(size_t column_ndx, size_t row_ndx);
@@ -29,6 +33,8 @@ Format:
     ConstTableView find_all_bool(size_t column_ndx, bool value) const; (for class TableView and ConstTableView)
     TableView      find_all_date(size_t column_ndx, time_t value);
     ConstTableView find_all_date(size_t column_ndx, time_t value) const; (for class TableView and ConstTableView)
-	
-	TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
-	ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const; (for class TableView and ConstTableView)
+
+2012-06-??
+----------
+- Group() interfaced changed. Now with multiple options. default option changed from readonly...
++ Generated C++ highlevel API for tables with up to 15 columns
