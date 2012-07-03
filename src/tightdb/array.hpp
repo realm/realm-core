@@ -72,6 +72,7 @@ static const size_t not_found = (size_t)-1;
 
 // Pre-definitions
 class Array;
+class AdaptiveStringColumn;
 
 #ifdef _DEBUG
 class MemStats {
@@ -175,6 +176,7 @@ public:
     int64_t ColumnGet(size_t ndx) const;
     const char* ColumnStringGet(size_t ndx) const;
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
+    size_t IndexStringFindFirst(const char* value, const AdaptiveStringColumn& column) const;
 
     void SetAllToZero();
     bool Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);

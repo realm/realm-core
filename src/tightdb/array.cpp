@@ -7,6 +7,7 @@
 #include "utilities.hpp"
 #include "query_conditions.hpp"
 #include "static_assert.hpp"
+#include "column_string.hpp"
 
 #ifdef _MSC_VER
     #include <win32/types.h>
@@ -2067,6 +2068,7 @@ size_t get_header_len_direct(const uint8_t* const header);
 int64_t GetDirect(const char* const data, size_t width, const size_t ndx);
 size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target);
 template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target);
+size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, int32_t target);
 
 bool get_header_isnode_direct(const uint8_t* const header)
 {
@@ -2182,6 +2184,28 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 
         if (v > target) high = (int)probe;
         else            low = (int)probe;
+    }
+    if (high == (int)len) return (size_t)-1;
+    else return (size_t)high;
+}
+
+size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, int32_t target)
+{
+    const size_t len = get_header_len_direct(header);
+
+    int low = -1;
+    int high = (int)len;
+
+    // Binary search based on:
+    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+    // Finds position of closest value BIGGER OR EQUAL to the target (for
+    // lookups in indexes)
+    while (high - low > 1) {
+        const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+        const int64_t v = GetDirect<32>(data, probe);
+
+        if (v < target) low = (int)probe;
+        else            high = (int)probe;
     }
     if (high == (int)len) return (size_t)-1;
     else return (size_t)high;
@@ -2388,6 +2412,90 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
     else {
         cache.CreateFromHeaderDirect(header);
         return cache.CompareEquality<true>(target, 0, -1);
+    }
+}
+
+size_t Array::IndexStringFindFirst(const char* value, const AdaptiveStringColumn& column) const
+{
+    const char* v = value;
+    const char* data   = (const char*)m_data;
+    const uint8_t* header = m_data - 8;
+    size_t width = m_width;
+    bool isNode = m_isNode;
+
+top:
+    // Create 4 byte index key
+    int32_t key = 0;
+    if (*v) key  = ((int32_t)(*v++) << 24);
+    if (*v) key |= ((int32_t)(*v++) << 16);
+    if (*v) key |= ((int32_t)(*v++) << 8);
+    if (*v) key |=  (int32_t)(*v++);
+
+    for (;;) {
+        // Get subnode table
+        const size_t ref_offsets = GetDirect(data, width, 0);
+        const size_t ref_refs    = GetDirect(data, width, 1);
+
+        // Find the position matching the key
+        const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+        const char* const offsets_data = (const char*)offsets_header + 8;
+        const size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == (size_t)-1) return (size_t)-1;
+
+        // Get entry under key
+        const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+        const char* const refs_data = (const char*)refs_header + 8;
+        const size_t refs_width  = get_header_width_direct(refs_header);
+        const size_t ref = GetDirect(refs_data, refs_width, pos);
+
+        if (isNode) {
+            // Set vars for next iteration
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+            continue;
+        }
+
+        const int32_t stored_key = (int32_t)GetDirect<32>(offsets_data, pos);
+
+        if (stored_key == key) {
+            // Literal row index
+            if (ref & 1) {
+                const size_t row_ref = (ref >> 1);
+                if (*v == '\0') return row_ref; // full string has been compared
+
+                const char* const str = column.Get(row_ref);
+                if (strcmp(str, value) == 0) return row_ref;
+                else return (size_t)-1;
+            }
+
+            const uint8_t* const sub_header = (const uint8_t*)m_alloc.Translate(ref);
+            const bool sub_hasrefs = get_header_hasrefs_direct(sub_header);
+
+            // List of matching row indexes
+            if (!sub_hasrefs) {
+                const char* const sub_data = (const char*)sub_header + 8;
+                const size_t sub_width  = get_header_width_direct(sub_header);
+
+                const size_t row_ref = GetDirect(sub_data, sub_width, 0);
+                if (*v == '\0') return row_ref; // full string has been compared
+
+                const char* const str =column.Get(row_ref);
+                if (strcmp(str, value) == 0) return row_ref;
+                else return (size_t)-1;
+            }
+
+            // Recurse into sub-index;
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+            goto top;
+        }
+        else return (size_t)-1;
     }
 }
 
