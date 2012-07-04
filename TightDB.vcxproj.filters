@@ -136,6 +136,9 @@
     <ClCompile Include="src\tightdb\c-table.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="test\testshared.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
