@@ -2,6 +2,26 @@
 
 using namespace tightdb;
 
+namespace {
+
+// Pre-declaration
+int32_t CreateKey(const char* v);
+
+int32_t CreateKey(const char* v)
+{
+    // Create 4 byte index key
+    // (encoded like this to allow literal comparisons
+    // independently of endianness)
+    int32_t key = 0;
+    if (*v) key  = ((int32_t)(*v++) << 24);
+    if (*v) key |= ((int32_t)(*v++) << 16);
+    if (*v) key |= ((int32_t)(*v++) << 8);
+    if (*v) key |=  (int32_t)(*v++);
+    return key;
+}
+
+} // namespace
+
 StringIndex::StringIndex(const AdaptiveStringColumn& c) : Column(COLUMN_HASREFS, NULL, 0, c.GetAllocator()), m_column(c)
 {
     // Add subcolumns for leafs
@@ -21,27 +41,37 @@ int64_t StringIndex::GetLastKey() const
     return offsets.back();
 }
 
-
-bool StringIndex::Insert(size_t row_ndx, const char* value, bool isLast)
+void StringIndex::BuildIndex()
 {
-    //TODO: Handle if not last
+    assert(is_empty()); // you can only build new index
 
-    return InsertWithOffset(row_ndx, 0, value);
+    const size_t count = m_column.Size();
+    for (size_t i = 0; i < count; ++i) {
+        const char* const value = m_column.Get(i);
+        Insert(i, value, true);
+    }
+}
+
+void StringIndex::Set(size_t ndx, const char* oldValue, const char* newValue)
+{
+    Delete(ndx, oldValue, true); // set isLast to avoid updating refs
+    Insert(ndx, newValue, true); // set isLast to avoid updating refs
+}
+
+void StringIndex::Insert(size_t row_ndx, const char* value, bool isLast)
+{
+    // If it is last item in column, we don't have to update refs
+    if (!isLast) UpdateRefs(row_ndx, 1);
+
+    InsertWithOffset(row_ndx, 0, value);
 }
 
 
 bool StringIndex::InsertWithOffset(size_t row_ndx, size_t offset, const char* value)
 {
-    const char* v = value + offset;
-
     // Create 4 byte index key
-    // (encoded like this to allow literal comparisons
-    // independently of endianness)
-    int32_t key = 0;
-    if (*v) key  = ((int32_t)(*v++) << 24);
-    if (*v) key |= ((int32_t)(*v++) << 16);
-    if (*v) key |= ((int32_t)(*v++) << 8);
-    if (*v) key |=  (int32_t)(*v++);
+    const char* v = value + offset;
+    const int32_t key = CreateKey(v);
 
     return TreeInsert(row_ndx, key, offset, value);
 }
@@ -50,16 +80,9 @@ bool StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
 {
     assert(!m_array->IsNode()); // only works in leafs
 
-    const char* v = value + offset;
-
     // Create 4 byte index key
-    // (encoded like this to allow literal comparisons
-    // independently of endianness)
-    int32_t key = 0;
-    if (*v) key  = ((int32_t)(*v++) << 24);
-    if (*v) key |= ((int32_t)(*v++) << 16);
-    if (*v) key |= ((int32_t)(*v++) << 8);
-    if (*v) key |=  (int32_t)(*v++);
+    const char* v = value + offset;
+    const int32_t key = CreateKey(v);
 
     // Get subnode table
     Array values = m_array->GetSubArray(0);
@@ -376,7 +399,140 @@ size_t StringIndex::find_first(const char* value) const
     return m_array->IndexStringFindFirst(value, m_column);
 }
 
+void StringIndex::UpdateRefs(size_t pos, int diff)
+{
+    assert(diff == 1 || diff == -1); // only used by insert and delete
+
+    Array refs = m_array->GetSubArray(1);
+    const size_t count = refs.Size();
+
+    if (m_array->IsNode()) {
+        for (size_t i = 0; i < count; ++i) {
+            const size_t ref = (size_t)refs.Get(i);
+            StringIndex ndx(ref, NULL, 0, m_column);
+            ndx.UpdateRefs(pos, diff);
+        }
+    }
+    else {
+        for (size_t i = 0; i < count; ++i) {
+            const int64_t ref = refs.Get(i);
+
+            // low bit set indicate literal ref (shifted)
+            if (ref & 1) {
+                const size_t r = (ref >> 1);
+                if (r >= pos) {
+                    const size_t adjusted_ref = ((r + diff) << 1)+1;
+                    refs.Set(i, adjusted_ref);
+                }
+            }
+            else {
+                Array sub = refs.GetSubArray(i);
+
+                // A real ref either points to a list or a sub-index
+                if (sub.HasRefs()) {
+                    StringIndex ndx((size_t)ref, &refs, i, m_column);
+                    ndx.UpdateRefs(pos, diff);
+                }
+                else {
+                    sub.IncrementIf(pos, diff);
+                }
+            }
+        }
+    }
+}
+
+void StringIndex::Delete(size_t row_ndx, const char* value, bool isLast)
+{
+    DoDelete(row_ndx, value, 0);
+
+    // Collapse top nodes with single item
+    while (IsNode()) {
+        Array refs = m_array->GetSubArray(1);
+        assert(refs.Size() != 0); // node cannot be empty
+        if (refs.Size() > 1) break;
+
+        const size_t ref = (size_t)refs.Get(0);
+        refs.Delete(0); // avoid deleting subtree
+        m_array->Destroy();
+        m_array->UpdateRef(ref);
+    }
+
+    // If it is last item in column, we don't have to update refs
+    if (!isLast) UpdateRefs(row_ndx, -1);
+}
+
+void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
+{
+    Array values = m_array->GetSubArray(0);
+    Array refs = m_array->GetSubArray(1);
+
+    // Create 4 byte index key
+    const char* v = value + offset;
+    const int32_t key = CreateKey(v);
+
+    const size_t pos = values.FindPos2(key);
+    assert(pos != not_found);
+
+    if (m_array->IsNode()) {
+        const size_t ref = refs.Get(pos);
+        StringIndex node(ref, &refs, pos, m_column);
+        node.DoDelete(row_ndx, value, offset);
+
+        // Update the ref
+        if (node.is_empty()) {
+            values.Delete(pos);
+            refs.Delete(pos);
+            node.Destroy();
+        }
+        else {
+            const int64_t maxval = node.GetLastKey();
+            if (maxval != values.Get(pos))
+                values.Set(pos, maxval);
+        }
+    }
+    else {
+        const int64_t ref = refs.Get(pos);
+        if (ref & 1) {
+            assert((ref >> 1) == (int64_t)row_ndx);
+            values.Delete(pos);
+            refs.Delete(pos);
+        }
+        else {
+            Array sub = refs.GetSubArray(pos);
+
+            // A real ref either points to a list or a sub-index
+            if (sub.HasRefs()) {
+                StringIndex subNdx((size_t)ref, &refs, pos, m_column);
+                subNdx.DoDelete(row_ndx, value, offset+4);
+
+                if (subNdx.is_empty()) {
+                    values.Delete(pos);
+                    refs.Delete(pos);
+                    subNdx.Destroy();
+                }
+            }
+            else {
+                const size_t r = sub.find_first(row_ndx);
+                assert(r != not_found);
+                sub.Delete(r);
+
+                if (sub.is_empty()) {
+                    values.Delete(pos);
+                    refs.Delete(pos);
+                    sub.Destroy();
+                }
+            }
+        }
+    }
+}
+
 #ifdef _DEBUG
+
+bool StringIndex::is_empty() const
+{
+    const Array values = m_array->GetSubArray(0);
+    return values.is_empty();
+}
 
 void StringIndex::to_dot(std::ostream& out)
 {

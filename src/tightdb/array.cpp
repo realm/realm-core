@@ -2442,7 +2442,7 @@ top:
         const size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == (size_t)-1) return (size_t)-1;
+        if (pos == not_found) return not_found;
 
         // Get entry under key
         const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
@@ -2469,7 +2469,7 @@ top:
 
                 const char* const str = column.Get(row_ref);
                 if (strcmp(str, value) == 0) return row_ref;
-                else return (size_t)-1;
+                else return not_found;
             }
 
             const uint8_t* const sub_header = (const uint8_t*)m_alloc.Translate(ref);
@@ -2485,7 +2485,7 @@ top:
 
                 const char* const str =column.Get(row_ref);
                 if (strcmp(str, value) == 0) return row_ref;
-                else return (size_t)-1;
+                else return not_found;
             }
 
             // Recurse into sub-index;
@@ -2495,7 +2495,7 @@ top:
             isNode = get_header_isnode_direct(header);
             goto top;
         }
-        else return (size_t)-1;
+        else return not_found;
     }
 }
 

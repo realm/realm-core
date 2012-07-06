@@ -30,11 +30,16 @@ public:
     StringIndex(const AdaptiveStringColumn& c);
     StringIndex(size_t ref, ArrayParent* parent, size_t pndx, const AdaptiveStringColumn& c);
     
-    bool Insert(size_t row_ndx, const char* value, bool isLast=false);
-    
+    void BuildIndex();
+
+    void Insert(size_t row_ndx, const char* value, bool isLast=false);
+    void Set(size_t row_ndx, const char* oldValue, const char* newValue);
+    void Delete(size_t row_ndx, const char* value, bool isLast=false);
+
     size_t find_first(const char* value) const;
     
 #ifdef _DEBUG
+    bool is_empty() const;
     void to_dot(std::ostream& out = std::cerr);
 #endif
     
@@ -42,6 +47,7 @@ protected:
     bool InsertWithOffset(size_t row_ndx, size_t offset, const char* value);
     bool InsertRowList(size_t ref, size_t offset, const char* value);
     int64_t GetLastKey() const;
+    void UpdateRefs(size_t pos, int diff);
     
     // B-Tree functions
     bool TreeInsert(size_t row_ndx, int32_t key, size_t offset, const char* value);
@@ -49,6 +55,7 @@ protected:
     bool LeafInsert(size_t row_ndx, int32_t key, size_t offset, const char* value, bool noextend=false);
     bool NodeInsertSplit(size_t ndx, size_t new_ref);
     bool NodeInsert(size_t ndx, size_t ref);
+    void DoDelete(size_t ndx, const char* value, size_t offset);
 
     // Member variables
     const AdaptiveStringColumn& m_column;
