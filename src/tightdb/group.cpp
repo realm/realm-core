@@ -228,7 +228,7 @@ void Group::init_shared() {
         }
     }
 }
-    
+
 void Group::reset_to_new()
 {
     assert(m_alloc.GetTopRef() == 0);
@@ -270,17 +270,18 @@ void Group::rollback()
 
 Group::~Group()
 {
-    if (!m_top.IsValid()) return; // nothing to clean up in new state
+    if (m_top.IsValid()) {
+        const size_t count = m_cachedtables.Size();
+        for (size_t i = 0; i < count; ++i) {
+            Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
+            delete t;
+        }
 
-    const size_t count = m_tables.Size();
-    for (size_t i = 0; i < count; ++i) {
-        Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
-        delete t;
+        // Recursively deletes entire tree
+        m_top.Destroy();
     }
-    m_cachedtables.Destroy();
 
-    // Recursively deletes entire tree
-    m_top.Destroy();
+    m_cachedtables.Destroy();
 }
 
 bool Group::is_empty() const
