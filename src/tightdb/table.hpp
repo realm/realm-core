@@ -55,15 +55,14 @@ class ConstTableView;
  */
 class Table {
 public:
-    // FIXME: Generally use the word 'spec' instead of 'schema'
-    // Construct a new top-level table with an independent schema.
+    // Construct a new top-level table with an independent spec.
     Table(Allocator& alloc = GetDefaultAllocator());
     ~Table();
 
-    // Schema handling (see also Spec.hpp)
+    // Schema handling (see also <tightdb/spec.hpp>)
     Spec&       get_spec();
     const Spec& get_spec() const;
-    void        update_from_spec(); // Must not be called for a table with shared schema
+    void        update_from_spec(); // Must not be called for a table with shared spec
                 // Add a column dynamically
     size_t      add_column(ColumnType type, const char* name);
 
@@ -196,7 +195,7 @@ protected:
 
 
     /**
-     * Construct a top-level table with independent schema from ref.
+     * Construct a top-level table with independent spec from ref.
      */
     Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent);
 
@@ -208,19 +207,19 @@ protected:
     class SubtableTag {};
 
     /**
-     * Construct a subtable with independent schema from ref.
+     * Construct a subtable with independent spec from ref.
      */
     Table(SubtableTag, Allocator& alloc, size_t top_ref,
           Parent* parent, size_t ndx_in_parent);
 
     /**
-     * Construct a subtable with shared schema from ref.
+     * Construct a subtable with shared spec from ref.
      *
      * It is possible to construct a 'null' table by passing zero for
      * columns_ref, in this case the columns will be created on
      * demand.
      */
-    Table(SubtableTag, Allocator& alloc, size_t schema_ref, size_t columns_ref,
+    Table(SubtableTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
           Parent* parent, size_t ndx_in_parent);
 
     void Create(size_t ref_specSet, size_t ref_columns,
@@ -278,7 +277,7 @@ private:
     void InstantiateBeforeChange();
 
     /**
-     * Construct a table with independent schema and return just the
+     * Construct a table with independent spec and return just the
      * reference to the underlying memory.
      */
     static size_t create_table(Allocator&);

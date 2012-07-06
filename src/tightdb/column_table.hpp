@@ -43,19 +43,19 @@ protected:
     /**
      * Get the subtable at the specified index.
      *
-     * This method must be used only for subtables with shared schema,
+     * This method must be used only for subtables with shared spec,
      * i.e. for elements of ColumnTable.
      *
      * The returned table pointer must always end up being wrapped in
      * a TableRef.
      */
-    Table* get_subtable_ptr(std::size_t subtable_ndx, std::size_t schema_ref) const;
+    Table* get_subtable_ptr(std::size_t subtable_ndx, std::size_t spec_ref) const;
 
     /**
      * Get the subtable at the specified index.
      *
      * This method must be used only for subtables with independent
-     * schemas, i.e. for elements of ColumnMixed.
+     * specs, i.e. for elements of ColumnMixed.
      *
      * The returned table pointer must always end up being wrapped in
      * a TableRef.
@@ -63,17 +63,17 @@ protected:
     Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
     /*
-     * This method must be used only for subtables with shared schema,
+     * This method must be used only for subtables with shared spec,
      * i.e. for elements of ColumnTable.
      */
-    TableRef get_subtable(std::size_t subtable_ndx, std::size_t schema_ref) const
+    TableRef get_subtable(std::size_t subtable_ndx, std::size_t spec_ref) const
     {
-        return TableRef(get_subtable_ptr(subtable_ndx, schema_ref));
+        return TableRef(get_subtable_ptr(subtable_ndx, spec_ref));
     }
 
     /*
      * This method must be used only for subtables with independent
-     * schemas, i.e. for elements of ColumnMixed.
+     * specs, i.e. for elements of ColumnMixed.
      */
     TableRef get_subtable(std::size_t subtable_ndx) const
     {
@@ -127,7 +127,7 @@ public:
      * \param tab If this column is used as part of a table you must
      * pass a pointer to that table. Otherwise you may pass null.
      */
-    ColumnTable(std::size_t schema_ref, ArrayParent* parent, std::size_t idx_in_parent,
+    ColumnTable(std::size_t spec_ref, ArrayParent* parent, std::size_t idx_in_parent,
                 Allocator& alloc, const Table* tab);
 
     /**
@@ -137,7 +137,7 @@ public:
      * \param tab If this column is used as part of a table you must
      * pass a pointer to that table. Otherwise you may pass null.
      */
-    ColumnTable(std::size_t columns_ref, std::size_t schema_ref,
+    ColumnTable(std::size_t columns_ref, std::size_t spec_ref,
                 ArrayParent* parent, std::size_t idx_in_parent,
                 Allocator& alloc, const Table* tab);
 
@@ -198,7 +198,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
 }
 
 inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
-                                                     std::size_t schema_ref) const
+                                                     std::size_t spec_ref) const
 {
     assert(subtable_ndx < Size());
 
@@ -206,7 +206,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
     if (!subtable) {
         const std::size_t columns_ref = GetAsRef(subtable_ndx);
         Allocator& alloc = GetAllocator();
-        subtable = new Table(Table::SubtableTag(), alloc, schema_ref, columns_ref,
+        subtable = new Table(Table::SubtableTag(), alloc, spec_ref, columns_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         const bool was_empty = m_subtable_map.empty();
         m_subtable_map.insert(subtable_ndx, subtable);

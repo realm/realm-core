@@ -50,10 +50,10 @@ Table::Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_par
     m_top.SetParent(parent, ndx_in_parent);
     assert(m_top.Size() == 2);
 
-    const size_t schema_ref  = m_top.GetAsRef(0);
+    const size_t spec_ref    = m_top.GetAsRef(0);
     const size_t columns_ref = m_top.GetAsRef(1);
 
-    Create(schema_ref, columns_ref, &m_top, 1);
+    Create(spec_ref, columns_ref, &m_top, 1);
     m_spec_set.set_parent(&m_top, 0);
 }
 
@@ -66,19 +66,19 @@ Table::Table(SubtableTag, Allocator& alloc, size_t top_ref, Parent* parent, size
     m_top.SetParent(parent, ndx_in_parent);
     assert(m_top.Size() == 2);
 
-    const size_t schema_ref  = m_top.GetAsRef(0);
+    const size_t spec_ref    = m_top.GetAsRef(0);
     const size_t columns_ref = m_top.GetAsRef(1);
 
-    Create(schema_ref, columns_ref, &m_top, 1);
+    Create(spec_ref, columns_ref, &m_top, 1);
     m_spec_set.set_parent(&m_top, 0);
 }
 
-// Create attached sub-table from ref and schema_ref
-Table::Table(SubtableTag, Allocator& alloc, size_t schema_ref, size_t columns_ref,
+// Create attached sub-table from ref and spec_ref
+Table::Table(SubtableTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
              Parent* parent, size_t ndx_in_parent):
     m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
 {
-    Create(schema_ref, columns_ref, parent, ndx_in_parent);
+    Create(spec_ref, columns_ref, parent, ndx_in_parent);
 }
 
 void Table::Create(size_t ref_specSet, size_t columns_ref,
@@ -1370,7 +1370,7 @@ void Table::UpdateColumnRefs(size_t column_ndx, int diff)
 }
 
 void Table::UpdateFromParent() {
-    // There is no top for sub-tables sharing schema
+    // There is no top for sub-tables sharing spec
     if (m_top.IsValid()) {
         if (!m_top.UpdateFromParent()) return;
     }
