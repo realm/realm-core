@@ -310,7 +310,7 @@ bool Group::has_table(const char* name) const
     if (!m_top.IsValid()) return false;
 
     const size_t n = m_tableNames.find_first(name);
-    return (n != (size_t)-1);
+    return (n != size_t(-1));
 }
 
 Table* Group::create_new_table(const char* name)
@@ -318,10 +318,6 @@ Table* Group::create_new_table(const char* name)
     const size_t ref = Table::create_table(m_alloc);
     m_tables.add(ref);
     m_tableNames.add(name);
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* repl = m_alloc.get_replication();
-    if (repl) repl->new_top_level_table(name);
-#endif
     Table* table = new Table(m_alloc, ref, this, m_tables.Size()-1); // FIXME: Risk of exception
     try {
         m_cachedtables.add(intptr_t(table)); // FIXME: intptr_t is not guaranteed to exists - even in C++11
@@ -331,6 +327,13 @@ Table* Group::create_new_table(const char* name)
         // FIXME: Should also remove table
         throw;
     }
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    Replication* repl = m_alloc.get_replication();
+    if (repl) {
+        error_code err = repl->new_top_level_table(name);
+        if (err) throw_error(err);
+    }
+#endif
     return table;
 }
 

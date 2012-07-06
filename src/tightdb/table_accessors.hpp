@@ -231,6 +231,37 @@ public:
         Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
         return *this;
     }
+
+    const FieldAccessor& operator-=(int64_t value) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        value = Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx) - value;
+        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
+        return *this;
+    }
+
+    const FieldAccessor& operator++() const { return (*this) += 1; }
+
+    const FieldAccessor& operator--() const { return (*this) -= 1; }
+
+    int64_t operator++(int) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        const int64_t value = Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx);
+        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value+1);
+        return value;
+    }
+
+    int64_t operator--(int) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        const int64_t value = Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx);
+        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value-1);
+        return value;
+    }
 };
 
 

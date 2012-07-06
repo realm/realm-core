@@ -328,59 +328,70 @@ protected:
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 struct Table::LocalTransactLog {
-    template<class T> void set_value(size_t column_ndx, size_t row_ndx, const T& value)
+    template<class T> error_code set_value(size_t column_ndx, size_t row_ndx, const T& value)
     {
-        if (m_repl) m_repl->set_value(m_table, column_ndx, row_ndx, value);
+        if (!m_repl) return ERROR_NONE;
+        return m_repl->set_value(m_table, column_ndx, row_ndx, value);
     }
 
-    template<class T> void insert_value(size_t column_ndx, size_t row_ndx, const T& value)
+    template<class T> error_code insert_value(size_t column_ndx, size_t row_ndx, const T& value)
     {
-        if (m_repl) m_repl->insert_value(m_table, column_ndx, row_ndx, value);
+        if (!m_repl) return ERROR_NONE;
+        return m_repl->insert_value(m_table, column_ndx, row_ndx, value);
     }
 
-    void row_insert_complete()
+    error_code row_insert_complete()
     {
-        if (m_repl) m_repl->row_insert_complete(m_table);
+        if (!m_repl) return ERROR_NONE;
+        return m_repl->row_insert_complete(m_table);
     }
 
-    void insert_empty_rows(std::size_t row_ndx, std::size_t num_rows)
+    error_code insert_empty_rows(std::size_t row_ndx, std::size_t num_rows)
     {
-        if (m_repl) m_repl->insert_empty_rows(m_table, row_ndx, num_rows);
+        if (!m_repl) return ERROR_NONE;
+        return m_repl->insert_empty_rows(m_table, row_ndx, num_rows);
     }
 
-    void remove_row(std::size_t row_ndx)
+    error_code remove_row(std::size_t row_ndx)
     {
-        if (m_repl) m_repl->remove_row(m_table, row_ndx);
+        if (!m_repl) return ERROR_NONE;
+        return m_repl->remove_row(m_table, row_ndx);
     }
 
-    void add_int_to_column(std::size_t column_ndx, int64_t value)
+    error_code add_int_to_column(std::size_t column_ndx, int64_t value)
     {
-        if (m_repl) m_repl->add_int_to_column(m_table, column_ndx, value);
+        if (!m_repl) return ERROR_NONE;
+        return m_repl->add_int_to_column(m_table, column_ndx, value);
     }
 
-    void add_index_to_column(std::size_t column_ndx)
+    error_code add_index_to_column(std::size_t column_ndx)
     {
-        if (m_repl) m_repl->add_index_to_column(m_table, column_ndx);
+        if (!m_repl) return ERROR_NONE;
+        return m_repl->add_index_to_column(m_table, column_ndx);
     }
 
-    void clear_table()
+    error_code clear_table()
     {
-        if (m_repl) m_repl->clear_table(m_table);
+        if (!m_repl) return ERROR_NONE;
+        return m_repl->clear_table(m_table);
     }
 
-    void optimize_table()
+    error_code optimize_table()
     {
-        if (m_repl) m_repl->optimize_table(m_table);
+        if (!m_repl) return ERROR_NONE;
+        return m_repl->optimize_table(m_table);
+    }
+
+    error_code add_column(ColumnType type, const char* name)
+    {
+        if (!m_repl) return ERROR_NONE;
+        return m_repl->add_column(m_table, &m_table->m_spec_set, type, name);
     }
 
     void on_table_destroyed()
     {
-        if (m_repl) m_repl->on_table_destroyed(m_table);
-    }
-
-    void add_column(ColumnType type, const char* name)
-    {
-        if (m_repl) m_repl->add_column(m_table, &m_table->m_spec_set, type, name);
+        if (!m_repl) return;
+        m_repl->on_table_destroyed(m_table);
     }
 
 private:

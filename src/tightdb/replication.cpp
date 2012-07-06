@@ -1,5 +1,6 @@
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
+#include <cassert>
 #include <new>
 #include <unistd.h>
 #include <fcntl.h>
@@ -7,7 +8,9 @@
 #include <sys/file.h>
 #include <sys/mman.h>
 
-#include <tightdb/static_assert.hpp>
+#include <tightdb/terminate.hpp>
+#include <tightdb/overflow.hpp>
+#include <tightdb/string_buffer.hpp>
 #include <tightdb/pthread_helpers.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/replication.hpp>
@@ -17,7 +20,7 @@ using namespace tightdb;
 
 namespace {
 
-    // Note: The sum of this value and sizeof(SharedState) may not
+    // Note: The sum of this value and sizeof(SharedState) must not
     // exceed the maximum values of any of the types 'size_t',
     // 'ptrdiff_t', or 'off_t'.
 #ifdef _DEBUG
@@ -27,82 +30,6 @@ namespace {
 #endif
 
     const size_t init_subtab_path_buf_size = 2*8-1; // 8 table levels (soft limit)
-
-
-    // Works for integers only. 'rval' must not be negative.
-    template<class L, class R> inline bool add_with_overflow_detect(L& lval, R rval)
-    {
-        TIGHTDB_STATIC_ASSERT((SameType<L,R>::value), "Same type required");
-        if (numeric_limits<R>::max() - rval < lval) return true;
-        lval += rval;
-        return false;
-    }
-
-    // Works for integers only. 'lval' must not be negative. 'rval'
-    // must be stricly greater than zero.
-    template<class L, class R> inline bool mul_with_overflow_detect(L& lval, R rval)
-    {
-        TIGHTDB_STATIC_ASSERT((SameType<L,R>::value), "Same type required");
-        if (numeric_limits<R>::max() / rval < lval) return true;
-        lval *= rval;
-        return false;
-    }
-
-
-    struct StringBuffer {
-        StringBuffer(): m_data(0), m_size(0), m_capacity(0) {}
-        ~StringBuffer() { delete[] m_data; }
-
-        error_code init(size_t capacity = 0)
-        {
-            if (capacity < numeric_limits<size_t>::max()) ++capacity;
-            m_data = new (nothrow) char[capacity];
-            if (!m_data) return ERROR_OUT_OF_MEMORY;
-            m_capacity = capacity;
-            m_data[0] = 0;
-            return ERROR_NONE;
-        }
-
-        const char* data() const { return m_data; }
-        size_t size() const { return m_size; }
-        const char* c_str() const { return m_data; }
-
-        error_code append(const char* data, size_t size)
-        {
-            size_t new_size = m_size;
-            if (add_with_overflow_detect(new_size, size)) return ERROR_NO_RESOURCE;
-            {
-                size_t new_min_capacity = new_size;
-                if (add_with_overflow_detect(new_min_capacity, size_t(1))) return ERROR_NO_RESOURCE;
-                if (m_capacity < new_min_capacity) {
-                    size_t new_capacity = m_capacity;
-                    if (mul_with_overflow_detect(new_capacity, size_t(2)))
-                        new_capacity = numeric_limits<size_t>::max();
-                    if (new_capacity < new_min_capacity) new_capacity = new_min_capacity;
-                    char* new_data = new (nothrow) char[new_capacity];
-                    if (!new_data) return ERROR_OUT_OF_MEMORY;
-                    copy(m_data, m_data + m_size+1, new_data);
-                    m_data     = new_data;
-                    m_capacity = new_capacity;
-                }
-            }
-            copy(data, data+size, m_data+m_size);
-            m_size += size;
-            m_data[m_size] = 0;
-            return ERROR_NONE;
-        }
-
-        error_code append_c_str(const char* str)
-        {
-            const size_t length = strlen(str);
-            return append(str, length);
-        }
-
-    private:
-        char *m_data;
-        size_t m_size;
-        size_t m_capacity;
-    };
 
 
     struct CloseGuard {
@@ -128,9 +55,10 @@ namespace {
 
         error_code init(int fd)
         {
+        again:
             int r = flock(fd, LOCK_EX);
             if (r<0) {
-                if (errno == EINTR) return ERROR_INTERRUPTED;
+                if (errno == EINTR) goto again;
                 if (errno == ENOLCK) return ERROR_NO_RESOURCE;
                 return ERROR_OTHER;
             }
@@ -251,16 +179,17 @@ struct Replication::SharedState {
 };
 
 
-error_code Replication::init()
+error_code Replication::init(const char* path_to_database_file,
+                             bool map_transact_log_buf)
 {
+    if (!path_to_database_file) path_to_database_file = get_path_to_database_file();
     if (!m_subtab_path_buf.set_size(init_subtab_path_buf_size)) return ERROR_OUT_OF_MEMORY;
     StringBuffer str_buf;
-    error_code err = str_buf.init();
-    if (err) return err;
-    err = str_buf.append_c_str(get_path_to_database_file());
+    error_code err = str_buf.append_c_str(path_to_database_file);
     if (err) return err;
     err = str_buf.append_c_str(".repl");
     if (err) return err;
+again:
     m_fd = open(str_buf.c_str(), O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (m_fd<0) {
         switch (errno) {
@@ -281,8 +210,8 @@ error_code Replication::init()
         case EMFILE:
         case ENFILE:
         case ENOSPC:       return ERROR_NO_RESOURCE;
+        case EINTR:        goto again;
         default:           return ERROR_OTHER;
-            // FIXME: What about EINTR? Can it even happen for a regular file?
         }
     }
     CloseGuard cg(m_fd);
@@ -298,25 +227,26 @@ error_code Replication::init()
             if (errno == ENOMEM) return ERROR_OUT_OF_MEMORY;
             return ERROR_OTHER;
         }
-        size_t size = statbuf.st_size;
-        if (size == 0) {
-            size = sizeof(SharedState) + initial_transact_log_buffer_size;
-            err = expand_file(m_fd, size);
+        size_t file_size = statbuf.st_size;
+        if (file_size == 0) {
+            file_size = sizeof(SharedState) + initial_transact_log_buffer_size;
+            err = expand_file(m_fd, file_size);
             if (err) return err;
         }
+        size_t mapped_size = map_transact_log_buf ? file_size : sizeof(SharedState);
         void* addr = 0;
-        err = map_file(m_fd, size, &addr);
+        err = map_file(m_fd, mapped_size, &addr);
         if (err) return err;
         SharedState* const shared_state = static_cast<SharedState*>(addr);
         if (shared_state->m_use_count == 0) {
-            UnmapGuard ug(addr, size);
-            err = shared_state->init(size);
+            UnmapGuard ug(addr, mapped_size);
+            err = shared_state->init(file_size);
             if (err) return err;
             ug.release();  // success, so do not unmap
         }
         ++shared_state->m_use_count;
         m_shared_state = shared_state;
-        m_shared_state_mapped_size = size;
+        m_shared_state_mapped_size = mapped_size;
     }
     cg.release(); // success, so do not close the file descriptor
     return ERROR_NONE;
@@ -346,10 +276,10 @@ Replication::~Replication()
 }
 
 
-void Replication::shutdown()
+void Replication::interrupt()
 {
     LockGuard lg(m_shared_state->m_mutex);
-    m_shared_state_shutdown = true;
+    m_interrupt = true;
     m_shared_state->m_cond_want_write_transact.notify_all();
     m_shared_state->m_cond_write_transact_available.notify_all();
     m_shared_state->m_cond_write_transact_finished.notify_all();
@@ -365,8 +295,14 @@ error_code Replication::acquire_write_access()
         ++m_shared_state->m_want_write_transact;
         m_shared_state->m_cond_want_write_transact.notify_all();
         while (!m_shared_state->m_write_transact_available) {
-            m_shared_state->m_cond_write_transact_available.wait(lg);
-            if (m_shared_state_shutdown) return ERROR_INTERRUPTED;
+            if (!m_interrupt) {
+                m_shared_state->m_cond_write_transact_available.wait(lg);
+            }
+            if (m_interrupt) {
+                // FIXME: Retracting the request for a write transaction may create problems fo the local coordinator
+                --m_shared_state->m_want_write_transact;
+                return ERROR_INTERRUPTED;
+            }
         }
         m_shared_state->m_write_transact_available = false;
         --m_shared_state->m_want_write_transact;
@@ -414,25 +350,37 @@ void Replication::release_write_access(bool rollback)
 }
 
 
+void Replication::clear_interrupt()
+{
+    LockGuard lg(m_shared_state->m_mutex);
+    m_interrupt = false;
+}
+
+
 bool Replication::wait_for_write_request()
 {
     LockGuard lg(m_shared_state->m_mutex);
     while (m_shared_state->m_want_write_transact == 0) {
-        m_shared_state->m_cond_want_write_transact.wait(lg);
-        if (m_shared_state_shutdown) return false;
+        if (!m_interrupt) {
+            m_shared_state->m_cond_want_write_transact.wait(lg);
+        }
+        if (m_interrupt) return false;
     }
     return true;
 }
 
 
+// FIXME: Consider what should happen if nobody remains interested in this write transaction
 bool Replication::grant_write_access_and_wait_for_completion(TransactLog& l)
 {
     LockGuard lg(m_shared_state->m_mutex);
     m_shared_state->m_write_transact_available = true;
     m_shared_state->m_cond_write_transact_available.notify_all();
     while (!m_shared_state->m_write_transact_finished) {
-        m_shared_state->m_cond_write_transact_finished.wait(lg);
-        if (m_shared_state_shutdown) return false;
+        if (!m_interrupt) {
+            m_shared_state->m_cond_write_transact_finished.wait(lg);
+        }
+        if (m_interrupt) return false;
     }
     m_shared_state->m_write_transact_finished = false;
     l.offset1 = m_shared_state->m_transact_log_new_begin;
@@ -446,6 +394,24 @@ bool Replication::grant_write_access_and_wait_for_completion(TransactLog& l)
         l.offset2 = l.size2 = 0;
     }
     return true;
+}
+
+
+error_code Replication::map(const TransactLog& l, const char** addr1, const char** addr2)
+{
+    if (m_shared_state_mapped_size < l.offset1+l.size1 ||
+        m_shared_state_mapped_size < l.offset2+l.size2) {
+        size_t file_size;
+        {
+            LockGuard lg(m_shared_state->m_mutex);
+            file_size = m_shared_state->m_size;
+        }
+        error_code err = remap_file(file_size);
+        if (err) return err;
+    }
+    *addr1 = static_cast<char*>(static_cast<void*>(m_shared_state)) + l.offset1;
+    *addr2 = static_cast<char*>(static_cast<void*>(m_shared_state)) + l.offset2;
+    return ERROR_NONE;
 }
 
 
@@ -520,8 +486,10 @@ error_code Replication::transact_log_reserve_contig(size_t n)
             // we will simply wait.
             if (m_shared_state->m_transact_log_used_begin ==
                 m_shared_state->m_transact_log_used_end) break;
-            m_shared_state->m_cond_transact_log_free.wait(lg);
-            if (m_shared_state_shutdown) return ERROR_INTERRUPTED;
+            if (!m_interrupt) {
+                m_shared_state->m_cond_transact_log_free.wait(lg);
+            }
+            if (m_interrupt) return ERROR_INTERRUPTED;
         }
     }
     // At this point we know that we have to expand the file. We also
@@ -542,7 +510,7 @@ error_code Replication::transact_log_reserve_contig(size_t n)
 
 error_code Replication::transact_log_append_overflow(const char* data, std::size_t size)
 {
-    // FIXME: During write access, it should be possible to used m_mapped_size instead of m_shared_state->m_size.
+    // FIXME: During write access, it should be possible to use m_mapped_size instead of m_shared_state->m_size.
     bool need_expand = false;
     {
         char* const base = static_cast<char*>(static_cast<void*>(m_shared_state));
@@ -579,8 +547,10 @@ error_code Replication::transact_log_append_overflow(const char* data, std::size
                 break;
             }
 
-            m_shared_state->m_cond_transact_log_free.wait(lg);
-            if (m_shared_state_shutdown) return ERROR_INTERRUPTED;
+            if (!m_interrupt) {
+                m_shared_state->m_cond_transact_log_free.wait(lg);
+            }
+            if (m_interrupt) return ERROR_INTERRUPTED;
         }
     }
     if (need_expand) {
@@ -782,7 +752,8 @@ good:
 
 error_code Replication::select_spec(const Table* table, const Spec* spec)
 {
-    check_table(table);
+    error_code err = check_table(table);
+    if (err) return err;
     size_t* begin;
     size_t* end;
     for (;;) {
@@ -795,7 +766,7 @@ error_code Replication::select_spec(const Table* table, const Spec* spec)
     }
     char* buf;
     const int max_elems_per_chunk = 8;
-    error_code err = transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int);
+    err = transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int);
     if (err) return err;
     *buf++ = 'S';
     assert(1 <= end - begin);
@@ -860,6 +831,7 @@ error_code Replication::SharedState::init(size_t file_size)
 }
 
 
+// FIXME: This one can be moved into the class
 void Replication::SharedState::destroy()
 {
     m_cond_want_write_transact.destroy();

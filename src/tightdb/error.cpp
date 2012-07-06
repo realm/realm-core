@@ -5,7 +5,7 @@ using namespace std;
 namespace tightdb {
 
 
-string get_message(error_code err)
+const char* get_message(error_code err)
 {
     switch (err) {
     case ERROR_NONE:             return "No error";
@@ -16,7 +16,8 @@ string get_message(error_code err)
     case ERROR_OUT_OF_MEMORY:    return "Out of memory";
     case ERROR_NO_RESOURCE:      return "Not enough resources";
     case ERROR_IO:               return "Input/output error";
-    case ERROR_INTERRUPTED:      return "Interrupted blocking operation";
+    case ERROR_INTERRUPTED:      return "Blocking operation interrupted";
+    case ERROR_NOT_IMPLEMENTED:  return "Not implemented";
     case ERROR_OTHER:            break;
     }
     return "Other/unknown error";

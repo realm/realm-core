@@ -62,15 +62,16 @@ SharedGroup::SharedGroup(const char* path_to_database_file):
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-SharedGroup::SharedGroup(replication_tag):
-    m_group(Replication::get_path_to_database_file(), GROUP_SHARED), m_info(NULL),
+SharedGroup::SharedGroup(replication_tag, const char* path_to_database_file):
+    m_group(path_to_database_file ? path_to_database_file :
+            Replication::get_path_to_database_file(), GROUP_SHARED), m_info(NULL),
     m_isValid(false), m_version(-1), m_lockfile_path(NULL)
 {
-    error_code err = m_replication.init();
+    error_code err = m_replication.init(path_to_database_file);
     if (err) return; // FIXME: Reveal the error code somehow
     m_group.set_replication(&m_replication);
 
-    init(Replication::get_path_to_database_file());
+    init(path_to_database_file ? path_to_database_file : Replication::get_path_to_database_file());
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
@@ -287,7 +288,7 @@ Group& SharedGroup::begin_write()
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (m_replication) {
         error_code err = m_replication.acquire_write_access();
-        if (err) TIGHTDB_TERMINATE("ABORTED"); // FIXME: Termination is not the right way to handle this.
+        if (err) throw_error(err);
     }
 #endif
 

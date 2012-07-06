@@ -39,7 +39,28 @@ public:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct replication_tag {};
-    SharedGroup(replication_tag);
+    SharedGroup(replication_tag, const char* path_to_database_file = 0);
+
+    /// This function may be called asynchronously to interrupt any
+    /// blocking call that is part of a transaction in a replication
+    /// setup. Only begin_write() and modifying function that are part
+    /// of a write transaction can block. The transaction is
+    /// interrupted only if such a call is blocked or would
+    /// block. This function may be called from a diffrent thread. It
+    /// may not be called directly from a system signal handler. When
+    /// a transaction is interrupted, the only valid member function
+    /// to call is rollback(). If a client calls
+    /// clear_interrupt_transact() after having called rollback(), it
+    /// may then resume normal operation on this database. Currently,
+    /// transaction interruption works by throwing an exception from
+    /// one of the mentioned member functions that may block.
+    void interrupt_transact() { m_replication.interrupt(); }
+
+    /// Clear the interrupted state of this database after rolling
+    /// back a transaction. It is not an error to call this function
+    /// in a situation where no interruption has occured. See
+    /// interrupt_transact() for more.
+    void clear_interrupt_transact() { m_replication.clear_interrupt(); }
 #endif
 
     bool is_valid() const {return m_isValid;}

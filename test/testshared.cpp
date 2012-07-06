@@ -292,7 +292,7 @@ TEST(Shared_Writes_SpecialOrder)
                 Group& group = db.begin_write();
                 MyTable_SpecialOrder::Ref table = group.get_table<MyTable_SpecialOrder>("test");
                 CHECK_EQUAL(j, table[i].first);
-                table[i].first = table[i].first + 1;
+                ++table[i].first;
             }
             db.commit();
         }

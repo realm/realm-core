@@ -131,7 +131,10 @@ void Spec::add_column(ColumnType type, const char* name)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* repl = m_specSet.GetAllocator().get_replication();
-    if (repl) repl->add_column(m_table, this, type, name);
+    if (repl) {
+        error_code err = repl->add_column(m_table, this, type, name);
+        if (err) throw_error(err);
+    }
 #endif
 }
 

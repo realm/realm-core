@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_ERROR_HPP
 #define TIGHTDB_ERROR_HPP
 
-#include <string>
+#include <stdexcept>
 
 namespace tightdb {
 
@@ -58,13 +58,25 @@ enum error_code {
     /// system signal.
     ERROR_INTERRUPTED,
 
+    /// A function was called, or a feature was requested, that was
+    /// not implemented.
+    ERROR_NOT_IMPLEMENTED,
+
     /// An error of unknown type, or one that is not covered by any of
     /// the preceeding error types.
     ERROR_OTHER
 };
 
 
-std::string get_message(error_code);
+const char* get_message(error_code);
+
+
+inline void throw_error(error_code err)
+{
+    // FIXME: Do we allow exceptions?
+    // FIXME: Should throw TightdbException(err, get_message(err))
+    throw std::runtime_error(get_message(err));
+}
 
 
 } // namespace tightdb
