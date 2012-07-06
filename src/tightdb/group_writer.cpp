@@ -167,6 +167,8 @@ void GroupWriter::WriteAt(size_t pos, const char* p, size_t n) {
     char* const mmap_end = m_data + m_len;
     char* const copy_end = dest + n;
     assert(copy_end <= mmap_end);
+    static_cast<void>(mmap_end);
+    static_cast<void>(copy_end);
 
     memcpy(dest, p, n);
 }

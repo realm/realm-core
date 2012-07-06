@@ -614,6 +614,8 @@ void Group::to_dot() const
 
 void Group::zero_free_space(size_t file_size, size_t readlock_version)
 {
+    static_cast<void>(readlock_version); // FIXME: Why is this parameter not used?
+
     if (!is_shared()) return;
 
 #if !defined(_MSC_VER)
