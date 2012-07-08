@@ -28,7 +28,8 @@
 namespace tightdb {
 
 
-/// Works for integers only. 'rval' must not be negative.
+/// Checks for positive overflow. Works for integers only. 'rval' must
+/// not be negative.
 template<class L, class R> inline bool add_with_overflow_detect(L& lval, R rval)
 {
     TIGHTDB_STATIC_ASSERT((SameType<L,R>::value), "Same type required");
@@ -38,13 +39,35 @@ template<class L, class R> inline bool add_with_overflow_detect(L& lval, R rval)
 }
 
 
-/// Works for integers only. 'lval' must not be negative. 'rval' must
-/// be stricly greater than zero.
-template<class L, class R> inline bool mul_with_overflow_detect(L& lval, R rval)
+/// Checks for negative overflow. Works for integers only. 'rval' must
+/// not be negative.
+template<class L, class R> inline bool subtract_with_overflow_detect(L& lval, R rval)
+{
+    TIGHTDB_STATIC_ASSERT((SameType<L,R>::value), "Same type required");
+    if (lval < std::numeric_limits<R>::min() + rval) return true;
+    lval -= rval;
+    return false;
+}
+
+
+/// Checks for positive overflow. Works for integers only. 'lval' must
+/// not be negative. 'rval' must be stricly greater than zero.
+template<class L, class R> inline bool multiply_with_overflow_detect(L& lval, R rval)
 {
     TIGHTDB_STATIC_ASSERT((SameType<L,R>::value), "Same type required");
     if (std::numeric_limits<R>::max() / rval < lval) return true;
     lval *= rval;
+    return false;
+}
+
+
+/// Checks for positive overflow. Works for integers only. 'lval' must
+/// not be negative. 'i' must be such that 'L(1)>>i' has a value that is
+/// defined by the standard.
+template<class L> inline bool shift_left_with_overflow_detect(L& lval, int i)
+{
+    if (std::numeric_limits<L>::max() >> i < lval) return true;
+    lval <<= i;
     return false;
 }
 

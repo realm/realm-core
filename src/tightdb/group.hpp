@@ -148,6 +148,10 @@ private:
     Table* create_new_table(const char* name);
 
     friend class LangBindHelper;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    friend class Replication;
+#endif
 };
 
 

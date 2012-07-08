@@ -35,8 +35,8 @@ public:
 
     // FIXME: It seems that the application must make sure that the
     // parent Spec object is kept alive for at least as long as the
-    // returned Spec. This also has implications for language bindings
-    // such as Java.
+    // spec that is returned. This also has implications for language
+    // bindings such as Java.
     Spec get_subspec(size_t column_ndx);
     const Spec get_subspec(size_t column_ndx) const;
 private:

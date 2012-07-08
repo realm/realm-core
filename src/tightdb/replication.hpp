@@ -22,6 +22,7 @@
 
 #include <cstddef>
 #include <cstring>
+#include <new>
 #include <algorithm>
 #include <limits>
 
@@ -35,6 +36,7 @@ namespace tightdb {
 
 class Spec;
 class Table;
+class Group;
 
 
 // FIXME: Be careful about the possibility of one modification functions being called by another where both do transaction logging.
@@ -194,8 +196,23 @@ struct Replication {
     void on_table_destroyed(const Table* t) { if (m_selected_table == t) m_selected_table = 0; }
     void on_spec_destroyed(const Spec* s)   { if (m_selected_spec  == s) m_selected_spec  = 0; }
 
+
+    struct InputStream {
+        /// \return The number of extracted bytes. This will always be
+        /// less than or equal to \a size. A value of zero indicates
+        /// end-of-input unless \a size was zero.
+        virtual std::size_t read(char* buffer, std::size_t size) = 0;
+
+        virtual ~InputStream() {}
+    };
+
+    /// \return ERROR_IO if the transaction log could not be
+    /// successfully parsed.
+    static error_code apply_transact_log(InputStream& transact_log, Group& target);
+
 private:
     struct SharedState;
+    struct TransactLogApplier;
 
 public:
     typedef SharedState* Replication::*unspecified_bool_type;
@@ -216,14 +233,16 @@ private:
     char* m_transact_log_free_begin;
     char* m_transact_log_free_end;
 
-    struct Buffer {
-        size_t* m_data;
+    template<class T> struct Buffer {
+        T* m_data;
         std::size_t m_size;
+        T& operator[](std::size_t i) { return m_data[i]; }
+        const T& operator[](std::size_t i) const { return m_data[i]; }
         Buffer(): m_data(0), m_size(0) {}
         ~Buffer() { delete[] m_data; }
         bool set_size(std::size_t);
     };
-    Buffer m_subtab_path_buf;
+    Buffer<std::size_t> m_subtab_path_buf;
 
     const Table* m_selected_table;
     const Spec*  m_selected_spec;
@@ -567,6 +586,17 @@ inline error_code Replication::optimize_table(const Table* t)
     error_code err = check_table(t);
     if (err) return err;
     return simple_cmd('Z', tuple());
+}
+
+
+template<class T> bool Replication::Buffer<T>::set_size(std::size_t new_size)
+{
+    T* const new_data = new (std::nothrow) T[new_size];
+    if (!new_data) return false;
+    delete[] m_data;
+    m_data = new_data;
+    m_size = new_size;
+    return true;
 }
 
 
