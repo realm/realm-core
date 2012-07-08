@@ -29,24 +29,22 @@
 namespace tightdb {
 
 
-/**
- * These functions are only to be used by language bindings to gain
- * access to certain otherwise private memebers.
- *
- * \note An application must never call these functions directly.
- *
- * All the get_*_ptr() functions in this class will return a Table
- * pointer where the reference count has already been incremented.
- *
- * The application must make sure that the unbind_table_ref() function is
- * called to decrement the reference count when it no longer needs
- * access to that table. The order of unbinding is important as you must
- * unbind subtables to a table before unbinding the table itself.
- *
- */
+/// These functions are only to be used by language bindings to gain
+/// access to certain otherwise private memebers.
+///
+/// \note An application must never call these functions directly.
+///
+/// All the get_*_ptr() functions in this class will return a Table
+/// pointer where the reference count has already been incremented.
+///
+/// The application must make sure that the unbind_table_ref() function is
+/// called to decrement the reference count when it no longer needs
+/// access to that table. The order of unbinding is important as you must
+/// unbind subtables to a table before unbinding the table itself.
+///
 class LangBindHelper {
 public:
-    /// Returns null on failure to allocate memory.
+    /// Returns null on memory allocation failure.
     static Table* new_table(); // FIXME: Verify that the caller checks for null!
 
     static Table* get_subtable_ptr(Table*, size_t column_ndx, size_t row_ndx);

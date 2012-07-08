@@ -38,21 +38,25 @@ class TableView;
 class ConstTableView;
 
 
-// FIXME: Table copying (from any group to any group) could be made aliasing safe as follows: Start by cloning source table into target allocator. On success, assign, and then deallocate any previous structure at the target.
-
-// FIXME: It might be desirable to have a 'table move' feature between two places inside the same group (say from a subtable or a mixed column to group level). This could be done in a very efficient manner.
-
-
-/**
- * The Table class is non-polymorphic, that is, it has no virtual
- * functions. This is important because it ensures that there is no
- * run-time distinction between a Table instance and an instance of
- * any variation of BasicTable<T>, and this, in turn, makes it valid
- * to cast a pointer from Table to BasicTable<T> even when the
- * instance is constructed as a Table. Of couse, this also assumes
- * that BasicTable<> is non-polymorphic, has no destructor, and adds
- * no extra data members.
- */
+/// The Table class is non-polymorphic, that is, it has no virtual
+/// functions. This is important because it ensures that there is no
+/// run-time distinction between a Table instance and an instance of
+/// any variation of BasicTable<T>, and this, in turn, makes it valid
+/// to cast a pointer from Table to BasicTable<T> even when the
+/// instance is constructed as a Table. Of couse, this also assumes
+/// that BasicTable<> is non-polymorphic, has no destructor, and adds
+/// no extra data members.
+///
+/// FIXME: Table copying (from any group to any group) could be made
+/// aliasing safe as follows: Start by cloning source table into
+/// target allocator. On success, assign, and then deallocate any
+/// previous structure at the target.
+///
+/// FIXME: It might be desirable to have a 'table move' feature
+/// between two places inside the same group (say from a subtable or a
+/// mixed column to group level). This could be done in a very
+/// efficient manner.
+///
 class Table {
 public:
     // Construct a new top-level table with an independent spec.
@@ -113,7 +117,10 @@ public:
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void add_int(size_t column_ndx, int64_t value);
 
-    // Sub-tables (works on columns whose type is either 'subtable' or 'mixed', for a value in a mixed column that is not a subtable, get_subtable() returns null, get_subtable_size() returns zero, and clear_subtable() does nothing.)
+    // Sub-tables (works on columns whose type is either 'subtable' or
+    // 'mixed', for a value in a mixed column that is not a subtable,
+    // get_subtable() returns null, get_subtable_size() returns zero,
+    // and clear_subtable() does nothing.)
     TableRef        get_subtable(size_t column_ndx, size_t row_ndx);
     ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;
@@ -194,34 +201,31 @@ protected:
     const ColumnMixed& GetColumnMixed(size_t column_ndx) const;
 
 
-    /**
-     * Construct a top-level table with independent spec from ref.
-     */
+    /// Construct a top-level table with independent spec from ref.
+    ///
     Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent);
 
-    /**
-     * Used when the lifetime of a table is managed by reference
-     * counting. The lifetime of free-standing tables allocated on the
-     * stack by the application is not managed by reference counting,
-     * so that is a case where this tag must not be specified.
-     */
+    /// Used when the lifetime of a table is managed by reference
+    /// counting. The lifetime of free-standing tables allocated on
+    /// the stack by the application is not managed by reference
+    /// counting, so that is a case where this tag must not be
+    /// specified.
+    ///
     class RefCountTag {};
 
-    /**
-     * Construct a table with independent spec from the specified \a
-     * top_ref, and whose lifetime is managed by reference counting.
-     */
+    /// Construct a table with independent spec from the specified \a
+    /// top_ref, and whose lifetime is managed by reference counting.
+    ///
     Table(RefCountTag, Allocator& alloc, size_t top_ref,
           Parent* parent, size_t ndx_in_parent);
 
-    /**
-     * Construct a table with shared spec from the specified refs,
-     * and whose lifetime is managed by reference counting.
-     *
-     * It is possible to construct a 'null' table by passing zero for
-     * \a columns_ref, in this case the columns will be created on
-     * demand.
-     */
+    /// Construct a table with shared spec from the specified refs,
+    /// and whose lifetime is managed by reference counting.
+    ///
+    /// It is possible to construct a 'null' table by passing zero for
+    /// \a columns_ref, in this case the columns will be created on
+    /// demand.
+    ///
     Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
           Parent* parent, size_t ndx_in_parent);
 
@@ -253,20 +257,18 @@ protected:
     // Cached columns
     Array m_cols;
 
-    /**
-     * Get the subtable at the specified column and row index.
-     *
-     * The returned table pointer must always end up being wrapped in
-     * a TableRef.
-     */
+    /// Get the subtable at the specified column and row index.
+    ///
+    /// The returned table pointer must always end up being wrapped in
+    /// a TableRef.
+    ///
     Table *get_subtable_ptr(size_t col_idx, size_t row_idx);
 
-    /**
-     * Get the subtable at the specified column and row index.
-     *
-     * The returned table pointer must always end up being wrapped in
-     * a ConstTableRef.
-     */
+    /// Get the subtable at the specified column and row index.
+    ///
+    /// The returned table pointer must always end up being wrapped in
+    /// a ConstTableRef.
+    ///
     const Table *get_subtable_ptr(size_t col_idx, size_t row_idx) const;
 
 private:
