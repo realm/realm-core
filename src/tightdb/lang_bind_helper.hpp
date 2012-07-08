@@ -20,6 +20,8 @@
 #ifndef TIGHTDB_LANG_BIND_HELPER_HPP
 #define TIGHTDB_LANG_BIND_HELPER_HPP
 
+#include <new>
+
 #include "table.hpp"
 #include "table_view.hpp"
 #include "group.hpp"
@@ -44,7 +46,9 @@ namespace tightdb {
  */
 class LangBindHelper {
 public:
-    static Table* new_table();
+    /// Returns null on failure to allocate memory.
+    static Table* new_table(); // FIXME: Verify that the caller checks for null!
+
     static Table* get_subtable_ptr(Table*, size_t column_ndx, size_t row_ndx);
     static const Table* get_subtable_ptr(const Table*, size_t column_ndx, size_t row_ndx);
 
@@ -59,11 +63,17 @@ public:
 };
 
 
+
+
 // Implementation:
 
 inline Table* LangBindHelper::new_table()
 {
-    Table* table = new Table();
+    Allocator& alloc = GetDefaultAllocator();
+    const size_t ref = Table::create_empty_table(alloc);
+    if (!ref) return 0;
+    Table* const table = new (std::nothrow) Table(Table::RefCountTag(), alloc, ref, 0, 0);
+    if (!table) return 0;
     table->bind_ref();
     return table;
 }

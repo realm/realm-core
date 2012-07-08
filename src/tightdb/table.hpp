@@ -200,30 +200,34 @@ protected:
     Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent);
 
     /**
-     * Used when constructing subtables, that is, tables whose
-     * lifetime is managed by reference counting, and not by the
-     * application.
+     * Used when the lifetime of a table is managed by reference
+     * counting. The lifetime of free-standing tables allocated on the
+     * stack by the application is not managed by reference counting,
+     * so that is a case where this tag must not be specified.
      */
-    class SubtableTag {};
+    class RefCountTag {};
 
     /**
-     * Construct a subtable with independent spec from ref.
+     * Construct a table with independent spec from the specified \a
+     * top_ref, and whose lifetime is managed by reference counting.
      */
-    Table(SubtableTag, Allocator& alloc, size_t top_ref,
+    Table(RefCountTag, Allocator& alloc, size_t top_ref,
           Parent* parent, size_t ndx_in_parent);
 
     /**
-     * Construct a subtable with shared spec from ref.
+     * Construct a table with shared spec from the specified refs,
+     * and whose lifetime is managed by reference counting.
      *
      * It is possible to construct a 'null' table by passing zero for
-     * columns_ref, in this case the columns will be created on
+     * \a columns_ref, in this case the columns will be created on
      * demand.
      */
-    Table(SubtableTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
+    Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
           Parent* parent, size_t ndx_in_parent);
 
-    void Create(size_t ref_specSet, size_t ref_columns,
-                ArrayParent* parent, size_t ndx_in_parent);
+    void init_from_ref(size_t top_ref, ArrayParent* parent, size_t ndx_in_parent);
+    void init_from_ref(size_t spec_ref, size_t columns_ref,
+                       ArrayParent* parent, size_t ndx_in_parent);
     void CreateColumns();
     void CacheColumns();
     void ClearCachedColumns();
@@ -276,11 +280,12 @@ private:
     ColumnBase& GetColumnBase(size_t column_ndx);
     void InstantiateBeforeChange();
 
-    /**
-     * Construct a table with independent spec and return just the
-     * reference to the underlying memory.
-     */
-    static size_t create_table(Allocator&);
+    /// Construct an empty table with independent spec and return just
+    /// the reference to the underlying memory.
+    ///
+    /// \return Zero if allocation fails.
+    ///
+    static size_t create_empty_table(Allocator&);
 
     // Experimental
     TableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max);
@@ -323,6 +328,78 @@ protected:
 
 
 // Implementation:
+
+inline size_t Table::create_empty_table(Allocator& alloc)
+{
+    Array top(COLUMN_HASREFS, 0, 0, alloc);
+    top.add(Spec::create_empty_spec(alloc));
+    top.add(Array::create_empty_array(COLUMN_HASREFS, alloc)); // Columns
+    return top.GetRef();
+}
+
+// Create new Table
+inline Table::Table(Allocator& alloc):
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1)
+{
+    const size_t ref = create_empty_table(alloc);
+    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    init_from_ref(ref, 0, 0);
+}
+
+// Create Table from ref
+inline Table::Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent):
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1)
+{
+    init_from_ref(top_ref, parent, ndx_in_parent);
+}
+
+// Create attached table from ref
+inline Table::Table(RefCountTag, Allocator& alloc, size_t top_ref,
+                    Parent* parent, size_t ndx_in_parent):
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
+{
+    init_from_ref(top_ref, parent, ndx_in_parent);
+}
+
+// Create attached sub-table from ref and spec_ref
+inline Table::Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
+                    Parent* parent, size_t ndx_in_parent):
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
+{
+    init_from_ref(spec_ref, columns_ref, parent, ndx_in_parent);
+}
+
+
+inline void Table::insert_bool(size_t column_ndx, size_t row_ndx, bool value)
+{
+    insert_int(column_ndx, row_ndx, value);
+}
+
+inline void Table::insert_date(size_t column_ndx, size_t row_ndx, time_t value)
+{
+    insert_int(column_ndx, row_ndx, value);
+}
+
+template<class E> inline void Table::insert_enum(size_t column_ndx, size_t row_ndx, E value)
+{
+    insert_int(column_ndx, row_ndx, value);
+}
+
+template<class E> inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
+{
+    set_int(column_ndx, row_ndx, value);
+}
+
+inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)
+{
+    return TableRef(get_subtable_ptr(column_ndx, row_ndx));
+}
+
+inline ConstTableRef Table::get_subtable(size_t column_ndx, size_t row_ndx) const
+{
+    return ConstTableRef(get_subtable_ptr(column_ndx, row_ndx));
+}
+
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
@@ -428,37 +505,6 @@ inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*)
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
-
-
-inline void Table::insert_bool(size_t column_ndx, size_t row_ndx, bool value)
-{
-    insert_int(column_ndx, row_ndx, value);
-}
-
-inline void Table::insert_date(size_t column_ndx, size_t row_ndx, time_t value)
-{
-    insert_int(column_ndx, row_ndx, value);
-}
-
-template<class E> inline void Table::insert_enum(size_t column_ndx, size_t row_ndx, E value)
-{
-    insert_int(column_ndx, row_ndx, value);
-}
-
-template<class E> inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
-{
-    set_int(column_ndx, row_ndx, value);
-}
-
-inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)
-{
-    return TableRef(get_subtable_ptr(column_ndx, row_ndx));
-}
-
-inline ConstTableRef Table::get_subtable(size_t column_ndx, size_t row_ndx) const
-{
-    return ConstTableRef(get_subtable_ptr(column_ndx, row_ndx));
-}
 
 
 } // namespace tightdb

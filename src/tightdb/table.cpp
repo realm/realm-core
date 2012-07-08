@@ -27,23 +27,7 @@ struct FakeParent: Table::Parent {
 
 // -- Table ---------------------------------------------------------------------------------
 
-// Create new Table
-Table::Table(Allocator& alloc):
-    m_size(0),
-    m_top(COLUMN_HASREFS, NULL, 0, alloc),
-    m_columns(COLUMN_HASREFS, NULL, 0, alloc),
-    m_spec_set(this, alloc, NULL, 0),
-    m_ref_count(1)
-{
-    m_top.add(m_spec_set.get_ref());
-    m_top.add(m_columns.GetRef());
-    m_spec_set.set_parent(&m_top, 0);
-    m_columns.SetParent(&m_top, 1);
-}
-
-// Create Table from ref
-Table::Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1)
+void Table::init_from_ref(size_t top_ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     // Load from allocated memory
     m_top.UpdateRef(top_ref);
@@ -53,44 +37,20 @@ Table::Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_par
     const size_t spec_ref    = m_top.GetAsRef(0);
     const size_t columns_ref = m_top.GetAsRef(1);
 
-    Create(spec_ref, columns_ref, &m_top, 1);
+    init_from_ref(spec_ref, columns_ref, &m_top, 1);
     m_spec_set.set_parent(&m_top, 0);
 }
 
-// Create attached table from ref
-Table::Table(SubtableTag, Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
+void Table::init_from_ref(size_t spec_ref, size_t columns_ref,
+                          ArrayParent* parent, size_t ndx_in_parent)
 {
-    // Load from allocated memory
-    m_top.UpdateRef(top_ref);
-    m_top.SetParent(parent, ndx_in_parent);
-    assert(m_top.Size() == 2);
-
-    const size_t spec_ref    = m_top.GetAsRef(0);
-    const size_t columns_ref = m_top.GetAsRef(1);
-
-    Create(spec_ref, columns_ref, &m_top, 1);
-    m_spec_set.set_parent(&m_top, 0);
-}
-
-// Create attached sub-table from ref and spec_ref
-Table::Table(SubtableTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
-             Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
-{
-    Create(spec_ref, columns_ref, parent, ndx_in_parent);
-}
-
-void Table::Create(size_t ref_specSet, size_t columns_ref,
-                   ArrayParent *parent, size_t ndx_in_parent)
-{
-    m_spec_set.update_ref(ref_specSet);
+    m_spec_set.update_ref(spec_ref);
 
     // A table instatiated with a zero-ref is just an empty table
     // but it will have to create itself on first modification
     if (columns_ref != 0) {
         m_columns.UpdateRef(columns_ref);
-        CacheColumns();
+        CacheColumns(); // Also initializes m_size
     }
     m_columns.SetParent(parent, ndx_in_parent);
 }
@@ -1401,15 +1361,6 @@ void Table::update_from_spec()
     assert(m_columns.is_empty() && m_cols.is_empty()); // only on initial creation
 
     CreateColumns();
-}
-
-
-size_t Table::create_table(Allocator& alloc)
-{
-    FakeParent fake_parent;
-    Table t(alloc);
-    t.m_top.SetParent(&fake_parent, 0);
-    return t.m_top.GetRef();
 }
 
 

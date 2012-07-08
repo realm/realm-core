@@ -74,7 +74,7 @@ const char* get_message(error_code);
 inline void throw_error(error_code err)
 {
     // FIXME: Do we allow exceptions?
-    // FIXME: Should throw TightdbException(err, get_message(err))
+    // FIXME: Should throw TightdbException(err, get_message(err)) or maybe one type of exception per error type.
     throw std::runtime_error(get_message(err));
 }
 

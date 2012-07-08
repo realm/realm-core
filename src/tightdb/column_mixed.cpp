@@ -356,20 +356,28 @@ void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
     }
 }
 
-void ColumnMixed::insert_table(size_t ndx)
+// FIXME: Check that callers test the return value
+bool ColumnMixed::insert_table(size_t ndx)
 {
     assert(ndx <= m_types->Size());
-    const size_t ref = Table::create_table(m_array->GetAllocator());
+    const size_t ref = Table::create_empty_table(m_array->GetAllocator());
+    if (!ref) return false;
+    // FIXME: These interts can also fail on allocation
     m_types->Insert(ndx, COLUMN_TYPE_TABLE);
     m_refs->Insert(ndx, ref);
+    return true;
 }
 
-void ColumnMixed::SetTable(size_t ndx)
+// FIXME: Check that callers test the return value
+bool ColumnMixed::SetTable(size_t ndx)
 {
     assert(ndx < m_types->Size());
-    const size_t ref = Table::create_table(m_array->GetAllocator());
+    const size_t ref = Table::create_empty_table(m_array->GetAllocator());
+    if (!ref) return false;
+    // FIXME: Could the following operations also fail on allocation?
     ClearValue(ndx, COLUMN_TYPE_TABLE); // Remove any previous refs or binary data
     m_refs->Set(ndx, ref);
+    return true;
 }
 
 void ColumnMixed::Delete(size_t ndx)

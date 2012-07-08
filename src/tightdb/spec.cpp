@@ -8,42 +8,6 @@ using namespace std;
 
 namespace tightdb {
 
-// Uninitialized Spec (call UpdateRef to init)
-Spec::Spec(const Table* table, Allocator& alloc):
-    m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
-{
-}
-
-// Create a new Spec
-Spec::Spec(const Table* table, Allocator& alloc, ArrayParent* parent, size_t pndx):
-    m_table(table), m_specSet(COLUMN_HASREFS, parent, pndx, alloc),
-    m_spec(COLUMN_NORMAL, NULL, 0, alloc), m_names(NULL, 0, alloc), m_subSpecs(alloc)
-{
-    // The SpecSet contains the specification (types and names) of all columns and sub-tables
-    m_specSet.add(m_spec.GetRef());
-    m_specSet.add(m_names.GetRef());
-    m_spec.SetParent(&m_specSet, 0);
-    m_names.SetParent(&m_specSet, 1);
-}
-
-// Create Spec from ref
-Spec::Spec(const Table* table, Allocator& alloc, size_t ref, ArrayParent* parent, size_t pndx):
-    m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
-{
-    create(ref, parent, pndx);
-}
-
-Spec::Spec(const Spec& s):
-    m_table(s.m_table), m_specSet(s.m_specSet.GetAllocator()), m_spec(s.m_specSet.GetAllocator()),
-    m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator())
-{
-    const size_t ref    = s.m_specSet.GetRef();
-    ArrayParent *parent = s.m_specSet.GetParent();
-    const size_t pndx   = s.m_specSet.GetParentNdx();
-
-    create(ref, parent, pndx);
-}
-
 Spec::~Spec()
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -52,10 +16,10 @@ Spec::~Spec()
 #endif
 }
 
-void Spec::create(size_t ref, ArrayParent* parent, size_t pndx)
+void Spec::init_from_ref(size_t ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     m_specSet.UpdateRef(ref);
-    m_specSet.SetParent(parent, pndx);
+    m_specSet.SetParent(parent, ndx_in_parent);
     assert(m_specSet.Size() == 2 || m_specSet.Size() == 3);
 
     m_spec.UpdateRef(m_specSet.GetAsRef(0));
@@ -79,7 +43,7 @@ size_t Spec::get_ref() const {
 }
 
 void Spec::update_ref(size_t ref, ArrayParent* parent, size_t pndx) {
-    create(ref, parent, pndx);
+    init_from_ref(ref, parent, pndx);
 }
 
 void Spec::set_parent(ArrayParent* parent, size_t pndx) {

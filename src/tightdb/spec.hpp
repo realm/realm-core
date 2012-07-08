@@ -75,7 +75,7 @@ public:
     ~Spec();
 
 private:
-    void create(size_t ref, ArrayParent *parent, size_t pndx);
+    void init_from_ref(size_t ref, ArrayParent *parent, size_t pndx);
     void destroy();
 
     size_t get_ref() const;
@@ -105,12 +105,65 @@ private:
     Spec(const Table*, Allocator&, ArrayParent* parent, size_t pndx);
     Spec(const Table*, Allocator&, size_t ref, ArrayParent *parent, size_t pndx);
 
+    /// Construct an empty spec and return just the reference to the
+    /// underlying memory.
+    ///
+    /// \return Zero if allocation fails.
+    ///
+    static size_t create_empty_spec(Allocator&);
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     size_t* record_subspec_path(const ArrayParent* root, size_t* begin, size_t* end) const;
 #endif
 
     friend class Table;
 };
+
+
+
+
+// Implementation:
+
+inline size_t Spec::create_empty_spec(Allocator& alloc)
+{
+    // The 'spec_set' contains the specification (types and names) of
+    // all columns and sub-tables
+    Array spec_set(COLUMN_HASREFS, 0, 0, alloc);
+    spec_set.add(Array::create_empty_array(COLUMN_NORMAL, alloc)); // One type for each column
+    spec_set.add(ArrayString::create_empty_string_array(alloc)); // One name for each column
+    return spec_set.GetRef();
+}
+
+// Uninitialized Spec (call UpdateRef to init)
+inline Spec::Spec(const Table* table, Allocator& alloc):
+    m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc) {}
+
+// Create a new Spec
+inline Spec::Spec(const Table* table, Allocator& alloc, ArrayParent* parent, size_t ndx_in_parent):
+    m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
+{
+    const size_t ref = create_empty_spec(alloc);
+    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    init_from_ref(ref, parent, ndx_in_parent);
+}
+
+// Create Spec from ref
+inline Spec::Spec(const Table* table, Allocator& alloc, size_t ref, ArrayParent* parent, size_t pndx):
+    m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
+{
+    init_from_ref(ref, parent, pndx);
+}
+
+inline Spec::Spec(const Spec& s):
+    m_table(s.m_table), m_specSet(s.m_specSet.GetAllocator()), m_spec(s.m_specSet.GetAllocator()),
+    m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator())
+{
+    const size_t ref    = s.m_specSet.GetRef();
+    ArrayParent *parent = s.m_specSet.GetParent();
+    const size_t pndx   = s.m_specSet.GetParentNdx();
+
+    init_from_ref(ref, parent, pndx);
+}
 
 
 } // namespace tightdb

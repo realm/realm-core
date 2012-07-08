@@ -188,7 +188,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
     if (!subtable) {
         const std::size_t top_ref = GetAsRef(subtable_ndx);
         Allocator& alloc = GetAllocator();
-        subtable = new Table(Table::SubtableTag(), alloc, top_ref,
+        subtable = new Table(Table::RefCountTag(), alloc, top_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         const bool was_empty = m_subtable_map.empty();
         m_subtable_map.insert(subtable_ndx, subtable);
@@ -206,7 +206,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
     if (!subtable) {
         const std::size_t columns_ref = GetAsRef(subtable_ndx);
         Allocator& alloc = GetAllocator();
-        subtable = new Table(Table::SubtableTag(), alloc, spec_ref, columns_ref,
+        subtable = new Table(Table::RefCountTag(), alloc, spec_ref, columns_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         const bool was_empty = m_subtable_map.empty();
         m_subtable_map.insert(subtable_ndx, subtable);

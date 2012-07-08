@@ -31,28 +31,6 @@ size_t round_up(size_t len)
 
 namespace tightdb {
 
-ArrayString::ArrayString(ArrayParent *parent, size_t pndx, Allocator& alloc):
-    Array(COLUMN_NORMAL, parent, pndx, alloc)
-{
-    // Manually set wtype as array constructor in initiatializer list
-    // will not be able to call correct virtual function
-    set_header_wtype(TDB_MULTIPLY);
-}
-
-ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc):
-    Array(alloc)
-{
-    // Manually create array as doing it in initializer list
-    // will not be able to call correct virtual functions
-    Create(ref);
-    SetParent(const_cast<ArrayParent *>(parent), pndx);
-}
-
-// Creates new array (but invalid, call UpdateRef to init)
-ArrayString::ArrayString(Allocator& alloc): Array(alloc) {}
-
-
-ArrayString::~ArrayString() {}
 
 const char* ArrayString::Get(size_t ndx) const
 {
@@ -227,6 +205,7 @@ void ArrayString::Delete(size_t ndx)
 
 size_t ArrayString::CalcByteLen(size_t count, size_t width) const
 {
+    // FIXME: This arithemtic could overflow. Consider using <tightdb/overflow.hpp>
     return 8 + (count * width);
 }
 

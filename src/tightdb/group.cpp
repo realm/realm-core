@@ -316,7 +316,8 @@ bool Group::has_table(const char* name) const
 
 Table* Group::create_new_table(const char* name)
 {
-    const size_t ref = Table::create_table(m_alloc);
+    const size_t ref = Table::create_empty_table(m_alloc);
+    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly by callers
     m_tables.add(ref);
     m_tableNames.add(name);
     Table* table = new Table(m_alloc, ref, this, m_tables.Size()-1); // FIXME: Risk of exception
