@@ -1,7 +1,7 @@
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 #include <cassert>
-#include <new>
+#include <utility>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -13,6 +13,7 @@
 #include <tightdb/string_buffer.hpp>
 #include <tightdb/pthread_helpers.hpp>
 #include <tightdb/table.hpp>
+#include <tightdb/group.hpp>
 #include <tightdb/replication.hpp>
 
 using namespace std;
@@ -20,116 +21,119 @@ using namespace tightdb;
 
 namespace {
 
-    // Note: The sum of this value and sizeof(SharedState) must not
-    // exceed the maximum values of any of the types 'size_t',
-    // 'ptrdiff_t', or 'off_t'.
+
+// Note: The sum of this value and sizeof(SharedState) must not
+// exceed the maximum values of any of the types 'size_t',
+// 'ptrdiff_t', or 'off_t'.
 #ifdef _DEBUG
-    const size_t initial_transact_log_buffer_size = 128;
+const size_t initial_transact_log_buffer_size = 128;
 #else
-    const size_t initial_transact_log_buffer_size = 16*1024;
+const size_t initial_transact_log_buffer_size = 16*1024;
 #endif
 
-    const size_t init_subtab_path_buf_size = 2*8-1; // 8 table levels (soft limit)
+const size_t init_subtab_path_buf_size = 2*8-1; // 8 table levels (soft limit)
 
 
-    struct CloseGuard {
-        CloseGuard(int fd): m_fd(fd) {}
-        ~CloseGuard()
-        {
-            if (0 <= m_fd) {
-                int r = close(m_fd);
-                assert(r == 0);
-                static_cast<void>(r);
-            }
-        }
-
-        void release() { m_fd = -1; }
-
-    private:
-        int m_fd;
-    };
-
-
-    struct FileLockGuard {
-        FileLockGuard(): m_fd(-1) {}
-
-        error_code init(int fd)
-        {
-        again:
-            int r = flock(fd, LOCK_EX);
-            if (r<0) {
-                if (errno == EINTR) goto again;
-                if (errno == ENOLCK) return ERROR_NO_RESOURCE;
-                return ERROR_OTHER;
-            }
-            m_fd = fd;
-            return ERROR_NONE;
-        }
-
-        ~FileLockGuard()
-        {
-            if (0 <= m_fd) {
-                int r = flock(m_fd, LOCK_UN);
-                assert(r == 0);
-                static_cast<void>(r);
-            }
-        }
-
-    private:
-        int m_fd;
-    };
-
-
-    struct UnmapGuard {
-        UnmapGuard(void* a, size_t s): m_addr(a), m_size(s) {}
-        ~UnmapGuard()
-        {
-            if (m_addr) {
-                int r = munmap(m_addr, m_size);
-                assert(r == 0);
-                static_cast<void>(r);
-            }
-        }
-
-        void release() { m_addr = 0; }
-
-    private:
-        void* m_addr;
-        size_t m_size;
-    };
-
-
-    error_code expand_file(int fd, off_t size)
+struct CloseGuard {
+    CloseGuard(int fd): m_fd(fd) {}
+    ~CloseGuard()
     {
-        int res = ftruncate(fd, size);
-        if (res<0) {
-            switch (errno) {
-            case EFBIG:
-            case EINVAL: return ERROR_NO_RESOURCE;
-            case EIO:    return ERROR_IO;
-            case EROFS:  return ERROR_PERMISSION;
-            default:     return ERROR_OTHER;
-            }
+        if (0 <= m_fd) {
+            int r = close(m_fd);
+            assert(r == 0);
+            static_cast<void>(r);
         }
+    }
+
+    void release() { m_fd = -1; }
+
+private:
+    int m_fd;
+};
+
+
+struct FileLockGuard {
+    FileLockGuard(): m_fd(-1) {}
+
+    error_code init(int fd)
+    {
+    again:
+        int r = flock(fd, LOCK_EX);
+        if (r<0) {
+            if (errno == EINTR) goto again;
+            if (errno == ENOLCK) return ERROR_NO_RESOURCE;
+            return ERROR_OTHER;
+        }
+        m_fd = fd;
         return ERROR_NONE;
     }
 
-    error_code map_file(int fd, off_t size, void** addr)
+    ~FileLockGuard()
     {
-        void* const a = mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-        if (a == MAP_FAILED) {
-            switch (errno) {
-            case EAGAIN:
-            case EMFILE: return ERROR_NO_RESOURCE;
-            case ENOMEM: return ERROR_OUT_OF_MEMORY;
-            case ENODEV:
-            case ENXIO:  return ERROR_BAD_FILESYS_PATH;
-            default:     return ERROR_OTHER;
-            }
+        if (0 <= m_fd) {
+            int r = flock(m_fd, LOCK_UN);
+            assert(r == 0);
+            static_cast<void>(r);
         }
-        *addr = a;
-        return ERROR_NONE;
     }
+
+private:
+    int m_fd;
+};
+
+
+struct UnmapGuard {
+    UnmapGuard(void* a, size_t s): m_addr(a), m_size(s) {}
+    ~UnmapGuard()
+    {
+        if (m_addr) {
+            int r = munmap(m_addr, m_size);
+            assert(r == 0);
+            static_cast<void>(r);
+        }
+    }
+
+    void release() { m_addr = 0; }
+
+private:
+    void* m_addr;
+    size_t m_size;
+};
+
+
+error_code expand_file(int fd, off_t size)
+{
+    int res = ftruncate(fd, size);
+    if (res<0) {
+        switch (errno) {
+        case EFBIG:
+        case EINVAL: return ERROR_NO_RESOURCE;
+        case EIO:    return ERROR_IO;
+        case EROFS:  return ERROR_PERMISSION;
+        default:     return ERROR_OTHER;
+        }
+    }
+    return ERROR_NONE;
+}
+
+
+error_code map_file(int fd, off_t size, void** addr)
+{
+    void* const a = mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if (a == MAP_FAILED) {
+        switch (errno) {
+        case EAGAIN:
+        case EMFILE: return ERROR_NO_RESOURCE;
+        case ENOMEM: return ERROR_OUT_OF_MEMORY;
+        case ENODEV:
+        case ENXIO:  return ERROR_BAD_FILESYS_PATH;
+        default:     return ERROR_OTHER;
+        }
+    }
+    *addr = a;
+    return ERROR_NONE;
+}
+
 
 } // anonymous namespace
 
@@ -174,8 +178,43 @@ struct Replication::SharedState {
     /// m_write_transact_finished is true.
     size_t m_transact_log_new_begin;
 
-    error_code init(size_t file_size);
-    void destroy();
+    error_code init(size_t file_size)
+    {
+        m_want_write_transact = 0;
+        m_write_transact_available = false;
+        m_write_transact_finished  = false;
+        m_size = file_size;
+        m_transact_log_used_begin = sizeof(SharedState);
+        m_transact_log_used_end = m_transact_log_used_begin;
+        error_code err = m_mutex.init_shared();
+        if (err) return err;
+        MutexDestroyGuard mdg(m_mutex);
+        err = m_cond_want_write_transact.init_shared();
+        if (err) return err;
+        ConditionDestroyGuard cdg1(m_cond_want_write_transact);
+        err = m_cond_write_transact_available.init_shared();
+        if (err) return err;
+        ConditionDestroyGuard cdg2(m_cond_write_transact_available);
+        err = m_cond_write_transact_finished.init_shared();
+        if (err) return err;
+        ConditionDestroyGuard cdg3(m_cond_write_transact_finished);
+        err = m_cond_transact_log_free.init_shared();
+        if (err) return err;
+        cdg3.release();
+        cdg2.release();
+        cdg1.release();
+        mdg.release();
+        return ERROR_NONE;
+    }
+
+    void destroy()
+    {
+        m_cond_want_write_transact.destroy();
+        m_cond_write_transact_available.destroy();
+        m_cond_write_transact_finished.destroy();
+        m_cond_transact_log_free.destroy();
+        m_mutex.destroy();
+    }
 };
 
 
@@ -628,7 +667,7 @@ error_code Replication::transact_log_expand(size_t free, bool contig)
     }
 
     size_t new_size = m_shared_state->m_size;
-    if (mul_with_overflow_detect(new_size, size_t(2))) {
+    if (multiply_with_overflow_detect(new_size, size_t(2))) {
         new_size = numeric_limits<size_t>::max();
     }
     if (new_size < min_size) new_size = min_size;
@@ -721,7 +760,7 @@ error_code Replication::select_table(const Table* table)
         end = table->record_subtable_path(begin, begin+m_subtab_path_buf.m_size);
         if (end) break;
         size_t new_size = m_subtab_path_buf.m_size;
-        if (mul_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
+        if (multiply_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
         if (!m_subtab_path_buf.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
     }
     char* buf;
@@ -730,7 +769,7 @@ error_code Replication::select_table(const Table* table)
     if (err) return err;
     *buf++ = 'T';
     assert(1 <= end - begin);
-    const ptrdiff_t level = (end - begin)/2;
+    const ptrdiff_t level = (end - begin) / 2;
     buf = encode_int(buf, level);
     for (;;) {
         for (int i=0; i<max_elems_per_chunk; ++i) {
@@ -761,7 +800,7 @@ error_code Replication::select_spec(const Table* table, const Spec* spec)
         end = table->record_subspec_path(spec, begin, begin+m_subtab_path_buf.m_size);
         if (end) break;
         size_t new_size = m_subtab_path_buf.m_size;
-        if (mul_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
+        if (multiply_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
         if (!m_subtab_path_buf.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
     }
     char* buf;
@@ -789,56 +828,200 @@ good:
 }
 
 
-bool Replication::Buffer::set_size(std::size_t new_size)
+struct Replication::TransactLogApplier {
+    TransactLogApplier(InputStream& transact_log, Group& group):
+        m_input(transact_log), m_group(group), m_input_buffer(0), m_num_subspecs(0) {}
+
+    ~TransactLogApplier()
+    {
+        delete[] m_input_buffer;
+        delete_subspecs();
+    }
+
+    error_code apply();
+
+private:
+    InputStream& m_input;
+    Group& m_group;
+    static const size_t m_input_buffer_size = 4096;
+    char* m_input_buffer;
+    const char* m_input_begin;
+    const char* m_input_end;
+    Buffer<Spec*> m_subspecs;
+    size_t m_num_subspecs;
+
+    // Returns false on end-of-input
+    bool fill_input_buffer()
+    {
+        const size_t n = m_input.read(m_input_buffer, m_input_buffer_size);
+        if (n == 0) return false;
+        m_input_begin = m_input_buffer;
+        m_input_end   = m_input_buffer + n;
+        return true;
+    }
+
+    // Returns false on premature end-of-input
+    bool read_char(char& c)
+    {
+        if (m_input_begin == m_input_end && !fill_input_buffer()) return false;
+        c = *m_input_begin++;
+        return true;
+    }
+
+    // Returns false on overflow or premature end-of-input
+    template<class T> bool read_int(T&);
+
+    error_code read_string(StringBuffer&);
+
+    error_code add_subspec(Spec*);
+
+    void delete_subspecs()
+    {
+        const size_t n = m_num_subspecs;
+        for (size_t i=0; i<n; ++i) delete m_subspecs[i];
+        m_num_subspecs = 0;
+    }
+};
+
+
+template<class T> bool Replication::TransactLogApplier::read_int(T& v)
 {
-    size_t* new_data = new (nothrow) size_t[new_size];
-    if (!new_data) return false;
-    delete[] m_data;
-    m_data = new_data;
-    m_size = new_size;
+    T value = 0;
+    char c;
+    for (;;) {
+        if (!read_char(c)) return false;
+        if ((static_cast<unsigned char>(c) & 0x80) == 0) break;
+        if (shift_left_with_overflow_detect(value, 7)) return false;
+        value |= static_cast<unsigned char>(c) & 0x7F;
+    }
+    if (shift_left_with_overflow_detect(value, 6)) return false;
+    value |= static_cast<unsigned char>(c) & 0x3F;
+    if (static_cast<unsigned char>(c) & 0x40) {
+        // The real value is negative. Because 'value' is positive at
+        // this point, the following negation is guaranteed by the
+        // standard to never overflow.
+        value = -value;
+        if (subtract_with_overflow_detect(value, T(1))) return false;
+    }
+    v = value;
     return true;
 }
 
 
-// FIXME: This one can be moved into the class
-error_code Replication::SharedState::init(size_t file_size)
+error_code Replication::TransactLogApplier::read_string(StringBuffer& buf)
 {
-    m_want_write_transact = 0;
-    m_write_transact_available = false;
-    m_write_transact_finished  = false;
-    m_size = file_size;
-    m_transact_log_used_begin = sizeof(SharedState);
-    m_transact_log_used_end = m_transact_log_used_begin;
-    error_code err = m_mutex.init_shared();
+    buf.clear();
+    size_t size;
+    if (!read_int(size)) return ERROR_IO;
+    const error_code err = buf.resize(size);
     if (err) return err;
-    MutexDestroyGuard mdg(m_mutex);
-    err = m_cond_want_write_transact.init_shared();
-    if (err) return err;
-    ConditionDestroyGuard cdg1(m_cond_want_write_transact);
-    err = m_cond_write_transact_available.init_shared();
-    if (err) return err;
-    ConditionDestroyGuard cdg2(m_cond_write_transact_available);
-    err = m_cond_write_transact_finished.init_shared();
-    if (err) return err;
-    ConditionDestroyGuard cdg3(m_cond_write_transact_finished);
-    err = m_cond_transact_log_free.init_shared();
-    if (err) return err;
-    cdg3.release();
-    cdg2.release();
-    cdg1.release();
-    mdg.release();
+    char* str_end = buf.data();
+    for (;;) {
+        const size_t avail = m_input_end - m_input_begin;
+        if (size <= avail) break;
+        const char* to = m_input_begin + avail;
+        copy(m_input_begin, to, str_end);
+        str_end += avail;
+        if (!fill_input_buffer()) return ERROR_IO;
+    }
+    const char* to = m_input_begin + size;
+    copy(m_input_begin, to, str_end);
+    m_input_begin = to;
     return ERROR_NONE;
 }
 
 
-// FIXME: This one can be moved into the class
-void Replication::SharedState::destroy()
+error_code Replication::TransactLogApplier::add_subspec(Spec* spec)
 {
-    m_cond_want_write_transact.destroy();
-    m_cond_write_transact_available.destroy();
-    m_cond_write_transact_finished.destroy();
-    m_cond_transact_log_free.destroy();
-    m_mutex.destroy();
+    if (m_num_subspecs == m_subspecs.m_size) {
+        Buffer<Spec*> new_subspecs;
+        size_t new_size = m_subspecs.m_size;
+        if (new_size == 0) {
+            new_size = 16;
+        }
+        else {
+            if (multiply_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
+        }
+        if (!new_subspecs.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
+        copy(m_subspecs.m_data, m_subspecs.m_data+m_num_subspecs, new_subspecs.m_data);
+        using std::swap;
+        swap(m_subspecs, new_subspecs);
+    }
+    m_subspecs[m_num_subspecs++] = spec;
+    return ERROR_NONE;
+}
+
+
+error_code Replication::TransactLogApplier::apply()
+{
+    if (!m_input_buffer) {
+        m_input_buffer = new (nothrow) char[m_input_buffer_size];
+        if (!m_input_buffer) return ERROR_OUT_OF_MEMORY;
+    }
+    m_input_begin = m_input_end = m_input_buffer;
+
+    StringBuffer string_buffer;
+    TableRef table;
+    Spec* spec = 0;
+    for (;;) {
+        char instr;
+        if (!read_char(instr)) {
+            break;
+        }
+        switch (instr) {
+        case 'S':  // Select spec for currently selected table
+            {
+                delete_subspecs();
+                spec = &table->get_spec();
+                int levels;
+                if (!read_int(levels)) return ERROR_IO;
+                for (int i=0; i<levels; ++i) {
+                    int column_ndx;
+                    if (!read_int(column_ndx)) return ERROR_IO;
+                    spec = new (nothrow) Spec(spec->get_subspec(column_ndx)); // FIXME: Can Spec::get_subspec() or Spec copy constructor fail/throw?
+                    if (!spec) return ERROR_OUT_OF_MEMORY;
+                    const error_code err = add_subspec(spec);
+                    if (err) {
+                        delete spec;
+                        return err;
+                    }
+                }
+            }
+        case 'T':  // Select table
+            {
+                int levels;
+                if (!read_int(levels)) return ERROR_IO;
+                size_t ndx;
+                if (!read_int(ndx)) return ERROR_IO;
+                table = m_group.get_table_ptr(ndx)->get_table_ref();
+                for (int i=0; i<levels; ++i) {
+                    int column_ndx;
+                    if (!read_int(column_ndx)) return ERROR_IO;
+                    if (!read_int(ndx)) return ERROR_IO;
+                    table = table->get_subtable(column_ndx, ndx);
+                }
+            }
+        case 'N':  // New top level table
+            {
+                const error_code err = read_string(string_buffer);
+                if (err) return err;
+                const char* const name = string_buffer.c_str();
+                assert(!m_group.has_table(name));
+                m_group.create_new_table(name);
+            }
+        default:
+            return ERROR_IO;
+        }
+    }
+
+    return ERROR_NONE;
+}
+
+
+error_code Replication::apply_transact_log(InputStream& transact_log, Group& group)
+{
+    TransactLogApplier applier(transact_log, group);
+    return applier.apply();
 }
 
 

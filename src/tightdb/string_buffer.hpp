@@ -67,9 +67,10 @@ struct StringBuffer {
     /// terminating zero. If the specified size is less than the
     /// current size, then the string is truncated accordingly. If the
     /// specified size is greater than the current size, then the
-    /// extra characters will have undefined values, however, the
-    /// original terminating zero will be left in place such that from
-    /// the point of view of c_str(), the size of the string is
+    /// extra characters will have undefined values, however,
+    /// therewill be a terminating zero at *(c_str()+size()), and the
+    /// original terminating zero will also be left in place such that
+    /// from the point of view of c_str(), the size of the string is
     /// unchanged.
     error_code resize(std::size_t size);
 
@@ -80,8 +81,8 @@ struct StringBuffer {
     /// operation has no effect.
     error_code reserve(std::size_t capacity);
 
-    /// Set size and capacity to zero.
-    void clear();
+    /// Set size to zero. The capacity remains unchanged.
+    void clear() { resize(0); }
 
 private:
     char *m_data;
@@ -117,17 +118,9 @@ inline error_code StringBuffer::resize(std::size_t size)
     // Note that even reserve(0) will attempt to allocate a
     // buffer, so we can safely write the truncating zero at this
     // time.
-    if (size < m_size) m_data[size] = 0;
     m_size = size;
+    m_data[size] = 0;
     return ERROR_NONE;
-}
-
-inline void StringBuffer::clear()
-{
-    delete[] m_data;
-    m_data = 0;
-    m_size = 0;
-    m_allocated = 0;
 }
 
 

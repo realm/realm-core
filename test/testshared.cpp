@@ -325,6 +325,11 @@ void* IncrementEntry(void* arg )
         {
             Group& g1 = shared.begin_write();
             TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            if (t1->size() < row_id+1) {
+                for (size_t i = t1->size(); i < row_id+1; ++i) {
+                    t1->add(0, 2, false, "test");
+                }
+            }
             t1[row_id].first += 1;
             shared.commit();
         }
@@ -361,6 +366,7 @@ TEST(Shared_WriterThreads)
         const size_t thread_count = 10;
 
         // Create first table in group
+/*
         {
             Group& g1 = shared.begin_write();
             TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
@@ -369,6 +375,7 @@ TEST(Shared_WriterThreads)
             }
             shared.commit();
         }
+*/
 
         pthread_t threads[thread_count];
 

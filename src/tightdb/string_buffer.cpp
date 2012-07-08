@@ -36,7 +36,7 @@ error_code StringBuffer::realloc(std::size_t capacity)
         return ERROR_NO_RESOURCE;
     }
     size_t new_allocated = m_allocated;
-    if (mul_with_overflow_detect(new_allocated, size_t(2)))
+    if (multiply_with_overflow_detect(new_allocated, size_t(2)))
         new_allocated = numeric_limits<size_t>::max();
     if (new_allocated < min_allocated) new_allocated = min_allocated;
     char* new_data = new (nothrow) char[new_allocated];
