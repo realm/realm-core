@@ -38,19 +38,25 @@ namespace tightdb {
 
 class Mixed {
 public:
-    explicit Mixed(ColumnType v)
-    {
-        assert(v == COLUMN_TYPE_TABLE);
-        static_cast<void>(v);
-        m_type = COLUMN_TYPE_TABLE;
-    }
-
     Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
     Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
     Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.get_date();}
     Mixed(const char* v) {m_type = COLUMN_TYPE_STRING; m_str  = v;}
     Mixed(BinaryData v)  {m_type = COLUMN_TYPE_BINARY; m_str = v.pointer; m_len = v.len;}
     Mixed(const char* v, std::size_t len) {m_type = COLUMN_TYPE_BINARY; m_str = v; m_len = len;}
+
+    struct subtable_tag {};
+    Mixed(subtable_tag): m_type(COLUMN_TYPE_TABLE) {}
+
+    // FIXME: This constructor is obsolete. Use Mixed(subtable_tag)
+    // instead. This way there will be no room for run-time errors and
+    // therefore no need for assert().
+    explicit Mixed(ColumnType v)
+    {
+        assert(v == COLUMN_TYPE_TABLE);
+        static_cast<void>(v);
+        m_type = COLUMN_TYPE_TABLE;
+    }
 
     ColumnType get_type() const {return m_type;}
 

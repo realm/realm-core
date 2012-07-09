@@ -203,6 +203,8 @@ public:
 
     size_t FindPos(int64_t value) const;
     size_t FindPos2(int64_t value) const;
+
+    /// Returns std::size_t(-1) if the specified value is not found.
     size_t find_first(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
 
     template <class F> size_t find_first(F function_, int64_t value, size_t start, size_t end) const

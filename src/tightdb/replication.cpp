@@ -847,6 +847,7 @@ private:
     char* m_input_buffer;
     const char* m_input_begin;
     const char* m_input_end;
+    TableRef m_table;
     Buffer<Spec*> m_subspecs;
     size_t m_num_subspecs;
 
@@ -880,6 +881,21 @@ private:
         const size_t n = m_num_subspecs;
         for (size_t i=0; i<n; ++i) delete m_subspecs[i];
         m_num_subspecs = 0;
+    }
+
+    bool is_valid_column_type(int type)
+    {
+        switch (type) {
+        case COLUMN_TYPE_INT:
+        case COLUMN_TYPE_BOOL:
+        case COLUMN_TYPE_DATE:
+        case COLUMN_TYPE_STRING:
+        case COLUMN_TYPE_BINARY:
+        case COLUMN_TYPE_TABLE:
+        case COLUMN_TYPE_MIXED: return true;
+        default: break;
+        }
+        return false;
     }
 };
 
@@ -937,7 +953,7 @@ error_code Replication::TransactLogApplier::add_subspec(Spec* spec)
         Buffer<Spec*> new_subspecs;
         size_t new_size = m_subspecs.m_size;
         if (new_size == 0) {
-            new_size = 16;
+            new_size = 16; // FIXME: Use a small value (1) when compiling in debug mode
         }
         else {
             if (multiply_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
@@ -961,7 +977,6 @@ error_code Replication::TransactLogApplier::apply()
     m_input_begin = m_input_end = m_input_buffer;
 
     StringBuffer string_buffer;
-    TableRef table;
     Spec* spec = 0;
     for (;;) {
         char instr;
@@ -969,15 +984,141 @@ error_code Replication::TransactLogApplier::apply()
             break;
         }
         switch (instr) {
+        case 's':  // Set value
+            {
+                int column_ndx;
+                if (!read_int(column_ndx)) return ERROR_IO;
+                size_t ndx;
+                if (!read_int(ndx)) return ERROR_IO;
+                if (!m_table) return ERROR_IO;
+                if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                    return ERROR_IO;
+                if (m_table->size() <= ndx) return ERROR_IO;
+                switch (m_table->get_column_type(column_ndx)) {
+                case COLUMN_TYPE_INT:
+                    {
+                        int64_t value;
+                        if (!read_int(value)) return ERROR_IO;
+                        m_table->set_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
+                    break;
+                case COLUMN_TYPE_BOOL:
+                    {
+                        bool value;
+                        if (!read_int(value)) return ERROR_IO;
+                        m_table->set_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
+                    break;
+                case COLUMN_TYPE_DATE:
+                    {
+                        time_t value;
+                        if (!read_int(value)) return ERROR_IO;
+                        m_table->set_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
+                    break;
+                case COLUMN_TYPE_STRING:
+                    {
+                        const error_code err = read_string(string_buffer);
+                        if (err) return err;
+                        const char* const value = string_buffer.c_str();
+                        m_table->set_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
+                    break;
+                case COLUMN_TYPE_BINARY:
+                    {
+                        const error_code err = read_string(string_buffer);
+                        if (err) return err;
+                        m_table->set_binary(column_ndx, ndx, string_buffer.data(),
+                                            string_buffer.size()); // FIXME: Memory allocation failure!!!
+                    }
+                    break;
+                case COLUMN_TYPE_TABLE:
+                    m_table->clear_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
+                    break;
+                case COLUMN_TYPE_MIXED:
+                    {
+                        int type;
+                        if (!read_int(type)) return ERROR_IO;
+                        switch (type) {
+                        case COLUMN_TYPE_INT:
+                            {
+                                int64_t value;
+                                if (!read_int(value)) return ERROR_IO;
+                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                            }
+                            break;
+                        case COLUMN_TYPE_BOOL:
+                            {
+                                bool value;
+                                if (!read_int(value)) return ERROR_IO;
+                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                            }
+                            break;
+                        case COLUMN_TYPE_DATE:
+                            {
+                                time_t value;
+                                if (!read_int(value)) return ERROR_IO;
+                                m_table->set_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
+                            }
+                            break;
+                        case COLUMN_TYPE_STRING:
+                            {
+                                const error_code err = read_string(string_buffer);
+                                if (err) return err;
+                                const char* const value = string_buffer.c_str();
+                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                            }
+                            break;
+                        case COLUMN_TYPE_BINARY:
+                            {
+                                const error_code err = read_string(string_buffer);
+                                if (err) return err;
+                                const BinaryData value(string_buffer.data(), string_buffer.size());
+                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                            }
+                            break;
+                        case COLUMN_TYPE_TABLE:
+                            m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
+                            break;
+                        default:
+                            return ERROR_IO;
+                        }
+                    }
+                    break;
+                default:
+                    return ERROR_IO;
+                }
+            }
+            break;
+
+        case 'A':  // Add column to selected spec
+            {
+                int type;
+                if (!read_int(type)) return ERROR_IO;
+                if (!is_valid_column_type(type)) return ERROR_IO;
+                const error_code err = read_string(string_buffer);
+                if (err) return err;
+                const char* const name = string_buffer.c_str();
+                if (!spec) return ERROR_IO;
+                // FIXME: Is it legal to have multiple columns with the same name?
+                if (spec->get_column_index(name) != size_t(-1)) return ERROR_IO;
+                spec->add_column(ColumnType(type), name);
+            }
+            break;
+
         case 'S':  // Select spec for currently selected table
             {
                 delete_subspecs();
-                spec = &table->get_spec();
+                if (!m_table) return ERROR_IO;
+                spec = &m_table->get_spec();
                 int levels;
                 if (!read_int(levels)) return ERROR_IO;
                 for (int i=0; i<levels; ++i) {
                     int column_ndx;
                     if (!read_int(column_ndx)) return ERROR_IO;
+                    if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                        return ERROR_IO;
+                    if (m_table->get_column_type(column_ndx) != COLUMN_TYPE_TABLE) return ERROR_IO;
                     spec = new (nothrow) Spec(spec->get_subspec(column_ndx)); // FIXME: Can Spec::get_subspec() or Spec copy constructor fail/throw?
                     if (!spec) return ERROR_OUT_OF_MEMORY;
                     const error_code err = add_subspec(spec);
@@ -987,28 +1128,39 @@ error_code Replication::TransactLogApplier::apply()
                     }
                 }
             }
+            break;
+
         case 'T':  // Select table
             {
                 int levels;
                 if (!read_int(levels)) return ERROR_IO;
                 size_t ndx;
                 if (!read_int(ndx)) return ERROR_IO;
-                table = m_group.get_table_ptr(ndx)->get_table_ref();
+                if (m_group.get_table_count() <= ndx) return ERROR_IO;
+                m_table = m_group.get_table_ptr(ndx)->get_table_ref();
+                spec = 0;
                 for (int i=0; i<levels; ++i) {
                     int column_ndx;
                     if (!read_int(column_ndx)) return ERROR_IO;
                     if (!read_int(ndx)) return ERROR_IO;
-                    table = table->get_subtable(column_ndx, ndx);
+                    if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                        return ERROR_IO;
+                    if (m_table->get_column_type(column_ndx) != COLUMN_TYPE_TABLE) return ERROR_IO;
+                    if (m_table->size() <= ndx) return ERROR_IO;
+                    m_table = m_table->get_subtable(column_ndx, ndx);
                 }
             }
+            break;
+
         case 'N':  // New top level table
             {
                 const error_code err = read_string(string_buffer);
                 if (err) return err;
                 const char* const name = string_buffer.c_str();
-                assert(!m_group.has_table(name));
+                if (m_group.has_table(name)) return ERROR_IO;
                 m_group.create_new_table(name);
             }
+
         default:
             return ERROR_IO;
         }

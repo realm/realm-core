@@ -120,7 +120,7 @@ public:
     // Sub-tables (works on columns whose type is either 'subtable' or
     // 'mixed', for a value in a mixed column that is not a subtable,
     // get_subtable() returns null, get_subtable_size() returns zero,
-    // and clear_subtable() does nothing.)
+    // and clear_subtable() replaces the value with an empty table.)
     TableRef        get_subtable(size_t column_ndx, size_t row_ndx);
     ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;

@@ -52,6 +52,8 @@ public:
     ColumnType get_column_type(size_t column_ndx) const;
     ColumnType get_real_column_type(size_t column_ndx) const;
     const char* get_column_name(size_t column_ndx) const;
+
+    /// Returns std::size_t(-1) if the specified column is not found.
     size_t get_column_index(const char* name) const;
 
     // Column Attributes
