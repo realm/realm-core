@@ -128,6 +128,16 @@ TEST(TestQueryDelete)
     CHECK_EQUAL(2, ttt.size());
     CHECK_EQUAL(2, ttt[0].first);
     CHECK_EQUAL(4, ttt[1].first);
+    
+    // test remove of all
+    ttt.clear();
+    ttt.add(1, "X");
+    ttt.add(2, "X");
+    ttt.add(3, "X");
+    TupleTableType::Query q2 = ttt.where().second.equal("X");
+    r = q2.remove(ttt);
+    CHECK_EQUAL(3, r);
+    CHECK_EQUAL(0, ttt.size());
 }
 
 
