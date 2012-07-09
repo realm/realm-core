@@ -14,20 +14,10 @@ namespace {
 
 int main()
 {
-    // Create table with all column types
-    Table table;
-    Spec& s = table.get_spec();
-    s.add_column(COLUMN_TYPE_STRING, "string");
-    table.update_from_spec();
-
-    // Add some rows
-    for (size_t i = 0; i < 5; ++i) {
-        table.insert_string(0, i, "s");
-        table.insert_done();
-    }
-
-    // Test Clear
-    table.clear();
+    // Load the group and let it clean up without loading
+    // any tables
+    Group fromDisk("table_test.tbl", GROUP_READONLY);
+    CHECK(fromDisk.is_valid());
 
     return 0;
 }

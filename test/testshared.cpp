@@ -366,7 +366,6 @@ TEST(Shared_WriterThreads)
         const size_t thread_count = 10;
 
         // Create first table in group
-/*
         {
             Group& g1 = shared.begin_write();
             TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
@@ -375,7 +374,6 @@ TEST(Shared_WriterThreads)
             }
             shared.commit();
         }
-*/
 
         pthread_t threads[thread_count];
 

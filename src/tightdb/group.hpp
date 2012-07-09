@@ -121,9 +121,6 @@ protected:
     void create();
     void create_from_ref();
 
-    Table* get_table_ptr(size_t ndx);
-    const Table* get_table_ptr(size_t ndx) const;
-
     template<class S> size_t write(S& out);
 
     // Member variables
@@ -145,7 +142,9 @@ private:
     template<class T> T* get_table_ptr(const char* name);
     template<class T> const T* get_table_ptr(const char* name) const;
 
-    Table* create_new_table(const char* name);
+    Table* get_table_ptr(size_t ndx); // Throws
+    const Table* get_table_ptr(size_t ndx) const; // Throws
+    Table* create_new_table(const char* name); // Throws
 
     friend class LangBindHelper;
 
@@ -194,7 +193,7 @@ template<class T> inline T* Group::get_table_ptr(const char* name)
     }
 
     T* const table = static_cast<T*>(create_new_table(name));
-    table->set_dynamic_spec();
+    table->set_dynamic_spec(); // FIXME: May fail
     return table;
 }
 

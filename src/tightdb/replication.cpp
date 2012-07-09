@@ -1158,7 +1158,7 @@ error_code Replication::TransactLogApplier::apply()
                 if (err) return err;
                 const char* const name = string_buffer.c_str();
                 if (m_group.has_table(name)) return ERROR_IO;
-                m_group.create_new_table(name);
+                if (!m_group.create_new_table(name)) ERROR_OUT_OF_MEMORY;
             }
 
         default:

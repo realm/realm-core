@@ -166,7 +166,7 @@ public:
 
     // Parent tracking
     bool HasParent() const {return m_parent != NULL;}
-    void SetParent(ArrayParent *parent, size_t pndx);
+    void SetParent(ArrayParent *parent, size_t ndx_in_parent);
     void UpdateParentNdx(int diff) {m_parentNdx += diff;}
     ArrayParent *GetParent() const {return m_parent;}
     size_t GetParentNdx() const {return m_parentNdx;}

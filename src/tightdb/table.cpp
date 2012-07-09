@@ -283,21 +283,14 @@ Table::~Table()
         return;
     }
 
-    // 'm_columns' has no parent if, and only if this is a free
-    // standing instance of Table. In that case it is the
-    // responsibility of this destructor to deallocate all the memory
-    // chunks that make up the entire hierarchy of arrays. Otherwise
-    // we must notify our parent.
+    // 'm_columns' has no parent if, and only if this table is
+    // invalidated. Otherwise we must notify our parent.
     if (ArrayParent* parent = m_columns.GetParent()) {
         assert(m_ref_count == 0 || m_ref_count == 1);
         assert(dynamic_cast<Parent*>(parent));
         static_cast<Parent*>(parent)->child_destroyed(m_columns.GetParentNdx());
         return;
     }
-
-    assert(m_ref_count == 1);
-    m_spec_set.destroy();
-    m_columns.Destroy();
 }
 
 size_t Table::get_column_count() const

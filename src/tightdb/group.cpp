@@ -273,8 +273,10 @@ Group::~Group()
     if (m_top.IsValid()) {
         const size_t count = m_cachedtables.Size();
         for (size_t i = 0; i < count; ++i) {
-            Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
-            delete t;
+            if (Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i))) {
+                t->invalidate();
+                t->unbind_ref();
+            }
         }
 
         // Recursively deletes entire tree
@@ -314,31 +316,6 @@ bool Group::has_table(const char* name) const
     return (n != size_t(-1));
 }
 
-Table* Group::create_new_table(const char* name)
-{
-    const size_t ref = Table::create_empty_table(m_alloc);
-    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly by callers
-    m_tables.add(ref);
-    m_tableNames.add(name);
-    Table* table = new Table(m_alloc, ref, this, m_tables.Size()-1); // FIXME: Risk of exception
-    try {
-        m_cachedtables.add(intptr_t(table)); // FIXME: intptr_t is not guaranteed to exists - even in C++11
-    }
-    catch (...) {
-        delete table;
-        // FIXME: Should also remove table
-        throw;
-    }
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* repl = m_alloc.get_replication();
-    if (repl) {
-        error_code err = repl->new_top_level_table(name);
-        if (err) throw_error(err);
-    }
-#endif
-    return table;
-}
-
 Table* Group::get_table_ptr(size_t ndx)
 {
     assert(m_top.IsValid());
@@ -348,15 +325,45 @@ Table* Group::get_table_ptr(size_t ndx)
     Table* table = reinterpret_cast<Table*>(m_cachedtables.Get(ndx));
     if (!table) {
         const size_t ref = m_tables.GetAsRef(ndx);
-        table = new Table(m_alloc, ref, this, ndx);
-        try {
-            m_cachedtables.Set(ndx, intptr_t(table)); // FIXME: intptr_t is not guaranteed to exists - even in C++11
+        table = new (nothrow) Table(Table::RefCountTag(), m_alloc, ref, this, ndx);
+        if (!table) {
+        error:
+            throw_error(ERROR_OUT_OF_MEMORY);
         }
-        catch (...) {
-            delete table;
-            throw;
+        table->bind_ref(); // The group has shared ownership
+        if (!m_cachedtables.Set(ndx, intptr_t(table))) { // FIXME: intptr_t is not guaranteed to exists, even in C++11
+            table->unbind_ref();
+            goto error;
         }
     }
+    return table;
+}
+
+Table* Group::create_new_table(const char* name)
+{
+    const size_t ref = Table::create_empty_table(m_alloc);
+    if (!ref) {
+    error:
+        throw_error(ERROR_OUT_OF_MEMORY);
+    }
+    if (!m_tables.add(ref)) goto error;
+    if (!m_tableNames.add(name)) goto error;
+    Table* const table =
+        new (nothrow) Table(Table::RefCountTag(), m_alloc, ref, this, m_tables.Size()-1);
+    if (!table) goto error;
+    table->bind_ref(); // The group has shared ownership
+    if (!m_cachedtables.add(intptr_t(table))) { // FIXME: intptr_t is not guaranteed to exists, even in C++11
+        table->unbind_ref();
+        goto error;
+    }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    Replication* repl = m_alloc.get_replication();
+    if (repl) {
+        error_code err = repl->new_top_level_table(name);
+        if (err) throw_error(err);
+    }
+#endif
     return table;
 }
 
@@ -534,14 +541,7 @@ void Group::Verify()
 
     // Verify tables
     for (size_t i = 0; i < m_tables.Size(); ++i) {
-        // Get table from cache if exists, else create
-        Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
-        if (!t) {
-            const size_t ref = m_tables.GetAsRef(i);
-            t = new Table(m_alloc, ref, this, i);
-            m_cachedtables.Set(i, intptr_t(t));
-        }
-        t->Verify();
+        get_table_ptr(i)->Verify();
     }
 }
 

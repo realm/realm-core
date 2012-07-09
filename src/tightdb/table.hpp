@@ -63,6 +63,15 @@ public:
     Table(Allocator& alloc = GetDefaultAllocator());
     ~Table();
 
+    /// An invalid table must not be accessed in anyway. A table that
+    /// is obtained from a Group becomes invalid if its group is
+    /// destroyed. This is also true for any subtable that is obtained
+    /// indirectly from a group. A subtable will become invalid if its
+    /// parent table is modified in any way. A free standing table
+    /// will never become invalid. A subtable of a freestanding table
+    /// may become invalid.
+    bool is_valid() const { return m_columns.HasParent(); }
+
     // Schema handling (see also <tightdb/spec.hpp>)
     Spec&       get_spec();
     const Spec& get_spec() const;
@@ -201,10 +210,6 @@ protected:
     const ColumnMixed& GetColumnMixed(size_t column_ndx) const;
 
 
-    /// Construct a top-level table with independent spec from ref.
-    ///
-    Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent);
-
     /// Used when the lifetime of a table is managed by reference
     /// counting. The lifetime of free-standing tables allocated on
     /// the stack by the application is not managed by reference
@@ -213,14 +218,14 @@ protected:
     ///
     class RefCountTag {};
 
-    /// Construct a table with independent spec from the specified \a
-    /// top_ref, and whose lifetime is managed by reference counting.
+    /// Construct a wrapper for a table with independent spec, and
+    /// whose lifetime is managed by reference counting.
     ///
     Table(RefCountTag, Allocator& alloc, size_t top_ref,
           Parent* parent, size_t ndx_in_parent);
 
-    /// Construct a table with shared spec from the specified refs,
-    /// and whose lifetime is managed by reference counting.
+    /// Construct a wrapper for a table with shared spec, and whose
+    /// lifetime is managed by reference counting.
     ///
     /// It is possible to construct a 'null' table by passing zero for
     /// \a columns_ref, in this case the columns will be created on
@@ -274,6 +279,16 @@ protected:
 private:
     Table(Table const &); // Disable copy construction
     Table &operator=(Table const &); // Disable copying assignment
+
+    void invalidate()
+    {
+        // This prevents the destructor from deallocating the
+        // underlying memory structure, and from attempting to notify
+        // the parent. It also causes is_valid() to return false.
+        m_top.Invalidate();
+        m_columns.SetParent(0,0);
+        // FIXME: Invalidate all subtables
+    }
 
     mutable size_t m_ref_count;
     void bind_ref() const { ++m_ref_count; }
@@ -346,13 +361,6 @@ inline Table::Table(Allocator& alloc):
     const size_t ref = create_empty_table(alloc);
     if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
     init_from_ref(ref, 0, 0);
-}
-
-// Create Table from ref
-inline Table::Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1)
-{
-    init_from_ref(top_ref, parent, ndx_in_parent);
 }
 
 // Create attached table from ref
