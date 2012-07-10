@@ -102,7 +102,7 @@ struct Replication {
     /// 'write' transaction. This ensures that the local shared
     /// database is up-to-date. During the transaction, all
     /// modifications must be posted to this Replication instance as
-    /// calls to set() and friends. After the completion of the
+    /// calls to set_value() and friends. After the completion of the
     /// transaction, the client must call release_write_access().
     ///
     /// This function returns ERROR_INTERRUPTED if it was interrupted
@@ -207,7 +207,7 @@ struct Replication {
     };
 
     /// \return ERROR_IO if the transaction log could not be
-    /// successfully parsed.
+    /// successfully parsed, or ended prematurely.
     static error_code apply_transact_log(InputStream& transact_log, Group& target);
 
 private:

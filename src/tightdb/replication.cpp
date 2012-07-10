@@ -334,14 +334,12 @@ error_code Replication::acquire_write_access()
         ++m_shared_state->m_want_write_transact;
         m_shared_state->m_cond_want_write_transact.notify_all();
         while (!m_shared_state->m_write_transact_available) {
-            if (!m_interrupt) {
-                m_shared_state->m_cond_write_transact_available.wait(lg);
-            }
             if (m_interrupt) {
                 // FIXME: Retracting the request for a write transaction may create problems fo the local coordinator
                 --m_shared_state->m_want_write_transact;
                 return ERROR_INTERRUPTED;
             }
+            m_shared_state->m_cond_write_transact_available.wait(lg);
         }
         m_shared_state->m_write_transact_available = false;
         --m_shared_state->m_want_write_transact;
@@ -984,6 +982,7 @@ error_code Replication::TransactLogApplier::apply()
         if (!read_char(instr)) {
             break;
         }
+cerr << "["<<instr<<"]";
         switch (instr) {
         case 's':  // Set value
             {
@@ -1111,12 +1110,15 @@ error_code Replication::TransactLogApplier::apply()
             {
                 delete_subspecs();
                 if (!m_table) return ERROR_IO;
+cerr << "{1}";
                 spec = &m_table->get_spec();
                 int levels;
                 if (!read_int(levels)) return ERROR_IO;
+cerr << "{2}";
                 for (int i=0; i<levels; ++i) {
                     int column_ndx;
                     if (!read_int(column_ndx)) return ERROR_IO;
+cerr << "{3}";
                     if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
                         return ERROR_IO;
                     if (m_table->get_column_type(column_ndx) != COLUMN_TYPE_TABLE) return ERROR_IO;
@@ -1157,10 +1159,14 @@ error_code Replication::TransactLogApplier::apply()
             {
                 const error_code err = read_string(string_buffer);
                 if (err) return err;
+cerr << "(1)";
                 const char* const name = string_buffer.c_str();
                 if (m_group.has_table(name)) return ERROR_IO;
-                if (!m_group.create_new_table(name)) ERROR_OUT_OF_MEMORY;
+cerr << "(2)";
+                if (!m_group.create_new_table(name)) return ERROR_OUT_OF_MEMORY;
+cerr << "(3)";
             }
+            break;
 
         default:
             return ERROR_IO;
