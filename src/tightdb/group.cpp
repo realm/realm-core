@@ -1,8 +1,5 @@
 #include "group.hpp"
 #include <assert.h>
-#ifdef WIN32
-#define _CRT_SECURE_NO_WARNINGS
-#endif
 #include <new>
 #include <iostream>
 #include <fstream>

@@ -90,7 +90,7 @@ private:
     std::size_t m_allocated;
     static char m_zero;
 
-    error_code realloc(std::size_t capacity);
+    error_code reallocate(std::size_t capacity);
 };
 
 
@@ -108,7 +108,7 @@ inline error_code StringBuffer::append_c_str(const char* str)
 inline error_code StringBuffer::reserve(std::size_t capacity)
 {
     if (capacity < m_allocated) return ERROR_NONE;
-    return realloc(capacity);
+    return reallocate(capacity);
 }
 
 inline error_code StringBuffer::resize(std::size_t size)

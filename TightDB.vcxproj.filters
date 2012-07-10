@@ -139,6 +139,24 @@
     <ClCompile Include="test\testshared.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="src\tightdb\error.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\file.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\index_string.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\string_buffer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\replication.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testindexstring.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -292,6 +310,24 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\error.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\index_string.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\overflow.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\replication.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\string_buffer.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\pthread_helpers.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
