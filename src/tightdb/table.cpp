@@ -128,7 +128,7 @@ void Table::CreateColumns()
         }
 
         // Cache Columns
-        m_cols.add((intptr_t)newColumn);
+        m_cols.add((intptr_t)newColumn); // FIXME: intptr_t is not guaranteed to exists, not even in C++11
     }
 }
 
@@ -141,6 +141,32 @@ Spec& Table::get_spec()
 const Spec& Table::get_spec() const
 {
     return m_spec_set;
+}
+
+
+void Table::invalidate()
+{
+    // This prevents the destructor from deallocating the underlying
+    // memory structure, and from attempting to notify the parent. It
+    // also causes is_valid() to return false.
+    m_columns.SetParent(0,0);
+
+    // Invalidate all subtables
+    const size_t n = m_cols.Size();
+    for (size_t i=0; i<n; ++i) {
+        switch (GetRealColumnType(i)) {
+        case COLUMN_TYPE_TABLE:
+            GetColumnTable(i).invalidate_subtables();
+            break;
+        case COLUMN_TYPE_MIXED:
+            GetColumnMixed(i).invalidate_subtables();
+            break;
+        default:
+            break;
+        }
+    }
+
+    ClearCachedColumns();
 }
 
 
@@ -215,7 +241,7 @@ void Table::CacheColumns()
                 assert(false);
         }
 
-        m_cols.add((intptr_t)newColumn);
+        m_cols.add((intptr_t)newColumn); // FIXME: intptr_t is not guaranteed to exists, even in C++11
 
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
@@ -245,11 +271,11 @@ void Table::ClearCachedColumns()
     for (size_t i = 0; i < count; ++i) {
         const ColumnType type = GetRealColumnType(i);
         if (type == COLUMN_TYPE_STRING_ENUM) {
-            ColumnStringEnum* const column = (ColumnStringEnum* const)m_cols.Get(i);
+            ColumnStringEnum* const column = reinterpret_cast<ColumnStringEnum*>(m_cols.Get(i));
             delete(column);
         }
         else {
-            ColumnBase* const column = (ColumnBase* const)m_cols.Get(i);
+            ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
             delete(column);
         }
     }
@@ -262,35 +288,41 @@ Table::~Table()
     get_local_transact_log().on_table_destroyed();
 #endif
 
-    // Delete cached columns
-    ClearCachedColumns();
-
-    if (m_top.IsValid()) {
-        // 'm_top' has no parent if, and only if this is a free
-        // standing instance of TopLevelTable. In that case it is the
-        // responsibility of this destructor to deallocate all the
-        // memory chunks that make up the entire hierarchy of
-        // arrays. Otherwise we must notify our parent.
-        if (ArrayParent* parent = m_top.GetParent()) {
-            assert(m_ref_count == 0 || m_ref_count == 1);
-            assert(dynamic_cast<Parent*>(parent));
-            static_cast<Parent*>(parent)->child_destroyed(m_top.GetParentNdx());
-            return;
-        }
-
-        assert(m_ref_count == 1);
-        m_top.Destroy();
+    if (!is_valid()) {
+        // This table has been invalidated.
+        assert(m_ref_count == 0);
         return;
     }
 
-    // 'm_columns' has no parent if, and only if this table is
-    // invalidated. Otherwise we must notify our parent.
-    if (ArrayParent* parent = m_columns.GetParent()) {
-        assert(m_ref_count == 0 || m_ref_count == 1);
+    if (!m_top.IsValid()) {
+        // This is a table with a shared spec, and its lifetime is
+        // managed by reference counting, so we must let our parent
+        // know about our demise.
+        ArrayParent* parent = m_columns.GetParent();
+        assert(parent);
+        assert(m_ref_count == 0);
         assert(dynamic_cast<Parent*>(parent));
         static_cast<Parent*>(parent)->child_destroyed(m_columns.GetParentNdx());
+        ClearCachedColumns();
         return;
     }
+
+    // This is a table with an independent spec.
+    if (ArrayParent* parent = m_top.GetParent()) {
+        // This is a table whose lifetime is managed by reference
+        // counting, so we must let our parent know about our demise.
+        assert(m_ref_count == 0);
+        assert(dynamic_cast<Parent*>(parent));
+        static_cast<Parent*>(parent)->child_destroyed(m_top.GetParentNdx());
+        ClearCachedColumns();
+        return;
+    }
+
+    // This is a freestanding table, so we are responsible for
+    // deallocating the underlying memory structure.
+    assert(m_ref_count == 1);
+    invalidate();
+    m_top.Destroy();
 }
 
 size_t Table::get_column_count() const
@@ -501,26 +533,26 @@ ColumnTable &Table::GetColumnTable(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
-    return *reinterpret_cast<ColumnTable*>(m_cols.Get(ndx));
+    return *static_cast<ColumnTable*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
-ColumnTable const &Table::GetColumnTable(size_t ndx) const
+const ColumnTable &Table::GetColumnTable(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    return *reinterpret_cast<ColumnTable*>(m_cols.Get(ndx));
+    return *static_cast<ColumnTable*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
 ColumnMixed& Table::GetColumnMixed(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
-    return *reinterpret_cast<ColumnMixed*>(m_cols.Get(ndx));
+    return *static_cast<ColumnMixed*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
 const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    return *reinterpret_cast<ColumnMixed*>(m_cols.Get(ndx));
+    return *static_cast<ColumnMixed*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
 size_t Table::add_empty_row(size_t num_rows)
@@ -602,7 +634,8 @@ void Table::insert_subtable(size_t column_ndx, size_t ndx)
     assert(ndx <= m_size);
 
     ColumnTable& subtables = GetColumnTable(column_ndx);
-    subtables.Insert(ndx);
+    subtables.invalidate_subtables();
+    subtables.Insert(ndx); // FIXME: Consider calling virtual method insert(size_t) instead.
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err =
@@ -674,10 +707,12 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     if (type == COLUMN_TYPE_TABLE) {
         ColumnTable& subtables = GetColumnTable(col_idx);
         subtables.Clear(row_idx);
+        subtables.invalidate_subtables();
     }
     else if (type == COLUMN_TYPE_MIXED) {
         ColumnMixed& subtables = GetColumnMixed(col_idx);
         subtables.SetTable(row_idx);
+        subtables.invalidate_subtables();
     }
     else {
         assert(false);
@@ -962,6 +997,8 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
             assert(false);
     }
 
+    column.invalidate_subtables();
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err = get_local_transact_log().set_value(column_ndx, ndx, value);
     if (err) throw_error(err);
@@ -1000,6 +1037,8 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
         default:
             assert(false);
     }
+
+    column.invalidate_subtables();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err = get_local_transact_log().insert_value(column_ndx, ndx, value);

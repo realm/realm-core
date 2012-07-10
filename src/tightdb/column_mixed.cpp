@@ -389,6 +389,8 @@ void ColumnMixed::Delete(size_t ndx)
 
     m_types->Delete(ndx);
     m_refs->Delete(ndx);
+
+    invalidate_subtables();
 }
 
 void ColumnMixed::Clear()
@@ -396,6 +398,7 @@ void ColumnMixed::Clear()
     m_types->Clear();
     m_refs->Clear();
     if (m_data) m_data->Clear();
+    invalidate_subtables();
 }
 
 

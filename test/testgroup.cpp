@@ -790,6 +790,57 @@ TEST(Group_MultiLevelSubtables)
 
 
 
+namespace {
+
+TIGHTDB_TABLE_3(TestTableGroup2,
+                first,  Mixed,
+                second, Subtable<TestTableGroup>,
+                third,  Subtable<TestTableGroup>)
+
+} // anonymous namespace
+
+TEST(Group_InvalidateTables)
+{
+    TestTableGroup2::Ref table;
+    TableRef             subtable1;
+    TestTableGroup::Ref  subtable2;
+    TestTableGroup::Ref  subtable3;
+    {
+        Group group;
+        table = group.get_table<TestTableGroup2>("foo");
+        CHECK(table->is_valid());
+        table->add(Mixed::subtable_tag(), 0, 0);
+        CHECK(table->is_valid());
+        subtable1 = table[0].first.get_subtable();
+        CHECK(table->is_valid());
+        CHECK(subtable1);
+        CHECK(subtable1->is_valid());
+        subtable2 = table[0].second;
+        CHECK(table->is_valid());
+        CHECK(subtable1->is_valid());
+        CHECK(subtable2);
+        CHECK(subtable2->is_valid());
+        subtable3 = table[0].third;
+        CHECK(table->is_valid());
+        CHECK(subtable1->is_valid());
+        CHECK(subtable2->is_valid());
+        CHECK(subtable3);
+        CHECK(subtable3->is_valid());
+        subtable3->add("alpha", 79542, true,  Wed);
+        subtable3->add("beta",     97, false, Mon);
+        CHECK(table->is_valid());
+        CHECK(subtable1->is_valid());
+        CHECK(subtable2->is_valid());
+        CHECK(subtable3->is_valid());
+    }
+    CHECK(!table->is_valid());
+    CHECK(!subtable1->is_valid());
+    CHECK(!subtable2->is_valid());
+    CHECK(!subtable3->is_valid());
+}
+
+
+
 #ifdef _DEBUG
 #ifdef TIGHTDB_TO_DOT
 

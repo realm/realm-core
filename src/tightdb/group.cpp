@@ -3,6 +3,7 @@
 #ifdef WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #endif
+#include <new>
 #include <iostream>
 #include <fstream>
 #include "group_writer.hpp"
@@ -238,13 +239,7 @@ void Group::reset_to_new()
     // written to does not have any internal structures yet
     // (we may have to re-create this after a rollback)
 
-    // Clear old cached state
-    const size_t count = m_cachedtables.Size();
-    for (size_t i = 0; i < count; ++i) {
-        Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
-        delete t;
-    }
-    m_cachedtables.Clear();
+    clear_cache();
 
     m_top.Invalidate();
     m_tables.Invalidate();
@@ -271,13 +266,7 @@ void Group::rollback()
 Group::~Group()
 {
     if (m_top.IsValid()) {
-        const size_t count = m_cachedtables.Size();
-        for (size_t i = 0; i < count; ++i) {
-            if (Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i))) {
-                t->invalidate();
-                t->unbind_ref();
-            }
-        }
+        clear_cache();
 
         // Recursively deletes entire tree
         m_top.Destroy();
@@ -457,7 +446,7 @@ void Group::update_refs(size_t topRef)
     // Also update cached tables
     const size_t count = m_cachedtables.Size();
     for (size_t i = 0; i < count; ++i) {
-        Table* const t = (Table*)m_cachedtables.Get(i);
+        Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
         if (t) {
             t->UpdateFromParent();
         }
@@ -487,18 +476,12 @@ void Group::update_from_shared(size_t top_ref, size_t len)
         }
     }
     
-    // If the names of the the tables in the group has not
-    // changed we know that it still contains the same tables
-    // so we can reuse the cached versions
+    // If the names of the tables in the group has not changed we know
+    // that it still contains the same tables so we can reuse the
+    // cached versions
     if (nameschanged) {
-        // Clear old cached state
-        const size_t count = m_cachedtables.Size();
-        for (size_t i = 0; i < count; ++i) {
-            Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
-            delete t;
-        }
-        m_cachedtables.Clear();
-    
+        clear_cache();
+
         // Make room for new pointers to cached tables
         const size_t table_count = m_tables.Size();
         for (size_t i = 0; i < table_count; ++i) {
@@ -510,7 +493,7 @@ void Group::update_from_shared(size_t top_ref, size_t len)
         //TODO: account for changed spec
         const size_t count = m_cachedtables.Size();
         for (size_t i = 0; i < count; ++i) {
-            Table* const t = (Table*)m_cachedtables.Get(i);
+            Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
             if (t) {
                 t->UpdateFromParent();
             }

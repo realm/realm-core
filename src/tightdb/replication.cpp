@@ -976,6 +976,7 @@ error_code Replication::TransactLogApplier::apply()
     }
     m_input_begin = m_input_end = m_input_buffer;
 
+    // FIXME: Problem: modifying group, table, and spec methods generally throw.
     StringBuffer string_buffer;
     Spec* spec = 0;
     for (;;) {

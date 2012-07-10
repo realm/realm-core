@@ -10,14 +10,34 @@ namespace {
 #define CHECK(v) if (!(v)) cerr << __LINE__ << ": CHECK failed" << endl
 #define CHECK_EQUAL(a, b) if ((a)!=(b)) cerr << __LINE__ << ": CHECK_EQUAL failed: " << (a) << " vs " << (b) << endl
 
+enum Days {
+    Mon,
+    Tue,
+    Wed,
+    Thu,
+    Fri,
+    Sat,
+    Sun
+};
+
+TIGHTDB_TABLE_4(TestTableGroup,
+                first,  String,
+                second, Int,
+                third,  Bool,
+                fourth, Enum<Days>)
+
+TIGHTDB_TABLE_1(TestTableGroup2,
+                second, Subtable<TestTableGroup>)
+
 } // namespace
 
 int main()
 {
-    // Load the group and let it clean up without loading
-    // any tables
-    Group fromDisk("table_test.tbl", GROUP_READONLY);
-    CHECK(fromDisk.is_valid());
+    TestTableGroup2::Ref table;
+    {
+        Group group;
+        table = group.get_table<TestTableGroup2>("foo");
+    }
 
     return 0;
 }

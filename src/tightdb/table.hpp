@@ -57,19 +57,45 @@ class ConstTableView;
 /// mixed column to group level). This could be done in a very
 /// efficient manner.
 ///
+/// FIXME: When compiling in debug mode, all table methods should
+/// should assert(is_valid()).
+///
 class Table {
 public:
     // Construct a new top-level table with an independent spec.
     Table(Allocator& alloc = GetDefaultAllocator());
     ~Table();
 
-    /// An invalid table must not be accessed in anyway. A table that
-    /// is obtained from a Group becomes invalid if its group is
-    /// destroyed. This is also true for any subtable that is obtained
-    /// indirectly from a group. A subtable will become invalid if its
-    /// parent table is modified in any way. A free standing table
+    /// An invalid table must not be accessed in any way except by
+    /// calling is_valid(). A table that is obtained from a Group
+    /// becomes invalid if its group is destroyed. This is also true
+    /// for any subtable that is obtained indirectly from a group. A
+    /// subtable will generally become invalid if its parent table is
+    /// modified. Calling a const member function on a parent table,
+    /// will never invalidate its subtables. A free standing table
     /// will never become invalid. A subtable of a freestanding table
     /// may become invalid.
+    ///
+    /// FIXME: High level language bindings will probably want to be
+    /// able to explicitely invalidate a group and all tables of that
+    /// group if any modifying operation fails (e.g. memory allocation
+    /// failure) (and something similar for freestanding tables) since
+    /// that leaves the group in state where any further access is
+    /// disallowed. This way they will be able to reliably intercept
+    /// any attempt at accessing such a failed group.
+    ///
+    /// FIXME: The C++ documentation must state that if any modifying
+    /// operation on a group (incl. tables, subtables, and specs), or
+    /// on a free standing table (incl. subtables and specs), then any
+    /// further access to that group (except ~Group()) or freestanding
+    /// table (except ~Table()) has undefined behaviour and is
+    /// considered an error on behalf of the application. Note that
+    /// even Table::is_valid() is disallowed in this case.
+    ///
+    /// FIXME: When Spec changes become possible for non-empty tables,
+    /// such changes would generally have to invalidate subtables
+    /// (except add_column()).
+    ///
     bool is_valid() const { return m_columns.HasParent(); }
 
     // Schema handling (see also <tightdb/spec.hpp>)
@@ -134,7 +160,7 @@ public:
     ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;
     void            clear_subtable(size_t column_ndx, size_t row_ndx);
-    void            insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
+    void            insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table FIXME: Does not work for mixed columns yet (note that is must invalidate subtables).
 
     // Indexing
     bool has_index(size_t column_ndx) const;
@@ -280,15 +306,7 @@ private:
     Table(Table const &); // Disable copy construction
     Table &operator=(Table const &); // Disable copying assignment
 
-    void invalidate()
-    {
-        // This prevents the destructor from deallocating the
-        // underlying memory structure, and from attempting to notify
-        // the parent. It also causes is_valid() to return false.
-        m_top.Invalidate();
-        m_columns.SetParent(0,0);
-        // FIXME: Invalidate all subtables
-    }
+    void invalidate();
 
     mutable size_t m_ref_count;
     void bind_ref() const { ++m_ref_count; }

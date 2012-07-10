@@ -18,7 +18,7 @@ Format:
 
 2012-06-27
 ----------
-+ Added a the following methods to a TableView:    
++ Added a the following methods to a TableView:
 	ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
 	size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const;
 	void        clear_subtable(size_t column_ndx, size_t row_ndx);
@@ -29,7 +29,7 @@ Format:
     ConstTableView find_all_bool(size_t column_ndx, bool value) const; (for class TableView and ConstTableView)
     TableView      find_all_date(size_t column_ndx, time_t value);
     ConstTableView find_all_date(size_t column_ndx, time_t value) const; (for class TableView and ConstTableView)
-	
+
 	TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
 	ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const; (for class TableView and ConstTableView)
 
@@ -37,3 +37,14 @@ Format:
 2012-07-08 (Kristian Spangsege)
 ----------
 . LangBindHelper::new_table() now returns null on memory allocation error. This may change in the future to instead throw an exception.
+
+
+2012-07-09 (Kristian Spangsege)
+----------
++ Table::is_valid() added. Most language bindings must check this flag before calling any member function on any table.
++ MyTable::is_valid() added.
++ Destroying a Group will invalidate all table wrappers (instances of Table) as well as all direct and indirect subtable wrappers.
++ Any modifying operation on a table will generally invalidate all direct and indirect subtable wrappers.
++ See documentation for Table::is_valid() for more details on when a table becomes invalid, and when it does not.
++ my_table[i].mixed.is_subtable() added.
++ my_table[i].mixed.get_subtable() added.

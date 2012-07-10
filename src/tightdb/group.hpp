@@ -146,6 +146,8 @@ private:
     const Table* get_table_ptr(size_t ndx) const; // Throws
     Table* create_new_table(const char* name); // Throws
 
+    void clear_cache();
+
     friend class LangBindHelper;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -274,6 +276,19 @@ void Group::to_json(S& out) const
     }
 
     out << "}";
+}
+
+
+inline void Group::clear_cache()
+{
+    const size_t count = m_cachedtables.Size();
+    for (size_t i = 0; i < count; ++i) {
+        if (Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i))) {
+            t->invalidate();
+            t->unbind_ref();
+        }
+    }
+    m_cachedtables.Clear();
 }
 
 
