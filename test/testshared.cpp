@@ -7,6 +7,8 @@
 
 using namespace tightdb;
 
+namespace {
+
 TIGHTDB_TABLE_4(TestTableShared,
                 first,  Int,
                 second, Int,
@@ -36,6 +38,59 @@ TEST(Shared_Initial)
         // Also do a basic ringbuffer test
         shared.test_ringbuf();
 #endif
+    }
+
+    // Verify that lock file was deleted after use
+    const int rc = access("test_shared.tdb.lock", F_OK);
+    CHECK_EQUAL(-1, rc);
+}
+
+} // anonymous namespace
+
+TEST(Shared_Initial2)
+{
+    // Delete old files if there
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock"); // also the info file
+
+    {
+        // Create a new shared db
+        SharedGroup shared("test_shared.tdb");
+        CHECK(shared.is_valid());
+
+        {
+            // Open the same db again (in empty state)
+            SharedGroup shared2("test_shared.tdb");
+            CHECK(shared2.is_valid());
+
+            // Verify that new group is empty
+            {
+                const Group& g1 = shared2.begin_read();
+                CHECK(g1.is_valid());
+                CHECK(g1.is_empty());
+                shared2.end_read();
+            }
+
+            // Add a new table
+            {
+                Group& g1 = shared2.begin_write();
+                TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+                t1->add(1, 2, false, "test");
+                shared2.commit();
+            }
+        }
+
+        // Verify that the new table has been added
+        {
+            const Group& g1 = shared.begin_read();
+            TestTableShared::ConstRef t1 = g1.get_table<TestTableShared>("test");
+            CHECK_EQUAL(1, t1->size());
+            CHECK_EQUAL(1, t1[0].first);
+            CHECK_EQUAL(2, t1[0].second);
+            CHECK_EQUAL(false, t1[0].third);
+            CHECK_EQUAL("test", (const char*)t1[0].fourth);
+            shared.end_read();
+        }
     }
 
     // Verify that lock file was deleted after use
@@ -256,6 +311,54 @@ TEST(Shared_Writes)
     CHECK_EQUAL(-1, rc);
 }
 
+namespace {
+
+TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
+
+} // anonymous namespace
+
+TEST(Shared_Writes_SpecialOrder)
+{
+    remove("test.tightdb");
+    remove("test.tightdb.lock");
+
+    SharedGroup db("test.tightdb");
+    CHECK(db.is_valid());
+
+    const int num_rows = 5; // FIXME: Should be strictly greater than MAX_LIST_SIZE, but that takes a loooooong time!
+    const int num_reps = 25;
+
+    {
+        Group& group = db.begin_write();
+        MyTable_SpecialOrder::Ref table = group.get_table<MyTable_SpecialOrder>("test");
+        for (int i=0; i<num_rows; ++i) {
+            table->add(0);
+        }
+    }
+    db.commit();
+
+    for (int i=0; i<num_rows; ++i) {
+        for (int j=0; j<num_reps; ++j) {
+            {
+                Group& group = db.begin_write();
+                MyTable_SpecialOrder::Ref table = group.get_table<MyTable_SpecialOrder>("test");
+                CHECK_EQUAL(j, table[i].first);
+                table[i].first = table[i].first + 1;
+            }
+            db.commit();
+        }
+    }
+
+    {
+        const Group& group = db.begin_read();
+        MyTable_SpecialOrder::ConstRef table = group.get_table<MyTable_SpecialOrder>("test");
+        for (int i=0; i<num_rows; ++i) {
+            CHECK_EQUAL(num_reps, table[i].first);
+        }
+    }
+    db.end_read();
+}
+
 namespace  {
 
 void* IncrementEntry(void* arg);
@@ -293,7 +396,7 @@ void* IncrementEntry(void* arg )
     return NULL;
 }
 
-} // namespace
+} // anonymous namespace
 
 TEST(Shared_WriterThreads)
 {

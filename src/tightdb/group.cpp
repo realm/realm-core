@@ -1,5 +1,8 @@
 #include "group.hpp"
 #include <assert.h>
+#ifdef WIN32
+#define _CRT_SECURE_NO_WARNINGS
+#endif
 #include <iostream>
 #include <fstream>
 #include "group_writer.hpp"
@@ -63,7 +66,7 @@ public:
 
     void seek(size_t pos)
     {
-        fseek(m_file, pos, SEEK_SET);
+        fseek(m_file, static_cast<long>(pos), SEEK_SET);
     }
 
 private:
@@ -163,8 +166,10 @@ void Group::create_from_ref()
         const size_t top_size = m_top.Size();
         assert(top_size >= 2);
 
-        m_tableNames.UpdateRef(m_top.Get(0));
-        m_tables.UpdateRef(m_top.Get(1));
+        const size_t n_ref = m_top.Get(0);
+        const size_t t_ref = m_top.Get(1);
+        m_tableNames.UpdateRef(n_ref);
+        m_tables.UpdateRef(t_ref);
         m_tableNames.SetParent(&m_top, 0);
         m_tables.SetParent(&m_top, 1);
 
@@ -172,8 +177,10 @@ void Group::create_from_ref()
         // at all, and files that are not shared does not
         // need version info for free space.
         if (top_size >= 4) {
-            m_freePositions.UpdateRef(m_top.Get(2));
-            m_freeLengths.UpdateRef(m_top.Get(3));
+            const size_t fp_ref = m_top.Get(2);
+            const size_t fl_ref = m_top.Get(3);
+            m_freePositions.UpdateRef(fp_ref);
+            m_freeLengths.UpdateRef(fl_ref);
             m_freePositions.SetParent(&m_top, 2);
             m_freeLengths.SetParent(&m_top, 3);
         }
@@ -281,6 +288,11 @@ bool Group::is_empty() const
     if (!m_top.IsValid()) return true;
 
     return m_tableNames.is_empty();
+}
+
+bool Group::in_inital_state() const
+{
+    return !m_top.IsValid();
 }
 
 size_t Group::get_table_count() const
@@ -441,12 +453,21 @@ void Group::update_refs(size_t topRef)
     
 void Group::update_from_shared(size_t top_ref, size_t len)
 {
-    if (top_ref == 0) return;              // just created
-    if (top_ref == m_top.GetRef()) return; // already up-to-date
-    
+    if (top_ref == 0) return; // just created
+
     // Update memory mapping if needed
-    m_alloc.ReMap(len);
-    
+    const bool isRemapped = m_alloc.ReMap(len);
+
+    // If the top has not changed, everything is up-to-date
+    if (!isRemapped && top_ref == m_top.GetRef()) return;
+
+    // If our last look at the file was when it
+    // was empty, we may have to re-create the group
+    if (in_inital_state()) {
+        create_from_ref();
+        return;
+    }
+
     // Update group arrays
     m_top.UpdateRef(top_ref);
     assert(m_top.Size() >= 2);
@@ -496,6 +517,23 @@ void Group::update_from_shared(size_t top_ref, size_t len)
 
 void Group::Verify()
 {
+    // Verify free lists
+    if (m_freePositions.IsValid()) {
+        assert(m_freeLengths.IsValid());
+
+        const size_t count_p = m_freePositions.Size();
+        const size_t count_l = m_freeLengths.Size();
+        assert(count_p == count_l);
+
+        for (size_t i = 0; i < count_p; ++i) {
+            const size_t p = m_freePositions.Get(i);
+            const size_t l = m_freeLengths.Get(i);
+            assert((p & 0x7) == 0); // 64bit alignment
+            assert((l & 0x7) == 0); // 64bit alignment
+        }
+    }
+
+    // Verify tables
     for (size_t i = 0; i < m_tables.Size(); ++i) {
         // Get table from cache if exists, else create
         Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
@@ -567,7 +605,14 @@ void Group::to_dot(std::ostream& out)
     out << "}" << endl;
 }
 
+void Group::to_dot()
+{
+    to_dot(std::cerr);
+}
+
+#if !defined(_MSC_VER)
 #include <sys/mman.h>
+#endif
 
 void Group::zero_free_space(size_t file_size, size_t readlock_version)
 {
