@@ -44,7 +44,8 @@ namespace tightdb {
 ///
 class LangBindHelper {
 public:
-    /// Returns null on memory allocation failure.
+    /// Construct a freestanding table. Returns null on memory
+    /// allocation failure.
     static Table* new_table(); // FIXME: Verify that the caller checks for null!
 
     static Table* get_subtable_ptr(Table*, size_t column_ndx, size_t row_ndx);
