@@ -52,12 +52,12 @@ TEST(Shared1)
     // Delete old files if there
     remove("test_shared.tdb");
     remove("test_shared.tdb.lock"); // also the info file
-    
+
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tdb");
         CHECK(shared.is_valid());
-        
+
         // Create first table in group
         {
             Group& g1 = shared.begin_write();
@@ -65,7 +65,7 @@ TEST(Shared1)
             t1->add(1, 2, false, "test");
             shared.commit();
         }
-        
+
         // Open same db again
         SharedGroup shared2("test_shared.tdb");
         CHECK(shared2.is_valid());
@@ -292,7 +292,7 @@ TEST(Shared_Writes_SpecialOrder)
                 Group& group = db.begin_write();
                 MyTable_SpecialOrder::Ref table = group.get_table<MyTable_SpecialOrder>("test");
                 CHECK_EQUAL(j, table[i].first);
-                table[i].first = table[i].first + 1;
+                ++table[i].first;
             }
             db.commit();
         }
@@ -325,6 +325,11 @@ void* IncrementEntry(void* arg )
         {
             Group& g1 = shared.begin_write();
             TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            if (t1->size() < row_id+1) {
+                for (size_t i = t1->size(); i < row_id+1; ++i) {
+                    t1->add(0, 2, false, "test");
+                }
+            }
             t1[row_id].first += 1;
             shared.commit();
         }
@@ -361,6 +366,7 @@ TEST(Shared_WriterThreads)
         const size_t thread_count = 10;
 
         // Create first table in group
+/*
         {
             Group& g1 = shared.begin_write();
             TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
@@ -369,6 +375,7 @@ TEST(Shared_WriterThreads)
             }
             shared.commit();
         }
+*/
 
         pthread_t threads[thread_count];
 

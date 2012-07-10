@@ -7,6 +7,7 @@
 #include "utilities.hpp"
 #include "query_conditions.hpp"
 #include "static_assert.hpp"
+#include "column_string.hpp"
 
 #ifdef _MSC_VER
     #include <win32/types.h>
@@ -17,43 +18,94 @@
 
 using namespace std;
 
+namespace {
+
+
+const size_t initial_capacity = 128;
+
+
+inline void set_header_isnode(bool value, void* header)
+{
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x80) | uint8_t(value << 7);
+}
+
+inline void set_header_hasrefs(bool value, void* header)
+{
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x40) | uint8_t(value << 6);
+}
+
+inline void set_header_wtype(int value, void* header)
+{
+    // Indicates how to calculate size in bytes based on width
+    // 0: bits      (width/8) * length
+    // 1: multiply  width * length
+    // 2: ignore    1 * length
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x18) | uint8_t(value << 3);
+}
+
+inline void set_header_width(size_t value, void* header)
+{
+    // Pack width in 3 bits (log2)
+    size_t w = 0;
+    size_t b = size_t(value);
+    while (b) {++w; b >>= 1;}
+    assert(w < 8);
+
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x7) | uint8_t(w);
+}
+
+inline void set_header_len(size_t value, void* header)
+{
+    assert(value <= 0xFFFFFF);
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[1] = (value >> 16) & 0x000000FF;
+    header2[2] = (value >>  8) & 0x000000FF;
+    header2[3] =  value        & 0x000000FF;
+}
+
+inline void set_header_capacity(size_t value, void* header)
+{
+    assert(value <= 0xFFFFFF);
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[4] = (value >> 16) & 0x000000FF;
+    header2[5] = (value >>  8) & 0x000000FF;
+    header2[6] =  value        & 0x000000FF;
+}
+
+
+inline void init_header(void* header, bool is_node, bool has_refs, int width_type,
+                        size_t width, size_t length, size_t capacity)
+{
+    // Note: Since the header layout contains unallocated
+    // bit and/or bytes, it is important that we put the
+    // entire 8 byte header into a well defined state
+    // initially. Note also: The C++ standard does not
+    // guarantee that int64_t is extactly 8 bytes wide. It
+    // may be more, and it may be less. That is why we
+    // need the statinc assert.
+    TIGHTDB_STATIC_ASSERT(sizeof(int64_t) == 8,
+                          "Trouble if int64_t is not 8 bytes wide");
+    *reinterpret_cast<int64_t*>(header) = 0;
+    set_header_isnode(is_node, header);
+    set_header_hasrefs(has_refs, header);
+    set_header_wtype(width_type, header);
+    set_header_width(width, header);
+    set_header_len(length, header);
+    set_header_capacity(capacity, header);
+}
+
+
+} // anonymous namespace
+
+
+
+
 namespace tightdb {
 
-Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
-    m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
-{
-    Create(ref);
-}
-
-Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    m_data(NULL), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false), m_hasRefs(false),
-    m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
-{
-    if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
-    else if (type == COLUMN_HASREFS)    m_hasRefs = true;
-
-    Alloc(0, 0);
-    SetWidth(0);
-}
-
-// Creates new array (but invalid, call UpdateRef or SetType to init)
-Array::Array(Allocator& alloc):
-    m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
-    m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
-
-// Copy-constructor
-// Note that this array now own the ref. Should only be used when
-// the source array goes away right after (like return values from functions)
-Array::Array(const Array& src):
-    m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
-{
-    const size_t ref = src.GetRef();
-    Create(ref);
-    src.Invalidate();
-}
-
-Array::~Array() {}
 
 // Header format (8 bytes):
 // |--------|--------|--------|--------|--------|--------|--------|--------|
@@ -61,56 +113,34 @@ Array::~Array() {}
 //
 //  1: isNode  2: hasRefs  3: multiplier  4: width (packed in 3 bits)
 
-void Array::set_header_isnode(bool value, void* header)
+void Array::set_header_isnode(bool value)
 {
-    uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[0] = (header2[0] & (~0x80)) | (uint8_t)(value << 7);
+    ::set_header_isnode(value, m_data - 8);
 }
 
-void Array::set_header_hasrefs(bool value, void* header)
+void Array::set_header_hasrefs(bool value)
 {
-    uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[0] = (header2[0] & (~0x40)) | (uint8_t)(value << 6);
+    ::set_header_hasrefs(value, m_data - 8);
 }
 
-void Array::set_header_wtype(WidthType value, void* header)
+void Array::set_header_wtype(WidthType value)
 {
-    // Indicates how to calculate size in bytes based on width
-    // 0: bits      (width/8) * length
-    // 1: multiply  width * length
-    // 2: ignore    1 * length
-    uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[0] = (header2[0] & (~0x18)) | (uint8_t)(value << 3);
+    ::set_header_wtype(value, m_data - 8);
 }
 
-void Array::set_header_width(size_t value, void* header)
+void Array::set_header_width(size_t value)
 {
-    // Pack width in 3 bits (log2)
-    size_t w = 0;
-    size_t b = (size_t)value;
-    while (b) {++w; b >>= 1;}
-    assert(w < 8);
-
-    uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[0] = (header2[0] & (~0x7)) | (uint8_t)w;
+    ::set_header_width(value, m_data - 8);
 }
 
-void Array::set_header_len(size_t value, void* header)
+void Array::set_header_len(size_t value)
 {
-    assert(value <= 0xFFFFFF);
-    uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[1] = ((value >> 16) & 0x000000FF);
-    header2[2] = (value >> 8) & 0x000000FF;
-    header2[3] = value & 0x000000FF;
+    ::set_header_len(value, m_data - 8);
 }
 
-void Array::set_header_capacity(size_t value, void* header)
+void Array::set_header_capacity(size_t value)
 {
-    assert(value <= 0xFFFFFF);
-    uint8_t* const header2 = header ? (uint8_t*)header : (m_data - 8);
-    header2[4] = (value >> 16) & 0x000000FF;
-    header2[5] = (value >> 8) & 0x000000FF;
-    header2[6] = value & 0x000000FF;
+    ::set_header_capacity(value, m_data - 8);
 }
 
 bool Array::get_header_isnode(const void* header) const
@@ -149,22 +179,22 @@ size_t Array::get_header_capacity(const void* header) const
     return (header2[4] << 16) + (header2[5] << 8) + header2[6];
 }
 
-void Array::Create(size_t ref)
+void Array::init_from_ref(size_t ref)
 {
     assert(ref);
     uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
     CreateFromHeader(header, ref);
 }
-    
+
 void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref) {
     // Parse header
     // We only need limited info for direct read-only use
     m_width    = get_header_width(header);
     m_len      = get_header_len(header);
-    
+
     m_ref = ref;
     m_data = header + 8;
-    
+
     SetWidth(m_width);
 }
 
@@ -222,8 +252,8 @@ bool Array::operator==(const Array& a) const
 
 void Array::UpdateRef(size_t ref)
 {
-    Create(ref);
-    update_ref_in_parent(ref);
+    init_from_ref(ref);
+    update_ref_in_parent();
 }
 
 bool Array::UpdateFromParent() {
@@ -234,7 +264,7 @@ bool Array::UpdateFromParent() {
     const size_t new_ref = m_parent->get_child_ref(m_parentNdx);
 
     if (new_ref != m_ref) {
-        Create(new_ref);
+        init_from_ref(new_ref);
         return true;
     }
     else {
@@ -802,7 +832,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             return not_found;
 
         start = (p - (int64_t *)m_data) * 8 * 8;
-        
+
         while (start < end)
             if (eq ? Get_1b(start) == value : Get_1b(start) != value)
                 return start;
@@ -820,7 +850,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 2;
-        
+
         while (start < end)
             if (eq ? Get_2b(start) == value : Get_2b(start) != value)
                 return start;
@@ -838,7 +868,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 4;
-        
+
         while (start < end)
             if (eq ? Get_4b(start) == value : Get_4b(start) != value)
                 return start;
@@ -856,7 +886,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 8;
-        
+
         while (start < end)
             if (eq ? Get_8b(start) == value : Get_8b(start) != value)
                 return start;
@@ -874,7 +904,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 16;
-        
+
         while (start < end)
             if (eq ? Get_16b(start) == value : Get_16b(start) != value)
                 return start;
@@ -892,7 +922,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 32;
-        
+
         while (start < end)
             if (eq ? Get_32b(start) == value : Get_32b(start) != value)
                 return start;
@@ -908,7 +938,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 64;
-        
+
         while (start < end)
             if (eq ? Get_64b(start) == value : Get_64b(start) != value)
                 return start;
@@ -1013,8 +1043,8 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
         }
 
         start = (p - (int64_t *)m_data) * 8 * 8;
-        
-        while (start < end) 
+
+        while (start < end)
             if (gt ? Get_1b(start) > value : Get_1b(start) < value)
                 return start;
             else
@@ -1337,10 +1367,10 @@ size_t Array::GetByteSize(bool align) const {
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
-    const size_t bits = (count * width);
-    size_t bytes = (bits / 8) + 8; // add room for 8 byte header
-    if (bits & 0x7) ++bytes;       // include partial bytes
-    return bytes;
+    // FIXME: This arithemtic could overflow. Consider using <tightdb/overflow.hpp>
+    const size_t bits = count * width;
+    const size_t bytes = (bits+7) / 8; // round up
+    return bytes + 8; // add room for 8 byte header
 }
 
 size_t Array::CalcItemCount(size_t bytes, size_t width) const
@@ -1421,7 +1451,7 @@ bool Array::CopyOnWrite()
     // Update capacity in header
     set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
 
-    update_ref_in_parent(mref.ref);
+    update_ref_in_parent();
 
     // Mark original as deleted, so that the space can be reclaimed in
     // future commits, when no versions are using it anymore
@@ -1429,6 +1459,23 @@ bool Array::CopyOnWrite()
 
     return true;
 }
+
+
+size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator& alloc)
+{
+    bool is_node = false, has_refs = false;
+    if (type == COLUMN_NODE) is_node = has_refs = true;
+    else if (type == COLUMN_HASREFS) has_refs = true;
+
+    const size_t capacity = initial_capacity;
+    MemRef mem_ref = alloc.Alloc(capacity);
+    if (!mem_ref.pointer) return 0;
+
+    init_header(mem_ref.pointer, is_node, has_refs, width_type, 0, 0, capacity);
+
+    return mem_ref.ref;
+}
+
 
 bool Array::Alloc(size_t count, size_t width)
 {
@@ -1439,44 +1486,35 @@ bool Array::Alloc(size_t count, size_t width)
 
         if (len > capacity) {
             // Double to avoid too many reallocs
-            new_capacity = capacity ? capacity * 2 : 128;
+            new_capacity = capacity ? capacity * 2 : initial_capacity;
             if (new_capacity < len) {
                 const size_t rest = (~len & 0x7)+1;
                 new_capacity = len;
                 if (rest < 8) new_capacity += rest; // 64bit align
             }
 
-            // Allocate the space
-            MemRef mref;
-            if (m_data) mref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
-            else mref = m_alloc.Alloc(new_capacity);
-
-            if (!mref.pointer) return false;
-
-            const bool isFirst = (capacity == 0);
-            m_ref = mref.ref;
-            m_data = (unsigned char*)mref.pointer + 8;
-
-            // Create header
-            if (isFirst) {
-                // Note: Since the header layout contains unallocated
-                // bit and/or bytes, it is important that we put the
-                // entire 8 byte header into a well defined state
-                // initially. Note also: The C++ standard does not
-                // guarantee that int64_t is extactly 8 bytes wide. It
-                // may be more, and it may be less. That is why we
-                // need the statinc assert.
-                TIGHTDB_STATIC_ASSERT(sizeof(int64_t) == 8,
-                                      "Trouble if int64_t is not 8 bytes wide");
-                *reinterpret_cast<int64_t*>(mref.pointer) = 0;
-                set_header_isnode(m_isNode);
-                set_header_hasrefs(m_hasRefs);
-                set_header_wtype(GetWidthType());
-                set_header_width(width);
+            // Allocate and initialize header
+            MemRef mem_ref;
+            if (!m_data) {
+                mem_ref = m_alloc.Alloc(new_capacity);
+                if (!mem_ref.pointer) return false;
+                init_header(mem_ref.pointer, m_isNode, m_hasRefs, GetWidthType(),
+                            width, count, new_capacity);
             }
-            set_header_capacity(new_capacity);
+            else {
+                mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
+                if (!mem_ref.pointer) return false;
+                ::set_header_width(width, mem_ref.pointer);
+                ::set_header_len(count, mem_ref.pointer);
+                ::set_header_capacity(new_capacity, mem_ref.pointer);
+            }
 
-            update_ref_in_parent(mref.ref);
+            // Update wrapper objects
+            m_ref = mem_ref.ref;
+            m_data = reinterpret_cast<unsigned char*>(mem_ref.pointer) + 8;
+            m_capacity = CalcItemCount(new_capacity, width);
+            update_ref_in_parent();
+            return true;
         }
 
         m_capacity = CalcItemCount(new_capacity, width);
@@ -1494,56 +1532,56 @@ void Array::SetWidth(size_t width)
     if (width == 0) {
         m_getter = &Array::Get_0b;
         m_setter = &Array::Set_0b;
-        
+
         m_lbound = 0;
         m_ubound = 0;
     }
     else if (width == 1) {
         m_getter = &Array::Get_1b;
         m_setter = &Array::Set_1b;
-        
+
         m_lbound = 0;
         m_ubound = 1;
     }
     else if (width == 2) {
         m_getter = &Array::Get_2b;
         m_setter = &Array::Set_2b;
-        
+
         m_lbound = 0;
         m_ubound = 3;
     }
     else if (width == 4) {
         m_getter = &Array::Get_4b;
         m_setter = &Array::Set_4b;
-        
+
         m_lbound = 0;
         m_ubound = 15;
     }
     else if (width == 8) {
         m_getter = &Array::Get_8b;
         m_setter = &Array::Set_8b;
-        
+
         m_lbound = -0x80LL;
         m_ubound =  0x7FLL;
     }
     else if (width == 16) {
         m_getter = &Array::Get_16b;
         m_setter = &Array::Set_16b;
-        
+
         m_lbound = -0x8000LL;
         m_ubound =  0x7FFFLL;
     }
     else if (width == 32) {
         m_getter = &Array::Get_32b;
         m_setter = &Array::Set_32b;
-        
+
         m_lbound = -0x80000000LL;
         m_ubound =  0x7FFFFFFFLL;
     }
     else if (width == 64) {
         m_getter = &Array::Get_64b;
         m_setter = &Array::Set_64b;
-        
+
         m_lbound = -0x8000000000000000LL;
         m_ubound =  0x7FFFFFFFFFFFFFFFLL;
     }
@@ -2067,6 +2105,7 @@ size_t get_header_len_direct(const uint8_t* const header);
 int64_t GetDirect(const char* const data, size_t width, const size_t ndx);
 size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target);
 template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target);
+size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, int32_t target);
 
 bool get_header_isnode_direct(const uint8_t* const header)
 {
@@ -2187,6 +2226,28 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
     else return (size_t)high;
 }
 
+size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, int32_t target)
+{
+    const size_t len = get_header_len_direct(header);
+
+    int low = -1;
+    int high = (int)len;
+
+    // Binary search based on:
+    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+    // Finds position of closest value BIGGER OR EQUAL to the target (for
+    // lookups in indexes)
+    while (high - low > 1) {
+        const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+        const int64_t v = GetDirect<32>(data, probe);
+
+        if (v < target) low = (int)probe;
+        else            high = (int)probe;
+    }
+    if (high == (int)len) return (size_t)-1;
+    else return (size_t)high;
+}
+
 }
 
 
@@ -2201,30 +2262,30 @@ void Array::GetBlock(size_t ndx, Array& arr, size_t& off) const
     size_t width  = m_width;
     bool isNode   = m_isNode;
     size_t offset = 0;
-    
+
     while (1) {
         if (isNode) {
             // Get subnode table
             const size_t ref_offsets = GetDirect(data, width, 0);
             const size_t ref_refs    = GetDirect(data, width, 1);
-            
+
             // Find the subnode containing the item
             const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
             const char* const offsets_data = (const char*)offsets_header + 8;
             const size_t offsets_width  = get_header_width_direct(offsets_header);
             const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
-            
+
             // Calc index in subnode
             const size_t localoffset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
             ndx -= localoffset; // local index
             offset += localoffset;
-            
+
             // Get ref to array
             const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
             const char* const refs_data = (const char*)refs_header + 8;
             const size_t refs_width  = get_header_width_direct(refs_header);
             const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
-            
+
             // Set vars for next iteration
             header = (uint8_t*)m_alloc.Translate(ref);
             data   = (char*)header + 8;
@@ -2352,24 +2413,24 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
 {
     uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
     const bool isNode = get_header_isnode_direct(header);
-        
+
     if (isNode) {
         const char* const data = (const char*)header + 8;
         const size_t width = get_header_width_direct(header);
-        
+
         // Get subnode table
         const size_t ref_offsets = GetDirect(data, width, 0);
         const size_t ref_refs    = GetDirect(data, width, 1);
-        
+
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
         const char* const offsets_data = (const char*)offsets_header + 8;
         const size_t offsets_width  = get_header_width_direct(offsets_header);
         const size_t offsets_len = get_header_len_direct(offsets_header);
-        
+
         const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
         const char* const refs_data = (const char*)refs_header + 8;
         const size_t refs_width  = get_header_width_direct(refs_header);
-        
+
         // Iterate over nodes until we find a match
         size_t offset = 0;
         for (size_t i = 0; i < offsets_len; ++i) {
@@ -2377,17 +2438,101 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
             const size_t result = ColumnFind(target, ref, cache);
             if (result != not_found)
                 return offset + result;
-            
+
             const size_t off = GetDirect(offsets_data, offsets_width, i);
             offset = off;
         }
-        
+
         // if we get to here there is no match
         return not_found;
     }
     else {
         cache.CreateFromHeaderDirect(header);
         return cache.CompareEquality<true>(target, 0, -1);
+    }
+}
+
+size_t Array::IndexStringFindFirst(const char* value, const AdaptiveStringColumn& column) const
+{
+    const char* v = value;
+    const char* data   = (const char*)m_data;
+    const uint8_t* header = m_data - 8;
+    size_t width = m_width;
+    bool isNode = m_isNode;
+
+top:
+    // Create 4 byte index key
+    int32_t key = 0;
+    if (*v) key  = ((int32_t)(*v++) << 24);
+    if (*v) key |= ((int32_t)(*v++) << 16);
+    if (*v) key |= ((int32_t)(*v++) << 8);
+    if (*v) key |=  (int32_t)(*v++);
+
+    for (;;) {
+        // Get subnode table
+        const size_t ref_offsets = GetDirect(data, width, 0);
+        const size_t ref_refs    = GetDirect(data, width, 1);
+
+        // Find the position matching the key
+        const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+        const char* const offsets_data = (const char*)offsets_header + 8;
+        const size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == not_found) return not_found;
+
+        // Get entry under key
+        const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+        const char* const refs_data = (const char*)refs_header + 8;
+        const size_t refs_width  = get_header_width_direct(refs_header);
+        const size_t ref = GetDirect(refs_data, refs_width, pos);
+
+        if (isNode) {
+            // Set vars for next iteration
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+            continue;
+        }
+
+        const int32_t stored_key = (int32_t)GetDirect<32>(offsets_data, pos);
+
+        if (stored_key == key) {
+            // Literal row index
+            if (ref & 1) {
+                const size_t row_ref = (ref >> 1);
+                if (*v == '\0') return row_ref; // full string has been compared
+
+                const char* const str = column.Get(row_ref);
+                if (strcmp(str, value) == 0) return row_ref;
+                else return not_found;
+            }
+
+            const uint8_t* const sub_header = (const uint8_t*)m_alloc.Translate(ref);
+            const bool sub_hasrefs = get_header_hasrefs_direct(sub_header);
+
+            // List of matching row indexes
+            if (!sub_hasrefs) {
+                const char* const sub_data = (const char*)sub_header + 8;
+                const size_t sub_width  = get_header_width_direct(sub_header);
+
+                const size_t row_ref = GetDirect(sub_data, sub_width, 0);
+                if (*v == '\0') return row_ref; // full string has been compared
+
+                const char* const str =column.Get(row_ref);
+                if (strcmp(str, value) == 0) return row_ref;
+                else return not_found;
+            }
+
+            // Recurse into sub-index;
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+            goto top;
+        }
+        else return not_found;
     }
 }
 

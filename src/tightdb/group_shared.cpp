@@ -41,10 +41,10 @@ struct tightdb::SharedInfo {
     pthread_mutex_t writemutex;
     uint64_t filesize;
     uint32_t infosize;
-    
+
     uint64_t current_top;
     uint32_t current_version;
-    
+
     uint32_t capacity; // -1 so it can also be used as mask
     uint32_t put_pos;
     uint32_t get_pos;
@@ -52,19 +52,44 @@ struct tightdb::SharedInfo {
 };
 
 
-SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED), m_info(NULL), m_isValid(false), m_version(-1), m_lockfile_path(NULL)
+SharedGroup::SharedGroup(const char* path_to_database_file):
+    m_group(path_to_database_file, GROUP_SHARED), m_info(NULL), m_isValid(false), m_version(-1),
+    m_lockfile_path(NULL)
+{
+    init(path_to_database_file);
+}
+
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+SharedGroup::SharedGroup(replication_tag, const char* path_to_database_file):
+    m_group(path_to_database_file ? path_to_database_file :
+            Replication::get_path_to_database_file(), GROUP_SHARED), m_info(NULL),
+    m_isValid(false), m_version(-1), m_lockfile_path(NULL)
+{
+    error_code err = m_replication.init(path_to_database_file);
+    if (err) return; // FIXME: Reveal the error code somehow
+    m_group.set_replication(&m_replication);
+
+    init(path_to_database_file ? path_to_database_file : Replication::get_path_to_database_file());
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
+
+void SharedGroup::init(const char* path_to_database_file)
 {
     if (!m_group.is_valid()) return;
-    
+
     // Open shared coordination buffer
-    m_lockfile_path = concat_strings(filename, ".lock");
+    m_lockfile_path = concat_strings(path_to_database_file, ".lock");
     m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return;
-    
+
     bool needInit = false;
     size_t len    = 0;
     struct stat statbuf;
-    
+
     // If we can get an exclusive lock we know that the file is
     // either new (empty) or a leftover from a previous
     // crashed process (needing re-initialization)
@@ -104,7 +129,7 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED)
         close(m_fd);
         return;
     }
-    
+
     // Map to memory
     void* const p = mmap(0, len, PROT_READ|PROT_WRITE, MAP_SHARED, m_fd, 0);
     if (p == (void*)-1) {
@@ -112,7 +137,7 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED)
         return;
     }
     m_info = (SharedInfo*)p;
-    
+
     if (needInit) {
         // Initialize mutexes so that they can be shared between processes
         pthread_mutexattr_t mattr;
@@ -129,7 +154,7 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED)
         m_info->infosize = (uint32_t)len;
         m_info->current_top = alloc.GetTopRef();
         m_info->current_version = 0;
-        m_info->capacity = 32-1; 
+        m_info->capacity = 32-1;
         m_info->put_pos = 0;
         m_info->get_pos = 0;
 
@@ -137,13 +162,14 @@ SharedGroup::SharedGroup(const char* filename) : m_group(filename, GROUP_SHARED)
         // so other processes can share it as well
         flock(m_fd, LOCK_SH);
     }
-    
+
     m_isValid = true;
 
 #ifdef _DEBUG
     m_state = SHARED_STATE_READY;
 #endif
 }
+
 
 SharedGroup::~SharedGroup()
 {
@@ -182,14 +208,14 @@ const Group& SharedGroup::begin_read()
 
     size_t new_topref = 0;
     size_t new_filesize = 0;
-    
+
     pthread_mutex_lock(&m_info->readmutex);
     {
         // Get the current top ref
         new_topref   = m_info->current_top;
         new_filesize = m_info->filesize;
         m_version    = m_info->current_version;
-        
+
         // Update reader list
         if (ringbuf_is_empty()) {
             const ReadCount r2 = {m_info->current_version, 1};
@@ -206,7 +232,7 @@ const Group& SharedGroup::begin_read()
         }
     }
     pthread_mutex_unlock(&m_info->readmutex);
-    
+
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
     if (new_topref == 0)
@@ -217,7 +243,7 @@ const Group& SharedGroup::begin_read()
 #ifdef _DEBUG
     m_state = SHARED_STATE_READING;
 #endif
-    
+
     return m_group;
 }
 
@@ -232,7 +258,7 @@ void SharedGroup::end_read()
         const size_t ndx = ringbuf_find(m_version);
         assert(ndx != (size_t)-1);
         ReadCount& r = ringbuf_get(ndx);
-        
+
         // Decrement count and remove as many entries as possible
         if (r.count == 1 && ringbuf_is_first(ndx)) {
             ringbuf_remove_first();
@@ -246,7 +272,7 @@ void SharedGroup::end_read()
         }
     }
     pthread_mutex_unlock(&m_info->readmutex);
-    
+
     m_version = (uint32_t)-1;
 
 #ifdef _DEBUG
@@ -259,15 +285,22 @@ Group& SharedGroup::begin_write()
     assert(m_state == SHARED_STATE_READY);
     assert(m_group.get_allocator().IsAllFree());
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (m_replication) {
+        error_code err = m_replication.acquire_write_access();
+        if (err) throw_error(err);
+    }
+#endif
+
     // Get write lock
     // Note that this will not get released until we call
     // end_write().
     pthread_mutex_lock(&m_info->writemutex);
-    
+
     // Get the current top ref
     const size_t new_topref   = m_info->current_top;
     const size_t new_filesize = m_info->filesize;
-    
+
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
     if (new_topref == 0) {
@@ -280,7 +313,7 @@ Group& SharedGroup::begin_write()
 #ifdef _DEBUG
     m_state = SHARED_STATE_WRITING;
 #endif
-    
+
     return m_group;
 }
 
@@ -303,7 +336,7 @@ void SharedGroup::commit()
         }
     }
     pthread_mutex_unlock(&m_info->readmutex);
-    
+
     // Reset version tracking in group if we are
     // starting from a new lock file
     if (current_version == 1) {
@@ -317,7 +350,7 @@ void SharedGroup::commit()
     const SlabAlloc& alloc = m_group.get_allocator();
     const size_t new_topref   = alloc.GetTopRef();
     const size_t new_filesize = alloc.GetFileLen();
-    
+
     // Update reader info
     pthread_mutex_lock(&m_info->readmutex);
     {
@@ -326,12 +359,16 @@ void SharedGroup::commit()
         ++m_info->current_version;
     }
     pthread_mutex_unlock(&m_info->readmutex);
-    
+
     // Release write lock
     pthread_mutex_unlock(&m_info->writemutex);
 
 #ifdef _DEBUG
     m_state = SHARED_STATE_READY;
+#endif
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (m_replication) m_replication.release_write_access(false);
 #endif
 }
 
@@ -347,6 +384,10 @@ void SharedGroup::rollback()
 
 #ifdef _DEBUG
     m_state = SHARED_STATE_READY;
+#endif
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (m_replication) m_replication.release_write_access(true);
 #endif
 }
 
@@ -392,12 +433,12 @@ void SharedGroup::ringbuf_remove_first() {
 void SharedGroup::ringbuf_put(const ReadCount& v)
 {
     const bool isFull = (ringbuf_size() == (m_info->capacity+1));
-    
+
     if(isFull) {
         //TODO: expand buffer
         assert(false);
     }
-    
+
     m_info->readers[m_info->put_pos] = v;
     m_info->put_pos = (m_info->put_pos + 1) & m_info->capacity;
 }
@@ -409,10 +450,10 @@ size_t SharedGroup::ringbuf_find(uint32_t version) const
         const ReadCount& r = m_info->readers[pos];
         if (r.version == version)
             return pos;
-        
+
         pos = (pos + 1) & m_info->capacity;
     }
-    
+
     return (size_t)-1;
 }
 
@@ -421,14 +462,14 @@ size_t SharedGroup::ringbuf_find(uint32_t version) const
 void SharedGroup::test_ringbuf()
 {
     assert(ringbuf_is_empty());
-    
+
     const ReadCount rc = {1, 1};
     ringbuf_put(rc);
     assert(ringbuf_size() == 1);
-    
+
     ringbuf_remove_first();
     assert(ringbuf_is_empty());
-    
+
     // Fill buffer
     const size_t capacity = ringbuf_capacity();
     for (size_t i = 0; i < capacity; ++i) {
@@ -443,7 +484,7 @@ void SharedGroup::test_ringbuf()
         ringbuf_remove_first();
     }
     assert(ringbuf_is_empty());
-    
+
 }
 
 void SharedGroup::zero_free_space()

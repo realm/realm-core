@@ -17,32 +17,18 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_DATE_HPP
-#define TIGHTDB_DATE_HPP
+#ifndef TIGHTDB_FILE_HPP
+#define TIGHTDB_FILE_HPP
 
-#include <ctime>
-#include <ostream>
+#include <tightdb/error.hpp>
+#include <tightdb/string_buffer.hpp>
 
 namespace tightdb {
 
 
-class Date {
-public:
-    Date(std::time_t d): m_date(d) {}
-    std::time_t get_date() const { return m_date; }
-
-    template<class Ch, class Tr>
-    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Date& d)
-    {
-        out << "Date("<<d.m_date<<")";
-        return out;
-    }
-
-private:
-    std::time_t m_date;
-};
+error_code create_temp_dir(StringBuffer& buffer);
 
 
 } // namespace tightdb
 
-#endif // TIGHTDB_DATE_HPP
+#endif // TIGHTDB_FILE_HPP

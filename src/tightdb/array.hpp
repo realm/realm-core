@@ -33,6 +33,7 @@
 #include <vector>
 #include <string>
 #include <cassert>
+#include <tightdb/error.hpp>
 
 #define TEMPEX(fun, arg) \
     if(m_width == 0) {fun<0> arg;} \
@@ -72,6 +73,7 @@ static const size_t not_found = (size_t)-1;
 
 // Pre-definitions
 class Array;
+class AdaptiveStringColumn;
 
 #ifdef _DEBUG
 class MemStats {
@@ -127,14 +129,26 @@ protected:
  * 'index in parent') may be valid even when the array is not valid,
  * that is IsValid() returns false.
  *
- * FIXME: Array should be endowed with proper copy and move semantics like TableView is.
+ * FIXME: Array should be endowed with proper copy and move semantics
+ * like TableView is.
  */
 class Array: public ArrayParent {
 public:
-    Array(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    Array(ColumnDef type=COLUMN_NORMAL, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    Array(Allocator& alloc); ///< Create an array in the invalid state (a null array).
-    Array(const Array& a); // FIXME: This is a moving copy and therfore it compromises constness.
+    /// Create a new array, and if \a parent and \a ndx_in_parent are
+    /// specified, update the parent to point to this new array.
+    Array(ColumnDef type=COLUMN_NORMAL, ArrayParent* parent=0, size_t ndx_in_parent=0,
+          Allocator& alloc=GetDefaultAllocator());
+
+    /// Initialize an array wrapper from the specified array.
+    Array(size_t ref, ArrayParent* parent=0, size_t ndx_in_parent=0,
+          Allocator& alloc=GetDefaultAllocator());
+
+    /// Create an array in the invalid state (a null array).
+    Array(Allocator& alloc);
+
+    /// FIXME: This is a moving copy and therfore it compromises constness.
+    Array(const Array& a);
+
     virtual ~Array();
 
     bool operator==(const Array& a) const;
@@ -144,9 +158,16 @@ public:
     bool Copy(const Array&); // Copy semantics for assignment
     void move_assign(Array&); // Move semantics for assignment
 
+    /// Construct an empty array of the spcified type and return just
+    /// the reference to the underlying memory.
+    ///
+    /// \return Zero if allocation fails.
+    ///
+    static size_t create_empty_array(ColumnDef, Allocator&);
+
     // Parent tracking
     bool HasParent() const {return m_parent != NULL;}
-    void SetParent(ArrayParent *parent, size_t pndx);
+    void SetParent(ArrayParent *parent, size_t ndx_in_parent);
     void UpdateParentNdx(int diff) {m_parentNdx += diff;}
     ArrayParent *GetParent() const {return m_parent;}
     size_t GetParentNdx() const {return m_parentNdx;}
@@ -175,6 +196,7 @@ public:
     int64_t ColumnGet(size_t ndx) const;
     const char* ColumnStringGet(size_t ndx) const;
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
+    size_t IndexStringFindFirst(const char* value, const AdaptiveStringColumn& column) const;
 
     void SetAllToZero();
     bool Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
@@ -183,6 +205,8 @@ public:
 
     size_t FindPos(int64_t value) const;
     size_t FindPos2(int64_t value) const;
+
+    /// Returns std::size_t(-1) if the specified value is not found.
     size_t find_first(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
 
     template <class F> size_t find_first(F function_, int64_t value, size_t start, size_t end) const
@@ -250,14 +274,14 @@ private:
     template <bool gt>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
     template <size_t w> void sort();
     template <size_t w>void ReferenceSort(Array &ref);
-    void update_ref_in_parent(size_t ref);
 
 protected:
     bool AddPositiveLocal(int64_t value);
 
-    void Create(size_t ref);
+    void init_from_ref(size_t ref);
     void CreateFromHeader(uint8_t* header, size_t ref=0);
     void CreateFromHeaderDirect(uint8_t* header, size_t ref=0);
+    void update_ref_in_parent();
 
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t(Array::*Getter)(size_t) const;
@@ -289,12 +313,12 @@ protected:
     virtual size_t CalcItemCount(size_t bytes, size_t width) const;
     virtual WidthType GetWidthType() const {return TDB_BITS;}
 
-    void set_header_isnode(bool value, void* header=NULL);
-    void set_header_hasrefs(bool value, void* header=NULL);
-    void set_header_wtype(WidthType value, void* header=NULL);
-    void set_header_width(size_t value, void* header=NULL);
-    void set_header_len(size_t value, void* header=NULL);
-    void set_header_capacity(size_t value, void* header=NULL);
+    void set_header_isnode(bool value);
+    void set_header_hasrefs(bool value);
+    void set_header_wtype(WidthType value);
+    void set_header_width(size_t value);
+    void set_header_len(size_t value);
+    void set_header_capacity(size_t value);
     bool get_header_isnode(const void* header=NULL) const;
     bool get_header_hasrefs(const void* header=NULL) const;
     WidthType get_header_wtype(const void* header=NULL) const;
@@ -330,6 +354,8 @@ protected:
     int64_t m_lbound;
     int64_t m_ubound;
 
+    static size_t create_empty_array(ColumnDef, WidthType, Allocator&);
+
     // Overriding methods in ArrayParent
     virtual void update_child_ref(size_t subtable_ndx, size_t new_ref);
     virtual size_t get_child_ref(size_t subtable_ndx) const;
@@ -339,6 +365,41 @@ protected:
 
 
 // Implementation:
+
+inline Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
+    m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+    m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
+    init_from_ref(ref);
+}
+
+inline Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc):
+    m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+    m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
+    const size_t ref = create_empty_array(type, alloc);
+    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    init_from_ref(ref);
+    update_ref_in_parent();
+}
+
+// Creates new array (but invalid, call UpdateRef or SetType to init)
+inline Array::Array(Allocator& alloc):
+    m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
+    m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
+
+// Copy-constructor
+// Note that this array now own the ref. Should only be used when
+// the source array goes away right after (like return values from functions)
+inline Array::Array(const Array& src):
+    m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
+{
+    const size_t ref = src.GetRef();
+    init_from_ref(ref);
+    src.Invalidate();
+}
+
+inline Array::~Array() {}
 
 template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 {
@@ -455,10 +516,15 @@ inline void Array::move_assign(Array& a)
     a.Invalidate();
 }
 
-inline void Array::update_ref_in_parent(size_t ref)
+inline size_t Array::create_empty_array(ColumnDef type, Allocator& alloc)
+{
+    return create_empty_array(type, TDB_BITS, alloc);
+}
+
+inline void Array::update_ref_in_parent()
 {
   if (!m_parent) return;
-  m_parent->update_child_ref(m_parentNdx, ref);
+  m_parent->update_child_ref(m_parentNdx, m_ref);
 }
 
 

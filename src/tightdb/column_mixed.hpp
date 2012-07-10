@@ -91,17 +91,17 @@ public:
     void set_date(size_t ndx, time_t value);
     void set_string(size_t ndx, const char* value);
     void set_binary(size_t ndx, const char* value, size_t len);
-    void SetTable(size_t ndx);
+    bool SetTable(size_t ndx); // FIXME: Rename to set_subtable()
 
     void insert_int(size_t ndx, int64_t value);
     void insert_bool(size_t ndx, bool value);
     void insert_date(size_t ndx, time_t value);
     void insert_string(size_t ndx, const char* value);
     void insert_binary(size_t ndx, const char* value, size_t len);
-    void insert_table(size_t ndx);
+    bool insert_table(size_t ndx); // FIXME: Rename to insert_subtable()
 
-    virtual bool add() { insert_int(Size(), 0); return true; }
-    virtual void insert(size_t ndx) { insert_int(ndx, 0); }
+    bool add() { insert_int(Size(), 0); return true; }
+    void insert(size_t ndx) { insert_int(ndx, 0); invalidate_subtables(); }
     void Clear();
     void Delete(size_t ndx);
 
@@ -111,6 +111,8 @@ public:
     void ClearIndex() {}
 
     size_t GetRef() const {return m_array->GetRef();}
+
+    void invalidate_subtables();
 
 #ifdef _DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
@@ -182,6 +184,11 @@ inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
     assert(row_idx < m_types->Size());
     if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
     return m_refs->get_subtable_ptr(row_idx);
+}
+
+inline void ColumnMixed::invalidate_subtables()
+{
+    m_refs->invalidate_subtables();
 }
 
 

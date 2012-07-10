@@ -16,7 +16,7 @@ ArrayBlob::ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx, Allocat
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
-    Create(ref);
+    init_from_ref(ref);
     SetParent(const_cast<ArrayParent *>(parent), pndx);
 }
 

@@ -98,8 +98,8 @@ public:
     SUBTABLE(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
     SUBTABLE() {};
     ~SUBTABLE() {
-    //    delete m_child; 
-    //    delete m_child2; 
+    //    delete m_child;
+    //    delete m_child2;
     }
     void Init(const Table& table)
     {
@@ -145,7 +145,7 @@ template <class T, class C, class F> class NODE: public ParentNode {
 public:
     NODE(T v, size_t column) : m_array(GetDefaultAllocator()), m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v), m_column_id(column) {m_child = 0;}
     ~NODE() {
-    //    delete m_child; 
+    //    delete m_child;
     }
 
     void Init(const Table& table)
@@ -222,7 +222,7 @@ public:
             error_code = "Malformed UTF-8: " + std::string(m_value);
     }
     ~STRINGNODE() {
-   //     delete m_child; 
+   //     delete m_child;
         free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase);
     }
 
@@ -284,8 +284,8 @@ public:
         memcpy(m_value, v, strlen(v) + 1);
     }
     ~STRINGNODE() {
-    //    delete m_child; 
-        free((void*)m_value); 
+    //    delete m_child;
+        free((void*)m_value);
     }
 
     void Init(const Table& table)
@@ -400,14 +400,14 @@ public:
         for (size_t s = start; s < end; ++s) {
             size_t f1;
             size_t f2;
-            
+
             if (m_last1 >= s && m_last1 != (size_t)-1)
                 f1 = m_last1;
             else {
                 f1 = m_cond1->find_first(s, end);
                 m_last1 = f1;
             }
-    
+
             if (m_last2 >= s && m_last2 != (size_t)-1)
                 f2 = m_last2;
             else {
