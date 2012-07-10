@@ -166,8 +166,10 @@ void Group::create_from_ref()
         const size_t top_size = m_top.Size();
         assert(top_size >= 2);
 
-        m_tableNames.UpdateRef(m_top.Get(0));
-        m_tables.UpdateRef(m_top.Get(1));
+        const size_t n_ref = m_top.Get(0);
+        const size_t t_ref = m_top.Get(1);
+        m_tableNames.UpdateRef(n_ref);
+        m_tables.UpdateRef(t_ref);
         m_tableNames.SetParent(&m_top, 0);
         m_tables.SetParent(&m_top, 1);
 
@@ -175,8 +177,10 @@ void Group::create_from_ref()
         // at all, and files that are not shared does not
         // need version info for free space.
         if (top_size >= 4) {
-            m_freePositions.UpdateRef(m_top.Get(2));
-            m_freeLengths.UpdateRef(m_top.Get(3));
+            const size_t fp_ref = m_top.Get(2);
+            const size_t fl_ref = m_top.Get(3);
+            m_freePositions.UpdateRef(fp_ref);
+            m_freeLengths.UpdateRef(fl_ref);
             m_freePositions.SetParent(&m_top, 2);
             m_freeLengths.SetParent(&m_top, 3);
         }
@@ -284,6 +288,11 @@ bool Group::is_empty() const
     if (!m_top.IsValid()) return true;
 
     return m_tableNames.is_empty();
+}
+
+bool Group::in_inital_state() const
+{
+    return !m_top.IsValid();
 }
 
 size_t Group::get_table_count() const
@@ -445,13 +454,20 @@ void Group::update_refs(size_t topRef)
 void Group::update_from_shared(size_t top_ref, size_t len)
 {
     if (top_ref == 0) return; // just created
-    
+
     // Update memory mapping if needed
     const bool isRemapped = m_alloc.ReMap(len);
 
     // If the top has not changed, everything is up-to-date
     if (!isRemapped && top_ref == m_top.GetRef()) return;
-    
+
+    // If our last look at the file was when it
+    // was empty, we may have to re-create the group
+    if (in_inital_state()) {
+        create_from_ref();
+        return;
+    }
+
     // Update group arrays
     m_top.UpdateRef(top_ref);
     assert(m_top.Size() >= 2);

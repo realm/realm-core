@@ -82,6 +82,7 @@ protected:
     friend class GroupWriter;
     friend class SharedGroup;
 
+    bool in_inital_state() const;
     void init_shared();
     bool commit(size_t current_version, size_t readlock_version);
     void rollback();
