@@ -1,6 +1,7 @@
 #include <iostream>
 #include <tightdb.hpp>
 #include <tightdb/group_shared.hpp>
+#include <tightdb/lang_bind_helper.hpp>
 
 using namespace tightdb;
 using namespace std;
@@ -33,11 +34,9 @@ TIGHTDB_TABLE_1(TestTableGroup2,
 
 int main()
 {
-    TestTableGroup2::Ref table;
-    {
-        Group group;
-        table = group.get_table<TestTableGroup2>("foo");
-    }
+    Table* table = LangBindHelper::new_table();
+    CHECK(table->is_valid());
+    LangBindHelper::unbind_table_ref(table);
 
     return 0;
 }

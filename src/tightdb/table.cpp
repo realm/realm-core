@@ -319,9 +319,15 @@ Table::~Table()
     }
 
     // This is a freestanding table, so we are responsible for
-    // deallocating the underlying memory structure.
-    assert(m_ref_count == 1);
-    invalidate();
+    // deallocating the underlying memory structure. If the table was
+    // created using the public table constructor (a stack allocated
+    // table) then the reference count must be strictly positive at
+    // this point. Otherwise the table has been created using
+    // LangBindHelper::new_table(), and then the reference count must
+    // be zero, because that is what has caused the destructor to be
+    // called. In the latter case, there can be no subtables to
+    // invalidate, because they would have kept the parent alive.
+    if (0 < m_ref_count) invalidate();
     m_top.Destroy();
 }
 
