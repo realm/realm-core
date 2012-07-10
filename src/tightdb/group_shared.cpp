@@ -154,7 +154,7 @@ void SharedGroup::init(const char* path_to_database_file)
         m_info->infosize = (uint32_t)len;
         m_info->current_top = alloc.GetTopRef();
         m_info->current_version = 0;
-        m_info->capacity = 32-1; 
+        m_info->capacity = 32-1;
         m_info->put_pos = 0;
         m_info->get_pos = 0;
 
@@ -208,14 +208,14 @@ const Group& SharedGroup::begin_read()
 
     size_t new_topref = 0;
     size_t new_filesize = 0;
-    
+
     pthread_mutex_lock(&m_info->readmutex);
     {
         // Get the current top ref
         new_topref   = m_info->current_top;
         new_filesize = m_info->filesize;
         m_version    = m_info->current_version;
-        
+
         // Update reader list
         if (ringbuf_is_empty()) {
             const ReadCount r2 = {m_info->current_version, 1};
@@ -232,7 +232,7 @@ const Group& SharedGroup::begin_read()
         }
     }
     pthread_mutex_unlock(&m_info->readmutex);
-    
+
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
     if (new_topref == 0)
@@ -243,7 +243,7 @@ const Group& SharedGroup::begin_read()
 #ifdef _DEBUG
     m_state = SHARED_STATE_READING;
 #endif
-    
+
     return m_group;
 }
 
@@ -258,7 +258,7 @@ void SharedGroup::end_read()
         const size_t ndx = ringbuf_find(m_version);
         assert(ndx != (size_t)-1);
         ReadCount& r = ringbuf_get(ndx);
-        
+
         // Decrement count and remove as many entries as possible
         if (r.count == 1 && ringbuf_is_first(ndx)) {
             ringbuf_remove_first();
@@ -272,7 +272,7 @@ void SharedGroup::end_read()
         }
     }
     pthread_mutex_unlock(&m_info->readmutex);
-    
+
     m_version = (uint32_t)-1;
 
 #ifdef _DEBUG
@@ -296,11 +296,11 @@ Group& SharedGroup::begin_write()
     // Note that this will not get released until we call
     // end_write().
     pthread_mutex_lock(&m_info->writemutex);
-    
+
     // Get the current top ref
     const size_t new_topref   = m_info->current_top;
     const size_t new_filesize = m_info->filesize;
-    
+
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
     if (new_topref == 0) {
@@ -313,7 +313,7 @@ Group& SharedGroup::begin_write()
 #ifdef _DEBUG
     m_state = SHARED_STATE_WRITING;
 #endif
-    
+
     return m_group;
 }
 
@@ -336,7 +336,7 @@ void SharedGroup::commit()
         }
     }
     pthread_mutex_unlock(&m_info->readmutex);
-    
+
     // Reset version tracking in group if we are
     // starting from a new lock file
     if (current_version == 1) {
@@ -350,7 +350,7 @@ void SharedGroup::commit()
     const SlabAlloc& alloc = m_group.get_allocator();
     const size_t new_topref   = alloc.GetTopRef();
     const size_t new_filesize = alloc.GetFileLen();
-    
+
     // Update reader info
     pthread_mutex_lock(&m_info->readmutex);
     {
@@ -359,7 +359,7 @@ void SharedGroup::commit()
         ++m_info->current_version;
     }
     pthread_mutex_unlock(&m_info->readmutex);
-    
+
     // Release write lock
     pthread_mutex_unlock(&m_info->writemutex);
 
@@ -433,12 +433,12 @@ void SharedGroup::ringbuf_remove_first() {
 void SharedGroup::ringbuf_put(const ReadCount& v)
 {
     const bool isFull = (ringbuf_size() == (m_info->capacity+1));
-    
+
     if(isFull) {
         //TODO: expand buffer
         assert(false);
     }
-    
+
     m_info->readers[m_info->put_pos] = v;
     m_info->put_pos = (m_info->put_pos + 1) & m_info->capacity;
 }
@@ -450,10 +450,10 @@ size_t SharedGroup::ringbuf_find(uint32_t version) const
         const ReadCount& r = m_info->readers[pos];
         if (r.version == version)
             return pos;
-        
+
         pos = (pos + 1) & m_info->capacity;
     }
-    
+
     return (size_t)-1;
 }
 
@@ -462,14 +462,14 @@ size_t SharedGroup::ringbuf_find(uint32_t version) const
 void SharedGroup::test_ringbuf()
 {
     assert(ringbuf_is_empty());
-    
+
     const ReadCount rc = {1, 1};
     ringbuf_put(rc);
     assert(ringbuf_size() == 1);
-    
+
     ringbuf_remove_first();
     assert(ringbuf_is_empty());
-    
+
     // Fill buffer
     const size_t capacity = ringbuf_capacity();
     for (size_t i = 0; i < capacity; ++i) {
@@ -484,7 +484,7 @@ void SharedGroup::test_ringbuf()
         ringbuf_remove_first();
     }
     assert(ringbuf_is_empty());
-    
+
 }
 
 void SharedGroup::zero_free_space()

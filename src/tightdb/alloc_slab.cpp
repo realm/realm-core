@@ -415,25 +415,25 @@ void SlabAlloc::FreeAll(size_t filesize)
 
     assert(IsAllFree());
 }
-   
+
 bool SlabAlloc::ReMap(size_t filesize)
 {
     assert(m_freeReadOnly.is_empty());
     assert(m_slabs.size() == m_freeSpace.size());
-    
+
     // We only need to remap the readonly buffer
     // if the file size have changed.
     if (filesize == m_baseline) return false;
-    
+
     assert(filesize >= m_baseline);
     assert((filesize & 0x7) == 0); // 64bit alignment
-    
+
 #if !defined(_MSC_VER) // write persistence
     //void* const p = mremap(m_shared, m_baseline, filesize); // linux only
     munmap(m_shared, m_baseline);
     void* const p = mmap(0, filesize, PROT_READ, MAP_SHARED, m_fd, 0);
     assert(p);
-    
+
     m_shared   = (char*)p;
     m_baseline = filesize;
 #endif

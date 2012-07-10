@@ -52,12 +52,12 @@ TEST(Shared1)
     // Delete old files if there
     remove("test_shared.tdb");
     remove("test_shared.tdb.lock"); // also the info file
-    
+
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tdb");
         CHECK(shared.is_valid());
-        
+
         // Create first table in group
         {
             Group& g1 = shared.begin_write();
@@ -65,7 +65,7 @@ TEST(Shared1)
             t1->add(1, 2, false, "test");
             shared.commit();
         }
-        
+
         // Open same db again
         SharedGroup shared2("test_shared.tdb");
         CHECK(shared2.is_valid());

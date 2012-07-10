@@ -452,17 +452,17 @@ void Group::update_refs(size_t topRef)
         }
     }
 }
-    
+
 void Group::update_from_shared(size_t top_ref, size_t len)
 {
     if (top_ref == 0) return; // just created
-    
+
     // Update memory mapping if needed
     const bool isRemapped = m_alloc.ReMap(len);
 
     // If the top has not changed, everything is up-to-date
     if (!isRemapped && top_ref == m_top.GetRef()) return;
-    
+
     // Update group arrays
     m_top.UpdateRef(top_ref);
     assert(m_top.Size() >= 2);
@@ -475,7 +475,7 @@ void Group::update_from_shared(size_t top_ref, size_t len)
             m_freeVersions.UpdateFromParent();
         }
     }
-    
+
     // If the names of the tables in the group has not changed we know
     // that it still contains the same tables so we can reuse the
     // cached versions

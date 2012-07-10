@@ -9,7 +9,7 @@ const size_t THREAD_CHUNK_SIZE = 1000;
 
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
- 
+
 Query::Query()
 {
     update.push_back(0);

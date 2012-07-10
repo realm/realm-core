@@ -832,7 +832,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
             return not_found;
 
         start = (p - (int64_t *)m_data) * 8 * 8;
-        
+
         while (start < end)
             if (eq ? Get_1b(start) == value : Get_1b(start) != value)
                 return start;
@@ -850,7 +850,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 2;
-        
+
         while (start < end)
             if (eq ? Get_2b(start) == value : Get_2b(start) != value)
                 return start;
@@ -868,7 +868,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 4;
-        
+
         while (start < end)
             if (eq ? Get_4b(start) == value : Get_4b(start) != value)
                 return start;
@@ -886,7 +886,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 8;
-        
+
         while (start < end)
             if (eq ? Get_8b(start) == value : Get_8b(start) != value)
                 return start;
@@ -904,7 +904,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 16;
-        
+
         while (start < end)
             if (eq ? Get_16b(start) == value : Get_16b(start) != value)
                 return start;
@@ -922,7 +922,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 32;
-        
+
         while (start < end)
             if (eq ? Get_32b(start) == value : Get_32b(start) != value)
                 return start;
@@ -938,7 +938,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
                 ++p;
         }
         start = (p - (int64_t *)m_data) * 8 * 8 / 64;
-        
+
         while (start < end)
             if (eq ? Get_64b(start) == value : Get_64b(start) != value)
                 return start;
@@ -1043,8 +1043,8 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
         }
 
         start = (p - (int64_t *)m_data) * 8 * 8;
-        
-        while (start < end) 
+
+        while (start < end)
             if (gt ? Get_1b(start) > value : Get_1b(start) < value)
                 return start;
             else
@@ -1532,56 +1532,56 @@ void Array::SetWidth(size_t width)
     if (width == 0) {
         m_getter = &Array::Get_0b;
         m_setter = &Array::Set_0b;
-        
+
         m_lbound = 0;
         m_ubound = 0;
     }
     else if (width == 1) {
         m_getter = &Array::Get_1b;
         m_setter = &Array::Set_1b;
-        
+
         m_lbound = 0;
         m_ubound = 1;
     }
     else if (width == 2) {
         m_getter = &Array::Get_2b;
         m_setter = &Array::Set_2b;
-        
+
         m_lbound = 0;
         m_ubound = 3;
     }
     else if (width == 4) {
         m_getter = &Array::Get_4b;
         m_setter = &Array::Set_4b;
-        
+
         m_lbound = 0;
         m_ubound = 15;
     }
     else if (width == 8) {
         m_getter = &Array::Get_8b;
         m_setter = &Array::Set_8b;
-        
+
         m_lbound = -0x80LL;
         m_ubound =  0x7FLL;
     }
     else if (width == 16) {
         m_getter = &Array::Get_16b;
         m_setter = &Array::Set_16b;
-        
+
         m_lbound = -0x8000LL;
         m_ubound =  0x7FFFLL;
     }
     else if (width == 32) {
         m_getter = &Array::Get_32b;
         m_setter = &Array::Set_32b;
-        
+
         m_lbound = -0x80000000LL;
         m_ubound =  0x7FFFFFFFLL;
     }
     else if (width == 64) {
         m_getter = &Array::Get_64b;
         m_setter = &Array::Set_64b;
-        
+
         m_lbound = -0x8000000000000000LL;
         m_ubound =  0x7FFFFFFFFFFFFFFFLL;
     }
@@ -2262,30 +2262,30 @@ void Array::GetBlock(size_t ndx, Array& arr, size_t& off) const
     size_t width  = m_width;
     bool isNode   = m_isNode;
     size_t offset = 0;
-    
+
     while (1) {
         if (isNode) {
             // Get subnode table
             const size_t ref_offsets = GetDirect(data, width, 0);
             const size_t ref_refs    = GetDirect(data, width, 1);
-            
+
             // Find the subnode containing the item
             const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
             const char* const offsets_data = (const char*)offsets_header + 8;
             const size_t offsets_width  = get_header_width_direct(offsets_header);
             const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
-            
+
             // Calc index in subnode
             const size_t localoffset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
             ndx -= localoffset; // local index
             offset += localoffset;
-            
+
             // Get ref to array
             const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
             const char* const refs_data = (const char*)refs_header + 8;
             const size_t refs_width  = get_header_width_direct(refs_header);
             const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
-            
+
             // Set vars for next iteration
             header = (uint8_t*)m_alloc.Translate(ref);
             data   = (char*)header + 8;
@@ -2413,24 +2413,24 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
 {
     uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
     const bool isNode = get_header_isnode_direct(header);
-        
+
     if (isNode) {
         const char* const data = (const char*)header + 8;
         const size_t width = get_header_width_direct(header);
-        
+
         // Get subnode table
         const size_t ref_offsets = GetDirect(data, width, 0);
         const size_t ref_refs    = GetDirect(data, width, 1);
-        
+
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
         const char* const offsets_data = (const char*)offsets_header + 8;
         const size_t offsets_width  = get_header_width_direct(offsets_header);
         const size_t offsets_len = get_header_len_direct(offsets_header);
-        
+
         const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
         const char* const refs_data = (const char*)refs_header + 8;
         const size_t refs_width  = get_header_width_direct(refs_header);
-        
+
         // Iterate over nodes until we find a match
         size_t offset = 0;
         for (size_t i = 0; i < offsets_len; ++i) {
@@ -2438,11 +2438,11 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
             const size_t result = ColumnFind(target, ref, cache);
             if (result != not_found)
                 return offset + result;
-            
+
             const size_t off = GetDirect(offsets_data, offsets_width, i);
             offset = off;
         }
-        
+
         // if we get to here there is no match
         return not_found;
     }

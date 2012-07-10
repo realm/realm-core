@@ -68,7 +68,7 @@ public:
     // Read transactions
     const Group& begin_read();
     void end_read();
-    
+
     // Write transactions
     Group& begin_write();
     void commit();
@@ -91,7 +91,7 @@ private:
     ReadCount& ringbuf_get(size_t ndx);
     ReadCount& ringbuf_get_first();
     ReadCount& ringbuf_get_last();
-    
+
     // Member variables
     Group       m_group;
     SharedInfo* m_info;

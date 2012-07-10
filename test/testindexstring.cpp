@@ -12,7 +12,7 @@ namespace {
     const char s5[] = "Johnathan";
     const char s6[] = "Johnny";
     const char s7[] = "Sam";
-    
+
 } // namespace
 
 TEST(StringIndex_BuildIndex)
@@ -26,25 +26,25 @@ TEST(StringIndex_BuildIndex)
     col.add(s1); // duplicate value
     col.add(s5); // common prefix
     col.add(s6); // common prefix
-    
+
     // Create a new index on column
     StringIndex ndx(col);
     ndx.BuildIndex();
-    
+
     const size_t r1 = ndx.find_first(s1);
     const size_t r2 = ndx.find_first(s2);
     const size_t r3 = ndx.find_first(s3);
     const size_t r4 = ndx.find_first(s4);
     const size_t r5 = ndx.find_first(s5);
     const size_t r6 = ndx.find_first(s6);
-    
+
     CHECK_EQUAL(0, r1);
     CHECK_EQUAL(1, r2);
     CHECK_EQUAL(2, r3);
     CHECK_EQUAL(3, r4);
     CHECK_EQUAL(5, r5);
     CHECK_EQUAL(6, r6);
-    
+
     // Clean up
     col.Destroy();
     ndx.Destroy();
