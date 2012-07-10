@@ -231,7 +231,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
             return true;
 
         // Create new list for item
-        StringIndex newList(m_array->GetAllocator());
+        StringIndex newList(m_column);
 
         if (!newList.LeafInsert(row_ndx, key, offset, value))
             return NodeChange(NodeChange::CT_ERROR);
@@ -264,7 +264,8 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         }
     }
 
-    return NodeChange(NodeChange::CT_NONE); // test
+    assert(false); // never reach here
+    return NodeChange(NodeChange::CT_NONE);
 }
 
 bool StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
