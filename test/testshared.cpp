@@ -47,6 +47,57 @@ TEST(Shared_Initial)
 
 } // anonymous namespace
 
+TEST(Shared_Initial2)
+{
+    // Delete old files if there
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock"); // also the info file
+
+    {
+        // Create a new shared db
+        SharedGroup shared("test_shared.tdb");
+        CHECK(shared.is_valid());
+
+        {
+            // Open the same db again (in empty state)
+            SharedGroup shared2("test_shared.tdb");
+            CHECK(shared2.is_valid());
+
+            // Verify that new group is empty
+            {
+                const Group& g1 = shared2.begin_read();
+                CHECK(g1.is_valid());
+                CHECK(g1.is_empty());
+                shared2.end_read();
+            }
+
+            // Add a new table
+            {
+                Group& g1 = shared2.begin_write();
+                TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+                t1->add(1, 2, false, "test");
+                shared2.commit();
+            }
+        }
+
+        // Verify that the new table has been added
+        {
+            const Group& g1 = shared.begin_read();
+            TestTableShared::ConstRef t1 = g1.get_table<TestTableShared>("test");
+            CHECK_EQUAL(1, t1->size());
+            CHECK_EQUAL(1, t1[0].first);
+            CHECK_EQUAL(2, t1[0].second);
+            CHECK_EQUAL(false, t1[0].third);
+            CHECK_EQUAL("test", (const char*)t1[0].fourth);
+            shared.end_read();
+        }
+    }
+
+    // Verify that lock file was deleted after use
+    const int rc = access("test_shared.tdb.lock", F_OK);
+    CHECK_EQUAL(-1, rc);
+}
+
 TEST(Shared1)
 {
     // Delete old files if there
