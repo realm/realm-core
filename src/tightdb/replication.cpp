@@ -762,7 +762,7 @@ error_code Replication::select_table(const Table* table)
         if (!m_subtab_path_buf.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
     }
     char* buf;
-    const int max_elems_per_chunk = 8;
+    const int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
     error_code err = transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int);
     if (err) return err;
     *buf++ = 'T';
@@ -802,13 +802,13 @@ error_code Replication::select_spec(const Table* table, const Spec* spec)
         if (!m_subtab_path_buf.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
     }
     char* buf;
-    const int max_elems_per_chunk = 8;
+    const int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
     err = transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int);
     if (err) return err;
     *buf++ = 'S';
-    assert(1 <= end - begin);
-    const ptrdiff_t level = end - begin - 1;
+    const ptrdiff_t level = end - begin;
     buf = encode_int(buf, level);
+    if (begin == end) goto good;
     for (;;) {
         for (int i=0; i<max_elems_per_chunk; ++i) {
             buf = encode_int(buf, *--end);
@@ -828,7 +828,8 @@ good:
 
 struct Replication::TransactLogApplier {
     TransactLogApplier(InputStream& transact_log, Group& group):
-        m_input(transact_log), m_group(group), m_input_buffer(0), m_num_subspecs(0) {}
+        m_input(transact_log), m_group(group), m_input_buffer(0),
+        m_num_subspecs(0), m_dirty_spec(false) {}
 
     ~TransactLogApplier()
     {
@@ -841,13 +842,14 @@ struct Replication::TransactLogApplier {
 private:
     InputStream& m_input;
     Group& m_group;
-    static const size_t m_input_buffer_size = 4096;
+    static const size_t m_input_buffer_size = 4096; // FIXME: Use smaller number when compiling in debug mode
     char* m_input_buffer;
     const char* m_input_begin;
     const char* m_input_end;
     TableRef m_table;
     Buffer<Spec*> m_subspecs;
     size_t m_num_subspecs;
+    bool m_dirty_spec;
 
     // Returns false on end-of-input
     bool fill_input_buffer()
@@ -879,6 +881,13 @@ private:
         const size_t n = m_num_subspecs;
         for (size_t i=0; i<n; ++i) delete m_subspecs[i];
         m_num_subspecs = 0;
+    }
+
+    void finalize_spec()
+    {
+        assert(m_table);
+        m_table->update_from_spec();
+        m_dirty_spec = false;
     }
 
     bool is_valid_column_type(int type)
@@ -986,6 +995,7 @@ cerr << "["<<instr<<"]";
         switch (instr) {
         case 's':  // Set value
             {
+                if (m_dirty_spec) finalize_spec();
                 int column_ndx;
                 if (!read_int(column_ndx)) return ERROR_IO;
                 size_t ndx;
@@ -1091,6 +1101,16 @@ cerr << "["<<instr<<"]";
             }
             break;
 
+        case 'I':  // Insert empty rows
+            {
+                if (m_dirty_spec) finalize_spec();
+                size_t ndx, num_rows;
+                if (!read_int(ndx) || !read_int(num_rows)) return ERROR_IO;
+                if (!m_table || m_table->size() < ndx) return ERROR_IO;
+                m_table->insert_empty_row(ndx, num_rows); // FIXME: May fail
+            }
+            break;
+
         case 'A':  // Add column to selected spec
             {
                 int type;
@@ -1103,6 +1123,7 @@ cerr << "["<<instr<<"]";
                 // FIXME: Is it legal to have multiple columns with the same name?
                 if (spec->get_column_index(name) != size_t(-1)) return ERROR_IO;
                 spec->add_column(ColumnType(type), name);
+                m_dirty_spec = true;
             }
             break;
 
@@ -1110,19 +1131,15 @@ cerr << "["<<instr<<"]";
             {
                 delete_subspecs();
                 if (!m_table) return ERROR_IO;
-cerr << "{1}";
                 spec = &m_table->get_spec();
                 int levels;
                 if (!read_int(levels)) return ERROR_IO;
-cerr << "{2}";
                 for (int i=0; i<levels; ++i) {
-                    int column_ndx;
-                    if (!read_int(column_ndx)) return ERROR_IO;
-cerr << "{3}";
-                    if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                    int subspec_ndx;
+                    if (!read_int(subspec_ndx)) return ERROR_IO;
+                    if (subspec_ndx < 0 || int(spec->get_num_subspecs()) <= subspec_ndx)
                         return ERROR_IO;
-                    if (m_table->get_column_type(column_ndx) != COLUMN_TYPE_TABLE) return ERROR_IO;
-                    spec = new (nothrow) Spec(spec->get_subspec(column_ndx)); // FIXME: Can Spec::get_subspec() or Spec copy constructor fail/throw?
+                    spec = new (nothrow) Spec(spec->get_subspec_by_ndx(subspec_ndx));
                     if (!spec) return ERROR_OUT_OF_MEMORY;
                     const error_code err = add_subspec(spec);
                     if (err) {
@@ -1135,6 +1152,7 @@ cerr << "{3}";
 
         case 'T':  // Select table
             {
+                if (m_dirty_spec) finalize_spec();
                 int levels;
                 if (!read_int(levels)) return ERROR_IO;
                 size_t ndx;
@@ -1159,12 +1177,9 @@ cerr << "{3}";
             {
                 const error_code err = read_string(string_buffer);
                 if (err) return err;
-cerr << "(1)";
                 const char* const name = string_buffer.c_str();
                 if (m_group.has_table(name)) return ERROR_IO;
-cerr << "(2)";
                 if (!m_group.create_new_table(name)) return ERROR_OUT_OF_MEMORY;
-cerr << "(3)";
             }
             break;
 

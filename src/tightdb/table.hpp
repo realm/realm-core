@@ -329,7 +329,9 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct LocalTransactLog;
     LocalTransactLog get_local_transact_log();
+    // Precondition: 1 <= end - begin
     size_t* record_subspec_path(const Spec*, size_t* begin, size_t* end) const;
+    // Precondition: 1 <= end - begin
     size_t* record_subtable_path(size_t* begin, size_t* end) const;
     friend class Replication;
 #endif
@@ -512,15 +514,19 @@ inline Table::LocalTransactLog Table::get_local_transact_log()
 
 inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin, size_t* end) const
 {
-    return spec->record_subspec_path(&m_top, begin, end);
+    if (spec != &m_spec_set) {
+        assert(m_spec_set.m_subSpecs.IsValid());
+        return spec->record_subspec_path(&m_spec_set.m_subSpecs, begin, end);
+    }
+    return begin;
 }
 
 inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const
 {
     const Array& real_top = m_top.IsValid() ? m_top : m_columns;
     const size_t index_in_parent = real_top.GetParentNdx();
-    *begin = index_in_parent;
-    if (++begin == end) return 0; // Error, not enough space in buffer
+    assert(begin < end);
+    *begin++ = index_in_parent;
     ArrayParent* parent = real_top.GetParent();
     assert(parent);
     assert(dynamic_cast<Parent*>(parent));

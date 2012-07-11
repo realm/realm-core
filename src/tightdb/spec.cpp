@@ -272,16 +272,17 @@ size_t Spec::get_column_index(const char* name) const
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-size_t* Spec::record_subspec_path(const ArrayParent* root, size_t* begin, size_t* end) const
+size_t* Spec::record_subspec_path(const Array* root_subspecs, size_t* begin, size_t* end) const
 {
+    assert(begin < end);
     const Array* spec_set = &m_specSet;
     for (;;) {
-        *begin = spec_set->GetParentNdx();
-        if (++begin == end) return 0; // Error, not enough space in buffer
-        const ArrayParent* parent = spec_set->GetParent();
-        if (parent == root) break;
-        const Array* subspecs = static_cast<const Array*>(parent);
-        spec_set = static_cast<const Array*>(subspecs->GetParent());
+        const size_t subspec_ndx = spec_set->GetParentNdx();
+        *begin++ = subspec_ndx;
+        const Array* const parent_subspecs = static_cast<const Array*>(spec_set->GetParent());
+        if (parent_subspecs == root_subspecs) break;
+        if (begin == end) return 0; // Error, not enough space in buffer
+        spec_set = static_cast<const Array*>(parent_subspecs->GetParent());
     }
     return begin;
 }

@@ -470,12 +470,14 @@ ColumnBase& Table::GetColumnBase(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
+    assert(m_cols.Size() == get_column_count());
     return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
 }
 
 const ColumnBase& Table::GetColumnBase(size_t ndx) const
 {
     assert(ndx < get_column_count());
+    assert(m_cols.Size() == get_column_count());
     return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
 }
 
@@ -512,12 +514,14 @@ ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
+    assert(m_cols.Size() == get_column_count());
     return *reinterpret_cast<ColumnStringEnum*>(m_cols.Get(ndx));
 }
 
 const ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) const
 {
     assert(ndx < get_column_count());
+    assert(m_cols.Size() == get_column_count());
     return *reinterpret_cast<ColumnStringEnum*>(m_cols.Get(ndx));
 }
 
@@ -539,12 +543,14 @@ ColumnTable &Table::GetColumnTable(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
+    assert(m_cols.Size() == get_column_count());
     return *static_cast<ColumnTable*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
 const ColumnTable &Table::GetColumnTable(size_t ndx) const
 {
     assert(ndx < get_column_count());
+    assert(m_cols.Size() == get_column_count());
     return *static_cast<ColumnTable*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
@@ -552,22 +558,23 @@ ColumnMixed& Table::GetColumnMixed(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
+    assert(m_cols.Size() == get_column_count());
     return *static_cast<ColumnMixed*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
 const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
 {
+    assert(m_cols.Size() == get_column_count());
     assert(ndx < get_column_count());
     return *static_cast<ColumnMixed*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
 size_t Table::add_empty_row(size_t num_rows)
 {
-    const size_t col_count = get_column_count();
-
-    for (size_t row = 0; row < num_rows; ++row) {
-        for (size_t i = 0; i < col_count; ++i) {
-            ColumnBase& column = GetColumnBase(i);
+    const size_t n = get_column_count();
+    for (size_t i=0; i<n; ++i) {
+        ColumnBase& column = GetColumnBase(i);
+        for (size_t j=0; j<num_rows; ++j) {
             column.add();
         }
     }
@@ -577,7 +584,7 @@ size_t Table::add_empty_row(size_t num_rows)
     m_size += num_rows;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().insert_empty_rows(size(), 1);
+    error_code err = get_local_transact_log().insert_empty_rows(new_ndx, 1);
     if (err) throw_error(err);
 #endif
 
@@ -586,12 +593,13 @@ size_t Table::add_empty_row(size_t num_rows)
 
 void Table::insert_empty_row(size_t ndx, size_t num_rows)
 {
-    const size_t col_count = get_column_count();
-
-    for (size_t row = 0; row < num_rows; ++row) {
-        for (size_t i = 0; i < col_count; ++i) {
-            ColumnBase& column = GetColumnBase(i);
-            column.insert(ndx+i); // FIXME: This should be optimized by passing 'num_rows' to column.insert()
+    const size_t ndx2 = ndx + num_rows; // FIXME: Should we check for overflow?
+    const size_t n = get_column_count();
+    for (size_t i=0; i<n; ++i) {
+        ColumnBase& column = GetColumnBase(i);
+        // FIXME: This could maybe be optimized by passing 'num_rows' to column.insert()
+        for (size_t j=ndx; j<ndx2; ++j) {
+            column.insert(j);
         }
     }
 

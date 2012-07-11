@@ -161,7 +161,7 @@ struct Replication {
     //   s  Set value
     //   i  Insert value
     //   c  Row insert complete
-    //   I  insert empty row
+    //   I  Insert empty rows
     //   R  Remove row
     //   a  Add int to column
     //   x  Add index to column

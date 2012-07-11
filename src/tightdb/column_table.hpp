@@ -88,9 +88,10 @@ protected:
     // Overriding method in Table::Parent
     virtual size_t* record_subtable_path(size_t* begin, size_t* end)
     {
+        if (end == begin) return 0; // Error, not enough space in buffer
         const size_t column_index = m_array->GetParentNdx();
-        *begin = column_index;
-        if (++begin == end) return 0; // Error, not enough space in buffer
+        *begin++ = column_index;
+        if (end == begin) return 0; // Error, not enough space in buffer
         return m_table->record_subtable_path(begin, end);
     }
 #endif // TIGHTDB_ENABLE_REPLICATION

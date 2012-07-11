@@ -80,7 +80,7 @@ SlabAlloc::~SlabAlloc()
     if (!IsAllFree()) {
         m_slabs.print();
         m_freeSpace.print();
-        assert(false);
+        assert(false);  // FIXME: Should this assert be here?
     }
 #endif //_DEBUG
 
