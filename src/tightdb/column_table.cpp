@@ -64,6 +64,8 @@ void ColumnTable::Delete(size_t ndx)
     }
 
     Column::Delete(ndx);
+
+    invalidate_subtables();
 }
 
 void ColumnTable::Clear(size_t ndx)

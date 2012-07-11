@@ -5,7 +5,7 @@
 #include<iostream>
 
 #if defined(_MSC_VER) && defined(_DEBUG)
-    #include <vld.h>
+//    #include <vld.h>
 #endif
 
 int main(int argc, char const *const argv[])

@@ -128,6 +128,59 @@ TEST(TestQueryDelete)
     CHECK_EQUAL(2, ttt.size());
     CHECK_EQUAL(2, ttt[0].first);
     CHECK_EQUAL(4, ttt[1].first);
+    
+    // test remove of all
+    ttt.clear();
+    ttt.add(1, "X");
+    ttt.add(2, "X");
+    ttt.add(3, "X");
+    TupleTableType::Query q2 = ttt.where().second.equal("X");
+    r = q2.remove(ttt);
+    CHECK_EQUAL(3, r);
+    CHECK_EQUAL(0, ttt.size());
+}
+
+TEST(TestQueryDeleteRange)
+{
+    TupleTableType ttt;
+
+    ttt.add(0, "X");
+    ttt.add(1, "X");
+    ttt.add(2, "X");
+    ttt.add(3, "X");
+    ttt.add(4, "X");
+    ttt.add(5, "X");
+
+    TupleTableType::Query q = ttt.where().second.equal("X");
+    size_t r = q.remove(ttt, 1, 4);
+
+    CHECK_EQUAL(3, r);
+    CHECK_EQUAL(3, ttt.size());
+    CHECK_EQUAL(0, ttt[0].first);
+    CHECK_EQUAL(4, ttt[1].first);
+    CHECK_EQUAL(5, ttt[2].first);
+}
+
+TEST(TestQueryDeleteLimit)
+{
+    TupleTableType ttt;
+
+    ttt.add(0, "X");
+    ttt.add(1, "X");
+    ttt.add(2, "X");
+    ttt.add(3, "X");
+    ttt.add(4, "X");
+    ttt.add(5, "X");
+
+    TupleTableType::Query q = ttt.where().second.equal("X");
+    size_t r = q.remove(ttt, 1, 4, 2);
+
+    CHECK_EQUAL(2, r);
+    CHECK_EQUAL(4, ttt.size());
+    CHECK_EQUAL(0, ttt[0].first);
+    CHECK_EQUAL(3, ttt[1].first);
+    CHECK_EQUAL(4, ttt[2].first);
+    CHECK_EQUAL(5, ttt[3].first);
 }
 
 
@@ -152,18 +205,18 @@ TEST(TestQuerySimpleBUGdetect)
 	TupleTableType ttt;
 	ttt.add(1, "a");
 	ttt.add(2, "a");
-			
+
 	TupleTableType::Query q1 = ttt.where();
-			
+
 	TupleTableType::View tv1 = q1.find_all(ttt);
 	CHECK_EQUAL(2, tv1.size());
 	CHECK_EQUAL(0, tv1.get_source_ndx(0));
-			
-	TupleTableType::View resView = tv1.cols().second.find_all("Foo");          
-    
+
+	TupleTableType::View resView = tv1.cols().second.find_all("Foo");
+
     // This previously crashed:
-    // TableView resView = TableView(tv1);				
-    // tv1.find_all(resView, 1, "Foo");          
+    // TableView resView = TableView(tv1);
+    // tv1.find_all(resView, 1, "Foo");
 }
 
 
@@ -760,7 +813,7 @@ TEST(TestQueryFindAllOr)
 
 
 
- 
+
 
 TEST(TestQueryFindAll_Parans2)
 {
@@ -1123,25 +1176,25 @@ TEST(TestQuery_OfByOne)
     for (size_t i = 0; i < MAX_LIST_SIZE * 2; ++i) {
         t.add(1, "a");
     }
-    
+
     // Top
     t[0].first = 0;
     size_t res = t.where().first.equal(0).find_next(t);
     CHECK_EQUAL(0, res);
     t[0].first = 1; // reset
-    
+
     // Before split
     t[MAX_LIST_SIZE-1].first = 0;
     res = t.where().first.equal(0).find_next(t);
     CHECK_EQUAL(MAX_LIST_SIZE-1, res);
     t[MAX_LIST_SIZE-1].first = 1; // reset
-    
+
     // After split
     t[MAX_LIST_SIZE].first = 0;
     res = t.where().first.equal(0).find_next(t);
     CHECK_EQUAL(MAX_LIST_SIZE, res);
     t[MAX_LIST_SIZE].first = 1; // reset
-    
+
     // Before end
     const size_t last_pos = (MAX_LIST_SIZE*2)-1;
     t[last_pos].first = 0;

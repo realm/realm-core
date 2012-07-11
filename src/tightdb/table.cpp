@@ -27,70 +27,30 @@ struct FakeParent: Table::Parent {
 
 // -- Table ---------------------------------------------------------------------------------
 
-// Create new Table
-Table::Table(Allocator& alloc):
-    m_size(0),
-    m_top(COLUMN_HASREFS, NULL, 0, alloc),
-    m_columns(COLUMN_HASREFS, NULL, 0, alloc),
-    m_spec_set(alloc, NULL, 0),
-    m_ref_count(1)
-{
-    m_top.add(m_spec_set.get_ref());
-    m_top.add(m_columns.GetRef());
-    m_spec_set.set_parent(&m_top, 0);
-    m_columns.SetParent(&m_top, 1);
-}
-
-// Create Table from ref
-Table::Table(Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(alloc), m_ref_count(1)
+void Table::init_from_ref(size_t top_ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     // Load from allocated memory
     m_top.UpdateRef(top_ref);
     m_top.SetParent(parent, ndx_in_parent);
     assert(m_top.Size() == 2);
 
-    const size_t schema_ref  = m_top.GetAsRef(0);
+    const size_t spec_ref    = m_top.GetAsRef(0);
     const size_t columns_ref = m_top.GetAsRef(1);
 
-    Create(schema_ref, columns_ref, &m_top, 1);
+    init_from_ref(spec_ref, columns_ref, &m_top, 1);
     m_spec_set.set_parent(&m_top, 0);
 }
 
-// Create attached table from ref
-Table::Table(SubtableTag, Allocator& alloc, size_t top_ref, Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(alloc), m_ref_count(0)
+void Table::init_from_ref(size_t spec_ref, size_t columns_ref,
+                          ArrayParent* parent, size_t ndx_in_parent)
 {
-    // Load from allocated memory
-    m_top.UpdateRef(top_ref);
-    m_top.SetParent(parent, ndx_in_parent);
-    assert(m_top.Size() == 2);
-
-    const size_t schema_ref  = m_top.GetAsRef(0);
-    const size_t columns_ref = m_top.GetAsRef(1);
-
-    Create(schema_ref, columns_ref, &m_top, 1);
-    m_spec_set.set_parent(&m_top, 0);
-}
-
-// Create attached sub-table from ref and schema_ref
-Table::Table(SubtableTag, Allocator& alloc, size_t schema_ref, size_t columns_ref,
-             Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(alloc), m_ref_count(0)
-{
-    Create(schema_ref, columns_ref, parent, ndx_in_parent);
-}
-
-void Table::Create(size_t ref_specSet, size_t columns_ref,
-                   ArrayParent *parent, size_t ndx_in_parent)
-{
-    m_spec_set.update_ref(ref_specSet);
+    m_spec_set.update_ref(spec_ref);
 
     // A table instatiated with a zero-ref is just an empty table
     // but it will have to create itself on first modification
     if (columns_ref != 0) {
         m_columns.UpdateRef(columns_ref);
-        CacheColumns();
+        CacheColumns(); // Also initializes m_size
     }
     m_columns.SetParent(parent, ndx_in_parent);
 }
@@ -168,19 +128,45 @@ void Table::CreateColumns()
         }
 
         // Cache Columns
-        m_cols.add((intptr_t)newColumn);
+        m_cols.add((intptr_t)newColumn); // FIXME: intptr_t is not guaranteed to exists, not even in C++11
     }
 }
 
 Spec& Table::get_spec()
 {
-    assert(m_top.IsValid()); // you can only change specs on top-level tablesu
+    assert(m_top.IsValid()); // you can only change specs on top-level tables
     return m_spec_set;
 }
 
 const Spec& Table::get_spec() const
 {
     return m_spec_set;
+}
+
+
+void Table::invalidate()
+{
+    // This prevents the destructor from deallocating the underlying
+    // memory structure, and from attempting to notify the parent. It
+    // also causes is_valid() to return false.
+    m_columns.SetParent(0,0);
+
+    // Invalidate all subtables
+    const size_t n = m_cols.Size();
+    for (size_t i=0; i<n; ++i) {
+        switch (GetRealColumnType(i)) {
+        case COLUMN_TYPE_TABLE:
+            GetColumnTable(i).invalidate_subtables();
+            break;
+        case COLUMN_TYPE_MIXED:
+            GetColumnMixed(i).invalidate_subtables();
+            break;
+        default:
+            break;
+        }
+    }
+
+    ClearCachedColumns();
 }
 
 
@@ -255,7 +241,7 @@ void Table::CacheColumns()
                 assert(false);
         }
 
-        m_cols.add((intptr_t)newColumn);
+        m_cols.add((intptr_t)newColumn); // FIXME: intptr_t is not guaranteed to exists, even in C++11
 
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
@@ -285,11 +271,11 @@ void Table::ClearCachedColumns()
     for (size_t i = 0; i < count; ++i) {
         const ColumnType type = GetRealColumnType(i);
         if (type == COLUMN_TYPE_STRING_ENUM) {
-            ColumnStringEnum* const column = (ColumnStringEnum* const)m_cols.Get(i);
+            ColumnStringEnum* const column = reinterpret_cast<ColumnStringEnum*>(m_cols.Get(i));
             delete(column);
         }
         else {
-            ColumnBase* const column = (ColumnBase* const)m_cols.Get(i);
+            ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
             delete(column);
         }
     }
@@ -298,42 +284,51 @@ void Table::ClearCachedColumns()
 
 Table::~Table()
 {
-    // Delete cached columns
-    ClearCachedColumns();
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    get_local_transact_log().on_table_destroyed();
+#endif
 
-    if (m_top.IsValid()) {
-        // 'm_top' has no parent if, and only if this is a free
-        // standing instance of TopLevelTable. In that case it is the
-        // responsibility of this destructor to deallocate all the
-        // memory chunks that make up the entire hierarchy of
-        // arrays. Otherwise we must notify our parent.
-        if (ArrayParent *parent = m_top.GetParent()) {
-            assert(m_ref_count == 0 || m_ref_count == 1);
-            assert(dynamic_cast<Parent *>(parent));
-            static_cast<Parent *>(parent)->child_destroyed(m_top.GetParentNdx());
-            return;
-        }
-
-        assert(m_ref_count == 1);
-        m_top.Destroy();
+    if (!is_valid()) {
+        // This table has been invalidated.
+        assert(m_ref_count == 0);
         return;
     }
 
-    // 'm_columns' has no parent if, and only if this is a free
-    // standing instance of Table. In that case it is the
-    // responsibility of this destructor to deallocate all the memory
-    // chunks that make up the entire hierarchy of arrays. Otherwise
-    // we must notify our parent.
-    if (ArrayParent *parent = m_columns.GetParent()) {
-        assert(m_ref_count == 0 || m_ref_count == 1);
-        assert(dynamic_cast<Parent *>(parent));
-        static_cast<Parent *>(parent)->child_destroyed(m_columns.GetParentNdx());
+    if (!m_top.IsValid()) {
+        // This is a table with a shared spec, and its lifetime is
+        // managed by reference counting, so we must let our parent
+        // know about our demise.
+        ArrayParent* parent = m_columns.GetParent();
+        assert(parent);
+        assert(m_ref_count == 0);
+        assert(dynamic_cast<Parent*>(parent));
+        static_cast<Parent*>(parent)->child_destroyed(m_columns.GetParentNdx());
+        ClearCachedColumns();
         return;
     }
 
-    assert(m_ref_count == 1);
-    m_spec_set.destroy();
-    m_columns.Destroy();
+    // This is a table with an independent spec.
+    if (ArrayParent* parent = m_top.GetParent()) {
+        // This is a table whose lifetime is managed by reference
+        // counting, so we must let our parent know about our demise.
+        assert(m_ref_count == 0);
+        assert(dynamic_cast<Parent*>(parent));
+        static_cast<Parent*>(parent)->child_destroyed(m_top.GetParentNdx());
+        ClearCachedColumns();
+        return;
+    }
+
+    // This is a freestanding table, so we are responsible for
+    // deallocating the underlying memory structure. If the table was
+    // created using the public table constructor (a stack allocated
+    // table) then the reference count must be strictly positive at
+    // this point. Otherwise the table has been created using
+    // LangBindHelper::new_table(), and then the reference count must
+    // be zero, because that is what has caused the destructor to be
+    // called. In the latter case, there can be no subtables to
+    // invalidate, because they would have kept the parent alive.
+    if (0 < m_ref_count) invalidate();
+    m_top.Destroy();
 }
 
 size_t Table::get_column_count() const
@@ -433,6 +428,11 @@ size_t Table::add_column(ColumnType type, const char* name)
     m_spec_set.add_column(type, name);
     m_cols.add((intptr_t)newColumn);
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().add_column(type, name);
+    if (err) throw_error(err);
+#endif
+
     return column_ndx;
 }
 
@@ -459,6 +459,11 @@ void Table::set_index(size_t column_ndx)
     else {
         assert(false);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().add_index_to_column(column_ndx);
+    if (err) throw_error(err);
+#endif
 }
 
 ColumnBase& Table::GetColumnBase(size_t ndx)
@@ -534,33 +539,33 @@ ColumnTable &Table::GetColumnTable(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
-    return *reinterpret_cast<ColumnTable*>(m_cols.Get(ndx));
+    return *static_cast<ColumnTable*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
-ColumnTable const &Table::GetColumnTable(size_t ndx) const
+const ColumnTable &Table::GetColumnTable(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    return *reinterpret_cast<ColumnTable*>(m_cols.Get(ndx));
+    return *static_cast<ColumnTable*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
 ColumnMixed& Table::GetColumnMixed(size_t ndx)
 {
     assert(ndx < get_column_count());
     InstantiateBeforeChange();
-    return *reinterpret_cast<ColumnMixed*>(m_cols.Get(ndx));
+    return *static_cast<ColumnMixed*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
 const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
 {
     assert(ndx < get_column_count());
-    return *reinterpret_cast<ColumnMixed*>(m_cols.Get(ndx));
+    return *static_cast<ColumnMixed*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 
-size_t Table::add_empty_row(size_t num_of_rows)
+size_t Table::add_empty_row(size_t num_rows)
 {
     const size_t col_count = get_column_count();
 
-    for (size_t row = 0; row < num_of_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         for (size_t i = 0; i < col_count; ++i) {
             ColumnBase& column = GetColumnBase(i);
             column.add();
@@ -569,20 +574,31 @@ size_t Table::add_empty_row(size_t num_of_rows)
 
     // Return index of first new added row
     size_t new_ndx = m_size;
-    m_size += num_of_rows;
+    m_size += num_rows;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().insert_empty_rows(size(), 1);
+    if (err) throw_error(err);
+#endif
+
     return new_ndx;
 }
 
-void Table::insert_empty_row(size_t ndx, size_t num_of_rows)
+void Table::insert_empty_row(size_t ndx, size_t num_rows)
 {
     const size_t col_count = get_column_count();
 
-    for (size_t row = 0; row < num_of_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         for (size_t i = 0; i < col_count; ++i) {
             ColumnBase& column = GetColumnBase(i);
-            column.insert(ndx+i); // FIXME: This should be optimized by passing 'num_of_rows' to column.insert()
+            column.insert(ndx+i); // FIXME: This should be optimized by passing 'num_rows' to column.insert()
         }
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().insert_empty_rows(ndx, num_rows);
+    if (err) throw_error(err);
+#endif
 }
 
 void Table::clear()
@@ -593,6 +609,11 @@ void Table::clear()
         column.Clear();
     }
     m_size = 0;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().clear_table();
+    if (err) throw_error(err);
+#endif
 }
 
 void Table::remove(size_t ndx)
@@ -605,6 +626,11 @@ void Table::remove(size_t ndx)
         column.Delete(ndx);
     }
     --m_size;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().remove_row(ndx);
+    if (err) throw_error(err);
+#endif
 }
 
 void Table::insert_subtable(size_t column_ndx, size_t ndx)
@@ -614,7 +640,14 @@ void Table::insert_subtable(size_t column_ndx, size_t ndx)
     assert(ndx <= m_size);
 
     ColumnTable& subtables = GetColumnTable(column_ndx);
-    subtables.Insert(ndx);
+    subtables.invalidate_subtables();
+    subtables.Insert(ndx); // FIXME: Consider calling virtual method insert(size_t) instead.
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err =
+        get_local_transact_log().insert_value(column_ndx, ndx, Replication::SubtableTag());
+    if (err) throw_error(err);
+#endif
 }
 
 Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx)
@@ -680,14 +713,22 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     if (type == COLUMN_TYPE_TABLE) {
         ColumnTable& subtables = GetColumnTable(col_idx);
         subtables.Clear(row_idx);
+        subtables.invalidate_subtables();
     }
     else if (type == COLUMN_TYPE_MIXED) {
         ColumnMixed& subtables = GetColumnMixed(col_idx);
         subtables.SetTable(row_idx);
+        subtables.invalidate_subtables();
     }
     else {
         assert(false);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().set_value(col_idx, row_idx,
+                                                        Replication::SubtableTag());
+    if (err) throw_error(err);
+#endif
 }
 
 int64_t Table::get_int(size_t column_ndx, size_t ndx) const
@@ -706,11 +747,23 @@ void Table::set_int(size_t column_ndx, size_t ndx, int64_t value)
 
     Column& column = GetColumn(column_ndx);
     column.Set(ndx, value);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().set_value(column_ndx, ndx, value);
+    if (err) throw_error(err);
+#endif
 }
 
 void Table::add_int(size_t column_ndx, int64_t value)
 {
+    assert(column_ndx < get_column_count());
+    assert(GetRealColumnType(column_ndx) == COLUMN_TYPE_INT);
     GetColumn(column_ndx).Increment64(value);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().add_int_to_column(column_ndx, value);
+    if (err) throw_error(err);
+#endif
 }
 
 bool Table::get_bool(size_t column_ndx, size_t ndx) const
@@ -731,6 +784,11 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
 
     Column& column = GetColumn(column_ndx);
     column.Set(ndx, value ? 1 : 0);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().set_value(column_ndx, ndx, int(value));
+    if (err) throw_error(err);
+#endif
 }
 
 time_t Table::get_date(size_t column_ndx, size_t ndx) const
@@ -751,6 +809,11 @@ void Table::set_date(size_t column_ndx, size_t ndx, time_t value)
 
     Column& column = GetColumn(column_ndx);
     column.Set(ndx, (int64_t)value);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().set_value(column_ndx, ndx, value);
+    if (err) throw_error(err);
+#endif
 }
 
 void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
@@ -760,6 +823,11 @@ void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
 
     Column& column = GetColumn(column_ndx);
     column.Insert(ndx, value);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().insert_value(column_ndx, ndx, value);
+    if (err) throw_error(err);
+#endif
 }
 
 const char* Table::get_string(size_t column_ndx, size_t ndx) const
@@ -796,6 +864,12 @@ void Table::set_string(size_t column_ndx, size_t ndx, const char* value)
         ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
         column.Set(ndx, value);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().set_value(column_ndx, ndx,
+                                                        BinaryData(value, std::strlen(value)));
+    if (err) throw_error(err);
+#endif
 }
 
 void Table::insert_string(size_t column_ndx, size_t ndx, const char* value)
@@ -814,6 +888,12 @@ void Table::insert_string(size_t column_ndx, size_t ndx, const char* value)
         ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
         column.Insert(ndx, value);
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().insert_value(column_ndx, ndx,
+                                                           BinaryData(value, std::strlen(value)));
+    if (err) throw_error(err);
+#endif
 }
 
 BinaryData Table::get_binary(size_t column_ndx, size_t ndx) const
@@ -825,22 +905,32 @@ BinaryData Table::get_binary(size_t column_ndx, size_t ndx) const
     return column.Get(ndx);
 }
 
-void Table::set_binary(size_t column_ndx, size_t ndx, const char* value, size_t len)
+void Table::set_binary(size_t column_ndx, size_t ndx, const char* data, size_t size)
 {
     assert(column_ndx < get_column_count());
     assert(ndx < m_size);
 
     ColumnBinary& column = GetColumnBinary(column_ndx);
-    column.Set(ndx, value, len);
+    column.Set(ndx, data, size);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().set_value(column_ndx, ndx, BinaryData(data, size));
+    if (err) throw_error(err);
+#endif
 }
 
-void Table::insert_binary(size_t column_ndx, size_t ndx, const char* value, size_t len)
+void Table::insert_binary(size_t column_ndx, size_t ndx, const char* data, size_t size)
 {
     assert(column_ndx < get_column_count());
     assert(ndx <= m_size);
 
     ColumnBinary& column = GetColumnBinary(column_ndx);
-    column.Insert(ndx, value, len);
+    column.Insert(ndx, data, size);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().insert_value(column_ndx, ndx, BinaryData(data, size));
+    if (err) throw_error(err);
+#endif
 }
 
 Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const
@@ -912,6 +1002,13 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
         default:
             assert(false);
     }
+
+    column.invalidate_subtables();
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().set_value(column_ndx, ndx, value);
+    if (err) throw_error(err);
+#endif
 }
 
 void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
@@ -946,6 +1043,13 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
         default:
             assert(false);
     }
+
+    column.invalidate_subtables();
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().insert_value(column_ndx, ndx, value);
+    if (err) throw_error(err);
+#endif
 }
 
 void Table::insert_done()
@@ -955,18 +1059,20 @@ void Table::insert_done()
 #ifdef _DEBUG
     Verify();
 #endif //_DEBUG
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().row_insert_complete();
+    if (err) throw_error(err);
+#endif
 }
 
 int64_t Table::sum(size_t column_ndx) const
 {
     assert(column_ndx < get_column_count());
     assert(get_column_type(column_ndx) == COLUMN_TYPE_INT);
-    int64_t sum = 0;
 
-    for(size_t i = 0; i < size(); ++i)
-        sum += get_int(column_ndx, i);
-
-    return sum;
+    const Column& column = GetColumn(column_ndx);
+    return column.sum();
 }
 
 int64_t Table::maximum(size_t column_ndx) const
@@ -1174,7 +1280,7 @@ ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t
     return move(tv);
 }
 
-TableView Table::sorted(size_t column_ndx, bool ascending)
+TableView Table::get_sorted_view(size_t column_ndx, bool ascending)
 {
     assert(column_ndx < m_columns.Size());
 
@@ -1193,7 +1299,7 @@ TableView Table::sorted(size_t column_ndx, bool ascending)
     return move(tv);
 }
 
-ConstTableView Table::sorted(size_t column_ndx, bool ascending) const
+ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
 {
     assert(column_ndx < m_columns.Size());
 
@@ -1246,6 +1352,11 @@ void Table::optimize()
             delete &column;
         }
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().optimize_table();
+    if (err) throw_error(err);
+#endif
 }
 
 void Table::UpdateColumnRefs(size_t column_ndx, int diff)
@@ -1257,7 +1368,7 @@ void Table::UpdateColumnRefs(size_t column_ndx, int diff)
 }
 
 void Table::UpdateFromParent() {
-    // There is no top for sub-tables sharing schema
+    // There is no top for sub-tables sharing spec
     if (m_top.IsValid()) {
         if (!m_top.UpdateFromParent()) return;
     }
@@ -1288,15 +1399,6 @@ void Table::update_from_spec()
     assert(m_columns.is_empty() && m_cols.is_empty()); // only on initial creation
 
     CreateColumns();
-}
-
-
-size_t Table::create_table(Allocator& alloc)
-{
-    FakeParent fake_parent;
-    Table t(alloc);
-    t.m_top.SetParent(&fake_parent, 0);
-    return t.m_top.GetRef();
 }
 
 

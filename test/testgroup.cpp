@@ -3,6 +3,8 @@
 
 using namespace tightdb;
 
+namespace {
+
 enum Days {
     Mon,
     Tue,
@@ -18,6 +20,8 @@ TIGHTDB_TABLE_4(TestTableGroup,
                 second, Int,
                 third,  Bool,
                 fourth, Enum<Days>)
+
+} // Anonymous namespace
 
 TEST(Group_GetTable)
 {
@@ -515,7 +519,7 @@ TEST(Group_Subtable)
     g.write("subtables.tdb");
 
     // Read back tables
-    Group g2("subtables.tdb");
+    Group g2("subtables.tdb", GROUP_READONLY);
     TableRef table2 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -606,7 +610,7 @@ TEST(Group_Subtable)
     g2.write("subtables2.tdb");
 
     // Read back tables
-    Group g3("subtables2.tdb");
+    Group g3("subtables2.tdb", GROUP_READONLY);
     TableRef table3 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -705,7 +709,7 @@ TEST(Group_MultiLevelSubtables)
 
     // Non-mixed
     {
-        Group g("subtables.tdb");
+        Group g("subtables.tdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -726,7 +730,7 @@ TEST(Group_MultiLevelSubtables)
         g.write("subtables2.tdb");
     }
     {
-        Group g("subtables2.tdb");
+        Group g("subtables2.tdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -747,7 +751,7 @@ TEST(Group_MultiLevelSubtables)
 
     // Mixed
     {
-        Group g("subtables3.tdb");
+        Group g("subtables3.tdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -768,7 +772,7 @@ TEST(Group_MultiLevelSubtables)
         g.write("subtables4.tdb");
     }
     {
-        Group g("subtables4.tdb");
+        Group g("subtables4.tdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -789,6 +793,57 @@ TEST(Group_MultiLevelSubtables)
 }
 
 #endif
+
+namespace {
+
+TIGHTDB_TABLE_3(TestTableGroup2,
+                first,  Mixed,
+                second, Subtable<TestTableGroup>,
+                third,  Subtable<TestTableGroup>)
+
+} // anonymous namespace
+
+TEST(Group_InvalidateTables)
+{
+    TestTableGroup2::Ref table;
+    TableRef             subtable1;
+    TestTableGroup::Ref  subtable2;
+    TestTableGroup::Ref  subtable3;
+    {
+        Group group;
+        table = group.get_table<TestTableGroup2>("foo");
+        CHECK(table->is_valid());
+        table->add(Mixed::subtable_tag(), 0, 0);
+        CHECK(table->is_valid());
+        subtable1 = table[0].first.get_subtable();
+        CHECK(table->is_valid());
+        CHECK(subtable1);
+        CHECK(subtable1->is_valid());
+        subtable2 = table[0].second;
+        CHECK(table->is_valid());
+        CHECK(subtable1->is_valid());
+        CHECK(subtable2);
+        CHECK(subtable2->is_valid());
+        subtable3 = table[0].third;
+        CHECK(table->is_valid());
+        CHECK(subtable1->is_valid());
+        CHECK(subtable2->is_valid());
+        CHECK(subtable3);
+        CHECK(subtable3->is_valid());
+        subtable3->add("alpha", 79542, true,  Wed);
+        subtable3->add("beta",     97, false, Mon);
+        CHECK(table->is_valid());
+        CHECK(subtable1->is_valid());
+        CHECK(subtable2->is_valid());
+        CHECK(subtable3->is_valid());
+    }
+    CHECK(!table->is_valid());
+    CHECK(!subtable1->is_valid());
+    CHECK(!subtable2->is_valid());
+    CHECK(!subtable3->is_valid());
+}
+
+
 
 #ifdef _DEBUG
 #ifdef TIGHTDB_TO_DOT

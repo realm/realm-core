@@ -94,6 +94,7 @@ LD_COVERAGE     = $(LD) --coverage $(LDFLAGS_PTHREAD)
 
 CFLAGS         += $(EXTRA_CFLAGS)
 CXXFLAGS       += $(EXTRA_CXXFLAGS)
+LDFLAGS        += $(EXTRA_LDFLAGS)
 
 
 # Installation

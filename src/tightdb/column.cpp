@@ -599,6 +599,24 @@ bool ColumnBase::NodeUpdateOffsets(size_t ndx)
     return offsets.Increment(diff, ndx);
 }
 
+bool ColumnBase::NodeAddKey(size_t ref)
+{
+    assert(ref);
+    assert(IsNode());
+
+    Array offsets = NodeGetOffsets();
+    Array refs = NodeGetRefs();
+    assert(offsets.Size() < MAX_LIST_SIZE);
+
+    const Array new_top(ref, NULL, 0,m_array->GetAllocator());
+    const Array new_offsets(new_top.GetAsRef(0), NULL, 0,m_array->GetAllocator());
+    assert(!new_offsets.is_empty());
+
+    const int64_t key = new_offsets.back();
+    if (!offsets.add(key)) return false;
+    return refs.add(ref);
+}
+
 void Column::Delete(size_t ndx)
 {
     assert(ndx < Size());
@@ -643,11 +661,11 @@ size_t Column::find_first(int64_t value, size_t start, size_t end) const
 {
     assert(start <= Size());
     assert(end == (size_t)-1 || end <= Size());
-    
+
     if (start == 0 && end == (size_t)-1) {
         Array cache(m_array->GetAllocator());
         const size_t ref = m_array->GetRef();
-        
+
         return m_array->ColumnFind(value, ref, cache);
     }
     else {

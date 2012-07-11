@@ -31,6 +31,7 @@
 namespace tightdb {
 
 // Pre-declarations
+class Group;
 class GroupWriter;
 
 class SlabAlloc : public Allocator {
@@ -53,7 +54,7 @@ public:
     bool   CanPersist() const;
     size_t GetFileLen() const {return m_baseline;}
     void   FreeAll(size_t filesize=(size_t)-1);
-    void   ReMap(size_t filesize);
+    bool   ReMap(size_t filesize);
 
 #ifndef _MSC_VER
     int    GetFileDescriptor() {return m_fd;}
@@ -69,6 +70,7 @@ public:
 #endif //_DEBUG
 
 protected:
+    friend class Group;
     friend class GroupWriter;
 
     // Define internal tables
@@ -100,6 +102,11 @@ protected:
 #ifdef _DEBUG
     bool      m_debugOut;
 #endif //_DEBUG
+
+private:
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    void set_replication(Replication* r) { m_replication = r; }
+#endif
 };
 
 

@@ -149,6 +149,7 @@ typedef struct Query Query;
 /*** Table ************************************/
 
     /* Creating and deleting tables */
+    /* FIXME: Remove table_delete() and use table_unbind() instead. Consider renaming table_new() to table_create(). */
     Table*      table_new();
     void        table_delete(Table* t);       /* Delete after use of table_new() */
     void        table_unbind(const Table* t); /* Ref-count delete of table* from table_get_table() */

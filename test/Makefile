@@ -1,11 +1,3 @@
-# Note:
-# $@  The name of the target file (the one before the colon)
-# $<  The name of the first (or only) prerequisite file
-#     (the first one after the colon)
-# $^  The names of all the prerequisite files (space separated)
-# $*  The stem (the bit which matches the % wildcard in the rule definition.
-#
-
 ROOT = ..
 
 INC_FLAGS     = -I$(ROOT)/src -IUnitTest++/src
@@ -31,19 +23,19 @@ cover: $(COVERAGE_TARGET)
 .PHONY: cover
 
 test: debug
-	./tightdb-tests-debug
+	./$(DEBUG_TARGET)
 .PHONY: test
 
 test-release: all
-	./tightdb-tests
+	./$(TARGET)
 .PHONY: test-release
 
 memtest: debug
-	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./tightdb-tests-debug --no-error-exit-staus
+	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./$(DEBUG_TARGET) --no-error-exit-staus
 .PHONY: memtest
 
 memtest-release: all
-	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./tightdb-tests --no-error-exit-staus
+	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./$(TARGET) --no-error-exit-staus
 .PHONY: memtest-release
 
 benchmark: test-tightdb test-sqlite3 test-stl

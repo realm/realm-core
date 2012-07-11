@@ -9,7 +9,7 @@ const size_t THREAD_CHUNK_SIZE = 1000;
 
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
- 
+
 Query::Query()
 {
     update.push_back(0);
@@ -364,12 +364,16 @@ double Query::average(const Table& table, size_t column_ndx, size_t* resultcount
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove(Table& table, size_t start, size_t end, size_t limit) const
 {
-    size_t r = start - 1;
+    if(end == not_found)
+        end = table.size();
+
+    size_t r = start;
     size_t results = 0;
+    size_t displace = 0;
     Init(table);
 
     for (;;) {
-        r = FindInternal(table, r + 1 - results, end);
+        r = FindInternal(table, r, end - results);
         if (r == size_t(-1) || r == table.size() || results == limit)
             break;
         ++results;

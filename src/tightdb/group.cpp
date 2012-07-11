@@ -1,5 +1,6 @@
 #include "group.hpp"
 #include <assert.h>
+#include <new>
 #include <iostream>
 #include <fstream>
 #include "group_writer.hpp"
@@ -63,7 +64,7 @@ public:
 
     void seek(size_t pos)
     {
-        fseek(m_file, pos, SEEK_SET);
+        fseek(m_file, static_cast<long>(pos), SEEK_SET);
     }
 
 private:
@@ -71,20 +72,23 @@ private:
     FILE*  m_file;
 };
 
-} // namespace
+} // anonymous namespace
 
 
 namespace tightdb {
 
 Group::Group():
     m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
-    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc), m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc), m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_persistMode(0), m_isValid(true)
+    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc),
+    m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc),
+    m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_persistMode(0), m_isValid(true)
 {
     create();
 }
 
 Group::Group(const char* filename, int mode):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(mode), m_isValid(false)
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(mode), m_isValid(false)
 {
     assert(filename);
 
@@ -103,7 +107,8 @@ Group::Group(const char* filename, int mode):
 }
 
 Group::Group(const char* buffer, size_t len):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc), m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
 {
     assert(buffer);
 
@@ -163,17 +168,21 @@ void Group::create_from_ref()
         const size_t top_size = m_top.Size();
         assert(top_size >= 2);
 
-        m_tableNames.UpdateRef(m_top.Get(0));
-        m_tables.UpdateRef(m_top.Get(1));
+        const size_t n_ref = m_top.Get(0);
+        const size_t t_ref = m_top.Get(1);
+        m_tableNames.UpdateRef(n_ref);
+        m_tables.UpdateRef(t_ref);
         m_tableNames.SetParent(&m_top, 0);
         m_tables.SetParent(&m_top, 1);
 
         // Serialized files do not have free space markers
         // at all, and files that are not shared does not
         // need version info for free space.
-        if (top_size == 4) {
-            m_freePositions.UpdateRef(m_top.Get(2));
-            m_freeLengths.UpdateRef(m_top.Get(3));
+        if (top_size >= 4) {
+            const size_t fp_ref = m_top.Get(2);
+            const size_t fl_ref = m_top.Get(3);
+            m_freePositions.UpdateRef(fp_ref);
+            m_freeLengths.UpdateRef(fl_ref);
             m_freePositions.SetParent(&m_top, 2);
             m_freeLengths.SetParent(&m_top, 3);
         }
@@ -221,7 +230,7 @@ void Group::init_shared() {
         }
     }
 }
-    
+
 void Group::reset_to_new()
 {
     assert(m_alloc.GetTopRef() == 0);
@@ -231,13 +240,7 @@ void Group::reset_to_new()
     // written to does not have any internal structures yet
     // (we may have to re-create this after a rollback)
 
-    // Clear old cached state
-    const size_t count = m_cachedtables.Size();
-    for (size_t i = 0; i < count; ++i) {
-        Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
-        delete t;
-    }
-    m_cachedtables.Clear();
+    clear_cache();
 
     m_top.Invalidate();
     m_tables.Invalidate();
@@ -263,17 +266,14 @@ void Group::rollback()
 
 Group::~Group()
 {
-    if (!m_top.IsValid()) return; // nothing to clean up in new state
+    if (m_top.IsValid()) {
+        clear_cache();
 
-    const size_t count = m_tables.Size();
-    for (size_t i = 0; i < count; ++i) {
-        Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
-        delete t;
+        // Recursively deletes entire tree
+        m_top.Destroy();
     }
-    m_cachedtables.Destroy();
 
-    // Recursively deletes entire tree
-    m_top.Destroy();
+    m_cachedtables.Destroy();
 }
 
 bool Group::is_empty() const
@@ -281,6 +281,11 @@ bool Group::is_empty() const
     if (!m_top.IsValid()) return true;
 
     return m_tableNames.is_empty();
+}
+
+bool Group::in_inital_state() const
+{
+    return !m_top.IsValid();
 }
 
 size_t Group::get_table_count() const
@@ -303,43 +308,58 @@ bool Group::has_table(const char* name) const
     if (!m_top.IsValid()) return false;
 
     const size_t n = m_tableNames.find_first(name);
-    return (n != (size_t)-1);
+    return (n != size_t(-1));
 }
 
-Table* Group::get_table_ptr(const char* name)
-{
-    const size_t n = m_tableNames.find_first(name);
-
-    if (n == size_t(-1)) {
-        // Create new table
-        Table* const t = new Table(m_alloc);
-        t->m_top.SetParent(this, m_tables.Size());
-
-        m_tables.add(t->m_top.GetRef());
-        m_tableNames.add(name);
-        m_cachedtables.add((intptr_t)t);
-
-        return t;
-    }
-    else {
-        // Get table from cache if exists, else create
-        return &get_table(n);
-    }
-}
-
-Table& Group::get_table(size_t ndx)
+Table* Group::get_table_ptr(size_t ndx)
 {
     assert(m_top.IsValid());
     assert(ndx < m_tables.Size());
 
     // Get table from cache if exists, else create
-    Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(ndx));
-    if (!t) {
+    Table* table = reinterpret_cast<Table*>(m_cachedtables.Get(ndx));
+    if (!table) {
         const size_t ref = m_tables.GetAsRef(ndx);
-        t = new Table(m_alloc, ref, this, ndx);
-        m_cachedtables.Set(ndx, intptr_t(t));
+        table = new (nothrow) Table(Table::RefCountTag(), m_alloc, ref, this, ndx);
+        if (!table) {
+        error:
+            throw_error(ERROR_OUT_OF_MEMORY);
+        }
+        table->bind_ref(); // The group has shared ownership
+        if (!m_cachedtables.Set(ndx, intptr_t(table))) { // FIXME: intptr_t is not guaranteed to exists, even in C++11
+            table->unbind_ref();
+            goto error;
+        }
     }
-    return *t;
+    return table;
+}
+
+Table* Group::create_new_table(const char* name)
+{
+    const size_t ref = Table::create_empty_table(m_alloc);
+    if (!ref) {
+    error:
+        throw_error(ERROR_OUT_OF_MEMORY);
+    }
+    if (!m_tables.add(ref)) goto error;
+    if (!m_tableNames.add(name)) goto error;
+    Table* const table =
+        new (nothrow) Table(Table::RefCountTag(), m_alloc, ref, this, m_tables.Size()-1);
+    if (!table) goto error;
+    table->bind_ref(); // The group has shared ownership
+    if (!m_cachedtables.add(intptr_t(table))) { // FIXME: intptr_t is not guaranteed to exists, even in C++11
+        table->unbind_ref();
+        goto error;
+    }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    Replication* repl = m_alloc.get_replication();
+    if (repl) {
+        error_code err = repl->new_top_level_table(name);
+        if (err) throw_error(err);
+    }
+#endif
+    return table;
 }
 
 
@@ -399,73 +419,6 @@ bool Group::commit(size_t current_version, size_t readlock_version)
     return true;
 }
 
-size_t Group::get_free_space(size_t len, size_t& filesize, bool testOnly)
-{
-    // Do we have a free space we can reuse?
-    const size_t count = m_freeLengths.Size();
-    for (size_t i = 0; i < count; ++i) {
-        const size_t free_len = m_freeLengths.Get(i);
-        if (len <= free_len) {
-            // Only blocks that are not occupied by current
-            // readers are allowed to be used.
-            if (is_shared()) {
-                const size_t v = m_freeVersions.Get(i);
-                if (v >= m_readlock_version) continue;
-            }
-
-            const size_t location = m_freePositions.Get(i);
-            if (testOnly) return location;
-
-            // Update free list
-            const size_t rest = free_len - len;
-            if (rest == 0) {
-                m_freePositions.Delete(i);
-                m_freeLengths.Delete(i);
-                if (is_shared())
-                    m_freeVersions.Delete(i);
-            }
-            else {
-                m_freeLengths.Set(i, rest);
-                m_freePositions.Set(i, location + len);
-            }
-
-            return location;
-        }
-    }
-
-    // No free space, so we have to expand the file.
-    // we always expand megabytes at a time, both for
-    // performance and to avoid excess fragmentation
-    const size_t old_filesize = filesize;
-    const size_t needed_size = old_filesize + len;
-    while (filesize < needed_size) {
-#ifdef _DEBUG
-        // in debug, increase in small intervals to force overwriting
-        filesize += 10;
-#else
-        filesize += 1024*1024;
-#endif
-    }
-
-#if !defined(_MSC_VER) // write persistence
-    // Extend the file
-    const int fd = m_alloc.GetFileDescriptor();
-    lseek(fd, filesize-1, SEEK_SET);
-    ssize_t r = ::write(fd, "\0", 1);
-    static_cast<void>(r); // FIXME: We should probably check for error here!
-#endif
-
-    // Add new free space
-    const size_t end  = old_filesize + len;
-    const size_t rest = filesize - end;
-    m_freePositions.add(end);
-    m_freeLengths.add(rest);
-    if (is_shared())
-        m_freeVersions.add(0); // new space is always free for writing
-
-    return old_filesize;
-}
-
 void Group::update_refs(size_t topRef)
 {
     // Update top with the new (persistent) ref
@@ -499,21 +452,30 @@ void Group::update_refs(size_t topRef)
     // Also update cached tables
     const size_t count = m_cachedtables.Size();
     for (size_t i = 0; i < count; ++i) {
-        Table* const t = (Table*)m_cachedtables.Get(i);
+        Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
         if (t) {
             t->UpdateFromParent();
         }
     }
 }
-    
+
 void Group::update_from_shared(size_t top_ref, size_t len)
 {
-    if (top_ref == 0) return;              // just created
-    if (top_ref == m_top.GetRef()) return; // already up-to-date
-    
+    if (top_ref == 0) return; // just created
+
     // Update memory mapping if needed
-    m_alloc.ReMap(len);
-    
+    const bool isRemapped = m_alloc.ReMap(len);
+
+    // If the top has not changed, everything is up-to-date
+    if (!isRemapped && top_ref == m_top.GetRef()) return;
+
+    // If our last look at the file was when it
+    // was empty, we may have to re-create the group
+    if (in_inital_state()) {
+        create_from_ref();
+        return;
+    }
+
     // Update group arrays
     m_top.UpdateRef(top_ref);
     assert(m_top.Size() >= 2);
@@ -522,20 +484,17 @@ void Group::update_from_shared(size_t top_ref, size_t len)
     if (m_top.Size() > 2) {
         m_freePositions.UpdateFromParent();
         m_freeLengths.UpdateFromParent();
-    }
-    
-    // If the names of the the tables in the group has not
-    // changed we know that it still contains the same tables
-    // so we can reuse the cached versions
-    if (nameschanged) {
-        // Clear old cached state
-        const size_t count = m_cachedtables.Size();
-        for (size_t i = 0; i < count; ++i) {
-            Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
-            delete t;
+        if (m_top.Size() > 4) {
+            m_freeVersions.UpdateFromParent();
         }
-        m_cachedtables.Clear();
-    
+    }
+
+    // If the names of the tables in the group has not changed we know
+    // that it still contains the same tables so we can reuse the
+    // cached versions
+    if (nameschanged) {
+        clear_cache();
+
         // Make room for new pointers to cached tables
         const size_t table_count = m_tables.Size();
         for (size_t i = 0; i < table_count; ++i) {
@@ -547,7 +506,7 @@ void Group::update_from_shared(size_t top_ref, size_t len)
         //TODO: account for changed spec
         const size_t count = m_cachedtables.Size();
         for (size_t i = 0; i < count; ++i) {
-            Table* const t = (Table*)m_cachedtables.Get(i);
+            Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
             if (t) {
                 t->UpdateFromParent();
             }
@@ -560,15 +519,25 @@ void Group::update_from_shared(size_t top_ref, size_t len)
 
 void Group::Verify()
 {
-    for (size_t i = 0; i < m_tables.Size(); ++i) {
-        // Get table from cache if exists, else create
-        Table* t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
-        if (!t) {
-            const size_t ref = m_tables.GetAsRef(i);
-            t = new Table(m_alloc, ref, this, i);
-            m_cachedtables.Set(i, intptr_t(t));
+    // Verify free lists
+    if (m_freePositions.IsValid()) {
+        assert(m_freeLengths.IsValid());
+
+        const size_t count_p = m_freePositions.Size();
+        const size_t count_l = m_freeLengths.Size();
+        assert(count_p == count_l);
+
+        for (size_t i = 0; i < count_p; ++i) {
+            const size_t p = m_freePositions.Get(i);
+            const size_t l = m_freeLengths.Get(i);
+            assert((p & 0x7) == 0); // 64bit alignment
+            assert((l & 0x7) == 0); // 64bit alignment
         }
-        t->Verify();
+    }
+
+    // Verify tables
+    for (size_t i = 0; i < m_tables.Size(); ++i) {
+        get_table_ptr(i)->Verify();
     }
 }
 
@@ -586,7 +555,30 @@ void Group::print() const
     m_alloc.Print();
 }
 
-void Group::to_dot(std::ostream& out)
+void Group::print_free() const
+{
+    if (!m_freePositions.IsValid()) {
+        printf("none\n");
+        return;
+    }
+    const bool hasVersions = m_freeVersions.IsValid();
+
+    const size_t count = m_freePositions.Size();
+    for (size_t i = 0; i < count; ++i) {
+        const size_t pos  = m_freePositions[i];
+        const size_t size = m_freeLengths[i];
+        printf("%d: %d %d", (int)i, (int)pos, (int)size);
+
+        if (hasVersions) {
+            const size_t version = m_freeVersions[i];
+            printf(" %d", (int)version);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+void Group::to_dot(std::ostream& out) const
 {
     out << "digraph G {" << endl;
 
@@ -599,13 +591,51 @@ void Group::to_dot(std::ostream& out)
 
     // Tables
     for (size_t i = 0; i < m_tables.Size(); ++i) {
-        const Table& table = get_table(i);
+        const Table* table = get_table_ptr(i);
         const char* const name = get_table_name(i);
-        table.to_dot(out, name);
+        table->to_dot(out, name);
     }
 
     out << "}" << endl;
     out << "}" << endl;
+}
+
+void Group::to_dot() const
+{
+    to_dot(std::cerr);
+}
+
+#if !defined(_MSC_VER)
+#include <sys/mman.h>
+#endif
+
+void Group::zero_free_space(size_t file_size, size_t readlock_version)
+{
+    static_cast<void>(readlock_version); // FIXME: Why is this parameter not used?
+
+    if (!is_shared()) return;
+
+#if !defined(_MSC_VER)
+    const int fd = m_alloc.GetFileDescriptor();
+
+    // Map to memory
+    void* const p = mmap(0, file_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if (p == (void*)-1) return;
+
+    const size_t count = m_freePositions.Size();
+    for (size_t i = 0; i < count; ++i) {
+        const size_t v = m_freeVersions.Get(i);
+        if (v >= m_readlock_version) continue;
+
+        const size_t pos = m_freePositions.Get(i);
+        const size_t len = m_freeLengths.Get(i);
+
+        memset((char*)p+pos, 0, len);
+    }
+
+    munmap(p, file_size);
+
+#endif
 }
 
 #endif //_DEBUG
