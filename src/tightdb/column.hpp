@@ -37,6 +37,7 @@ namespace tightdb {
 // Pre-definitions
 class Column;
 class Index;
+class StringIndex;
 
 class ColumnBase {
 public:
@@ -76,6 +77,8 @@ template<class C, class A> A* TreeGetArray(size_t start, size_t *first, size_t *
 template<typename T, class C, class F> size_t TreeFind(T value, size_t start, size_t end) const;
 
 protected:
+    friend class StringIndex;
+
     struct NodeChange {
         size_t ref1;
         size_t ref2;
@@ -111,9 +114,7 @@ protected:
     Array NodeGetRefs();
     template<class C> bool NodeInsert(size_t ndx, size_t ref);
     template<class C> bool NodeAdd(size_t ref);
-public: // FIXME: I had to make NodeAddKey() public. GCC woul not compile it. Alexander?
     bool NodeAddKey(size_t ref);
-protected:
     bool NodeUpdateOffsets(size_t ndx);
     template<class C> bool NodeInsertSplit(size_t ndx, size_t newRef);
     size_t GetRefSize(size_t ref) const;
