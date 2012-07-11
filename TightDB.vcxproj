@@ -174,6 +174,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalDependencies>Debug\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -195,6 +196,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -222,6 +224,8 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DUSE_SSE42 %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
+      <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalDependencies>WS2_32.lib ;x64\Debug\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -249,6 +253,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
       <AdditionalOptions>/DUSE_SSE %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -271,6 +276,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalOptions> %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalDependencies>Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -294,6 +300,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalDependencies>
@@ -325,6 +332,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalOptions>/DUSE_SSE42 %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalDependencies>WS2_32.lib;x64\Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -357,6 +365,7 @@
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalDependencies>x64\Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -382,12 +391,17 @@
     <ClCompile Include="src\tightdb\column_string.cpp" />
     <ClCompile Include="src\tightdb\column_string_enum.cpp" />
     <ClCompile Include="src\tightdb\column_table.cpp" />
+    <ClCompile Include="src\tightdb\error.cpp" />
+    <ClCompile Include="src\tightdb\file.cpp" />
     <ClCompile Include="src\tightdb\group.cpp" />
     <ClCompile Include="src\tightdb\group_shared.cpp" />
     <ClCompile Include="src\tightdb\group_writer.cpp" />
     <ClCompile Include="src\tightdb\index.cpp" />
+    <ClCompile Include="src\tightdb\index_string.cpp" />
     <ClCompile Include="src\tightdb\query.cpp" />
+    <ClCompile Include="src\tightdb\replication.cpp" />
     <ClCompile Include="src\tightdb\spec.cpp" />
+    <ClCompile Include="src\tightdb\string_buffer.cpp" />
     <ClCompile Include="src\tightdb\table.cpp" />
     <ClCompile Include="src\tightdb\table_view.cpp" />
     <ClCompile Include="src\tightdb\utf8.cpp" />
@@ -495,11 +509,23 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="test\testindexstring.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="test\testquery.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testshared.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="test\testtable.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
@@ -544,18 +570,24 @@
     <ClInclude Include="src\tightdb\column_type.hpp" />
     <ClInclude Include="src\tightdb\config.h" />
     <ClInclude Include="src\tightdb\date.hpp" />
+    <ClInclude Include="src\tightdb\error.hpp" />
     <ClInclude Include="src\tightdb\group.hpp" />
     <ClInclude Include="src\tightdb\group_shared.hpp" />
     <ClInclude Include="src\tightdb\group_writer.hpp" />
     <ClInclude Include="src\tightdb\index.hpp" />
+    <ClInclude Include="src\tightdb\index_string.hpp" />
     <ClInclude Include="src\tightdb\lang_bind_helper.hpp" />
     <ClInclude Include="src\tightdb\meta.hpp" />
     <ClInclude Include="src\tightdb\mixed.hpp" />
+    <ClInclude Include="src\tightdb\overflow.hpp" />
+    <ClInclude Include="src\tightdb\pthread_helpers.hpp" />
     <ClInclude Include="src\tightdb\query.hpp" />
     <ClInclude Include="src\tightdb\query_conditions.hpp" />
     <ClInclude Include="src\tightdb\query_engine.hpp" />
+    <ClInclude Include="src\tightdb\replication.hpp" />
     <ClInclude Include="src\tightdb\spec.hpp" />
     <ClInclude Include="src\tightdb\static_assert.hpp" />
+    <ClInclude Include="src\tightdb\string_buffer.hpp" />
     <ClInclude Include="src\tightdb\table.hpp" />
     <ClInclude Include="src\tightdb\table_accessors.hpp" />
     <ClInclude Include="src\tightdb\table_basic.hpp" />

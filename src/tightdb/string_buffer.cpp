@@ -28,7 +28,7 @@ error_code StringBuffer::append(const char* data, size_t size)
 }
 
 
-error_code StringBuffer::realloc(std::size_t capacity)
+error_code StringBuffer::reallocate(std::size_t capacity)
 {
     size_t min_allocated = capacity;
     // Make space of zero termination
