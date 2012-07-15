@@ -991,7 +991,7 @@ error_code Replication::TransactLogApplier::apply()
         if (!read_char(instr)) {
             break;
         }
-cerr << "["<<instr<<"]";
+//cerr << "["<<instr<<"]";
         switch (instr) {
         case 's':  // Set value
             {

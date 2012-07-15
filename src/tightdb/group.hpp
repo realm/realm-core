@@ -71,6 +71,15 @@ public:
     // Conversion
     template<class S> void to_json(S& out) const;
 
+    /// Compare two groups for equality. Two groups are equal if, and
+    /// only if, they contain the same tables in the same order, that
+    /// is, for each table T at index I in one of the groups, there is
+    /// a table at index I in the other group that is equal to T.
+    bool operator==(const Group&) const;
+
+    /// Compare two groups for inequality. See operator==().
+    bool operator!=(const Group& g) const { return !(*this == g); }
+
 #ifdef _DEBUG
     void Verify(); // Must be upper case to avoid conflict with macro in ObjC
     void print() const;

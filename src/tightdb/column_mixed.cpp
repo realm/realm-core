@@ -401,6 +401,48 @@ void ColumnMixed::Clear()
     invalidate_subtables();
 }
 
+bool ColumnMixed::Compare(const ColumnMixed& c) const
+{
+    const size_t n = Size();
+    if (c.Size() != n) return false;
+    for (size_t i=0; i<n; ++i) {
+        const ColumnType type = GetType(i);
+        if (c.GetType(i) != type) return false;
+        switch (type) {
+        case COLUMN_TYPE_INT:
+            if (GetInt(i) != c.GetInt(i)) return false;
+            break;
+        case COLUMN_TYPE_BOOL:
+            if (get_bool(i) != c.get_bool(i)) return false;
+            break;
+        case COLUMN_TYPE_DATE:
+            if (get_date(i) != c.get_date(i)) return false;
+            break;
+        case COLUMN_TYPE_STRING:
+            if (strcmp(get_string(i), c.get_string(i)) != 0) return false;
+            break;
+        case COLUMN_TYPE_BINARY:
+            {
+                const BinaryData d1 = get_binary(i);
+                const BinaryData d2 = c.get_binary(i);
+                if (d1.len != d2.len ||
+                    !equal(d1.pointer, d1.pointer+d1.len, d2.pointer)) return false;
+            }
+            break;
+        case COLUMN_TYPE_TABLE:
+            {
+                ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
+                ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
+                if (*t1 != *t2) return false;
+            }
+            break;
+        default:
+            assert(false);
+        }
+    }
+    return true;
+}
+
 
 #ifdef _DEBUG
 

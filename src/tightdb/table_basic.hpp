@@ -194,14 +194,24 @@ public:
 
     class Query;
 
-    Query where() const {
-        return Query();
-    } // FIXME: Bad thing to copy queries
+    Query where() const
+    {
+        return Query(); // FIXME: Bad thing to copy queries
+    }
+
+    /// Compare two tables for equality. Two tables are equal if, and
+    /// only if, they contain the same rows in the same order, that
+    /// is, for each value V at column index C and row index R in one
+    /// of the tables, there is a value at column index C and row
+    /// index R in the other tables that is equal to V.
+    bool operator==(const BasicTable& t) const { return compare_rows(t); }
+
+    /// Compare two tables for inequality. See operator==().
+    bool operator!=(const BasicTable& t) const { return !compare_rows(t); }
 
 #ifdef _DEBUG
     using Table::Verify;
     using Table::print;
-    bool compare(const BasicTable& c) const { return Table::compare(c); }
 #endif
 
 private:

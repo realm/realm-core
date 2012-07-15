@@ -128,20 +128,20 @@ size_t ColumnStringEnum::GetKeyNdxOrAdd(const char* value)
     }
 }
 
-#ifdef _DEBUG
-
 bool ColumnStringEnum::Compare(const ColumnStringEnum& c) const
 {
-    if (c.Size() != Size()) return false;
-
-    for (size_t i = 0; i < Size(); ++i) {
+    const size_t n = Size();
+    if (c.Size() != n) return false;
+    for (size_t i=0; i<n; ++i) {
         const char* s1 = Get(i);
         const char* s2 = c.Get(i);
         if (strcmp(s1, s2) != 0) return false;
     }
-
     return true;
 }
+
+
+#ifdef _DEBUG
 
 void ColumnStringEnum::Verify() const
 {

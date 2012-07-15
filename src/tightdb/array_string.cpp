@@ -260,9 +260,6 @@ size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, siz
     return (size_t)-1; // not found
 }
 
-#ifdef _DEBUG
-#include "stdio.h"
-
 bool ArrayString::Compare(const ArrayString& c) const
 {
     if (c.Size() != Size()) return false;
@@ -273,6 +270,10 @@ bool ArrayString::Compare(const ArrayString& c) const
 
     return true;
 }
+
+
+#ifdef _DEBUG
+#include "stdio.h"
 
 void ArrayString::StringStats() const
 {

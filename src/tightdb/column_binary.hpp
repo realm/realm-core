@@ -63,6 +63,9 @@ public:
     void SetParent(ArrayParent *parent, size_t pndx) {m_array->SetParent(parent, pndx);}
     void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
+    /// Compare two binary columns for equality.
+    bool Compare(const ColumnBinary&) const;
+
 #ifdef _DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif //_DEBUG

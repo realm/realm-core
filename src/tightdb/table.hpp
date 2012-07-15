@@ -202,9 +202,19 @@ public:
     TableRef get_table_ref() { return TableRef(this); }
     ConstTableRef get_table_ref() const { return ConstTableRef(this); }
 
+    /// Compare two tables for equality. Two tables are equal if, and
+    /// only if, they contain the same columns and rows in the same
+    /// order, that is, for each value V of type T at column index C
+    /// and row index R in one of the tables, there is a value of type
+    /// T at column index C and row index R in the other tables that
+    /// is equal to V.
+    bool operator==(const Table&) const;
+
+    /// Compare two tables for inequality. See operator==().
+    bool operator!=(const Table& t) const;
+
     // Debug
 #ifdef _DEBUG
-    bool compare(const Table& c) const;
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream& out, const char* title=NULL) const;
     void print() const;
@@ -302,6 +312,11 @@ protected:
     ///
     const Table *get_subtable_ptr(size_t col_idx, size_t row_idx) const;
 
+    /// Compare the rows of two tables under the assumption that the
+    /// two tables have the same spec, and therefore the same sequence
+    /// of columns.
+    bool compare_rows(const Table&) const;
+
 private:
     Table(Table const &); // Disable copy construction
     Table &operator=(Table const &); // Disable copying assignment
@@ -374,7 +389,6 @@ inline size_t Table::create_empty_table(Allocator& alloc)
     return top.GetRef();
 }
 
-// Create new Table
 inline Table::Table(Allocator& alloc):
     m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1)
 {
@@ -383,7 +397,6 @@ inline Table::Table(Allocator& alloc):
     init_from_ref(ref, 0, 0);
 }
 
-// Create attached table from ref
 inline Table::Table(RefCountTag, Allocator& alloc, size_t top_ref,
                     Parent* parent, size_t ndx_in_parent):
     m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
@@ -391,7 +404,6 @@ inline Table::Table(RefCountTag, Allocator& alloc, size_t top_ref,
     init_from_ref(top_ref, parent, ndx_in_parent);
 }
 
-// Create attached sub-table from ref and spec_ref
 inline Table::Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
                     Parent* parent, size_t ndx_in_parent):
     m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
@@ -428,6 +440,16 @@ inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)
 inline ConstTableRef Table::get_subtable(size_t column_ndx, size_t row_ndx) const
 {
     return ConstTableRef(get_subtable_ptr(column_ndx, row_ndx));
+}
+
+inline bool Table::operator==(const Table& t) const
+{
+    return m_spec_set == t.m_spec_set && compare_rows(t);
+}
+
+inline bool Table::operator!=(const Table& t) const
+{
+    return m_spec_set != t.m_spec_set || !compare_rows(t);
 }
 
 

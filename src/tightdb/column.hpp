@@ -199,9 +199,11 @@ public:
 
     void sort();
 
+    /// Compare two columns for equality.
+    bool Compare(const Column&) const;
+
     // Debug
 #ifdef _DEBUG
-    bool Compare(const Column& c) const;
     void Print() const;
     virtual void Verify() const;
     MemStats Stats() const;

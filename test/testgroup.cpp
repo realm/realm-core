@@ -126,7 +126,7 @@ TEST(Group_Serialize1)
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table->compare(*t));
+    CHECK(*table == *t);
 #endif
 
     // Modify both tables
@@ -139,7 +139,7 @@ TEST(Group_Serialize1)
 
 #ifdef _DEBUG
     // Verify that both changed correctly
-    CHECK(table->compare(*t));
+    CHECK(*table == *t);
     toDisk.Verify();
     fromDisk.Verify();
 #endif //_DEBUG
@@ -186,8 +186,8 @@ TEST(Group_Serialize2)
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table1->compare(*t1));
-    CHECK(table2->compare(*t2));
+    CHECK(*table1 == *t1);
+    CHECK(*table2 == *t2);
     toDisk.Verify();
     fromDisk.Verify();
 #endif //_DEBUG
@@ -220,7 +220,7 @@ TEST(Group_Serialize3)
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table->compare(*t));
+    CHECK(*table == *t);
     toDisk.Verify();
     fromDisk.Verify();
 #endif //_DEBUG}
@@ -261,7 +261,7 @@ TEST(Group_Serialize_Men)
 
 #ifdef _DEBUG
     // Verify that original values are there
-    CHECK(table->compare(*t));
+    CHECK(*table == *t);
     toMem.Verify();
     fromMem.Verify();
 #endif //_DEBUG
@@ -300,7 +300,7 @@ TEST(Group_Serialize_Optimized)
 
     // Verify that original values are there
 #ifdef _DEBUG
-    CHECK(table->compare(*t));
+    CHECK(*table == *t);
 #endif
 
     // Add a row with a known (but unique) value

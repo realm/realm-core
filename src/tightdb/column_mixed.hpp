@@ -114,6 +114,9 @@ public:
 
     void invalidate_subtables();
 
+    /// Compare two mixed columns for equality.
+    bool Compare(const ColumnMixed&) const;
+
 #ifdef _DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void ToDot(std::ostream& out, const char* title) const;

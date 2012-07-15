@@ -249,10 +249,12 @@ public:
     size_t GetByteSize(bool align=false) const;
     vector<int64_t> ToVector(void) const;
 
+    /// Compare two arrays for equality.
+    bool Compare(const Array&) const;
+
     // Debug
     size_t GetBitWidth() const {return m_width;}
 #ifdef _DEBUG
-    bool Compare(const Array& c) const;
     void Print() const;
     void Verify() const;
     void ToDot(ostream& out, const char* title=NULL) const;

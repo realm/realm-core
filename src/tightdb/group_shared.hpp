@@ -101,6 +101,8 @@ private:
     int         m_fd;
     const char* m_lockfile_path;
 
+    void init(const char* path_to_database_file);
+
 #ifdef _DEBUG
     // In debug mode we want to track state
     enum SharedState {
@@ -114,8 +116,6 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication m_replication;
 #endif
-
-    void init(const char* path_to_database_file);
 };
 
 } // namespace tightdb

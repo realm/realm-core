@@ -50,8 +50,10 @@ public:
     ///
     static size_t create_empty_string_array(Allocator&);
 
+    /// Compare two string arrays for equality.
+    bool Compare(const ArrayString&) const;
+
 #ifdef _DEBUG
-    bool Compare(const ArrayString& c) const;
     void StringStats() const;
     //void ToDot(FILE* f) const;
     void ToDot(std::ostream& out, const char* title=NULL) const;

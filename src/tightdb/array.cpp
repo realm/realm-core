@@ -186,7 +186,8 @@ void Array::init_from_ref(size_t ref)
     CreateFromHeader(header, ref);
 }
 
-void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref) {
+void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref)
+{
     // Parse header
     // We only need limited info for direct read-only use
     m_width    = get_header_width(header);
@@ -198,7 +199,8 @@ void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref) {
     SetWidth(m_width);
 }
 
-void Array::CreateFromHeader(uint8_t* header, size_t ref) {
+void Array::CreateFromHeader(uint8_t* header, size_t ref)
+{
     // Parse header
     m_isNode   = get_header_isnode(header);
     m_hasRefs  = get_header_hasrefs(header);
@@ -256,7 +258,8 @@ void Array::UpdateRef(size_t ref)
     update_ref_in_parent();
 }
 
-bool Array::UpdateFromParent() {
+bool Array::UpdateFromParent()
+{
     if (!m_parent) return false;
 
     // After commit to disk, the array may have moved
@@ -1356,7 +1359,8 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
     */
 }
 
-size_t Array::GetByteSize(bool align) const {
+size_t Array::GetByteSize(bool align) const
+{
     size_t len = CalcByteLen(m_len, m_width);
     if (align) {
         const size_t rest = (~len & 0x7)+1;
@@ -1950,7 +1954,8 @@ void Array::QuickSort(size_t lo, size_t hi)
     TEMPEX(QuickSort, (lo, hi);)
 }
 
-template<size_t w> void Array::QuickSort(size_t lo, size_t hi) {
+template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
+{
     // Quicksort based on
     // http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
     int i = (int)lo;
@@ -1977,16 +1982,14 @@ template<size_t w> void Array::QuickSort(size_t lo, size_t hi) {
     if (i < (int)hi) QuickSort(i, hi);
 }
 
-std::vector<int64_t> Array::ToVector(void) const {
+std::vector<int64_t> Array::ToVector(void) const
+{
     std::vector<int64_t> v;
     const size_t count = Size();
     for(size_t t = 0; t < count; ++t)
         v.push_back(Get(t));
     return v;
 }
-
-#ifdef _DEBUG
-#include "stdio.h"
 
 bool Array::Compare(const Array& c) const
 {
@@ -1998,6 +2001,10 @@ bool Array::Compare(const Array& c) const
 
     return true;
 }
+
+
+#ifdef _DEBUG
+#include "stdio.h"
 
 void Array::Print() const
 {
@@ -2085,12 +2092,11 @@ void Array::Stats(MemStats& stats) const
             sub.Stats(stats);
         }
     }
-
 }
 
 #endif //_DEBUG
 
-}
+} // namespace tightdb
 
 
 namespace {
@@ -2248,7 +2254,7 @@ size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, in
     else return (size_t)high;
 }
 
-}
+} // anonymous namespace
 
 
 namespace tightdb {

@@ -67,8 +67,10 @@ public:
     // Optimizing data layout
     bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
 
+    /// Compare two string columns for equality.
+    bool Compare(const AdaptiveStringColumn&) const;
+
 #ifdef _DEBUG
-    bool Compare(const AdaptiveStringColumn& c) const;
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif //_DEBUG
 

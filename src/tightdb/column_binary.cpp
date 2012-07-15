@@ -1,8 +1,10 @@
-#include "column_binary.hpp"
+#include <algorithm>
 
-namespace {
+#include <tightdb/column_binary.hpp>
 
 using namespace tightdb;
+
+namespace {
 
 bool IsNodeFromRef(size_t ref, Allocator& alloc)
 {
@@ -12,7 +14,7 @@ bool IsNodeFromRef(size_t ref, Allocator& alloc)
     return isNode;
 }
 
-}
+} // anonymous namespace
 
 
 namespace tightdb {
@@ -171,6 +173,18 @@ void ColumnBinary::Resize(size_t ndx)
     assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
     assert(ndx < Size());
     ((ArrayBinary*)m_array)->Resize(ndx);
+}
+
+bool ColumnBinary::Compare(const ColumnBinary& c) const
+{
+    const size_t n = Size();
+    if (c.Size() != n) return false;
+    for (size_t i=0; i<n; ++i) {
+        const BinaryData d1 = Get(i);
+        const BinaryData d2 = c.Get(i);
+        if (d1.len != d2.len || !equal(d1.pointer, d1.pointer+d1.len, d2.pointer)) return false;
+    }
+    return true;
 }
 
 BinaryData ColumnBinary::LeafGet(size_t ndx) const

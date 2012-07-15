@@ -514,6 +514,18 @@ void Group::update_from_shared(size_t top_ref, size_t len)
     }
 }
 
+bool Group::operator==(const Group& g) const
+{
+    const size_t n = get_table_count();
+    if (n != g.get_table_count()) return false;
+    for (size_t i=0; i<n; ++i) {
+        const Table* t1 = get_table_ptr(i);
+        const Table* t2 = g.get_table_ptr(i);
+        if (*t1 != *t2) return false;
+    }
+    return true;
+}
+
 
 #ifdef _DEBUG
 

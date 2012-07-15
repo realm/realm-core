@@ -66,8 +66,13 @@ public:
     // instruction.
     void set_column_attr(size_t column_ndx, ColumnType attr);
 
+    /// Compare two table specs for equality.
+    bool operator==(const Spec&) const;
+
+    /// Compare two tables specs for inequality. See operator==().
+    bool operator!=(const Spec& s) const { return !(*this == s); }
+
 #ifdef _DEBUG
-    bool compare(const Spec& spec) const;
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream& out, const char* title=NULL) const;
 #endif //_DEBUG

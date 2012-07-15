@@ -84,6 +84,19 @@ void ColumnTable::Clear(size_t ndx)
     Set(ndx, 0);
 }
 
+bool ColumnTable::Compare(const ColumnTable& c) const
+{
+    const size_t n = Size();
+    if (c.Size() != n) return false;
+    for (size_t i=0; i<n; ++i) {
+        ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
+        ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
+        if (!compare_subtable_rows(*t1, *t2)) return false;
+    }
+    return true;
+}
+
+
 #ifdef _DEBUG
 
 void ColumnTable::Verify() const

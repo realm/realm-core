@@ -16,6 +16,18 @@ Format:
 ----------
 
 
+2012-07-15 (Kristian Spangsege)
+----------
++ Spec::compare() renamed to Spec::operator==(), and made generally available, not only while compiling in debug mode.
++ Spec::operator!=() added.
++ Table::compare() renamed to Table::operator==(), and made generally available, not only while compiling in debug mode.
++ Table::operator!=() added.
++ MyTable::compare() renamed to MyTable::operator==(), and made generally available, not only while compiling in debug mode.
++ MyTable::operator!=() added.
++ Group::operator==() and Group::operator!=() added.
+. Array::Compare() and Column::Compare() made generally available, not only while compiling in debug mode.
+
+
 2012-07-09 (Kristian Spangsege)
 ----------
 + Table::is_valid() added. Most language bindings must check this flag before calling any member function on any table.

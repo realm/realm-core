@@ -34,23 +34,28 @@ void Spec::init_from_ref(size_t ref, ArrayParent* parent, size_t ndx_in_parent)
     }
 }
 
-void Spec::destroy() {
+void Spec::destroy()
+{
     m_specSet.Destroy();
 }
 
-size_t Spec::get_ref() const {
+size_t Spec::get_ref() const
+{
     return m_specSet.GetRef();
 }
 
-void Spec::update_ref(size_t ref, ArrayParent* parent, size_t pndx) {
+void Spec::update_ref(size_t ref, ArrayParent* parent, size_t pndx)
+{
     init_from_ref(ref, parent, pndx);
 }
 
-void Spec::set_parent(ArrayParent* parent, size_t pndx) {
+void Spec::set_parent(ArrayParent* parent, size_t pndx)
+{
     m_specSet.SetParent(parent, pndx);
 }
 
-bool Spec::update_from_parent() {
+bool Spec::update_from_parent()
+{
     if (m_specSet.UpdateFromParent()) {
         m_spec.UpdateFromParent();
         m_names.UpdateFromParent();
@@ -146,7 +151,8 @@ const Spec Spec::get_subspec(size_t column_ndx) const
     return Spec(m_table, alloc, ref, NULL, 0);
 }
 
-size_t Spec::get_subspec_ref(std::size_t subtable_ndx) const {
+size_t Spec::get_subspec_ref(std::size_t subtable_ndx) const
+{
     assert(subtable_ndx < m_subSpecs.Size());
 
     // Note that this addresses subspecs directly, indexing
@@ -154,11 +160,13 @@ size_t Spec::get_subspec_ref(std::size_t subtable_ndx) const {
     return m_subSpecs.GetAsRef(subtable_ndx);
 }
 
-size_t Spec::get_type_attr_count() const {
+size_t Spec::get_type_attr_count() const
+{
     return m_spec.Size();
 }
 
-ColumnType Spec::get_type_attr(size_t ndx) const {
+ColumnType Spec::get_type_attr(size_t ndx) const
+{
     return (ColumnType)m_spec.Get(ndx);
 }
 
@@ -193,7 +201,8 @@ ColumnType Spec::get_column_type(size_t ndx) const
     else return type;
 }
 
-void Spec::set_column_type(std::size_t column_ndx, ColumnType type) {
+void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
+{
     assert(column_ndx < get_column_count());
 
     size_t type_ndx = 0;
@@ -288,16 +297,18 @@ size_t* Spec::record_subspec_path(const Array* root_subspecs, size_t* begin, siz
 }
 #endif // TIGHTDB_ENABLE_REPLICATION
 
-#ifdef _DEBUG
-
-bool Spec::compare(const Spec& spec) const {
+bool Spec::operator==(const Spec& spec) const
+{
     if (!m_spec.Compare(spec.m_spec)) return false;
     if (!m_names.Compare(spec.m_names)) return false;
-
     return true;
 }
 
-void Spec::Verify() const {
+
+#ifdef _DEBUG
+
+void Spec::Verify() const
+{
     const size_t column_count = get_column_count();
     assert(column_count == m_names.Size());
     assert(column_count == m_spec.Size());

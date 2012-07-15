@@ -367,20 +367,20 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
     return true;
 }
 
-#ifdef _DEBUG
-
 bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const
 {
-    if (c.Size() != Size()) return false;
-
-    for (size_t i = 0; i < Size(); ++i) {
+    const size_t n = Size();
+    if (c.Size() != n) return false;
+    for (size_t i=0; i<n; ++i) {
         const char* s1 = Get(i);
         const char* s2 = c.Get(i);
         if (strcmp(s1, s2) != 0) return false;
     }
-
     return true;
 }
+
+
+#ifdef _DEBUG
 
 void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) const
 {

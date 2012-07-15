@@ -84,6 +84,9 @@ protected:
     // Overriding method in Table::Parent
     virtual void child_destroyed(std::size_t subtable_ndx);
 
+    /// Assumes that the two tables have the same spec.
+    static bool compare_subtable_rows(const Table&, const Table&);
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Overriding method in Table::Parent
     virtual size_t* record_subtable_path(size_t* begin, size_t* end)
@@ -168,6 +171,9 @@ public:
         ColumnSubtableParent::Clear();
         invalidate_subtables();
     }
+
+    /// Compare two subtable columns for equality.
+    bool Compare(const ColumnTable&) const;
 
 #ifdef _DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
@@ -314,6 +320,11 @@ inline void ColumnSubtableParent::invalidate_subtables()
     const bool was_empty = m_subtable_map.empty();
     m_subtable_map.invalidate_subtables();
     if (!was_empty && m_table) m_table->unbind_ref();
+}
+
+inline bool ColumnSubtableParent::compare_subtable_rows(const Table& a, const Table& b)
+{
+    return a.compare_rows(b);
 }
 
 

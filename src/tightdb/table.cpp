@@ -1531,48 +1531,74 @@ void Table::to_json(std::ostream& out)
     out << "]";
 }
 
-#ifdef _DEBUG
-
-bool Table::compare(const Table& c) const
+bool Table::compare_rows(const Table& t) const
 {
-    if (!m_spec_set.compare(c.m_spec_set)) return false;
+    // A wrapper for an empty subtable with shared spec may be created
+    // with m_data == 0. In this case there are no Column wrappers, so
+    // the standard comparison scheme becomes impossible.
+    if (m_size == 0) return t.m_size == 0;
 
-    const size_t column_count = get_column_count();
-    if (column_count != c.get_column_count()) return false;
-
-    for (size_t i = 0; i < column_count; ++i) {
+    const size_t n = get_column_count();
+    assert(t.get_column_count() == n);
+    for (size_t i=0; i<n; ++i) {
         const ColumnType type = GetRealColumnType(i);
+        assert(t.GetRealColumnType(i) == type);
 
         switch (type) {
-            case COLUMN_TYPE_INT:
-            case COLUMN_TYPE_BOOL:
-                {
-                    const Column& column1 = GetColumn(i);
-                    const Column& column2 = c.GetColumn(i);
-                    if (!column1.Compare(column2)) return false;
-                }
-                break;
-            case COLUMN_TYPE_STRING:
-                {
-                    const AdaptiveStringColumn& column1 = GetColumnString(i);
-                    const AdaptiveStringColumn& column2 = c.GetColumnString(i);
-                    if (!column1.Compare(column2)) return false;
-                }
-                break;
-            case COLUMN_TYPE_STRING_ENUM:
-                {
-                    const ColumnStringEnum& column1 = GetColumnStringEnum(i);
-                    const ColumnStringEnum& column2 = c.GetColumnStringEnum(i);
-                    if (!column1.Compare(column2)) return false;
-                }
-                break;
+        case COLUMN_TYPE_INT:
+        case COLUMN_TYPE_BOOL:
+        case COLUMN_TYPE_DATE:
+            {
+                const Column& c1 = GetColumn(i);
+                const Column& c2 = t.GetColumn(i);
+                if (!c1.Compare(c2)) return false;
+            }
+            break;
+        case COLUMN_TYPE_STRING:
+            {
+                const AdaptiveStringColumn& c1 = GetColumnString(i);
+                const AdaptiveStringColumn& c2 = t.GetColumnString(i);
+                if (!c1.Compare(c2)) return false;
+            }
+            break;
+        case COLUMN_TYPE_BINARY:
+            {
+                const ColumnBinary& c1 = GetColumnBinary(i);
+                const ColumnBinary& c2 = t.GetColumnBinary(i);
+                if (!c1.Compare(c2)) return false;
+            }
+            break;
+        case COLUMN_TYPE_TABLE:
+            {
+                const ColumnTable& c1 = GetColumnTable(i);
+                const ColumnTable& c2 = t.GetColumnTable(i);
+                if (!c1.Compare(c2)) return false;
+            }
+            break;
+        case COLUMN_TYPE_MIXED:
+            {
+                const ColumnMixed& c1 = GetColumnMixed(i);
+                const ColumnMixed& c2 = t.GetColumnMixed(i);
+                if (!c1.Compare(c2)) return false;
+            }
+            break;
+        case COLUMN_TYPE_STRING_ENUM:
+            {
+                const ColumnStringEnum& c1 = GetColumnStringEnum(i);
+                const ColumnStringEnum& c2 = t.GetColumnStringEnum(i);
+                if (!c1.Compare(c2)) return false;
+            }
+            break;
 
-            default:
-                assert(false);
+        default:
+            assert(false);
         }
     }
     return true;
 }
+
+
+#ifdef _DEBUG
 
 void Table::Verify() const
 {

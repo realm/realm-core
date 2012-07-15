@@ -769,20 +769,19 @@ void Column::sort()
     sort(0, Size());
 }
 
+bool Column::Compare(const Column& c) const
+{
+    const size_t n = Size();
+    if (c.Size() != n) return false;
+    for (size_t i=0; i<n; ++i) {
+        if (Get(i) != c.Get(i)) return false;
+    }
+    return true;
+}
+
 
 #ifdef _DEBUG
 #include "stdio.h"
-
-bool Column::Compare(const Column& c) const
-{
-    if (c.Size() != Size()) return false;
-
-    for (size_t i = 0; i < Size(); ++i) {
-        if (Get(i) != c.Get(i)) return false;
-    }
-
-    return true;
-}
 
 void Column::Print() const
 {
