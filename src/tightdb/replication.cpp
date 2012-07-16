@@ -147,7 +147,18 @@ struct Replication::SharedState {
     int m_want_write_transact;
     bool m_write_transact_available, m_write_transact_finished;
     Condition m_cond_want_write_transact, m_cond_write_transact_available,
-        m_cond_write_transact_finished, m_cond_transact_log_free;
+        m_cond_write_transact_finished, m_cond_transact_log_free, m_cond_persisted_db_version;
+
+    /// Valid when m_write_transact_available is true, and is the
+    /// version that the database will have after completion of the
+    /// 'write' transaction that is made available.
+    db_version_type m_write_transact_db_version;
+
+    /// The version of the database that has been made
+    /// persistent. After a commit, a client must wait for this
+    /// version to reach the value of m_write_transact_db_version as
+    /// it was at the time the transaction was initiated.
+    db_version_type m_persisted_db_version;
 
     /// Size of the file. Invariant: 'm_size <= s' where 's' is the
     /// actual size of the file. This obviously assumes that the file
@@ -183,6 +194,7 @@ struct Replication::SharedState {
         m_want_write_transact = 0;
         m_write_transact_available = false;
         m_write_transact_finished  = false;
+        m_persisted_db_version = 0;
         m_size = file_size;
         m_transact_log_used_begin = sizeof(SharedState);
         m_transact_log_used_end = m_transact_log_used_begin;
@@ -200,6 +212,10 @@ struct Replication::SharedState {
         ConditionDestroyGuard cdg3(m_cond_write_transact_finished);
         err = m_cond_transact_log_free.init_shared();
         if (err) return err;
+        ConditionDestroyGuard cdg4(m_cond_transact_log_free);
+        err = m_cond_persisted_db_version.init_shared();
+        if (err) return err;
+        cdg4.release();
         cdg3.release();
         cdg2.release();
         cdg1.release();
@@ -213,6 +229,7 @@ struct Replication::SharedState {
         m_cond_write_transact_available.destroy();
         m_cond_write_transact_finished.destroy();
         m_cond_transact_log_free.destroy();
+        m_cond_persisted_db_version.destroy();
         m_mutex.destroy();
     }
 };
@@ -323,10 +340,11 @@ void Replication::interrupt()
     m_shared_state->m_cond_write_transact_available.notify_all();
     m_shared_state->m_cond_write_transact_finished.notify_all();
     m_shared_state->m_cond_transact_log_free.notify_all();
+    m_shared_state->m_cond_persisted_db_version.notify_all();
 }
 
 
-error_code Replication::acquire_write_access()
+error_code Replication::begin_write_transact()
 {
     size_t file_size, transact_log_used_begin, transact_log_used_end;
     {
@@ -346,6 +364,7 @@ error_code Replication::acquire_write_access()
         file_size = m_shared_state->m_size;
         transact_log_used_begin = m_shared_state->m_transact_log_used_begin;
         transact_log_used_end   = m_shared_state->m_transact_log_used_end;
+        m_write_transact_db_version = m_shared_state->m_write_transact_db_version;
     }
     // At this point we know that the file size cannot change because
     // this cleint is the only one who may change it.
@@ -353,7 +372,7 @@ error_code Replication::acquire_write_access()
     if (m_shared_state_mapped_size < file_size) {
         error_code err = remap_file(file_size);
         if (err) {
-            release_write_access(true); // Rollback
+            rollback_write_transact();
             return err;
         }
     }
@@ -374,14 +393,29 @@ error_code Replication::acquire_write_access()
 }
 
 
-void Replication::release_write_access(bool rollback)
+bool Replication::commit_write_transact()
 {
     LockGuard lg(m_shared_state->m_mutex);
     m_shared_state->m_transact_log_new_begin = m_shared_state->m_transact_log_used_end;
-    if (!rollback) {
-        m_shared_state->m_transact_log_used_end =
-            m_transact_log_free_begin - static_cast<char*>(static_cast<void*>(m_shared_state));
+    m_shared_state->m_transact_log_used_end =
+        m_transact_log_free_begin - static_cast<char*>(static_cast<void*>(m_shared_state));
+    m_shared_state->m_write_transact_finished = true;
+    m_shared_state->m_cond_write_transact_finished.notify_all();
+
+    // Wait for the transaction log to be made persistent
+    while (m_shared_state->m_persisted_db_version < m_write_transact_db_version) {
+        if (m_interrupt) return false;
+        m_shared_state->m_cond_persisted_db_version.wait(lg);
     }
+
+    return true;
+}
+
+
+void Replication::rollback_write_transact()
+{
+    LockGuard lg(m_shared_state->m_mutex);
+    m_shared_state->m_transact_log_new_begin = m_shared_state->m_transact_log_used_end;
     m_shared_state->m_write_transact_finished = true;
     m_shared_state->m_cond_write_transact_finished.notify_all();
 }
@@ -398,46 +432,44 @@ bool Replication::wait_for_write_request()
 {
     LockGuard lg(m_shared_state->m_mutex);
     while (m_shared_state->m_want_write_transact == 0) {
-        if (!m_interrupt) {
-            m_shared_state->m_cond_want_write_transact.wait(lg);
-        }
         if (m_interrupt) return false;
+        m_shared_state->m_cond_want_write_transact.wait(lg);
     }
     return true;
 }
 
 
 // FIXME: Consider what should happen if nobody remains interested in this write transaction
-bool Replication::grant_write_access_and_wait_for_completion(TransactLog& l)
+bool Replication::grant_write_access_and_wait_for_completion(TransactLog& transact_log)
 {
     LockGuard lg(m_shared_state->m_mutex);
+    m_shared_state->m_write_transact_db_version = transact_log.m_db_version;
     m_shared_state->m_write_transact_available = true;
     m_shared_state->m_cond_write_transact_available.notify_all();
     while (!m_shared_state->m_write_transact_finished) {
-        if (!m_interrupt) {
-            m_shared_state->m_cond_write_transact_finished.wait(lg);
-        }
         if (m_interrupt) return false;
+        m_shared_state->m_cond_write_transact_finished.wait(lg);
     }
     m_shared_state->m_write_transact_finished = false;
-    l.offset1 = m_shared_state->m_transact_log_new_begin;
+    transact_log.m_offset1 = m_shared_state->m_transact_log_new_begin;
     if (m_shared_state->m_transact_log_used_end < m_shared_state->m_transact_log_new_begin) {
-        l.size1   = m_shared_state->m_transact_log_used_wrap - l.offset1;
-        l.offset2 = sizeof(SharedState);
-        l.size2   = m_shared_state->m_transact_log_used_end - sizeof(SharedState);
+        transact_log.m_size1   = m_shared_state->m_transact_log_used_wrap - transact_log.m_offset1;
+        transact_log.m_offset2 = sizeof(SharedState);
+        transact_log.m_size2   = m_shared_state->m_transact_log_used_end - sizeof(SharedState);
     }
     else {
-        l.size1   = m_shared_state->m_transact_log_used_end - l.offset1;
-        l.offset2 = l.size2 = 0;
+        transact_log.m_size1   = m_shared_state->m_transact_log_used_end - transact_log.m_offset1;
+        transact_log.m_offset2 = transact_log.m_size2 = 0;
     }
     return true;
 }
 
 
-error_code Replication::map(const TransactLog& l, const char** addr1, const char** addr2)
+error_code Replication::map_transact_log(const TransactLog& transact_log,
+                                         const char** addr1, const char** addr2)
 {
-    if (m_shared_state_mapped_size < l.offset1+l.size1 ||
-        m_shared_state_mapped_size < l.offset2+l.size2) {
+    if (m_shared_state_mapped_size < transact_log.m_offset1+transact_log.m_size1 ||
+        m_shared_state_mapped_size < transact_log.m_offset2+transact_log.m_size2) {
         size_t file_size;
         {
             LockGuard lg(m_shared_state->m_mutex);
@@ -446,9 +478,17 @@ error_code Replication::map(const TransactLog& l, const char** addr1, const char
         error_code err = remap_file(file_size);
         if (err) return err;
     }
-    *addr1 = static_cast<char*>(static_cast<void*>(m_shared_state)) + l.offset1;
-    *addr2 = static_cast<char*>(static_cast<void*>(m_shared_state)) + l.offset2;
+    *addr1 = static_cast<char*>(static_cast<void*>(m_shared_state)) + transact_log.m_offset1;
+    *addr2 = static_cast<char*>(static_cast<void*>(m_shared_state)) + transact_log.m_offset2;
     return ERROR_NONE;
+}
+
+
+void Replication::update_persisted_db_version(db_version_type version)
+{
+    LockGuard lg(m_shared_state->m_mutex);
+    m_shared_state->m_persisted_db_version = version;
+    m_shared_state->m_cond_persisted_db_version.notify_all();
 }
 
 

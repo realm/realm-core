@@ -287,7 +287,7 @@ Group& SharedGroup::begin_write()
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (m_replication) {
-        error_code err = m_replication.acquire_write_access();
+        error_code err = m_replication.begin_write_transact();
         if (err) throw_error(err);
     }
 #endif
@@ -368,7 +368,9 @@ void SharedGroup::commit()
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication) m_replication.release_write_access(false);
+    if (m_replication) {
+        if (!m_replication.commit_write_transact()) throw_error(ERROR_INTERRUPTED);
+    }
 #endif
 }
 
@@ -387,7 +389,7 @@ void SharedGroup::rollback()
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication) m_replication.release_write_access(true);
+    if (m_replication) m_replication.rollback_write_transact();
 #endif
 }
 

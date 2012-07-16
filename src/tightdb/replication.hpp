@@ -89,9 +89,9 @@ struct Replication {
     ///
     /// After any function has returned with an interruption
     /// indication, the only functions that may safely be called are
-    /// release_write_access(true) and the destructor. If a client,
+    /// rollback_write_transact() and the destructor. If a client,
     /// after having received an interruption indication, calls
-    /// release_write_access(true) and then clear_interrupt(), it may
+    /// rollback_write_transact() and then clear_interrupt(), it may
     /// then resume normal operation on this object.
     ///
     /// This function can never fail.
@@ -103,21 +103,40 @@ struct Replication {
     /// database is up-to-date. During the transaction, all
     /// modifications must be posted to this Replication instance as
     /// calls to set_value() and friends. After the completion of the
-    /// transaction, the client must call release_write_access().
+    /// transaction, the client must call either
+    /// commit_write_transact() or rollback_write_transact().
     ///
     /// This function returns ERROR_INTERRUPTED if it was interrupted
     /// by an asynchronous call to shutdown().
-    error_code acquire_write_access();
+    error_code begin_write_transact();
 
-    /// Called by a client to commit or discard the accumulated
-    /// transacttion log. The transaction log may not be comitted if
-    /// any of the functions that submit data to it, have failed or
-    /// been interrupted.
-    void release_write_access(bool rollback);
+    /// Called by a client to commit the accumulated transaction
+    /// log. The transaction log may not be committed if any of the
+    /// functions that submit data to it, have failed or been
+    /// interrupted. This operation will block until the local
+    /// coordinator reports that the transaction log has been dealt
+    /// with in a manner that makes the transaction persistent. This
+    /// operation may be interrupted by an asynchronous call to
+    /// interrupt().
+    ///
+    /// \return True on success and false if interrupted.
+    ///
+    /// FIXME: In general the transaction will be considered complete
+    /// even if this operation is interrupted. Is that ok?
+    bool commit_write_transact();
 
-    /// May be called by a client to reset this object after an
-    /// interrupted transaction. It is not an error to call this
-    /// function in a situation where no interruption has
+    /// Called by a client to discard the accumulated transaction
+    /// log. This function must be called if a write transaction was
+    /// successfully initiated, but one of the functions that submit
+    /// data to the transaction log has failed or has been
+    /// interrupted. It must also be called after a failed or
+    /// interrupted call to commit_write_transact(). This function can
+    /// never fail.
+    void rollback_write_transact();
+
+    /// May be called by a client to reset this replication instance
+    /// after an interrupted transaction. It is not an error to call
+    /// this function in a situation where no interruption has
     /// occured. This function can never fail.
     void clear_interrupt();
 
@@ -128,20 +147,40 @@ struct Replication {
     /// call to shutdown().
     bool wait_for_write_request();
 
-    struct TransactLog { size_t offset1, size1, offset2, size2; };
+    typedef int db_version_type;
+
+    struct TransactLog {
+        db_version_type m_db_version;
+        size_t m_offset1, m_size1, m_offset2, m_size2;
+    };
 
     /// Called by the local coordinator to grant permission for one
     /// client to start a new 'write' transaction. This function also
     /// waits for the client to signal completion of the write
     /// transaction.
     ///
+    /// At entry, \c transact_log.db_version must be set to the
+    /// version of the database as it will be after completion of the
+    /// 'write' transaction that is granted. At exit, the offsets and
+    /// the sizes in \a transact_log will have been properly
+    /// initialized.
+    ///
     /// \return False if the operation was aborted by an asynchronous
     /// call to shutdown().
-    bool grant_write_access_and_wait_for_completion(TransactLog&);
+    bool grant_write_access_and_wait_for_completion(TransactLog& transact_log);
 
-    /// This function cannot block, and can therefore not be
-    /// interrupted.
-    error_code map(const TransactLog&, const char** addr1, const char** addr2);
+    /// Called by the local coordinator to gain access to the memory
+    /// that corresponds to the specified transaction log. The memory
+    /// mapping of the underlying file is expanded as necessary. This
+    /// function cannot block, and can therefore not be interrupted.
+    error_code map_transact_log(const TransactLog&, const char** addr1, const char** addr2);
+
+    /// Called by the local coordinator to signal to clients that a
+    /// new version of the database has been persisted. Presumably,
+    /// one of the clients is blocked in a call to
+    /// commit_write_transact() waiting for this signal. This function
+    /// can never fail.
+    void update_persisted_db_version(db_version_type);
 
     /// Called by the local coordinator to release space in the
     /// transaction log buffer corresponding to a previously completed
@@ -227,6 +266,10 @@ private:
     // Invariant: m_shared_state_size <= std::numeric_limits<std::ptrdiff_t>::max()
     std::size_t m_shared_state_mapped_size;
     bool m_interrupt; // Protected by m_shared_state->m_mutex
+
+    // Set by begin_write_transact() to the new database version
+    // created by the initiated 'write' transaction.
+    db_version_type m_write_transact_db_version;
 
     // These two delimit a contiguous region of free space in the
     // buffer following the last written data. It may be empty.
