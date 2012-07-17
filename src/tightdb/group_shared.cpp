@@ -147,7 +147,11 @@ void SharedGroup::init(const char* path_to_database_file)
         pthread_mutex_init(&m_info->writemutex, &mattr);
         pthread_mutexattr_destroy(&mattr);
 
-        const SlabAlloc& alloc = m_group.get_allocator();
+        SlabAlloc& alloc = m_group.get_allocator();
+
+        // The file may be in the process of being created by another
+        // thread. So we have to ensure that we get the correct size.
+        alloc.RefreshMapping();
 
         // Set initial values
         m_info->filesize = alloc.GetFileLen();

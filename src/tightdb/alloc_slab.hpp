@@ -55,6 +55,7 @@ public:
     size_t GetFileLen() const {return m_baseline;}
     void   FreeAll(size_t filesize=(size_t)-1);
     bool   ReMap(size_t filesize);
+    bool   RefreshMapping();
 
 #ifndef _MSC_VER
     int    GetFileDescriptor() {return m_fd;}
