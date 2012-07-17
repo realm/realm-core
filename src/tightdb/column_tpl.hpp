@@ -29,7 +29,7 @@
 
 // Has to be define to allow overload from build settings
 #ifndef MAX_LIST_SIZE
-#define MAX_LIST_SIZE 1000
+#define MAX_LIST_SIZE 3
 #endif
 
 namespace tightdb {
@@ -417,12 +417,10 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
 
 
 
-template<typename T, class C>
-void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset,
-                             size_t start, size_t end) const
+template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end, int cond) const
 {
     if (!IsNode()) {
-        return static_cast<const C*>(this)->LeafFindAll(result, value, add_offset, start, end);
+        return static_cast<const C*>(this)->LeafFindAll(result, value, add_offset, start, end, cond);
     }
     else {
         // Get subnode table
@@ -440,7 +438,7 @@ void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset,
 
             size_t add = i ? TO_REF(offsets.Get(i-1)) : 0;
             add += add_offset;
-            col.template TreeFindAll<T, C>(result, value, add, s, e);
+            col.template TreeFindAll<T, C>(result, value, add, s, e, cond);
             ++i;
             if (i >= count) break;
 

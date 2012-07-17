@@ -3,6 +3,7 @@
 
 namespace tightdb {
 
+    enum {TDB_SUM, TDB_MAX, TDB_MIN};
 
 // Searching
 size_t TableViewBase::find_first_int(size_t column_ndx, int64_t value) const
@@ -88,7 +89,6 @@ TableView TableView::find_all_string(size_t column_ndx, const char* value)
     return move(tv);
 }
 
-
 ConstTableView TableView::find_all_string(size_t column_ndx, const char* value) const
 {
     assert(m_table);
@@ -101,7 +101,6 @@ ConstTableView TableView::find_all_string(size_t column_ndx, const char* value) 
         tv.get_ref_column().add(i);
     return move(tv);
 }
-
 
 ConstTableView ConstTableView::find_all_string(size_t column_ndx, const char* value) const
 {
@@ -116,54 +115,66 @@ ConstTableView ConstTableView::find_all_string(size_t column_ndx, const char* va
     return move(tv);
 }
 
-
 int64_t TableViewBase::sum(size_t column_ndx) const
 {
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
-    int64_t sum = 0;
-
-    for(size_t i = 0; i < m_refs.Size(); i++)
-        sum += get_int(column_ndx, i);
-
-    return sum;
+    return aggregate<TDB_SUM>(column_ndx);
 }
-
 
 int64_t TableViewBase::maximum(size_t column_ndx) const
 {
-    assert(m_table);
-    if (is_empty()) return 0;
-    if (m_refs.Size() == 0) return 0;
-
-    int64_t mv = get_int(column_ndx, 0);
-    for (size_t i = 1; i < m_refs.Size(); ++i) {
-        const int64_t v = get_int(column_ndx, i);
-        if (v > mv) {
-            mv = v;
-        }
-    }
-    return mv;
+    return aggregate<TDB_MAX>(column_ndx);
 }
-
 
 int64_t TableViewBase::minimum(size_t column_ndx) const
 {
-    assert(m_table);
-    if (is_empty()) return 0;
-    if (m_refs.Size() == 0) return 0;
-
-    int64_t mv = get_int(column_ndx, 0);
-    for (size_t i = 1; i < m_refs.Size(); ++i) {
-        const int64_t v = get_int(column_ndx, i);
-        if (v < mv) {
-            mv = v;
-        }
-    }
-    return mv;
+    return aggregate<TDB_MIN>(column_ndx);
 }
 
+template <int function>int64_t TableViewBase::aggregate(size_t column_ndx) const
+{
+    assert(function == TDB_SUM || function == TDB_MAX || function == TDB_MIN);
+    assert(m_table);
+    assert(column_ndx < m_table->get_column_count());
+    assert(m_table->get_column_type(column_ndx) == COLUMN_TYPE_INT);
+    if (m_refs.Size() == 0) return 0;
+
+    int64_t res = 0;
+    Column& m_column = m_table->GetColumn(column_ndx);
+
+    if(m_refs.Size() == m_column.Size()) {
+        if(function == TDB_MAX)
+            return m_column.maximum();
+        if(function == TDB_MIN)
+            return m_column.minimum();
+        if(function == TDB_SUM)
+            return m_column.sum();
+    }
+
+    Array m_array;
+    size_t m_leaf_start = 0;
+    size_t m_leaf_end = 0;
+    size_t s;
+
+    res = get_int(column_ndx, 0);
+
+    for (size_t ss = 1; ss < m_refs.Size(); ++ss) {
+        s = m_refs.Get(ss);
+        if (s >= m_leaf_end) {
+            m_column.GetBlock(s, m_array, m_leaf_start);
+            const size_t leaf_size = m_array.Size();
+            m_leaf_end = m_leaf_start + leaf_size;
+        }    
+
+        int64_t v = m_array.Get(s - m_leaf_start);
+
+        if(function == TDB_SUM)
+            res += v;
+        else if(function == TDB_MAX ? v > res : v < res)
+            res = v;
+    }
+    
+    return res;
+}
 
 void TableViewBase::sort(size_t column, bool Ascending)
 {

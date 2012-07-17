@@ -935,6 +935,8 @@ TEST(Greater)
         }
         for(size_t i = 0; i < items; i++) {
             a.Set(i, 210);
+            if(i == 7)
+                printf("");
             size_t t = a.Query<GREATER>(200, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 200);
@@ -1370,5 +1372,33 @@ TEST(ArrayCopy)
     c.Destroy();
     d.Destroy();
     //e.Destroy() // will be destroyed as sub-array by d
+}
+
+TEST(Finding)
+{
+    Array a;
+    Array r;
+
+    a.add(1);
+    a.add(2);
+    a.add(3);
+    a.add(1);
+    a.add(2);
+
+    a.find_all(COND_EQUAL, &r, 2, 0, 0, a.Size());
+
+    CHECK_EQUAL(2, r.Size());
+    CHECK_EQUAL(1, r.Get(0));
+    CHECK_EQUAL(4, r.Get(1));
+
+    r.Clear();
+
+    a.find_all(COND_LESS, &r, 3, 0, 0, a.Size());
+
+    CHECK_EQUAL(4, r.Size());
+    CHECK_EQUAL(0, r.Get(0));
+    CHECK_EQUAL(1, r.Get(1));
+    CHECK_EQUAL(3, r.Get(2));
+    CHECK_EQUAL(4, r.Get(3));
 }
 

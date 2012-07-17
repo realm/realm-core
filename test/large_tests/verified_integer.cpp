@@ -146,6 +146,9 @@ size_t VerifiedInteger::Size(void)
 // todo/fixme, end ignored
 void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end)
 {
+    static int64_t count = 0;
+    count++;
+
     std::vector<int64_t>::iterator ita = v.begin() + start;
     std::vector<int64_t>::iterator itb = end == size_t(-1) ? v.end() : v.begin() + (end == size_t(-1) ? v.size() : end);;
     std::vector<size_t> result;
@@ -159,7 +162,6 @@ void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end
     }
 
     c.Clear();
-
     u.find_all(c, value);
     if (c.Size() != result.size())
         assert(false);

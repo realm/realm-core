@@ -33,12 +33,23 @@ namespace tightdb {
 
 class ParentNode {
 public:
-    ParentNode() : m_table(NULL) {}
+    ParentNode() : m_table(NULL), cond(-1) {}
     virtual ~ParentNode() {
 
     }
     virtual void Init(const Table& table) {m_table = &table; if (m_child) m_child->Init(table);}
     virtual size_t find_first(size_t start, size_t end) = 0;
+
+    virtual void find_all(Array* res, size_t start, size_t end, size_t limit) 
+    {
+        size_t r = start - 1;
+        for(;;) {
+            r = find_first(r + 1, end);
+            if (r == end || res->Size() == limit)
+                break;
+            res->add(r); // todo, AddPositiveLocal
+        }        
+    }
 
     virtual std::string Verify(void)
     {
@@ -51,6 +62,8 @@ public:
     };
 
     ParentNode* m_child;
+    int cond;
+    size_t m_column_id;
 
 protected:
     const Table* m_table;
@@ -97,10 +110,7 @@ class SUBTABLE: public ParentNode {
 public:
     SUBTABLE(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
     SUBTABLE() {};
-    ~SUBTABLE() {
-    //    delete m_child; 
-    //    delete m_child2; 
-    }
+
     void Init(const Table& table)
     {
         m_table = &table;
@@ -135,7 +145,7 @@ public:
         }
         return end;
     }
-//protected:
+
     ParentNode* m_child2;
     size_t m_column;
 };
@@ -143,9 +153,11 @@ public:
 
 template <class T, class C, class F> class NODE: public ParentNode {
 public:
-    NODE(T v, size_t column) : m_array(GetDefaultAllocator()), m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v), m_column_id(column) {m_child = 0;}
-    ~NODE() {
-    //    delete m_child; 
+    NODE(T v, size_t column) : m_array(GetDefaultAllocator()), m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v) {
+        m_column_id = column;
+        m_child = 0;
+        F f;
+        cond = f.condition();
     }
 
     void Init(const Table& table)
@@ -156,6 +168,32 @@ public:
 
         if (m_child)m_child->Init(table);
     }
+
+    void find_all(Array* res, size_t start, size_t end, size_t limit) {
+        
+        F f;
+        int c = f.condition();
+
+        if(m_child == 0 && (c == COND_EQUAL || c == COND_NOTEQUAL || c == COND_LESS || c == COND_GREATER)) {
+            C* m_column = (C*)&m_table->GetColumnBase(m_column_id);
+            m_column->find_all(*res, m_value, 0, start, end, c);
+            if(res->Size() > limit) {
+                res->Resize(limit); // todo, optimize by adding limit argument to find_all()
+            }
+        }
+        else {
+            size_t r = start - 1;
+            for(;;) {
+                r = find_first(r + 1, end);
+                if (r == end || res->Size() == limit) // todo, optimize away Size() call
+                    break;
+                res->add(r); // todo, AddPositiveLocal
+            } 
+        }
+        
+
+    }
+
 
     size_t find_first(size_t start, size_t end)
     {
@@ -194,21 +232,23 @@ public:
         return end;
     }
 
+    T m_value;
+
 protected:
     C* m_column;
     Array m_array;
     size_t m_leaf_start;
     size_t m_leaf_end;
     size_t m_local_end;
-    T m_value;
-    size_t m_column_id;
+
 };
 
 
 template <class F> class STRINGNODE: public ParentNode {
 public:
-    STRINGNODE(const char* v, size_t column): m_column_id(column)
+    STRINGNODE(const char* v, size_t column)
     {
+        m_column_id = column;
         m_child = 0;
 
         m_value = (char *)malloc(strlen(v)*6);
@@ -222,7 +262,6 @@ public:
             error_code = "Malformed UTF-8: " + std::string(m_value);
     }
     ~STRINGNODE() {
-   //     delete m_child; 
         free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase);
     }
 
@@ -269,7 +308,6 @@ protected:
     char* m_value;
     char* m_lcase;
     char* m_ucase;
-    size_t m_column_id;
     const ColumnBase* m_column;
     ColumnType m_column_type;
 };
@@ -278,13 +316,13 @@ protected:
 
 template <> class STRINGNODE<EQUAL>: public ParentNode {
 public:
-    STRINGNODE(const char* v, size_t column): m_column_id(column), m_key_ndx((size_t)-1) {
+    STRINGNODE(const char* v, size_t column): m_key_ndx((size_t)-1) {
+        m_column_id = column;
         m_child = 0;
         m_value = (char *)malloc(strlen(v)*6);
         memcpy(m_value, v, strlen(v) + 1);
     }
     ~STRINGNODE() {
-    //    delete m_child; 
         free((void*)m_value); 
     }
 
@@ -335,7 +373,6 @@ public:
 
 protected:
     char*  m_value;
-    size_t m_column_id;
 
 private:
     const ColumnBase* m_column;
@@ -347,12 +384,7 @@ private:
 class OR_NODE: public ParentNode {
 public:
     OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond1 = p1; m_cond2 = NULL;};
-    ~OR_NODE()
-    {
-//        delete m_cond1;
-//        delete m_cond2;
-//        delete m_child;
-    }
+
 
     void Init(const Table& table)
     {

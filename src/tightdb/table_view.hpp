@@ -100,6 +100,8 @@ protected:
 
     Array& get_ref_column() { return m_refs; }
     const Array& get_ref_column() const { return m_refs; }
+private:
+    template <int function>int64_t aggregate(size_t column_ndx) const;
 };
 
 

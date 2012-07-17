@@ -25,6 +25,7 @@
 
 namespace tightdb {
 
+enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_LESS};
 
 struct CONTAINS {
     CONTAINS() {};
@@ -69,6 +70,7 @@ struct EQUAL {
         return strcmp(v1, v2) == 0;
     }
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
+    int condition(void) {return COND_EQUAL;}
 };
 
 struct NOTEQUAL {
@@ -79,6 +81,7 @@ struct NOTEQUAL {
         return strcmp(v1, v2) != 0;
     }
     template<class T> bool operator()(const T& v1, const T& v2) const { return v1 != v2; }
+    int condition(void) {return -1;}
 };
 
 // does v1 contain v2?
@@ -88,6 +91,7 @@ struct CONTAINS_INS {
         (void)v1;
         return case_strstr(v1_upper, v1_lower, v2);
     }
+    int condition(void) {return -1;}
 };
 
 // is v2 a prefix of v1?
@@ -97,6 +101,7 @@ struct BEGINSWITH_INS {
         (void)v1;
         return case_prefix(v1_upper, v1_lower, v2) != (size_t)-1;
     }
+    int condition(void) {return -1;}
 };
 
 // does v1 end with s2?
@@ -111,6 +116,7 @@ struct ENDSWITH_INS {
         bool r = case_cmp(v1_upper, v1_lower, v2 + l2 - l1);
         return r;
     }
+    int condition(void) {return -1;}
 };
 
 struct EQUAL_INS {
@@ -119,6 +125,7 @@ struct EQUAL_INS {
         (void)v1;
         return case_cmp(v1_upper, v1_lower, v2);
     }
+    int condition(void) {return -1;}
 };
 
 struct NOTEQUAL_INS {
@@ -128,22 +135,27 @@ struct NOTEQUAL_INS {
         (void)v1;
         return !case_cmp(v1_upper, v1_lower, v2);
     }
+    int condition(void) {return -1;}
 };
 
 struct GREATER {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 > v2;}
+    int condition(void) {return COND_GREATER;}
 };
 
 struct LESS {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 < v2;}
+    int condition(void) {return COND_LESS;}
 };
 
 struct LESSEQUAL {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 <= v2;}
+    int condition(void) {return -1;}
 };
 
 struct GREATEREQUAL {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
+    int condition(void) {return -1;}
 };
 
 
