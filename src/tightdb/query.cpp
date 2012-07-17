@@ -232,37 +232,35 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
     if(end == size_t(-1))
         end = table.size();
 
-
     // User created query with no criteria; return everything
     if(first[0] == 0) {
         TableView tv(table);
-        for(size_t i = start; i < end; i++)
+        for(size_t i = start; i < end && i - start < limit; i++)
             tv.get_ref_column().add(i);
         return move(tv);
     }
 
     if(m_threadcount > 0) {
         // Use multithreading
+        //FIXME: Honor 'limit'
         return FindAllMulti(table, start, end);
     }
 
-    TableView tv(table);
-
     // Use single threading
-    for(;;) {
-        r = first[0]->find_first(r + 1, end);
-        if (r == end || tv.size() == limit)
-            break;
-        tv.get_ref_column().add(r);
-
-    }
-
+    TableView tv(table);
+    first[0]->find_all(&tv.get_ref_column(), start, end, limit);
     return move(tv);
 }
 
-int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end,
-            size_t limit) const
+int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if(first[0] == 0) {
+        if(resultcount)
+            *resultcount = table.size();
+        const Column& c = table.GetColumn(column);  
+        return c.sum(start, end);
+    }
+
     Init(table);
 
     size_t r = start - 1;
@@ -280,14 +278,18 @@ int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_
         sum += c.Get(r);
     }
 
-    if(resultcount != 0)
+    if(resultcount)
         *resultcount = results;
     return sum;
 }
 
-int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end,
-                size_t limit) const
+int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if(first[0] == 0) {
+        const Column& c = table.GetColumn(column);  
+        return c.maximum(start, end);
+    }
+
     Init(table);
 
     size_t r = start - 1;
@@ -311,6 +313,11 @@ int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, s
 
 int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if(first[0] == 0) {
+        const Column& c = table.GetColumn(column);  
+        return c.minimum(start, end);
+    }
+
     Init(table);
 
     size_t r = start - 1;
@@ -333,6 +340,10 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
 
 size_t Query::count(const Table& table, size_t start, size_t end, size_t limit) const
 {
+    if(first[0] == 0) { 
+        return table.size();
+    }
+
     Init(table);
 
     size_t r = start - 1;

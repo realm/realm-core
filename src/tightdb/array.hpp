@@ -61,6 +61,41 @@ namespace tightdb {
 
 static const size_t not_found = (size_t)-1;
 
+ /* wid == 16/32 likely when accessing offsets in B tree */
+#define TEMPEX(fun, wid, arg) \
+    if(wid == 16) {fun<16> arg;} \
+    else if (wid == 32) {fun<32> arg;} \
+    else if (wid == 0) {fun<0> arg;} \
+    else if (wid == 1) {fun<1> arg;} \
+    else if (wid == 2) {fun<2> arg;} \
+    else if (wid == 4) {fun<4> arg;} \
+    else if (wid == 8) {fun<8> arg;} \
+    else if (wid == 64) {fun<64> arg;} \
+    else {assert(true); fun<0> arg;}
+
+#define TEMPEX2(fun, targ, wid, arg) \
+    if(wid == 16) {fun<targ, 16> arg;} \
+    else if (wid == 32) {fun<targ, 32> arg;} \
+    else if (wid == 0) {fun<targ, 0> arg;} \
+    else if (wid == 1) {fun<targ, 1> arg;} \
+    else if (wid == 2) {fun<targ, 2> arg;} \
+    else if (wid == 4) {fun<targ, 4> arg;} \
+    else if (wid == 8) {fun<targ, 8> arg;} \
+    else if (wid == 64) {fun<targ, 64> arg;} \
+    else {assert(true); fun<targ, 0> arg;}
+
+#define TEMPEX3(fun, targ1, targ2, wid, arg) \
+    if(wid == 16) {fun<targ1, targ2, 16> arg;} \
+    else if (wid == 32) {fun<targ1, targ2, 32> arg;} \
+    else if (wid == 0) {fun<targ1, targ2, 0> arg;} \
+    else if (wid == 1) {fun<targ1, targ2, 1> arg;} \
+    else if (wid == 2) {fun<targ1, targ2, 2> arg;} \
+    else if (wid == 4) {fun<targ1, targ2, 4> arg;} \
+    else if (wid == 8) {fun<targ1, targ2, 8> arg;} \
+    else if (wid == 64) {fun<targ1, targ2, 64> arg;} \
+    else {assert(true); fun<targ1, targ2, 0> arg;}
+
+
 // Pre-definitions
 class Array;
 class AdaptiveStringColumn;
@@ -199,18 +234,16 @@ public:
     template <size_t w> bool Increment(int64_t value, size_t start, size_t end);
     size_t FindPos(int64_t value) const;
     size_t FindPos2(int64_t value) const;
-
-    /// Returns std::size_t(-1) if the specified value is not found.
-    size_t find_first(int64_t value, size_t start=0, size_t end=(size_t)-1) const;
+    size_t find_first(int64_t value, size_t start=0, size_t end=(size_t)-1, Array* akku = NULL) const;
     void Preset(int64_t min, int64_t max, size_t count);
     void Preset(size_t bitwidth, size_t count);
     void find_all(Array& result, int64_t value, size_t offset=0, size_t start=0, size_t end=(size_t)-1) const;
+    void find_all(int cond, Array* akku, int64_t value, size_t baseindex = 0, size_t start = 0, size_t end = (size_t)-1);
     void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     int64_t sum(size_t start = 0, size_t end = (size_t)-1) const;
     bool maximum(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
     bool minimum(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
     template <class F> size_t Query(int64_t value, size_t start, size_t end);
-
     void sort(void);
     void ReferenceSort(Array &ref);
     void Resize(size_t count);
@@ -232,6 +265,7 @@ public:
 
     // Debug
     size_t GetBitWidth() const {return m_width;}
+
 #ifdef _DEBUG
     bool Compare(const Array& c) const;
     void Print() const;
@@ -249,15 +283,26 @@ private:
     void ReferenceQuickSort(Array &ref);
     template<size_t w> void ReferenceQuickSort(size_t lo, size_t hi, Array &ref);
 #if defined(USE_SSE42) || defined(USE_SSE3)
-    template <int C, size_t width>  size_t FindSSE(int64_t value, __m128i *data, size_t items) const;
+    template <int cond, size_t width, bool accumulate> size_t FindSSE(int64_t value, __m128i *data, size_t items, Array* akku, size_t baseindex) const;
 #endif //USE_SSE
     template <size_t w> void sort();
     template <size_t w>void ReferenceSort(Array &ref);
 
-    template <size_t width> void find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const;
-    template <size_t w> size_t sum(size_t start, size_t end) const;
+    template <size_t w> int64_t sum(size_t start, size_t end) const;
     template <size_t w> size_t FindPos(int64_t target) const;
 	template<size_t w> int64_t GetUniversal(const char* const data, const size_t ndx) const;
+    template <bool gt, size_t width, bool accumulate>size_t FindGTLT_Limited(int64_t v, uint64_t chunk, uint64_t magic, Array* akku, size_t baseindex) const;
+    template <bool gt, size_t width, bool accumulate>size_t FindGTLT(int64_t v, uint64_t chunk, Array *akku, size_t baseindex) const;
+    template <int cond, bool accumulate, size_t bitwidth> size_t find(int64_t value, size_t start, size_t end, size_t baseindex, Array *akku) const;
+
+    template <int cond> size_t find_first(int64_t value, size_t start, size_t end) const
+    {
+        assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
+
+        Finder finder = m_finder[cond];
+        size_t i = (this->*finder)(value, start, end, 0, NULL);
+        return i;
+    }
 
 protected:
     bool AddPositiveLocal(int64_t value);
@@ -270,7 +315,7 @@ protected:
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t(Array::*Getter)(size_t) const;
     typedef void(Array::*Setter)(size_t, int64_t);
-    typedef size_t (Array::*Finder)(int64_t, size_t, size_t) const;
+    typedef size_t (Array::*Finder)(int64_t, size_t, size_t, size_t, Array*) const;
 
     enum WidthType {
         TDB_BITS     = 0,
@@ -307,12 +352,11 @@ protected:
 
 private:
     size_t m_ref;
-    template <int cond, size_t bitwidth>size_t Compare(int64_t value, size_t start, size_t end) const;
-    template <bool eq, size_t width> inline size_t CompareEquality(int64_t value, size_t start, size_t end) const;
-    template <bool gt, size_t width>size_t CompareRelation(int64_t value, size_t start, size_t end) const;
+    template <int cond, size_t bitwidth, bool accumulate>size_t Compare(int64_t value, size_t start, size_t end, size_t baseindex, Array* akku) const;
+    template <bool eq, size_t width, bool accumulate> inline size_t CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, Array* akku) const;
+    template <bool gt, size_t bitwidth, bool accumulate>size_t CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, Array* akku) const;
     template <bool max, size_t w> bool minmax(int64_t& result, size_t start, size_t end) const;
-    template <int C, size_t bitwidth>size_t find_first(int64_t value, size_t start, size_t end) const;
-    template <int C>size_t find_first(int64_t value, size_t start, size_t end) const;
+//    template <int C, bool accumulate, size_t bitwidth>size_t find2(int64_t value, size_t start, size_t end, Array* akku) const;
 
 protected:
     size_t m_len;
@@ -337,9 +381,6 @@ protected:
     virtual void update_child_ref(size_t subtable_ndx, size_t new_ref);
     virtual size_t get_child_ref(size_t subtable_ndx) const;
 };
-
-
-
 
 // Implementation:
 

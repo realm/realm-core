@@ -64,6 +64,7 @@ public:
     // FIXME: Need: size_t find_first_binary(size_t column_ndx, const char* value, size_t len) const;
 
     // Aggregate functions
+    template <int function>int64_t aggregate(size_t column_ndx) const;
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;

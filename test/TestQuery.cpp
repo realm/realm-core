@@ -576,6 +576,15 @@ TEST(TestQueryLimit)
     TupleTableType::View tv3 = q1.find_all(ttt, tv2.get_source_ndx(tv2.size() - 1) + 1, size_t(-1), 2);
     CHECK_EQUAL(1, tv3.size());
     CHECK_EQUAL(13, tv3.get_source_ndx(0));
+
+
+    TupleTableType::Query q2 = ttt.where();
+    TupleTableType::View tv4 = q2.find_all(ttt, 0, 5, 3);
+    CHECK_EQUAL(3, tv4.size());
+
+    TupleTableType::Query q3 = ttt.where();
+    TupleTableType::View tv5 = q3.find_all(ttt, 0, 3, 5);
+    CHECK_EQUAL(3, tv5.size());
 }
 
 TEST(TestQueryFindNext)

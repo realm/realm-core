@@ -340,6 +340,7 @@ private:
     template<class> friend class bind_ptr;
     friend class ColumnSubtableParent;
     friend class LangBindHelper;
+    friend class TableViewBase;
 };
 
 
