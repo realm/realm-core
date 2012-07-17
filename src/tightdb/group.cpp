@@ -461,20 +461,20 @@ void Group::update_refs(size_t topRef)
 
 void Group::update_from_shared(size_t top_ref, size_t len)
 {
-    if (top_ref == 0) return; // just created
-
     // Update memory mapping if needed
     const bool isRemapped = m_alloc.ReMap(len);
 
-    // If the top has not changed, everything is up-to-date
-    if (!isRemapped && top_ref == m_top.GetRef()) return;
-
     // If our last look at the file was when it
     // was empty, we may have to re-create the group
-    if (in_inital_state()) {
+    if (in_inital_state() || top_ref == 0) {
+        if (top_ref == 0)
+            reset_to_new();    // may have been a rollback
         create_from_ref();
         return;
     }
+
+    // If the top has not changed, everything is up-to-date
+    if (!isRemapped && top_ref == m_top.GetRef()) return;
 
     // Update group arrays
     m_top.UpdateRef(top_ref);

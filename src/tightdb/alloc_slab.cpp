@@ -375,12 +375,12 @@ error:
 
 bool SlabAlloc::RefreshMapping()
 {
+#if !defined(_MSC_VER) // write persistence
     // We need a lock on the file so we don't get
     // a partial size because some other process is
     // creating it.
     if (flock(m_fd, LOCK_EX) != 0) return false;
 
-#if !defined(_MSC_VER) // write persistence
     // Get current file size
     struct stat statbuf;
     if (fstat(m_fd, &statbuf) < 0) return false;
