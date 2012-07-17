@@ -307,12 +307,7 @@ Group& SharedGroup::begin_write()
 
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
-    if (new_topref == 0) {
-        m_group.reset_to_new(); // may have been a rollback
-        m_group.create_from_ref();
-    }
-    else
-        m_group.update_from_shared(new_topref, new_filesize);
+    m_group.update_from_shared(new_topref, new_filesize);
 
 #ifdef _DEBUG
     m_state = SHARED_STATE_WRITING;
