@@ -312,54 +312,64 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
 
     m_shared = (char *)pBuf;
     m_mapfile = hMapFile;
-#else
-    // Open file
-    m_fd = open(path, readOnly ? O_RDONLY : O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-    if (m_fd < 0) return false;
-
-    // Get size
-    struct stat statbuf;
-    if (fstat(m_fd, &statbuf) < 0) {
-        close(m_fd);
-        return false;
-    }
-    size_t len = statbuf.st_size;
-
-    if (readOnly && len == 0) {
-        // You have opened an non-existing or empty file
-        close(m_fd);
-        return false;
-    }
-
-    // Handle empty files (new database)
-    if (len == 0) {
-        if (readOnly) return false;
-        ssize_t r = write(m_fd, "\0\0\0\0\0\0\0\0", 8); // write top-ref
-	static_cast<void>(r); // FIXME: We should probably check for error here!
-
-        // pre-alloc initial space when mmapping
-        len = 1024*1024;
-        int r2 = ftruncate(m_fd, len);
-        static_cast<void>(r2); // FIXME: We should probably check for error here!
-    }
-
-    // Verify that data is 64bit aligned
-    if ((len & 0x7) != 0) return false;
-
-    // Map to memory (read only)
-    void* const p = mmap(0, len, PROT_READ, MAP_SHARED, m_fd, 0);
-    if (p == (void*)-1) {
-        close(m_fd);
-        return false;
-    }
-
-    //TODO: Verify the data structures
-
-    m_shared = (char*)p;
-    m_baseline = len;
-#endif
 
     return true;
+#else
+    // Open file
+    {
+        m_fd = open(path, readOnly ? O_RDONLY : O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (m_fd < 0) return false;
+
+        // Get size
+        struct stat statbuf;
+        if (fstat(m_fd, &statbuf) < 0) goto error;
+        size_t len = statbuf.st_size;
+
+        // Handle empty files (new database)
+        if (len == 0) {
+            if (readOnly) goto error; // non-existing or empty file
+
+            // We dont want multiple processes creating files at the same time
+            if (flock(m_fd, LOCK_EX) != 0) goto error;
+
+            // Verify that file has not been created by other process while
+            // we waited for lock
+            if (fstat(m_fd, &statbuf) < 0) goto error;
+            len = statbuf.st_size;
+
+            if (len == 0) {
+                const ssize_t r = write(m_fd, "\0\0\0\0\0\0\0\0", 8); // write top-ref
+                if (r == -1) goto error;
+
+                // pre-alloc initial space when mmapping
+                len = 1024*1024;
+                const int r2 = ftruncate(m_fd, len);
+                if (r2 == -1) goto error;
+            }
+
+            if (flock(m_fd, LOCK_UN) != 0) goto error;
+        }
+
+        // Verify that data is 64bit aligned
+        if ((len & 0x7) != 0) goto error;
+
+        // Map to memory (read only)
+        void* const p = mmap(0, len, PROT_READ, MAP_SHARED, m_fd, 0);
+        if (p == (void*)-1) goto error;
+
+        //TODO: Verify the data structures
+
+        m_shared = (char*)p;
+        m_baseline = len;
+
+        return true;
+    }
+
+error:
+    if (m_fd >= 0)
+        close(m_fd);
+    return false;
+#endif
 }
 
 bool SlabAlloc::CanPersist() const
