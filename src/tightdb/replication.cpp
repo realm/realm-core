@@ -890,6 +890,7 @@ private:
     Buffer<Spec*> m_subspecs;
     size_t m_num_subspecs;
     bool m_dirty_spec;
+    StringBuffer m_string_buffer;
 
     // Returns false on end-of-input
     bool fill_input_buffer()
@@ -915,6 +916,8 @@ private:
     error_code read_string(StringBuffer&);
 
     error_code add_subspec(Spec*);
+
+    template<bool insert> error_code set_or_insert(int column_ndx, size_t ndx);
 
     void delete_subspecs()
     {
@@ -950,16 +953,23 @@ private:
 template<class T> bool Replication::TransactLogApplier::read_int(T& v)
 {
     T value = 0;
-    char c;
-    for (;;) {
+    int part;
+    const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
+    for (int i=0; i<max_bytes; ++i) {
+        char c;
         if (!read_char(c)) return false;
-        if ((static_cast<unsigned char>(c) & 0x80) == 0) break;
-        if (shift_left_with_overflow_detect(value, 7)) return false;
-        value |= static_cast<unsigned char>(c) & 0x7F;
+        part = static_cast<unsigned char>(c);
+        if (0xFF < part) return false; // Only the first 8 bits may be used in each byte
+        if ((part & 0x80) == 0) {
+            T p = part & 0x3F;
+            if (shift_left_with_overflow_detect(p, i*7)) return false;
+            value |= p;
+            break;
+        }
+        if (i == max_bytes-1) return false; // Two many bytes
+        value |= T(part & 0x7F) << (i*7);
     }
-    if (shift_left_with_overflow_detect(value, 6)) return false;
-    value |= static_cast<unsigned char>(c) & 0x3F;
-    if (static_cast<unsigned char>(c) & 0x40) {
+    if (part & 0x40) {
         // The real value is negative. Because 'value' is positive at
         // this point, the following negation is guaranteed by the
         // standard to never overflow.
@@ -1015,6 +1025,120 @@ error_code Replication::TransactLogApplier::add_subspec(Spec* spec)
 }
 
 
+template<bool insert>
+error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
+{
+    switch (m_table->get_column_type(column_ndx)) {
+    case COLUMN_TYPE_INT:
+        {
+            int64_t value;
+            if (!read_int(value)) return ERROR_IO;
+            if (insert) m_table->insert_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else m_table->set_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+        }
+        break;
+    case COLUMN_TYPE_BOOL:
+        {
+            bool value;
+            if (!read_int(value)) return ERROR_IO;
+            if (insert) m_table->insert_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else m_table->set_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+        }
+        break;
+    case COLUMN_TYPE_DATE:
+        {
+            time_t value;
+            if (!read_int(value)) return ERROR_IO;
+            if (insert) m_table->insert_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else m_table->set_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+        }
+        break;
+    case COLUMN_TYPE_STRING:
+        {
+            const error_code err = read_string(m_string_buffer);
+            if (err) return err;
+            const char* const value = m_string_buffer.c_str();
+            if (insert) m_table->insert_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else m_table->set_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+        }
+        break;
+    case COLUMN_TYPE_BINARY:
+        {
+            const error_code err = read_string(m_string_buffer);
+            if (err) return err;
+            if (insert) m_table->insert_binary(column_ndx, ndx, m_string_buffer.data(),
+                                               m_string_buffer.size()); // FIXME: Memory allocation failure!!!
+            else m_table->set_binary(column_ndx, ndx, m_string_buffer.data(),
+                                     m_string_buffer.size()); // FIXME: Memory allocation failure!!!
+        }
+        break;
+    case COLUMN_TYPE_TABLE:
+        if (insert) m_table->insert_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
+        else m_table->clear_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
+        break;
+    case COLUMN_TYPE_MIXED:
+        {
+            int type;
+            if (!read_int(type)) return ERROR_IO;
+            switch (type) {
+            case COLUMN_TYPE_INT:
+                {
+                    int64_t value;
+                    if (!read_int(value)) return ERROR_IO;
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                }
+                break;
+            case COLUMN_TYPE_BOOL:
+                {
+                    bool value;
+                    if (!read_int(value)) return ERROR_IO;
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                }
+                break;
+            case COLUMN_TYPE_DATE:
+                {
+                    time_t value;
+                    if (!read_int(value)) return ERROR_IO;
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
+                }
+                break;
+            case COLUMN_TYPE_STRING:
+                {
+                    const error_code err = read_string(m_string_buffer);
+                    if (err) return err;
+                    const char* const value = m_string_buffer.c_str();
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                }
+                break;
+            case COLUMN_TYPE_BINARY:
+                {
+                    const error_code err = read_string(m_string_buffer);
+                    if (err) return err;
+                    const BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                }
+                break;
+            case COLUMN_TYPE_TABLE:
+                if (insert) m_table->insert_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
+                else m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
+                break;
+            default:
+                return ERROR_IO;
+            }
+        }
+        break;
+    default:
+        return ERROR_IO;
+    }
+    return ERROR_NONE;
+}
+
+
 error_code Replication::TransactLogApplier::apply()
 {
     if (!m_input_buffer) {
@@ -1024,7 +1148,6 @@ error_code Replication::TransactLogApplier::apply()
     m_input_begin = m_input_end = m_input_buffer;
 
     // FIXME: Problem: modifying group, table, and spec methods generally throw.
-    StringBuffer string_buffer;
     Spec* spec = 0;
     for (;;) {
         char instr;
@@ -1044,101 +1167,33 @@ error_code Replication::TransactLogApplier::apply()
                 if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
                     return ERROR_IO;
                 if (m_table->size() <= ndx) return ERROR_IO;
-                switch (m_table->get_column_type(column_ndx)) {
-                case COLUMN_TYPE_INT:
-                    {
-                        int64_t value;
-                        if (!read_int(value)) return ERROR_IO;
-                        m_table->set_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    break;
-                case COLUMN_TYPE_BOOL:
-                    {
-                        bool value;
-                        if (!read_int(value)) return ERROR_IO;
-                        m_table->set_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    break;
-                case COLUMN_TYPE_DATE:
-                    {
-                        time_t value;
-                        if (!read_int(value)) return ERROR_IO;
-                        m_table->set_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    break;
-                case COLUMN_TYPE_STRING:
-                    {
-                        const error_code err = read_string(string_buffer);
-                        if (err) return err;
-                        const char* const value = string_buffer.c_str();
-                        m_table->set_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    break;
-                case COLUMN_TYPE_BINARY:
-                    {
-                        const error_code err = read_string(string_buffer);
-                        if (err) return err;
-                        m_table->set_binary(column_ndx, ndx, string_buffer.data(),
-                                            string_buffer.size()); // FIXME: Memory allocation failure!!!
-                    }
-                    break;
-                case COLUMN_TYPE_TABLE:
-                    m_table->clear_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
-                    break;
-                case COLUMN_TYPE_MIXED:
-                    {
-                        int type;
-                        if (!read_int(type)) return ERROR_IO;
-                        switch (type) {
-                        case COLUMN_TYPE_INT:
-                            {
-                                int64_t value;
-                                if (!read_int(value)) return ERROR_IO;
-                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                            }
-                            break;
-                        case COLUMN_TYPE_BOOL:
-                            {
-                                bool value;
-                                if (!read_int(value)) return ERROR_IO;
-                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                            }
-                            break;
-                        case COLUMN_TYPE_DATE:
-                            {
-                                time_t value;
-                                if (!read_int(value)) return ERROR_IO;
-                                m_table->set_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
-                            }
-                            break;
-                        case COLUMN_TYPE_STRING:
-                            {
-                                const error_code err = read_string(string_buffer);
-                                if (err) return err;
-                                const char* const value = string_buffer.c_str();
-                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                            }
-                            break;
-                        case COLUMN_TYPE_BINARY:
-                            {
-                                const error_code err = read_string(string_buffer);
-                                if (err) return err;
-                                const BinaryData value(string_buffer.data(), string_buffer.size());
-                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                            }
-                            break;
-                        case COLUMN_TYPE_TABLE:
-                            m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
-                            break;
-                        default:
-                            return ERROR_IO;
-                        }
-                    }
-                    break;
-                default:
-                    return ERROR_IO;
-                }
+                const bool insert = false;
+                const error_code err = set_or_insert<insert>(column_ndx, ndx);
+                if (err) return err;
             }
+            break;
+
+        case 'i':  // Insert value
+            {
+                if (m_dirty_spec) finalize_spec();
+                int column_ndx;
+                if (!read_int(column_ndx)) return ERROR_IO;
+                size_t ndx;
+                if (!read_int(ndx)) return ERROR_IO;
+                if (!m_table) return ERROR_IO;
+                if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                    return ERROR_IO;
+                if (m_table->size() < ndx) return ERROR_IO;
+                const bool insert = true;
+                const error_code err = set_or_insert<insert>(column_ndx, ndx);
+                if (err) return err;
+            }
+            break;
+
+        case 'c':  // Row insert complete
+            if (m_dirty_spec) finalize_spec();
+            if (!m_table) return ERROR_IO;
+            m_table->insert_done(); // FIXME: May fail
             break;
 
         case 'I':  // Insert empty rows
@@ -1156,9 +1211,9 @@ error_code Replication::TransactLogApplier::apply()
                 int type;
                 if (!read_int(type)) return ERROR_IO;
                 if (!is_valid_column_type(type)) return ERROR_IO;
-                const error_code err = read_string(string_buffer);
+                const error_code err = read_string(m_string_buffer);
                 if (err) return err;
-                const char* const name = string_buffer.c_str();
+                const char* const name = m_string_buffer.c_str();
                 if (!spec) return ERROR_IO;
                 // FIXME: Is it legal to have multiple columns with the same name?
                 if (spec->get_column_index(name) != size_t(-1)) return ERROR_IO;
@@ -1215,9 +1270,9 @@ error_code Replication::TransactLogApplier::apply()
 
         case 'N':  // New top level table
             {
-                const error_code err = read_string(string_buffer);
+                const error_code err = read_string(m_string_buffer);
                 if (err) return err;
-                const char* const name = string_buffer.c_str();
+                const char* const name = m_string_buffer.c_str();
                 if (m_group.has_table(name)) return ERROR_IO;
                 if (!m_group.create_new_table(name)) return ERROR_OUT_OF_MEMORY;
             }
