@@ -969,18 +969,60 @@ template <bool gt, size_t width, bool accumulate>size_t Array::FindGTLT(int64_t 
         //97 ms ms:
         // if(gt ? (char)(chunk >> 0*8) > v : (char)(chunk >> 0*8) < v) return 0;
     }
-    else if(width == 16) {      
+    else if(width == 16) {
+
         if(gt ? (short int)(chunk >> 0*16) > v : (short int)(chunk >> 0*16) < v) {if(accumulate) akku->AddPositiveLocal(0 + baseindex); else return 0;};
         if(gt ? (short int)(chunk >> 1*16) > v : (short int)(chunk >> 1*16) < v) {if(accumulate) akku->AddPositiveLocal(1 + baseindex); else return 1;};
         if(gt ? (short int)(chunk >> 2*16) > v : (short int)(chunk >> 2*16) < v) {if(accumulate) akku->AddPositiveLocal(2 + baseindex); else return 2;};
         if(gt ? (short int)(chunk >> 3*16) > v : (short int)(chunk >> 3*16) < v) {if(accumulate) akku->AddPositiveLocal(3 + baseindex); else return 3;};
-/*
-        // Disabled due to bug in VC2010 compiler
+
+        /*
+        // Faster but disabled due to bug in VC2010 compiler (fixed in 2012 toolchain) where last 'if' is errorneously optimized away
         if(gt ? (short int)chunk > v : (short int)chunk < v) {if(accumulate) akku->AddPositiveLocal(0 + baseindex); else return 0;} chunk >>= 16;
         if(gt ? (short int)chunk > v : (short int)chunk < v) {if(accumulate) akku->AddPositiveLocal(1 + baseindex); else return 1;} chunk >>= 16;
         if(gt ? (short int)chunk > v : (short int)chunk < v) {if(accumulate) akku->AddPositiveLocal(2 + baseindex); else return 2;} chunk >>= 16;
         if(gt ? (short int)chunk > v : (short int)chunk < v) {if(accumulate) akku->AddPositiveLocal(3 + baseindex); else return 3;} chunk >>= 16;
-*/
+
+        // Following illustrates it:
+        #include <stdint.h>
+        #include <stdio.h>
+        #include <stdlib.h>
+
+        size_t bug(int64_t v, uint64_t chunk)
+        {
+            bool gt = true;
+
+            if(gt ? (short int)chunk > v : (short int)chunk < v) {return 0;} chunk >>= 16;
+            if(gt ? (short int)chunk > v : (short int)chunk < v) {return 1;} chunk >>= 16;
+            if(gt ? (short int)chunk > v : (short int)chunk < v) {return 2;} chunk >>= 16;
+            if(gt ? (short int)chunk > v : (short int)chunk < v) {return 3;} chunk >>= 16;
+
+            return -1;
+        }
+
+        int main(int argc, char const *const argv[])
+        {
+            int64_t v;
+            if(rand()*rand() == 3) {
+                v = rand()*rand()*rand()*rand()*rand();
+                printf("Change '3' to something else and run test again\n");
+            }
+            else {
+                v = 0x2222000000000000ULL;
+            }  
+
+            size_t idx;
+    
+            idx = bug(200, v);
+            if(idx != 3)
+                printf("Compiler failed: idx == %d (expected idx == 3)\n", idx);
+
+            v = 0x2222000000000000ULL;
+            idx = bug(200, v);
+            if(idx == 3)
+                printf("Touching v made it work\n", idx);
+        }
+        */
     }
     else if(width == 32) {
         if(gt ? (int)chunk > v : (int)chunk < v) {if(accumulate) akku->AddPositiveLocal(0 + baseindex); else return 0;} chunk >>= 32;
