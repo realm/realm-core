@@ -603,6 +603,8 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
         }
     }
 
+    m_size += num_rows;
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err = get_local_transact_log().insert_empty_rows(ndx, num_rows);
     if (err) throw_error(err);
