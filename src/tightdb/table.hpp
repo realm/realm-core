@@ -62,21 +62,21 @@ class ConstTableView;
 ///
 class Table {
 public:
-    /// Construct a new top-level table with an independent spec and
-    /// with static lifetime.
+    /// Construct a new freestanding top-level table with static
+    /// lifetime.
     ///
-    /// This constructor must be used only when placing table
+    /// This constructor should be used only when placing table
     /// variables on the stack, and it is then the responsibility of
-    /// the application that there are no objects of type TableRef
-    /// that refer to it, or to any of its subtables, when it goes out
-    /// of scope. To create a top-level table with dynamic lifetime,
-    /// use Table::create() instead.
+    /// the application that there are no objects of type TableRef or
+    /// ConstTableRef that refer to it, or to any of its subtables,
+    /// when it goes out of scope. To create a top-level table with
+    /// dynamic lifetime, use Table::create() instead.
     Table(Allocator& alloc = GetDefaultAllocator());
 
     ~Table();
 
-    /// Construct a new top-level table with independent spec and with
-    /// dynamic lifetime.
+    /// Construct a new freestanding top-level table with dynamic
+    /// lifetime.
     ///
     /// \return A reference to the new table, or null if allocation
     /// fails.

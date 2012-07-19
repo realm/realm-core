@@ -18,7 +18,7 @@ Format:
 
 2012-07-19 (Kristian Spangsege)
 ----------
-+ Table::create() added. Use this to create a top-level table with dynamic lifetime (determined by reference counting).
++ Table::create() added. Use this to create a freestanding top-level table with dynamic lifetime (determined by reference counting).
 + TableRef::reset() added to set a table reference to null.
 
 
