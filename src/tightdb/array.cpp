@@ -1432,6 +1432,9 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
     if (end == (size_t)-1) end = m_len;
     assert(start < m_len && end <= m_len && start < end);
 
+    if(w == 0)
+        return 0;
+
     int64_t m = Get<w>(start);
     ++start;
 
@@ -1501,6 +1504,9 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
 { 
     if (end == (size_t)-1) end = m_len;
     assert(start < m_len && end <= m_len && start < end);
+
+    if(w == 0)
+        return 0;
 
     int64_t s = 0;
 
