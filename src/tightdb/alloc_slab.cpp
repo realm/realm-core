@@ -387,7 +387,7 @@ bool SlabAlloc::RefreshMapping()
     const size_t len = statbuf.st_size;
 
     // Remap file if needed
-    if (!ReMap(len)) return false;
+    ReMap(len);
 
     if (flock(m_fd, LOCK_UN) != 0) return false;
 #endif
