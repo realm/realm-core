@@ -16,6 +16,12 @@ Format:
 ----------
 
 
+2012-07-19 (Kristian Spangsege)
+----------
++ Table::create() added. Use this to create a top-level table with dynamic lifetime (determined by reference counting).
++ TableRef::reset() added to set a table reference to null.
+
+
 2012-07-15 (Kristian Spangsege)
 ----------
 + Spec::compare() renamed to Spec::operator==(), and made generally available, not only while compiling in debug mode.
