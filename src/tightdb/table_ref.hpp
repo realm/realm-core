@@ -112,6 +112,8 @@ public:
     using bind_ptr<T>::operator typename bind_ptr<T>::unspecified_bool_type;
 #endif
 
+    void reset() { bind_ptr<T>::reset(); }
+
     void swap(BasicTableRef& r) { this->bind_ptr<T>::swap(r); }
     friend void swap(BasicTableRef& a, BasicTableRef& b) { a.swap(b); }
 

@@ -62,9 +62,25 @@ class ConstTableView;
 ///
 class Table {
 public:
-    // Construct a new top-level table with an independent spec.
+    /// Construct a new top-level table with an independent spec and
+    /// with static lifetime.
+    ///
+    /// This constructor must be used only when placing table
+    /// variables on the stack, and it is then the responsibility of
+    /// the application that there are no objects of type TableRef
+    /// that refer to it, or to any of its subtables, when it goes out
+    /// of scope. To create a top-level table with dynamic lifetime,
+    /// use Table::create() instead.
     Table(Allocator& alloc = GetDefaultAllocator());
+
     ~Table();
+
+    /// Construct a new top-level table with independent spec and with
+    /// dynamic lifetime.
+    ///
+    /// \return A reference to the new table, or null if allocation
+    /// fails.
+    static TableRef create(Allocator& alloc = GetDefaultAllocator());
 
     /// An invalid table must not be accessed in any way except by
     /// calling is_valid(). A table that is obtained from a Group
@@ -409,6 +425,15 @@ inline Table::Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t colum
     m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
 {
     init_from_ref(spec_ref, columns_ref, parent, ndx_in_parent);
+}
+
+inline TableRef Table::create(Allocator& alloc)
+{
+    const size_t ref = Table::create_empty_table(alloc);
+    if (!ref) return TableRef();
+    Table* const table = new (std::nothrow) Table(Table::RefCountTag(), alloc, ref, 0, 0);
+    if (!table) return TableRef();
+    return table->get_table_ref();
 }
 
 
