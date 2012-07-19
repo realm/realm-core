@@ -2,6 +2,8 @@
 
 #include <cassert>
 #include <utility>
+#include <ostream>
+#include <iomanip>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -25,10 +27,10 @@ namespace {
 // Note: The sum of this value and sizeof(SharedState) must not
 // exceed the maximum values of any of the types 'size_t',
 // 'ptrdiff_t', or 'off_t'.
-#ifdef _DEBUG
-const size_t initial_transact_log_buffer_size = 128;
-#else
+#ifdef NDEBUG
 const size_t initial_transact_log_buffer_size = 16*1024;
+#else
+const size_t initial_transact_log_buffer_size = 128;
 #endif
 
 const size_t init_subtab_path_buf_size = 2*8-1; // 8 table levels (soft limit)
@@ -563,10 +565,8 @@ error_code Replication::transact_log_reserve_contig(size_t n)
             // we will simply wait.
             if (m_shared_state->m_transact_log_used_begin ==
                 m_shared_state->m_transact_log_used_end) break;
-            if (!m_interrupt) {
-                m_shared_state->m_cond_transact_log_free.wait(lg);
-            }
             if (m_interrupt) return ERROR_INTERRUPTED;
+            m_shared_state->m_cond_transact_log_free.wait(lg);
         }
     }
     // At this point we know that we have to expand the file. We also
@@ -624,10 +624,8 @@ error_code Replication::transact_log_append_overflow(const char* data, std::size
                 break;
             }
 
-            if (!m_interrupt) {
-                m_shared_state->m_cond_transact_log_free.wait(lg);
-            }
             if (m_interrupt) return ERROR_INTERRUPTED;
+            m_shared_state->m_cond_transact_log_free.wait(lg);
         }
     }
     if (need_expand) {
@@ -877,6 +875,10 @@ struct Replication::TransactLogApplier {
         delete_subspecs();
     }
 
+#ifndef NDEBUG
+    void set_apply_log(ostream* log) { m_log = log; *m_log << boolalpha; }
+#endif
+
     error_code apply();
 
 private:
@@ -891,6 +893,9 @@ private:
     size_t m_num_subspecs;
     bool m_dirty_spec;
     StringBuffer m_string_buffer;
+#ifndef NDEBUG
+    ostream* m_log;
+#endif
 
     // Returns false on end-of-input
     bool fill_input_buffer()
@@ -930,6 +935,9 @@ private:
     {
         assert(m_table);
         m_table->update_from_spec();
+#ifndef NDEBUG
+        if (m_log) *m_log << "table->update_from_spec()\n";
+#endif
         m_dirty_spec = false;
     }
 
@@ -1035,6 +1043,12 @@ error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t
             if (!read_int(value)) return ERROR_IO;
             if (insert) m_table->insert_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else m_table->set_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+            if (m_log) {
+                if (insert) *m_log << "table->insert_int("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                else *m_log << "table->set_int("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+            }
+#endif
         }
         break;
     case COLUMN_TYPE_BOOL:
@@ -1043,6 +1057,12 @@ error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t
             if (!read_int(value)) return ERROR_IO;
             if (insert) m_table->insert_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else m_table->set_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+            if (m_log) {
+                if (insert) *m_log << "table->insert_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                else *m_log << "table->set_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+            }
+#endif
         }
         break;
     case COLUMN_TYPE_DATE:
@@ -1051,6 +1071,12 @@ error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t
             if (!read_int(value)) return ERROR_IO;
             if (insert) m_table->insert_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else m_table->set_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+            if (m_log) {
+                if (insert) *m_log << "table->insert_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                else *m_log << "table->set_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+            }
+#endif
         }
         break;
     case COLUMN_TYPE_STRING:
@@ -1060,6 +1086,12 @@ error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t
             const char* const value = m_string_buffer.c_str();
             if (insert) m_table->insert_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else m_table->set_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+            if (m_log) {
+                if (insert) *m_log << "table->insert_string("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
+                else *m_log << "table->set_string("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
+            }
+#endif
         }
         break;
     case COLUMN_TYPE_BINARY:
@@ -1070,11 +1102,23 @@ error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t
                                                m_string_buffer.size()); // FIXME: Memory allocation failure!!!
             else m_table->set_binary(column_ndx, ndx, m_string_buffer.data(),
                                      m_string_buffer.size()); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+            if (m_log) {
+                if (insert) *m_log << "table->insert_binary("<<column_ndx<<", "<<ndx<<", ...)\n";
+                else *m_log << "table->set_binary("<<column_ndx<<", "<<ndx<<", ...)\n";
+            }
+#endif
         }
         break;
     case COLUMN_TYPE_TABLE:
         if (insert) m_table->insert_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
         else m_table->clear_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+        if (m_log) {
+            if (insert) *m_log << "table->insert_subtable("<<column_ndx<<", "<<ndx<<")\n";
+            else *m_log << "table->clear_subtable("<<column_ndx<<", "<<ndx<<")\n";
+        }
+#endif
         break;
     case COLUMN_TYPE_MIXED:
         {
@@ -1087,6 +1131,12 @@ error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t
                     if (!read_int(value)) return ERROR_IO;
                     if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
                     else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                    }
+#endif
                 }
                 break;
             case COLUMN_TYPE_BOOL:
@@ -1095,6 +1145,12 @@ error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t
                     if (!read_int(value)) return ERROR_IO;
                     if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
                     else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                    }
+#endif
                 }
                 break;
             case COLUMN_TYPE_DATE:
@@ -1103,6 +1159,12 @@ error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t
                     if (!read_int(value)) return ERROR_IO;
                     if (insert) m_table->insert_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
                     else m_table->set_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", Date("<<value<<"))\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Date("<<value<<"))\n";
+                    }
+#endif
                 }
                 break;
             case COLUMN_TYPE_STRING:
@@ -1112,6 +1174,12 @@ error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t
                     const char* const value = m_string_buffer.c_str();
                     if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
                     else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
+                    }
+#endif
                 }
                 break;
             case COLUMN_TYPE_BINARY:
@@ -1121,11 +1189,23 @@ error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t
                     const BinaryData value(m_string_buffer.data(), m_string_buffer.size());
                     if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
                     else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", BinaryData(...))\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", BinaryData(...))\n";
+                    }
+#endif
                 }
                 break;
             case COLUMN_TYPE_TABLE:
                 if (insert) m_table->insert_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
                 else m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
+#ifndef NDEBUG
+                if (m_log) {
+                    if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
+                    else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
+                }
+#endif
                 break;
             default:
                 return ERROR_IO;
@@ -1194,6 +1274,9 @@ error_code Replication::TransactLogApplier::apply()
             if (m_dirty_spec) finalize_spec();
             if (!m_table) return ERROR_IO;
             m_table->insert_done(); // FIXME: May fail
+#ifndef NDEBUG
+            if (m_log) *m_log << "table->insert_done()\n";
+#endif
             break;
 
         case 'I':  // Insert empty rows
@@ -1203,6 +1286,9 @@ error_code Replication::TransactLogApplier::apply()
                 if (!read_int(ndx) || !read_int(num_rows)) return ERROR_IO;
                 if (!m_table || m_table->size() < ndx) return ERROR_IO;
                 m_table->insert_empty_row(ndx, num_rows); // FIXME: May fail
+#ifndef NDEBUG
+                if (m_log) *m_log << "table->insert_empty_row("<<ndx<<", "<<num_rows<<")\n";
+#endif
             }
             break;
 
@@ -1218,6 +1304,9 @@ error_code Replication::TransactLogApplier::apply()
                 // FIXME: Is it legal to have multiple columns with the same name?
                 if (spec->get_column_index(name) != size_t(-1)) return ERROR_IO;
                 spec->add_column(ColumnType(type), name);
+#ifndef NDEBUG
+                if (m_log) *m_log << "spec->add_column("<<type<<", \""<<name<<"\")\n";
+#endif
                 m_dirty_spec = true;
             }
             break;
@@ -1227,6 +1316,9 @@ error_code Replication::TransactLogApplier::apply()
                 delete_subspecs();
                 if (!m_table) return ERROR_IO;
                 spec = &m_table->get_spec();
+#ifndef NDEBUG
+                if (m_log) *m_log << "spec = table->get_spec()\n";
+#endif
                 int levels;
                 if (!read_int(levels)) return ERROR_IO;
                 for (int i=0; i<levels; ++i) {
@@ -1241,6 +1333,9 @@ error_code Replication::TransactLogApplier::apply()
                         delete spec;
                         return err;
                     }
+#ifndef NDEBUG
+                    if (m_log) *m_log << "spec = spec->get_subspec_by_ndx("<<subspec_ndx<<")\n";
+#endif
                 }
             }
             break;
@@ -1254,6 +1349,9 @@ error_code Replication::TransactLogApplier::apply()
                 if (!read_int(ndx)) return ERROR_IO;
                 if (m_group.get_table_count() <= ndx) return ERROR_IO;
                 m_table = m_group.get_table_ptr(ndx)->get_table_ref();
+#ifndef NDEBUG
+                if (m_log) *m_log << "table = group->get_table_by_ndx("<<ndx<<")\n";
+#endif
                 spec = 0;
                 for (int i=0; i<levels; ++i) {
                     int column_ndx;
@@ -1264,6 +1362,9 @@ error_code Replication::TransactLogApplier::apply()
                     if (m_table->get_column_type(column_ndx) != COLUMN_TYPE_TABLE) return ERROR_IO;
                     if (m_table->size() <= ndx) return ERROR_IO;
                     m_table = m_table->get_subtable(column_ndx, ndx);
+#ifndef NDEBUG
+                    if (m_log) *m_log << "table = table->get_subtable("<<column_ndx<<", "<<ndx<<")\n";
+#endif
                 }
             }
             break;
@@ -1275,6 +1376,9 @@ error_code Replication::TransactLogApplier::apply()
                 const char* const name = m_string_buffer.c_str();
                 if (m_group.has_table(name)) return ERROR_IO;
                 if (!m_group.create_new_table(name)) return ERROR_OUT_OF_MEMORY;
+#ifndef NDEBUG
+                if (m_log) *m_log << "group->create_new_table(\""<<name<<"\")\n";
+#endif
             }
             break;
 
@@ -1287,11 +1391,20 @@ error_code Replication::TransactLogApplier::apply()
 }
 
 
+#ifdef NDEBUG
 error_code Replication::apply_transact_log(InputStream& transact_log, Group& group)
 {
     TransactLogApplier applier(transact_log, group);
     return applier.apply();
 }
+#else // !NDEBUG
+error_code Replication::apply_transact_log(InputStream& transact_log, Group& group, ostream* log)
+{
+    TransactLogApplier applier(transact_log, group);
+    applier.set_apply_log(log);
+    return applier.apply();
+}
+#endif // !NDEBUG
 
 
 } // namespace tightdb

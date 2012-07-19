@@ -245,9 +245,18 @@ struct Replication {
         virtual ~InputStream() {}
     };
 
+    /// \param log If specified, and the library was compiled in debug
+    /// mode, then a line describing each individual operation is
+    /// writted to that stream.
+    ///
     /// \return ERROR_IO if the transaction log could not be
     /// successfully parsed, or ended prematurely.
+#ifdef NDEBUG
     static error_code apply_transact_log(InputStream& transact_log, Group& target);
+#else
+    static error_code apply_transact_log(InputStream& transact_log, Group& target,
+                                         std::ostream* log = 0);
+#endif
 
 private:
     struct SharedState;
