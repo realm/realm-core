@@ -174,7 +174,7 @@ public:
             // Do search directly on cached leaf array
             s = m_array.Query<F>(m_value, s - m_leaf_start, m_local_end);
 
-            if (s == (size_t)-1) {
+            if (s == not_found) {
                 s = m_leaf_end-1;
                 continue;
             }

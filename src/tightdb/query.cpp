@@ -364,13 +364,19 @@ double Query::average(const Table& table, size_t column_ndx, size_t* resultcount
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove(Table& table, size_t start, size_t end, size_t limit) const
 {
-    size_t r = start - 1;
+    if (end == not_found)
+        end = table.size();
+
+    size_t r = start;
     size_t results = 0;
-    Init(table);
 
     for (;;) {
-        r = FindInternal(table, r + 1 - results, end);
-        if (r == size_t(-1) || r == table.size() || results == limit)
+        // Every remove invalidates the array cache in the nodes
+        // so we have to re-initialize it before searching
+        Init(table);
+
+        r = FindInternal(table, r, end - results);
+        if (r == not_found || r == table.size() || results == limit)
             break;
         ++results;
         table.remove(r);
@@ -468,7 +474,7 @@ std::string Query::Verify()
 void Query::Init(const Table& table) const
 {
     if (first[0] != NULL) {
-        ParentNode* top = (ParentNode*)first[0];
+        ParentNode* const top = (ParentNode*)first[0];
         top->Init(table);
     }
 }
@@ -476,7 +482,7 @@ void Query::Init(const Table& table) const
 size_t Query::FindInternal(const Table& table, size_t start, size_t end) const
 {
     if (end == size_t(-1)) end = table.size();
-    if (start == end) return size_t(-1);
+    if (start == end) return not_found;
 
     size_t r;
     if (first[0] != 0)
@@ -485,7 +491,7 @@ size_t Query::FindInternal(const Table& table, size_t start, size_t end) const
         r = start; // user built an empty query; return any first
 
     if (r == table.size())
-        return size_t(-1);
+        return not_found;
     else
         return r;
 }
