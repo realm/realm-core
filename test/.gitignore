@@ -1,0 +1,26 @@
+/*.d
+/*.o
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/UnitTest++/libUnitTest++.a
+/UnitTest++/TestUnitTest++
+/UnitTest++/src/*.d
+/UnitTest++/src/*.o
+/UnitTest++/src/Posix/*.d
+/UnitTest++/src/Posix/*.o
+/UnitTest++/src/tests/*.d
+/UnitTest++/src/tests/*.o
+
+/tightdb-tests
+/tightdb-tests-debug
+/tightdb-tests-cover
+/subtables*.tdb
+/subtables.tightdb
+/table_test.tbl
+/*.lock
+
+/benchmark/x64
+/benchmark

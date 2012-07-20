@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include "tightdb.hpp"
-#include <UnitTest++.h>
 #include <assert.h>
+#include <UnitTest++.h>
+#include <tightdb/table_macros.hpp>
 #include "../Support/mem.hpp"
 #include "../Support/number_names.hpp"
 
@@ -18,11 +18,11 @@ uint64_t rand2()
     return seed * seed2 + seed2;
 }
 
-TDB_TABLE_1(IntegerTable,
-            Int,        first)
+TIGHTDB_TABLE_1(IntegerTable,
+                first, Int)
 
-TDB_TABLE_1(StringTable,
-            String,        first)
+TIGHTDB_TABLE_1(StringTable,
+                first, String)
 
 enum Days {
     Mon,
@@ -34,11 +34,11 @@ enum Days {
     Sun
 };
 
-TDB_TABLE_4(TestTable,
-            Int,        first,
-            String,     second,
-            Int,        third,
-            Enum<Days>, fourth)
+TIGHTDB_TABLE_4(TestTable,
+                first,  Int,
+                second, String,
+                third,  Int,
+                fourth, Enum<Days>)
 
 int main()
 {
@@ -50,9 +50,9 @@ int main()
         const size_t n = rand() % 1000;// * 10 + rand();
         const string s = number_name(n);
 
-        table.Add(n, s.c_str(), 100, Wed);
+        table.add(n, s.c_str(), 100, Wed);
     }
-    table.Add(0, "abcde", 100, Wed);
+    table.add(0, "abcde", 100, Wed);
 
     printf("Memory usage: %lld bytes\n", (long long)GetMemUsage()); // %zu doesn't work in vc
 
@@ -64,7 +64,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.cols().fourth.Find(Tue);
+            const size_t res = table.cols().fourth.find_first(Tue);
             if (res != size_t(-1)) {
                 printf("error");
             }
@@ -80,7 +80,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.cols().third.Find(50);
+            const size_t res = table.cols().third.find_first(50);
             if (res != size_t(-1)) {
                 printf("error");
             }
@@ -96,7 +96,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.cols().second.Find("abcde");
+            const size_t res = table.cols().second.find_first("abcde");
             if (res != 250000) {
                 printf("error");
             }
@@ -110,7 +110,7 @@ int main()
     {
         timer.Start();
 
-        table.set_index(0);
+        table.cols().first.set_index();
 
         const int search_time = timer.GetTimeInMs();
         printf("Add index: %dms\n", search_time);
@@ -124,7 +124,7 @@ int main()
 
         for (size_t i = 0; i < 100000; ++i) {
             const size_t n = rand() % 1000;
-            const size_t res = table.cols().first.Find(n);
+            const size_t res = table.cols().first.find_first(n);
             if (res == 2500002) { // to avoid above find being optimized away
                 printf("error");
             }
@@ -133,6 +133,8 @@ int main()
         const int search_time = timer.GetTimeInMs();
         printf("Search index: %dms\n", search_time);
     }
-
+#ifdef _MSC_VER
+    getchar();
+#endif
     return 0;
 }

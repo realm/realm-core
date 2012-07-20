@@ -1,5 +1,5 @@
-#include "array_binary.hpp"
 #include <UnitTest++.h>
+#include <tightdb/array_binary.hpp>
 
 using namespace tightdb;
 
@@ -11,12 +11,12 @@ ArrayBinary db_setup_binary::c;
 
 TEST_FIXTURE(db_setup_binary, ArrayBinaryMultiEmpty)
 {
-    c.Add("", 0);
-    c.Add("", 0);
-    c.Add("", 0);
-    c.Add(NULL, 0);
-    c.Add(NULL, 0);
-    c.Add(NULL, 0);
+    c.add("", 0);
+    c.add("", 0);
+    c.add("", 0);
+    c.add(NULL, 0);
+    c.add(NULL, 0);
+    c.add(NULL, 0);
 
     CHECK_EQUAL(6, c.Size());
 
@@ -48,12 +48,12 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryAdd)
     c.Clear();
     CHECK_EQUAL(0, c.Size());
 
-    c.Add("abc", 4);
+    c.add("abc", 4);
     CHECK_EQUAL("abc", c.Get(0)); // single
     CHECK_EQUAL(4, c.GetLen(0));
     CHECK_EQUAL(1, c.Size());
 
-    c.Add("defg", 5); //non-empty
+    c.add("defg", 5); //non-empty
     CHECK_EQUAL("abc", c.Get(0));
     CHECK_EQUAL("defg", c.Get(1));
     CHECK_EQUAL(4, c.GetLen(0));
@@ -66,7 +66,7 @@ TEST_FIXTURE(db_setup_binary, ArrayBinarySet2)
     // {shrink, grow} x {first, middle, last, single}
     c.Clear();
 
-    c.Add("abc", 4);
+    c.add("abc", 4);
     c.Set(0, "de", 3); // shrink single
     CHECK_EQUAL("de", c.Get(0));
     CHECK_EQUAL(1, c.Size());
@@ -75,7 +75,7 @@ TEST_FIXTURE(db_setup_binary, ArrayBinarySet2)
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL(1, c.Size());
 
-    c.Add("efg", 4);
+    c.add("efg", 4);
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL("efg", c.Get(1));
     CHECK_EQUAL(2, c.Size());
@@ -90,7 +90,7 @@ TEST_FIXTURE(db_setup_binary, ArrayBinarySet2)
     CHECK_EQUAL("jklmno", c.Get(1));
     CHECK_EQUAL(2, c.Size());
 
-    c.Add("pq", 3);
+    c.add("pq", 3);
     c.Set(1, "efghijkl", 9); // grow middle
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL("efghijkl", c.Get(1));
@@ -155,11 +155,11 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryDelete)
 {
     c.Clear();
 
-    c.Add("a", 2);
-    c.Add("bc", 3);
-    c.Add("def", 4);
-    c.Add("ghij", 5);
-    c.Add("klmno", 6);
+    c.add("a", 2);
+    c.add("bc", 3);
+    c.add("def", 4);
+    c.add("ghij", 5);
+    c.add("klmno", 6);
 
     c.Delete(0); // first
     CHECK_EQUAL("bc", c.Get(0));

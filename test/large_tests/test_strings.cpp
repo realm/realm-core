@@ -1,16 +1,14 @@
-
 #include <UnitTest++.h>
+#include <tightdb/column.hpp>
 #include "../testsettings.hpp"
 #include "../Support/number_names.hpp"
-#include "column.hpp"
-
 #include "verified_string.hpp"
 
 #if TEST_DURATION > 0
 
 using namespace tightdb;
 
-string randstring(void);
+std::string randstring(void);
 
 namespace {
 
@@ -27,14 +25,14 @@ uint64_t rand2(int bitwidth = 64)
 
 }
 
-string randstring(void)
+std::string randstring(void)
 {
     // If there are in the order of MAX_LIST_SIZE different strings, then we'll get a good
     // distribution btw. arrays with no matches and arrays with multiple matches, when
     // testing Find/FindAll
     int64_t t = (rand() % 100) * 100;
     size_t len = (rand() % 10) * 100 + 1;
-    string s;
+    std::string s;
     while(s.length() < len)
         s += number_name(t);
 
@@ -60,8 +58,8 @@ TEST(ColumnString_monkeytest2)
         if (!(rand2() % (ITER / 100))) {
             trend = (unsigned int)rand2() % 10;
 
-            a.Find(randstring().c_str());
-            a.FindAll(res, randstring().c_str());
+            a.find_first(randstring().c_str());
+            a.find_all(res, randstring().c_str());
         }
 
         if (rand2() % 10 > trend && a.Size() < ITER / 100) {
@@ -72,7 +70,7 @@ TEST(ColumnString_monkeytest2)
             }
             else {
                 // Add
-                a.Add(randstring().c_str());
+                a.add(randstring().c_str());
             }
         }
         else if(a.Size() > 0) {

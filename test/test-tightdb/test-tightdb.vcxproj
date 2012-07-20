@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -35,53 +35,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\alloc.cpp" />
-    <ClCompile Include="..\..\src\Array.cpp" />
-    <ClCompile Include="..\..\src\ArrayBinary.cpp" />
-    <ClCompile Include="..\..\src\ArrayBlob.cpp" />
-    <ClCompile Include="..\..\src\ArrayString.cpp" />
-    <ClCompile Include="..\..\src\ArrayStringLong.cpp" />
-    <ClCompile Include="..\..\src\Column.cpp" />
-    <ClCompile Include="..\..\src\ColumnBinary.cpp" />
-    <ClCompile Include="..\..\src\ColumnMixed.cpp" />
-    <ClCompile Include="..\..\src\ColumnString.cpp" />
-    <ClCompile Include="..\..\src\ColumnStringEnum.cpp" />
-    <ClCompile Include="..\..\src\ColumnTable.cpp" />
-    <ClCompile Include="..\..\src\ctightdb.cpp" />
-    <ClCompile Include="..\..\src\Group.cpp" />
-    <ClCompile Include="..\..\src\Index.cpp" />
-    <ClCompile Include="..\..\src\Table.cpp" />
-    <ClCompile Include="..\..\src\TableView.cpp" />
-    <ClCompile Include="..\..\src\utf8.cpp" />
-    <ClCompile Include="..\..\src\utilities.cpp" />
     <ClCompile Include="..\Support\win32\mem.cpp" />
     <ClCompile Include="..\UnitTest++\src\Win32\TimeHelpers.cpp" />
     <ClCompile Include="test-tightdb.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\alloc.hpp" />
-    <ClInclude Include="..\..\src\AllocSlab.hpp" />
-    <ClInclude Include="..\..\src\Array.hpp" />
-    <ClInclude Include="..\..\src\ArrayBinary.hpp" />
-    <ClInclude Include="..\..\src\ArrayBlob.hpp" />
-    <ClInclude Include="..\..\src\ArrayString.hpp" />
-    <ClInclude Include="..\..\src\ArrayStringLong.hpp" />
-    <ClInclude Include="..\..\src\Column.hpp" />
-    <ClInclude Include="..\..\src\ColumnBinary.hpp" />
-    <ClInclude Include="..\..\src\ColumnMixed.hpp" />
-    <ClInclude Include="..\..\src\ColumnString.hpp" />
-    <ClInclude Include="..\..\src\ColumnStringEnum.hpp" />
-    <ClInclude Include="..\..\src\ColumnTable.hpp" />
-    <ClInclude Include="..\..\src\ColumnType.hpp" />
-    <ClInclude Include="..\..\src\Column_tpl.hpp" />
-    <ClInclude Include="..\..\src\ctightdb.h" />
-    <ClInclude Include="..\..\src\Group.hpp" />
-    <ClInclude Include="..\..\src\Index.hpp" />
-    <ClInclude Include="..\..\src\Table.hpp" />
-    <ClInclude Include="..\..\src\TableRef.hpp" />
-    <ClInclude Include="..\..\src\tightdb.hpp" />
-    <ClInclude Include="..\..\src\utf8.hpp" />
-    <ClInclude Include="..\..\src\utilities.hpp" />
+    <ClInclude Include="..\Support\mem.hpp" />
+    <ClInclude Include="..\Support\number_names.hpp" />
     <ClInclude Include="..\UnitTest++\src\Win32\TimeHelpers.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -208,7 +168,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\Support;..\..\src;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Support;..\..\src;..\..\include;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -219,16 +179,18 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>tightdb32d.lib;Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX86</TargetMachine>
+      <AdditionalLibraryDirectories>..\..\lib</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>libcpmtd.lib;LIBCMTD.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\Support;..\..\src;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Support;..\..\src;..\..\include;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -243,6 +205,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX86</TargetMachine>
+      <AdditionalLibraryDirectories>..\..\lib</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>MSVCRT.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -251,7 +215,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\Support;..\..\src;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Support;..\..\src;..\..\include;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -262,10 +226,12 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>tightdb64d.lib;;Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX64</TargetMachine>
+      <AdditionalLibraryDirectories>..\..\lib</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>libcpmtd.lib;LIBCMTD.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">
@@ -274,7 +240,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\Support;..\..\src;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Support;..\..\src;..\..\include;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -289,13 +255,15 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX64</TargetMachine>
+      <AdditionalLibraryDirectories>..\..\lib</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>MSVCRT.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\Support;..\..\src;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Support;..\..\src;..\..\include;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -305,19 +273,21 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>tightdb32.lib;Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
+      <AdditionalLibraryDirectories>..\..\lib</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>libcpmt.lib;LIBCMT.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\Support;..\..\src;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Support;..\..\src;..\..\include;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -333,6 +303,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
+      <AdditionalLibraryDirectories>..\..\lib</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>MSVCRT.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -342,7 +314,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\Support;..\..\src;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Support;..\..\src;..\..\include;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -352,12 +324,16 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>TightDB64.lib;Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX64</TargetMachine>
+      <AdditionalLibraryDirectories>..\..\lib</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>libcpmt.lib;LIBCMT.lib</IgnoreSpecificDefaultLibraries>
+      <IgnoreAllDefaultLibraries>
+      </IgnoreAllDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">
@@ -367,7 +343,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\Support;..\..\src;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Support;..\..\src;..\..\include;..\UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -377,12 +353,15 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>TightDB64.lib;Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX64</TargetMachine>
+      <AdditionalLibraryDirectories>..\..\lib</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>libcpmt.lib;msvcprt.lib;MSVCRT.lib</IgnoreSpecificDefaultLibraries>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

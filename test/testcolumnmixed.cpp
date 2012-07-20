@@ -1,5 +1,5 @@
-#include "column_mixed.hpp"
 #include <UnitTest++.h>
+#include <tightdb/column_mixed.hpp>
 
 using namespace tightdb;
 
@@ -40,9 +40,9 @@ TEST(ColumnMixed_Bool)
 {
     ColumnMixed c;
 
-    c.InsertBool(0, true);
-    c.InsertBool(1, false);
-    c.InsertBool(2, true);
+    c.insert_bool(0, true);
+    c.insert_bool(1, false);
+    c.insert_bool(2, true);
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
@@ -73,9 +73,9 @@ TEST(ColumnMixed_Date)
 {
     ColumnMixed c;
 
-    c.InsertDate(0,     2);
-    c.InsertDate(1,   100);
-    c.InsertDate(2, 20000);
+    c.insert_date(0,     2);
+    c.insert_date(1,   100);
+    c.insert_date(2, 20000);
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
@@ -106,9 +106,9 @@ TEST(ColumnMixed_String)
 {
     ColumnMixed c;
 
-    c.InsertString(0, "aaa");
-    c.InsertString(1, "bbbbb");
-    c.InsertString(2, "ccccccc");
+    c.insert_string(0, "aaa");
+    c.insert_string(1, "bbbbb");
+    c.insert_string(2, "ccccccc");
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
@@ -139,9 +139,9 @@ TEST(ColumnMixed_Binary)
 {
     ColumnMixed c;
 
-    c.InsertBinary(0, "aaa", 4);
-    c.InsertBinary(1, "bbbbb", 6);
-    c.InsertBinary(2, "ccccccc", 8);
+    c.insert_binary(0, "aaa", 4);
+    c.insert_binary(1, "bbbbb", 6);
+    c.insert_binary(2, "ccccccc", 8);
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
@@ -172,8 +172,8 @@ TEST(ColumnMixed_Table)
 {
     ColumnMixed c;
 
-    c.InsertTable(0);
-    c.InsertTable(1);
+    c.insert_table(0);
+    c.insert_table(1);
     CHECK_EQUAL(2, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
@@ -196,11 +196,11 @@ TEST(ColumnMixed_Mixed)
 
     // Insert mixed types
     c.insert_int(0, 23);
-    c.InsertBool(0, false);
-    c.InsertDate(0, 23423);
-    c.InsertString(0, "Hello");
-    c.InsertBinary(0, "binary", 7);
-    c.InsertTable(0);
+    c.insert_bool(0, false);
+    c.insert_date(0, 23423);
+    c.insert_string(0, "Hello");
+    c.insert_binary(0, "binary", 7);
+    c.insert_table(0);
     CHECK_EQUAL(6, c.Size());
 
     CHECK_EQUAL(COLUMN_TYPE_TABLE,  c.GetType(0));

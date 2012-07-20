@@ -1,11 +1,13 @@
+#include "../testsettings.hpp"
+
 #if TEST_DURATION > 0
 
 #include "column.hpp"
 #include <UnitTest++.h>
 #include <vector>
 #include <algorithm>
-#include "../testsettings.hpp"
 #include "verified_integer.hpp"
+#include "query_conditions.hpp"
 
 using namespace tightdb;
 
@@ -23,6 +25,65 @@ uint64_t rand2(int bitwidth = 64)
 
 }
 
+TEST(LESS)
+{
+    const size_t LEN = 300;
+    Array a;
+    for(size_t t = 0; t < LEN; t++)
+        a.add(100);
+
+    a.Set(132, 50);
+    size_t f = a.Query<LESS>(100, 0, 137);
+
+
+    for(size_t from = 0; from < LEN; from++) {
+        for(size_t to = from + 1; to <= LEN; to++) {
+            for(size_t match = 0; match < LEN; match++) {
+                a.Set(match, 50);
+                size_t f = a.Query<LESS>(100, from, to);
+                a.Set(match, 100);
+                if(match >= from && match < to) {
+                    CHECK_EQUAL(match, f);
+                    assert(match == f);
+                }
+                else {
+                    CHECK_EQUAL(f, -1);
+                    assert(f == -1);
+                }
+            }
+        }
+
+    }
+}
+
+
+
+TEST(Find1)
+{
+    const size_t LEN = 300;
+    Array a;
+    for(size_t t = 0; t < LEN; t++)
+        a.add(100);
+
+    for(size_t from = 0; from < LEN; from++) {
+        for(size_t to = from + 1; to <= LEN; to++) {
+            for(size_t match = 0; match < LEN; match++) {
+                a.Set(match, 200);
+                size_t f = a.find_first(200, from, to);
+                a.Set(match, 100);
+                if(match >= from && match < to) {
+                    CHECK_EQUAL(match, f);
+                    assert(match == f);
+                }
+                else {
+                    CHECK_EQUAL(f, -1);
+                    assert(f == -1);
+                }
+            }
+        }
+
+    }
+}
 
 TEST(Column_monkeytest2)
 {
@@ -43,12 +104,12 @@ TEST(Column_monkeytest2)
 
             if (!(rand2() % (ITER_PER_BITWIDTH / 100))) {
                 trend = (unsigned int)rand2() % 10;
-                a.Find(rand2(current_bitwidth));
-                a.FindAll(res, rand2(current_bitwidth));
+                a.find_first(rand2(current_bitwidth));
+                a.find_all(res, rand2(current_bitwidth));
                 size_t start = rand2() % (a.Size() + 1);
-                a.sum(start, start + rand2() % (a.Size() + 1 - start));
-                a.Max(start, start + rand2() % (a.Size() + 1 - start));
-                a.Min(start, start + rand2() % (a.Size() + 1 - start));
+                a.Sum(start, start + rand2() % (a.Size() + 1 - start));
+                a.maximum(start, start + rand2() % (a.Size() + 1 - start));
+                a.minimum(start, start + rand2() % (a.Size() + 1 - start));
             }
 
             if (rand2() % 10 > trend && a.Size() < ITER_PER_BITWIDTH / 100) {
@@ -60,7 +121,7 @@ TEST(Column_monkeytest2)
                 }
                 else {
                     // Add
-                    a.Add(l);
+                    a.add(l);
                 }
             }
             else if(a.Size() > 0) {

@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "tightdb.hpp"
+#include "../../src/tightdb.hpp"
 #include "../../test/UnitTest++/src/UnitTest++.h"
 #include "../../test/UnitTest++/src/Win32/TimeHelpers.h"
 #include "../Support/mem.hpp"
@@ -24,8 +24,8 @@ uint64_t rand2()
     return seed * seed2 + seed2;
 }
 
-TDB_TABLE_1(IntegerTable,
-            Int,        first)
+TIGHTDB_TABLE_1(IntegerTable,
+                first, Int)
 
 UnitTest::Timer timer;
 int ITEMS = 50000;
@@ -35,8 +35,6 @@ int RANGE = 50000;
 void stl(void);
 
 volatile uint64_t writethrough;
-
-
 
 
 void tightdb2(void)
@@ -49,9 +47,9 @@ void tightdb2(void)
 
     for(int index = 0; index < 2; index++) {
         std::string indexed;
-        integers.Clear();
+        integers.clear();
         if(index == 1) {
-            integers.set_index(0);
+            integers.cols().first.set_index();
             indexed = "Indexed ";
         }
 
@@ -60,17 +58,17 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (i + 1);
-            integers.Add((int64_t)rand2() % RANGE);
+            integers.add((int64_t)rand2() % RANGE);
         }
 //      printf((indexed + "Memory usage: %lld bytes\n").c_str(), (int64_t)GetMemUsage()); // %zu doesn't work in vc
         printf((indexed + "Add: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 
 
-        //integers.Clear();
+        //integers.clear();
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (i + 1);
-            integers.insert_int(0, p, (int64_t)rand2() % RANGE);
+            integers.insert(p, (int64_t)rand2() % RANGE);
         }
         printf((indexed + "Insert: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 
@@ -95,7 +93,7 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             uint64_t f = rand2() % RANGE;
-            integers.first.Find(f);
+            integers.cols().first.find_first(f);
 
             // Sanity test to ensure that average distance between matches is the same as in the STL tests
 /*
@@ -112,7 +110,7 @@ void tightdb2(void)
 
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
-            integers.first.FindAll(rand2() % RANGE);
+            integers.cols().first.find_all(rand2() % RANGE);
         }
         printf((indexed + "FindAll: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 
@@ -120,7 +118,7 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             size_t p = rand2() % (ITEMS - i);
-            integers.DeleteRow(p);
+            integers.remove(p);
         }
         printf((indexed + "Delete: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
         printf("\n");
@@ -132,5 +130,7 @@ void tightdb2(void)
 void main(void)
 {
     tightdb2();
-//    getchar();
+#ifdef _MSC_VER
+    getchar();
+#endif
 }

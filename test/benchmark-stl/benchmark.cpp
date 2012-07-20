@@ -13,9 +13,6 @@
 
 using namespace tightdb;
 
-
-
-
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
 uint64_t rand2()
 {
@@ -26,8 +23,8 @@ uint64_t rand2()
     return seed * seed2 + seed2;
 }
 
-TDB_TABLE_1(IntegerTable,
-            Int,        first)
+TIGHTDB_TABLE_1(IntegerTable,
+                first, Int)
 
 UnitTest::Timer timer;
 int ITEMS = 50000;
@@ -119,7 +116,7 @@ void stl()
     timer.Start();
     for (size_t i = 0; i < ITEMS; ++i) {
         size_t p = rand2() % (ITEMS - i);
-        integers.remove(integers.begin() + p);
+        integers.erase(integers.begin() + p);
     }
     printf("Delete: %dms\n", timer.GetTimeInMs());
     printf("\n");
@@ -164,4 +161,8 @@ void stl()
 //          printf("%d %d\n", i->second, i->first); // sanity check
     }
     printf("Indexed FindAll: %dms\n", timer.GetTimeInMs());
+
+#ifdef _MSC_VER
+    getchar();
+#endif
 }

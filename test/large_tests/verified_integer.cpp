@@ -5,7 +5,7 @@
 #include <string>
 #include <algorithm>
 #ifdef _MSC_VER
-    #include "win32\stdint.h"
+    #include <win32\stdint.h>
 #endif
 #include <stdio.h>
 #include "verified_integer.hpp"
@@ -25,10 +25,10 @@ void VerifiedInteger::VerifyNeighbours(size_t ndx)
         assert(v[ndx + 1] == u.Get(ndx + 1));
 }
 
-void VerifiedInteger::Add(int64_t value)
+void VerifiedInteger::add(int64_t value)
 {
     v.push_back(value);
-    u.Add(value);
+    u.add(value);
     assert(v.size() == u.Size());
     VerifyNeighbours(v.size());
     assert(ConditionalVerify());
@@ -66,7 +66,7 @@ int64_t VerifiedInteger::Sum(size_t start, size_t end)
     return sum;
 }
 
-int64_t VerifiedInteger::Max(size_t start, size_t end)
+int64_t VerifiedInteger::maximum(size_t start, size_t end)
 {
     if(end == size_t(-1))
         end = v.size();
@@ -80,11 +80,11 @@ int64_t VerifiedInteger::Max(size_t start, size_t end)
         if(v[t] > max)
             max = v[t];
 
-    assert(max == u.Max(start, end));
+    assert(max == u.maximum(start, end));
     return max;
 }
 
-int64_t VerifiedInteger::Min(size_t start, size_t end)
+int64_t VerifiedInteger::minimum(size_t start, size_t end)
 {
     if(end == size_t(-1))
         end = v.size();
@@ -98,7 +98,7 @@ int64_t VerifiedInteger::Min(size_t start, size_t end)
         if(v[t] < min)
             min = v[t];
 
-    assert(min == u.Min(start, end));
+    assert(min == u.minimum(start, end));
     return min;
 }
 
@@ -127,11 +127,11 @@ void VerifiedInteger::Clear()
     assert(ConditionalVerify());
 }
 
-size_t VerifiedInteger::Find(int64_t value)
+size_t VerifiedInteger::find_first(int64_t value)
 {
     std::vector<int64_t>::iterator it = std::find(v.begin(), v.end(), value);
     size_t ndx = std::distance(v.begin(), it);
-    size_t index2 = u.Find(value);
+    size_t index2 = u.find_first(value);
     assert(ndx == index2 || (it == v.end() && index2 == size_t(-1)));
     (void)index2;
     return ndx;
@@ -144,7 +144,7 @@ size_t VerifiedInteger::Size(void)
 }
 
 // todo/fixme, end ignored
-void VerifiedInteger::FindAll(Array &c, int64_t value, size_t start, size_t end)
+void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end)
 {
     std::vector<int64_t>::iterator ita = v.begin() + start;
     std::vector<int64_t>::iterator itb = end == size_t(-1) ? v.end() : v.begin() + (end == size_t(-1) ? v.size() : end);;
@@ -160,7 +160,7 @@ void VerifiedInteger::FindAll(Array &c, int64_t value, size_t start, size_t end)
 
     c.Clear();
 
-    u.FindAll(c, value);
+    u.find_all(c, value);
     if (c.Size() != result.size())
         assert(false);
     for(size_t t = 0; t < result.size(); ++t) {

@@ -1,5 +1,5 @@
-#include "array_blob.hpp"
 #include <UnitTest++.h>
+#include <tightdb/array_blob.hpp>
 
 using namespace tightdb;
 
@@ -16,9 +16,9 @@ TEST(ArrayBlob)
     const size_t l3 = strlen(t3)+1;
 
     // Test add
-    blob.Add(t1, l1);
-    blob.Add(t2, l2);
-    blob.Add(t3, l3);
+    blob.add(t1, l1);
+    blob.add(t2, l2);
+    blob.add(t3, l3);
 
     CHECK_EQUAL(t1, blob.Get(0));
     CHECK_EQUAL(t2, blob.Get(l1));

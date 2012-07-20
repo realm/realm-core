@@ -1,12 +1,11 @@
-
 #include <vector>
 #include <string>
 #include <algorithm>
 #ifdef _MSC_VER
-    #include "win32\stdint.h"
+    #include <win32\stdint.h>
 #endif
 #include <stdio.h>
-#include "column_string.hpp"
+#include <tightdb/column_string.hpp>
 #include "verified_string.hpp"
 
 using namespace std;
@@ -24,10 +23,10 @@ void VerifiedString::VerifyNeighbours(size_t ndx)
         assert(v[ndx + 1] == u.Get(ndx + 1));
 }
 
-void VerifiedString::Add(const char * value)
+void VerifiedString::add(const char * value)
 {
     v.push_back(value);
-    u.Add(value);
+    u.add(value);
     assert(v.size() == u.Size());
     VerifyNeighbours(v.size());
     assert(ConditionalVerify());
@@ -75,11 +74,11 @@ void VerifiedString::Clear()
     assert(ConditionalVerify());
 }
 
-size_t VerifiedString::Find(const char *value)
+size_t VerifiedString::find_first(const char *value)
 {
     std::vector<string>::iterator it = std::find(v.begin(), v.end(), value);
     size_t ndx = std::distance(v.begin(), it);
-    size_t index2 = u.Find(value);
+    size_t index2 = u.find_first(value);
     (void)index2;
     assert(ndx == index2 || (it == v.end() && index2 == size_t(-1)));
     return ndx;
@@ -92,7 +91,7 @@ size_t VerifiedString::Size(void)
 }
 
 // todo/fixme, end ignored
-void VerifiedString::FindAll(Array &c, const char *value, size_t start, size_t end)
+void VerifiedString::find_all(Array &c, const char *value, size_t start, size_t end)
 {
     std::vector<string>::iterator ita = v.begin() + start;
     std::vector<string>::iterator itb = v.begin() + (end == size_t(-1) ? v.size() : end);
@@ -108,7 +107,7 @@ void VerifiedString::FindAll(Array &c, const char *value, size_t start, size_t e
 
     c.Clear();
 
-    u.FindAll(c, value);
+    u.find_all(c, value);
     size_t cs = c.Size();
     if (cs != result.size())
         assert(false);

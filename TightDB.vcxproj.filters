@@ -1,27 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="src\array_binary.cpp" />
-    <ClCompile Include="src\array_blob.cpp" />
-    <ClCompile Include="src\array_string.cpp" />
-    <ClCompile Include="src\array_string_long.cpp" />
-    <ClCompile Include="src\column.cpp" />
-    <ClCompile Include="src\column_binary.cpp" />
-    <ClCompile Include="src\column_mixed.cpp" />
-    <ClCompile Include="src\column_string.cpp" />
-    <ClCompile Include="src\column_string_enum.cpp" />
-    <ClCompile Include="src\column_table.cpp" />
-    <ClCompile Include="src\c-table.cpp" />
-    <ClCompile Include="src\group.cpp" />
-    <ClCompile Include="src\group_writer.cpp" />
-    <ClCompile Include="src\index.cpp" />
-    <ClCompile Include="src\spec.cpp" />
-    <ClCompile Include="src\table.cpp" />
-    <ClCompile Include="src\table_view.cpp" />
-    <ClCompile Include="src\utf8.cpp" />
-    <ClCompile Include="src\utilities.cpp" />
-    <ClCompile Include="src\alloc_slab.cpp" />
-    <ClCompile Include="src\array.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c">
       <Filter>pthreads</Filter>
     </ClCompile>
@@ -58,9 +37,6 @@
     <ClCompile Include="test\testtable.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testTableView.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="test\test_c_api.c">
       <Filter>test</Filter>
     </ClCompile>
@@ -74,64 +50,115 @@
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\large_tests\test_strings.cpp">
-      <Filter>large_tests</Filter>
+      <Filter>test\large_tests</Filter>
     </ClCompile>
     <ClCompile Include="test\large_tests\verified_integer.cpp">
-      <Filter>large_tests</Filter>
+      <Filter>test\large_tests</Filter>
     </ClCompile>
     <ClCompile Include="test\large_tests\verified_string.cpp">
-      <Filter>large_tests</Filter>
+      <Filter>test\large_tests</Filter>
     </ClCompile>
     <ClCompile Include="test\large_tests\test_column.cpp">
-      <Filter>large_tests</Filter>
+      <Filter>test\large_tests</Filter>
     </ClCompile>
     <ClCompile Include="test\testquery.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="test\testtableview.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\column.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\column_binary.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\column_mixed.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\column_string.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\column_string_enum.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\column_table.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\group.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\group_shared.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\group_writer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\index.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\query.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\spec.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\table.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\table_view.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\utf8.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\utilities.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\alloc_slab.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\array.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\array_binary.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\array_blob.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\array_string.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\array_string_long.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\c-table.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testshared.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\error.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\file.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\index_string.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\string_buffer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\replication.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testindexstring.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\group.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="include\table.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="include\tightdb.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\alloc.hpp" />
-    <ClInclude Include="src\alloc_slab.hpp" />
-    <ClInclude Include="src\array.hpp" />
-    <ClInclude Include="src\array_binary.hpp" />
-    <ClInclude Include="src\array_blob.hpp" />
-    <ClInclude Include="src\array_string.hpp" />
-    <ClInclude Include="src\array_string_long.hpp" />
-    <ClInclude Include="src\column.hpp" />
-    <ClInclude Include="src\column_binary.hpp" />
-    <ClInclude Include="src\column_fwd.hpp" />
-    <ClInclude Include="src\column_mixed.hpp" />
-    <ClInclude Include="src\column_string.hpp" />
-    <ClInclude Include="src\column_string_enum.hpp" />
-    <ClInclude Include="src\column_table.hpp" />
-    <ClInclude Include="src\column_tpl.hpp" />
-    <ClInclude Include="src\column_type.hpp" />
-    <ClInclude Include="src\c-table.h" />
-    <ClInclude Include="src\c-tightdb.h" />
-    <ClInclude Include="src\date.hpp" />
-    <ClInclude Include="src\group_writer.hpp" />
-    <ClInclude Include="src\index.hpp" />
-    <ClInclude Include="src\meta.hpp" />
-    <ClInclude Include="src\mixed.hpp" />
-    <ClInclude Include="src\query.hpp" />
-    <ClInclude Include="src\query_conditions.hpp" />
-    <ClInclude Include="src\query_engine.hpp" />
-    <ClInclude Include="src\spec.hpp" />
-    <ClInclude Include="src\static_assert.hpp" />
-    <ClInclude Include="src\table_basic.hpp" />
-    <ClInclude Include="src\table_ref.hpp" />
-    <ClInclude Include="src\table_view.hpp" />
-    <ClInclude Include="src\utf8.hpp" />
-    <ClInclude Include="src\utilities.hpp" />
     <ClInclude Include="src\win32\pthread\pthread.h">
       <Filter>pthreads</Filter>
     </ClInclude>
@@ -139,24 +166,186 @@
       <Filter>test</Filter>
     </ClInclude>
     <ClInclude Include="test\large_tests\verified_integer.hpp">
-      <Filter>large_tests</Filter>
+      <Filter>test\large_tests</Filter>
     </ClInclude>
     <ClInclude Include="test\large_tests\verified_string.hpp">
-      <Filter>large_tests</Filter>
+      <Filter>test\large_tests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\query_conditions.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\query_engine.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\spec.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\static_assert.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\table.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\table_accessors.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\table_basic.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\table_macros.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\table_ref.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\table_view.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\table_view_basic.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\tightdb-c.h">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\tuple.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\type_list.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\utf8.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\utilities.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\alloc.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\alloc_slab.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array_binary.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array_blob.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array_string.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array_string_long.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\binary_data.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\bind_ptr.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_binary.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_fwd.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_mixed.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_string.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_string_enum.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_table.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_tpl.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_type.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\config.h">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\c-table.h">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\c-tightdb.h">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\date.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\group.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\group_shared.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\group_writer.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\index.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\lang_bind_helper.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\meta.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\mixed.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\query.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\error.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\index_string.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\overflow.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\replication.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\string_buffer.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\pthread_helpers.hpp">
+      <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="large_tests">
-      <UniqueIdentifier>{3e451fa6-2e90-45e6-824f-68fe7042fbcf}</UniqueIdentifier>
-    </Filter>
     <Filter Include="pthreads">
       <UniqueIdentifier>{b4eeb124-957f-4448-b620-3662238e268a}</UniqueIdentifier>
     </Filter>
     <Filter Include="test">
       <UniqueIdentifier>{d65594c9-e911-48b1-9f60-693bab72c732}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include">
-      <UniqueIdentifier>{efc02ae3-bdec-4ca7-b675-f17d63169548}</UniqueIdentifier>
+    <Filter Include="test\large_tests">
+      <UniqueIdentifier>{3e451fa6-2e90-45e6-824f-68fe7042fbcf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{aa9470f4-4998-465f-8e58-85b31d962c13}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\include">
+      <UniqueIdentifier>{4436af4e-59db-4e36-9b8c-acb6e5d85aea}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

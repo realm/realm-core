@@ -5,33 +5,13 @@
 *.ncb
 *.suo
 *.vcproj.*.user
-*.d
-*.o
-*.so
-*.a
 *.swp
-*.gcno
-*.gcda
 *~
 cscope.*
 tags
 
 /cover_html
 /gcovr.xml
-/test/UnitTest++/TestUnitTest++
-/test/tightdb-tests
-/test/tightdb-tests-debug
-/test/tightdb-tests-cover
-/test/subtables*.tdb
-/test/subtables.tightdb
-/test/table_test.tbl
-/test/test-tightdb/test-tightdb
-/test/test-tightdb/test-tightdb-debug
-/test/test-sqlite3/test-sqlite3
-/test/test-stl/test-stl
-
-/test/benchmark/x64
-/test/benchmark
 
 #ignore thumbnails created by windows
 Thumbs.db
@@ -63,3 +43,4 @@ _ReSharper*/
 Static library*/
 *.opensdf
 *.sdf
+/tightdb.xcodeproj

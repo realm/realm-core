@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -35,26 +35,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\alloc.cpp" />
-    <ClCompile Include="..\..\src\Array.cpp" />
-    <ClCompile Include="..\..\src\ArrayBinary.cpp" />
-    <ClCompile Include="..\..\src\ArrayBlob.cpp" />
-    <ClCompile Include="..\..\src\ArrayString.cpp" />
-    <ClCompile Include="..\..\src\ArrayStringLong.cpp" />
-    <ClCompile Include="..\..\src\Column.cpp" />
-    <ClCompile Include="..\..\src\ColumnBinary.cpp" />
-    <ClCompile Include="..\..\src\ColumnMixed.cpp" />
-    <ClCompile Include="..\..\src\ColumnString.cpp" />
-    <ClCompile Include="..\..\src\ColumnStringEnum.cpp" />
-    <ClCompile Include="..\..\src\ColumnTable.cpp" />
-    <ClCompile Include="..\..\src\ctightdb.cpp" />
-    <ClCompile Include="..\..\src\Group.cpp" />
-    <ClCompile Include="..\..\src\Index.cpp" />
-    <ClCompile Include="..\..\src\Table.cpp" />
-    <ClCompile Include="..\..\src\TableView.cpp" />
-    <ClCompile Include="..\..\src\utf8.cpp" />
-    <ClCompile Include="..\..\src\utilities.cpp" />
-    <ClCompile Include="..\Support\win32\mem.cpp" />
     <ClCompile Include="..\UnitTest++\src\Win32\TimeHelpers.cpp" />
     <ClCompile Include="sqlite3.c" />
     <ClCompile Include="test-sqlite3.cpp" />

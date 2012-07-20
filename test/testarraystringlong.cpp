@@ -1,5 +1,5 @@
-#include "array_string_long.hpp"
 #include <UnitTest++.h>
+#include <tightdb/array_string_long.hpp>
 
 using namespace tightdb;
 
@@ -11,12 +11,12 @@ ArrayStringLong db_setup_string_long::c;
 
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongMultiEmpty)
 {
-    c.Add("");
-    c.Add("");
-    c.Add("");
-    c.Add("");
-    c.Add("");
-    c.Add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
     CHECK_EQUAL(6, c.Size());
 
     CHECK_EQUAL("", c.Get(0));
@@ -45,11 +45,11 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongAdd)
     c.Clear();
     CHECK_EQUAL(0, c.Size());
 
-    c.Add("abc");
+    c.add("abc");
     CHECK_EQUAL("abc", c.Get(0)); // single
     CHECK_EQUAL(1, c.Size());
 
-    c.Add("defg"); //non-empty
+    c.add("defg"); //non-empty
     CHECK_EQUAL("abc", c.Get(0));
     CHECK_EQUAL("defg", c.Get(1));
     CHECK_EQUAL(2, c.Size());
@@ -60,7 +60,7 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2)
     // {shrink, grow} x {first, middle, last, single}
     c.Clear();
 
-    c.Add("abc");
+    c.add("abc");
     c.Set(0, "de"); // shrink single
     CHECK_EQUAL("de", c.Get(0));
     CHECK_EQUAL(1, c.Size());
@@ -69,7 +69,7 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2)
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL(1, c.Size());
 
-    c.Add("efg");
+    c.add("efg");
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL("efg", c.Get(1));
     CHECK_EQUAL(2, c.Size());
@@ -84,7 +84,7 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2)
     CHECK_EQUAL("jklmno", c.Get(1));
     CHECK_EQUAL(2, c.Size());
 
-    c.Add("pq");
+    c.add("pq");
     c.Set(1, "efghijkl"); // grow middle
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL("efghijkl", c.Get(1));
@@ -150,11 +150,11 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete)
 {
     c.Clear();
 
-    c.Add("a");
-    c.Add("bc");
-    c.Add("def");
-    c.Add("ghij");
-    c.Add("klmno");
+    c.add("a");
+    c.add("bc");
+    c.add("def");
+    c.add("ghij");
+    c.add("klmno");
 
     c.Delete(0); // first
     CHECK_EQUAL("bc", c.Get(0));
@@ -187,19 +187,19 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind)
 {
     c.Clear();
 
-    c.Add("a");
-    c.Add("bc iu");
-    c.Add("def");
-    c.Add("ghij uihi i ih iu huih ui");
-    c.Add("klmno hiuh iuh uih i huih i biuhui");
+    c.add("a");
+    c.add("bc iu");
+    c.add("def");
+    c.add("ghij uihi i ih iu huih ui");
+    c.add("klmno hiuh iuh uih i huih i biuhui");
 
-    size_t res1 = c.Find("");
+    size_t res1 = c.find_first("");
     CHECK_EQUAL((size_t)-1, res1);
 
-    size_t res2 = c.Find("xlmno hiuh iuh uih i huih i biuhui");
+    size_t res2 = c.find_first("xlmno hiuh iuh uih i huih i biuhui");
     CHECK_EQUAL((size_t)-1, res2);
 
-    size_t res3 = c.Find("ghij uihi i ih iu huih ui");
+    size_t res3 = c.find_first("ghij uihi i ih iu huih ui");
     CHECK_EQUAL(3, res3);
 }
 
