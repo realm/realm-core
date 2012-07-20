@@ -876,7 +876,7 @@ struct Replication::TransactLogApplier {
     }
 
 #ifndef NDEBUG
-    void set_apply_log(ostream* log) { m_log = log; *m_log << boolalpha; }
+    void set_apply_log(ostream* log) { m_log = log; if (m_log) *m_log << boolalpha; }
 #endif
 
     error_code apply();
