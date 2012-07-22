@@ -46,6 +46,7 @@ namespace tightdb {
 
 namespace _impl {
     template<class Type, int col_idx> struct AddCol;
+    template<class Type, int col_idx> struct DiffColType;
     template<class Type, int col_idx> struct InsertIntoCol;
     template<class Type, int col_idx> struct AssignIntoCol;
 }
@@ -62,7 +63,6 @@ namespace _impl {
 /// assumes that Table is non-polymorphic. Further more, accessing the
 /// Table via a poiter or reference to a BasicTable is not in
 /// violation of the strict aliasing rule.
-///
 template<class Spec> class BasicTable: private Table, public Spec::ConvenienceMethods {
 public:
     typedef Spec spec_type;
@@ -241,6 +241,18 @@ private:
         update_from_spec();
     }
 
+    /// Checks whether this static table type has the same columns as
+    /// the specified dynamic spec. The number of column must be the
+    /// same. Two columns are considered the same if, and only if they
+    /// have the same name and the same type. The type is understood
+    /// as the value encoded by the ColumnType enumeration. This check
+    /// proceeds recursively for subtable columns.
+    static bool matches_dynamic_spec(const tightdb::Spec* spec)
+    {
+        return !HasType<typename Spec::Columns,
+                        _impl::DiffColType>::exec(spec, Spec::dyn_col_names());
+    }
+
     // This one allows a BasicTable to know that BasicTables with
     // other Specs are also derived from Table.
     template<class> friend class BasicTable;
@@ -259,12 +271,13 @@ private:
     friend class BasicTableView<BasicTable>;
     friend class BasicTableView<const BasicTable>;
 
+    template<class, int> friend struct _impl::DiffColType;
     template<class, int, class, bool> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::MixedFieldAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessor;
     template<class, int, class> friend class _impl::QueryColumn;
-    friend class Group; // FIXME: Probably only one method in Group
+    friend class Group;
 };
 
 
@@ -378,6 +391,27 @@ namespace _impl
             Spec subspec = spec->add_subtable_column(col_names[col_idx]);
             const char* const* const subcol_names = Subtab::spec_type::dyn_col_names();
             ForEachType<Subcolumns, _impl::AddCol>::exec(&subspec, subcol_names);
+        }
+    };
+
+
+
+    template<class Type, int col_idx> struct DiffColType {
+        static bool exec(const Spec* spec, const char* const* col_names)
+        {
+            return GetColumnTypeId<Type>::id != spec->get_column_type(col_idx) ||
+                std::strcmp(col_names[col_idx], spec->get_column_name(col_idx)) != 0;
+        }
+    };
+
+    // DiffColType specialization for subtables
+    template<class Subtab, int col_idx> struct DiffColType<SpecBase::Subtable<Subtab>, col_idx> {
+        static bool exec(const Spec* spec, const char* const* col_names)
+        {
+            if (spec->get_column_type(col_idx) != COLUMN_TYPE_TABLE ||
+                std::strcmp(col_names[col_idx], spec->get_column_name(col_idx)) != 0) return true;
+            Spec subspec = spec->get_subspec(col_idx);
+            return !Subtab::matches_dynamic_spec(&subspec);
         }
     };
 

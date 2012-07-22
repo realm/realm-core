@@ -362,7 +362,7 @@ bool ColumnMixed::insert_table(size_t ndx)
     assert(ndx <= m_types->Size());
     const size_t ref = Table::create_empty_table(m_array->GetAllocator());
     if (!ref) return false;
-    // FIXME: These interts can also fail on allocation
+    // FIXME: These inserts can also fail on allocation
     m_types->Insert(ndx, COLUMN_TYPE_TABLE);
     m_refs->Insert(ndx, ref);
     return true;

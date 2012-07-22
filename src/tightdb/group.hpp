@@ -55,7 +55,10 @@ public:
     size_t get_table_count() const;
     const char* get_table_name(size_t table_ndx) const;
     bool has_table(const char* name) const;
-    // FIXME: Add has_table<MyTable>(name) which also checks the spec
+
+    /// Check whether this group has a table with the specified name
+    /// and type.
+    template<class T> bool has_table(const char* name) const;
 
     TableRef      get_table(const char* name);
     ConstTableRef get_table(const char* name) const;
@@ -169,6 +172,23 @@ private:
 
 // Implementation
 
+inline bool Group::has_table(const char* name) const
+{
+    if (!m_top.IsValid()) return false;
+
+    const size_t i = m_tableNames.find_first(name);
+    return i != size_t(-1);
+}
+
+template<class T> inline bool Group::has_table(const char* name) const
+{
+    if (!m_top.IsValid()) return false;
+    const size_t i = m_tableNames.find_first(name);
+    if (i == size_t(-1)) return false;
+    const Table* const table = get_table_ptr(i);
+    return T::matches_dynamic_spec(&table->get_spec());
+}
+
 inline const Table* Group::get_table_ptr(size_t ndx) const
 {
     return const_cast<Group*>(this)->get_table_ptr(ndx);
@@ -195,7 +215,7 @@ inline const Table* Group::get_table_ptr(const char* name) const
 template<class T> inline T* Group::get_table_ptr(const char* name)
 {
     TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    // FIXME: assert(!has_table(name) || has_table<T>(name));
+    assert(!has_table(name) || has_table<T>(name));
 
     assert(m_top.IsValid());
     const size_t ndx = m_tableNames.find_first(name);

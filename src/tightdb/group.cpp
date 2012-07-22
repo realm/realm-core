@@ -304,14 +304,6 @@ const char* Group::get_table_name(size_t table_ndx) const
     return m_tableNames.Get(table_ndx);
 }
 
-bool Group::has_table(const char* name) const
-{
-    if (!m_top.IsValid()) return false;
-
-    const size_t n = m_tableNames.find_first(name);
-    return (n != size_t(-1));
-}
-
 Table* Group::get_table_ptr(size_t ndx)
 {
     assert(m_top.IsValid());

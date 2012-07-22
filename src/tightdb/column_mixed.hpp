@@ -34,27 +34,21 @@ class ColumnBinary;
 
 class ColumnMixed : public ColumnBase {
 public:
-    /**
-     * Create a freestanding mixed column.
-     */
+    /// Create a freestanding mixed column.
     ColumnMixed();
 
-    /**
-     * Create a mixed column and have it instantiate a new array
-     * structure.
-     *
-     * \param tab If this column is used as part of a table you must
-     * pass a pointer to that table. Otherwise you may pass null.
-     */
+    /// Create a mixed column and have it instantiate a new array
+    /// structure.
+    ///
+    /// \param tab If this column is used as part of a table you must
+    /// pass a pointer to that table. Otherwise you may pass null.
     ColumnMixed(Allocator& alloc, const Table* tab);
 
-    /**
-     * Create a mixed column and attach it to an already existing
-     * array structure.
-     *
-     * \param tab If this column is used as part of a table you must
-     * pass a pointer to that table. Otherwise you may pass null.
-     */
+    /// Create a mixed column and attach it to an already existing
+    /// array structure.
+    ///
+    /// \param tab If this column is used as part of a table you must
+    /// pass a pointer to that table. Otherwise you may pass null.
     ColumnMixed(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc, const Table* tab);
 
     ~ColumnMixed();
@@ -73,17 +67,13 @@ public:
     const char* get_string(size_t ndx) const;
     BinaryData get_binary(size_t ndx) const;
 
-    /**
-     * The returned size is zero if the specified row does not contain
-     * a subtable.
-     */
+    /// The returned size is zero if the specified row does not
+    /// contain a subtable.
     size_t get_subtable_size(std::size_t row_idx) const;
 
-    /**
-     * Returns null if the specified row does not contain a subtable,
-     * otherwise the returned table pointer must end up being wrapped
-     * by an instance of BasicTableRef.
-     */
+    /// Returns null if the specified row does not contain a subtable,
+    /// otherwise the returned table pointer must end up being wrapped
+    /// by an instance of BasicTableRef.
     Table* get_subtable_ptr(std::size_t row_idx) const;
 
     void SetInt(size_t ndx, int64_t value);

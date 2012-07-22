@@ -27,7 +27,6 @@ namespace tightdb {
 
 
 /// Base class for any column that can contain subtables.
-///
 class ColumnSubtableParent: public Column, public Table::Parent {
 public:
     void UpdateFromParent();
@@ -48,7 +47,6 @@ protected:
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a TableRef.
-    ///
     Table* get_subtable_ptr(std::size_t subtable_ndx, std::size_t spec_ref) const;
 
     /// Get the subtable at the specified index.
@@ -58,12 +56,10 @@ protected:
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a TableRef.
-    ///
     Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
     /// This method must be used only for subtables with shared spec,
     /// i.e. for elements of ColumnTable.
-    ///
     TableRef get_subtable(std::size_t subtable_ndx, std::size_t spec_ref) const
     {
         return TableRef(get_subtable_ptr(subtable_ndx, spec_ref));
@@ -71,7 +67,6 @@ protected:
 
     /// This method must be used only for subtables with independent
     /// specs, i.e. for elements of ColumnMixed.
-    ///
     TableRef get_subtable(std::size_t subtable_ndx) const
     {
         return TableRef(get_subtable_ptr(subtable_ndx));
@@ -127,7 +122,6 @@ public:
     ///
     /// \param tab If this column is used as part of a table you must
     /// pass a pointer to that table. Otherwise you may pass null.
-    ///
     ColumnTable(std::size_t spec_ref, ArrayParent* parent, std::size_t idx_in_parent,
                 Allocator& alloc, const Table* tab);
 
@@ -136,7 +130,6 @@ public:
     ///
     /// \param tab If this column is used as part of a table you must
     /// pass a pointer to that table. Otherwise you may pass null.
-    ///
     ColumnTable(std::size_t columns_ref, std::size_t spec_ref,
                 ArrayParent* parent, std::size_t idx_in_parent,
                 Allocator& alloc, const Table* tab);
@@ -145,7 +138,6 @@ public:
 
     /// The returned table pointer must always end up being wrapped in
     /// an instance of BasicTableRef.
-    ///
     Table* get_subtable_ptr(std::size_t subtable_ndx) const
     {
         return ColumnSubtableParent::get_subtable_ptr(subtable_ndx, m_ref_specSet);
