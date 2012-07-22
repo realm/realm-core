@@ -59,7 +59,6 @@ class ConstTableView;
 ///
 /// FIXME: When compiling in debug mode, all table methods should
 /// should assert(is_valid()).
-///
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
@@ -111,7 +110,6 @@ public:
     /// FIXME: When Spec changes become possible for non-empty tables,
     /// such changes would generally have to invalidate subtables
     /// (except add_column()).
-    ///
     bool is_valid() const { return m_columns.HasParent(); }
 
     // Schema handling (see also <tightdb/spec.hpp>)
@@ -267,12 +265,10 @@ protected:
     /// the stack by the application is not managed by reference
     /// counting, so that is a case where this tag must not be
     /// specified.
-    ///
     class RefCountTag {};
 
     /// Construct a wrapper for a table with independent spec, and
     /// whose lifetime is managed by reference counting.
-    ///
     Table(RefCountTag, Allocator& alloc, size_t top_ref,
           Parent* parent, size_t ndx_in_parent);
 
@@ -282,7 +278,6 @@ protected:
     /// It is possible to construct a 'null' table by passing zero for
     /// \a columns_ref, in this case the columns will be created on
     /// demand.
-    ///
     Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
           Parent* parent, size_t ndx_in_parent);
 
@@ -318,14 +313,12 @@ protected:
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a TableRef.
-    ///
     Table *get_subtable_ptr(size_t col_idx, size_t row_idx);
 
     /// Get the subtable at the specified column and row index.
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a ConstTableRef.
-    ///
     const Table *get_subtable_ptr(size_t col_idx, size_t row_idx) const;
 
     /// Compare the rows of two tables under the assumption that the
@@ -350,7 +343,6 @@ private:
     /// the reference to the underlying memory.
     ///
     /// \return Zero if allocation fails.
-    ///
     static size_t create_empty_table(Allocator&);
 
     // Experimental
@@ -381,9 +373,7 @@ class Table::Parent: public ArrayParent {
 protected:
     friend class Table;
 
-    /**
-     * Must be called whenever a child Table is destroyed.
-     */
+    /// Must be called whenever a child Table is destroyed.
     virtual void child_destroyed(size_t child_ndx) = 0;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

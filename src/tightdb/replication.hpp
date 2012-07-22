@@ -245,9 +245,12 @@ struct Replication {
         virtual ~InputStream() {}
     };
 
-    /// \param log If specified, and the library was compiled in debug
-    /// mode, then a line describing each individual operation is
-    /// writted to that stream.
+    /// Called by the local coordinator to apply a transaction log
+    /// received from another local coordinator.
+    ///
+    /// \param apply_log If specified, and the library was compiled in
+    /// debug mode, then a line describing each individual operation
+    /// is writted to the specified stream.
     ///
     /// \return ERROR_IO if the transaction log could not be
     /// successfully parsed, or ended prematurely.
@@ -255,7 +258,7 @@ struct Replication {
     static error_code apply_transact_log(InputStream& transact_log, Group& target);
 #else
     static error_code apply_transact_log(InputStream& transact_log, Group& target,
-                                         std::ostream* log = 0);
+                                         std::ostream* apply_log = 0);
 #endif
 
 private:
