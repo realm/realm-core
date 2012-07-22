@@ -21,10 +21,10 @@
 #ifndef TIGHTDB_GROUP_HPP
 #define TIGHTDB_GROUP_HPP
 
-#include "static_assert.hpp"
-#include "table.hpp"
-#include "table_basic_fwd.hpp"
-#include "alloc_slab.hpp"
+#include <tightdb/static_assert.hpp>
+#include <tightdb/table.hpp>
+#include <tightdb/table_basic_fwd.hpp>
+#include <tightdb/alloc_slab.hpp>
 
 namespace tightdb {
 

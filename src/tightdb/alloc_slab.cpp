@@ -1,4 +1,3 @@
-
 // Memory Mapping includes
 #ifdef _MSC_VER
 #include <windows.h>
@@ -16,18 +15,18 @@
 
 #include <cassert>
 #include <iostream>
-#include "alloc_slab.hpp"
-#include "array.hpp"
+
+#include <tightdb/alloc_slab.hpp>
+#include <tightdb/array.hpp>
 
 #ifdef _DEBUG
 #include <cstdio>
 #endif //_DEBUG
 
 using namespace std;
+using namespace tightdb;
 
 namespace {
-
-using namespace tightdb;
 
 // Support function
 // todo, fixme: use header function in array instead!
@@ -57,7 +56,7 @@ size_t GetSizeFromHeader(void* p)
     return bytes;
 }
 
-}
+} // anonymous namespace
 
 
 namespace tightdb {

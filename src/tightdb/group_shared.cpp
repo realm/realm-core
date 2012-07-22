@@ -1,5 +1,6 @@
-#include "group_shared.hpp"
 #include <cassert>
+
+#include <tightdb/group_shared.hpp>
 
 // Does not work for windows yet
 #ifndef _MSC_VER

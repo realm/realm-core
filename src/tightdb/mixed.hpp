@@ -29,9 +29,9 @@
 #include <cassert>
 #include <cstddef> // size_t
 
-#include "column_type.hpp"
-#include "date.hpp"
-#include "binary_data.hpp"
+#include <tightdb/column_type.hpp>
+#include <tightdb/date.hpp>
+#include <tightdb/binary_data.hpp>
 
 namespace tightdb {
 

@@ -1,4 +1,4 @@
-#include "index_string.hpp"
+#include <tightdb/index_string.hpp>
 
 using namespace tightdb;
 

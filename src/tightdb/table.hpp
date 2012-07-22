@@ -20,10 +20,10 @@
 #ifndef TIGHTDB_TABLE_HPP
 #define TIGHTDB_TABLE_HPP
 
-#include "column_fwd.hpp"
-#include "table_ref.hpp"
-#include "spec.hpp"
-#include "mixed.hpp"
+#include <tightdb/column_fwd.hpp>
+#include <tightdb/table_ref.hpp>
+#include <tightdb/spec.hpp>
+#include <tightdb/mixed.hpp>
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #include <tightdb/replication.hpp>

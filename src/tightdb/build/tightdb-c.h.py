@@ -27,8 +27,8 @@ directiveStartToken = %
 #ifndef TIGHTDB_TIGHTDB_C_H
 #define TIGHTDB_TIGHTDB_C_H
 
-#include "c-table.hpp"
-#include "query.h"
+#include <tightdb/c-table.hpp>
+#include <tightdb/query.h>
 
 %for $col in range($max_cols)
 %set $num_cols = $col + 1

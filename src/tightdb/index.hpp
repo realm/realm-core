@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_INDEX_HPP
 #define TIGHTDB_INDEX_HPP
 
-#include "column.hpp"
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 

@@ -1,5 +1,5 @@
-#include "query.hpp"
-#include "query_engine.hpp"
+#include <tightdb/query.hpp>
+#include <tightdb/query_engine.hpp>
 
 #define MULTITHREAD 1
 

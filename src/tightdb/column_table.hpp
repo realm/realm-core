@@ -20,8 +20,8 @@
 #ifndef TIGHTDB_COLUMN_TABLE_HPP
 #define TIGHTDB_COLUMN_TABLE_HPP
 
-#include "column.hpp"
-#include "table.hpp"
+#include <tightdb/column.hpp>
+#include <tightdb/table.hpp>
 
 namespace tightdb {
 

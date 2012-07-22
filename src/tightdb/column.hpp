@@ -20,8 +20,6 @@
 #ifndef TIGHTDB_COLUMN_HPP
 #define TIGHTDB_COLUMN_HPP
 
-#include "array.hpp"
-
 #ifdef _MSC_VER
 #include <win32/stdint.h>
 #else
@@ -30,6 +28,8 @@
 //#include <climits> // size_t
 #include <cstdlib> // size_t
 #include <assert.h>
+
+#include <tightdb/array.hpp>
 
 namespace tightdb {
 
@@ -238,6 +238,6 @@ private:
 } // namespace tightdb
 
 // Templates
-#include "column_tpl.hpp"
+#include <tightdb/column_tpl.hpp>
 
 #endif // TIGHTDB_COLUMN_HPP

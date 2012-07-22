@@ -2,17 +2,18 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
-#include "array.hpp"
-#include "column.hpp"
-#include "utilities.hpp"
-#include "query_conditions.hpp"
-#include "static_assert.hpp"
-#include "column_string.hpp"
 
 #ifdef _MSC_VER
     #include <win32/types.h>
     #pragma warning (disable : 4127) // Condition is constant warning
 #endif
+
+#include <tightdb/array.hpp>
+#include <tightdb/column.hpp>
+#include <tightdb/utilities.hpp>
+#include <tightdb/query_conditions.hpp>
+#include <tightdb/static_assert.hpp>
+#include <tightdb/column_string.hpp>
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
@@ -2004,7 +2005,6 @@ bool Array::Compare(const Array& c) const
 
 
 #ifdef _DEBUG
-#include "stdio.h"
 
 void Array::Print() const
 {

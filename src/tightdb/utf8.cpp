@@ -1,6 +1,7 @@
 #include <string>
 #include <assert.h>
-#include "utf8.hpp"
+
+#include <tightdb/utf8.hpp>
 
 namespace tightdb {
 

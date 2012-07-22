@@ -1,9 +1,9 @@
-#include "c-table.h"
-
-#include "lang_bind_helper.hpp"
-#include "query.hpp"
 #include <cstdarg>
 #include <assert.h>
+
+#include <tightdb/lang_bind_helper.hpp>
+#include <tightdb/query.hpp>
+#include <tightdb/c-table.h>
 
 /*
 C1X will be getting support for type generic expressions they look like this:

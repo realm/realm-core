@@ -20,8 +20,8 @@
 #ifndef __TDB_INDEX_STRING__
 #define __TDB_INDEX_STRING__
 
-#include "column.hpp"
-#include "column_string.hpp"
+#include <tightdb/column.hpp>
+#include <tightdb/column_string.hpp>
 
 namespace tightdb {
 

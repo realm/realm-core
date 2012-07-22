@@ -1,9 +1,10 @@
-#include "group.hpp"
 #include <assert.h>
 #include <new>
 #include <iostream>
 #include <fstream>
-#include "group_writer.hpp"
+
+#include <tightdb/group_writer.hpp>
+#include <tightdb/group.hpp>
 
 using namespace std;
 

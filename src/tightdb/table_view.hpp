@@ -21,7 +21,8 @@
 #define TIGHTDB_TABLE_VIEW_HPP
 
 #include <iostream>
-#include "table.hpp"
+
+#include <tightdb/table.hpp>
 
 namespace tightdb {
 

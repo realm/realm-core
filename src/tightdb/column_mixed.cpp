@@ -1,5 +1,5 @@
-#include "column_mixed.hpp"
-#include "column_binary.hpp"
+#include <tightdb/column_mixed.hpp>
+#include <tightdb/column_binary.hpp>
 
 using namespace std;
 

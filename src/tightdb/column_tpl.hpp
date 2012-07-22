@@ -21,11 +21,10 @@
 #define TIGHTDB_COLUMN_TPL_HPP
 
 #include <assert.h>
-
-#include "array.hpp"
-#include "column.hpp"
-
 #include <cstdlib>
+
+#include <tightdb/array.hpp>
+#include <tightdb/column.hpp>
 
 // Has to be define to allow overload from build settings
 #ifndef MAX_LIST_SIZE

@@ -32,14 +32,14 @@
 #include <ctime>
 #include <utility>
 
-#include "static_assert.hpp"
-#include "meta.hpp"
-#include "tuple.hpp"
-#include "table.hpp"
-#include "column.hpp"
-#include "query.hpp"
-#include "table_accessors.hpp"
-#include "table_view_basic.hpp"
+#include <tightdb/static_assert.hpp>
+#include <tightdb/meta.hpp>
+#include <tightdb/tuple.hpp>
+#include <tightdb/table.hpp>
+#include <tightdb/column.hpp>
+#include <tightdb/query.hpp>
+#include <tightdb/table_accessors.hpp>
+#include <tightdb/table_view_basic.hpp>
 
 namespace tightdb {
 

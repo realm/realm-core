@@ -1,11 +1,12 @@
-#include "array_string_long.hpp"
-#include "array_blob.hpp"
-#include "column.hpp"
 #include <assert.h>
 
 #ifdef _MSC_VER
 #include <win32/types.h> //ssize_t
 #endif
+
+#include <tightdb/array_string_long.hpp>
+#include <tightdb/array_blob.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 

@@ -1,4 +1,4 @@
-#include "column_string_enum.hpp"
+#include <tightdb/column_string_enum.hpp>
 
 namespace tightdb {
 

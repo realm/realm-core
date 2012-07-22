@@ -21,12 +21,12 @@
 #define TIGHTDB_QUERY_ENGINE_HPP
 
 #include <string>
-#include "table.hpp"
-#include "column_string.hpp"
-#include "column_string_enum.hpp"
 
-#include "utf8.hpp"
-#include "query_conditions.hpp"
+#include <tightdb/table.hpp>
+#include <tightdb/column_string.hpp>
+#include <tightdb/column_string_enum.hpp>
+#include <tightdb/utf8.hpp>
+#include <tightdb/query_conditions.hpp>
 
 namespace tightdb {
 

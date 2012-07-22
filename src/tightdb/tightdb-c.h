@@ -20,8 +20,8 @@
 #ifndef __C_TIGHTDB_H__
 #define __C_TIGHTDB_H__
 
-#include "c-table.hpp"
-#include "query.h"
+#include <tightdb/c-table.hpp>
+#include <tightdb/query.h>
 
 
 #define TIGHTSB_TABLE_1(TableName, CName0, CType0) \

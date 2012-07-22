@@ -23,7 +23,7 @@
 #include <cstring>
 #include <utility>
 
-#include "mixed.hpp"
+#include <tightdb/mixed.hpp>
 
 namespace tightdb {
 

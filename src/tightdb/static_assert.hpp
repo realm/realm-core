@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_STATIC_ASSERT_HPP
 #define TIGHTDB_STATIC_ASSERT_HPP
 
-#include "config.h"
+#include <tightdb/config.h>
 
 
 #ifdef TIGHTDB_HAVE_CXX11_STATIC_ASSERT

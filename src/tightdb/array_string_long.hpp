@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_ARRAY_STRING_LONG_HPP
 #define TIGHTDB_ARRAY_STRING_LONG_HPP
 
-#include "array_blob.hpp"
+#include <tightdb/array_blob.hpp>
 
 namespace tightdb {
 

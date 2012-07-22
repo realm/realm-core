@@ -20,9 +20,9 @@
 #ifndef TIGHTDB_SPEC_HPP
 #define TIGHTDB_SPEC_HPP
 
-#include "array.hpp"
-#include "array_string.hpp"
-#include "column_type.hpp"
+#include <tightdb/array.hpp>
+#include <tightdb/array_string.hpp>
+#include <tightdb/column_type.hpp>
 
 namespace tightdb {
 using std::size_t;

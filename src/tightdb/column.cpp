@@ -12,9 +12,9 @@
 #include <stdint.h> // unint8_t etc
 #endif
 
-#include "column.hpp"
-#include "index.hpp"
-#include "query_conditions.hpp"
+#include <tightdb/column.hpp>
+#include <tightdb/index.hpp>
+#include <tightdb/query_conditions.hpp>
 
 using namespace std;
 
@@ -781,7 +781,6 @@ bool Column::Compare(const Column& c) const
 
 
 #ifdef _DEBUG
-#include "stdio.h"
 
 void Column::Print() const
 {

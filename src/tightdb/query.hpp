@@ -32,7 +32,7 @@
     #include <pthread.h>
 #endif
 
-#include "table_view.hpp"
+#include <tightdb/table_view.hpp>
 
 namespace tightdb {
 

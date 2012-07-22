@@ -20,9 +20,9 @@
 #ifndef TIGHTDB_COLUMN_STRING_HPP
 #define TIGHTDB_COLUMN_STRING_HPP
 
-#include "column.hpp"
-#include "array_string.hpp"
-#include "array_string_long.hpp"
+#include <tightdb/column.hpp>
+#include <tightdb/array_string.hpp>
+#include <tightdb/array_string_long.hpp>
 
 namespace tightdb {
 

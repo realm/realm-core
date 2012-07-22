@@ -1,17 +1,18 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include "table.hpp"
 #include <assert.h>
-#include "index.hpp"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
-#include "alloc_slab.hpp"
-#include "column.hpp"
-#include "column_string.hpp"
-#include "column_string_enum.hpp"
-#include "column_binary.hpp"
-#include "column_table.hpp"
-#include "column_mixed.hpp"
+
+#include <tightdb/table.hpp>
+#include <tightdb/index.hpp>
+#include <tightdb/alloc_slab.hpp>
+#include <tightdb/column.hpp>
+#include <tightdb/column_string.hpp>
+#include <tightdb/column_string_enum.hpp>
+#include <tightdb/column_binary.hpp>
+#include <tightdb/column_table.hpp>
+#include <tightdb/column_mixed.hpp>
 
 using namespace std;
 

@@ -1,4 +1,4 @@
-#include "column_table.hpp"
+#include <tightdb/column_table.hpp>
 
 using namespace std;
 

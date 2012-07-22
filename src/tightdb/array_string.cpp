@@ -3,9 +3,10 @@
 #include <cstring>
 #include <cstdio> // debug
 #include <iostream>
-#include "utilities.hpp"
-#include "column.hpp"
-#include "array_string.hpp"
+
+#include <tightdb/utilities.hpp>
+#include <tightdb/column.hpp>
+#include <tightdb/array_string.hpp>
 
 using namespace std;
 
@@ -273,7 +274,6 @@ bool ArrayString::Compare(const ArrayString& c) const
 
 
 #ifdef _DEBUG
-#include "stdio.h"
 
 void ArrayString::StringStats() const
 {

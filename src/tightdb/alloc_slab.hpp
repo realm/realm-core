@@ -20,13 +20,13 @@
 #ifndef TIGHTDB_ALLOC_SLAB_HPP
 #define TIGHTDB_ALLOC_SLAB_HPP
 
-#include "table_macros.hpp"
-
 #ifdef _MSC_VER
 #include <win32/stdint.h>
 #else
 #include <stdint.h> // unint8_t etc
 #endif
+
+#include <tightdb/table_macros.hpp>
 
 namespace tightdb {
 

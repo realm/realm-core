@@ -20,9 +20,9 @@
 #ifndef TIGHTDB_COLUMN_BINARY_HPP
 #define TIGHTDB_COLUMN_BINARY_HPP
 
-#include "column.hpp"
-#include "binary_data.hpp"
-#include "array_binary.hpp"
+#include <tightdb/column.hpp>
+#include <tightdb/binary_data.hpp>
+#include <tightdb/array_binary.hpp>
 
 namespace tightdb {
 

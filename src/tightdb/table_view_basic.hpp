@@ -20,9 +20,9 @@
 #ifndef TIGHTDB_TABLE_VIEW_BASIC_HPP
 #define TIGHTDB_TABLE_VIEW_BASIC_HPP
 
-#include "meta.hpp"
-#include "table_view.hpp"
-#include "table_accessors.hpp"
+#include <tightdb/meta.hpp>
+#include <tightdb/table_view.hpp>
+#include <tightdb/table_accessors.hpp>
 
 namespace tightdb {
 

@@ -23,7 +23,7 @@
 #include <cstddef>
 #include <algorithm>
 
-#include "bind_ptr.hpp"
+#include <tightdb/bind_ptr.hpp>
 
 namespace tightdb {
 

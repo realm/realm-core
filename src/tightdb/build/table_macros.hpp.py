@@ -28,7 +28,7 @@ directiveStartToken = %
 #ifndef TIGHTDB_TABLE_MACROS_HPP
 #define TIGHTDB_TABLE_MACROS_HPP
 
-#include "table_basic.hpp"
+#include <tightdb/table_basic.hpp>
 
 
 %for $i in range($max_cols)

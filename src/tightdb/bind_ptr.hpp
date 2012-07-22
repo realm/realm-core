@@ -23,7 +23,7 @@
 #include <algorithm>
 #include <ostream>
 
-#include "config.h"
+#include <tightdb/config.h>
 
 #ifdef TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
 #include <utility>

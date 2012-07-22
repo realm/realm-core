@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_COLUMN_STRING_ENUM_HPP
 #define TIGHTDB_COLUMN_STRING_ENUM_HPP
 
-#include "column_string.hpp"
+#include <tightdb/column_string.hpp>
 
 namespace tightdb {
 

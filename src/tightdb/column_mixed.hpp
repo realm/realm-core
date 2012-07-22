@@ -20,11 +20,11 @@
 #ifndef TIGHTDB_COLUMN_MIXED_HPP
 #define TIGHTDB_COLUMN_MIXED_HPP
 
-#include "column.hpp"
-#include "column_type.hpp"
-#include "column_table.hpp"
-#include "table.hpp"
-#include "index.hpp"
+#include <tightdb/column.hpp>
+#include <tightdb/column_type.hpp>
+#include <tightdb/column_table.hpp>
+#include <tightdb/table.hpp>
+#include <tightdb/index.hpp>
 
 namespace tightdb {
 

@@ -1,5 +1,5 @@
-#include "table_view.hpp"
-#include "column.hpp"
+#include <tightdb/table_view.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 

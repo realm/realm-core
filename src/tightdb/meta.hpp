@@ -24,7 +24,7 @@
 #include <cwchar>
 #include <limits>
 
-#include "config.h"
+#include <tightdb/config.h>
 
 namespace tightdb {
 

@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_GROUP_SHARED_HPP
 #define TIGHTDB_GROUP_SHARED_HPP
 
-#include "group.hpp"
+#include <tightdb/group.hpp>
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #include <tightdb/replication.hpp>

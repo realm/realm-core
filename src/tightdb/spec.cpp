@@ -1,4 +1,4 @@
-#include "spec.hpp"
+#include <tightdb/spec.hpp>
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #include <tightdb/replication.hpp>

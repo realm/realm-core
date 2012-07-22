@@ -27,13 +27,14 @@
 #endif
 #include <cstdlib> // size_t
 #include <cstring> // memmove
-#include "alloc.hpp"
 #include <iostream>
-#include "utilities.hpp"
 #include <vector>
 #include <string>
 #include <cassert>
+
 #include <tightdb/error.hpp>
+#include <tightdb/alloc.hpp>
+#include <tightdb/utilities.hpp>
 
 #define TEMPEX(fun, arg) \
     if(m_width == 0) {fun<0> arg;} \

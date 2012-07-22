@@ -1,10 +1,10 @@
-#include "group_writer.hpp"
-#include "group.hpp"
-#include "alloc_slab.hpp"
-
 #if !defined(_MSC_VER)
 #include <sys/mman.h>
 #endif
+
+#include <tightdb/group_writer.hpp>
+#include <tightdb/group.hpp>
+#include <tightdb/alloc_slab.hpp>
 
 using namespace tightdb;
 

@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_ARRAY_STRING_HPP
 #define TIGHTDB_ARRAY_STRING_HPP
 
-#include "array.hpp"
+#include <tightdb/array.hpp>
 
 namespace tightdb {
 

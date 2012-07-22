@@ -1,5 +1,3 @@
-
-#include "utilities.hpp"
 #include <string>
 #include <assert.h>
 #include <cstdlib> // size_t
@@ -8,6 +6,8 @@
 #else
 #include <win32/stdint.h>
 #endif
+
+#include <tightdb/utilities.hpp>
 
 namespace tightdb {
 

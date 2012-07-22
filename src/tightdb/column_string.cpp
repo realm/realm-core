@@ -3,12 +3,12 @@
 #include <assert.h>
 #include <cstring>
 #include <cstdio> // debug
-#include "query_conditions.hpp"
 #ifdef _MSC_VER
     #include <win32\types.h>
 #endif
 
-#include "column_string.hpp"
+#include <tightdb/query_conditions.hpp>
+#include <tightdb/column_string.hpp>
 
 namespace {
 
