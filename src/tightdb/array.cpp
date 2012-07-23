@@ -1451,6 +1451,23 @@ size_t Array::count(int64_t value) const
             count += a;
         }
     }
+    else if (m_width == 32) {
+        const int32_t v = (int32_t)value;
+        const int32_t* const d = (const int32_t*)m_data;
+        for (; i < end; ++i) {
+            if (d[i] == v)
+                ++count;
+        }
+        return count;
+    }
+    else if (m_width == 64) {
+        const int64_t* const d = (const int64_t*)m_data;
+        for (; i < end; ++i) {
+            if (d[i] == value)
+                ++count;
+        }
+        return count;
+    }
 
     // Sum remainding elements
     for(; i < end; ++i)
