@@ -59,7 +59,7 @@ struct SpecBase {
         Subtable(T* t) : m_table(t) {};
         operator T*() const { return m_table; }
     private:
-        T *m_table;
+        T* m_table;
     };
 
     /// By default, there are no static column names defined for a
@@ -519,6 +519,14 @@ public:
     /// template<class T> T::ConstRef checked_cast(ConstTableRef); // Returns null if wrong type
     /// template<class T> T::Ref unchecked_cast(TableRef);
     /// template<class T> T::ConstRef unchecked_cast(ConstTableRef);
+    ///
+    /// Or maybe these five Table methods instead:
+    ///
+    /// template<class T> Table::is() const { return T::is_type_of(this); }
+    /// template<class T> BasicTableRef<T> Table::checked_cast() { return T::checked_cast(this); }
+    /// template<class T> BasicTableRef<const T> Table::checked_cast() const { return T::checked_cast(this); }
+    /// template<class T> BasicTableRef<T> Table::unchecked_cast() { return T::unchecked_cast(this); }
+    /// template<class T> BasicTableRef<const T> Table::unchecked_cast() const { return T::unchecked_cast(this); }
     ///
 //    template<class T> bool is_subtable() const  { ... }
 };

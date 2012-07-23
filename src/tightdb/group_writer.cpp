@@ -1,4 +1,5 @@
 #if !defined(_MSC_VER)
+#include <unistd.h>
 #include <sys/mman.h>
 #endif
 

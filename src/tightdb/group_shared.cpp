@@ -5,6 +5,7 @@
 // Does not work for windows yet
 #ifndef _MSC_VER
 
+#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
