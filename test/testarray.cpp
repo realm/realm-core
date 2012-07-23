@@ -1235,3 +1235,91 @@ TEST(ArrayCopy)
     d.Destroy();
     //e.Destroy() // will be destroyed as sub-array by d
 }
+
+TEST(ArrayCount)
+{
+    Array a;
+
+    // 0 bit width
+    for (size_t i = 0; i < 150; ++i) {
+        a.add(0);
+    }
+    const size_t c1 = a.count(0);
+    const size_t c2 = a.count(1);
+    CHECK_EQUAL(150, c1);
+    CHECK_EQUAL(0, c2);
+    CHECK_EQUAL(0, a.count(-1));
+    CHECK_EQUAL(0, a.count(2));
+
+    // 1 bit width
+    for (size_t i = 0; i < 100; ++i) {
+        if (i % 2) a.Set(i, 1);
+    }
+    const size_t c3 = a.count(0);
+    const size_t c4 = a.count(1);
+    CHECK_EQUAL(100, c3);
+    CHECK_EQUAL(50, c4);
+    CHECK_EQUAL(0, a.count(-1));
+    CHECK_EQUAL(0, a.count(4));
+
+    // 2 bit width
+    for (size_t i = 0; i < 100; ++i) {
+        if (i % 2) a.Set(i, 2);
+    }
+    const size_t c5 = a.count(0);
+    const size_t c6 = a.count(2);
+    CHECK_EQUAL(100, c5);
+    CHECK_EQUAL(50, c6);
+    CHECK_EQUAL(0, a.count(-1));
+    CHECK_EQUAL(0, a.count(4));
+
+    // 4 bit width
+    for (size_t i = 0; i < 100; ++i) {
+        if (i % 2) a.Set(i, 7);
+    }
+    const size_t c7 = a.count(0);
+    const size_t c8 = a.count(7);
+    CHECK_EQUAL(100, c7);
+    CHECK_EQUAL(50, c8);
+    CHECK_EQUAL(0, a.count(-1));
+    CHECK_EQUAL(0, a.count(4));
+
+    // 8 bit width
+    for (size_t i = 0; i < 100; ++i) {
+        if (i % 2) a.Set(i, 100);
+    }
+    const size_t c9 = a.count(0);
+    const size_t c10 = a.count(100);
+    CHECK_EQUAL(100, c9);
+    CHECK_EQUAL(50, c10);
+    CHECK_EQUAL(0, a.count(-1));
+    CHECK_EQUAL(0, a.count(128));
+    CHECK_EQUAL(0, a.count(-128));
+
+    // 16 bit width
+    for (size_t i = 0; i < 100; ++i) {
+        if (i % 2) a.Set(i, 500);
+    }
+    const size_t c11 = a.count(0);
+    const size_t c12 = a.count(500);
+    CHECK_EQUAL(100, c11);
+    CHECK_EQUAL(50, c12);
+    CHECK_EQUAL(0, a.count(-1));
+    CHECK_EQUAL(0, a.count(0xFFFF));
+    CHECK_EQUAL(0, a.count(-0xFFFF));
+
+    // 32 bit width
+    for (size_t i = 0; i < 100; ++i) {
+        if (i % 2) a.Set(i, 0x1FFFF);
+    }
+    const size_t c13 = a.count(0);
+    const size_t c14 = a.count(0x1FFFF);
+    CHECK_EQUAL(100, c13);
+    CHECK_EQUAL(50, c14);
+    CHECK_EQUAL(0, a.count(-1));
+    CHECK_EQUAL(0, a.count(0xFFFFFFFF));
+    CHECK_EQUAL(0, a.count(-0xFFFFFFFF));
+
+    // Clean-up
+    a.Destroy();
+}

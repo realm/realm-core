@@ -1305,11 +1305,180 @@ int64_t Array::sum(size_t start, size_t end) const
         }
 
         // Sum remainding elements
-        for(; i < end; i++)
+        for(; i < end; ++i)
             sum += Get(i);
     }
 
     return sum;
+}
+
+size_t Array::count(int64_t value) const
+{
+    const uint64_t* const next = (const uint64_t*)m_data;
+    size_t count = 0;
+    const size_t end = m_len;
+    size_t i = 0;
+
+    // staiic values needed for fast population count
+    const uint64_t m1  = 0x5555555555555555ULL;
+    const uint64_t m2  = 0x3333333333333333ULL;
+    const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
+    const uint64_t h01 = 0x0101010101010101ULL;
+
+    if (m_width == 0) {
+        if (value == 0) return m_len;
+        else return 0;
+    }
+    else if (m_width == 1) {
+        if ((uint64_t)value > 1) return 0;
+
+        const size_t chunkvals = 64;
+        for (; i + chunkvals <= end; i += chunkvals) {
+            uint64_t a = next[i / chunkvals];
+            if (value == 0) a = ~a; // reverse
+
+            a -= (a >> 1) & m1;
+            a = (a & m2) + ((a >> 2) & m2);
+            a = (a + (a >> 4)) & m4;
+            a = (a * h01) >> 56;
+
+            // Could use intrinsic instead:
+            // a = __builtin_popcountll(a); // gcc intrinsic
+
+            count += a;
+        }
+    }
+    else if (m_width == 2) {
+        if ((uint64_t)value > 3) return 0;
+
+        const uint64_t v = ~0ULL/0x3 * value;
+
+        // Masks to avoid spillover between segments in cascades
+        const uint64_t c1 = ~0ULL/0x3 * 0x1;
+
+        const size_t chunkvals = 32;
+        for (; i + chunkvals <= end; i += chunkvals) {
+            uint64_t a = next[i / chunkvals];
+            a ^= v;      // zero matching bit segments
+            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
+            a &= m1;     // isolate single bit in each segment
+            a ^= m1;     // reverse isolated bits
+            //if (!a) continue;
+
+            // Population count
+            a = (a & m2) + ((a >> 2) & m2);
+            a = (a + (a >> 4)) & m4;
+            a = (a * h01) >> 56;
+
+            count += a;
+        }
+    }
+    else if (m_width == 4) {
+        if ((uint64_t)value > 15) return 0;
+
+        const uint64_t v  = ~0ULL/0xF * value;
+        const uint64_t m  = ~0ULL/0xF * 0x1;
+
+        // Masks to avoid spillover between segments in cascades
+        const uint64_t c1 = ~0ULL/0xF * 0x7;
+        const uint64_t c2 = ~0ULL/0xF * 0x3;
+
+        const size_t chunkvals = 16;
+        for (; i + chunkvals <= end; i += chunkvals) {
+            uint64_t a = next[i / chunkvals];
+            a ^= v;      // zero matching bit segments
+            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
+            a |= (a >> 2) & c2;
+            a &= m;     // isolate single bit in each segment
+            a ^= m;     // reverse isolated bits
+
+            // Population count
+            a = (a + (a >> 4)) & m4;
+            a = (a * h01) >> 56;
+
+            count += a;
+        }
+    }
+    else if (m_width == 8) {
+        if (value > 0x7FLL || value < -0x80LL) return 0; // by casting?
+
+        const uint64_t v  = ~0ULL/0xFF * value;
+        const uint64_t m  = ~0ULL/0xFF * 0x1;
+
+        // Masks to avoid spillover between segments in cascades
+        const uint64_t c1 = ~0ULL/0xFF * 0x7F;
+        const uint64_t c2 = ~0ULL/0xFF * 0x3F;
+        const uint64_t c3 = ~0ULL/0xFF * 0x0F;
+
+        const size_t chunkvals = 8;
+        for (; i + chunkvals <= end; i += chunkvals) {
+            uint64_t a = next[i / chunkvals];
+            a ^= v;      // zero matching bit segments
+            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
+            a |= (a >> 2) & c2;
+            a |= (a >> 4) & c3;
+            a &= m;     // isolate single bit in each segment
+            a ^= m;     // reverse isolated bits
+
+            // Population count
+            a = (a * h01) >> 56;
+
+            count += a;
+        }
+    }
+    else if (m_width == 16) {
+        if (value > 0x7FFFLL || value < -0x8000LL) return 0; // by casting?
+
+        const uint64_t v  = ~0ULL/0xFFFF * value;
+        const uint64_t m  = ~0ULL/0xFFFF * 0x1;
+
+        // Masks to avoid spillover between segments in cascades
+        const uint64_t c1 = ~0ULL/0xFFFF * 0x7FFF;
+        const uint64_t c2 = ~0ULL/0xFFFF * 0x3FFF;
+        const uint64_t c3 = ~0ULL/0xFFFF * 0x0FFF;
+        const uint64_t c4 = ~0ULL/0xFFFF * 0x00FF;
+
+        const size_t chunkvals = 4;
+        for (; i + chunkvals <= end; i += chunkvals) {
+            uint64_t a = next[i / chunkvals];
+            a ^= v;      // zero matching bit segments
+            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
+            a |= (a >> 2) & c2;
+            a |= (a >> 4) & c3;
+            a |= (a >> 8) & c4;
+            a &= m;     // isolate single bit in each segment
+            a ^= m;     // reverse isolated bits
+
+            // Population count
+            a = (a * h01) >> 56;
+
+            count += a;
+        }
+    }
+    else if (m_width == 32) {
+        const int32_t v = (int32_t)value;
+        const int32_t* const d = (const int32_t*)m_data;
+        for (; i < end; ++i) {
+            if (d[i] == v)
+                ++count;
+        }
+        return count;
+    }
+    else if (m_width == 64) {
+        const int64_t* const d = (const int64_t*)m_data;
+        for (; i < end; ++i) {
+            if (d[i] == value)
+                ++count;
+        }
+        return count;
+    }
+
+    // Sum remainding elements
+    for(; i < end; ++i)
+        if (value == Get(i))
+            ++count;
+
+    return count;
 }
 
 

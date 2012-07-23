@@ -40,6 +40,7 @@ const Column GetColumnFromRef(const Array& parent, size_t ndx)
 
 // Pre-declare local functions
 bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state);
+bool callme_count(Array* a, size_t start, size_t end, size_t caller_base, void* state);
 bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
 bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
 bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
@@ -51,8 +52,22 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
 bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state)
 {
     (void)caller_base;
-    int64_t s = a->sum(start, end);
+    const int64_t s = a->sum(start, end);
     *(int64_t *)state += s;
+    return true;
+}
+
+struct CountState {
+    int64_t target;
+    size_t  count;
+};
+
+bool callme_count(Array* a, size_t start, size_t end, size_t caller_base, void* state)
+{
+    (void)caller_base;
+    CountState& cstate = *(CountState*)state;
+    const size_t s = a->count(cstate.target);
+    cstate.count += s;
     return true;
 }
 
@@ -473,6 +488,13 @@ bool Column::Insert(size_t ndx, int64_t value)
 #endif //DEBUG
 
     return true;
+}
+
+size_t Column::count(int64_t target) const
+{
+    CountState state = {target, 0};
+    TreeVisitLeafs<Array, Column>(0, Size(), 0, callme_count, (void *)&state);
+    return state.count;
 }
 
 int64_t Column::sum(size_t start, size_t end) const
