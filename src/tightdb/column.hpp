@@ -161,6 +161,7 @@ public:
     bool add() {return add(0);}
     bool add(int64_t value);
 
+    size_t  count(int64_t target) const;
     int64_t sum(size_t start = 0, size_t end = -1) const;
     int64_t maximum(size_t start = 0, size_t end = -1) const;
     int64_t minimum(size_t start = 0, size_t end = -1) const;

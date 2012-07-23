@@ -167,6 +167,7 @@ public:
     void set_index(size_t column_ndx);
 
     // Aggregate functions
+    size_t  count(size_t column_ndx, int64_t target) const;
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;
