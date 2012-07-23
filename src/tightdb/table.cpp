@@ -1077,6 +1077,15 @@ void Table::insert_done()
 #endif
 }
 
+size_t Table::count(size_t column_ndx, int64_t target) const
+{
+    assert(column_ndx < get_column_count());
+    assert(get_column_type(column_ndx) == COLUMN_TYPE_INT);
+
+    const Column& column = GetColumn(column_ndx);
+    return column.count(target);
+}
+
 int64_t Table::sum(size_t column_ndx) const
 {
     assert(column_ndx < get_column_count());

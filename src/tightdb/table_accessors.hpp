@@ -635,6 +635,11 @@ public:
         return Base::m_table->get_impl()->find_all_int(col_idx, value);
     }
 
+    size_t count(int64_t target) const
+    {
+        return Base::m_table->get_impl()->count(col_idx, target);
+    }
+
     int64_t sum() const
     {
         return Base::m_table->get_impl()->sum(col_idx);
