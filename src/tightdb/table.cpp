@@ -154,15 +154,12 @@ void Table::invalidate()
     // Invalidate all subtables
     const size_t n = m_cols.Size();
     for (size_t i=0; i<n; ++i) {
-        switch (GetRealColumnType(i)) {
-        case COLUMN_TYPE_TABLE:
-            GetColumnTable(i).invalidate_subtables();
-            break;
-        case COLUMN_TYPE_MIXED:
-            GetColumnMixed(i).invalidate_subtables();
-            break;
-        default:
-            break;
+        ColumnBase* const c = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
+        if (ColumnTable* c2 = dynamic_cast<ColumnTable*>(c)) {
+            c2->invalidate_subtables();
+        }
+        else if (ColumnMixed* c2 = dynamic_cast<ColumnMixed*>(c)) {
+            c2->invalidate_subtables();
         }
     }
 
@@ -269,15 +266,8 @@ void Table::ClearCachedColumns()
 
     const size_t count = m_cols.Size();
     for (size_t i = 0; i < count; ++i) {
-        const ColumnType type = GetRealColumnType(i);
-        if (type == COLUMN_TYPE_STRING_ENUM) {
-            ColumnStringEnum* const column = reinterpret_cast<ColumnStringEnum*>(m_cols.Get(i));
-            delete(column);
-        }
-        else {
-            ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
-            delete(column);
-        }
+        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
+        delete column;
     }
     m_cols.Destroy();
 }

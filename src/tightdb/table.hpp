@@ -331,6 +331,20 @@ private:
     Table(Table const &); // Disable copy construction
     Table &operator=(Table const &); // Disable copying assignment
 
+    /// Put this table wrapper into the invalid state, which detaches
+    /// it from the underlying structure of arrays. Also do this
+    /// recursively for subtables. When this function returns,
+    /// is_valid() will return false.
+    ///
+    /// This function may be called for a table wrapper that is
+    /// already in the invalid state (idempotency).
+    ///
+    /// It is also valid to call this function for a table wrapper
+    /// that has not yet been marked as invalid, but whose underlying
+    /// structure of arrays have changed in an unpredictable/unknown
+    /// way. This generally happens when a modifying table operation
+    /// fails, and also when one transaction is ended and a new one is
+    /// started.
     void invalidate();
 
     mutable size_t m_ref_count;

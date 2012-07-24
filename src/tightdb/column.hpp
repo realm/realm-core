@@ -72,8 +72,11 @@ public:
     virtual void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif // TIGHTDB_DEBUG
 
-template<class C, class A> A* TreeGetArray(size_t start, size_t *first, size_t *last) const;
-template<typename T, class C, class F> size_t TreeFind(T value, size_t start, size_t end) const;
+    template<class C, class A>
+    A* TreeGetArray(size_t start, size_t *first, size_t *last) const;
+
+    template<typename T, class C, class F>
+    size_t TreeFind(T value, size_t start, size_t end) const;
 
 protected:
     friend class StringIndex;
@@ -220,7 +223,7 @@ protected:
     bool LeafInsert(size_t ndx, int64_t value) {return m_array->Insert(ndx, value);}
     void LeafDelete(size_t ndx) {m_array->Delete(ndx);}
 
-    template <class F>size_t LeafFind(int64_t value, size_t start, size_t end) const
+    template<class F> size_t LeafFind(int64_t value, size_t start, size_t end) const
     {
         return m_array->Query<F>(value, start, end);
     }
