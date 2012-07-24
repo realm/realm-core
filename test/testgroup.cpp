@@ -445,7 +445,7 @@ TEST(Group_Subtable)
             st->set_int(0, 0, 200+i);
         }
         if (i%3 == 1) {
-            table->set_mixed(2, i, Mixed(COLUMN_TYPE_TABLE));
+            table->set_mixed(2, i, Mixed::subtable_tag());
             TableRef st = table->get_subtable(2, i);
             st->add_column(COLUMN_TYPE_INT, "banach");
             st->add_empty_row();
@@ -473,7 +473,7 @@ TEST(Group_Subtable)
             CHECK_EQUAL(st->get_int(0,0), 700+i);
         }
         if (i%8 == 3) {
-            if (i%3 != 1) table->set_mixed(2, i, Mixed(COLUMN_TYPE_TABLE));
+            if (i%3 != 1) table->set_mixed(2, i, Mixed::subtable_tag());
             TableRef st = table->get_subtable(2, i);
             if (i%3 != 1) st->add_column(COLUMN_TYPE_INT, "banach");
             st->add_empty_row();
@@ -556,7 +556,7 @@ TEST(Group_Subtable)
             }
         }
         if (i%7 == 4) {
-            if (i%3 != 1 && i%8 != 3) table2->set_mixed(2, i, Mixed(COLUMN_TYPE_TABLE));
+            if (i%3 != 1 && i%8 != 3) table2->set_mixed(2, i, Mixed::subtable_tag());
             TableRef st = table2->get_subtable(2, i);
             if (i%3 != 1 && i%8 != 3) st->add_column(COLUMN_TYPE_INT, "banach");
             st->add_empty_row();
@@ -682,7 +682,7 @@ TEST(Group_MultiLevelSubtables)
             b->add_empty_row();
         }
         {
-            table->set_mixed(2, 0, Mixed(COLUMN_TYPE_TABLE));
+            table->set_mixed(2, 0, Mixed::subtable_tag());
             TableRef a = table->get_subtable(2, 0);
             {
                 Spec& s = a->get_spec();
@@ -691,7 +691,7 @@ TEST(Group_MultiLevelSubtables)
                 a->update_from_spec();
             }
             a->add_empty_row();
-            a->set_mixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
+            a->set_mixed(1, 0, Mixed::subtable_tag());
             TableRef b = a->get_subtable(1, 0);
             {
                 Spec& s = b->get_spec();

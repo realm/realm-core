@@ -48,16 +48,6 @@ public:
     struct subtable_tag {};
     Mixed(subtable_tag): m_type(COLUMN_TYPE_TABLE) {}
 
-    // FIXME: This constructor is obsolete. Use Mixed(subtable_tag)
-    // instead. This way there will be no room for run-time errors and
-    // therefore no need for TIGHTDB_ASSERT().
-    explicit Mixed(ColumnType v)
-    {
-        TIGHTDB_ASSERT(v == COLUMN_TYPE_TABLE);
-        static_cast<void>(v);
-        m_type = COLUMN_TYPE_TABLE;
-    }
-
     ColumnType get_type() const {return m_type;}
 
     int64_t     get_int()    const;

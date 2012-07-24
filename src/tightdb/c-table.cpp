@@ -39,7 +39,7 @@ Mixed *mixed_new_binary(const char* value, size_t len)
 }
 Mixed *mixed_new_table(void)
 {
-    return new Mixed(tightdb::COLUMN_TYPE_TABLE);
+    return new Mixed(Mixed::subtable_tag());
 }
 void mixed_delete(Mixed *mixed)
 {

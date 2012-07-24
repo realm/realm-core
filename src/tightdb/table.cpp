@@ -963,7 +963,7 @@ Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const
         case COLUMN_TYPE_BINARY:
             return Mixed(column.get_binary(ndx));
         case COLUMN_TYPE_TABLE:
-            return Mixed(COLUMN_TYPE_TABLE);
+            return Mixed::subtable_tag();
         default:
             TIGHTDB_ASSERT(false);
             return Mixed((int64_t)0);

@@ -226,7 +226,7 @@ TEST(Table_Delete_All_Types)
                 // Add subtable to mixed column
                 // We can first set schema and contents when the entire
                 // row has been inserted
-                table.insert_mixed(7, i, Mixed(COLUMN_TYPE_TABLE));
+                table.insert_mixed(7, i, Mixed::subtable_tag());
                 break;
             }
         }
@@ -727,7 +727,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
 
     table.insert_int(0, 5, 0);
-    table.insert_mixed(1, 5, Mixed(COLUMN_TYPE_TABLE));
+    table.insert_mixed(1, 5, Mixed::subtable_tag());
     table.insert_done();
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
@@ -809,7 +809,7 @@ TEST(Table_SubtableSizeAndClear)
     table.insert_done();
 
     table.insert_subtable(0, 1);
-    table.insert_mixed(1, 1, Mixed(COLUMN_TYPE_TABLE));
+    table.insert_mixed(1, 1, Mixed::subtable_tag());
     table.insert_done();
 
     CHECK_EQUAL(table.get_subtable_size(0,0), 0); // Subtable column
@@ -820,7 +820,7 @@ TEST(Table_SubtableSizeAndClear)
     CHECK(!table.get_subtable(1, 0)); // Mixed column, bool value, must return NULL
     CHECK(table.get_subtable(1, 1));  // Mixed column, table value
 
-    table.set_mixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
+    table.set_mixed(1, 0, Mixed::subtable_tag());
     table.set_mixed(1, 1, false);
     CHECK(table.get_subtable(1, 0));
     CHECK(!table.get_subtable(1, 1));
