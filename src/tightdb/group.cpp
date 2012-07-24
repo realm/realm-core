@@ -276,6 +276,25 @@ Group::~Group()
     m_cachedtables.Destroy();
 }
 
+void Group::invalidate()
+{
+    //TODO: Should only invalidate object wrappers and never
+    // touch the unferlying data (that may no longer be valid)
+    clear_cache();
+
+    m_top.Invalidate();
+    m_tables.Invalidate();
+    m_tableNames.Invalidate();
+    m_freePositions.Invalidate();
+    m_freeLengths.Invalidate();
+    m_freeVersions.Invalidate();
+
+    // Reads may allocate some temproary state that we have
+    // to clean up
+    // TODO: This is also done in commit(), fix to do it only once
+    m_alloc.FreeAll();
+}
+
 bool Group::is_empty() const
 {
     if (!m_top.IsValid()) return true;
@@ -414,7 +433,19 @@ bool Group::commit(size_t current_version, size_t readlock_version)
     }
 
     // Recursively write all changed arrays to end of file
-    out.Commit();
+    const size_t top_pos = out.Commit();
+
+    // If the group is persisiting in single-thread (un-shared) mode
+    // we have to make sure that the group stays valid after commit
+    if (!is_shared()) {
+        // Recusively update refs in all active tables (columns, arrays..)
+        update_refs(top_pos);
+    }
+    else {
+        assert(m_alloc.IsAllFree());
+        invalidate();
+        assert(m_alloc.IsAllFree());
+    }
 
     return true;
 }
