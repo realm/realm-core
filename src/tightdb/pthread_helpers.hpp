@@ -23,6 +23,7 @@
 #include <cerrno>
 #include <pthread.h>
 
+#include <tightdb/assert.hpp>
 #include <tightdb/error.hpp>
 #include <tightdb/terminate.hpp>
 
