@@ -357,7 +357,7 @@ void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
 }
 
 // FIXME: Check that callers test the return value
-bool ColumnMixed::insert_table(size_t ndx)
+bool ColumnMixed::insert_subtable(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx <= m_types->Size());
     const size_t ref = Table::create_empty_table(m_array->GetAllocator());
@@ -369,7 +369,7 @@ bool ColumnMixed::insert_table(size_t ndx)
 }
 
 // FIXME: Check that callers test the return value
-bool ColumnMixed::SetTable(size_t ndx)
+bool ColumnMixed::set_subtable(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
     const size_t ref = Table::create_empty_table(m_array->GetAllocator());

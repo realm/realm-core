@@ -646,12 +646,22 @@ void Table::remove(size_t ndx)
 void Table::insert_subtable(size_t column_ndx, size_t ndx)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(GetRealColumnType(column_ndx) == COLUMN_TYPE_TABLE);
     TIGHTDB_ASSERT(ndx <= m_size);
 
-    ColumnTable& subtables = GetColumnTable(column_ndx);
-    subtables.invalidate_subtables();
-    subtables.Insert(ndx); // FIXME: Consider calling virtual method insert(size_t) instead.
+    const ColumnType type = GetRealColumnType(column_ndx);
+    if (type == COLUMN_TYPE_TABLE) {
+        ColumnTable& subtables = GetColumnTable(column_ndx);
+        subtables.invalidate_subtables();
+        subtables.Insert(ndx); // FIXME: Consider calling virtual method insert(size_t) instead.
+    }
+    else if (type == COLUMN_TYPE_MIXED) {
+        ColumnMixed& subtables = GetColumnMixed(column_ndx);
+        subtables.invalidate_subtables();
+        subtables.insert_subtable(ndx);
+    }
+    else {
+        TIGHTDB_ASSERT(false);
+    }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err =
@@ -727,7 +737,7 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     }
     else if (type == COLUMN_TYPE_MIXED) {
         ColumnMixed& subtables = GetColumnMixed(col_idx);
-        subtables.SetTable(row_idx);
+        subtables.set_subtable(row_idx);
         subtables.invalidate_subtables();
     }
     else {
@@ -1007,7 +1017,7 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
             break;
         }
         case COLUMN_TYPE_TABLE:
-            column.SetTable(ndx);
+            column.set_subtable(ndx);
             break;
         default:
             TIGHTDB_ASSERT(false);
@@ -1048,7 +1058,7 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
             break;
         }
         case COLUMN_TYPE_TABLE:
-            column.insert_table(ndx);
+            column.insert_subtable(ndx);
             break;
         default:
             TIGHTDB_ASSERT(false);

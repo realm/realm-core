@@ -174,7 +174,7 @@ public:
     ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;
     void            clear_subtable(size_t column_ndx, size_t row_ndx);
-    void            insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table FIXME: Does not work for mixed columns yet (note that is must invalidate subtables).
+    void            insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
 
     // Indexing
     bool has_index(size_t column_ndx) const;
