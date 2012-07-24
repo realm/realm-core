@@ -167,14 +167,14 @@ public:
     /// Compare two subtable columns for equality.
     bool Compare(const ColumnTable&) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 protected:
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     size_t m_ref_specSet;
 };
@@ -192,7 +192,7 @@ inline void ColumnSubtableParent::UpdateFromParent()
 
 inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) const
 {
-    assert(subtable_ndx < Size());
+    TIGHTDB_ASSERT(subtable_ndx < Size());
 
     Table *subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
@@ -211,7 +211,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
 inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
                                                      std::size_t spec_ref) const
 {
-    assert(subtable_ndx < Size());
+    TIGHTDB_ASSERT(subtable_ndx < Size());
 
     Table *subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
@@ -230,7 +230,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
 inline ColumnSubtableParent::SubtableMap::~SubtableMap()
 {
     if (m_indices.IsValid()) {
-        assert(m_indices.is_empty());
+        TIGHTDB_ASSERT(m_indices.is_empty());
         m_indices.Destroy();
         m_wrappers.Destroy();
     }
@@ -255,9 +255,9 @@ inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table
 
 inline void ColumnSubtableParent::SubtableMap::remove(size_t subtable_ndx)
 {
-    assert(m_indices.IsValid());
+    TIGHTDB_ASSERT(m_indices.IsValid());
     const size_t pos = m_indices.find_first(subtable_ndx);
-    assert(pos != size_t(-1));
+    TIGHTDB_ASSERT(pos != size_t(-1));
     m_indices.Delete(pos);
     m_wrappers.Delete(pos);
 }

@@ -41,9 +41,9 @@ public:
     void Resize(size_t len);
     void Clear();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 private:
     virtual size_t CalcByteLen(size_t count, size_t width) const;

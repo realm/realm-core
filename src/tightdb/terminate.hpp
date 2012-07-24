@@ -21,25 +21,20 @@
 #define TIGHTDB_TERMINATE_HPP
 
 #include <cstdlib>
+#include <string>
 
-#ifdef NDEBUG
-
-#define TIGHTDB_TERMINATE(msg) std::abort()
-
-#else // !NDEBUG
-
-#include <iostream>
-
-#define TIGHTDB_TERMINATE(msg) tightdb::terminate((msg), __FILE__, __LINE__)
+#ifdef TIGHTDB_DEBUG
+#  define TIGHTDB_TERMINATE(msg) tightdb::terminate((msg), __FILE__, __LINE__)
+#else
+#  define TIGHTDB_TERMINATE(msg) std::abort()
+#endif
 
 namespace tightdb {
-    inline void terminate(std::string message, const char* file, long line)
-    {
-        std::cerr << file << ":" << line << ": " << message << std::endl;
-        std::abort();
-    }
-} // namespace tightdb
 
-#endif // !NDEBUG
+
+void terminate(std::string message, const char* file, long line);
+
+
+} // namespace tightdb
 
 #endif // TIGHTDB_TERMINATE_HPP

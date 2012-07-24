@@ -46,7 +46,7 @@ public:
     size_t write(const char* p, size_t n);
     void WriteAt(size_t pos, const char* p, size_t n);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void ZeroFreeSpace();
 #endif
 

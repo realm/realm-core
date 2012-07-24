@@ -30,8 +30,8 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include <cassert>
 
+#include <tightdb/assert.hpp>
 #include <tightdb/error.hpp>
 #include <tightdb/alloc.hpp>
 #include <tightdb/utilities.hpp>
@@ -62,7 +62,7 @@
     #include <pmmintrin.h> // __SSE3__
 #endif
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 #include <stdio.h>
 #endif
 
@@ -76,7 +76,7 @@ static const size_t not_found = (size_t)-1;
 class Array;
 class AdaptiveStringColumn;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 class MemStats {
 public:
     MemStats() : allocated(0), used(0), array_count(0) {}
@@ -256,12 +256,12 @@ public:
 
     // Debug
     size_t GetBitWidth() const {return m_width;}
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Print() const;
     void Verify() const;
     void ToDot(ostream& out, const char* title=NULL) const;
     void Stats(MemStats& stats) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
     mutable unsigned char* m_data; // FIXME: Should be 'char' not 'unsigned char'
 
 private:
@@ -407,7 +407,7 @@ inline Array::~Array() {}
 
 template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 {
-    assert(IsValid());
+    TIGHTDB_ASSERT(IsValid());
 
     // Ignore un-changed arrays when persisting
     if (persist && m_alloc.IsReadOnly(m_ref)) return m_ref;
@@ -431,7 +431,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
             else {
                 const Array sub(ref, NULL, 0, GetAllocator());
                 const size_t sub_pos = sub.Write(out, true, persist);
-                assert((sub_pos & 0x7) == 0); // 64bit alignment
+                TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
                 newRefs.add(sub_pos);
             }
         }
@@ -472,14 +472,14 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
     // Write array
     const char* const data = reinterpret_cast<const char*>(m_data-8);
     const size_t array_pos = out.write(data, len);
-    assert((array_pos & 0x7) == 0); /// 64bit alignment
+    TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64bit alignment
 
     return array_pos; // Return position of this array
 }
 
 template<class S> void Array::WriteAt(size_t pos, S& out) const
 {
-    assert(IsValid());
+    TIGHTDB_ASSERT(IsValid());
 
     // TODO: replace capacity with checksum
 

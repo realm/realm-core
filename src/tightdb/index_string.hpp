@@ -38,7 +38,7 @@ public:
 
     size_t find_first(const char* value) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     bool is_empty() const;
     void to_dot(std::ostream& out = std::cerr);
 #endif
@@ -60,7 +60,7 @@ protected:
     // Member variables
     const AdaptiveStringColumn& m_column;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
     void ArrayToDot(std::ostream& out, const Array& array) const;
     void KeysToDot(std::ostream& out, const Array& array, const char* title=NULL) const;

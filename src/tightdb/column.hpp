@@ -27,7 +27,6 @@
 #endif
 //#include <climits> // size_t
 #include <cstdlib> // size_t
-#include <assert.h>
 
 #include <tightdb/array.hpp>
 
@@ -68,10 +67,10 @@ public:
     virtual void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
     virtual void UpdateFromParent() {m_array->UpdateFromParent();}
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in ObjC
     virtual void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 template<class C, class A> A* TreeGetArray(size_t start, size_t *first, size_t *last) const;
 template<typename T, class C, class F> size_t TreeFind(T value, size_t start, size_t end) const;
@@ -119,10 +118,10 @@ protected:
     template<class C> bool NodeInsertSplit(size_t ndx, size_t newRef);
     size_t GetRefSize(size_t ref) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void ArrayToDot(std::ostream& out, const Array& array) const;
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Member variables
     mutable Array* m_array;
@@ -204,11 +203,11 @@ public:
     bool Compare(const Column&) const;
 
     // Debug
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Print() const;
     virtual void Verify() const;
     MemStats Stats() const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 protected:
     friend class ColumnBase;

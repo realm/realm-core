@@ -27,7 +27,7 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const
     // FIXME: If the table object is cached, it is possible to get the
     // size from it. Maybe it is faster in general to check for the
     // presence of the cached object and use it when available.
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);
     if (ref_columns == 0) return 0;
@@ -44,7 +44,7 @@ bool ColumnTable::add()
 
 void ColumnTable::Insert(size_t ndx)
 {
-    assert(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= Size());
 
     // zero-ref indicates empty table
     Column::Insert(ndx, 0);
@@ -52,7 +52,7 @@ void ColumnTable::Insert(size_t ndx)
 
 void ColumnTable::Delete(size_t ndx)
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);
 
@@ -70,7 +70,7 @@ void ColumnTable::Delete(size_t ndx)
 
 void ColumnTable::Clear(size_t ndx)
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);
     if (ref_columns == 0) return; // already empty
@@ -97,7 +97,7 @@ bool ColumnTable::Compare(const ColumnTable& c) const
 }
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void ColumnTable::Verify() const
 {
@@ -125,6 +125,6 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const
     }
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 } // namespace tightdb

@@ -1,5 +1,4 @@
 #include <cstdlib>
-#include <cassert>
 #include <cstring>
 #include <cstdio> // debug
 #include <iostream>
@@ -35,7 +34,7 @@ namespace tightdb {
 
 const char* ArrayString::Get(size_t ndx) const
 {
-    assert(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_len);
 
     if (m_width == 0) return "";
     else return (const char*)(m_data + (ndx * m_width));
@@ -43,17 +42,17 @@ const char* ArrayString::Get(size_t ndx) const
 
 bool ArrayString::Set(size_t ndx, const char* value)
 {
-    assert(ndx < m_len);
-    assert(value);
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(value);
 
     return Set(ndx, value, strlen(value));
 }
 
 bool ArrayString::Set(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx < m_len);
-    assert(value);
-    assert(len < 64); // otherwise we have to use another column type
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(value);
+    TIGHTDB_ASSERT(len < 64); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     if (!CopyOnWrite()) return false;
@@ -112,9 +111,9 @@ bool ArrayString::Insert(size_t ndx, const char* value)
 
 bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx <= m_len);
-    assert(value);
-    assert(len < 64); // otherwise we have to use another column type
+    TIGHTDB_ASSERT(ndx <= m_len);
+    TIGHTDB_ASSERT(value);
+    TIGHTDB_ASSERT(len < 64); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     if (!CopyOnWrite()) return false;
@@ -185,7 +184,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
 
 void ArrayString::Delete(size_t ndx)
 {
-    assert(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
     CopyOnWrite();
@@ -220,13 +219,13 @@ size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const
 
 size_t ArrayString::find_first(const char* value, size_t start, size_t end) const
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
     return FindWithLen(value, strlen(value), start, end);
 }
 
 void ArrayString::find_all(Array& result, const char* value, size_t add_offset, size_t start, size_t end)
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
 
     const size_t len = strlen(value);
 
@@ -241,11 +240,11 @@ void ArrayString::find_all(Array& result, const char* value, size_t add_offset, 
 
 size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, size_t end) const
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
 
     if (end == (size_t)-1) end = m_len;
     if (start == end) return (size_t)-1;
-    assert(start < m_len && end <= m_len && start < end);
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
     if (m_len == 0) return (size_t)-1; // empty list
     if (len >= m_width) return (size_t)-1; // A string can never be wider than the column width
 
@@ -273,7 +272,7 @@ bool ArrayString::Compare(const ArrayString& c) const
 }
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void ArrayString::StringStats() const
 {
@@ -344,6 +343,6 @@ void ArrayString::ToDot(std::ostream& out, const char* title) const
     if (title) out << "}" << std::endl;
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

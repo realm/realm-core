@@ -70,9 +70,9 @@ public:
     /// Compare two string columns for equality.
     bool Compare(const AdaptiveStringColumn&) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 protected:
     friend class ColumnBase;
@@ -90,9 +90,9 @@ protected:
 
     bool FindKeyPos(const char* target, size_t& pos) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 };
 
 

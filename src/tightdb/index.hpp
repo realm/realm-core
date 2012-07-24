@@ -43,9 +43,9 @@ public:
     bool find_all(Column& result, int64_t value) const;
     bool FindAllRange(Column& result, int64_t start, int64_t end) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Verify() const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 protected:
     // B-Tree functions

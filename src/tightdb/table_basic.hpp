@@ -26,13 +26,11 @@
 #include <stdint.h> // unint8_t etc
 #endif
 
-#include <cassert>
 #include <cstddef>
 #include <cstring> // strcmp()
 #include <ctime>
 #include <utility>
 
-#include <tightdb/static_assert.hpp>
 #include <tightdb/meta.hpp>
 #include <tightdb/tuple.hpp>
 #include <tightdb/table.hpp>
@@ -209,7 +207,7 @@ public:
     /// Compare two tables for inequality. See operator==().
     bool operator!=(const BasicTable& t) const { return !compare_rows(t); }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     using Table::Verify;
     using Table::print;
 #endif
@@ -335,7 +333,7 @@ public:
         return m_impl.remove(table, start, end, limit);
     }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     std::string Verify() { return m_impl.Verify(); }
 #endif
 
@@ -377,7 +375,7 @@ namespace _impl
     template<class Type, int col_idx> struct AddCol {
         static void exec(Spec* spec, const char* const* col_names)
         {
-            assert(col_idx == spec->get_column_count());
+            TIGHTDB_ASSERT(col_idx == spec->get_column_count());
             spec->add_column(GetColumnTypeId<Type>::id, col_names[col_idx]);
         }
     };
@@ -386,7 +384,7 @@ namespace _impl
     template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
         static void exec(Spec* spec, const char* const* col_names)
         {
-            assert(col_idx == spec->get_column_count());
+            TIGHTDB_ASSERT(col_idx == spec->get_column_count());
             typedef typename Subtab::Columns Subcolumns;
             Spec subspec = spec->add_subtable_column(col_names[col_idx]);
             const char* const* const subcol_names = Subtab::spec_type::dyn_col_names();
@@ -472,7 +470,7 @@ namespace _impl
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
             t->insert_subtable(col_idx, row_idx);
-            assert(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
+            TIGHTDB_ASSERT(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
             static_cast<void>(tuple);
         }
     };
@@ -542,7 +540,7 @@ namespace _impl
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
             t->clear_subtable(col_idx, row_idx);
-            assert(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
+            TIGHTDB_ASSERT(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
             static_cast<void>(tuple);
         }
     };

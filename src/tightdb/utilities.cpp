@@ -1,5 +1,4 @@
 #include <string>
-#include <assert.h>
 #include <cstdlib> // size_t
 #ifndef _MSC_VER
 #include <stdint.h>
@@ -7,15 +6,16 @@
 #include <win32/stdint.h>
 #endif
 
+#include <tightdb/assert.hpp>
 #include <tightdb/utilities.hpp>
 
 namespace tightdb {
 
 size_t TO_REF(int64_t v)
 {
-#if !defined(NDEBUG) && defined(_DEBUG)
+#ifdef TIGHTDB_DEBUG
     uint64_t m = (size_t)(-1);
-    assert((uint64_t)v <= m);
+    TIGHTDB_ASSERT((uint64_t)v <= m);
 #endif
     return (size_t)v;
 }

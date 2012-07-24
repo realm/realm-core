@@ -21,7 +21,6 @@
 #ifndef TIGHTDB_GROUP_HPP
 #define TIGHTDB_GROUP_HPP
 
-#include <tightdb/static_assert.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_basic_fwd.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -83,7 +82,7 @@ public:
     /// Compare two groups for inequality. See operator==().
     bool operator!=(const Group& g) const { return !(*this == g); }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Verify(); // Must be upper case to avoid conflict with macro in ObjC
     void print() const;
     void print_free() const;
@@ -92,7 +91,7 @@ public:
     void to_dot(std::ostream& out) const;
     void to_dot() const; // For GDB
     void zero_free_space(size_t file_size, size_t readlock_version);
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 protected:
     friend class GroupWriter;
@@ -196,7 +195,7 @@ inline const Table* Group::get_table_ptr(size_t ndx) const
 
 inline Table* Group::get_table_ptr(const char* name)
 {
-    assert(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.IsValid());
     const size_t ndx = m_tableNames.find_first(name);
     if (ndx != size_t(-1)) {
         // Get table from cache
@@ -208,16 +207,16 @@ inline Table* Group::get_table_ptr(const char* name)
 
 inline const Table* Group::get_table_ptr(const char* name) const
 {
-    assert(has_table(name));
+    TIGHTDB_ASSERT(has_table(name));
     return const_cast<Group*>(this)->get_table_ptr(name);
 }
 
 template<class T> inline T* Group::get_table_ptr(const char* name)
 {
     TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    assert(!has_table(name) || has_table<T>(name));
+    TIGHTDB_ASSERT(!has_table(name) || has_table<T>(name));
 
-    assert(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.IsValid());
     const size_t ndx = m_tableNames.find_first(name);
     if (ndx != size_t(-1)) {
         // Get table from cache
@@ -231,7 +230,7 @@ template<class T> inline T* Group::get_table_ptr(const char* name)
 
 template<class T> inline const T* Group::get_table_ptr(const char* name) const
 {
-    assert(has_table(name));
+    TIGHTDB_ASSERT(has_table(name));
     return const_cast<Group*>(this)->get_table_ptr<T>(name);
 }
 

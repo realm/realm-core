@@ -53,11 +53,11 @@ public:
     /// Compare two string arrays for equality.
     bool Compare(const ArrayString&) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void StringStats() const;
     //void ToDot(FILE* f) const;
     void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 private:
     size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;

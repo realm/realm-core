@@ -78,10 +78,10 @@ int64_t TableViewBase::minimum(size_t column_ndx) const
 
 void TableViewBase::sort(size_t column, bool Ascending)
 {
-    assert(m_table);
-    assert(m_table->get_column_type(column) == COLUMN_TYPE_INT ||
-           m_table->get_column_type(column) == COLUMN_TYPE_DATE ||
-           m_table->get_column_type(column) == COLUMN_TYPE_BOOL);
+    TIGHTDB_ASSERT(m_table);
+    TIGHTDB_ASSERT(m_table->get_column_type(column) == COLUMN_TYPE_INT  ||
+                   m_table->get_column_type(column) == COLUMN_TYPE_DATE ||
+                   m_table->get_column_type(column) == COLUMN_TYPE_BOOL);
 
     if(m_refs.Size() == 0)
         return;
@@ -148,8 +148,8 @@ void TableViewBase::sort(size_t column, bool Ascending)
 
 void TableView::remove(size_t ndx)
 {
-    assert(m_table);
-    assert(ndx < m_refs.Size());
+    TIGHTDB_ASSERT(m_table);
+    TIGHTDB_ASSERT(ndx < m_refs.Size());
 
     // Delete row in source table
     const size_t real_ndx = size_t(m_refs.Get(ndx));
@@ -163,7 +163,7 @@ void TableView::remove(size_t ndx)
 
 void TableView::clear()
 {
-    assert(m_table);
+    TIGHTDB_ASSERT(m_table);
     m_refs.sort();
 
     // Delete all referenced rows in source table

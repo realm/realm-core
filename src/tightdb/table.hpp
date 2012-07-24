@@ -58,7 +58,7 @@ class ConstTableView;
 /// efficient manner.
 ///
 /// FIXME: When compiling in debug mode, all table methods should
-/// should assert(is_valid()).
+/// should TIGHTDB_ASSERT(is_valid()).
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
@@ -229,12 +229,12 @@ public:
     bool operator!=(const Table& t) const;
 
     // Debug
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream& out, const char* title=NULL) const;
     void print() const;
     MemStats stats() const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // todo, note, these three functions have been protected
     const ColumnBase& GetColumnBase(size_t column_ndx) const;
@@ -295,9 +295,9 @@ protected:
     void UpdateFromParent();
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void ToDotInternal(std::ostream& out) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Member variables
     size_t m_size;
@@ -553,7 +553,7 @@ inline Table::LocalTransactLog Table::get_local_transact_log()
 inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin, size_t* end) const
 {
     if (spec != &m_spec_set) {
-        assert(m_spec_set.m_subSpecs.IsValid());
+        TIGHTDB_ASSERT(m_spec_set.m_subSpecs.IsValid());
         return spec->record_subspec_path(&m_spec_set.m_subSpecs, begin, end);
     }
     return begin;
@@ -563,11 +563,11 @@ inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const
 {
     const Array& real_top = m_top.IsValid() ? m_top : m_columns;
     const size_t index_in_parent = real_top.GetParentNdx();
-    assert(begin < end);
+    TIGHTDB_ASSERT(begin < end);
     *begin++ = index_in_parent;
     ArrayParent* parent = real_top.GetParent();
-    assert(parent);
-    assert(dynamic_cast<Parent*>(parent));
+    TIGHTDB_ASSERT(parent);
+    TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
 }
 

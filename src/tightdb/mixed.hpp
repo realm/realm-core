@@ -26,9 +26,9 @@
 #include <win32/stdint.h>
 #endif
 
-#include <cassert>
 #include <cstddef> // size_t
 
+#include <tightdb/assert.hpp>
 #include <tightdb/column_type.hpp>
 #include <tightdb/date.hpp>
 #include <tightdb/binary_data.hpp>
@@ -50,21 +50,21 @@ public:
 
     // FIXME: This constructor is obsolete. Use Mixed(subtable_tag)
     // instead. This way there will be no room for run-time errors and
-    // therefore no need for assert().
+    // therefore no need for TIGHTDB_ASSERT().
     explicit Mixed(ColumnType v)
     {
-        assert(v == COLUMN_TYPE_TABLE);
+        TIGHTDB_ASSERT(v == COLUMN_TYPE_TABLE);
         static_cast<void>(v);
         m_type = COLUMN_TYPE_TABLE;
     }
 
     ColumnType get_type() const {return m_type;}
 
-    int64_t     get_int()    const { assert(m_type == COLUMN_TYPE_INT);    return m_int; }
-    bool        get_bool()   const { assert(m_type == COLUMN_TYPE_BOOL);   return m_bool; }
-    std::time_t get_date()   const { assert(m_type == COLUMN_TYPE_DATE);   return m_date; }
-    const char* get_string() const { assert(m_type == COLUMN_TYPE_STRING); return m_str; }
-    BinaryData  get_binary() const { assert(m_type == COLUMN_TYPE_BINARY); return BinaryData(m_str, m_len); }
+    int64_t     get_int()    const;
+    bool        get_bool()   const;
+    std::time_t get_date()   const;
+    const char* get_string() const;
+    BinaryData  get_binary() const;
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Mixed& m)
@@ -77,7 +77,7 @@ public:
         case COLUMN_TYPE_STRING: out << m.m_str; break;
         case COLUMN_TYPE_BINARY: out << BinaryData(m.m_str, m.m_len); break;
         case COLUMN_TYPE_TABLE: out << "subtable"; break;
-        default: assert(false); break;
+        default: TIGHTDB_ASSERT(false); break;
         }
         out << ")";
         return out;
@@ -93,6 +93,41 @@ private:
     };
     std::size_t m_len;
 };
+
+
+
+
+// Implementation:
+
+inline int64_t Mixed::get_int() const
+{
+    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_INT);
+    return m_int;
+}
+
+inline bool Mixed::get_bool() const
+{
+    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_BOOL);
+    return m_bool;
+}
+
+inline std::time_t Mixed::get_date() const
+{
+    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_DATE);
+    return m_date;
+}
+
+inline const char* Mixed::get_string() const
+{
+    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_STRING);
+    return m_str;
+}
+
+inline BinaryData Mixed::get_binary() const
+{
+    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_BINARY);
+    return BinaryData(m_str, m_len);
+}
 
 
 } // namespace tightdb

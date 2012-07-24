@@ -1,4 +1,3 @@
-#include <cassert>
 #include <vector>
 #include <iostream>
 #include <iomanip>
@@ -12,7 +11,6 @@
 #include <tightdb/column.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/query_conditions.hpp>
-#include <tightdb/static_assert.hpp>
 #include <tightdb/column_string.hpp>
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
@@ -53,7 +51,7 @@ inline void set_header_width(size_t value, void* header)
     size_t w = 0;
     size_t b = size_t(value);
     while (b) {++w; b >>= 1;}
-    assert(w < 8);
+    TIGHTDB_ASSERT(w < 8);
 
     uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
     header2[0] = (header2[0] & ~0x7) | uint8_t(w);
@@ -61,7 +59,7 @@ inline void set_header_width(size_t value, void* header)
 
 inline void set_header_len(size_t value, void* header)
 {
-    assert(value <= 0xFFFFFF);
+    TIGHTDB_ASSERT(value <= 0xFFFFFF);
     uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
     header2[1] = (value >> 16) & 0x000000FF;
     header2[2] = (value >>  8) & 0x000000FF;
@@ -70,7 +68,7 @@ inline void set_header_len(size_t value, void* header)
 
 inline void set_header_capacity(size_t value, void* header)
 {
-    assert(value <= 0xFFFFFF);
+    TIGHTDB_ASSERT(value <= 0xFFFFFF);
     uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
     header2[4] = (value >> 16) & 0x000000FF;
     header2[5] = (value >>  8) & 0x000000FF;
@@ -182,7 +180,7 @@ size_t Array::get_header_capacity(const void* header) const
 
 void Array::init_from_ref(size_t ref)
 {
-    assert(ref);
+    TIGHTDB_ASSERT(ref);
     uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
     CreateFromHeader(header, ref);
 }
@@ -309,7 +307,7 @@ void Array::Preset(size_t bitwidth, size_t count)
 {
     Clear();
     SetWidth(bitwidth);
-    assert(Alloc(count, bitwidth));
+    TIGHTDB_ASSERT(Alloc(count, bitwidth));
     m_len = count;
     for(size_t n = 0; n < count; n++)
         Set(n, 0);
@@ -329,19 +327,19 @@ void Array::SetParent(ArrayParent *parent, size_t pndx)
 
 Array Array::GetSubArray(size_t ndx)
 {
-    assert(ndx < m_len);
-    assert(m_hasRefs);
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(m_hasRefs);
 
     const size_t ref = (size_t)Get(ndx);
-    assert(ref);
+    TIGHTDB_ASSERT(ref);
 
     return Array(ref, this, ndx, m_alloc);
 }
 
 const Array Array::GetSubArray(size_t ndx) const
 {
-    assert(ndx < m_len);
-    assert(m_hasRefs);
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(m_hasRefs);
 
     return Array(size_t(Get(ndx)), const_cast<Array *>(this), ndx, m_alloc);
 }
@@ -399,7 +397,7 @@ void Array::Clear()
 
 void Array::Delete(size_t ndx)
 {
-    assert(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
     CopyOnWrite();
@@ -427,27 +425,27 @@ void Array::Delete(size_t ndx)
 
 int64_t Array::Get(size_t ndx) const
 {
-    assert(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_len);
     return (this->*m_getter)(ndx);
 }
 
 size_t Array::GetAsRef(size_t ndx) const
 {
-    assert(ndx < m_len);
-    assert(m_hasRefs);
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(m_hasRefs);
     const int64_t v = (this->*m_getter)(ndx);
     return TO_REF(v);
 }
 
 int64_t Array::back() const
 {
-    assert(m_len);
+    TIGHTDB_ASSERT(m_len);
     return (this->*m_getter)(m_len-1);
 }
 
 bool Array::Set(size_t ndx, int64_t value)
 {
-    assert(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
     if (!CopyOnWrite()) return false;
@@ -484,8 +482,8 @@ bool Array::Set(size_t ndx, int64_t value)
 // lot when returning results to TableViews)
 bool Array::AddPositiveLocal(int64_t value)
 {
-    assert(value >= 0);
-    assert(&m_alloc == &GetDefaultAllocator());
+    TIGHTDB_ASSERT(value >= 0);
+    TIGHTDB_ASSERT(&m_alloc == &GetDefaultAllocator());
 
     if (value <= m_ubound) {
         if (m_len < m_capacity) {
@@ -501,7 +499,7 @@ bool Array::AddPositiveLocal(int64_t value)
 
 bool Array::Insert(size_t ndx, int64_t value)
 {
-    assert(ndx <= m_len);
+    TIGHTDB_ASSERT(ndx <= m_len);
 
     // Check if we need to copy before modifying
     if (!CopyOnWrite()) return false;
@@ -567,7 +565,7 @@ bool Array::add(int64_t value)
 
 void Array::Resize(size_t count)
 {
-    assert(count <= m_len);
+    TIGHTDB_ASSERT(count <= m_len);
 
     CopyOnWrite();
 
@@ -590,8 +588,8 @@ void Array::SetAllToZero()
 bool Array::Increment(int64_t value, size_t start, size_t end)
 {
     if (end == (size_t)-1) end = m_len;
-    assert(start < m_len);
-    assert(end >= start && end <= m_len);
+    TIGHTDB_ASSERT(start < m_len);
+    TIGHTDB_ASSERT(end >= start && end <= m_len);
 
     // Increment range
     for (size_t i = start; i < end; ++i) {
@@ -612,7 +610,7 @@ bool Array::IncrementIf(int64_t limit, int64_t value)
 
 void Array::Adjust(size_t start, int64_t diff)
 {
-    assert(start <= m_len);
+    TIGHTDB_ASSERT(start <= m_len);
 
     for (size_t i = start; i < m_len; ++i) {
         const int64_t v = Get(i);
@@ -758,7 +756,7 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
     }
 #endif
     else
-        assert(true);
+        TIGHTDB_ASSERT(false);
     return _mm_movemask_epi8(compare) == 0 ? not_found : i - 1;
 }
 #endif //USE_SSE
@@ -769,7 +767,7 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, size_t end) const
 {
     if (end == (size_t)-1) end = m_len;
-    assert(start <= m_len && end <= m_len && start <= end);
+    TIGHTDB_ASSERT(start <= m_len && end <= m_len && start <= end);
 
     // When starting from beginning of array the data is always 64bit aligned
     // but otherwise we have to ensure alignment.
@@ -806,7 +804,7 @@ template <bool eq>size_t Array::CompareEquality(int64_t value, size_t start, siz
     const int64_t* const e = (int64_t*)(m_data + (end * m_width / 8)) - 1;
 
     // Test if p is aligned
-	assert((size_t)p / 8 * 8 == (size_t)p);
+	TIGHTDB_ASSERT((size_t)p / 8 * 8 == (size_t)p);
 
     // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
@@ -960,7 +958,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     if (end == (size_t)-1) end = m_len;
     if (start == end) return;
 
-    assert(start < m_len && end <= m_len && start < end);
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     // If the value is wider than the column
     // then we know it can't be there
@@ -1003,7 +1001,7 @@ template <bool gt>size_t Array::CompareRelation(int64_t value, size_t start, siz
     if (is_empty()) return (size_t)-1;
     if (start >= end) return (size_t)-1;
 
-    assert(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
+    TIGHTDB_ASSERT(start < m_len && (end <= m_len || end == (size_t)-1) && start < end);
 
     // Test 64 items with no latency for cases where the first few 64-bit chunks are likely to
     // contain one or more matches (because the linear test we use later cannot extract the position)
@@ -1183,7 +1181,7 @@ bool Array::maximum(int64_t& result, size_t start, size_t end) const
 {
     if (end == (size_t)-1) end = m_len;
     if (start == end) return false;
-    assert(start < m_len && end <= m_len && start < end);
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
     if (m_width == 0) {result = 0; return true;} // max value is zero
 
     result = Get(start);
@@ -1203,7 +1201,7 @@ bool Array::minimum(int64_t& result, size_t start, size_t end) const
 {
     if (end == (size_t)-1) end = m_len;
     if (start == end) return false;
-    assert(start < m_len && end <= m_len && start < end);
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
     if (m_width == 0) {result = 0; return true;} // min value is zero
 
     result = Get(start);
@@ -1224,7 +1222,7 @@ int64_t Array::sum(size_t start, size_t end) const
     if (is_empty()) return 0;
     if (end == (size_t)-1) end = m_len;
     if (start == end) return 0;
-    assert(start < m_len && end <= m_len && start < end);
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     int64_t sum = 0;
 
@@ -1491,7 +1489,7 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
     /*
     // Only implemented for 64bit values
     if (m_width != 64) {
-        assert(false);
+        TIGHTDB_ASSERT(false);
         return;
     }
 
@@ -1760,7 +1758,7 @@ void Array::SetWidth(size_t width)
         m_ubound =  0x7FFFFFFFFFFFFFFFLL;
     }
     else {
-        assert(false);
+        TIGHTDB_ASSERT(false);
     }
 
     m_width = width;
@@ -2173,7 +2171,7 @@ bool Array::Compare(const Array& c) const
 }
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void Array::Print() const
 {
@@ -2187,14 +2185,14 @@ void Array::Print() const
 
 void Array::Verify() const
 {
-    assert(!IsValid() || (m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
-                          m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64));
+    TIGHTDB_ASSERT(!IsValid() || (m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
+                                  m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64));
 
     // Check that parent is set correctly
     if (!m_parent) return;
 
     const size_t ref_in_parent = m_parent->get_child_ref(m_parentNdx);
-    assert(ref_in_parent == (IsValid() ? m_ref : 0));
+    TIGHTDB_ASSERT(ref_in_parent == (IsValid() ? m_ref : 0));
 }
 
 void Array::ToDot(std::ostream& out, const char* title) const
@@ -2263,7 +2261,7 @@ void Array::Stats(MemStats& stats) const
     }
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 } // namespace tightdb
 
@@ -2355,7 +2353,7 @@ int64_t GetDirect(const char* const data, size_t width, const size_t ndx)
         case 32: return GetDirect<32>(data, ndx);
         case 64: return GetDirect<64>(data, ndx);
         default:
-            assert(false);
+            TIGHTDB_ASSERT(false);
             return 0;
     }
 }
@@ -2373,7 +2371,7 @@ size_t FindPosDirect(const uint8_t* const header, const char* const data, const 
         case 32: return FindPosDirectImp<32>(header, data, target);
         case 64: return FindPosDirectImp<64>(header, data, target);
         default:
-            assert(false);
+            TIGHTDB_ASSERT(false);
             return 0;
     }
 }

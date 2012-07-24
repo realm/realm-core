@@ -13,15 +13,14 @@
 #include <sys/file.h>
 #endif
 
-#include <cassert>
 #include <iostream>
 
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/array.hpp>
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 #include <cstdio>
-#endif //_DEBUG
+#endif
 
 using namespace std;
 using namespace tightdb;
@@ -69,20 +68,20 @@ Allocator& GetDefaultAllocator()
 
 SlabAlloc::SlabAlloc(): m_shared(NULL), m_owned(false), m_baseline(8)
 {
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     m_debugOut = false;
-#endif //_DEBUG
+#endif
 }
 
 SlabAlloc::~SlabAlloc()
 {
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     if (!IsAllFree()) {
         m_slabs.print();
         m_freeSpace.print();
-        assert(false);  // FIXME: Should this assert be here?
+        TIGHTDB_ASSERT(false);  // FIXME: Should this assert be here?
     }
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Release all allocated memory
     for (size_t i = 0; i < m_slabs.size(); ++i) {
@@ -110,7 +109,7 @@ SlabAlloc::~SlabAlloc()
 
 MemRef SlabAlloc::Alloc(size_t size)
 {
-    assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
+    TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
     // Do we have a free space we can reuse?
     const size_t count = m_freeSpace.size();
@@ -127,11 +126,11 @@ MemRef SlabAlloc::Alloc(size_t size)
                 r.ref += (unsigned int)size;
             }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
             if (m_debugOut) {
                 printf("Alloc ref: %lu size: %lu\n", location, size);
             }
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
             void* const pointer = Translate(location);
             return MemRef(pointer, location);
@@ -160,11 +159,11 @@ MemRef SlabAlloc::Alloc(size_t size)
     f.ref = slabsBack + size;
     f.size = rest;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     if (m_debugOut) {
         printf("Alloc ref: %lu size: %lu\n", slabsBack, size);
     }
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     return MemRef(slab, slabsBack);
 }
@@ -180,11 +179,11 @@ void SlabAlloc::Free(size_t ref, void* p)
     const size_t refEnd = ref + size;
     bool isMerged = false;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     if (m_debugOut) {
         printf("Free ref: %lu size: %lu\n", ref, size);
     }
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Check if we can merge with start of free block
     const size_t n = freeSpace.cols().ref.find_first(refEnd);
@@ -224,7 +223,7 @@ void SlabAlloc::Free(size_t ref, void* p)
 
 MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
 {
-    assert((size & 0x7) == 0); // only allow sizes that are multibles of 8
+    TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
     //TODO: Check if we can extend current space
 
@@ -243,11 +242,11 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
         Free(ref, p);
     //}
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     if (m_debugOut) {
         printf("ReAlloc origref: %lu oldsize: %lu newref: %lu newsize: %lu\n", ref, oldsize, space.ref, size);
     }
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     return space;
 }
@@ -257,7 +256,7 @@ void* SlabAlloc::Translate(size_t ref) const
     if (ref < m_baseline) return m_shared + ref;
     else {
         const size_t ndx = m_slabs.cols().offset.find_pos(ref);
-        assert(ndx != not_found);
+        TIGHTDB_ASSERT(ndx != not_found);
 
         const size_t offset = ndx ? m_slabs[ndx-1].offset : m_baseline;
         return (char*)(intptr_t)m_slabs[ndx].pointer + (ref - offset);
@@ -290,7 +289,7 @@ bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len)
 bool SlabAlloc::SetShared(const char* path, bool readOnly)
 {
 #ifdef _MSC_VER
-    assert(readOnly); // write persistence is not implemented for windows yet
+    TIGHTDB_ASSERT(readOnly); // write persistence is not implemented for windows yet
     // Open file
     m_fd = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, NULL, NULL);
 
@@ -401,10 +400,10 @@ bool SlabAlloc::CanPersist() const
 
 size_t SlabAlloc::GetTopRef() const
 {
-    assert(m_shared && m_baseline > 0);
+    TIGHTDB_ASSERT(m_shared && m_baseline > 0);
 
     const size_t ref = TO_REF(*(uint64_t*)m_shared);
-    assert(ref < m_baseline);
+    TIGHTDB_ASSERT(ref < m_baseline);
 
     return ref;
 }
@@ -421,8 +420,8 @@ size_t SlabAlloc::GetTotalSize() const
 
 void SlabAlloc::FreeAll(size_t filesize)
 {
-    assert(filesize >= m_baseline);
-    assert((filesize & 0x7) == 0 || filesize == (size_t)-1); // 64bit alignment
+    TIGHTDB_ASSERT(filesize >= m_baseline);
+    TIGHTDB_ASSERT((filesize & 0x7) == 0 || filesize == (size_t)-1); // 64bit alignment
 
     // Free all scratch space (done after all data has
     // been commited to persistent space)
@@ -445,26 +444,26 @@ void SlabAlloc::FreeAll(size_t filesize)
     if (filesize != (size_t)-1)
         ReMap(filesize);
 
-    assert(IsAllFree());
+    TIGHTDB_ASSERT(IsAllFree());
 }
 
 bool SlabAlloc::ReMap(size_t filesize)
 {
-    assert(m_freeReadOnly.is_empty());
-    assert(m_slabs.size() == m_freeSpace.size());
+    TIGHTDB_ASSERT(m_freeReadOnly.is_empty());
+    TIGHTDB_ASSERT(m_slabs.size() == m_freeSpace.size());
 
     // We only need to remap the readonly buffer
     // if the file size have changed.
     if (filesize == m_baseline) return false;
 
-    assert(filesize >= m_baseline);
-    assert((filesize & 0x7) == 0); // 64bit alignment
+    TIGHTDB_ASSERT(filesize >= m_baseline);
+    TIGHTDB_ASSERT((filesize & 0x7) == 0); // 64bit alignment
 
 #if !defined(_MSC_VER) // write persistence
     //void* const p = mremap(m_shared, m_baseline, filesize); // linux only
     munmap(m_shared, m_baseline);
     void* const p = mmap(0, filesize, PROT_READ, MAP_SHARED, m_fd, 0);
-    assert(p);
+    TIGHTDB_ASSERT(p);
 
     m_shared   = (char*)p;
     m_baseline = filesize;
@@ -484,7 +483,7 @@ bool SlabAlloc::ReMap(size_t filesize)
     return true;
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 bool SlabAlloc::IsAllFree() const
 {
@@ -514,12 +513,12 @@ void SlabAlloc::Verify() const
         const size_t ref = TO_REF(c.ref);
 
         const size_t ndx = m_slabs.cols().offset.find_pos(ref);
-        assert(ndx != size_t(-1));
+        TIGHTDB_ASSERT(ndx != size_t(-1));
 
         const size_t slab_end = TO_REF(m_slabs[ndx].offset);
         const size_t free_end = ref + TO_REF(c.size);
 
-        assert(free_end <= slab_end);
+        TIGHTDB_ASSERT(free_end <= slab_end);
     }
 }
 
@@ -535,6 +534,6 @@ void SlabAlloc::Print() const
     cout << "Base: " << (m_shared ? m_baseline : 0) << " Allocated: " << (allocated - free) << "\n";
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 } //namespace tightdb

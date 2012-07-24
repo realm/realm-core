@@ -38,7 +38,7 @@ bool ColumnStringEnum::is_empty() const
 
 const char* ColumnStringEnum::Get(size_t ndx) const
 {
-    assert(ndx < Column::Size());
+    TIGHTDB_ASSERT(ndx < Column::Size());
     const size_t key_ndx = Column::GetAsRef(ndx);
     return m_keys.Get(key_ndx);
 }
@@ -50,8 +50,8 @@ bool ColumnStringEnum::add(const char* value)
 
 bool ColumnStringEnum::Set(size_t ndx, const char* value)
 {
-    assert(ndx < Column::Size());
-    assert(value);
+    TIGHTDB_ASSERT(ndx < Column::Size());
+    TIGHTDB_ASSERT(value);
 
     const size_t key_ndx = GetKeyNdxOrAdd(value);
     return Column::Set(ndx, key_ndx);
@@ -59,8 +59,8 @@ bool ColumnStringEnum::Set(size_t ndx, const char* value)
 
 bool ColumnStringEnum::Insert(size_t ndx, const char* value)
 {
-    assert(ndx <= Column::Size());
-    assert(value);
+    TIGHTDB_ASSERT(ndx <= Column::Size());
+    TIGHTDB_ASSERT(value);
 
     const size_t key_ndx = GetKeyNdxOrAdd(value);
     return Column::Insert(ndx, key_ndx);
@@ -68,7 +68,7 @@ bool ColumnStringEnum::Insert(size_t ndx, const char* value)
 
 void ColumnStringEnum::Delete(size_t ndx)
 {
-    assert(ndx < Column::Size());
+    TIGHTDB_ASSERT(ndx < Column::Size());
     Column::Delete(ndx);
 }
 
@@ -141,7 +141,7 @@ bool ColumnStringEnum::Compare(const ColumnStringEnum& c) const
 }
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void ColumnStringEnum::Verify() const
 {
@@ -164,6 +164,6 @@ void ColumnStringEnum::ToDot(std::ostream& out, const char* title) const
     out << "}" << std::endl;
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

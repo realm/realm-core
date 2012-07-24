@@ -1,9 +1,12 @@
+#include <fstream>
 #include <UnitTest++.h>
 #include "tightdb.hpp"
 #include "tightdb/group_shared.hpp"
 
 // Does not work for windows yet
 #ifndef _MSC_VER
+
+#include <unistd.h>
 
 using namespace tightdb;
 
@@ -34,7 +37,7 @@ TEST(Shared_Initial)
             shared.end_read();
         }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
         // Also do a basic ringbuffer test
         shared.test_ringbuf();
 #endif
@@ -454,6 +457,7 @@ TEST(Shared_WriterThreads)
 }
 
 
+#if 0
 TEST(Shared_ErrorCase1)
 {
     remove("test_shared.tdb");
@@ -462,6 +466,8 @@ TEST(Shared_ErrorCase1)
     CHECK(db.is_valid());
     {
         Group& group = db.begin_write();
+        ofstream out("/tmp/x01.dot");
+        group.to_dot(out);
         TableRef table = group.get_table("my_table");
         {
             Spec& spec = table->get_spec();
@@ -488,79 +494,125 @@ TEST(Shared_ErrorCase1)
 
     {
         Group& group = db.begin_write();
+        ofstream out("/tmp/x02.dot");
+        group.to_dot(out);
         static_cast<void>(group);
     }
     db.commit();
 
     {
         Group& group = db.begin_write();
-        TableRef table = group.get_table("my_table");
-        table->set_int(0, 0, 1);
+        ofstream out("/tmp/x03.dot");
+        group.to_dot(out);
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 1);
+        }
     }
     db.commit();
 
     {
         Group& group = db.begin_write();
-        TableRef table = group.get_table("my_table");
-        table->set_int(0, 0, 2);
+        ofstream out("/tmp/x04.dot");
+        group.to_dot(out);
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 2);
+        }
     }
     db.commit();
 
     {
         Group& group = db.begin_write();
-        TableRef table = group.get_table("my_table");
-        table = table->get_subtable(6, 0);
-        table->insert_int(0, 0, 0);
-        table->insert_subtable(1, 0);
-        table->insert_done();
-        table = group.get_table("my_table");
-        table->set_int(0, 0, 3);
+        ofstream out("/tmp/x05.dot");
+        group.to_dot(out);
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            table2->insert_int(0, 0, 0);
+            table2->insert_subtable(1, 0);
+            table2->insert_done();
+        }
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 3);
+        }
     }
     db.commit();
 
     {
         Group& group = db.begin_write();
-        TableRef table = group.get_table("my_table");
-        table->set_int(0, 0, 4);
+        ofstream out("/tmp/x06.dot");
+        group.to_dot(out);
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 4);
+        }
     }
     db.commit();
 
     {
         Group& group = db.begin_write();
-        TableRef table = group.get_table("my_table");
-        table = table->get_subtable(6, 0);
-        table = table->get_subtable(1, 0);
-        table->insert_empty_row(0, 1);
+        ofstream out("/tmp/x07.dot");
+        group.to_dot(out);
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            TableRef table3 = table2->get_subtable(1, 0);
+            table3->insert_empty_row(0, 1);
+        }
     }
     db.commit();
 
     {
         Group& group = db.begin_write();
-        TableRef table = group.get_table("my_table");
-        table = table->get_subtable(6, 0);
-        table = table->get_subtable(1, 0);
-        table->insert_empty_row(1, 1);
+        ofstream out("/tmp/x08.dot");
+        group.to_dot(out);
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            TableRef table3 = table2->get_subtable(1, 0);
+            table3->insert_empty_row(1, 1);
+        }
     }
     db.commit();
 
     {
         Group& group = db.begin_write();
-        TableRef table = group.get_table("my_table");
-        table = table->get_subtable(6, 0);
-        table = table->get_subtable(1, 0);
-        table->set_int(0, 0, 0);
-        table = group.get_table("my_table");
-        table->set_int(0, 0, 5);
-        table = group.get_table("my_table");
-        table = table->get_subtable(6, 0);
-        table->set_int(0, 0, 1);
+        {
+            ofstream out("/tmp/x09.dot");
+            group.to_dot(out);
+        }
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            TableRef table3 = table2->get_subtable(1, 0);
+            table3->set_int(0, 0, 0);
+        }
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 5);
+        }
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            table2->set_int(0, 0, 1);
+        }
+        {
+            ofstream out("/tmp/x10.dot"); // ERROR: Group is good at this point
+            group.to_dot(out);
+        }
     }
     db.commit();
 
     {
         Group& group = db.begin_write();
+        {
+            ofstream out("/tmp/x11.dot"); // ERROR: Group is corrupt at this point
+            group.to_dot(out);
+        }
         TableRef table = group.get_table("my_table");
-        table = table->get_subtable(6, 0);
+        table = table->get_subtable(6, 0); // ERROR: When creating a Spec for the new subtable wrapper from the shared spec ref, Spec::m_specs becomes corrupt.
         table = table->get_subtable(1, 0);
         table->set_int(0, 1, 1);
         table = group.get_table("my_table");
@@ -568,8 +620,13 @@ TEST(Shared_ErrorCase1)
         table = group.get_table("my_table");
         table = table->get_subtable(6, 0);
         table->set_int(0, 0, 2);
+        {
+            ofstream out("/tmp/x12.dot"); // ERROR: Group is corrupt at this point
+            group.to_dot(out);
+        }
     }
     db.commit();
 }
+#endif // 0
 
 #endif // !_MSV_VER

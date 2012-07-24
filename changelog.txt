@@ -16,6 +16,17 @@ Format:
 ----------
 
 
+2012-07-24 (Kristian Spangsege)
+----------
++ New macro TIGHTDB_DEBUG to control compilation mode.
+  The library (including all headers) is no longer affected in any way by the definition status of NDEBUG or _DEBUG.
+  When we (TightDB) compile the library in debug mode, we must define this macro.
+  We will deliver two versions of the library, one for release mode, and one for debug mode.
+  If the customer wishes to use the debugging version of the library, he must do two things:
+  1) Define TIGHTDB_DEBUG in any translation unit that includes a TightDB header.
+  2) Use the version of the library that is compiled for debug mode (libtightdb_d.a).
+
+
 2012-07-19 (Kristian Spangsege)
 ----------
 + Table::create() added. Use this to create a freestanding top-level table with dynamic lifetime (determined by reference counting).

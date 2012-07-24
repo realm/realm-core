@@ -43,7 +43,7 @@ int64_t StringIndex::GetLastKey() const
 
 void StringIndex::BuildIndex()
 {
-    assert(is_empty()); // you can only build new index
+    TIGHTDB_ASSERT(is_empty()); // you can only build new index
 
     const size_t count = m_column.Size();
     for (size_t i = 0; i < count; ++i) {
@@ -78,7 +78,7 @@ bool StringIndex::InsertWithOffset(size_t row_ndx, size_t offset, const char* va
 
 bool StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
 {
-    assert(!m_array->IsNode()); // only works in leafs
+    TIGHTDB_ASSERT(!m_array->IsNode()); // only works in leafs
 
     // Create 4 byte index key
     const char* v = value + offset;
@@ -97,11 +97,11 @@ bool StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
         return true;
     }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Since we only use this for moving existing values to new
     // sub-indexes, there should never be an existing match.
     const int32_t k = (int32_t)values.Get(ins_pos);
-    assert(k != key);
+    TIGHTDB_ASSERT(k != key);
 #endif
 
     // If key is not present we add it at the correct location
@@ -144,7 +144,7 @@ bool StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, const c
             break;
         }
         default:
-            assert(false);
+            TIGHTDB_ASSERT(false);
             return false;
     }
 
@@ -264,20 +264,20 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         }
     }
 
-    assert(false); // never reach here
+    TIGHTDB_ASSERT(false); // never reach here
     return NodeChange(NodeChange::CT_NONE);
 }
 
 bool StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
 {
-    assert(IsNode());
-    assert(new_ref);
+    TIGHTDB_ASSERT(IsNode());
+    TIGHTDB_ASSERT(new_ref);
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
 
-    assert(ndx < offsets.Size());
-    assert(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(ndx < offsets.Size());
+    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
 
     // Get sublists
     const StringIndex orig_col = GetColumnFromRef<StringIndex>(refs, ndx);
@@ -297,14 +297,14 @@ bool StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
 
 bool StringIndex::NodeInsert(size_t ndx, size_t ref)
 {
-    assert(ref);
-    assert(IsNode());
+    TIGHTDB_ASSERT(ref);
+    TIGHTDB_ASSERT(IsNode());
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
 
-    assert(ndx <= offsets.Size());
-    assert(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(ndx <= offsets.Size());
+    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
 
     const StringIndex col(ref, (Array*)NULL, 0, m_array->GetAllocator());
     const int64_t lastKey = col.GetLastKey();
@@ -315,7 +315,7 @@ bool StringIndex::NodeInsert(size_t ndx, size_t ref)
 
 bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const char* value, bool noextend)
 {
-    assert(!IsNode());
+    TIGHTDB_ASSERT(!IsNode());
 
     // Get subnode table
     Array values = m_array->GetSubArray(0);
@@ -402,7 +402,7 @@ size_t StringIndex::find_first(const char* value) const
 
 void StringIndex::UpdateRefs(size_t pos, int diff)
 {
-    assert(diff == 1 || diff == -1); // only used by insert and delete
+    TIGHTDB_ASSERT(diff == 1 || diff == -1); // only used by insert and delete
 
     Array refs = m_array->GetSubArray(1);
     const size_t count = refs.Size();
@@ -449,7 +449,7 @@ void StringIndex::Delete(size_t row_ndx, const char* value, bool isLast)
     // Collapse top nodes with single item
     while (IsNode()) {
         Array refs = m_array->GetSubArray(1);
-        assert(refs.Size() != 0); // node cannot be empty
+        TIGHTDB_ASSERT(refs.Size() != 0); // node cannot be empty
         if (refs.Size() > 1) break;
 
         const size_t ref = (size_t)refs.Get(0);
@@ -472,7 +472,7 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
     const int32_t key = CreateKey(v);
 
     const size_t pos = values.FindPos2(key);
-    assert(pos != not_found);
+    TIGHTDB_ASSERT(pos != not_found);
 
     if (m_array->IsNode()) {
         const size_t ref = refs.Get(pos);
@@ -494,7 +494,7 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
     else {
         const int64_t ref = refs.Get(pos);
         if (ref & 1) {
-            assert((ref >> 1) == (int64_t)row_ndx);
+            TIGHTDB_ASSERT((ref >> 1) == (int64_t)row_ndx);
             values.Delete(pos);
             refs.Delete(pos);
         }
@@ -514,7 +514,7 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
             }
             else {
                 const size_t r = sub.find_first(row_ndx);
-                assert(r != not_found);
+                TIGHTDB_ASSERT(r != not_found);
                 sub.Delete(r);
 
                 if (sub.is_empty()) {
@@ -527,7 +527,7 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
     }
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 bool StringIndex::is_empty() const
 {
@@ -638,4 +638,4 @@ void StringIndex::KeysToDot(std::ostream& out, const Array& array, const char* t
 }
 
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG

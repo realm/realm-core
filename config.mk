@@ -34,11 +34,11 @@ CFLAGS          = -ansi -pedantic -Wall -Wextra -Wno-long-long
 CXXFLAGS        = $(CFLAGS)
 
 # These compiler flags are those that are special to each build mode.
-CFLAGS_OPTIMIZE = -O3 -msse4.2 -DUSE_SSE -DNDEBUG
+CFLAGS_OPTIMIZE = -O3 -msse4.2 -DUSE_SSE
 # FIXME: '-fno-elide-constructors' currently causes failure in TightDB
-#CFLAGS_DEBUG    = -ggdb3 -fno-elide-constructors -D_DEBUG -DMAX_LIST_SIZE=4
-CFLAGS_DEBUG    = -ggdb3 -D_DEBUG -DMAX_LIST_SIZE=4
-CFLAGS_COVERAGE = --coverage -msse4.2 -DUSE_SSE -D_DEBUG -DMAX_LIST_SIZE=4
+#CFLAGS_DEBUG    = -ggdb3 -fno-elide-constructors -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
+CFLAGS_DEBUG    = -ggdb3 -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
+CFLAGS_COVERAGE = --coverage -msse4.2 -DUSE_SSE -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
 
 # Extra compiler flags used for both C and C++ when building a shared library.
 CFLAGS_SHARED   = -fPIC -DPIC
@@ -60,11 +60,11 @@ CXXFLAGS        = $(CFLAGS) -std=c++03
 LDFLAGS         = -lstdc++
 
 # These compiler flags are those that are special to each build mode.
-CFLAGS_OPTIMIZE = -O3 -msse4.2 -DUSE_SSE -DNDEBUG
+CFLAGS_OPTIMIZE = -O3 -msse4.2 -DUSE_SSE
 # Note: '-fno-elide-constructors' currently causes failure in TightDB
-#CFLAGS_DEBUG    = -ggdb3 -fno-elide-constructors -D_DEBUG -DMAX_LIST_SIZE=4
-CFLAGS_DEBUG    = -ggdb3 -D_DEBUG -DMAX_LIST_SIZE=4
-CFLAGS_COVERAGE = --coverage -msse4.2 -DUSE_SSE -D_DEBUG -DMAX_LIST_SIZE=4
+#CFLAGS_DEBUG    = -ggdb3 -fno-elide-constructors -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
+CFLAGS_DEBUG    = -ggdb3 -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
+CFLAGS_COVERAGE = --coverage -msse4.2 -DUSE_SSE -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
 
 # Extra compiler flags used for both C and C++ when building a shared library.
 CFLAGS_SHARED   = -fPIC -DPIC

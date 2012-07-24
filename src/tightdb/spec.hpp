@@ -72,10 +72,10 @@ public:
     /// Compare two tables specs for inequality. See operator==().
     bool operator!=(const Spec& s) const { return !(*this == s); }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     Spec(const Spec& s);
     ~Spec();

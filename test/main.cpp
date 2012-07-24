@@ -16,7 +16,7 @@ int main(int argc, char const *const argv[])
 {
     bool const no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exit-staus") == 0;
 
-#ifndef NDEBUG
+#ifdef TIGHTDB_DEBUG
     cout << "Running Debug unit tests\n\n";
 #else
     cout << "Running Release unit tests\n\n";

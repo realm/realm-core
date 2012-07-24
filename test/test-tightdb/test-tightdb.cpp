@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <assert.h>
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
 #include "../Support/mem.hpp"

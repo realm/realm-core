@@ -33,7 +33,7 @@ bool GroupWriter::IsValid() const
 }
 
 void GroupWriter::SetVersions(size_t current, size_t readlock) {
-    assert(readlock <= current);
+    TIGHTDB_ASSERT(readlock <= current);
     m_current_version  = current;
     m_readlock_version = readlock;
 }
@@ -45,7 +45,7 @@ void GroupWriter::Commit()
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
     const bool isShared = m_group.is_shared();
-    assert(fpositions.Size() == flengths.Size());
+    TIGHTDB_ASSERT(fpositions.Size() == flengths.Size());
 
     // Recursively write all changed arrays
     // (but not top yet, as it contains refs to free lists which are changing)
@@ -152,7 +152,7 @@ void GroupWriter::Commit()
 size_t GroupWriter::write(const char* p, size_t n) {
     // Get position of free space to write in (expanding file if needed)
     const size_t pos = get_free_space(n, m_len);
-    assert((pos & 0x7) == 0); // Write position should always be 64bit aligned
+    TIGHTDB_ASSERT((pos & 0x7) == 0); // Write position should always be 64bit aligned
 
     // Write the block
     char* const dest = m_data + pos;
@@ -167,7 +167,7 @@ void GroupWriter::WriteAt(size_t pos, const char* p, size_t n) {
 
     char* const mmap_end = m_data + m_len;
     char* const copy_end = dest + n;
-    assert(copy_end <= mmap_end);
+    TIGHTDB_ASSERT(copy_end <= mmap_end);
     static_cast<void>(mmap_end);
     static_cast<void>(copy_end);
 
@@ -198,8 +198,8 @@ void GroupWriter::DoCommit(uint64_t topPos)
 
 size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
 {
-    assert((len & 0x7) == 0); // 64bit alignment
-    assert((filesize & 0x7) == 0); // 64bit alignment
+    TIGHTDB_ASSERT((len & 0x7) == 0); // 64bit alignment
+    TIGHTDB_ASSERT((filesize & 0x7) == 0); // 64bit alignment
 
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
@@ -243,7 +243,7 @@ size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
     const size_t old_filesize = filesize;
     const size_t needed_size = old_filesize + len;
     while (filesize < needed_size) {
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
         // in debug, increase in small intervals to force overwriting
         filesize += 64;
 #else
@@ -263,7 +263,7 @@ size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
     //void* const p = mremap(m_shared, m_baseline, filesize); // linux only
     munmap(m_data, old_filesize);
     m_data = (char*)mmap(0, filesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    assert(m_data != (char*)-1);
+    TIGHTDB_ASSERT(m_data != (char*)-1);
 #endif
 
     // Add new free space
@@ -278,7 +278,7 @@ size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
 }
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void GroupWriter::ZeroFreeSpace()
 {

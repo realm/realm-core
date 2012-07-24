@@ -106,9 +106,9 @@ TEST(Group_Serialize1)
     table->add("", 30, true, Wed);
     table->add("",  9, true, Wed);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toDisk.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Delete old file if there
     remove("table_test.tbl");
@@ -124,7 +124,7 @@ TEST(Group_Serialize1)
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
 #endif
@@ -137,12 +137,12 @@ TEST(Group_Serialize1)
     table->remove(1);
     t->remove(1);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Verify that both changed correctly
     CHECK(*table == *t);
     toDisk.Verify();
     fromDisk.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Group_Read1)
@@ -166,9 +166,9 @@ TEST(Group_Serialize2)
     table2->add("hey",  0, true, Tue);
     table2->add("hello", 3232, false, Sun);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toDisk.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Delete old file if there
     remove("table_test.tbl");
@@ -184,13 +184,13 @@ TEST(Group_Serialize2)
     (void)t2;
     (void)t1;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table1 == *t1);
     CHECK(*table2 == *t2);
     toDisk.Verify();
     fromDisk.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Group_Serialize3)
@@ -201,9 +201,9 @@ TEST(Group_Serialize3)
     table->add("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1",  1, true, Wed);
     table->add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toDisk.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Delete old file if there
     remove("table_test.tbl");
@@ -218,12 +218,12 @@ TEST(Group_Serialize3)
     (void)t;
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
     toDisk.Verify();
     fromDisk.Verify();
-#endif //_DEBUG}
+#endif // TIGHTDB_DEBUG}
 }
 
 TEST(Group_Serialize_Men)
@@ -242,9 +242,9 @@ TEST(Group_Serialize_Men)
     table->add("", 30, true, Wed);
     table->add("",  9, true, Wed);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toMem.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Serialize to memory (we now own the buffer)
     size_t len;
@@ -259,12 +259,12 @@ TEST(Group_Serialize_Men)
     CHECK_EQUAL(10, t->size());
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
     toMem.Verify();
     fromMem.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Group_Serialize_Optimized)
@@ -283,9 +283,9 @@ TEST(Group_Serialize_Optimized)
 
     table->optimize();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toMem.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Serialize to memory (we now own the buffer)
     size_t len;
@@ -299,7 +299,7 @@ TEST(Group_Serialize_Optimized)
     CHECK_EQUAL(4, t->get_column_count());
 
     // Verify that original values are there
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     CHECK(*table == *t);
 #endif
 
@@ -309,10 +309,10 @@ TEST(Group_Serialize_Optimized)
     const size_t res = table->cols().first.find_first("search_target");
     CHECK_EQUAL(table->size()-1, res);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toMem.Verify();
     fromMem.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Group_Serialize_All)
@@ -385,9 +385,9 @@ TEST(Group_Persist) {
     // Write changes to file
     db.commit();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     db.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
@@ -406,9 +406,9 @@ TEST(Group_Persist) {
     // Write changes to file
     db.commit();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     db.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
@@ -841,7 +841,7 @@ TEST(Group_InvalidateTables)
 
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 #ifdef TIGHTDB_TO_DOT
 
 #include <fstream>
@@ -949,5 +949,5 @@ TEST(Group_ToDot)
 }
 
 #endif //TIGHTDB_TO_DOT
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 #endif

@@ -49,9 +49,9 @@ public:
     size_t find_first(const char* value, size_t start=0 , size_t end=-1) const;
     void find_all(Array &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 private:
     size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;

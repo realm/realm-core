@@ -63,12 +63,12 @@ public:
     void*  GetFileDescriptor() {return m_fd;}
 #endif
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void EnableDebug(bool enable) {m_debugOut = enable;}
     void Verify() const;
     bool IsAllFree() const;
     void Print() const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 protected:
     friend class Group;
@@ -100,9 +100,9 @@ protected:
     void*     m_fd;
 #endif
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     bool      m_debugOut;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 private:
 #ifdef TIGHTDB_ENABLE_REPLICATION

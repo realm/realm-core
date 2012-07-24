@@ -1,5 +1,3 @@
-#include <assert.h>
-
 #ifdef _MSC_VER
 #include <win32/types.h>
 #endif
@@ -25,9 +23,9 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
     Array(ref, parent, pndx, alloc), m_offsets(Array::GetAsRef(0), NULL, 0, alloc),
     m_blob(Array::GetAsRef(1), NULL, 0, alloc)
 {
-    assert(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
-    assert(Array::Size() == 2);
-    assert(m_blob.Size() ==(size_t)(m_offsets.is_empty() ? 0 : m_offsets.back()));
+    TIGHTDB_ASSERT(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
+    TIGHTDB_ASSERT(Array::Size() == 2);
+    TIGHTDB_ASSERT(m_blob.Size() ==(size_t)(m_offsets.is_empty() ? 0 : m_offsets.back()));
 
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
@@ -50,7 +48,7 @@ size_t ArrayBinary::Size() const
 
 const char* ArrayBinary::Get(size_t ndx) const
 {
-    assert(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.Size());
 
     const size_t offset = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     return m_blob.Get(offset);
@@ -58,7 +56,7 @@ const char* ArrayBinary::Get(size_t ndx) const
 
 size_t ArrayBinary::GetLen(size_t ndx) const
 {
-    assert(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.Size());
 
     const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     const size_t end = (size_t)m_offsets.Get(ndx);
@@ -68,7 +66,7 @@ size_t ArrayBinary::GetLen(size_t ndx) const
 
 void ArrayBinary::add(const char* value, size_t len)
 {
-    assert(len == 0 || value);
+    TIGHTDB_ASSERT(len == 0 || value);
 
     m_blob.add(value, len);
     m_offsets.add(m_offsets.is_empty() ? len : m_offsets.back() + len);
@@ -76,8 +74,8 @@ void ArrayBinary::add(const char* value, size_t len)
 
 void ArrayBinary::Set(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx < m_offsets.Size());
-    assert(len == 0 || value);
+    TIGHTDB_ASSERT(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(len == 0 || value);
 
     const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     const size_t current_end = (size_t)m_offsets.Get(ndx);
@@ -89,8 +87,8 @@ void ArrayBinary::Set(size_t ndx, const char* value, size_t len)
 
 void ArrayBinary::Insert(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx <= m_offsets.Size());
-    assert(len == 0 || value);
+    TIGHTDB_ASSERT(ndx <= m_offsets.Size());
+    TIGHTDB_ASSERT(len == 0 || value);
 
     const size_t pos = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
 
@@ -101,7 +99,7 @@ void ArrayBinary::Insert(size_t ndx, const char* value, size_t len)
 
 void ArrayBinary::Delete(size_t ndx)
 {
-    assert(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.Size());
 
     const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     const size_t end = (size_t)m_offsets.Get(ndx);
@@ -113,7 +111,7 @@ void ArrayBinary::Delete(size_t ndx)
 
 void ArrayBinary::Resize(size_t ndx)
 {
-    assert(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.Size());
 
     const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
 
@@ -127,7 +125,7 @@ void ArrayBinary::Clear()
     m_offsets.Clear();
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void ArrayBinary::ToDot(std::ostream& out, const char* title) const
 {
@@ -145,6 +143,6 @@ void ArrayBinary::ToDot(std::ostream& out, const char* title) const
     out << "}" << std::endl;
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

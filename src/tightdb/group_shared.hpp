@@ -74,7 +74,7 @@ public:
     void commit();
     void rollback();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void test_ringbuf();
     void zero_free_space();
 #endif
@@ -103,7 +103,7 @@ private:
 
     void init(const char* path_to_database_file);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // In debug mode we want to track state
     enum SharedState {
         SHARED_STATE_READY,

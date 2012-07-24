@@ -111,8 +111,8 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        assert(m_table);
-        assert(m_child);
+        TIGHTDB_ASSERT(m_table);
+        TIGHTDB_ASSERT(m_child);
 
         for (size_t s = start; s < end; ++s) {
             const TableRef subtable = ((Table*)m_table)->get_subtable(m_column, s);
@@ -159,7 +159,7 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        assert(m_table);
+        TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
             // Cache internal leafs
@@ -303,7 +303,7 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        assert(m_table);
+        TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
             // todo, can be optimized by placing outside loop

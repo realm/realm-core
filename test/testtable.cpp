@@ -39,9 +39,9 @@ TEST(Table1)
         CHECK_EQUAL(v2, table.get_int(1, i));
     }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 enum Days {
@@ -72,9 +72,9 @@ TEST(Table2)
     CHECK_EQUAL(true, r.third);
     CHECK_EQUAL(Wed, r.fourth);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Table3)
@@ -100,9 +100,9 @@ TEST(Table3)
     CHECK_EQUAL(3, table[0].first);
     CHECK_EQUAL(3, table[99].first);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TIGHTDB_TABLE_2(TestTableEnum,
@@ -124,9 +124,9 @@ TEST(Table4)
     CHECK_EQUAL(size_t(1),  table.cols().second.find_first("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
     CHECK_EQUAL(size_t(-1), table.cols().second.find_first("Foo"));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Table_Delete)
@@ -149,9 +149,9 @@ TEST(Table_Delete)
     CHECK_EQUAL(7, table[5].second);
     CHECK_EQUAL(8, table[6].second);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Delete all items one at a time
     for (size_t i = 0; i < 7; ++i) {
@@ -161,9 +161,9 @@ TEST(Table_Delete)
     CHECK(table.is_empty());
     CHECK_EQUAL(0, table.size());
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Table_Delete_All_Types)
@@ -261,17 +261,17 @@ TEST(Table_Delete_All_Types)
 
     CHECK_EQUAL(12, table.size());
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Test Clear
     table.clear();
     CHECK_EQUAL(0, table.size());
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Table_Find_Int)
@@ -286,9 +286,9 @@ TEST(Table_Find_Int)
     CHECK_EQUAL(size_t(1000), table.cols().second.find_first(0));
     CHECK_EQUAL(size_t(-1),   table.cols().second.find_first(1001));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 
@@ -313,9 +313,9 @@ TEST(Table6)
     //size_t result2 = table.Range(10, 200).find_first(TestQuery());
     //CHECK_EQUAL((size_t)-1, result2);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 */
 
@@ -349,9 +349,9 @@ TEST(Table_FindAll_Int)
     CHECK_EQUAL(7, v.get_source_ndx(3));
     CHECK_EQUAL(9, v.get_source_ndx(4));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Table_Sorted_Int)
@@ -384,9 +384,9 @@ TEST(Table_Sorted_Int)
     CHECK_EQUAL(3, v.get_source_ndx(8));
     CHECK_EQUAL(8, v.get_source_ndx(9));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 
@@ -469,9 +469,9 @@ TEST(Table_Index_Int)
     CHECK_EQUAL(6, table.cols().second.find_first(30));
     CHECK_EQUAL(7, table.cols().second.find_first(100));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TIGHTDB_TABLE_4(TestTableAE,
@@ -576,9 +576,9 @@ TEST(Table_SlabAlloc)
     table.remove(2);
     table.remove(4);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 #include <tightdb/group.hpp>
@@ -763,9 +763,9 @@ TEST(Table_Mixed)
     CHECK_EQUAL("John", subtable2->get_string(0, 0));
     CHECK_EQUAL(40, subtable2->get_int(1, 0));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TIGHTDB_TABLE_1(TestTableMX,
@@ -1087,7 +1087,7 @@ TEST(Table_SubtableWithParentChange)
     CHECK_EQUAL(table[1].subtab[0].val, 7);
     CHECK_EQUAL(subtab[0].val, 7);
     CHECK(subtab->is_valid());
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
     subtab->Verify();
 #endif

@@ -1,5 +1,4 @@
 #include <cstdlib>
-#include <cassert>
 #include <cstring>
 #include <cstdio> // debug output
 #include <climits> // size_t
@@ -24,16 +23,16 @@ using namespace tightdb;
 
 Column GetColumnFromRef(Array &parent, size_t ndx)
 {
-    assert(parent.HasRefs());
-    assert(ndx < parent.Size());
+    TIGHTDB_ASSERT(parent.HasRefs());
+    TIGHTDB_ASSERT(ndx < parent.Size());
     return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
 }
 
 /*
 const Column GetColumnFromRef(const Array& parent, size_t ndx)
 {
-    assert(parent.HasRefs());
-    assert(ndx < parent.Size());
+    TIGHTDB_ASSERT(parent.HasRefs());
+    TIGHTDB_ASSERT(ndx < parent.Size());
     return Column((size_t)parent.Get(ndx), &parent, ndx);
 }
 */
@@ -64,7 +63,9 @@ struct CountState {
 
 bool callme_count(Array* a, size_t start, size_t end, size_t caller_base, void* state)
 {
-    (void)caller_base;
+    static_cast<void>(start);
+    static_cast<void>(end);
+    static_cast<void>(caller_base);
     CountState& cstate = *(CountState*)state;
     const size_t s = a->count(cstate.target);
     cstate.count += s;
@@ -161,13 +162,13 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
         idxres->add(i1);
     }
 
-    assert(idxres->Size() == idx0->Size() + idx1->Size());
+    TIGHTDB_ASSERT(idxres->Size() == idx0->Size() + idx1->Size());
 }
 
 // Merge two sorted arrays into a single sorted array
 void merge_core(const Array& a0, const Array& a1, Array& res)
 {
-    assert(res.is_empty());
+    TIGHTDB_ASSERT(res.is_empty());
 
     size_t p0 = 0;
     size_t p1 = 0;
@@ -206,7 +207,7 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
         res.add(v1);
     }
 
-    assert(res.Size() == a0.Size() + a1.Size());
+    TIGHTDB_ASSERT(res.Size() == a0.Size() + a1.Size());
 }
 
 // Input:
@@ -420,16 +421,16 @@ void Column::SetHasRefs()
 /*
 Column Column::GetSubColumn(size_t ndx)
 {
-    assert(ndx < m_len);
-    assert(m_hasRefs);
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(m_hasRefs);
 
     return Column((void*)ListGet(ndx), this, ndx);
 }
 
 const Column Column::GetSubColumn(size_t ndx) const
 {
-    assert(ndx < m_len);
-    assert(m_hasRefs);
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(m_hasRefs);
 
     return Column((void*)ListGet(ndx), this, ndx);
 }
@@ -472,7 +473,7 @@ bool Column::add(int64_t value)
 
 bool Column::Insert(size_t ndx, int64_t value)
 {
-    assert(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= Size());
 
     const bool res = TreeInsert<int64_t, Column>(ndx, value);
     if (!res) return false;
@@ -483,7 +484,7 @@ bool Column::Insert(size_t ndx, int64_t value)
         m_index->Insert(ndx, value, isLast);
     }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     Verify();
 #endif //DEBUG
 
@@ -584,35 +585,35 @@ size_t ColumnBase::GetRefSize(size_t ref) const
 
 Array ColumnBase::NodeGetOffsets()
 {
-    assert(IsNode());
+    TIGHTDB_ASSERT(IsNode());
     return m_array->GetSubArray(0);
 }
 
 const Array ColumnBase::NodeGetOffsets() const
 {
-    assert(IsNode());
+    TIGHTDB_ASSERT(IsNode());
     return m_array->GetSubArray(0);
 }
 
 Array ColumnBase::NodeGetRefs()
 {
-    assert(IsNode());
+    TIGHTDB_ASSERT(IsNode());
     return m_array->GetSubArray(1);
 }
 
 const Array ColumnBase::NodeGetRefs() const
 {
-    assert(IsNode());
+    TIGHTDB_ASSERT(IsNode());
     return m_array->GetSubArray(1);
 }
 
 bool ColumnBase::NodeUpdateOffsets(size_t ndx)
 {
-    assert(IsNode());
+    TIGHTDB_ASSERT(IsNode());
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
-    assert(ndx < offsets.Size());
+    TIGHTDB_ASSERT(ndx < offsets.Size());
 
     const int64_t newSize = GetRefSize((size_t)refs.Get(ndx));
     const int64_t oldSize = offsets.Get(ndx) - (ndx ? offsets.Get(ndx-1) : 0);
@@ -623,16 +624,16 @@ bool ColumnBase::NodeUpdateOffsets(size_t ndx)
 
 bool ColumnBase::NodeAddKey(size_t ref)
 {
-    assert(ref);
-    assert(IsNode());
+    TIGHTDB_ASSERT(ref);
+    TIGHTDB_ASSERT(IsNode());
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
-    assert(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
 
     const Array new_top(ref, NULL, 0,m_array->GetAllocator());
     const Array new_offsets(new_top.GetAsRef(0), NULL, 0,m_array->GetAllocator());
-    assert(!new_offsets.is_empty());
+    TIGHTDB_ASSERT(!new_offsets.is_empty());
 
     const int64_t key = new_offsets.back();
     if (!offsets.add(key)) return false;
@@ -641,7 +642,7 @@ bool ColumnBase::NodeAddKey(size_t ref)
 
 void Column::Delete(size_t ndx)
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
 
     const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
 
@@ -681,8 +682,8 @@ bool Column::Increment64(int64_t value, size_t start, size_t end)
 
 size_t Column::find_first(int64_t value, size_t start, size_t end) const
 {
-    assert(start <= Size());
-    assert(end == (size_t)-1 || end <= Size());
+    TIGHTDB_ASSERT(start <= Size());
+    TIGHTDB_ASSERT(end == (size_t)-1 || end <= Size());
 
     if (start == 0 && end == (size_t)-1) {
         Array cache(m_array->GetAllocator());
@@ -699,8 +700,8 @@ void Column::find_all(Array& result, int64_t value, size_t caller_offset,
                      size_t start, size_t end) const
 {
     (void)caller_offset;
-    assert(start <= Size());
-    assert(end == (size_t)-1 || end <= Size());
+    TIGHTDB_ASSERT(start <= Size());
+    TIGHTDB_ASSERT(end == (size_t)-1 || end <= Size());
     if (is_empty()) return;
     TreeFindAll<int64_t, Column>(result, value, 0, start, end);
 }
@@ -759,15 +760,15 @@ size_t Column::find_pos(int64_t target) const
 
 size_t Column::FindWithIndex(int64_t target) const
 {
-    assert(m_index);
-    assert(m_index->Size() == Size());
+    TIGHTDB_ASSERT(m_index);
+    TIGHTDB_ASSERT(m_index->Size() == Size());
 
     return m_index->find_first(target);
 }
 
 Index& Column::GetIndex()
 {
-    assert(m_index);
+    TIGHTDB_ASSERT(m_index);
     return *m_index;
 }
 
@@ -802,7 +803,7 @@ bool Column::Compare(const Column& c) const
 }
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void Column::Print() const
 {
@@ -828,20 +829,20 @@ void Column::Print() const
 void Column::Verify() const
 {
     if (IsNode()) {
-        assert(m_array->Size() == 2);
-        //assert(m_hasRefs);
+        TIGHTDB_ASSERT(m_array->Size() == 2);
+        //TIGHTDB_ASSERT(m_hasRefs);
 
         const Array offsets = NodeGetOffsets();
         const Array refs = NodeGetRefs();
         offsets.Verify();
         refs.Verify();
-        assert(refs.HasRefs());
-        assert(offsets.Size() == refs.Size());
+        TIGHTDB_ASSERT(refs.HasRefs());
+        TIGHTDB_ASSERT(offsets.Size() == refs.Size());
 
         size_t off = 0;
         for (size_t i = 0; i < refs.Size(); ++i) {
             const size_t ref = size_t(refs.Get(i));
-            assert(ref);
+            TIGHTDB_ASSERT(ref);
 
             const Column col(ref, NULL, 0, m_array->GetAllocator());
             col.Verify();
@@ -849,7 +850,7 @@ void Column::Verify() const
             off += col.Size();
             const size_t node_off = (size_t)offsets.Get(i);
             if (node_off != off) {
-                assert(false);
+                TIGHTDB_ASSERT(false);
             }
         }
     }
@@ -909,6 +910,6 @@ MemStats Column::Stats() const
     return stats;
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

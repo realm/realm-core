@@ -1,5 +1,3 @@
-#include <assert.h>
-
 #ifdef _MSC_VER
 #include <win32/types.h> //ssize_t
 #endif
@@ -25,9 +23,9 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
     Array(ref, parent, pndx, alloc), m_offsets(Array::GetAsRef(0), NULL, 0, alloc),
     m_blob(Array::GetAsRef(1), NULL, 0, alloc)
 {
-    assert(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
-    assert(Array::Size() == 2);
-    assert(m_blob.Size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.back()));
+    TIGHTDB_ASSERT(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
+    TIGHTDB_ASSERT(Array::Size() == 2);
+    TIGHTDB_ASSERT(m_blob.Size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.back()));
 
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
@@ -49,7 +47,7 @@ size_t ArrayStringLong::Size() const
 
 const char* ArrayStringLong::Get(size_t ndx) const
 {
-    assert(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.Size());
 
     const size_t offset = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     return (const char*)m_blob.Get(offset);
@@ -62,7 +60,7 @@ void ArrayStringLong::add(const char* value)
 
 void ArrayStringLong::add(const char* value, size_t len)
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
 
     len += 1; // include trailing null byte
     m_blob.add(value, len);
@@ -76,8 +74,8 @@ void ArrayStringLong::Set(size_t ndx, const char* value)
 
 void ArrayStringLong::Set(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx < m_offsets.Size());
-    assert(value);
+    TIGHTDB_ASSERT(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(value);
 
     const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     const size_t current_end = (size_t)m_offsets.Get(ndx);
@@ -96,8 +94,8 @@ void ArrayStringLong::Insert(size_t ndx, const char* value)
 
 void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx <= m_offsets.Size());
-    assert(value);
+    TIGHTDB_ASSERT(ndx <= m_offsets.Size());
+    TIGHTDB_ASSERT(value);
 
     const size_t pos = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     len += 1; // include trailing null byte
@@ -109,7 +107,7 @@ void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len)
 
 void ArrayStringLong::Delete(size_t ndx)
 {
-    assert(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.Size());
 
     const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     const size_t end = (size_t)m_offsets.Get(ndx);
@@ -121,7 +119,7 @@ void ArrayStringLong::Delete(size_t ndx)
 
 void ArrayStringLong::Resize(size_t ndx)
 {
-    assert(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.Size());
 
     const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
 
@@ -137,14 +135,14 @@ void ArrayStringLong::Clear()
 
 size_t ArrayStringLong::find_first(const char* value, size_t start, size_t end) const
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
     return FindWithLen(value, strlen(value), start, end);
 }
 
 void ArrayStringLong::find_all(Array& result, const char* value, size_t add_offset,
                               size_t start, size_t end) const
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
 
     const size_t len = strlen(value);
 
@@ -159,7 +157,7 @@ void ArrayStringLong::find_all(Array& result, const char* value, size_t add_offs
 
 size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start, size_t end) const
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
 
     len += 1; // include trailing null byte
     const size_t count = m_offsets.Size();
@@ -179,7 +177,7 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
     return (size_t)-1; // not found
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void ArrayStringLong::ToDot(std::ostream& out, const char* title) const
 {
@@ -197,6 +195,6 @@ void ArrayStringLong::ToDot(std::ostream& out, const char* title) const
     out << "}" << std::endl;
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

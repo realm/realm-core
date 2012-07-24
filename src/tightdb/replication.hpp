@@ -254,11 +254,11 @@ struct Replication {
     ///
     /// \return ERROR_IO if the transaction log could not be
     /// successfully parsed, or ended prematurely.
-#ifdef NDEBUG
-    static error_code apply_transact_log(InputStream& transact_log, Group& target);
-#else
+#ifdef TIGHTDB_DEBUG
     static error_code apply_transact_log(InputStream& transact_log, Group& target,
                                          std::ostream* apply_log = 0);
+#else
+    static error_code apply_transact_log(InputStream& transact_log, Group& target);
 #endif
 
 private:
@@ -491,7 +491,7 @@ inline error_code Replication::mixed_cmd(char cmd, std::size_t column_ndx,
         transact_log_advance(buf);
         break;
     default:
-        assert(false);
+        TIGHTDB_ASSERT(false);
     }
     return ERROR_NONE;
 }

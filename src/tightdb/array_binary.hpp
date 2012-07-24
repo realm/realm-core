@@ -45,9 +45,9 @@ public:
     void Resize(size_t ndx);
     void Clear();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 private:
     Array m_offsets;

@@ -448,14 +448,14 @@ int Query::SetThreads(unsigned int threadcount)
     for (size_t i = 0; i < threadcount; ++i) {
         int r = pthread_create(&threads[i], NULL, query_thread, (void*)&ts);
         if(r != 0)
-            assert(false); //todo
+            TIGHTDB_ASSERT(false); //todo
     }
 #endif
     m_threadcount = threadcount;
     return 0;
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 std::string Query::Verify()
 {
     if(first.size() == 0)
@@ -469,7 +469,7 @@ std::string Query::Verify()
 
     return first[0]->Verify(); // errors detected by QueryEngine
 }
-#endif // _DEBUG
+#endif // TIGHTDB_DEBUG
 
 void Query::Init(const Table& table) const
 {

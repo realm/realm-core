@@ -53,14 +53,14 @@ void ColumnMixed::Create(size_t ref, ArrayParent *parent, size_t pndx,
                          Allocator &alloc, Table const *tab)
 {
     m_array = new Array(ref, parent, pndx, alloc);
-    assert(m_array->Size() == 2 || m_array->Size() == 3);
+    TIGHTDB_ASSERT(m_array->Size() == 2 || m_array->Size() == 3);
 
     const size_t ref_types = m_array->GetAsRef(0);
     const size_t ref_refs  = m_array->GetAsRef(1);
 
     m_types = new Column(ref_types, m_array, 0, alloc);
     m_refs  = new RefsColumn(ref_refs, m_array, 1, alloc, tab);
-    assert(m_types->Size() == m_refs->Size());
+    TIGHTDB_ASSERT(m_types->Size() == m_refs->Size());
 
     // Binary column with values that does not fit in refs
     // is only there if needed
@@ -74,7 +74,7 @@ void ColumnMixed::InitDataColumn()
 {
     if (m_data) return;
 
-    assert(m_array->Size() == 2);
+    TIGHTDB_ASSERT(m_array->Size() == 2);
 
     // Create new data column for items that do not fit in refs
     m_data = new ColumnBinary(m_array->GetAllocator());
@@ -86,7 +86,7 @@ void ColumnMixed::InitDataColumn()
 
 void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype)
 {
-    assert(ndx < m_types->Size());
+    TIGHTDB_ASSERT(ndx < m_types->Size());
 
     const ColumnType type = (ColumnType)m_types->Get(ndx);
     if (type != COLUMN_TYPE_INT) {
@@ -113,7 +113,7 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype)
                 break;
             }
             default:
-                assert(false);
+                TIGHTDB_ASSERT(false);
         }
     }
 
@@ -122,14 +122,14 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype)
 
 ColumnType ColumnMixed::GetType(size_t ndx) const
 {
-    assert(ndx < m_types->Size());
+    TIGHTDB_ASSERT(ndx < m_types->Size());
     return (ColumnType)m_types->Get(ndx);
 }
 
 int64_t ColumnMixed::GetInt(size_t ndx) const
 {
-    assert(ndx < m_types->Size());
-    assert(m_types->Get(ndx) == COLUMN_TYPE_INT);
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_INT);
 
     const int64_t value = m_refs->Get(ndx) >> 1;
     return value;
@@ -137,8 +137,8 @@ int64_t ColumnMixed::GetInt(size_t ndx) const
 
 bool ColumnMixed::get_bool(size_t ndx) const
 {
-    assert(ndx < m_types->Size());
-    assert(m_types->Get(ndx) == COLUMN_TYPE_BOOL);
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_BOOL);
 
     const bool value = (m_refs->Get(ndx) >> 1) == 1;
     return value;
@@ -146,8 +146,8 @@ bool ColumnMixed::get_bool(size_t ndx) const
 
 time_t ColumnMixed::get_date(size_t ndx) const
 {
-    assert(ndx < m_types->Size());
-    assert(m_types->Get(ndx) == COLUMN_TYPE_DATE);
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_DATE);
 
     const time_t value = m_refs->Get(ndx) >> 1;
     return value;
@@ -155,9 +155,9 @@ time_t ColumnMixed::get_date(size_t ndx) const
 
 const char* ColumnMixed::get_string(size_t ndx) const
 {
-    assert(ndx < m_types->Size());
-    assert(m_types->Get(ndx) == COLUMN_TYPE_STRING);
-    assert(m_data);
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_STRING);
+    TIGHTDB_ASSERT(m_data);
 
     const size_t ref = m_refs->GetAsRef(ndx) >> 1;
     const char* value = (const char*)m_data->GetData(ref);
@@ -167,9 +167,9 @@ const char* ColumnMixed::get_string(size_t ndx) const
 
 BinaryData ColumnMixed::get_binary(size_t ndx) const
 {
-    assert(ndx < m_types->Size());
-    assert(m_types->Get(ndx) == COLUMN_TYPE_BINARY);
-    assert(m_data);
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_BINARY);
+    TIGHTDB_ASSERT(m_data);
 
     const size_t ref = m_refs->GetAsRef(ndx) >> 1;
 
@@ -178,7 +178,7 @@ BinaryData ColumnMixed::get_binary(size_t ndx) const
 
 void ColumnMixed::insert_int(size_t ndx, int64_t value)
 {
-    assert(ndx <= m_types->Size());
+    TIGHTDB_ASSERT(ndx <= m_types->Size());
 
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
@@ -190,7 +190,7 @@ void ColumnMixed::insert_int(size_t ndx, int64_t value)
 
 void ColumnMixed::insert_bool(size_t ndx, bool value)
 {
-    assert(ndx <= m_types->Size());
+    TIGHTDB_ASSERT(ndx <= m_types->Size());
 
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
@@ -202,7 +202,7 @@ void ColumnMixed::insert_bool(size_t ndx, bool value)
 
 void ColumnMixed::insert_date(size_t ndx, time_t value)
 {
-    assert(ndx <= m_types->Size());
+    TIGHTDB_ASSERT(ndx <= m_types->Size());
 
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
@@ -214,7 +214,7 @@ void ColumnMixed::insert_date(size_t ndx, time_t value)
 
 void ColumnMixed::insert_string(size_t ndx, const char* value)
 {
-    assert(ndx <= m_types->Size());
+    TIGHTDB_ASSERT(ndx <= m_types->Size());
     InitDataColumn();
 
     const size_t len = strlen(value)+1;
@@ -231,7 +231,7 @@ void ColumnMixed::insert_string(size_t ndx, const char* value)
 
 void ColumnMixed::insert_binary(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx <= m_types->Size());
+    TIGHTDB_ASSERT(ndx <= m_types->Size());
     InitDataColumn();
 
     const size_t ref = m_data->Size();
@@ -247,7 +247,7 @@ void ColumnMixed::insert_binary(size_t ndx, const char* value, size_t len)
 
 void ColumnMixed::SetInt(size_t ndx, int64_t value)
 {
-    assert(ndx < m_types->Size());
+    TIGHTDB_ASSERT(ndx < m_types->Size());
 
     // Remove refs or binary data (sets type to int)
     ClearValue(ndx, COLUMN_TYPE_INT);
@@ -261,7 +261,7 @@ void ColumnMixed::SetInt(size_t ndx, int64_t value)
 
 void ColumnMixed::set_bool(size_t ndx, bool value)
 {
-    assert(ndx < m_types->Size());
+    TIGHTDB_ASSERT(ndx < m_types->Size());
 
     // Remove refs or binary data (sets type to int)
     ClearValue(ndx, COLUMN_TYPE_BOOL);
@@ -275,7 +275,7 @@ void ColumnMixed::set_bool(size_t ndx, bool value)
 
 void ColumnMixed::set_date(size_t ndx, time_t value)
 {
-    assert(ndx < m_types->Size());
+    TIGHTDB_ASSERT(ndx < m_types->Size());
 
     // Remove refs or binary data (sets type to int)
     ClearValue(ndx, COLUMN_TYPE_DATE);
@@ -289,7 +289,7 @@ void ColumnMixed::set_date(size_t ndx, time_t value)
 
 void ColumnMixed::set_string(size_t ndx, const char* value)
 {
-    assert(ndx < m_types->Size());
+    TIGHTDB_ASSERT(ndx < m_types->Size());
     InitDataColumn();
 
     const ColumnType type = (ColumnType)m_types->Get(ndx);
@@ -324,7 +324,7 @@ void ColumnMixed::set_string(size_t ndx, const char* value)
 
 void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx < m_types->Size());
+    TIGHTDB_ASSERT(ndx < m_types->Size());
     InitDataColumn();
 
     const ColumnType type = (ColumnType)m_types->Get(ndx);
@@ -359,7 +359,7 @@ void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
 // FIXME: Check that callers test the return value
 bool ColumnMixed::insert_table(size_t ndx)
 {
-    assert(ndx <= m_types->Size());
+    TIGHTDB_ASSERT(ndx <= m_types->Size());
     const size_t ref = Table::create_empty_table(m_array->GetAllocator());
     if (!ref) return false;
     // FIXME: These inserts can also fail on allocation
@@ -371,7 +371,7 @@ bool ColumnMixed::insert_table(size_t ndx)
 // FIXME: Check that callers test the return value
 bool ColumnMixed::SetTable(size_t ndx)
 {
-    assert(ndx < m_types->Size());
+    TIGHTDB_ASSERT(ndx < m_types->Size());
     const size_t ref = Table::create_empty_table(m_array->GetAllocator());
     if (!ref) return false;
     // FIXME: Could the following operations also fail on allocation?
@@ -382,7 +382,7 @@ bool ColumnMixed::SetTable(size_t ndx)
 
 void ColumnMixed::Delete(size_t ndx)
 {
-    assert(ndx < m_types->Size());
+    TIGHTDB_ASSERT(ndx < m_types->Size());
 
     // Remove refs or binary data
     ClearValue(ndx, COLUMN_TYPE_INT);
@@ -437,14 +437,14 @@ bool ColumnMixed::Compare(const ColumnMixed& c) const
             }
             break;
         default:
-            assert(false);
+            TIGHTDB_ASSERT(false);
         }
     }
     return true;
 }
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void ColumnMixed::Verify() const
 {
@@ -456,7 +456,7 @@ void ColumnMixed::Verify() const
     // types and refs should be in sync
     const size_t types_len = m_types->Size();
     const size_t refs_len  = m_refs->Size();
-    assert(types_len == refs_len);
+    TIGHTDB_ASSERT(types_len == refs_len);
 
     // Verify each sub-table
     const size_t count = Size();
@@ -498,6 +498,6 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const
     out << "}" << std::endl;
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 } // namespace tightdb

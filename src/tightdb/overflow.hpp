@@ -22,7 +22,7 @@
 
 #include <limits>
 
-#include <tightdb/static_assert.hpp>
+#include <tightdb/assert.hpp>
 #include <tightdb/meta.hpp>
 
 namespace tightdb {

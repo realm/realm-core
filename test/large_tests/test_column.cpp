@@ -44,11 +44,11 @@ TEST(LESS)
                 a.Set(match, 100);
                 if(match >= from && match < to) {
                     CHECK_EQUAL(match, f);
-                    assert(match == f);
+                    TIGHTDB_ASSERT(match == f);
                 }
                 else {
                     CHECK_EQUAL(f, -1);
-                    assert(f == -1);
+                    TIGHTDB_ASSERT(f == -1);
                 }
             }
         }
@@ -73,11 +73,11 @@ TEST(Find1)
                 a.Set(match, 100);
                 if(match >= from && match < to) {
                     CHECK_EQUAL(match, f);
-                    assert(match == f);
+                    TIGHTDB_ASSERT(match == f);
                 }
                 else {
                     CHECK_EQUAL(f, -1);
-                    assert(f == -1);
+                    TIGHTDB_ASSERT(f == -1);
                 }
             }
         }

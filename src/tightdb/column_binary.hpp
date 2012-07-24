@@ -66,9 +66,9 @@ public:
     /// Compare two binary columns for equality.
     bool Compare(const ColumnBinary&) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 protected:
     friend class ColumnBase;
@@ -84,9 +84,9 @@ protected:
     bool LeafInsert(size_t ndx, BinaryData value);
     void LeafDelete(size_t ndx);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 };
 
 

@@ -107,10 +107,10 @@ public:
     /// Compare two mixed columns for equality.
     bool Compare(const ColumnMixed&) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void ToDot(std::ostream& out, const char* title) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 private:
     void Create(Allocator& alloc, const Table* tab);
@@ -162,7 +162,7 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const
     // FIXME: If the table object is cached, it is possible to get the
     // size from it. Maybe it is faster in general to check for the
     // the presence of the cached object and use it when available.
-    assert(row_idx < m_types->Size());
+    TIGHTDB_ASSERT(row_idx < m_types->Size());
     if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
     const size_t top_ref = m_refs->GetAsRef(row_idx);
     const size_t columns_ref = Array(top_ref, NULL, 0, m_refs->GetAllocator()).GetAsRef(1);
@@ -174,7 +174,7 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const
 
 inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
 {
-    assert(row_idx < m_types->Size());
+    TIGHTDB_ASSERT(row_idx < m_types->Size());
     if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
     return m_refs->get_subtable_ptr(row_idx);
 }

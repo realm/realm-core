@@ -770,7 +770,7 @@ TEST(FindSSE)
     for(size_t i = 0; i < 100; i++) {
         a.Set(i, 123);
         size_t t = a.find_first(123);
-        assert(t == i);
+        TIGHTDB_ASSERT(t == i);
         a.Set(i, 10000);
         (void)t;
     }
@@ -1196,7 +1196,7 @@ TEST(ArrayCopy)
     Array b;
     b.Copy(a);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     b.Verify();
 #endif
 
@@ -1214,7 +1214,7 @@ TEST(ArrayCopy)
     Array d;
     d.Copy(c);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     b.Verify();
 #endif
 
