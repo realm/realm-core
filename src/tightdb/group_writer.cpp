@@ -38,7 +38,7 @@ void GroupWriter::SetVersions(size_t current, size_t readlock) {
     m_readlock_version = readlock;
 }
 
-void GroupWriter::Commit()
+size_t GroupWriter::Commit()
 {
     Array& top          = m_group.get_top_array();
     Array& fpositions   = m_group.m_freePositions;
@@ -145,8 +145,7 @@ void GroupWriter::Commit()
     SlabAlloc& alloc = m_group.get_allocator();
     alloc.FreeAll(m_len);
 
-    // Recusively update refs in all active tables (columns, arrays..)
-    m_group.update_refs(top_pos);
+    return top_pos;
 }
 
 size_t GroupWriter::write(const char* p, size_t n) {

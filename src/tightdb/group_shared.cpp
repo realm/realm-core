@@ -279,6 +279,9 @@ void SharedGroup::end_read()
 
     m_version = (uint32_t)-1;
 
+    // The read may have allocated some temporary state
+    m_group.invalidate();
+
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;
 #endif
