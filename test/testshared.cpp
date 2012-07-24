@@ -1,4 +1,3 @@
-#include <fstream>
 #include <UnitTest++.h>
 #include "tightdb.hpp"
 #include "tightdb/group_shared.hpp"
@@ -457,7 +456,6 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if 0
 TEST(Shared_ErrorCase1)
 {
     remove("test_shared.tdb");
@@ -466,8 +464,6 @@ TEST(Shared_ErrorCase1)
     CHECK(db.is_valid());
     {
         Group& group = db.begin_write();
-        ofstream out("/tmp/x01.dot");
-        group.to_dot(out);
         TableRef table = group.get_table("my_table");
         {
             Spec& spec = table->get_spec();
@@ -494,16 +490,12 @@ TEST(Shared_ErrorCase1)
 
     {
         Group& group = db.begin_write();
-        ofstream out("/tmp/x02.dot");
-        group.to_dot(out);
         static_cast<void>(group);
     }
     db.commit();
 
     {
         Group& group = db.begin_write();
-        ofstream out("/tmp/x03.dot");
-        group.to_dot(out);
         {
             TableRef table = group.get_table("my_table");
             table->set_int(0, 0, 1);
@@ -513,8 +505,6 @@ TEST(Shared_ErrorCase1)
 
     {
         Group& group = db.begin_write();
-        ofstream out("/tmp/x04.dot");
-        group.to_dot(out);
         {
             TableRef table = group.get_table("my_table");
             table->set_int(0, 0, 2);
@@ -524,8 +514,6 @@ TEST(Shared_ErrorCase1)
 
     {
         Group& group = db.begin_write();
-        ofstream out("/tmp/x05.dot");
-        group.to_dot(out);
         {
             TableRef table = group.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
@@ -542,8 +530,6 @@ TEST(Shared_ErrorCase1)
 
     {
         Group& group = db.begin_write();
-        ofstream out("/tmp/x06.dot");
-        group.to_dot(out);
         {
             TableRef table = group.get_table("my_table");
             table->set_int(0, 0, 4);
@@ -553,8 +539,6 @@ TEST(Shared_ErrorCase1)
 
     {
         Group& group = db.begin_write();
-        ofstream out("/tmp/x07.dot");
-        group.to_dot(out);
         {
             TableRef table = group.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
@@ -566,8 +550,6 @@ TEST(Shared_ErrorCase1)
 
     {
         Group& group = db.begin_write();
-        ofstream out("/tmp/x08.dot");
-        group.to_dot(out);
         {
             TableRef table = group.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
@@ -579,10 +561,6 @@ TEST(Shared_ErrorCase1)
 
     {
         Group& group = db.begin_write();
-        {
-            ofstream out("/tmp/x09.dot");
-            group.to_dot(out);
-        }
         {
             TableRef table = group.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
@@ -598,21 +576,13 @@ TEST(Shared_ErrorCase1)
             TableRef table2 = table->get_subtable(6, 0);
             table2->set_int(0, 0, 1);
         }
-        {
-            ofstream out("/tmp/x10.dot"); // ERROR: Group is good at this point
-            group.to_dot(out);
-        }
     }
     db.commit();
 
     {
         Group& group = db.begin_write();
-        {
-            ofstream out("/tmp/x11.dot"); // ERROR: Group is corrupt at this point
-            group.to_dot(out);
-        }
         TableRef table = group.get_table("my_table");
-        table = table->get_subtable(6, 0); // ERROR: When creating a Spec for the new subtable wrapper from the shared spec ref, Spec::m_specs becomes corrupt.
+        table = table->get_subtable(6, 0);
         table = table->get_subtable(1, 0);
         table->set_int(0, 1, 1);
         table = group.get_table("my_table");
@@ -620,13 +590,8 @@ TEST(Shared_ErrorCase1)
         table = group.get_table("my_table");
         table = table->get_subtable(6, 0);
         table->set_int(0, 0, 2);
-        {
-            ofstream out("/tmp/x12.dot"); // ERROR: Group is corrupt at this point
-            group.to_dot(out);
-        }
     }
     db.commit();
 }
-#endif // 0
 
 #endif // !_MSV_VER
