@@ -713,7 +713,7 @@ size_t Array::FindSSE(int64_t value, __m128i *data, size_t bytewidth, size_t ite
 //    for (int j = 0; j < (int)(sizeof(__m128i) / bytewidth); ++j)
 //        memcpy((char *)&search + j * bytewidth, &value, bytewidth);
 
-    // The loops that initialie '__m128i search' are made simple so that compilers unroll or optimize them
+    // The loops that initialize '__m128i search' are made simple so that compilers unroll or optimize them
     // automatically (VC and gcc converts the case bytewidth == 1 to memset(), and unrolls the remaining cases fully).
 
     if (bytewidth == 1) {

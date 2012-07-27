@@ -40,7 +40,7 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     bool is_empty() const;
-    void to_dot(std::ostream& out = std::cerr);
+    void to_dot(std::ostream& out);
 #endif
 
 protected:

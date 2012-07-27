@@ -138,6 +138,20 @@ public:
         ColumnSubtableParent(ref, parent, pndx, alloc, tab) {}
     using ColumnSubtableParent::get_subtable_ptr;
     using ColumnSubtableParent::get_subtable;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    // Overriding method in ColumnSubtableParent
+    virtual size_t* record_subtable_path(size_t* begin, size_t* end)
+    {
+        if (end == begin) return 0; // Error, not enough space in buffer
+        ArrayParent* const parent = m_array->GetParent();
+        TIGHTDB_ASSERT(dynamic_cast<Array*>(parent));
+        const size_t column_index = static_cast<Array*>(parent)->GetParentNdx();
+        *begin++ = column_index;
+        if (end == begin) return 0; // Error, not enough space in buffer
+        return m_table->record_subtable_path(begin, end);
+    }
+#endif // TIGHTDB_ENABLE_REPLICATION
 };
 
 

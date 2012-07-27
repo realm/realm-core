@@ -16,6 +16,17 @@ Format:
 ----------
 
 
+2012-07-27 (Kristian Spangsege)
+----------
++ tightdb::is_a<MyTable>(const Table&) added.
++ tightdb::unchecked_cast<MyTable>(TableRef) added.
++ tightdb::checked_cast<MyTable>(TableRef) added.
++ my_table[i].mixed.set_subtable() added.
++ my_table[i].mixed.set_subtable<MySubtable>() added.
++ my_table[i].mixed.is_subtable<MyTable>() added (inefficient, do we want it at all?).
++ my_table[i].mixed.get_subtable<MySubtable>() added (unsafe/unchecked, do we want it at all?).
+
+
 2012-07-24 (Kristian Spangsege)
 ----------
 + New macro TIGHTDB_DEBUG to control compilation mode.

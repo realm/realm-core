@@ -207,7 +207,7 @@ struct Replication {
     //   C  Clear table
     //   Z  Optimize table
 
-    struct SubtableTag {};
+    struct subtable_tag {};
 
     error_code new_top_level_table(const char* name);
     error_code add_column(const Table*, const Spec*, ColumnType, const char* name);
@@ -216,13 +216,13 @@ struct Replication {
     error_code set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
     error_code set_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
     error_code set_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
-    error_code set_value(const Table*, std::size_t column_ndx, std::size_t ndx, SubtableTag);
+    error_code set_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
 
     template<class T>
     error_code insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
     error_code insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
     error_code insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
-    error_code insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, SubtableTag);
+    error_code insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
 
     error_code row_insert_complete(const Table*);
     error_code insert_empty_rows(const Table*, std::size_t row_ndx, std::size_t num_rows);
@@ -544,7 +544,7 @@ inline error_code Replication::set_value(const Table* t, std::size_t column_ndx,
 }
 
 inline error_code Replication::set_value(const Table* t, std::size_t column_ndx,
-                                         std::size_t ndx, SubtableTag)
+                                         std::size_t ndx, subtable_tag)
 {
     error_code err = check_table(t);
     if (err) return err;
@@ -578,7 +578,7 @@ inline error_code Replication::insert_value(const Table* t, std::size_t column_n
 }
 
 inline error_code Replication::insert_value(const Table* t, std::size_t column_ndx,
-                                            std::size_t ndx, SubtableTag)
+                                            std::size_t ndx, subtable_tag)
 {
     error_code err = check_table(t);
     if (err) return err;

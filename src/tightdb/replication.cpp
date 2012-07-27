@@ -930,7 +930,7 @@ private:
         m_num_subspecs = 0;
     }
 
-    void finalize_spec()
+    void finalize_spec() // FIXME: May fail
     {
         TIGHTDB_ASSERT(m_table);
         m_table->update_from_spec();
@@ -1001,8 +1001,9 @@ error_code Replication::TransactLogApplier::read_string(StringBuffer& buf)
         if (size <= avail) break;
         const char* to = m_input_begin + avail;
         copy(m_input_begin, to, str_end);
-        str_end += avail;
         if (!fill_input_buffer()) return ERROR_IO;
+        str_end += avail;
+        size -= avail;
     }
     const char* to = m_input_begin + size;
     copy(m_input_begin, to, str_end);
@@ -1226,14 +1227,14 @@ error_code Replication::TransactLogApplier::apply()
     }
     m_input_begin = m_input_end = m_input_buffer;
 
-    // FIXME: Problem: modifying group, table, and spec methods generally throw.
+    // FIXME: Problem: The modifying methods of group, table, and spec generally throw.
     Spec* spec = 0;
     for (;;) {
         char instr;
         if (!read_char(instr)) {
             break;
         }
-//cerr << "["<<instr<<"]";
+// cerr << "["<<instr<<"]";
         switch (instr) {
         case 's':  // Set value
             {
@@ -1287,6 +1288,19 @@ error_code Replication::TransactLogApplier::apply()
                 m_table->insert_empty_row(ndx, num_rows); // FIXME: May fail
 #ifdef TIGHTDB_DEBUG
                 if (m_log) *m_log << "table->insert_empty_row("<<ndx<<", "<<num_rows<<")\n";
+#endif
+            }
+            break;
+
+        case 'R':  // Remove row
+            {
+                if (m_dirty_spec) finalize_spec();
+                size_t ndx;
+                if (!read_int(ndx)) return ERROR_IO;
+                if (!m_table || m_table->size() < ndx) return ERROR_IO;
+                m_table->remove(ndx); // FIXME: May fail
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table->remove("<<ndx<<")\n";
 #endif
             }
             break;
@@ -1358,9 +1372,18 @@ error_code Replication::TransactLogApplier::apply()
                     if (!read_int(ndx)) return ERROR_IO;
                     if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
                         return ERROR_IO;
-                    if (m_table->get_column_type(column_ndx) != COLUMN_TYPE_TABLE) return ERROR_IO;
                     if (m_table->size() <= ndx) return ERROR_IO;
-                    m_table = m_table->get_subtable(column_ndx, ndx);
+                    switch (m_table->get_column_type(column_ndx)) {
+                    case COLUMN_TYPE_TABLE:
+                        m_table = m_table->get_subtable(column_ndx, ndx);
+                        break;
+                    case COLUMN_TYPE_MIXED:
+                        m_table = m_table->get_subtable(column_ndx, ndx);
+                        if (!m_table) return ERROR_IO;
+                        break;
+                    default:
+                        return ERROR_IO;
+                    }
 #ifdef TIGHTDB_DEBUG
                     if (m_log) *m_log << "table = table->get_subtable("<<column_ndx<<", "<<ndx<<")\n";
 #endif
@@ -1386,6 +1409,7 @@ error_code Replication::TransactLogApplier::apply()
         }
     }
 
+    if (m_dirty_spec) finalize_spec(); // FIXME: Why is this necessary?
     return ERROR_NONE;
 }
 

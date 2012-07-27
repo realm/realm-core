@@ -201,11 +201,26 @@ public:
     /// only if, they contain the same rows in the same order, that
     /// is, for each value V at column index C and row index R in one
     /// of the tables, there is a value at column index C and row
-    /// index R in the other tables that is equal to V.
+    /// index R in the other table that is equal to V.
     bool operator==(const BasicTable& t) const { return compare_rows(t); }
 
     /// Compare two tables for inequality. See operator==().
     bool operator!=(const BasicTable& t) const { return !compare_rows(t); }
+
+    /// Checks whether the dynamic type of the specified table matches
+    /// the statically specified table type. The two types (or specs)
+    /// must have the same columns, and in the same order. Two columns
+    /// are considered equal if, and only if they have the same name
+    /// and the same type. The type is understood as the value encoded
+    /// by the ColumnType enumeration. This check proceeds recursively
+    /// for subtable columns.
+    ///
+    /// \tparam T The static table type. It makes no difference
+    /// whether it is const-qualified or not.
+    template<class T> friend bool is_a(const Table&);
+
+    template<class T> friend BasicTableRef<T> checked_cast(TableRef);
+    template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef);
 
 #ifdef TIGHTDB_DEBUG
     using Table::Verify;
@@ -239,12 +254,6 @@ private:
         update_from_spec();
     }
 
-    /// Checks whether this static table type has the same columns as
-    /// the specified dynamic spec. The number of column must be the
-    /// same. Two columns are considered the same if, and only if they
-    /// have the same name and the same type. The type is understood
-    /// as the value encoded by the ColumnType enumeration. This check
-    /// proceeds recursively for subtable columns.
     static bool matches_dynamic_spec(const tightdb::Spec* spec)
     {
         return !HasType<typename Spec::Columns,
@@ -345,6 +354,10 @@ private:
 #pragma warning(pop)
 #endif
 
+
+
+
+// Implementation:
 
 namespace _impl
 {
@@ -552,6 +565,24 @@ namespace _impl
             t->set_mixed(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
+}
+
+
+template<class T> inline bool is_a(const Table& t)
+{
+    return T::matches_dynamic_spec(&t.get_spec());
+}
+
+template<class T> inline BasicTableRef<T> checked_cast(TableRef t)
+{
+    if (!is_a<T>(*t)) return BasicTableRef<T>(); // Null
+    return unchecked_cast<T>(t);
+}
+
+template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t)
+{
+    if (!is_a<T>(*t)) return BasicTableRef<const T>(); // Null
+    return unchecked_cast<T>(t);
 }
 
 

@@ -179,7 +179,7 @@ void Table::CacheColumns()
 
     Allocator& alloc = m_columns.GetAllocator();
     ColumnType attr = COLUMN_ATTR_NONE;
-    size_t size = (size_t)-1;
+    size_t size = size_t(-1);
     size_t column_ndx = 0;
     const size_t count = m_spec_set.get_type_attr_count();
     size_t subtable_count = 0;
@@ -190,7 +190,7 @@ void Table::CacheColumns()
         const size_t ref = m_columns.GetAsRef(column_ndx);
 
         ColumnBase* newColumn = NULL;
-        size_t colsize = (size_t)-1;
+        size_t colsize = size_t(-1);
         switch (type) {
             case COLUMN_TYPE_INT:
             case COLUMN_TYPE_BOOL:
@@ -251,13 +251,13 @@ void Table::CacheColumns()
 
         // Set table size
         // (and verify that all column are same length)
-        if (size == (size_t)-1) size = colsize;
+        if (size == size_t(-1)) size = colsize;
         else TIGHTDB_ASSERT(size == colsize);
 
         ++column_ndx;
     }
 
-    if (size != (size_t)-1) m_size = size;
+    if (size != size_t(-1)) m_size = size;
 }
 
 void Table::ClearCachedColumns()
@@ -636,26 +636,16 @@ void Table::remove(size_t ndx)
 void Table::insert_subtable(size_t column_ndx, size_t ndx)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(GetRealColumnType(column_ndx) == COLUMN_TYPE_TABLE);
     TIGHTDB_ASSERT(ndx <= m_size);
 
-    const ColumnType type = GetRealColumnType(column_ndx);
-    if (type == COLUMN_TYPE_TABLE) {
-        ColumnTable& subtables = GetColumnTable(column_ndx);
-        subtables.invalidate_subtables();
-        subtables.Insert(ndx); // FIXME: Consider calling virtual method insert(size_t) instead.
-    }
-    else if (type == COLUMN_TYPE_MIXED) {
-        ColumnMixed& subtables = GetColumnMixed(column_ndx);
-        subtables.invalidate_subtables();
-        subtables.insert_subtable(ndx);
-    }
-    else {
-        TIGHTDB_ASSERT(false);
-    }
+    ColumnTable& subtables = GetColumnTable(column_ndx);
+    subtables.invalidate_subtables();
+    subtables.Insert(ndx); // FIXME: Consider calling virtual method insert(size_t) instead.
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err =
-        get_local_transact_log().insert_value(column_ndx, ndx, Replication::SubtableTag());
+        get_local_transact_log().insert_value(column_ndx, ndx, Replication::subtable_tag());
     if (err) throw_error(err);
 #endif
 }
@@ -724,21 +714,27 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
         ColumnTable& subtables = GetColumnTable(col_idx);
         subtables.Clear(row_idx);
         subtables.invalidate_subtables();
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err =
+        get_local_transact_log().set_value(col_idx, row_idx, Replication::subtable_tag());
+    if (err) throw_error(err);
+#endif
     }
     else if (type == COLUMN_TYPE_MIXED) {
         ColumnMixed& subtables = GetColumnMixed(col_idx);
         subtables.set_subtable(row_idx);
         subtables.invalidate_subtables();
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err =
+        get_local_transact_log().set_value(col_idx, row_idx, Mixed(Mixed::subtable_tag()));
+    if (err) throw_error(err);
+#endif
     }
     else {
         TIGHTDB_ASSERT(false);
     }
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().set_value(col_idx, row_idx,
-                                                        Replication::SubtableTag());
-    if (err) throw_error(err);
-#endif
 }
 
 int64_t Table::get_int(size_t column_ndx, size_t ndx) const

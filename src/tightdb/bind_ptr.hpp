@@ -121,6 +121,10 @@ namespace tightdb {
         struct move_tag {};
         bind_ptr(bind_ptr* p, move_tag): m_ptr(p->release()) {}
 
+        struct casting_move_tag {};
+        template<class U> bind_ptr(bind_ptr<U>* p, casting_move_tag):
+            m_ptr(static_cast<T*>(p->release())) {}
+
     private:
         T* m_ptr;
 

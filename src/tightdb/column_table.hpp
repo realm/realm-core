@@ -34,6 +34,8 @@ public:
     void invalidate_subtables();
 
 protected:
+    const Table* const m_table;
+
     ColumnSubtableParent(ArrayParent* parent_array, std::size_t parent_ndx,
                          Allocator& alloc, const Table* tab);
 
@@ -109,7 +111,6 @@ private:
         Array m_wrappers;
     };
 
-    const Table* const m_table;
     mutable SubtableMap m_subtable_map;
 };
 

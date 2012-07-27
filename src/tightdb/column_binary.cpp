@@ -2,6 +2,7 @@
 
 #include <tightdb/column_binary.hpp>
 
+using namespace std;
 using namespace tightdb;
 
 namespace {

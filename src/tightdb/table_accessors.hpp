@@ -510,25 +510,24 @@ public:
     /// Checks whether this value is a subtable of the specified type.
     ///
     /// FIXME: Since it will be hard to make this operation efficient,
-    /// it might be better to instead offer the following six
-    /// namespace level functions:
+    /// it may be better to instead offer the following four
+    /// functions:
     ///
-    /// template<class T> bool is(TableRef);
-    /// template<class T> bool is(ConstTableRef);
-    /// template<class T> T::Ref checked_cast(TableRef); // Returns null if wrong type
-    /// template<class T> T::ConstRef checked_cast(ConstTableRef); // Returns null if wrong type
-    /// template<class T> T::Ref unchecked_cast(TableRef);
-    /// template<class T> T::ConstRef unchecked_cast(ConstTableRef);
+    /// template<class T> BasicTableRef<T> checked_cast(TableRef); // Returns null if wrong type
+    /// template<class T> BasicTableRef<const T> checked_cast(ConstTableRef); // Returns null if wrong type
+    /// template<class T> BasicTableRef<T> unchecked_cast(TableRef);
+    /// template<class T> BasicTableRef<const T> unchecked_cast(ConstTableRef);
     ///
-    /// Or maybe these five Table methods instead:
-    ///
-    /// template<class T> Table::is() const { return T::is_type_of(this); }
-    /// template<class T> BasicTableRef<T> Table::checked_cast() { return T::checked_cast(this); }
-    /// template<class T> BasicTableRef<const T> Table::checked_cast() const { return T::checked_cast(this); }
-    /// template<class T> BasicTableRef<T> Table::unchecked_cast() { return T::unchecked_cast(this); }
-    /// template<class T> BasicTableRef<const T> Table::unchecked_cast() const { return T::unchecked_cast(this); }
-    ///
-//    template<class T> bool is_subtable() const  { ... }
+    /// FIXME: Consider deleting this function. It is mostly
+    /// redundant, and it is inefficient if you want to also get a
+    /// reference to the table, or if you want to check for multiple
+    /// table types.
+    template<class T> bool is_subtable() const
+    {
+        // FIXME: Conversion from TableRef to ConstTableRef is relatively expensive, or is it? Check whether it involves access to the reference count!
+        const ConstTableRef t = static_cast<FieldAccessor*>(this)->get_subtable();
+        return t && T::matches_dynamic_spec(&t->get_spec());
+    }
 };
 
 
@@ -543,12 +542,67 @@ private:
 public:
     explicit FieldAccessor(typename Base::Init i): Base(i) {}
 
+    /// Returns null if the current value is not a subtable.
     TableRef get_subtable() const
     {
         return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx);
     }
 
-    // FIXME: Add methods get_subtable<MyTable>(), set_subtable(), set_subtable<MyTable>(). See Group::get_table<MyTable>() for hints on setting up the spec in set_subtable<MyTable>().
+    /// Overwrites the current value with an empty subtable and
+    /// returns a reference to it.
+    TableRef set_subtable() const
+    {
+        Base::m_table->get_impl()->clear_subtable(col_idx, Base::m_row_idx);
+        return get_subtable();
+    }
+
+    /// This function assumes that if the current value is a subtable,
+    /// then it is a subtable of the specified type. If this is not
+    /// the case, anything can happend when you call this function,
+    /// including memory corruption.
+    ///
+    /// To safely and efficiently check whether the current value is a
+    /// subtable of any of a set of specific table types, you may do
+    /// as follows:
+    ///
+    /// \code{.cpp}
+    ///
+    ///   if (TableRef subtable = my_table[i].mixed.get_subtable()) {
+    ///     if (subtable->is_a<MyFirstSubtable>()) {
+    ///       MyFirstSubtable::Ref s = unchecked_cast<MyFirstSubtable>(move(subtable))) {
+    ///       // ...
+    ///     }
+    ///     else if (subtable->is_a<MySecondSubtable>()) {
+    ///       MySecondSubtable::Ref s = unchecked_cast<MySecondSubtable>(move(subtable))) {
+    ///       // ...
+    ///     }
+    ///   }
+    ///
+    /// \endcode
+    ///
+    /// \return Null if the current value is not a subtable.
+    ///
+    /// \note This function is generally unsafe because it does not
+    /// check that the specified table type matches the actual table
+    /// type.
+    ///
+    /// FIXME: Consider deleting this function, since it is both
+    /// unsafe and superfluous.
+    template<class T> BasicTableRef<T> get_subtable() const
+    {
+        return unchecked_cast<T>(get_subtable());
+    }
+
+    /// Overwrites the current value with an empty subtable and
+    /// returns a reference to it.
+    ///
+    /// \tparam T The subtable type. It must not be const-qualified.
+    template<class T> BasicTableRef<T> set_subtable() const
+    {
+        BasicTableRef<T> t = unchecked_cast<T>(set_subtable());
+        t->set_dynamic_spec();
+        return move(t);
+    }
 };
 
 
@@ -568,7 +622,12 @@ public:
         return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx);
     }
 
-    // FIXME: Add methods get_subtable<MyTable>().
+    /// FIXME: Consider deleting this function, since it is both
+    /// unsafe and superfluous.
+    template<class T> BasicTableRef<const T> get_subtable() const
+    {
+        return unchecked_cast<const T>(get_subtable());
+    }
 };
 
 

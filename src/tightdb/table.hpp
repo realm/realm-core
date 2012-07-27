@@ -116,8 +116,7 @@ public:
     Spec&       get_spec();
     const Spec& get_spec() const;
     void        update_from_spec(); // Must not be called for a table with shared spec
-                // Add a column dynamically
-    size_t      add_column(ColumnType type, const char* name);
+    size_t      add_column(ColumnType type, const char* name); // Add a column dynamically
 
     // Table size and deletion
     bool        is_empty() const {return m_size == 0;}
@@ -143,8 +142,9 @@ public:
     void insert_date(size_t column_ndx, size_t row_ndx, time_t value);
     template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
     void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
-    void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void insert_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+    void insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
+    void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void insert_done();
 
     // Get cell values
@@ -174,7 +174,6 @@ public:
     ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;
     void            clear_subtable(size_t column_ndx, size_t row_ndx);
-    void            insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
 
     // Indexing
     bool has_index(size_t column_ndx) const;
@@ -221,7 +220,7 @@ public:
     /// only if, they contain the same columns and rows in the same
     /// order, that is, for each value V of type T at column index C
     /// and row index R in one of the tables, there is a value of type
-    /// T at column index C and row index R in the other tables that
+    /// T at column index C and row index R in the other table that
     /// is equal to V.
     bool operator==(const Table&) const;
 
