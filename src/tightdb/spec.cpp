@@ -151,13 +151,13 @@ const Spec Spec::get_subspec(size_t column_ndx) const
     return Spec(m_table, alloc, ref, NULL, 0);
 }
 
-size_t Spec::get_subspec_ref(std::size_t subtable_ndx) const
+size_t Spec::get_subspec_ref(std::size_t subspec_ndx) const
 {
-    TIGHTDB_ASSERT(subtable_ndx < m_subSpecs.Size());
+    TIGHTDB_ASSERT(subspec_ndx < m_subSpecs.Size());
 
     // Note that this addresses subspecs directly, indexing
     // by number of sub-table columns
-    return m_subSpecs.GetAsRef(subtable_ndx);
+    return m_subSpecs.GetAsRef(subspec_ndx);
 }
 
 size_t Spec::get_type_attr_count() const

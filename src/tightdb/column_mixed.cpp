@@ -35,12 +35,12 @@ void ColumnMixed::UpdateFromParent()
 }
 
 
-void ColumnMixed::Create(Allocator &alloc, Table const *tab)
+void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx)
 {
     m_array = new Array(COLUMN_HASREFS, NULL, 0, alloc);
 
     m_types = new Column(COLUMN_NORMAL, alloc);
-    m_refs  = new RefsColumn(alloc, tab);
+    m_refs  = new RefsColumn(alloc, table, column_ndx);
 
     m_array->add(m_types->GetRef());
     m_array->add(m_refs->GetRef());
@@ -49,24 +49,24 @@ void ColumnMixed::Create(Allocator &alloc, Table const *tab)
     m_refs->SetParent(m_array, 1);
 }
 
-void ColumnMixed::Create(size_t ref, ArrayParent *parent, size_t pndx,
-                         Allocator &alloc, Table const *tab)
+void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx,
+                         ArrayParent* parent, size_t ndx_in_parent, size_t ref)
 {
-    m_array = new Array(ref, parent, pndx, alloc);
+    m_array = new Array(ref, parent, ndx_in_parent, alloc);
     TIGHTDB_ASSERT(m_array->Size() == 2 || m_array->Size() == 3);
 
-    const size_t ref_types = m_array->GetAsRef(0);
-    const size_t ref_refs  = m_array->GetAsRef(1);
+    const size_t types_ref = m_array->GetAsRef(0);
+    const size_t refs_ref  = m_array->GetAsRef(1);
 
-    m_types = new Column(ref_types, m_array, 0, alloc);
-    m_refs  = new RefsColumn(ref_refs, m_array, 1, alloc, tab);
+    m_types = new Column(types_ref, m_array, 0, alloc);
+    m_refs  = new RefsColumn(alloc, table, column_ndx, m_array, 1, refs_ref);
     TIGHTDB_ASSERT(m_types->Size() == m_refs->Size());
 
     // Binary column with values that does not fit in refs
     // is only there if needed
     if (m_array->Size() == 3) {
-        const size_t ref_data = m_array->GetAsRef(2);
-        m_data = new ColumnBinary(ref_data, m_array, 2, alloc);
+        const size_t data_ref = m_array->GetAsRef(2);
+        m_data = new ColumnBinary(data_ref, m_array, 2, alloc);
     }
 }
 

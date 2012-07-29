@@ -70,65 +70,80 @@ void Table::CreateColumns()
     const size_t count = m_spec_set.get_type_attr_count();
 
     // Add the newly defined columns
-    for (size_t i = 0; i < count; ++i) {
+    for (size_t i=0; i<count; ++i) {
         const ColumnType type = m_spec_set.get_type_attr(i);
         const size_t ref_pos =  m_columns.Size();
-        ColumnBase* newColumn = NULL;
+        ColumnBase* new_col = 0;
 
         switch (type) {
-            case COLUMN_TYPE_INT:
-            case COLUMN_TYPE_BOOL:
-            case COLUMN_TYPE_DATE:
-                newColumn = new Column(COLUMN_NORMAL, alloc);
-                m_columns.add(((Column*)newColumn)->GetRef());
-                ((Column*)newColumn)->SetParent(&m_columns, ref_pos);
-                break;
-            case COLUMN_TYPE_STRING:
-                newColumn = new AdaptiveStringColumn(alloc);
-                m_columns.add(((AdaptiveStringColumn*)newColumn)->GetRef());
-                ((Column*)newColumn)->SetParent(&m_columns, ref_pos);
-                break;
-            case COLUMN_TYPE_BINARY:
-                newColumn = new ColumnBinary(alloc);
-                m_columns.add(((ColumnBinary*)newColumn)->GetRef());
-                ((ColumnBinary*)newColumn)->SetParent(&m_columns, ref_pos);
-                break;
-            case COLUMN_TYPE_TABLE:
+        case COLUMN_TYPE_INT:
+        case COLUMN_TYPE_BOOL:
+        case COLUMN_TYPE_DATE:
             {
+                Column* c = new Column(COLUMN_NORMAL, alloc);
+                m_columns.add(c->GetRef());
+                c->SetParent(&m_columns, ref_pos);
+                new_col = c;
+            }
+            break;
+        case COLUMN_TYPE_STRING:
+            {
+                AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
+                m_columns.add(c->GetRef());
+                c->SetParent(&m_columns, ref_pos);
+                new_col = c;
+            }
+            break;
+        case COLUMN_TYPE_BINARY:
+            {
+                ColumnBinary* c = new ColumnBinary(alloc);
+                m_columns.add(c->GetRef());
+                c->SetParent(&m_columns, ref_pos);
+                new_col = c;
+            }
+            break;
+        case COLUMN_TYPE_TABLE:
+            {
+                const size_t column_ndx = m_cols.Size();
                 const size_t subspec_ref = m_spec_set.get_subspec_ref(subtable_count);
-                newColumn = new ColumnTable(subspec_ref, NULL, 0, alloc, this);
-                m_columns.add(((ColumnTable*)newColumn)->GetRef());
-                ((ColumnTable*)newColumn)->SetParent(&m_columns, ref_pos);
+                ColumnTable* c = new ColumnTable(alloc, this, column_ndx, subspec_ref);
+                m_columns.add(c->GetRef());
+                c->SetParent(&m_columns, ref_pos);
+                new_col = c;
                 ++subtable_count;
             }
-                break;
-            case COLUMN_TYPE_MIXED:
-                newColumn = new ColumnMixed(alloc, this);
-                m_columns.add(((ColumnMixed*)newColumn)->GetRef());
-                ((ColumnMixed*)newColumn)->SetParent(&m_columns, ref_pos);
-                break;
+            break;
+        case COLUMN_TYPE_MIXED:
+            {
+                const size_t column_ndx = m_cols.Size();
+                ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
+                m_columns.add(c->GetRef());
+                c->SetParent(&m_columns, ref_pos);
+                new_col = c;
+            }
+            break;
 
             // Attributes
-            case COLUMN_ATTR_INDEXED:
-            case COLUMN_ATTR_UNIQUE:
-                attr = type;
-                break;
+        case COLUMN_ATTR_INDEXED:
+        case COLUMN_ATTR_UNIQUE:
+            attr = type;
+            break;
 
-            default:
-                TIGHTDB_ASSERT(false);
+        default:
+            TIGHTDB_ASSERT(false);
         }
 
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
             TIGHTDB_ASSERT(false); //TODO:
-            //const index_ref = newColumn->CreateIndex(attr);
+            //const index_ref = new_col->CreateIndex(attr);
             //m_columns.add(index_ref);
 
             attr = COLUMN_ATTR_NONE;
         }
 
         // Cache Columns
-        m_cols.add((intptr_t)newColumn); // FIXME: intptr_t is not guaranteed to exists, not even in C++11
+        m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, not even in C++11
     }
 }
 
@@ -180,72 +195,91 @@ void Table::CacheColumns()
     Allocator& alloc = m_columns.GetAllocator();
     ColumnType attr = COLUMN_ATTR_NONE;
     size_t size = size_t(-1);
-    size_t column_ndx = 0;
+    size_t ndx_in_parent = 0;
     const size_t count = m_spec_set.get_type_attr_count();
     size_t subtable_count = 0;
 
     // Cache columns
     for (size_t i = 0; i < count; ++i) {
         const ColumnType type = m_spec_set.get_type_attr(i);
-        const size_t ref = m_columns.GetAsRef(column_ndx);
+        const size_t ref = m_columns.GetAsRef(ndx_in_parent);
 
-        ColumnBase* newColumn = NULL;
+        ColumnBase* new_col = 0;
         size_t colsize = size_t(-1);
         switch (type) {
-            case COLUMN_TYPE_INT:
-            case COLUMN_TYPE_BOOL:
-            case COLUMN_TYPE_DATE:
-                newColumn = new Column(ref, &m_columns, column_ndx, alloc);
-                colsize = ((Column*)newColumn)->Size();
-                break;
-            case COLUMN_TYPE_STRING:
-                newColumn = new AdaptiveStringColumn(ref, &m_columns, column_ndx, alloc);
-                colsize = ((AdaptiveStringColumn*)newColumn)->Size();
-                break;
-            case COLUMN_TYPE_BINARY:
-                newColumn = new ColumnBinary(ref, &m_columns, column_ndx, alloc);
-                colsize = ((ColumnBinary*)newColumn)->Size();
-                break;
-            case COLUMN_TYPE_STRING_ENUM:
+        case COLUMN_TYPE_INT:
+        case COLUMN_TYPE_BOOL:
+        case COLUMN_TYPE_DATE:
             {
-                const size_t ref_values = m_columns.GetAsRef(column_ndx+1);
-                newColumn = new ColumnStringEnum(ref, ref_values, &m_columns, column_ndx, alloc);
-                colsize = ((ColumnStringEnum*)newColumn)->Size();
-                ++column_ndx; // advance one extra pos to account for keys/values pair
-                break;
+                Column* c = new Column(ref, &m_columns, ndx_in_parent, alloc);
+                colsize = c->Size();
+                new_col = c;
             }
-            case COLUMN_TYPE_TABLE:
+            break;
+        case COLUMN_TYPE_STRING:
             {
-                const size_t ref_specSet = m_spec_set.get_subspec_ref(subtable_count);
-
-                newColumn = new ColumnTable(ref, ref_specSet, &m_columns, column_ndx, alloc, this);
-                colsize = ((ColumnTable*)newColumn)->Size();
+                AdaptiveStringColumn* c =
+                    new AdaptiveStringColumn(ref, &m_columns, ndx_in_parent, alloc);
+                colsize = c->Size();
+                new_col = c;
+            }
+            break;
+        case COLUMN_TYPE_BINARY:
+            {
+                ColumnBinary* c = new ColumnBinary(ref, &m_columns, ndx_in_parent, alloc);
+                colsize = c->Size();
+                new_col = c;
+            }
+            break;
+        case COLUMN_TYPE_STRING_ENUM:
+            {
+                const size_t values_ref = m_columns.GetAsRef(ndx_in_parent+1);
+                ColumnStringEnum* c =
+                    new ColumnStringEnum(ref, values_ref, &m_columns, ndx_in_parent, alloc);
+                colsize = c->Size();
+                new_col = c;
+                ++ndx_in_parent; // advance one extra pos to account for keys/values pair
+            }
+            break;
+        case COLUMN_TYPE_TABLE:
+            {
+                const size_t column_ndx = m_cols.Size();
+                const size_t spec_ref = m_spec_set.get_subspec_ref(subtable_count);
+                ColumnTable* c = new ColumnTable(alloc, this, column_ndx, &m_columns, ndx_in_parent,
+                                                 spec_ref, ref);
+                colsize = c->Size();
+                new_col = c;
                 ++subtable_count;
-                break;
             }
-            case COLUMN_TYPE_MIXED:
-                newColumn = new ColumnMixed(ref, &m_columns, column_ndx, alloc, this);
-                colsize = ((ColumnMixed*)newColumn)->Size();
-                break;
+            break;
+        case COLUMN_TYPE_MIXED:
+            {
+                const size_t column_ndx = m_cols.Size();
+                ColumnMixed* c =
+                    new ColumnMixed(alloc, this, column_ndx, &m_columns, ndx_in_parent, ref);
+                colsize = c->Size();
+                new_col = c;
+            }
+            break;
 
             // Attributes
-            case COLUMN_ATTR_INDEXED:
-            case COLUMN_ATTR_UNIQUE:
-                attr = type;
-                break;
+        case COLUMN_ATTR_INDEXED:
+        case COLUMN_ATTR_UNIQUE:
+            attr = type;
+            break;
 
-            default:
-                TIGHTDB_ASSERT(false);
+        default:
+            TIGHTDB_ASSERT(false);
         }
 
-        m_cols.add((intptr_t)newColumn); // FIXME: intptr_t is not guaranteed to exists, even in C++11
+        m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
 
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
-            const size_t index_ref = m_columns.GetAsRef(column_ndx+1);
-            newColumn->SetIndexRef(index_ref);
+            const size_t index_ref = m_columns.GetAsRef(ndx_in_parent+1);
+            new_col->SetIndexRef(index_ref);
 
-            ++column_ndx; // advance one extra pos to account for index
+            ++ndx_in_parent; // advance one extra pos to account for index
             attr = COLUMN_ATTR_NONE;
         }
 
@@ -254,7 +288,7 @@ void Table::CacheColumns()
         if (size == size_t(-1)) size = colsize;
         else TIGHTDB_ASSERT(size == colsize);
 
-        ++column_ndx;
+        ++ndx_in_parent;
     }
 
     if (size != size_t(-1)) m_size = size;
@@ -381,42 +415,66 @@ size_t Table::add_column(ColumnType type, const char* name)
     // Currently it's not possible to dynamically add columns to a table with content.
     TIGHTDB_ASSERT(size() == 0);
     if (size() != 0)
-        return (size_t)-1;
+        return size_t(-1);
+
+    m_spec_set.add_column(type, name); // FIXME: May fail
 
     const size_t column_ndx = m_cols.Size();
 
-    ColumnBase* newColumn = NULL;
+    ColumnBase* new_col = 0;
     Allocator& alloc = m_columns.GetAllocator();
 
     switch (type) {
     case COLUMN_TYPE_INT:
     case COLUMN_TYPE_BOOL:
     case COLUMN_TYPE_DATE:
-        newColumn = new Column(COLUMN_NORMAL, alloc);
-        m_columns.add(((Column*)newColumn)->GetRef());
-        ((Column*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
+        {
+            Column* c = new Column(COLUMN_NORMAL, alloc);
+            m_columns.add(c->GetRef());
+            c->SetParent(&m_columns, m_columns.Size()-1);
+            new_col = c;
+        }
         break;
     case COLUMN_TYPE_STRING:
-        newColumn = new AdaptiveStringColumn(alloc);
-        m_columns.add(((AdaptiveStringColumn*)newColumn)->GetRef());
-        ((Column*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
+        {
+            AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
+            m_columns.add(c->GetRef());
+            c->SetParent(&m_columns, m_columns.Size()-1);
+            new_col = c;
+        }
         break;
     case COLUMN_TYPE_BINARY:
-        newColumn = new ColumnBinary(alloc);
-        m_columns.add(((ColumnBinary*)newColumn)->GetRef());
-        ((ColumnBinary*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
+        {
+            ColumnBinary* c = new ColumnBinary(alloc);
+            m_columns.add(c->GetRef());
+            c->SetParent(&m_columns, m_columns.Size()-1);
+            new_col = c;
+        }
         break;
+
+    case COLUMN_TYPE_TABLE:
+        {
+            const size_t subspec_ref = m_spec_set.get_subspec_ref(m_spec_set.get_num_subspecs()-1);
+            ColumnTable* c = new ColumnTable(alloc, this, column_ndx, subspec_ref);
+            m_columns.add(c->GetRef());
+            c->SetParent(&m_columns, m_columns.Size()-1);
+            new_col = c;
+        }
+        break;
+
     case COLUMN_TYPE_MIXED:
-        newColumn = new ColumnMixed(alloc, this);
-        m_columns.add(((ColumnMixed*)newColumn)->GetRef());
-        ((ColumnMixed*)newColumn)->SetParent(&m_columns, m_columns.Size()-1);
+        {
+            ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
+            m_columns.add(c->GetRef());
+            c->SetParent(&m_columns, m_columns.Size()-1);
+            new_col = c;
+        }
         break;
     default:
         TIGHTDB_ASSERT(false);
     }
 
-    m_spec_set.add_column(type, name);
-    m_cols.add((intptr_t)newColumn);
+    m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err = get_local_transact_log().add_column(type, name);
@@ -1342,11 +1400,11 @@ void Table::optimize()
         const ColumnType type = GetRealColumnType(i);
 
         if (type == COLUMN_TYPE_STRING) {
-            AdaptiveStringColumn& column = GetColumnString(i);
+            AdaptiveStringColumn* column = &GetColumnString(i);
 
             size_t ref_keys;
             size_t ref_values;
-            const bool res = column.AutoEnumerate(ref_keys, ref_values);
+            const bool res = column->AutoEnumerate(ref_keys, ref_values);
             if (!res) continue;
 
             // Add to spec and column refs
@@ -1361,10 +1419,10 @@ void Table::optimize()
             UpdateColumnRefs(column_ndx+1, 1);
 
             // Replace cached column
-            ColumnStringEnum* e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc);
+            ColumnStringEnum* e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc); // FIXME: We may have to use 'new (nothrow)' here. It depends on whether we choose to allow exceptions.
             m_cols.Set(i, (intptr_t)e);
-            column.Destroy();
-            delete &column;
+            column->Destroy();
+            delete column;
         }
     }
 
@@ -1377,7 +1435,7 @@ void Table::optimize()
 void Table::UpdateColumnRefs(size_t column_ndx, int diff)
 {
     for (size_t i = column_ndx; i < m_cols.Size(); ++i) {
-        ColumnBase* const column = (ColumnBase*)m_cols.Get(i);
+        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
         column->UpdateParentNdx(diff);
     }
 }
@@ -1394,7 +1452,7 @@ void Table::UpdateFromParent() {
     // Update cached columns
     const size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
-        ColumnBase* const column = (ColumnBase*)m_cols.Get(i);
+        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
         column->UpdateFromParent();
     }
 
@@ -1403,7 +1461,7 @@ void Table::UpdateFromParent() {
         m_size = 0;
     }
     else {
-        const ColumnBase* const column = (ColumnBase*)m_cols.Get(0);
+        const ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(0));
         m_size = column->Size();
     }
 }

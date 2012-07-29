@@ -317,47 +317,47 @@ namespace tightdb {
 
 size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc)
 {
-    Array a(ref, NULL, 0, alloc);
+    Array a(ref, 0, 0, alloc);
     if (!a.IsNode()) return a.Size();
-    Array offsets(a.Get(0), NULL, 0, alloc);
+    Array offsets(a.Get(0), 0, 0, alloc);
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
 
-Column::Column(Allocator& alloc): m_index(NULL)
+Column::Column(Allocator& alloc): m_index(0)
 {
-    m_array = new Array(COLUMN_NORMAL, NULL, 0, alloc);
+    m_array = new Array(COLUMN_NORMAL, 0, 0, alloc);
     Create();
 }
 
-Column::Column(ColumnDef type, Allocator& alloc): m_index(NULL)
+Column::Column(ColumnDef type, Allocator& alloc): m_index(0)
 {
-    m_array = new Array(type, NULL, 0, alloc);
+    m_array = new Array(type, 0, 0, alloc);
     Create();
 }
 
-Column::Column(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(NULL)
+Column::Column(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
 {
     m_array = new Array(type, parent, pndx, alloc);
     Create();
 }
 
-Column::Column(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(NULL)
+Column::Column(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
 {
     m_array = new Array(ref, parent, pndx, alloc);
 }
 
-Column::Column(const Column& column): m_index(NULL)
+Column::Column(const Column& column): m_index(0)
 {
     m_array = column.m_array; // we now own array
-    column.m_array = NULL;    // so invalidate source
+    column.m_array = 0;       // so invalidate source
 }
 
 void Column::Create()
 {
     // Add subcolumns for nodes
     if (IsNode()) {
-        const Array offsets(COLUMN_NORMAL, NULL, 0, m_array->GetAllocator());
-        const Array refs(COLUMN_HASREFS, NULL, 0, m_array->GetAllocator());
+        const Array offsets(COLUMN_NORMAL, 0, 0, m_array->GetAllocator());
+        const Array refs(COLUMN_HASREFS, 0, 0, m_array->GetAllocator());
         m_array->add(offsets.GetRef());
         m_array->add(refs.GetRef());
     }
@@ -382,7 +382,7 @@ Column::~Column()
 void Column::Destroy()
 {
     ClearIndex();
-    if(m_array != NULL)
+    if (m_array)
         m_array->Destroy();
 }
 

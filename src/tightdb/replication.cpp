@@ -1404,6 +1404,17 @@ error_code Replication::TransactLogApplier::apply()
             }
             break;
 
+        case 'Z':  // Optimize table
+            {
+                if (m_dirty_spec) finalize_spec();
+                if (!m_table) return ERROR_IO;
+                m_table->optimize(); // FIXME: May fail
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table->optimize()\n";
+#endif
+            }
+            break;
+
         default:
             return ERROR_IO;
         }

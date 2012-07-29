@@ -34,22 +34,33 @@ class ColumnBinary;
 
 class ColumnMixed : public ColumnBase {
 public:
-    /// Create a freestanding mixed column.
+    /// Create a free-standing mixed column.
     ColumnMixed();
 
-    /// Create a mixed column and have it instantiate a new array
-    /// structure.
+    /// Create a mixed column wrapper and have it instantiate a new
+    /// underlying structure of arrays.
     ///
-    /// \param tab If this column is used as part of a table you must
-    /// pass a pointer to that table. Otherwise you may pass null.
-    ColumnMixed(Allocator& alloc, const Table* tab);
+    /// \param table If this column is used as part of a table you
+    /// must pass a pointer to that table. Otherwise you must pass
+    /// null.
+    ///
+    /// \param column_ndx If this column is used as part of a table
+    /// you must pass the logical index of the column within that
+    /// table. Otherwise you should pass zero.
+    ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx);
 
-    /// Create a mixed column and attach it to an already existing
-    /// array structure.
+    /// Create a mixed column wrapper and attach it to a preexisting
+    /// underlying structure of arrays.
     ///
-    /// \param tab If this column is used as part of a table you must
-    /// pass a pointer to that table. Otherwise you may pass null.
-    ColumnMixed(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc, const Table* tab);
+    /// \param table If this column is used as part of a table you
+    /// must pass a pointer to that table. Otherwise you must pass
+    /// null.
+    ///
+    /// \param column_ndx If this column is used as part of a table
+    /// you must pass the logical index of the column within that
+    /// table. Otherwise you should pass zero.
+    ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx,
+                ArrayParent* parent, std::size_t ndx_in_parent, std::size_t ref);
 
     ~ColumnMixed();
     void Destroy();
@@ -113,8 +124,9 @@ public:
 #endif // TIGHTDB_DEBUG
 
 private:
-    void Create(Allocator& alloc, const Table* tab);
-    void Create(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc, const Table* tab);
+    void Create(Allocator& alloc, const Table* table, size_t column_ndx);
+    void Create(Allocator& alloc, const Table* table, size_t column_ndx,
+                ArrayParent* parent, size_t ndx_in_parent, size_t ref);
     void InitDataColumn();
 
     void ClearValue(size_t ndx, ColumnType newtype);
@@ -131,11 +143,11 @@ private:
 class ColumnMixed::RefsColumn: public ColumnSubtableParent
 {
 public:
-    RefsColumn(Allocator& alloc, const Table* tab):
-        ColumnSubtableParent(NULL, 0, alloc, tab) {}
-    RefsColumn(std::size_t ref, ArrayParent* parent, std::size_t pndx,
-               Allocator& alloc, const Table* tab):
-        ColumnSubtableParent(ref, parent, pndx, alloc, tab) {}
+    RefsColumn(Allocator& alloc, const Table* table, std::size_t column_ndx):
+        ColumnSubtableParent(alloc, table, column_ndx) {}
+    RefsColumn(Allocator& alloc, const Table* table, std::size_t column_ndx,
+               ArrayParent* parent, std::size_t ndx_in_parent, std::size_t ref):
+        ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, ref) {}
     using ColumnSubtableParent::get_subtable_ptr;
     using ColumnSubtableParent::get_subtable;
 
@@ -155,20 +167,22 @@ public:
 };
 
 
-inline ColumnMixed::ColumnMixed(): m_data(NULL)
+inline ColumnMixed::ColumnMixed(): m_data(0)
 {
-    Create(GetDefaultAllocator(), 0);
+    Create(GetDefaultAllocator(), 0, 0);
 }
 
-inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* tab): m_data(NULL)
+inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx):
+    m_data(0)
 {
-    Create(alloc, tab);
+    Create(alloc, table, column_ndx);
 }
 
-inline ColumnMixed::ColumnMixed(size_t ref, ArrayParent* parent, size_t pndx,
-                                Allocator& alloc, const Table* tab): m_data(NULL)
+inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx,
+                                ArrayParent* parent, std::size_t ndx_in_parent, std::size_t ref):
+    m_data(0)
 {
-    Create(ref, parent, pndx, alloc, tab);
+    Create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
 }
 
 inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const

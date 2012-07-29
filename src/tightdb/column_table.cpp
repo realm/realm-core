@@ -12,16 +12,6 @@ void ColumnSubtableParent::child_destroyed(size_t subtable_ndx)
     if (m_table && m_subtable_map.empty()) m_table->unbind_ref();
 }
 
-
-
-ColumnTable::ColumnTable(size_t ref_specSet, ArrayParent *parent, size_t pndx,
-                         Allocator &alloc, Table const *tab):
-    ColumnSubtableParent(parent, pndx, alloc, tab), m_ref_specSet(ref_specSet) {}
-
-ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, ArrayParent *parent, size_t pndx,
-                         Allocator& alloc, Table const *tab):
-    ColumnSubtableParent(ref_column, parent, pndx, alloc, tab), m_ref_specSet(ref_specSet) {}
-
 size_t ColumnTable::get_subtable_size(size_t ndx) const
 {
     // FIXME: If the table object is cached, it is possible to get the

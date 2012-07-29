@@ -92,7 +92,7 @@ private:
 
     // FIXME: This one was made private because it is called
     // internally from Table::optimize(), and it is not called from
-    // any test case. If it must be public, it must aslo be made to
+    // any test case. If it must be public, it must also be made to
     // emit a transaction log instruction, but the internal call must
     // then call a different version that does not emit such an
     // instruction.
@@ -111,7 +111,7 @@ private:
     Spec(const Table*, Allocator&, ArrayParent* parent, size_t ndx_in_parent);
     Spec(const Table*, Allocator&, size_t ref, ArrayParent *parent, size_t ndx_in_parent);
 
-    size_t get_subspec_ref(size_t column_ndx) const;
+    size_t get_subspec_ref(size_t subspec_ndx) const;
     size_t get_num_subspecs() const { return m_subSpecs.IsValid() ? m_subSpecs.Size() : 0; }
     Spec get_subspec_by_ndx(size_t subspec_ndx);
 
