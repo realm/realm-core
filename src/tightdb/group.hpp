@@ -131,7 +131,7 @@ protected:
         return m_tables.GetAsRef(subtable_ndx);
     }
 
-    void create();
+    void create(); // FIXME: Could be private
     void create_from_ref();
 
     template<class S> size_t write(S& out);

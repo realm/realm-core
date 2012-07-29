@@ -14,10 +14,12 @@ namespace tightdb {
 size_t TO_REF(int64_t v)
 {
 #ifdef TIGHTDB_DEBUG
-    uint64_t m = (size_t)(-1);
-    TIGHTDB_ASSERT((uint64_t)v <= m);
+    uint64_t m = size_t(-1);
+    TIGHTDB_ASSERT(uint64_t(v) <= m);
+    // FIXME: This misbehaves for negative v and on architectures that do not use 2's complement represenation of negative numbers.
+    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
 #endif
-    return (size_t)v;
+    return size_t(v);
 }
 
 void* round_up(void* p, size_t align)

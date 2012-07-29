@@ -44,7 +44,7 @@ public:
 
     MemRef Alloc(size_t size);
     MemRef ReAlloc(size_t ref, void* p, size_t size);
-    void   Free(size_t ref, void* p);
+    void   Free(size_t ref, void* p); // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void*  Translate(size_t ref) const;
 
     bool   IsReadOnly(size_t ref) const;

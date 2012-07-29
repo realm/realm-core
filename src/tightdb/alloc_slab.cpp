@@ -138,7 +138,7 @@ MemRef SlabAlloc::Alloc(size_t size)
     }
 
     // Else, allocate new slab
-    const size_t multible = 256 * ((size / 256) + 1);
+    const size_t multible = 256 * ((size / 256) + 1); // FIXME: Not an english word. Also, is this the intended rounding behavior?
     const size_t slabsBack = m_slabs.is_empty() ? m_baseline : m_slabs.back().offset;
     const size_t doubleLast = m_slabs.is_empty() ? 0 :
         (slabsBack - ((m_slabs.size() == 1) ? size_t(0) : m_slabs.back(-2).offset)) * 2;
@@ -149,13 +149,13 @@ MemRef SlabAlloc::Alloc(size_t size)
     if (!slab) return MemRef(NULL, 0);
 
     // Add to slab table
-    Slabs::Cursor s = m_slabs.add();
+    Slabs::Cursor s = m_slabs.add(); // FIXME: Use the immediate form add()
     s.offset = slabsBack + newsize;
     s.pointer = (intptr_t)slab;
 
     // Update free list
     const size_t rest = newsize - size;
-    FreeSpace::Cursor f = m_freeSpace.add();
+    FreeSpace::Cursor f = m_freeSpace.add(); // FIXME: Use the immediate form add()
     f.ref = slabsBack + size;
     f.size = rest;
 
@@ -358,7 +358,7 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
 
         //TODO: Verify the data structures
 
-        m_shared = (char*)p;
+        m_shared = static_cast<char*>(p);
         m_baseline = len;
 
         return true;

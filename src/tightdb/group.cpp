@@ -120,7 +120,7 @@ Group::Group(const char* buffer, size_t len):
 
 void Group::create()
 {
-    m_tables.SetType(COLUMN_HASREFS);
+    m_tables.SetType(COLUMN_HASREFS); // FIXME: Why is this not done in Group() like the rest of the arrays?
 
     m_top.add(m_tableNames.GetRef());
     m_top.add(m_tables.GetRef());
@@ -260,8 +260,11 @@ void Group::rollback()
 {
     TIGHTDB_ASSERT(is_shared());
 
+    // FIXME: I (Kristian) had to add this to avoid double deallocation in ~Group(), but is this the right fix? Alexander?
+    invalidate();
+
     // Clear all changes made during transaction
-    m_alloc.FreeAll();
+//    m_alloc.FreeAll(); FIXME: Not needed if we keep the call to invalidate() above.
 }
 
 Group::~Group()
@@ -288,6 +291,13 @@ void Group::invalidate()
     m_freePositions.Invalidate();
     m_freeLengths.Invalidate();
     m_freeVersions.Invalidate();
+
+    // FIXME: I (Kristian) had to add these to avoid a problem when resurrecting the arrays in create_from_ref() (top_ref==0). The problem is that if the parent is left as non-null, then Array::Alloc() will attempt to update the parent array, but the parent array is still empty at that point. I don't, however, think this is a sufficiently good fix? Alexander?
+    m_tables.SetParent(0,0);
+    m_tableNames.SetParent(0,0);
+    m_freePositions.SetParent(0,0);
+    m_freeLengths.SetParent(0,0);
+    m_freeVersions.SetParent(0,0);
 
     // Reads may allocate some temproary state that we have
     // to clean up
