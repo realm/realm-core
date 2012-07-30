@@ -178,6 +178,7 @@ public:
         invalidate_subtables();
     }
 
+    // Overriding virtual method in ColumnSubtableParent.
     void Clear()
     {
         ColumnSubtableParent::Clear();

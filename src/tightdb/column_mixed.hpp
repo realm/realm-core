@@ -103,7 +103,7 @@ public:
 
     bool add() { insert_int(Size(), 0); return true; }
     void insert(size_t ndx) { insert_int(ndx, 0); invalidate_subtables(); }
-    void Clear();
+    void Clear(); // Overriding virtual method in Column.
     void Delete(size_t ndx);
 
     // Indexing

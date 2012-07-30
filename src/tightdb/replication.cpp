@@ -1391,6 +1391,17 @@ error_code Replication::TransactLogApplier::apply()
             }
             break;
 
+        case 'C':  // Clear table
+            {
+                if (m_dirty_spec) finalize_spec();
+                if (!m_table) return ERROR_IO;
+                m_table->clear(); // FIXME: Can probably fail!
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table->clear()\n";
+#endif
+            }
+            break;
+
         case 'N':  // New top level table
             {
                 const error_code err = read_string(m_string_buffer);
