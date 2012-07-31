@@ -83,7 +83,7 @@ public:
     bool operator!=(const Group& g) const { return !(*this == g); }
 
 #ifdef TIGHTDB_DEBUG
-    void Verify(); // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void print() const;
     void print_free() const;
     MemStats stats();
@@ -172,6 +172,11 @@ private:
 
 // Implementation
 
+inline const Table* Group::get_table_ptr(size_t ndx) const
+{
+    return const_cast<Group*>(this)->get_table_ptr(ndx);
+}
+
 inline bool Group::has_table(const char* name) const
 {
     if (!m_top.IsValid()) return false;
@@ -187,11 +192,6 @@ template<class T> inline bool Group::has_table(const char* name) const
     if (i == size_t(-1)) return false;
     const Table* const table = get_table_ptr(i);
     return T::matches_dynamic_spec(&table->get_spec());
-}
-
-inline const Table* Group::get_table_ptr(size_t ndx) const
-{
-    return const_cast<Group*>(this)->get_table_ptr(ndx);
 }
 
 inline Table* Group::get_table_ptr(const char* name)

@@ -398,7 +398,6 @@ void ColumnMixed::Clear()
     m_types->Clear();
     m_refs->Clear();
     if (m_data) m_data->Clear();
-    invalidate_subtables();
 }
 
 bool ColumnMixed::Compare(const ColumnMixed& c) const

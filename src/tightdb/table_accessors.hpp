@@ -509,15 +509,6 @@ public:
 
     /// Checks whether this value is a subtable of the specified type.
     ///
-    /// FIXME: Since it will be hard to make this operation efficient,
-    /// it may be better to instead offer the following four
-    /// functions:
-    ///
-    /// template<class T> BasicTableRef<T> checked_cast(TableRef); // Returns null if wrong type
-    /// template<class T> BasicTableRef<const T> checked_cast(ConstTableRef); // Returns null if wrong type
-    /// template<class T> BasicTableRef<T> unchecked_cast(TableRef);
-    /// template<class T> BasicTableRef<const T> unchecked_cast(ConstTableRef);
-    ///
     /// FIXME: Consider deleting this function. It is mostly
     /// redundant, and it is inefficient if you want to also get a
     /// reference to the table, or if you want to check for multiple
@@ -525,7 +516,7 @@ public:
     template<class T> bool is_subtable() const
     {
         // FIXME: Conversion from TableRef to ConstTableRef is relatively expensive, or is it? Check whether it involves access to the reference count!
-        const ConstTableRef t = static_cast<FieldAccessor*>(this)->get_subtable();
+        const ConstTableRef t = static_cast<const FieldAccessor*>(this)->get_subtable();
         return t && T::matches_dynamic_spec(&t->get_spec());
     }
 };
@@ -590,6 +581,7 @@ public:
     /// unsafe and superfluous.
     template<class T> BasicTableRef<T> get_subtable() const
     {
+        TIGHTDB_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
         return unchecked_cast<T>(get_subtable());
     }
 
@@ -626,6 +618,7 @@ public:
     /// unsafe and superfluous.
     template<class T> BasicTableRef<const T> get_subtable() const
     {
+        TIGHTDB_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
         return unchecked_cast<const T>(get_subtable());
     }
 };

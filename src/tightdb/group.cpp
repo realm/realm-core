@@ -562,7 +562,7 @@ bool Group::operator==(const Group& g) const
 
 #ifdef TIGHTDB_DEBUG
 
-void Group::Verify()
+void Group::Verify() const
 {
     // Verify free lists
     if (m_freePositions.IsValid()) {

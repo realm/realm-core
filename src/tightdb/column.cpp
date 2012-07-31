@@ -486,7 +486,7 @@ bool Column::Insert(size_t ndx, int64_t value)
 
 #ifdef TIGHTDB_DEBUG
     Verify();
-#endif //DEBUG
+#endif
 
     return true;
 }

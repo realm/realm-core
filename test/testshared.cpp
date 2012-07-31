@@ -456,7 +456,7 @@ TEST(Shared_WriterThreads)
 }
 
 
-TEST(Shared_ErrorCase1)
+TEST(Shared_FormerErrorCase1)
 {
     remove("test_shared.tdb");
     remove("test_shared.tdb.lock");
@@ -593,5 +593,42 @@ TEST(Shared_ErrorCase1)
     }
     db.commit();
 }
+
+
+
+namespace {
+
+TIGHTDB_TABLE_1(FormerErrorCase2_Subtable,
+                value,  Int)
+
+TIGHTDB_TABLE_1(FormerErrorCase2_Table,
+                bar, Subtable<FormerErrorCase2_Subtable>)
+
+} // namespace
+
+TEST(Shared_FormerErrorCase2)
+{
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock");
+
+    for (int i=0; i<10; ++i) {
+        SharedGroup db("test_shared.tdb");
+        CHECK(db.is_valid());
+        {
+            Group& group = db.begin_write();
+            FormerErrorCase2_Table::Ref table = group.get_table<FormerErrorCase2_Table>("table");
+            table->add();
+            table->add();
+            table->add();
+            table->add();
+            table->add();
+            table->clear();
+            table->add();
+            table[0].bar->add();
+        }
+        db.commit();
+    }
+}
+
 
 #endif // !_MSV_VER

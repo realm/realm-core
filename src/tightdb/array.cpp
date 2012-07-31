@@ -225,14 +225,16 @@ void Array::SetType(ColumnDef type)
         m_ref = 0;
         m_capacity = 0;
         m_len = 0;
-        m_width = (size_t)-1;
+        m_width = size_t(-1);
     }
 
     if (m_ref) CopyOnWrite();
 
-    if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
-    else if (type == COLUMN_HASREFS)    m_hasRefs = true;
-    else m_isNode = m_hasRefs = false;
+    bool is_node = false, has_refs = false;
+    if (type == COLUMN_NODE) is_node = has_refs = true;
+    else if (type == COLUMN_HASREFS) has_refs = true;
+    m_isNode  = is_node;
+    m_hasRefs = has_refs;
 
     if (!m_data) {
         // Create array
@@ -241,8 +243,8 @@ void Array::SetType(ColumnDef type)
     }
     else {
         // Update Header
-        set_header_isnode(m_isNode);
-        set_header_hasrefs(m_hasRefs);
+        set_header_isnode(is_node);
+        set_header_hasrefs(has_refs);
     }
 }
 

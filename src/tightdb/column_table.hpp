@@ -33,6 +33,14 @@ public:
 
     void invalidate_subtables();
 
+    // Overriding virtual method.
+    void Clear()
+    {
+        m_array->Clear();
+        if (m_array->IsNode()) m_array->SetType(COLUMN_HASREFS);
+        invalidate_subtables();
+    }
+
 protected:
     /// A pointer to the table that this column is part of. For a
     /// free-standing column, this pointer is null.
@@ -57,7 +65,7 @@ protected:
     /// Get the subtable at the specified index.
     ///
     /// This method must be used only for subtables with shared spec,
-    /// i.e. for elements of ColumnTable.
+    /// i.e. for elements of a ColumnTable.
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a TableRef.
@@ -66,21 +74,21 @@ protected:
     /// Get the subtable at the specified index.
     ///
     /// This method must be used only for subtables with independent
-    /// specs, i.e. for elements of ColumnMixed.
+    /// specs, i.e. for elements of a ColumnMixed.
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a TableRef.
     Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
     /// This method must be used only for subtables with shared spec,
-    /// i.e. for elements of ColumnTable.
+    /// i.e. for elements of a ColumnTable.
     TableRef get_subtable(std::size_t subtable_ndx, std::size_t spec_ref) const
     {
         return TableRef(get_subtable_ptr(subtable_ndx, spec_ref));
     }
 
     /// This method must be used only for subtables with independent
-    /// specs, i.e. for elements of ColumnMixed.
+    /// specs, i.e. for elements of a ColumnMixed.
     TableRef get_subtable(std::size_t subtable_ndx) const
     {
         return TableRef(get_subtable_ptr(subtable_ndx));
@@ -175,13 +183,6 @@ public:
     void insert(size_t ndx)
     {
         ColumnSubtableParent::insert(ndx);
-        invalidate_subtables();
-    }
-
-    // Overriding virtual method in ColumnSubtableParent.
-    void Clear()
-    {
-        ColumnSubtableParent::Clear();
         invalidate_subtables();
     }
 
