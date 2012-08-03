@@ -496,6 +496,8 @@ void Table::set_index(size_t column_ndx)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     if (has_index(column_ndx)) return;
 
+/* FIXME: This fails to work together with Group::commit()
+
     ColumnBase& col = GetColumnBase(column_ndx);
 
     if (col.IsIntColumn()) {
@@ -507,6 +509,7 @@ void Table::set_index(size_t column_ndx)
     else {
         TIGHTDB_ASSERT(false);
     }
+*/
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err = get_local_transact_log().add_index_to_column(column_ndx);

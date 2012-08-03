@@ -334,17 +334,24 @@ public:
         return *this;
     }
 
-    // FIXME: Not good to define operator==() here, beacuse it does
-    // not have this semantic for char pointers in general. However,
-    // if we choose to keep it, we should also have all the other
-    // comparison operators, and many other operators need to be
-    // disabled such that e.g. 't.foo - 10' is no longer possible (it
-    // is now, due to the conversion operator). A much better approach
-    // would probably be to define a special tightdb::String type.
-    bool operator==(const char* value) const
+    friend bool operator==(const FieldAccessor& a, const char* b)
     {
-        const char* const v = Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx);
-        return std::strcmp(v, value) == 0;
+        return std::strcmp(static_cast<const char*>(a), b) == 0;
+    }
+
+    friend bool operator!=(const FieldAccessor& a, const char* b)
+    {
+        return std::strcmp(static_cast<const char*>(a), b) != 0;
+    }
+
+    friend bool operator==(const char* a, const FieldAccessor& b)
+    {
+        return std::strcmp(a, static_cast<const char*>(b)) == 0;
+    }
+
+    friend bool operator!=(const char* a, const FieldAccessor& b)
+    {
+        return std::strcmp(a, static_cast<const char*>(b)) != 0;
     }
 };
 
@@ -518,6 +525,32 @@ public:
         // FIXME: Conversion from TableRef to ConstTableRef is relatively expensive, or is it? Check whether it involves access to the reference count!
         const ConstTableRef t = static_cast<const FieldAccessor*>(this)->get_subtable();
         return t && T::matches_dynamic_spec(&t->get_spec());
+    }
+
+    /// Generally more efficient that get_subtable()->size().
+    std::size_t get_subtable_size() const
+    {
+        return Base::m_table->get_impl()->get_subtable_size(col_idx, Base::m_row_idx);
+    }
+
+    template<class T> friend bool operator==(const FieldAccessor& a, const T& b)
+    {
+        return Mixed(a) == b;
+    }
+
+    template<class T> friend bool operator!=(const FieldAccessor& a, const T& b)
+    {
+        return Mixed(a) != b;
+    }
+
+    template<class T> friend bool operator==(const T& a, const FieldAccessor& b)
+    {
+        return a == Mixed(b);
+    }
+
+    template<class T> friend bool operator!=(const T& a, const FieldAccessor& b)
+    {
+        return a != Mixed(b);
     }
 };
 

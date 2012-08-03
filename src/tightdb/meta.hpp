@@ -143,6 +143,15 @@ public:
 
 
 
+template<class T> struct Wrap {
+    Wrap(const T& v): m_value(v) {}
+    operator T() const { return m_value; }
+private:
+    T m_value;
+};
+
+
+
 namespace _impl {
     template<class T, bool is_signed> struct IsNegative {
         static bool test(T value) { return value < 0; }

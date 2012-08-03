@@ -1305,51 +1305,20 @@ error_code Replication::TransactLogApplier::apply()
             }
             break;
 
-        case 'A':  // Add column to selected spec
+        case 'a':  // Add int to column
             {
-                int type;
-                if (!read_int(type)) return ERROR_IO;
-                if (!is_valid_column_type(type)) return ERROR_IO;
-                const error_code err = read_string(m_string_buffer);
-                if (err) return err;
-                const char* const name = m_string_buffer.c_str();
-                if (!spec) return ERROR_IO;
-                // FIXME: Is it legal to have multiple columns with the same name?
-                if (spec->get_column_index(name) != size_t(-1)) return ERROR_IO;
-                spec->add_column(ColumnType(type), name);
-#ifdef TIGHTDB_DEBUG
-                if (m_log) *m_log << "spec->add_column("<<type<<", \""<<name<<"\")\n";
-#endif
-                m_dirty_spec = true;
-            }
-            break;
-
-        case 'S':  // Select spec for currently selected table
-            {
-                delete_subspecs();
+                if (m_dirty_spec) finalize_spec();
+                int column_ndx;
+                if (!read_int(column_ndx)) return ERROR_IO;
                 if (!m_table) return ERROR_IO;
-                spec = &m_table->get_spec();
+                if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                    return ERROR_IO;
+                int64_t value;
+                if (!read_int(value)) return ERROR_IO;
+                m_table->add_int(column_ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
-                if (m_log) *m_log << "spec = table->get_spec()\n";
+                if (m_log) *m_log << "table->add_int("<<column_ndx<<", "<<value<<")\n";
 #endif
-                int levels;
-                if (!read_int(levels)) return ERROR_IO;
-                for (int i=0; i<levels; ++i) {
-                    int subspec_ndx;
-                    if (!read_int(subspec_ndx)) return ERROR_IO;
-                    if (subspec_ndx < 0 || int(spec->get_num_subspecs()) <= subspec_ndx)
-                        return ERROR_IO;
-                    spec = new (nothrow) Spec(spec->get_subspec_by_ndx(subspec_ndx));
-                    if (!spec) return ERROR_OUT_OF_MEMORY;
-                    const error_code err = add_subspec(spec);
-                    if (err) {
-                        delete spec;
-                        return err;
-                    }
-#ifdef TIGHTDB_DEBUG
-                    if (m_log) *m_log << "spec = spec->get_subspec_by_ndx("<<subspec_ndx<<")\n";
-#endif
-                }
             }
             break;
 
@@ -1399,6 +1368,69 @@ error_code Replication::TransactLogApplier::apply()
 #ifdef TIGHTDB_DEBUG
                 if (m_log) *m_log << "table->clear()\n";
 #endif
+            }
+            break;
+
+        case 'x':  // Add index to column
+            {
+                if (m_dirty_spec) finalize_spec();
+                int column_ndx;
+                if (!read_int(column_ndx)) return ERROR_IO;
+                if (!m_table) return ERROR_IO;
+                if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                    return ERROR_IO;
+                m_table->set_index(column_ndx); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table->set_index("<<column_ndx<<")\n";
+#endif
+            }
+            break;
+
+        case 'A':  // Add column to selected spec
+            {
+                int type;
+                if (!read_int(type)) return ERROR_IO;
+                if (!is_valid_column_type(type)) return ERROR_IO;
+                const error_code err = read_string(m_string_buffer);
+                if (err) return err;
+                const char* const name = m_string_buffer.c_str();
+                if (!spec) return ERROR_IO;
+                // FIXME: Is it legal to have multiple columns with the same name?
+                if (spec->get_column_index(name) != size_t(-1)) return ERROR_IO;
+                spec->add_column(ColumnType(type), name);
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "spec->add_column("<<type<<", \""<<name<<"\")\n";
+#endif
+                m_dirty_spec = true;
+            }
+            break;
+
+        case 'S':  // Select spec for currently selected table
+            {
+                delete_subspecs();
+                if (!m_table) return ERROR_IO;
+                spec = &m_table->get_spec();
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "spec = table->get_spec()\n";
+#endif
+                int levels;
+                if (!read_int(levels)) return ERROR_IO;
+                for (int i=0; i<levels; ++i) {
+                    int subspec_ndx;
+                    if (!read_int(subspec_ndx)) return ERROR_IO;
+                    if (subspec_ndx < 0 || int(spec->get_num_subspecs()) <= subspec_ndx)
+                        return ERROR_IO;
+                    spec = new (nothrow) Spec(spec->get_subspec_by_ndx(subspec_ndx));
+                    if (!spec) return ERROR_OUT_OF_MEMORY;
+                    const error_code err = add_subspec(spec);
+                    if (err) {
+                        delete spec;
+                        return err;
+                    }
+#ifdef TIGHTDB_DEBUG
+                    if (m_log) *m_log << "spec = spec->get_subspec_by_ndx("<<subspec_ndx<<")\n";
+#endif
+                }
             }
             break;
 

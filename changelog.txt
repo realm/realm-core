@@ -16,6 +16,15 @@ Format:
 ----------
 
 
+2012-08-01 (Kristian Spangsege)
+----------
++ Date::operator==(const Date&) and Date::operator!=(const Date&) added.
++ BinaryData::operator==(const BinaryData&) and BinaryData::operator!=(const BinaryData&) added.
++ Operators added for comparison between a value of type Mixed and a value of one of the possible types that a Mixed can contain. Operators are added for both orders of the two arguments.
++ Comparison operators added for "foo" == my_table[i].str and "foo" != my_table[i].str. We already had a comparison operator for the reverse order case, my_table[i].str == "foo".
++ my_table[i].mixed.get_subtable_size() added.
+
+
 2012-07-27 (Kristian Spangsege)
 ----------
 + tightdb::is_a<MyTable>(const Table&) added.
