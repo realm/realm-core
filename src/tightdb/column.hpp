@@ -161,9 +161,10 @@ public:
     bool add() {return add(0);}
     bool add(int64_t value);
 
-    int64_t sum(size_t start = 0, size_t end = -1) const;
-    int64_t maximum(size_t start = 0, size_t end = -1) const;
-    int64_t minimum(size_t start = 0, size_t end = -1) const;
+    int64_t sum(size_t start = 0, size_t end = -1, int cond = COND_NONE, int64_t value = 0) const;
+    int64_t maximum(size_t start = 0, size_t end = -1, int cond = COND_NONE, int64_t value = 0) const;
+    int64_t minimum(size_t start = 0, size_t end = -1, int cond = COND_NONE, int64_t value = 0) const;
+    int64_t count(size_t start, size_t end, int cond, int64_t value) const;
     void sort(size_t start, size_t end);
     void ReferenceSort(size_t start, size_t end, Column &ref);
 
@@ -220,7 +221,7 @@ protected:
 
     template <class F>size_t LeafFind(int64_t value, size_t start, size_t end) const
     {
-        return m_array->Query<F>(value, start, end);
+        return m_array->find_first<F>(value, start, end);
     }
 
     void DoSort(size_t lo, size_t hi);

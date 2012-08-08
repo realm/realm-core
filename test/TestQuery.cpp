@@ -7,6 +7,9 @@ TIGHTDB_TABLE_2(TwoIntTable,
                 first,  Int,
                 second, Int)
 
+TIGHTDB_TABLE_1(OneIntTable,
+                first,  Int)
+
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
@@ -14,6 +17,67 @@ TIGHTDB_TABLE_2(TupleTableType,
 TIGHTDB_TABLE_2(BoolTupleTable,
                 first,  Int,
                 second, Bool)
+
+
+TEST(TestQuery_sum_new_aggregates)
+{
+    // test the new ACTION_FIND_PATTERN() method in array
+
+    OneIntTable t;
+    for(size_t i = 0; i < 1000; i++) {
+        t.add(1);
+        t.add(2);
+        t.add(4);
+        t.add(6);
+    }
+    size_t c = t.where().first.equal(2).count(t);
+    CHECK_EQUAL(1000, c);
+
+    c = t.where().first.greater(2).count(t);
+    CHECK_EQUAL(2000, c);
+
+}
+
+TEST(TestQuery_sum_min_max_avg_foreign_col)
+{
+    TwoIntTable t;
+    t.add(1, 10);
+    t.add(2, 20);
+    t.add(2, 30);
+    t.add(3, 40);
+
+    CHECK_EQUAL(50, t.where().first.equal(2).second.sum(t));
+}
+
+
+TEST(TestAggregateSingleCond)
+{
+    OneIntTable ttt;
+
+    ttt.add(1);
+    ttt.add(2);
+    ttt.add(2);
+    ttt.add(3);
+    ttt.add(3);
+    ttt.add(4);
+
+//    OneIntTable::Query q1 = ttt.where().first.equal(2);
+//    int64_t s = q1.first.sum(ttt);
+
+    int64_t s = ttt.where().first.equal(2).first.sum(ttt);
+    CHECK_EQUAL(4, s);
+
+    s = ttt.where().first.greater(2).first.sum(ttt);
+    CHECK_EQUAL(10, s);
+
+    s = ttt.where().first.less(3).first.sum(ttt);
+    CHECK_EQUAL(5, s);
+
+    s = ttt.where().first.not_equal(3).first.sum(ttt);
+    CHECK_EQUAL(9, s);
+
+
+}
 
 
 TEST(TestQueryFindAll_range1)

@@ -48,20 +48,47 @@ void merge_core(const Array& a0, const Array& a1, Array& res);
 Array* merge(const Array& ArrayList);
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
 
-bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state)
-{
-    (void)caller_base;
-    int64_t s = a->sum(start, end);
-    *(int64_t *)state += s;
-    return true;
-}
 
 class AggregateState {
 public:
     AggregateState() : isValid(false), result(0) {}
     bool    isValid;
     int64_t result;
+    int cond;
+    int64_t value;
 };
+
+
+bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state)
+{
+    (void)caller_base;
+    AggregateState* p = (AggregateState*)state;
+    int64_t s;
+
+    if(p->cond == COND_NONE)
+        s = a->sum(start, end);
+    else
+        s = a->find(p->cond, TDB_SUM, p->value, start, end, caller_base, NULL);     
+
+    p->result += s;
+    return true;
+}
+
+bool callme_count(Array* a, size_t start, size_t end, size_t caller_base, void* state)
+{
+    (void)caller_base;
+    AggregateState* p = (AggregateState*)state;
+    int64_t s;
+
+    if(p->cond == COND_NONE)
+        s = end - start;
+    else
+        s = a->find(p->cond, TDB_COUNT, p->value, start, end, caller_base, NULL);     
+
+    p->result += s;
+    return true;
+}
+
 
 bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
 {
@@ -69,7 +96,15 @@ bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* 
     AggregateState* p = (AggregateState*)state;
 
     int64_t res;
-    if (!a->minimum(res, start, end)) return true;
+    int64_t s;
+
+    if(p->cond == COND_NONE)
+        s = a->minimum(res, start, end);
+    else
+        s = a->find(p->cond, TDB_MIN, p->value, start, end, caller_offset, NULL);     
+
+    if (!s) 
+        return true;
 
     if (!p->isValid || (res < p->result)) {
         p->result  = res;
@@ -84,7 +119,15 @@ bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* 
     AggregateState* p = (AggregateState*)state;
 
     int64_t res;
-    if (!a->maximum(res, start, end)) return true;
+    int64_t s;
+
+    if(p->cond == COND_NONE)
+        s = a->maximum(res, start, end);
+    else
+        s = a->find(p->cond, TDB_MAX, p->value, start, end, caller_offset, NULL);     
+
+    if (!s) 
+        return true;
 
     if (!p->isValid || (res > p->result)) {
         p->result  = res;
@@ -475,24 +518,45 @@ bool Column::Insert(size_t ndx, int64_t value)
     return true;
 }
 
-int64_t Column::sum(size_t start, size_t end) const
-{
-    int64_t sum = 0;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_sum, (void *)&sum);
-    return sum;
-}
 
-int64_t Column::minimum(size_t start, size_t end) const
+// There are currently two implementations that do aggregates on a column: The below methods
+// that iterate over leafs through TreeVisitLEafs() and through Query which has its
+// own read-only leaf traverser (which is faster). Todo: Remove one of the implementations
+// when it has been decided how query API and implementation must work
+
+int64_t Column::sum(size_t start, size_t end, int cond, int64_t value) const
 {
     AggregateState state;
+    state.cond = cond;
+    state.value = value;
+    TreeVisitLeafs<Array, Column>(start, end, 0, callme_sum, (void *)&state);
+    return state.result;
+}
+
+int64_t Column::minimum(size_t start, size_t end, int cond, int64_t value) const
+{
+    AggregateState state;
+    state.cond = cond;
+    state.value = value;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_min, (void *)&state);
     return state.result; // will return zero for empty ranges
 }
 
-int64_t Column::maximum(size_t start, size_t end) const
+int64_t Column::maximum(size_t start, size_t end, int cond, int64_t value) const
 {
     AggregateState state;
+    state.cond = cond;
+    state.value = value;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_max, (void *)&state);
+    return state.result; // will return zero for empty ranges
+}
+
+int64_t Column::count(size_t start, size_t end, int cond, int64_t value) const
+{
+    AggregateState state;
+    state.cond = cond;
+    state.value = value;
+    TreeVisitLeafs<Array, Column>(start, end, 0, callme_count, (void *)&state);
     return state.result; // will return zero for empty ranges
 }
 
@@ -685,7 +749,7 @@ void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t
 void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end, int cond) const
 {
     //return m_array->find_all(result, value, add_offset, start, end);
-    m_array->find_all(cond, &result, value, add_offset, start, end);
+    m_array->find_all(result, value, add_offset, start, end);
 }
 
 void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const

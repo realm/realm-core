@@ -157,6 +157,9 @@
     <ClCompile Include="test\testindexstring.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="callback.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -329,6 +332,9 @@
     </ClInclude>
     <ClInclude Include="src\tightdb\pthread_helpers.hpp">
       <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="callback.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -22,10 +22,14 @@
 
 #include <string>
 #include "utf8.hpp"
+#ifdef _MSC_VER
+    #include <win32/stdint.h>
+#endif
 
 namespace tightdb {
 
-enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_LESS};
+enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_LESS, COND_NONE};
+
 
 struct CONTAINS {
     CONTAINS() {};
@@ -71,6 +75,8 @@ struct EQUAL {
     }
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
     int condition(void) {return COND_EQUAL;}
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (v >= lbound && v <= ubound); }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v == 0 && ubound == 0 && lbound == 0); }
 };
 
 struct NOTEQUAL {
@@ -81,7 +87,9 @@ struct NOTEQUAL {
         return strcmp(v1, v2) != 0;
     }
     template<class T> bool operator()(const T& v1, const T& v2) const { return v1 != v2; }
-    int condition(void) {return -1;}
+    int condition(void) {return COND_NOTEQUAL;}
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return !(v == 0 && ubound == 0 && lbound == 0); }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v > ubound || v < lbound); }
 };
 
 // does v1 contain v2?
@@ -141,11 +149,20 @@ struct NOTEQUAL_INS {
 struct GREATER {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 > v2;}
     int condition(void) {return COND_GREATER;}
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (ubound > v); }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (lbound > v); }
+};
+
+struct NONE {
+    template<class T> bool operator()(const T& v1, const T& v2) const {return true;}
+    int condition(void) {return COND_NONE;}
 };
 
 struct LESS {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 < v2;}
-    int condition(void) {return COND_LESS;}
+    int condition(void) {return  COND_LESS;}
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (lbound < v); }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (ubound < v); }
 };
 
 struct LESSEQUAL {

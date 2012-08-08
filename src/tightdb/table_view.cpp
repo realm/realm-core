@@ -3,8 +3,6 @@
 
 namespace tightdb {
 
-    enum {TDB_SUM, TDB_MAX, TDB_MIN};
-
 // Searching
 
 // find_*_integer() methods are used for all "kinds" of integer values (bool, int, Date)
