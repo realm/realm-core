@@ -157,6 +157,9 @@
     <ClCompile Include="test\testindexstring.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="src\tightdb\terminate.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">

@@ -140,6 +140,49 @@ TEST(TestQueryDelete)
     CHECK_EQUAL(0, ttt.size());
 }
 
+TEST(TestQueryDeleteRange)
+{
+    TupleTableType ttt;
+
+    ttt.add(0, "X");
+    ttt.add(1, "X");
+    ttt.add(2, "X");
+    ttt.add(3, "X");
+    ttt.add(4, "X");
+    ttt.add(5, "X");
+
+    TupleTableType::Query q = ttt.where().second.equal("X");
+    size_t r = q.remove(ttt, 1, 4);
+
+    CHECK_EQUAL(3, r);
+    CHECK_EQUAL(3, ttt.size());
+    CHECK_EQUAL(0, ttt[0].first);
+    CHECK_EQUAL(4, ttt[1].first);
+    CHECK_EQUAL(5, ttt[2].first);
+}
+
+TEST(TestQueryDeleteLimit)
+{
+    TupleTableType ttt;
+
+    ttt.add(0, "X");
+    ttt.add(1, "X");
+    ttt.add(2, "X");
+    ttt.add(3, "X");
+    ttt.add(4, "X");
+    ttt.add(5, "X");
+
+    TupleTableType::Query q = ttt.where().second.equal("X");
+    size_t r = q.remove(ttt, 1, 4, 2);
+
+    CHECK_EQUAL(2, r);
+    CHECK_EQUAL(4, ttt.size());
+    CHECK_EQUAL(0, ttt[0].first);
+    CHECK_EQUAL(3, ttt[1].first);
+    CHECK_EQUAL(4, ttt[2].first);
+    CHECK_EQUAL(5, ttt[3].first);
+}
+
 
 
 TEST(TestQuerySimple)
@@ -347,7 +390,7 @@ TEST(TestQuerySort_QuickSort)
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t-1].first <= tv[t-1].first); // FIXME: Something is wrong here - not testing anything!
+        CHECK(tv[t].first >= tv[t-1].first);
     }
 }
 
@@ -365,7 +408,7 @@ TEST(TestQuerySort_CountSort)
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t-1].first <= tv[t-1].first); // FIXME: Something is wrong here - not testing anything!
+        CHECK(tv[t].first >= tv[t-1].first);
     }
 }
 
@@ -383,7 +426,7 @@ TEST(TestQuerySort_Descending)
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t-1].first >= tv[t-1].first); // FIXME: Something is wrong here - not testing anything!
+        CHECK(tv[t].first <= tv[t-1].first);
     }
 }
 
