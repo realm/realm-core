@@ -87,7 +87,7 @@ Spec* spec_add_column_table(Spec* spec, const char* name)
 
 Spec* spec_get_spec(Spec* spec, size_t column_ndx)
 {
-    return new Spec(spec->get_subspec(column_ndx));
+    return new Spec(spec->get_subtable_spec(column_ndx));
 }
 
 size_t spec_get_column_count(Spec* spec)
@@ -700,7 +700,7 @@ void query_subtable(Query* q, size_t column_ndx)
 #endif
 void query_parent(Query* q)
 {
-    q->parent();
+    q->end_subtable();
 }
 
 Query* query_bool_equal(Query* q, size_t column_ndx, bool value)

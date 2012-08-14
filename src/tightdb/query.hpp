@@ -96,7 +96,7 @@ public:
     void group();
     void end_group();
     void subtable(size_t column);
-    void parent();
+    void end_subtable();
     void Or();
 
     // Searching

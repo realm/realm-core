@@ -181,7 +181,7 @@ void Query::subtable(size_t column)
     group();
 }
 
-void Query::parent()
+void Query::end_subtable()
 {
     end_group();
 

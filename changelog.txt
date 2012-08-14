@@ -17,7 +17,10 @@ Format:
 
 2012-08-14 (Brian Munkholm)
 ----------
-+ 10 Renamed cols() to column()
++ 10 Renamed cols() to column().
++ 10 Renamed get_subspec() to get_subtable_spec(). 
++ 10 Renamed parent() to end_subtable().
+
 
 2012-08-01 (Kristian Spangsege)
 ----------
