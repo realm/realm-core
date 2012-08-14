@@ -16,36 +16,36 @@ using namespace tightdb;
 void VerifiedInteger::VerifyNeighbours(size_t ndx)
 {
     if(v.size() > ndx)
-        assert(v[ndx] == u.Get(ndx));
+        TIGHTDB_ASSERT(v[ndx] == u.Get(ndx));
 
     if(ndx > 0)
-        assert(v[ndx - 1] == u.Get(ndx - 1));
+        TIGHTDB_ASSERT(v[ndx - 1] == u.Get(ndx - 1));
 
     if(v.size() > ndx + 1)
-        assert(v[ndx + 1] == u.Get(ndx + 1));
+        TIGHTDB_ASSERT(v[ndx + 1] == u.Get(ndx + 1));
 }
 
 void VerifiedInteger::add(int64_t value)
 {
     v.push_back(value);
     u.add(value);
-    assert(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.Size());
     VerifyNeighbours(v.size());
-    assert(ConditionalVerify());
+    TIGHTDB_ASSERT(ConditionalVerify());
 }
 
 void VerifiedInteger::Insert(size_t ndx, int64_t value)
 {
     v.insert(v.begin() + ndx, value);
     u.Insert(ndx, value);
-    assert(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.Size());
     VerifyNeighbours(ndx);
-    assert(ConditionalVerify());
+    TIGHTDB_ASSERT(ConditionalVerify());
 }
 
 int64_t VerifiedInteger::Get(size_t ndx)
 {
-    assert(v[ndx] == u.Get(ndx));
+    TIGHTDB_ASSERT(v[ndx] == u.Get(ndx));
     return v[ndx];
 }
 
@@ -62,7 +62,7 @@ int64_t VerifiedInteger::Sum(size_t start, size_t end)
     for(size_t t = start; t < end; ++t)
         sum += v[t];
 
-    assert(sum == u.sum(start, end));
+    TIGHTDB_ASSERT(sum == u.sum(start, end));
     return sum;
 }
 
@@ -80,7 +80,7 @@ int64_t VerifiedInteger::maximum(size_t start, size_t end)
         if(v[t] > max)
             max = v[t];
 
-    assert(max == u.maximum(start, end));
+    TIGHTDB_ASSERT(max == u.maximum(start, end));
     return max;
 }
 
@@ -98,7 +98,7 @@ int64_t VerifiedInteger::minimum(size_t start, size_t end)
         if(v[t] < min)
             min = v[t];
 
-    assert(min == u.minimum(start, end));
+    TIGHTDB_ASSERT(min == u.minimum(start, end));
     return min;
 }
 
@@ -107,24 +107,24 @@ void VerifiedInteger::Set(size_t ndx, int64_t value)
     v[ndx] = value;
     u.Set(ndx, value);
     VerifyNeighbours(ndx);
-    assert(ConditionalVerify());
+    TIGHTDB_ASSERT(ConditionalVerify());
 }
 
 void VerifiedInteger::Delete(size_t ndx)
 {
     v.erase(v.begin() + ndx);
     u.Delete(ndx);
-    assert(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.Size());
     VerifyNeighbours(ndx);
-    assert(ConditionalVerify());
+    TIGHTDB_ASSERT(ConditionalVerify());
 }
 
 void VerifiedInteger::Clear()
 {
     v.clear();
     u.Clear();
-    assert(v.size() == u.Size());
-    assert(ConditionalVerify());
+    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(ConditionalVerify());
 }
 
 size_t VerifiedInteger::find_first(int64_t value)
@@ -132,14 +132,14 @@ size_t VerifiedInteger::find_first(int64_t value)
     std::vector<int64_t>::iterator it = std::find(v.begin(), v.end(), value);
     size_t ndx = std::distance(v.begin(), it);
     size_t index2 = u.find_first(value);
-    assert(ndx == index2 || (it == v.end() && index2 == size_t(-1)));
+    TIGHTDB_ASSERT(ndx == index2 || (it == v.end() && index2 == size_t(-1)));
     (void)index2;
     return ndx;
 }
 
 size_t VerifiedInteger::Size(void)
 {
-    assert(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.Size());
     return v.size();
 }
 
@@ -162,10 +162,10 @@ void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end
 
     u.find_all(c, value);
     if (c.Size() != result.size())
-        assert(false);
+        TIGHTDB_ASSERT(false);
     for(size_t t = 0; t < result.size(); ++t) {
         if (result[t] != (size_t)c.Get(t))
-            assert(false);
+            TIGHTDB_ASSERT(false);
     }
 
     return;
@@ -173,12 +173,12 @@ void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end
 
 bool VerifiedInteger::Verify(void)
 {
-    assert(u.Size() == v.size());
+    TIGHTDB_ASSERT(u.Size() == v.size());
     if (u.Size() != v.size())
         return false;
 
     for(size_t t = 0; t < v.size(); ++t) {
-        assert(v[t] == u.Get(t));
+        TIGHTDB_ASSERT(v[t] == u.Get(t));
         if (v[t] != u.Get(t))
             return false;
     }

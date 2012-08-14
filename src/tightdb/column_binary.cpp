@@ -1,8 +1,11 @@
-#include "column_binary.hpp"
+#include <algorithm>
+
+#include <tightdb/column_binary.hpp>
+
+using namespace std;
+using namespace tightdb;
 
 namespace {
-
-using namespace tightdb;
 
 bool IsNodeFromRef(size_t ref, Allocator& alloc)
 {
@@ -12,7 +15,7 @@ bool IsNodeFromRef(size_t ref, Allocator& alloc)
     return isNode;
 }
 
-}
+} // anonymous namespace
 
 
 namespace tightdb {
@@ -47,7 +50,7 @@ void ColumnBinary::Destroy()
 
 void ColumnBinary::UpdateRef(size_t ref)
 {
-    assert(IsNodeFromRef(ref, m_array->GetAllocator())); // Can only be called when creating node
+    TIGHTDB_ASSERT(IsNodeFromRef(ref, m_array->GetAllocator())); // Can only be called when creating node
 
     if (IsNode()) m_array->UpdateRef(ref);
     else {
@@ -108,33 +111,33 @@ void ColumnBinary::Clear()
 
 BinaryData ColumnBinary::Get(size_t ndx) const
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
     return TreeGet<BinaryData,ColumnBinary>(ndx);
 }
 
 const char* ColumnBinary::GetData(size_t ndx) const
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
     const BinaryData bin = TreeGet<BinaryData,ColumnBinary>(ndx);
     return bin.pointer;
 }
 
 size_t ColumnBinary::GetLen(size_t ndx) const
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
     const BinaryData bin = TreeGet<BinaryData,ColumnBinary>(ndx);
     return bin.len;
 }
 
 void ColumnBinary::Set(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
     Set(ndx, BinaryData(value, len));
 }
 
 bool ColumnBinary::Set(size_t ndx, BinaryData bin)
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
     return TreeSet<BinaryData,ColumnBinary>(ndx, bin);
 }
 
@@ -150,27 +153,39 @@ bool ColumnBinary::add(BinaryData bin)
 
 void ColumnBinary::Insert(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= Size());
     Insert(ndx, BinaryData(value, len));
 }
 
 bool ColumnBinary::Insert(size_t ndx, BinaryData bin)
 {
-    assert(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= Size());
     return TreeInsert<BinaryData,ColumnBinary>(ndx, bin);
 }
 
 void ColumnBinary::Delete(size_t ndx)
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
     TreeDelete<BinaryData,ColumnBinary>(ndx);
 }
 
 void ColumnBinary::Resize(size_t ndx)
 {
-    assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
+    TIGHTDB_ASSERT(ndx < Size());
     ((ArrayBinary*)m_array)->Resize(ndx);
+}
+
+bool ColumnBinary::Compare(const ColumnBinary& c) const
+{
+    const size_t n = Size();
+    if (c.Size() != n) return false;
+    for (size_t i=0; i<n; ++i) {
+        const BinaryData d1 = Get(i);
+        const BinaryData d2 = c.Get(i);
+        if (d1.len != d2.len || !equal(d1.pointer, d1.pointer+d1.len, d2.pointer)) return false;
+    }
+    return true;
 }
 
 BinaryData ColumnBinary::LeafGet(size_t ndx) const
@@ -196,7 +211,7 @@ void ColumnBinary::LeafDelete(size_t ndx)
     ((ArrayBinary*)m_array)->Delete(ndx);
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void ColumnBinary::LeafToDot(std::ostream& out, const Array& array) const
 {
@@ -207,6 +222,6 @@ void ColumnBinary::LeafToDot(std::ostream& out, const Array& array) const
     binarray.ToDot(out);
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

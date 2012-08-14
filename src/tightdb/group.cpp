@@ -1,9 +1,9 @@
-#include "group.hpp"
-#include <assert.h>
 #include <new>
 #include <iostream>
 #include <fstream>
-#include "group_writer.hpp"
+
+#include <tightdb/group_writer.hpp>
+#include <tightdb/group.hpp>
 
 using namespace std;
 
@@ -90,7 +90,7 @@ Group::Group(const char* filename, int mode):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(mode), m_isValid(false)
 {
-    assert(filename);
+    TIGHTDB_ASSERT(filename);
 
     // Memory map file
     const bool readOnly = mode & GROUP_READONLY;
@@ -110,7 +110,7 @@ Group::Group(const char* buffer, size_t len):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
 {
-    assert(buffer);
+    TIGHTDB_ASSERT(buffer);
 
     // Memory map file
     m_isValid = m_alloc.SetSharedBuffer(buffer, len);
@@ -120,7 +120,7 @@ Group::Group(const char* buffer, size_t len):
 
 void Group::create()
 {
-    m_tables.SetType(COLUMN_HASREFS);
+    m_tables.SetType(COLUMN_HASREFS); // FIXME: Why is this not done in Group() like the rest of the arrays?
 
     m_top.add(m_tableNames.GetRef());
     m_top.add(m_tables.GetRef());
@@ -166,7 +166,7 @@ void Group::create_from_ref()
     else {
         m_top.UpdateRef(top_ref);
         const size_t top_size = m_top.Size();
-        assert(top_size >= 2);
+        TIGHTDB_ASSERT(top_size >= 2);
 
         const size_t n_ref = m_top.Get(0);
         const size_t t_ref = m_top.Get(1);
@@ -233,7 +233,7 @@ void Group::init_shared() {
 
 void Group::reset_to_new()
 {
-    assert(m_alloc.GetTopRef() == 0);
+    TIGHTDB_ASSERT(m_alloc.GetTopRef() == 0);
     if (!m_top.IsValid()) return; // already in new state
 
     // A shared group that has just been created and not yet
@@ -258,10 +258,13 @@ void Group::reset_to_new()
 
 void Group::rollback()
 {
-    assert(is_shared());
+    TIGHTDB_ASSERT(is_shared());
+
+    // FIXME: I (Kristian) had to add this to avoid double deallocation in ~Group(), but is this the right fix? Alexander?
+    invalidate();
 
     // Clear all changes made during transaction
-    m_alloc.FreeAll();
+//    m_alloc.FreeAll(); FIXME: Not needed if we keep the call to invalidate() above.
 }
 
 Group::~Group()
@@ -274,6 +277,32 @@ Group::~Group()
     }
 
     m_cachedtables.Destroy();
+}
+
+void Group::invalidate()
+{
+    //TODO: Should only invalidate object wrappers and never
+    // touch the unferlying data (that may no longer be valid)
+    clear_cache();
+
+    m_top.Invalidate();
+    m_tables.Invalidate();
+    m_tableNames.Invalidate();
+    m_freePositions.Invalidate();
+    m_freeLengths.Invalidate();
+    m_freeVersions.Invalidate();
+
+    // FIXME: I (Kristian) had to add these to avoid a problem when resurrecting the arrays in create_from_ref() (top_ref==0). The problem is that if the parent is left as non-null, then Array::Alloc() will attempt to update the parent array, but the parent array is still empty at that point. I don't, however, think this is a sufficiently good fix? Alexander?
+    m_tables.SetParent(0,0);
+    m_tableNames.SetParent(0,0);
+    m_freePositions.SetParent(0,0);
+    m_freeLengths.SetParent(0,0);
+    m_freeVersions.SetParent(0,0);
+
+    // Reads may allocate some temproary state that we have
+    // to clean up
+    // TODO: This is also done in commit(), fix to do it only once
+    m_alloc.FreeAll();
 }
 
 bool Group::is_empty() const
@@ -297,24 +326,16 @@ size_t Group::get_table_count() const
 
 const char* Group::get_table_name(size_t table_ndx) const
 {
-    assert(m_top.IsValid());
-    assert(table_ndx < m_tableNames.Size());
+    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(table_ndx < m_tableNames.Size());
 
     return m_tableNames.Get(table_ndx);
 }
 
-bool Group::has_table(const char* name) const
-{
-    if (!m_top.IsValid()) return false;
-
-    const size_t n = m_tableNames.find_first(name);
-    return (n != size_t(-1));
-}
-
 Table* Group::get_table_ptr(size_t ndx)
 {
-    assert(m_top.IsValid());
-    assert(ndx < m_tables.Size());
+    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(ndx < m_tables.Size());
 
     // Get table from cache if exists, else create
     Table* table = reinterpret_cast<Table*>(m_cachedtables.Get(ndx));
@@ -365,8 +386,8 @@ Table* Group::create_new_table(const char* name)
 
 bool Group::write(const char* filepath)
 {
-    assert(filepath);
-    assert(m_top.IsValid());
+    TIGHTDB_ASSERT(filepath);
+    TIGHTDB_ASSERT(m_top.IsValid());
 
     FileOStream out(filepath);
     if (!out.is_valid()) return false;
@@ -378,7 +399,7 @@ bool Group::write(const char* filepath)
 
 char* Group::write_to_mem(size_t& len)
 {
-    assert(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.IsValid());
 
     // Get max possible size of buffer
     const size_t max_size = m_alloc.GetTotalSize();
@@ -397,8 +418,8 @@ bool Group::commit()
 
 bool Group::commit(size_t current_version, size_t readlock_version)
 {
-    assert(m_top.IsValid());
-    assert(readlock_version <= current_version);
+    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(readlock_version <= current_version);
 
     if (!m_alloc.CanPersist()) return false;
 
@@ -414,7 +435,19 @@ bool Group::commit(size_t current_version, size_t readlock_version)
     }
 
     // Recursively write all changed arrays to end of file
-    out.Commit();
+    const size_t top_pos = out.Commit();
+
+    // If the group is persisiting in single-thread (un-shared) mode
+    // we have to make sure that the group stays valid after commit
+    if (!is_shared()) {
+        // Recusively update refs in all active tables (columns, arrays..)
+        update_refs(top_pos);
+    }
+    else {
+        TIGHTDB_ASSERT(m_alloc.IsAllFree());
+        invalidate();
+        TIGHTDB_ASSERT(m_alloc.IsAllFree());
+    }
 
     return true;
 }
@@ -423,7 +456,7 @@ void Group::update_refs(size_t topRef)
 {
     // Update top with the new (persistent) ref
     m_top.UpdateRef(topRef);
-    assert(m_top.Size() >= 2);
+    TIGHTDB_ASSERT(m_top.Size() >= 2);
 
     // Now we can update it's child arrays
     m_tableNames.UpdateFromParent();
@@ -461,24 +494,24 @@ void Group::update_refs(size_t topRef)
 
 void Group::update_from_shared(size_t top_ref, size_t len)
 {
-    if (top_ref == 0) return; // just created
-
     // Update memory mapping if needed
     const bool isRemapped = m_alloc.ReMap(len);
 
-    // If the top has not changed, everything is up-to-date
-    if (!isRemapped && top_ref == m_top.GetRef()) return;
-
     // If our last look at the file was when it
     // was empty, we may have to re-create the group
-    if (in_inital_state()) {
+    if (in_inital_state() || top_ref == 0) {
+        if (top_ref == 0)
+            reset_to_new();    // may have been a rollback
         create_from_ref();
         return;
     }
 
+    // If the top has not changed, everything is up-to-date
+    if (!isRemapped && top_ref == m_top.GetRef()) return;
+
     // Update group arrays
     m_top.UpdateRef(top_ref);
-    assert(m_top.Size() >= 2);
+    TIGHTDB_ASSERT(m_top.Size() >= 2);
     const bool nameschanged = !m_tableNames.UpdateFromParent();
     m_tables.UpdateFromParent();
     if (m_top.Size() > 2) {
@@ -514,24 +547,36 @@ void Group::update_from_shared(size_t top_ref, size_t len)
     }
 }
 
+bool Group::operator==(const Group& g) const
+{
+    const size_t n = get_table_count();
+    if (n != g.get_table_count()) return false;
+    for (size_t i=0; i<n; ++i) {
+        const Table* t1 = get_table_ptr(i);
+        const Table* t2 = g.get_table_ptr(i);
+        if (*t1 != *t2) return false;
+    }
+    return true;
+}
 
-#ifdef _DEBUG
 
-void Group::Verify()
+#ifdef TIGHTDB_DEBUG
+
+void Group::Verify() const
 {
     // Verify free lists
     if (m_freePositions.IsValid()) {
-        assert(m_freeLengths.IsValid());
+        TIGHTDB_ASSERT(m_freeLengths.IsValid());
 
         const size_t count_p = m_freePositions.Size();
         const size_t count_l = m_freeLengths.Size();
-        assert(count_p == count_l);
+        TIGHTDB_ASSERT(count_p == count_l);
 
         for (size_t i = 0; i < count_p; ++i) {
             const size_t p = m_freePositions.Get(i);
             const size_t l = m_freeLengths.Get(i);
-            assert((p & 0x7) == 0); // 64bit alignment
-            assert((l & 0x7) == 0); // 64bit alignment
+            TIGHTDB_ASSERT((p & 0x7) == 0); // 64bit alignment
+            TIGHTDB_ASSERT((l & 0x7) == 0); // 64bit alignment
         }
     }
 
@@ -638,6 +683,6 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
 #endif
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 } //namespace tightdb

@@ -12,6 +12,9 @@ uninstall: SUBDIRS_MODE = uninstall
 uninstall: all
 .PHONY: uninstall
 
+bindist: all
+	(dir="`mktemp -d /tmp/temp.XXXX`"; name="tightdb-`git describe`"; mkdir "$$dir/$$name"; tar czf "$$dir/tightdb.tar.gz" src/tightdb/*.h src/tightdb/*.hpp src/tightdb/libtightdb* src/tightdb/Makefile src/*.hpp src/Makefile config.mk Makefile; (cd "$$dir/$$name"; tar xf "$$dir/tightdb.tar.gz"; cd ..; tar czf "$$name.tar.gz" "$$name/"); cp "$$dir/$$name.tar.gz" .)
+
 # Build optimized shared library
 shared: SUBDIRS_MODE = shared
 shared: all

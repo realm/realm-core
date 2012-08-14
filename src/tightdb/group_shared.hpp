@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_GROUP_SHARED_HPP
 #define TIGHTDB_GROUP_SHARED_HPP
 
-#include "group.hpp"
+#include <tightdb/group.hpp>
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #include <tightdb/replication.hpp>
@@ -74,7 +74,7 @@ public:
     void commit();
     void rollback();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void test_ringbuf();
     void zero_free_space();
 #endif
@@ -101,7 +101,9 @@ private:
     int         m_fd;
     const char* m_lockfile_path;
 
-#ifdef _DEBUG
+    void init(const char* path_to_database_file);
+
+#ifdef TIGHTDB_DEBUG
     // In debug mode we want to track state
     enum SharedState {
         SHARED_STATE_READY,
@@ -114,8 +116,6 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication m_replication;
 #endif
-
-    void init(const char* path_to_database_file);
 };
 
 } // namespace tightdb

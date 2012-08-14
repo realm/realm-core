@@ -1,19 +1,18 @@
-#include <cassert>
 #include <vector>
 #include <iostream>
 #include <iomanip>
-#include "array.hpp"
-#include "column.hpp"
-#include "utilities.hpp"
-#include "query_conditions.hpp"
-#include "static_assert.hpp"
-#include "column_string.hpp"
 
 #ifdef _MSC_VER
     #include <intrin.h>
     #include <win32/types.h>
     #pragma warning (disable : 4127) // Condition is constant warning
 #endif
+
+#include <tightdb/array.hpp>
+#include <tightdb/column.hpp>
+#include <tightdb/utilities.hpp>
+#include <tightdb/query_conditions.hpp>
+#include <tightdb/column_string.hpp>
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
@@ -25,15 +24,9 @@
 	#define PTR_64
 #endif
 
-
-//using namespace std;
-
-
 namespace {
 
-
 const size_t initial_capacity = 128;
-
 
 inline void set_header_isnode(bool value, void* header)
 {
@@ -63,7 +56,7 @@ inline void set_header_width(size_t value, void* header)
     size_t w = 0;
     size_t b = size_t(value);
     while (b) {++w; b >>= 1;}
-    assert(w < 8);
+    TIGHTDB_ASSERT(w < 8);
 
     uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
     header2[0] = (header2[0] & ~0x7) | uint8_t(w);
@@ -71,7 +64,7 @@ inline void set_header_width(size_t value, void* header)
 
 inline void set_header_len(size_t value, void* header)
 {
-    assert(value <= 0xFFFFFF);
+    TIGHTDB_ASSERT(value <= 0xFFFFFF);
     uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
     header2[1] = (value >> 16) & 0x000000FF;
     header2[2] = (value >>  8) & 0x000000FF;
@@ -80,7 +73,7 @@ inline void set_header_len(size_t value, void* header)
 
 inline void set_header_capacity(size_t value, void* header)
 {
-    assert(value <= 0xFFFFFF);
+    TIGHTDB_ASSERT(value <= 0xFFFFFF);
     uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
     header2[4] = (value >> 16) & 0x000000FF;
     header2[5] = (value >>  8) & 0x000000FF;
@@ -192,12 +185,13 @@ size_t Array::get_header_capacity(const void* header) const
 
 void Array::init_from_ref(size_t ref)
 {
-    assert(ref);
+    TIGHTDB_ASSERT(ref);
     uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
     CreateFromHeader(header, ref);
 }
 
-void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref) {
+void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref)
+{
     // Parse header
     // We only need limited info for direct read-only use
     m_width    = get_header_width(header);
@@ -209,7 +203,8 @@ void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref) {
     SetWidth(m_width);
 }
 
-void Array::CreateFromHeader(uint8_t* header, size_t ref) {
+void Array::CreateFromHeader(uint8_t* header, size_t ref)
+{
     // Parse header
     m_isNode   = get_header_isnode(header);
     m_hasRefs  = get_header_hasrefs(header);
@@ -235,14 +230,16 @@ void Array::SetType(ColumnDef type)
         m_ref = 0;
         m_capacity = 0;
         m_len = 0;
-        m_width = (size_t)-1;
+        m_width = size_t(-1);
     }
 
     if (m_ref) CopyOnWrite();
 
-    if (type == COLUMN_NODE) m_isNode = m_hasRefs = true;
-    else if (type == COLUMN_HASREFS)    m_hasRefs = true;
-    else m_isNode = m_hasRefs = false;
+    bool is_node = false, has_refs = false;
+    if (type == COLUMN_NODE) is_node = has_refs = true;
+    else if (type == COLUMN_HASREFS) has_refs = true;
+    m_isNode  = is_node;
+    m_hasRefs = has_refs;
 
     if (!m_data) {
         // Create array
@@ -251,8 +248,8 @@ void Array::SetType(ColumnDef type)
     }
     else {
         // Update Header
-        set_header_isnode(m_isNode);
-        set_header_hasrefs(m_hasRefs);
+        set_header_isnode(is_node);
+        set_header_hasrefs(has_refs);
     }
 }
 
@@ -267,7 +264,8 @@ void Array::UpdateRef(size_t ref)
     update_ref_in_parent();
 }
 
-bool Array::UpdateFromParent() {
+bool Array::UpdateFromParent()
+{
     if (!m_parent) return false;
 
     // After commit to disk, the array may have moved
@@ -316,7 +314,7 @@ void Array::Preset(size_t bitwidth, size_t count)
 {
     Clear();
     SetWidth(bitwidth);
-    assert(Alloc(count, bitwidth));
+    TIGHTDB_ASSERT(Alloc(count, bitwidth));
     m_len = count;
     for(size_t n = 0; n < count; n++)
         Set(n, 0);
@@ -336,19 +334,19 @@ void Array::SetParent(ArrayParent *parent, size_t pndx)
 
 Array Array::GetSubArray(size_t ndx)
 {
-    assert(ndx < m_len);
-    assert(m_hasRefs);
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(m_hasRefs);
 
     const size_t ref = (size_t)Get(ndx);
-    assert(ref);
+    TIGHTDB_ASSERT(ref);
 
     return Array(ref, this, ndx, m_alloc);
 }
 
 const Array Array::GetSubArray(size_t ndx) const
 {
-    assert(ndx < m_len);
-    assert(m_hasRefs);
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(m_hasRefs);
 
     return Array(size_t(Get(ndx)), const_cast<Array *>(this), ndx, m_alloc);
 }
@@ -406,7 +404,7 @@ void Array::Clear()
 
 void Array::Delete(size_t ndx)
 {
-    assert(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
     CopyOnWrite();
@@ -472,7 +470,7 @@ template<size_t w> int64_t Array::GetUniversal(const char* const data, const siz
 
 int64_t Array::Get(size_t ndx) const
 {
-    assert(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_len);
     return (this->*m_getter)(ndx);
 
 // Two ideas that are not efficient but may be worth looking into again:
@@ -494,21 +492,21 @@ int64_t Array::Get(size_t ndx) const
 
 size_t Array::GetAsRef(size_t ndx) const
 {
-    assert(ndx < m_len);
-    assert(m_hasRefs);
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(m_hasRefs);
     const int64_t v = Get(ndx);
     return TO_REF(v);
 }
 
 int64_t Array::back() const
 {
-    assert(m_len);
+    TIGHTDB_ASSERT(m_len);
     return Get(m_len-1);
 }
 
 bool Array::Set(size_t ndx, int64_t value)
 {
-    assert(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
     if (!CopyOnWrite()) return false;
@@ -545,8 +543,8 @@ bool Array::Set(size_t ndx, int64_t value)
 // lot when returning results to TableViews)
 bool Array::AddPositiveLocal(int64_t value)
 {
-    assert(value >= 0);
-    assert(&m_alloc == &GetDefaultAllocator());
+    TIGHTDB_ASSERT(value >= 0);
+    TIGHTDB_ASSERT(&m_alloc == &GetDefaultAllocator());
 
     if (value <= m_ubound) {
         if (m_len < m_capacity) {
@@ -562,7 +560,7 @@ bool Array::AddPositiveLocal(int64_t value)
 
 bool Array::Insert(size_t ndx, int64_t value)
 {
-    assert(ndx <= m_len);
+    TIGHTDB_ASSERT(ndx <= m_len);
 
     // Check if we need to copy before modifying
     if (!CopyOnWrite()) return false;
@@ -628,7 +626,7 @@ bool Array::add(int64_t value)
 
 void Array::Resize(size_t count)
 {
-    assert(count <= m_len);
+    TIGHTDB_ASSERT(count <= m_len);
 
     CopyOnWrite();
 
@@ -651,8 +649,8 @@ void Array::SetAllToZero()
 bool Array::Increment(int64_t value, size_t start, size_t end)
 {
     if (end == (size_t)-1) end = m_len;
-    assert(start < m_len);
-    assert(end >= start && end <= m_len);
+    TIGHTDB_ASSERT(start < m_len);
+    TIGHTDB_ASSERT(end >= start && end <= m_len);
 
     // Increment range
     for (size_t i = start; i < end; ++i) {
@@ -673,7 +671,7 @@ bool Array::IncrementIf(int64_t limit, int64_t value)
 
 void Array::Adjust(size_t start, int64_t diff)
 {
-    assert(start <= m_len);
+    TIGHTDB_ASSERT(start <= m_len);
 
     for (size_t i = start; i < m_len; ++i) {
         const int64_t v = Get(i);
@@ -882,7 +880,8 @@ template <bool gt, size_t width, bool accumulate>size_t Array::FindGTLT_Limited(
             return t;
         p++;
     }
-    return -1;
+
+        TIGHTDB_ASSERT(false);
 }
 
 
@@ -1308,7 +1307,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
 {
 #if 1
     if (end == (size_t)-1) end = m_len;
-    assert(start < m_len && end <= m_len && start < end);
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     TEMPEX3(find, COND_EQUAL, true, m_width, (value, start, end, colOffset, &result));
 
@@ -1430,7 +1429,7 @@ template <> size_t Array::Query<LESS>(int64_t value, size_t start, size_t end)
 template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
 { 
     if (end == (size_t)-1) end = m_len;
-    assert(start < m_len && end <= m_len && start < end);
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     if(w == 0)
         return 0;
@@ -1503,7 +1502,7 @@ int64_t Array::sum(size_t start, size_t end) const
 template <size_t w> int64_t Array::sum(size_t start, size_t end) const
 { 
     if (end == (size_t)-1) end = m_len;
-    assert(start < m_len && end <= m_len && start < end);
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     if(w == 0)
         return 0;
@@ -1653,6 +1652,176 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
     return s;
 }
 
+size_t Array::count(int64_t value) const
+{
+    const uint64_t* const next = (const uint64_t*)m_data;
+    size_t count = 0;
+    const size_t end = m_len;
+    size_t i = 0;
+
+    // staiic values needed for fast population count
+    const uint64_t m1  = 0x5555555555555555ULL;
+    const uint64_t m2  = 0x3333333333333333ULL;
+    const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
+    const uint64_t h01 = 0x0101010101010101ULL;
+
+    if (m_width == 0) {
+        if (value == 0) return m_len;
+        else return 0;
+    }
+    else if (m_width == 1) {
+        if ((uint64_t)value > 1) return 0;
+
+        const size_t chunkvals = 64;
+        for (; i + chunkvals <= end; i += chunkvals) {
+            uint64_t a = next[i / chunkvals];
+            if (value == 0) a = ~a; // reverse
+
+            a -= (a >> 1) & m1;
+            a = (a & m2) + ((a >> 2) & m2);
+            a = (a + (a >> 4)) & m4;
+            a = (a * h01) >> 56;
+
+            // Could use intrinsic instead:
+            // a = __builtin_popcountll(a); // gcc intrinsic
+
+            count += a;
+        }
+    }
+    else if (m_width == 2) {
+        if ((uint64_t)value > 3) return 0;
+
+        const uint64_t v = ~0ULL/0x3 * value;
+
+        // Masks to avoid spillover between segments in cascades
+        const uint64_t c1 = ~0ULL/0x3 * 0x1;
+
+        const size_t chunkvals = 32;
+        for (; i + chunkvals <= end; i += chunkvals) {
+            uint64_t a = next[i / chunkvals];
+            a ^= v;      // zero matching bit segments
+            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
+            a &= m1;     // isolate single bit in each segment
+            a ^= m1;     // reverse isolated bits
+            //if (!a) continue;
+
+            // Population count
+            a = (a & m2) + ((a >> 2) & m2);
+            a = (a + (a >> 4)) & m4;
+            a = (a * h01) >> 56;
+
+            count += a;
+        }
+    }
+    else if (m_width == 4) {
+        if ((uint64_t)value > 15) return 0;
+
+        const uint64_t v  = ~0ULL/0xF * value;
+        const uint64_t m  = ~0ULL/0xF * 0x1;
+
+        // Masks to avoid spillover between segments in cascades
+        const uint64_t c1 = ~0ULL/0xF * 0x7;
+        const uint64_t c2 = ~0ULL/0xF * 0x3;
+
+        const size_t chunkvals = 16;
+        for (; i + chunkvals <= end; i += chunkvals) {
+            uint64_t a = next[i / chunkvals];
+            a ^= v;      // zero matching bit segments
+            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
+            a |= (a >> 2) & c2;
+            a &= m;     // isolate single bit in each segment
+            a ^= m;     // reverse isolated bits
+
+            // Population count
+            a = (a + (a >> 4)) & m4;
+            a = (a * h01) >> 56;
+
+            count += a;
+        }
+    }
+    else if (m_width == 8) {
+        if (value > 0x7FLL || value < -0x80LL) return 0; // by casting?
+
+        const uint64_t v  = ~0ULL/0xFF * value;
+        const uint64_t m  = ~0ULL/0xFF * 0x1;
+
+        // Masks to avoid spillover between segments in cascades
+        const uint64_t c1 = ~0ULL/0xFF * 0x7F;
+        const uint64_t c2 = ~0ULL/0xFF * 0x3F;
+        const uint64_t c3 = ~0ULL/0xFF * 0x0F;
+
+        const size_t chunkvals = 8;
+        for (; i + chunkvals <= end; i += chunkvals) {
+            uint64_t a = next[i / chunkvals];
+            a ^= v;      // zero matching bit segments
+            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
+            a |= (a >> 2) & c2;
+            a |= (a >> 4) & c3;
+            a &= m;     // isolate single bit in each segment
+            a ^= m;     // reverse isolated bits
+
+            // Population count
+            a = (a * h01) >> 56;
+
+            count += a;
+        }
+    }
+    else if (m_width == 16) {
+        if (value > 0x7FFFLL || value < -0x8000LL) return 0; // by casting?
+
+        const uint64_t v  = ~0ULL/0xFFFF * value;
+        const uint64_t m  = ~0ULL/0xFFFF * 0x1;
+
+        // Masks to avoid spillover between segments in cascades
+        const uint64_t c1 = ~0ULL/0xFFFF * 0x7FFF;
+        const uint64_t c2 = ~0ULL/0xFFFF * 0x3FFF;
+        const uint64_t c3 = ~0ULL/0xFFFF * 0x0FFF;
+        const uint64_t c4 = ~0ULL/0xFFFF * 0x00FF;
+
+        const size_t chunkvals = 4;
+        for (; i + chunkvals <= end; i += chunkvals) {
+            uint64_t a = next[i / chunkvals];
+            a ^= v;      // zero matching bit segments
+            a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
+            a |= (a >> 2) & c2;
+            a |= (a >> 4) & c3;
+            a |= (a >> 8) & c4;
+            a &= m;     // isolate single bit in each segment
+            a ^= m;     // reverse isolated bits
+
+            // Population count
+            a = (a * h01) >> 56;
+
+            count += a;
+        }
+    }
+    else if (m_width == 32) {
+        const int32_t v = (int32_t)value;
+        const int32_t* const d = (const int32_t*)m_data;
+        for (; i < end; ++i) {
+            if (d[i] == v)
+                ++count;
+        }
+        return count;
+    }
+    else if (m_width == 64) {
+        const int64_t* const d = (const int64_t*)m_data;
+        for (; i < end; ++i) {
+            if (d[i] == value)
+                ++count;
+        }
+        return count;
+    }
+
+    // Sum remainding elements
+    for(; i < end; ++i)
+        if (value == Get(i))
+            ++count;
+
+    return count;
+}
+
+
 void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const
 {
     (void)result;
@@ -1661,7 +1830,8 @@ void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t
     (void)offset;
 }
 
-size_t Array::GetByteSize(bool align) const {
+size_t Array::GetByteSize(bool align) const
+{
     size_t len = CalcByteLen(m_len, m_width);
     if (align) {
         const size_t rest = (~len & 0x7)+1;
@@ -1873,7 +2043,7 @@ template <size_t width> void Array::SetWidth(void)
         m_ubound =  0x7FFFFFFFFFFFFFFFLL;
     }
     else {
-        assert(false);
+        TIGHTDB_ASSERT(false);
     }
 
     m_width = width;
@@ -2179,7 +2349,8 @@ void Array::QuickSort(size_t lo, size_t hi)
     TEMPEX(QuickSort, m_width, (lo, hi);)
 }
 
-template<size_t w> void Array::QuickSort(size_t lo, size_t hi) {
+template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
+{
     // Quicksort based on
     // http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
     int i = (int)lo;
@@ -2206,16 +2377,14 @@ template<size_t w> void Array::QuickSort(size_t lo, size_t hi) {
     if (i < (int)hi) QuickSort(i, hi);
 }
 
-std::vector<int64_t> Array::ToVector(void) const {
+std::vector<int64_t> Array::ToVector(void) const
+{
     std::vector<int64_t> v;
     const size_t count = Size();
     for(size_t t = 0; t < count; ++t)
         v.push_back(Get(t));
     return v;
 }
-
-#ifdef _DEBUG
-#include "stdio.h"
 
 bool Array::Compare(const Array& c) const
 {
@@ -2228,26 +2397,29 @@ bool Array::Compare(const Array& c) const
     return true;
 }
 
+
+#ifdef TIGHTDB_DEBUG
+
 void Array::Print() const
 {
-    cout << hex << GetRef() << dec << ": (" << Size() << ") ";
+    std::cout << std::hex << GetRef() << std::dec << ": (" << Size() << ") ";
     for (size_t i = 0; i < Size(); ++i) {
-        if (i) cout << ", ";
-        cout << Get(i);
+        if (i) std::cout << ", ";
+        std::cout << Get(i);
     }
-    cout << "\n";
+    std::cout << "\n";
 }
 
 void Array::Verify() const
 {
-    assert(!IsValid() || (m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
-                          m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64));
+    TIGHTDB_ASSERT(!IsValid() || (m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
+                                  m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64));
 
     // Check that parent is set correctly
     if (!m_parent) return;
 
     const size_t ref_in_parent = m_parent->get_child_ref(m_parentNdx);
-    assert(ref_in_parent == (IsValid() ? m_ref : 0));
+    TIGHTDB_ASSERT(ref_in_parent == (IsValid() ? m_ref : 0));
 }
 
 void Array::ToDot(std::ostream& out, const char* title) const
@@ -2314,12 +2486,11 @@ void Array::Stats(MemStats& stats) const
             sub.Stats(stats);
         }
     }
-
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
-}
+} // namespace tightdb
 
 
 namespace {

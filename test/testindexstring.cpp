@@ -75,7 +75,7 @@ TEST(StringIndex_DeleteAll)
     ndx.Delete(2, s3, true);
     ndx.Delete(1, s2, true);
     ndx.Delete(0, s1, true);
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
 #endif
 
@@ -91,7 +91,7 @@ TEST(StringIndex_DeleteAll)
     ndx.Delete(0, s1);
     ndx.Delete(0, s5);
     ndx.Delete(0, s6);
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
 #endif
 
@@ -146,7 +146,7 @@ TEST(StringIndex_Delete)
     ndx.Delete(0, s1);
     col.Delete(0);
     ndx.Delete(0, s1);
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
 #endif
 

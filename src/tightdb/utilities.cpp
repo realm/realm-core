@@ -1,7 +1,4 @@
-
-#include "utilities.hpp"
 #include <string>
-#include <assert.h>
 #include <cstdlib> // size_t
 #ifndef _MSC_VER
 #include <stdint.h>
@@ -9,15 +6,22 @@
 #include <win32/stdint.h>
 #endif
 
+#include <tightdb/assert.hpp>
+#include <tightdb/utilities.hpp>
+
 namespace tightdb {
 
 size_t TO_REF(int64_t v)
 {
-#if !defined(NDEBUG) && defined(_DEBUG)
-    uint64_t m = (size_t)(-1);
-    assert((uint64_t)v <= m);
+#ifdef TIGHTDB_DEBUG
+    uint64_t m = size_t(-1);
+    TIGHTDB_ASSERT(uint64_t(v) <= m);
+    // FIXME: This misbehaves for negative v when size_t is 64-bits.
+    // FIXME: This misbehaves on architectures that do not use 2's complement represenation of negative numbers.
+    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
+    // FIXME: Must also check that v is divisible by 8 (64-bit aligned).
 #endif
-    return (size_t)v;
+    return size_t(v);
 }
 
 void* round_up(void* p, size_t align)

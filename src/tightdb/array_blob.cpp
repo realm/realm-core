@@ -1,5 +1,4 @@
-#include "array_blob.hpp"
-#include <assert.h>
+#include <tightdb/array_blob.hpp>
 
 namespace tightdb {
 
@@ -42,9 +41,9 @@ void ArrayBlob::Insert(size_t pos, const char* data, size_t len)
 
 void ArrayBlob::Replace(size_t start, size_t end, const char* data, size_t len)
 {
-    assert(start <= end);
-    assert(end <= m_len);
-    assert(len == 0 || data);
+    TIGHTDB_ASSERT(start <= end);
+    TIGHTDB_ASSERT(end <= m_len);
+    TIGHTDB_ASSERT(len == 0 || data);
 
     CopyOnWrite();
 
@@ -74,7 +73,7 @@ void ArrayBlob::Delete(size_t start, size_t end)
 
 void ArrayBlob::Resize(size_t len)
 {
-    assert(len <= m_len);
+    TIGHTDB_ASSERT(len <= m_len);
     Replace(len, m_len, NULL, 0);
 }
 
@@ -93,7 +92,7 @@ size_t ArrayBlob::CalcItemCount(size_t bytes, size_t) const
     return bytes - 8;
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void ArrayBlob::ToDot(std::ostream& out, const char* title) const
 {
@@ -124,6 +123,6 @@ void ArrayBlob::ToDot(std::ostream& out, const char* title) const
     out << std::endl;
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

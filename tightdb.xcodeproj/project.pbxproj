@@ -10,6 +10,10 @@
 		3604595214C97A4E008ACFFD /* testcolumnmixed.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3604595114C97A4E008ACFFD /* testcolumnmixed.cpp */; };
 		360F1A1D146AB3AA00EBB9C6 /* libUnitTest++.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */; };
 		3626F56B14A228850097F17B /* libtightdb.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* libtightdb.a */; };
+		3640797A15AD6674009A3A82 /* error.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3640797915AD6674009A3A82 /* error.cpp */; };
+		3640797F15AD6687009A3A82 /* error.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3640797C15AD6687009A3A82 /* error.hpp */; };
+		3640798015AD6687009A3A82 /* file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3640797D15AD6687009A3A82 /* file.cpp */; };
+		3640798115AD6687009A3A82 /* file.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3640797E15AD6687009A3A82 /* file.hpp */; };
 		3647E10D1420E66B00D56FD7 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DFF314209CE600D56FD7 /* main.cpp */; };
 		3647E10E1420E69400D56FD7 /* testarray.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04A14209CE600D56FD7 /* testarray.cpp */; };
 		3647E10F1420E69400D56FD7 /* testarraystring.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04B14209CE600D56FD7 /* testarraystring.cpp */; };
@@ -146,6 +150,10 @@
 /* Begin PBXFileReference section */
 		3604595114C97A4E008ACFFD /* testcolumnmixed.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testcolumnmixed.cpp; sourceTree = "<group>"; };
 		360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libUnitTest++.a"; path = "test/UnitTest++/libUnitTest++.a"; sourceTree = "<group>"; };
+		3640797915AD6674009A3A82 /* error.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = error.cpp; path = tightdb/error.cpp; sourceTree = "<group>"; };
+		3640797C15AD6687009A3A82 /* error.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = error.hpp; path = tightdb/error.hpp; sourceTree = "<group>"; };
+		3640797D15AD6687009A3A82 /* file.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = file.cpp; path = tightdb/file.cpp; sourceTree = "<group>"; };
+		3640797E15AD6687009A3A82 /* file.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = file.hpp; path = tightdb/file.hpp; sourceTree = "<group>"; };
 		3647DFF314209CE600D56FD7 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		3647DFF414209CE600D56FD7 /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
 		3647DFF514209CE600D56FD7 /* run_tests.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = run_tests.sh; sourceTree = "<group>"; };
@@ -412,6 +420,10 @@
 				365CCE11157CC37D00172BF8 /* column.hpp */,
 				365CCE12157CC37D00172BF8 /* config.h */,
 				365CCE13157CC37D00172BF8 /* date.hpp */,
+				3640797915AD6674009A3A82 /* error.cpp */,
+				3640797C15AD6687009A3A82 /* error.hpp */,
+				3640797D15AD6687009A3A82 /* file.cpp */,
+				3640797E15AD6687009A3A82 /* file.hpp */,
 				365CCE7E157CCB4100172BF8 /* group_shared.cpp */,
 				365CCE7F157CCB4100172BF8 /* group_shared.hpp */,
 				365CCE14157CC37D00172BF8 /* group_writer.cpp */,
@@ -735,6 +747,8 @@
 				365CCE78157CC3A100172BF8 /* tightdb.hpp in Headers */,
 				365CCE81157CCB4100172BF8 /* group_shared.hpp in Headers */,
 				36E67FCB15A2EDDB00D131FB /* index_string.hpp in Headers */,
+				3640797F15AD6687009A3A82 /* error.hpp in Headers */,
+				3640798115AD6687009A3A82 /* file.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -876,6 +890,8 @@
 				365CCE75157CC37D00172BF8 /* utilities.cpp in Sources */,
 				365CCE80157CCB4100172BF8 /* group_shared.cpp in Sources */,
 				36E67FCA15A2EDDB00D131FB /* index_string.cpp in Sources */,
+				3640797A15AD6674009A3A82 /* error.cpp in Sources */,
+				3640798015AD6687009A3A82 /* file.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

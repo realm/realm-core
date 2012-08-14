@@ -106,9 +106,9 @@ TEST(Group_Serialize1)
     table->add("", 30, true, Wed);
     table->add("",  9, true, Wed);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toDisk.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Delete old file if there
     remove("table_test.tbl");
@@ -124,9 +124,9 @@ TEST(Group_Serialize1)
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
-    CHECK(table->compare(*t));
+    CHECK(*table == *t);
 #endif
 
     // Modify both tables
@@ -137,12 +137,12 @@ TEST(Group_Serialize1)
     table->remove(1);
     t->remove(1);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Verify that both changed correctly
-    CHECK(table->compare(*t));
+    CHECK(*table == *t);
     toDisk.Verify();
     fromDisk.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Group_Read1)
@@ -166,9 +166,9 @@ TEST(Group_Serialize2)
     table2->add("hey",  0, true, Tue);
     table2->add("hello", 3232, false, Sun);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toDisk.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Delete old file if there
     remove("table_test.tbl");
@@ -184,13 +184,13 @@ TEST(Group_Serialize2)
     (void)t2;
     (void)t1;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
-    CHECK(table1->compare(*t1));
-    CHECK(table2->compare(*t2));
+    CHECK(*table1 == *t1);
+    CHECK(*table2 == *t2);
     toDisk.Verify();
     fromDisk.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Group_Serialize3)
@@ -201,9 +201,9 @@ TEST(Group_Serialize3)
     table->add("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1",  1, true, Wed);
     table->add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toDisk.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Delete old file if there
     remove("table_test.tbl");
@@ -218,12 +218,12 @@ TEST(Group_Serialize3)
     (void)t;
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
-    CHECK(table->compare(*t));
+    CHECK(*table == *t);
     toDisk.Verify();
     fromDisk.Verify();
-#endif //_DEBUG}
+#endif // TIGHTDB_DEBUG}
 }
 
 TEST(Group_Serialize_Men)
@@ -242,9 +242,9 @@ TEST(Group_Serialize_Men)
     table->add("", 30, true, Wed);
     table->add("",  9, true, Wed);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toMem.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Serialize to memory (we now own the buffer)
     size_t len;
@@ -259,12 +259,28 @@ TEST(Group_Serialize_Men)
     CHECK_EQUAL(10, t->size());
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
-    CHECK(table->compare(*t));
+    CHECK(*table == *t);
     toMem.Verify();
     fromMem.Verify();
 #endif //_DEBUG
+}
+
+TEST(Group_Close)
+{
+    Group *toMem = new Group();
+    TestTableGroup::Ref table = toMem->get_table<TestTableGroup>("test");
+    table->add("",  1, true, Wed);
+    table->add("",  2, true, Wed);
+
+    // Serialize to memory (we now own the buffer)
+    size_t len;
+    const char* const buffer = toMem->write_to_mem(len);
+
+    Group *fromMem = new Group(buffer, len);
+    delete toMem;
+    delete fromMem;
 }
 
 TEST(Group_Serialize_Optimized)
@@ -283,9 +299,9 @@ TEST(Group_Serialize_Optimized)
 
     table->optimize();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toMem.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Serialize to memory (we now own the buffer)
     size_t len;
@@ -299,20 +315,20 @@ TEST(Group_Serialize_Optimized)
     CHECK_EQUAL(4, t->get_column_count());
 
     // Verify that original values are there
-#ifdef _DEBUG
-    CHECK(table->compare(*t));
+#ifdef TIGHTDB_DEBUG
+    CHECK(*table == *t);
 #endif
 
     // Add a row with a known (but unique) value
     table->add("search_target", 9, true, Fri);
 
-    const size_t res = table->cols().first.find_first("search_target");
+    const size_t res = table->column().first.find_first("search_target");
     CHECK_EQUAL(table->size()-1, res);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     toMem.Verify();
     fromMem.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Group_Serialize_All)
@@ -385,9 +401,9 @@ TEST(Group_Persist) {
     // Write changes to file
     db.commit();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     db.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
@@ -406,9 +422,9 @@ TEST(Group_Persist) {
     // Write changes to file
     db.commit();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     db.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
@@ -447,7 +463,7 @@ TEST(Group_Subtable)
             st->set_int(0, 0, 200+i);
         }
         if (i%3 == 1) {
-            table->set_mixed(2, i, Mixed(COLUMN_TYPE_TABLE));
+            table->set_mixed(2, i, Mixed::subtable_tag());
             TableRef st = table->get_subtable(2, i);
             st->add_column(COLUMN_TYPE_INT, "banach");
             st->add_empty_row();
@@ -475,7 +491,7 @@ TEST(Group_Subtable)
             CHECK_EQUAL(st->get_int(0,0), 700+i);
         }
         if (i%8 == 3) {
-            if (i%3 != 1) table->set_mixed(2, i, Mixed(COLUMN_TYPE_TABLE));
+            if (i%3 != 1) table->set_mixed(2, i, Mixed::subtable_tag());
             TableRef st = table->get_subtable(2, i);
             if (i%3 != 1) st->add_column(COLUMN_TYPE_INT, "banach");
             st->add_empty_row();
@@ -558,7 +574,7 @@ TEST(Group_Subtable)
             }
         }
         if (i%7 == 4) {
-            if (i%3 != 1 && i%8 != 3) table2->set_mixed(2, i, Mixed(COLUMN_TYPE_TABLE));
+            if (i%3 != 1 && i%8 != 3) table2->set_mixed(2, i, Mixed::subtable_tag());
             TableRef st = table2->get_subtable(2, i);
             if (i%3 != 1 && i%8 != 3) st->add_column(COLUMN_TYPE_INT, "banach");
             st->add_empty_row();
@@ -686,7 +702,7 @@ TEST(Group_MultiLevelSubtables)
             b->add_empty_row();
         }
         {
-            table->set_mixed(2, 0, Mixed(COLUMN_TYPE_TABLE));
+            table->set_mixed(2, 0, Mixed::subtable_tag());
             TableRef a = table->get_subtable(2, 0);
             {
                 Spec& s = a->get_spec();
@@ -695,7 +711,7 @@ TEST(Group_MultiLevelSubtables)
                 a->update_from_spec();
             }
             a->add_empty_row();
-            a->set_mixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
+            a->set_mixed(1, 0, Mixed::subtable_tag());
             TableRef b = a->get_subtable(1, 0);
             {
                 Spec& s = b->get_spec();
@@ -845,7 +861,7 @@ TEST(Group_InvalidateTables)
 
 
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 #ifdef TIGHTDB_TO_DOT
 
 #include <fstream>
@@ -909,7 +925,7 @@ TEST(Group_ToDot)
                 break;
         }
 
-        table->insert_table(8, i);
+        table->insert_subtable(8, i);
         table->insert_done();
 
         // Add sub-tables
@@ -953,5 +969,5 @@ TEST(Group_ToDot)
 }
 
 #endif //TIGHTDB_TO_DOT
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 #endif

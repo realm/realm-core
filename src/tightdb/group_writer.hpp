@@ -41,12 +41,12 @@ public:
     bool IsValid() const;
     void SetVersions(size_t current, size_t readlock);
 
-    void Commit();
+    size_t Commit();
 
     size_t write(const char* p, size_t n);
     void WriteAt(size_t pos, const char* p, size_t n);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void ZeroFreeSpace();
 #endif
 

@@ -20,8 +20,8 @@
 #ifndef __TDB_INDEX_STRING__
 #define __TDB_INDEX_STRING__
 
-#include "column.hpp"
-#include "column_string.hpp"
+#include <tightdb/column.hpp>
+#include <tightdb/column_string.hpp>
 
 namespace tightdb {
 
@@ -38,9 +38,9 @@ public:
 
     size_t find_first(const char* value) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     bool is_empty() const;
-    void to_dot(std::ostream& out = std::cerr);
+    void to_dot(std::ostream& out);
 #endif
 
 protected:
@@ -60,7 +60,7 @@ protected:
     // Member variables
     const AdaptiveStringColumn& m_column;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
     void ArrayToDot(std::ostream& out, const Array& array) const;
     void KeysToDot(std::ostream& out, const Array& array, const char* title=NULL) const;

@@ -1,9 +1,8 @@
-#include "c-table.h"
-
-#include "lang_bind_helper.hpp"
-#include "query.hpp"
 #include <cstdarg>
-#include <assert.h>
+
+#include <tightdb/lang_bind_helper.hpp>
+#include <tightdb/query.hpp>
+#include <tightdb/c-table.h>
 
 /*
 C1X will be getting support for type generic expressions they look like this:
@@ -40,7 +39,7 @@ Mixed *mixed_new_binary(const char* value, size_t len)
 }
 Mixed *mixed_new_table(void)
 {
-    return new Mixed(tightdb::COLUMN_TYPE_TABLE);
+    return new Mixed(Mixed::subtable_tag());
 }
 void mixed_delete(Mixed *mixed)
 {
@@ -289,7 +288,7 @@ void table_clear_table(Table* t, size_t column_ndx, size_t ndx)
 
 void table_insert_impl(Table* t, size_t ndx, va_list ap)
 {
-    assert(ndx <= t->size());
+    TIGHTDB_ASSERT(ndx <= t->size());
 
     const size_t count = t->get_column_count();
     for (size_t i = 0; i < count; ++i) {
@@ -339,7 +338,7 @@ void table_insert_impl(Table* t, size_t ndx, va_list ap)
             }
             break;
         default:
-            assert(false);
+            TIGHTDB_ASSERT(false);
         }
     }
 
@@ -572,7 +571,7 @@ size_t tableview_find_string(TableView* tv, size_t column_ndx, const char* value
 void tableview_find_all(TableView* tv, size_t column_ndx, int64_t value)
 {
     // ??? waiting for implementation: tv->find_all(*tv, column_ndx, value);
-    assert(0);
+    TIGHTDB_ASSERT(0);
 }
 
 void tableview_find_all_string(TableView* tv, size_t column_ndx, const char *value)

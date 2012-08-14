@@ -5,6 +5,8 @@
 // Does not work for windows yet
 #ifndef _MSC_VER
 
+#include <unistd.h>
+
 using namespace tightdb;
 
 namespace {
@@ -34,7 +36,7 @@ TEST(Shared_Initial)
             shared.end_read();
         }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
         // Also do a basic ringbuffer test
         shared.test_ringbuf();
 #endif
@@ -376,11 +378,6 @@ void* IncrementEntry(void* arg )
         {
             Group& g1 = shared.begin_write();
             TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
-            if (t1->size() < row_id+1) {
-                for (size_t i = t1->size(); i < row_id+1; ++i) {
-                    t1->add(0, 2, false, "test");
-                }
-            }
             t1[row_id].first += 1;
             shared.commit();
         }
@@ -417,7 +414,6 @@ TEST(Shared_WriterThreads)
         const size_t thread_count = 10;
 
         // Create first table in group
-/*
         {
             Group& g1 = shared.begin_write();
             TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
@@ -426,7 +422,6 @@ TEST(Shared_WriterThreads)
             }
             shared.commit();
         }
-*/
 
         pthread_t threads[thread_count];
 
@@ -460,4 +455,180 @@ TEST(Shared_WriterThreads)
     CHECK_EQUAL(-1, rc);
 }
 
-#endif //_MSV_VER
+
+TEST(Shared_FormerErrorCase1)
+{
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock");
+    SharedGroup db("test_shared.tdb");
+    CHECK(db.is_valid());
+    {
+        Group& group = db.begin_write();
+        TableRef table = group.get_table("my_table");
+        {
+            Spec& spec = table->get_spec();
+            spec.add_column(COLUMN_TYPE_INT, "alpha");
+            spec.add_column(COLUMN_TYPE_BOOL, "beta");
+            spec.add_column(COLUMN_TYPE_INT, "gamma");
+            spec.add_column(COLUMN_TYPE_DATE, "delta");
+            spec.add_column(COLUMN_TYPE_STRING, "epsilon");
+            spec.add_column(COLUMN_TYPE_BINARY, "zeta");
+            {
+                Spec subspec = spec.add_subtable_column("eta");
+                subspec.add_column(COLUMN_TYPE_INT, "foo");
+                {
+                    Spec subsubspec = subspec.add_subtable_column("bar");
+                    subsubspec.add_column(COLUMN_TYPE_INT, "value");
+                }
+            }
+            spec.add_column(COLUMN_TYPE_MIXED, "theta");
+        }
+        table->update_from_spec();
+        table->insert_empty_row(0, 1);
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        static_cast<void>(group);
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 1);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 2);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            table2->insert_int(0, 0, 0);
+            table2->insert_subtable(1, 0);
+            table2->insert_done();
+        }
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 3);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 4);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            TableRef table3 = table2->get_subtable(1, 0);
+            table3->insert_empty_row(0, 1);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            TableRef table3 = table2->get_subtable(1, 0);
+            table3->insert_empty_row(1, 1);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            TableRef table3 = table2->get_subtable(1, 0);
+            table3->set_int(0, 0, 0);
+        }
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 5);
+        }
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            table2->set_int(0, 0, 1);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        TableRef table = group.get_table("my_table");
+        table = table->get_subtable(6, 0);
+        table = table->get_subtable(1, 0);
+        table->set_int(0, 1, 1);
+        table = group.get_table("my_table");
+        table->set_int(0, 0, 6);
+        table = group.get_table("my_table");
+        table = table->get_subtable(6, 0);
+        table->set_int(0, 0, 2);
+    }
+    db.commit();
+}
+
+
+
+namespace {
+
+TIGHTDB_TABLE_1(FormerErrorCase2_Subtable,
+                value,  Int)
+
+TIGHTDB_TABLE_1(FormerErrorCase2_Table,
+                bar, Subtable<FormerErrorCase2_Subtable>)
+
+} // namespace
+
+TEST(Shared_FormerErrorCase2)
+{
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock");
+
+    for (int i=0; i<10; ++i) {
+        SharedGroup db("test_shared.tdb");
+        CHECK(db.is_valid());
+        {
+            Group& group = db.begin_write();
+            FormerErrorCase2_Table::Ref table = group.get_table<FormerErrorCase2_Table>("table");
+            table->add();
+            table->add();
+            table->add();
+            table->add();
+            table->add();
+            table->clear();
+            table->add();
+            table[0].bar->add();
+        }
+        db.commit();
+    }
+}
+
+
+#endif // !_MSV_VER

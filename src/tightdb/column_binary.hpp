@@ -20,9 +20,9 @@
 #ifndef TIGHTDB_COLUMN_BINARY_HPP
 #define TIGHTDB_COLUMN_BINARY_HPP
 
-#include "column.hpp"
-#include "binary_data.hpp"
-#include "array_binary.hpp"
+#include <tightdb/column.hpp>
+#include <tightdb/binary_data.hpp>
+#include <tightdb/array_binary.hpp>
 
 namespace tightdb {
 
@@ -63,9 +63,12 @@ public:
     void SetParent(ArrayParent *parent, size_t pndx) {m_array->SetParent(parent, pndx);}
     void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
-#ifdef _DEBUG
+    /// Compare two binary columns for equality.
+    bool Compare(const ColumnBinary&) const;
+
+#ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 protected:
     friend class ColumnBase;
@@ -81,9 +84,9 @@ protected:
     bool LeafInsert(size_t ndx, BinaryData value);
     void LeafDelete(size_t ndx);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 };
 
 

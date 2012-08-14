@@ -21,12 +21,12 @@
 #define TIGHTDB_QUERY_ENGINE_HPP
 
 #include <string>
-#include "table.hpp"
-#include "column_string.hpp"
-#include "column_string_enum.hpp"
 
-#include "utf8.hpp"
-#include "query_conditions.hpp"
+#include <tightdb/table.hpp>
+#include <tightdb/column_string.hpp>
+#include <tightdb/column_string_enum.hpp>
+#include <tightdb/utf8.hpp>
+#include <tightdb/query_conditions.hpp>
 
 namespace tightdb {
 
@@ -120,8 +120,8 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        assert(m_table);
-        assert(m_child);
+        TIGHTDB_ASSERT(m_table);
+        TIGHTDB_ASSERT(m_child);
 
         for (size_t s = start; s < end; ++s) {
             const TableRef subtable = ((Table*)m_table)->get_subtable(m_column, s);
@@ -202,7 +202,7 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        assert(m_table);
+        TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
             // Cache internal leafs
@@ -217,7 +217,7 @@ public:
             // Do search directly on cached leaf array
             s = m_array.Query<F>(m_value, s - m_leaf_start, m_local_end);
 
-            if (s == (size_t)-1) {
+            if (s == not_found) {
                 s = m_leaf_end-1;
                 continue;
             }
@@ -346,7 +346,7 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        assert(m_table);
+        TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
             // todo, can be optimized by placing outside loop

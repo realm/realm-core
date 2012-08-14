@@ -32,7 +32,7 @@
     #include <pthread.h>
 #endif
 
-#include "table_view.hpp"
+#include <tightdb/table_view.hpp>
 
 namespace tightdb {
 
@@ -123,7 +123,7 @@ public:
     ConstTableView FindAllMulti(const Table& table, size_t start=0, size_t end=size_t(-1));
     int            SetThreads(unsigned int threadcount);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     std::string Verify(); // Must be upper case to avoid conflict with macro in ObjC
 #endif
 

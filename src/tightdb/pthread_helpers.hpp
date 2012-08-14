@@ -20,10 +20,10 @@
 #ifndef TIGHTDB_PTHREAD_HELPERS_HPP
 #define TIGHTDB_PTHREAD_HELPERS_HPP
 
-#include <cassert>
 #include <cerrno>
 #include <pthread.h>
 
+#include <tightdb/assert.hpp>
 #include <tightdb/error.hpp>
 #include <tightdb/terminate.hpp>
 
@@ -55,10 +55,10 @@ struct Mutex {
             else return ERROR_OTHER;
         }
         r = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-        assert(r == 0);
+        TIGHTDB_ASSERT(r == 0);
         r = pthread_mutex_init(&m_impl, &attr);
         int r2 = pthread_mutexattr_destroy(&attr);
-        assert(r2 == 0);
+        TIGHTDB_ASSERT(r2 == 0);
         static_cast<void>(r2);
         if (r != 0) {
             switch (r) {
@@ -101,7 +101,7 @@ struct LockGuard {
     ~LockGuard()
     {
         int r = pthread_mutex_unlock(&m_mutex.m_impl);
-        assert(r == 0);
+        TIGHTDB_ASSERT(r == 0);
         static_cast<void>(r);
     }
 
@@ -122,7 +122,7 @@ struct Condition {
     void notify_all()
     {
         int r = pthread_cond_broadcast(&m_impl);
-        assert(r == 0);
+        TIGHTDB_ASSERT(r == 0);
         static_cast<void>(r);
     }
 
@@ -154,10 +154,10 @@ struct Condition {
             else return ERROR_OTHER;
         }
         r = pthread_condattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-        assert(r == 0);
+        TIGHTDB_ASSERT(r == 0);
         r = pthread_cond_init(&m_impl, &attr);
         int r2 = pthread_condattr_destroy(&attr);
-        assert(r2 == 0);
+        TIGHTDB_ASSERT(r2 == 0);
         static_cast<void>(r2);
         if (r != 0) {
             switch (r) {

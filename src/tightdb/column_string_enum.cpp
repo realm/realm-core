@@ -1,4 +1,4 @@
-#include "column_string_enum.hpp"
+#include <tightdb/column_string_enum.hpp>
 
 namespace tightdb {
 
@@ -38,7 +38,7 @@ bool ColumnStringEnum::is_empty() const
 
 const char* ColumnStringEnum::Get(size_t ndx) const
 {
-    assert(ndx < Column::Size());
+    TIGHTDB_ASSERT(ndx < Column::Size());
     const size_t key_ndx = Column::GetAsRef(ndx);
     return m_keys.Get(key_ndx);
 }
@@ -50,8 +50,8 @@ bool ColumnStringEnum::add(const char* value)
 
 bool ColumnStringEnum::Set(size_t ndx, const char* value)
 {
-    assert(ndx < Column::Size());
-    assert(value);
+    TIGHTDB_ASSERT(ndx < Column::Size());
+    TIGHTDB_ASSERT(value);
 
     const size_t key_ndx = GetKeyNdxOrAdd(value);
     return Column::Set(ndx, key_ndx);
@@ -59,8 +59,8 @@ bool ColumnStringEnum::Set(size_t ndx, const char* value)
 
 bool ColumnStringEnum::Insert(size_t ndx, const char* value)
 {
-    assert(ndx <= Column::Size());
-    assert(value);
+    TIGHTDB_ASSERT(ndx <= Column::Size());
+    TIGHTDB_ASSERT(value);
 
     const size_t key_ndx = GetKeyNdxOrAdd(value);
     return Column::Insert(ndx, key_ndx);
@@ -68,7 +68,7 @@ bool ColumnStringEnum::Insert(size_t ndx, const char* value)
 
 void ColumnStringEnum::Delete(size_t ndx)
 {
-    assert(ndx < Column::Size());
+    TIGHTDB_ASSERT(ndx < Column::Size());
     Column::Delete(ndx);
 }
 
@@ -128,20 +128,20 @@ size_t ColumnStringEnum::GetKeyNdxOrAdd(const char* value)
     }
 }
 
-#ifdef _DEBUG
-
 bool ColumnStringEnum::Compare(const ColumnStringEnum& c) const
 {
-    if (c.Size() != Size()) return false;
-
-    for (size_t i = 0; i < Size(); ++i) {
+    const size_t n = Size();
+    if (c.Size() != n) return false;
+    for (size_t i=0; i<n; ++i) {
         const char* s1 = Get(i);
         const char* s2 = c.Get(i);
         if (strcmp(s1, s2) != 0) return false;
     }
-
     return true;
 }
+
+
+#ifdef TIGHTDB_DEBUG
 
 void ColumnStringEnum::Verify() const
 {
@@ -164,6 +164,6 @@ void ColumnStringEnum::ToDot(std::ostream& out, const char* title) const
     out << "}" << std::endl;
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

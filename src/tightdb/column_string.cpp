@@ -1,14 +1,12 @@
 #include <cstdlib>
-#include <cassert>
-#include <assert.h>
 #include <cstring>
 #include <cstdio> // debug
-#include "query_conditions.hpp"
 #ifdef _MSC_VER
     #include <win32\types.h>
 #endif
 
-#include "column_string.hpp"
+#include <tightdb/query_conditions.hpp>
+#include <tightdb/column_string.hpp>
 
 namespace {
 
@@ -66,7 +64,7 @@ void AdaptiveStringColumn::Destroy()
 
 void AdaptiveStringColumn::UpdateRef(size_t ref)
 {
-    assert(GetTypeFromArray(ref, m_array->GetAllocator()) == COLUMN_NODE); // Can only be called when creating node
+    TIGHTDB_ASSERT(GetTypeFromArray(ref, m_array->GetAllocator()) == COLUMN_NODE); // Can only be called when creating node
 
     if (IsNode()) m_array->UpdateRef(ref);
     else {
@@ -129,7 +127,7 @@ void AdaptiveStringColumn::Clear()
 
 void AdaptiveStringColumn::Resize(size_t ndx)
 {
-    assert(!IsNode()); // currently only available on leaf level (used by b-tree code)
+    TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
 
     if (IsLongStrings()) {
         ((ArrayStringLong*)m_array)->Resize(ndx);
@@ -140,14 +138,14 @@ void AdaptiveStringColumn::Resize(size_t ndx)
 
 const char* AdaptiveStringColumn::Get(size_t ndx) const
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
     return m_array->ColumnStringGet(ndx);
     //return TreeGet<const char*, AdaptiveStringColumn>(ndx);
 }
 
 bool AdaptiveStringColumn::Set(size_t ndx, const char* value)
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
     return TreeSet<const char*, AdaptiveStringColumn>(ndx, value);
 }
 
@@ -158,26 +156,26 @@ bool AdaptiveStringColumn::add(const char* value)
 
 bool AdaptiveStringColumn::Insert(size_t ndx, const char* value)
 {
-    assert(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= Size());
     return TreeInsert<const char*, AdaptiveStringColumn>(ndx, value);
 }
 
 void AdaptiveStringColumn::Delete(size_t ndx)
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
     TreeDelete<const char*, AdaptiveStringColumn>(ndx);
 }
 
 size_t AdaptiveStringColumn::find_first(const char* value, size_t start, size_t end) const
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
     return TreeFind<const char*, AdaptiveStringColumn, EQUAL>(value, start, end);
 }
 
 
 void AdaptiveStringColumn::find_all(Array &result, const char* value, size_t start, size_t end) const
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
     TreeFindAll<const char*, AdaptiveStringColumn>(result, value, 0, start, end);
 }
 
@@ -355,7 +353,7 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
 
         size_t pos;
         const bool res = keys.FindKeyPos(v, pos);  // todo/fixme, res isn't used
-        assert(res);
+        TIGHTDB_ASSERT(res);
         (void)res;
 
         values.add(pos);
@@ -366,20 +364,20 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
     return true;
 }
 
-#ifdef _DEBUG
-
 bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const
 {
-    if (c.Size() != Size()) return false;
-
-    for (size_t i = 0; i < Size(); ++i) {
+    const size_t n = Size();
+    if (c.Size() != n) return false;
+    for (size_t i=0; i<n; ++i) {
         const char* s1 = Get(i);
         const char* s2 = c.Get(i);
         if (strcmp(s1, s2) != 0) return false;
     }
-
     return true;
 }
+
+
+#ifdef TIGHTDB_DEBUG
 
 void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) const
 {
@@ -397,6 +395,6 @@ void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) cons
     }
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

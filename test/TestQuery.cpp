@@ -212,7 +212,7 @@ TEST(TestQuerySimpleBUGdetect)
 	CHECK_EQUAL(2, tv1.size());
 	CHECK_EQUAL(0, tv1.get_source_ndx(0));
 
-	TupleTableType::View resView = tv1.cols().second.find_all("Foo");
+	TupleTableType::View resView = tv1.column().second.find_all("Foo");
 
     // This previously crashed:
     // TableView resView = TableView(tv1);
@@ -362,7 +362,7 @@ TEST(TestQuerySort1)
 
     TupleTableType::Query q = ttt.where().first.not_equal(2);
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort();
+    tv.column().first.sort();
 
     CHECK(tv.size() == 7);
     CHECK(tv[0].first == 1);
@@ -386,7 +386,7 @@ TEST(TestQuerySort_QuickSort)
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort();
+    tv.column().first.sort();
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
@@ -404,7 +404,7 @@ TEST(TestQuerySort_CountSort)
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort();
+    tv.column().first.sort();
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
@@ -422,7 +422,7 @@ TEST(TestQuerySort_Descending)
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort(false);
+    tv.column().first.sort(false);
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
@@ -1123,43 +1123,43 @@ TEST(TestQuerySyntaxCheck)
     ttt.add(3, "X");
 
     TupleTableType::Query q1 = ttt.where().first.equal(2).end_group();
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     s = q1.Verify();
     CHECK(s != "");
 #endif
 
     TupleTableType::Query q2 = ttt.where().group().group().first.equal(2).end_group();
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     s = q2.Verify();
     CHECK(s != "");
 #endif
 
     TupleTableType::Query q3 = ttt.where().first.equal(2).Or();
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     s = q3.Verify();
     CHECK(s != "");
 #endif
 
     TupleTableType::Query q4 = ttt.where().Or().first.equal(2);
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     s = q4.Verify();
     CHECK(s != "");
 #endif
 
     TupleTableType::Query q5 = ttt.where().first.equal(2);
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     s = q5.Verify();
     CHECK(s == "");
 #endif
 
     TupleTableType::Query q6 = ttt.where().group().first.equal(2);
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     s = q6.Verify();
     CHECK(s != "");
 
 #endif
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     s = q7.Verify();
     CHECK(s != "");
 #endif

@@ -1,9 +1,9 @@
-#include "group_shared.hpp"
-#include <cassert>
+#include <tightdb/group_shared.hpp>
 
 // Does not work for windows yet
 #ifndef _MSC_VER
 
+#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -147,7 +147,11 @@ void SharedGroup::init(const char* path_to_database_file)
         pthread_mutex_init(&m_info->writemutex, &mattr);
         pthread_mutexattr_destroy(&mattr);
 
-        const SlabAlloc& alloc = m_group.get_allocator();
+        SlabAlloc& alloc = m_group.get_allocator();
+
+        // The file may be in the process of being created by another
+        // thread. So we have to ensure that we get the correct size.
+        alloc.RefreshMapping();
 
         // Set initial values
         m_info->filesize = alloc.GetFileLen();
@@ -165,7 +169,7 @@ void SharedGroup::init(const char* path_to_database_file)
 
     m_isValid = true;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;
 #endif
 }
@@ -173,7 +177,7 @@ void SharedGroup::init(const char* path_to_database_file)
 
 SharedGroup::~SharedGroup()
 {
-    assert(m_state == SHARED_STATE_READY);
+    TIGHTDB_ASSERT(m_state == SHARED_STATE_READY);
 
     if (m_info) {
         // If we can get an exclusive lock on the file
@@ -203,8 +207,8 @@ SharedGroup::~SharedGroup()
 
 const Group& SharedGroup::begin_read()
 {
-    assert(m_state == SHARED_STATE_READY);
-    assert(m_group.get_allocator().IsAllFree());
+    TIGHTDB_ASSERT(m_state == SHARED_STATE_READY);
+    TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
 
     size_t new_topref = 0;
     size_t new_filesize = 0;
@@ -240,7 +244,7 @@ const Group& SharedGroup::begin_read()
     else
         m_group.update_from_shared(new_topref, new_filesize);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READING;
 #endif
 
@@ -249,14 +253,14 @@ const Group& SharedGroup::begin_read()
 
 void SharedGroup::end_read()
 {
-    assert(m_state == SHARED_STATE_READING);
-    assert(m_version != (uint32_t)-1);
+    TIGHTDB_ASSERT(m_state == SHARED_STATE_READING);
+    TIGHTDB_ASSERT(m_version != (uint32_t)-1);
 
     pthread_mutex_lock(&m_info->readmutex);
     {
         // Find entry for current version
         const size_t ndx = ringbuf_find(m_version);
-        assert(ndx != (size_t)-1);
+        TIGHTDB_ASSERT(ndx != (size_t)-1);
         ReadCount& r = ringbuf_get(ndx);
 
         // Decrement count and remove as many entries as possible
@@ -267,7 +271,7 @@ void SharedGroup::end_read()
             }
         }
         else {
-            assert(r.count > 0);
+            TIGHTDB_ASSERT(r.count > 0);
             --r.count;
         }
     }
@@ -275,19 +279,22 @@ void SharedGroup::end_read()
 
     m_version = (uint32_t)-1;
 
-#ifdef _DEBUG
+    // The read may have allocated some temporary state
+    m_group.invalidate();
+
+#ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;
 #endif
 }
 
 Group& SharedGroup::begin_write()
 {
-    assert(m_state == SHARED_STATE_READY);
-    assert(m_group.get_allocator().IsAllFree());
+    TIGHTDB_ASSERT(m_state == SHARED_STATE_READY);
+    TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (m_replication) {
-        error_code err = m_replication.acquire_write_access();
+        error_code err = m_replication.begin_write_transact();
         if (err) throw_error(err);
     }
 #endif
@@ -303,14 +310,9 @@ Group& SharedGroup::begin_write()
 
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
-    if (new_topref == 0) {
-        m_group.reset_to_new(); // may have been a rollback
-        m_group.create_from_ref();
-    }
-    else
-        m_group.update_from_shared(new_topref, new_filesize);
+    m_group.update_from_shared(new_topref, new_filesize);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_WRITING;
 #endif
 
@@ -319,7 +321,7 @@ Group& SharedGroup::begin_write()
 
 void SharedGroup::commit()
 {
-    assert(m_state == SHARED_STATE_WRITING);
+    TIGHTDB_ASSERT(m_state == SHARED_STATE_WRITING);
 
     // Get version info
     size_t current_version;
@@ -363,18 +365,20 @@ void SharedGroup::commit()
     // Release write lock
     pthread_mutex_unlock(&m_info->writemutex);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication) m_replication.release_write_access(false);
+    if (m_replication) {
+        if (!m_replication.commit_write_transact()) throw_error(ERROR_INTERRUPTED);
+    }
 #endif
 }
 
 void SharedGroup::rollback()
 {
-    assert(m_state == SHARED_STATE_WRITING);
+    TIGHTDB_ASSERT(m_state == SHARED_STATE_WRITING);
 
     // Clear all changes made during transaction
     m_group.rollback();
@@ -382,12 +386,12 @@ void SharedGroup::rollback()
     // Release write lock
     pthread_mutex_unlock(&m_info->writemutex);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication) m_replication.release_write_access(true);
+    if (m_replication) m_replication.rollback_write_transact();
 #endif
 }
 
@@ -436,7 +440,7 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
 
     if(isFull) {
         //TODO: expand buffer
-        assert(false);
+        TIGHTDB_ASSERT(false);
     }
 
     m_info->readers[m_info->put_pos] = v;
@@ -457,33 +461,33 @@ size_t SharedGroup::ringbuf_find(uint32_t version) const
     return (size_t)-1;
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void SharedGroup::test_ringbuf()
 {
-    assert(ringbuf_is_empty());
+    TIGHTDB_ASSERT(ringbuf_is_empty());
 
     const ReadCount rc = {1, 1};
     ringbuf_put(rc);
-    assert(ringbuf_size() == 1);
+    TIGHTDB_ASSERT(ringbuf_size() == 1);
 
     ringbuf_remove_first();
-    assert(ringbuf_is_empty());
+    TIGHTDB_ASSERT(ringbuf_is_empty());
 
     // Fill buffer
     const size_t capacity = ringbuf_capacity();
     for (size_t i = 0; i < capacity; ++i) {
         const ReadCount r = {1, (uint32_t)i};
         ringbuf_put(r);
-        assert(ringbuf_get_last().count == i);
+        TIGHTDB_ASSERT(ringbuf_get_last().count == i);
     }
     for (size_t i = 0; i < 32; ++i) {
         const ReadCount& r = ringbuf_get_first();
-        assert(r.count == i);
+        TIGHTDB_ASSERT(r.count == i);
 
         ringbuf_remove_first();
     }
-    assert(ringbuf_is_empty());
+    TIGHTDB_ASSERT(ringbuf_is_empty());
 
 }
 
@@ -510,6 +514,6 @@ void SharedGroup::zero_free_space()
     m_group.zero_free_space(file_size, readlock_version);
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 #endif //_MSV_VER

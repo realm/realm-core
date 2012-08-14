@@ -1,5 +1,5 @@
-#include "query.hpp"
-#include "query_engine.hpp"
+#include <tightdb/query.hpp>
+#include <tightdb/query_engine.hpp>
 
 #define MULTITHREAD 1
 
@@ -381,11 +381,14 @@ size_t Query::remove(Table& table, size_t start, size_t end, size_t limit) const
     size_t r = start;
     size_t results = 0;
     size_t displace = 0;
-    Init(table);
 
     for (;;) {
+        // Every remove invalidates the array cache in the nodes
+        // so we have to re-initialize it before searching
+        Init(table);
+
         r = FindInternal(table, r, end - results);
-        if (r == size_t(-1) || r == table.size() || results == limit)
+        if (r == not_found || r == table.size() || results == limit)
             break;
         ++results;
         table.remove(r);
@@ -457,14 +460,14 @@ int Query::SetThreads(unsigned int threadcount)
     for (size_t i = 0; i < threadcount; ++i) {
         int r = pthread_create(&threads[i], NULL, query_thread, (void*)&ts);
         if(r != 0)
-            assert(false); //todo
+            TIGHTDB_ASSERT(false); //todo
     }
 #endif
     m_threadcount = threadcount;
     return 0;
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 std::string Query::Verify()
 {
     if(first.size() == 0)
@@ -478,12 +481,12 @@ std::string Query::Verify()
 
     return first[0]->Verify(); // errors detected by QueryEngine
 }
-#endif // _DEBUG
+#endif // TIGHTDB_DEBUG
 
 void Query::Init(const Table& table) const
 {
     if (first[0] != NULL) {
-        ParentNode* top = (ParentNode*)first[0];
+        ParentNode* const top = (ParentNode*)first[0];
         top->Init(table);
     }
 }
@@ -491,7 +494,7 @@ void Query::Init(const Table& table) const
 size_t Query::FindInternal(const Table& table, size_t start, size_t end) const
 {
     if (end == size_t(-1)) end = table.size();
-    if (start == end) return size_t(-1);
+    if (start == end) return not_found;
 
     size_t r;
     if (first[0] != 0)
@@ -500,7 +503,7 @@ size_t Query::FindInternal(const Table& table, size_t start, size_t end) const
         r = start; // user built an empty query; return any first
 
     if (r == table.size())
-        return size_t(-1);
+        return not_found;
     else
         return r;
 }

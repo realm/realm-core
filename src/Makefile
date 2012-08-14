@@ -1,4 +1,11 @@
+ROOT = ..
+
 SUBDIRS = tightdb
+
+INSTALLED_HEADERS = $(wildcard *.h *.hpp)
+
+CONFIG_MK = $(ROOT)/config.mk
+include $(CONFIG_MK)
 
 
 all: $(SUBDIRS)
@@ -6,10 +13,12 @@ all: $(SUBDIRS)
 
 install: SUBDIRS_MODE = install
 install: all
+	$(INSTALL_HEADER) $(INSTALLED_HEADERS) $(DESTDIR)$(includedir)/
 .PHONY: install
 
 uninstall: SUBDIRS_MODE = uninstall
 uninstall: all
+	rm $(DESTDIR)$(includedir)/tightdb.hpp
 .PHONY: uninstall
 
 shared: SUBDIRS_MODE = shared
