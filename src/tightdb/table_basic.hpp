@@ -107,8 +107,8 @@ private:
     typedef typename Spec::template ColNames<ConstCol, const BasicTable*> ConstColsAccessor;
 
 public:
-    ColsAccessor cols() { return ColsAccessor(this); }
-    ConstColsAccessor cols() const { return ConstColsAccessor(this); }
+    ColsAccessor column() { return ColsAccessor(this); }
+    ConstColsAccessor column() const { return ConstColsAccessor(this); }
 
 private:
     template<int col_idx> struct Field {

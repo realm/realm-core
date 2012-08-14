@@ -212,7 +212,7 @@ TEST(TestQuerySimpleBUGdetect)
 	CHECK_EQUAL(2, tv1.size());
 	CHECK_EQUAL(0, tv1.get_source_ndx(0));
 
-	TupleTableType::View resView = tv1.cols().second.find_all("Foo");
+	TupleTableType::View resView = tv1.column().second.find_all("Foo");
 
     // This previously crashed:
     // TableView resView = TableView(tv1);
@@ -362,7 +362,7 @@ TEST(TestQuerySort1)
 
     TupleTableType::Query q = ttt.where().first.not_equal(2);
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort();
+    tv.column().first.sort();
 
     CHECK(tv.size() == 7);
     CHECK(tv[0].first == 1);
@@ -386,7 +386,7 @@ TEST(TestQuerySort_QuickSort)
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort();
+    tv.column().first.sort();
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
@@ -404,7 +404,7 @@ TEST(TestQuerySort_CountSort)
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort();
+    tv.column().first.sort();
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
@@ -422,7 +422,7 @@ TEST(TestQuerySort_Descending)
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort(false);
+    tv.column().first.sort(false);
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
