@@ -105,11 +105,12 @@ inline void init_header(void* header, bool is_node, bool has_refs, int width_typ
 
 } // anonymous namespace
 
-
-
+bool tdb_dummy (int64_t t)
+{ 
+    return true; 
+};
 
 namespace tightdb {
-
 
 // Header format (8 bytes):
 // |--------|--------|--------|--------|--------|--------|--------|--------|
@@ -463,8 +464,8 @@ template<size_t w> int64_t Array::GetUniversal(const char* const data, const siz
         return *(const int64_t*)(data + offset);
     }
     else {
-        assert(true);
-        return 0;
+        assert(false);
+        return int64_t(-1);
     }
 }
 
@@ -496,6 +497,13 @@ size_t Array::GetAsRef(size_t ndx) const
     TIGHTDB_ASSERT(m_hasRefs);
     const int64_t v = Get(ndx);
     return TO_REF(v);
+}
+
+size_t Array::GetAsSizeT(size_t ndx) const
+{
+    TIGHTDB_ASSERT(ndx < m_len);
+    const int64_t v = Get(ndx);
+    return TO_SIZET(v);
 }
 
 int64_t Array::back() const
@@ -797,8 +805,8 @@ template <size_t width> inline int64_t LowerBits(void)
     else if(width == 64)
         return 0x0000000000000001ULL;
     else {
-        assert(true);
-        return 0;
+        assert(false);
+        return int64_t(-1);
     }
 }
 
@@ -814,7 +822,6 @@ template <size_t width> inline bool TestZero(uint64_t value) {
 // Finds zero element of bit width 'width'
 template <bool eq, size_t width>size_t FindZero(uint64_t v)
 {
-
     size_t start = 0;
     uint64_t hasZeroByte;
 
@@ -825,12 +832,12 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v)
         hasZeroByte = TestZero<width>(v | 0xffffffff00000000ULL);
         if(eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
             // 00?? -> increasing
-            start += 64 / (width == 0 ? 1 : width) / 2;
+            start += 64 / no0(width) / 2;
             if(width <= 4) {
                 hasZeroByte = TestZero<width>(v | 0xffff000000000000ULL);
                 if(eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
                     // 000?
-                    start += 64 / (width == 0 ? 1 : width) / 4;
+                    start += 64 / no0(width) / 4;
                 }
             }
         }
@@ -840,7 +847,7 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v)
                 hasZeroByte = TestZero<width>(v | 0xffffffffffff0000ULL);
                 if(eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
                     // 0?00
-                    start += 64 / (width == 0 ? 1 : width) / 4;
+                    start += 64 / no0(width) / 4;
                 }
             }
         }
@@ -852,578 +859,6 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v)
     }
 
     return start;
-}
-
-
-template <bool gt, size_t width>size_t FindGTLT_Magic(int64_t v)
-{
-    uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
-    uint64_t mask2 = mask1 >> 1;
-    uint64_t magic = gt ? (~0ULL / mask1 * (mask2 - v)) : (~0ULL / mask1 * v);
-    return magic;
-}
-
-template <bool gt, size_t width, bool accumulate>size_t Array::FindGTLT_Limited(int64_t v, uint64_t chunk, uint64_t magic, Array* akku = 0, size_t baseindex = 0) const
-{
-    uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
-    uint64_t mask2 = mask1 >> 1;
-    uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / mask1 * (mask2 + 1)) : ((chunk - magic) & ~chunk&~0ULL/mask1*(mask2+1));
-    size_t p = 0;
-    while(m) {
-        size_t t = FirstSetBit64(m) / (width == 0 ? 1 : width);
-        p += t;
-        if(accumulate) {
-            akku->AddPositiveLocal(p + baseindex);
-            m >>= (t + 1) * width;            
-        }
-        else
-            return t;
-        p++;
-    }
-
-        TIGHTDB_ASSERT(false);
-}
-
-
-// template <bool gt, size_t width>size_t __forceinline FindGTLT(int64_t v, uint64_t chunk) // fixme, __forceinline makes it crash, find out why
-template <bool gt, size_t width, bool accumulate>size_t Array::FindGTLT(int64_t v, uint64_t chunk, Array *akku = 0, size_t baseindex = 0) const
-{
-    if(width == 1) {
-        if(gt ? (v == 0 && chunk != 0) : (v == 1 && chunk != 0xffffffffffffffffULL)) {
-            return FirstSetBit64(gt ? chunk : ~chunk);
-        }
-    }
-    else if(width == 2) {
-        // Alot (50% +) faster than loop/compiler-unrolled loop
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(0 + baseindex); else return 0;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(1 + baseindex); else return 1;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(2 + baseindex); else return 2;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(3 + baseindex); else return 3;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(4 + baseindex); else return 4;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(5 + baseindex); else return 5;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(6 + baseindex); else return 6;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(7 + baseindex); else return 7;} chunk >>= 2;
-
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(8 + baseindex); else return 8;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(9 + baseindex); else return 9;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(10 + baseindex); else return 10;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(11 + baseindex); else return 11;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(12 + baseindex); else return 12;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(13 + baseindex); else return 13;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(14 + baseindex); else return 14;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(15 + baseindex); else return 15;} chunk >>= 2;
-
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(16 + baseindex); else return 16;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(17 + baseindex); else return 17;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(18 + baseindex); else return 18;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(19 + baseindex); else return 19;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(20 + baseindex); else return 20;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(21 + baseindex); else return 21;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(22 + baseindex); else return 22;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(23 + baseindex); else return 23;} chunk >>= 2;
-
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(24 + baseindex); else return 24;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(25 + baseindex); else return 25;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(26 + baseindex); else return 26;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(27 + baseindex); else return 27;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(28 + baseindex); else return 28;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(29 + baseindex); else return 29;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(30 + baseindex); else return 30;} chunk >>= 2;
-        if(gt ? (int64_t)(chunk & 0x3) > v : (int64_t)(chunk & 0x3) < v) {if(accumulate) akku->AddPositiveLocal(31 + baseindex); else return 31;} chunk >>= 2;
-    }
-    else if(width == 4) {
-        // 128 ms:
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(0 + baseindex); else return 0;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(1 + baseindex); else return 1;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(2 + baseindex); else return 2;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(3 + baseindex); else return 3;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(4 + baseindex); else return 4;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(5 + baseindex); else return 5;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(6 + baseindex); else return 6;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(7 + baseindex); else return 7;} chunk >>= 4;
-
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(8 + baseindex); else return 8;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(9 + baseindex); else return 9;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(10 + baseindex); else return 10;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(11 + baseindex); else return 11;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(12 + baseindex); else return 12;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(13 + baseindex); else return 13;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(14 + baseindex); else return 14;} chunk >>= 4;
-        if(gt ? (int64_t)(chunk & 0xf) > v : (int64_t)(chunk & 0xf) < v) {if(accumulate) akku->AddPositiveLocal(15 + baseindex); else return 15;} chunk >>= 4;
-
-        // 187 ms:
-        // if(gt ? (int64_t)(chunk >> 0*4) & 0xf > v : (int64_t)(chunk >> 0*4) & 0xf < v) return 0;
-    }
-    else if(width == 8) {
-        // 88 ms:
-        if(gt ? (char)chunk > v : (char)chunk < v) {if(accumulate) akku->AddPositiveLocal(0 + baseindex); else return 0;} chunk >>= 8;
-        if(gt ? (char)chunk > v : (char)chunk < v) {if(accumulate) akku->AddPositiveLocal(1 + baseindex); else return 1;} chunk >>= 8;
-        if(gt ? (char)chunk > v : (char)chunk < v) {if(accumulate) akku->AddPositiveLocal(2 + baseindex); else return 2;} chunk >>= 8;
-        if(gt ? (char)chunk > v : (char)chunk < v) {if(accumulate) akku->AddPositiveLocal(3 + baseindex); else return 3;} chunk >>= 8;
-        if(gt ? (char)chunk > v : (char)chunk < v) {if(accumulate) akku->AddPositiveLocal(4 + baseindex); else return 4;} chunk >>= 8;
-        if(gt ? (char)chunk > v : (char)chunk < v) {if(accumulate) akku->AddPositiveLocal(5 + baseindex); else return 5;} chunk >>= 8;
-        if(gt ? (char)chunk > v : (char)chunk < v) {if(accumulate) akku->AddPositiveLocal(6 + baseindex); else return 6;} chunk >>= 8;
-        if(gt ? (char)chunk > v : (char)chunk < v) {if(accumulate) akku->AddPositiveLocal(7 + baseindex); else return 7;} chunk >>= 8;
-       
-        //97 ms ms:
-        // if(gt ? (char)(chunk >> 0*8) > v : (char)(chunk >> 0*8) < v) return 0;
-    }
-    else if(width == 16) {
-
-        if(gt ? (short int)(chunk >> 0*16) > v : (short int)(chunk >> 0*16) < v) {if(accumulate) akku->AddPositiveLocal(0 + baseindex); else return 0;};
-        if(gt ? (short int)(chunk >> 1*16) > v : (short int)(chunk >> 1*16) < v) {if(accumulate) akku->AddPositiveLocal(1 + baseindex); else return 1;};
-        if(gt ? (short int)(chunk >> 2*16) > v : (short int)(chunk >> 2*16) < v) {if(accumulate) akku->AddPositiveLocal(2 + baseindex); else return 2;};
-        if(gt ? (short int)(chunk >> 3*16) > v : (short int)(chunk >> 3*16) < v) {if(accumulate) akku->AddPositiveLocal(3 + baseindex); else return 3;};
-
-        /*
-        // Faster but disabled due to bug in VC2010 compiler (fixed in 2012 toolchain) where last 'if' is errorneously optimized away
-        if(gt ? (short int)chunk > v : (short int)chunk < v) {if(accumulate) akku->AddPositiveLocal(0 + baseindex); else return 0;} chunk >>= 16;
-        if(gt ? (short int)chunk > v : (short int)chunk < v) {if(accumulate) akku->AddPositiveLocal(1 + baseindex); else return 1;} chunk >>= 16;
-        if(gt ? (short int)chunk > v : (short int)chunk < v) {if(accumulate) akku->AddPositiveLocal(2 + baseindex); else return 2;} chunk >>= 16;
-        if(gt ? (short int)chunk > v : (short int)chunk < v) {if(accumulate) akku->AddPositiveLocal(3 + baseindex); else return 3;} chunk >>= 16;
-
-        // Following illustrates it:
-        #include <stdint.h>
-        #include <stdio.h>
-        #include <stdlib.h>
-
-        size_t bug(int64_t v, uint64_t chunk)
-        {
-            bool gt = true;
-
-            if(gt ? (short int)chunk > v : (short int)chunk < v) {return 0;} chunk >>= 16;
-            if(gt ? (short int)chunk > v : (short int)chunk < v) {return 1;} chunk >>= 16;
-            if(gt ? (short int)chunk > v : (short int)chunk < v) {return 2;} chunk >>= 16;
-            if(gt ? (short int)chunk > v : (short int)chunk < v) {return 3;} chunk >>= 16;
-
-            return -1;
-        }
-
-        int main(int argc, char const *const argv[])
-        {
-            int64_t v;
-            if(rand()*rand() == 3) {
-                v = rand()*rand()*rand()*rand()*rand();
-                printf("Change '3' to something else and run test again\n");
-            }
-            else {
-                v = 0x2222000000000000ULL;
-            }  
-
-            size_t idx;
-    
-            idx = bug(200, v);
-            if(idx != 3)
-                printf("Compiler failed: idx == %d (expected idx == 3)\n", idx);
-
-            v = 0x2222000000000000ULL;
-            idx = bug(200, v);
-            if(idx == 3)
-                printf("Touching v made it work\n", idx);
-        }
-        */
-    }
-    else if(width == 32) {
-        if(gt ? (int)chunk > v : (int)chunk < v) {if(accumulate) akku->AddPositiveLocal(0 + baseindex); else return 0;} chunk >>= 32;
-        if(gt ? (int)chunk > v : (int)chunk < v) {if(accumulate) akku->AddPositiveLocal(1 + baseindex); else return 1;} chunk >>= 32;
-    }
-    else if(width == 64) {
-        if(gt ? (int64_t)v > v : (int64_t)(v) < v) {if(accumulate) akku->AddPositiveLocal(0 + baseindex); else return 0;} chunk >>= 64;
-    }
-
-    return -1;
-}
-
-// Not meant to be called from outside Array.cpp
-template <bool eq, size_t width, bool accumulate> inline size_t Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, Array* akku) const {
-    assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
-
-    size_t ee = round_up(start, 64 / (width == 0 ? 1 : width));
-    ee = ee > end ? end : ee;
-    for (; start < ee; ++start)
-        if (eq ? (Get<width>(start) == value) : (Get<width>(start) != value)) {
-            if(accumulate)
-                akku->AddPositiveLocal(start + baseindex);
-            else
-                return start;
-        }
-    
-    if(start >= end)
-        return not_found;
-
-    if(width != 32 && width != 64) {
-        const int64_t* p = (const int64_t*)(m_data + (start * width / 8));
-        const int64_t* const e = (int64_t*)(m_data + (end * width / 8)) - 1;
-		const uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
-        const uint64_t valuemask = ~0ULL / (mask == 0 ? 1 : mask) * (value & mask); // the "== ? :" is to avoid division by 0 compiler error
- 
-        uint64_t hasZeroByte;
-
-        while (p < e) {
-            uint64_t chunk = *p;
-            uint64_t v2 = chunk ^ valuemask;
-
-            hasZeroByte = TestZero<width>(v2);
-
-            while(eq ? hasZeroByte : v2) {
-                start = (p - (int64_t *)m_data) * 8 * 8 / (width == 0 ? 1 : width);
-                size_t t = FindZero<eq, width>(v2);
-                if(accumulate && start + t < end) {
-                    akku->AddPositiveLocal(start + t + baseindex);
-                    if(eq) {
-                        v2 |= 1ULL << (t * width);
-                        hasZeroByte = TestZero<width>(v2);
-                    }
-                    else
-                        v2 >>= t * width;
-                }
-                else
-                    return start + t < end ? start + t : not_found;
-            }
-            
-            ++p;
-        }
-
-        // Loop ended because we are near end or end of array. No need to optimize search in remainder in this case because end of array means that
-        // lots of search work has taken place prior to ending here. So time spent searching remainder is relatively tiny
-        start = (p - (int64_t *)m_data) * 8 * 8 / (width == 0 ? 1 : width);
-    }
-
-    while (start < end) {
-        if (eq ? Get<width>(start) == value : Get<width>(start) != value) {
-            if(accumulate)
-                akku->AddPositiveLocal(start + baseindex);
-            else
-                return start;
-        }
-        ++start;
-    }
-    return not_found;
-}
-
-
-template <int cond, bool accumulate, size_t bitwidth> size_t Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Array *akku) const
-{
-    assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
-    
-    if(m_len > start && ((cond == COND_EQUAL && Get<bitwidth>(start) == value) || (cond == COND_NOTEQUAL && Get<bitwidth>(start) != value) || (cond == COND_LESS && Get<bitwidth>(start) < value) || (cond == COND_GREATER && Get<bitwidth>(start) > value)) && start < end) {if (accumulate) {akku->AddPositiveLocal(start + baseindex); } else return start;} ++start;
-    if(m_len > start && ((cond == COND_EQUAL && Get<bitwidth>(start) == value) || (cond == COND_NOTEQUAL && Get<bitwidth>(start) != value) || (cond == COND_LESS && Get<bitwidth>(start) < value) || (cond == COND_GREATER && Get<bitwidth>(start) > value)) && start < end) {if (accumulate) {akku->AddPositiveLocal(start + baseindex); } else return start;} ++start;
-    if(m_len > start && ((cond == COND_EQUAL && Get<bitwidth>(start) == value) || (cond == COND_NOTEQUAL && Get<bitwidth>(start) != value) || (cond == COND_LESS && Get<bitwidth>(start) < value) || (cond == COND_GREATER && Get<bitwidth>(start) > value)) && start < end) {if (accumulate) {akku->AddPositiveLocal(start + baseindex); } else return start;} ++start;
-    if(m_len > start && ((cond == COND_EQUAL && Get<bitwidth>(start) == value) || (cond == COND_NOTEQUAL && Get<bitwidth>(start) != value) || (cond == COND_LESS && Get<bitwidth>(start) < value) || (cond == COND_GREATER && Get<bitwidth>(start) > value)) && start < end) {if (accumulate) {akku->AddPositiveLocal(start + baseindex); } else return start;} ++start;
-    if(!(m_len > start && start < end))
-        return not_found;
-
-    if (end == (size_t)-1) end = m_len;
-
-    if (m_width == 0 || (value < m_lbound || value > m_ubound)) {
-        if((m_width == 0 && value == 0 && cond != COND_EQUAL) || 
-          ((value < m_lbound || value > m_ubound) && (cond == COND_EQUAL || cond == COND_LESS && value < m_lbound || cond == COND_GREATER && value > m_ubound))) {
-            return not_found;
-        }
-        else {
-            if(accumulate)
-                for(; start < end; start++) akku->AddPositiveLocal(start + baseindex);
-            return start;
-        }
-        assert(false);
-    }
-
-#if defined(USE_SSE42) || defined(USE_SSE3)
-
-#if defined(USE_SSE42)
-    if (end - start < sizeof(__m128i) || m_width < 8) {
-#elif defined(USE_SSE3)
-    if (cond != COND_EQUAL || end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) {
-#endif
-		size_t r = Compare<cond, bitwidth, accumulate>(value, start, end, baseindex, akku); 
-        return r; 
-    }
-
-    // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
-    __m128i* const a = (__m128i *)round_up(m_data + start * bitwidth / 8, sizeof(__m128i));
-    __m128i* const b = (__m128i *)round_down(m_data + end * bitwidth / 8, sizeof(__m128i));
-
-    size_t t = 0;
-
-    t = Compare<cond, bitwidth, accumulate>(value, start, ((unsigned char *)a - m_data) * 8 / (bitwidth == 0 ? 1 : bitwidth), baseindex, akku);
-    if (t != (size_t)-1 && akku == NULL)
-        return t;
-
-    // Search aligned area with SSE
-    if (b > a) {
-#if defined(USE_SSE42)
-		t = FindSSE<cond, bitwidth, accumulate>(value, a, b - a, akku, baseindex + (((unsigned char *)a - m_data) * 8 / (bitwidth == 0 ? 1 : bitwidth)));
-#elif defined(USE_SSE3)
-		t = FindSSE<COND_EQUAL, bitwidth, accumulate>(value, a, b - a, akku, baseindex + (((unsigned char *)a - m_data) * 8 / (bitwidth == 0 ? 1 : bitwidth)));
-#endif
-        if (t != (size_t)-1) {
-            t += (((unsigned char *)a - m_data) * 8 / (bitwidth == 0 ? 1 : bitwidth));
-            if(!accumulate)
-                return t;
-        }
-    }
-
-    // Search remainder with CompareEquality()
-    t = Compare<cond, bitwidth, accumulate>(value, ((unsigned char *)b - m_data) * 8 / (bitwidth == 0 ? 1 : bitwidth), end, baseindex, akku);
-    return t;
-#else
-    return Compare<cond, bitwidth, accumulate>(value, start, end, baseindex, akku);
-#endif
-}
-
-size_t Array::find_first(int64_t value, size_t start, size_t end, Array *akku) const
-{
-    return find_first<COND_EQUAL>(value, start, end);
-}
-
-
-
-void Array::find_all(int cond, Array* akku, int64_t value, size_t baseindex, size_t start, size_t end)
-{
-    if(cond == 0)
-        TEMPEX3(find, 0, true, m_width, (value, start, end, baseindex, akku));
-    if(cond == 1)
-        TEMPEX3(find, 1, true, m_width, (value, start, end, baseindex, akku));
-    if(cond == 2)
-        TEMPEX3(find, 2, true, m_width, (value, start, end, baseindex, akku));
-    if(cond == 3)
-        TEMPEX3(find, 3, true, m_width, (value, start, end, baseindex, akku));
-}
-
-
-#if defined(USE_SSE42) || defined(USE_SSE3)
-// 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
-template <int cond, size_t width, bool accumulate> size_t Array::FindSSE(int64_t value, __m128i *data, size_t items, Array* akku, size_t baseindex) const
-{
-    (void) baseindex;
-    (void) akku;
-
-    int resmask;
-    __m128i search = {0};
-    __m128i compare = {0};
-    size_t i = 0;
-
-    // The loop is made simple so that compilers unrolls or optimizes it automatically (VC and gcc converts the 
-    // case width == 8 to a memset(), and unrolls the remaining cases fully). 
-    for(size_t t = 0; t < 16 * 8 / (width == 0 ? 1 : width); t++) {
-        if(width == 8)
-            *(((char*)&search) + t) = (char)value;
-        else if(width == 16)
-            *(((short int*)&search) + t) = (short int)value;
-        else if (width == 32)
-            *(((int*)&search) + t) = (int)value;
-        else if (width == 64)
-            *(((int64_t*)&search) + t) = value;
-    }
-
-    // Search loop. Unrolling it has been tested to NOT increase performance (apparently mem bound)
-    for (i = 0; i < items; ++i) {
-        // equal / not-equal
-        if(cond == COND_EQUAL || cond == COND_NOTEQUAL) {
-            if(width == 8)
-                compare = _mm_cmpeq_epi8(data[i], search);
-            if(width == 16)
-                compare = _mm_cmpeq_epi16(data[i], search);
-            if(width == 32)
-                compare = _mm_cmpeq_epi32(data[i], search);
-            if(width == 64) {
-#ifdef USE_SSE42
-                compare = _mm_cmpeq_epi64(data[i], search);
-#else
-				assert(true);
-#endif
-			}
-        }
-#ifdef USE_SSE42
-        // greater
-        else if(cond == COND_GREATER) {
-            if(width == 8)
-                compare = _mm_cmpgt_epi8(data[i], search);
-            if(width == 16)
-                compare = _mm_cmpgt_epi16(data[i], search);
-            if(width == 32)
-                compare = _mm_cmpgt_epi32(data[i], search);
-            if(width == 64)
-                compare = _mm_cmpgt_epi64(data[i], search);
-        }
-        // less
-        else if(cond == COND_LESS) {
-            if(width == 8)
-                compare = _mm_cmplt_epi8(data[i], search);
-            if(width == 16)
-                compare = _mm_cmplt_epi16(data[i], search);
-            if(width == 32)
-                compare = _mm_cmplt_epi32(data[i], search);
-            if(width == 64){
-                // There exists no _mm_cmplt_epi64 instruction, so emulate it. _mm_set1_epi8(0xff) is pre-calculated by compiler.
-                compare = _mm_cmpeq_epi64(data[i], search);
-                compare = _mm_andnot_si128(compare, _mm_set1_epi32(0xffffffff));
-            }
-        }
-#endif
-        resmask = _mm_movemask_epi8(compare);
-
-        if(cond == COND_NOTEQUAL)
-            resmask = ~resmask & 0x0000ffff;
-
-        size_t s = i * sizeof(__m128i) * 8 / (width == 0 ? 1 : width);
-
-        while(resmask != 0) {
-            size_t idx = FirstSetBit(resmask) * 8 / (width == 0 ? 1 : width);
-            s += idx;
-            if(accumulate) {
-                akku->AddPositiveLocal(s + baseindex);
-                resmask >>= (idx + 1) * (width == 0 ? 1 : width) / 8;
-                ++s;
-            }
-            else
-                return s; 
-        }
-    }
-
-    return not_found;
-}
-#endif //USE_SSE
-
-// If gt = true: Find first element which is greater than value
-// If gt = false: Find first element which is smaller than value
-template <int cond, size_t bitwidth, bool accumulate>size_t Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, Array* akku) const
-{
-    size_t ret;
-    if(cond == COND_EQUAL)
-        ret = CompareEquality<true, bitwidth, accumulate>(value, start, end, baseindex, akku);
-    if(cond == COND_NOTEQUAL)
-        ret = CompareEquality<false, bitwidth, accumulate>(value, start, end, baseindex, akku);
-    if(cond == COND_GREATER)
-        ret = CompareRelation<true, bitwidth, accumulate>(value, start, end, baseindex, akku);
-    if(cond == COND_LESS)
-        ret = CompareRelation<false, bitwidth, accumulate>(value, start, end, baseindex, akku);
-
-
-    return ret;
-}
-
-void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
-{
-#if 1
-    if (end == (size_t)-1) end = m_len;
-    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
-
-    TEMPEX3(find, COND_EQUAL, true, m_width, (value, start, end, colOffset, &result));
-
-    return;
-#else
-    // Naive implementation to test for bugs
-    size_t f = start - 1;
-    for(;;) {
-        f = find2<COND_EQUAL, false, width>(value, f + 1, end, NULL);
-        if (f == (size_t)-1)
-            break;
-        else
-            result.AddPositiveLocal(f + colOffset);
-    }
-#endif
-}
-
-// If gt = true: Find first element which is greater than value
-// If gt = false: Find first element which is smaller than value
-template <bool gt, size_t bitwidth, bool accumulate>size_t Array::CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, Array* akku) const
-{
-    assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
-  
-    size_t ee = round_up(start, 64 / (bitwidth == 0 ? 1 : bitwidth));
-    ee = ee > end ? end : ee;
-    for (; start < ee; start++) {
-        if (gt ? (Get<bitwidth>(start) > value) : (Get<bitwidth>(start) < value)) {
-            if(accumulate)
-                akku->AddPositiveLocal(start + baseindex);
-            else
-                return start;
-        }
-    }
-
-    if(start >= end)
-        return (size_t)-1;
-
-    const int64_t* p = (const int64_t*)(m_data + (start * bitwidth / 8));
-    const int64_t* const e = (int64_t*)(m_data + (end * bitwidth / 8)) - 1;
-
-    // Matches are rare enough to setup fast linear search for remaining items. We use
-    // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
-
-    if (bitwidth == 1 || bitwidth == 2 || bitwidth == 4 || bitwidth == 8 || bitwidth == 16) {
-        // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than' 
-        if(value >= 0 && bitwidth != 1 && (bitwidth == 4 ? value <= (gt ? 7 : 8) : true) && (bitwidth == 2 ? value <= (gt ? 1 : 2) : true)) {
-            // 15 ms
-            uint64_t magic = FindGTLT_Magic<gt, bitwidth>(value);
-
-            while (p < e) {
-                uint64_t upper = LowerBits<bitwidth>() * 1ULL << (bitwidth == 0 ? 0 : (bitwidth - 1ULL));
-
-                const int64_t v = *p;
-                size_t idx;
-
-                // Bit hacks only works for positive items in chunk, so test their sign bits
-                if((bitwidth == 2 || bitwidth == 4 || bitwidth == 8 || bitwidth == 16) ? upper : false)
-                    idx = FindGTLT<gt, bitwidth, accumulate>(value, v, akku, (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth) + baseindex);
-                else
-                    idx = FindGTLT_Limited<gt, bitwidth, accumulate>(value, v, magic, akku, (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth) + baseindex); 
-
-                if(idx != not_found && !accumulate) {
-                    start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
-                    return start + idx;
-                }
-
-                ++p;
-            }
-        }
-        else {
-            // 24 ms
-            while(p < e) {
-                int64_t v = *p;
-                size_t idx = FindGTLT<gt, bitwidth, accumulate>(value, v, akku, (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth) + baseindex);
-                if(idx != not_found && !accumulate) {
-                    start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
-                    return start + idx;
-                } 
-
-                ++p;
-            }
-        }
-        start = (p - (int64_t *)m_data) * 8 * 8 / (bitwidth == 0 ? 1 : bitwidth);
-    }
-
-    // extra logic in SIMD no longer pays off for 32/64 bit ints because we have just 4/2 elements
-
-    // Test unaligned end manually
-    while (start < end) {
-        if (gt ? Get<bitwidth>(start) > value : Get<bitwidth>(start) < value) {
-            if(accumulate)
-                akku->AddPositiveLocal(start + baseindex);
-            else
-                return start;
-        }
-        ++start;
-    }
-    return (size_t)-1;
-}
-
-// Wrappers because query engine expects functions of such names.
-template <> size_t Array::Query<EQUAL>(int64_t value, size_t start, size_t end)
-{
-    return find_first<COND_EQUAL>(value, start, end);
-}
-template <> size_t Array::Query<NOTEQUAL>(int64_t value, size_t start, size_t end)
-{
-    return find_first<COND_NOTEQUAL>(value, start, end);
-}
-template <> size_t Array::Query<GREATER>(int64_t value, size_t start, size_t end)
-{
-    return find_first<COND_GREATER>(value, start, end);
-}
-template <> size_t Array::Query<LESS>(int64_t value, size_t start, size_t end)
-{
-    return find_first<COND_LESS>(value, start, end);
 }
 
 template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
@@ -1445,7 +880,7 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
             m = Get<w>(start);
     }
 
-	if((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / (w == 0 ? 1 : w)) {
+	if((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / no0(w)) {
         __m128i *data = (__m128i *)(m_data + start * w / 8);
         __m128i state = data[0];
         __m128i state2;
@@ -1459,12 +894,12 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
             else if(w == 32)
                 state = max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
 
-            start += sizeof(__m128i) * 8 / (w == 0 ? 1 : w);
+            start += sizeof(__m128i) * 8 / no0(w);
         }
         
         // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
         state2 = state; 
-        for (size_t t = 0; t < sizeof(__m128i) * 8 / (w == 0 ? 1 : w); ++t) {
+        for (size_t t = 0; t < sizeof(__m128i) * 8 / no0(w); ++t) {
             const int64_t v = GetUniversal<w>(((const char *)&state2), t);
             if (max ? v > m : v < m) {
                 m = v;
@@ -1563,7 +998,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                     s += a;
                 }
             }
-            start += sizeof(int64_t) * 8 / (w == 0 ? 1 : w) * chunks;
+            start += sizeof(int64_t) * 8 / no0(w) * chunks;
         }
 
 #ifdef USE_SSE42
@@ -1571,7 +1006,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
     // Naive, templated Get<>: 391 371 374
     // SSE:                     97 148 282
 
-    if((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / (w == 0 ? 1 : w)) {
+    if((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
         __m128i *data = (__m128i *)(m_data + start * w / 8);
         __m128i sum = {0};
         __m128i sum2;
@@ -1634,7 +1069,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                 */
             }
         }
-        start += sizeof(__m128i) * 8 / (w == 0 ? 1 : w) * chunks;
+        start += sizeof(__m128i) * 8 / no0(w) * chunks;
 
         // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
         sum2 = sum; 
@@ -1685,7 +1120,7 @@ size_t Array::count(int64_t value) const
             // Could use intrinsic instead:
             // a = __builtin_popcountll(a); // gcc intrinsic
 
-            count += a;
+            count += TO_SIZET(a);
         }
     }
     else if (m_width == 2) {
@@ -1710,7 +1145,7 @@ size_t Array::count(int64_t value) const
             a = (a + (a >> 4)) & m4;
             a = (a * h01) >> 56;
 
-            count += a;
+            count += TO_SIZET(a);
         }
     }
     else if (m_width == 4) {
@@ -1736,7 +1171,7 @@ size_t Array::count(int64_t value) const
             a = (a + (a >> 4)) & m4;
             a = (a * h01) >> 56;
 
-            count += a;
+            count += TO_SIZET(a);
         }
     }
     else if (m_width == 8) {
@@ -1763,7 +1198,7 @@ size_t Array::count(int64_t value) const
             // Population count
             a = (a * h01) >> 56;
 
-            count += a;
+            count += TO_SIZET(a);
         }
     }
     else if (m_width == 16) {
@@ -1792,7 +1227,7 @@ size_t Array::count(int64_t value) const
             // Population count
             a = (a * h01) >> 56;
 
-            count += a;
+            count += TO_SIZET(a);
         }
     }
     else if (m_width == 32) {
@@ -2047,8 +1482,7 @@ template <size_t width> void Array::SetWidth(void)
     }
 
     m_width = width;
-
-    // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of Get() instead of Get<n>
+        // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of Get() instead of Get<n>
     // if the declaration and association of the getter are on two different source lines
     Getter temp_getter = &Array::Get<width>; 
     m_getter = temp_getter;
@@ -2056,17 +1490,19 @@ template <size_t width> void Array::SetWidth(void)
     Setter temp_setter = &Array::Set<width>; 
     m_setter = temp_setter;
 
-    Finder feq = &Array::find<COND_EQUAL, false, width>;
+    struct Callback {};
+    Finder feq = &Array::find<EQUAL, TDB_RETURN_FIRST, width>;
     m_finder[COND_EQUAL] = feq;
 
-    Finder fne = &Array::find<COND_NOTEQUAL, false, width>;
+    Finder fne = &Array::find<NOTEQUAL, TDB_RETURN_FIRST, width>;
     m_finder[COND_NOTEQUAL]  = fne;
 
-    Finder fg = &Array::find<COND_GREATER, false, width>;
+    Finder fg = &Array::find<GREATER, TDB_RETURN_FIRST, width>;
     m_finder[COND_GREATER] = fg;
 
-    Finder fl =  &Array::find<COND_LESS, false, width>;
+    Finder fl =  &Array::find<LESS, TDB_RETURN_FIRST, width>;
     m_finder[COND_LESS] = fl;
+
 }
 
 template <size_t w>int64_t Array::Get(size_t ndx) const
@@ -2567,8 +2003,8 @@ template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx)
         return *(const int64_t*)(data + offset);
     }
     else {
-        assert(true);
-        return 0;
+        assert(false);
+        return int64_t(-1);
     }
 }
 
@@ -2640,8 +2076,8 @@ void Array::GetBlock(size_t ndx, Array& arr, size_t& off) const
     while (1) {
         if (isNode) {
             // Get subnode table
-            const size_t ref_offsets = GetDirect(data, width, 0);
-            const size_t ref_refs    = GetDirect(data, width, 1);
+            const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
+            const size_t ref_refs    = TO_SIZET(GetDirect(data, width, 1));
 
             // Find the subnode containing the item
             const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2658,7 +2094,7 @@ void Array::GetBlock(size_t ndx, Array& arr, size_t& off) const
             const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
             const char* const refs_data = (const char*)refs_header + 8;
             const size_t refs_width  = get_header_width_direct(refs_header);
-            const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
+            const size_t ref = TO_SIZET(GetDirect(refs_data, refs_width, node_ndx));
 
             // Set vars for next iteration
             header = (uint8_t*)m_alloc.Translate(ref);
@@ -2686,8 +2122,8 @@ int64_t Array::ColumnGet(size_t ndx) const
     while (1) {
         if (isNode) {
             // Get subnode table
-            const size_t ref_offsets = GetDirect(data, width, 0);
-            const size_t ref_refs    = GetDirect(data, width, 1);
+            const size_t ref_offsets = TO_REF(GetDirect(data, width, 0));
+            const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
 
             // Find the subnode containing the item
             const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2703,7 +2139,7 @@ int64_t Array::ColumnGet(size_t ndx) const
             const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
             const char* const refs_data = (const char*)refs_header + 8;
             const size_t refs_width  = get_header_width_direct(refs_header);
-            const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
+            const size_t ref = TO_SIZET(GetDirect(refs_data, refs_width, node_ndx));
 
             // Set vars for next iteration
             header = (const uint8_t*)m_alloc.Translate(ref);
@@ -2727,8 +2163,8 @@ const char* Array::ColumnStringGet(size_t ndx) const
     while (1) {
         if (isNode) {
             // Get subnode table
-            const size_t ref_offsets = GetDirect(data, width, 0);
-            const size_t ref_refs    = GetDirect(data, width, 1);
+            const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
+            const size_t ref_refs    = TO_SIZET(GetDirect(data, width, 1));
 
             // Find the subnode containing the item
             const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2744,7 +2180,7 @@ const char* Array::ColumnStringGet(size_t ndx) const
             const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
             const char* const refs_data = (const char*)refs_header + 8;
             const size_t refs_width  = get_header_width_direct(refs_header);
-            const size_t ref = GetDirect(refs_data, refs_width, node_ndx);
+            const size_t ref = TO_REF(GetDirect(refs_data, refs_width, node_ndx));
 
             // Set vars for next iteration
             header = (const uint8_t*)m_alloc.Translate(ref);
@@ -2756,8 +2192,8 @@ const char* Array::ColumnStringGet(size_t ndx) const
             const bool hasRefs = get_header_hasrefs_direct(header);
             if (hasRefs) {
                 // long strings
-                const size_t ref_offsets = GetDirect(data, width, 0);
-                const size_t ref_blob    = GetDirect(data, width, 1);
+                const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
+                const size_t ref_blob    = TO_SIZET(GetDirect(data, width, 1));
 
                 size_t offset = 0;
                 if (ndx) {
@@ -2765,7 +2201,7 @@ const char* Array::ColumnStringGet(size_t ndx) const
                     const char* const offsets_data = (const char*)offsets_header + 8;
                     const size_t offsets_width  = get_header_width_direct(offsets_header);
 
-                    offset = GetDirect(offsets_data, offsets_width, ndx-1);
+                    offset = TO_SIZET(GetDirect(offsets_data, offsets_width, ndx-1));
                 }
 
                 const uint8_t* const blob_header = (const uint8_t*)m_alloc.Translate(ref_blob);
@@ -2793,8 +2229,8 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
         const size_t width = get_header_width_direct(header);
 
         // Get subnode table
-        const size_t ref_offsets = GetDirect(data, width, 0);
-        const size_t ref_refs    = GetDirect(data, width, 1);
+        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
+        const size_t ref_refs    = TO_SIZET(GetDirect(data, width, 1));
 
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
         const char* const offsets_data = (const char*)offsets_header + 8;
@@ -2808,12 +2244,12 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
         // Iterate over nodes until we find a match
         size_t offset = 0;
         for (size_t i = 0; i < offsets_len; ++i) {
-            const size_t ref = GetDirect(refs_data, refs_width, i);
+            const size_t ref = TO_REF(GetDirect(refs_data, refs_width, i));
             const size_t result = ColumnFind(target, ref, cache);
             if (result != not_found)
                 return offset + result;
 
-            const size_t off = GetDirect(offsets_data, offsets_width, i);
+            const size_t off = TO_SIZET(GetDirect(offsets_data, offsets_width, i));
             offset = off;
         }
 
@@ -2844,8 +2280,8 @@ top:
 
     for (;;) {
         // Get subnode table
-        const size_t ref_offsets = GetDirect(data, width, 0);
-        const size_t ref_refs    = GetDirect(data, width, 1);
+        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0)); // todo, test if you can use TO_REF instead
+        const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
 
         // Find the position matching the key
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2859,7 +2295,7 @@ top:
         const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
         const char* const refs_data = (const char*)refs_header + 8;
         const size_t refs_width  = get_header_width_direct(refs_header);
-        const size_t ref = GetDirect(refs_data, refs_width, pos);
+        const size_t ref = TO_REF(GetDirect(refs_data, refs_width, pos));
 
         if (isNode) {
             // Set vars for next iteration
@@ -2891,7 +2327,7 @@ top:
                 const char* const sub_data = (const char*)sub_header + 8;
                 const size_t sub_width  = get_header_width_direct(sub_header);
 
-                const size_t row_ref = GetDirect(sub_data, sub_width, 0);
+                const size_t row_ref = TO_SIZET(GetDirect(sub_data, sub_width, 0));
                 if (*v == '\0') return row_ref; // full string has been compared
 
                 const char* const str =column.Get(row_ref);

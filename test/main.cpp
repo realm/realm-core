@@ -1,8 +1,8 @@
 #include <cstring>
-#include <string>
-#include <math.h>
-#include<iostream>
+#include <iostream>
+
 #include <UnitTest++.h>
+
 #include <tightdb/column.hpp>
 
 #if defined(_MSC_VER) && defined(_DEBUG)

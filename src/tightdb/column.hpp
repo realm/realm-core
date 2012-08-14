@@ -226,7 +226,7 @@ protected:
 
     template<class F> size_t LeafFind(int64_t value, size_t start, size_t end) const
     {
-        return m_array->Query<F>(value, start, end);
+        return m_array->find_first<F>(value, start, end);
     }
 
     void DoSort(size_t lo, size_t hi);

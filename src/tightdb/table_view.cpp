@@ -4,8 +4,6 @@
 
 namespace tightdb {
 
-    enum {TDB_SUM, TDB_MAX, TDB_MIN};
-
 // Searching
 
 // find_*_integer() methods are used for all "kinds" of integer values (bool, int, Date)
@@ -58,7 +56,7 @@ template <int function>int64_t TableViewBase::aggregate(size_t column_ndx) const
     res = get_int(column_ndx, 0);
 
     for (size_t ss = 1; ss < m_refs.Size(); ++ss) {
-        s = m_refs.Get(ss);
+        s = m_refs.GetAsRef(ss);
         if (s >= m_leaf_end) {
             m_column.GetBlock(s, m_array, m_leaf_start);
             const size_t leaf_size = m_array.Size();

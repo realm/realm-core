@@ -1,3 +1,4 @@
+
 #include <UnitTest++.h>
 #include <tightdb.hpp>
 
@@ -971,3 +972,4 @@ TEST(Group_ToDot)
 #endif //TIGHTDB_TO_DOT
 #endif // TIGHTDB_DEBUG
 #endif
+

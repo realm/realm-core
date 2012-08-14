@@ -330,7 +330,7 @@ inline void ColumnSubtableParent::update_child_ref(size_t subtable_ndx, size_t n
 
 inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const
 {
-    return Get(subtable_ndx);
+    return GetAsRef(subtable_ndx);
 }
 
 inline void ColumnSubtableParent::invalidate_subtables()

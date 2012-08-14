@@ -57,6 +57,8 @@ typedef struct {
 } checksum_t;
 
 size_t TO_REF(int64_t v);
+size_t TO_SIZET(int64_t v);
+
 unsigned long long checksum(unsigned char* data, size_t len);
 void checksum_rolling(unsigned char* data, size_t len, checksum_t* t);
 void* round_up(void* p, size_t align);

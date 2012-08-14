@@ -1,6 +1,7 @@
 #include <tightdb/query.hpp>
 #include <tightdb/query_engine.hpp>
 
+
 #define MULTITHREAD 1
 
 using namespace tightdb;
@@ -226,6 +227,8 @@ size_t Query::find_next(const Table& table, size_t lastmatch)
 
 TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
 {
+    if(end == size_t(-1)) end = table.size();
+
     Init(table);
 
     size_t r  = start - 1;
@@ -248,12 +251,14 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
 
     // Use single threading
     TableView tv(table);
-    first[0]->find_all(&tv.get_ref_column(), start, end, limit);
+    first[0]->aggregate(&tv.get_ref_column(), start, end, limit);
     return move(tv);
 }
 
 int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if(end == size_t(-1)) end = table.size();
+
     if(first[0] == 0) {
         if(resultcount)
             *resultcount = table.size();
@@ -263,56 +268,30 @@ int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_
 
     Init(table);
 
-    size_t r = start - 1;
-    size_t results = 0;
-    int64_t sum = 0;
-
-    const Column& c = table.GetColumn(column);
-    const size_t table_size = table.size();
-
-    for (;;) {
-        r = FindInternal(table, r + 1, end);
-        if (r == size_t(-1) || r == table_size || results == limit)
-            break;
-        ++results;
-        sum += c.Get(r);
-    }
-
-    if(resultcount)
-        *resultcount = results;
-    return sum;
+    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_SUM, column);
+    return r;
 }
 
 int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if(end == size_t(-1)) end = table.size();
+
     if(first[0] == 0) {
         const Column& c = table.GetColumn(column);  
         return c.maximum(start, end);
     }
-
+        
     Init(table);
 
-    size_t r = start - 1;
-    size_t results = 0;
-    int64_t max = 0;
+     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MAX);
+    return r;
 
-    for (;;) {
-        r = FindInternal(table, r + 1, end);
-        if (r == size_t(-1) || r == table.size() || results == limit)
-            break;
-        const int64_t g = table.get_int(column, r);
-        if (results == 0 || g > max)
-            max = g;
-        results++;
-    }
-
-    if(resultcount != 0)
-        *resultcount = results;
-    return max;
 }
 
 int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if(end == size_t(-1)) end = table.size();
+
     if(first[0] == 0) {
         const Column& c = table.GetColumn(column);  
         return c.minimum(start, end);
@@ -320,42 +299,23 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
 
     Init(table);
 
-    size_t r = start - 1;
-    size_t results = 0;
-    int64_t min = 0;
+    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MIN);
+    return r;
 
-    for (;;) {
-        r = FindInternal(table, r + 1, end);
-        if (r == size_t(-1) || r == table.size() || results == limit)
-            break;
-        const int64_t g = table.get_int(column, r);
-        if (results == 0 || g < min)
-            min = g;
-        ++results;
-    }
-    if(resultcount != 0)
-        *resultcount = results;
-    return min;
 }
 
 size_t Query::count(const Table& table, size_t start, size_t end, size_t limit) const
 {
-    if(first[0] == 0) { 
-        return table.size();
+    if(end == size_t(-1)) end = table.size();
+
+    if(first[0] == 0) {
+        return (limit < end - start ? limit : end - start);
     }
 
     Init(table);
+    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_COUNT);
+    return size_t(r);
 
-    size_t r = start - 1;
-    size_t results = 0;
-
-    for(;;) {
-        r = FindInternal(table, r + 1, end);
-        if (r == size_t(-1) || r == table.size() || results == limit)
-            break;
-        ++results;
-    }
-    return results;
 }
 
 double Query::average(const Table& table, size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const

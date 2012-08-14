@@ -345,7 +345,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
         return true;
     }
 
-    const size_t ref = refs.Get(ins_pos);
+    const size_t ref = refs.GetAsRef(ins_pos);
     const size_t sub_offset = offset + 4;
 
     // Single match (lowest bit set indicates literal row_ndx)
