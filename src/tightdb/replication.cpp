@@ -10,7 +10,7 @@
 #include <sys/mman.h>
 
 #include <tightdb/terminate.hpp>
-#include <tightdb/overflow.hpp>
+#include <tightdb/safe_int_ops.hpp>
 #include <tightdb/string_buffer.hpp>
 #include <tightdb/pthread_helpers.hpp>
 #include <tightdb/table.hpp>
@@ -677,16 +677,16 @@ error_code Replication::transact_log_expand(size_t free, bool contig)
         if (used_lower < used_upper) {
             // Move lower section
             min_size = used_wrap;
-            if (add_with_overflow_detect(min_size, used_lower)) return ERROR_NO_RESOURCE;
+            if (int_add_with_overflow_detect(min_size, used_lower)) return ERROR_NO_RESOURCE;
             const size_t avail_lower = used_begin - buffer_begin;
             if (avail_lower <= free) { // Require one unused byte
-                if (add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
+                if (int_add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
             }
         }
         else {
             // Move upper section
             min_size = used_end + 1 + used_upper; // Require one unused byte
-            if (add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
+            if (int_add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
         }
     }
     else {
@@ -698,11 +698,11 @@ error_code Replication::transact_log_expand(size_t free, bool contig)
             // Require one unused byte
             min_size = buffer_begin + (used_end-used_begin) + 1;
         }
-        if (add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
+        if (int_add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
     }
 
     size_t new_size = m_shared_state->m_size;
-    if (multiply_with_overflow_detect(new_size, size_t(2))) {
+    if (int_multiply_with_overflow_detect(new_size, 2)) {
         new_size = numeric_limits<size_t>::max();
     }
     if (new_size < min_size) new_size = min_size;
@@ -795,7 +795,7 @@ error_code Replication::select_table(const Table* table)
         end = table->record_subtable_path(begin, begin+m_subtab_path_buf.m_size);
         if (end) break;
         size_t new_size = m_subtab_path_buf.m_size;
-        if (multiply_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
+        if (int_multiply_with_overflow_detect(new_size, 2)) return ERROR_NO_RESOURCE;
         if (!m_subtab_path_buf.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
     }
     char* buf;
@@ -835,7 +835,7 @@ error_code Replication::select_spec(const Table* table, const Spec* spec)
         end = table->record_subspec_path(spec, begin, begin+m_subtab_path_buf.m_size);
         if (end) break;
         size_t new_size = m_subtab_path_buf.m_size;
-        if (multiply_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
+        if (int_multiply_with_overflow_detect(new_size, 2)) return ERROR_NO_RESOURCE;
         if (!m_subtab_path_buf.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
     }
     char* buf;
@@ -969,7 +969,7 @@ template<class T> bool Replication::TransactLogApplier::read_int(T& v)
         if (0xFF < part) return false; // Only the first 8 bits may be used in each byte
         if ((part & 0x80) == 0) {
             T p = part & 0x3F;
-            if (shift_left_with_overflow_detect(p, i*7)) return false;
+            if (int_shift_left_with_overflow_detect(p, i*7)) return false;
             value |= p;
             break;
         }
@@ -981,7 +981,7 @@ template<class T> bool Replication::TransactLogApplier::read_int(T& v)
         // this point, the following negation is guaranteed by the
         // standard to never overflow.
         value = -value;
-        if (subtract_with_overflow_detect(value, T(1))) return false;
+        if (int_subtract_with_overflow_detect(value, 1)) return false;
     }
     v = value;
     return true;
@@ -1021,7 +1021,7 @@ error_code Replication::TransactLogApplier::add_subspec(Spec* spec)
             new_size = 16; // FIXME: Use a small value (1) when compiling in debug mode
         }
         else {
-            if (multiply_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
+            if (int_multiply_with_overflow_detect(new_size, 2)) return ERROR_NO_RESOURCE;
         }
         if (!new_subspecs.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
         copy(m_subspecs.m_data, m_subspecs.m_data+m_num_subspecs, new_subspecs.m_data);

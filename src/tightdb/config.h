@@ -21,6 +21,10 @@
 #define TIGHTDB_CONFIG_H
 
 
+#define TIGHTDB_BEGIN_NAMESPACE(ns) namespace ns {
+#define TIGHTDB_END_NAMESPACE(ns) } // namespace ns
+
+
 /* This one works for both GCC and Clang, and of course any compiler
  * that fully supports C++11. */
 #if defined __cplusplus && __cplusplus >= 201103 || \
