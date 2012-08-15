@@ -119,9 +119,9 @@ public:
     size_t  remove(Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
     // Multi-threading
-    TableView      FindAllMulti(Table& table, size_t start=0, size_t end=size_t(-1));
-    ConstTableView FindAllMulti(const Table& table, size_t start=0, size_t end=size_t(-1));
-    int            SetThreads(unsigned int threadcount);
+    TableView      find_all_multi(Table& table, size_t start=0, size_t end=size_t(-1));
+    ConstTableView find_all_multi(const Table& table, size_t start=0, size_t end=size_t(-1));
+    int            set_threads(unsigned int threadcount);
 
 #ifdef TIGHTDB_DEBUG
     std::string Verify(); // Must be upper case to avoid conflict with macro in ObjC

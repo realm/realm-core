@@ -505,7 +505,7 @@ TEST(TestQueryThreads)
     TupleTableType::Query q1 = ttt.where().first.equal(2).second.equal("b");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-    //q1.SetThreads(5);
+    //q1.set_threads(5);
     TupleTableType::View tv = q1.find_all(ttt);
 
     CHECK_EQUAL(100, tv.size());
