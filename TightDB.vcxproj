@@ -243,7 +243,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>include;test\UnitTest++\src;UnitTest++\src;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TIGHTDB_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
