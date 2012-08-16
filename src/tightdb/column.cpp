@@ -710,19 +710,18 @@ size_t Column::find_first(int64_t value, size_t start, size_t end) const
     }
 }
 
-void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t start, size_t end, int cond) const
+void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t start, size_t end) const
 {
     (void)caller_offset;
     TIGHTDB_ASSERT(start <= Size());
     TIGHTDB_ASSERT(end == (size_t)-1 || end <= Size());
     if (is_empty()) return;
-    TreeFindAll<int64_t, Column>(result, value, 0, start, end, cond);
+    TreeFindAll<int64_t, Column>(result, value, 0, start, end);
 }
 
-void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end, int cond) const
+void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const
 {
-    //return m_array->find_all(result, value, add_offset, start, end);
-    m_array->find_all(result, value, add_offset, start, end);
+	m_array->find_all(result, value, add_offset, start, end);
 }
 
 void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const

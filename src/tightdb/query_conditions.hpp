@@ -150,8 +150,8 @@ struct NOTEQUAL_INS {
 struct GREATER {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 > v2;}
     int condition(void) {return COND_GREATER;}
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (ubound > v); }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (lbound > v); }
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { (void)lbound; return (ubound > v); }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { (void)ubound; return (lbound > v); }
 };
 
 struct NONE {
@@ -162,8 +162,8 @@ struct NONE {
 struct LESS {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 < v2;}
     int condition(void) {return  COND_LESS;}
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (lbound < v); }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (ubound < v); }
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { (void)ubound; return (lbound < v); }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { (void)lbound; return (ubound < v); }
 };
 
 struct LESSEQUAL {

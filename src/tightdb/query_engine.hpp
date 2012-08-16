@@ -35,15 +35,19 @@ namespace tightdb {
 
 class ParentNode {
 public:
-    ParentNode() : m_table(NULL), cond(-1) {}
+    ParentNode() : cond(-1), m_table(NULL) {}
     virtual ~ParentNode() {
 
     }
     virtual void Init(const Table& table) {m_table = &table; if (m_child) m_child->Init(table);}
     virtual size_t find_first(size_t start, size_t end) = 0;
 
-    virtual int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, int action = TDB_ACCUMULATE, size_t agg_col = not_found) 
+    virtual int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, int action = TDB_ACCUMULATE, size_t agg_col = not_found,  int64_t* matchcount = 0) 
     {
+		// aggregate called on non-integer column type
+		(void)matchcount;
+		(void)agg_col; // todo, let user accumulate foreign column (other col than criteria-col)
+
         size_t r = start - 1;
         size_t count = 0;
         for(;;) {
@@ -161,7 +165,7 @@ public:
 
 template <class T, class C, class F> class NODE: public ParentNode {
 public:
-    NODE(T v, size_t column) : m_array(GetDefaultAllocator()), m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_value(v), m_leaf_end_agg(0) {
+    NODE(T v, size_t column) : m_value(v), m_array(GetDefaultAllocator()),m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_leaf_end_agg(0) {
         m_column_id = column;
         m_child = 0;
         F f;
@@ -178,18 +182,17 @@ public:
         if (m_child)m_child->Init(table);
     }
 
-
-    int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, int action = TDB_ACCUMULATE, size_t agg_col = not_found) {
+    int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, int action = TDB_ACCUMULATE, size_t agg_col = not_found, int64_t* matchcount = 0) {
         if(action == TDB_ACCUMULATE)
-            return aggregate<TDB_ACCUMULATE>(res, start, end, limit, agg_col);
+            return aggregate<TDB_ACCUMULATE>(res, start, end, limit, agg_col, matchcount);
         if(action == TDB_SUM)
-            return aggregate<TDB_SUM>(res, start, end, limit, agg_col);
+            return aggregate<TDB_SUM>(res, start, end, limit, agg_col, matchcount);
         if(action == TDB_MAX)
-            return aggregate<TDB_MAX>(res, start, end, limit, agg_col);
+            return aggregate<TDB_MAX>(res, start, end, limit, agg_col, matchcount);
         if(action == TDB_MIN)
-            return aggregate<TDB_MIN>(res, start, end, limit, agg_col);
+            return aggregate<TDB_MIN>(res, start, end, limit, agg_col, matchcount);
         if(action == TDB_COUNT)
-            return aggregate<TDB_COUNT>(res, start, end, limit, agg_col);
+            return aggregate<TDB_COUNT>(res, start, end, limit, agg_col, matchcount);
 
         assert(false);
         return uint64_t(-1);
@@ -209,7 +212,7 @@ public:
         return b;
     }
 
-    template <int action> int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {
+    template <int action> int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, size_t agg_col, int64_t* matchcount = 0) {
         F f;
         int c = f.condition();
         Array rr;
@@ -221,7 +224,7 @@ public:
         rr.state_init(action, &state);
         state.state = (int64_t)res;
 
-        if(m_child == 0 && (SameType<F, EQUAL>::value || SameType<F, NOTEQUAL>::value || SameType<F, LESS>::value || SameType<F, GREATER>::value || SameType<F, NONE>::value)) {
+        if(m_child == 0 && limit > m_table->size() && (SameType<F, EQUAL>::value || SameType<F, NOTEQUAL>::value || SameType<F, LESS>::value || SameType<F, GREATER>::value || SameType<F, NONE>::value)) {
             
             for (size_t s = start; s < end; ) {
                 // Cache internal leafs
@@ -232,7 +235,7 @@ public:
                     m_local_end = leaf_size;
                 }
 
-                if(agg_col == m_column_id || agg_col == -1)
+                if(agg_col == m_column_id || agg_col == size_t(-1))
                     m_array.find(c, action, m_value, s - m_leaf_start, m_local_end, m_leaf_start, &state);
                 else
                     m_array.find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, m_local_end, m_leaf_start, &state, std::bind1st(std::mem_fun(&NODE::match_callback<action>), this));
@@ -241,26 +244,32 @@ public:
             }
 
             if(action == TDB_ACCUMULATE && res->Size() > limit) {
-                res->Resize(limit); // todo, optimize by adding limit argument to find_all()
+                res->Resize(limit); // todo, optimize by adding limit argument to find()
             }
 
+            if(matchcount)
+                *matchcount = int64_t(state.match_count);
             return state.state;
 
         }
         else {
             size_t r = start - 1;
-            for(;;) {
+            size_t n = 0;
+            while(n < limit) {
                 r = find_first(r + 1, end);
-                if (r == end || res->Size() == limit) // todo, optimize away Size() call
+                if (r == end)
                     break;
 
-                if(agg_col == m_column_id || agg_col == -1)
+                if(agg_col == m_column_id || agg_col == size_t(-1))
                     m_array.FIND_ACTION<action>(r, m_column->Get(r), &state, &tdb_dummy);
                 else
                     match_callback<action>(r);
+                n++;
             } 
         }
         
+        if(matchcount)
+            *matchcount = int64_t(state.match_count);
         return state.state;
     }
 
@@ -282,7 +291,7 @@ public:
             s = m_array.find_first<F>(m_value, s - m_leaf_start, m_local_end);
 
             if (s == not_found) {
-                s = m_leaf_end-1;
+                s = m_leaf_end - 1;
                 continue;
             }
             else
@@ -323,7 +332,7 @@ protected:
 
 template <class F> class STRINGNODE: public ParentNode {
 public:
-    template <int action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;};
+    template <int action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
 
     STRINGNODE(const char* v, size_t column)
     {
@@ -395,7 +404,7 @@ protected:
 
 template <> class STRINGNODE<EQUAL>: public ParentNode {
 public:
-    template <int action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;};
+    template <int action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
 
     STRINGNODE(const char* v, size_t column): m_key_ndx((size_t)-1) {
         m_column_id = column;
@@ -464,7 +473,7 @@ private:
 
 class OR_NODE: public ParentNode {
 public:
-    template <int action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;};
+    template <int action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
 
     OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond1 = p1; m_cond2 = NULL;};
 
@@ -477,8 +486,8 @@ public:
         if(m_child)
             m_child->Init(table);
 
-        m_last1 = -1;
-        m_last2 = -1;
+        m_last1 = size_t(-1);
+        m_last2 = size_t(-1);
 
         m_table = &table;
     }

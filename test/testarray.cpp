@@ -893,10 +893,7 @@ TEST(Greater)
         for(size_t i = 0; i < items; i++) {
             a.Set(i, 1);
 
-            if(i == 4 && items == 0x9)
-                printf("");
-
-            size_t t = a.find_first<GREATER>(0, 0, (size_t)-1);
+			size_t t = a.find_first<GREATER>(0, 0, (size_t)-1);
             assert(i == t);
 
             CHECK_EQUAL(i, t);

@@ -137,7 +137,7 @@ TEST(TestQueryFindAll_range_or_monkey2)
 
         CHECK_EQUAL(s1, s2);
         for(size_t t = 0; t < a.Size(); t++) {
-            int64_t i1 = a.Get(t);
+            size_t i1 = a.GetAsSizeT(t);
             size_t i2 = tv1.get_source_ndx(t);
             CHECK_EQUAL(i1, i2);
         }

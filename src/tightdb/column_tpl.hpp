@@ -413,12 +413,10 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
     }
 }
 
-
-
-template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end, int cond) const
+template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const
 {
     if (!IsNode()) {
-        return static_cast<const C*>(this)->LeafFindAll(result, value, add_offset, start, end, cond);
+        return static_cast<const C*>(this)->LeafFindAll(result, value, add_offset, start, end);
     }
     else {
         // Get subnode table
@@ -436,7 +434,7 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T valu
 
             size_t add = i ? TO_REF(offsets.Get(i-1)) : 0;
             add += add_offset;
-            col.template TreeFindAll<T, C>(result, value, add, s, e, cond);
+            col.template TreeFindAll<T, C>(result, value, add, s, e);
             ++i;
             if (i >= count) break;
 

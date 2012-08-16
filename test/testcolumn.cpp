@@ -723,7 +723,7 @@ TEST(Column_prepend_many)
 
     for (size_t items = 0; items < 3000; ++items) {
         a.Clear();
-        for (int j = 0; j < items + 1; ++j) {
+        for (size_t j = 0; j < items + 1; ++j) {
             a.Insert(0, j);
         }
         a.Insert(items, 444);

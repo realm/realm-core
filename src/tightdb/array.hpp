@@ -123,6 +123,7 @@ class AdaptiveStringColumn;
 
 struct state_state {
     int64_t state;
+    size_t match_count;
 };
 
 #ifdef TIGHTDB_DEBUG
@@ -296,7 +297,7 @@ public:
     // Debug
     size_t GetBitWidth() const {return m_width;}
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Print() const;
     void Verify() const;
     void ToDot(std::ostream& out, const char* title=NULL) const;
@@ -334,10 +335,14 @@ private:
 public:
 void state_init(int action, state_state *state) 
 {
-    if(action == TDB_MAX)
-        state->state = -9223372036854775808LL;
-    if(action == TDB_MIN)
-        state->state = 9223372036854775807LL;
+    if(action == TDB_MAX) {
+        state->state = -0x7fffffffffffffffLL - 1LL;
+        state->match_count = 0;
+    }
+    if(action == TDB_MIN) {
+        state->state = 0x7fffffffffffffffLL;
+        state->match_count = 0;
+    }
     if(action == TDB_RETURN_FIRST)
         state->state = not_found;
     if(action == TDB_SUM)
@@ -375,10 +380,16 @@ template <int action, bool pattern, class Callback>bool state_match(size_t index
 
     if(action == TDB_CALLBACK_IDX)
         return callback(index);
-    if(action == TDB_MAX && value > *(int64_t*)state)
+    if(action == TDB_MAX && value > *(int64_t*)state) {
         state->state = value;
-    if(action == TDB_MIN && value < *(int64_t*)state)
+        state->match_count++;
+//         state->match_count = 1; // faster than ++ (write microop vs. read+inc+write microop) but gives no count to end-user. However, it's rarely executeed, so not chosen
+    }
+    if(action == TDB_MIN && value < *(int64_t*)state) {
         state->state = value;
+//         state->match_count = 1; // faster than ++ (write microop vs. read+inc+write microop) but gives no count to end-user. However, it's rarely executeed, so not chosen
+        state->match_count++;
+    }
     if(action == TDB_SUM)
         state->state += value;
     if(action == TDB_COUNT)
@@ -411,9 +422,7 @@ template<size_t width> uint64_t cascade(uint64_t a) const
 
     // staiic values needed for fast population count
     const uint64_t m1  = 0x5555555555555555ULL;
-    const uint64_t m2  = 0x3333333333333333ULL;
-    const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
-    const uint64_t h01 = 0x0101010101010101ULL;
+
 
     if (width == 1) {
         return ~a;
@@ -510,7 +519,6 @@ template<size_t width> uint64_t cascade(uint64_t a) const
 template <class cond2, int action, size_t bitwidth, class Callback> void find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
 {
     cond2 C;
-    int cond = C.condition();
     assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
 
     if(m_len > start && C(Get<bitwidth>(start), value) && start < end) { if(!FIND_ACTION<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;} ++start; 
@@ -542,7 +550,7 @@ template <class cond2, int action, size_t bitwidth, class Callback> void find_op
 #if defined(USE_SSE42)
     if (end - start < sizeof(__m128i) || m_width < 8) {
 #elif defined(USE_SSE3)
-    if (cond != EQUAL || end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) {
+    if (!SameType<cond2, EQUAL>::value || end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) {
 #endif
 		Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
         return;
@@ -715,9 +723,11 @@ template <size_t width> inline bool TestZero(uint64_t value) const {
 }
 
 
-// Finds first zero element of bit width 'width'
+
 template <bool eq, size_t width>size_t FindZero(uint64_t v) const
 {
+    // Finds first zero element in a chunk of valies. This function assumes that at least 1 item matches! So use TestZero() before calling this function
+
     size_t start = 0;
     uint64_t hasZeroByte;
     uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
@@ -755,6 +765,7 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v) const
     }
 
     while(eq == (((v >> (width * start)) & mask) != 0)) {
+        assert(start <= 8 * sizeof(v)); // You must only call FindZero() if you are sure that at least 1 item matches
         start++;
     }
 
@@ -790,19 +801,19 @@ template <bool gt, int action, size_t width, class Callback>bool FindGTLT_Fast(i
         if(!FIND_ACTION<action, Callback>(p + baseindex, (chunk >> (p * width)) & mask1, state, callback))
             return false;
 
-        m >>= (t + 1) * width;            
+        if((t + 1) * width == 64)
+            m = 0;
+        else 
+            m >>= (t + 1) * width;            
         p++;
     }
 
     return true;
 }
 
-
-// template <bool gt, size_t width>size_t __forceinline FindGTLT(int64_t v, uint64_t chunk) // fixme, __forceinline makes it crash, find out why
 template <bool gt, int action, size_t width, class Callback>bool FindGTLT(int64_t v, uint64_t chunk, state_state *state, size_t baseindex, Callback callback) const
 {
-    int64_t result = 0;
-
+    // Fínd items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
     if(width == 1) {
         for(size_t t = 0; t < 64; t++) {
             if(gt ? (int64_t)(chunk & 0x1) > v : (int64_t)(chunk & 0x1) < v) {if(!FIND_ACTION<action, Callback>( t + baseindex, (int64_t)(chunk & 0x1), state, callback)) return false;} chunk >>= 1;
@@ -943,15 +954,16 @@ template <bool gt, int action, size_t width, class Callback>bool FindGTLT(int64_
         if(gt ? (int)chunk > v : (int)chunk < v) {if(!FIND_ACTION<action, Callback>( 1 + baseindex, (int)chunk, state, callback)) return false;} chunk >>= 32;
     }
     else if(width == 64) {
-        if(gt ? (int64_t)v > v : (int64_t)(v) < v) {if(!FIND_ACTION<action, Callback>( 0 + baseindex, (int64_t)v, state, callback)) return false;} chunk >>= 64;
+        if(gt ? (int64_t)v > v : (int64_t)(v) < v) {if(!FIND_ACTION<action, Callback>( 0 + baseindex, (int64_t)v, state, callback)) return false;};
     }
 
     return true;
 }
 
 
-// Not meant to be called from outside Array.cpp
 template <bool eq, int action, size_t width, class Callback> inline bool CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const {
+    // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
+
     assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
 
     size_t ee = round_up(start, 64 / no0(width));
@@ -1014,6 +1026,8 @@ template <bool eq, int action, size_t width, class Callback> inline bool Compare
      return true;
 }
 
+// There exists a couple of find() functions that take more or less template arguments. Always call the one that takes as most as possible to get 
+// best performance.
 
 template <class cond, int action, size_t bitwidth> void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const
 {
@@ -1025,68 +1039,89 @@ template <class cond, int action, class Callback> void find(int64_t value, size_
     TEMPEX4(find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
 }
 
-
-
 void find(int cond, int action, int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const
 {
     if(cond == COND_EQUAL) {
-        if(action == TDB_SUM)
+        if(action == TDB_SUM) {
             TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_MIN)
+		}
+        else if(action == TDB_MIN) {
             TEMPEX3(find, EQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_MAX)
+		}
+        else if(action == TDB_MAX) {
             TEMPEX3(find, EQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_COUNT)
+		}
+        else if(action == TDB_COUNT) {
             TEMPEX3(find, EQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_ACCUMULATE)
+		}
+        else if(action == TDB_ACCUMULATE) {
             TEMPEX3(find, EQUAL, TDB_ACCUMULATE, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_CALLBACK_IDX)
+		}
+        else if(action == TDB_CALLBACK_IDX) {
             TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
+		}
     }
     if(cond == COND_NOTEQUAL) {
-        if(action == TDB_SUM)
+        if(action == TDB_SUM) {
             TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_MIN)
+		}
+        else if(action == TDB_MIN) {
             TEMPEX3(find, NOTEQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_MAX)
+		}
+        else if(action == TDB_MAX) {
             TEMPEX3(find, NOTEQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_COUNT)
+		}
+        else if(action == TDB_COUNT) {
             TEMPEX3(find, NOTEQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_ACCUMULATE)
+		}
+        else if(action == TDB_ACCUMULATE) {
             TEMPEX3(find, NOTEQUAL, TDB_ACCUMULATE, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_CALLBACK_IDX)
+		}
+        else if(action == TDB_CALLBACK_IDX) {
             TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
+		}
     }
     if(cond == COND_GREATER) {
-        if(action == TDB_SUM)
+        if(action == TDB_SUM) {
             TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_MIN)
+		}
+        else if(action == TDB_MIN) {
             TEMPEX3(find, GREATER, TDB_MIN, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_MAX)
+		}
+        else if(action == TDB_MAX) {
             TEMPEX3(find, GREATER, TDB_MAX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_COUNT)
+		}
+        else if(action == TDB_COUNT) {
             TEMPEX3(find, GREATER, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_ACCUMULATE)
+		}
+        else if(action == TDB_ACCUMULATE) {
             TEMPEX3(find, GREATER, TDB_ACCUMULATE, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_CALLBACK_IDX)
+		}
+        else if(action == TDB_CALLBACK_IDX) {
             TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
+		}
     }
     if(cond == COND_LESS) {
-        if(action == TDB_SUM)
+        if(action == TDB_SUM) {
             TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_MIN)
+		}
+        else if(action == TDB_MIN) {
             TEMPEX3(find, LESS, TDB_MIN, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_MAX)
+		}
+        else if(action == TDB_MAX) {
             TEMPEX3(find, LESS, TDB_MAX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_COUNT)
+		}
+        else if(action == TDB_COUNT) {
             TEMPEX3(find, LESS, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_ACCUMULATE)
+		}
+        else if(action == TDB_ACCUMULATE) {
             TEMPEX3(find, LESS, TDB_ACCUMULATE, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-        else if(action == TDB_CALLBACK_IDX)
+		}
+        else if(action == TDB_CALLBACK_IDX) {
             TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
+		}
     }
 }
-
 
 
 template <class cond, int action, size_t bitwidth, class Callback> void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
@@ -1105,10 +1140,6 @@ template <class cond, int action, size_t bitwidth, class Callback> void find(int
         r_state.state = state->state;
     }
 #endif
-
-    if(value == 8 && start == 0 && end == 34)
-        printf("");
-
     find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     
 #ifdef _DEBUG
@@ -1361,10 +1392,9 @@ void find_all(Array& result, int64_t value, size_t colOffset = 0, size_t start =
 // If gt = false: Find elements that are smaller than value
 template <bool gt, int action, size_t bitwidth, class Callback>bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
 {
-    int64_t result = 0;
-
     assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
-  
+    uint64_t mask = (bitwidth == 64 ? ~0ULL : ((1ULL << (bitwidth == 64 ? 0 : bitwidth)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
+
     size_t ee = round_up(start, 64 / no0(bitwidth));
     ee = ee > end ? end : ee;
     for (; start < ee; start++) {
@@ -1383,12 +1413,12 @@ template <bool gt, int action, size_t bitwidth, class Callback>bool CompareRelat
     // Matches are rare enough to setup fast linear search for remaining items. We use
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
 
-    if (bitwidth == 1 || bitwidth == 2 || bitwidth == 4 || bitwidth == 8 || bitwidth == 16) {
+    if (bitwidth == 1 || bitwidth == 2 || bitwidth == 4 || bitwidth == 8 || bitwidth == 16) {        
+        uint64_t magic = FindGTLT_Magic<gt, bitwidth>(value);
+        
         // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than' 
-        if(value >= 0 && bitwidth != 1 && (bitwidth == 4 ? value <= (gt ? 7 : 8) : true) && (bitwidth == 2 ? value <= (gt ? 1 : 2) : true)) {
+        if(value != int64_t((magic & mask)) && value >= 0 && bitwidth >= 2 && value <= (int64_t)((mask >> 1) - (gt ? 1 : 0))) {
             // 15 ms
-            uint64_t magic = FindGTLT_Magic<gt, bitwidth>(value);
-
             while (p < e) {
                 uint64_t upper = LowerBits<bitwidth>() << (no0(bitwidth) - 1);
 
@@ -1398,7 +1428,7 @@ template <bool gt, int action, size_t bitwidth, class Callback>bool CompareRelat
                 // Bit hacks only works for positive items in chunk, so test their sign bits
                 upper = upper & v;
 
-                if(bitwidth > 4 ? !upper : true)
+                if((bitwidth > 4 ? !upper : true))
                     idx = FindGTLT_Fast<gt, action, bitwidth, Callback>(value, v, magic, state, (p - (int64_t *)m_data) * 8 * 8 / no0(bitwidth) + baseindex, callback); 
                 else
                     idx = FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - (int64_t *)m_data) * 8 * 8 / no0(bitwidth) + baseindex, callback);
@@ -1420,9 +1450,9 @@ template <bool gt, int action, size_t bitwidth, class Callback>bool CompareRelat
         start = (p - (int64_t *)m_data) * 8 * 8 / no0(bitwidth);
     }
 
-    // extra logic in SIMD no longer pays off for 32/64 bit ints because we have just 4/2 elements
+    // matchcount logic in SIMD no longer pays off for 32/64 bit ints because we have just 4/2 elements
 
-    // Test unaligned end manually
+    // Test unaligned end and/or values of width > 16 manually
     while (start < end) {
         if (gt ? Get<bitwidth>(start) > value : Get<bitwidth>(start) < value) {
             if(!FIND_ACTION<action, Callback>( start + baseindex, Get<bitwidth>(start), state, callback))

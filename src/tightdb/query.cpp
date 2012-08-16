@@ -231,7 +231,6 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
 
     Init(table);
 
-    size_t r  = start - 1;
     if(end == size_t(-1))
         end = table.size();
 
@@ -267,8 +266,12 @@ int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_
     }
 
     Init(table);
+    int64_t matchcount = 0;
 
-    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_SUM, column);
+    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_SUM, column, &matchcount);
+    if(resultcount)
+        *resultcount = matchcount;
+
     return r;
 }
 
@@ -282,8 +285,11 @@ int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, s
     }
         
     Init(table);
+    int64_t matchcount = 0;
 
-     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MAX);
+    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MAX, column, &matchcount);
+    if(resultcount)
+        *resultcount = matchcount;
     return r;
 
 }
@@ -298,8 +304,11 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
     }
 
     Init(table);
+    int64_t matchcount = 0;
 
-    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MIN);
+    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MIN, not_found, &matchcount);
+    if(resultcount)
+        *resultcount = matchcount;
     return r;
 
 }
@@ -322,7 +331,7 @@ double Query::average(const Table& table, size_t column_ndx, size_t* resultcount
 {
     Init(table);
 
-    size_t resultcount2;
+    size_t resultcount2 = 0;
 
     const int64_t sum1 = sum(table, column_ndx, &resultcount2, start, end, limit);
     const double avg1 = (float)sum1 / (float)resultcount2;
@@ -340,7 +349,6 @@ size_t Query::remove(Table& table, size_t start, size_t end, size_t limit) const
 
     size_t r = start;
     size_t results = 0;
-    size_t displace = 0;
 
     for (;;) {
         // Every remove invalidates the array cache in the nodes

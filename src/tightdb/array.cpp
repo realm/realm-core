@@ -107,8 +107,9 @@ inline void init_header(void* header, bool is_node, bool has_refs, int width_typ
 
 bool tdb_dummy (int64_t t)
 { 
+	(void)t;
     return true; 
-};
+}
 
 namespace tightdb {
 
@@ -482,7 +483,7 @@ int64_t Array::Get(size_t ndx) const
     TEMPEX(return Get, (ndx));              
 */
 /*
-    // Slightly slower in both of the if-cases. Also needs an extra m_len check too, to avoid
+    // Slightly slower in both of the if-cases. Also needs an matchcount m_len check too, to avoid
     // reading beyond array.
     if(m_width >= 8 && m_len > ndx + 7)     
         return Get<64>(ndx >> m_shift) & m_widthmask;
@@ -866,8 +867,13 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
     if (end == (size_t)-1) end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
-    if(w == 0)
-        return 0;
+    if(m_len == 0)
+        return false;
+
+    if(w == 0) {
+        result = 0;
+        return true;
+    }
 
     int64_t m = Get<w>(start);
     ++start;
@@ -1294,7 +1300,7 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const
 
 bool Array::Copy(const Array& a)
 {
-    // Calculate size in bytes (plus a bit of extra room for expansion)
+    // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t len = CalcByteLen(a.m_len, a.m_width);
     const size_t rest = (~len & 0x7)+1;
     if (rest < 8) len += rest; // 64bit blocks
@@ -1339,7 +1345,7 @@ bool Array::CopyOnWrite()
 {
     if (!m_alloc.IsReadOnly(m_ref)) return true;
 
-    // Calculate size in bytes (plus a bit of extra room for expansion)
+    // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t len = CalcByteLen(m_len, m_width);
     const size_t rest = (~len & 0x7)+1;
     if (rest < 8) len += rest; // 64bit blocks
