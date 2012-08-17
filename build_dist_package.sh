@@ -12,7 +12,7 @@ MAKE="make -j8"
 # Setup OS specific stuff
 OS="$(uname -s)" || exit 1
 if [ "$OS" = "Darwin" ]; then
-    MAKE="$MAKE CC=gcc"
+    MAKE="$MAKE CC=clang"
 fi
 
 
