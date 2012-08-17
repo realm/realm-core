@@ -4,6 +4,9 @@ TIGHTDB_HOME="$(pwd)"
 #LANG_BINDINGS="tightdb_java2 tightdb_node tightdb_python tightdb_php"
 LANG_BINDINGS="tightdb_java2 tightdb_python"
 
+VERSION="$(git describe)" || exit 1
+echo "TIGHTDB VERSION = $VERSION"
+
 MAKE="make -j8"
 
 # Setup OS specific stuff
@@ -27,7 +30,6 @@ done
 
 
 # Setup package directory
-VERSION="$(git describe)" || exit 1
 NAME="tightdb-$VERSION"
 TEMP_DIR="$(mktemp -d /tmp/temp.XXXX)" || exit 1
 PKG_DIR="$TEMP_DIR/$NAME"
