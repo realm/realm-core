@@ -186,10 +186,10 @@ void SlabAlloc::Free(size_t ref, void* p)
 #endif // TIGHTDB_DEBUG
 
     // Check if we can merge with start of free block
-    const size_t n = freeSpace.cols().ref.find_first(refEnd);
+    const size_t n = freeSpace.column().ref.find_first(refEnd);
     if (n != (size_t)-1) {
         // No consolidation over slab borders
-        if (m_slabs.cols().offset.find_first(refEnd) == (size_t)-1) {
+        if (m_slabs.column().offset.find_first(refEnd) == (size_t)-1) {
             freeSpace[n].ref = ref;
             freeSpace[n].size += size;
             isMerged = true;
@@ -197,7 +197,7 @@ void SlabAlloc::Free(size_t ref, void* p)
     }
 
     // Check if we can merge with end of free block
-    if (m_slabs.cols().offset.find_first(ref) == (size_t)-1) { // avoid slab borders
+    if (m_slabs.column().offset.find_first(ref) == (size_t)-1) { // avoid slab borders
         const size_t count = freeSpace.size();
         for (size_t i = 0; i < count; ++i) {
             FreeSpace::Cursor c = freeSpace[i];
@@ -255,7 +255,7 @@ void* SlabAlloc::Translate(size_t ref) const
 {
     if (ref < m_baseline) return m_shared + ref;
     else {
-        const size_t ndx = m_slabs.cols().offset.find_pos(ref);
+        const size_t ndx = m_slabs.column().offset.find_pos(ref);
         TIGHTDB_ASSERT(ndx != not_found);
 
         const size_t offset = ndx ? m_slabs[ndx-1].offset : m_baseline;
@@ -495,7 +495,7 @@ bool SlabAlloc::IsAllFree() const
         Slabs::ConstCursor c = m_slabs[i];
         const size_t size = TO_REF(c.offset) - ref;
 
-        const size_t r = m_freeSpace.cols().ref.find_first(ref);
+        const size_t r = m_freeSpace.column().ref.find_first(ref);
         if (r == (size_t)-1) return false;
         if (size != (size_t)m_freeSpace[r].size) return false;
 
@@ -512,7 +512,7 @@ void SlabAlloc::Verify() const
         FreeSpace::ConstCursor c = m_freeSpace[i];
         const size_t ref = TO_REF(c.ref);
 
-        const size_t ndx = m_slabs.cols().offset.find_pos(ref);
+        const size_t ndx = m_slabs.column().offset.find_pos(ref);
         TIGHTDB_ASSERT(ndx != size_t(-1));
 
         const size_t slab_end = TO_REF(m_slabs[ndx].offset);

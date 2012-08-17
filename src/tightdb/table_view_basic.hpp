@@ -57,9 +57,9 @@ private:
     typedef typename Spec::template ColNames<ConstCol, const View*> ConstColsAccessor;
 
 public:
-    ColsAccessor cols() { return ColsAccessor(static_cast<View*>(this)); }
+    ColsAccessor column() { return ColsAccessor(static_cast<View*>(this)); }
 
-    ConstColsAccessor cols() const { return ConstColsAccessor(static_cast<const View*>(this)); }
+    ConstColsAccessor column() const { return ConstColsAccessor(static_cast<const View*>(this)); }
 
 private:
     template<int col_idx> struct Field {

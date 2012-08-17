@@ -15,66 +15,73 @@ Format:
 2012-??-??
 ----------
 
+2012-08-14 (Brian Munkholm)
+----------
++ 10 Renamed FindAllMulti() to find_all_multe(). And SetThreads() to set_threads()
++ 10 Renamed cols() to column().
++ 10 Renamed get_subspec() to get_subtable_spec(). 
++ 10 Renamed parent() to end_subtable().
+
 
 2012-08-01 (Kristian Spangsege)
 ----------
-+ Date::operator==(const Date&) and Date::operator!=(const Date&) added.
-+ BinaryData::operator==(const BinaryData&) and BinaryData::operator!=(const BinaryData&) added.
-+ Operators added for comparison between a value of type Mixed and a value of one of the possible types that a Mixed can contain. Operators are added for both orders of the two arguments.
-+ Comparison operators added for "foo" == my_table[i].str and "foo" != my_table[i].str. We already had a comparison operator for the reverse order case, my_table[i].str == "foo".
-+ my_table[i].mixed.get_subtable_size() added.
++ 9 Date::operator==(const Date&) and Date::operator!=(const Date&) added.
++ 9 BinaryData::operator==(const BinaryData&) and BinaryData::operator!=(const BinaryData&) added.
++ 9 Operators added for comparison between a value of type Mixed and a value of one of the possible types that a Mixed can contain. Operators are added for both orders of the two arguments.
++ 8 Comparison operators added for "foo" == my_table[i].str and "foo" != my_table[i].str. We already had a comparison operator for the reverse order case, my_table[i].str == "foo".
++ 7 my_table[i].mixed.get_subtable_size() added.
 
 
 2012-07-27 (Kristian Spangsege)
 ----------
-+ tightdb::is_a<MyTable>(const Table&) added.
-+ tightdb::unchecked_cast<MyTable>(TableRef) added.
-+ tightdb::checked_cast<MyTable>(TableRef) added.
-+ my_table[i].mixed.set_subtable() added.
-+ my_table[i].mixed.set_subtable<MySubtable>() added.
-+ my_table[i].mixed.is_subtable<MyTable>() added (inefficient, do we want it at all?).
-+ my_table[i].mixed.get_subtable<MySubtable>() added (unsafe/unchecked, do we want it at all?).
++ 6 tightdb::is_a<MyTable>(const Table&) added.
++ 6 tightdb::unchecked_cast<MyTable>(TableRef) added.
++ 6 tightdb::checked_cast<MyTable>(TableRef) added.
++ 6 my_table[i].mixed.set_subtable() added.
++ 6 my_table[i].mixed.set_subtable<MySubtable>() added.
++ 6 my_table[i].mixed.is_subtable<MyTable>() added (inefficient, do we want it at all?).
++ 6 my_table[i].mixed.get_subtable<MySubtable>() added (unsafe/unchecked, do we want it at all?).
 
 
 2012-07-24 (Kristian Spangsege)
 ----------
-+ New macro TIGHTDB_DEBUG to control compilation mode.
++  New macro TIGHTDB_DEBUG to control compilation mode.
     The library (including all headers) is no longer affected in any way by the definition status of NDEBUG or _DEBUG.
     When we (TightDB) compile the library in debug mode, we must define this macro.
     We will deliver two versions of the library, one for release mode, and one for debug mode.
     If the customer wishes to use the debugging version of the library, he must do two things:
     1) Define TIGHTDB_DEBUG in any translation unit that includes a TightDB header.
     2) Use the version of the library that is compiled for debug mode (libtightdb_d.a).
-+ Removed obsolete constructor Mixed(ColumnType). Use Mixed(subtable_tag) instead, since this has no runtime overhead.
++ 5 Removed obsolete constructor Mixed(ColumnType). Use Mixed(subtable_tag) instead, since this has no runtime overhead.
 
 
 2012-07-19 (Kristian Spangsege)
 ----------
-+ Table::create() added. Use this to create a freestanding top-level table with dynamic lifetime (determined by reference counting).
-+ TableRef::reset() added to set a table reference to null.
++ 4 Table::create() added. Use this to create a freestanding top-level table with dynamic lifetime (determined by reference counting).
++   TableRef::reset() added to set a table reference to null.
 
 
 2012-07-15 (Kristian Spangsege)
 ----------
-+ Spec::compare() renamed to Spec::operator==(), and made generally available, not only while compiling in debug mode.
-+ Spec::operator!=() added.
-+ Table::compare() renamed to Table::operator==(), and made generally available, not only while compiling in debug mode.
-+ Table::operator!=() added.
-+ MyTable::compare() renamed to MyTable::operator==(), and made generally available, not only while compiling in debug mode.
-+ MyTable::operator!=() added.
-+ Group::operator==() and Group::operator!=() added.
++ 3 Spec::compare() renamed to Spec::operator==(), and made generally available, not only while compiling in debug mode.
++ 3 Spec::operator!=() added.
++ 3 Table::compare() renamed to Table::operator==(), and made generally available, not only while compiling in debug mode.
++ 3 Table::operator!=() added.
++ 3 MyTable::compare() renamed to MyTable::operator==(), and made generally available, not only while compiling in debug mode.
++ 3 MyTable::operator!=() added.
++ 3 Group::operator==() and Group::operator!=() added.
 . Array::Compare() and Column::Compare() made generally available, not only while compiling in debug mode.
 
 
 2012-07-09 (Kristian Spangsege)
 ----------
-+ Table::is_valid() added. Most language bindings must check this flag before calling any member function on any table.
-+ MyTable::is_valid() added.
-+ Destroying a Group will invalidate all table wrappers (instances of Table) as well as all direct and indirect subtable wrappers.
-+ Any modifying operation on a table will generally invalidate all direct and indirect subtable wrappers.
-+ See documentation for Table::is_valid() for more details on when a table becomes invalid, and when it does not.
-+ my_table[i].mixed.is_subtable() added.
-+ my_table[i].mixed.get_subtable() added.
++ 1 Table::is_valid() added. Most language bindings must check this flag before calling any member function on any table.
++ 1 MyTable::is_valid() added.
++   See documentation for Table::is_valid() for more details on when a table becomes invalid, and when it does not.
++   Destroying a Group will invalidate all table wrappers (instances of Table) as well as all direct and indirect subtable wrappers.
++   Any modifying operation on a table will generally invalidate all direct and indirect subtable wrappers.
++ 2 my_table[i].mixed.is_subtable() added.
++ 2 my_table[i].mixed.get_subtable() added.
 
 
 2012-07-08 (Kristian Spangsege)

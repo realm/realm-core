@@ -140,6 +140,49 @@ TEST(TestQueryDelete)
     CHECK_EQUAL(0, ttt.size());
 }
 
+TEST(TestQueryDeleteRange)
+{
+    TupleTableType ttt;
+
+    ttt.add(0, "X");
+    ttt.add(1, "X");
+    ttt.add(2, "X");
+    ttt.add(3, "X");
+    ttt.add(4, "X");
+    ttt.add(5, "X");
+
+    TupleTableType::Query q = ttt.where().second.equal("X");
+    size_t r = q.remove(ttt, 1, 4);
+
+    CHECK_EQUAL(3, r);
+    CHECK_EQUAL(3, ttt.size());
+    CHECK_EQUAL(0, ttt[0].first);
+    CHECK_EQUAL(4, ttt[1].first);
+    CHECK_EQUAL(5, ttt[2].first);
+}
+
+TEST(TestQueryDeleteLimit)
+{
+    TupleTableType ttt;
+
+    ttt.add(0, "X");
+    ttt.add(1, "X");
+    ttt.add(2, "X");
+    ttt.add(3, "X");
+    ttt.add(4, "X");
+    ttt.add(5, "X");
+
+    TupleTableType::Query q = ttt.where().second.equal("X");
+    size_t r = q.remove(ttt, 1, 4, 2);
+
+    CHECK_EQUAL(2, r);
+    CHECK_EQUAL(4, ttt.size());
+    CHECK_EQUAL(0, ttt[0].first);
+    CHECK_EQUAL(3, ttt[1].first);
+    CHECK_EQUAL(4, ttt[2].first);
+    CHECK_EQUAL(5, ttt[3].first);
+}
+
 
 
 TEST(TestQuerySimple)
@@ -169,7 +212,7 @@ TEST(TestQuerySimpleBUGdetect)
 	CHECK_EQUAL(2, tv1.size());
 	CHECK_EQUAL(0, tv1.get_source_ndx(0));
 
-	TupleTableType::View resView = tv1.cols().second.find_all("Foo");
+	TupleTableType::View resView = tv1.column().second.find_all("Foo");
 
     // This previously crashed:
     // TableView resView = TableView(tv1);
@@ -244,7 +287,7 @@ TEST(TestQuerySubtable)
     q1->greater(0, 200);
     q1->subtable(2);
     q1->less(0, 50);
-    q1->parent();
+    q1->end_subtable();
     TableView t1 = q1->find_all(*table, 0, (size_t)-1);
     CHECK_EQUAL(2, t1.size());
     CHECK_EQUAL(1, t1.get_source_ndx(0));
@@ -257,7 +300,7 @@ TEST(TestQuerySubtable)
     q2->greater(0, 50);
     q2->Or();
     q2->less(0, 20);
-    q2->parent();
+    q2->end_subtable();
     TableView t2 = q2->find_all(*table, 0, (size_t)-1);
     CHECK_EQUAL(2, t2.size());
     CHECK_EQUAL(0, t2.get_source_ndx(0));
@@ -270,7 +313,7 @@ TEST(TestQuerySubtable)
     q3->greater(0, 50);
     q3->Or();
     q3->less(0, 20);
-    q3->parent();
+    q3->end_subtable();
     q3->less(0, 300);
     TableView t3 = q3->find_all(*table, 0, (size_t)-1);
     CHECK_EQUAL(1, t3.size());
@@ -285,7 +328,7 @@ TEST(TestQuerySubtable)
     q4->greater(0, 50);
     q4->Or();
     q4->less(0, 20);
-    q4->parent();
+    q4->end_subtable();
     TableView t4 = q4->find_all(*table, 0, (size_t)-1);
     delete q4;
 
@@ -319,7 +362,7 @@ TEST(TestQuerySort1)
 
     TupleTableType::Query q = ttt.where().first.not_equal(2);
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort();
+    tv.column().first.sort();
 
     CHECK(tv.size() == 7);
     CHECK(tv[0].first == 1);
@@ -343,11 +386,11 @@ TEST(TestQuerySort_QuickSort)
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort();
+    tv.column().first.sort();
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t-1].first <= tv[t-1].first); // FIXME: Something is wrong here - not testing anything!
+        CHECK(tv[t].first >= tv[t-1].first);
     }
 }
 
@@ -361,11 +404,11 @@ TEST(TestQuerySort_CountSort)
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort();
+    tv.column().first.sort();
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t-1].first <= tv[t-1].first); // FIXME: Something is wrong here - not testing anything!
+        CHECK(tv[t].first >= tv[t-1].first);
     }
 }
 
@@ -379,11 +422,11 @@ TEST(TestQuerySort_Descending)
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all(ttt);
-    tv.cols().first.sort(false);
+    tv.column().first.sort(false);
 
     CHECK(tv.size() == 1000);
     for(size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t-1].first >= tv[t-1].first); // FIXME: Something is wrong here - not testing anything!
+        CHECK(tv[t].first <= tv[t-1].first);
     }
 }
 
@@ -462,7 +505,7 @@ TEST(TestQueryThreads)
     TupleTableType::Query q1 = ttt.where().first.equal(2).second.equal("b");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-    //q1.SetThreads(5);
+    //q1.set_threads(5);
     TupleTableType::View tv = q1.find_all(ttt);
 
     CHECK_EQUAL(100, tv.size());

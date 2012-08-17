@@ -264,7 +264,23 @@ TEST(Group_Serialize_Men)
     CHECK(*table == *t);
     toMem.Verify();
     fromMem.Verify();
-#endif // TIGHTDB_DEBUG
+#endif //_DEBUG
+}
+
+TEST(Group_Close)
+{
+    Group *toMem = new Group();
+    TestTableGroup::Ref table = toMem->get_table<TestTableGroup>("test");
+    table->add("",  1, true, Wed);
+    table->add("",  2, true, Wed);
+
+    // Serialize to memory (we now own the buffer)
+    size_t len;
+    const char* const buffer = toMem->write_to_mem(len);
+
+    Group *fromMem = new Group(buffer, len);
+    delete toMem;
+    delete fromMem;
 }
 
 TEST(Group_Serialize_Optimized)
@@ -306,7 +322,7 @@ TEST(Group_Serialize_Optimized)
     // Add a row with a known (but unique) value
     table->add("search_target", 9, true, Fri);
 
-    const size_t res = table->cols().first.find_first("search_target");
+    const size_t res = table->column().first.find_first("search_target");
     CHECK_EQUAL(table->size()-1, res);
 
 #ifdef TIGHTDB_DEBUG
