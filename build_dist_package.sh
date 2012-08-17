@@ -7,7 +7,7 @@ LANG_BINDINGS="tightdb_java2"
 MAKE="make -j8"
 
 # Setup OS specific stuff
-OS="$(uname -o)" || exit 1
+OS="$(uname -s)" || exit 1
 if [ "$OS" = "Darwin" ]; then
     MAKE="$MAKE CC=gcc"
 fi
