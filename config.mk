@@ -56,7 +56,8 @@ ifneq ($(filter clang++%,$(CXX)),)
 
 # These compiler flags are those that are common to all build modes
 # (STATIC, SHARED, DEBUG, and COVERAGE).
-CFLAGS          = -Weverything -Wno-long-long -Wno-sign-conversion -Wno-cast-align -Wno-shadow -Wno-unreachable-code -Wno-overloaded-virtual -Wno-unused-macros -Wno-conditional-uninitialized -Wno-global-constructors -Wno-missing-prototypes -Wno-shorten-64-to-32 -Wno-padded -Wno-exit-time-destructors -Wno-weak-vtables -Wno-unused-member-function -Wno-missing-noreturn -Wno-covered-switch-default
+#CFLAGS          = -Weverything -Wno-long-long -Wno-sign-conversion -Wno-cast-align -Wno-shadow -Wno-unreachable-code -Wno-overloaded-virtual -Wno-unused-macros -Wno-conditional-uninitialized -Wno-global-constructors -Wno-missing-prototypes -Wno-shorten-64-to-32 -Wno-padded -Wno-exit-time-destructors -Wno-weak-vtables -Wno-unused-member-function -Wno-missing-noreturn -Wno-covered-switch-default
+CFLAGS          = -ansi -pedantic -Wall -Wextra -Wno-long-long
 CXXFLAGS        = $(CFLAGS)
 
 # These compiler flags are those that are special to each build mode.

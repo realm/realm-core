@@ -1,13 +1,10 @@
 cd "$(dirname "$0")"
 TIGHTDB_HOME="$(pwd)"
 
-#LANG_BINDINGS="tightdb_java2 tightdb_node tightdb_python tightdb_php"
-LANG_BINDINGS="tightdb_java2 tightdb_python"
-
-VERSION="$(git describe)" || exit 1
-echo "TIGHTDB VERSION = $VERSION"
+LANG_BINDINGS="tightdb_java2 tightdb_python tightdb_objc tightdb_node tightdb_php"
 
 MAKE="make -j8"
+
 
 # Setup OS specific stuff
 OS="$(uname -s)" || exit 1
@@ -16,26 +13,42 @@ if [ "$OS" = "Darwin" ]; then
 fi
 
 
-# Check that all language bindings are available
+# Check availability of language bindings
 for x in $LANG_BINDINGS; do
     LANG_BIND_HOME="$TIGHTDB_HOME/../$x"
     if ! [ -r "$LANG_BIND_HOME/build_dist.sh" ]; then
-        echo "Missing language binding '$x'" 1>&2
-        exit 1
+        echo ">>>>>>>> WARNING: Missing language binding '$x'" 1>&2
+        continue
     fi
+    if [ "$AVAIL_LANG_BINDINGS" ]; then
+        AVAIL_LANG_BINDINGS="$AVAIL_LANG_BINDINGS $x"
+    else
+        AVAIL_LANG_BINDINGS="$x"
+    fi
+done
+
+
+# Check state of working directories
+if [ "$(git status --porcelain)" ]; then
+    echo ">>>>>>>> WARNING: Dirty working directory '$TIGHTDB_HOME'" 1>&2
+fi
+for x in $AVAIL_LANG_BINDINGS; do
+    LANG_BIND_HOME="$TIGHTDB_HOME/../$x"
     if [ "$(cd "$LANG_BIND_HOME" && git status --porcelain)" ]; then
-        echo "WARNING: Unclean working directory '$LANG_BIND_HOME'" 1>&2
+        echo ">>>>>>>> WARNING: Dirty working directory '$LANG_BIND_HOME'" 1>&2
     fi
 done
 
 
 # Setup package directory
+VERSION="$(git describe)" || exit 1
+echo "tightdb version: $VERSION"
 NAME="tightdb-$VERSION"
 TEMP_DIR="$(mktemp -d /tmp/temp.XXXX)" || exit 1
 PKG_DIR="$TEMP_DIR/$NAME"
 mkdir "$PKG_DIR" || exit 1
 LOG_FILE="$TEMP_DIR/build.log"
-export INSTALL_ROOT="$TEMP_DIR/install"
+INSTALL_ROOT="$TEMP_DIR/install"
 
 
 if [ "$CPATH" ]; then
@@ -66,7 +79,7 @@ if (
     tar czf "$TEMP_DIR/core.tar.gz" src/tightdb/*.h src/tightdb/*.hpp src/tightdb/libtightdb* src/tightdb/Makefile src/*.hpp src/Makefile config.mk Makefile || exit 1
     (cd "$PKG_DIR" && tar xf "$TEMP_DIR/core.tar.gz") || exit 1
 
-    for x in $LANG_BINDINGS; do
+    for x in $AVAIL_LANG_BINDINGS; do
         echo "Transfering language binding '$x' to package" | tee -a "$LOG_FILE"
         mkdir "$PKG_DIR/$x" || exit 1
         sh "../$x/build_dist.sh" copy "$PKG_DIR/$x" >>"$LOG_FILE" 2>&1 || exit 1
@@ -85,24 +98,31 @@ if (
     echo "Installing core library to test location" | tee -a "$LOG_FILE"
     (cd "$TEST_PKG_DIR" && $MAKE prefix="$INSTALL_ROOT" install >>"$LOG_FILE" 2>&1) || exit 1
 
-    for x in $LANG_BINDINGS; do
+    for x in $AVAIL_LANG_BINDINGS; do
         echo "Building language binding '$x'" | tee -a "$LOG_FILE"
         if ! sh "$TEST_PKG_DIR/$x/build_dist.sh" build >>"$LOG_FILE" 2>&1; then
-            echo "WARNING: Failed to build language binding '$x'" 1>&2
-            SHOW_LOG=1
+            echo ">>>>>>>> WARNING: Failed to build language binding '$x'" 1>&2
         else
             echo "Testing language binding '$x'" | tee -a "$LOG_FILE"
             if ! sh "$TEST_PKG_DIR/$x/build_dist.sh" test >>"$LOG_FILE" 2>&1; then
-                echo "WARNING: Testing failed for language binding '$x'" 1>&2
-                SHOW_LOG=1
+                echo ">>>>>>>> WARNING: Testing failed for language binding '$x'" 1>&2
+            fi
+            echo "Installing language binding '$x' to test location" | tee -a "$LOG_FILE"
+            if ! sh "$TEST_PKG_DIR/$x/build_dist.sh" install "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
+                echo ">>>>>>>> WARNING: Installation failed for language binding '$x'" 1>&2
+            else
+                echo "Testing installation of language binding '$x'" | tee -a "$LOG_FILE"
+                if ! sh "$TEST_PKG_DIR/$x/build_dist.sh" test-installed "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
+                    echo ">>>>>>>> WARNING: Post installation test failed for language binding '$x'" 1>&2
+                fi
             fi
         fi
     done
 
-    [ "$SHOW_LOG" ] && echo "Log file is here: $LOG_FILE"
     exit 0
 
 ); then
+    echo "Log file is here: $LOG_FILE"
     echo "Package is here: $TEMP_DIR/$NAME.tar.gz"
     echo 'Done!'
 else
