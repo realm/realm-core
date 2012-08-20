@@ -7,5 +7,5 @@
 
 /libtightdb.so
 /libtightdb.a
-/libtightdb_d.a
-/libtightdb_c.a
+/libtightdb-dbg.a
+/libtightdb-cov.a

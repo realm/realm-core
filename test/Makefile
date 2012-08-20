@@ -1,44 +1,26 @@
-ROOT = ..
+PASSIVE_SUBDIRS   = UnitTest++ test-tightdb test-sqlite3 test-stl
+test_tightdb_DEPS = UnitTest++
+test_sqlite3_DEPS = UnitTest++
+test_stl          = UnitTest++
 
-INC_FLAGS     = -I$(ROOT)/src -IUnitTest++/src
-INC_FLAGS_ABS = -I$(abspath $(ROOT)/src) -IUnitTest++/src
-LIB_FLAGS     = -LUnitTest++ -lUnitTest++
+TEST_PROGRAMS = tightdb-tests
 
-SOURCES             = $(wildcard *.c *.cpp large_tests/*.cpp)
-LIBTIGHTDB          = $(ROOT)/src/tightdb/libtightdb.a
-LIBTIGHTDB_DEBUG    = $(ROOT)/src/tightdb/libtightdb_d.a
-LIBTIGHTDB_COVERAGE = $(ROOT)/src/tightdb/libtightdb_c.a
-TARGET              = tightdb-tests
-DEBUG_TARGET        = tightdb-tests-debug
-COVERAGE_TARGET     = tightdb-tests-cover
-TARGETS = $(TARGET) $(DEBUG_TARGET) $(COVERAGE_TARGET)
+tightdb_tests_SOURCES = $(wildcard *.c *.cpp large_tests/*.cpp)
+tightdb_tests_LIBADD = ../src/tightdb/libtightdb.a
 
-all: $(TARGET)
-.PHONY: all
+#ADD_CFLAGS_INCLUDE = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
+#tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
 
-debug: $(DEBUG_TARGET)
-.PHONY: debug
+ADD_CFLAGS_INCLUDE = -IUnitTest++/src
+tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
+tightdb_tests_DEPS = UnitTest++
 
-cover: $(COVERAGE_TARGET)
-.PHONY: cover
+EXTRA_CLEAN_DIRS = large_tests
 
-test: debug
-	./$(DEBUG_TARGET)
-.PHONY: test
+include ../generic.mk
 
-test-release: all
-	./$(TARGET)
-.PHONY: test-release
-
-memtest: debug
-	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./$(DEBUG_TARGET) --no-error-exit-staus
-.PHONY: memtest
-
-memtest-release: all
-	valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./$(TARGET) --no-error-exit-staus
-.PHONY: memtest-release
-
-benchmark: test-tightdb test-sqlite3 test-stl
+.PHONY: benchmark
+benchmark: subdir/test-tightdb/default subdir/test-sqlite3/default subdir/test-stl/default
 	@echo ""
 	@echo ".:: TightDB ::."
 	test-tightdb/test-tightdb
@@ -48,75 +30,9 @@ benchmark: test-tightdb test-sqlite3 test-stl
 	@echo ""
 	@echo ".:: STL Vector ::."
 	test-stl/test-stl
-test-tightdb test-sqlite3 test-stl: UnitTest++
-	@$(MAKE) -C $@
-.PHONY: benchmark test-tightdb test-sqlite3 test-stl
 
+.PHONY: UnitTest++
 UnitTest++:
 	$(MAKE) -C UnitTest++ CXX=g++ CXXFLAGS=-g -Wall -W -ansi LDFLAGS= >/dev/null
-.PHONY: UnitTest++
-$(TARGETS): | UnitTest++
 
-
-
-CONFIG_MK = $(ROOT)/config.mk
-include $(CONFIG_MK)
-
-STATIC_OBJECTS = $(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(SOURCES)))
-SHARED_OBJECTS   = $(STATIC_OBJECTS:.o=.dyn.o)
-DEBUG_OBJECTS    = $(STATIC_OBJECTS:.o=.dbg.o)
-COVERAGE_OBJECTS = $(STATIC_OBJECTS:.o=.cov.o)
-OBJECTS = $(STATIC_OBJECTS) $(SHARED_OBJECTS) $(DEBUG_OBJECTS) $(COVERAGE_OBJECTS)
-
-$(OBJECTS): Makefile $(CONFIG_MK)
-
-
-CLEAN_EXTRA = clean/UnitTest++ clean/test-tightdb clean/test-sqlite3 clean/test-stl
-clean: clean/local $(CLEAN_EXTRA)
-clean/local:
-	$(RM) *.d *.o *.gcno *.gcda $(TARGETS)
-	$(RM) large_tests/*.d large_tests/*.o large_tests/*.gcno large_tests/*.gcda
-$(CLEAN_EXTRA): clean/%:
-	@$(MAKE) -C $* clean
-.PHONY: clean clean/local $(CLEAN_EXTRA)
-
-
-# Linking
-
-$(TARGET): $(STATIC_OBJECTS) $(LIBTIGHTDB)
-	$(LD_STATIC) $(STATIC_OBJECTS) $(LIBTIGHTDB) $(LDFLAGS) $(LIB_FLAGS) -o $@
-
-$(DEBUG_TARGET): $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG)
-	$(LD_DEBUG) $(DEBUG_OBJECTS) $(LIBTIGHTDB_DEBUG) $(LDFLAGS) $(LIB_FLAGS) -o $@
-
-$(COVERAGE_TARGET): $(COVERAGE_OBJECTS) $(LIBTIGHTDB_COVERAGE)
-	$(LD_COVERAGE) $(COVERAGE_OBJECTS) $(LIBTIGHTDB_COVERAGE) $(LDFLAGS) $(LIB_FLAGS) -o $@
-
-
-# Compiling + automatic dependencies
-
-%.o: %.c
-	$(CC_STATIC) $(CFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
-
-%.o: %.cpp
-	$(CXX_STATIC) $(CXXFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
-
-%.dyn.o: %.c
-	$(CC_SHARED) $(CFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
-
-%.dyn.o: %.cpp
-	$(CXX_SHARED) $(CXXFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
-
-%.dbg.o: %.c
-	$(CC_DEBUG) $(CFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
-
-%.dbg.o: %.cpp
-	$(CXX_DEBUG) $(CXXFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
-
-%.cov.o: %.c
-	$(CC_COVERAGE) $(CFLAGS) $(INC_FLAGS_ABS) -MMD -MP -c $(abspath $<) -o $(abspath $@)
-
-%.cov.o: %.cpp
-	$(CXX_COVERAGE) $(CXXFLAGS) $(INC_FLAGS_ABS) -MMD -MP -c $(abspath $<) -o $(abspath $@)
-
--include $(OBJECTS:.o=.d)
+clean/extra: subdir/UnitTest++/clean subdir/test-tightdb/clean subdir/test-sqlite3/clean subdir/test-stl/clean
