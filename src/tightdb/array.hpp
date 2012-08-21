@@ -560,8 +560,6 @@ template <class cond2, int action, size_t bitwidth, class Callback> void find_op
     __m128i* const a = (__m128i *)round_up(m_data + start * bitwidth / 8, sizeof(__m128i));
     __m128i* const b = (__m128i *)round_down(m_data + end * bitwidth / 8, sizeof(__m128i));
 
-    size_t t = 0;
-
     if(!Compare<cond2, action, bitwidth, Callback>(value, start, ((unsigned char *)a - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
         return;
    
@@ -1202,8 +1200,6 @@ template <class cond2, int action, size_t width, class Callback> size_t FindSSE(
 {
     cond2 C;
     int cond = C.condition();
-
-    int64_t result = 0;
 
     (void) baseindex;
     (void) state;
