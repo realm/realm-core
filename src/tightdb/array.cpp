@@ -28,6 +28,9 @@ namespace {
 
 const size_t initial_capacity = 128;
 
+size_t FirstSetBit(unsigned int v);
+size_t FirstSetBit64(int64_t v);
+
 inline void set_header_isnode(bool value, void* header)
 {
     uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
@@ -741,7 +744,6 @@ size_t Array::FindPos2(int64_t target) const
     if (high == (int)m_len) return (size_t)-1;
     else return (size_t)high;
 }
-
 
 size_t FirstSetBit(unsigned int v) 
 {
