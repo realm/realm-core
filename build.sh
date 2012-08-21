@@ -20,12 +20,16 @@ case "$MODE" in
             MAKE="$MAKE CC=clang"
         fi
 
+        TEMP_DIR="$(mktemp -d /tmp/tightdb.dist.XXXX)" || exit 1
+        LOG_FILE="$TEMP_DIR/build.log"
 
-        # Check availability of language bindings
+
+        echo "Checking availability of language bindings" | tee -a "$LOG_FILE"
+        AVAIL_LANG_BINDINGS=""
         for x in $LANG_BINDINGS; do
-            LANG_BIND_HOME="$TIGHTDB_HOME/../$x"
+            LANG_BIND_HOME="../$x"
             if ! [ -r "$LANG_BIND_HOME/build.sh" ]; then
-                echo ">>>>>>>> WARNING: Missing language binding '$x'" 1>&2
+                echo ">>>>>>>> WARNING: Missing language binding '$LANG_BIND_HOME'" | tee -a "$LOG_FILE"
                 continue
             fi
             if [ "$AVAIL_LANG_BINDINGS" ]; then
@@ -35,26 +39,62 @@ case "$MODE" in
             fi
         done
 
-        # Check state of working directories
-        if [ "$(git status --porcelain)" ]; then
-            echo ">>>>>>>> WARNING: Dirty working directory '$TIGHTDB_HOME'" 1>&2
-        fi
+
+        # Checking that each language binding is capable of copying
+        # itself to the package
+        FAKE_PKG_DIR="$TEMP_DIR/fake_pkg"
+        mkdir "$FAKE_PKG_DIR" || exit 1
+        NEW_AVAIL_LANG_BINDINGS=""
         for x in $AVAIL_LANG_BINDINGS; do
-            LANG_BIND_HOME="$TIGHTDB_HOME/../$x"
-            if [ "$(cd "$LANG_BIND_HOME" && git status --porcelain)" ]; then
-                echo ">>>>>>>> WARNING: Dirty working directory '$LANG_BIND_HOME'" 1>&2
+            LANG_BIND_HOME="../$x"
+            echo "Testing transfer of language binding '$x' to package" >> "$LOG_FILE"
+            mkdir "$FAKE_PKG_DIR/$x" || exit 1
+            if ! sh "../$x/build.sh" copy "$FAKE_PKG_DIR/$x" >>"$LOG_FILE" 2>&1; then
+                echo ">>>>>>>> WARNING: Transfer of language binding '$x' to test package failed" | tee -a "$LOG_FILE"
+                continue
+            fi
+            if [ "$NEW_AVAIL_LANG_BINDINGS" ]; then
+                NEW_AVAIL_LANG_BINDINGS="$NEW_AVAIL_LANG_BINDINGS $x"
+            else
+                NEW_AVAIL_LANG_BINDINGS="$x"
             fi
         done
+        AVAIL_LANG_BINDINGS="$NEW_AVAIL_LANG_BINDINGS"
+
+
+        # Check state of working directories
+        if [ "$(git status --porcelain)" ]; then
+            echo ">>>>>>>> WARNING: Dirty working directory '../$(basename "$TIGHTDB_HOME")'" | tee -a "$LOG_FILE"
+        fi
+        for x in $AVAIL_LANG_BINDINGS; do
+            LANG_BIND_HOME="../$x"
+            if [ "$(cd "$LANG_BIND_HOME" && git status --porcelain)" ]; then
+                echo ">>>>>>>> WARNING: Dirty working directory '$LANG_BIND_HOME'" | tee -a "$LOG_FILE"
+            fi
+        done
+
+
+        {
+            if [ -z "$AVAIL_LANG_BINDINGS" ]; then
+                echo "Continuing with no language bindings"
+            else
+                echo "Continuing with these language bindings:"
+                {
+                    for x in $AVAIL_LANG_BINDINGS; do
+                        LANG_BIND_HOME="../$x"
+                        echo "  $x  ->  $LANG_BIND_HOME"
+                    done
+                } | column -t
+            fi
+        } | tee -a "$LOG_FILE"
 
 
         # Setup package directory
         VERSION="$(git describe)" || exit 1
         echo "tightdb version: $VERSION"
         NAME="tightdb-$VERSION"
-        TEMP_DIR="$(mktemp -d /tmp/tightdb.build.XXXX)" || exit 1
         PKG_DIR="$TEMP_DIR/$NAME"
         mkdir "$PKG_DIR" || exit 1
-        LOG_FILE="$TEMP_DIR/build.log"
         INSTALL_ROOT="$TEMP_DIR/install"
 
 
@@ -107,21 +147,22 @@ case "$MODE" in
                 (cd "$TEST_PKG_DIR" && $MAKE prefix="$INSTALL_ROOT" install >>"$LOG_FILE" 2>&1) || exit 1
 
                 for x in $AVAIL_LANG_BINDINGS; do
-                    echo "Building language binding '$x'" | tee -a "$LOG_FILE"
+                    echo "Testing language binding '$x'"
+                    echo "Building language binding '$x'" >> "$LOG_FILE"
                     if ! sh "$TEST_PKG_DIR/$x/build.sh" build >>"$LOG_FILE" 2>&1; then
-                        echo ">>>>>>>> WARNING: Failed to build language binding '$x'" 1>&2
+                        echo ">>>>>>>> WARNING: Failed to build language binding '$x'" | tee -a "$LOG_FILE"
                     else
-                        echo "Testing language binding '$x'" | tee -a "$LOG_FILE"
+                        echo "Testing language binding '$x'" >> "$LOG_FILE"
                         if ! sh "$TEST_PKG_DIR/$x/build.sh" test >>"$LOG_FILE" 2>&1; then
-                            echo ">>>>>>>> WARNING: Testing failed for language binding '$x'" 1>&2
+                            echo ">>>>>>>> WARNING: Test suite failed for language binding '$x'" | tee -a "$LOG_FILE"
                         fi
-                        echo "Installing language binding '$x' to test location" | tee -a "$LOG_FILE"
+                        echo "Installing language binding '$x' to test location" >> "$LOG_FILE"
                         if ! sh "$TEST_PKG_DIR/$x/build.sh" install "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
-                            echo ">>>>>>>> WARNING: Installation failed for language binding '$x'" 1>&2
+                            echo ">>>>>>>> WARNING: Installation failed for language binding '$x'" | tee -a "$LOG_FILE"
                         else
-                            echo "Testing installation of language binding '$x'" | tee -a "$LOG_FILE"
+                            echo "Testing installation of language binding '$x'" >> "$LOG_FILE"
                             if ! sh "$TEST_PKG_DIR/$x/build.sh" test-installed "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
-                                echo ">>>>>>>> WARNING: Post installation test failed for language binding '$x'" 1>&2
+                                echo ">>>>>>>> WARNING: Post installation test failed for language binding '$x'" | tee -a "$LOG_FILE"
                             fi
                         fi
                     fi
