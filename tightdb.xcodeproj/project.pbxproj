@@ -70,7 +70,6 @@
 		365CCE63157CC37D00172BF8 /* query.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 365CCE20157CC37D00172BF8 /* query.hpp */; };
 		365CCE64157CC37D00172BF8 /* spec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCE21157CC37D00172BF8 /* spec.cpp */; };
 		365CCE65157CC37D00172BF8 /* spec.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 365CCE22157CC37D00172BF8 /* spec.hpp */; };
-		365CCE66157CC37D00172BF8 /* static_assert.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 365CCE23157CC37D00172BF8 /* static_assert.hpp */; };
 		365CCE67157CC37D00172BF8 /* table_accessors.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 365CCE24157CC37D00172BF8 /* table_accessors.hpp */; };
 		365CCE68157CC37D00172BF8 /* table_basic.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 365CCE25157CC37D00172BF8 /* table_basic.hpp */; };
 		365CCE69157CC37D00172BF8 /* table_macros.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 365CCE26157CC37D00172BF8 /* table_macros.hpp */; };
@@ -94,6 +93,16 @@
 		3672919C1471566800060DB2 /* libUnitTest++.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */; };
 		368063381445AF9B00283774 /* testgroup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063361445AD9200283774 /* testgroup.cpp */; };
 		3680633A1446D12B00283774 /* testalloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063391446D12A00283774 /* testalloc.cpp */; };
+		36D6FC3B15E3813700B02534 /* assert.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36D6FC3115E3813700B02534 /* assert.hpp */; };
+		36D6FC3C15E3813700B02534 /* pthread_helpers.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36D6FC3215E3813700B02534 /* pthread_helpers.hpp */; };
+		36D6FC3D15E3813700B02534 /* replication.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36D6FC3315E3813700B02534 /* replication.cpp */; };
+		36D6FC3E15E3813700B02534 /* replication.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36D6FC3415E3813700B02534 /* replication.hpp */; };
+		36D6FC3F15E3813700B02534 /* safe_int_ops.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36D6FC3515E3813700B02534 /* safe_int_ops.hpp */; };
+		36D6FC4015E3813700B02534 /* string_buffer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36D6FC3615E3813700B02534 /* string_buffer.cpp */; };
+		36D6FC4115E3813700B02534 /* string_buffer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36D6FC3715E3813700B02534 /* string_buffer.hpp */; };
+		36D6FC4215E3813700B02534 /* table_basic_fwd.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36D6FC3815E3813700B02534 /* table_basic_fwd.hpp */; };
+		36D6FC4315E3813700B02534 /* terminate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36D6FC3915E3813700B02534 /* terminate.cpp */; };
+		36D6FC4415E3813700B02534 /* terminate.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36D6FC3A15E3813700B02534 /* terminate.hpp */; };
 		36E608681459976700CCC3E8 /* test-tightdb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E02214209CE600D56FD7 /* test-tightdb.cpp */; };
 		36E608691459977000CCC3E8 /* libtightdb.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* libtightdb.a */; };
 		36E6086F1459A3EB00CCC3E8 /* mem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E6086E1459A3EB00CCC3E8 /* mem.cpp */; };
@@ -298,7 +307,6 @@
 		365CCE20157CC37D00172BF8 /* query.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = query.hpp; path = tightdb/query.hpp; sourceTree = "<group>"; };
 		365CCE21157CC37D00172BF8 /* spec.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = spec.cpp; path = tightdb/spec.cpp; sourceTree = "<group>"; };
 		365CCE22157CC37D00172BF8 /* spec.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = spec.hpp; path = tightdb/spec.hpp; sourceTree = "<group>"; };
-		365CCE23157CC37D00172BF8 /* static_assert.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = static_assert.hpp; path = tightdb/static_assert.hpp; sourceTree = "<group>"; };
 		365CCE24157CC37D00172BF8 /* table_accessors.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = table_accessors.hpp; path = tightdb/table_accessors.hpp; sourceTree = "<group>"; };
 		365CCE25157CC37D00172BF8 /* table_basic.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = table_basic.hpp; path = tightdb/table_basic.hpp; sourceTree = "<group>"; };
 		365CCE26157CC37D00172BF8 /* table_macros.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = table_macros.hpp; path = tightdb/table_macros.hpp; sourceTree = "<group>"; };
@@ -321,6 +329,16 @@
 		365CCE83157CCB5200172BF8 /* testshared.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testshared.cpp; sourceTree = "<group>"; };
 		368063361445AD9200283774 /* testgroup.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testgroup.cpp; sourceTree = "<group>"; };
 		368063391446D12A00283774 /* testalloc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testalloc.cpp; sourceTree = "<group>"; };
+		36D6FC3115E3813700B02534 /* assert.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = assert.hpp; path = tightdb/assert.hpp; sourceTree = "<group>"; };
+		36D6FC3215E3813700B02534 /* pthread_helpers.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = pthread_helpers.hpp; path = tightdb/pthread_helpers.hpp; sourceTree = "<group>"; };
+		36D6FC3315E3813700B02534 /* replication.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = replication.cpp; path = tightdb/replication.cpp; sourceTree = "<group>"; };
+		36D6FC3415E3813700B02534 /* replication.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = replication.hpp; path = tightdb/replication.hpp; sourceTree = "<group>"; };
+		36D6FC3515E3813700B02534 /* safe_int_ops.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = safe_int_ops.hpp; path = tightdb/safe_int_ops.hpp; sourceTree = "<group>"; };
+		36D6FC3615E3813700B02534 /* string_buffer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = string_buffer.cpp; path = tightdb/string_buffer.cpp; sourceTree = "<group>"; };
+		36D6FC3715E3813700B02534 /* string_buffer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = string_buffer.hpp; path = tightdb/string_buffer.hpp; sourceTree = "<group>"; };
+		36D6FC3815E3813700B02534 /* table_basic_fwd.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = table_basic_fwd.hpp; path = tightdb/table_basic_fwd.hpp; sourceTree = "<group>"; };
+		36D6FC3915E3813700B02534 /* terminate.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = terminate.cpp; path = tightdb/terminate.cpp; sourceTree = "<group>"; };
+		36D6FC3A15E3813700B02534 /* terminate.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = terminate.hpp; path = tightdb/terminate.hpp; sourceTree = "<group>"; };
 		36DB877E153F02250096CF75 /* libtightdb_ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libtightdb_ios.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		36E6085E1459972100CCC3E8 /* test-tightdb */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "test-tightdb"; sourceTree = BUILT_PRODUCTS_DIR; };
 		36E6086E1459A3EB00CCC3E8 /* mem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mem.cpp; path = mac/mem.cpp; sourceTree = "<group>"; };
@@ -386,6 +404,16 @@
 			isa = PBXGroup;
 			children = (
 				365CCDF1157CC37D00172BF8 /* alloc_slab.cpp */,
+				36D6FC3115E3813700B02534 /* assert.hpp */,
+				36D6FC3215E3813700B02534 /* pthread_helpers.hpp */,
+				36D6FC3315E3813700B02534 /* replication.cpp */,
+				36D6FC3415E3813700B02534 /* replication.hpp */,
+				36D6FC3515E3813700B02534 /* safe_int_ops.hpp */,
+				36D6FC3615E3813700B02534 /* string_buffer.cpp */,
+				36D6FC3715E3813700B02534 /* string_buffer.hpp */,
+				36D6FC3815E3813700B02534 /* table_basic_fwd.hpp */,
+				36D6FC3915E3813700B02534 /* terminate.cpp */,
+				36D6FC3A15E3813700B02534 /* terminate.hpp */,
 				365CCDF2157CC37D00172BF8 /* alloc_slab.hpp */,
 				365CCDF3157CC37D00172BF8 /* alloc.hpp */,
 				365CCDF4157CC37D00172BF8 /* array_binary.cpp */,
@@ -443,7 +471,6 @@
 				365CCE20157CC37D00172BF8 /* query.hpp */,
 				365CCE21157CC37D00172BF8 /* spec.cpp */,
 				365CCE22157CC37D00172BF8 /* spec.hpp */,
-				365CCE23157CC37D00172BF8 /* static_assert.hpp */,
 				365CCE24157CC37D00172BF8 /* table_accessors.hpp */,
 				365CCE25157CC37D00172BF8 /* table_basic.hpp */,
 				365CCE26157CC37D00172BF8 /* table_macros.hpp */,
@@ -731,7 +758,6 @@
 				365CCE61157CC37D00172BF8 /* query_engine.hpp in Headers */,
 				365CCE63157CC37D00172BF8 /* query.hpp in Headers */,
 				365CCE65157CC37D00172BF8 /* spec.hpp in Headers */,
-				365CCE66157CC37D00172BF8 /* static_assert.hpp in Headers */,
 				365CCE67157CC37D00172BF8 /* table_accessors.hpp in Headers */,
 				365CCE68157CC37D00172BF8 /* table_basic.hpp in Headers */,
 				365CCE69157CC37D00172BF8 /* table_macros.hpp in Headers */,
@@ -749,6 +775,13 @@
 				36E67FCB15A2EDDB00D131FB /* index_string.hpp in Headers */,
 				3640797F15AD6687009A3A82 /* error.hpp in Headers */,
 				3640798115AD6687009A3A82 /* file.hpp in Headers */,
+				36D6FC3B15E3813700B02534 /* assert.hpp in Headers */,
+				36D6FC3C15E3813700B02534 /* pthread_helpers.hpp in Headers */,
+				36D6FC3E15E3813700B02534 /* replication.hpp in Headers */,
+				36D6FC3F15E3813700B02534 /* safe_int_ops.hpp in Headers */,
+				36D6FC4115E3813700B02534 /* string_buffer.hpp in Headers */,
+				36D6FC4215E3813700B02534 /* table_basic_fwd.hpp in Headers */,
+				36D6FC4415E3813700B02534 /* terminate.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -892,6 +925,9 @@
 				36E67FCA15A2EDDB00D131FB /* index_string.cpp in Sources */,
 				3640797A15AD6674009A3A82 /* error.cpp in Sources */,
 				3640798015AD6687009A3A82 /* file.cpp in Sources */,
+				36D6FC3D15E3813700B02534 /* replication.cpp in Sources */,
+				36D6FC4015E3813700B02534 /* string_buffer.cpp in Sources */,
+				36D6FC4315E3813700B02534 /* terminate.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -959,6 +995,7 @@
 				CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION = YES;
 				CLANG_WARN__EXIT_TIME_DESTRUCTORS = NO;
 				CLANG_X86_VECTOR_INSTRUCTIONS = sse4.2;
+				GCC_PREPROCESSOR_DEFINITIONS = "TIGHTDB_DEBUG=1";
 				GCC_PREPROCESSOR_DEFINITIONS_NOT_USED_IN_PRECOMPS = USE_SSE42;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_MISSING_FIELD_INITIALIZERS = YES;
