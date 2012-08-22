@@ -155,9 +155,9 @@ case "$MODE" in
                 cat <<EOI > "$PKG_DIR/Makefile"
 all: build
 build:
-	@sh tightdb/build.sh dist-build
+	@sh tightdb/build.sh dist-build \$(prefix)
 install:
-	@sh tightdb/build.sh dist-install \$(prefix)
+	@sh tightdb/build.sh dist-install
 clean:
 	@sh tightdb/build.sh dist-clean
 EOI
@@ -187,11 +187,11 @@ EOI
                 for x in $AVAIL_EXTENSIONS; do
                     echo "Testing extension '$x'"
                     echo "Building extension '$x'" >> "$LOG_FILE"
-                    if ! sh "$TEST_PKG_DIR/$x/build.sh" build >>"$LOG_FILE" 2>&1; then
+                    if ! sh "$TEST_PKG_DIR/$x/build.sh" build "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
                         echo ">>>>>>>> WARNING: Failed to build extension '$x'" | tee -a "$LOG_FILE"
                     else
                         echo "Testing extension '$x'" >> "$LOG_FILE"
-                        if ! sh "$TEST_PKG_DIR/$x/build.sh" test >>"$LOG_FILE" 2>&1; then
+                        if ! sh "$TEST_PKG_DIR/$x/build.sh" test "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
                             echo ">>>>>>>> WARNING: Test suite failed for extension '$x'" | tee -a "$LOG_FILE"
                         fi
                         echo "Installing extension '$x' to test location" >> "$LOG_FILE"
@@ -234,6 +234,12 @@ EOI
 
 
     "dist-build")
+        PREFIX="$1"
+        BUILD=build
+        if [ "$PREFIX" ]; then
+            BUILD="$BUILD $PREFIX"
+        fi
+        echo "$PREFIX" > install_prefix
         if [ "$CPATH" ]; then
             export CPATH="$TIGHTDB_HOME/src:$CPATH"
         else
@@ -254,7 +260,7 @@ EOI
             EXT_HOME="../$x"
             if [ -r "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> BUILDING '$x'"
-                if sh "$EXT_HOME/build.sh" build; then
+                if sh "$EXT_HOME/build.sh" $BUILD; then
                     if [ "$AVAIL_EXTENSIONS" ]; then
                         AVAIL_EXTENSIONS="$AVAIL_EXTENSIONS $x"
                     else
@@ -269,7 +275,8 @@ EOI
 
 
     "dist-install")
-        PREFIX="$1"
+        touch install_prefix
+        PREFIX="$(cat install_prefix)"
         INSTALL=install
         if [ "$PREFIX" ]; then
             INSTALL="$INSTALL $PREFIX"
