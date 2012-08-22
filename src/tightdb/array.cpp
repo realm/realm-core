@@ -435,44 +435,6 @@ void Array::Delete(size_t ndx)
     set_header_len(m_len);
 }
 
-template<size_t w> int64_t Array::GetUniversal(const char* const data, const size_t ndx) const
-{
-    if(w == 0) {
-        return 0;
-    }
-    else if(w == 1) {
-        const size_t offset = ndx >> 3;
-        return (data[offset] >> (ndx & 7)) & 0x01;
-    }
-    else if(w == 2) {
-        const size_t offset = ndx >> 2;
-        return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
-    }
-    else if(w == 4) {
-        const size_t offset = ndx >> 1;
-        return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
-    }
-    else if(w == 8) {
-        return *((const signed char*)(data + ndx));
-    }
-    if(w == 16) {
-        const size_t offset = ndx * 2;
-        return *(const int16_t*)(data + offset);
-    }
-    else if(w == 32) {
-        const size_t offset = ndx * 4;
-        return *(const int32_t*)(data + offset);
-    }
-    else if(w == 64) {
-        const size_t offset = ndx * 8;
-        return *(const int64_t*)(data + offset);
-    }
-    else {
-        assert(false);
-        return int64_t(-1);
-    }
-}
-
 int64_t Array::Get(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < m_len);
@@ -1041,36 +1003,36 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                 sum = _mm_add_epi32(sum, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
                 */
                 
-                __m128i vl = _mm_cvtepi8_epi16(data[t]); // sign extend lower words 8->16
+                __m128i vl = _mm_cvtepi8_epi16(data[t]);        // sign extend lower words 8->16
                 __m128i vh = data[t];
-                vh = _mm_srli_si128(vh, 8); // v >>= 64
-                vh = _mm_cvtepi8_epi16(vh); // sign extend lower words 8->16
+                vh = _mm_srli_si128(vh, 8);                     // v >>= 64
+                vh = _mm_cvtepi8_epi16(vh);                     // sign extend lower words 8->16
                 __m128i sum1 = _mm_add_epi16(vl, vh);
                 __m128i sumH = _mm_cvtepi16_epi32(sum1);
-                __m128i sumL = _mm_srli_si128(sum1, 8); // v >>= 64
+                __m128i sumL = _mm_srli_si128(sum1, 8);         // v >>= 64
                 sumL = _mm_cvtepi16_epi32(sumL);
                 sum = _mm_add_epi32(sum, sumL);
                 sum = _mm_add_epi32(sum, sumH);
             }
             else if(w == 16) {
                 // todo, can overflow for array size > 2^32 
-                __m128i vl = _mm_cvtepi16_epi32(data[t]); // sign extend lower words 16->32
+                __m128i vl = _mm_cvtepi16_epi32(data[t]);       // sign extend lower words 16->32
                 __m128i vh = data[t];
-                vh = _mm_srli_si128(vh, 8); // v >>= 64
-                vh = _mm_cvtepi16_epi32(vh); // sign extend lower words 16->32
+                vh = _mm_srli_si128(vh, 8);                     // v >>= 64
+                vh = _mm_cvtepi16_epi32(vh);                    // sign extend lower words 16->32
                 sum = _mm_add_epi32(sum, vl);
                 sum = _mm_add_epi32(sum, vh);
             }
             else if(w == 32) {
                 __m128i v = data[t];
-                __m128i v0 = _mm_cvtepi32_epi64(v); // sign extend lower dwords 32->64
-                v = _mm_srli_si128(v, 8); // v >>= 64
-                __m128i v1 = _mm_cvtepi32_epi64(v); // sign extend lower dwords 32->64
+                __m128i v0 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
+                v = _mm_srli_si128(v, 8);                       // v >>= 64
+                __m128i v1 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
                 sum = _mm_add_epi64(sum, v0);
                 sum = _mm_add_epi64(sum, v1);
 
                 /*
-                __m128i m = _mm_set1_epi32(0xc000); // test if overflow could happen (still need underflow test).
+                __m128i m = _mm_set1_epi32(0xc000);             // test if overflow could happen (still need underflow test).
                 __m128i mm = _mm_and_si128(data[t], m);
                 zz = _mm_or_si128(mm, zz);
                 sum = _mm_add_epi32(sum, data[t]);
@@ -1080,9 +1042,15 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
         start += sizeof(__m128i) * 8 / no0(w) * chunks;
 
         // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
-        sum2 = sum; 
+        sum2 = sum;
+
+        // Avoid aliasing bug where sum2 might not yet be initialized when accessed by GetUniversal 
+        char sum3[sizeof(sum2)];
+        memcpy(&sum3, &sum2, sizeof(sum2));
+
+        // Sum elements of sum
         for (size_t t = 0; t < sizeof(__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
-            int64_t v = GetUniversal<(w == 8 || w == 16) ? 32 : 64>(((const char *)&sum2), t);
+            int64_t v = GetUniversal<(w == 8 || w == 16) ? 32 : 64>(((const char *)&sum3), t);
             s += v;
         }
     }

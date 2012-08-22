@@ -46,7 +46,7 @@ TEST(LESS)
     
     };
 
-    for (size_t w = 2; w < sizeof(v) / sizeof(*v); w++) {
+    for (size_t w = 0; w < sizeof(v) / sizeof(*v); w++) {
        printf("%d ", w);
         
         const size_t LEN = 64 * 20 + 1000; 
