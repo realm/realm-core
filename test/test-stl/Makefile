@@ -9,10 +9,12 @@ else
 	test_stl_SOURCES += ../Support/posix/mem.cpp
 endif
 
-#ADD_CFLAGS_INCLUDE = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
-#test_stl_LDFLAGS = $(shell pkg-config unittest++ --libs)
-
+ifeq ($(shell pkg-config unittest++ --exists && echo yes),yes)
+ADD_CFLAGS_INCLUDE = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
+test_stl_LDFLAGS  += $(shell pkg-config unittest++ --libs)
+else
 ADD_CFLAGS_INCLUDE = -I../UnitTest++/src
-test_stl_LDFLAGS += -L../UnitTest++ -lUnitTest++
+test_stl_LDFLAGS  += -L../UnitTest++ -lUnitTest++
+endif
 
 include ../../generic.mk

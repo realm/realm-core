@@ -1,21 +1,24 @@
-PASSIVE_SUBDIRS   = UnitTest++ test-tightdb test-sqlite3 test-stl
-test_tightdb_DEPS = UnitTest++
-test_sqlite3_DEPS = UnitTest++
-test_stl          = UnitTest++
+PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl
 
 TEST_PROGRAMS = tightdb-tests
 
 tightdb_tests_SOURCES = $(wildcard *.c *.cpp large_tests/*.cpp)
 tightdb_tests_LIBADD = ../src/tightdb/libtightdb.a
 
-#ADD_CFLAGS_INCLUDE = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
-#tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
-
-ADD_CFLAGS_INCLUDE = -IUnitTest++/src
-tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
-tightdb_tests_DEPS = UnitTest++
-
 EXTRA_CLEAN_DIRS = large_tests
+
+ifeq ($(shell pkg-config unittest++ --exists && echo yes),yes)
+ADD_CFLAGS_INCLUDE    = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
+tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
+else
+PASSIVE_SUBDIRS      += UnitTest++
+test_tightdb_DEPS     = UnitTest++
+test_sqlite3_DEPS     = UnitTest++
+test_stl              = UnitTest++
+ADD_CFLAGS_INCLUDE    = -IUnitTest++/src
+tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
+tightdb_tests_DEPS    = UnitTest++
+endif
 
 include ../generic.mk
 
@@ -34,5 +37,3 @@ benchmark: subdir/test-tightdb/default subdir/test-sqlite3/default subdir/test-s
 .PHONY: UnitTest++
 UnitTest++:
 	$(MAKE) -C UnitTest++ CXX=g++ CXXFLAGS=-g -Wall -W -ansi LDFLAGS= >/dev/null
-
-clean/extra: subdir/UnitTest++/clean subdir/test-tightdb/clean subdir/test-sqlite3/clean subdir/test-stl/clean

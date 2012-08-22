@@ -356,8 +356,8 @@ $(foreach x,$(SUBDIRS) $(PASSIVE_SUBDIRS),$(eval $(call SUBDIR_RULES,$(x))))
 
 define RECURSIVE_MODE_RULES
 .PHONY: $(1) $(1)/local $(1)/after
-$(1): $(1)/local $$(patsubst %,subdir/%/$(1),$$(SUBDIRS)) $(1)/after
-$(1)/after: $(1)/local $$(patsubst %,subdir/%/$(1),$$(SUBDIRS))
+$(1): $(1)/local $(patsubst %,subdir/%/$(1),$(SUBDIRS)) $(1)/after
+$(1)/after: $(1)/local $(patsubst %,subdir/%/$(1),$(SUBDIRS))
 endef
 
 $(foreach x,$(RECURSIVE_MODES),$(eval $(call RECURSIVE_MODE_RULES,$(x))))
@@ -378,6 +378,8 @@ clean/local: clean/extra
 endef
 $(eval $(CLEANING_RULES))
 endif
+
+clean clean/after: $(patsubst %,subdir/%/clean,$(PASSIVE_SUBDIRS))
 
 
 

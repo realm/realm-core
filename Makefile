@@ -1,5 +1,6 @@
 SUBDIRS = src test
 test_DEPS = src
+PASSIVE_SUBDIRS = test-installed
 
 include generic.mk
 
@@ -20,3 +21,7 @@ lcov: test-cover
 .PHONY: gcovr
 gcovr: test-cover
 	gcovr -r src -x >gcovr.xml
+
+.PHONY: test-installed
+test-installed:
+	@$(MAKE) -C test-installed test

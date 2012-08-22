@@ -10,10 +10,12 @@ else
 	test_tightdb_SOURCES += ../Support/posix/mem.cpp
 endif
 
-#ADD_CFLAGS_INCLUDE = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
-#test_tightdb_LDFLAGS = $(shell pkg-config unittest++ --libs)
-
-ADD_CFLAGS_INCLUDE = -I../UnitTest++/src
+ifeq ($(shell pkg-config unittest++ --exists && echo yes),yes)
+ADD_CFLAGS_INCLUDE    = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
+test_tightdb_LDFLAGS += $(shell pkg-config unittest++ --libs)
+else
+ADD_CFLAGS_INCLUDE    = -I../UnitTest++/src
 test_tightdb_LDFLAGS += -L../UnitTest++ -lUnitTest++
+endif
 
 include ../../generic.mk
