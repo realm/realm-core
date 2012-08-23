@@ -295,10 +295,23 @@ EOI
         ;;
 
 
+    "dist-pull")
+        echo ">>>>>>>> PULLING 'tightdb'"
+        git pull
+        for x in $EXTENSIONS; do
+            EXT_HOME="../$x"
+            if [ -r "$EXT_HOME/build.sh" ]; then
+                echo ">>>>>>>> PULLING '$EXT_HOME'"
+                (cd "$EXT_HOME/"; git pull)
+            fi
+        done
+        ;;
+
+
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: clean build test install test-installed" 1>&2
-        echo "As well as: dist dist-clean dist-build dist-install" 1>&2
+        echo "As well as: dist dist-clean dist-build dist-install dist-pull" 1>&2
         exit 1
         ;;
 
