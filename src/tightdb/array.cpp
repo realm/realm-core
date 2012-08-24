@@ -1875,7 +1875,7 @@ void Array::Set_64b(size_t ndx, int64_t value)
     const size_t offset = ndx * 8;
     *(int64_t*)(m_data + offset) = value;
 }
-#ifdef __MSVCRT__
+#ifdef _MSC_VER
 #pragma warning (disable : 4127)
 #endif
 template <size_t w> void Array::Set(size_t ndx, int64_t value)
@@ -1889,7 +1889,9 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
     else if(w == 32) Set_32b(ndx, value);
     else if(w == 64) Set_64b(ndx, value);
 }
-
+#ifdef _MSC_VER
+#pragma warning (enable : 4127)
+#endif
 
 // Sort array.
 void Array::sort()
