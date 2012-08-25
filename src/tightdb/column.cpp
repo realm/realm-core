@@ -346,7 +346,7 @@ Column::Column(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc): 
     m_array = new Array(ref, parent, pndx, alloc);
 }
 
-Column::Column(const Column& column): m_index(0)
+Column::Column(const Column& column): ColumnBase(), m_index(0)
 {
     m_array = column.m_array; // we now own array
     column.m_array = 0;       // so invalidate source

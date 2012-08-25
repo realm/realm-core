@@ -393,7 +393,7 @@ inline Array::Array(Allocator& alloc):
 // Note that this array now own the ref. Should only be used when
 // the source array goes away right after (like return values from functions)
 inline Array::Array(const Array& src):
-    m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
+    ArrayParent(), m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
 {
     const size_t ref = src.GetRef();
     init_from_ref(ref);
