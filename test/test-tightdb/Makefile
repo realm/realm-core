@@ -2,12 +2,12 @@ NOINST_PROGRAMS = test-tightdb
 
 test_tightdb_SOURCES = $(wildcard *.c *.cpp)
 test_tightdb_LIBADD  = ../../src/tightdb/libtightdb.a
-test_tightdb_LDFLAGS = -lproc
 
 ifeq ($(MSYSTEM), MINGW32)
-	test_tightdb_SOURCES += ../Support/win32/mem.cpp
+test_tightdb_SOURCES += ../Support/win32/mem.cpp
 else
-	test_tightdb_SOURCES += ../Support/posix/mem.cpp
+test_tightdb_SOURCES += ../Support/posix/mem.cpp
+test_tightdb_LDFLAGS = -lproc
 endif
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)

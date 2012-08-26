@@ -2,12 +2,13 @@ NOINST_PROGRAMS = test-sqlite3
 
 test_sqlite3_SOURCES = sqlite3.c $(wildcard *.cpp)
 test_sqlite3_LIBADD  = ../../src/tightdb/libtightdb.a
-test_sqlite3_LDFLAGS = -lproc -ldl
+test_sqlite3_LDFLAGS = -ldl
 
 ifeq ($(MSYSTEM), MINGW32)
-	test_sqlite3_SOURCES += ../Support/win32/mem.cpp
+test_sqlite3_SOURCES += ../Support/win32/mem.cpp
 else
-	test_sqlite3_SOURCES += ../Support/posix/mem.cpp
+test_sqlite3_SOURCES += ../Support/posix/mem.cpp
+test_sqlite3_LDFLAGS += -lproc
 endif
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)

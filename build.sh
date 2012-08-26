@@ -21,26 +21,30 @@ fi
 
 word_list_append()
 {
-    local list_name="$1"
-    local new_word="$2"
-    local list="$(eval echo \"\${$list_name}\")" || return 1
+    local list_name new_word list
+    list_name="$1"
+    new_word="$2"
+    list="$(eval "printf \"%s\\n\" \"\${$list_name}\"")" || return 1
     if [ "$list" ]; then
         eval "$list_name=\"\$list \$new_word\""
     else
         eval "$list_name=\"\$new_word\""
     fi
+    return 0
 }
 
 path_list_prepend()
 {
-    local list_name="$1"
-    local new_path="$2"
-    local list="$(eval echo \"\${$list_name}\")" || return 1
+    local list_name new_path list
+    list_name="$1"
+    new_path="$2"
+    list="$(eval "printf \"%s\\n\" \"\${$list_name}\"")" || return 1
     if [ "$list" ]; then
         eval "$list_name=\"\$new_path:\$list\""
     else
         eval "$list_name=\"\$new_path\""
     fi
+    return 0
 }
 
 
@@ -49,14 +53,17 @@ case "$MODE" in
 
     "clean")
         $MAKE clean || exit 1
+        exit 0
         ;;
 
     "build")
         $MAKE || exit 1
+        exit 0
         ;;
 
     "test")
         $MAKE test || exit 1
+        exit 0
         ;;
 
     "install")
@@ -66,11 +73,16 @@ case "$MODE" in
             INSTALL="prefix=$PREFIX $INSTALL"
         fi
         $MAKE $INSTALL || exit 1
+        if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
+            ldconfig
+        fi
+        exit 0
         ;;
 
     "test-installed")
         PREFIX="$1"
         $MAKE test-installed || exit 1
+        exit 0
         ;;
 
 
@@ -86,7 +98,7 @@ case "$MODE" in
                 echo ">>>>>>>> WARNING: Missing extension '$EXT_HOME'" | tee -a "$LOG_FILE"
                 continue
             fi
-            word_list_append AVAIL_EXTENSIONS "$x"
+            word_list_append AVAIL_EXTENSIONS "$x" || exit 1
         done
 
 
@@ -103,7 +115,7 @@ case "$MODE" in
                 echo ">>>>>>>> WARNING: Transfer of extension '$x' to test package failed" | tee -a "$LOG_FILE"
                 continue
             fi
-            word_list_append NEW_AVAIL_EXTENSIONS "$x"
+            word_list_append NEW_AVAIL_EXTENSIONS "$x" || exit 1
         done
         AVAIL_EXTENSIONS="$NEW_AVAIL_EXTENSIONS"
 
@@ -130,9 +142,9 @@ case "$MODE" in
                         EXT_HOME="../$x"
                         echo "  $x  ->  $EXT_HOME"
                     done
-                } | column -t
+                } | column -t || exit 1
             fi
-        } | tee -a "$LOG_FILE"
+        } | tee -a "$LOG_FILE" || exit 1
 
 
         # Setup package directory
@@ -144,9 +156,9 @@ case "$MODE" in
         INSTALL_ROOT="$TEMP_DIR/install"
 
 
-        path_list_prepend CPATH                   "$INSTALL_ROOT/include"
-        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"
-        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib"
+        path_list_prepend CPATH                   "$INSTALL_ROOT/include" || exit 1
+        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"     || exit 1
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib"     || exit 1
         export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME"
 
 
@@ -165,9 +177,9 @@ case "$MODE" in
                 cat <<EOI > "$PKG_DIR/Makefile"
 all: build
 build:
-	@sh tightdb/build.sh dist-build \$(prefix)
+	@sh tightdb/build.sh dist-build
 install:
-	@sh tightdb/build.sh dist-install
+	@sh tightdb/build.sh dist-install \$(prefix)
 clean:
 	@sh tightdb/build.sh dist-clean
 EOI
@@ -197,11 +209,11 @@ EOI
                 for x in $AVAIL_EXTENSIONS; do
                     echo "Testing extension '$x'"
                     echo "Building extension '$x'" >> "$LOG_FILE"
-                    if ! sh "$TEST_PKG_DIR/$x/build.sh" build "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
+                    if ! sh "$TEST_PKG_DIR/$x/build.sh" build >>"$LOG_FILE" 2>&1; then
                         echo ">>>>>>>> WARNING: Failed to build extension '$x'" | tee -a "$LOG_FILE"
                     else
                         echo "Testing extension '$x'" >> "$LOG_FILE"
-                        if ! sh "$TEST_PKG_DIR/$x/build.sh" test "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
+                        if ! sh "$TEST_PKG_DIR/$x/build.sh" test >>"$LOG_FILE" 2>&1; then
                             echo ">>>>>>>> WARNING: Test suite failed for extension '$x'" | tee -a "$LOG_FILE"
                         fi
                         echo "Installing extension '$x' to test location" >> "$LOG_FILE"
@@ -227,6 +239,7 @@ EOI
             echo 'FAILED!' 1>&2
             exit 1
         fi
+        exit 0
         ;;
 
 
@@ -244,22 +257,16 @@ EOI
 
 
     "dist-build")
-        PREFIX="$1"
-        BUILD=build
-        if [ "$PREFIX" ]; then
-            BUILD="$BUILD $PREFIX"
-        fi
-        echo "$PREFIX" > install_prefix
-        path_list_prepend CPATH                   "$TIGHTDB_HOME/src"
-        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb"
-        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb"
+        path_list_prepend CPATH                   "$TIGHTDB_HOME/src"         || exit 1
+        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb" || exit 1
         export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME"
         AVAIL_EXTENSIONS=""
         for x in $EXTENSIONS; do
             EXT_HOME="../$x"
             if [ -r "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> BUILDING '$x'"
-                if sh "$EXT_HOME/build.sh" $BUILD; then
+                if sh "$EXT_HOME/build.sh" build; then
                     if [ "$AVAIL_EXTENSIONS" ]; then
                         AVAIL_EXTENSIONS="$AVAIL_EXTENSIONS $x"
                     else
@@ -268,14 +275,13 @@ EOI
                 fi
             fi
         done
-        echo "$AVAIL_EXTENSIONS" > successfull_extensions
+        printf "%s\n" "$AVAIL_EXTENSIONS" > successfull_extensions
         exit 0
         ;;
 
 
     "dist-install")
-        touch install_prefix
-        PREFIX="$(cat install_prefix)"
+        PREFIX="$1"
         INSTALL=install
         if [ "$PREFIX" ]; then
             INSTALL="$INSTALL $PREFIX"
@@ -304,6 +310,7 @@ EOI
                 (cd "$EXT_HOME/"; git pull)
             fi
         done
+        exit 0
         ;;
 
 

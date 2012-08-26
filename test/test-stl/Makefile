@@ -1,12 +1,12 @@
 NOINST_PROGRAMS = test-stl
 
 test_stl_SOURCES = $(wildcard *.c *.cpp)
-test_stl_LDFLAGS = -lproc
 
 ifeq ($(MSYSTEM), MINGW32)
-	test_stl_SOURCES += ../Support/win32/mem.cpp
+test_stl_SOURCES += ../Support/win32/mem.cpp
 else
-	test_stl_SOURCES += ../Support/posix/mem.cpp
+test_stl_SOURCES += ../Support/posix/mem.cpp
+test_stl_LDFLAGS = -lproc
 endif
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
