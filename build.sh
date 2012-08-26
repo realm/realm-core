@@ -7,12 +7,41 @@ MODE="$1"
 EXTENSIONS="tightdb_java2 tightdb_python tightdb_objc tightdb_node tightdb_php"
 
 MAKE="make -j8"
+LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
+
 
 # Setup OS specific stuff
 OS="$(uname -s)" || exit 1
 if [ "$OS" = "Darwin" ]; then
     MAKE="$MAKE CC=clang"
+    LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
 fi
+
+
+
+word_list_append()
+{
+    local list_name="$1"
+    local new_word="$2"
+    local list="$(eval echo \"\${$list_name}\")" || return 1
+    if [ "$list" ]; then
+        eval "$list_name=\"\$list \$new_word\""
+    else
+        eval "$list_name=\"\$new_word\""
+    fi
+}
+
+path_list_prepend()
+{
+    local list_name="$1"
+    local new_path="$2"
+    local list="$(eval echo \"\${$list_name}\")" || return 1
+    if [ "$list" ]; then
+        eval "$list_name=\"\$new_path:\$list\""
+    else
+        eval "$list_name=\"\$new_path\""
+    fi
+}
 
 
 
@@ -57,11 +86,7 @@ case "$MODE" in
                 echo ">>>>>>>> WARNING: Missing extension '$EXT_HOME'" | tee -a "$LOG_FILE"
                 continue
             fi
-            if [ "$AVAIL_EXTENSIONS" ]; then
-                AVAIL_EXTENSIONS="$AVAIL_EXTENSIONS $x"
-            else
-                AVAIL_EXTENSIONS="$x"
-            fi
+            word_list_append AVAIL_EXTENSIONS "$x"
         done
 
 
@@ -78,11 +103,7 @@ case "$MODE" in
                 echo ">>>>>>>> WARNING: Transfer of extension '$x' to test package failed" | tee -a "$LOG_FILE"
                 continue
             fi
-            if [ "$NEW_AVAIL_EXTENSIONS" ]; then
-                NEW_AVAIL_EXTENSIONS="$NEW_AVAIL_EXTENSIONS $x"
-            else
-                NEW_AVAIL_EXTENSIONS="$x"
-            fi
+            word_list_append NEW_AVAIL_EXTENSIONS "$x"
         done
         AVAIL_EXTENSIONS="$NEW_AVAIL_EXTENSIONS"
 
@@ -123,21 +144,10 @@ case "$MODE" in
         INSTALL_ROOT="$TEMP_DIR/install"
 
 
-        if [ "$CPATH" ]; then
-            export CPATH="$INSTALL_ROOT/include:$CPATH"
-        else
-            export CPATH="$INSTALL_ROOT/include"
-        fi
-        if [ "$LIBRARY_PATH" ]; then
-            export LIBRARY_PATH="$INSTALL_ROOT/lib:$LIBRARY_PATH"
-        else
-            export LIBRARY_PATH="$INSTALL_ROOT/lib"
-        fi
-        if [ "$LD_LIBRARY_PATH" ]; then
-            export LD_LIBRARY_PATH="$INSTALL_ROOT/lib:$LD_LIBRARY_PATH"
-        else
-            export LD_LIBRARY_PATH="$INSTALL_ROOT/lib"
-        fi
+        path_list_prepend CPATH                   "$INSTALL_ROOT/include"
+        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib"
+        export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME"
 
 
         if (
@@ -240,21 +250,10 @@ EOI
             BUILD="$BUILD $PREFIX"
         fi
         echo "$PREFIX" > install_prefix
-        if [ "$CPATH" ]; then
-            export CPATH="$TIGHTDB_HOME/src:$CPATH"
-        else
-            export CPATH="$TIGHTDB_HOME/src"
-        fi
-        if [ "$LIBRARY_PATH" ]; then
-            export LIBRARY_PATH="$TIGHTDB_HOME/src/tightdb:$LIBRARY_PATH"
-        else
-            export LIBRARY_PATH="$TIGHTDB_HOME/src/tightdb"
-        fi
-        if [ "$LD_LIBRARY_PATH" ]; then
-            export LD_LIBRARY_PATH="$TIGHTDB_HOME/src/tightdb:$LD_LIBRARY_PATH"
-        else
-            export LD_LIBRARY_PATH="$TIGHTDB_HOME/src/tightdb"
-        fi
+        path_list_prepend CPATH                   "$TIGHTDB_HOME/src"
+        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb"
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb"
+        export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME"
         AVAIL_EXTENSIONS=""
         for x in $EXTENSIONS; do
             EXT_HOME="../$x"

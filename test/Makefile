@@ -7,7 +7,7 @@ tightdb_tests_LIBADD = ../src/tightdb/libtightdb.a
 
 EXTRA_CLEAN_DIRS = large_tests
 
-ifeq ($(shell pkg-config unittest++ --exists && echo yes),yes)
+ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
 ADD_CFLAGS_INCLUDE    = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
 tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
 else
