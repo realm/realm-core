@@ -963,6 +963,8 @@ TEST(TestQueryCaseSensitivity)
     TupleTableType ttt;
 
     ttt.add(1, "BLAAbaergroed");
+    ttt.add(1, "BLAAbaergroedandMORE");
+    ttt.add(1, "BLAAbaergroed2");
 
     TupleTableType::Query q1 = ttt.where().second.equal("blaabaerGROED", false);
     TupleTableType::View tv1 = q1.find_all(ttt);
