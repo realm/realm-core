@@ -1142,6 +1142,24 @@ size_t Table::count(size_t column_ndx, int64_t target) const
     return column.count(target);
 }
 
+size_t Table::count_string(size_t column_ndx, const char* value) const
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(value);
+    
+    const ColumnType type = GetRealColumnType(column_ndx);
+    
+    if (type == COLUMN_TYPE_STRING) {
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        return column.count(value);
+    }
+    else {
+        TIGHTDB_ASSERT(type == COLUMN_TYPE_STRING_ENUM);
+        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+        return column.count(value);
+    }
+}
+
 int64_t Table::sum(size_t column_ndx) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());

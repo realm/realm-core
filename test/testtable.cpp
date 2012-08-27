@@ -521,7 +521,17 @@ TEST(TableAutoEnumeration)
         CHECK_EQUAL(Fri, table[4+n].fourth);
     }
 
-
+    // Verify counts
+    const size_t count1 = table.column().second.count("abd");
+    const size_t count2 = table.column().second.count("eftg");
+    const size_t count3 = table.column().second.count("hijkl");
+    const size_t count4 = table.column().second.count("mnopqr");
+    const size_t count5 = table.column().second.count("stuvxyz");
+    CHECK_EQUAL(5, count1);
+    CHECK_EQUAL(5, count2);
+    CHECK_EQUAL(5, count3);
+    CHECK_EQUAL(5, count4);
+    CHECK_EQUAL(5, count5);
 }
 
 

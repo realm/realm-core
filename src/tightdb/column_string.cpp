@@ -166,6 +166,31 @@ void AdaptiveStringColumn::Delete(size_t ndx)
     TreeDelete<const char*, AdaptiveStringColumn>(ndx);
 }
 
+size_t AdaptiveStringColumn::count(const char* target) const
+{
+    size_t count = 0;
+    
+    if (m_array->IsNode()) {
+        const Array refs = NodeGetRefs();
+        const size_t n = refs.Size();
+        
+        for (size_t i = 0; i < n; ++i) {
+            const size_t ref = refs.GetAsRef(i);
+            const AdaptiveStringColumn col(ref, NULL, 0, m_array->GetAllocator());
+            
+            count += col.count(target);
+        }
+    }
+    else {
+        if (IsLongStrings())
+            count += ((ArrayStringLong*)m_array)->count(target);
+        else
+            count +=((ArrayString*)m_array)->count(target);
+    }
+    
+    return count;
+}
+
 size_t AdaptiveStringColumn::find_first(const char* value, size_t start, size_t end) const
 {
     TIGHTDB_ASSERT(value);

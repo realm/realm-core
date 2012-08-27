@@ -51,6 +51,7 @@ public:
     void Clear();
     void Resize(size_t ndx);
 
+    size_t count(const char* value) const;
     size_t find_first(const char* value, size_t start=0 , size_t end=-1) const;
     void find_all(Array& result, const char* value, size_t start = 0, size_t end = -1) const;
 

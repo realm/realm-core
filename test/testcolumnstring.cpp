@@ -588,6 +588,48 @@ TEST(AdaptiveStringColumnFindAllRanges)
     c.Destroy();
 }
 
+TEST(AdaptiveStringColumnCount)
+{
+    AdaptiveStringColumn asc;
+    
+    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+    asc.add("HEJSA"); // 0
+    asc.add("1");
+    asc.add("HEJSA");
+    asc.add("3");
+    asc.add("HEJSA");
+    asc.add("5");
+    asc.add("HEJSA");
+    asc.add("7");
+    asc.add("HEJSA");
+    asc.add("9");
+    asc.add("HEJSA");
+    asc.add("11");
+    asc.add("HEJSA");
+    asc.add("13");
+    asc.add("HEJSA");
+    asc.add("15");
+    asc.add("HEJSA"); // 16
+    
+    const size_t count = asc.count("HEJSA");
+    CHECK_EQUAL(9, count);
+    
+    // Create StringEnum
+    size_t keys;
+    size_t values;
+    const bool res = asc.AutoEnumerate(keys, values);
+    CHECK(res);
+    ColumnStringEnum e(keys, values);
+    
+    // Check that enumerated column return same result
+    const size_t ecount = e.count("HEJSA");
+    CHECK_EQUAL(9, ecount);
+    
+    // Clean-up
+    asc.Destroy();
+    e.Destroy();
+}
+
 TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)

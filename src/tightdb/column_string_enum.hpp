@@ -42,9 +42,11 @@ public:
     void Delete(size_t ndx);
     void Clear();
 
+    size_t count(const char* value) const;
     size_t find_first(const char* value, size_t start=0, size_t end=-1) const;
     void find_all(Array& res, const char* value, size_t start=0, size_t end=-1) const;
 
+    size_t count(size_t key_index) const;
     size_t find_first(size_t key_index, size_t start=0, size_t end=-1) const;
     void find_all(Array& res, size_t key_index, size_t start=0, size_t end=-1) const;
 

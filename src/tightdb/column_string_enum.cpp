@@ -78,6 +78,18 @@ void ColumnStringEnum::Clear()
     Column::Clear();
 }
 
+size_t ColumnStringEnum::count(size_t key_ndx) const
+{
+    return Column::count(key_ndx);
+}
+
+size_t ColumnStringEnum::count(const char* value) const
+{
+    const size_t key_ndx = m_keys.find_first(value);
+    if (key_ndx == not_found) return 0;
+    return Column::count(key_ndx);
+}
+
 void ColumnStringEnum::find_all(Array& res, const char* value, size_t start, size_t end) const
 {
     const size_t key_ndx = m_keys.find_first(value);
