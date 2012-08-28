@@ -195,6 +195,7 @@ public:
     const char* ColumnStringGet(size_t ndx) const;
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
     size_t IndexStringFindFirst(const char* value, const AdaptiveStringColumn& column) const;
+    size_t IndexStringCount(const char* value, const AdaptiveStringColumn& column) const;
 
     void SetAllToZero();
     bool Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);

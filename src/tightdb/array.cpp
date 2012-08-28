@@ -2713,4 +2713,89 @@ top:
     }
 }
 
+size_t Array::IndexStringCount(const char* value, const AdaptiveStringColumn& column) const
+{
+    const char* v = value;
+    const char* data   = (const char*)m_data;
+    const uint8_t* header = m_data - 8;
+    size_t width = m_width;
+    bool isNode = m_isNode;
+
+top:
+    // Create 4 byte index key
+    int32_t key = 0;
+    if (*v) key  = ((int32_t)(*v++) << 24);
+    if (*v) key |= ((int32_t)(*v++) << 16);
+    if (*v) key |= ((int32_t)(*v++) << 8);
+    if (*v) key |=  (int32_t)(*v++);
+
+    for (;;) {
+        // Get subnode table
+        const size_t ref_offsets = GetDirect(data, width, 0);
+        const size_t ref_refs    = GetDirect(data, width, 1);
+
+        // Find the position matching the key
+        const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+        const char* const offsets_data = (const char*)offsets_header + 8;
+        const size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == not_found) return 0;
+
+        // Get entry under key
+        const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+        const char* const refs_data = (const char*)refs_header + 8;
+        const size_t refs_width  = get_header_width_direct(refs_header);
+        const size_t ref = GetDirect(refs_data, refs_width, pos);
+
+        if (isNode) {
+            // Set vars for next iteration
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+            continue;
+        }
+
+        const int32_t stored_key = (int32_t)GetDirect<32>(offsets_data, pos);
+
+        if (stored_key == key) {
+            // Literal row index
+            if (ref & 1) {
+                const size_t row_ref = (ref >> 1);
+                if (*v == '\0') return 1; // full string has been compared
+
+                const char* const str = column.Get(row_ref);
+                if (strcmp(str, value) == 0) return 1;
+                else return 0;
+            }
+
+            const uint8_t* const sub_header = (const uint8_t*)m_alloc.Translate(ref);
+            const bool sub_hasrefs = get_header_hasrefs_direct(sub_header);
+
+            // List of matching row indexes
+            if (!sub_hasrefs) {
+                const char* const sub_data = (const char*)sub_header + 8;
+                const size_t sub_width  = get_header_width_direct(sub_header);
+                const size_t sub_count  = get_header_len_direct(sub_header);
+
+                const size_t row_ref = GetDirect(sub_data, sub_width, 0);
+                if (*v == '\0') return sub_count; // full string has been compared
+
+                const char* const str = column.Get(row_ref);
+                if (strcmp(str, value) == 0) return sub_count;
+                else return 0;
+            }
+
+            // Recurse into sub-index;
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+            goto top;
+        }
+        else return 0;
+    }
+}
+
 } //namespace tightdb

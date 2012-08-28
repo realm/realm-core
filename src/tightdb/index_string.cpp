@@ -397,7 +397,14 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
 
 size_t StringIndex::find_first(const char* value) const
 {
+    // Use direct access method
     return m_array->IndexStringFindFirst(value, m_column);
+}
+
+size_t StringIndex::count(const char* value) const
+{
+    // Use direct access method
+    return m_array->IndexStringCount(value, m_column);
 }
 
 void StringIndex::UpdateRefs(size_t pos, int diff)
