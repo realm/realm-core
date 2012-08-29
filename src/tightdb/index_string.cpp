@@ -353,10 +353,10 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
         const size_t row_ndx2 = ref >> 1;
         const char* const v2 = m_column.Get(row_ndx2);
         if (strcmp(v2, value) == 0) {
-            // convert to list
+            // convert to list (in sorted order)
             Array row_list(COLUMN_NORMAL, NULL, 0, m_array->GetAllocator());
-            row_list.add(row_ndx2);
-            row_list.add(row_ndx);
+            row_list.add(row_ndx < row_ndx2 ? row_ndx : row_ndx2);
+            row_list.add(row_ndx < row_ndx2 ? row_ndx2 : row_ndx);
             refs.Set(ins_pos, row_list.GetRef());
         }
         else {
@@ -377,7 +377,12 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
         const size_t r1 = (size_t)sub.Get(0);
         const char* const v2 = m_column.Get(r1);
         if (strcmp(v2, value) == 0) {
-            sub.add(row_ndx);
+            // find insert position (the list has to be kept in sorted order)
+            const size_t pos = sub.FindPos2(row_ndx);
+            if (pos == not_found)
+                sub.add(row_ndx);
+            else
+                sub.Insert(pos, row_ndx);
         }
         else {
             StringIndex sub_index(m_column);
@@ -397,7 +402,14 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
 
 size_t StringIndex::find_first(const char* value) const
 {
+    // Use direct access method
     return m_array->IndexStringFindFirst(value, m_column);
+}
+
+size_t StringIndex::count(const char* value) const
+{
+    // Use direct access method
+    return m_array->IndexStringCount(value, m_column);
 }
 
 void StringIndex::UpdateRefs(size_t pos, int diff)

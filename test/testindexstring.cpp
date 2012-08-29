@@ -257,3 +257,39 @@ TEST(StringIndex_Set)
     col.Destroy();
     ndx.Destroy();
 }
+
+TEST(StringIndex_Count)
+{
+    // Create a column with duplcate values
+    AdaptiveStringColumn col;
+    col.add(s1);
+    col.add(s2);
+    col.add(s2);
+    col.add(s3);
+    col.add(s3);
+    col.add(s3);
+    col.add(s4);
+    col.add(s4);
+    col.add(s4);
+    col.add(s4);
+
+    // Create a new index on column
+    StringIndex ndx(col);
+    ndx.BuildIndex();
+
+    // Counts
+    const size_t c0 = ndx.count(s5);
+    const size_t c1 = ndx.count(s1);
+    const size_t c2 = ndx.count(s2);
+    const size_t c3 = ndx.count(s3);
+    const size_t c4 = ndx.count(s4);
+    CHECK_EQUAL(0, c0);
+    CHECK_EQUAL(1, c1);
+    CHECK_EQUAL(2, c2);
+    CHECK_EQUAL(3, c3);
+    CHECK_EQUAL(4, c4);
+
+    // Clean up
+    col.Destroy();
+    ndx.Destroy();
+}
