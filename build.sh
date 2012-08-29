@@ -4,7 +4,7 @@ TIGHTDB_HOME="$(pwd)"
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-EXTENSIONS="tightdb_java2 tightdb_python tightdb_objc tightdb_node tightdb_php"
+EXTENSIONS="tightdb_java2 tightdb_python tightdb_objc tightdb_node tightdb_php tightdb_gui"
 
 MAKE="make -j8"
 LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
