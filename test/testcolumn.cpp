@@ -635,7 +635,7 @@ TEST(Column_Max)
 {
     Column c;
     int64_t t = c.maximum();
-    CHECK_EQUAL(0, t); // max on empty range returns zero
+//    CHECK_EQUAL(0, t); // max on empty range returns zero // edit: is undefined!
 
     c.add(1);
     t = c.maximum();
@@ -667,7 +667,7 @@ TEST(Column_Min)
 {
     Column c;
     int64_t t = c.minimum();
-    CHECK_EQUAL(0, t); // min on empty range returns zero
+//    CHECK_EQUAL(0, t); // min on empty range returns zero // update: is undefined
 
     c.add(1);
     t = c.minimum();

@@ -1458,7 +1458,7 @@ template <size_t width> void Array::SetWidth(void)
     }
 
     m_width = width;
-        // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of Get() instead of Get<n>
+    // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of Get() instead of Get<n>
     // if the declaration and association of the getter are on two different source lines
     Getter temp_getter = &Array::Get<width>; 
     m_getter = temp_getter;
@@ -2034,54 +2034,60 @@ size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, in
     else return (size_t)high;
 }
 
-
 }
 
 namespace tightdb {
 
-// Get containing array block direct through column b-tree
-// without instatiating any Arrays.
-void Array::GetBlock(size_t ndx, Array& arr, size_t& off) const
+// Get containing array block direct through column b-tree without instatiating any Arrays. Calling with 
+// use_retval = true will return itself if leaf and avoid unneccesary header initialization. 
+const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval) const
 {
+    // Reduce time overhead for cols with few entries
+    if(!m_isNode) {
+        if(!use_retval)
+            arr.CreateFromHeaderDirect((uint8_t*)m_data-8);
+        off = 0;
+        return this;
+    }
+
     char* data = (char*)m_data;
-    uint8_t* header = (uint8_t*)data-8;
+    uint8_t* header = (uint8_t*)data-8; 
     size_t width  = m_width;
     bool isNode   = m_isNode;
     size_t offset = 0;
 
     while (1) {
-        if (isNode) {
-            // Get subnode table
-            const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
-            const size_t ref_refs    = TO_SIZET(GetDirect(data, width, 1));
+        // Get subnode table
+        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
+        const size_t ref_refs    = TO_SIZET(GetDirect(data, width, 1));
 
-            // Find the subnode containing the item
-            const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
-            const char* const offsets_data = (const char*)offsets_header + 8;
-            const size_t offsets_width  = get_header_width_direct(offsets_header);
-            const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
+        // Find the subnode containing the item
+        const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+        const char* const offsets_data = (const char*)offsets_header + 8;
+        const size_t offsets_width  = get_header_width_direct(offsets_header);
+        const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
 
-            // Calc index in subnode
-            const size_t localoffset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
-            ndx -= localoffset; // local index
-            offset += localoffset;
+        // Calc index in subnode
+        const size_t localoffset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
+        ndx -= localoffset; // local index
+        offset += localoffset;
 
-            // Get ref to array
-            const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
-            const char* const refs_data = (const char*)refs_header + 8;
-            const size_t refs_width  = get_header_width_direct(refs_header);
-            const size_t ref = TO_SIZET(GetDirect(refs_data, refs_width, node_ndx));
+        // Get ref to array
+        const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+        const char* const refs_data = (const char*)refs_header + 8;
+        const size_t refs_width  = get_header_width_direct(refs_header);
+        const size_t ref = TO_SIZET(GetDirect(refs_data, refs_width, node_ndx));
 
-            // Set vars for next iteration
-            header = (uint8_t*)m_alloc.Translate(ref);
-            data   = (char*)header + 8;
-            width  = get_header_width_direct(header);
-            isNode = get_header_isnode_direct(header);
-        }
-        else {
+        // Set vars for next iteration
+        header = (uint8_t*)m_alloc.Translate(ref);
+        data   = (char*)header + 8;
+        width  = get_header_width_direct(header);
+        isNode = get_header_isnode_direct(header);
+        
+        if(!isNode) {
             arr.CreateFromHeaderDirect(header);
             off = offset;
-            return;
+            return &arr;
         }
     }
 }

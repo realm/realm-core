@@ -28,7 +28,7 @@ uint64_t rand2(int bitwidth = 64)
 
 }
 
-#if 0
+#if 1
 
 TEST(LESS)
 {
@@ -46,7 +46,7 @@ TEST(LESS)
     
     };
 
-    for (size_t w = 0; w < sizeof(v) / sizeof(*v); w++) {
+    for (size_t w = 5; w < sizeof(v) / sizeof(*v); w++) {
        printf("%d ", w);
         
         const size_t LEN = 64 * 20 + 1000; 
@@ -60,7 +60,6 @@ TEST(LESS)
         Array akku;
         state_state state;
         state.state = int64_t(&akku);
-
 
         for(size_t from = 0; from < LEN2; from++) {
             for(size_t to = from + 1; to <= LEN2; to++) {
@@ -138,7 +137,8 @@ TEST(LESS)
                     if(match >= from && match < to)
                         intended = (to - from - 1) * v[w] + v[w] + 1;
                     else
-                        intended = (to - from) * v[w];                   
+                        intended = (to - from) * v[w];      
+
                     assert(intended == val);
 
 
@@ -149,11 +149,8 @@ TEST(LESS)
                             a.Set(match, v[w] - 1);
                             a.Set(match + off, v[w] - 1);
 
-                            if(to == 17 && w == 15 && off == 2 && match == 8)
-                                printf("");
-
                             akku.Clear();
-                            a.find(COND_LESS, TDB_ACCUMULATE, v[w], from, to, 0, &state);
+                            a.find(COND_LESS, TDB_FINDALL, v[w], from, to, 0, &state);
 
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
@@ -172,7 +169,7 @@ TEST(LESS)
                     }
 
 
-                                        // Find all, GREATER
+                    // Find all, GREATER
                     if(v[w] != 9223372036854775807LL) {
                         for(size_t off = 1; off < 8; off++) {
 
@@ -180,9 +177,7 @@ TEST(LESS)
                             a.Set(match + off, v[w] + 1);
 
                             akku.Clear();
-                            a.find(COND_GREATER, TDB_ACCUMULATE, v[w], from, to, 0, &state);
-
-//                            a.find_all(GREATER, &akku, v[w], 0, from, to);
+                            a.find(COND_GREATER, TDB_FINDALL, v[w], from, to, 0, &state);
 
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
@@ -200,15 +195,14 @@ TEST(LESS)
                     }
 
 
-                                        // Find all, EQUAL
+                    // Find all, EQUAL
                     if(v[w] != 9223372036854775807LL) {
                         for(size_t off = 1; off < 8; off++) {
                             a.Set(match, v[w] + 1);
                             a.Set(match + off, v[w] + 1);
 
                             akku.Clear();
-                            a.find(COND_EQUAL, TDB_ACCUMULATE, v[w] + 1, from, to, 0, &state);
-//                            a.find_all(EQUAL, &akku, v[w] + 1, 0, from, to);
+                            a.find(COND_EQUAL, TDB_FINDALL, v[w] + 1, from, to, 0, &state);
 
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
@@ -224,11 +218,6 @@ TEST(LESS)
                             a.Set(match + off, v[w]);
                         }
                     }
-
-
-
-
-
                 }
             }    
 

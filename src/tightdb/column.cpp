@@ -14,6 +14,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/index.hpp>
 #include <tightdb/query_conditions.hpp>
+#include <tightdb/query_engine.hpp>
 
 using namespace std;
 
@@ -38,90 +39,11 @@ const Column GetColumnFromRef(const Array& parent, size_t ndx)
 */
 
 // Pre-declare local functions
-bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state);
-bool callme_count(Array* a, size_t start, size_t end, size_t caller_base, void* state);
-bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
-bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
 bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
 void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres);
 void merge_core(const Array& a0, const Array& a1, Array& res);
 Array* merge(const Array& ArrayList);
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
-
-struct CountState {
-    int64_t target;
-    size_t  count;
-};
-
-class AggregateState {
-public:
-    AggregateState() : isValid(false), result(0) {}
-    bool    isValid;
-    int64_t result;
-    int cond;
-    int64_t value;
-};
-
-bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state)
-{
-    (void)caller_base;
-    AggregateState* p = (AggregateState*)state;
-    int64_t s;
-    s = a->sum(start, end);
-    p->result += s;
-    return true;
-}
-
-bool callme_count(Array* a, size_t start, size_t end, size_t caller_base, void* state)
-{
-    static_cast<void>(start);
-    static_cast<void>(end);
-    static_cast<void>(caller_base);
-    CountState& cstate = *(CountState*)state;
-    const size_t s = a->count(cstate.target);
-    cstate.count += s;
-    return true;
-}
-
-bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
-{
-    (void)caller_offset;
-    AggregateState* p = (AggregateState*)state;
-
-    int64_t res;
-    int64_t s;
-
-    s = a->minimum(res, start, end);
-
-    if (!s) 
-        return true;
-
-    if (!p->isValid || (res < p->result)) {
-        p->result  = res;
-        p->isValid = true;
-    }
-    return true;
-}
-
-bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
-{
-    (void)caller_offset;
-    AggregateState* p = (AggregateState*)state;
-
-    int64_t res;
-    int64_t s;
-
-    s = a->maximum(res, start, end);
-
-    if (!s) 
-        return true;
-
-    if (!p->isValid || (res > p->result)) {
-        p->result  = res;
-        p->isValid = true;
-    }
-    return true;
-}
 
 // Input:
 //     vals:   An array of values
@@ -252,12 +174,12 @@ Array* merge(const Array& arrayList)
     if (l && r)
         merge_core(*l, *r, *res);
     else if (l) {
-        const size_t ref = Right.Get(0);
+        const size_t ref = Right.GetAsRef(0);
         Array r0(ref, NULL);
         merge_core(*l, r0, *res);
     }
     else if (r) {
-        const size_t ref = Left.Get(0);
+        const size_t ref = Left.GetAsRef(0);
         Array l0(ref, NULL);
         merge_core(l0, *r, *res);
     }
@@ -505,32 +427,96 @@ bool Column::Insert(size_t ndx, int64_t value)
     return true;
 }
 
+template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, size_t start, size_t end, size_t *matchcount) const
+{ 
+#if 1
+    if(end == size_t(-1)) end = ((Column*)this)->Size();
+    Column* m_column = (Column*)this;
+   
+    // We must allocate N on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
+    // slower because of initial overhead).
+    NODE<int64_t, Column, cond>* N = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
+    new (N) NODE<int64_t, Column, cond>(target, NULL);
+
+//    static NODE<int64_t, Column, cond> N(target, NULL);
+
+    N->QuickInit(m_column, target); 
+    int64_t r = N->aggregate<action>(0, start, end, size_t(-1), size_t(-1), matchcount);
+        
+    return r;
+#else
+    // Experimental
+
+    if(end == size_t(-1)) end = ((Column*)this)->Size();
+    Column* m_column = (Column*)this;
+    // To make column aggregates fast on few number of values we need low initial overhead
+    // so we allocate Array instance from stack and use fast constructor intended for read-only use
+    // with GetDirect():
+
+//    #define ARRAYPTR
+
+//    Array *m_array = (Array*)alloca(sizeof(Array));     // Fast
+//    new (m_array) Array(false);
+
+    static Array m_array;                            // Fast but very bad practise
+    // Array m_array;                                   // Around 10 times slower for 1000 items
+    // Array *m_array = new Array(false);               // Also 10 times slower
+
+    size_t m_leaf_start = 0;
+    size_t m_leaf_end = 0;
+    size_t m_local_end = 0;
+    state_state state;
+
+#ifdef ARRAYPTR
+    m_array->state_init(action, &state, NULL);
+#else
+    m_array.state_init(action, &state, NULL);
+#endif
+
+    for (size_t s = start; s < end; ) {
+        // Cache internal leafs
+        if (s >= m_leaf_end) {
+#ifdef ARRAYPTR
+            m_column->GetBlock(s, *m_array, m_leaf_start);
+            const size_t leaf_size = m_array->Size();
+#else
+            m_column->GetBlock(s, m_array, m_leaf_start);
+            const size_t leaf_size = m_array.Size();
+#endif
+            m_leaf_end = m_leaf_start + leaf_size;
+            const size_t e = end - m_leaf_start;
+            m_local_end = leaf_size < e ? leaf_size : e;
+        }
+#ifdef ARRAYPTR
+        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tdb_dummy);
+#else
+        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tdb_dummy);
+#endif
+        s = m_leaf_end;
+    }
+
+    return state.state;
+#endif
+}
+
 size_t Column::count(int64_t target) const
 {
-    CountState state = {target, 0};
-    TreeVisitLeafs<Array, Column>(0, Size(), 0, callme_count, (void *)&state);
-    return state.count;
+    return size_t(aggregate<TDB_COUNT, EQUAL>(target, 0, ((Column*)this)->Size()));
 }
 
 int64_t Column::sum(size_t start, size_t end) const
 {
-    AggregateState state;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_sum, (void *)&state);
-    return state.result;
+    return aggregate<TDB_SUM, NONE>(0, start, end);
 }
 
 int64_t Column::minimum(size_t start, size_t end) const
 {
-    AggregateState state;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_min, (void *)&state);
-    return state.result; // will return zero for empty ranges
+    return aggregate<TDB_MIN, NONE>(0, start, end);
 }
 
 int64_t Column::maximum(size_t start, size_t end) const
 {
-    AggregateState state;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_max, (void *)&state);
-    return state.result; // will return zero for empty ranges
+    return aggregate<TDB_MAX, NONE>(0, start, end);
 }
 
 void Column::sort(size_t start, size_t end)

@@ -155,8 +155,11 @@ struct GREATER {
 };
 
 struct NONE {
-    template<class T> bool operator()(const T& v1, const T& v2) const {return true;}
+    template<class T> bool operator()(const T& v1, const T& v2) const {(void)v1; (void)v2; return true;}
     int condition(void) {return COND_NONE;}
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) {(void)lbound; (void)ubound; (void)v; return true; }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) {(void)lbound; (void)ubound; (void)v; return true; }
+
 };
 
 struct LESS {

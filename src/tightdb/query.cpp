@@ -266,7 +266,7 @@ int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_
     }
 
     Init(table);
-    int64_t matchcount = 0;
+    size_t matchcount = 0;
 
     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_SUM, column, &matchcount);
     if(resultcount)
@@ -285,7 +285,7 @@ int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, s
     }
         
     Init(table);
-    int64_t matchcount = 0;
+    size_t matchcount = 0;
 
     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MAX, column, &matchcount);
     if(resultcount)
@@ -304,7 +304,7 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
     }
 
     Init(table);
-    int64_t matchcount = 0;
+    size_t matchcount = 0;
 
     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MIN, not_found, &matchcount);
     if(resultcount)
