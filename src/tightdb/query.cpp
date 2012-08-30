@@ -182,7 +182,7 @@ void Query::subtable(size_t column)
     group();
 }
 
-void Query::parent()
+void Query::end_subtable()
 {
     end_group();
 
@@ -244,8 +244,7 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
 
     if(m_threadcount > 0) {
         // Use multithreading
-        //FIXME: Honor 'limit'
-        return FindAllMulti(table, start, end);
+        return find_all_multi(table, start, end);
     }
 
     // Use single threading
@@ -364,7 +363,7 @@ size_t Query::remove(Table& table, size_t start, size_t end, size_t limit) const
     return results;
 }
 
-TableView Query::FindAllMulti(Table& table, size_t start, size_t end)
+TableView Query::find_all_multi(Table& table, size_t start, size_t end)
 {
 #if MULTITHREAD
     // Initialization
@@ -408,7 +407,7 @@ TableView Query::FindAllMulti(Table& table, size_t start, size_t end)
 #endif
 }
 
-int Query::SetThreads(unsigned int threadcount)
+int Query::set_threads(unsigned int threadcount)
 {
 #if MULTITHREAD
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)

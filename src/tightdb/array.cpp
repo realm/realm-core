@@ -1528,7 +1528,9 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
         *(int64_t*)(m_data + offset) = value;   
     }
 }
-
+#ifdef _MSC_VER
+#pragma warning (enable : 4127)
+#endif
 
 // Sort array.
 void Array::sort()

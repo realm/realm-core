@@ -305,7 +305,7 @@ public:
 
     Query& end_group() { m_impl.end_group(); return *this; }
 
-    Query& parent() { m_impl.parent(); return *this; }
+    Query& end_subtable() { m_impl.end_subtable(); return *this; }
 
     Query& Or() { m_impl.Or(); return *this; }
 
@@ -421,7 +421,7 @@ namespace _impl
         {
             if (spec->get_column_type(col_idx) != COLUMN_TYPE_TABLE ||
                 std::strcmp(col_names[col_idx], spec->get_column_name(col_idx)) != 0) return true;
-            Spec subspec = spec->get_subspec(col_idx);
+            Spec subspec = spec->get_subtable_spec(col_idx);
             return !Subtab::matches_dynamic_spec(&subspec);
         }
     };

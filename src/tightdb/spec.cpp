@@ -112,10 +112,10 @@ Spec Spec::add_subtable_column(const char* name)
     const size_t column_ndx = m_names.Size();
     add_column(COLUMN_TYPE_TABLE, name);
 
-    return get_subspec(column_ndx);
+    return get_subtable_spec(column_ndx);
 }
 
-Spec Spec::get_subspec(size_t column_ndx)
+Spec Spec::get_subtable_spec(size_t column_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < m_spec.Size());
     TIGHTDB_ASSERT((ColumnType)m_spec.Get(column_ndx) == COLUMN_TYPE_TABLE);
@@ -133,7 +133,7 @@ Spec Spec::get_subspec(size_t column_ndx)
     return Spec(m_table, alloc, ref, &m_subSpecs, pos);
 }
 
-const Spec Spec::get_subspec(size_t column_ndx) const
+const Spec Spec::get_subtable_spec(size_t column_ndx) const
 {
     TIGHTDB_ASSERT(column_ndx < m_spec.Size());
     TIGHTDB_ASSERT((ColumnType)m_spec.Get(column_ndx) == COLUMN_TYPE_TABLE);

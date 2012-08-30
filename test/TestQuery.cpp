@@ -351,7 +351,7 @@ TEST(TestQuerySubtable)
     q1->greater(0, 200);
     q1->subtable(2);
     q1->less(0, 50);
-    q1->parent();
+    q1->end_subtable();
     TableView t1 = q1->find_all(*table, 0, (size_t)-1);
     CHECK_EQUAL(2, t1.size());
     CHECK_EQUAL(1, t1.get_source_ndx(0));
@@ -364,7 +364,7 @@ TEST(TestQuerySubtable)
     q2->greater(0, 50);
     q2->Or();
     q2->less(0, 20);
-    q2->parent();
+    q2->end_subtable();
     TableView t2 = q2->find_all(*table, 0, (size_t)-1);
     CHECK_EQUAL(2, t2.size());
     CHECK_EQUAL(0, t2.get_source_ndx(0));
@@ -377,7 +377,7 @@ TEST(TestQuerySubtable)
     q3->greater(0, 50);
     q3->Or();
     q3->less(0, 20);
-    q3->parent();
+    q3->end_subtable();
     q3->less(0, 300);
     TableView t3 = q3->find_all(*table, 0, (size_t)-1);
     CHECK_EQUAL(1, t3.size());
@@ -392,7 +392,7 @@ TEST(TestQuerySubtable)
     q4->greater(0, 50);
     q4->Or();
     q4->less(0, 20);
-    q4->parent();
+    q4->end_subtable();
     TableView t4 = q4->find_all(*table, 0, (size_t)-1);
     delete q4;
 
@@ -569,7 +569,7 @@ TEST(TestQueryThreads)
     TupleTableType::Query q1 = ttt.where().first.equal(2).second.equal("b");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-    //q1.SetThreads(5);
+    //q1.set_threads(5);
     TupleTableType::View tv = q1.find_all(ttt);
 
     CHECK_EQUAL(100, tv.size());
@@ -1036,6 +1036,8 @@ TEST(TestQueryCaseSensitivity)
     TupleTableType ttt;
 
     ttt.add(1, "BLAAbaergroed");
+    ttt.add(1, "BLAAbaergroedandMORE");
+    ttt.add(1, "BLAAbaergroed2");
 
     TupleTableType::Query q1 = ttt.where().second.equal("blaabaerGROED", false);
     TupleTableType::View tv1 = q1.find_all(ttt);

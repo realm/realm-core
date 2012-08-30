@@ -37,10 +37,10 @@ public:
     // parent Spec object is kept alive for at least as long as the
     // spec that is returned. This also has implications for language
     // bindings such as Java.
-    Spec get_subspec(size_t column_ndx);
+    Spec get_subtable_spec(size_t column_ndx);
     // FIXME: Returning a const Spec is futile since Spec has a public
     // copy constructor.
-    const Spec get_subspec(size_t column_ndx) const;
+    const Spec get_subtable_spec(size_t column_ndx) const;
 
     // Direct access to type and attribute list
     size_t get_type_attr_count() const;
