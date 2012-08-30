@@ -2682,7 +2682,7 @@ top:
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
-                if (((char*)&stored_key)[3] == '\0') return row_ref;
+                if (!(stored_key << 24)) return row_ref;
 
                 const char* const str = column.Get(row_ref);
                 if (strcmp(str, value) == 0) return row_ref;
@@ -2700,7 +2700,7 @@ top:
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
-                if (((char*)&stored_key)[3] == '\0') return row_ref;
+                if (!(stored_key << 24)) return row_ref;
 
                 const char* const str = column.Get(row_ref);
                 if (strcmp(str, value) == 0) return row_ref;
@@ -2771,7 +2771,7 @@ top:
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
-                if (((char*)&stored_key)[3] == '\0') return row_ref;
+                if (!(stored_key << 24)) return 1;
 
                 const char* const str = column.Get(row_ref);
                 if (strcmp(str, value) == 0) return 1;
@@ -2790,7 +2790,7 @@ top:
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
-                if (((char*)&stored_key)[3] == '\0') return row_ref;
+                if (!(stored_key << 24)) return sub_count;
 
                 const char* const str = column.Get(row_ref);
                 if (strcmp(str, value) == 0) return sub_count;
