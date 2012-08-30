@@ -30,11 +30,10 @@ public:
     StringIndex(const AdaptiveStringColumn& c);
     StringIndex(size_t ref, ArrayParent* parent, size_t pndx, const AdaptiveStringColumn& c);
 
-    void BuildIndex();
-
     void Insert(size_t row_ndx, const char* value, bool isLast=false);
     void Set(size_t row_ndx, const char* oldValue, const char* newValue);
     void Delete(size_t row_ndx, const char* value, bool isLast=false);
+    void Clear();
 
     size_t find_first(const char* value) const;
     size_t count(const char* value) const;

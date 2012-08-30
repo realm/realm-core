@@ -41,17 +41,6 @@ int64_t StringIndex::GetLastKey() const
     return offsets.back();
 }
 
-void StringIndex::BuildIndex()
-{
-    TIGHTDB_ASSERT(is_empty()); // you can only build new index
-
-    const size_t count = m_column.Size();
-    for (size_t i = 0; i < count; ++i) {
-        const char* const value = m_column.Get(i);
-        Insert(i, value, true);
-    }
-}
-
 void StringIndex::Set(size_t ndx, const char* oldValue, const char* newValue)
 {
     Delete(ndx, oldValue, true); // set isLast to avoid updating refs
@@ -452,6 +441,14 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
             }
         }
     }
+}
+
+void StringIndex::Clear()
+{
+    Array values = m_array->GetSubArray(0);
+    Array refs   = m_array->GetSubArray(1);
+    values.Clear();
+    refs.Clear();
 }
 
 void StringIndex::Delete(size_t row_ndx, const char* value, bool isLast)
