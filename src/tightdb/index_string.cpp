@@ -55,11 +55,10 @@ void StringIndex::Insert(size_t row_ndx, const char* value, bool isLast)
     InsertWithOffset(row_ndx, 0, value);
 }
 
-
 bool StringIndex::InsertWithOffset(size_t row_ndx, size_t offset, const char* value)
 {
     // Create 4 byte index key
-    const char* v = value + offset;
+    const char* const v = value + offset;
     const int32_t key = CreateKey(v);
 
     return TreeInsert(row_ndx, key, offset, value);
@@ -70,7 +69,7 @@ bool StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
     TIGHTDB_ASSERT(!m_array->IsNode()); // only works in leafs
 
     // Create 4 byte index key
-    const char* v = value + offset;
+    const char* const v = value + offset;
     const int32_t key = CreateKey(v);
 
     // Get subnode table
