@@ -7,6 +7,7 @@ MODE="$1"
 EXTENSIONS="tightdb_java2 tightdb_python tightdb_objc tightdb_node tightdb_php tightdb_gui"
 
 MAKE="make -j8"
+ARCH_FLAGS=""
 LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 
 
@@ -14,6 +15,8 @@ LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 OS="$(uname -s)" || exit 1
 if [ "$OS" = "Darwin" ]; then
     MAKE="$MAKE CC=clang"
+    # Construct fat binaries on Darwin
+    ARCH_FLAGS="-arch i386 -arch x86_64"
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
 fi
 
@@ -57,7 +60,7 @@ case "$MODE" in
         ;;
 
     "build")
-        $MAKE || exit 1
+        $MAKE EXTRA_CFLAGS="$ARCH_FLAGS" EXTRA_LDFLAGS="$ARCH_FLAGS" || exit 1
         exit 0
         ;;
 
