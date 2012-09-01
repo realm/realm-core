@@ -119,6 +119,17 @@ template<class L, class R> inline bool int_multiply_with_overflow_detect(L& lval
 template<class L> inline bool int_shift_left_with_overflow_detect(L& lval, int i);
 
 
+/// Check for overflow when casting an integer value from one type to
+/// another.
+///
+/// This function checks at compile time that both types have valid
+/// specializations of std::numeric_limits<> and that both are indeed
+/// integers.
+///
+/// This function makes absolutely no assumptions about the platform
+/// except that it complies with at least C++03.
+template<class F, class T> bool int_cast_with_overflow_detect(F from, T& to);
+
 
 
 
@@ -238,6 +249,14 @@ template<class L> inline bool int_shift_left_with_overflow_detect(L& lval, int i
     if (std::numeric_limits<L>::max() >> i < lval) return true;
     lval <<= i;
     return false;
+}
+
+template<class F, class T> inline bool int_cast_with_overflow_detect(F from, T& to)
+{
+    typedef std::numeric_limits<T> lim_to;
+    if (int_less_than(from, lim_to::min()) || int_less_than(lim_to::max(), from)) return false;
+    to = from;
+    return true;
 }
 
 
