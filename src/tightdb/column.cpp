@@ -401,11 +401,6 @@ size_t Column::Size() const
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
 
-void Column::SetParent(ArrayParent* parent, size_t pndx)
-{
-    m_array->SetParent(parent, pndx);
-}
-
 void Column::UpdateParentNdx(int diff)
 {
     m_array->UpdateParentNdx(diff);

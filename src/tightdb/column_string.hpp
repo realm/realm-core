@@ -58,8 +58,8 @@ public:
     // Index
     bool HasIndex() const {return m_index != NULL;}
     const StringIndex& GetIndex() const {return *m_index;}
-    const StringIndex& CreateIndex();
-    void SetIndex(size_t ref, ArrayParent* parent, size_t pndx);
+    StringIndex& CreateIndex();
+    void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
     void RemoveIndex() {m_index = NULL;}
 
     size_t GetRef() const {return m_array->GetRef();}

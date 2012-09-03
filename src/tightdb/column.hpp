@@ -61,9 +61,10 @@ public:
     //virtual Index& GetIndex() = 0;
     //virtual void BuildIndex(Index& index) = 0;
     //virtual void ClearIndex() = 0;
-    virtual void SetIndexRef(size_t ref) { static_cast<void>(ref); }
+    virtual void SetIndexRef(size_t, ArrayParent*, size_t) {}
 
     virtual size_t GetRef() const = 0;
+    virtual void SetParent(ArrayParent* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
     virtual void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
     virtual void UpdateFromParent() {m_array->UpdateFromParent();}
 
@@ -147,7 +148,6 @@ public:
 
     bool operator==(const Column& column) const;
 
-    void SetParent(ArrayParent *parent, size_t pndx);
     void UpdateParentNdx(int diff);
     void SetHasRefs();
 

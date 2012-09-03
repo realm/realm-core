@@ -24,11 +24,15 @@ int32_t CreateKey(const char* v)
 
 StringIndex::StringIndex(const AdaptiveStringColumn& c) : Column(COLUMN_HASREFS, NULL, 0, c.GetAllocator()), m_column(c)
 {
+    Allocator& alloc = m_array->GetAllocator();
+
     // Add subcolumns for leafs
-    const Array values(COLUMN_NORMAL);
-    const Array refs(COLUMN_HASREFS);
+    Array values(COLUMN_NORMAL, NULL, 0, alloc);
+    Array refs(COLUMN_HASREFS, NULL, 1, alloc);
     m_array->add(values.GetRef());
     m_array->add(refs.GetRef());
+    values.SetParent((ArrayParent*)m_array, 0);
+    refs.SetParent((ArrayParent*)m_array, 1);
 }
 
 StringIndex::StringIndex(size_t ref, ArrayParent* parent, size_t pndx, const AdaptiveStringColumn& c) : Column(ref, parent, pndx, c.GetAllocator()), m_column(c)

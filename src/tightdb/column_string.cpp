@@ -87,7 +87,7 @@ void AdaptiveStringColumn::UpdateRef(size_t ref)
     }
 }
 
-const StringIndex& AdaptiveStringColumn::CreateIndex()
+StringIndex& AdaptiveStringColumn::CreateIndex()
 {
     TIGHTDB_ASSERT(m_index == NULL);
 
@@ -104,7 +104,7 @@ const StringIndex& AdaptiveStringColumn::CreateIndex()
     return *m_index;
 }
 
-void AdaptiveStringColumn::SetIndex(size_t ref, ArrayParent* parent, size_t pndx)
+void AdaptiveStringColumn::SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx)
 {
     TIGHTDB_ASSERT(m_index == NULL);
     m_index = new StringIndex(ref, parent, pndx, *this);

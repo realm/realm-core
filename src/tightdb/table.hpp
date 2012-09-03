@@ -177,7 +177,7 @@ public:
 
     // Indexing
     bool has_index(size_t column_ndx) const;
-    void set_index(size_t column_ndx);
+    void set_index(size_t column_ndx, bool update_spec=true);
 
     // Aggregate functions
     size_t  count(size_t column_ndx, int64_t target) const;
