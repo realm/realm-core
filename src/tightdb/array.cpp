@@ -2629,7 +2629,7 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
     }
 }
 
-size_t Array::IndexStringFindFirst(const char* value, const AdaptiveStringColumn& column) const
+size_t Array::IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const
 {
     const char* v = value;
     const char* data   = (const char*)m_data;
@@ -2679,9 +2679,12 @@ top:
             // Literal row index
             if (ref & 1) {
                 const size_t row_ref = (ref >> 1);
-                if (*v == '\0') return row_ref; // full string has been compared
 
-                const char* const str = column.Get(row_ref);
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) return row_ref;
+
+                const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return row_ref;
                 else return not_found;
             }
@@ -2693,11 +2696,13 @@ top:
             if (!sub_hasrefs) {
                 const char* const sub_data = (const char*)sub_header + 8;
                 const size_t sub_width  = get_header_width_direct(sub_header);
-
                 const size_t row_ref = GetDirect(sub_data, sub_width, 0);
-                if (*v == '\0') return row_ref; // full string has been compared
 
-                const char* const str =column.Get(row_ref);
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) return row_ref;
+
+                const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return row_ref;
                 else return not_found;
             }
@@ -2713,7 +2718,7 @@ top:
     }
 }
 
-size_t Array::IndexStringCount(const char* value, const AdaptiveStringColumn& column) const
+size_t Array::IndexStringCount(const char* value, void* column, StringGetter get_func) const
 {
     const char* v = value;
     const char* data   = (const char*)m_data;
@@ -2763,9 +2768,12 @@ top:
             // Literal row index
             if (ref & 1) {
                 const size_t row_ref = (ref >> 1);
-                if (*v == '\0') return 1; // full string has been compared
 
-                const char* const str = column.Get(row_ref);
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) return 1;
+
+                const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return 1;
                 else return 0;
             }
@@ -2778,11 +2786,13 @@ top:
                 const char* const sub_data = (const char*)sub_header + 8;
                 const size_t sub_width  = get_header_width_direct(sub_header);
                 const size_t sub_count  = get_header_len_direct(sub_header);
-
                 const size_t row_ref = GetDirect(sub_data, sub_width, 0);
-                if (*v == '\0') return sub_count; // full string has been compared
 
-                const char* const str = column.Get(row_ref);
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) return sub_count;
+
+                const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return sub_count;
                 else return 0;
             }

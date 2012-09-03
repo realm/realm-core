@@ -25,16 +25,18 @@
 
 namespace tightdb {
 
+typedef const char*(*StringGetter)(void*, size_t);
+
 class StringIndex : public Column {
 public:
-    StringIndex(const AdaptiveStringColumn& c);
-    StringIndex(size_t ref, ArrayParent* parent, size_t pndx, const AdaptiveStringColumn& c);
-
-    void BuildIndex();
+    StringIndex(void* target_column, StringGetter get_func, Allocator& alloc);
+    StringIndex(size_t ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc);
+    void SetTarget(void* target_column, StringGetter get_func);
 
     void Insert(size_t row_ndx, const char* value, bool isLast=false);
     void Set(size_t row_ndx, const char* oldValue, const char* newValue);
     void Delete(size_t row_ndx, const char* value, bool isLast=false);
+    void Clear();
 
     size_t find_first(const char* value) const;
     size_t count(const char* value) const;
@@ -58,8 +60,11 @@ protected:
     bool NodeInsert(size_t ndx, size_t ref);
     void DoDelete(size_t ndx, const char* value, size_t offset);
 
+    const char* Get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
+
     // Member variables
-    const AdaptiveStringColumn& m_column;
+    void* m_target_column;
+    StringGetter m_get_func;
 
 #ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;

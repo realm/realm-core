@@ -28,8 +28,7 @@ TEST(StringIndex_BuildIndex)
     col.add(s6); // common prefix
 
     // Create a new index on column
-    StringIndex ndx(col);
-    ndx.BuildIndex();
+    const StringIndex& ndx = col.CreateIndex();
 
     const size_t r1 = ndx.find_first(s1);
     const size_t r2 = ndx.find_first(s2);
@@ -47,7 +46,6 @@ TEST(StringIndex_BuildIndex)
 
     // Clean up
     col.Destroy();
-    ndx.Destroy();
 }
 
 TEST(StringIndex_DeleteAll)
@@ -63,41 +61,45 @@ TEST(StringIndex_DeleteAll)
     col.add(s6); // common prefix
 
     // Create a new index on column
-    StringIndex ndx(col);
-    ndx.BuildIndex();
+    const StringIndex& ndx = col.CreateIndex();
 
     // Delete all entries
     // (reverse order to avoid ref updates)
-    ndx.Delete(6, s6, true);
-    ndx.Delete(5, s5, true);
-    ndx.Delete(4, s1, true);
-    ndx.Delete(3, s4, true);
-    ndx.Delete(2, s3, true);
-    ndx.Delete(1, s2, true);
-    ndx.Delete(0, s1, true);
+    col.Delete(6);
+    col.Delete(5);
+    col.Delete(4);
+    col.Delete(3);
+    col.Delete(2);
+    col.Delete(1);
+    col.Delete(0);
 #ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
 #endif
 
     // Re-insert values
-    ndx.BuildIndex();
+    col.add(s1);
+    col.add(s2);
+    col.add(s3);
+    col.add(s4);
+    col.add(s1); // duplicate value
+    col.add(s5); // common prefix
+    col.add(s6); // common prefix
 
     // Delete all entries
     // (in order to force constant ref updating)
-    ndx.Delete(0, s1);
-    ndx.Delete(0, s2);
-    ndx.Delete(0, s3);
-    ndx.Delete(0, s4);
-    ndx.Delete(0, s1);
-    ndx.Delete(0, s5);
-    ndx.Delete(0, s6);
+    col.Delete(0);
+    col.Delete(0);
+    col.Delete(0);
+    col.Delete(0);
+    col.Delete(0);
+    col.Delete(0);
+    col.Delete(0);
 #ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
 #endif
 
     // Clean up
     col.Destroy();
-    ndx.Destroy();
 }
 
 TEST(StringIndex_Delete)
@@ -111,48 +113,41 @@ TEST(StringIndex_Delete)
     col.add(s1); // duplicate value
 
     // Create a new index on column
-    StringIndex ndx(col);
-    ndx.BuildIndex();
+    const StringIndex& ndx = col.CreateIndex();
 
     // Delete first item (in index)
     col.Delete(1);
-    ndx.Delete(1, s2); // opt for last item
 
-    CHECK_EQUAL(0, ndx.find_first(s1));
-    CHECK_EQUAL(1, ndx.find_first(s3));
-    CHECK_EQUAL(2, ndx.find_first(s4));
+    CHECK_EQUAL(0, col.find_first(s1));
+    CHECK_EQUAL(1, col.find_first(s3));
+    CHECK_EQUAL(2, col.find_first(s4));
     CHECK_EQUAL(not_found, ndx.find_first(s2));
 
     // Delete last item (in index)
     col.Delete(2);
-    ndx.Delete(2, s4);
 
-    CHECK_EQUAL(0, ndx.find_first(s1));
-    CHECK_EQUAL(1, ndx.find_first(s3));
-    CHECK_EQUAL(not_found, ndx.find_first(s4));
-    CHECK_EQUAL(not_found, ndx.find_first(s2));
+    CHECK_EQUAL(0, col.find_first(s1));
+    CHECK_EQUAL(1, col.find_first(s3));
+    CHECK_EQUAL(not_found, col.find_first(s4));
+    CHECK_EQUAL(not_found, col.find_first(s2));
 
     // Delete middle item (in index)
     col.Delete(1);
-    ndx.Delete(1, s3);
 
-    CHECK_EQUAL(0, ndx.find_first(s1));
-    CHECK_EQUAL(not_found, ndx.find_first(s3));
-    CHECK_EQUAL(not_found, ndx.find_first(s4));
-    CHECK_EQUAL(not_found, ndx.find_first(s2));
+    CHECK_EQUAL(0, col.find_first(s1));
+    CHECK_EQUAL(not_found, col.find_first(s3));
+    CHECK_EQUAL(not_found, col.find_first(s4));
+    CHECK_EQUAL(not_found, col.find_first(s2));
 
     // Delete all items
     col.Delete(0);
-    ndx.Delete(0, s1);
     col.Delete(0);
-    ndx.Delete(0, s1);
 #ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
 #endif
 
     // Clean up
     col.Destroy();
-    ndx.Destroy();
 }
 
 TEST(StringIndex_Insert)
@@ -166,46 +161,41 @@ TEST(StringIndex_Insert)
     col.add(s1); // duplicate value
 
     // Create a new index on column
-    StringIndex ndx(col);
-    ndx.BuildIndex();
+    col.CreateIndex();
 
     // Insert item in top of column
     col.Insert(0, s5);
-    ndx.Insert(0, s5);
 
-    CHECK_EQUAL(0, ndx.find_first(s5));
-    CHECK_EQUAL(1, ndx.find_first(s1));
-    CHECK_EQUAL(2, ndx.find_first(s2));
-    CHECK_EQUAL(3, ndx.find_first(s3));
-    CHECK_EQUAL(4, ndx.find_first(s4));
+    CHECK_EQUAL(0, col.find_first(s5));
+    CHECK_EQUAL(1, col.find_first(s1));
+    CHECK_EQUAL(2, col.find_first(s2));
+    CHECK_EQUAL(3, col.find_first(s3));
+    CHECK_EQUAL(4, col.find_first(s4));
     //CHECK_EQUAL(5, ndx.find_first(s1)); // duplicate
 
     // Append item in end of column
     col.Insert(6, s6);
-    ndx.Insert(6, s6, true); // opt for last item
 
-    CHECK_EQUAL(0, ndx.find_first(s5));
-    CHECK_EQUAL(1, ndx.find_first(s1));
-    CHECK_EQUAL(2, ndx.find_first(s2));
-    CHECK_EQUAL(3, ndx.find_first(s3));
-    CHECK_EQUAL(4, ndx.find_first(s4));
-    CHECK_EQUAL(6, ndx.find_first(s6));
+    CHECK_EQUAL(0, col.find_first(s5));
+    CHECK_EQUAL(1, col.find_first(s1));
+    CHECK_EQUAL(2, col.find_first(s2));
+    CHECK_EQUAL(3, col.find_first(s3));
+    CHECK_EQUAL(4, col.find_first(s4));
+    CHECK_EQUAL(6, col.find_first(s6));
 
     // Insert item in middle
     col.Insert(3, s7);
-    ndx.Insert(3, s7);
 
-    CHECK_EQUAL(0, ndx.find_first(s5));
-    CHECK_EQUAL(1, ndx.find_first(s1));
-    CHECK_EQUAL(2, ndx.find_first(s2));
-    CHECK_EQUAL(3, ndx.find_first(s7));
-    CHECK_EQUAL(4, ndx.find_first(s3));
-    CHECK_EQUAL(5, ndx.find_first(s4));
-    CHECK_EQUAL(7, ndx.find_first(s6));
+    CHECK_EQUAL(0, col.find_first(s5));
+    CHECK_EQUAL(1, col.find_first(s1));
+    CHECK_EQUAL(2, col.find_first(s2));
+    CHECK_EQUAL(3, col.find_first(s7));
+    CHECK_EQUAL(4, col.find_first(s3));
+    CHECK_EQUAL(5, col.find_first(s4));
+    CHECK_EQUAL(7, col.find_first(s6));
 
     // Clean up
     col.Destroy();
-    ndx.Destroy();
 }
 
 TEST(StringIndex_Set)
@@ -219,43 +209,40 @@ TEST(StringIndex_Set)
     col.add(s1); // duplicate value
 
     // Create a new index on column
-    StringIndex ndx(col);
-    ndx.BuildIndex();
+    col.CreateIndex();
 
     // Set top value
     col.Set(0, s5);
-    ndx.Set(0, s1, s5);
 
-    CHECK_EQUAL(0, ndx.find_first(s5));
-    CHECK_EQUAL(1, ndx.find_first(s2));
-    CHECK_EQUAL(2, ndx.find_first(s3));
-    CHECK_EQUAL(3, ndx.find_first(s4));
-    CHECK_EQUAL(4, ndx.find_first(s1));
+    CHECK_EQUAL(0, col.find_first(s5));
+    CHECK_EQUAL(1, col.find_first(s2));
+    CHECK_EQUAL(2, col.find_first(s3));
+    CHECK_EQUAL(3, col.find_first(s4));
+    CHECK_EQUAL(4, col.find_first(s1));
 
     // Set bottom value
-    ndx.Set(4, s1, s6);
+    col.Set(4, s6);
 
-    CHECK_EQUAL(not_found, ndx.find_first(s1));
-    CHECK_EQUAL(0, ndx.find_first(s5));
-    CHECK_EQUAL(1, ndx.find_first(s2));
-    CHECK_EQUAL(2, ndx.find_first(s3));
-    CHECK_EQUAL(3, ndx.find_first(s4));
-    CHECK_EQUAL(4, ndx.find_first(s6));
+    CHECK_EQUAL(not_found, col.find_first(s1));
+    CHECK_EQUAL(0, col.find_first(s5));
+    CHECK_EQUAL(1, col.find_first(s2));
+    CHECK_EQUAL(2, col.find_first(s3));
+    CHECK_EQUAL(3, col.find_first(s4));
+    CHECK_EQUAL(4, col.find_first(s6));
 
     // Set middle value
-    ndx.Set(2, s3, s7);
+    col.Set(2, s7);
 
-    CHECK_EQUAL(not_found, ndx.find_first(s3));
-    CHECK_EQUAL(not_found, ndx.find_first(s1));
-    CHECK_EQUAL(0, ndx.find_first(s5));
-    CHECK_EQUAL(1, ndx.find_first(s2));
-    CHECK_EQUAL(2, ndx.find_first(s7));
-    CHECK_EQUAL(3, ndx.find_first(s4));
-    CHECK_EQUAL(4, ndx.find_first(s6));
+    CHECK_EQUAL(not_found, col.find_first(s3));
+    CHECK_EQUAL(not_found, col.find_first(s1));
+    CHECK_EQUAL(0, col.find_first(s5));
+    CHECK_EQUAL(1, col.find_first(s2));
+    CHECK_EQUAL(2, col.find_first(s7));
+    CHECK_EQUAL(3, col.find_first(s4));
+    CHECK_EQUAL(4, col.find_first(s6));
 
     // Clean up
     col.Destroy();
-    ndx.Destroy();
 }
 
 TEST(StringIndex_Count)
@@ -274,15 +261,14 @@ TEST(StringIndex_Count)
     col.add(s4);
 
     // Create a new index on column
-    StringIndex ndx(col);
-    ndx.BuildIndex();
+    col.CreateIndex();
 
     // Counts
-    const size_t c0 = ndx.count(s5);
-    const size_t c1 = ndx.count(s1);
-    const size_t c2 = ndx.count(s2);
-    const size_t c3 = ndx.count(s3);
-    const size_t c4 = ndx.count(s4);
+    const size_t c0 = col.count(s5);
+    const size_t c1 = col.count(s1);
+    const size_t c2 = col.count(s2);
+    const size_t c3 = col.count(s3);
+    const size_t c4 = col.count(s4);
     CHECK_EQUAL(0, c0);
     CHECK_EQUAL(1, c1);
     CHECK_EQUAL(2, c2);
@@ -291,5 +277,4 @@ TEST(StringIndex_Count)
 
     // Clean up
     col.Destroy();
-    ndx.Destroy();
 }

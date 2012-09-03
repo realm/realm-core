@@ -12,6 +12,7 @@
 #include <tightdb/column_binary.hpp>
 #include <tightdb/column_table.hpp>
 #include <tightdb/column_mixed.hpp>
+#include <tightdb/index_string.hpp>
 
 using namespace std;
 
@@ -127,23 +128,22 @@ void Table::CreateColumns()
         case COLUMN_ATTR_INDEXED:
         case COLUMN_ATTR_UNIQUE:
             attr = type;
-            break;
+            continue; // attr prefix column types)
 
         default:
             TIGHTDB_ASSERT(false);
         }
 
+        // Cache Columns
+        m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, not even in C++11
+
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
-            TIGHTDB_ASSERT(false); //TODO:
-            //const index_ref = new_col->CreateIndex(attr);
-            //m_columns.add(index_ref);
+            const size_t column_ndx = m_cols.Size()-1;
+            set_index(column_ndx, false);
 
             attr = COLUMN_ATTR_NONE;
         }
-
-        // Cache Columns
-        m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, not even in C++11
     }
 }
 
@@ -262,11 +262,11 @@ void Table::CacheColumns()
             }
             break;
 
-            // Attributes
+            // Attributes (prefixing column types)
         case COLUMN_ATTR_INDEXED:
         case COLUMN_ATTR_UNIQUE:
             attr = type;
-            break;
+            continue;
 
         default:
             TIGHTDB_ASSERT(false);
@@ -276,8 +276,12 @@ void Table::CacheColumns()
 
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
-            const size_t index_ref = m_columns.GetAsRef(ndx_in_parent+1);
-            new_col->SetIndexRef(index_ref);
+            TIGHTDB_ASSERT(attr == COLUMN_ATTR_INDEXED); // only attribute supported for now
+            TIGHTDB_ASSERT(type == COLUMN_TYPE_STRING);  // index only for strings
+
+            const size_t pndx = ndx_in_parent+1;
+            const size_t index_ref = m_columns.GetAsRef(pndx);
+            new_col->SetIndexRef(index_ref, &m_columns, pndx);
 
             ++ndx_in_parent; // advance one extra pos to account for index
             attr = COLUMN_ATTR_NONE;
@@ -491,25 +495,33 @@ bool Table::has_index(size_t column_ndx) const
     return col.HasIndex();
 }
 
-void Table::set_index(size_t column_ndx)
+void Table::set_index(size_t column_ndx, bool update_spec)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     if (has_index(column_ndx)) return;
 
-/* FIXME: This fails to work together with Group::commit()
+    const ColumnType ct = GetRealColumnType(column_ndx);
 
-    ColumnBase& col = GetColumnBase(column_ndx);
+    if (ct == COLUMN_TYPE_STRING) {
+        AdaptiveStringColumn& col = GetColumnString(column_ndx);
 
-    if (col.IsIntColumn()) {
-        Column& c = static_cast<Column&>(col);
-        Index* index = new Index();
-        c.BuildIndex(*index);
-        m_columns.add((intptr_t)index->GetRef());
+        // Create the index
+        StringIndex& ndx = col.CreateIndex();
+        const size_t ndx_ref = ndx.GetRef();
+
+        // Insert ref into columns list after the owning column
+        const size_t column_pos = GetColumnRefPos(column_ndx);
+        m_columns.Insert(column_pos+1, ndx_ref);
+        ndx.SetParent(&m_columns, column_pos+1);
+        UpdateColumnRefs(column_ndx+1, 1);
+
+        // Update spec
+        if (update_spec)
+            m_spec_set.set_column_attr(column_ndx, COLUMN_ATTR_INDEXED);
     }
     else {
         TIGHTDB_ASSERT(false);
     }
-*/
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err = get_local_transact_log().add_index_to_column(column_ndx);
@@ -1440,8 +1452,16 @@ void Table::optimize()
             UpdateColumnRefs(column_ndx+1, 1);
 
             // Replace cached column
-            ColumnStringEnum* e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc); // FIXME: We may have to use 'new (nothrow)' here. It depends on whether we choose to allow exceptions.
+            ColumnStringEnum* const e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc); // FIXME: We may have to use 'new (nothrow)' here. It depends on whether we choose to allow exceptions.
             m_cols.Set(i, (intptr_t)e);
+
+            // Inherit any existing index
+            if (column->HasIndex()) {
+                StringIndex& ndx = column->PullIndex();
+                e->TakeOverIndex(ndx);
+            }
+
+            // Clean up the old column
             column->Destroy();
             delete column;
         }

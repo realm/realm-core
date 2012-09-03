@@ -630,6 +630,99 @@ TEST(AdaptiveStringColumnCount)
     e.Destroy();
 }
 
+TEST(AdaptiveStringColumnIndex)
+{
+    AdaptiveStringColumn asc;
+    
+    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+    asc.add("HEJSA"); // 0
+    asc.add("1");
+    asc.add("HEJSA");
+    asc.add("3");
+    asc.add("HEJSA");
+    asc.add("5");
+    asc.add("HEJSA");
+    asc.add("7");
+    asc.add("HEJSA");
+    asc.add("9");
+    asc.add("HEJSA");
+    asc.add("11");
+    asc.add("HEJSA");
+    asc.add("13");
+    asc.add("HEJSA");
+    asc.add("15");
+    asc.add("HEJSA"); // 16
+    
+    asc.CreateIndex();
+    CHECK(asc.HasIndex());
+    
+    const size_t count0 = asc.count("HEJ");
+    const size_t count1 = asc.count("HEJSA");
+    const size_t count2 = asc.count("1");
+    const size_t count3 = asc.count("15");
+    CHECK_EQUAL(0, count0);
+    CHECK_EQUAL(9, count1);
+    CHECK_EQUAL(1, count2);
+    CHECK_EQUAL(1, count3);
+    
+    const size_t ndx0 = asc.find_first("HEJS");
+    const size_t ndx1 = asc.find_first("HEJSA");
+    const size_t ndx2 = asc.find_first("1");
+    const size_t ndx3 = asc.find_first("15");
+    CHECK_EQUAL(not_found, ndx0);
+    CHECK_EQUAL(0, ndx1);
+    CHECK_EQUAL(1, ndx2);
+    CHECK_EQUAL(15, ndx3);
+    
+    // Set some values
+    asc.Set(1, "one");
+    asc.Set(15, "fifteen");
+    const size_t set1 = asc.find_first("1");
+    const size_t set2 = asc.find_first("15");
+    const size_t set3 = asc.find_first("one");
+    const size_t set4 = asc.find_first("fifteen");
+    CHECK_EQUAL(not_found, set1);
+    CHECK_EQUAL(not_found, set2);
+    CHECK_EQUAL(1, set3);
+    CHECK_EQUAL(15, set4);
+    
+    // Insert some values
+    asc.Insert(0, "top");
+    asc.Insert(8, "middle");
+    asc.add("bottom");
+    const size_t ins1 = asc.find_first("top");
+    const size_t ins2 = asc.find_first("middle");
+    const size_t ins3 = asc.find_first("bottom");
+    CHECK_EQUAL(0, ins1);
+    CHECK_EQUAL(8, ins2);
+    CHECK_EQUAL(19, ins3);
+    
+    // Delete some values
+    asc.Delete(0);  // top
+    asc.Delete(7);  // middle
+    asc.Delete(17); // bottom
+    const size_t del1 = asc.find_first("top");
+    const size_t del2 = asc.find_first("middle");
+    const size_t del3 = asc.find_first("bottom");
+    const size_t del4 = asc.find_first("HEJSA");
+    const size_t del5 = asc.find_first("fifteen");
+    CHECK_EQUAL(not_found, del1);
+    CHECK_EQUAL(not_found, del2);
+    CHECK_EQUAL(not_found, del3);
+    CHECK_EQUAL(0, del4);
+    CHECK_EQUAL(15, del5);
+    
+    // Remove all
+    asc.Clear();
+    const size_t c1 = asc.find_first("HEJSA");
+    const size_t c2 = asc.find_first("fifteen");
+    CHECK_EQUAL(not_found, c1);
+    CHECK_EQUAL(not_found, c2);
+    
+    // Clean-up
+    asc.Destroy();
+}
+
 TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
