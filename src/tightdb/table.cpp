@@ -1452,8 +1452,16 @@ void Table::optimize()
             UpdateColumnRefs(column_ndx+1, 1);
 
             // Replace cached column
-            ColumnStringEnum* e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc); // FIXME: We may have to use 'new (nothrow)' here. It depends on whether we choose to allow exceptions.
+            ColumnStringEnum* const e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc); // FIXME: We may have to use 'new (nothrow)' here. It depends on whether we choose to allow exceptions.
             m_cols.Set(i, (intptr_t)e);
+
+            // Inherit any existing index
+            if (column->HasIndex()) {
+                StringIndex& ndx = column->PullIndex();
+                e->TakeOverIndex(ndx);
+            }
+
+            // Clean up the old column
             column->Destroy();
             delete column;
         }

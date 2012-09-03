@@ -36,7 +36,6 @@ namespace tightdb {
 // Pre-definitions
 class Column;
 class Index;
-class StringIndex;
 
 class ColumnBase {
 public:
@@ -135,7 +134,7 @@ protected:
 
 class Column : public ColumnBase {
 public:
-    Column(Allocator& alloc);
+    explicit Column(Allocator& alloc);
     Column(ColumnDef type, Allocator& alloc);
     Column(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
     Column(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());

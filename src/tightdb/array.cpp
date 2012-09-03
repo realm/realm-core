@@ -2629,7 +2629,7 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
     }
 }
 
-size_t Array::IndexStringFindFirst(const char* value, const AdaptiveStringColumn& column) const
+size_t Array::IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const
 {
     const char* v = value;
     const char* data   = (const char*)m_data;
@@ -2684,7 +2684,7 @@ top:
                 // compared against the entire (target) string
                 if (!(stored_key << 24)) return row_ref;
 
-                const char* const str = column.Get(row_ref);
+                const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return row_ref;
                 else return not_found;
             }
@@ -2702,7 +2702,7 @@ top:
                 // compared against the entire (target) string
                 if (!(stored_key << 24)) return row_ref;
 
-                const char* const str = column.Get(row_ref);
+                const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return row_ref;
                 else return not_found;
             }
@@ -2718,7 +2718,7 @@ top:
     }
 }
 
-size_t Array::IndexStringCount(const char* value, const AdaptiveStringColumn& column) const
+size_t Array::IndexStringCount(const char* value, void* column, StringGetter get_func) const
 {
     const char* v = value;
     const char* data   = (const char*)m_data;
@@ -2773,7 +2773,7 @@ top:
                 // compared against the entire (target) string
                 if (!(stored_key << 24)) return 1;
 
-                const char* const str = column.Get(row_ref);
+                const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return 1;
                 else return 0;
             }
@@ -2792,7 +2792,7 @@ top:
                 // compared against the entire (target) string
                 if (!(stored_key << 24)) return sub_count;
 
-                const char* const str = column.Get(row_ref);
+                const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return sub_count;
                 else return 0;
             }

@@ -87,12 +87,18 @@ void AdaptiveStringColumn::UpdateRef(size_t ref)
     }
 }
 
+// Getter function for string index
+static const char* GetString(void* column, size_t ndx)
+{
+    return ((AdaptiveStringColumn*)column)->Get(ndx);
+}
+
 StringIndex& AdaptiveStringColumn::CreateIndex()
 {
     TIGHTDB_ASSERT(m_index == NULL);
 
     // Create new index
-    m_index = new StringIndex(*this);
+    m_index = new StringIndex(this, &GetString, m_array->GetAllocator());
 
     // Populate the index
     const size_t count = Size();
@@ -107,7 +113,7 @@ StringIndex& AdaptiveStringColumn::CreateIndex()
 void AdaptiveStringColumn::SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx)
 {
     TIGHTDB_ASSERT(m_index == NULL);
-    m_index = new StringIndex(ref, parent, pndx, *this);
+    m_index = new StringIndex(ref, parent, pndx, this, &GetString, m_array->GetAllocator());
 }
 
 bool AdaptiveStringColumn::is_empty() const

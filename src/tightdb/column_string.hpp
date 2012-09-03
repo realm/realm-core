@@ -26,6 +26,8 @@
 
 namespace tightdb {
 
+// Pre-declarations
+class StringIndex;
 
 class AdaptiveStringColumn : public ColumnBase {
 public:
@@ -58,6 +60,7 @@ public:
     // Index
     bool HasIndex() const {return m_index != NULL;}
     const StringIndex& GetIndex() const {return *m_index;}
+    StringIndex& PullIndex() {StringIndex& ndx = *m_index; m_index = NULL; return ndx;}
     StringIndex& CreateIndex();
     void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
     void RemoveIndex() {m_index = NULL;}
