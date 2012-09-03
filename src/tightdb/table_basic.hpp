@@ -301,6 +301,8 @@ public:
 
     Query(): Spec::template ColNames<QueryCol, Query*>(this) {}
 
+    Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
+
     Query& group() { m_impl.group(); return *this; }
 
     Query& end_group() { m_impl.end_group(); return *this; }

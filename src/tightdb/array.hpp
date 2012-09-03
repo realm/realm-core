@@ -418,13 +418,11 @@ public:
             return callback(index);
         if(action == TDB_MAX && value > *(int64_t*)state) {
             state->state = value;
-    //        state->match_count++;
-            state->match_count = 1; // faster than ++ 
+            state->match_count++;
         }
         if(action == TDB_MIN && value < *(int64_t*)state) {
             state->state = value;
-            // state->match_count++;
-            state->match_count = 1;
+            state->match_count++;
         }
         if(action == TDB_SUM)
             state->state += value;
@@ -439,6 +437,13 @@ public:
         return true;
     }
 
+    template <ACTION action> bool USES_VAL(void) 
+    {
+        if(action == TDB_MAX || action == TDB_MIN || action == TDB_SUM)
+            return true;
+        else
+            return false;
+    }
 
     template <ACTION action, class Callback>bool FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const
     {

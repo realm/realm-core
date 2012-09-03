@@ -49,6 +49,9 @@ public:
     Query(const Query& copy); // FIXME: Try to remove this
     ~Query();
 
+    // Conditions: Query only rows contained in tv
+    Query& tableview(const Array& arr);
+
     // Conditions: int
     Query& equal(size_t column_ndx, int64_t value);
     Query& not_equal(size_t column_ndx, int64_t value);

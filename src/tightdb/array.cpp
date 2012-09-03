@@ -2046,7 +2046,7 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retva
 {
     // Reduce time overhead for cols with few entries
     if(!m_isNode) {
-        if(!use_retval)
+//        if(!use_retval)
             arr.CreateFromHeaderDirect((uint8_t*)m_data-8);
         off = 0;
         return this;

@@ -25,6 +25,7 @@
 #include "meta.hpp"
 
 #include <tightdb/table.hpp>
+#include <tightdb/table_view.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/utf8.hpp>
@@ -82,6 +83,86 @@ protected:
     const Table* m_table;
     std::string error_code;
 };
+
+
+class ARRAYNODE: public ParentNode {
+public:
+    ARRAYNODE(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.Size()) {m_child = 0;}
+
+    void Init(const Table& table)
+    {
+        m_next = 0;
+        if(m_size > 0)
+            m_max = m_arr.Get(m_size - 1);
+        if (m_child) m_child->Init(table);
+    }
+
+    size_t find_first(size_t start, size_t end)
+    {
+        for (size_t s = start; s < end; ++s) {
+            // Test first few values and end
+            if(m_size == 0)
+                return end;               
+
+            if(m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
+            if(m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
+
+            if(start > m_max) return end;
+
+            if(m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
+            if(m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
+
+            // Find bounds
+            --m_next;
+            size_t add = 1;
+            while(m_next + add < m_size && TO_SIZET(m_arr.Get(m_next + add)) < start)
+                add *= 2;
+
+            // Do binary search inside bounds
+            assert(m_arr.GetAsSizeT(m_arr.Size() - 1) >= start);
+
+            size_t high = m_next + add < m_size ? m_next + add : m_size;
+            m_next = m_next + add / 2 - 1;
+
+            while (high - m_next > 1) {
+                const size_t probe = (m_next + high) / 2;
+                const size_t v = m_arr.GetAsSizeT(probe);
+                if (v < start) 
+                    m_next = probe;
+                else           
+                    high = probe;
+            }
+            if (high == m_next + add)         
+                m_next = end;
+            else
+                m_next = high;
+match:
+            // Test remaining query criterias
+            s = m_arr.Get(m_next);
+            ++m_next;
+            if (m_child == 0)
+                return s;
+            else {
+                const size_t a = m_child->find_first(s, end);
+                if (s == a)
+                    return s;
+                else
+                    s = a - 1;
+            }
+        }
+        return end;
+    }
+
+protected:
+    const Array& m_arr;
+    size_t m_max;
+    size_t m_next;
+    size_t m_size;
+
+};
+
+
+
 
 /*
 // This is a template NODE, used if you want to special-handle new data types for performance.
@@ -218,7 +299,9 @@ public:
             m_leaf_end_agg = m_leaf_start_agg + leaf_size;
         }
 
-        int64_t av = m_array_agg.Get(TO_SIZET(v) - m_leaf_start_agg);
+        int64_t av = NULL;        
+        if(m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
+            av = m_array_agg.Get(TO_SIZET(v) - m_leaf_start_agg);
         bool b = m_array.FIND_ACTION<action>(TO_SIZET(v), av, &state, &tdb_dummy);
 
         return b;
@@ -274,8 +357,12 @@ public:
                 if (r == end)
                     break;
 
-                if(agg_col == m_column_id || agg_col == size_t(-1))
-                    m_array.FIND_ACTION<action>(r, m_column->Get(r), &state, &tdb_dummy);
+                if(agg_col == m_column_id || agg_col == size_t(-1)) {
+                    if(m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
+                        m_array.FIND_ACTION<action>(r, m_column->Get(r), &state, &tdb_dummy);
+                    else
+                        m_array.FIND_ACTION<action>(r, NULL, &state, &tdb_dummy);
+                }
                 else
                     match_callback<action>(r);
                 n++;
@@ -300,7 +387,7 @@ public:
                 const size_t e = end - m_leaf_start;
                 m_local_end = leaf_size < e ? leaf_size : e;
             }
-
+            
             // Do search directly on cached leaf array
             s = m_array.find_first<F>(m_value, s - m_leaf_start, m_local_end);
 
@@ -323,6 +410,7 @@ public:
         }
         return end;
     }
+
 
     T m_value;
 

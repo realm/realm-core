@@ -48,6 +48,14 @@ Query::~Query()
     }
 }
 
+// Makes query search only in rows contained in tv
+Query& Query::tableview(const Array &arr)
+{
+    ParentNode* const p = new ARRAYNODE(arr);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+
 Query& Query::equal(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new NODE<int64_t, Column, EQUAL>(value, column_ndx);
