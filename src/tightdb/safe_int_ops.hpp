@@ -26,7 +26,7 @@
 #include <tightdb/assert.hpp>
 #include <tightdb/meta.hpp>
 
-TIGHTDB_BEGIN_NAMESPACE(tightdb)
+namespace tightdb {
 
 
 //@{
@@ -254,12 +254,12 @@ template<class L> inline bool int_shift_left_with_overflow_detect(L& lval, int i
 template<class F, class T> inline bool int_cast_with_overflow_detect(F from, T& to)
 {
     typedef std::numeric_limits<T> lim_to;
-    if (int_less_than(from, lim_to::min()) || int_less_than(lim_to::max(), from)) return false;
+    if (int_less_than(from, lim_to::min()) || int_less_than(lim_to::max(), from)) return true;
     to = from;
-    return true;
+    return false;
 }
 
 
-TIGHTDB_END_NAMESPACE(tightdb)
+} // namespace tightdb
 
 #endif // TIGHTDB_SAFE_INT_OPS_HPP
