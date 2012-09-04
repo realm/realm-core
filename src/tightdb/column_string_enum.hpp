@@ -53,14 +53,14 @@ public:
     void find_all(Array& res, size_t key_index, size_t start=0, size_t end=-1) const;
 
     void UpdateParentNdx(int diff);
-    void  UpdateFromParent();
+    void UpdateFromParent();
 
     // Index
     bool HasIndex() const {return m_index != NULL;}
     const StringIndex& GetIndex() const {return *m_index;}
     StringIndex& CreateIndex();
     void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
-    void TakeOverIndex(StringIndex& index);
+    void ReuseIndex(StringIndex& index);
     void RemoveIndex() {m_index = NULL;}
 
     /// Compare two string enumeration columns for equality

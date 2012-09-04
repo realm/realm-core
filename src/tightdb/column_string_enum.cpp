@@ -226,12 +226,12 @@ void ColumnStringEnum::SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx)
     m_index = new StringIndex(ref, parent, pndx, this, &GetString, m_array->GetAllocator());
 }
 
-void ColumnStringEnum::TakeOverIndex(StringIndex& index)
+void ColumnStringEnum::ReuseIndex(StringIndex& index)
 {
     TIGHTDB_ASSERT(m_index == NULL);
 
     index.SetTarget(this, &GetString);
-    m_index = &index;
+    m_index = &index; // we now own this index
 }
 
 

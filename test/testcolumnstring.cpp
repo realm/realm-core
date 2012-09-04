@@ -397,6 +397,112 @@ TEST(ColumnStringAutoEnumerate)
     e.Destroy();
 }
 
+TEST(ColumnStringAutoEnumerateIndex)
+{
+    AdaptiveStringColumn c;
+
+    // Add duplicate values
+    for (size_t i = 0; i < 5; ++i) {
+        c.add("a");
+        c.add("bc");
+        c.add("def");
+        c.add("ghij");
+        c.add("klmop");
+    }
+
+    // Create StringEnum
+    size_t keys;
+    size_t values;
+    const bool res = c.AutoEnumerate(keys, values);
+    CHECK(res);
+    ColumnStringEnum e(keys, values);
+
+    // Set index
+    e.CreateIndex();
+    CHECK(e.HasIndex());
+
+    // Search for a value that does not exist
+    const size_t res1 = e.find_first("nonexist");
+    CHECK_EQUAL(not_found, res1);
+
+    // Search for an existing value
+    const size_t res2 = e.find_first("klmop");
+    CHECK_EQUAL(4, res2);
+
+    // Set a value
+    e.Set(1, "newval");
+    const size_t res3 = e.count("a");
+    const size_t res4 = e.count("bc");
+    const size_t res5 = e.count("newval");
+    CHECK_EQUAL(5, res3);
+    CHECK_EQUAL(4, res4);
+    CHECK_EQUAL(1, res5);
+
+    // Insert a value
+    e.Insert(4, "newval");
+    const size_t res6 = e.count("newval");
+    CHECK_EQUAL(2, res6);
+
+    // Delete values
+    e.Delete(1);
+    e.Delete(0);
+    const size_t res7 = e.count("a");
+    const size_t res8 = e.count("newval");
+    CHECK_EQUAL(4, res7);
+    CHECK_EQUAL(1, res8);
+
+    // Clear all
+    e.Clear();
+    const size_t res9 = e.count("a");
+    CHECK_EQUAL(0, res9);
+
+    // Cleanup
+    c.Destroy();
+    e.Destroy();
+}
+
+TEST(ColumnStringAutoEnumerateIndexReuse)
+{
+    AdaptiveStringColumn c;
+
+    // Add duplicate values
+    for (size_t i = 0; i < 5; ++i) {
+        c.add("a");
+        c.add("bc");
+        c.add("def");
+        c.add("ghij");
+        c.add("klmop");
+    }
+
+    // Set index
+    c.CreateIndex();
+    CHECK(c.HasIndex());
+
+    // Create StringEnum
+    size_t keys;
+    size_t values;
+    const bool res = c.AutoEnumerate(keys, values);
+    CHECK(res);
+    ColumnStringEnum e(keys, values);
+
+    // Reuse the index from original column
+    StringIndex& ndx = c.PullIndex();
+    e.ReuseIndex(ndx);
+    CHECK(e.HasIndex());
+
+    // Search for a value that does not exist
+    const size_t res1 = e.find_first("nonexist");
+    CHECK_EQUAL(not_found, res1);
+
+    // Search for an existing value
+    const size_t res2 = e.find_first("klmop");
+    CHECK_EQUAL(4, res2);
+
+    // Cleanup
+    c.Destroy();
+    e.Destroy();
+}
+
 // Test "Replace string array with long string array" when doing it through LeafSet()
 TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
 {

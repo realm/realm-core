@@ -277,7 +277,8 @@ void Table::CacheColumns()
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
             TIGHTDB_ASSERT(attr == COLUMN_ATTR_INDEXED); // only attribute supported for now
-            TIGHTDB_ASSERT(type == COLUMN_TYPE_STRING);  // index only for strings
+            TIGHTDB_ASSERT(type == COLUMN_TYPE_STRING ||
+                           type == COLUMN_TYPE_STRING_ENUM);  // index only for strings
 
             const size_t pndx = ndx_in_parent+1;
             const size_t index_ref = m_columns.GetAsRef(pndx);
@@ -501,27 +502,37 @@ void Table::set_index(size_t column_ndx, bool update_spec)
     if (has_index(column_ndx)) return;
 
     const ColumnType ct = GetRealColumnType(column_ndx);
+    const size_t column_pos = GetColumnRefPos(column_ndx);
+    size_t ndx_ref = -1;
 
     if (ct == COLUMN_TYPE_STRING) {
         AdaptiveStringColumn& col = GetColumnString(column_ndx);
 
         // Create the index
         StringIndex& ndx = col.CreateIndex();
-        const size_t ndx_ref = ndx.GetRef();
-
-        // Insert ref into columns list after the owning column
-        const size_t column_pos = GetColumnRefPos(column_ndx);
-        m_columns.Insert(column_pos+1, ndx_ref);
         ndx.SetParent(&m_columns, column_pos+1);
-        UpdateColumnRefs(column_ndx+1, 1);
+        ndx_ref = ndx.GetRef();
+    }
+    else if (ct == COLUMN_TYPE_STRING_ENUM) {
+        ColumnStringEnum& col = GetColumnStringEnum(column_ndx);
 
-        // Update spec
-        if (update_spec)
-            m_spec_set.set_column_attr(column_ndx, COLUMN_ATTR_INDEXED);
+        // Create the index
+        StringIndex& ndx = col.CreateIndex();
+        ndx.SetParent(&m_columns, column_pos+1);
+        ndx_ref = ndx.GetRef();
     }
     else {
         TIGHTDB_ASSERT(false);
+        return;
     }
+
+    // Insert ref into columns list after the owning column
+    m_columns.Insert(column_pos+1, ndx_ref);
+    UpdateColumnRefs(column_ndx+1, 1);
+
+    // Update spec
+    if (update_spec)
+        m_spec_set.set_column_attr(column_ndx, COLUMN_ATTR_INDEXED);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err = get_local_transact_log().add_index_to_column(column_ndx);
@@ -1458,7 +1469,7 @@ void Table::optimize()
             // Inherit any existing index
             if (column->HasIndex()) {
                 StringIndex& ndx = column->PullIndex();
-                e->TakeOverIndex(ndx);
+                e->ReuseIndex(ndx);
             }
 
             // Clean up the old column
