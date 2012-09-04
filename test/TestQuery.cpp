@@ -18,6 +18,35 @@ TIGHTDB_TABLE_2(BoolTupleTable,
                 first,  Int,
                 second, Bool)
 
+TEST(TestQueryFindAll_Contains2_2)
+{
+    TupleTableType ttt;
+
+    ttt.add(0, "foo");
+    ttt.add(1, "foobar");
+    ttt.add(2, "hellofoobar");
+    ttt.add(3, "foO");
+    ttt.add(4, "foObar");
+    ttt.add(5, "hellofoObar");
+    
+    TupleTableType::Query q1 = ttt.where().second.contains("foO",false);
+    TupleTableType::View tv1 = q1.find_all(ttt);
+    CHECK_EQUAL(6, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(1));
+    CHECK_EQUAL(2, tv1.get_source_ndx(2));
+    CHECK_EQUAL(3, tv1.get_source_ndx(3));
+    CHECK_EQUAL(4, tv1.get_source_ndx(4));
+    CHECK_EQUAL(5, tv1.get_source_ndx(5));
+
+    TupleTableType::Query q2 = ttt.where().second.contains("foO", true);
+    TupleTableType::View tv2 = q2.find_all(ttt);
+    CHECK_EQUAL(3, tv2.size());
+    CHECK_EQUAL(3, tv2.get_source_ndx(0));
+    CHECK_EQUAL(4, tv2.get_source_ndx(1));
+    CHECK_EQUAL(5, tv2.get_source_ndx(2));
+
+}
 
 TEST(TestQuery_sum_new_aggregates)
 {
