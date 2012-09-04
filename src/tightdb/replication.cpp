@@ -107,11 +107,11 @@ error_code expand_file(int fd, off_t size)
     int res = ftruncate(fd, size);
     if (res<0) {
         switch (errno) {
-        case EFBIG:
-        case EINVAL: return ERROR_NO_RESOURCE;
-        case EIO:    return ERROR_IO;
-        case EROFS:  return ERROR_PERMISSION;
-        default:     return ERROR_OTHER;
+            case EFBIG:
+            case EINVAL: return ERROR_NO_RESOURCE;
+            case EIO:    return ERROR_IO;
+            case EROFS:  return ERROR_PERMISSION;
+            default:     return ERROR_OTHER;
         }
     }
     return ERROR_NONE;
@@ -123,12 +123,12 @@ error_code map_file(int fd, off_t size, void** addr)
     void* const a = mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if (a == MAP_FAILED) {
         switch (errno) {
-        case EAGAIN:
-        case EMFILE: return ERROR_NO_RESOURCE;
-        case ENOMEM: return ERROR_OUT_OF_MEMORY;
-        case ENODEV:
-        case ENXIO:  return ERROR_BAD_FILESYS_PATH;
-        default:     return ERROR_OTHER;
+            case EAGAIN:
+            case EMFILE: return ERROR_NO_RESOURCE;
+            case ENOMEM: return ERROR_OUT_OF_MEMORY;
+            case ENODEV:
+            case ENXIO:  return ERROR_BAD_FILESYS_PATH;
+            default:     return ERROR_OTHER;
         }
     }
     *addr = a;

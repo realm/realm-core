@@ -4,9 +4,10 @@ TIGHTDB_HOME="$(pwd)"
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-EXTENSIONS="tightdb_java2 tightdb_python tightdb_objc tightdb_node tightdb_php"
+EXTENSIONS="tightdb_java2 tightdb_python tightdb_objc tightdb_node tightdb_php tightdb_gui"
 
 MAKE="make -j8"
+ARCH_FLAGS=""
 LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 
 
@@ -14,6 +15,8 @@ LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 OS="$(uname -s)" || exit 1
 if [ "$OS" = "Darwin" ]; then
     MAKE="$MAKE CC=clang"
+    # Construct fat binaries on Darwin
+    ARCH_FLAGS="-arch i386 -arch x86_64"
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
 fi
 
@@ -57,7 +60,7 @@ case "$MODE" in
         ;;
 
     "build")
-        $MAKE || exit 1
+        $MAKE EXTRA_CFLAGS="$ARCH_FLAGS" EXTRA_LDFLAGS="$ARCH_FLAGS" || exit 1
         exit 0
         ;;
 
@@ -290,10 +293,42 @@ EOI
         sh build.sh $INSTALL || exit 1
         touch successfull_extensions
         for x in $(cat successfull_extensions); do
+            echo ">>>>>>>> INSTALLING '$x'"
+            sh "../$x/build.sh" $INSTALL
+        done
+        exit 0
+        ;;
+
+
+    "dist-test-installed")
+        PREFIX="$1"
+        TEST_INSTALLED=install
+        if [ "$PREFIX" ]; then
+            TEST_INSTALLED="$TEST_INSTALLED $PREFIX"
+        fi
+        echo ">>>>>>>> TESTING INSTALLATION OF 'tightdb'"
+        sh build.sh $TEST_INSTALLED || exit 1
+        touch successfull_extensions
+        for x in $(cat successfull_extensions); do
+            echo ">>>>>>>> TESTING INSTALLATION OF '$x'"
+            if sh "../$x/build.sh" $TEST_INSTALLED >/dev/null 2>&1; then
+                echo "OK"
+            else
+                echo "FAILED!!!"
+            fi
+        done
+        exit 0
+        ;;
+
+
+    "dist-status")
+        echo ">>>>>>>> STATUS OF 'tightdb'"
+        git status
+        for x in $EXTENSIONS; do
             EXT_HOME="../$x"
             if [ -r "$EXT_HOME/build.sh" ]; then
-                echo ">>>>>>>> INSTALLING '$x'"
-                sh "$EXT_HOME/build.sh" $INSTALL
+                echo ">>>>>>>> STATUS OF '$EXT_HOME'"
+                (cd "$EXT_HOME/"; git status)
             fi
         done
         exit 0
@@ -317,7 +352,7 @@ EOI
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: clean build test install test-installed" 1>&2
-        echo "As well as: dist dist-clean dist-build dist-install dist-pull" 1>&2
+        echo "As well as: dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull" 1>&2
         exit 1
         ;;
 
