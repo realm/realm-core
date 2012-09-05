@@ -1,10 +1,12 @@
+# NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
+
 cd "$(dirname "$0")"
 TIGHTDB_HOME="$(pwd)"
 
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-EXTENSIONS="tightdb_java2 tightdb_python tightdb_objc tightdb_node tightdb_php tightdb_gui"
+EXTENSIONS="java2 python objc node php gui"
 
 MAKE="make -j8"
 ARCH_FLAGS=""
@@ -21,6 +23,14 @@ if [ "$OS" = "Darwin" ]; then
 fi
 
 
+
+map_ext_name_to_dir()
+{
+    local ext_name
+    ext_name="$1"
+    printf "tightdb_%s\n" "$ext_name"
+    return 0
+}
 
 word_list_append()
 {
@@ -96,7 +106,7 @@ case "$MODE" in
         echo "Checking availability of extensions" | tee -a "$LOG_FILE"
         AVAIL_EXTENSIONS=""
         for x in $EXTENSIONS; do
-            EXT_HOME="../$x"
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if ! [ -r "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> WARNING: Missing extension '$EXT_HOME'" | tee -a "$LOG_FILE"
                 continue
@@ -111,10 +121,11 @@ case "$MODE" in
         mkdir "$FAKE_PKG_DIR" || exit 1
         NEW_AVAIL_EXTENSIONS=""
         for x in $AVAIL_EXTENSIONS; do
-            EXT_HOME="../$x"
+            EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
+            EXT_HOME="../$EXT_DIR"
             echo "Testing transfer of extension '$x' to package" >> "$LOG_FILE"
-            mkdir "$FAKE_PKG_DIR/$x" || exit 1
-            if ! sh "../$x/build.sh" dist-copy "$FAKE_PKG_DIR/$x" >>"$LOG_FILE" 2>&1; then
+            mkdir "$FAKE_PKG_DIR/$EXT_DIR" || exit 1
+            if ! sh "$EXT_HOME/build.sh" dist-copy "$FAKE_PKG_DIR/$EXT_DIR" >>"$LOG_FILE" 2>&1; then
                 echo ">>>>>>>> WARNING: Transfer of extension '$x' to test package failed" | tee -a "$LOG_FILE"
                 continue
             fi
@@ -128,7 +139,7 @@ case "$MODE" in
             echo ">>>>>>>> WARNING: Dirty working directory '../$(basename "$TIGHTDB_HOME")'" | tee -a "$LOG_FILE"
         fi
         for x in $AVAIL_EXTENSIONS; do
-            EXT_HOME="../$x"
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ "$(cd "$EXT_HOME" && git status --porcelain)" ]; then
                 echo ">>>>>>>> WARNING: Dirty working directory '$EXT_HOME'" | tee -a "$LOG_FILE"
             fi
@@ -142,7 +153,7 @@ case "$MODE" in
                 echo "Continuing with these extensions:"
                 {
                     for x in $AVAIL_EXTENSIONS; do
-                        EXT_HOME="../$x"
+                        EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                         echo "  $x  ->  $EXT_HOME"
                     done
                 } | column -t || exit 1
@@ -177,20 +188,73 @@ case "$MODE" in
                 mkdir "$PKG_DIR/tightdb" || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/core.tar.gz") || exit 1
                 echo "NO_BUILD_ON_INSTALL = 1" >> "$PKG_DIR/tightdb/config.mk"
-                cat <<EOI > "$PKG_DIR/Makefile"
-all: build
-build:
-	@sh tightdb/build.sh dist-build
-install:
-	@sh tightdb/build.sh dist-install \$(prefix)
-clean:
-	@sh tightdb/build.sh dist-clean
+                cat <<EOI > "$PKG_DIR/build"
+#!/bin/sh
+
+EXTENSIONS="$AVAIL_EXTENSIONS"
+
+if [ \$# -eq 1 -a "\$1" = "clean" ]; then
+    sh tightdb/build.sh dist-clean || exit 1
+    exit 0
+fi
+
+if [ \\( \$# -eq 1 -o \$# -eq 2 \\) -a "\$1" = "install" ]; then
+    shift
+    sh tightdb/build.sh dist-install "\$@" || exit 1
+    exit 0
+fi
+
+if [ \\( \$# -eq 1 -o \$# -eq 2 \\) -a "\$1" = "test" ]; then
+    shift
+    sh tightdb/build.sh dist-test-installed "\$@" || exit 1
+    exit 0
+fi
+
+if [ \$# -eq 1 -a "\$1" = "all" ]; then
+    sh tightdb/build.sh dist-build \$EXTENSIONS || exit 1
+    exit 0
+fi
+
+if [ \$# -ge 1 ]; then
+    all_found="1"
+    for x in "\$@"; do
+        found=""
+        for y in \$EXTENSIONS; do
+            if [ "\$y" = "\$x" ]; then
+                found="1"
+                break
+            fi
+        done
+        if ! [ "\$found" ]; then
+            echo "No such extension '\$x'" 1>&2
+            all_found=""
+            break
+        fi
+    done
+    if [ "\$all_found" ]; then
+        sh tightdb/build.sh dist-build "\$@" || exit 1
+        exit 0
+    fi
+    echo 1>&2
+fi
+
+echo "Build specific extensions: \$0  EXT1  [EXT2]..." 1>&2
+echo "Build all extensions:      \$0  all" 1>&2
+echo "Install what was built:    \$0  install  [INSTALL_PREFIX]" 1>&2
+echo "Test installation:         \$0  test     [INSTALL_PREFIX]" 1>&2
+echo "Start from scratch:        \$0  clean" 1>&2
+echo 1>&2
+echo "Available extensions are: \$EXTENSIONS" 1>&2
+exit 1
 EOI
+                chmod +x "$PKG_DIR/build"
 
                 for x in $AVAIL_EXTENSIONS; do
                     echo "Transfering extension '$x' to package" | tee -a "$LOG_FILE"
-                    mkdir "$PKG_DIR/$x" || exit 1
-                    sh "../$x/build.sh" dist-copy "$PKG_DIR/$x" >>"$LOG_FILE" 2>&1 || exit 1
+                    EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
+                    EXT_HOME="../$EXT_DIR"
+                    mkdir "$PKG_DIR/$EXT_DIR" || exit 1
+                    sh "$EXT_HOME/build.sh" dist-copy "$PKG_DIR/$EXT_DIR" >>"$LOG_FILE" 2>&1 || exit 1
                 done
 
                 echo "Zipping the package" | tee -a "$LOG_FILE"
@@ -212,19 +276,20 @@ EOI
                 for x in $AVAIL_EXTENSIONS; do
                     echo "Testing extension '$x'"
                     echo "Building extension '$x'" >> "$LOG_FILE"
-                    if ! sh "$TEST_PKG_DIR/$x/build.sh" build >>"$LOG_FILE" 2>&1; then
+                    EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
+                    if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" build >>"$LOG_FILE" 2>&1; then
                         echo ">>>>>>>> WARNING: Failed to build extension '$x'" | tee -a "$LOG_FILE"
                     else
                         echo "Testing extension '$x'" >> "$LOG_FILE"
-                        if ! sh "$TEST_PKG_DIR/$x/build.sh" test >>"$LOG_FILE" 2>&1; then
+                        if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" test >>"$LOG_FILE" 2>&1; then
                             echo ">>>>>>>> WARNING: Test suite failed for extension '$x'" | tee -a "$LOG_FILE"
                         fi
                         echo "Installing extension '$x' to test location" >> "$LOG_FILE"
-                        if ! sh "$TEST_PKG_DIR/$x/build.sh" install "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
+                        if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" install "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
                             echo ">>>>>>>> WARNING: Installation failed for extension '$x'" | tee -a "$LOG_FILE"
                         else
                             echo "Testing state of extension '$x' installation" >> "$LOG_FILE"
-                            if ! sh "$TEST_PKG_DIR/$x/build.sh" test-installed "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
+                            if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" test-installed "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
                                 echo ">>>>>>>> WARNING: Post installation test failed for extension '$x'" | tee -a "$LOG_FILE"
                             fi
                         fi
@@ -247,76 +312,148 @@ EOI
 
 
     "dist-clean")
-        rm -f successfull_extensions
+        TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-clean.XXXX)" || exit 1
+        LOG_FILE="$TEMP_DIR/clean.log"
+        ERROR=""
         for x in $EXTENSIONS; do
-            EXT_HOME="../$x"
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -r "$EXT_HOME/build.sh" ]; then
-                echo ">>>>>>>> CLEANING '$x'"
-                sh "$EXT_HOME/build.sh" clean
+                echo ">>>>>>>> CLEANING '$x'" | tee -a "$LOG_FILE"
+                rm -f "$EXT_HOME/TO_BE_INSTALLED" || exit 1
+                if ! sh "$EXT_HOME/build.sh" clean >>"$LOG_FILE" 2>&1; then
+                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    ERROR="1"
+                fi
             fi
         done
+        if [ "$ERROR" ]; then
+            echo "Log file is here: $LOG_FILE" 1>&2
+            exit 1
+        fi
         exit 0
         ;;
 
 
     "dist-build")
+        TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build.XXXX)" || exit 1
+        LOG_FILE="$TEMP_DIR/build.log"
+        mkdir "$TEMP_DIR/select" || exit 1
+        if [ $# -eq 0 ]; then
+            for x in $EXTENSIONS; do
+                EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+                if [ -r "$EXT_HOME/build.sh" ]; then
+                    touch "$TEMP_DIR/select/$x" || exit 1
+                fi
+            done
+        else
+            for x in "$@"; do
+                EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+                if [ -e "$EXT_HOME/build.sh" ]; then
+                    touch "$TEMP_DIR/select/$x" || exit 1
+                else
+                    echo "ERROR: No such extension '$x'" 1>&2
+                    exit 1
+                fi
+            done
+        fi
         path_list_prepend CPATH                   "$TIGHTDB_HOME/src"         || exit 1
         path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
         path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb" || exit 1
         export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME"
-        AVAIL_EXTENSIONS=""
+        ERROR=""
         for x in $EXTENSIONS; do
-            EXT_HOME="../$x"
-            if [ -r "$EXT_HOME/build.sh" ]; then
-                echo ">>>>>>>> BUILDING '$x'"
-                if sh "$EXT_HOME/build.sh" build; then
-                    if [ "$AVAIL_EXTENSIONS" ]; then
-                        AVAIL_EXTENSIONS="$AVAIL_EXTENSIONS $x"
-                    else
-                        AVAIL_EXTENSIONS="$x"
-                    fi
+            if [ -e "$TEMP_DIR/select/$x" ]; then
+                echo ">>>>>>>> BUILDING '$x'" | tee -a "$LOG_FILE"
+                EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+                rm -f "$EXT_HOME/TO_BE_INSTALLED" || exit 1
+                if sh "$EXT_HOME/build.sh" build >>"$LOG_FILE" 2>&1; then
+                    touch "$EXT_HOME/TO_BE_INSTALLED" || exit 1
+                else
+                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    ERROR="1"
                 fi
             fi
         done
-        printf "%s\n" "$AVAIL_EXTENSIONS" > successfull_extensions
+        if [ "$ERROR" ]; then
+            echo "Log file is here: $LOG_FILE" 1>&2
+            exit 1
+        fi
         exit 0
         ;;
 
 
     "dist-install")
         PREFIX="$1"
-        INSTALL=install
+        INSTALL="install"
         if [ "$PREFIX" ]; then
             INSTALL="$INSTALL $PREFIX"
         fi
-        echo ">>>>>>>> INSTALLING 'tightdb'"
-        sh build.sh $INSTALL || exit 1
-        touch successfull_extensions
-        for x in $(cat successfull_extensions); do
-            echo ">>>>>>>> INSTALLING '$x'"
-            sh "../$x/build.sh" $INSTALL
-        done
+        TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-install.XXXX)" || exit 1
+        LOG_FILE="$TEMP_DIR/install.log"
+        ERROR=""
+        echo ">>>>>>>> INSTALLING 'tightdb'" | tee -a "$LOG_FILE"
+        if sh build.sh $INSTALL >>"$LOG_FILE" 2>&1; then
+            touch "WAS_INSTALLED" || exit 1
+            for x in $EXTENSIONS; do
+                EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+                if [ -e "$EXT_HOME/TO_BE_INSTALLED" ]; then
+                    echo ">>>>>>>> INSTALLING '$x'" | tee -a "$LOG_FILE"
+                    if sh "$EXT_HOME/build.sh" $INSTALL >>"$LOG_FILE" 2>&1; then
+                        touch "$EXT_HOME/WAS_INSTALLED" || exit 1
+                    else
+                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                        ERROR="1"
+                    fi
+                fi
+            done
+        else
+            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+            ERROR="1"
+        fi
+        if [ "$ERROR" ]; then
+            echo "Log file is here: $LOG_FILE" 1>&2
+            exit 1
+        fi
         exit 0
         ;;
 
 
     "dist-test-installed")
         PREFIX="$1"
-        TEST_INSTALLED=install
+        TEST_INSTALLED="test-installed"
         if [ "$PREFIX" ]; then
             TEST_INSTALLED="$TEST_INSTALLED $PREFIX"
         fi
-        echo ">>>>>>>> TESTING INSTALLATION OF 'tightdb'"
-        sh build.sh $TEST_INSTALLED || exit 1
-        touch successfull_extensions
-        for x in $(cat successfull_extensions); do
-            echo ">>>>>>>> TESTING INSTALLATION OF '$x'"
-            if sh "../$x/build.sh" $TEST_INSTALLED >/dev/null 2>&1; then
-                echo "OK"
-            else
-                echo "FAILED!!!"
+        if ! [ -e "WAS_INSTALLED" ]; then
+            echo "Nothing was installed" 1>&2
+            exit 1
+        fi
+        TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-test-installed.XXXX)" || exit 1
+        LOG_FILE="$TEMP_DIR/test.log"
+        ERROR=""
+        echo ">>>>>>>> TESTING INSTALLATION OF 'tightdb'" | tee -a "$LOG_FILE"
+        if sh build.sh $TEST_INSTALLED >>"$LOG_FILE" 2>&1; then
+            echo "SUCCESS!"  | tee -a "$LOG_FILE"
+        else
+            echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+            ERROR="1"
+        fi
+        for x in $EXTENSIONS; do
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+            if [ -e "$EXT_HOME/WAS_INSTALLED" ]; then
+                echo ">>>>>>>> TESTING INSTALLATION OF '$x'" | tee -a "$LOG_FILE"
+                if sh "$EXT_HOME/build.sh" $TEST_INSTALLED >>"$LOG_FILE" 2>&1; then
+                    echo "SUCCESS!"  | tee -a "$LOG_FILE"
+                else
+                    echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+                    ERROR="1"
+                fi
             fi
         done
+        if [ "$ERROR" ]; then
+            echo "Log file is here: $LOG_FILE" 1>&2
+            exit 1
+        fi
         exit 0
         ;;
 
@@ -325,7 +462,7 @@ EOI
         echo ">>>>>>>> STATUS OF 'tightdb'"
         git status
         for x in $EXTENSIONS; do
-            EXT_HOME="../$x"
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -r "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> STATUS OF '$EXT_HOME'"
                 (cd "$EXT_HOME/"; git status)
@@ -339,7 +476,7 @@ EOI
         echo ">>>>>>>> PULLING 'tightdb'"
         git pull
         for x in $EXTENSIONS; do
-            EXT_HOME="../$x"
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -r "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> PULLING '$EXT_HOME'"
                 (cd "$EXT_HOME/"; git pull)
