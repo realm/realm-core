@@ -3,6 +3,16 @@
 #include <iomanip>
 #include <fstream>
 
+#include <tightdb/config.h>
+
+#ifndef TIGHTDB_HAVE_RTTI
+#pragma message("RTTI disabled")
+#endif
+
+#ifndef TIGHTDB_HAVE_EXCEPTIONS
+#pragma message("Exceptions disabled")
+#endif
+
 #include <tightdb/table.hpp>
 #include <tightdb/index.hpp>
 #include <tightdb/alloc_slab.hpp>

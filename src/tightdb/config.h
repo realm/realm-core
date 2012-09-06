@@ -29,6 +29,14 @@
 #endif
 
 
+/* GCC defines __EXCEPTIONS when '-fno-exceptions' is not
+ * specified. The same is true for Clang >= v3.0. Microsoft Visual C++
+ * defines _CPPUNWIND when '/GX' is specified. */
+#if defined __EXCEPTIONS || defined _CPPUNWIND
+#define TIGHTDB_HAVE_EXCEPTIONS 1
+#endif
+
+
 /* This one works for both GCC and Clang, and of course any compiler
  * that fully supports C++11. */
 #if defined __cplusplus && __cplusplus >= 201103 || \
