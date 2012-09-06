@@ -196,6 +196,7 @@ public:
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
     typedef const char*(*StringGetter)(void*, size_t); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const;
+    void   IndexStringFindAll(Array& result, const char* value, void* column, StringGetter get_func) const;
     size_t IndexStringCount(const char* value, void* column, StringGetter get_func) const;
 
     void SetAllToZero();

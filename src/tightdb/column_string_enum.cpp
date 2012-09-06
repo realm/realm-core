@@ -134,6 +134,9 @@ size_t ColumnStringEnum::count(const char* value) const
 
 void ColumnStringEnum::find_all(Array& res, const char* value, size_t start, size_t end) const
 {
+    if (m_index && start == 0 && end == (size_t)-1)
+        return m_index->find_all(res, value);
+
     const size_t key_ndx = m_keys.find_first(value);
     if (key_ndx == (size_t)-1) return;
     Column::find_all(res, key_ndx, 0, start, end);
