@@ -201,15 +201,15 @@ if [ \$# -eq 1 -a "\$1" = "clean" ]; then
     exit 0
 fi
 
-if [ \\( \$# -eq 1 -o \$# -eq 2 \\) -a "\$1" = "install" ]; then
+if [ \$# -eq 1 -a "\$1" = "install" ]; then
     shift
-    sh tightdb/build.sh dist-install "\$@" || exit 1
+    sh tightdb/build.sh dist-install || exit 1
     exit 0
 fi
 
-if [ \\( \$# -eq 1 -o \$# -eq 2 \\) -a "\$1" = "test" ]; then
+if [ \$# -eq 1 -a "\$1" = "test" ]; then
     shift
-    sh tightdb/build.sh dist-test-installed "\$@" || exit 1
+    sh tightdb/build.sh dist-test-installed || exit 1
     exit 0
 fi
 
@@ -241,13 +241,15 @@ if [ \$# -ge 1 ]; then
     echo 1>&2
 fi
 
-echo "Build specific extensions: \$0  EXT1  [EXT2]..." 1>&2
-echo "Build all extensions:      \$0  all" 1>&2
-echo "Install what was built:    \$0  install  [INSTALL_PREFIX]" 1>&2
-echo "Test installation:         \$0  test     [INSTALL_PREFIX]" 1>&2
-echo "Start from scratch:        \$0  clean" 1>&2
-echo 1>&2
-echo "Available extensions are: \$EXTENSIONS" 1>&2
+cat 1>&2 <<END
+Build specific extensions:   \$0  EXT1  [EXT2]...
+Build all extensions:        \$0  all
+Install what was built:      sudo  \$0  install
+Test installation:           \$0  test
+Start from scratch:          \$0  clean
+
+Available extensions are: \$EXTENSIONS
+END
 exit 1
 EOI
                 chmod +x "$PKG_DIR/build"
@@ -386,22 +388,17 @@ EOI
 
 
     "dist-install")
-        PREFIX="$1"
-        INSTALL="install"
-        if [ "$PREFIX" ]; then
-            INSTALL="$INSTALL $PREFIX"
-        fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-install.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/install.log"
         ERROR=""
         echo ">>>>>>>> INSTALLING 'tightdb'" | tee -a "$LOG_FILE"
-        if sh build.sh $INSTALL >>"$LOG_FILE" 2>&1; then
+        if sh build.sh install >>"$LOG_FILE" 2>&1; then
             touch "WAS_INSTALLED" || exit 1
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                 if [ -e "$EXT_HOME/TO_BE_INSTALLED" ]; then
                     echo ">>>>>>>> INSTALLING '$x'" | tee -a "$LOG_FILE"
-                    if sh "$EXT_HOME/build.sh" $INSTALL >>"$LOG_FILE" 2>&1; then
+                    if sh "$EXT_HOME/build.sh" install >>"$LOG_FILE" 2>&1; then
                         touch "$EXT_HOME/WAS_INSTALLED" || exit 1
                     else
                         echo "Failed!" | tee -a "$LOG_FILE" 1>&2
@@ -422,11 +419,6 @@ EOI
 
 
     "dist-test-installed")
-        PREFIX="$1"
-        TEST_INSTALLED="test-installed"
-        if [ "$PREFIX" ]; then
-            TEST_INSTALLED="$TEST_INSTALLED $PREFIX"
-        fi
         if ! [ -e "WAS_INSTALLED" ]; then
             echo "Nothing was installed" 1>&2
             exit 1
@@ -435,7 +427,7 @@ EOI
         LOG_FILE="$TEMP_DIR/test.log"
         ERROR=""
         echo ">>>>>>>> TESTING INSTALLATION OF 'tightdb'" | tee -a "$LOG_FILE"
-        if sh build.sh $TEST_INSTALLED >>"$LOG_FILE" 2>&1; then
+        if sh build.sh test-installed >>"$LOG_FILE" 2>&1; then
             echo "SUCCESS!"  | tee -a "$LOG_FILE"
         else
             echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
@@ -445,7 +437,7 @@ EOI
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/WAS_INSTALLED" ]; then
                 echo ">>>>>>>> TESTING INSTALLATION OF '$x'" | tee -a "$LOG_FILE"
-                if sh "$EXT_HOME/build.sh" $TEST_INSTALLED >>"$LOG_FILE" 2>&1; then
+                if sh "$EXT_HOME/build.sh" test-installed >>"$LOG_FILE" 2>&1; then
                     echo "SUCCESS!"  | tee -a "$LOG_FILE"
                 else
                     echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
