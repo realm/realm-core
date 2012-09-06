@@ -406,6 +406,12 @@ size_t StringIndex::find_first(const char* value) const
     return m_array->IndexStringFindFirst(value, m_target_column, m_get_func);
 }
 
+void StringIndex::find_all(Array& result, const char* value) const
+{
+    // Use direct access method
+    return m_array->IndexStringFindAll(result, value, m_target_column, m_get_func);
+}
+
 size_t StringIndex::count(const char* value) const
 {
     // Use direct access method

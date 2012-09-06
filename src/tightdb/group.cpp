@@ -158,8 +158,8 @@ void Group::create_from_ref()
         create();
 
         // Everything but header is free space
-        m_freePositions.add(8);
-        m_freeLengths.add(m_alloc.GetFileLen()-8);
+        m_freePositions.add(header_len);
+        m_freeLengths.add(m_alloc.GetFileLen() - header_len);
         if (is_shared())
             m_freeVersions.add(0);
     }

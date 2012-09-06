@@ -425,9 +425,21 @@ TEST(ColumnStringAutoEnumerateIndex)
     const size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(not_found, res1);
 
+    Array results;
+    e.find_all(results, "nonexist");
+    CHECK(results.is_empty());
+
     // Search for an existing value
     const size_t res2 = e.find_first("klmop");
     CHECK_EQUAL(4, res2);
+
+    e.find_all(results, "klmop");
+    CHECK_EQUAL(5, results.Size());
+    CHECK_EQUAL(4, results.Get(0));
+    CHECK_EQUAL(9, results.Get(1));
+    CHECK_EQUAL(14, results.Get(2));
+    CHECK_EQUAL(19, results.Get(3));
+    CHECK_EQUAL(24, results.Get(4));
 
     // Set a value
     e.Set(1, "newval");
@@ -437,6 +449,11 @@ TEST(ColumnStringAutoEnumerateIndex)
     CHECK_EQUAL(5, res3);
     CHECK_EQUAL(4, res4);
     CHECK_EQUAL(1, res5);
+
+    results.Clear();
+    e.find_all(results, "newval");
+    CHECK_EQUAL(1, results.Size());
+    CHECK_EQUAL(1, results.Get(0));
 
     // Insert a value
     e.Insert(4, "newval");
@@ -459,6 +476,7 @@ TEST(ColumnStringAutoEnumerateIndex)
     // Cleanup
     c.Destroy();
     e.Destroy();
+    results.Destroy();
 }
 
 TEST(ColumnStringAutoEnumerateIndexReuse)

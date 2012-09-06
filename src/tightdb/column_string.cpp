@@ -277,6 +277,10 @@ size_t AdaptiveStringColumn::find_first(const char* value, size_t start, size_t 
 void AdaptiveStringColumn::find_all(Array &result, const char* value, size_t start, size_t end) const
 {
     TIGHTDB_ASSERT(value);
+
+    if (m_index && start == 0 && end == (size_t)-1)
+        return m_index->find_all(result, value);
+
     TreeFindAll<const char*, AdaptiveStringColumn>(result, value, 0, start, end);
 }
 
