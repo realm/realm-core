@@ -6,7 +6,7 @@ TIGHTDB_HOME="$(pwd)"
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-EXTENSIONS="java2 python objc node php gui"
+EXTENSIONS="java python objc node php gui"
 
 MAKE="make -j8"
 ARCH_FLAGS=""
@@ -28,7 +28,10 @@ map_ext_name_to_dir()
 {
     local ext_name
     ext_name="$1"
-    printf "tightdb_%s\n" "$ext_name"
+    case $ext_name in
+        "java") echo "tightdb_java2";;
+        *)      echo "tightdb_$ext_name";;
+    esac
     return 0
 }
 
