@@ -113,10 +113,13 @@ public:
 
     size_t GetRef() const {return m_array->GetRef();}
 
-    void invalidate_subtables();
-
     /// Compare two mixed columns for equality.
     bool Compare(const ColumnMixed&) const;
+
+    void invalidate_subtables();
+
+    // Overriding virtual method.
+    void invalidate_subtables_virtual();
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
@@ -196,6 +199,11 @@ inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
 inline void ColumnMixed::invalidate_subtables()
 {
     m_refs->invalidate_subtables();
+}
+
+inline void ColumnMixed::invalidate_subtables_virtual()
+{
+    invalidate_subtables();
 }
 
 

@@ -581,7 +581,9 @@ inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const
     *begin++ = index_in_parent;
     ArrayParent* parent = real_top.GetParent();
     TIGHTDB_ASSERT(parent);
+#ifdef TIGHTDB_HAVE_RTTI
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+#endif
     return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
 }
 
