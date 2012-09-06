@@ -85,7 +85,7 @@ bool case_cmp(const char* constant_upper, const char* constant_lower, const char
 bool case_strstr(const char *constant_upper, const char *constant_lower, const char *source) {
     size_t source_pos = 0;
     do {
-        if(case_cmp(constant_upper, constant_lower, source + source_pos))
+        if(case_prefix(constant_upper, constant_lower, source + source_pos) != size_t(-1))
             return true;
         source_pos++;
     } while(source[source_pos] != 0);
