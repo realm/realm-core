@@ -28,6 +28,9 @@ TEST(TestQueryFindAll_Contains2_2)
     ttt.add(3, "foO");
     ttt.add(4, "foObar");
     ttt.add(5, "hellofoObar");
+    ttt.add(6, "hellofo");
+    ttt.add(7, "fobar");
+    ttt.add(8, "oobar");
     
     TupleTableType::Query q1 = ttt.where().second.contains("foO",false);
     TupleTableType::View tv1 = q1.find_all(ttt);
