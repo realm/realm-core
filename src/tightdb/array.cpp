@@ -367,7 +367,7 @@ void Array::Destroy()
         }
     }
 
-    void* ref = m_data-8;
+    void* const ref = m_data-8;
     m_alloc.Free(m_ref, ref);
     m_data = NULL;
 }

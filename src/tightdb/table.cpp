@@ -403,10 +403,10 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const
         const ColumnType type = (ColumnType)m_spec_set.get_type_attr(i);
         if (type >= COLUMN_ATTR_INDEXED)
             continue; // ignore attributes
-        if (type < COLUMN_TYPE_STRING_ENUM)
-            ++pos;
+        if (type == COLUMN_TYPE_STRING_ENUM)
+            pos += 2; // string enums take up two places in m_columns
         else
-            pos += 2;
+            ++pos;
 
         ++current_column;
     }
@@ -1460,7 +1460,7 @@ void Table::optimize()
             // There are still same number of columns, but since
             // the enum type takes up two posistions in m_columns
             // we have to move refs in all following columns
-            UpdateColumnRefs(column_ndx+1, 1);
+            UpdateColumnRefs(i+1, 1);
 
             // Replace cached column
             ColumnStringEnum* const e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc); // FIXME: We may have to use 'new (nothrow)' here. It depends on whether we choose to allow exceptions.
