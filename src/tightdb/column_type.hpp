@@ -32,6 +32,8 @@
 namespace tightdb {
 #endif
 
+// Note: tightdb_objc/Deliv/ColumnType.h must be kept in sync with his file.
+
 enum TIGHTDB_QUAL_CC(ColumnType) {
     // Column types
     TIGHTDB_QUAL_UC(COLUMN_TYPE_INT)         =  0,
