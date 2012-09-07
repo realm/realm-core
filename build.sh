@@ -249,6 +249,9 @@ Test installation:           \$0  test
 Start from scratch:          \$0  clean
 
 Available extensions are: \$EXTENSIONS
+
+During installation, the prebuilt core library will be installed along
+with all the extensions that you have built.
 END
 exit 1
 EOI
@@ -262,6 +265,9 @@ Test installation:           ./build  test
 Start from scratch:          ./build  clean
 
 Available extensions are: $AVAIL_EXTENSIONS
+
+During installation, the prebuilt core library will be installed along
+with all the extensions that you have built.
 EOI
 
                 for x in $AVAIL_EXTENSIONS; do
@@ -399,6 +405,7 @@ EOI
 
     "dist-install")
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-install.XXXX)" || exit 1
+        chmod a+rx "$TEMP_DIR" || exit 1
         LOG_FILE="$TEMP_DIR/install.log"
         ERROR=""
         echo ">>>>>>>> INSTALLING 'tightdb'" | tee -a "$LOG_FILE"
