@@ -28,11 +28,12 @@ Building and installing
 Building a distribution package
 -------------------------------
 
-### Consider tagging before making the package:
+    sh build.sh dist
+
+If everything went well, consider tagging and then making the package again:
 
     git tag -a 'bNNN' -m "New tag for 'Build NNN'"
     git push --tags
 
-### Then:
-
-    sh build.sh dist
+This will produce a package whose name and whose top-level directory
+is named according to the tag.
