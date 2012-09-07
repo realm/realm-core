@@ -254,6 +254,16 @@ exit 1
 EOI
                 chmod +x "$PKG_DIR/build"
 
+                cat <<EOI > "$PKG_DIR/README"
+Build specific extensions:   ./build  EXT1  [EXT2]...
+Build all extensions:        ./build  all
+Install what was built:      sudo  ./build  install
+Test installation:           ./build  test
+Start from scratch:          ./build  clean
+
+Available extensions are: $AVAIL_EXTENSIONS
+EOI
+
                 for x in $AVAIL_EXTENSIONS; do
                     echo "Transfering extension '$x' to package" | tee -a "$LOG_FILE"
                     EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
