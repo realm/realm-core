@@ -28,4 +28,11 @@ Building and installing
 Building a distribution package
 -------------------------------
 
+### Consider tagging before making the package:
+
+    git tag -a 'bNNN' -m "New tag for 'Build NNN'"
+    git push --tags
+
+### Then:
+
     sh build.sh dist
