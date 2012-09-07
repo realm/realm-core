@@ -33,6 +33,7 @@ namespace tightdb {
 #endif
 
 // Note: tightdb_objc/Deliv/ColumnType.h must be kept in sync with his file.
+// Note: tightdb_java2/src/main/java/ColumnType.java must be kept in sync with his file.
 
 enum TIGHTDB_QUAL_CC(ColumnType) {
     // Column types
