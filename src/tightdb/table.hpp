@@ -212,6 +212,7 @@ public:
 
     // Conversion
     void to_json(std::ostream& out);
+    void to_string(std::ostream& out, size_t limit=500);
 
     // Get a reference to this table
     TableRef get_table_ref() { return TableRef(this); }
