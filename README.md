@@ -21,7 +21,7 @@ Building and installing
 -----------------------
 
     sh build.sh clean
-    sh build.sh
+    sh build.sh build
     sudo sh build.sh install
 
 
@@ -29,3 +29,11 @@ Building a distribution package
 -------------------------------
 
     sh build.sh dist
+
+If everything went well, consider tagging and then making the package again:
+
+    git tag -a 'bNNN' -m "New tag for 'Build NNN'"
+    git push --tags
+
+This will produce a package whose name and whose top-level directory
+is named according to the tag.

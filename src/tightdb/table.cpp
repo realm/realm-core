@@ -3,6 +3,16 @@
 #include <iomanip>
 #include <fstream>
 
+#include <tightdb/config.h>
+
+#ifndef TIGHTDB_HAVE_RTTI
+#pragma message("RTTI disabled")
+#endif
+
+#ifndef TIGHTDB_HAVE_EXCEPTIONS
+#pragma message("Exceptions disabled")
+#endif
+
 #include <tightdb/table.hpp>
 #include <tightdb/index.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -170,12 +180,7 @@ void Table::invalidate()
     const size_t n = m_cols.Size();
     for (size_t i=0; i<n; ++i) {
         ColumnBase* const c = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
-        if (ColumnTable* c2 = dynamic_cast<ColumnTable*>(c)) {
-            c2->invalidate_subtables();
-        }
-        else if (ColumnMixed* c2 = dynamic_cast<ColumnMixed*>(c)) {
-            c2->invalidate_subtables();
-        }
+        c->invalidate_subtables_virtual();
     }
 
     ClearCachedColumns();
@@ -330,7 +335,9 @@ Table::~Table()
         ArrayParent* parent = m_columns.GetParent();
         TIGHTDB_ASSERT(parent);
         TIGHTDB_ASSERT(m_ref_count == 0);
+#ifdef TIGHTDB_HAVE_RTTI
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+#endif
         static_cast<Parent*>(parent)->child_destroyed(m_columns.GetParentNdx());
         ClearCachedColumns();
         return;
@@ -341,7 +348,9 @@ Table::~Table()
         // This is a table whose lifetime is managed by reference
         // counting, so we must let our parent know about our demise.
         TIGHTDB_ASSERT(m_ref_count == 0);
+#ifdef TIGHTDB_HAVE_RTTI
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+#endif
         static_cast<Parent*>(parent)->child_destroyed(m_top.GetParentNdx());
         ClearCachedColumns();
         return;
