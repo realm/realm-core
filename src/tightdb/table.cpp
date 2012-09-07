@@ -1656,7 +1656,7 @@ static size_t chars_in_int(int64_t v)
     return count+1;
 }
 
-void Table::to_string(std::ostream& out, size_t limit)
+void Table::to_string(std::ostream& out, size_t limit) const
 {
     const size_t column_count = get_column_count();
     const size_t row_count = size();
