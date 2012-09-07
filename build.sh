@@ -251,7 +251,7 @@ Start from scratch:          \$0  clean
 Available extensions are: \$EXTENSIONS
 
 During installation, the prebuilt core library will be installed along
-with all the extensions that you have built.
+with all the extensions that you have built yourself.
 END
 exit 1
 EOI
@@ -267,7 +267,7 @@ Start from scratch:          ./build  clean
 Available extensions are: $AVAIL_EXTENSIONS
 
 During installation, the prebuilt core library will be installed along
-with all the extensions that you have built.
+with all the extensions that you have built yourself.
 EOI
 
                 for x in $AVAIL_EXTENSIONS; do
