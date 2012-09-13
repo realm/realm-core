@@ -166,7 +166,7 @@ case "$MODE" in
 
         # Setup package directory
         VERSION="$(git describe)" || exit 1
-        echo "tightdb version: $VERSION"
+        echo "TightDB version: $VERSION"
         NAME="tightdb-$VERSION"
         PKG_DIR="$TEMP_DIR/$NAME"
         mkdir "$PKG_DIR" || exit 1
@@ -241,23 +241,12 @@ if [ \$# -ge 1 ]; then
     echo 1>&2
 fi
 
-cat 1>&2 <<END
-Build specific extensions:   \$0  EXT1  [EXT2]...
-Build all extensions:        \$0  all
-Install what was built:      sudo  \$0  install
-Test installation:           \$0  test
-Start from scratch:          \$0  clean
-
-Available extensions are: \$EXTENSIONS
-
-During installation, the prebuilt core library will be installed along
-with all the extensions that you have built yourself.
-END
+cat README 1>&2
 exit 1
 EOI
                 chmod +x "$PKG_DIR/build"
 
-                cat <<EOI > "$PKG_DIR/README"
+                cat <<EOI >"$PKG_DIR/README"
 Build specific extensions:   ./build  EXT1  [EXT2]...
 Build all extensions:        ./build  all
 Install what was built:      sudo  ./build  install
@@ -269,6 +258,20 @@ Available extensions are: $AVAIL_EXTENSIONS
 During installation, the prebuilt core library will be installed along
 with all the extensions that you have built yourself.
 EOI
+
+                for x in $AVAIL_EXTENSIONS; do
+                    EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
+                    EXT_HOME="../$EXT_DIR"
+                    if REMARKS="$(sh "$EXT_HOME/build.sh" dist-remarks 2>&1)"; then
+                        cat <<EOI >>"$PKG_DIR/README"
+
+
+Remarks for '$x':
+
+$REMARKS
+EOI
+                    fi
+                done
 
                 for x in $AVAIL_EXTENSIONS; do
                     echo "Transfering extension '$x' to package" | tee -a "$LOG_FILE"
@@ -307,7 +310,7 @@ EOI
                         fi
                         echo "Installing extension '$x' to test location" >> "$LOG_FILE"
                         if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" install "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
-                            echo ">>>>>>>> WARNING: Installation failed for extension '$x'" | tee -a "$LOG_FILE"
+                            echo ">>>>>>>> WARNING: Installation test failed for extension '$x'" | tee -a "$LOG_FILE"
                         else
                             echo "Testing state of extension '$x' installation" >> "$LOG_FILE"
                             if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" test-installed "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
@@ -355,6 +358,20 @@ EOI
         ;;
 
 
+    "dist-check-avail")
+        for x in $EXTENSIONS; do
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+            if [ -r "$EXT_HOME/build.sh" ]; then
+                echo ">>>>>>>> CHECKING AVAILABILITY OF '$x'"
+                if sh "$EXT_HOME/build.sh" check-avail; then
+                    echo "YES!"
+                fi
+            fi
+        done
+        exit 0
+        ;;
+
+
     "dist-build")
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/build.log"
@@ -396,7 +413,12 @@ EOI
             fi
         done
         if [ "$ERROR" ]; then
-            echo "Log file is here: $LOG_FILE" 1>&2
+            cat 1>&2 <<EOF
+Some extensions failed to build. You may be missing one or more
+dependencies. Check the README file details. If this does not help,
+check the log file.
+The log file is here: $LOG_FILE
+EOF
             exit 1
         fi
         exit 0
