@@ -157,7 +157,8 @@ case "$MODE" in
                 {
                     for x in $AVAIL_EXTENSIONS; do
                         EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-                        echo "  $x  ->  $EXT_HOME"
+                        EXT_VERSION="$(cd "$EXT_HOME" && git describe)" || exit 1
+                        echo "  $x  ->  $EXT_HOME  ($EXT_VERSION)"
                     done
                 } | column -t || exit 1
             fi
