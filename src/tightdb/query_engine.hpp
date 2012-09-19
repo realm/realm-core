@@ -291,7 +291,7 @@ public:
     }
 
     // This function is called from Array::find() for each search result if action == TDB_CALLBACK_IDX
-    // in the NODE::aggregate() call. Used if aggregate source column is different from search criteria column
+    // in the NODE::aggregate() call. Used if aggregate source column (column on which SUM or MAX or MIN or whatever is being performed) is different from search criteria column
     template <ACTION action>bool match_callback(int64_t v) {
         if (TO_SIZET(v) >= m_leaf_end_agg) {
             m_column_agg->GetBlock(TO_SIZET(v), m_array_agg, m_leaf_start_agg);

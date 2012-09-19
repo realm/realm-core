@@ -17,6 +17,24 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
+
+/*
+Searching: The main finding function is:
+    template <class cond, ACTION action, size_t bitwidth, class Callback> void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
+
+    cond:       One of EQUAL, NOTEQUAL, GREATER, etc. classes
+    ACTION:     One of TDB_RETURN_FIRST, TDB_FINDALL, TDB_MAX, TDB_CALLBACK_IDX, etc, constants
+    Callback:   Optional function to call for each search result. Will be called if action == TDB_CALLBACK_IDX
+  
+    find() will call FIND_ACTION_PATTERN() or FIND_ACTION() that again calls state_match() for each search result which optionally calls callback():
+    
+        find() -> FIND_ACTION() -------> bool state_match() -> bool callback()
+             |                            ^
+             +-> FIND_ACTION_PATTERN()----+
+
+    If callback() returns false, find() will exit, otherwise it will keep searching remaining items in array.
+*/
+
 #ifndef TIGHTDB_ARRAY_HPP
 #define TIGHTDB_ARRAY_HPP
 
@@ -368,7 +386,7 @@ private:
 public:
 
     /*
-    Array-finder will call state_match() for each search result. 
+    find() (calls find_optimized()) will call state_match() for each search result. 
 
     If pattern == true:
         'indexpattern' contains a 64-bit chunk of elements, each of 'width' bits in size where each element indicates a match if its lower bit is set, otherwise 
@@ -445,6 +463,9 @@ public:
             return false;
     }
 
+    // These wrapper functions only exist to enable a possibility to make the compiler see that 'value' and/or 'index' are unused, such that caller's 
+    // computation of these values will not be made. Only works if FIND_ACTION and FIND_ACTION_PATTERN rewritten as macros. Note: This problem has been fixed in
+    // next upcoming array.hpp version
     template <ACTION action, class Callback>bool FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const
     {
         return state_match<action, false, Callback>(index, 0, value, state, callback);
@@ -557,11 +578,14 @@ public:
 
     }
 
+    // This is the main finding function for Array. Other finding functions are just wrappers around this one.
+    // Search for 'value' using condition cond2 (EQUAL, NOTEQUAL, LESS, etc) and call FIND_ACTION() or FIND_ACTION_PATTERN() for each match. Break and return if FIND_ACTION returns false or 'end' is reached.
     template <class cond2, ACTION action, size_t bitwidth, class Callback> void find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
     {
         cond2 C;
         assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
 
+        // Test first few items with no initial time overhead
         if(start > 0) {
             if(m_len > start && C(Get<bitwidth>(start), value) && start < end) { if(!FIND_ACTION<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;} ++start; 
             if(m_len > start && C(Get<bitwidth>(start), value) && start < end) { if(!FIND_ACTION<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;} ++start; 
@@ -574,9 +598,11 @@ public:
     
         if (end == (size_t)-1) end = m_len;
 
+        // Return immediately if no items in array can match (such as if cond2 == GREATER and value == 100 and m_ubound == 15).
         if(!C.can_match(value, m_lbound, m_ubound))
             return;
     
+        // call FIND_ACTION on all items in array if all items are guaranteed to match (such as cond2 == NOTEQUAL and value == 100 and m_ubound == 15)
         if(C.will_match(value, m_lbound, m_ubound)) {
             if(action == TDB_SUM || action == TDB_MAX || action == TDB_MIN) {
                 int64_t res;
@@ -770,6 +796,7 @@ public:
         }
     }
 
+    // Tests if any chunk in 'value' is 0
     template <size_t width> inline bool TestZero(uint64_t value) const {
         uint64_t hasZeroByte;
         uint64_t lower = LowerBits<width>();
@@ -780,10 +807,10 @@ public:
 
 
 
+    // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position. 
+    // IMPORTANT: This function assumes that at least 1 item matches (test this with TestZero() or other means first)!
     template <bool eq, size_t width>size_t FindZero(uint64_t v) const
     {
-        // Finds first zero element in a chunk of valies. This function assumes that at least 1 item matches! So use TestZero() before calling this function
-
         size_t start = 0;
         uint64_t hasZeroByte;
         uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
@@ -828,7 +855,7 @@ public:
         return start;
     }
 
-
+    // Generate a magic constant used for later bithacks
     template <bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const
     {
         uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
@@ -840,8 +867,9 @@ public:
     template <bool gt, ACTION action, size_t width, class Callback>bool FindGTLT_Fast(int64_t v, uint64_t chunk, uint64_t magic, state_state *state, size_t baseindex, Callback callback) const
     {
         // Tests if a a chunk of values contains values that are greater (if gt == true) or less (if gt == false) than v. 
-        // Fast, but limited to work when all values in the chunk are positive
-
+        // Fast, but limited to work when all values in the chunk are positive.
+        
+        // Assert that all values in chunk are positive.
         assert(width <= 4 || ((LowerBits<width>() << (no0(width) - 1)) & v) == 0);
 
         uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
@@ -866,6 +894,7 @@ public:
 
         return true;
     }
+
 
     template <bool gt, ACTION action, size_t width, class Callback>bool FindGTLT(int64_t v, uint64_t chunk, state_state *state, size_t baseindex, Callback callback) const
     {
