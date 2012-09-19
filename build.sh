@@ -148,17 +148,21 @@ case "$MODE" in
             fi
         done
 
+        BRANCH="$(git rev-parse --abbrev-ref HEAD)" || exit 1
+        VERSION="$(git describe)" || exit 1
 
         {
             if [ -z "$AVAIL_EXTENSIONS" ]; then
                 echo "Continuing with no extensions"
             else
-                echo "Continuing with these extensions:"
+                echo "Continuing with these parts:"
                 {
+                    echo "  core  ->  .  $BRANCH  $VERSION"
                     for x in $AVAIL_EXTENSIONS; do
                         EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+                        EXT_BRANCH="$(cd "$EXT_HOME" && git rev-parse --abbrev-ref HEAD)" || exit 1
                         EXT_VERSION="$(cd "$EXT_HOME" && git describe)" || exit 1
-                        echo "  $x  ->  $EXT_HOME  ($EXT_VERSION)"
+                        echo "  $x  ->  $EXT_HOME  $EXT_BRANCH  $EXT_VERSION"
                     done
                 } | column -t || exit 1
             fi
@@ -166,8 +170,6 @@ case "$MODE" in
 
 
         # Setup package directory
-        VERSION="$(git describe)" || exit 1
-        echo "TightDB version: $VERSION"
         NAME="tightdb-$VERSION"
         PKG_DIR="$TEMP_DIR/$NAME"
         mkdir "$PKG_DIR" || exit 1
