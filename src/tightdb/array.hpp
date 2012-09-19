@@ -867,14 +867,11 @@ public:
         return magic;
     }
 
-    template <bool gt, ACTION action, size_t width, class Callback>bool FindGTLT_Fast(int64_t v, uint64_t chunk, uint64_t magic, state_state *state, size_t baseindex, Callback callback) const
+    template <bool gt, ACTION action, size_t width, class Callback>bool FindGTLT_Fast(uint64_t chunk, uint64_t magic, state_state *state, size_t baseindex, Callback callback) const
     {
         // Tests if a a chunk of values contains values that are greater (if gt == true) or less (if gt == false) than v. 
         // Fast, but limited to work when all values in the chunk are positive.
         
-        // Assert that all values in chunk are positive.
-        TIGHTDB_ASSERT(width <= 4 || ((LowerBits<width>() << (no0(width) - 1)) & v) == 0);
-
         uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
         uint64_t mask2 = mask1 >> 1;
         uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / no0(mask1) * (mask2 + 1)) : ((chunk - magic) & ~chunk&~0ULL/no0(mask1)*(mask2+1));
@@ -1496,8 +1493,11 @@ public:
                     // Bit hacks only works for positive items in chunk, so test their sign bits
                     upper = upper & v;
 
-                    if ((bitwidth > 4 ? !upper : true))
-                        idx = FindGTLT_Fast<gt, action, bitwidth, Callback>(value, v, magic, state, (p - (int64_t *)m_data) * 8 * 8 / no0(bitwidth) + baseindex, callback); 
+                    if ((bitwidth > 4 ? !upper : true)) {
+                        // Assert that all values in chunk are positive.
+                        TIGHTDB_ASSERT(bitwidth <= 4 || ((LowerBits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
+                        idx = FindGTLT_Fast<gt, action, bitwidth, Callback>(v, magic, state, (p - (int64_t *)m_data) * 8 * 8 / no0(bitwidth) + baseindex, callback); 
+                    }
                     else
                         idx = FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - (int64_t *)m_data) * 8 * 8 / no0(bitwidth) + baseindex, callback);
 

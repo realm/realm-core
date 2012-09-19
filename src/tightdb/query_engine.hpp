@@ -114,14 +114,16 @@ public:
 
             // Find bounds
             --m_next;
-            size_t add = 1;
+            size_t add;
+            add = 1;
             while(m_next + add < m_size && TO_SIZET(m_arr.Get(m_next + add)) < start)
                 add *= 2;
 
             // Do binary search inside bounds
             TIGHTDB_ASSERT(m_arr.GetAsSizeT(m_arr.Size() - 1) >= start);
 
-            size_t high = m_next + add < m_size ? m_next + add : m_size;
+            size_t high;
+            high = m_next + add < m_size ? m_next + add : m_size;
             m_next = m_next + add / 2 - 1;
 
             while (high - m_next > 1) {
