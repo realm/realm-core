@@ -387,7 +387,7 @@ protected:
     // Member variables
     Getter m_getter;
     Setter m_setter;
-    Finder m_finder[100]; // one for each COND_XXX enum
+    Finder m_finder[COND_COUNT_MINUS_1 + 1]; // one for each COND_XXX enum
 
 private:
     size_t m_ref;
