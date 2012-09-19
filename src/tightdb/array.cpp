@@ -770,7 +770,7 @@ template <size_t width> inline int64_t LowerBits(void)
     else if(width == 64)
         return 0x0000000000000001ULL;
     else {
-        assert(false);
+        TIGHTDB_ASSERT(false);
         return int64_t(-1);
     }
 }
@@ -1981,7 +1981,7 @@ template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx)
         return *(const int64_t*)(data + offset);
     }
     else {
-        assert(false);
+        TIGHTDB_ASSERT(false);
         return int64_t(-1);
     }
 }

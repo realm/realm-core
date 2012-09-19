@@ -119,7 +119,7 @@ public:
                 add *= 2;
 
             // Do binary search inside bounds
-            assert(m_arr.GetAsSizeT(m_arr.Size() - 1) >= start);
+            TIGHTDB_ASSERT(m_arr.GetAsSizeT(m_arr.Size() - 1) >= start);
 
             size_t high = m_next + add < m_size ? m_next + add : m_size;
             m_next = m_next + add / 2 - 1;
@@ -286,7 +286,7 @@ public:
         if(action == TDB_COUNT)
             return aggregate<TDB_COUNT>(res, start, end, limit, agg_col, matchcount);
 
-        assert(false);
+        TIGHTDB_ASSERT(false);
         return uint64_t(-1);
     }
 
@@ -434,7 +434,7 @@ protected:
 
 template <class F> class STRINGNODE: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
+    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {TIGHTDB_ASSERT(false); return 0;}
 
     STRINGNODE(const char* v, size_t column)
     {
@@ -506,7 +506,7 @@ protected:
 
 template <> class STRINGNODE<EQUAL>: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
+    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {TIGHTDB_ASSERT(false); return 0;}
 
     STRINGNODE(const char* v, size_t column): m_key_ndx((size_t)-1) {
         m_column_id = column;
@@ -575,7 +575,7 @@ private:
 
 class OR_NODE: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
+    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {TIGHTDB_ASSERT(false); return 0;}
 
     OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond1 = p1; m_cond2 = NULL;};
 

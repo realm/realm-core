@@ -99,7 +99,7 @@ const size_t not_found = size_t(-1);
     else if (wid == 4) {fun<4> arg;} \
     else if (wid == 8) {fun<8> arg;} \
     else if (wid == 64) {fun<64> arg;} \
-    else {assert(false); fun<0> arg;}
+    else {TIGHTDB_ASSERT(false); fun<0> arg;}
 
 #define TEMPEX2(fun, targ, wid, arg) \
     if(wid == 16) {fun<targ, 16> arg;} \
@@ -110,7 +110,7 @@ const size_t not_found = size_t(-1);
     else if (wid == 4) {fun<targ, 4> arg;} \
     else if (wid == 8) {fun<targ, 8> arg;} \
     else if (wid == 64) {fun<targ, 64> arg;} \
-    else {assert(false); fun<targ, 0> arg;}
+    else {TIGHTDB_ASSERT(false); fun<targ, 0> arg;}
 
 #define TEMPEX3(fun, targ1, targ2, wid, arg) \
     if(wid == 16) {fun<targ1, targ2, 16> arg;} \
@@ -121,7 +121,7 @@ const size_t not_found = size_t(-1);
     else if (wid == 4) {fun<targ1, targ2, 4> arg;} \
     else if (wid == 8) {fun<targ1, targ2, 8> arg;} \
     else if (wid == 64) {fun<targ1, targ2, 64> arg;} \
-    else {assert(false); fun<targ1, targ2, 0> arg;}
+    else {TIGHTDB_ASSERT(false); fun<targ1, targ2, 0> arg;}
 
 #define TEMPEX4(fun, targ1, targ2, wid, targ3, arg) \
     if(wid == 16) {fun<targ1, targ2, 16, targ3> arg;} \
@@ -132,7 +132,7 @@ const size_t not_found = size_t(-1);
     else if (wid == 4) {fun<targ1, targ2, 4, targ3> arg;} \
     else if (wid == 8) {fun<targ1, targ2, 8, targ3> arg;} \
     else if (wid == 64) {fun<targ1, targ2, 64, targ3> arg;} \
-    else {assert(false); fun<targ1, targ2, 0, targ3> arg;}
+    else {TIGHTDB_ASSERT(false); fun<targ1, targ2, 0, targ3> arg;}
 
 
 // Pre-definitions
@@ -380,7 +380,7 @@ private:
             return *((const int64_t*)(data + offset));
         }
         else {
-            assert(false);
+            TIGHTDB_ASSERT(false);
             return int64_t(-1);
         }
     }
@@ -575,7 +575,7 @@ public:
             return a == 0 ? 1 : 0;
         }
         else {
-            assert(false);
+            TIGHTDB_ASSERT(false);
             return uint64_t(-1);
         }
 
@@ -586,7 +586,7 @@ public:
     template <class cond2, ACTION action, size_t bitwidth, class Callback> void find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
     {
         cond2 C;
-        assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
+        TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
 
         // Test first few items with no initial time overhead
         if(start > 0) {
@@ -630,7 +630,7 @@ public:
         }
 
         // finder cannot handle this bitwidth
-        assert(m_width != 0);
+        TIGHTDB_ASSERT(m_width != 0);
 
     #if defined(USE_SSE42) || defined(USE_SSE3)
 
@@ -794,7 +794,7 @@ public:
         else if(width == 64)
             return 0x0000000000000001ULL;
         else {
-            assert(false);
+            TIGHTDB_ASSERT(false);
             return int64_t(-1);
         }
     }
@@ -851,7 +851,7 @@ public:
         }
 
         while(eq == (((v >> (width * start)) & mask) != 0)) {
-            assert(start <= 8 * sizeof(v)); // You must only call FindZero() if you are sure that at least 1 item matches
+            TIGHTDB_ASSERT(start <= 8 * sizeof(v)); // You must only call FindZero() if you are sure that at least 1 item matches
             start++;
         }
 
@@ -873,7 +873,7 @@ public:
         // Fast, but limited to work when all values in the chunk are positive.
         
         // Assert that all values in chunk are positive.
-        assert(width <= 4 || ((LowerBits<width>() << (no0(width) - 1)) & v) == 0);
+        TIGHTDB_ASSERT(width <= 4 || ((LowerBits<width>() << (no0(width) - 1)) & v) == 0);
 
         uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
         uint64_t mask2 = mask1 >> 1;
@@ -1052,7 +1052,7 @@ public:
     template <bool eq, ACTION action, size_t width, class Callback> inline bool CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const {
         // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
-        assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
+        TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
 
         size_t ee = round_up(start, 64 / no0(width));
         ee = ee > end ? end : ee;
@@ -1256,9 +1256,9 @@ public:
         if(action == TDB_MAX || action == TDB_MIN || action == TDB_SUM || action == TDB_COUNT || action == TDB_RETURN_FIRST || action == TDB_COUNT) {
             find_reference<cond, action, bitwidth, Callback>(value, start, end, baseindex, &r_state, callback);
             if(action == TDB_FINDALL)
-                assert(akku->Compare(r_arr));
+                TIGHTDB_ASSERT(akku->Compare(r_arr));
             else
-                assert(state->state == r_state.state);
+                TIGHTDB_ASSERT(state->state == r_state.state);
         }
         r_arr.Destroy();
     #endif
@@ -1364,7 +1364,7 @@ public:
     #ifdef USE_SSE42
                     compare = _mm_cmpeq_epi64(data[i], search);
     #else
-                assert(false);
+                TIGHTDB_ASSERT(false);
                 return int64_t(-1);
     #endif
 			    }
@@ -1446,7 +1446,7 @@ public:
     void find_all(Array& result, int64_t value, size_t colOffset = 0, size_t start = 0, size_t end = (size_t)-1) const
     {
         if (end == (size_t)-1) end = m_len;
-        assert(start < m_len && end <= m_len && start < end);
+        TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
         state_state state;
         state.state = (int64_t)&result;
@@ -1460,7 +1460,7 @@ public:
     // If gt = false: Find elements that are smaller than value
     template <bool gt, ACTION action, size_t bitwidth, class Callback>bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
     {
-        assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
+        TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
         uint64_t mask = (bitwidth == 64 ? ~0ULL : ((1ULL << (bitwidth == 64 ? 0 : bitwidth)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
 
         size_t ee = round_up(start, 64 / no0(bitwidth));
@@ -1542,7 +1542,7 @@ public:
     template <class cond> size_t find_first(int64_t value, size_t start, size_t end) const
     {
         cond C;        
-        assert(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
+        TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
         state_state state;
         state.state = not_found;
         Finder finder = m_finder[C.condition()];

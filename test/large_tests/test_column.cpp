@@ -71,10 +71,10 @@ TEST(LESS)
                         size_t f = a.find_first<LESS>(v[w], from, to);
                         a.Set(match, v[w]);
                         if(match >= from && match < to) {
-                            assert(match == f);
+                            TIGHTDB_ASSERT(match == f);
                         }
                         else {
-                            assert(f == size_t(-1));
+                            TIGHTDB_ASSERT(f == size_t(-1));
                         }
                     }
 
@@ -84,10 +84,10 @@ TEST(LESS)
                         size_t f = a.find_first<GREATER>(v[w], from, to);
                         a.Set(match, v[w]);
                         if(match >= from && match < to) {
-                            assert(match == f);
+                            TIGHTDB_ASSERT(match == f);
                         }
                         else {
-                            assert(f == size_t(-1));
+                            TIGHTDB_ASSERT(f == size_t(-1));
                         }
                     }
 
@@ -96,10 +96,10 @@ TEST(LESS)
                     size_t f = a.find_first(v[w]-1, from, to);
                     a.Set(match, v[w]);
                     if(match >= from && match < to) {
-                        assert(match == f);
+                        TIGHTDB_ASSERT(match == f);
                     }
                     else {
-                        assert(f == size_t(-1));
+                        TIGHTDB_ASSERT(f == size_t(-1));
                     }
 
                     if(v[w] != LL_MIN) {
@@ -110,9 +110,9 @@ TEST(LESS)
                         a.Set(match, v[w]);
                         CHECK_EQUAL(true, b);
                         if(match >= from && match < to)
-                            assert(val == v[w]-1);
+                            TIGHTDB_ASSERT(val == v[w]-1);
                         else
-                            assert(val == v[w]);
+                            TIGHTDB_ASSERT(val == v[w]);
                     }
     
                     // MAX
@@ -123,9 +123,9 @@ TEST(LESS)
                         a.Set(match, v[w]);
                         CHECK_EQUAL(true, b);
                         if(match >= from && match < to)
-                            assert(val == v[w]+1);
+                            TIGHTDB_ASSERT(val == v[w]+1);
                         else
-                            assert(val == v[w]);
+                            TIGHTDB_ASSERT(val == v[w]);
                     }
 
                     // SUM
@@ -139,7 +139,7 @@ TEST(LESS)
                     else
                         intended = (to - from) * v[w];      
 
-                    assert(intended == val);
+                    TIGHTDB_ASSERT(intended == val);
 
 
                     // Find all, LESS
@@ -156,10 +156,10 @@ TEST(LESS)
                             a.Set(match + off, v[w]);
 
                             if(match >= from && match < to) {
-                                assert(akku.GetAsSizeT(0) == match);
+                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match);
                             }
                             if(match + off >= from && match + off < to) {
-                                assert(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
+                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
                             }
 
                             a.Set(match, v[w]);
@@ -183,10 +183,10 @@ TEST(LESS)
                             a.Set(match + off, v[w]);
 
                             if(match >= from && match < to) {
-                                assert(akku.GetAsSizeT(0) == match);
+                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match);
                             }
                             if(match + off >= from && match + off < to) {
-                                assert(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
+                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
                             }
 
                             a.Set(match, v[w]);
@@ -208,10 +208,10 @@ TEST(LESS)
                             a.Set(match + off, v[w]);
 
                             if(match >= from && match < to) {
-                                assert(akku.GetAsSizeT(0) == match);
+                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match);
                             }
                             if(match + off >= from && match + off < to) {
-                                assert(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
+                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
                             }
 
                             a.Set(match, v[w]);

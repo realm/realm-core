@@ -894,7 +894,7 @@ TEST(Greater)
             a.Set(i, 1);
 
 			size_t t = a.find_first<GREATER>(0, 0, (size_t)-1);
-            assert(i == t);
+            TIGHTDB_ASSERT(i == t);
 
             CHECK_EQUAL(i, t);
             a.Set(i, 0);
@@ -907,7 +907,7 @@ TEST(Greater)
         for(size_t i = 0; i < items; i++) {
             a.Set(i, 3);
             size_t t = a.find_first<GREATER>(2, 0, (size_t)-1);
-            assert(i == t);
+            TIGHTDB_ASSERT(i == t);
             a.Set(i, 2);
         }
 
