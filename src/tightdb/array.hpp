@@ -343,6 +343,81 @@ private:
     template <size_t w> int64_t sum(size_t start, size_t end) const;
     template <size_t w> size_t FindPos(int64_t target) const;
    
+protected:
+    bool AddPositiveLocal(int64_t value);
+
+    void init_from_ref(size_t ref);
+    void CreateFromHeader(uint8_t* header, size_t ref=0);
+    void CreateFromHeaderDirect(uint8_t* header, size_t ref=0);
+    void update_ref_in_parent();
+
+    // Getters and Setters for adaptive-packed arrays
+    typedef int64_t(Array::*Getter)(size_t) const;
+    typedef void(Array::*Setter)(size_t, int64_t);
+    typedef void (Array::*Finder)(int64_t, size_t, size_t, size_t, state_state*) const;
+
+    enum WidthType {
+        TDB_BITS     = 0,
+        TDB_MULTIPLY = 1,
+        TDB_IGNORE   = 2
+    };
+
+    virtual size_t CalcByteLen(size_t count, size_t width) const;
+    virtual size_t CalcItemCount(size_t bytes, size_t width) const;
+    virtual WidthType GetWidthType() const {return TDB_BITS;}
+
+    void set_header_isnode(bool value);
+    void set_header_hasrefs(bool value);
+    void set_header_wtype(WidthType value);
+    void set_header_width(size_t value);
+    void set_header_len(size_t value);
+    void set_header_capacity(size_t value);
+    bool get_header_isnode(const void* header=NULL) const;
+    bool get_header_hasrefs(const void* header=NULL) const;
+    WidthType get_header_wtype(const void* header=NULL) const;
+    size_t get_header_width(const void* header=NULL) const;
+    size_t get_header_len(const void* header=NULL) const;
+    size_t get_header_capacity(const void* header=NULL) const;
+
+    template <size_t width> void SetWidth(void);
+    void SetWidth(size_t width);
+    bool Alloc(size_t count, size_t width);
+    bool CopyOnWrite();
+
+    // Member variables
+    Getter m_getter;
+    Setter m_setter;
+    Finder m_finder[100]; // one for each COND_XXX enum
+
+private:
+    size_t m_ref;
+    template <bool max, size_t w> bool minmax(int64_t& result, size_t start, size_t end) const;
+
+protected:
+    size_t m_len;
+    size_t m_capacity;
+    size_t m_width;
+    bool m_isNode;
+    bool m_hasRefs;
+
+private:
+    ArrayParent *m_parent;
+    size_t m_parentNdx;
+
+    Allocator& m_alloc;
+
+protected:
+    int64_t m_lbound;
+    int64_t m_ubound;
+
+    static size_t create_empty_array(ColumnDef, WidthType, Allocator&);
+
+    // Overriding methods in ArrayParent
+    virtual void update_child_ref(size_t child_ndx, size_t new_ref);
+    virtual size_t get_child_ref(size_t child_ndx) const;
+
+public:
+
     //*************************************************************************************
     // Finding code                                                                       *
     //*************************************************************************************
@@ -384,9 +459,6 @@ private:
             return int64_t(-1);
         }
     }
-
-
-public:
 
     /*
     find() (calls find_optimized()) will call state_match() for each search result. 
@@ -721,10 +793,6 @@ public:
     #endif // select best popcount implementations
 
 
-
-
-
-
     size_t FirstSetBit(unsigned int v) const
     {
         if (v & 1)
@@ -807,8 +875,6 @@ public:
         hasZeroByte = (value - lower) & ~value & upper;
         return hasZeroByte != 0;
     }
-
-
 
     // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position. 
     // IMPORTANT: This function assumes that at least 1 item matches (test this with TestZero() or other means first)!
@@ -1532,13 +1598,6 @@ public:
 
     }
 
-    //*************************************************************************************
-    // Finding code ends                                                                  *
-    //*************************************************************************************
-
-
-public:
-
     template <class cond> size_t find_first(int64_t value, size_t start, size_t end) const
     {
         cond C;        
@@ -1551,79 +1610,9 @@ public:
         return size_t(state.state);
     }
 
-
-protected:
-    bool AddPositiveLocal(int64_t value);
-
-    void init_from_ref(size_t ref);
-    void CreateFromHeader(uint8_t* header, size_t ref=0);
-    void CreateFromHeaderDirect(uint8_t* header, size_t ref=0);
-    void update_ref_in_parent();
-
-    // Getters and Setters for adaptive-packed arrays
-    typedef int64_t(Array::*Getter)(size_t) const;
-    typedef void(Array::*Setter)(size_t, int64_t);
-    typedef void (Array::*Finder)(int64_t, size_t, size_t, size_t, state_state*) const;
-
-    enum WidthType {
-        TDB_BITS     = 0,
-        TDB_MULTIPLY = 1,
-        TDB_IGNORE   = 2
-    };
-
-    virtual size_t CalcByteLen(size_t count, size_t width) const;
-    virtual size_t CalcItemCount(size_t bytes, size_t width) const;
-    virtual WidthType GetWidthType() const {return TDB_BITS;}
-
-    void set_header_isnode(bool value);
-    void set_header_hasrefs(bool value);
-    void set_header_wtype(WidthType value);
-    void set_header_width(size_t value);
-    void set_header_len(size_t value);
-    void set_header_capacity(size_t value);
-    bool get_header_isnode(const void* header=NULL) const;
-    bool get_header_hasrefs(const void* header=NULL) const;
-    WidthType get_header_wtype(const void* header=NULL) const;
-    size_t get_header_width(const void* header=NULL) const;
-    size_t get_header_len(const void* header=NULL) const;
-    size_t get_header_capacity(const void* header=NULL) const;
-
-    template <size_t width> void SetWidth(void);
-    void SetWidth(size_t width);
-    bool Alloc(size_t count, size_t width);
-    bool CopyOnWrite();
-
-    // Member variables
-    Getter m_getter;
-    Setter m_setter;
-    Finder m_finder[100]; // one for each COND_XXX enum
-
-private:
-    size_t m_ref;
-    template <bool max, size_t w> bool minmax(int64_t& result, size_t start, size_t end) const;
-
-protected:
-    size_t m_len;
-    size_t m_capacity;
-    size_t m_width;
-    bool m_isNode;
-    bool m_hasRefs;
-
-private:
-    ArrayParent *m_parent;
-    size_t m_parentNdx;
-
-    Allocator& m_alloc;
-
-protected:
-    int64_t m_lbound;
-    int64_t m_ubound;
-
-    static size_t create_empty_array(ColumnDef, WidthType, Allocator&);
-
-    // Overriding methods in ArrayParent
-    virtual void update_child_ref(size_t child_ndx, size_t new_ref);
-    virtual size_t get_child_ref(size_t child_ndx) const;
+    //*************************************************************************************
+    // Finding code ends                                                                  *
+    //*************************************************************************************
 };
 
 // Implementation:
