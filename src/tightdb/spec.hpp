@@ -30,7 +30,7 @@ class Table;
 
 class Spec {
 public:
-    void add_column(ColumnType type, const char* name);
+    void add_column(ColumnType type, const char* name, ColumnType attr=COLUMN_ATTR_NONE);
     Spec add_subtable_column(const char* name);
 
     // FIXME: It seems that the application must make sure that the
@@ -57,14 +57,6 @@ public:
 
     // Column Attributes
     ColumnType get_column_attr(size_t column_ndx) const;
-    // FIXME: What is the purpose of this one? Should it be public? It
-    // is not called from anywhere. If it must be public, it must aslo
-    // be made to emit a transaction log instruction. If it must also
-    // be internally callable from a function that itself emits a
-    // transaction log instruction, then the internal call must be to
-    // a version of this function that does not emit a transaction log
-    // instruction.
-    void set_column_attr(size_t column_ndx, ColumnType attr);
 
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const;
@@ -97,6 +89,7 @@ private:
     // then call a different version that does not emit such an
     // instruction.
     void set_column_type(size_t column_ndx, ColumnType type);
+    void set_column_attr(size_t column_ndx, ColumnType attr);
 
     // Serialization
     template<class S> size_t write(S& out, size_t& pos) const;

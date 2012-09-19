@@ -177,10 +177,11 @@ public:
 
     // Indexing
     bool has_index(size_t column_ndx) const;
-    void set_index(size_t column_ndx);
+    void set_index(size_t column_ndx, bool update_spec=true);
 
     // Aggregate functions
-    size_t  count(size_t column_ndx, int64_t target);
+    size_t  count(size_t column_ndx, int64_t target) const;
+    size_t  count_string(size_t column_ndx, const char* target) const;
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;
@@ -211,6 +212,7 @@ public:
 
     // Conversion
     void to_json(std::ostream& out);
+    void to_string(std::ostream& out, size_t limit=500) const;
 
     // Get a reference to this table
     TableRef get_table_ref() { return TableRef(this); }
@@ -581,7 +583,9 @@ inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const
     *begin++ = index_in_parent;
     ArrayParent* parent = real_top.GetParent();
     TIGHTDB_ASSERT(parent);
+#ifdef TIGHTDB_HAVE_RTTI
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+#endif
     return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
 }
 

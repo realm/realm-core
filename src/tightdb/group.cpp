@@ -158,8 +158,8 @@ void Group::create_from_ref()
         create();
 
         // Everything but header is free space
-        m_freePositions.add(8);
-        m_freeLengths.add(m_alloc.GetFileLen()-8);
+        m_freePositions.add(header_len);
+        m_freeLengths.add(m_alloc.GetFileLen() - header_len);
         if (is_shared())
             m_freeVersions.add(0);
     }
@@ -559,6 +559,46 @@ bool Group::operator==(const Group& g) const
     return true;
 }
 
+void Group::to_string(std::ostream& out) const
+{
+    const size_t count = get_table_count();
+
+    // Calculate widths
+    size_t name_width = 6;
+    size_t rows_width = 4;
+    for (size_t i = 0; i < count; ++i) {
+        const char* const name = get_table_name(i);
+        const size_t len = strlen(name);
+        if (name_width < len) name_width = len;
+
+        ConstTableRef table = get_table(name);
+        const size_t row_count = table->size();
+        if (rows_width < row_count) rows_width = row_count;
+    }
+
+    // Print header
+    out << "   ";
+    out.width(name_width);
+    out << "tables" << "  ";
+    out.width(rows_width);
+    out << "rows\n";
+
+    // Print tables
+    for (size_t i = 0; i < count; ++i) {
+        const char* const name = get_table_name(i);
+        ConstTableRef table = get_table(name);
+        const size_t row_count = table->size();
+
+        out << i << "  ";
+        out.width(name_width);
+        out.setf(std::ostream::left, std::ostream::adjustfield);
+        out << name;
+        out << "  ";
+        out.width(rows_width);
+        out.unsetf(std::ostream::adjustfield);
+        out << row_count << std::endl;
+    }
+}
 
 #ifdef TIGHTDB_DEBUG
 

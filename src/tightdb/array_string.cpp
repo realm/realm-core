@@ -217,6 +217,22 @@ size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const
     return bytes_without_header / width;
 }
 
+size_t ArrayString::count(const char* value, size_t start, size_t end) const
+{
+    const size_t len = strlen(value);
+    size_t count = 0;
+    
+    size_t lastmatch = start - 1;
+    for (;;) {
+        lastmatch = FindWithLen(value, len, lastmatch+1, end);
+        if (lastmatch != not_found)
+            ++count;
+        else break;
+    }
+    
+    return count;
+}
+
 size_t ArrayString::find_first(const char* value, size_t start, size_t end) const
 {
     TIGHTDB_ASSERT(value);

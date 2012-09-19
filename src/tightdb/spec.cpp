@@ -67,12 +67,19 @@ bool Spec::update_from_parent()
     else return false;
 }
 
-void Spec::add_column(ColumnType type, const char* name)
+void Spec::add_column(ColumnType type, const char* name, ColumnType attr)
 {
     TIGHTDB_ASSERT(name);
 
     m_names.add(name);
     m_spec.add(type);
+
+    // We can set column attribute on creation
+    // TODO: add to replication log
+    if (attr != COLUMN_ATTR_NONE) {
+        const size_t column_ndx = m_names.Size()-1;
+        set_column_attr(column_ndx, attr);
+    }
 
     if (type == COLUMN_TYPE_TABLE) {
         // SubSpecs array is only there when there are subtables

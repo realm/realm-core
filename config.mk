@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ifeq ($(CXX),g++)
 CC := gcc
 else ifneq ($(filter g++-%,$(CXX)),)
@@ -65,47 +66,17 @@ CFLAGS_OPTIMIZE = -O3 -msse4.2 -DUSE_SSE42
 #CFLAGS_DEBUG    = -ggdb3 -fno-elide-constructors -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
 CFLAGS_DEBUG    = -ggdb3 -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
 CFLAGS_COVERAGE = --coverage -msse4.2 -DUSE_SSE42 -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
+=======
+SOURCE_ROOT = src
+>>>>>>> d62517b4304f7c52f14900802134d37cfce00934
 
-# Extra compiler flags used for both C and C++ when building a shared library.
-CFLAGS_SHARED   = -fPIC -DPIC
-
-# Extra compiler and linker flags used to enable support for PTHREADS.
-CFLAGS_PTHREAD  = -pthread
-LDFLAGS_PTHREAD = $(CFLAGS_PTHREAD)
-
+ifneq ($(CC_AND_CXX_ARE_GCC_LIKE),)
+CFLAGS_DEFAULT   += -Wextra -ansi -pedantic -Wno-long-long -msse4.2
+# FIXME: '-fno-elide-constructors' currently causes TightDB to fail
+#CFLAGS_DEBUG     += -fno-elide-constructors
+CFLAGS_PTHREAD   += -pthread
 endif
-endif
 
-
-CC_STATIC       = $(CC) $(CFLAGS_OPTIMIZE) $(CFLAGS_PTHREAD)
-CC_SHARED       = $(CC) $(CFLAGS_SHARED) $(CFLAGS_OPTIMIZE) $(CFLAGS_PTHREAD)
-CC_DEBUG        = $(CC) $(CFLAGS_DEBUG) $(CFLAGS_PTHREAD)
-CC_COVERAGE     = $(CC) $(CFLAGS_COVERAGE) $(CFLAGS_PTHREAD)
-
-CXX_STATIC      = $(CXX) $(CFLAGS_OPTIMIZE) $(CFLAGS_PTHREAD)
-CXX_SHARED      = $(CXX) $(CFLAGS_SHARED) $(CFLAGS_OPTIMIZE) $(CFLAGS_PTHREAD)
-CXX_DEBUG       = $(CXX) $(CFLAGS_DEBUG) $(CFLAGS_PTHREAD)
-CXX_COVERAGE    = $(CXX) $(CFLAGS_COVERAGE) $(CFLAGS_PTHREAD)
-
-LD_STATIC       = $(LD) $(LDFLAGS_PTHREAD)
-LD_SHARED       = $(LD) -shared $(CFLAGS_SHARED) $(CFLAGS_OPTIMIZE) $(LDFLAGS_PTHREAD)
-LD_DEBUG        = $(LD) $(LDFLAGS_PTHREAD)
-LD_COVERAGE     = $(LD) --coverage $(LDFLAGS_PTHREAD)
-
-CFLAGS         += $(EXTRA_CFLAGS)
-CXXFLAGS       += $(EXTRA_CXXFLAGS)
-LDFLAGS        += $(EXTRA_LDFLAGS)
-
-
-# Installation
-prefix      = /usr/local
-exec_prefix = $(prefix)
-includedir  = $(prefix)/include
-bindir      = $(exec_prefix)/bin
-libdir      = $(exec_prefix)/lib
-INSTALL         = install
-INSTALL_PROGRAM = $(INSTALL)
-INSTALL_DATA    = $(INSTALL) -m 644
-INSTALL_HEADER  = $(INSTALL_DATA)
-INSTALL_LIB     = $(INSTALL)
-INSTALL_DIR     = $(INSTALL) -d
+CFLAGS_DEFAULT   += -DUSE_SSE42
+CFLAGS_DEBUG     += -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
+CFLAGS_COVERAGE  += -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4

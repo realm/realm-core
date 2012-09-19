@@ -389,7 +389,39 @@ TEST(Table_Sorted_Int)
 #endif // TIGHTDB_DEBUG
 }
 
+TEST(Table_Index_String)
+{
+    TestTableEnum table;
+    
+    table.add(Mon, "jeff");
+    table.add(Tue, "jim");
+    table.add(Wed, "jennifer");
+    table.add(Thu, "john");
+    table.add(Fri, "jimmy");
+    table.add(Sat, "jimbo");
+    table.add(Sun, "johnny");
+    table.add(Mon, "jennifer"); //duplicate
+    
+    table.column().second.set_index();
+    CHECK(table.column().second.has_index());
+    
+    const size_t r1 = table.column().second.find_first("jimmi");
+    CHECK_EQUAL(not_found, r1);
+    
+    const size_t r2 = table.column().second.find_first("jeff");
+    const size_t r3 = table.column().second.find_first("jim");
+    const size_t r4 = table.column().second.find_first("jimbo");
+    const size_t r5 = table.column().second.find_first("johnny");
+    CHECK_EQUAL(0, r2);
+    CHECK_EQUAL(1, r3);
+    CHECK_EQUAL(5, r4);
+    CHECK_EQUAL(6, r5);
+    
+    const size_t c1 = table.column().second.count("jennifer");
+    CHECK_EQUAL(2, c1);
+}
 
+/*
 TEST(Table_Index_Int)
 {
     TestTable table;
@@ -473,6 +505,7 @@ TEST(Table_Index_Int)
     table.Verify();
 #endif // TIGHTDB_DEBUG
 }
+*/
 
 TIGHTDB_TABLE_4(TestTableAE,
                 first,  Int,
@@ -521,7 +554,17 @@ TEST(TableAutoEnumeration)
         CHECK_EQUAL(Fri, table[4+n].fourth);
     }
 
-
+    // Verify counts
+    const size_t count1 = table.column().second.count("abd");
+    const size_t count2 = table.column().second.count("eftg");
+    const size_t count3 = table.column().second.count("hijkl");
+    const size_t count4 = table.column().second.count("mnopqr");
+    const size_t count5 = table.column().second.count("stuvxyz");
+    CHECK_EQUAL(5, count1);
+    CHECK_EQUAL(5, count2);
+    CHECK_EQUAL(5, count3);
+    CHECK_EQUAL(5, count4);
+    CHECK_EQUAL(5, count5);
 }
 
 

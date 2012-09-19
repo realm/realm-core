@@ -189,8 +189,22 @@ void GroupWriter::DoCommit(uint64_t topPos)
     // Write data
     msync(m_data, m_len, MS_SYNC);
 
-    // Write top pointer
-    memcpy(m_data, (const char*)&topPos, 8);
+    // File header is 24 bytes, composed of three 64bit
+    // blocks. The two first being top_refs (only one valid
+    // at a time) and the last being the info block.
+    char* const file_header = (char*)m_data;
+
+    // Last byte in info block indicates which top_ref block
+    // is valid
+    const size_t current_valid_ref = file_header[23] & 0x1;
+    const size_t new_valid_ref = current_valid_ref == 0 ? 1 : 0;
+
+    // Update top ref pointer
+    uint64_t* const top_refs = (uint64_t*)m_data;
+    top_refs[new_valid_ref] = topPos;
+    file_header[23] = (char)new_valid_ref; // swap
+
+    // Write new header to disk
     msync(m_data, m_len, MS_SYNC);
 #endif
 }
