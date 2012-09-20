@@ -78,7 +78,7 @@ public:
     /// lifetime.
     ///
     /// \return A reference to the new table, or null if allocation
-    /// fails.
+    /// failed.
     static TableRef create(Allocator& alloc = GetDefaultAllocator());
 
     /// An invalid table must not be accessed in any way except by
