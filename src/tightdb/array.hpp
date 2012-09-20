@@ -1613,7 +1613,6 @@ public:
     // Finding code ends                                                                  *
     //*************************************************************************************
 
-    // BM FIXME: a little too many I guess....
 };
 
 // Implementation:

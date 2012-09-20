@@ -1485,7 +1485,8 @@ template <size_t w>int64_t Array::Get(size_t ndx) const
 }
 
 #ifdef _MSC_VER
-#pragma warning (disable : 4127)
+#pragma warning(push)
+#pragma warning(disable : 4127)
 #endif
 template <size_t w> void Array::Set(size_t ndx, int64_t value)
 {
@@ -1527,7 +1528,7 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
     }
 }
 #ifdef _MSC_VER
-#pragma warning (enable : 4127)
+#pragma warning(pop)
 #endif
 
 // Sort array.

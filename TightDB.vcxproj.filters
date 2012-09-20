@@ -333,9 +333,6 @@
     <ClInclude Include="src\tightdb\pthread_helpers.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="callback.h">
-      <Filter>src</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">
