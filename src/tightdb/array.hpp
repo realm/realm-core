@@ -234,7 +234,7 @@ public:
     bool Copy(const Array&); // Copy semantics for assignment
     void move_assign(Array&); // Move semantics for assignment
 
-    /// Construct an empty array of the spcified type and return just
+    /// Construct an empty array of the specified type and return just
     /// the reference to the underlying memory.
     ///
     /// \return Zero if allocation fails.
@@ -1430,14 +1430,15 @@ public:
         cond2 C;
         int cond = C.condition();
 
+        // BM: FIXME: What if cond is none of below? Add TIGHTDB_ASSERT. Set "bool ret = false;"?
         bool ret;
-        if(cond == COND_EQUAL)
+        if (cond == COND_EQUAL)
             ret = CompareEquality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-        if(cond == COND_NOTEQUAL)
+        if (cond == COND_NOTEQUAL)
             ret = CompareEquality<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-        if(cond == COND_GREATER)
+        if (cond == COND_GREATER)
             ret = CompareRelation<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-        if(cond == COND_LESS)
+        if (cond == COND_LESS)
             ret = CompareRelation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 
         return ret;
@@ -1446,14 +1447,12 @@ public:
     void find_all(Array& result, int64_t value, size_t colOffset = 0, size_t start = 0, size_t end = (size_t)-1) const
     {
         if (end == (size_t)-1) end = m_len;
-        assert(start < m_len && end <= m_len && start < end);
+        TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
         state_state state;
         state.state = (int64_t)&result;
 
         TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, &tdb_dummy));
-
-        return;
     }
 
     // If gt = true: Find elements that are greater than value
@@ -1596,6 +1595,8 @@ protected:
     // Member variables
     Getter m_getter;
     Setter m_setter;
+
+    // BM FIXME: a little too many I guess....
     Finder m_finder[100]; // one for each COND_XXX enum
 
 private:

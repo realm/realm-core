@@ -14,6 +14,7 @@
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 
+//// TODO: Move below #defines to common file
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
@@ -93,7 +94,7 @@ inline void init_header(void* header, bool is_node, bool has_refs, int width_typ
     // initially. Note also: The C++ standard does not
     // guarantee that int64_t is extactly 8 bytes wide. It
     // may be more, and it may be less. That is why we
-    // need the statinc assert.
+    // need the static assert.
     TIGHTDB_STATIC_ASSERT(sizeof(int64_t) == 8,
                           "Trouble if int64_t is not 8 bytes wide");
     *reinterpret_cast<int64_t*>(header) = 0;
@@ -661,7 +662,7 @@ void Array::Adjust(size_t start, int64_t diff)
 
 template <size_t w> size_t Array::FindPos(int64_t target) const
 {
-    size_t low = -1;
+    size_t low = (size_t)-1;
     size_t high = m_len;
     
     // Binary search based on:
@@ -679,35 +680,33 @@ template <size_t w> size_t Array::FindPos(int64_t target) const
     else return high;
 }
 
-
-
 size_t Array::FindPos(int64_t target) const
 {
     TEMPEX(return FindPos, m_width, (target));
 }
 
-
 size_t Array::FindPos2(int64_t target) const
 {
-    int low = -1;
-    int high = (int)m_len;
+    size_t low = (size_t)-1;
+    size_t high = m_len;
 
     // Binary search based on:
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
     // Finds position of closest value BIGGER OR EQUAL to the target (for
     // lookups in indexes)
     while (high - low > 1) {
-        const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+        const size_t probe = (low + high) >> 1;
         const int64_t v = Get(probe);
 
-        if (v < target) low = (int)probe;
-        else            high = (int)probe;
+        if (v < target) high = probe;
+        else            low = probe;
     }
-    if (high == (int)m_len) return (size_t)-1;
-    else return (size_t)high;
+    if (high == m_len) return not_found;
+    else return high;
 }
 
-size_t FirstSetBit(unsigned int v) 
+
+size_t FirstSetBit(unsigned int v)
 {
     #if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
         unsigned long ul;
@@ -729,13 +728,12 @@ size_t FirstSetBit(unsigned int v)
     #endif
 }
 
-size_t FirstSetBit64(int64_t v) 
+size_t FirstSetBit64(int64_t v)
 {
     #if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
         unsigned long ul;
         _BitScanForward64(&ul, v);
         return ul;
-
     #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
         return __builtin_clzll(v);
     #else
@@ -753,7 +751,7 @@ size_t FirstSetBit64(int64_t v)
 }
 
 
-template <size_t width> inline int64_t LowerBits(void) 
+template <size_t width> inline int64_t LowerBits(void)
 {
     if(width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
@@ -785,7 +783,7 @@ template <size_t width> inline bool TestZero(uint64_t value) {
 
 
 // Finds zero element of bit width 'width'
-template <bool eq, size_t width>size_t FindZero(uint64_t v)
+template <bool eq, size_t width> size_t FindZero(uint64_t v)
 {
     size_t start = 0;
     uint64_t hasZeroByte;
