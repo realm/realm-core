@@ -709,45 +709,45 @@ size_t Array::FindPos2(int64_t target) const
 
 size_t FirstSetBit(unsigned int v)
 {
-    #if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
-        unsigned long ul;
-        // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
-        _BitScanForward(&ul, v);
-        return ul;
-    #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
-        return __builtin_clz(v);
-    #else
-        int r;
-        static const int MultiplyDeBruijnBitPosition[32] = 
-        {
-            0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
-            31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
-        };
+#if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
+    unsigned long ul;
+    // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
+    _BitScanForward(&ul, v);
+    return ul;
+#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
+    return __builtin_clz(v);
+#else
+    int r;
+    static const int MultiplyDeBruijnBitPosition[32] = 
+    {
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
+        31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+    };
 
-        r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
-        return r;
-    #endif
+    r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
+    return r;
+#endif
 }
 
 size_t FirstSetBit64(int64_t v)
 {
-    #if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
-        unsigned long ul;
-        _BitScanForward64(&ul, v);
-        return ul;
-    #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
-        return __builtin_clzll(v);
-    #else
-        unsigned int v0 = (unsigned int)v;
-        unsigned int v1 = (unsigned int)(v >> 32);
-        size_t r;
+#if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
+    unsigned long ul;
+    _BitScanForward64(&ul, v);
+    return ul;
+#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
+    return __builtin_clzll(v);
+#else
+    unsigned int v0 = (unsigned int)v;
+    unsigned int v1 = (unsigned int)(v >> 32);
+    size_t r;
 
-        if (v0 != 0)
-            r = FirstSetBit(v0);
-        else
-            r = FirstSetBit(v1) + 32;
+    if (v0 != 0)
+        r = FirstSetBit(v0);
+    else
+        r = FirstSetBit(v1) + 32;
 
-        return r;
+    return r;
 #endif
 }
 
@@ -774,7 +774,8 @@ template <size_t width> inline int64_t LowerBits(void)
     }
 }
 
-template <size_t width> inline bool TestZero(uint64_t value) {
+// Return true if 'value' has an element (of bit-width 'width') which is 0
+template <size_t width> inline bool has_zero_element(uint64_t value) {
     uint64_t hasZeroByte;
     uint64_t lower = LowerBits<width>();
     uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
@@ -793,25 +794,25 @@ template <bool eq, size_t width> size_t FindZero(uint64_t v)
     // the work done by TestZero() is wasted for the cases where the value exists in first half, but useful if it exists in last 
     // half. Sweet spot turns out to be the widths and partitions below.
     if (width <= 8) {
-        hasZeroByte = TestZero<width>(v | 0xffffffff00000000ULL);
+        hasZeroByte = has_zero_element<width>(v | 0xffffffff00000000ULL);
         if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
             // 00?? -> increasing
-            start += 64 / no0(width) / 2;
+            start += 64 / NO0(width) / 2;
             if (width <= 4) {
-                hasZeroByte = TestZero<width>(v | 0xffff000000000000ULL);
+                hasZeroByte = has_zero_element<width>(v | 0xffff000000000000ULL);
                 if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
                     // 000?
-                    start += 64 / no0(width) / 4;
+                    start += 64 / NO0(width) / 4;
                 }
             }
         }
         else {
             if (width <= 4) {
                 // ??00
-                hasZeroByte = TestZero<width>(v | 0xffffffffffff0000ULL);
+                hasZeroByte = has_zero_element<width>(v | 0xffffffffffff0000ULL);
                 if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
                     // 0?00
-                    start += 64 / no0(width) / 4;
+                    start += 64 / NO0(width) / 4;
                 }
             }
         }
@@ -825,9 +826,10 @@ template <bool eq, size_t width> size_t FindZero(uint64_t v)
     return start;
 }
 
-template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
-{ 
-    if (end == (size_t)-1) end = m_len;
+template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
+{
+    if (end == (size_t)-1) 
+        end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     if (m_len == 0)
@@ -845,11 +847,11 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
 
     // Test manually until 128 bit aligned
     for (; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
-        if (max ? Get<w>(start) > m : Get<w>(start) < m)
+        if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
             m = Get<w>(start);
     }
 
-	if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / no0(w)) {
+	if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
         __m128i *data = (__m128i *)(m_data + start * w / 8);
         __m128i state = data[0];
         __m128i state2;
@@ -857,20 +859,20 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
         size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
         for (size_t t = 0; t < chunks; t++) {
             if (w == 8)
-                state = max ? _mm_max_epi8(data[t], state) : _mm_min_epi8(data[t], state);
+                state = find_max ? _mm_max_epi8(data[t], state) : _mm_min_epi8(data[t], state);
             else if (w == 16)
-                state = max ? _mm_max_epi16(data[t], state) : _mm_min_epi16(data[t], state);
+                state = find_max ? _mm_max_epi16(data[t], state) : _mm_min_epi16(data[t], state);
             else if (w == 32)
-                state = max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
+                state = find_max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
 
-            start += sizeof(__m128i) * 8 / no0(w);
+            start += sizeof(__m128i) * 8 / NO0(w);
         }
-        
+
         // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
         state2 = state; 
-        for (size_t t = 0; t < sizeof(__m128i) * 8 / no0(w); ++t) {
+        for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
             const int64_t v = GetUniversal<w>(((const char *)&state2), t);
-            if (max ? v > m : v < m) {
+            if (find_max ? v > m : v < m) {
                 m = v;
             }
         }        
@@ -879,7 +881,7 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
 
     for (; start < end; ++start) {
         const int64_t v = Get<w>(start);
-        if (max ? v > m : v < m) {
+        if (find_max ? v > m : v < m) {
             m = v;
         }
     }
@@ -923,7 +925,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
         // uses a divide and conquer algorithm that is a variation of popolation count:
         // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 
-        // staiic values needed for fast sums
+        // static values needed for fast sums
         const uint64_t m2  = 0x3333333333333333ULL;
         const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
         const uint64_t h01 = 0x0101010101010101ULL;
@@ -946,28 +948,22 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                     a = (a * h01) >> 56;
                     s += a;
 #endif               
-                }
-            
+            }
             else if (w == 2) {
                     uint64_t a = data[t];
-
                     a = (a & m2) + ((a >> 2) & m2);
                     a = (a + (a >> 4)) & m4;
                     a = (a * h01) >> 56;
-
-                    s += a;
-                
+                    s += a;    
             }
             else if (w == 4) {
                     uint64_t a = data[t];
-
                     a = (a & m4) + ((a >> 4) & m4);
                     a = (a * h01) >> 56;
-
                     s += a;
                 }
             }
-            start += sizeof(int64_t) * 8 / no0(w) * chunks;
+            start += sizeof(int64_t) * 8 / NO0(w) * chunks;
         }
 
 #ifdef USE_SSE42
@@ -975,7 +971,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
     // Naive, templated Get<>: 391 371 374
     // SSE:                     97 148 282
 
-    if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
+    if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / NO0(w)) {
         __m128i *data = (__m128i *)(m_data + start * w / 8);
         __m128i sum = {0};
         __m128i sum2;
@@ -1038,7 +1034,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                 */
             }
         }
-        start += sizeof(__m128i) * 8 / no0(w) * chunks;
+        start += sizeof(__m128i) * 8 / NO0(w) * chunks;
 
         // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
         sum2 = sum;
@@ -1478,7 +1474,6 @@ template <size_t width> void Array::SetWidth(void)
 
     Finder fl =  &Array::find<LESS, TDB_RETURN_FIRST, width>;
     m_finder[COND_LESS] = fl;
-
 }
 
 template <size_t w>int64_t Array::Get(size_t ndx) const
