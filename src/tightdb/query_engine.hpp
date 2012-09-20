@@ -51,14 +51,14 @@ public:
 
         size_t r = start - 1;
         size_t count = 0;
-        for(;;) {
+        for (;;) {
             r = find_first(r + 1, end);
             if (r == end || count == limit)
                 break;
             count++;
 
             // Only aggregate function available for non-integer nodes are TDB_FINDALL and count
-            if(action == TDB_FINDALL)
+            if (action == TDB_FINDALL)
                 res->add(r); // todo, AddPositiveLocal
         }
 
@@ -67,9 +67,9 @@ public:
 
     virtual std::string Verify(void)
     {
-        if(error_code != "")
+        if (error_code != "")
             return error_code;
-        if(m_child == 0)
+        if (m_child == 0)
             return "";
         else
             return m_child->Verify();
@@ -92,7 +92,7 @@ public:
     void Init(const Table& table)
     {
         m_next = 0;
-        if(m_size > 0)
+        if (m_size > 0)
             m_max = m_arr.Get(m_size - 1);
         if (m_child) m_child->Init(table);
     }
@@ -101,27 +101,29 @@ public:
     {
         for (size_t s = start; s < end; ++s) {
             // Test first few values and end
-            if(m_size == 0)
+            if (m_size == 0)
                 return end;               
 
-            if(m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
-            if(m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
+            if (m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
+            if (m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
 
-            if(start > m_max) return end;
+            if (start > m_max) return end;
 
-            if(m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
-            if(m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
+            if (m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
+            if (m_next < m_size && m_arr.GetAsSizeT(m_next) >= start) goto match; else ++m_next;
 
             // Find bounds
             --m_next;
-            size_t add = 1;
+            size_t add;
+            add = 1;
             while(m_next + add < m_size && TO_SIZET(m_arr.Get(m_next + add)) < start)
                 add *= 2;
 
             // Do binary search inside bounds
-            assert(m_arr.GetAsSizeT(m_arr.Size() - 1) >= start);
+            TIGHTDB_ASSERT(m_arr.GetAsSizeT(m_arr.Size() - 1) >= start);
 
-            size_t high = m_next + add < m_size ? m_next + add : m_size;
+            size_t high;
+            high = m_next + add < m_size ? m_next + add : m_size;
             m_next = m_next + add / 2 - 1;
 
             while (high - m_next > 1) {
@@ -224,7 +226,7 @@ public:
             const size_t subsize = subtable->size();
             const size_t sub = m_child->find_first(0, subsize);
 
-            if(sub != subsize) {
+            if (sub != subsize) {
                 if (m_child2 == 0)
                     return s;
                 else {
@@ -275,18 +277,18 @@ public:
     }
 
     int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, ACTION action = TDB_FINDALL, size_t agg_col = not_found, size_t* matchcount = 0) {
-        if(action == TDB_FINDALL)
+        if (action == TDB_FINDALL)
             return aggregate<TDB_FINDALL>(res, start, end, limit, agg_col, matchcount);
-        if(action == TDB_SUM)
+        if (action == TDB_SUM)
             return aggregate<TDB_SUM>(res, start, end, limit, agg_col, matchcount);
-        if(action == TDB_MAX)
+        if (action == TDB_MAX)
             return aggregate<TDB_MAX>(res, start, end, limit, agg_col, matchcount);
-        if(action == TDB_MIN)
+        if (action == TDB_MIN)
             return aggregate<TDB_MIN>(res, start, end, limit, agg_col, matchcount);
-        if(action == TDB_COUNT)
+        if (action == TDB_COUNT)
             return aggregate<TDB_COUNT>(res, start, end, limit, agg_col, matchcount);
 
-        assert(false);
+        TIGHTDB_ASSERT(false);
         return uint64_t(-1);
     }
 
@@ -299,8 +301,8 @@ public:
             m_leaf_end_agg = m_leaf_start_agg + leaf_size;
         }
 
-        int64_t av = NULL;        
-        if(m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
+        int64_t av = 0;        
+        if (m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
             av = m_array_agg.Get(TO_SIZET(v) - m_leaf_start_agg);
         bool b = m_array.FIND_ACTION<action>(TO_SIZET(v), av, &state, &tdb_dummy);
 
@@ -314,13 +316,13 @@ public:
         F f;
         int c = f.condition();
 
-        if(agg_col != not_found)
+        if (agg_col != not_found)
             m_column_agg = (C*)&m_table->GetColumnBase(agg_col);
 
         m_array.state_init(action, &state, res);
 
         // If query only has 1 criteria, and arrays have built-in intrinsics for it, then perform it directly on array
-        if(m_child == 0 && limit > m_column->Size() && (SameType<F, EQUAL>::value || SameType<F, NOTEQUAL>::value || SameType<F, LESS>::value || SameType<F, GREATER>::value || SameType<F, NONE>::value)) {
+        if (m_child == 0 && limit > m_column->Size() && (SameType<F, EQUAL>::value || SameType<F, NOTEQUAL>::value || SameType<F, LESS>::value || SameType<F, GREATER>::value || SameType<F, NONE>::value)) {
             const Array* criteria_arr = NULL;
             for (size_t s = start; s < end; ) {
                 // Cache internal leafs
@@ -332,7 +334,7 @@ public:
                     m_local_end = leaf_size < e ? leaf_size : e;
                 }
 
-                if(agg_col == m_column_id || agg_col == size_t(-1))
+                if (agg_col == m_column_id || agg_col == size_t(-1))
                     criteria_arr->find(c, action, m_value, s - m_leaf_start, m_local_end, m_leaf_start, &state);
                 else
                     criteria_arr->find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, m_local_end, m_leaf_start, &state, std::bind1st(std::mem_fun(&NODE::match_callback<action>), this));
@@ -340,11 +342,11 @@ public:
                 s = m_leaf_end;
             }
 
-            if(action == TDB_FINDALL && res->Size() > limit) {
+            if (action == TDB_FINDALL && res->Size() > limit) {
                 res->Resize(limit); // todo, optimize by adding limit argument to find()
             }
 
-            if(matchcount)
+            if (matchcount)
                 *matchcount = int64_t(state.match_count);
             return state.state;
 
@@ -357,11 +359,11 @@ public:
                 if (r == end)
                     break;
 
-                if(agg_col == m_column_id || agg_col == size_t(-1)) {
-                    if(m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
+                if (agg_col == m_column_id || agg_col == size_t(-1)) {
+                    if (m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
                         m_array.FIND_ACTION<action>(r, m_column->Get(r), &state, &tdb_dummy);
                     else
-                        m_array.FIND_ACTION<action>(r, NULL, &state, &tdb_dummy);
+                        m_array.FIND_ACTION<action>(r, 0, &state, &tdb_dummy);
                 }
                 else
                     match_callback<action>(r);
@@ -369,7 +371,7 @@ public:
             } 
         }
         
-        if(matchcount)
+        if (matchcount)
             *matchcount = int64_t(state.match_count);
         return state.state;
     }
@@ -434,7 +436,7 @@ protected:
 
 template <class F> class STRINGNODE: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
+    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {TIGHTDB_ASSERT(false); return 0;}
 
     STRINGNODE(const char* v, size_t column)
     {
@@ -506,7 +508,7 @@ protected:
 
 template <> class STRINGNODE<EQUAL>: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
+    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {TIGHTDB_ASSERT(false); return 0;}
 
     STRINGNODE(const char* v, size_t column): m_key_ndx((size_t)-1) {
         m_column_id = column;
@@ -575,7 +577,7 @@ private:
 
 class OR_NODE: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
+    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {TIGHTDB_ASSERT(false); return 0;}
 
     OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond1 = p1; m_cond2 = NULL;};
 
@@ -585,7 +587,7 @@ public:
         m_cond1->Init(table);
         m_cond2->Init(table);
 
-        if(m_child)
+        if (m_child)
             m_child->Init(table);
 
         m_last1 = size_t(-1);
@@ -659,22 +661,22 @@ public:
 
     virtual std::string Verify(void)
     {
-        if(error_code != "")
+        if (error_code != "")
             return error_code;
-        if(m_cond1 == 0)
+        if (m_cond1 == 0)
             return "Missing left-hand side of OR";
-        if(m_cond2 == 0)
+        if (m_cond2 == 0)
             return "Missing right-hand side of OR";
         std::string s;
-        if(m_child != 0)
+        if (m_child != 0)
             s = m_child->Verify();
-        if(s != "")
+        if (s != "")
             return s;
         s = m_cond1->Verify();
-        if(s != "")
+        if (s != "")
             return s;
         s = m_cond2->Verify();
-        if(s != "")
+        if (s != "")
             return s;
         return "";
     }
