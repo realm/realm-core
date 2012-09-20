@@ -685,6 +685,7 @@ size_t Array::FindPos(int64_t target) const
     TEMPEX(return FindPos, m_width, (target));
 }
 
+// BM FIXME: Rename to something better...
 size_t Array::FindPos2(int64_t target) const
 {
     size_t low = (size_t)-1;
@@ -698,8 +699,8 @@ size_t Array::FindPos2(int64_t target) const
         const size_t probe = (low + high) >> 1;
         const int64_t v = Get(probe);
 
-        if (v < target) high = probe;
-        else            low = probe;
+        if (v < target) low = probe;
+        else            high = probe;
     }
     if (high == m_len) return not_found;
     else return high;
