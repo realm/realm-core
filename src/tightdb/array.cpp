@@ -1655,43 +1655,44 @@ bool Array::Alloc(size_t count, size_t width)
 {
     if (count > m_capacity || width != m_width) {
         const size_t len      = CalcByteLen(count, width);              // bytes needed
-        const size_t capacity = m_capacity ? get_header_capacity() : 0; // bytes currently available
-        size_t new_capacity   = capacity;
+        size_t capacity_bytes = m_capacity ? get_header_capacity() : 0; // space currently available in bytes
 
-        if (len > capacity) {
-            // Double to avoid too many reallocs
-            new_capacity = capacity ? capacity * 2 : initial_capacity;
-            if (new_capacity < len) {
+        if (len > capacity_bytes) {
+            // Double to avoid too many reallocs (or initialize to initial size)
+            capacity_bytes = capacity_bytes ? capacity_bytes * 2 : initial_capacity;
+
+            // If doubling is not enough, expand enough to fit
+            if (capacity_bytes < len) {
                 const size_t rest = (~len & 0x7)+1;
-                new_capacity = len;
-                if (rest < 8) new_capacity += rest; // 64bit align
+                capacity_bytes = len;
+                if (rest < 8) capacity_bytes += rest; // 64bit align
             }
 
             // Allocate and initialize header
             MemRef mem_ref;
             if (!m_data) {
-                mem_ref = m_alloc.Alloc(new_capacity);
+                mem_ref = m_alloc.Alloc(capacity_bytes);
                 if (!mem_ref.pointer) return false;
                 init_header(mem_ref.pointer, m_isNode, m_hasRefs, GetWidthType(),
-                            width, count, new_capacity);
+                            width, count, capacity_bytes);
             }
             else {
-                mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
+                mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, capacity_bytes);
                 if (!mem_ref.pointer) return false;
                 ::set_header_width(width, mem_ref.pointer);
                 ::set_header_len(count, mem_ref.pointer);
-                ::set_header_capacity(new_capacity, mem_ref.pointer);
+                ::set_header_capacity(capacity_bytes, mem_ref.pointer);
             }
 
             // Update wrapper objects
-            m_ref = mem_ref.ref;
-            m_data = reinterpret_cast<unsigned char*>(mem_ref.pointer) + 8;
-            m_capacity = CalcItemCount(new_capacity, width);
+            m_ref      = mem_ref.ref;
+            m_data     = reinterpret_cast<unsigned char*>(mem_ref.pointer) + 8;
+            m_capacity = CalcItemCount(capacity_bytes, width);
             update_ref_in_parent();
             return true;
         }
 
-        m_capacity = CalcItemCount(new_capacity, width);
+        m_capacity = CalcItemCount(capacity_bytes, width);
         set_header_width(width);
     }
 
@@ -2250,7 +2251,10 @@ void Array::ToDot(std::ostream& out, const char* title) const
 
 void Array::Stats(MemStats& stats) const
 {
-    const MemStats m(m_capacity, CalcByteLen(m_len, m_width), 1);
+    const size_t capacity_bytes = get_header_capacity();
+    const size_t bytes_used     = CalcByteLen(m_len, m_width);
+
+    const MemStats m(capacity_bytes, bytes_used, 1);
     stats.add(m);
 
     // Add stats for all sub-arrays
