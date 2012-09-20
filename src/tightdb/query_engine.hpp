@@ -304,7 +304,7 @@ public:
         int64_t av = 0;        
         if (m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
             av = m_array_agg.Get(TO_SIZET(v) - m_leaf_start_agg);
-        bool b = m_array.FIND_ACTION<action>(TO_SIZET(v), av, &state, &tdb_dummy);
+        bool b = m_array.FIND_ACTION<action>(TO_SIZET(v), av, &state, &tightdb_dummy);
 
         return b;
     }
@@ -361,9 +361,9 @@ public:
 
                 if (agg_col == m_column_id || agg_col == size_t(-1)) {
                     if (m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
-                        m_array.FIND_ACTION<action>(r, m_column->Get(r), &state, &tdb_dummy);
+                        m_array.FIND_ACTION<action>(r, m_column->Get(r), &state, &tightdb_dummy);
                     else
-                        m_array.FIND_ACTION<action>(r, 0, &state, &tdb_dummy);
+                        m_array.FIND_ACTION<action>(r, 0, &state, &tightdb_dummy);
                 }
                 else
                     match_callback<action>(r);
