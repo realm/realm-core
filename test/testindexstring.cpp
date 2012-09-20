@@ -74,6 +74,8 @@ TEST(StringIndex_DeleteAll)
     col.Delete(0);
 #ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
+#else
+    static_cast<void>(ndx);
 #endif
 
     // Re-insert values
@@ -96,6 +98,8 @@ TEST(StringIndex_DeleteAll)
     col.Delete(0);
 #ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
+#else
+    static_cast<void>(ndx);
 #endif
 
     // Clean up
