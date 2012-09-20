@@ -1364,17 +1364,17 @@ size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator
 bool Array::Alloc(size_t count, size_t width)
 {
     if (count > m_capacity || width != m_width) {
-        const size_t len      = CalcByteLen(count, width);              // bytes needed
-        size_t capacity_bytes = m_capacity ? get_header_capacity() : 0; // space currently available in bytes
+        const size_t needed_bytes = CalcByteLen(count, width);              
+        size_t capacity_bytes     = m_capacity ? get_header_capacity() : 0; // space currently available in bytes
 
-        if (len > capacity_bytes) {
+        if (needed_bytes > capacity_bytes) {
             // Double to avoid too many reallocs (or initialize to initial size)
             capacity_bytes = capacity_bytes ? capacity_bytes * 2 : initial_capacity;
 
             // If doubling is not enough, expand enough to fit
-            if (capacity_bytes < len) {
-                const size_t rest = (~len & 0x7)+1;
-                capacity_bytes = len;
+            if (capacity_bytes < needed_bytes) {
+                const size_t rest = (~needed_bytes & 0x7)+1;
+                capacity_bytes = needed_bytes;
                 if (rest < 8) capacity_bytes += rest; // 64bit align
             }
 
