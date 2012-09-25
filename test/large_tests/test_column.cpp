@@ -11,8 +11,9 @@
 
 using namespace tightdb;
 
-#define LL_MIN (-9223372036854775807LL - 1)
 #define LL_MAX (9223372036854775807LL)
+#define LL_MIN (-LLMAX - 1)
+
 
 namespace {
 
@@ -170,7 +171,7 @@ TEST(LESS)
 
 
                     // Find all, GREATER
-                    if (v[w] != 9223372036854775807LL) {
+                    if (v[w] != LL_MAX) {
                         for (size_t off = 1; off < 8; off++) {
 
                             a.Set(match, v[w] + 1);
@@ -196,7 +197,7 @@ TEST(LESS)
 
 
                     // Find all, EQUAL
-                    if (v[w] != 9223372036854775807LL) {
+                    if (v[w] != LL_MAX) {
                         for (size_t off = 1; off < 8; off++) {
                             a.Set(match, v[w] + 1);
                             a.Set(match + off, v[w] + 1);
