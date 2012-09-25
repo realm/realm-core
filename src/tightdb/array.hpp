@@ -428,6 +428,9 @@ public:
     mutable unsigned char* m_data; // FIXME: Should be 'char' not 'unsigned char'
 
 private:
+
+    typedef bool (*CallbackDummy)(int64_t);
+
     template <size_t w> bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max);
     Array& operator=(const Array&) {return *this;} // not allowed
     template<size_t w> void QuickSort(size_t lo, size_t hi);
@@ -485,7 +488,7 @@ protected:
     // Member variables
     Getter m_getter;
     Setter m_setter;
-    Finder m_finder[COND_COUNT_MINUS_1 + 1]; // one for each COND_XXX enum
+    Finder m_finder[COND_COUNT]; // one for each COND_XXX enum
 
 private:
     size_t m_ref;
@@ -1391,7 +1394,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
 
     template <class cond, ACTION action, size_t bitwidth> void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const
     {
-        find<cond, action, bitwidth>(value, start, end, baseindex, state, &tightdb_dummy);
+        find<cond, action, bitwidth>(value, start, end, baseindex, state, CallbackDummy());
     }
 
     template <class cond, ACTION action, class Callback> void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const

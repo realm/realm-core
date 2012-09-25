@@ -313,7 +313,7 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
     Init(table);
     size_t matchcount = 0;
 
-    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MIN, not_found, &matchcount);
+    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MIN, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
