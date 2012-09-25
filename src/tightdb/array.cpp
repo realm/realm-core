@@ -290,6 +290,7 @@ bool Array::UpdateFromParent()
  * For alignment this is rounded up to nearest log2.
  * Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
  */
+// FIXME: Deprecated use of 'static' - use anonymous namespace instead.
 static size_t BitWidth(int64_t v)
 {
     if ((v >> 4) == 0) {
@@ -533,10 +534,12 @@ bool Array::Insert(size_t ndx, int64_t value)
     }
     else if (ndx != m_len) {
         // when byte sized and no expansion, use memmove
+// FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
         unsigned char* src = m_data + (ndx * w);
         unsigned char* dst = src + w;
         const size_t count = (m_len - ndx) * w;
+// FIXME: Use std::copy() or std::copy_backward() instead!
         memmove(dst, src, count);
     }
 
