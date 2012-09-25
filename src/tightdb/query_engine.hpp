@@ -553,7 +553,11 @@ public:
         }
 
         if(m_column->HasIndex()) {
-            ((AdaptiveStringColumn*)m_column)->find_all(m_index, m_value);
+            if(m_column_type == COLUMN_TYPE_STRING_ENUM)
+                ((ColumnStringEnum*)m_column)->find_all(m_index, m_value);
+            else {
+                ((AdaptiveStringColumn*)m_column)->find_all(m_index, m_value);
+            }
             has_index = true;
             last_indexed = 0;
         }

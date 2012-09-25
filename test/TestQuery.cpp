@@ -18,7 +18,38 @@ TIGHTDB_TABLE_2(BoolTupleTable,
                 first,  Int,
                 second, Bool)
 
-TEST(TestQueryStrIndexed)
+TEST(TestQueryStrIndexed_enum)
+{
+    TupleTableType ttt;
+
+    for(size_t t = 0; t < 10; t++) {
+        ttt.add(1, "a");
+        ttt.add(4, "b");
+        ttt.add(7, "c");
+        ttt.add(10, "a");
+        ttt.add(1, "b");
+        ttt.add(4, "c");
+    }
+
+    ttt.optimize();
+
+    ttt.column().second.set_index();
+
+    size_t s = ttt.where().second.equal("a").first.sum(ttt);
+    CHECK_EQUAL(10*11, s);
+
+    s = ttt.where().second.equal("a").first.equal(10).first.sum(ttt);
+    CHECK_EQUAL(100, s);
+
+    s = ttt.where().first.equal(10).second.equal("a").first.sum(ttt);
+    CHECK_EQUAL(100, s);
+
+    TupleTableType::View tv = ttt.where().second.equal("a").find_all(ttt);
+    CHECK_EQUAL(10*2, tv.size());
+}
+
+
+TEST(TestQueryStrIndexed_non_enum)
 {
     TupleTableType ttt;
 
