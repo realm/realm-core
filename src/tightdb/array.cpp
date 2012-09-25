@@ -293,6 +293,8 @@ bool Array::UpdateFromParent()
 // FIXME: Deprecated use of 'static' - use anonymous namespace instead.
 static size_t BitWidth(int64_t v)
 {
+    // FIXME: Assuming there is a 64-bit CPU reverse bitscan instruction and it is fast, then this function could be implemented simply as (v<2 ? v : 2<<rev_bitscan(rev_bitscan(v))).
+
     if ((v >> 4) == 0) {
         static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
         return bits[(int8_t)v];
@@ -414,10 +416,12 @@ void Array::Delete(size_t ndx)
     }
     else if (ndx < m_len-1) {
         // when byte sized, use memmove
+// FIXME: Should be optimized as a simple division by 8.
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
         unsigned char* dst = m_data + (ndx * w);
         unsigned char* src = dst + w;
         const size_t count = (m_len - ndx - 1) * w;
+// FIXME: Use std::copy instead.
         memmove(dst, src, count);
     }
 
@@ -2291,6 +2295,7 @@ size_t FindPosDirect(const uint8_t* const header, const char* const data, const 
 template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target);
 size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, int32_t target);
 
+// FIXME: These should all be declared inline
 bool get_header_isnode_direct(const uint8_t* const header)
 {
     return (header[0] & 0x80) != 0;
