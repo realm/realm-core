@@ -421,7 +421,7 @@ void Array::Delete(size_t ndx)
         unsigned char* dst = m_data + (ndx * w);
         unsigned char* src = dst + w;
         const size_t count = (m_len - ndx - 1) * w;
-// FIXME: Use std::copy instead.
+// FIXME: Use std::copy() or std::copy_backward() instead.
         memmove(dst, src, count);
     }
 
@@ -543,7 +543,7 @@ bool Array::Insert(size_t ndx, int64_t value)
         unsigned char* src = m_data + (ndx * w);
         unsigned char* dst = src + w;
         const size_t count = (m_len - ndx) * w;
-// FIXME: Use std::copy() or std::copy_backward() instead!
+// FIXME: Use std::copy() or std::copy_backward() instead.
         memmove(dst, src, count);
     }
 
