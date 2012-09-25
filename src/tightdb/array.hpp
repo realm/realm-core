@@ -344,7 +344,7 @@ private:
 protected:
     size_t m_len;
     size_t m_capacity;
-    size_t m_width;
+    size_t m_width; // FIXME: Should be an 'int'
     bool m_isNode;
     bool m_hasRefs;
 
