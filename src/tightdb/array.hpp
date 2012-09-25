@@ -1485,7 +1485,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
 
     // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
     template <class cond2, ACTION action, size_t width, class Callback> 
-    size_t FindSSE(int64_t value, __m128i *data, size_t items, state_state *state, size_t baseindex, Callback callback) const
+    size_t Array::FindSSE(int64_t value, __m128i *data, size_t items, state_state *state, size_t baseindex, Callback callback) const
     {
         cond2 C;
         int cond = C.condition();
@@ -1498,19 +1498,19 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
         __m128i compare = {0};
         size_t i = 0;
 
-      if (width == 8)
+        if (width == 8)
             search = _mm_set1_epi8((char)value);
         else if (width == 16)
             search = _mm_set1_epi16((short int)value);
         else if (width == 32)
             search = _mm_set1_epi32((int)value);
         else if (width == 64) {
-#ifdef _MSC_VER 
+        #ifdef _MSC_VER 
             search.m128i_i64[0] = value;
             search.m128i_i64[1] = value;
-#else
+        #else
             search = _mm_set1_epi64(_mm_set_pi64x(value));
-#endif
+        #endif
         }
 
         // Search loop. Unrolling it has been tested to NOT increase performance (apparently mem bound)
@@ -1532,7 +1532,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
     #endif
                 }
             }
-    #ifdef USE_SSE42
+        #ifdef USE_SSE42
             // greater
             else if (cond == COND_GREATER) {
                 if (width == 8)
@@ -1558,7 +1558,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
                     compare = _mm_andnot_si128(compare, _mm_set1_epi32(0xffffffff));
                 }
             }
-    #endif
+        #endif
             resmask = _mm_movemask_epi8(compare);
 
             if (cond == COND_NOTEQUAL)
@@ -1584,7 +1584,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
 
         return true;
     }
-    #endif //USE_SSE
+#endif //USE_SSE
 
     // If gt = true: Find element(s) which are greater than value
     // If gt = false: Find element(s) which are smaller than value

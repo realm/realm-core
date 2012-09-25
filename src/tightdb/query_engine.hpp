@@ -36,14 +36,14 @@ namespace tightdb {
 
 class ParentNode {
 public:
-    ParentNode() : c_child(NULL), m_cond(-1), m_table(NULL), m_array(false) {}
+    ParentNode() : m_child(NULL), m_cond(-1), m_table(NULL), m_array(false) {}
     virtual ~ParentNode() {}
     virtual void Init(const Table& table) {m_table = &table; if (m_child) m_child->Init(table);}
     virtual size_t find_first(size_t start, size_t end) = 0;
 
     template <ACTION action> int64_t agg(Array* res, size_t start, size_t end, size_t limit, size_t agg_col, size_t* matchcount = 0) 
     {
-        m_array.state_init(action, &state, res);
+        m_array.state_init(action, &m_state, res);
         Column *column_agg;            // Column on which aggregate function is executed (or not_found actions that don't use row value, such as COUNT and FIND_ALL)
         if (agg_col != not_found)
             column_agg = (Column*)&m_table->GetColumnBase(agg_col); 
@@ -57,12 +57,12 @@ public:
             count++;
             
             if (agg_col != size_t(-1) && m_array.USES_VAL<action>())
-                m_array.FIND_ACTION<action>(r, column_agg->Get(r), &state, &tightdb_dummy);
+                m_array.FIND_ACTION<action>(r, column_agg->Get(r), &m_state, &tightdb_dummy);
             else
-                m_array.FIND_ACTION<action>(r, 0, &state, &tightdb_dummy);  
+                m_array.FIND_ACTION<action>(r, 0, &m_state, &tightdb_dummy);  
         }
 
-        return state.state;
+        return m_state.state;
 
     }
 
@@ -103,8 +103,8 @@ protected:
     size_t          m_column_id;    // initialized in classes that inherit
     const Table*    m_table;
     std::string     m_error_code;
-    Array m_array; 
-    state_state m_state;
+    Array           m_array; 
+    state_state     m_state;
 };
 
 
@@ -333,7 +333,7 @@ public:
         int64_t av = 0;        
         if (m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
             av = m_array_agg.Get(TO_SIZET(v) - m_leaf_start_agg);
-        bool b = m_array.FIND_ACTION<action>(TO_SIZET(v), av, &state, &tightdb_dummy);
+        bool b = m_array.FIND_ACTION<action>(TO_SIZET(v), av, &m_state, &tightdb_dummy);
 
         return b;
     }
@@ -348,7 +348,7 @@ public:
         if (agg_col != not_found)
             m_column_agg = (C*)&m_table->GetColumnBase(agg_col);
 
-        m_array.state_init(action, &state, res);
+        m_array.state_init(action, &m_state, res);
 
         // If query only has 1 criteria, and arrays have built-in intrinsics for it, then perform it directly on array
         if (m_child == 0 && limit > m_column->Size() && (SameType<F, EQUAL>::value || SameType<F, NOTEQUAL>::value || SameType<F, LESS>::value || SameType<F, GREATER>::value || SameType<F, NONE>::value)) {
@@ -364,9 +364,9 @@ public:
                 }
 
                 if (agg_col == m_column_id || agg_col == size_t(-1))
-                    criteria_arr->find(c, action, m_value, s - m_leaf_start, m_local_end, m_leaf_start, &state);
+                    criteria_arr->find(c, action, m_value, s - m_leaf_start, m_local_end, m_leaf_start, &m_state);
                 else
-                    criteria_arr->find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, m_local_end, m_leaf_start, &state, std::bind1st(std::mem_fun(&NODE::match_callback<action>), this));
+                    criteria_arr->find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, m_local_end, m_leaf_start, &m_state, std::bind1st(std::mem_fun(&NODE::match_callback<action>), this));
                     
                 s = m_leaf_end;
             }
@@ -376,8 +376,8 @@ public:
             }
 
             if (matchcount)
-                *matchcount = int64_t(state.match_count);
-            return state.state;
+                *matchcount = int64_t(m_state.match_count);
+            return m_state.state;
 
         }
         else {
@@ -390,9 +390,9 @@ public:
 
                 if (agg_col == m_column_id || agg_col == size_t(-1)) {
                     if (m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
-                        m_array.FIND_ACTION<action>(r, m_column->Get(r), &state, &tightdb_dummy);
+                        m_array.FIND_ACTION<action>(r, m_column->Get(r), &m_state, &tightdb_dummy);
                     else
-                        m_array.FIND_ACTION<action>(r, 0, &state, &tightdb_dummy);
+                        m_array.FIND_ACTION<action>(r, 0, &m_state, &tightdb_dummy);
                 }
                 else
                     match_callback<action>(r);
@@ -401,8 +401,8 @@ public:
         }
         
         if (matchcount)
-            *matchcount = int64_t(state.match_count);
-        return state.state;
+            *matchcount = int64_t(m_state.match_count);
+        return m_state.state;
     }
 
     size_t find_first(size_t start, size_t end)
@@ -555,13 +555,13 @@ public:
             m_key_ndx = ((const ColumnStringEnum*)m_column)->GetKeyNdx(m_value);
         }
 
-        if(m_column->HasIndex()) {
+        if (m_column->HasIndex()) {
             ((AdaptiveStringColumn*)m_column)->find_all(m_index, m_value);
-            has_index = true;
-            last_indexed = 0;
+            m_has_index = true;
+            m_last_indexed = 0;
         }
         else
-            has_index = false;
+            m_has_index = false;
 
         if (m_child) 
             m_child->Init(table);
@@ -573,14 +573,14 @@ public:
 
         for (size_t s = start; s < end; ++s) {
 
-            if(has_index) {
+            if (m_has_index) {
                 for(;;) {
-                    if(last_indexed >= m_index.Size()) {
+                    if (m_last_indexed >= m_index.Size()) {
                         s = not_found;
                         break;
                     }
-                    size_t cand = m_index.GetAsSizeT(last_indexed);
-                    ++last_indexed;
+                    size_t cand = m_index.GetAsSizeT(m_last_indexed);
+                    ++m_last_indexed;
                     if(cand >= s && cand < end) {
                         s = cand;
                         break;
