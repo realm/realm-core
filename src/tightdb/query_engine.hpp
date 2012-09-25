@@ -36,16 +36,17 @@ namespace tightdb {
 
 class ParentNode {
 public:
-    ParentNode() : m_child(NULL), m_cond(-1), m_table(NULL) {}
+    ParentNode() : c_child(NULL), m_cond(-1), m_table(NULL), m_array(false) {}
     virtual ~ParentNode() {}
     virtual void Init(const Table& table) {m_table = &table; if (m_child) m_child->Init(table);}
     virtual size_t find_first(size_t start, size_t end) = 0;
 
-    virtual int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, ACTION action = TDB_FINDALL, size_t agg_col = not_found,  size_t* matchcount = 0) 
+    template <ACTION action> int64_t agg(Array* res, size_t start, size_t end, size_t limit, size_t agg_col, size_t* matchcount = 0) 
     {
-		// aggregate called on non-integer column type
-		(void)matchcount;
-		(void)agg_col; // todo, let user TDB_FINDALL on foreign column (other col than criteria-col)
+        m_array.state_init(action, &state, res);
+        Column *column_agg;            // Column on which aggregate function is executed (or not_found actions that don't use row value, such as COUNT and FIND_ALL)
+        if (agg_col != not_found)
+            column_agg = (Column*)&m_table->GetColumnBase(agg_col); 
 
         size_t r = start - 1;
         size_t count = 0;
@@ -54,19 +55,34 @@ public:
             if (r == end || count == limit)
                 break;
             count++;
-
-            // Only aggregate function available for non-integer nodes are TDB_FINDALL and count
-            switch (action) {
-            case TDB_FINDALL: 
-                res->add(r); // todo, AddPositiveLocal
-                break;
-            case TDB_COUNT:
-                // BM: count isn't tested, assert until then..
-            default:
-                TIGHTDB_ASSERT(0);
-            }                
+            
+            if (agg_col != size_t(-1) && m_array.USES_VAL<action>())
+                m_array.FIND_ACTION<action>(r, column_agg->Get(r), &state, &tightdb_dummy);
+            else
+                m_array.FIND_ACTION<action>(r, 0, &state, &tightdb_dummy);  
         }
-        return count;
+
+        return state.state;
+
+    }
+
+
+    virtual int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, ACTION action = TDB_FINDALL, size_t agg_col = not_found,  size_t* matchcount = 0) 
+    {
+        if (action == TDB_FINDALL)
+            return agg<TDB_FINDALL>(res, start, end, limit, agg_col, matchcount);
+        if (action == TDB_SUM)
+            return agg<TDB_SUM>(res, start, end, limit, agg_col, matchcount);
+        if (action == TDB_MAX)
+            return agg<TDB_MAX>(res, start, end, limit, agg_col, matchcount);
+        if (action == TDB_MIN)
+            return agg<TDB_MIN>(res, start, end, limit, agg_col, matchcount);
+        if (action == TDB_COUNT)
+            return agg<TDB_COUNT>(res, start, end, limit, agg_col, matchcount);
+
+        TIGHTDB_ASSERT(false);
+        return uint64_t(-1);
+
     }
 
     virtual std::string Verify(void)
@@ -87,6 +103,8 @@ protected:
     size_t          m_column_id;    // initialized in classes that inherit
     const Table*    m_table;
     std::string     m_error_code;
+    Array m_array; 
+    state_state m_state;
 };
 
 
@@ -258,9 +276,7 @@ template <class T, class C, class F> class NODE: public ParentNode {
 public:
     // NOTE: Be careful to call Array(false) constructors on m_array and m_array_agg in the initializer list, otherwise
     // their default constructors are called which are slow
-    NODE(T v, size_t column) : m_value(v), m_array(false),m_leaf_start(0), m_leaf_end(0), m_local_end(0), 
-        m_array_agg(false), m_leaf_end_agg(0) 
-    {
+    NODE(T v, size_t column) : m_value(v), m_leaf_start(0), m_leaf_end(0), m_local_end(0), m_array_agg(false), m_leaf_end_agg(0) {
         m_column_id = column;
         F f;
         m_cond = f.condition();
@@ -317,7 +333,7 @@ public:
         int64_t av = 0;        
         if (m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
             av = m_array_agg.Get(TO_SIZET(v) - m_leaf_start_agg);
-        bool b = m_array.FIND_ACTION<action>(TO_SIZET(v), av, &state, &tdb_dummy);
+        bool b = m_array.FIND_ACTION<action>(TO_SIZET(v), av, &state, &tightdb_dummy);
 
         return b;
     }
@@ -374,9 +390,9 @@ public:
 
                 if (agg_col == m_column_id || agg_col == size_t(-1)) {
                     if (m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
-                        m_array.FIND_ACTION<action>(r, m_column->Get(r), &state, &tdb_dummy);
+                        m_array.FIND_ACTION<action>(r, m_column->Get(r), &state, &tightdb_dummy);
                     else
-                        m_array.FIND_ACTION<action>(r, 0, &state, &tdb_dummy);
+                        m_array.FIND_ACTION<action>(r, 0, &state, &tightdb_dummy);
                 }
                 else
                     match_callback<action>(r);
@@ -430,11 +446,9 @@ protected:
     T m_value;
 
 protected:
-    state_state state;
 
     C* m_column;                // Column on which search criteria is applied
     C *m_column_agg;            // Column on which aggregate function is executed (can be same as m_column)
-    Array m_array;              
     size_t m_leaf_start;
     size_t m_leaf_end;
     size_t m_local_end;
@@ -541,6 +555,14 @@ public:
             m_key_ndx = ((const ColumnStringEnum*)m_column)->GetKeyNdx(m_value);
         }
 
+        if(m_column->HasIndex()) {
+            ((AdaptiveStringColumn*)m_column)->find_all(m_index, m_value);
+            has_index = true;
+            last_indexed = 0;
+        }
+        else
+            has_index = false;
+
         if (m_child) 
             m_child->Init(table);
     }
@@ -550,14 +572,36 @@ public:
         TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
-            // todo, can be optimized by placing outside loop
-            if (m_column_type == COLUMN_TYPE_STRING)
-                s = ((const AdaptiveStringColumn*)m_column)->find_first(m_value, s, end);
+
+            if(has_index) {
+                for(;;) {
+                    if(last_indexed >= m_index.Size()) {
+                        s = not_found;
+                        break;
+                    }
+                    size_t cand = m_index.GetAsSizeT(last_indexed);
+                    ++last_indexed;
+                    if(cand >= s && cand < end) {
+                        s = cand;
+                        break;
+                    }
+                    else if(cand >= end) {
+                        s = not_found;
+                        break;
+                    }
+                }
+            }
             else {
-                if (m_key_ndx == size_t(-1)) s = end; // not in key set
+
+                // todo, can be optimized by placing outside loop
+                if (m_column_type == COLUMN_TYPE_STRING)
+                    s = ((const AdaptiveStringColumn*)m_column)->find_first(m_value, s, end);
                 else {
-                    const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_column;
-                    s = cse->find_first(m_key_ndx, s, end);
+                    if (m_key_ndx == size_t(-1)) s = end; // not in key set
+                    else {
+                        const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_column;
+                        s = cse->find_first(m_key_ndx, s, end);
+                    }
                 }
             }
 
@@ -579,11 +623,14 @@ public:
 
 protected:
     char*  m_value;
+    bool   m_has_index;
+    size_t m_last_indexed;
 
 private:
     const ColumnBase* m_column;
     ColumnType m_column_type;
     size_t m_key_ndx;
+    Array m_index;
 };
 
 

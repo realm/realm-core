@@ -15,22 +15,9 @@
 #include <tightdb/column_string.hpp>
 
 //// TODO: Move below #defines to common file
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
-
-#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-	#define X86X64
-#endif
-
-#if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
-	#define PTR_64
-#endif
-
 namespace {
 
 const size_t initial_capacity = 128;
-
-size_t FirstSetBit(unsigned int v);
-size_t FirstSetBit64(int64_t v);
 
 inline void set_header_isnode(bool value, void* header)
 {
@@ -109,13 +96,15 @@ inline void init_header(void* header, bool is_node, bool has_refs, int width_typ
 
 } // anonymous namespace
 
-bool tdb_dummy (int64_t t)
+
+
+namespace tightdb {
+
+bool tightdb_dummy (int64_t t)
 { 
 	(void)t;
     return true; 
 }
-
-namespace tightdb {
 
 // Header format (8 bytes):
 // |--------|--------|--------|--------|--------|--------|--------|--------|
@@ -328,7 +317,7 @@ void Array::Preset(size_t bitwidth, size_t count)
 
 void Array::Preset(int64_t min, int64_t max, size_t count)
 {
-    size_t w = MAX(BitWidth(max), BitWidth(min));
+    size_t w = TIGHTDB_MAX(BitWidth(max), BitWidth(min));
     Preset(w, count);
 }
 
@@ -721,12 +710,12 @@ size_t Array::FindPos2(int64_t target) const
 
 size_t FirstSetBit(unsigned int v)
 {
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
+    #if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
     unsigned long ul;
     // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
     _BitScanForward(&ul, v);
     return ul;
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
+    #elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
     return __builtin_clz(v);
 #else
     int r;
@@ -743,11 +732,11 @@ size_t FirstSetBit(unsigned int v)
 
 size_t FirstSetBit64(int64_t v)
 {
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
+#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
     unsigned long ul;
     _BitScanForward64(&ul, v);
     return ul;
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
+#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
     return __builtin_clzll(v);
 #else
     unsigned int v0 = (unsigned int)v;
@@ -947,9 +936,10 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
 
         for (size_t t = 0; t < chunks; t++) {
             if (w == 1) {
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
+
+#if defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
                     s += __popcnt64(data[t]);
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
+#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
 					s += __builtin_popcountll(data[t]);
 #else
                     uint64_t a = data[t];
@@ -959,24 +949,24 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                     a = (a + (a >> 4)) & m4;
                     a = (a * h01) >> 56;
                     s += a;
-#endif               
+#endif         
             }
             else if (w == 2) {
-                    uint64_t a = data[t];
-                    a = (a & m2) + ((a >> 2) & m2);
-                    a = (a + (a >> 4)) & m4;
-                    a = (a * h01) >> 56;
-                    s += a;    
+                uint64_t a = data[t];
+                a = (a & m2) + ((a >> 2) & m2);
+                a = (a + (a >> 4)) & m4;
+                a = (a * h01) >> 56;
+                s += a;
             }
             else if (w == 4) {
-                    uint64_t a = data[t];
-                    a = (a & m4) + ((a >> 4) & m4);
-                    a = (a * h01) >> 56;
-                    s += a;
-                }
+                uint64_t a = data[t];
+                a = (a & m4) + ((a >> 4) & m4);
+                a = (a * h01) >> 56;
+                s += a;
             }
-            start += sizeof(int64_t) * 8 / NO0(w) * chunks;
         }
+        start += sizeof(int64_t) * 8 / NO0(w) * chunks;
+    }
 
 #ifdef USE_SSE42
     // 2000 items summed 500000 times, 8/16/32 bits, miliseconds: 
@@ -2049,6 +2039,223 @@ size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, in
 }
 
 namespace tightdb {
+
+void Array::state_init(ACTION action, state_state *state, Array* akku) 
+{
+    if (action == TDB_MAX) {
+        state->state = -0x7fffffffffffffffLL - 1LL;
+        state->match_count = 0;
+    }
+    if (action == TDB_MIN) {
+        state->state = 0x7fffffffffffffffLL;
+        state->match_count = 0;
+    }
+    if (action == TDB_RETURN_FIRST)
+        state->state = not_found;
+    if (action == TDB_SUM)
+        state->state = 0;
+    if (action == TDB_COUNT)
+        state->state = 0;
+    if (action == TDB_FINDALL)
+        state->state = (int64_t)akku;
+}
+
+void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
+{
+    if (end == (size_t)-1) end = m_len;
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
+
+    state_state state;
+    state.state = (int64_t)&result;
+
+    TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, &tightdb_dummy));
+
+    return;
+}
+
+void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const
+{
+    if (cond == COND_EQUAL) {
+        if (action == TDB_SUM) {
+            TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MIN) {
+            TEMPEX3(find, EQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MAX) {
+            TEMPEX3(find, EQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_COUNT) {
+            TEMPEX3(find, EQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_FINDALL) {
+            TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_CALLBACK_IDX) {
+            TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+    }
+    if (cond == COND_NOTEQUAL) {
+        if (action == TDB_SUM) {
+            TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MIN) {
+            TEMPEX3(find, NOTEQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MAX) {
+            TEMPEX3(find, NOTEQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_COUNT) {
+            TEMPEX3(find, NOTEQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_FINDALL) {
+            TEMPEX3(find, NOTEQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_CALLBACK_IDX) {
+            TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+    }
+    if (cond == COND_GREATER) {
+        if (action == TDB_SUM) {
+            TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MIN) {
+            TEMPEX3(find, GREATER, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MAX) {
+            TEMPEX3(find, GREATER, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_COUNT) {
+            TEMPEX3(find, GREATER, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_FINDALL) {
+            TEMPEX3(find, GREATER, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_CALLBACK_IDX) {
+            TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+    }
+    if (cond == COND_LESS) {
+        if (action == TDB_SUM) {
+            TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MIN) {
+            TEMPEX3(find, LESS, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MAX) {
+            TEMPEX3(find, LESS, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_COUNT) {
+            TEMPEX3(find, LESS, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_FINDALL) {
+            TEMPEX3(find, LESS, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_CALLBACK_IDX) {
+            TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+    }
+    if (cond == COND_NONE) {
+        if (action == TDB_SUM) {
+            TEMPEX3(find, NONE, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MIN) {
+            TEMPEX3(find, NONE, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MAX) {
+            TEMPEX3(find, NONE, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_COUNT) {
+            TEMPEX3(find, NONE, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_FINDALL) {
+            TEMPEX3(find, NONE, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_CALLBACK_IDX) {
+            TEMPEX3(find, NONE, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+    }
+}
+
+size_t Array::FirstSetBit(unsigned int v) const
+{
+    if (v & 1)
+        return 0;
+
+        int r;
+        static const int MultiplyDeBruijnBitPosition[32] = 
+        {
+            0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
+            31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+        };
+
+        r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
+        return r;
+
+
+    #if defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
+        unsigned long ul;
+        // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
+        _BitScanForward(&ul, v);
+        return ul;
+    #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
+        return __builtin_clz(v);
+    #else
+        int r;
+        static const int MultiplyDeBruijnBitPosition[32] = 
+        {
+            0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
+            31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+        };
+
+        r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
+        return r;
+    #endif
+}
+
+size_t Array::FirstSetBit64(int64_t v) const
+{
+    if (v & 1)
+        return 0;
+
+
+        unsigned int v0 = (unsigned int)v;
+        unsigned int v1 = (unsigned int)(v >> 32);
+        size_t r;
+
+        if (v0 != 0)
+            r = FirstSetBit(v0);
+        else
+            r = FirstSetBit(v1) + 32;
+
+        return r;
+
+
+    #if defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
+        unsigned long ul;
+        _BitScanForward64(&ul, v);
+        return ul;
+
+    #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
+        return __builtin_clzll(v);
+    #else
+        unsigned int v0 = (unsigned int)v;
+        unsigned int v1 = (unsigned int)(v >> 32);
+        size_t r;
+
+        if (v0 != 0)
+            r = FirstSetBit(v0);
+        else
+            r = FirstSetBit(v1) + 32;
+
+        return r;
+#endif
+}
+
+size_t Array::find_first(int64_t value, size_t start, size_t end) const
+{
+    return find_first<EQUAL>(value, start, end);
+}
 
 // Get containing array block direct through column b-tree without instantiating any Arrays. Calling with 
 // use_retval = true will return itself if leaf and avoid unneccesary header initialization. 

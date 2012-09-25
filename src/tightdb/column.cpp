@@ -485,9 +485,9 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
             m_local_end = leaf_size < e ? leaf_size : e;
         }
 #ifdef ARRAYPTR
-        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tdb_dummy);
+        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
 #else
-        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tdb_dummy);
+        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
 #endif
         s = m_leaf_end;
     }

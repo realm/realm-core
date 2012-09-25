@@ -76,14 +76,22 @@ Searching: The main finding function is:
 #include <stdio.h>
 #endif
 
+#define TIGHTDB_MAX(a, b) (((a) > (b)) ? (a) : (b))
 
+#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
+    #define TIGHTDB_X86X64
+#endif
+
+#if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
+    #define TIGHTDB_PTR_64
+#endif
 
 // todo, move
 enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
 
-bool tdb_dummy(int64_t t);
-
 namespace tightdb {
+
+bool tightdb_dummy (int64_t t);
 
 #define NO0(v) ((v) == 0 ? 1 : (v))
 
@@ -320,6 +328,96 @@ public:
     /// Compare two arrays for equality.
     bool Compare(const Array&) const;
 
+    // Main finding function - used for find_first, find_all, sum, max, min, etc.    
+    void find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const;
+    
+    template <class cond, ACTION action, size_t bitwidth, class Callback> 
+    void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
+    
+    template <class cond, ACTION action, size_t bitwidth> 
+    void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const;
+    
+    template <class cond, ACTION action, class Callback> 
+    void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
+   
+    // Optimized implementation for release mode
+    template <class cond2, ACTION action, size_t bitwidth, class Callback>
+    void find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
+
+    // Reference implementation of find() - verifies result from optimized version if debug mode
+    template <class cond2, ACTION action, size_t bitwidth, class Callback>
+    int64_t find_reference(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
+
+    // Initialize state before calling find()
+    void state_init(ACTION action, state_state *state, Array* akku);
+
+    // Called for each search result
+    template <ACTION action, bool pattern, class Callback> bool state_match(size_t index, uint64_t indexpattern, int64_t value, state_state *state, Callback callback) const;
+    template <ACTION action, class Callback> bool FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const;
+    template <ACTION action, class Callback> bool FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const;
+
+    // Wrappers for backwards compatibility and for simple use without setting up state initialization etc
+    template <class cond> size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const;
+    void find_all(Array& result, int64_t value, size_t colOffset = 0, size_t start = 0, size_t end = (size_t)-1) const;
+    size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const;
+
+    // Non-SSE find for the four functions EQUAL/NOTEQUAL/LESS/GREATER
+    template <class cond2, ACTION action, size_t bitwidth, class Callback>  
+    bool Compare(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
+    
+    // Non-SSE find for EQUAL/NOTEQUAL
+    template <bool eq, ACTION action, size_t width, class Callback> 
+    inline bool CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
+    
+    // Non-SSE find for LESS/GREATER
+    template <bool gt, ACTION action, size_t bitwidth, class Callback> 
+    bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
+    
+    // SSE find for the four functions EQUAL/NOTEQUAL/LESS/GREATER 
+    template <class cond2, ACTION action, size_t width, class Callback> 
+    size_t FindSSE(int64_t value, __m128i *data, size_t items, state_state *state, size_t baseindex, Callback callback) const;
+    
+    template <size_t width> inline bool TestZero(uint64_t value) const;         // Tests value for 0-elements
+    template <bool eq, size_t width>size_t FindZero(uint64_t v) const;          // Finds position of 0/non-zero element
+    template <ACTION action> bool USES_VAL(void);                               // Helps compiler knowing that a Get()'ed value is unused
+    template<size_t width> uint64_t cascade(uint64_t a) const;                  // Sets uppermost bits of non-zero elements
+    template <bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
+    template <size_t width> inline int64_t LowerBits(void) const;               // Return chunk with lower bit set in each element 
+    size_t FirstSetBit(unsigned int v) const;
+    size_t FirstSetBit64(int64_t v) const;
+    template <size_t w> int64_t GetUniversal(const char* const data, const size_t ndx) const;
+    
+    // Find value greater/less in 64-bit chunk - only works for positive values
+    template <bool gt, ACTION action, size_t width, class Callback>             
+    bool FindGTLT_Fast(uint64_t chunk, uint64_t magic, state_state *state, size_t baseindex, Callback callback) const;
+    
+    // Find value greater/less in 64-bit chunk - no constraints
+    template <bool gt, ACTION action, size_t width, class Callback>             
+    bool FindGTLT(int64_t v, uint64_t chunk, state_state *state, size_t baseindex, Callback callback) const;
+    
+
+    // popcount
+    #if defined(_MSC_VER) && _MSC_VER >= 1500
+        inline int fast_popcount32(uint32_t x);
+        #if defined(_M_X64)
+            inline int fast_popcount64(unsigned __int64 x) const;
+        #else
+            inline int fast_popcount64(unsigned __int64 x) const;
+        #endif
+    #elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
+        #if ULONG_MAX == 0xffffffff
+            inline int fast_popcount64(unsigned long long x) const;
+        #else
+            inline int fast_popcount64(unsigned long long x) const;
+        #endif
+    #else
+        // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
+        inline int fast_popcount32(uint32_t x) const;
+
+        inline int fast_popcount64(uint64_t x) const;
+    #endif // select best popcount implementations
+
+
     // Debug
     size_t GetBitWidth() const {return m_width;}
 
@@ -332,6 +430,9 @@ public:
     mutable unsigned char* m_data; // FIXME: Should be 'char' not 'unsigned char'
 
 private:
+
+    typedef bool (*CallbackDummy)(int64_t);
+
     template <size_t w> bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max);
     Array& operator=(const Array&) {return *this;} // not allowed
     template<size_t w> void QuickSort(size_t lo, size_t hi);
@@ -418,13 +519,197 @@ protected:
     virtual void update_child_ref(size_t child_ndx, size_t new_ref);
     virtual size_t get_child_ref(size_t child_ndx) const;
 
-public:
+};
+
+// Implementation:
+
+inline Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
+    m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+    m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
+    init_from_ref(ref);
+}
+
+inline Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc):
+    m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+    m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
+    const size_t ref = create_empty_array(type, alloc);
+    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    init_from_ref(ref);
+    update_ref_in_parent();
+}
+
+// Creates new array (but invalid, call UpdateRef or SetType to init)
+inline Array::Array(Allocator& alloc):
+    m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
+    m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
+
+// Copy-constructor
+// Note that this array now own the ref. Should only be used when
+// the source array goes away right after (like return values from functions)
+inline Array::Array(const Array& src):
+    ArrayParent(), m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
+{
+    const size_t ref = src.GetRef();
+    init_from_ref(ref);
+    src.Invalidate();
+}
+
+// Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
+// and a few other basic things needed for read-only access. Or for use if you just want a way to call
+// some methods written in Array.*
+inline Array::Array(bool b) : m_alloc(GetDefaultAllocator()) {
+    (void)b;
+}
+
+
+inline Array::~Array() {}
+
+template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
+{
+    TIGHTDB_ASSERT(IsValid());
+
+    // Ignore un-changed arrays when persisting
+    if (persist && m_alloc.IsReadOnly(m_ref)) return m_ref;
+
+    if (recurse && m_hasRefs) {
+        // Temp array for updated refs
+        Array newRefs(m_isNode ? COLUMN_NODE : COLUMN_HASREFS);
+
+        // First write out all sub-arrays
+        const size_t count = Size();
+        for (size_t i = 0; i < count; ++i) {
+            const size_t ref = GetAsRef(i);
+            if (ref == 0 || ref & 0x1) {
+                // zero-refs and refs that are not 64-aligned do not point to sub-trees
+                newRefs.add(ref);
+            }
+            else if (persist && m_alloc.IsReadOnly(ref)) {
+                // Ignore un-changed arrays when persisting
+                newRefs.add(ref);
+            }
+            else {
+                const Array sub(ref, NULL, 0, GetAllocator());
+                const size_t sub_pos = sub.Write(out, true, persist);
+                TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
+                newRefs.add(sub_pos);
+            }
+        }
+
+        // Write out the replacement array
+        // (but don't write sub-tree as it has alredy been written)
+        const size_t refs_pos = newRefs.Write(out, false, persist);
+
+        // Clean-up
+        newRefs.SetType(COLUMN_NORMAL); // avoid recursive del
+        newRefs.Destroy();
+
+        return refs_pos; // Return position
+    }
+
+    // TODO: replace capacity with checksum
+
+    // Calculate full lenght of array in bytes, including padding
+    // for 64bit alignment (that may be composed of random bits)
+    size_t len          = m_len;
+    const WidthType wt  = get_header_wtype();
+
+    // Adjust length to number of bytes
+    if (wt == TDB_BITS) {
+        const size_t bits = (len * m_width);
+        len = bits / 8;
+        if (bits & 0x7) ++len;
+    }
+    else if (wt == TDB_MULTIPLY) {
+        len *= m_width;
+    }
+
+    // Add bytes used for padding
+    const size_t rest = (~len & 0x7)+1;
+    if (rest < 8) len += rest; // 64bit blocks
+    len += 8; // include header in total
+
+    // Write array
+    const char* const data = reinterpret_cast<const char*>(m_data-8);
+    const size_t array_pos = out.write(data, len);
+    TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64bit alignment
+
+    return array_pos; // Return position of this array
+}
+
+template<class S> void Array::WriteAt(size_t pos, S& out) const
+{
+    TIGHTDB_ASSERT(IsValid());
+
+    // TODO: replace capacity with checksum
+
+    // Calculate full lenght of array in bytes, including padding
+    // for 64bit alignment (that may be composed of random bits)
+    size_t len          = m_len;
+    const WidthType wt  = get_header_wtype();
+
+    // Adjust length to number of bytes
+    if (wt == TDB_BITS) {
+        const size_t bits = (len * m_width);
+        len = bits / 8;
+        if (bits & 0x7) ++len;
+    }
+    else if (wt == TDB_MULTIPLY) {
+        len *= m_width;
+    }
+
+    // Add bytes used for padding
+    const size_t rest = (~len & 0x7)+1;
+    if (rest < 8) len += rest; // 64bit blocks
+    len += 8; // include header in total
+
+    // Write array
+    const char* const data = reinterpret_cast<const char*>(m_data-8);
+    out.WriteAt(pos, data, len);
+}
+
+inline void Array::move_assign(Array& a)
+{
+    // FIXME: It will likely be a lot better for the optimizer if we
+    // did a member-wise copy, rather than recreating the state from
+    // the referenced data. This is important because TableView, for
+    // example, relies on long chains of moves to be optimized away
+    // completely. This change should be a 'no-brainer'.
+    Destroy();
+    UpdateRef(a.GetRef());
+    a.Invalidate();
+}
+
+inline size_t Array::create_empty_array(ColumnDef type, Allocator& alloc)
+{
+    return create_empty_array(type, TDB_BITS, alloc);
+}
+
+inline void Array::update_ref_in_parent()
+{
+    if (!m_parent) return;
+    m_parent->update_child_ref(m_parentNdx, m_ref);
+}
+
+
+inline void Array::update_child_ref(size_t child_ndx, size_t new_ref)
+{
+    Set(child_ndx, new_ref);
+}
+
+inline size_t Array::get_child_ref(size_t child_ndx) const
+{
+    return GetAsRef(child_ndx);
+}
+
+
 
     //*************************************************************************************
     // Finding code                                                                       *
     //*************************************************************************************
 
-    template <size_t w> int64_t GetUniversal(const char* const data, const size_t ndx) const
+    template <size_t w> int64_t Array::GetUniversal(const char* const data, const size_t ndx) const
     {
         if (w == 0) {
             return 0;
@@ -478,28 +763,8 @@ public:
     computations for the given search criteria makes it feasible to construct such a pattern.
     */
 
-    void state_init(ACTION action, state_state *state, Array* akku) 
-    {
-        if (action == TDB_MAX) {
-            state->state = -0x7fffffffffffffffLL - 1LL;
-            state->match_count = 0;
-        }
-        if (action == TDB_MIN) {
-            state->state = 0x7fffffffffffffffLL;
-            state->match_count = 0;
-        }
-        if (action == TDB_RETURN_FIRST)
-            state->state = not_found;
-        if (action == TDB_SUM)
-            state->state = 0;
-        if (action == TDB_COUNT)
-            state->state = 0;
-        if (action == TDB_FINDALL)
-            state->state = (int64_t)akku;
-    }
-
-    template <ACTION action, bool pattern, class Callback>
-    bool state_match(size_t index, uint64_t indexpattern, int64_t value, state_state *state, Callback callback) const
+    template <ACTION action, bool pattern, class Callback> 
+    bool Array::state_match(size_t index, uint64_t indexpattern, int64_t value, state_state *state, Callback callback) const
     {
         if (pattern) {
             if (action == TDB_COUNT) {
@@ -533,7 +798,7 @@ public:
         return true;
     }
 
-    template <ACTION action> bool USES_VAL(void) 
+    template <ACTION action> bool Array::USES_VAL(void) 
     {
         if (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM)
             return true;
@@ -541,23 +806,22 @@ public:
             return false;
     }
 
-    // These wrapper functions only exist to enable a possibility to make the compiler see 
-    // that 'value' and/or 'index' are unused, such that caller's computation of these values 
-    // will not be made. Only works if FIND_ACTION and FIND_ACTION_PATTERN rewritten as macros. 
-    // Note: This problem has been fixed in next upcoming array.hpp version
-    template <ACTION action, class Callback>
-    bool FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const
+    // These wrapper functions only exist to enable a possibility to make the compiler see that 'value' and/or 'index' are unused, such that caller's 
+    // computation of these values will not be made. Only works if FIND_ACTION and FIND_ACTION_PATTERN rewritten as macros. Note: This problem has been fixed in
+    // next upcoming array.hpp version
+    template <ACTION action, class Callback> 
+    bool Array::FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const
     {
         return state_match<action, false, Callback>(index, 0, value, state, callback);
     }
-    
-    template <ACTION action, class Callback>
-    bool FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const
+    template <ACTION action, class Callback> 
+    bool Array::FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const
     {
         return state_match<action, true, Callback>(index, pattern, 0, state, callback);
     }
 
-    template <size_t width> uint64_t cascade(uint64_t a) const
+
+    template <size_t width> uint64_t Array::cascade(uint64_t a) const
     {
         // Takes a chunk of values as argument and sets the uppermost bit for each element which is 0. Example:
         // width == 4 and v = 01000000 00001000 10000001 00001000 00000000 10100100 00001100 00111110 01110100 00010000 00000000 00000001 10000000 01111110 
@@ -659,7 +923,8 @@ public:
 
     // This is the main finding function for Array. Other finding functions are just wrappers around this one.
     // Search for 'value' using condition cond2 (EQUAL, NOTEQUAL, LESS, etc) and call FIND_ACTION() or FIND_ACTION_PATTERN() for each match. Break and return if FIND_ACTION returns false or 'end' is reached.
-    template <class cond2, ACTION action, size_t bitwidth, class Callback> void find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
+    template <class cond2, ACTION action, size_t bitwidth, class Callback> 
+    void Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
     {
         cond2 C;
         TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
@@ -715,7 +980,7 @@ public:
     #elif defined(USE_SSE3)
         if (!SameType<cond2, EQUAL>::value || end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) {
     #endif
-		    Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+            Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
             return;
         }
 
@@ -729,10 +994,10 @@ public:
         // Search aligned area with SSE
         if (b > a) {
     #if defined(USE_SSE42)
-		    if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth)), callback))
+            if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth)), callback))
                 return;
     #elif defined(USE_SSE3)
-		    if (!FindSSE<EQUAL, bitwidth, accumulate>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth))))
+            if (!FindSSE<EQUAL, bitwidth, accumulate>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth))))
                 return false;
     #endif
         }
@@ -750,104 +1015,53 @@ public:
 
     // popcount
     #if defined(_MSC_VER) && _MSC_VER >= 1500
-	    #include <intrin.h>
-	    inline int fast_popcount32(uint32_t x)
-	    {
-		    return __popcnt(x);
-	    }
-	    #if defined(_M_X64)
-		    inline int fast_popcount64(unsigned __int64 x) const
-		    {
-			    return (int)__popcnt64(x);
-		    }
-	    #else
-		    inline int fast_popcount64(unsigned __int64 x) const
-		    {
-			    return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
-		    }
-	    #endif
+        #include <intrin.h>
+        inline int Array::fast_popcount32(uint32_t x)
+        {
+            return __popcnt(x);
+        }
+        #if defined(_M_X64)
+            inline int Array::fast_popcount64(unsigned __int64 x) const
+            {
+                return (int)__popcnt64(x);
+            }
+        #else
+            inline int Array::fast_popcount64(unsigned __int64 x) const
+            {
+                return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
+            }
+        #endif
     #elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
-	    #define fast_popcount32 __builtin_popcount
-	    #if ULONG_MAX == 0xffffffff
-		    inline int fast_popcount64(unsigned long long x) const
-		    {
-			    return __builtin_popcount((unsigned)(x)) + __builtin_popcount((unsigned)(x >> 32));
-		    }
-	    #else
-		    inline int fast_popcount64(unsigned long long x) const
-		    {
-			    return __builtin_popcountll(x);
-		    }
-	    #endif
+        #define fast_popcount32 __builtin_popcount
+        #if ULONG_MAX == 0xffffffff
+            inline int Array::fast_popcount64(unsigned long long x) const
+            {
+                return __builtin_popcount((unsigned)(x)) + __builtin_popcount((unsigned)(x >> 32));
+            }
+        #else
+            inline int Array::fast_popcount64(unsigned long long x) const
+            {
+                return __builtin_popcountll(x);
+            }
+        #endif
     #else
-	    static const char a_popcount_bits[256] = {
-		    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,		1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,		1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,		1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,		3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,		4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
-	    };
+        static const char a_popcount_bits[256] = {
+            0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+        };
 
         // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
-	    inline int fast_popcount32(uint32_t x) const
-	    {
-		    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
-	    }
-	    inline int fast_popcount64(uint64_t x) const
-	    {
+        inline int Array::fast_popcount32(uint32_t x) const
+        {
+            return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
+        }
+        inline int Array::fast_popcount64(uint64_t x) const
+        {
             return fast_popcount32(x) + fast_popcount32(x >> 32);
-	    }
+        }
 
     #endif // select best popcount implementations
 
-
-    size_t FirstSetBit(unsigned int v) const
-    {
-        if (v & 1)
-            return 0;
-
-        #if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
-            unsigned long ul;
-            // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
-            _BitScanForward(&ul, v);
-            return ul;
-        #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
-            return __builtin_clz(v);
-        #else
-            int r;
-            static const int MultiplyDeBruijnBitPosition[32] = 
-            {
-                0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
-                31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
-            };
-
-            r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
-            return r;
-        #endif
-    }
-
-    size_t FirstSetBit64(int64_t v) const
-    {
-        if (v & 1)
-            return 0;
-
-        #if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
-            unsigned long ul;
-            _BitScanForward64(&ul, v);
-            return ul;
-
-        #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
-            return __builtin_clzll(v);
-        #else
-            unsigned int v0 = (unsigned int)v;
-            unsigned int v1 = (unsigned int)(v >> 32);
-            size_t r;
-
-            if (v0 != 0)
-                r = FirstSetBit(v0);
-            else
-                r = FirstSetBit(v1) + 32;
-           return r;
-    #endif
-    }
-
-    template <size_t width> inline int64_t LowerBits(void) const
+    template <size_t width> inline int64_t Array::LowerBits(void) const
     {
         if (width == 1)
             return 0xFFFFFFFFFFFFFFFFULL;
@@ -870,7 +1084,7 @@ public:
     }
 
     // Tests if any chunk in 'value' is 0
-    template <size_t width> inline bool TestZero(uint64_t value) const {
+    template <size_t width> inline bool Array::TestZero(uint64_t value) const {
         uint64_t hasZeroByte;
         uint64_t lower = LowerBits<width>();
         uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
@@ -880,7 +1094,7 @@ public:
 
     // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position.
     // IMPORTANT: This function assumes that at least 1 item matches (test this with TestZero() or other means first)!
-    template <bool eq, size_t width>size_t FindZero(uint64_t v) const
+    template <bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
     {
         size_t start = 0;
         uint64_t hasZeroByte;
@@ -927,7 +1141,7 @@ public:
     }
 
     // Generate a magic constant used for later bithacks
-    template <bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const
+    template <bool gt, size_t width>int64_t Array::FindGTLT_Magic(int64_t v) const
     {
         uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
         uint64_t mask2 = mask1 >> 1;
@@ -935,7 +1149,8 @@ public:
         return magic;
     }
 
-    template <bool gt, ACTION action, size_t width, class Callback>bool FindGTLT_Fast(uint64_t chunk, uint64_t magic, state_state *state, size_t baseindex, Callback callback) const
+    template <bool gt, ACTION action, size_t width, class Callback> 
+    bool Array::FindGTLT_Fast(uint64_t chunk, uint64_t magic, state_state *state, size_t baseindex, Callback callback) const
     {
         // Tests if a a chunk of values contains values that are greater (if gt == true) or less (if gt == false) than v. 
         // Fast, but limited to work when all values in the chunk are positive.
@@ -964,7 +1179,8 @@ public:
     }
 
 
-    template <bool gt, ACTION action, size_t width, class Callback>bool FindGTLT(int64_t v, uint64_t chunk, state_state *state, size_t baseindex, Callback callback) const
+    template <bool gt, ACTION action, size_t width, class Callback> 
+    bool Array::FindGTLT(int64_t v, uint64_t chunk, state_state *state, size_t baseindex, Callback callback) const
     {
         // Fínd items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
         if (width == 1) {
@@ -1114,7 +1330,8 @@ public:
     }
 
 
-    template <bool eq, ACTION action, size_t width, class Callback> inline bool CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const {
+    template <bool eq, ACTION action, size_t width, class Callback> inline 
+    bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const {
         // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
         TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
@@ -1133,7 +1350,7 @@ public:
         if (width != 32 && width != 64) {
             const int64_t* p = (const int64_t*)(m_data + (start * width / 8));
             const int64_t* const e = (int64_t*)(m_data + (end * width / 8)) - 1;
-		    const uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
+            const uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
             const uint64_t valuemask = ~0ULL / NO0(mask) * (value & mask);
  
             while (p < e) {
@@ -1163,10 +1380,8 @@ public:
                 ++p;
             }
 
-            // Loop ended because we are near end or end of array. 
-            // No need to optimize search in remainder in this case because end of array means that
-            // lots of search work has taken place prior to ending here. 
-            // So time spent searching remainder is relatively tiny
+            // Loop ended because we are near end or end of array. No need to optimize search in remainder in this case because end of array means that
+            // lots of search work has taken place prior to ending here. So time spent searching remainder is relatively tiny
             start = (p - (int64_t *)m_data) * 8 * 8 / NO0(width);
         }
 
@@ -1184,123 +1399,20 @@ public:
     // There exists a couple of find() functions that take more or less template arguments. Always call the one that takes as most as possible to get 
     // best performance.
 
-    template <class cond, ACTION action, size_t bitwidth> void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const
+    template <class cond, ACTION action, size_t bitwidth> 
+    void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const
     {
-        find<cond, action, bitwidth>(value, start, end, baseindex, state, &tdb_dummy);
+        find<cond, action, bitwidth>(value, start, end, baseindex, state, CallbackDummy());
     }
 
-    template <class cond, ACTION action, class Callback> void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
+    template <class cond, ACTION action, class Callback> 
+    void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
     {
         TEMPEX4(find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
     }
 
-    void find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const
-    {
-        if (cond == COND_EQUAL) {
-            if (action == TDB_SUM) {
-                TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_MIN) {
-                TEMPEX3(find, EQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_MAX) {
-                TEMPEX3(find, EQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_COUNT) {
-                TEMPEX3(find, EQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_FINDALL) {
-                TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_CALLBACK_IDX) {
-                TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-        }
-        if (cond == COND_NOTEQUAL) {
-            if (action == TDB_SUM) {
-                TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_MIN) {
-                TEMPEX3(find, NOTEQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_MAX) {
-                TEMPEX3(find, NOTEQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_COUNT) {
-                TEMPEX3(find, NOTEQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_FINDALL) {
-                TEMPEX3(find, NOTEQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_CALLBACK_IDX) {
-                TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-        }
-        if (cond == COND_GREATER) {
-            if (action == TDB_SUM) {
-                TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_MIN) {
-                TEMPEX3(find, GREATER, TDB_MIN, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_MAX) {
-                TEMPEX3(find, GREATER, TDB_MAX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_COUNT) {
-                TEMPEX3(find, GREATER, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_FINDALL) {
-                TEMPEX3(find, GREATER, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_CALLBACK_IDX) {
-                TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-        }
-        if (cond == COND_LESS) {
-            if (action == TDB_SUM) {
-                TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_MIN) {
-                TEMPEX3(find, LESS, TDB_MIN, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_MAX) {
-                TEMPEX3(find, LESS, TDB_MAX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_COUNT) {
-                TEMPEX3(find, LESS, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_FINDALL) {
-                TEMPEX3(find, LESS, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_CALLBACK_IDX) {
-                TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-        }
-        if (cond == COND_NONE) {
-            if (action == TDB_SUM) {
-                TEMPEX3(find, NONE, TDB_SUM, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_MIN) {
-                TEMPEX3(find, NONE, TDB_MIN, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_MAX) {
-                TEMPEX3(find, NONE, TDB_MAX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_COUNT) {
-                TEMPEX3(find, NONE, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_FINDALL) {
-                TEMPEX3(find, NONE, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-            else if (action == TDB_CALLBACK_IDX) {
-                TEMPEX3(find, NONE, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tdb_dummy))
-		    }
-        }
-
-    }
-
-
-    template <class cond, ACTION action, size_t bitwidth, class Callback> void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
+    template <class cond, ACTION action, size_t bitwidth, class Callback> 
+    void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
     {
     #ifdef TIGHTDB_DEBUG
         Array r_arr;
@@ -1332,7 +1444,8 @@ public:
 
     }
 
-    template <class cond2, ACTION action, size_t bitwidth, class Callback> int64_t find_reference(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
+    template <class cond2, ACTION action, size_t bitwidth, class Callback> 
+    int64_t Array::find_reference(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
     {
         // Reference implementation of find_optimized for bug testing
         (void)callback;
@@ -1368,25 +1481,7 @@ public:
             return true;
     }
 
-
-    size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
-    {
-        return find_first<EQUAL>(value, start, end);
-    }
-
-    #if defined(USE_SSE42) || defined(USE_SSE3)
-
-    #ifdef _MSC_VER // if Visual C/C++
-    __inline __m64 _mm_set_pi64x (const __int64 i) const {
-        union {
-            __int64 i;
-            __m64 v;
-        } u;
-
-        u.i = i;
-        return u.v;
-    }
-    #endif
+#if defined(USE_SSE42) || defined(USE_SSE3)
 
     // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
     template <class cond2, ACTION action, size_t width, class Callback> 
@@ -1435,7 +1530,7 @@ public:
                 TIGHTDB_ASSERT(false);
                 return int64_t(-1);
     #endif
-			    }
+                }
             }
     #ifdef USE_SSE42
             // greater
@@ -1493,8 +1588,8 @@ public:
 
     // If gt = true: Find element(s) which are greater than value
     // If gt = false: Find element(s) which are smaller than value
-    template <class cond2, ACTION action, size_t bitwidth, class Callback>
-    bool Compare(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
+    template <class cond2, ACTION action, size_t bitwidth, class Callback> 
+    bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
     {
         cond2 C;
         int cond = C.condition();
@@ -1513,21 +1608,10 @@ public:
         return ret;
     }
 
-    void find_all(Array& result, int64_t value, size_t colOffset = 0, size_t start = 0, size_t end = (size_t)-1) const
-    {
-        if (end == (size_t)-1) end = m_len;
-        TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
-
-        state_state state;
-        state.state = (int64_t)&result;
-
-        TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, &tdb_dummy));
-    }
-
     // If gt = true: Find elements that are greater than value
     // If gt = false: Find elements that are smaller than value
-    template <bool gt, ACTION action, size_t bitwidth, class Callback>
-    bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
+    template <bool gt, ACTION action, size_t bitwidth, class Callback> 
+    bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const
     {
         TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
         uint64_t mask = (bitwidth == 64 ? ~0ULL : ((1ULL << (bitwidth == 64 ? 0 : bitwidth)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
@@ -1604,7 +1688,7 @@ public:
 
     }
 
-    template <class cond> size_t find_first(int64_t value, size_t start, size_t end) const
+    template <class cond> size_t Array::find_first(int64_t value, size_t start, size_t end) const
     {
         cond C;        
         TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
@@ -1620,194 +1704,8 @@ public:
     // Finding code ends                                                                  *
     //*************************************************************************************
 
-};
-
-// Implementation:
-
-inline Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
-    m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
-{
-    init_from_ref(ref);
-}
-
-inline Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
-    m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
-{
-    const size_t ref = create_empty_array(type, alloc);
-    if (!ref) 
-            throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
-    init_from_ref(ref);
-    update_ref_in_parent();
-}
-
-// Creates new array (but invalid, call UpdateRef or SetType to init)
-inline Array::Array(Allocator& alloc):
-    m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
-    m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
-
-// Copy-constructor
-// Note that this array now own the ref. Should only be used when
-// the source array goes away right after (like return values from functions)
-inline Array::Array(const Array& src):
-    ArrayParent(), m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
-{
-    const size_t ref = src.GetRef();
-    init_from_ref(ref);
-    src.Invalidate();
-}
-
-// Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
-// and a few other basic things needed for read-only access. Or for use if you just want a way to call
-// some methods written in Array.*
-inline Array::Array(bool b) : m_alloc(GetDefaultAllocator()) {
-    (void)b;
-}
 
 
-inline Array::~Array() {}
-
-template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
-{
-    TIGHTDB_ASSERT(IsValid());
-
-    // Ignore un-changed arrays when persisting
-    if (persist && m_alloc.IsReadOnly(m_ref)) 
-        return m_ref;
-
-    if (recurse && m_hasRefs) {
-        // Temp array for updated refs
-        Array newRefs(m_isNode ? COLUMN_NODE : COLUMN_HASREFS);
-
-        // First write out all sub-arrays
-        const size_t count = Size();
-        for (size_t i = 0; i < count; ++i) {
-            const size_t ref = GetAsRef(i);
-            if (ref == 0 || ref & 0x1) {
-                // zero-refs and refs that are not 64-aligned do not point to sub-trees
-                newRefs.add(ref);
-            }
-            else if (persist && m_alloc.IsReadOnly(ref)) {
-                // Ignore un-changed arrays when persisting
-                newRefs.add(ref);
-            }
-            else {
-                const Array sub(ref, NULL, 0, GetAllocator());
-                const size_t sub_pos = sub.Write(out, true, persist);
-                TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
-                newRefs.add(sub_pos);
-            }
-        }
-
-        // Write out the replacement array
-        // (but don't write sub-tree as it has alredy been written)
-        const size_t refs_pos = newRefs.Write(out, false, persist);
-
-        // Clean-up
-        newRefs.SetType(COLUMN_NORMAL); // avoid recursive del
-        newRefs.Destroy();
-
-        return refs_pos; // Return position
-    }
-
-    // TODO: replace capacity with checksum
-
-    // Calculate full lenght of array in bytes, including padding
-    // for 64bit alignment (that may be composed of random bits)
-    size_t len          = m_len;
-    const WidthType wt  = get_header_wtype();
-
-    // Adjust length to number of bytes
-    if (wt == TDB_BITS) {
-        const size_t bits = (len * m_width);
-        len = bits / 8;
-        if (bits & 0x7) ++len;
-    }
-    else if (wt == TDB_MULTIPLY) {
-        len *= m_width;
-    }
-
-    // Add bytes used for padding
-    const size_t rest = (~len & 0x7)+1;
-    if (rest < 8) 
-        len += rest; // 64bit blocks
-    len += 8; // include header in total
-
-    // Write array
-    const char* const data = reinterpret_cast<const char*>(m_data-8);
-    const size_t array_pos = out.write(data, len);
-    TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64bit alignment
-
-    return array_pos; // Return position of this array
-}
-
-template<class S> void Array::WriteAt(size_t pos, S& out) const
-{
-    TIGHTDB_ASSERT(IsValid());
-
-    // TODO: replace capacity with checksum
-
-    // Calculate full lenght of array in bytes, including padding
-    // for 64bit alignment (that may be composed of random bits)
-    size_t len          = m_len;
-    const WidthType wt  = get_header_wtype();
-
-    // Adjust length to number of bytes
-    if (wt == TDB_BITS) {
-        const size_t bits = (len * m_width);
-        len = bits / 8;
-        if (bits & 0x7) 
-            ++len;
-    }
-    else if (wt == TDB_MULTIPLY) {
-        len *= m_width;
-    }
-
-    // Add bytes used for padding
-    const size_t rest = (~len & 0x7)+1;
-    if (rest < 8) 
-        len += rest; // 64bit blocks
-    len += 8; // include header in total
-
-    // Write array
-    const char* const data = reinterpret_cast<const char*>(m_data-8);
-    out.WriteAt(pos, data, len);
-}
-
-inline void Array::move_assign(Array& a)
-{
-    // FIXME: It will likely be a lot better for the optimizer if we
-    // did a member-wise copy, rather than recreating the state from
-    // the referenced data. This is important because TableView, for
-    // example, relies on long chains of moves to be optimized away
-    // completely. This change should be a 'no-brainer'.
-    Destroy();
-    UpdateRef(a.GetRef());
-    a.Invalidate();
-}
-
-inline size_t Array::create_empty_array(ColumnDef type, Allocator& alloc)
-{
-    return create_empty_array(type, TDB_BITS, alloc);
-}
-
-inline void Array::update_ref_in_parent()
-{
-    if (!m_parent) return;
-    m_parent->update_child_ref(m_parentNdx, m_ref);
-}
-
-
-inline void Array::update_child_ref(size_t child_ndx, size_t new_ref)
-{
-    Set(child_ndx, new_ref);
-}
-
-inline size_t Array::get_child_ref(size_t child_ndx) const
-{
-    return GetAsRef(child_ndx);
-}
 
 
 } // namespace tightdb
