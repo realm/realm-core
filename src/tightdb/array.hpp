@@ -389,7 +389,7 @@ protected:
     // Member variables
     Getter m_getter;
     Setter m_setter;
-    Finder m_finder[COND_COUNT_MINUS_1 + 1]; // one for each COND_XXX enum
+    Finder m_finder[COND_COUNT]; // one for each COND_XXX enum
 
 private:
     size_t m_ref;
@@ -721,7 +721,7 @@ public:
         __m128i* const a = (__m128i *)round_up(m_data + start * bitwidth / 8, sizeof(__m128i));
         __m128i* const b = (__m128i *)round_down(m_data + end * bitwidth / 8, sizeof(__m128i));
 
-        if(!Compare<cond2, action, bitwidth, Callback>(value, start, ((unsigned char *)a - m_data) * 8 / NO0(bitwidth), baseindex, state, callback))
+        if (!Compare<cond2, action, bitwidth, Callback>(value, start, ((unsigned char *)a - m_data) * 8 / NO0(bitwidth), baseindex, state, callback))
             return;
    
         // Search aligned area with SSE
@@ -918,7 +918,7 @@ public:
             }
         }
 
-        while(eq == (((v >> (width * start)) & mask) != 0)) {
+        while (eq == (((v >> (width * start)) & mask) != 0)) {
             TIGHTDB_ASSERT(start <= 8 * sizeof(v)); // You must only call FindZero() if you are sure that at least 1 item matches
             start++;
         }
@@ -944,7 +944,7 @@ public:
         uint64_t mask2 = mask1 >> 1;
         uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / NO0(mask1) * (mask2 + 1)) : ((chunk - magic) & ~chunk&~0ULL/NO0(mask1)*(mask2+1));
         size_t p = 0;
-        while(m) {
+        while (m) {
             if (FIND_ACTION_PATTERN<action, Callback>(baseindex, m >> (NO0(width) - 1), state, callback))
                 break; // consumed, so do not call FIND_ACTION()
 
@@ -1142,7 +1142,7 @@ public:
                 start = (p - (int64_t *)m_data) * 8 * 8 / NO0(width);
                 size_t a = 0;
 
-                while(eq ? TestZero<width>(v2) : v2) {
+                while (eq ? TestZero<width>(v2) : v2) {
                 
                     if (FIND_ACTION_PATTERN<action, Callback>(start + baseindex, cascade<width>(eq ? v2 : ~v2), state, callback))
                         break; // consumed
@@ -1468,7 +1468,7 @@ public:
 
             size_t s = i * sizeof(__m128i) * 8 / NO0(width);
 
-            while(resmask != 0) {
+            while (resmask != 0) {
 
                 uint64_t upper = LowerBits<width / 8>() << (NO0(width / 8) - 1);
                 uint64_t pattern = resmask & upper; // fixme, bits at wrong offsets. Only OK because we only use them in 'count' aggregate
@@ -1575,7 +1575,7 @@ public:
             }
             else {
                 // 24 ms
-                while(p < e) {
+                while (p < e) {
                     int64_t v = *p;
                     if (!FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - (int64_t *)m_data) * 8 * 8 / NO0(bitwidth) + baseindex, callback))
                         return false;
