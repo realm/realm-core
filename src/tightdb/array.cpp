@@ -651,7 +651,7 @@ void Array::Adjust(size_t start, int64_t diff)
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
 // Finds position of largest value SMALLER than the target (for lookups in
 // nodes)
-
+// Todo: rename to LastLessThan()
 template <size_t w> size_t Array::FindPos(int64_t target) const
 {
     size_t low = (size_t)-1;
@@ -681,7 +681,7 @@ size_t Array::FindPos(int64_t target) const
     TEMPEX(return FindPos, m_width, (target));
 }
 
-// BM FIXME: Rename to something better...
+// BM FIXME: Rename to something better... // FirstGTE()
 size_t Array::FindPos2(int64_t target) const
 {
     size_t low = (size_t)-1;

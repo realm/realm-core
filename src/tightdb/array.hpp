@@ -994,7 +994,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
                 return;
     #elif defined(USE_SSE3)
             if (!FindSSE<EQUAL, bitwidth, accumulate>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth))))
-                return false;
+                return;
     #endif
         }
 
@@ -1581,16 +1581,18 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
         cond2 C;
         int cond = C.condition();
 
-        // BM: FIXME: What if cond is none of below? Add TIGHTDB_ASSERT. Set "bool ret = false;"?
         bool ret;
+
         if (cond == COND_EQUAL)
             ret = CompareEquality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-        if (cond == COND_NOTEQUAL)
+        else if (cond == COND_NOTEQUAL)
             ret = CompareEquality<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-        if (cond == COND_GREATER)
+        else if (cond == COND_GREATER)
             ret = CompareRelation<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-        if (cond == COND_LESS)
+        else if (cond == COND_LESS)
             ret = CompareRelation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        else
+            TIGHTDB_ASSERT(false);
 
         return ret;
     }
