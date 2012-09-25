@@ -11,15 +11,16 @@
 
 using namespace tightdb;
 
-#define LL_MIN (-9223372036854775807LL - 1)
 #define LL_MAX (9223372036854775807LL)
+#define LL_MIN (-LLMAX - 1)
+
 
 namespace {
 
 uint64_t rand2(int bitwidth = 64)
 {
     uint64_t i = (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand();
-    if(bitwidth < 64) {
+    if (bitwidth < 64) {
         const uint64_t mask = ((1ULL << bitwidth) - 1ULL);
         i &= mask;
     }
@@ -51,7 +52,7 @@ TEST(LESS)
         
         const size_t LEN = 64 * 20 + 1000; 
         Array a;
-        for(size_t t = 0; t < LEN; t++)
+        for (size_t t = 0; t < LEN; t++)
             a.add(v[w]);
         
         // to create at least 64 bytes of data (2 * 128-bit SSE chunks + 64 bit chunk before and after + some unaligned data before and after)
@@ -61,16 +62,16 @@ TEST(LESS)
         state_state state;
         state.state = int64_t(&akku);
 
-        for(size_t from = 0; from < LEN2; from++) {
-            for(size_t to = from + 1; to <= LEN2; to++) {
-                for(size_t match = (from > 8 ? from - 8 : 0); match < (to > 8 ? to - 8 : 8); match++) { 
+        for (size_t from = 0; from < LEN2; from++) {
+            for (size_t to = from + 1; to <= LEN2; to++) {
+                for (size_t match = (from > 8 ? from - 8 : 0); match < (to > 8 ? to - 8 : 8); match++) { 
 
-                    if(v[w] != LL_MIN) {
+                    if (v[w] != LL_MIN) {
                         // LESS
                         a.Set(match, v[w] - 1);
                         size_t f = a.find_first<LESS>(v[w], from, to);
                         a.Set(match, v[w]);
-                        if(match >= from && match < to) {
+                        if (match >= from && match < to) {
                             TIGHTDB_ASSERT(match == f);
                         }
                         else {
@@ -78,12 +79,12 @@ TEST(LESS)
                         }
                     }
 
-                    if(v[w] != LL_MAX) {
+                    if (v[w] != LL_MAX) {
                         // GREATER
                         a.Set(match, v[w] + 1);
                         size_t f = a.find_first<GREATER>(v[w], from, to);
                         a.Set(match, v[w]);
-                        if(match >= from && match < to) {
+                        if (match >= from && match < to) {
                             TIGHTDB_ASSERT(match == f);
                         }
                         else {
@@ -95,34 +96,34 @@ TEST(LESS)
                     a.Set(match, v[w]-1);
                     size_t f = a.find_first(v[w]-1, from, to);
                     a.Set(match, v[w]);
-                    if(match >= from && match < to) {
+                    if (match >= from && match < to) {
                         TIGHTDB_ASSERT(match == f);
                     }
                     else {
                         TIGHTDB_ASSERT(f == size_t(-1));
                     }
 
-                    if(v[w] != LL_MIN) {
+                    if (v[w] != LL_MIN) {
                         // MIN
                         int64_t val = 0;
                         a.Set(match, v[w]-1);
                         bool b = a.minimum(val, from, to);
                         a.Set(match, v[w]);
                         CHECK_EQUAL(true, b);
-                        if(match >= from && match < to)
+                        if (match >= from && match < to)
                             TIGHTDB_ASSERT(val == v[w]-1);
                         else
                             TIGHTDB_ASSERT(val == v[w]);
                     }
     
                     // MAX
-                    if(v[w] != LL_MAX) {
+                    if (v[w] != LL_MAX) {
                         int64_t val = 0;
                         a.Set(match, v[w]+1);
                         bool b = a.maximum(val, from, to);
                         a.Set(match, v[w]);
                         CHECK_EQUAL(true, b);
-                        if(match >= from && match < to)
+                        if (match >= from && match < to)
                             TIGHTDB_ASSERT(val == v[w]+1);
                         else
                             TIGHTDB_ASSERT(val == v[w]);
@@ -134,7 +135,7 @@ TEST(LESS)
                     val = a.sum(from, to);
                     a.Set(match, v[w]);
                     int64_t intended;
-                    if(match >= from && match < to)
+                    if (match >= from && match < to)
                         intended = (to - from - 1) * v[w] + v[w] + 1;
                     else
                         intended = (to - from) * v[w];      
@@ -143,8 +144,8 @@ TEST(LESS)
 
 
                     // Find all, LESS
-                    if(v[w] != LL_MIN) {
-                        for(size_t off = 1; off < 8; off++) {
+                    if (v[w] != LL_MIN) {
+                        for (size_t off = 1; off < 8; off++) {
 
                             a.Set(match, v[w] - 1);
                             a.Set(match + off, v[w] - 1);
@@ -155,10 +156,10 @@ TEST(LESS)
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
 
-                            if(match >= from && match < to) {
+                            if (match >= from && match < to) {
                                 TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match);
                             }
-                            if(match + off >= from && match + off < to) {
+                            if (match + off >= from && match + off < to) {
                                 TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
                             }
 
@@ -170,8 +171,8 @@ TEST(LESS)
 
 
                     // Find all, GREATER
-                    if(v[w] != 9223372036854775807LL) {
-                        for(size_t off = 1; off < 8; off++) {
+                    if (v[w] != LL_MAX) {
+                        for (size_t off = 1; off < 8; off++) {
 
                             a.Set(match, v[w] + 1);
                             a.Set(match + off, v[w] + 1);
@@ -182,10 +183,10 @@ TEST(LESS)
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
 
-                            if(match >= from && match < to) {
+                            if (match >= from && match < to) {
                                 TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match);
                             }
-                            if(match + off >= from && match + off < to) {
+                            if (match + off >= from && match + off < to) {
                                 TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
                             }
 
@@ -196,8 +197,8 @@ TEST(LESS)
 
 
                     // Find all, EQUAL
-                    if(v[w] != 9223372036854775807LL) {
-                        for(size_t off = 1; off < 8; off++) {
+                    if (v[w] != LL_MAX) {
+                        for (size_t off = 1; off < 8; off++) {
                             a.Set(match, v[w] + 1);
                             a.Set(match + off, v[w] + 1);
 
@@ -207,10 +208,10 @@ TEST(LESS)
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
 
-                            if(match >= from && match < to) {
+                            if (match >= from && match < to) {
                                 TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match);
                             }
-                            if(match + off >= from && match + off < to) {
+                            if (match + off >= from && match + off < to) {
                                 TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
                             }
 
@@ -241,10 +242,10 @@ TEST(Column_monkeytest2)
     size_t current_bitwidth = 0;
     unsigned int trend = 5;
 
-    for(current_bitwidth = 0; current_bitwidth < 65; current_bitwidth++) {
-        for(size_t iter = 0; iter < ITER_PER_BITWIDTH; iter++) {
+    for (current_bitwidth = 0; current_bitwidth < 65; current_bitwidth++) {
+        for (size_t iter = 0; iter < ITER_PER_BITWIDTH; iter++) {
 
-//          if(rand() % 10 == 0) printf("Input bitwidth around ~%d, , a.Size()=%d\n", (int)current_bitwidth, (int)a.Size());
+//          if (rand() % 10 == 0) printf("Input bitwidth around ~%d, , a.Size()=%d\n", (int)current_bitwidth, (int)a.Size());
 
             if (!(rand2() % (ITER_PER_BITWIDTH / 100))) {
                 trend = (unsigned int)rand2() % 10;
@@ -258,7 +259,7 @@ TEST(Column_monkeytest2)
 
             if (rand2() % 10 > trend && a.Size() < ITER_PER_BITWIDTH / 100) {
                 uint64_t l = rand2((int)current_bitwidth);
-                if(rand2() % 2 == 0) {
+                if (rand2() % 2 == 0) {
                     // Insert
                     const size_t pos = rand2() % (a.Size() + 1);
                     a.Insert(pos, l);
@@ -268,7 +269,7 @@ TEST(Column_monkeytest2)
                     a.add(l);
                 }
             }
-            else if(a.Size() > 0) {
+            else if (a.Size() > 0) {
                 // Delete
                 const size_t i = rand2() % a.Size();
                 a.Delete(i);

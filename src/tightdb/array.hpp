@@ -242,7 +242,7 @@ public:
     bool Copy(const Array&); // Copy semantics for assignment
     void move_assign(Array&); // Move semantics for assignment
 
-    /// Construct an empty array of the spcified type and return just
+    /// Construct an empty array of the specified type and return just
     /// the reference to the underlying memory.
     ///
     /// \return Zero if allocation fails.
@@ -295,10 +295,12 @@ public:
     template <size_t w> void Adjust(size_t start, int64_t diff);
     void Adjust(size_t start, int64_t diff);
     template <size_t w> bool Increment(int64_t value, size_t start, size_t end);
+
     size_t FindPos(int64_t value) const;
     size_t FindPos2(int64_t value) const;
     void Preset(int64_t min, int64_t max, size_t count);
     void Preset(size_t bitwidth, size_t count);
+
     void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     int64_t sum(size_t start = 0, size_t end = (size_t)-1) const;
     size_t count(int64_t value) const;
@@ -727,7 +729,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
         else if (w == 8) {
             return *((const signed char*)(data + ndx));
         }
-        if (w == 16) {
+        else if (w == 16) {
             const size_t offset = ndx * 2;
             return *(const int16_t*)(data + offset);
         }
@@ -825,7 +827,6 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
         // static values needed for fast population count
         const uint64_t m1  = 0x5555555555555555ULL;
 
-
         if (width == 1) {
             return ~a;
         }
@@ -915,7 +916,6 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
             TIGHTDB_ASSERT(false);
             return uint64_t(-1);
         }
-
     }
 
     // This is the main finding function for Array. Other finding functions are just wrappers around this one.
@@ -1088,7 +1088,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
         return hasZeroByte != 0;
     }
 
-    // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position. 
+    // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position.
     // IMPORTANT: This function assumes that at least 1 item matches (test this with TestZero() or other means first)!
     template <bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
     {
@@ -1128,7 +1128,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
             }
         }
 
-        while(eq == (((v >> (width * start)) & mask) != 0)) {
+        while (eq == (((v >> (width * start)) & mask) != 0)) {
             TIGHTDB_ASSERT(start <= 8 * sizeof(v)); // You must only call FindZero() if you are sure that at least 1 item matches
             start++;
         }
@@ -1165,8 +1165,8 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
 
             if ((t + 1) * width == 64)
                 m = 0;
-            else 
-                m >>= (t + 1) * width;            
+            else
+                m >>= (t + 1) * width;
             p++;
         }
 
@@ -1352,7 +1352,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
                 start = (p - (int64_t *)m_data) * 8 * 8 / NO0(width);
                 size_t a = 0;
 
-                while(eq ? TestZero<width>(v2) : v2) {
+                while (eq ? TestZero<width>(v2) : v2) {
                 
                     if (FIND_ACTION_PATTERN<action, Callback>(start + baseindex, cascade<width>(eq ? v2 : ~v2), state, callback))
                         break; // consumed
@@ -1554,7 +1554,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
 
             size_t s = i * sizeof(__m128i) * 8 / NO0(width);
 
-            while(resmask != 0) {
+            while (resmask != 0) {
 
                 uint64_t upper = LowerBits<width / 8>() << (NO0(width / 8) - 1);
                 uint64_t pattern = resmask & upper; // fixme, bits at wrong offsets. Only OK because we only use them in 'count' aggregate
@@ -1581,6 +1581,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
         cond2 C;
         int cond = C.condition();
 
+        // BM: FIXME: What if cond is none of below? Add TIGHTDB_ASSERT. Set "bool ret = false;"?
         bool ret;
         if (cond == COND_EQUAL)
             ret = CompareEquality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
@@ -1649,7 +1650,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
             }
             else {
                 // 24 ms
-                while(p < e) {
+                while (p < e) {
                     int64_t v = *p;
                     if (!FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - (int64_t *)m_data) * 8 * 8 / NO0(bitwidth) + baseindex, callback))
                         return false;

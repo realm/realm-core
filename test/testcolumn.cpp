@@ -502,7 +502,7 @@ TEST(Column_FindAll_IntMin)
     const int value = 0;
     const int vReps = 5;
 
-    for(int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++){
         c.add(0);
     }
 
@@ -511,8 +511,8 @@ TEST(Column_FindAll_IntMin)
 
     size_t i = 0;
     size_t j = 0;
-    while(i < c.Size()){
-        if(c.Get(i) == value)
+    while (i < c.Size()){
+        if (c.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -530,7 +530,7 @@ TEST(Column_FindAll_IntMax)
     const int64_t value = 4300000003ULL;
     const int vReps = 5;
 
-    for(int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++){
         // 64 bitwidth
         c.add(4300000000ULL);
         c.add(4300000001ULL);
@@ -543,8 +543,8 @@ TEST(Column_FindAll_IntMax)
 
     size_t i = 0;
     size_t j = 0;
-    while(i < c.Size()){
-        if(c.Get(i) == value)
+    while (i < c.Size()){
+        if (c.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -588,41 +588,41 @@ TEST(Column_Sum)
 
     c.Clear();
 
-    for(int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
         c.add(i);
     }
 
     // Sum of entire range, using default args
     sum = 0;
-    for(int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
         sum += c.Get(i);
     }
     CHECK_EQUAL(sum, c.sum());
 
     // Sum of entire range, given explicit range
     sum = 0;
-    for(int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
         sum += c.Get(i);
     }
     CHECK_EQUAL(sum, c.sum(0, 100));
 
     // Start to N
     sum = 0;
-    for(int i = 0; i < 63; i++) {
+    for (int i = 0; i < 63; i++) {
         sum += c.Get(i);
     }
     CHECK_EQUAL(sum, c.sum(0, 63));
 
     // N to end
     sum = 0;
-    for(int i = 47; i < 100; i++) {
+    for (int i = 47; i < 100; i++) {
         sum += c.Get(i);
     }
     CHECK_EQUAL(sum, c.sum(47, 100));
 
     // N to M
     sum = 0;
-    for(int i = 55; i < 79; i++) {
+    for (int i = 55; i < 79; i++) {
         sum += c.Get(i);
     }
     CHECK_EQUAL(sum, c.sum(55, 79));
@@ -649,7 +649,7 @@ TEST(Column_Max2)
 {
     Column c;
 
-    for(int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
         c.add(10);
     }
     c.Set(20, 20);
@@ -681,7 +681,7 @@ TEST(Column_Min2)
 {
     Column c;
 
-    for(int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
         c.add(10);
     }
     c.Set(20, 20);
@@ -700,12 +700,12 @@ TEST(Column_Sort2)
 {
     Column c;
 
-    for(size_t t = 0; t < 9*MAX_LIST_SIZE; t++)
+    for (size_t t = 0; t < 9*MAX_LIST_SIZE; t++)
         c.add(rand() % 300 - 100);
 
     c.sort();
 
-    for(size_t t = 1; t < 9*MAX_LIST_SIZE; t++) {
+    for (size_t t = 1; t < 9*MAX_LIST_SIZE; t++) {
         CHECK(c.Get(t) >= c.Get(t - 1));
     }
 

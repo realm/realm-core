@@ -80,7 +80,7 @@ inline void init_header(void* header, bool is_node, bool has_refs, int width_typ
     // initially. Note also: The C++ standard does not
     // guarantee that int64_t is extactly 8 bytes wide. It
     // may be more, and it may be less. That is why we
-    // need the statinc assert.
+    // need the static assert.
     TIGHTDB_STATIC_ASSERT(sizeof(int64_t) == 8,
                           "Trouble if int64_t is not 8 bytes wide");
     *reinterpret_cast<int64_t*>(header) = 0;
@@ -472,7 +472,8 @@ bool Array::Set(size_t ndx, int64_t value)
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) return false;
+    if (!CopyOnWrite()) 
+        return false;
 
     // Make room for the new value
     size_t width = m_width;
@@ -482,9 +483,9 @@ bool Array::Set(size_t ndx, int64_t value)
 
     const bool doExpand = (width > m_width);
     if (doExpand) {
-
-        Getter oldGetter = m_getter;
-        if (!Alloc(m_len, width)) return false;
+        Getter oldGetter = m_getter;    // Save old getter before width expansion
+        if (!Alloc(m_len, width)) 
+            return false;
         SetWidth(width);
 
         // Expand the old values
@@ -501,9 +502,8 @@ bool Array::Set(size_t ndx, int64_t value)
     return true;
 }
 
-// Optimization for the common case of adding
-// positive values to a local array (happens a
-// lot when returning results to TableViews)
+// Optimization for the common case of adding positive values to a local array 
+// (happens a lot when returning results to TableViews)
 bool Array::AddPositiveLocal(int64_t value)
 {
     TIGHTDB_ASSERT(value >= 0);
@@ -526,9 +526,8 @@ bool Array::Insert(size_t ndx, int64_t value)
     TIGHTDB_ASSERT(ndx <= m_len);
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) return false;
-
-    Getter getter = m_getter;
+    if (!CopyOnWrite()) 
+        return false;
 
     // Make room for the new value
     size_t width = m_width;
@@ -536,20 +535,24 @@ bool Array::Insert(size_t ndx, int64_t value)
     if (value < m_lbound || value > m_ubound)
         width = BitWidth(value);
 
+    Getter oldGetter = m_getter;    // Save old getter before potential width expansion
+
     const bool doExpand = (width > m_width);
     if (doExpand) {
-        if (!Alloc(m_len+1, width)) return false;
+        if (!Alloc(m_len+1, width)) 
+            return false;
         SetWidth(width);
     }
     else {
-        if (!Alloc(m_len+1, m_width)) return false;
+        if (!Alloc(m_len+1, m_width)) 
+            return false;
     }
 
     // Move values below insertion (may expand)
     if (doExpand || m_width < 8) {
         int k = (int)m_len;
         while (--k >= (int)ndx) {
-            const int64_t v = (this->*getter)(k);
+            const int64_t v = (this->*oldGetter)(k);
             (this->*m_setter)(k+1, v);
         }
     }
@@ -569,7 +572,7 @@ bool Array::Insert(size_t ndx, int64_t value)
     if (doExpand) {
         int k = (int)ndx;
         while (--k >= 0) {
-            const int64_t v = (this->*getter)(k);
+            const int64_t v = (this->*oldGetter)(k);
             (this->*m_setter)(k, v);
         }
     }
@@ -627,7 +630,8 @@ bool Array::IncrementIf(int64_t limit, int64_t value)
     // Update (incr or decrement) values bigger or equal to the limit
     for (size_t i = 0; i < m_len; ++i) {
         const int64_t v = Get(i);
-        if (v >= limit) Set(i, v + value);
+        if (v >= limit) 
+            Set(i, v + value);
     }
     return true;
 }
@@ -650,7 +654,7 @@ void Array::Adjust(size_t start, int64_t diff)
 
 template <size_t w> size_t Array::FindPos(int64_t target) const
 {
-    size_t low = -1;
+    size_t low = (size_t)-1;
     size_t high = m_len;
     
     // Binary search based on:
@@ -661,42 +665,49 @@ template <size_t w> size_t Array::FindPos(int64_t target) const
         const size_t probe = (low + high) >> 1;
         const int64_t v = Get<w>(probe);
 
-        if (v > target) high = probe;
-        else            low = probe;
+        if (v > target) 
+            high = probe;
+        else
+            low = probe;
     }
-    if (high == m_len) return not_found;
-    else return high;
+    if (high == m_len) 
+        return not_found;
+    else 
+        return high;
 }
-
-
 
 size_t Array::FindPos(int64_t target) const
 {
     TEMPEX(return FindPos, m_width, (target));
 }
 
-
+// BM FIXME: Rename to something better...
 size_t Array::FindPos2(int64_t target) const
 {
-    int low = -1;
-    int high = (int)m_len;
+    size_t low = (size_t)-1;
+    size_t high = m_len;
 
     // Binary search based on:
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
     // Finds position of closest value BIGGER OR EQUAL to the target (for
     // lookups in indexes)
     while (high - low > 1) {
-        const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+        const size_t probe = (low + high) >> 1;
         const int64_t v = Get(probe);
 
-        if (v < target) low = (int)probe;
-        else            high = (int)probe;
+        if (v < target) 
+            low = probe;
+        else
+            high = probe;
     }
-    if (high == (int)m_len) return (size_t)-1;
-    else return (size_t)high;
+    if (high == m_len) 
+        return not_found;
+    else 
+        return high;
 }
 
-size_t FirstSetBit(unsigned int v) 
+
+size_t FirstSetBit(unsigned int v)
 {
     #if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
         unsigned long ul;
@@ -713,12 +724,12 @@ size_t FirstSetBit(unsigned int v)
             31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
         };
 
-        r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
-        return r;
-    #endif
+    r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
+    return r;
+#endif
 }
 
-size_t FirstSetBit64(int64_t v) 
+size_t FirstSetBit64(int64_t v)
 {
 #if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
     unsigned long ul;
@@ -742,7 +753,7 @@ size_t FirstSetBit64(int64_t v)
 }
 
 
-template <size_t width> inline int64_t LowerBits(void) 
+template <size_t width> inline int64_t LowerBits(void)
 {
     if (width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
@@ -764,7 +775,8 @@ template <size_t width> inline int64_t LowerBits(void)
     }
 }
 
-template <size_t width> inline bool TestZero(uint64_t value) {
+// Return true if 'value' has an element (of bit-width 'width') which is 0
+template <size_t width> inline bool has_zero_element(uint64_t value) {
     uint64_t hasZeroByte;
     uint64_t lower = LowerBits<width>();
     uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
@@ -774,7 +786,7 @@ template <size_t width> inline bool TestZero(uint64_t value) {
 
 
 // Finds zero element of bit width 'width'
-template <bool eq, size_t width>size_t FindZero(uint64_t v)
+template <bool eq, size_t width> size_t FindZero(uint64_t v)
 {
     size_t start = 0;
     uint64_t hasZeroByte;
@@ -783,12 +795,12 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v)
     // the work done by TestZero() is wasted for the cases where the value exists in first half, but useful if it exists in last 
     // half. Sweet spot turns out to be the widths and partitions below.
     if (width <= 8) {
-        hasZeroByte = TestZero<width>(v | 0xffffffff00000000ULL);
+        hasZeroByte = has_zero_element<width>(v | 0xffffffff00000000ULL);
         if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
             // 00?? -> increasing
             start += 64 / NO0(width) / 2;
             if (width <= 4) {
-                hasZeroByte = TestZero<width>(v | 0xffff000000000000ULL);
+                hasZeroByte = has_zero_element<width>(v | 0xffff000000000000ULL);
                 if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
                     // 000?
                     start += 64 / NO0(width) / 4;
@@ -798,7 +810,7 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v)
         else {
             if (width <= 4) {
                 // ??00
-                hasZeroByte = TestZero<width>(v | 0xffffffffffff0000ULL);
+                hasZeroByte = has_zero_element<width>(v | 0xffffffffffff0000ULL);
                 if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
                     // 0?00
                     start += 64 / NO0(width) / 4;
@@ -808,16 +820,17 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v)
     }
 
     uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
-    while(eq == (((v >> (width * start)) & mask) != 0)) {
+    while (eq == (((v >> (width * start)) & mask) != 0)) {
         start++;
     }
 
     return start;
 }
 
-template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
-{ 
-    if (end == (size_t)-1) end = m_len;
+template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
+{
+    if (end == (size_t)-1) 
+        end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     if (m_len == 0)
@@ -835,7 +848,7 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
 
     // Test manually until 128 bit aligned
     for (; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
-        if (max ? Get<w>(start) > m : Get<w>(start) < m)
+        if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
             m = Get<w>(start);
     }
 
@@ -847,20 +860,20 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
         size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
         for (size_t t = 0; t < chunks; t++) {
             if (w == 8)
-                state = max ? _mm_max_epi8(data[t], state) : _mm_min_epi8(data[t], state);
+                state = find_max ? _mm_max_epi8(data[t], state) : _mm_min_epi8(data[t], state);
             else if (w == 16)
-                state = max ? _mm_max_epi16(data[t], state) : _mm_min_epi16(data[t], state);
+                state = find_max ? _mm_max_epi16(data[t], state) : _mm_min_epi16(data[t], state);
             else if (w == 32)
-                state = max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
+                state = find_max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
 
             start += sizeof(__m128i) * 8 / NO0(w);
         }
-        
+
         // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
         state2 = state; 
         for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
             const int64_t v = GetUniversal<w>(((const char *)&state2), t);
-            if (max ? v > m : v < m) {
+            if (find_max ? v > m : v < m) {
                 m = v;
             }
         }        
@@ -869,7 +882,7 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
 
     for (; start < end; ++start) {
         const int64_t v = Get<w>(start);
-        if (max ? v > m : v < m) {
+        if (find_max ? v > m : v < m) {
             m = v;
         }
     }
@@ -913,7 +926,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
         // uses a divide and conquer algorithm that is a variation of popolation count:
         // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 
-        // staiic values needed for fast sums
+        // static values needed for fast sums
         const uint64_t m2  = 0x3333333333333333ULL;
         const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
         const uint64_t h01 = 0x0101010101010101ULL;
@@ -937,11 +950,9 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                     a = (a * h01) >> 56;
                     s += a;
 #endif         
-                }
-            
+            }
             else if (w == 2) {
                 uint64_t a = data[t];
-
                 a = (a & m2) + ((a >> 2) & m2);
                 a = (a + (a >> 4)) & m4;
                 a = (a * h01) >> 56;
@@ -951,10 +962,8 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
             }
             else if (w == 4) {
                 uint64_t a = data[t];
-
                 a = (a & m4) + ((a >> 4) & m4);
                 a = (a * h01) >> 56;
-
                 s += a;
             }
         }
@@ -1046,7 +1055,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
     }
 #endif
     
-
+    // Sum remaining elements
     for (; start < end; ++start)
         s += Get<w>(start);
 
@@ -1356,17 +1365,17 @@ size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator
 bool Array::Alloc(size_t count, size_t width)
 {
     if (count > m_capacity || width != m_width) {
-        const size_t len      = CalcByteLen(count, width);              // bytes needed
-        size_t capacity_bytes = m_capacity ? get_header_capacity() : 0; // space currently available in bytes
+        const size_t needed_bytes = CalcByteLen(count, width);              
+        size_t capacity_bytes     = m_capacity ? get_header_capacity() : 0; // space currently available in bytes
 
-        if (len > capacity_bytes) {
+        if (needed_bytes > capacity_bytes) {
             // Double to avoid too many reallocs (or initialize to initial size)
             capacity_bytes = capacity_bytes ? capacity_bytes * 2 : initial_capacity;
 
             // If doubling is not enough, expand enough to fit
-            if (capacity_bytes < len) {
-                const size_t rest = (~len & 0x7)+1;
-                capacity_bytes = len;
+            if (capacity_bytes < needed_bytes) {
+                const size_t rest = (~needed_bytes & 0x7)+1;
+                capacity_bytes = needed_bytes;
                 if (rest < 8) capacity_bytes += rest; // 64bit align
             }
 
@@ -1457,7 +1466,6 @@ template <size_t width> void Array::SetWidth(void)
     Setter temp_setter = &Array::Set<width>; 
     m_setter = temp_setter;
 
-    struct Callback {};
     Finder feq = &Array::find<EQUAL, TDB_RETURN_FIRST, width>;
     m_finder[COND_EQUAL] = feq;
 
@@ -1469,7 +1477,6 @@ template <size_t width> void Array::SetWidth(void)
 
     Finder fl =  &Array::find<LESS, TDB_RETURN_FIRST, width>;
     m_finder[COND_LESS] = fl;
-
 }
 
 template <size_t w>int64_t Array::Get(size_t ndx) const
@@ -1478,7 +1485,8 @@ template <size_t w>int64_t Array::Get(size_t ndx) const
 }
 
 #ifdef _MSC_VER
-#pragma warning (disable : 4127)
+#pragma warning(push)
+#pragma warning(disable : 4127)
 #endif
 template <size_t w> void Array::Set(size_t ndx, int64_t value)
 {
@@ -1520,7 +1528,7 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
     }
 }
 #ifdef _MSC_VER
-#pragma warning (enable : 4127)
+#pragma warning(pop)
 #endif
 
 // Sort array.
@@ -1989,7 +1997,7 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 {
     const size_t len = get_header_len_direct(header);
 
-    size_t low = -1;
+    size_t low = (size_t)-1;
     size_t high = len;
 
     // Binary search based on:
@@ -2564,8 +2572,8 @@ top:
 
     for (;;) {
         // Get subnode table
-        const size_t ref_offsets = GetDirect(data, width, 0);
-        const size_t ref_refs    = GetDirect(data, width, 1);
+        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
+        const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
 
         // Find the position matching the key
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2579,7 +2587,7 @@ top:
         const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
         const char* const refs_data = (const char*)refs_header + 8;
         const size_t refs_width  = get_header_width_direct(refs_header);
-        const size_t ref = GetDirect(refs_data, refs_width, pos);
+        const size_t ref = TO_REF(GetDirect(refs_data, refs_width, pos));
 
         if (isNode) {
             // Set vars for next iteration
@@ -2619,7 +2627,7 @@ top:
             if (!sub_hasrefs) {
                 const char* const sub_data = (const char*)sub_header + 8;
                 const size_t sub_width  = get_header_width_direct(sub_header);
-                const size_t first_row_ref = GetDirect(sub_data, sub_width, 0);
+                const size_t first_row_ref = TO_REF(GetDirect(sub_data, sub_width, 0));
 
                 // If the last byte in the stored key is not zero, we have
                 // not yet compared against the entire (target) string
@@ -2633,7 +2641,7 @@ top:
                 const size_t sub_len  = get_header_len_direct(sub_header);
 
                 for (size_t i = 0; i < sub_len; ++i) {
-                    const size_t row_ref = GetDirect(sub_data, sub_width, i);
+                    const size_t row_ref = TO_REF(GetDirect(sub_data, sub_width, i));
                     result.add(row_ref);
                 }
                 return;
@@ -2668,8 +2676,8 @@ top:
 
     for (;;) {
         // Get subnode table
-        const size_t ref_offsets = GetDirect(data, width, 0);
-        const size_t ref_refs    = GetDirect(data, width, 1);
+        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
+        const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
 
         // Find the position matching the key
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2683,7 +2691,7 @@ top:
         const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
         const char* const refs_data = (const char*)refs_header + 8;
         const size_t refs_width  = get_header_width_direct(refs_header);
-        const size_t ref = GetDirect(refs_data, refs_width, pos);
+        const size_t ref = TO_REF(GetDirect(refs_data, refs_width, pos));
 
         if (isNode) {
             // Set vars for next iteration
@@ -2718,7 +2726,7 @@ top:
                 const char* const sub_data = (const char*)sub_header + 8;
                 const size_t sub_width  = get_header_width_direct(sub_header);
                 const size_t sub_count  = get_header_len_direct(sub_header);
-                const size_t row_ref = GetDirect(sub_data, sub_width, 0);
+                const size_t row_ref = TO_REF(GetDirect(sub_data, sub_width, 0));
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string

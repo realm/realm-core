@@ -89,8 +89,8 @@ public:
 
     virtual std::string Verify(void)
     {
-        if (error_code != "")
-            return error_code;
+        if (m_error_code != "")
+            return m_error_code;
         if (m_child == 0)
             return "";
         else
@@ -103,7 +103,7 @@ public:
 
 protected:
     const Table* m_table;
-    std::string error_code;
+    std::string m_error_code;
     Array m_array; 
     state_state state;
 };
@@ -118,7 +118,8 @@ public:
         m_next = 0;
         if (m_size > 0)
             m_max = m_arr.Get(m_size - 1);
-        if (m_child) m_child->Init(table);
+        if (m_child) 
+            m_child->Init(table);
     }
 
     size_t find_first(size_t start, size_t end)
@@ -140,7 +141,7 @@ public:
             --m_next;
             size_t add;
             add = 1;
-            while(m_next + add < m_size && TO_SIZET(m_arr.Get(m_next + add)) < start)
+            while (m_next + add < m_size && TO_SIZET(m_arr.Get(m_next + add)) < start)
                 add *= 2;
 
             // Do binary search inside bounds
@@ -225,7 +226,7 @@ protected:
 };
 */
 
-// Not finished
+// TODO: Not finished
 class SUBTABLE: public ParentNode {
 public:
     SUBTABLE(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
@@ -234,8 +235,10 @@ public:
     {
         m_table = &table;
 
-        if (m_child) m_child->Init(table);
-        if (m_child2) m_child2->Init(table);
+        if (m_child) 
+            m_child->Init(table);
+        if (m_child2) 
+            m_child2->Init(table);
     }
 
     size_t find_first(size_t start, size_t end)
@@ -265,6 +268,8 @@ public:
         return end;
     }
 
+protected:
+    friend class Query;
     ParentNode* m_child2;
     size_t m_column;
 };
@@ -290,17 +295,20 @@ public:
         m_value = value;
     }
 
-    // Todo, Make caller set m_column_id through this function instead of through constructor, to simplify code. 
+    // TODO, Make caller set m_column_id through this function instead of through constructor, to simplify code. 
     // This also allows to get rid of QuickInit()
     void Init(const Table& table)
     {
         m_column = (C*)&table.GetColumnBase(m_column_id);
         m_table = &table;
         m_leaf_end = 0;
-        if (m_child)m_child->Init(table);
+        if (m_child)
+            m_child->Init(table);
     }
 
-    int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, ACTION action = TDB_FINDALL, size_t agg_col = not_found, size_t* matchcount = 0) {
+    int64_t aggregate(Array* res, size_t start, size_t end, size_t limit, ACTION action = TDB_FINDALL, 
+                      size_t agg_col = not_found, size_t* matchcount = 0) 
+    {
         if (action == TDB_FINDALL)
             return aggregate<TDB_FINDALL>(res, start, end, limit, agg_col, matchcount);
         if (action == TDB_SUM)
@@ -378,7 +386,7 @@ public:
         else {
             size_t r = start - 1;
             size_t n = 0;
-            while(n < limit) {
+            while (n < limit) {
                 r = find_first(r + 1, end);
                 if (r == end)
                     break;
@@ -437,7 +445,7 @@ public:
         return end;
     }
 
-
+protected:
     T m_value;
 
 protected:
@@ -473,7 +481,7 @@ public:
         const bool b1 = utf8case(v, m_lcase, false);
         const bool b2 = utf8case(v, m_ucase, true);
         if (!b1 || !b2)
-            error_code = "Malformed UTF-8: " + std::string(m_value);
+            m_error_code = "Malformed UTF-8: " + std::string(m_value);
     }
     ~STRINGNODE() {
         free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase);
@@ -485,7 +493,8 @@ public:
         m_column = &table.GetColumnBase(m_column_id);
         m_column_type = table.GetRealColumnType(m_column_id);
 
-        if (m_child) m_child->Init(table);
+        if (m_child) 
+            m_child->Init(table);
     }
 
     size_t find_first(size_t start, size_t end)
@@ -549,7 +558,7 @@ public:
         m_column_type = table.GetRealColumnType(m_column_id);
 
         if (m_column_type == COLUMN_TYPE_STRING_ENUM) {
-            m_key_ndx =  ((const ColumnStringEnum*)m_column)->GetKeyNdx(m_value);
+            m_key_ndx = ((const ColumnStringEnum*)m_column)->GetKeyNdx(m_value);
         }
 
         if(m_column->HasIndex()) {
@@ -720,8 +729,8 @@ public:
 
     virtual std::string Verify(void)
     {
-        if (error_code != "")
-            return error_code;
+        if (m_error_code != "")
+            return m_error_code;
         if (m_cond1 == 0)
             return "Missing left-hand side of OR";
         if (m_cond2 == 0)
