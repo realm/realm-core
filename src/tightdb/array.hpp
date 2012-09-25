@@ -81,7 +81,7 @@ Searching: The main finding function is:
 // todo, move
 enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
 
-bool tdb_dummy (int64_t t);
+bool tdb_dummy(int64_t t);
 
 namespace tightdb {
 
@@ -287,10 +287,12 @@ public:
     template <size_t w> void Adjust(size_t start, int64_t diff);
     void Adjust(size_t start, int64_t diff);
     template <size_t w> bool Increment(int64_t value, size_t start, size_t end);
+
     size_t FindPos(int64_t value) const;
     size_t FindPos2(int64_t value) const;
     void Preset(int64_t min, int64_t max, size_t count);
     void Preset(size_t bitwidth, size_t count);
+
     void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     int64_t sum(size_t start = 0, size_t end = (size_t)-1) const;
     size_t count(int64_t value) const;
