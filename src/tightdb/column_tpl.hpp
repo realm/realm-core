@@ -401,7 +401,7 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
                         e = size_t(-1);
                     else {
                         offset = TO_REF(offsets.Get(i-1));
-                        if(offset >= end)
+                        if (offset >= end)
                             break;
                         e = end - offset;
                     }
@@ -443,7 +443,7 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T valu
                 if (end >= TO_REF(offsets.Get(i))) e = size_t(-1);
                 else {
                     offset = TO_REF(offsets.Get(i-1));
-                    if(offset >= end)
+                    if (offset >= end)
                         return;
                     e = end - offset;
                 }
@@ -461,9 +461,9 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
                                 void *state) const
 {
     if (!IsNode()) {
-        if(end == size_t(-1))
+        if (end == size_t(-1))
             end = m_array->Size();
-        if(m_array->Size() > 0)
+        if (m_array->Size() > 0)
             call(m_array, start, end, caller_offset, state);
     }
     else {
@@ -490,7 +490,7 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
                 if (end >= TO_REF(offsets.Get(i))) e = size_t(-1);
                 else {
                     offset = TO_REF(offsets.Get(i-1));
-                    if(offset >= end)
+                    if (offset >= end)
                         return;
                     e = end - offset;
                 }

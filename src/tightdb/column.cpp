@@ -66,34 +66,34 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
     v0 = vals->Get(i0);
     v1 = vals->Get(i1);
 
-    for(;;) {
-        if(v0 < v1) {
+    for (;;) {
+        if (v0 < v1) {
             idxres->add(i0);
             // Only check p0 if it has been modified :)
-            if(p0 == s0)
+            if (p0 == s0)
                 break;
             i0 = idx0->GetAsRef(p0++);
             v0 = vals->Get(i0);
         }
         else {
             idxres->add(i1);
-            if(p1 == s1)
+            if (p1 == s1)
                 break;
             i1 = idx1->GetAsRef(p1++);
             v1 = vals->Get(i1);
         }
     }
 
-    if(p0 == s0)
+    if (p0 == s0)
         p0--;
     else
         p1--;
 
-    while(p0 < s0) {
+    while (p0 < s0) {
         i0 = idx0->GetAsRef(p0++);
         idxres->add(i0);
     }
-    while(p1 < s1) {
+    while (p1 < s1) {
         i1 = idx1->GetAsRef(p1++);
         idxres->add(i1);
     }
@@ -204,7 +204,7 @@ Array* merge(const Array& arrayList)
 // TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 {
-    if(indexlists->Size() == 1) {
+    if (indexlists->Size() == 1) {
 //      size_t ref = valuelist->Get(0);
         *indexresult = (Array *)indexlists->Get(0);
         return;
@@ -213,11 +213,11 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
     Array leftV, rightV;
     Array leftI, rightI;
     size_t leftSize = indexlists->Size() / 2;
-    for(size_t t = 0; t < leftSize; t++) {
+    for (size_t t = 0; t < leftSize; t++) {
         leftV.add(indexlists->Get(t));
         leftI.add(indexlists->Get(t));
     }
-    for(size_t t = leftSize; t < indexlists->Size(); t++) {
+    for (size_t t = leftSize; t < indexlists->Size(); t++) {
         rightV.add(indexlists->Get(t));
         rightI.add(indexlists->Get(t));
     }
@@ -444,7 +444,7 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
 #else
     // Experimental
 
-    if(end == size_t(-1)) end = ((Column*)this)->Size();
+    if (end == size_t(-1)) end = ((Column*)this)->Size();
     Column* m_column = (Column*)this;
     // To make column aggregates fast on few number of values we need low initial overhead
     // so we allocate Array instance from stack and use fast constructor intended for read-only use
@@ -530,7 +530,7 @@ void Column::sort(size_t start, size_t end)
     if (sorted) {
         // Todo, this is a bit slow. Add bulk insert or the like to Column
         const size_t count = sorted->Size();
-        for(size_t t = 0; t < count; ++t) {
+        for (size_t t = 0; t < count; ++t) {
             Set(t, sorted->Get(t));
         }
 
@@ -552,14 +552,14 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&values);
 
     size_t offset = 0;
-    for(size_t t = 0; t < values.Size(); t++) {
+    for (size_t t = 0; t < values.Size(); t++) {
         Array *i = new Array();
         size_t ref = values.GetAsRef(t);
         Array v(ref);
-        for(size_t j = 0; j < v.Size(); j++)
+        for (size_t j = 0; j < v.Size(); j++)
             all_values.add(v.Get(j));
         v.ReferenceSort(*i);
-        for(size_t n = 0; n < v.Size(); n++)
+        for (size_t n = 0; n < v.Size(); n++)
             i->Set(n, i->Get(n) + offset);
         offset += v.Size();
         indexes.add((int64_t)i);
@@ -569,7 +569,7 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
 
     merge_references(&all_values, &indexes, &ResI);
 
-    for(size_t t = 0; t < ResI->Size(); t++)
+    for (size_t t = 0; t < ResI->Size(); t++)
         ref.add(ResI->Get(t));
 }
 

@@ -394,7 +394,7 @@ TableView Query::find_all_multi(Table& table, size_t start, size_t end)
 
     // Wait until all threads have completed
     pthread_mutex_lock(&ts.completed_mutex);
-    while(ts.done_job < ts.end_job)
+    while (ts.done_job < ts.end_job)
         pthread_cond_wait(&ts.completed_cond, &ts.completed_mutex);
     pthread_mutex_lock(&ts.jobs_mutex);
     pthread_mutex_unlock(&ts.completed_mutex);
@@ -408,7 +408,7 @@ TableView Query::find_all_multi(Table& table, size_t start, size_t end)
         const size_t upto = (i == ts.chunks.size() - 1) ? size_t(-1) : ts.chunks[i + 1].first;
         size_t first = ts.chunks[i].second;
 
-        while(first < ts.results.size() && ts.results[first] < upto && ts.results[first] >= from) {
+        while (first < ts.results.size() && ts.results[first] < upto && ts.results[first] >= from) {
             tv.get_ref_column().add(ts.results[first]);
             ++first;
         }
@@ -519,7 +519,7 @@ void* Query::query_thread(void* arg)
     for (;;) {
         // Main waiting loop that waits for a query to start
         pthread_mutex_lock(&ts->jobs_mutex);
-        while(ts->next_job == ts->end_job)
+        while (ts->next_job == ts->end_job)
             pthread_cond_wait(&ts->jobs_cond, &ts->jobs_mutex);
         pthread_mutex_unlock(&ts->jobs_mutex);
 

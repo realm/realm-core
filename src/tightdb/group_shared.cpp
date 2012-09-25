@@ -438,7 +438,7 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
 {
     const bool isFull = (ringbuf_size() == (m_info->capacity+1));
 
-    if(isFull) {
+    if (isFull) {
         //TODO: expand buffer
         TIGHTDB_ASSERT(false);
     }
