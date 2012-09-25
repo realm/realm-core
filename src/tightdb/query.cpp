@@ -235,8 +235,6 @@ size_t Query::find_next(const Table& table, size_t lastmatch)
 
 TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
 {
-    if (end == size_t(-1)) end = table.size();
-
     Init(table);
 
     if (end == size_t(-1))
@@ -263,9 +261,11 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
 
 int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    if (end == size_t(-1)) end = table.size();
+    if (end == size_t(-1)) 
+        end = table.size();
 
     if (first[0] == 0) {
+        // User created query with no criteria; sum() range
         if (resultcount)
             *resultcount = table.size();
         const Column& c = table.GetColumn(column);  
@@ -278,15 +278,18 @@ int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_
     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_SUM, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
-
     return r;
 }
 
 int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    if (end == size_t(-1)) end = table.size();
+    if (end == size_t(-1)) 
+        end = table.size();
 
     if (first[0] == 0) {
+        // User created query with no criteria; max() range
+        if (resultcount)
+            *resultcount = table.size();
         const Column& c = table.GetColumn(column);  
         return c.maximum(start, end);
     }
@@ -298,14 +301,17 @@ int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, s
     if (resultcount)
         *resultcount = matchcount;
     return r;
-
 }
 
 int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    if (end == size_t(-1)) end = table.size();
+    if (end == size_t(-1)) 
+        end = table.size();
 
     if (first[0] == 0) {
+        // User created query with no criteria; min() range
+        if (resultcount)
+            *resultcount = table.size();
         const Column& c = table.GetColumn(column);  
         return c.minimum(start, end);
     }
@@ -317,21 +323,21 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
     if (resultcount)
         *resultcount = matchcount;
     return r;
-
 }
 
 size_t Query::count(const Table& table, size_t start, size_t end, size_t limit) const
 {
-    if (end == size_t(-1)) end = table.size();
+    if (end == size_t(-1)) 
+        end = table.size();
 
     if (first[0] == 0) {
+        // User created query with no criteria; count all
         return (limit < end - start ? limit : end - start);
     }
 
     Init(table);
     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_COUNT);
     return size_t(r);
-
 }
 
 double Query::average(const Table& table, size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
@@ -339,7 +345,6 @@ double Query::average(const Table& table, size_t column_ndx, size_t* resultcount
     Init(table);
 
     size_t resultcount2 = 0;
-
     const int64_t sum1 = sum(table, column_ndx, &resultcount2, start, end, limit);
     const double avg1 = (float)sum1 / (float)resultcount2;
 
@@ -468,8 +473,10 @@ void Query::Init(const Table& table) const
 
 size_t Query::FindInternal(const Table& table, size_t start, size_t end) const
 {
-    if (end == size_t(-1)) end = table.size();
-    if (start == end) return not_found;
+    if (end == size_t(-1)) 
+        end = table.size();
+    if (start == end) 
+        return not_found;
 
     size_t r;
     if (first[0] != 0)
