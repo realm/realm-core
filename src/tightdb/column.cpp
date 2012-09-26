@@ -669,11 +669,25 @@ bool Column::Increment64(int64_t value, size_t start, size_t end)
     else {
         //TODO: partial incr
         Array refs = NodeGetRefs();
-        for (size_t i = 0; i < refs.Size(); ++i) {
+        const size_t count = refs.Size();
+        for (size_t i = 0; i < count; ++i) {
             Column col = ::GetColumnFromRef(refs, i);
             if (!col.Increment64(value)) return false;
         }
         return true;
+    }
+}
+
+void Column::IncrementIf(int64_t limit, int64_t value)
+{
+    if (!IsNode()) m_array->IncrementIf(limit, value);
+    else {
+        Array refs = NodeGetRefs();
+        const size_t count = refs.Size();
+        for (size_t i = 0; i < count; ++i) {
+            Column col = ::GetColumnFromRef(refs, i);
+            col.IncrementIf(limit, value);
+        }
     }
 }
 
@@ -748,7 +762,33 @@ size_t Column::find_pos(int64_t target) const
         if (v > target) high = (int)probe;
         else            low = (int)probe;
     }
-    if (high == len) return (size_t)-1;
+    if (high == len) return not_found;
+    else return high;
+}
+
+size_t Column::find_pos2(int64_t target) const
+{
+    // NOTE: Binary search only works if the column is sorted
+
+    if (!IsNode()) {
+        return m_array->FindPos2(target);
+    }
+
+    const int len = (int)Size();
+    int low = -1;
+    int high = len;
+
+    // Binary search based on:
+    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+    // Finds position of closest value BIGGER OR EQUAL to the target
+    while (high - low > 1) {
+        const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+        const int64_t v = Get(probe);
+
+        if (v < target) low  = (int)probe;
+        else            high = (int)probe;
+    }
+    if (high == len) return not_found;
     else return high;
 }
 
