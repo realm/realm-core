@@ -35,6 +35,12 @@ inline void set_header_hasrefs(bool value, void* header)
     header2[0] = (header2[0] & ~0x40) | uint8_t(value << 6);
 }
 
+inline void set_header_indexflag(bool value, void* header)
+{
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x20) | uint8_t(value << 5);
+}
+
 inline void set_header_wtype(int value, void* header)
 {
     // Indicates how to calculate size in bytes based on width
@@ -108,9 +114,16 @@ namespace tightdb {
 
 // Header format (8 bytes):
 // |--------|--------|--------|--------|--------|--------|--------|--------|
-// |12-33444|          length          |         capacity         |reserved|
+// |12344555|          length          |         capacity         |reserved|
 //
-//  1: isNode  2: hasRefs  3: multiplier  4: width (packed in 3 bits)
+//  1: isNode  2: hasRefs  3: indexflag 4: multiplier 5: width (packed in 3 bits)
+
+bool IsArrayIndexNode(size_t ref, const Allocator& alloc)
+{
+    TIGHTDB_ASSERT(ref);
+    const uint8_t* const header = (const uint8_t*)alloc.Translate(ref);
+    return (header[0] & 0x20) != 0;
+}
 
 void Array::set_header_isnode(bool value)
 {
@@ -120,6 +133,11 @@ void Array::set_header_isnode(bool value)
 void Array::set_header_hasrefs(bool value)
 {
     ::set_header_hasrefs(value, m_data - 8);
+}
+
+void Array::set_header_indexflag(bool value)
+{
+    ::set_header_indexflag(value, m_data - 8);
 }
 
 void Array::set_header_wtype(WidthType value)
@@ -152,6 +170,12 @@ bool Array::get_header_hasrefs(const void* header) const
 {
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[0] & 0x40) != 0;
+}
+
+bool Array::get_header_indexflag(const void* header) const
+{
+    const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
+    return (header2[0] & 0x20) != 0;
 }
 
 Array::WidthType Array::get_header_wtype(const void* header) const
@@ -2281,6 +2305,7 @@ namespace {
 // Pre-declarations
 bool get_header_isnode_direct(const uint8_t* const header);
 bool get_header_hasrefs_direct(const uint8_t* const header);
+bool get_header_indexflag_direct(const uint8_t* const header);
 unsigned int get_header_width_direct(const uint8_t* const header);
 size_t get_header_len_direct(const uint8_t* const header);
 int64_t GetDirect(const char* const data, size_t width, const size_t ndx);
@@ -2296,6 +2321,11 @@ bool get_header_isnode_direct(const uint8_t* const header)
 bool get_header_hasrefs_direct(const uint8_t* const header)
 {
     return (header[0] & 0x40) != 0;
+}
+
+bool get_header_indexflag_direct(const uint8_t* const header)
+{
+    return (header[0] & 0x20) != 0;
 }
 
 unsigned int get_header_width_direct(const uint8_t* const header)
@@ -2694,13 +2724,23 @@ top:
             }
 
             const uint8_t* const sub_header = (const uint8_t*)m_alloc.Translate(ref);
-            const bool sub_hasrefs = get_header_hasrefs_direct(sub_header);
+            const bool sub_isindex = get_header_indexflag_direct(sub_header);
 
             // List of matching row indexes
-            if (!sub_hasrefs) {
+            if (!sub_isindex) {
                 const char* const sub_data = (const char*)sub_header + 8;
                 const size_t sub_width  = get_header_width_direct(sub_header);
-                const size_t row_ref = GetDirect(sub_data, sub_width, 0);
+                const bool sub_isnode = get_header_isnode_direct(sub_header);
+
+                // In most cases the row list will just be an array but there
+                // might be so many matches that it has branched into a column
+                size_t row_ref;
+                if (!sub_isnode)
+                    row_ref = GetDirect(sub_data, sub_width, 0);
+                else {
+                    const Array sub(ref, NULL, 0, m_alloc);
+                    row_ref = sub.ColumnGet(0);
+                }
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
@@ -2789,28 +2829,54 @@ top:
             }
 
             const uint8_t* const sub_header = (const uint8_t*)m_alloc.Translate(ref);
-            const bool sub_hasrefs = get_header_hasrefs_direct(sub_header);
+            const bool sub_isindex = get_header_indexflag_direct(sub_header);
 
             // List of matching row indexes
-            if (!sub_hasrefs) {
-                const char* const sub_data = (const char*)sub_header + 8;
-                const size_t sub_width  = get_header_width_direct(sub_header);
-                const size_t first_row_ref = GetDirect(sub_data, sub_width, 0);
+            if (!sub_isindex) {
+                const bool sub_isnode = get_header_isnode_direct(sub_header);
 
-                // If the last byte in the stored key is not zero, we have
-                // not yet compared against the entire (target) string
-                if ((stored_key << 24)) {
-                    const char* const str = (*get_func)(column, first_row_ref);
-                    if (strcmp(str, value) != 0)
-                        return; // not_found
+                // In most cases the row list will just be an array but there
+                // might be so many matches that it has branched into a column
+                if (!sub_isnode) {
+                    const size_t sub_width  = get_header_width_direct(sub_header);
+                    const char* const sub_data = (const char*)sub_header + 8;
+                    const size_t first_row_ref = GetDirect(sub_data, sub_width, 0);
+
+                    // If the last byte in the stored key is not zero, we have
+                    // not yet compared against the entire (target) string
+                    if ((stored_key << 24)) {
+                        const char* const str = (*get_func)(column, first_row_ref);
+                        if (strcmp(str, value) != 0)
+                            return; // not_found
+                    }
+
+                    // Copy all matches into result array
+                    const size_t sub_len  = get_header_len_direct(sub_header);
+
+                    for (size_t i = 0; i < sub_len; ++i) {
+                        const size_t row_ref = GetDirect(sub_data, sub_width, i);
+                        result.add(row_ref);
+                    }
                 }
+                else {
+                    const Column sub(ref, NULL, 0, m_alloc);
+                    const size_t first_row_ref = sub.Get(0);
 
-                // Copy all matches into result array
-                const size_t sub_len  = get_header_len_direct(sub_header);
+                    // If the last byte in the stored key is not zero, we have
+                    // not yet compared against the entire (target) string
+                    if ((stored_key << 24)) {
+                        const char* const str = (*get_func)(column, first_row_ref);
+                        if (strcmp(str, value) != 0)
+                            return; // not_found
+                    }
 
-                for (size_t i = 0; i < sub_len; ++i) {
-                    const size_t row_ref = GetDirect(sub_data, sub_width, i);
-                    result.add(row_ref);
+                    // Copy all matches into result array
+                    const size_t sub_len  = sub.Size();
+
+                    for (size_t i = 0; i < sub_len; ++i) {
+                        const size_t row_ref = sub.Get(i);
+                        result.add(row_ref);
+                    }
                 }
                 return;
             }
@@ -2887,18 +2953,37 @@ top:
             }
 
             const uint8_t* const sub_header = (const uint8_t*)m_alloc.Translate(ref);
-            const bool sub_hasrefs = get_header_hasrefs_direct(sub_header);
+            const bool sub_isindex = get_header_indexflag_direct(sub_header);
 
             // List of matching row indexes
-            if (!sub_hasrefs) {
-                const char* const sub_data = (const char*)sub_header + 8;
-                const size_t sub_width  = get_header_width_direct(sub_header);
-                const size_t sub_count  = get_header_len_direct(sub_header);
-                const size_t row_ref = GetDirect(sub_data, sub_width, 0);
+            if (!sub_isindex) {
+                const bool sub_isnode = get_header_isnode_direct(sub_header);
+                size_t sub_count;
+                size_t row_ref;
 
-                // If the last byte in the stored key is zero, we know that we have
-                // compared against the entire (target) string
-                if (!(stored_key << 24)) return sub_count;
+                // In most cases the row list will just be an array but there
+                // might be so many matches that it has branched into a column
+                if (!sub_isnode) {
+                    sub_count  = get_header_len_direct(sub_header);
+
+                    // If the last byte in the stored key is zero, we know that we have
+                    // compared against the entire (target) string
+                    if (!(stored_key << 24)) return sub_count;
+
+                    const char* const sub_data = (const char*)sub_header + 8;
+                    const size_t sub_width  = get_header_width_direct(sub_header);
+                    row_ref = GetDirect(sub_data, sub_width, 0);
+                }
+                else {
+                    const Column sub(ref, NULL, 0, m_alloc);
+                    sub_count = sub.Size();
+
+                    // If the last byte in the stored key is zero, we know that we have
+                    // compared against the entire (target) string
+                    if (!(stored_key << 24)) return sub_count;
+
+                    row_ref = sub.Get(0);
+                }
 
                 const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return sub_count;

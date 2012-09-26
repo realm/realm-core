@@ -30,6 +30,7 @@ typedef const char*(*StringGetter)(void*, size_t);
 class StringIndex : public Column {
 public:
     StringIndex(void* target_column, StringGetter get_func, Allocator& alloc);
+    StringIndex(ColumnDef type, Allocator& alloc);
     StringIndex(size_t ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc);
     void SetTarget(void* target_column, StringGetter get_func);
 
@@ -48,9 +49,11 @@ public:
 #endif
 
 protected:
+    void Create();
+
     bool InsertWithOffset(size_t row_ndx, size_t offset, const char* value);
     bool InsertRowList(size_t ref, size_t offset, const char* value);
-    int64_t GetLastKey() const;
+    int32_t GetLastKey() const;
     void UpdateRefs(size_t pos, int diff);
 
     // B-Tree functions

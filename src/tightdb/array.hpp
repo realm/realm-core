@@ -103,6 +103,7 @@ enum ColumnDef {
     COLUMN_HASREFS
 };
 
+bool IsArrayIndexNode(size_t ref, const Allocator& alloc);
 
 class ArrayParent
 {
@@ -238,6 +239,8 @@ public:
 
     bool IsNode() const {return m_isNode;}
     bool HasRefs() const {return m_hasRefs;}
+    bool IsIndexNode() const {return get_header_indexflag();}
+    void SetIsIndexNode(bool value) {set_header_indexflag(value);}
     Array GetSubArray(size_t ndx);
     const Array GetSubArray(size_t ndx) const;
     size_t GetRef() const {return m_ref;};
@@ -319,12 +322,14 @@ protected:
 
     void set_header_isnode(bool value);
     void set_header_hasrefs(bool value);
+    void set_header_indexflag(bool value);
     void set_header_wtype(WidthType value);
     void set_header_width(size_t value);
     void set_header_len(size_t value);
     void set_header_capacity(size_t value);
     bool get_header_isnode(const void* header=NULL) const;
     bool get_header_hasrefs(const void* header=NULL) const;
+    bool get_header_indexflag(const void* header=NULL) const;
     WidthType get_header_wtype(const void* header=NULL) const;
     size_t get_header_width(const void* header=NULL) const;
     size_t get_header_len(const void* header=NULL) const;
@@ -415,6 +420,10 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
     if (recurse && m_hasRefs) {
         // Temp array for updated refs
         Array newRefs(m_isNode ? COLUMN_NODE : COLUMN_HASREFS);
+
+        // Make sure that all flags are retained
+        if (IsIndexNode())
+            newRefs.SetIsIndexNode(true);
 
         // First write out all sub-arrays
         const size_t count = Size();
