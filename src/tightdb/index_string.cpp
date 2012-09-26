@@ -401,11 +401,18 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
         const char* const v2 = Get(r1);
         if (strcmp(v2, value) == 0) {
             // find insert position (the list has to be kept in sorted order)
-            const size_t pos = sub.find_pos2(row_ndx);
-            if (pos == not_found)
+            // In most cases we refs will be added to the end. So we test for that
+            // first to see if we can avoid the binary search for insert position
+            const size_t lastRef = (size_t)sub.Back();
+            if (row_ndx > lastRef)
                 sub.add(row_ndx);
-            else
-                sub.Insert(pos, row_ndx);
+            else {
+                const size_t pos = sub.find_pos2(row_ndx);
+                if (pos == not_found)
+                    sub.add(row_ndx);
+                else
+                    sub.Insert(pos, row_ndx);
+            }
         }
         else {
             StringIndex sub_index(m_target_column, m_get_func, alloc);
