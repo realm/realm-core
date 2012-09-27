@@ -348,7 +348,8 @@ bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
 
     // Copy strings to new array
     ArrayString* const oldarray = (ArrayString*)m_array;
-    for (size_t i = 0; i < oldarray->Size(); ++i) {
+    const size_t n = oldarray->Size();
+    for (size_t i=0; i<n; ++i) {
         newarray->add(oldarray->Get(i));
     }
     newarray->Insert(ndx, value, len);
@@ -380,8 +381,7 @@ template<class F>size_t AdaptiveStringColumn::LeafFind(const char* value,
         }
 }
 
-void AdaptiveStringColumn::LeafFindAll(Array &result, const char* value, size_t add_offset,
-                                       size_t start, size_t end) const
+void AdaptiveStringColumn::LeafFindAll(Array &result, const char* value, size_t add_offset, size_t start, size_t end) const
 {
     if (IsLongStrings()) {
         return ((ArrayStringLong*)m_array)->find_all(result, value, add_offset, start, end);

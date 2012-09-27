@@ -65,6 +65,7 @@ public:
     // FIXME: Need: size_t find_first_binary(size_t column_ndx, const char* value, size_t len) const;
 
     // Aggregate functions
+    template <int function>int64_t aggregate(size_t column_ndx) const;
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;
@@ -77,7 +78,6 @@ public:
 
 protected:
     friend class Table;
-    friend class Query;
     template <class R, class V> static R find_all_integer(V*, size_t, int64_t);
     template <class R, class V> static R find_all_string(V*, size_t, const char*);
 

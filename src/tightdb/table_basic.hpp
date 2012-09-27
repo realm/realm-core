@@ -78,6 +78,7 @@ public:
     using Table::clear;
     using Table::remove;
     using Table::optimize;
+    using Table::lookup;
 
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc) { set_dynamic_spec(); }
 
@@ -300,6 +301,8 @@ public:
     template<class, int, class> friend class _impl::QueryColumn;
 
     Query(): Spec::template ColNames<QueryCol, Query*>(this) {}
+
+    Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
 
     Query& group() { m_impl.group(); return *this; }
 

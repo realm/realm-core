@@ -421,6 +421,63 @@ TEST(Table_Index_String)
     CHECK_EQUAL(2, c1);
 }
 
+TIGHTDB_TABLE_2(LookupTable,
+                first,  String,
+                second, Int)
+
+TEST(Table_Lookup)
+{
+    LookupTable table;
+
+    table.add("jeff",     0);
+    table.add("jim",      1);
+    table.add("jennifer", 2);
+    table.add("john",     3);
+    table.add("jimmy",    4);
+    table.add("jimbo",    5);
+    table.add("johnny",   6);
+    table.add("jennifer", 7); //duplicate
+
+    // Do lookups with manual search
+    const size_t a0 = table.lookup("jeff");
+    const size_t a1 = table.lookup("jim");
+    const size_t a2 = table.lookup("jennifer");
+    const size_t a3 = table.lookup("john");
+    const size_t a4 = table.lookup("jimmy");
+    const size_t a5 = table.lookup("jimbo");
+    const size_t a6 = table.lookup("johnny");
+    const size_t a7 = table.lookup("jerry");
+    CHECK_EQUAL(0, a0);
+    CHECK_EQUAL(1, a1);
+    CHECK_EQUAL(2, a2);
+    CHECK_EQUAL(3, a3);
+    CHECK_EQUAL(4, a4);
+    CHECK_EQUAL(5, a5);
+    CHECK_EQUAL(6, a6);
+    CHECK_EQUAL(not_found, a7);
+
+    table.column().first.set_index();
+    CHECK(table.column().first.has_index());
+
+    // Do lookups using (cached) index
+    const size_t b0 = table.lookup("jeff");
+    const size_t b1 = table.lookup("jim");
+    const size_t b2 = table.lookup("jennifer");
+    const size_t b3 = table.lookup("john");
+    const size_t b4 = table.lookup("jimmy");
+    const size_t b5 = table.lookup("jimbo");
+    const size_t b6 = table.lookup("johnny");
+    const size_t b7 = table.lookup("jerry");
+    CHECK_EQUAL(0, b0);
+    CHECK_EQUAL(1, b1);
+    CHECK_EQUAL(2, b2);
+    CHECK_EQUAL(3, b3);
+    CHECK_EQUAL(4, b4);
+    CHECK_EQUAL(5, b5);
+    CHECK_EQUAL(6, b6);
+    CHECK_EQUAL(not_found, b7);
+}
+
 /*
 TEST(Table_Index_Int)
 {
@@ -438,7 +495,7 @@ TEST(Table_Index_Int)
     table.add(0,  9, true, Wed);
 
     // Create index for column two
-    table.column().second.set_index();
+//    table.cols().second.set_index();
 
     // Search for a value that does not exits
     const size_t r1 = table.column().second.find_first(2);
@@ -625,6 +682,9 @@ TEST(Table_SlabAlloc)
 }
 
 #include <tightdb/group.hpp>
+
+#ifndef _MSC_VER
+
 TEST(Table_Spec)
 {
     Group group;
@@ -689,6 +749,8 @@ TEST(Table_Spec)
         CHECK_EQUAL("test", subtable2->get_string(1, 0));
     }
 }
+
+#endif
 
 TEST(Table_Mixed)
 {

@@ -7,6 +7,9 @@ TIGHTDB_TABLE_2(TwoIntTable,
                 first,  Int,
                 second, Int)
 
+TIGHTDB_TABLE_1(OneIntTable,
+                first,  Int)
+
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
@@ -14,6 +17,66 @@ TIGHTDB_TABLE_2(TupleTableType,
 TIGHTDB_TABLE_2(BoolTupleTable,
                 first,  Int,
                 second, Bool)
+
+TEST(TestQueryStrIndexed_enum)
+{
+    TupleTableType ttt;
+
+    for(size_t t = 0; t < 10; t++) {
+        ttt.add(1, "a");
+        ttt.add(4, "b");
+        ttt.add(7, "c");
+        ttt.add(10, "a");
+        ttt.add(1, "b");
+        ttt.add(4, "c");
+    }
+
+    ttt.optimize();
+
+    ttt.column().second.set_index();
+
+    size_t s = ttt.where().second.equal("a").first.sum(ttt);
+    CHECK_EQUAL(10*11, s);
+
+    s = ttt.where().second.equal("a").first.equal(10).first.sum(ttt);
+    CHECK_EQUAL(100, s);
+
+    s = ttt.where().first.equal(10).second.equal("a").first.sum(ttt);
+    CHECK_EQUAL(100, s);
+
+    TupleTableType::View tv = ttt.where().second.equal("a").find_all(ttt);
+    CHECK_EQUAL(10*2, tv.size());
+}
+
+
+TEST(TestQueryStrIndexed_non_enum)
+{
+    TupleTableType ttt;
+
+    for(size_t t = 0; t < 10; t++) {
+        ttt.add(1, "a");
+        ttt.add(4, "b");
+        ttt.add(7, "c");
+        ttt.add(10, "a");
+        ttt.add(1, "b");
+        ttt.add(4, "c");
+    }
+
+    ttt.column().second.set_index();
+
+    size_t s = ttt.where().second.equal("a").first.sum(ttt);
+    CHECK_EQUAL(10*11, s);
+
+    s = ttt.where().second.equal("a").first.equal(10).first.sum(ttt);
+    CHECK_EQUAL(100, s);
+
+    s = ttt.where().first.equal(10).second.equal("a").first.sum(ttt);
+    CHECK_EQUAL(100, s);
+
+    TupleTableType::View tv = ttt.where().second.equal("a").find_all(ttt);
+    CHECK_EQUAL(10*2, tv.size());
+}
+
 
 TEST(TestQueryFindAll_Contains2_2)
 {
@@ -40,14 +103,70 @@ TEST(TestQueryFindAll_Contains2_2)
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
     CHECK_EQUAL(4, tv1.get_source_ndx(4));
     CHECK_EQUAL(5, tv1.get_source_ndx(5));
-#endif
-
     TupleTableType::Query q2 = ttt.where().second.contains("foO", true);
     TupleTableType::View tv2 = q2.find_all(ttt);
     CHECK_EQUAL(3, tv2.size());
     CHECK_EQUAL(3, tv2.get_source_ndx(0));
     CHECK_EQUAL(4, tv2.get_source_ndx(1));
     CHECK_EQUAL(5, tv2.get_source_ndx(2));
+#endif
+}
+
+TEST(TestQuery_sum_new_aggregates)
+{
+    // test the new ACTION_FIND_PATTERN() method in array
+
+    OneIntTable t;
+    for (size_t i = 0; i < 1000; i++) {
+        t.add(1);
+        t.add(2);
+        t.add(4);
+        t.add(6);
+    }
+    size_t c = t.where().first.equal(2).count(t);
+    CHECK_EQUAL(1000, c);
+
+    c = t.where().first.greater(2).count(t);
+    CHECK_EQUAL(2000, c);
+
+}
+
+TEST(TestQuery_sum_min_max_avg_foreign_col)
+{
+    TwoIntTable t;
+    t.add(1, 10);
+    t.add(2, 20);
+    t.add(2, 30);
+    t.add(3, 40);
+
+    CHECK_EQUAL(50, t.where().first.equal(2).second.sum(t));
+}
+
+
+TEST(TestAggregateSingleCond)
+{
+    OneIntTable ttt;
+
+    ttt.add(1);
+    ttt.add(2);
+    ttt.add(2);
+    ttt.add(3);
+    ttt.add(3);
+    ttt.add(4);
+
+    int64_t s = ttt.where().first.equal(2).first.sum(ttt);
+    CHECK_EQUAL(4, s);
+
+    s = ttt.where().first.greater(2).first.sum(ttt);
+    CHECK_EQUAL(10, s);
+
+    s = ttt.where().first.less(3).first.sum(ttt);
+    CHECK_EQUAL(5, s);
+
+    s = ttt.where().first.not_equal(3).first.sum(ttt);
+    CHECK_EQUAL(9, s);
+
+
 }
 
 TEST(TestQueryFindAll_range1)
@@ -78,17 +197,17 @@ TEST(TestQueryFindAll_range_or_monkey2)
     const size_t ROWS = 20;
     const size_t ITER = 1000;
 
-    for(size_t u = 0; u < ITER; u++)
+    for (size_t u = 0; u < ITER; u++)
     {
         TwoIntTable tit;
         Array a;
         size_t start = rand() % (ROWS + 1);
         size_t end = start + rand() % (ROWS + 1);
 
-        if(end > ROWS)
+        if (end > ROWS)
             end = ROWS;
 
-        for(size_t t = 0; t < ROWS; t++) {
+        for (size_t t = 0; t < ROWS; t++) {
             int64_t r1 = rand() % 10;
             int64_t r2 = rand() % 10;
             tit.add(r1, r2);
@@ -97,8 +216,8 @@ TEST(TestQueryFindAll_range_or_monkey2)
         TwoIntTable::Query q1 = tit.where().group().first.equal(3).Or().first.equal(7).end_group().second.greater(5);
         TwoIntTable::View tv1 = q1.find_all(tit, start, end);
 
-        for(size_t t = start; t < end; t++) {
-            if((tit[t].first == 3 || tit[t].first == 7) && tit[t].second > 5) {
+        for (size_t t = start; t < end; t++) {
+            if ((tit[t].first == 3 || tit[t].first == 7) && tit[t].second > 5) {
                 a.add(t);
             }
         }
@@ -106,8 +225,8 @@ TEST(TestQueryFindAll_range_or_monkey2)
         size_t s2 = tv1.size();
 
         CHECK_EQUAL(s1, s2);
-        for(size_t t = 0; t < a.Size(); t++) {
-            size_t i1 = a.Get(t);
+        for (size_t t = 0; t < a.Size(); t++) {
+            size_t i1 = a.GetAsSizeT(t);
             size_t i2 = tv1.get_source_ndx(t);
             CHECK_EQUAL(i1, i2);
         }
@@ -415,7 +534,7 @@ TEST(TestQuerySort_QuickSort)
     // Triggers QuickSort because range > len
     TupleTableType ttt;
 
-    for(size_t t = 0; t < 1000; t++)
+    for (size_t t = 0; t < 1000; t++)
         ttt.add(rand() % 1100, "a"); // 0
 
     TupleTableType::Query q = ttt.where();
@@ -423,7 +542,7 @@ TEST(TestQuerySort_QuickSort)
     tv.column().first.sort();
 
     CHECK(tv.size() == 1000);
-    for(size_t t = 1; t < tv.size(); t++) {
+    for (size_t t = 1; t < tv.size(); t++) {
         CHECK(tv[t].first >= tv[t-1].first);
     }
 }
@@ -433,7 +552,7 @@ TEST(TestQuerySort_CountSort)
     // Triggers CountSort because range <= len
     TupleTableType ttt;
 
-    for(size_t t = 0; t < 1000; t++)
+    for (size_t t = 0; t < 1000; t++)
         ttt.add(rand() % 900, "a"); // 0
 
     TupleTableType::Query q = ttt.where();
@@ -441,7 +560,7 @@ TEST(TestQuerySort_CountSort)
     tv.column().first.sort();
 
     CHECK(tv.size() == 1000);
-    for(size_t t = 1; t < tv.size(); t++) {
+    for (size_t t = 1; t < tv.size(); t++) {
         CHECK(tv[t].first >= tv[t-1].first);
     }
 }
@@ -451,7 +570,7 @@ TEST(TestQuerySort_Descending)
 {
     TupleTableType ttt;
 
-    for(size_t t = 0; t < 1000; t++)
+    for (size_t t = 0; t < 1000; t++)
         ttt.add(rand() % 1100, "a"); // 0
 
     TupleTableType::Query q = ttt.where();
@@ -459,7 +578,7 @@ TEST(TestQuerySort_Descending)
     tv.column().first.sort(false);
 
     CHECK(tv.size() == 1000);
-    for(size_t t = 1; t < tv.size(); t++) {
+    for (size_t t = 1; t < tv.size(); t++) {
         CHECK(tv[t].first <= tv[t-1].first);
     }
 }
@@ -525,8 +644,8 @@ TEST(TestQueryThreads)
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for(int i = 0; i < 100; i++) {
-        for(int j = 0; j < 10; j++) {
+    for (int i = 0; i < 100; i++) {
+        for (int j = 0; j < 10; j++) {
             ttt.add(5, "a");
             ttt.add(j, "b");
             ttt.add(6, "c");
@@ -543,7 +662,7 @@ TEST(TestQueryThreads)
     TupleTableType::View tv = q1.find_all(ttt);
 
     CHECK_EQUAL(100, tv.size());
-    for(int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
         const size_t expected = i*7*10 + 14 + 1;
         const size_t actual   = tv.get_source_ndx(i);
         CHECK_EQUAL(expected, actual);
@@ -610,6 +729,15 @@ TEST(TestQueryLimit)
     TupleTableType::View tv3 = q1.find_all(ttt, tv2.get_source_ndx(tv2.size() - 1) + 1, size_t(-1), 2);
     CHECK_EQUAL(1, tv3.size());
     CHECK_EQUAL(13, tv3.get_source_ndx(0));
+
+
+    TupleTableType::Query q2 = ttt.where();
+    TupleTableType::View tv4 = q2.find_all(ttt, 0, 5, 3);
+    CHECK_EQUAL(3, tv4.size());
+
+    TupleTableType::Query q3 = ttt.where();
+    TupleTableType::View tv5 = q3.find_all(ttt, 0, 3, 5);
+    CHECK_EQUAL(3, tv5.size());
 }
 
 TEST(TestQueryFindNext)

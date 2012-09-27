@@ -7,7 +7,9 @@ Dependencies
 ### Ubuntu 12.04
 
     sudo apt-get install build-essential
-    # For testing:
+    #   For regenerating <tightdb/table-macros.hpp>
+    sudo apt-get install python-cheetah
+    #   For testing:
     sudo apt-get install libunittest++-dev
     sudo apt-get install libproc-dev
 

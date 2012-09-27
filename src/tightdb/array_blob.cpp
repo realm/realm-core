@@ -57,11 +57,11 @@ void ArrayBlob::Replace(size_t start, size_t end, const char* data, size_t len)
     if (start != m_len && gapsize != len) {
         const size_t dst = start + len;
         const size_t src_len = m_len - end;
-        memmove(m_data + dst, m_data + end, src_len);
+        memmove(m_data + dst, m_data + end, src_len); // FIXME: Use std::copy() or std::copy_backward() instead!
     }
 
     // Insert the data
-    memcpy(m_data + start, data, len);
+    memcpy(m_data + start, data, len); // FIXME: Use std::copy() instead!
 
     m_len = newsize;
 }

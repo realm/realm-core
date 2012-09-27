@@ -243,7 +243,7 @@ void Table::CacheColumns()
                     new ColumnStringEnum(ref, values_ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->Size();
                 new_col = c;
-                ++ndx_in_parent; // advance one extra pos to account for keys/values pair
+                ++ndx_in_parent; // advance one matchcount pos to account for keys/values pair
             }
             break;
         case COLUMN_TYPE_TABLE:
@@ -289,7 +289,7 @@ void Table::CacheColumns()
             const size_t index_ref = m_columns.GetAsRef(pndx);
             new_col->SetIndexRef(index_ref, &m_columns, pndx);
 
-            ++ndx_in_parent; // advance one extra pos to account for index
+            ++ndx_in_parent; // advance one matchcount pos to account for index
             attr = COLUMN_ATTR_NONE;
         }
 
@@ -1227,6 +1227,38 @@ int64_t Table::minimum(size_t column_ndx) const
         }
     }
     return mv;
+}
+
+size_t Table::lookup(const char* value) const
+{
+    // First time we do a lookup we check if we can cache the index
+    if (!m_lookup_index) {
+        if (get_column_count() < 1)
+            return not_found; // no column to lookup in
+
+        const ColumnType type = GetRealColumnType(0);
+
+        if (type == COLUMN_TYPE_STRING) {
+            const AdaptiveStringColumn& column = GetColumnString(0);
+            if (!column.HasIndex())
+                return column.find_first(value);
+            else {
+                m_lookup_index = &column.GetIndex();
+            }
+        }
+        else if (type == COLUMN_TYPE_STRING_ENUM) {
+            const ColumnStringEnum& column = GetColumnStringEnum(0);
+            if (!column.HasIndex())
+                return column.find_first(value);
+            else {
+                m_lookup_index = &column.GetIndex();
+            }
+        }
+        else return not_found; // invalid column type
+    }
+
+    // Do lookup directly on cached index
+    return m_lookup_index->find_first(value);
 }
 
 size_t Table::find_first_int(size_t column_ndx, int64_t value) const
