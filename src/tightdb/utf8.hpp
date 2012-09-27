@@ -20,8 +20,6 @@
 #ifndef TIGHTDB_UTF8_HPP
 #define TIGHTDB_UTF8_HPP
 
-#include <crtdefs.h>
-
 namespace tightdb {
 
 bool case_cmp(const char* constant_upper, const char* constant_lower, const char* source);
