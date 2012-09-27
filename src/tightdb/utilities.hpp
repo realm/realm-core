@@ -30,11 +30,7 @@
     #define WINDOWS
 #endif
 
-#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-    #define X86X64
-#endif
-
-#if defined(X86X64) && (defined(__GNUC__) || defined(__INTEL_COMPILER))
+#if defined(TIGHTDB_X86X64) && (defined(__GNUC__) || defined(__INTEL_COMPILER))
     #define tdb_likely(x) __builtin_expect (x, 1)
     #define tdb_unlikely(x) __builtin_expect (x, 0)
 #else
@@ -57,6 +53,8 @@ typedef struct {
 } checksum_t;
 
 size_t TO_REF(int64_t v);
+size_t TO_SIZET(int64_t v);
+
 unsigned long long checksum(unsigned char* data, size_t len);
 void checksum_rolling(unsigned char* data, size_t len, checksum_t* t);
 void* round_up(void* p, size_t align);

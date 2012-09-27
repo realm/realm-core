@@ -14,6 +14,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/index.hpp>
 #include <tightdb/query_conditions.hpp>
+#include <tightdb/query_engine.hpp>
 
 using namespace std;
 
@@ -38,76 +39,11 @@ const Column GetColumnFromRef(const Array& parent, size_t ndx)
 */
 
 // Pre-declare local functions
-bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state);
-bool callme_count(Array* a, size_t start, size_t end, size_t caller_base, void* state);
-bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
-bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
 bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
 void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres);
 void merge_core(const Array& a0, const Array& a1, Array& res);
 Array* merge(const Array& ArrayList);
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
-
-bool callme_sum(Array* a, size_t start, size_t end, size_t caller_base, void* state)
-{
-    (void)caller_base;
-    const int64_t s = a->sum(start, end);
-    *(int64_t *)state += s;
-    return true;
-}
-
-struct CountState {
-    int64_t target;
-    size_t  count;
-};
-
-bool callme_count(Array* a, size_t start, size_t end, size_t caller_base, void* state)
-{
-    static_cast<void>(start);
-    static_cast<void>(end);
-    static_cast<void>(caller_base);
-    CountState& cstate = *(CountState*)state;
-    const size_t s = a->count(cstate.target);
-    cstate.count += s;
-    return true;
-}
-
-class AggregateState {
-public:
-    AggregateState() : isValid(false), result(0) {}
-    bool    isValid;
-    int64_t result;
-};
-
-bool callme_min(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
-{
-    (void)caller_offset;
-    AggregateState* p = (AggregateState*)state;
-
-    int64_t res;
-    if (!a->minimum(res, start, end)) return true;
-
-    if (!p->isValid || (res < p->result)) {
-        p->result  = res;
-        p->isValid = true;
-    }
-    return true;
-}
-
-bool callme_max(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
-{
-    (void)caller_offset;
-    AggregateState* p = (AggregateState*)state;
-
-    int64_t res;
-    if (!a->maximum(res, start, end)) return true;
-
-    if (!p->isValid || (res > p->result)) {
-        p->result  = res;
-        p->isValid = true;
-    }
-    return true;
-}
 
 // Input:
 //     vals:   An array of values
@@ -130,34 +66,34 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
     v0 = vals->Get(i0);
     v1 = vals->Get(i1);
 
-    for(;;) {
-        if(v0 < v1) {
+    for (;;) {
+        if (v0 < v1) {
             idxres->add(i0);
             // Only check p0 if it has been modified :)
-            if(p0 == s0)
+            if (p0 == s0)
                 break;
             i0 = idx0->GetAsRef(p0++);
             v0 = vals->Get(i0);
         }
         else {
             idxres->add(i1);
-            if(p1 == s1)
+            if (p1 == s1)
                 break;
             i1 = idx1->GetAsRef(p1++);
             v1 = vals->Get(i1);
         }
     }
 
-    if(p0 == s0)
+    if (p0 == s0)
         p0--;
     else
         p1--;
 
-    while(p0 < s0) {
+    while (p0 < s0) {
         i0 = idx0->GetAsRef(p0++);
         idxres->add(i0);
     }
-    while(p1 < s1) {
+    while (p1 < s1) {
         i1 = idx1->GetAsRef(p1++);
         idxres->add(i1);
     }
@@ -216,45 +152,46 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
 //     Merge-sorted array of all values
 Array* merge(const Array& arrayList)
 {
-    const size_t count = arrayList.Size();
+    const size_t size = arrayList.Size();
 
-    if (count == 1) return NULL; // already sorted
+    if (size == 1) 
+        return NULL; // already sorted
 
-    Array Left, Right;
-    const size_t left = count / 2;
-    for (size_t t = 0; t < left; ++t)
-        Left.add(arrayList.Get(t));
-    for (size_t t = left; t < count; ++t)
-        Right.add(arrayList.Get(t));
-
-    Array* l = NULL;
-    Array* r = NULL;
-    Array* res = new Array();
+    Array leftHalf, rightHalf;
+    const size_t leftSize = size / 2;
+    for (size_t t = 0; t < leftSize; ++t)
+        leftHalf.add(arrayList.Get(t));
+    for (size_t t = leftSize; t < size; ++t)
+        rightHalf.add(arrayList.Get(t));
 
     // We merge left-half-first instead of bottom-up so that we access the same data in each call
     // so that it's in cache, at least for the first few iterations until lists get too long
-    l = merge(Left);
-    r = merge(Right);
-    if (l && r)
-        merge_core(*l, *r, *res);
-    else if (l) {
-        const size_t ref = Right.Get(0);
-        Array r0(ref, NULL);
-        merge_core(*l, r0, *res);
+    Array* left = merge(leftHalf);
+    Array* right = merge(rightHalf);
+    Array* res = new Array();
+
+    if (left && right)
+        merge_core(*left, *right, *res);
+    else if (left) {
+        const size_t ref = rightHalf.GetAsRef(0);
+        Array right0(ref, NULL);
+        merge_core(*left, right0, *res);
     }
-    else if (r) {
-        const size_t ref = Left.Get(0);
-        Array l0(ref, NULL);
-        merge_core(l0, *r, *res);
+    else if (right) {
+        const size_t ref = leftHalf.GetAsRef(0);
+        Array left0(ref, NULL);
+        merge_core(left0, *right, *res);
     }
 
     // Clean-up
-    Left.Destroy();
-    Right.Destroy();
-    if (l) l->Destroy();
-    if (r) r->Destroy();
-    delete l;
-    delete r;
+    leftHalf.Destroy();
+    rightHalf.Destroy();
+    if (left) 
+        left->Destroy();
+    if (right) 
+        right->Destroy();
+    delete left;
+    delete right;
 
     return res; // receiver now own the array, and has to delete it when done
 }
@@ -267,36 +204,36 @@ Array* merge(const Array& arrayList)
 // TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 {
-    if(indexlists->Size() == 1) {
+    if (indexlists->Size() == 1) {
 //      size_t ref = valuelist->Get(0);
         *indexresult = (Array *)indexlists->Get(0);
         return;
     }
 
-    Array LeftV, RightV;
-    Array LeftI, RightI;
-    size_t left = indexlists->Size() / 2;
-    for(size_t t = 0; t < left; t++) {
-        LeftV.add(indexlists->Get(t));
-        LeftI.add(indexlists->Get(t));
+    Array leftV, rightV;
+    Array leftI, rightI;
+    size_t leftSize = indexlists->Size() / 2;
+    for (size_t t = 0; t < leftSize; t++) {
+        leftV.add(indexlists->Get(t));
+        leftI.add(indexlists->Get(t));
     }
-    for(size_t t = left; t < indexlists->Size(); t++) {
-        RightV.add(indexlists->Get(t));
-        RightI.add(indexlists->Get(t));
+    for (size_t t = leftSize; t < indexlists->Size(); t++) {
+        rightV.add(indexlists->Get(t));
+        rightI.add(indexlists->Get(t));
     }
 
     Array *li;
     Array *ri;
 
-    Array *ResI = new Array();
+    Array *resI = new Array();
 
     // We merge left-half-first instead of bottom-up so that we access the same data in each call
     // so that it's in cache, at least for the first few iterations until lists get too long
-    merge_references(valuelist, &LeftI, &ri);
-    merge_references(valuelist, &RightI, &li);
-    merge_core_references(valuelist, li, ri, ResI);
+    merge_references(valuelist, &leftI, &ri);
+    merge_references(valuelist, &rightI, &li);
+    merge_core_references(valuelist, li, ri, resI);
 
-    *indexresult = ResI;
+    *indexresult = resI;
 }
 
 bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
@@ -486,32 +423,97 @@ bool Column::Insert(size_t ndx, int64_t value)
     return true;
 }
 
+template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, size_t start, size_t end, size_t *matchcount) const
+{ 
+#if 1
+    if (end == size_t(-1)) 
+        end = ((Column*)this)->Size();
+    Column* m_column = (Column*)this;
+   
+    // We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
+    // slower because of initial overhead).
+    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
+    new (node) NODE<int64_t, Column, cond>(target, 0);
+
+//    static NODE<int64_t, Column, cond> node(target, NULL);
+
+    node->QuickInit(m_column, target);
+    int64_t r = node->aggregate<action>(0, start, end, size_t(-1), size_t(-1), matchcount);
+
+    return r;
+#else
+    // Experimental
+
+    if (end == size_t(-1)) end = ((Column*)this)->Size();
+    Column* m_column = (Column*)this;
+    // To make column aggregates fast on few number of values we need low initial overhead
+    // so we allocate Array instance from stack and use fast constructor intended for read-only use
+    // with GetDirect():
+
+//    #define ARRAYPTR
+
+//    Array *m_array = (Array*)alloca(sizeof(Array));     // Fast
+//    new (m_array) Array(false);
+
+    static Array m_array;                            // Fast but very bad practise
+    // Array m_array;                                   // Around 10 times slower for 1000 items
+    // Array *m_array = new Array(false);               // Also 10 times slower
+
+    size_t m_leaf_start = 0;
+    size_t m_leaf_end = 0;
+    size_t m_local_end = 0;
+    state_state state;
+
+#ifdef ARRAYPTR
+    m_array->state_init(action, &state, NULL);
+#else
+    m_array.state_init(action, &state, NULL);
+#endif
+
+    for (size_t s = start; s < end; ) {
+        // Cache internal leafs
+        if (s >= m_leaf_end) {
+#ifdef ARRAYPTR
+            m_column->GetBlock(s, *m_array, m_leaf_start);
+            const size_t leaf_size = m_array->Size();
+#else
+            m_column->GetBlock(s, m_array, m_leaf_start);
+            const size_t leaf_size = m_array.Size();
+#endif
+            m_leaf_end = m_leaf_start + leaf_size;
+            const size_t e = end - m_leaf_start;
+            m_local_end = leaf_size < e ? leaf_size : e;
+        }
+#ifdef ARRAYPTR
+        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
+#else
+        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
+#endif
+        s = m_leaf_end;
+    }
+
+    return state.state;
+#endif
+}
+
 size_t Column::count(int64_t target) const
 {
-    CountState state = {target, 0};
-    TreeVisitLeafs<Array, Column>(0, Size(), 0, callme_count, (void *)&state);
-    return state.count;
+    return size_t(aggregate<TDB_COUNT, EQUAL>(target, 0, ((Column*)this)->Size()));
 }
 
 int64_t Column::sum(size_t start, size_t end) const
 {
-    int64_t sum = 0;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_sum, (void *)&sum);
-    return sum;
+    return aggregate<TDB_SUM, NONE>(0, start, end);
 }
 
 int64_t Column::minimum(size_t start, size_t end) const
 {
-    AggregateState state;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_min, (void *)&state);
-    return state.result; // will return zero for empty ranges
+    return aggregate<TDB_MIN, NONE>(0, start, end);
 }
 
 int64_t Column::maximum(size_t start, size_t end) const
 {
-    AggregateState state;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_max, (void *)&state);
-    return state.result; // will return zero for empty ranges
+    return aggregate<TDB_MAX, NONE>(0, start, end);
 }
 
 void Column::sort(size_t start, size_t end)
@@ -528,7 +530,7 @@ void Column::sort(size_t start, size_t end)
     if (sorted) {
         // Todo, this is a bit slow. Add bulk insert or the like to Column
         const size_t count = sorted->Size();
-        for(size_t t = 0; t < count; ++t) {
+        for (size_t t = 0; t < count; ++t) {
             Set(t, sorted->Get(t));
         }
 
@@ -550,14 +552,14 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&values);
 
     size_t offset = 0;
-    for(size_t t = 0; t < values.Size(); t++) {
+    for (size_t t = 0; t < values.Size(); t++) {
         Array *i = new Array();
         size_t ref = values.GetAsRef(t);
         Array v(ref);
-        for(size_t j = 0; j < v.Size(); j++)
+        for (size_t j = 0; j < v.Size(); j++)
             all_values.add(v.Get(j));
         v.ReferenceSort(*i);
-        for(size_t n = 0; n < v.Size(); n++)
+        for (size_t n = 0; n < v.Size(); n++)
             i->Set(n, i->Get(n) + offset);
         offset += v.Size();
         indexes.add((int64_t)i);
@@ -567,7 +569,7 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
 
     merge_references(&all_values, &indexes, &ResI);
 
-    for(size_t t = 0; t < ResI->Size(); t++)
+    for (size_t t = 0; t < ResI->Size(); t++)
         ref.add(ResI->Get(t));
 }
 
@@ -705,8 +707,7 @@ size_t Column::find_first(int64_t value, size_t start, size_t end) const
     }
 }
 
-void Column::find_all(Array& result, int64_t value, size_t caller_offset,
-                     size_t start, size_t end) const
+void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t start, size_t end) const
 {
     (void)caller_offset;
     TIGHTDB_ASSERT(start <= Size());
@@ -715,10 +716,9 @@ void Column::find_all(Array& result, int64_t value, size_t caller_offset,
     TreeFindAll<int64_t, Column>(result, value, 0, start, end);
 }
 
-void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset,
-                         size_t start, size_t end) const
+void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const
 {
-    return m_array->find_all(result, value, add_offset, start, end);
+	m_array->find_all(result, value, add_offset, start, end);
 }
 
 void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const

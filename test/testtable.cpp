@@ -438,7 +438,7 @@ TEST(Table_Index_Int)
     table.add(0,  9, true, Wed);
 
     // Create index for column two
-    table.column().second.set_index();
+//    table.cols().second.set_index();
 
     // Search for a value that does not exits
     const size_t r1 = table.column().second.find_first(2);
@@ -625,6 +625,9 @@ TEST(Table_SlabAlloc)
 }
 
 #include <tightdb/group.hpp>
+
+#ifndef _MSC_VER
+
 TEST(Table_Spec)
 {
     Group group;
@@ -689,6 +692,8 @@ TEST(Table_Spec)
         CHECK_EQUAL("test", subtable2->get_string(1, 0));
     }
 }
+
+#endif
 
 TEST(Table_Mixed)
 {

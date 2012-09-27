@@ -6,11 +6,13 @@
 #include <tightdb/column.hpp>
 
 #if defined(_MSC_VER) && defined(_DEBUG)
-    #include <vld.h>
+//    #include <vld.h>
 #endif
 
 using namespace std;
 
+#include <tightdb/array.hpp>
+using namespace tightdb;
 
 int main(int argc, char* argv[])
 {
@@ -22,7 +24,7 @@ int main(int argc, char* argv[])
     cout << "Running Release unit tests\n\n";
 #endif
 
-    const int res = UnitTest::RunAllTests();
+    const int res =UnitTest::RunAllTests();
 
 #ifdef _MSC_VER
     getchar(); // wait for key

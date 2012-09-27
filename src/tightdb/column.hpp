@@ -27,7 +27,7 @@
 #endif
 //#include <climits> // size_t
 #include <cstdlib> // size_t
-
+#include "query_conditions.hpp"
 #include <tightdb/array.hpp>
 
 namespace tightdb {
@@ -104,10 +104,7 @@ protected:
     template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
     template<typename T, class C> void TreeDelete(size_t ndx);
     template<typename T, class C> void TreeFindAll(Array &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
-
     template<typename T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T *arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const;
-
-
     template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 
     // Node functions
@@ -130,7 +127,6 @@ protected:
 
     // Member variables
     mutable Array* m_array;
-
     static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
 };
 
@@ -190,8 +186,8 @@ public:
 
     // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
-    void GetBlock(size_t ndx, Array& arr, size_t& off) const {
-        m_array->GetBlock(ndx, arr, off);
+    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const {
+        return m_array->GetBlock(ndx, arr, off, use_retval);
     }
 
     // Index
@@ -203,6 +199,7 @@ public:
 
     size_t GetRef() const {return m_array->GetRef();}
     Allocator& GetAllocator() const {return m_array->GetAllocator();}
+    Array* GetArray(void) {return m_array;}
 
     void sort();
 
@@ -226,14 +223,13 @@ protected:
     bool LeafSet(size_t ndx, int64_t value) {return m_array->Set(ndx, value);}
     bool LeafInsert(size_t ndx, int64_t value) {return m_array->Insert(ndx, value);}
     void LeafDelete(size_t ndx) {m_array->Delete(ndx);}
-
     template<class F> size_t LeafFind(int64_t value, size_t start, size_t end) const
     {
-        return m_array->Query<F>(value, start, end);
+        return m_array->find_first<F>(value, start, end);
     }
 
     void DoSort(size_t lo, size_t hi);
-
+    template <ACTION action, class cond>int64_t aggregate(int64_t target, size_t start, size_t end, size_t *matchcount = 0) const;
     // Member variables
     Index* m_index;
 

@@ -243,7 +243,7 @@ void Table::CacheColumns()
                     new ColumnStringEnum(ref, values_ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->Size();
                 new_col = c;
-                ++ndx_in_parent; // advance one extra pos to account for keys/values pair
+                ++ndx_in_parent; // advance one matchcount pos to account for keys/values pair
             }
             break;
         case COLUMN_TYPE_TABLE:
@@ -289,7 +289,7 @@ void Table::CacheColumns()
             const size_t index_ref = m_columns.GetAsRef(pndx);
             new_col->SetIndexRef(index_ref, &m_columns, pndx);
 
-            ++ndx_in_parent; // advance one extra pos to account for index
+            ++ndx_in_parent; // advance one matchcount pos to account for index
             attr = COLUMN_ATTR_NONE;
         }
 

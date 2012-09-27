@@ -381,8 +381,7 @@ template<class F>size_t AdaptiveStringColumn::LeafFind(const char* value,
         }
 }
 
-void AdaptiveStringColumn::LeafFindAll(Array &result, const char* value, size_t add_offset,
-                                       size_t start, size_t end) const
+void AdaptiveStringColumn::LeafFindAll(Array &result, const char* value, size_t add_offset, size_t start, size_t end) const
 {
     if (IsLongStrings()) {
         return ((ArrayStringLong*)m_array)->find_all(result, value, add_offset, start, end);

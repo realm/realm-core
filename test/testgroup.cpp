@@ -1,3 +1,4 @@
+
 #include <UnitTest++.h>
 #include <tightdb.hpp>
 
@@ -439,6 +440,8 @@ TEST(Group_Persist) {
 }
 #endif
 
+#ifndef _MSC_VER
+
 TEST(Group_Subtable)
 {
     int n = 1;
@@ -669,7 +672,9 @@ TEST(Group_Subtable)
     }
 }
 
+#endif
 
+#ifndef _MSC_VER
 
 TEST(Group_MultiLevelSubtables)
 {
@@ -804,7 +809,7 @@ TEST(Group_MultiLevelSubtables)
     }
 }
 
-
+#endif
 
 namespace {
 
@@ -1026,3 +1031,4 @@ TEST(Group_ToDot)
 #endif //TIGHTDB_TO_DOT
 #endif // TIGHTDB_DEBUG
 #endif
+
