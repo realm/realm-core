@@ -36,6 +36,7 @@ using std::time_t;
 
 class TableView;
 class ConstTableView;
+class StringIndex;
 
 
 /// The Table class is non-polymorphic, that is, it has no virtual
@@ -187,6 +188,7 @@ public:
     int64_t minimum(size_t column_ndx) const;
 
     // Searching
+    size_t         lookup(const char* value) const;
     size_t         find_first_int(size_t column_ndx, int64_t value) const;
     size_t         find_first_bool(size_t column_ndx, bool value) const;
     size_t         find_first_date(size_t column_ndx, time_t value) const;
@@ -349,6 +351,8 @@ private:
     void invalidate();
 
     mutable size_t m_ref_count;
+    mutable const StringIndex* m_lookup_index;
+
     void bind_ref() const { ++m_ref_count; }
     void unbind_ref() const { if (--m_ref_count == 0) delete this; }
 
@@ -412,7 +416,7 @@ inline size_t Table::create_empty_table(Allocator& alloc)
 }
 
 inline Table::Table(Allocator& alloc):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1), m_lookup_index(NULL)
 {
     const size_t ref = create_empty_table(alloc);
     if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
@@ -421,14 +425,14 @@ inline Table::Table(Allocator& alloc):
 
 inline Table::Table(RefCountTag, Allocator& alloc, size_t top_ref,
                     Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0), m_lookup_index(NULL)
 {
     init_from_ref(top_ref, parent, ndx_in_parent);
 }
 
 inline Table::Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
                     Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0), m_lookup_index(NULL)
 {
     init_from_ref(spec_ref, columns_ref, parent, ndx_in_parent);
 }
