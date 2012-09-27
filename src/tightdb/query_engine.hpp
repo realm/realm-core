@@ -701,14 +701,20 @@ public:
                 f1 = m_last1;
             else {
                 f1 = m_cond1->find_first(s, end);
-                m_last1 = f1;
+                if(f1 == end)
+                    m_last1 = size_t(-1);
+                else
+                    m_last1 = f1;
             }
 
             if (m_last2 >= s && m_last2 != (size_t)-1)
                 f2 = m_last2;
             else {
                 f2 = m_cond2->find_first(s, end);
-                m_last2 = f2;
+                if(f2 == end)
+                    m_last2 = size_t(-1);
+                else
+                    m_last2 = f2;
             }
             s = f1 < f2 ? f1 : f2;
 
