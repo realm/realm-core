@@ -193,7 +193,7 @@ case "$MODE" in
                 tar czf "$TEMP_DIR/core.tar.gz" src/tightdb/Makefile src/tightdb/*.h src/tightdb/*.hpp src/tightdb/libtightdb* src/Makefile src/*.hpp test/Makefile test-installed/Makefile test-installed/*.cpp config.mk generic.mk Makefile build.sh || exit 1
                 mkdir "$PKG_DIR/tightdb" || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/core.tar.gz") || exit 1
-                echo "NO_BUILD_ON_INSTALL = 1" >> "$PKG_DIR/tightdb/config.mk"
+                echo -e "\nNO_BUILD_ON_INSTALL = 1" >> "$PKG_DIR/tightdb/config.mk"
                 cat <<EOI > "$PKG_DIR/build"
 #!/bin/sh
 
