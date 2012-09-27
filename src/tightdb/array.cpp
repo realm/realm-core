@@ -731,29 +731,29 @@ size_t Array::FindPos2(int64_t target) const
 }
 
 
-size_t FirstSetBit(unsigned int v)
+size_t Array::FirstSetBit(unsigned int v) const
 {
-    #if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
-        unsigned long ul;
-        // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
-        _BitScanForward(&ul, v);
-        return ul;
-    #elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
-        return __builtin_clz(v);
-    #else
-        int r;
-        static const int MultiplyDeBruijnBitPosition[32] = 
-        {
-            0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
-            31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
-        };
+#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
+    unsigned long ul;
+    // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
+    _BitScanForward(&ul, v);
+    return ul;
+#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
+    return __builtin_clz(v);
+#else
+    int r;
+    static const int MultiplyDeBruijnBitPosition[32] = 
+    {
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
+        31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+    };
 
-    r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
-    return r;
+r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
+return r;
 #endif
 }
 
-size_t FirstSetBit64(int64_t v)
+size_t Array::FirstSetBit64(int64_t v) const
 {
 #if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
     unsigned long ul;
@@ -2209,80 +2209,6 @@ void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t en
     }
 }
 
-size_t Array::FirstSetBit(unsigned int v) const
-{
-    if (v & 1)
-        return 0;
-
-        int r;
-        static const int MultiplyDeBruijnBitPosition[32] = 
-        {
-            0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
-            31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
-        };
-
-        r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
-        return r;
-
-
-    #if defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
-        unsigned long ul;
-        // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
-        _BitScanForward(&ul, v);
-        return ul;
-    #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
-        return __builtin_clz(v);
-    #else
-        int r;
-        static const int MultiplyDeBruijnBitPosition[32] = 
-        {
-            0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
-            31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
-        };
-
-        r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
-        return r;
-    #endif
-}
-
-size_t Array::FirstSetBit64(int64_t v) const
-{
-    if (v & 1)
-        return 0;
-
-
-        unsigned int v0 = (unsigned int)v;
-        unsigned int v1 = (unsigned int)(v >> 32);
-        size_t r;
-
-        if (v0 != 0)
-            r = FirstSetBit(v0);
-        else
-            r = FirstSetBit(v1) + 32;
-
-        return r;
-
-
-    #if defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
-        unsigned long ul;
-        _BitScanForward64(&ul, v);
-        return ul;
-
-    #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
-        return __builtin_clzll(v);
-    #else
-        unsigned int v0 = (unsigned int)v;
-        unsigned int v1 = (unsigned int)(v >> 32);
-        size_t r;
-
-        if (v0 != 0)
-            r = FirstSetBit(v0);
-        else
-            r = FirstSetBit(v1) + 32;
-
-        return r;
-#endif
-}
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
