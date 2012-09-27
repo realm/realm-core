@@ -650,7 +650,7 @@ class OR_NODE: public ParentNode {
 public:
     template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {TIGHTDB_ASSERT(false); return 0;}
 
-    OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond1 = p1; m_cond2 = NULL;};
+    OR_NODE(ParentNode* p1) {m_child = NULL; m_cond1 = p1; m_cond2 = NULL;};
 
 
     void Init(const Table& table)
@@ -704,6 +704,8 @@ public:
                 f1 = m_last1;
             else {
                 f1 = m_cond1->find_first(s, end);
+                if(f1 == end)
+                    m_last1 = size_t(-1);
                 m_last1 = f1;
             }
 
@@ -757,7 +759,6 @@ public:
 private:
     size_t m_last1;
     size_t m_last2;
-    const Table* m_table;
 };
 
 
