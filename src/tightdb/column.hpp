@@ -158,6 +158,7 @@ public:
     // Getting and setting values
     int64_t Get(size_t ndx) const;
     size_t GetAsRef(size_t ndx) const;
+    int64_t Back() const {return Get(Size()-1);}
     bool Set(size_t ndx, int64_t value);
     void insert(size_t ndx) { Insert(ndx, 0); } // FIXME: Ignoring boolean return value here!
     bool Insert(size_t ndx, int64_t value);
@@ -179,11 +180,13 @@ public:
     bool Reserve(size_t len, size_t width=8);
 
     bool Increment64(int64_t value, size_t start=0, size_t end=-1);
+    void IncrementIf(int64_t limit, int64_t value);
     size_t find_first(int64_t value, size_t start=0, size_t end=-1) const;
 
     void find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
     void find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     size_t find_pos(int64_t value) const;
+    size_t find_pos2(int64_t value) const;
 
     // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
