@@ -377,9 +377,11 @@ public:
     bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
     
     // SSE find for the four functions EQUAL/NOTEQUAL/LESS/GREATER 
+#ifdef USE_SSE42
     template <class cond2, ACTION action, size_t width, class Callback> 
     size_t FindSSE(int64_t value, __m128i *data, size_t items, state_state *state, size_t baseindex, Callback callback) const;
-    
+#endif
+
     template <size_t width> inline bool TestZero(uint64_t value) const;         // Tests value for 0-elements
     template <bool eq, size_t width>size_t FindZero(uint64_t v) const;          // Finds position of 0/non-zero element
     template <ACTION action> bool USES_VAL(void);                               // Helps compiler knowing that a Get()'ed value is unused
