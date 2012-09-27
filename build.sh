@@ -8,7 +8,8 @@ MODE="$1"
 
 EXTENSIONS="java python objc node php gui"
 
-MAKE="make -j8"
+NUM_PROCESSORS=""
+MAKE="make"
 ARCH_FLAGS=""
 LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 
@@ -20,6 +21,15 @@ if [ "$OS" = "Darwin" ]; then
     # Construct fat binaries on Darwin
     ARCH_FLAGS="-arch i386 -arch x86_64"
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
+    NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
+else
+    if [ -r /proc/cpuinfo ]; then
+        NUM_PROCESSORS="$(cat /proc/cpuinfo | egrep 'processor[[:space:]]*:' | wc -l)" || exit 1
+    fi
+fi
+
+if [ "$NUM_PROCESSORS" ]; then
+    MAKE="$MAKE -j$NUM_PROCESSORS"
 fi
 
 
