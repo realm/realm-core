@@ -1,3 +1,4 @@
+#include <limits>
 #include <vector>
 #include <iostream>
 #include <iomanip>
@@ -1556,7 +1557,7 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
 
 size_t Array::CalcItemCount(size_t bytes, size_t width) const
 {
-    if (width == 0) return (size_t)-1; // zero width gives infinite space
+    if (width == 0) return numeric_limits<size_t>::max(); // zero width gives "infinite" space
 
     const size_t bytes_data = bytes - 8; // ignore 8 byte header
     const size_t total_bits = bytes_data * 8;

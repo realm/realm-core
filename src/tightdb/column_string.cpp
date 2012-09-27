@@ -348,7 +348,8 @@ bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
 
     // Copy strings to new array
     ArrayString* const oldarray = (ArrayString*)m_array;
-    for (size_t i = 0; i < oldarray->Size(); ++i) {
+    const size_t n = oldarray->Size();
+    for (size_t i=0; i<n; ++i) {
         newarray->add(oldarray->Get(i));
     }
     newarray->Insert(ndx, value, len);
