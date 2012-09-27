@@ -15,6 +15,8 @@
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 
+using namespace std;
+
 namespace {
 
 const size_t initial_capacity = 128;
