@@ -64,6 +64,9 @@ public:
                 m_array.FIND_ACTION<action>(r, 0, &state, &tightdb_dummy);  
         }
 
+        if (matchcount)
+            *matchcount = int64_t(state.match_count);
+
         return state.state;
 
     }
@@ -701,20 +704,14 @@ public:
                 f1 = m_last1;
             else {
                 f1 = m_cond1->find_first(s, end);
-                if(f1 == end)
-                    m_last1 = size_t(-1);
-                else
-                    m_last1 = f1;
+                m_last1 = f1;
             }
 
             if (m_last2 >= s && m_last2 != (size_t)-1)
                 f2 = m_last2;
             else {
                 f2 = m_cond2->find_first(s, end);
-                if(f2 == end)
-                    m_last2 = size_t(-1);
-                else
-                    m_last2 = f2;
+                m_last2 = f2;
             }
             s = f1 < f2 ? f1 : f2;
 
