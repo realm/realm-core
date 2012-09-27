@@ -100,11 +100,13 @@ public:
             return m_child->Verify();
     };
 
+protected:
+    friend class Query;
     ParentNode* m_child;
-    int m_cond;
-    size_t m_column_id;
 
 protected:
+    int m_cond;
+    size_t m_column_id;
     const Table* m_table;
     std::string m_error_code;
     Array m_array; 
