@@ -652,36 +652,42 @@ class OR_NODE: public ParentNode {
 public:
     template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {TIGHTDB_ASSERT(false); return 0;}
 
-    OR_NODE(ParentNode* p1) {m_child = NULL; m_cond1 = p1; m_cond2 = NULL;};
-
+    OR_NODE(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
 
     void Init(const Table& table)
     {
-        m_cond1->Init(table);
-        m_cond2->Init(table);
+        for(size_t c = 0; c < 2; ++c) {
+            m_cond[c]->Init(table);
+            m_last[c] = 0;
+            m_was_match[c] = false;
+        }
 
         if (m_child)
             m_child->Init(table);
 
-        m_last1 = size_t(-1);
-        m_last2 = size_t(-1);
-
         m_table = &table;
     }
 
-// Keep old un-optimized or code until new has been sufficiently tested
-#if 0
     size_t find_first(size_t start, size_t end)
     {
         for (size_t s = start; s < end; ++s) {
-            // Todo, redundant searches can occur
-            // We have to init here to reset nodes internal
-            // leaf cache (since we may go backwards)
-            m_cond1->Init(*m_table);
-            m_cond2->Init(*m_table);
-            const size_t f1 = m_cond1->find_first(s, end);
-            const size_t f2 = m_cond2->find_first(s, end);
-            s = f1 < f2 ? f1 : f2;
+            size_t f[2];
+
+            for(size_t c = 0; c < 2; ++c) {
+                if(m_last[c] >= end)
+                    f[c] = end;
+                else if(m_was_match[c] && m_last[c] >= s)
+                    f[c] = m_last[c];
+                else {
+                    size_t fmax = m_last[c] > s ? m_last[c] : s;
+                    f[c] = m_cond[c]->find_first(fmax, end);
+                    m_was_match[c] = (f[c] != end);
+                    m_last[c] = f[c];
+                }
+            }
+
+            s = f[0] < f[1] ? f[0] : f[1];
+            s = s > end ? end : s;
 
             if (m_child == 0)
                 return s;
@@ -692,75 +698,37 @@ public:
                 else
                     s = a - 1;
             }
+
         }
         return end;
     }
-#else
-    size_t find_first(size_t start, size_t end)
-    {
-        for (size_t s = start; s < end; ++s) {
-            size_t f1;
-            size_t f2;
-
-            if (m_last1 >= s && m_last1 != (size_t)-1)
-                f1 = m_last1;
-            else {
-                f1 = m_cond1->find_first(s, end);
-                if(f1 == end)
-                    m_last1 = size_t(-1);
-                m_last1 = f1;
-            }
-
-            if (m_last2 >= s && m_last2 != (size_t)-1)
-                f2 = m_last2;
-            else {
-                f2 = m_cond2->find_first(s, end);
-                m_last2 = f2;
-            }
-            s = f1 < f2 ? f1 : f2;
-
-            if (m_child == 0)
-                return s;
-            else {
-                const size_t a = m_child->find_first(s, end);
-                if (s == a)
-                    return s;
-                else
-                    s = a - 1;
-            }
-        }
-        return end;
-    }
-#endif
-
 
     virtual std::string Verify(void)
     {
         if (m_error_code != "")
             return m_error_code;
-        if (m_cond1 == 0)
+        if (m_cond[0] == 0)
             return "Missing left-hand side of OR";
-        if (m_cond2 == 0)
+        if (m_cond[1] == 0)
             return "Missing right-hand side of OR";
         std::string s;
         if (m_child != 0)
             s = m_child->Verify();
         if (s != "")
             return s;
-        s = m_cond1->Verify();
+        s = m_cond[0]->Verify();
         if (s != "")
             return s;
-        s = m_cond2->Verify();
+        s = m_cond[1]->Verify();
         if (s != "")
             return s;
         return "";
     }
 
-    ParentNode* m_cond1;
-    ParentNode* m_cond2;
+    ParentNode* m_cond[2];
 private:
-    size_t m_last1;
-    size_t m_last2;
+    size_t m_last[2];
+    bool m_was_match[2];
 };
 
 
