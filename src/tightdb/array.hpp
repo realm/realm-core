@@ -1498,7 +1498,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
             search.m128i_i64[0] = value;
             search.m128i_i64[1] = value;
 #else
-            search = _mm_set1_epi64(_mm_set_pi64x(value));
+            search = _mm_set1_epi64(_mm_set_epi64x(value));
 #endif
         }
 
