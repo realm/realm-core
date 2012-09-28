@@ -438,7 +438,7 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
 //    static NODE<int64_t, Column, cond> node(target, NULL);
 
     node->QuickInit(m_column, target);
-    int64_t r = node->aggregate<action>(0, start, end, size_t(-1), size_t(-1), matchcount);
+    int64_t r = node->template aggregate<action>(0, start, end, size_t(-1), size_t(-1), matchcount);
 
     return r;
 #else
