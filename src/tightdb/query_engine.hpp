@@ -374,7 +374,7 @@ public:
                 if (agg_col == m_column_id || agg_col == size_t(-1))
                     criteria_arr->find(c, action, m_value, s - m_leaf_start, m_local_end, m_leaf_start, &m_state);
                 else
-                    criteria_arr->find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, m_local_end, m_leaf_start, &m_state, std::bind1st(std::mem_fun(&NODE::match_callback<action>), this));
+                    criteria_arr->find< F, TDB_CALLBACK_IDX >(m_value, s - m_leaf_start, m_local_end, m_leaf_start, &m_state, std::bind1st(std::mem_fun(&NODE::template match_callback < action > ), this));
                     
                 s = m_leaf_end;
             }

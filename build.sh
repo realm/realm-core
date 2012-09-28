@@ -8,7 +8,8 @@ MODE="$1"
 
 EXTENSIONS="java python objc node php gui"
 
-MAKE="make -j8"
+NUM_PROCESSORS=""
+MAKE="make"
 ARCH_FLAGS=""
 LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 
@@ -20,6 +21,15 @@ if [ "$OS" = "Darwin" ]; then
     # Construct fat binaries on Darwin
     ARCH_FLAGS="-arch i386 -arch x86_64"
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
+    NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
+else
+    if [ -r /proc/cpuinfo ]; then
+        NUM_PROCESSORS="$(cat /proc/cpuinfo | egrep 'processor[[:space:]]*:' | wc -l)" || exit 1
+    fi
+fi
+
+if [ "$NUM_PROCESSORS" ]; then
+    MAKE="$MAKE -j$NUM_PROCESSORS"
 fi
 
 
@@ -193,7 +203,7 @@ case "$MODE" in
                 tar czf "$TEMP_DIR/core.tar.gz" src/tightdb/Makefile src/tightdb/*.h src/tightdb/*.hpp src/tightdb/libtightdb* src/Makefile src/*.hpp test/Makefile test-installed/Makefile test-installed/*.cpp config.mk generic.mk Makefile build.sh || exit 1
                 mkdir "$PKG_DIR/tightdb" || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/core.tar.gz") || exit 1
-                echo -e "\nNO_BUILD_ON_INSTALL = 1" >> "$PKG_DIR/tightdb/config.mk"
+                printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
                 cat <<EOI > "$PKG_DIR/build"
 #!/bin/sh
 

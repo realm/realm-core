@@ -1494,12 +1494,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
         else if (width == 32)
             search = _mm_set1_epi32((int)value);
         else if (width == 64) {
-#ifdef _MSC_VER 
-            search.m128i_i64[0] = value;
-            search.m128i_i64[1] = value;
-#else
-            search = _mm_set1_epi64(_mm_set_pi64x(value));
-#endif
+            search = _mm_set_epi64x(value, value);
         }
 
         // Search loop. Unrolling it has been tested to NOT increase performance (apparently mem bound)
