@@ -100,11 +100,13 @@ public:
             return m_child->Verify();
     };
 
+protected:
+    friend class Query;
     ParentNode* m_child;
-    int m_cond;
-    size_t m_column_id;
 
 protected:
+    int m_cond;
+    size_t m_column_id;
     const Table* m_table;
     std::string m_error_code;
     Array m_array; 
@@ -144,7 +146,7 @@ public:
             --m_next;
             size_t add;
             add = 1;
-            while (m_next + add < m_size && TO_SIZET(m_arr.Get(m_next + add)) < start)
+            while (m_next + add < m_size && to_size_t(m_arr.Get(m_next + add)) < start)
                 add *= 2;
 
             // Do binary search inside bounds
@@ -330,16 +332,16 @@ public:
     // This function is called from Array::find() for each search result if action == TDB_CALLBACK_IDX
     // in the NODE::aggregate() call. Used if aggregate source column (column on which SUM or MAX or MIN or whatever is being performed) is different from search criteria column
     template <ACTION action>bool match_callback(int64_t v) {
-        if (TO_SIZET(v) >= m_leaf_end_agg) {
-            m_column_agg->GetBlock(TO_SIZET(v), m_array_agg, m_leaf_start_agg);
+        if (to_size_t(v) >= m_leaf_end_agg) {
+            m_column_agg->GetBlock(to_size_t(v), m_array_agg, m_leaf_start_agg);
             const size_t leaf_size = m_array_agg.Size();
             m_leaf_end_agg = m_leaf_start_agg + leaf_size;
         }
 
         int64_t av = 0;        
         if (m_array.USES_VAL<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded
-            av = m_array_agg.Get(TO_SIZET(v) - m_leaf_start_agg);
-        bool b = m_array.FIND_ACTION<action>(TO_SIZET(v), av, &m_state, &tightdb_dummy);
+            av = m_array_agg.Get(to_size_t(v) - m_leaf_start_agg);
+        bool b = m_array.FIND_ACTION<action>(to_size_t(v), av, &m_state, &tightdb_dummy);
 
         return b;
     }

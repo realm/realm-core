@@ -346,7 +346,7 @@ void Array::Preset(size_t bitwidth, size_t count)
 
 void Array::Preset(int64_t min, int64_t max, size_t count)
 {
-    size_t w = TIGHTDB_MAX(BitWidth(max), BitWidth(min));
+    size_t w = std::max(BitWidth(max), BitWidth(min));
     Preset(w, count);
 }
 
@@ -483,14 +483,14 @@ size_t Array::GetAsRef(size_t ndx) const
     TIGHTDB_ASSERT(ndx < m_len);
     TIGHTDB_ASSERT(m_hasRefs);
     const int64_t v = Get(ndx);
-    return TO_REF(v);
+    return to_ref(v);
 }
 
 size_t Array::GetAsSizeT(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < m_len);
     const int64_t v = Get(ndx);
-    return TO_SIZET(v);
+    return to_size_t(v);
 }
 
 int64_t Array::back() const
@@ -1129,7 +1129,7 @@ size_t Array::count(int64_t value) const
             // Could use intrinsic instead:
             // a = __builtin_popcountll(a); // gcc intrinsic
 
-            count += TO_SIZET(a);
+            count += to_size_t(a);
         }
     }
     else if (m_width == 2) {
@@ -1154,7 +1154,7 @@ size_t Array::count(int64_t value) const
             a = (a + (a >> 4)) & m4;
             a = (a * h01) >> 56;
 
-            count += TO_SIZET(a);
+            count += to_size_t(a);
         }
     }
     else if (m_width == 4) {
@@ -1180,7 +1180,7 @@ size_t Array::count(int64_t value) const
             a = (a + (a >> 4)) & m4;
             a = (a * h01) >> 56;
 
-            count += TO_SIZET(a);
+            count += to_size_t(a);
         }
     }
     else if (m_width == 8) {
@@ -1207,7 +1207,7 @@ size_t Array::count(int64_t value) const
             // Population count
             a = (a * h01) >> 56;
 
-            count += TO_SIZET(a);
+            count += to_size_t(a);
         }
     }
     else if (m_width == 16) {
@@ -1236,7 +1236,7 @@ size_t Array::count(int64_t value) const
             // Population count
             a = (a * h01) >> 56;
 
-            count += TO_SIZET(a);
+            count += to_size_t(a);
         }
     }
     else if (m_width == 32) {
@@ -1294,7 +1294,8 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
 
 size_t Array::CalcItemCount(size_t bytes, size_t width) const
 {
-    if (width == 0) return numeric_limits<size_t>::max(); // zero width gives "infinite" space
+    if (width == 0) 
+        return numeric_limits<size_t>::max(); // zero width gives infinite space
 
     const size_t bytes_data = bytes - 8; // ignore 8 byte header
     const size_t total_bits = bytes_data * 8;
@@ -1647,7 +1648,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
 
         // Count occurences of each value
         for (size_t t = 0; t < m_len; t++) {
-            size_t i = TO_REF(Get<w>(t) - min);
+            size_t i = to_ref(Get<w>(t) - min);
             count.Set(i, count.Get(i) + 1);
         }
 
@@ -1660,7 +1661,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
             res.add(0);
 
         for (size_t t = m_len; t > 0; t--) {
-            size_t v = TO_REF(Get<w>(t - 1) - min);
+            size_t v = to_ref(Get<w>(t - 1) - min);
             size_t i = count.GetAsRef(v);
             count.Set(v, count.Get(v) - 1);
             res.Set(i - 1, ref.Get(t - 1));
@@ -1711,7 +1712,7 @@ template <size_t w> void Array::sort()
 
         // Count occurences of each value
         for (size_t t = lo; t <= hi; t++) {
-            size_t i = TO_REF(Get<w>(t) - min);
+            size_t i = to_ref(Get<w>(t) - min);
             count[i]++;
         }
 
@@ -2246,8 +2247,8 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retva
 
     while (1) {
         // Get subnode table
-        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
-        const size_t ref_refs    = TO_SIZET(GetDirect(data, width, 1));
+        const size_t ref_offsets = to_size_t(GetDirect(data, width, 0));
+        const size_t ref_refs    = to_size_t(GetDirect(data, width, 1));
 
         // Find the subnode containing the item
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2256,7 +2257,7 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retva
         const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
 
         // Calc index in subnode
-        const size_t localoffset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
+        const size_t localoffset = node_ndx ? to_ref(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
         ndx -= localoffset; // local index
         offset += localoffset;
 
@@ -2264,7 +2265,7 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retva
         const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
         const char* const refs_data = (const char*)refs_header + 8;
         const size_t refs_width  = get_header_width_direct(refs_header);
-        const size_t ref = TO_SIZET(GetDirect(refs_data, refs_width, node_ndx));
+        const size_t ref = to_size_t(GetDirect(refs_data, refs_width, node_ndx));
 
         // Set vars for next iteration
         header = (uint8_t*)m_alloc.Translate(ref);
@@ -2292,8 +2293,8 @@ int64_t Array::ColumnGet(size_t ndx) const
     while (1) {
         if (isNode) {
             // Get subnode table
-            const size_t ref_offsets = TO_REF(GetDirect(data, width, 0));
-            const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
+            const size_t ref_offsets = to_ref(GetDirect(data, width, 0));
+            const size_t ref_refs    = to_ref(GetDirect(data, width, 1));
 
             // Find the subnode containing the item
             const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2302,14 +2303,14 @@ int64_t Array::ColumnGet(size_t ndx) const
             const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
 
             // Calc index in subnode
-            const size_t offset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
+            const size_t offset = node_ndx ? to_ref(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
             ndx = ndx - offset; // local index
 
             // Get ref to array
             const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
             const char* const refs_data = (const char*)refs_header + 8;
             const size_t refs_width  = get_header_width_direct(refs_header);
-            const size_t ref = TO_SIZET(GetDirect(refs_data, refs_width, node_ndx));
+            const size_t ref = to_size_t(GetDirect(refs_data, refs_width, node_ndx));
 
             // Set vars for next iteration
             header = (const uint8_t*)m_alloc.Translate(ref);
@@ -2333,8 +2334,8 @@ const char* Array::ColumnStringGet(size_t ndx) const
     while (1) {
         if (isNode) {
             // Get subnode table
-            const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
-            const size_t ref_refs    = TO_SIZET(GetDirect(data, width, 1));
+            const size_t ref_offsets = to_size_t(GetDirect(data, width, 0));
+            const size_t ref_refs    = to_size_t(GetDirect(data, width, 1));
 
             // Find the subnode containing the item
             const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2343,14 +2344,14 @@ const char* Array::ColumnStringGet(size_t ndx) const
             const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
 
             // Calc index in subnode
-            const size_t offset = node_ndx ? TO_REF(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
+            const size_t offset = node_ndx ? to_ref(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
             ndx = ndx - offset; // local index
 
             // Get ref to array
             const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
             const char* const refs_data = (const char*)refs_header + 8;
             const size_t refs_width  = get_header_width_direct(refs_header);
-            const size_t ref = TO_REF(GetDirect(refs_data, refs_width, node_ndx));
+            const size_t ref = to_ref(GetDirect(refs_data, refs_width, node_ndx));
 
             // Set vars for next iteration
             header = (const uint8_t*)m_alloc.Translate(ref);
@@ -2362,8 +2363,8 @@ const char* Array::ColumnStringGet(size_t ndx) const
             const bool hasRefs = get_header_hasrefs_direct(header);
             if (hasRefs) {
                 // long strings
-                const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
-                const size_t ref_blob    = TO_SIZET(GetDirect(data, width, 1));
+                const size_t ref_offsets = to_size_t(GetDirect(data, width, 0));
+                const size_t ref_blob    = to_size_t(GetDirect(data, width, 1));
 
                 size_t offset = 0;
                 if (ndx) {
@@ -2371,7 +2372,7 @@ const char* Array::ColumnStringGet(size_t ndx) const
                     const char* const offsets_data = (const char*)offsets_header + 8;
                     const size_t offsets_width  = get_header_width_direct(offsets_header);
 
-                    offset = TO_SIZET(GetDirect(offsets_data, offsets_width, ndx-1));
+                    offset = to_size_t(GetDirect(offsets_data, offsets_width, ndx-1));
                 }
 
                 const uint8_t* const blob_header = (const uint8_t*)m_alloc.Translate(ref_blob);
@@ -2399,8 +2400,8 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
         const size_t width = get_header_width_direct(header);
 
         // Get subnode table
-        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
-        const size_t ref_refs    = TO_SIZET(GetDirect(data, width, 1));
+        const size_t ref_offsets = to_size_t(GetDirect(data, width, 0));
+        const size_t ref_refs    = to_size_t(GetDirect(data, width, 1));
 
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
         const char* const offsets_data = (const char*)offsets_header + 8;
@@ -2414,12 +2415,12 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
         // Iterate over nodes until we find a match
         size_t offset = 0;
         for (size_t i = 0; i < offsets_len; ++i) {
-            const size_t ref = TO_REF(GetDirect(refs_data, refs_width, i));
+            const size_t ref = to_ref(GetDirect(refs_data, refs_width, i));
             const size_t result = ColumnFind(target, ref, cache);
             if (result != not_found)
                 return offset + result;
 
-            const size_t off = TO_SIZET(GetDirect(offsets_data, offsets_width, i));
+            const size_t off = to_size_t(GetDirect(offsets_data, offsets_width, i));
             offset = off;
         }
 
@@ -2450,8 +2451,8 @@ top:
 
     for (;;) {
         // Get subnode table
-        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0)); // todo, test if you can use TO_REF instead
-        const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
+        const size_t ref_offsets = to_size_t(GetDirect(data, width, 0)); // todo, test if you can use to_ref instead
+        const size_t ref_refs    = to_ref(GetDirect(data, width, 1));
 
         // Find the position matching the key
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2465,7 +2466,7 @@ top:
         const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
         const char* const refs_data = (const char*)refs_header + 8;
         const size_t refs_width  = get_header_width_direct(refs_header);
-        const size_t ref = TO_REF(GetDirect(refs_data, refs_width, pos));
+        const size_t ref = to_ref(GetDirect(refs_data, refs_width, pos));
 
         if (isNode) {
             // Set vars for next iteration
@@ -2549,8 +2550,8 @@ top:
 
     for (;;) {
         // Get subnode table
-        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
-        const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
+        const size_t ref_offsets = to_size_t(GetDirect(data, width, 0));
+        const size_t ref_refs    = to_ref(GetDirect(data, width, 1));
 
         // Find the position matching the key
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2564,7 +2565,7 @@ top:
         const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
         const char* const refs_data = (const char*)refs_header + 8;
         const size_t refs_width  = get_header_width_direct(refs_header);
-        const size_t ref = TO_REF(GetDirect(refs_data, refs_width, pos));
+        const size_t ref = to_ref(GetDirect(refs_data, refs_width, pos));
 
         if (isNode) {
             // Set vars for next iteration
@@ -2679,8 +2680,8 @@ top:
 
     for (;;) {
         // Get subnode table
-        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
-        const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
+        const size_t ref_offsets = to_size_t(GetDirect(data, width, 0));
+        const size_t ref_refs    = to_ref(GetDirect(data, width, 1));
 
         // Find the position matching the key
         const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
@@ -2694,7 +2695,7 @@ top:
         const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
         const char* const refs_data = (const char*)refs_header + 8;
         const size_t refs_width  = get_header_width_direct(refs_header);
-        const size_t ref = TO_REF(GetDirect(refs_data, refs_width, pos));
+        const size_t ref = to_ref(GetDirect(refs_data, refs_width, pos));
 
         if (isNode) {
             // Set vars for next iteration
