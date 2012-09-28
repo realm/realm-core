@@ -1229,6 +1229,38 @@ int64_t Table::minimum(size_t column_ndx) const
     return mv;
 }
 
+size_t Table::lookup(const char* value) const
+{
+    // First time we do a lookup we check if we can cache the index
+    if (!m_lookup_index) {
+        if (get_column_count() < 1)
+            return not_found; // no column to lookup in
+
+        const ColumnType type = GetRealColumnType(0);
+
+        if (type == COLUMN_TYPE_STRING) {
+            const AdaptiveStringColumn& column = GetColumnString(0);
+            if (!column.HasIndex())
+                return column.find_first(value);
+            else {
+                m_lookup_index = &column.GetIndex();
+            }
+        }
+        else if (type == COLUMN_TYPE_STRING_ENUM) {
+            const ColumnStringEnum& column = GetColumnStringEnum(0);
+            if (!column.HasIndex())
+                return column.find_first(value);
+            else {
+                m_lookup_index = &column.GetIndex();
+            }
+        }
+        else return not_found; // invalid column type
+    }
+
+    // Do lookup directly on cached index
+    return m_lookup_index->find_first(value);
+}
+
 size_t Table::find_first_int(size_t column_ndx, int64_t value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.Size());

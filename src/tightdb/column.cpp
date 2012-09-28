@@ -382,7 +382,7 @@ int64_t Column::Get(size_t ndx) const
 
 size_t Column::GetAsRef(size_t ndx) const
 {
-    return TO_REF(TreeGet<int64_t, Column>(ndx));
+    return to_ref(TreeGet<int64_t, Column>(ndx));
 }
 
 bool Column::Set(size_t ndx, int64_t value)
@@ -521,7 +521,7 @@ void Column::sort(size_t start, size_t end)
     Array arr;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
     for (size_t t = 0; t < arr.Size(); t++) {
-        const size_t ref = TO_REF(arr.Get(t));
+        const size_t ref = to_ref(arr.Get(t));
         Array a(ref);
         a.sort();
     }

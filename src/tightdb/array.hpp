@@ -76,16 +76,6 @@ Searching: The main finding function is:
 #include <stdio.h>
 #endif
 
-#define TIGHTDB_MAX(a, b) (((a) > (b)) ? (a) : (b))
-
-#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-    #define TIGHTDB_X86X64
-#endif
-
-#if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
-    #define TIGHTDB_PTR_64
-#endif
-
 // todo, move
 enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
 
@@ -506,7 +496,7 @@ private:
 protected:
     size_t m_len;
     size_t m_capacity;
-    size_t m_width;
+    size_t m_width; // FIXME: Should be an 'int'
     bool m_isNode;
     bool m_hasRefs;
 
@@ -1497,7 +1487,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
         __m128i compare = {0};
         size_t i = 0;
 
-      if (width == 8)
+        if (width == 8)
             search = _mm_set1_epi8((char)value);
         else if (width == 16)
             search = _mm_set1_epi16((short int)value);

@@ -11,7 +11,7 @@
 
 namespace tightdb {
 
-size_t TO_REF(int64_t v)
+size_t to_ref(int64_t v)
 {
 #ifdef TIGHTDB_DEBUG
     uint64_t m = size_t(-1);
@@ -24,8 +24,8 @@ size_t TO_REF(int64_t v)
     return size_t(v);
 }
 
-// Safe cast from 64 to 32 bits on 32 bit architecture. Differs from TO_REF() by not testing alignment and REF-bitflag.
-size_t TO_SIZET(int64_t v)
+// Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
+size_t to_size_t(int64_t v)
 {
 #ifdef TIGHTDB_DEBUG
     uint64_t m = size_t(-1);
