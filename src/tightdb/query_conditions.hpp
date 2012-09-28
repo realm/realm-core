@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_QUERY_CONDITIONS_HPP
 #define TIGHTDB_QUERY_CONDITIONS_HPP
 
+#include <cstring>
 #include <string>
 #ifdef _MSC_VER
     #include <win32/stdint.h>
@@ -38,7 +39,7 @@ struct CONTAINS {
     {
         (void)v1_lower;
         (void)v1_upper;
-        return strstr(v2, v1) != 0;
+        return std::strstr(v2, v1) != 0;
     }
 };
 
@@ -48,7 +49,7 @@ struct BEGINSWITH {
     {
         (void)v1_lower;
         (void)v1_upper;
-        return strstr(v2, v1) == v2; // FIXME: Not the most efficient way to do this
+        return std::strstr(v2, v1) == v2; // FIXME: Not the most efficient way to do this
     }
 };
 
@@ -58,12 +59,12 @@ struct ENDSWITH {
     {
         (void)v1_lower;
         (void)v1_upper;
-        const size_t l1 = strlen(v1);
-        const size_t l2 = strlen(v2);
+        const size_t l1 = std::strlen(v1);
+        const size_t l2 = std::strlen(v2);
         if (l1 > l2)
             return false;
 
-        return strcmp(v1, v2 + l2 - l1) == 0;
+        return std::strcmp(v1, v2 + l2 - l1) == 0;
     }
 };
 
@@ -72,7 +73,7 @@ struct EQUAL {
     {
         (void)v1_lower;
         (void)v1_upper;
-        return strcmp(v1, v2) == 0;
+        return std::strcmp(v1, v2) == 0;
     }
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
     int condition(void) {return COND_EQUAL;}
@@ -85,7 +86,7 @@ struct NOTEQUAL {
     {
         (void)v1_lower;
         (void)v1_upper;
-        return strcmp(v1, v2) != 0;
+        return std::strcmp(v1, v2) != 0;
     }
     template<class T> bool operator()(const T& v1, const T& v2) const { return v1 != v2; }
     int condition(void) {return COND_NOTEQUAL;}
@@ -117,8 +118,8 @@ struct BEGINSWITH_INS {
 struct ENDSWITH_INS {
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
-        const size_t l1 = strlen(v1);
-        const size_t l2 = strlen(v2);
+        const size_t l1 = std::strlen(v1);
+        const size_t l2 = std::strlen(v2);
         if (l1 > l2)
             return false;
 
