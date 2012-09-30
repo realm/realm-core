@@ -15,7 +15,7 @@ LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 
 
 # Setup OS specific stuff
-OS="$(uname -s)" || exit 1
+OS="$(uname)" || exit 1
 if [ "$OS" = "Darwin" ]; then
     MAKE="$MAKE CC=clang"
     # Construct fat binaries on Darwin
