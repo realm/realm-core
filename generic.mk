@@ -131,9 +131,9 @@ MAP_CMD = $(if $(call MATCH_CMD,$(1),$(3)),$(if $(findstring /,$(3)),$(dir $(3))
 GCC_LIKE_COMPILERS = gcc llvm-gcc clang
 MAP_CC_TO_CXX = $(or $(call MAP_CMD,gcc,g++,$(1)),$(call MAP_CMD,llvm-gcc,llvm-g++,$(1)),$(call MAP_CMD,clang,clang++,$(1)))
 
-GXX_LIKE_COMPILERS = $(foreach x,$(GCC_LIKE_COMPILERS),$(call MAP_CC_TO_CXX,$(x)))
-IS_GCC_LIKE = $(foreach x,$(GCC_LIKE_COMPILERS),$(call MATCH_CMD,$(x),$(1)))
-IS_GXX_LIKE = $(foreach x,$(GXX_LIKE_COMPILERS),$(call MATCH_CMD,$(x),$(1)))
+GXX_LIKE_COMPILERS = $(strip $(foreach x,$(GCC_LIKE_COMPILERS),$(call MAP_CC_TO_CXX,$(x))))
+IS_GCC_LIKE = $(strip $(foreach x,$(GCC_LIKE_COMPILERS),$(call MATCH_CMD,$(x),$(1))))
+IS_GXX_LIKE = $(strip $(foreach x,$(GXX_LIKE_COMPILERS),$(call MATCH_CMD,$(x),$(1))))
 
 # C and C++
 CC_SPECIFIED        = $(filter-out undefined default,$(origin CC))
@@ -214,9 +214,9 @@ endif
 
 # LOAD PROJECT SPECIFIC CONFIGURATION
 
-CC_CXX_AND_LD_ARE = $(call CC_CXX_AND_LD_IS_HELP,$(1),$(call MAP_CC_TO_CXX,$(1)))
-CC_CXX_AND_LD_ARE_HELP = $(and $(call MATCH_CMD,$(1),$(CC)),$(foreach x,$(1) $(2),$(call MATCH_CMD,$(x),$(CXX))),$(foreach x,$(1) $(2),$(call MATCH_CMD,$(x),$(LD))))
-CC_CXX_AND_LD_ARE_GCC_LIKE = $(foreach x,$(GCC_LIKE_COMPILERS),$(call CC_CXX_AND_LD_ARE,$(x),$(1)))
+CC_CXX_AND_LD_ARE = $(call CC_CXX_AND_LD_ARE_HELP,$(1),$(call MAP_CC_TO_CXX,$(1)))
+CC_CXX_AND_LD_ARE_HELP = $(and $(call MATCH_CMD,$(1),$(CC)),$(strip $(foreach x,$(1) $(2),$(call MATCH_CMD,$(x),$(CXX)))),$(strip $(foreach x,$(1) $(2),$(call MATCH_CMD,$(x),$(LD)))))
+CC_CXX_AND_LD_ARE_GCC_LIKE = $(strip $(foreach x,$(GCC_LIKE_COMPILERS),$(call CC_CXX_AND_LD_ARE,$(x))))
 
 THIS_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 ROOT = $(patsubst %/,%,$(dir $(THIS_MAKEFILE)))
