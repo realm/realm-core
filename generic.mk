@@ -29,9 +29,21 @@
 # next, you should always start with a 'make clean'. MAKE does this
 # automatically when you change config.mk.
 #
-# In config.mk you may check the value of CC_AND_CXX_ARE_GCC_LIKE. If
-# it has a nonempty value, then both the C and the C++ compiler is
-# mostly command line compatible with GCC (gcc, llvm-gcc, clang).
+# A function CC_CXX_AND_LD_ARE is made available to check for a
+# specific compiler in config.mk. For example:
+#
+#   ifneq ($(call CC_CXX_AND_LD_ARE,clang),)
+#   # Clang specific stuff
+#   endif
+#
+# Likewise, a variable CC_CXX_AND_LD_ARE_GCC_LIKE is made available to
+# check for any GCC like compiler in config.mk (gcc, llvm-gcc,
+# clang). For example:
+#
+#   ifneq ($(CC_CXX_AND_LD_ARE_GCC_LIKE),)
+#   # GCC specific stuff
+#   endif
+
 
 
 # CONFIG VARIABLES
@@ -144,7 +156,7 @@ ifneq ($(X),)
 CXX = $(X)
 endif
 endif
-CC_AND_CXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(CC)),$(call IS_GXX_LIKE,$(CXX)))
+CC_AND_CXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(CC)),$(or $(call IS_GCC_LIKE,$(CXX)),$(call IS_GXX_LIKE,$(CXX))))
 ifneq ($(CC_AND_CXX_ARE_GCC_LIKE),)
 CFLAGS_DEFAULT   = -Wall
 CFLAGS_OPTIMIZE  = -O3
@@ -169,7 +181,7 @@ ifneq ($(X),)
 OCXX = $(X)
 endif
 endif
-OCC_AND_OCXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(OCC)),$(call IS_GXX_LIKE,$(OCXX)))
+OCC_AND_OCXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(OCC)),$(or $(call IS_GCC_LIKE,$(OCXX)),$(call IS_GXX_LIKE,$(OCXX))))
 
 
 
@@ -201,6 +213,10 @@ endif
 
 
 # LOAD PROJECT SPECIFIC CONFIGURATION
+
+CC_CXX_AND_LD_ARE = $(call CC_CXX_AND_LD_IS_HELP,$(1),$(call MAP_CC_TO_CXX,$(1)))
+CC_CXX_AND_LD_ARE_HELP = $(and $(call MATCH_CMD,$(1),$(CC)),$(foreach x,$(1) $(2),$(call MATCH_CMD,$(x),$(CXX))),$(foreach x,$(1) $(2),$(call MATCH_CMD,$(x),$(LD))))
+CC_CXX_AND_LD_ARE_GCC_LIKE = $(foreach x,$(GCC_LIKE_COMPILERS),$(call CC_CXX_AND_LD_ARE,$(x),$(1)))
 
 THIS_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 ROOT = $(patsubst %/,%,$(dir $(THIS_MAKEFILE)))

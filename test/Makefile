@@ -36,4 +36,4 @@ benchmark: subdir/test-tightdb/default subdir/test-sqlite3/default subdir/test-s
 
 .PHONY: UnitTest++
 UnitTest++:
-	$(MAKE) -C UnitTest++ CXX=g++ CXXFLAGS=-g -Wall -W -ansi LDFLAGS= >/dev/null
+	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS= >/dev/null

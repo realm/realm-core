@@ -28,7 +28,7 @@ fi
 
 
 if [ "$NUM_PROCESSORS" ]; then
-    MAKEFLAGS="-j$NUM_PROCESSORS"
+    export MAKEFLAGS="-j$NUM_PROCESSORS"
 fi
 
 
@@ -82,7 +82,7 @@ case "$MODE" in
         ;;
 
     "build")
-        make || exit 1
+        TIGHTDB_ENABLE_FAT_BINARIES=1 make || exit 1
         exit 0
         ;;
 
