@@ -321,7 +321,7 @@ void Array::Preset(size_t bitwidth, size_t count)
     SetWidth(bitwidth);
     TIGHTDB_ASSERT(Alloc(count, bitwidth));
     m_len = count;
-    for(size_t n = 0; n < count; n++)
+    for (size_t n = 0; n < count; n++)
         Set(n, 0);
 }
 
@@ -450,7 +450,7 @@ int64_t Array::Get(size_t ndx) const
 /*
     // Slightly slower in both of the if-cases. Also needs an matchcount m_len check too, to avoid
     // reading beyond array.
-    if(m_width >= 8 && m_len > ndx + 7)     
+    if (m_width >= 8 && m_len > ndx + 7)     
         return Get<64>(ndx >> m_shift) & m_widthmask;
     else 
         return (this->*m_getter)(ndx);
@@ -488,7 +488,7 @@ bool Array::Set(size_t ndx, int64_t value)
     // Make room for the new value
     size_t width = m_width;
 
-    if(value < m_lbound || value > m_ubound)
+    if (value < m_lbound || value > m_ubound)
         width = BitWidth(value);
 
     const bool doExpand = (width > m_width);
@@ -544,7 +544,7 @@ bool Array::Insert(size_t ndx, int64_t value)
     // Make room for the new value
     size_t width = m_width;
 
-    if(value < m_lbound || value > m_ubound)
+    if (value < m_lbound || value > m_ubound)
         width = BitWidth(value);
 
     const bool doExpand = (width > m_width);
@@ -707,6 +707,51 @@ size_t Array::FindPos2(int64_t target) const
     else return (size_t)high;
 }
 
+// find FIRST element E for which E >= target or return -1 if none
+size_t Array::FindGTE(int64_t target, size_t start) const
+{
+    if (start < m_len && Get(start) >= target) return start; else ++start;
+    if (start < m_len && Get(start) >= target) return start; else ++start;
+
+    if(m_len == 0)
+        return 1;
+
+    if (start > Get(m_len - 1)) return m_len;
+
+    // Todo, use templated Get<width> from this point for performance
+    if (start < m_len && Get(start) >= target) return start; else ++start;
+    if (start < m_len && Get(start) >= target) return start; else ++start;
+
+    // Find bounds
+    --start;
+    size_t add = 1;
+    while(start + add < m_len && Get(start + add) < target)
+        add *= 2;
+
+    // Do binary search inside bounds
+    assert(Get(m_len - 1) >= start);
+
+    size_t high = start + add < m_len ? start + add : m_len;
+    start = start + add / 2 - 1;
+
+    while (high - start > 1) {
+        const size_t probe = (start + high) / 2;
+        const int64_t v = Get(probe);
+        if (v < target) 
+            start = probe;
+        else           
+            high = probe;
+    }
+    if (high == start + add)         
+        start = m_len;
+    else
+        start = high;
+
+    return start;
+
+}
+
+
 size_t FirstSetBit(unsigned int v) 
 {
     #if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
@@ -743,7 +788,7 @@ size_t FirstSetBit64(int64_t v)
         unsigned int v1 = (unsigned int)(v >> 32);
         size_t r;
 
-        if(v0 != 0)
+        if (v0 != 0)
             r = FirstSetBit(v0);
         else
             r = FirstSetBit(v1) + 32;
@@ -755,19 +800,19 @@ size_t FirstSetBit64(int64_t v)
 
 template <size_t width> inline int64_t LowerBits(void) 
 {
-    if(width == 1)
+    if (width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
-    else if(width == 2)
+    else if (width == 2)
         return 0x5555555555555555ULL;
-    else if(width == 4)
+    else if (width == 4)
         return 0x1111111111111111ULL;
-    else if(width == 8)
+    else if (width == 8)
         return 0x0101010101010101ULL;
-    else if(width == 16)
+    else if (width == 16)
         return 0x0001000100010001ULL;
-    else if(width == 32)
+    else if (width == 32)
         return 0x0000000100000001ULL;
-    else if(width == 64)
+    else if (width == 64)
         return 0x0000000000000001ULL;
     else {
         assert(false);
@@ -793,24 +838,24 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v)
     // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay off because 
     // the work done by TestZero() is wasted for the cases where the value exists in first half, but useful if it exists in last 
     // half. Sweet spot turns out to be the widths and partitions below.
-    if(width <= 8) {
+    if (width <= 8) {
         hasZeroByte = TestZero<width>(v | 0xffffffff00000000ULL);
-        if(eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
+        if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
             // 00?? -> increasing
             start += 64 / no0(width) / 2;
-            if(width <= 4) {
+            if (width <= 4) {
                 hasZeroByte = TestZero<width>(v | 0xffff000000000000ULL);
-                if(eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
+                if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
                     // 000?
                     start += 64 / no0(width) / 4;
                 }
             }
         }
         else {
-            if(width <= 4) {
+            if (width <= 4) {
                 // ??00
                 hasZeroByte = TestZero<width>(v | 0xffffffffffff0000ULL);
-                if(eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
+                if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
                     // 0?00
                     start += 64 / no0(width) / 4;
                 }
@@ -831,10 +876,10 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
     if (end == (size_t)-1) end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
-    if(m_len == 0)
+    if (m_len == 0)
         return false;
 
-    if(w == 0) {
+    if (w == 0) {
         result = 0;
         return true;
     }
@@ -845,23 +890,23 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
 #ifdef USE_SSE42
 
     // Test manually until 128 bit aligned
-    for(; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
+    for (; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
         if (max ? Get<w>(start) > m : Get<w>(start) < m)
             m = Get<w>(start);
     }
 
-	if((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / no0(w)) {
+	if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / no0(w)) {
         __m128i *data = (__m128i *)(m_data + start * w / 8);
         __m128i state = data[0];
         __m128i state2;
 
         size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
-        for(size_t t = 0; t < chunks; t++) {
-            if(w == 8)
+        for (size_t t = 0; t < chunks; t++) {
+            if (w == 8)
                 state = max ? _mm_max_epi8(data[t], state) : _mm_min_epi8(data[t], state);
-            else if(w == 16)
+            else if (w == 16)
                 state = max ? _mm_max_epi16(data[t], state) : _mm_min_epi16(data[t], state);
-            else if(w == 32)
+            else if (w == 32)
                 state = max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
 
             start += sizeof(__m128i) * 8 / no0(w);
@@ -909,17 +954,17 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
     if (end == (size_t)-1) end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
-    if(w == 0)
+    if (w == 0)
         return 0;
 
     int64_t s = 0;
 
     // Sum manually until 128 bit aligned
-    for(; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % 128 != 0); start++) {
+    for (; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % 128 != 0); start++) {
         s += Get<w>(start);
     }
 
-    if(w == 1 || w == 2 || w == 4) {
+    if (w == 1 || w == 2 || w == 4) {
         // Sum of bitwidths less than a byte (which are always positive)
         // uses a divide and conquer algorithm that is a variation of popolation count:
         // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
@@ -932,7 +977,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
         int64_t *data = (int64_t *)(m_data + start * w / 8);
         size_t chunks = (end - start) * w / 8 / sizeof(int64_t);
 
-        for(size_t t = 0; t < chunks; t++) {
+        for (size_t t = 0; t < chunks; t++) {
             if (w == 1) {
 #if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
                     s += __popcnt64(data[t]);
@@ -976,15 +1021,15 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
     // Naive, templated Get<>: 391 371 374
     // SSE:                     97 148 282
 
-    if((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
+    if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
         __m128i *data = (__m128i *)(m_data + start * w / 8);
         __m128i sum = {0};
         __m128i sum2;
 
         size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
 
-        for(size_t t = 0; t < chunks; t++) {
-            if(w == 8) {
+        for (size_t t = 0; t < chunks; t++) {
+            if (w == 8) {
                 /* 
                 // 469 ms AND disadvantage of handling max 64k elements before overflow
                 __m128i vl = _mm_cvtepi8_epi16(data[t]);
@@ -1014,7 +1059,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                 sum = _mm_add_epi32(sum, sumL);
                 sum = _mm_add_epi32(sum, sumH);
             }
-            else if(w == 16) {
+            else if (w == 16) {
                 // todo, can overflow for array size > 2^32 
                 __m128i vl = _mm_cvtepi16_epi32(data[t]);       // sign extend lower words 16->32
                 __m128i vh = data[t];
@@ -1023,7 +1068,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                 sum = _mm_add_epi32(sum, vl);
                 sum = _mm_add_epi32(sum, vh);
             }
-            else if(w == 32) {
+            else if (w == 32) {
                 __m128i v = data[t];
                 __m128i v0 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
                 v = _mm_srli_si128(v, 8);                       // v >>= 64
@@ -1225,7 +1270,7 @@ size_t Array::count(int64_t value) const
     }
 
     // Sum remainding elements
-    for(; i < end; ++i)
+    for (; i < end; ++i)
         if (value == Get(i))
             ++count;
 
@@ -1479,6 +1524,10 @@ template <size_t width> void Array::SetWidth(void)
     Finder fl =  &Array::find<LESS, TDB_RETURN_FIRST, width>;
     m_finder[COND_LESS] = fl;
 
+    EqualFinder ef =  &Array::equalfind<width>;
+    m_equalfinder = ef;
+
+
 }
 
 template <size_t w>int64_t Array::Get(size_t ndx) const
@@ -1491,39 +1540,39 @@ template <size_t w>int64_t Array::Get(size_t ndx) const
 #endif
 template <size_t w> void Array::Set(size_t ndx, int64_t value)
 {
-    if(w == 0) {
+    if (w == 0) {
         return;   
     }
-    else if(w == 1) {
+    else if (w == 1) {
         const size_t offset = ndx >> 3;
         ndx &= 7;
         uint8_t* p = &m_data[offset];
         *p = (*p &~ (1 << ndx)) | (uint8_t)((value & 1) << ndx);
     }
-    else if(w == 2) {
+    else if (w == 2) {
         const size_t offset = ndx >> 2;
         const uint8_t n = (uint8_t)((ndx & 3) << 1);
         uint8_t* p = &m_data[offset];
         *p = (*p &~ (0x03 << n)) | (uint8_t)((value & 0x03) << n);        
     }
-    else if(w == 4) {
+    else if (w == 4) {
         const size_t offset = ndx >> 1;
         const uint8_t n = (uint8_t)((ndx & 1) << 2);
         uint8_t* p = &m_data[offset];
         *p = (*p &~ (0x0F << n)) | (uint8_t)((value & 0x0F) << n);
     }
-    else if(w == 8) {
+    else if (w == 8) {
         *((char*)m_data + ndx) = (char)value;        
     }
-    else if(w == 16) {
+    else if (w == 16) {
         const size_t offset = ndx * 2;
         *(int16_t*)(m_data + offset) = (int16_t)value;
     }
-    else if(w == 32) {
+    else if (w == 32) {
         const size_t offset = ndx * 4;
         *(int32_t*)(m_data + offset) = (int32_t)value;        
     }
-    else if(w == 64) {
+    else if (w == 64) {
         const size_t offset = ndx * 8;
         *(int64_t*)(m_data + offset) = value;   
     }
@@ -1549,22 +1598,22 @@ template <size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, 
     max2 = Get<w>(from);
     min2 = max2;
 
-    for(t = from + 1; t < to; t++) {
+    for (t = from + 1; t < to; t++) {
         int64_t v = Get<w>(t);
         // Utilizes that range test is only needed if max2 or min2 were changed
-        if(v < min2) {
+        if (v < min2) {
             min2 = v;
-            if((uint64_t)(max2 - min2) > maxdiff)
+            if ((uint64_t)(max2 - min2) > maxdiff)
                 break;
         }
-        else if(v > max2) {
+        else if (v > max2) {
             max2 = v;
-            if((uint64_t)(max2 - min2) > maxdiff)
+            if ((uint64_t)(max2 - min2) > maxdiff)
                 break;
         }
     }
 
-    if(t < to) {
+    if (t < to) {
         *max = 0;
         *min = 0;
         return false;
@@ -1585,7 +1634,7 @@ void Array::ReferenceSort(Array& ref)
 
 template <size_t w>void Array::ReferenceSort(Array& ref)
 {
-    if(m_len < 2)
+    if (m_len < 2)
         return;
 
     int64_t min;
@@ -1601,7 +1650,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
 //  bool b = MinMax<w>(0, m_len, -1, &min, &max); // force count sort
     bool b = MinMax<w>(0, m_len, 0, &min, &max); // force quicksort
 
-    if(b) {
+    if (b) {
         Array res;
         Array count;
 
@@ -1609,24 +1658,24 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
 //      res.Preset(0, m_len, m_len);
 //      count.Preset(0, m_len, max - min + 1);
 
-        for(int64_t t = 0; t < max - min + 1; t++)
+        for (int64_t t = 0; t < max - min + 1; t++)
             count.add(0);
 
         // Count occurences of each value
-        for(size_t t = 0; t < m_len; t++) {
+        for (size_t t = 0; t < m_len; t++) {
             size_t i = TO_REF(Get<w>(t) - min);
             count.Set(i, count.Get(i) + 1);
         }
 
         // Accumulate occurences
-        for(size_t t = 1; t < count.Size(); t++) {
+        for (size_t t = 1; t < count.Size(); t++) {
             count.Set(t, count.Get(t) + count.Get(t - 1));
         }
 
-        for(size_t t = 0; t < m_len; t++)
+        for (size_t t = 0; t < m_len; t++)
             res.add(0);
 
-        for(size_t t = m_len; t > 0; t--) {
+        for (size_t t = m_len; t > 0; t--) {
             size_t v = TO_REF(Get<w>(t - 1) - min);
             size_t i = count.GetAsRef(v);
             count.Set(v, count.Get(v) - 1);
@@ -1634,7 +1683,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
         }
 
         // Copy result into ref
-        for(size_t t = 0; t < res.Size(); t++)
+        for (size_t t = 0; t < res.Size(); t++)
             ref.Set(t, res.Get(t));
 
         res.Destroy();
@@ -1648,7 +1697,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
 // Sort array
 template <size_t w> void Array::sort()
 {
-    if(m_len < 2)
+    if (m_len < 2)
         return;
 
     size_t lo = 0;
@@ -1660,7 +1709,7 @@ template <size_t w> void Array::sort()
 
     // in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
     // Se we chose range < m_len as treshold for deciding which to use
-    if(m_width <= 8) {
+    if (m_width <= 8) {
         max = m_ubound;
         min = m_lbound;
         b = true;
@@ -1672,21 +1721,21 @@ template <size_t w> void Array::sort()
         b = MinMax<w>(lo, hi + 1, m_len, &min, &max);
     }
 
-    if(b) {
-        for(int64_t t = 0; t < max - min + 1; t++)
+    if (b) {
+        for (int64_t t = 0; t < max - min + 1; t++)
             count.push_back(0);
 
         // Count occurences of each value
-        for(size_t t = lo; t <= hi; t++) {
+        for (size_t t = lo; t <= hi; t++) {
             size_t i = TO_REF(Get<w>(t) - min);
             count[i]++;
         }
 
         // Overwrite original array with sorted values
         size_t dst = 0;
-        for(int64_t i = 0; i < max - min + 1; i++) {
+        for (int64_t i = 0; i < max - min + 1; i++) {
             size_t c = count[(unsigned int)i];
-            for(size_t j = 0; j < c; j++) {
+            for (size_t j = 0; j < c; j++) {
                 Set<w>(dst, i + min);
                 dst++;
             }
@@ -1795,7 +1844,7 @@ std::vector<int64_t> Array::ToVector(void) const
 {
     std::vector<int64_t> v;
     const size_t count = Size();
-    for(size_t t = 0; t < count; ++t)
+    for (size_t t = 0; t < count; ++t)
         v.push_back(Get(t));
     return v;
 }
@@ -1950,33 +1999,33 @@ int64_t GetDirect(const char* const data, size_t width, const size_t ndx)
 
 template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx)
 {
-    if(w == 0) {
+    if (w == 0) {
         return 0;
     }
-    else if(w == 1) {
+    else if (w == 1) {
         const size_t offset = ndx >> 3;
         return (data[offset] >> (ndx & 7)) & 0x01;
     }
-    else if(w == 2) {
+    else if (w == 2) {
         const size_t offset = ndx >> 2;
         return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
     }
-    else if(w == 4) {
+    else if (w == 4) {
         const size_t offset = ndx >> 1;
         return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
     }
-    else if(w == 8) {
+    else if (w == 8) {
         return *((const signed char*)(data + ndx));
     }
-    if(w == 16) {
+    if (w == 16) {
         const size_t offset = ndx * 2;
         return *(const int16_t*)(data + offset);
     }
-    else if(w == 32) {
+    else if (w == 32) {
         const size_t offset = ndx * 4;
         return *(const int32_t*)(data + offset);
     }
-    else if(w == 64) {
+    else if (w == 64) {
         const size_t offset = ndx * 8;
         return *(const int64_t*)(data + offset);
     }
@@ -2045,8 +2094,8 @@ namespace tightdb {
 const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval) const
 {
     // Reduce time overhead for cols with few entries
-    if(!m_isNode) {
-//        if(!use_retval)
+    if (!m_isNode) {
+        if (!use_retval)
             arr.CreateFromHeaderDirect((uint8_t*)m_data-8);
         off = 0;
         return this;
@@ -2086,7 +2135,7 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retva
         width  = get_header_width_direct(header);
         isNode = get_header_isnode_direct(header);
         
-        if(!isNode) {
+        if (!isNode) {
             arr.CreateFromHeaderDirect(header);
             off = offset;
             return &arr;

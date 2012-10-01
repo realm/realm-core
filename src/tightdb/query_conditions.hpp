@@ -74,6 +74,7 @@ struct EQUAL {
         (void)v1_upper;
         return strcmp(v1, v2) == 0;
     }
+    bool operator()(bool v1, bool v2) const {return v1 == v2;}
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
     int condition(void) {return COND_EQUAL;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (v >= lbound && v <= ubound); }

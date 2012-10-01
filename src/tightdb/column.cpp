@@ -436,12 +436,15 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
     // We must allocate N on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
     // slower because of initial overhead).
     NODE<int64_t, Column, cond>* N = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
-    new (N) NODE<int64_t, Column, cond>(target, NULL);
+    new (N) NODE<int64_t, Column, cond>(target, 0);
 
 //    static NODE<int64_t, Column, cond> N(target, NULL);
 
     N->QuickInit(m_column, target); 
-    int64_t r = N->aggregate<action>(0, start, end, size_t(-1), size_t(-1), matchcount);
+    state_state st;
+    Array spare;
+    st.init(action, NULL, m_column, &spare);
+    int64_t r = N->aggregate<action>(&st, start, end, size_t(-1), size_t(-1), matchcount);
         
     return r;
 #else

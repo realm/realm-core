@@ -19,6 +19,38 @@ TIGHTDB_TABLE_2(BoolTupleTable,
                 second, Bool)
 
 
+TEST(TestQueryNew2)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "a");
+    ttt.add(2, "b");
+    ttt.add(3, "a"); 
+    ttt.add(1, "b");
+    ttt.add(2, "a");
+    ttt.add(3, "b");
+    ttt.add(1, "a");
+    ttt.add(2, "b");
+    ttt.add(3, "a");
+
+    int64_t c;
+    
+    c = ttt.where().second.equal("a").first.equal(1).count(ttt);
+    CHECK_EQUAL(2, c);
+
+    c = ttt.where().first.equal(1).second.equal("a").count(ttt);
+    CHECK_EQUAL(2, c);
+
+
+//    TupleTableType::View tv1 = q1.find_all(ttt, 1, 8);
+//    CHECK_EQUAL(4, tv1.size());
+
+//    TupleTableType::Query q1 = ttt.where().first.equal(1).second.equal(a).count();
+
+}
+
+
+
 TEST(TestQuery_sum_new_aggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
@@ -106,7 +138,7 @@ TEST(TestQueryFindAll_range1)
 TEST(TestQueryFindAll_range_or_monkey2)
 {
     const size_t ROWS = 20;
-    const size_t ITER = 1000;
+    const size_t ITER = 100;
 
     for(size_t u = 0; u < ITER; u++)
     {
@@ -123,6 +155,9 @@ TEST(TestQueryFindAll_range_or_monkey2)
             int64_t r2 = rand() % 10;
             tit.add(r1, r2);
         }
+
+        if(u == 7)
+            printf("");
 
         TwoIntTable::Query q1 = tit.where().group().first.equal(3).Or().first.equal(7).end_group().second.greater(5);
         TwoIntTable::View tv1 = q1.find_all(tit, start, end);
@@ -604,7 +639,7 @@ TEST(TestQuerySimple2)
     CHECK_EQUAL(7, tv1.get_source_ndx(2));
 }
 
-
+/*
 TEST(TestQueryLimit)
 {
     TupleTableType ttt;
@@ -650,6 +685,7 @@ TEST(TestQueryLimit)
     TupleTableType::View tv5 = q3.find_all(ttt, 0, 3, 5);
     CHECK_EQUAL(3, tv5.size());
 }
+*/
 
 TEST(TestQueryFindNext)
 {
@@ -834,6 +870,7 @@ TEST(TestQueryFindAll_OrNested0)
     CHECK_EQUAL(5, tv1.get_source_ndx(0));
     CHECK_EQUAL(6, tv1.get_source_ndx(1));
 }
+
 
 TEST(TestQueryFindAll_OrNested)
 {

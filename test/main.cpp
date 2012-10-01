@@ -3,7 +3,7 @@
 
 #include <UnitTest++.h>
 
-#include <tightdb/column.hpp>
+#include <tightdb.hpp>
 
 #if defined(_MSC_VER) && defined(_DEBUG)
 //    #include <vld.h>
@@ -11,6 +11,12 @@
 
 using namespace std;
 
+TIGHTDB_TABLE_1(OneIntTable,
+                first,  Int)
+
+TIGHTDB_TABLE_2(TupleTableType,
+                first,  Int,
+                second, String)
 
 int main(int argc, char const *const argv[])
 {
