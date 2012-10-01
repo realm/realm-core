@@ -8,27 +8,29 @@ MODE="$1"
 
 EXTENSIONS="java python objc node php gui"
 
-NUM_PROCESSORS=""
-LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 
 
 # Setup OS specific stuff
 OS="$(uname)" || exit 1
+LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 if [ "$OS" = "Darwin" ]; then
-    if [ "$CC" = "" ] && which clang >/dev/null; then
-        export CC=clang
-    fi
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
-    NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
-else
-    if [ -r /proc/cpuinfo ]; then
-        NUM_PROCESSORS="$(cat /proc/cpuinfo | egrep 'processor[[:space:]]*:' | wc -l)" || exit 1
-    fi
 fi
-
-
-if [ "$NUM_PROCESSORS" ]; then
-    export MAKEFLAGS="-j$NUM_PROCESSORS"
+if ! printf "%s\n" "$MODE" | grep '^dist' >/dev/null; then
+    NUM_PROCESSORS=""
+    if [ "$OS" = "Darwin" ]; then
+        if [ "$CC" = "" ] && which clang >/dev/null; then
+            export CC=clang
+        fi
+        NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
+    else
+        if [ -r /proc/cpuinfo ]; then
+            NUM_PROCESSORS="$(cat /proc/cpuinfo | egrep 'processor[[:space:]]*:' | wc -l)" || exit 1
+        fi
+    fi
+    if [ "$NUM_PROCESSORS" ]; then
+        export MAKEFLAGS="-j$NUM_PROCESSORS"
+    fi
 fi
 
 
@@ -114,13 +116,32 @@ case "$MODE" in
     "dist")
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/build.log"
+        log_message()
+        {
+            local msg
+            msg="$1"
+            printf "\n>>>>>>>> %s\n" "$msg" >> "$LOG_FILE"
+        }
+        message()
+        {
+            local msg
+            msg="$1"
+            log_message "$msg"
+            printf "%s\n" "$msg"
+        }
+        warning()
+        {
+            local msg
+            msg="$1"
+            message "WARNING: $msg"
+        }
 
-        echo "Checking availability of extensions" | tee -a "$LOG_FILE"
+        message "Checking availability of extensions"
         AVAIL_EXTENSIONS=""
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if ! [ -r "$EXT_HOME/build.sh" ]; then
-                echo ">>>>>>>> WARNING: Missing extension '$EXT_HOME'" | tee -a "$LOG_FILE"
+                warning "Missing extension '$EXT_HOME'"
                 continue
             fi
             word_list_append AVAIL_EXTENSIONS "$x" || exit 1
@@ -138,7 +159,7 @@ case "$MODE" in
             echo "Testing transfer of extension '$x' to package" >> "$LOG_FILE"
             mkdir "$FAKE_PKG_DIR/$EXT_DIR" || exit 1
             if ! sh "$EXT_HOME/build.sh" dist-copy "$FAKE_PKG_DIR/$EXT_DIR" >>"$LOG_FILE" 2>&1; then
-                echo ">>>>>>>> WARNING: Transfer of extension '$x' to test package failed" | tee -a "$LOG_FILE"
+                warning "Transfer of extension '$x' to test package failed"
                 continue
             fi
             word_list_append NEW_AVAIL_EXTENSIONS "$x" || exit 1
@@ -148,12 +169,12 @@ case "$MODE" in
 
         # Check state of working directories
         if [ "$(git status --porcelain)" ]; then
-            echo ">>>>>>>> WARNING: Dirty working directory '../$(basename "$TIGHTDB_HOME")'" | tee -a "$LOG_FILE"
+            warning "Dirty working directory '../$(basename "$TIGHTDB_HOME")'"
         fi
         for x in $AVAIL_EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ "$(cd "$EXT_HOME" && git status --porcelain)" ]; then
-                echo ">>>>>>>> WARNING: Dirty working directory '$EXT_HOME'" | tee -a "$LOG_FILE"
+                warning "Dirty working directory '$EXT_HOME'"
             fi
         done
 
@@ -161,9 +182,9 @@ case "$MODE" in
         VERSION="$(git describe)" || exit 1
 
         if [ -z "$AVAIL_EXTENSIONS" ]; then
-            echo "Continuing with no extensions" | tee -a "$LOG_FILE"
+            message "Continuing with no extensions"
         else
-            echo "Continuing with these parts:"
+            message "Continuing with these parts:"
             {
                 echo "core  ->  .  $BRANCH  $VERSION"
                 for x in $AVAIL_EXTENSIONS; do
@@ -193,13 +214,13 @@ case "$MODE" in
 
 
         if (
-                echo "Building core library" | tee -a "$LOG_FILE"
+                message "Building core library"
                 (sh build.sh clean && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
 
-                echo "Running test suite for core library" | tee -a "$LOG_FILE"
+                message "Running test suite for core library"
                 sh build.sh test >>"$LOG_FILE" 2>&1 || exit 1
 
-                echo "Transfering prebuilt core library to package" | tee -a "$LOG_FILE"
+                message "Transfering prebuilt core library to package"
                 tar czf "$TEMP_DIR/core.tar.gz" src/tightdb/Makefile src/tightdb/*.h src/tightdb/*.hpp src/tightdb/libtightdb* src/Makefile src/*.hpp test/Makefile test-installed/Makefile test-installed/*.cpp config.mk generic.mk Makefile build.sh || exit 1
                 mkdir "$PKG_DIR/tightdb" || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/core.tar.gz") || exit 1
@@ -287,47 +308,47 @@ EOI
                 done
 
                 for x in $AVAIL_EXTENSIONS; do
-                    echo "Transfering extension '$x' to package" | tee -a "$LOG_FILE"
+                    message "Transfering extension '$x' to package"
                     EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
                     EXT_HOME="../$EXT_DIR"
                     mkdir "$PKG_DIR/$EXT_DIR" || exit 1
                     sh "$EXT_HOME/build.sh" dist-copy "$PKG_DIR/$EXT_DIR" >>"$LOG_FILE" 2>&1 || exit 1
                 done
 
-                echo "Zipping the package" | tee -a "$LOG_FILE"
+                message "Zipping the package"
                 (cd "$TEMP_DIR" && tar czf "$NAME.tar.gz" "$NAME/") || exit 1
 
-                echo "Extracting the package for test" | tee -a "$LOG_FILE"
+                message "Extracting the package for test"
                 TEST_DIR="$TEMP_DIR/test"
                 mkdir "$TEST_DIR" || exit 1
                 (cd "$TEST_DIR" && tar xzf "$TEMP_DIR/$NAME.tar.gz") || exit 1
                 TEST_PKG_DIR="$TEST_DIR/$NAME"
                 cd "$TEST_PKG_DIR" || exit 1
 
-                echo "Installing core library to test location" | tee -a "$LOG_FILE"
+                message "Installing core library to test location"
                 sh "$TEST_PKG_DIR/tightdb/build.sh" install "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1 || exit 1
 
-                echo "Testing state of core library installation" | tee -a "$LOG_FILE"
+                message "Testing state of core library installation"
                 sh "$TEST_PKG_DIR/tightdb/build.sh" test-installed "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1 || exit 1
 
                 for x in $AVAIL_EXTENSIONS; do
-                    echo "Testing extension '$x'"
-                    echo "Building extension '$x'" >> "$LOG_FILE"
+                    message "Testing extension '$x'"
+                    log_message "Building extension '$x'"
                     EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
                     if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" build >>"$LOG_FILE" 2>&1; then
-                        echo ">>>>>>>> WARNING: Failed to build extension '$x'" | tee -a "$LOG_FILE"
+                        warning "Failed to build extension '$x'"
                     else
-                        echo "Testing extension '$x'" >> "$LOG_FILE"
+                        log_message "Running test suite for extension '$x'"
                         if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" test >>"$LOG_FILE" 2>&1; then
-                            echo ">>>>>>>> WARNING: Test suite failed for extension '$x'" | tee -a "$LOG_FILE"
+                            warning "Test suite failed for extension '$x'"
                         fi
-                        echo "Installing extension '$x' to test location" >> "$LOG_FILE"
+                        log_message "Installing extension '$x' to test location"
                         if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" install "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
-                            echo ">>>>>>>> WARNING: Installation test failed for extension '$x'" | tee -a "$LOG_FILE"
+                            warning "Installation test failed for extension '$x'"
                         else
-                            echo "Testing state of extension '$x' installation" >> "$LOG_FILE"
+                            log_message "Testing state of test installation of extension '$x'"
                             if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" test-installed "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
-                                echo ">>>>>>>> WARNING: Post installation test failed for extension '$x'" | tee -a "$LOG_FILE"
+                                warning "Post installation test failed for extension '$x'"
                             fi
                         fi
                     fi
@@ -336,12 +357,12 @@ EOI
                 exit 0
 
             ); then
-            echo "Log file is here: $LOG_FILE"
-            echo "Package is here: $TEMP_DIR/$NAME.tar.gz"
-            echo 'Done!'
+            message 'Done!'
+            message "Log file is here: $LOG_FILE"
+            message "Package is here: $TEMP_DIR/$NAME.tar.gz"
         else
-            echo "Log file is here: $LOG_FILE"
-            echo 'FAILED!' 1>&2
+            message 'FAILED!' 1>&2
+            message "Log file is here: $LOG_FILE"
             exit 1
         fi
         exit 0
