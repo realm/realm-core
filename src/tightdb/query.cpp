@@ -177,7 +177,7 @@ void Query::Or()
     all_nodes.push_back(o);
 
     first[first.size()-1] = o;
-    update[update.size()-1] = &((OR_NODE*)o)->m_cond2;
+    update[update.size()-1] = &((OR_NODE*)o)->m_cond[1];
     update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
 }
 
