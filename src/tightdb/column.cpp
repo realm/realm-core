@@ -438,6 +438,7 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
 //    static NODE<int64_t, Column, cond> node(target, NULL);
 
     node->QuickInit(m_column, target);
+    // TODO: Erase matchcount
     int64_t r = node->template aggregate<action>(0, start, end, size_t(-1), size_t(-1), matchcount);
 
     return r;
@@ -504,6 +505,16 @@ size_t Column::count(int64_t target) const
 int64_t Column::sum(size_t start, size_t end) const
 {
     return aggregate<TDB_SUM, NONE>(0, start, end);
+}
+
+double Column::average(size_t start, size_t end) const
+{
+    if (end == size_t(-1))
+        end = ((Column*)this)->Size();
+    size_t size = end - start;
+    size_t sum = aggregate<TDB_SUM, NONE>(0, start, end);
+    double avg = double( sum ) / double( size == 0 ? 1 : size );
+    return avg;
 }
 
 int64_t Column::minimum(size_t start, size_t end) const

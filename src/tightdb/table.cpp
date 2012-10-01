@@ -1201,6 +1201,15 @@ int64_t Table::sum(size_t column_ndx) const
     return column.sum();
 }
 
+double Table::average(size_t column_ndx) const
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
+
+    const Column& column = GetColumn(column_ndx);
+    return column.average();
+}
+
 int64_t Table::maximum(size_t column_ndx) const
 {
     if (is_empty()) return 0;
