@@ -143,17 +143,17 @@ ifeq ($(CC_OR_CXX_SPECIFIED),)
 # Neither CC nor CXX is specified
 X := $(call FIND,$(GCC_LIKE_COMPILERS),HAVE_CMD)
 ifneq ($(X),)
-CC = $(X)
+CC := $(X)
 X := $(call MAP_CC_TO_CXX,$(CC))
 ifneq ($(X),)
-CXX = $(X)
+CXX := $(X)
 endif
 endif
 else ifeq ($(CXX_SPECIFIED),)
 # CXX is not specified, but CC is
 X := $(call MAP_CC_TO_CXX,$(CC))
 ifneq ($(X),)
-CXX = $(X)
+CXX := $(X)
 endif
 endif
 CC_AND_CXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(CC)),$(or $(call IS_GCC_LIKE,$(CXX)),$(call IS_GXX_LIKE,$(CXX))))
@@ -172,13 +172,13 @@ OCXX_SPECIFIED        = $(filter-out undefined default,$(origin OCXX))
 OCC_OR_OCXX_SPECIFIED = $(or $(OCC_SPECIFIED),$(OCXX_SPECIFIED))
 ifeq ($(OCC_OR_OCXX_SPECIFIED),)
 # Neither OCC nor OCXX is specified
-OCC  = $(CC)
-OCXX = $(CXX)
+OCC  := $(CC)
+OCXX := $(CXX)
 else ifeq ($(OCXX_SPECIFIED),)
 # OCXX is not specified, but OCC is
 X := $(call MAP_CC_TO_CXX,$(OCC))
 ifneq ($(X),)
-OCXX = $(X)
+OCXX := $(X)
 endif
 endif
 OCC_AND_OCXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(OCC)),$(or $(call IS_GCC_LIKE,$(OCXX)),$(call IS_GXX_LIKE,$(OCXX))))
@@ -189,7 +189,7 @@ OCC_AND_OCXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(OCC)),$(or $(call IS_GCC_
 
 ifneq ($(CC_AND_CXX_ARE_GCC_LIKE),)
 ifeq ($(LD_SPECIFIED),)
-LD = $(CXX)
+LD := $(CXX)
 endif
 endif
 LD_IS_GCC_LIKE = $(or $(call IS_GCC_LIKE,$(LD)),$(call IS_GXX_LIKE,$(LD)))
