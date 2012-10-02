@@ -31,20 +31,21 @@ size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) co
 template <int function>int64_t TableViewBase::aggregate(size_t column_ndx) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, COLUMN_TYPE_INT);
-    assert(function == TDB_SUM || function == TDB_MAX || function == TDB_MIN);
-    assert(m_table);
-    assert(column_ndx < m_table->get_column_count());
-    if (m_refs.Size() == 0) return 0;
+    TIGHTDB_ASSERT(function == TDB_SUM || function == TDB_MAX || function == TDB_MIN);
+    TIGHTDB_ASSERT(m_table);
+    TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
+    if (m_refs.Size() == 0) 
+        return 0;
 
     int64_t res = 0;
     Column& m_column = m_table->GetColumn(column_ndx);
 
-    if(m_refs.Size() == m_column.Size()) {
-        if(function == TDB_MAX)
+    if (m_refs.Size() == m_column.Size()) {
+        if (function == TDB_MAX)
             return m_column.maximum();
-        if(function == TDB_MIN)
+        if (function == TDB_MIN)
             return m_column.minimum();
-        if(function == TDB_SUM)
+        if (function == TDB_SUM)
             return m_column.sum();
     }
 
@@ -65,9 +66,9 @@ template <int function>int64_t TableViewBase::aggregate(size_t column_ndx) const
 
         int64_t v = m_array.Get(s - m_leaf_start);
 
-        if(function == TDB_SUM)
+        if (function == TDB_SUM)
             res += v;
-        else if(function == TDB_MAX ? v > res : v < res)
+        else if (function == TDB_MAX ? v > res : v < res)
             res = v;
     }
     
@@ -96,7 +97,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
                    m_table->get_column_type(column) == COLUMN_TYPE_DATE ||
                    m_table->get_column_type(column) == COLUMN_TYPE_BOOL);
 
-    if(m_refs.Size() == 0)
+    if (m_refs.Size() == 0)
         return;
 
     Array vals;

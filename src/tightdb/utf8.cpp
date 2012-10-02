@@ -1,4 +1,9 @@
+#include <cstring>
 #include <string>
+#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+#include <Windows.h>
+#include <crtdefs.h>
+#endif
 
 #include <tightdb/utf8.hpp>
 
@@ -29,7 +34,7 @@ size_t comparechars(const char* c1, const char* c2)
         if (c1[p] != c2[p])
             return 0;
         p++;
-    } while((c1[p] & 0x80) == 0x80);
+    } while ((c1[p] & 0x80) == 0x80);
 
     return p;
 }
@@ -49,7 +54,7 @@ size_t case_prefix(const char* constant_upper, const char* constant_lower, const
         else
             return (size_t)-1;
     }
-    while(constant_lower[matchlen] != 0 && source[matchlen] != 0);
+    while (constant_lower[matchlen] != 0 && source[matchlen] != 0);
 
     if (constant_lower[matchlen] == 0 && source[matchlen] != 0)
         return 0;
@@ -85,10 +90,10 @@ bool case_cmp(const char* constant_upper, const char* constant_lower, const char
 bool case_strstr(const char *constant_upper, const char *constant_lower, const char *source) {
     size_t source_pos = 0;
     do {
-        if (case_cmp(constant_upper, constant_lower, source + source_pos))
+        if (case_prefix(constant_upper, constant_lower, source + source_pos) != size_t(-1))
             return true;
         source_pos++;
-    } while(source[source_pos] != 0);
+    } while (source[source_pos] != 0);
 
     return false;
 }
@@ -127,7 +132,7 @@ bool utf8case_single(const char* source, char* destination, int upper)
 // original character. This may of course give wrong search results in very special cases. Todo.
 bool utf8case(const char* source, char* destination, int upper)
 {
-    while(*source != 0) {
+    while (*source != 0) {
         if (sequence_length(source) == 0)
             return false;
 

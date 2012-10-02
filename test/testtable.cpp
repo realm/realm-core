@@ -389,7 +389,96 @@ TEST(Table_Sorted_Int)
 #endif // TIGHTDB_DEBUG
 }
 
+TEST(Table_Index_String)
+{
+    TestTableEnum table;
+    
+    table.add(Mon, "jeff");
+    table.add(Tue, "jim");
+    table.add(Wed, "jennifer");
+    table.add(Thu, "john");
+    table.add(Fri, "jimmy");
+    table.add(Sat, "jimbo");
+    table.add(Sun, "johnny");
+    table.add(Mon, "jennifer"); //duplicate
+    
+    table.column().second.set_index();
+    CHECK(table.column().second.has_index());
+    
+    const size_t r1 = table.column().second.find_first("jimmi");
+    CHECK_EQUAL(not_found, r1);
+    
+    const size_t r2 = table.column().second.find_first("jeff");
+    const size_t r3 = table.column().second.find_first("jim");
+    const size_t r4 = table.column().second.find_first("jimbo");
+    const size_t r5 = table.column().second.find_first("johnny");
+    CHECK_EQUAL(0, r2);
+    CHECK_EQUAL(1, r3);
+    CHECK_EQUAL(5, r4);
+    CHECK_EQUAL(6, r5);
+    
+    const size_t c1 = table.column().second.count("jennifer");
+    CHECK_EQUAL(2, c1);
+}
 
+TIGHTDB_TABLE_2(LookupTable,
+                first,  String,
+                second, Int)
+
+TEST(Table_Lookup)
+{
+    LookupTable table;
+
+    table.add("jeff",     0);
+    table.add("jim",      1);
+    table.add("jennifer", 2);
+    table.add("john",     3);
+    table.add("jimmy",    4);
+    table.add("jimbo",    5);
+    table.add("johnny",   6);
+    table.add("jennifer", 7); //duplicate
+
+    // Do lookups with manual search
+    const size_t a0 = table.lookup("jeff");
+    const size_t a1 = table.lookup("jim");
+    const size_t a2 = table.lookup("jennifer");
+    const size_t a3 = table.lookup("john");
+    const size_t a4 = table.lookup("jimmy");
+    const size_t a5 = table.lookup("jimbo");
+    const size_t a6 = table.lookup("johnny");
+    const size_t a7 = table.lookup("jerry");
+    CHECK_EQUAL(0, a0);
+    CHECK_EQUAL(1, a1);
+    CHECK_EQUAL(2, a2);
+    CHECK_EQUAL(3, a3);
+    CHECK_EQUAL(4, a4);
+    CHECK_EQUAL(5, a5);
+    CHECK_EQUAL(6, a6);
+    CHECK_EQUAL(not_found, a7);
+
+    table.column().first.set_index();
+    CHECK(table.column().first.has_index());
+
+    // Do lookups using (cached) index
+    const size_t b0 = table.lookup("jeff");
+    const size_t b1 = table.lookup("jim");
+    const size_t b2 = table.lookup("jennifer");
+    const size_t b3 = table.lookup("john");
+    const size_t b4 = table.lookup("jimmy");
+    const size_t b5 = table.lookup("jimbo");
+    const size_t b6 = table.lookup("johnny");
+    const size_t b7 = table.lookup("jerry");
+    CHECK_EQUAL(0, b0);
+    CHECK_EQUAL(1, b1);
+    CHECK_EQUAL(2, b2);
+    CHECK_EQUAL(3, b3);
+    CHECK_EQUAL(4, b4);
+    CHECK_EQUAL(5, b5);
+    CHECK_EQUAL(6, b6);
+    CHECK_EQUAL(not_found, b7);
+}
+
+/*
 TEST(Table_Index_Int)
 {
     TestTable table;
@@ -473,6 +562,7 @@ TEST(Table_Index_Int)
     table.Verify();
 #endif // TIGHTDB_DEBUG
 }
+*/
 
 TIGHTDB_TABLE_4(TestTableAE,
                 first,  Int,
@@ -521,7 +611,17 @@ TEST(TableAutoEnumeration)
         CHECK_EQUAL(Fri, table[4+n].fourth);
     }
 
-
+    // Verify counts
+    const size_t count1 = table.column().second.count("abd");
+    const size_t count2 = table.column().second.count("eftg");
+    const size_t count3 = table.column().second.count("hijkl");
+    const size_t count4 = table.column().second.count("mnopqr");
+    const size_t count5 = table.column().second.count("stuvxyz");
+    CHECK_EQUAL(5, count1);
+    CHECK_EQUAL(5, count2);
+    CHECK_EQUAL(5, count3);
+    CHECK_EQUAL(5, count4);
+    CHECK_EQUAL(5, count5);
 }
 
 

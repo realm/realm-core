@@ -78,6 +78,7 @@ public:
     using Table::clear;
     using Table::remove;
     using Table::optimize;
+    using Table::lookup;
 
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc) { set_dynamic_spec(); }
 

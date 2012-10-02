@@ -349,6 +349,21 @@ TEST_FIXTURE(db_setup_string, ArrayStringFindAll)
     col.Destroy();
 }
 
+TEST_FIXTURE(db_setup_string, ArrayStringCount)
+{
+    c.Clear();
+    
+    // first, middle and end
+    c.add("foobar");
+    c.add("bar abc");
+    c.add("foobar");
+    c.add("baz");
+    c.add("foobar");
+    
+    const size_t count = c.count("foobar");
+    CHECK_EQUAL(3, count);
+}
+
 TEST_FIXTURE(db_setup_string, ArrayStringDestroy)
 {
     // clean up (ALWAYS PUT THIS LAST)

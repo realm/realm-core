@@ -3,7 +3,7 @@
 
 #include <UnitTest++.h>
 
-#include <tightdb.hpp>
+#include <tightdb/column.hpp>
 
 #if defined(_MSC_VER) && defined(_DEBUG)
 //    #include <vld.h>
@@ -11,14 +11,10 @@
 
 using namespace std;
 
-TIGHTDB_TABLE_1(OneIntTable,
-                first,  Int)
+#include <tightdb/array.hpp>
+using namespace tightdb;
 
-TIGHTDB_TABLE_2(TupleTableType,
-                first,  Int,
-                second, String)
-
-int main(int argc, char const *const argv[])
+int main(int argc, char* argv[])
 {
     bool const no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exit-staus") == 0;
 
@@ -28,7 +24,7 @@ int main(int argc, char const *const argv[])
     cout << "Running Release unit tests\n\n";
 #endif
 
-    const int res = UnitTest::RunAllTests();
+    const int res =UnitTest::RunAllTests();
 
 #ifdef _MSC_VER
     getchar(); // wait for key

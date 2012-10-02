@@ -1,5 +1,6 @@
 // Memory Mapping includes
 #ifdef _MSC_VER
+#define NOMINMAX
 #include <windows.h>
 #include <stdio.h>
 #include <conio.h>
@@ -204,7 +205,7 @@ void SlabAlloc::Free(size_t ref, void* p)
 
         //  printf("%d %d", c.ref, c.size);
 
-            const size_t end = TO_REF(c.ref + c.size);
+            const size_t end = to_ref(c.ref + c.size);
             if (ref == end) {
                 if (isMerged) {
                     c.size += freeSpace[n].size;
@@ -276,8 +277,8 @@ bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len)
     if (ref > len) return false;
 
     // There is a unit test that calls this function with an invalid buffer
-    // so we can't size_t-test range with TO_REF until now
-    ref = TO_REF(*(uint64_t*)buffer);
+    // so we can't size_t-test range with to_ref until now
+    ref = to_ref(*(uint64_t*)buffer);
     (void)ref; // the above macro contains an assert, this avoids warning for unused var
 
     m_shared = (char*)buffer;
@@ -307,7 +308,7 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
     // Get Size
     LARGE_INTEGER size;
     GetFileSizeEx(m_fd, &size);
-    m_baseline = TO_REF(size.QuadPart);
+    m_baseline = to_ref(size.QuadPart);
 
     m_shared = (char *)pBuf;
     m_mapfile = hMapFile;
@@ -337,7 +338,8 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
             len = statbuf.st_size;
 
             if (len == 0) {
-                const ssize_t r = write(m_fd, "\0\0\0\0\0\0\0\0", 8); // write top-ref
+                // write file header
+                const ssize_t r = write(m_fd, default_header, header_len);
                 if (r == -1) goto error;
 
                 // pre-alloc initial space when mmapping
@@ -356,7 +358,30 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
         void* const p = mmap(0, len, PROT_READ, MAP_SHARED, m_fd, 0);
         if (p == (void*)-1) goto error;
 
-        //TODO: Verify the data structures
+        // Verify the data structures
+        {
+            // File header is 24 bytes, composed of three 64bit
+            // blocks. The two first being top_refs (only one valid
+            // at a time) and the last being the info block.
+            const char* const file_header = (char*)p;
+
+            // First four bytes of info block is file format id
+            if (!(file_header[16] == 'T' &&
+                  file_header[17] == '-' &&
+                  file_header[18] == 'D' &&
+                  file_header[19] == 'B'))
+                return false; // Not a tightdb file
+
+            // Last bit in info block indicates which top_ref block is valid
+            const size_t valid_part = file_header[23] & 0x1;
+            if (valid_part != 0 && valid_part != 1)
+                return false; // invalid header
+
+            // Byte 4 and 5 (depending on valid_part) in the info block is version
+            const uint8_t version = file_header[valid_part ? 21 : 20];
+            if (version != 0)
+                return false; // unsupported version
+        }
 
         m_shared = static_cast<char*>(p);
         m_baseline = len;
@@ -402,7 +427,17 @@ size_t SlabAlloc::GetTopRef() const
 {
     TIGHTDB_ASSERT(m_shared && m_baseline > 0);
 
-    const size_t ref = TO_REF(*(uint64_t*)m_shared);
+    // File header is 24 bytes, composed of three 64bit
+    // blocks. The two first being top_refs (only one valid
+    // at a time) and the last being the info block.
+    const char* const file_header = (const char*)m_shared;
+
+    // Last bit in info block indicates which top_ref block
+    // is valid
+    const size_t valid_ref = file_header[23] & 0x1;
+
+    const uint64_t* const top_refs = (uint64_t*)m_shared;
+    const size_t ref = to_ref(top_refs[valid_ref]);
     TIGHTDB_ASSERT(ref < m_baseline);
 
     return ref;
@@ -414,7 +449,7 @@ size_t SlabAlloc::GetTotalSize() const
         return m_baseline;
     }
     else {
-        return TO_REF(m_slabs.back().offset);
+        return to_ref(m_slabs.back().offset);
     }
 }
 
@@ -493,13 +528,13 @@ bool SlabAlloc::IsAllFree() const
     size_t ref = m_baseline;
     for (size_t i = 0; i < m_slabs.size(); ++i) {
         Slabs::ConstCursor c = m_slabs[i];
-        const size_t size = TO_REF(c.offset) - ref;
+        const size_t size = to_ref(c.offset) - ref;
 
         const size_t r = m_freeSpace.column().ref.find_first(ref);
         if (r == (size_t)-1) return false;
         if (size != (size_t)m_freeSpace[r].size) return false;
 
-        ref = TO_REF(c.offset);
+        ref = to_ref(c.offset);
     }
     return true;
 }
@@ -510,13 +545,13 @@ void SlabAlloc::Verify() const
     const size_t count = m_freeSpace.size();
     for (size_t i = 0; i < count; ++i) {
         FreeSpace::ConstCursor c = m_freeSpace[i];
-        const size_t ref = TO_REF(c.ref);
+        const size_t ref = to_ref(c.ref);
 
         const size_t ndx = m_slabs.column().offset.find_pos(ref);
         TIGHTDB_ASSERT(ndx != size_t(-1));
 
-        const size_t slab_end = TO_REF(m_slabs[ndx].offset);
-        const size_t free_end = ref + TO_REF(c.size);
+        const size_t slab_end = to_ref(m_slabs[ndx].offset);
+        const size_t free_end = ref + to_ref(c.size);
 
         TIGHTDB_ASSERT(free_end <= slab_end);
     }
@@ -528,7 +563,7 @@ void SlabAlloc::Print() const
 
     size_t free = 0;
     for (size_t i = 0; i < m_freeSpace.size(); ++i) {
-        free += TO_REF(m_freeSpace[i].size);
+        free += to_ref(m_freeSpace[i].size);
     }
 
     cout << "Base: " << (m_shared ? m_baseline : 0) << " Allocated: " << (allocated - free) << "\n";

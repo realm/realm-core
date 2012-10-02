@@ -235,8 +235,6 @@ size_t Query::find_next(const Table& table, size_t lastmatch)
 
 TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
 {
-    if (end == size_t(-1)) end = table.size();
-
     Init(table);
 
     if (end == size_t(-1))
@@ -264,6 +262,7 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
     return move(tv);
 }
 
+
 int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (end == size_t(-1)) end = table.size();
@@ -288,6 +287,7 @@ int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_
     return r;
 }
 
+
 int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (end == size_t(-1)) end = table.size();
@@ -306,7 +306,6 @@ int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, s
     if (resultcount)
         *resultcount = matchcount;
     return r;
-
 }
 
 int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
@@ -326,7 +325,6 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
     if (resultcount)
         *resultcount = matchcount;
     return r;
-
 }
 
 size_t Query::count(const Table& table, size_t start, size_t end, size_t limit) const
@@ -350,7 +348,6 @@ double Query::average(const Table& table, size_t column_ndx, size_t* resultcount
     Init(table);
 
     size_t resultcount2 = 0;
-
     const int64_t sum1 = sum(table, column_ndx, &resultcount2, start, end, limit);
     const double avg1 = (float)sum1 / (float)resultcount2;
 
@@ -400,7 +397,7 @@ TableView Query::find_all_multi(Table& table, size_t start, size_t end)
 
     // Wait until all threads have completed
     pthread_mutex_lock(&ts.completed_mutex);
-    while(ts.done_job < ts.end_job)
+    while (ts.done_job < ts.end_job)
         pthread_cond_wait(&ts.completed_cond, &ts.completed_mutex);
     pthread_mutex_lock(&ts.jobs_mutex);
     pthread_mutex_unlock(&ts.completed_mutex);
@@ -414,7 +411,7 @@ TableView Query::find_all_multi(Table& table, size_t start, size_t end)
         const size_t upto = (i == ts.chunks.size() - 1) ? size_t(-1) : ts.chunks[i + 1].first;
         size_t first = ts.chunks[i].second;
 
-        while(first < ts.results.size() && ts.results[first] < upto && ts.results[first] >= from) {
+        while (first < ts.results.size() && ts.results[first] < upto && ts.results[first] >= from) {
             tv.get_ref_column().add(ts.results[first]);
             ++first;
         }
@@ -481,8 +478,10 @@ void Query::Init(const Table& table) const
 
 size_t Query::FindInternal(const Table& table, size_t start, size_t end) const
 {
-    if (end == size_t(-1)) end = table.size();
-    if (start == end) return not_found;
+    if (end == size_t(-1)) 
+        end = table.size();
+    if (start == end) 
+        return not_found;
 
     size_t r;
     if (first[0] != 0)
@@ -525,7 +524,7 @@ void* Query::query_thread(void* arg)
     for (;;) {
         // Main waiting loop that waits for a query to start
         pthread_mutex_lock(&ts->jobs_mutex);
-        while(ts->next_job == ts->end_job)
+        while (ts->next_job == ts->end_job)
             pthread_cond_wait(&ts->jobs_cond, &ts->jobs_mutex);
         pthread_mutex_unlock(&ts->jobs_mutex);
 

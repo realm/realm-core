@@ -66,6 +66,11 @@ Searching: The main finding function is:
     SSE4.1: smmintrin.h
     SSE4.2: nmmintrin.h
 */
+
+#if defined(_MSC_VER) && _MSC_VER >= 1500
+    #include <intrin.h>
+#endif
+
 #ifdef USE_SSE42
     #include <nmmintrin.h> // __SSE42__
 #elif defined (USE_SSE3)
@@ -138,76 +143,6 @@ class Array;
 class AdaptiveStringColumn;
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // popcount
-    #if defined(_MSC_VER) && _MSC_VER >= 1500
-	    #include <intrin.h>
-	    inline int fast_popcount32(uint32_t x)
-	    {
-		    return __popcnt(x);
-	    }
-	    #if defined(_M_X64)
-		    inline int fast_popcount64(unsigned __int64 x)
-		    {
-			    return (int)__popcnt64(x);
-		    }
-	    #else
-		    inline int fast_popcount64(unsigned __int64 x)
-		    {
-			    return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
-		    }
-	    #endif
-    #elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
-	    #define fast_popcount32 __builtin_popcount
-	    #if ULONG_MAX == 0xffffffff
-		    inline int fast_popcount64(unsigned long long x)
-		    {
-			    return __builtin_popcount((unsigned)(x)) + __builtin_popcount((unsigned)(x >> 32));
-		    }
-	    #else
-		    inline int fast_popcount64(unsigned long long x)
-		    {
-			    return __builtin_popcountll(x);
-		    }
-	    #endif
-    #else
-	    static const char a_popcount_bits[256] = {
-		    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,		1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,		1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,		1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,		2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,		3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,		3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,		4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
-	    };
-
-        // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
-	    inline int fast_popcount32(uint32_t x)
-	    {
-		    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
-	    }
-	    inline int fast_popcount64(uint64_t x)
-	    {
-            return fast_popcount32(x) + fast_popcount32(x >> 32);
-	    }
-
-    #endif // select best popcount implementations
-
-
-      
 class Array;
 class Column;
 
@@ -222,6 +157,56 @@ public:
     size_t m_local_end_agg;
     Column *m_column_agg;            // Column on which aggregate function is executed (can be same as m_column)
     
+
+
+    // popcount
+    #if defined(_MSC_VER) && _MSC_VER >= 1500
+        int fast_popcount32(uint32_t x)
+        {
+            return __popcnt(x);
+        }
+        #if defined(_M_X64)
+            int fast_popcount64(unsigned __int64 x)
+            {
+                return (int)__popcnt64(x);
+            }
+        #else
+            inline int fast_popcount64(unsigned __int64 x)
+            {
+                return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
+            }
+        #endif
+    #elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
+        #define fast_popcount32 __builtin_popcount
+        #if ULONG_MAX == 0xffffffff
+            inline int fast_popcount64(unsigned long long x)
+            {
+                return __builtin_popcount((unsigned)(x)) + __builtin_popcount((unsigned)(x >> 32));
+            }
+        #else
+            inline int fast_popcount64(unsigned long long x)
+            {
+                return __builtin_popcountll(x);
+            }
+        #endif
+    #else
+        static const char a_popcount_bits[256] = {
+            0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+        };
+
+        // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
+        inline int fast_popcount32(uint32_t x)
+        {
+            return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
+        }
+        inline int fast_popcount64(uint64_t x)
+        {
+            return fast_popcount32(x) + fast_popcount32(x >> 32);
+        }
+
+    #endif // select best popcount implementations
+
+
 
     template <ACTION action> bool uses_val(void) 
     {
@@ -306,33 +291,6 @@ public:
 
 
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -540,7 +498,6 @@ public:
     void state_init(ACTION action, state_state *state, Array* akku);
 
     // Called for each search result
-    template <ACTION action, bool pattern, class Callback> bool state_match(size_t index, uint64_t indexpattern, int64_t value, state_state *state, Callback callback) const;
     template <ACTION action, class Callback> bool FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const;
     template <ACTION action, class Callback> bool FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const;
 
@@ -585,7 +542,7 @@ public:
     template <bool gt, ACTION action, size_t width, class Callback>             
     bool FindGTLT(int64_t v, uint64_t chunk, state_state *state, size_t baseindex, Callback callback) const;
     
-
+    /*
     // popcount
     #if defined(_MSC_VER) && _MSC_VER >= 1500
         inline int fast_popcount32(uint32_t x);
@@ -606,7 +563,7 @@ public:
 
         inline int fast_popcount64(uint64_t x) const;
     #endif // select best popcount implementations
-
+    */
 
     // Debug
     size_t GetBitWidth() const {return m_width;}
@@ -959,60 +916,16 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
     computations for the given search criteria makes it feasible to construct such a pattern.
     */
 
-    template <ACTION action, bool pattern, class Callback> bool Array::state_match(size_t index, uint64_t indexpattern, int64_t value, state_state *state, Callback callback) const
-    {
-        if (pattern) {
-            if (action == TDB_COUNT) {
-                state->state += fast_popcount64(indexpattern);
-                return true;
-            }
-            // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
-            return false;
-        }
-
-        if (action == TDB_CALLBACK_IDX)
-            return callback(index);
-        if (action == TDB_MAX && value > *(int64_t*)state) {
-            state->state = value;
-            state->match_count++;
-        }
-        if (action == TDB_MIN && value < *(int64_t*)state) {
-            state->state = value;
-            state->match_count++;
-        }
-        if (action == TDB_SUM)
-            state->state += value;
-        if (action == TDB_COUNT)
-            state->state++;
-        if (action == TDB_FINDALL)
-            ((Array*)state->state)->add(index);
-        if (action == TDB_RETURN_FIRST) {
-            state->state = index;
-            return false;
-        }
-        return true;
-    }
-
-    template <ACTION action> bool Array::USES_VAL(void) 
-    {
-        if (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM)
-            return true;
-        else
-            return false;
-    }
-
     // These wrapper functions only exist to enable a possibility to make the compiler see that 'value' and/or 'index' are unused, such that caller's 
-    // computation of these values will not be made. Only works if FIND_ACTION and FIND_ACTION_PATTERN rewritten as macros. Note: This problem has been fixed in
-    // next upcoming array.hpp version
-    template <ACTION action, class Callback> bool Array::FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const
+    // computation of these values will not be made. Only works if FIND_ACTION and FIND_ACTION_PATTERN rewritten as macros.
+    template <ACTION action, class Callback>bool Array::FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const
     {
-        return state_match<action, false, Callback>(index, 0, value, state, callback);
+        return state->state_match<action, false, Callback>(index, 0, value, callback);
     }
-    template <ACTION action, class Callback> bool Array::FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const
+    template <ACTION action, class Callback>bool Array::FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const
     {
-        return state_match<action, true, Callback>(index, pattern, 0, state, callback);
+        return state->state_match<action, true, Callback>(index, pattern, 0, callback);
     }
-
 
     template<size_t width> uint64_t Array::cascade(uint64_t a) const
     {
@@ -1205,53 +1118,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
     #endif
     }
 
-    // popcount
-    #if defined(_MSC_VER) && _MSC_VER >= 1500
-        #include <intrin.h>
-        inline int Array::fast_popcount32(uint32_t x)
-        {
-            return __popcnt(x);
-        }
-        #if defined(_M_X64)
-            inline int Array::fast_popcount64(unsigned __int64 x) const
-            {
-                return (int)__popcnt64(x);
-            }
-        #else
-            inline int Array::fast_popcount64(unsigned __int64 x) const
-            {
-                return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
-            }
-        #endif
-    #elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
-        #define fast_popcount32 __builtin_popcount
-        #if ULONG_MAX == 0xffffffff
-            inline int Array::fast_popcount64(unsigned long long x) const
-            {
-                return __builtin_popcount((unsigned)(x)) + __builtin_popcount((unsigned)(x >> 32));
-            }
-        #else
-            inline int Array::fast_popcount64(unsigned long long x) const
-            {
-                return __builtin_popcountll(x);
-            }
-        #endif
-    #else
-        static const char a_popcount_bits[256] = {
-            0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
-        };
 
-        // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
-        inline int Array::fast_popcount32(uint32_t x) const
-        {
-            return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
-        }
-        inline int Array::fast_popcount64(uint64_t x) const
-        {
-            return fast_popcount32(x) + fast_popcount32(x >> 32);
-        }
-
-    #endif // select best popcount implementations
 
     template <size_t width> inline int64_t Array::LowerBits(void) const
     {

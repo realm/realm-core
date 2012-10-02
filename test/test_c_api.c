@@ -39,7 +39,7 @@ int c_test_1() {
     bool passed = true;
     Table* tbl = mytable_new();
 
-    for(size_t i = 0; i < TEST_DATA_ROWS; i++) {
+    for (size_t i = 0; i < TEST_DATA_ROWS; i++) {
         int_data[i] = i - (TEST_DATA_ROWS / 2);
         bool_data[i] = ((i % 2) == 1);
         sprintf(str, "hello string %d", i);
@@ -58,7 +58,7 @@ int c_test_1() {
     if (table_get_size(tbl) != TEST_DATA_ROWS)
         passed = false;
 
-    for(int64_t i = 0; i < TEST_DATA_ROWS; i++) {
+    for (int64_t i = 0; i < TEST_DATA_ROWS; i++) {
         if (mytable_get_MyInt(tbl, i) != i - (TEST_DATA_ROWS / 2))
             passed = false;
         sprintf(str, "hello string %d", i);
@@ -92,24 +92,24 @@ int c_test_2()
     col_ids[BOOL_COL] = table_register_column(t, COLUMN_TYPE_BOOL, col_names[BOOL_COL]);
     col_ids[STRING_COL] = table_register_column(t, COLUMN_TYPE_STRING, col_names[STRING_COL]);
 
-    for(size_t i = 0; i < TEST_DATA_COLUMNS; i++) {
-        if(col_ids[i] != table_get_column_index(t, col_names[i]))
+    for (size_t i = 0; i < TEST_DATA_COLUMNS; i++) {
+        if (col_ids[i] != table_get_column_index(t, col_names[i]))
             return TEST_FAILED;
     }
 
-    for(size_t row = 0; row < TEST_DATA_ROWS; row++){
+    for (size_t row = 0; row < TEST_DATA_ROWS; row++){
         table_insert_int(t, col_ids[INT_COL], row, int_data[row]);
         table_insert_bool(t, col_ids[BOOL_COL], row, bool_data[row]);
         table_insert_string(t, col_ids[STRING_COL], row, string_data);
         table_insert_done(t);
     }
 
-    for(size_t row = 0; row < TEST_DATA_ROWS; row++){
-        if(int_data[row] != table_get_int(t, col_ids[INT_COL], row))
+    for (size_t row = 0; row < TEST_DATA_ROWS; row++){
+        if (int_data[row] != table_get_int(t, col_ids[INT_COL], row))
            return TEST_FAILED;
-        if(bool_data[row] != table_get_bool(t, col_ids[BOOL_COL], row))
+        if (bool_data[row] != table_get_bool(t, col_ids[BOOL_COL], row))
            return TEST_FAILED;
-        if(strcmp(string_data, table_get_string(t, col_ids[STRING_COL], row)) != 0)
+        if (strcmp(string_data, table_get_string(t, col_ids[STRING_COL], row)) != 0)
            return TEST_FAILED;
     }
 

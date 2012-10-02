@@ -20,12 +20,6 @@
 #ifndef TIGHTDB_UTF8_HPP
 #define TIGHTDB_UTF8_HPP
 
-#include <string>
-#include <memory.h>
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-#include <Windows.h>
-#endif
-
 namespace tightdb {
 
 bool case_cmp(const char* constant_upper, const char* constant_lower, const char* source);

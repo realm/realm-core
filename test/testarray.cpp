@@ -481,7 +481,7 @@ TEST(findallint0)
     const int value = 0;
     const int vReps = 5;
 
-    for(int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++){
         a.add(0);
     }
 
@@ -490,8 +490,8 @@ TEST(findallint0)
 
     size_t i = 0;
     size_t j = 0;
-    while(i < a.Size()){
-        if(a.Get(i) == value)
+    while (i < a.Size()){
+        if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -509,7 +509,7 @@ TEST(findallint1)
     const int value = 1;
     const int vReps = 5;
 
-    for(int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++){
         a.add(0);
         a.add(0);
         a.add(1);
@@ -521,8 +521,8 @@ TEST(findallint1)
 
     size_t i = 0;
     size_t j = 0;
-    while(i < a.Size()){
-        if(a.Get(i) == value)
+    while (i < a.Size()){
+        if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -540,7 +540,7 @@ TEST(findallint2)
     const int value = 3;
     const int vReps = 5;
 
-    for(int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++){
         a.add(0);
         a.add(1);
         a.add(2);
@@ -552,8 +552,8 @@ TEST(findallint2)
 
     size_t i = 0;
     size_t j = 0;
-    while(i < a.Size()){
-        if(a.Get(i) == value)
+    while (i < a.Size()){
+        if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -571,7 +571,7 @@ TEST(findallint3)
     const int value = 10;
     const int vReps = 5;
     // 0, 4, 8
-    for(int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++){
         a.add(10);
         a.add(11);
         a.add(12);
@@ -583,8 +583,8 @@ TEST(findallint3)
 
     size_t i = 0;
     size_t j = 0;
-    while(i < a.Size()){
-        if(a.Get(i) == value)
+    while (i < a.Size()){
+        if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -602,7 +602,7 @@ TEST(findallint4)
     const int value = 20;
     const int vReps = 5;
 
-    for(int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++){
         // 8 bitwidth
         a.add(20);
         a.add(21);
@@ -615,8 +615,8 @@ TEST(findallint4)
 
     size_t i = 0;
     size_t j = 0;
-    while(i < a.Size()){
-        if(a.Get(i) == value)
+    while (i < a.Size()){
+        if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -634,7 +634,7 @@ TEST(findallint5)
     const int value = 303;
     const int vReps = 5;
 
-    for(int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++){
         // 16 bitwidth
         a.add(300);
         a.add(301);
@@ -647,8 +647,8 @@ TEST(findallint5)
 
     size_t i = 0;
     size_t j = 0;
-    while(i < a.Size()){
-        if(a.Get(i) == value)
+    while (i < a.Size()){
+        if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -666,7 +666,7 @@ TEST(findallint6)
     const int value = 70000;
     const int vReps = 5;
 
-    for(int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++){
         // 32 bitwidth
         a.add(70000);
         a.add(70001);
@@ -679,8 +679,8 @@ TEST(findallint6)
 
     size_t i = 0;
     size_t j = 0;
-    while(i < a.Size()){
-        if(a.Get(i) == value)
+    while (i < a.Size()){
+        if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -698,7 +698,7 @@ TEST(findallint7)
     const int64_t value = 4300000003ULL;
     const int vReps = 5;
 
-    for(int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++){
         // 64 bitwidth
         a.add(4300000000ULL);
         a.add(4300000001ULL);
@@ -711,8 +711,8 @@ TEST(findallint7)
 
     size_t i = 0;
     size_t j = 0;
-    while(i < a.Size()){
-        if(a.Get(i) == value)
+    while (i < a.Size()){
+        if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -727,7 +727,7 @@ void hasZeroByte(int64_t value, size_t reps)
     Array a;
     Array r;
 
-    for(size_t i = 0; i < reps - 1; i++){
+    for (size_t i = 0; i < reps - 1; i++){
         a.add(value);
     }
 
@@ -763,11 +763,11 @@ TEST(FindhasZeroByte)
 TEST(FindSSE)
 {
     Array a;
-    for(uint64_t i = 0; i < 100; i++) {
+    for (uint64_t i = 0; i < 100; i++) {
         a.add(10000);
     }
 
-    for(size_t i = 0; i < 100; i++) {
+    for (size_t i = 0; i < 100; i++) {
         a.Set(i, 123);
         size_t t = a.find_first(123);
         TIGHTDB_ASSERT(t == i);
@@ -781,7 +781,7 @@ TEST(FindSSE)
 TEST(Sum0)
 {
     Array a;
-    for(int i = 0; i < 64 + 7; i++) {
+    for (int i = 0; i < 64 + 7; i++) {
         a.add(0);
     }
     CHECK_EQUAL(0, a.sum(0, a.Size()));
@@ -792,16 +792,16 @@ TEST(Sum1)
 {
     int64_t s1 = 0;
     Array a;
-    for(int i = 0; i < 256 + 7; i++)
+    for (int i = 0; i < 256 + 7; i++)
         a.add(i % 2);
 
     s1 = 0;
-    for(int i = 0; i < 256 + 7; i++)
+    for (int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
     CHECK_EQUAL(s1, a.sum(0, a.Size()));
 
     s1 = 0;
-    for(int i = 3; i < 100; i++)
+    for (int i = 3; i < 100; i++)
         s1 += a.Get(i);
     CHECK_EQUAL(s1, a.sum(3, 100));
 
@@ -812,16 +812,16 @@ TEST(Sum2)
 {
     int64_t s1 = 0;
     Array a;
-    for(int i = 0; i < 256 + 7; i++)
+    for (int i = 0; i < 256 + 7; i++)
         a.add(i % 4);
 
     s1 = 0;
-    for(int i = 0; i < 256 + 7; i++)
+    for (int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
     CHECK_EQUAL(s1, a.sum(0, a.Size()));
 
     s1 = 0;
-    for(int i = 3; i < 100; i++)
+    for (int i = 3; i < 100; i++)
         s1 += a.Get(i);
     CHECK_EQUAL(s1, a.sum(3, 100));
 
@@ -833,16 +833,16 @@ TEST(Sum4)
 {
     int64_t s1 = 0;
     Array a;
-    for(int i = 0; i < 256 + 7; i++)
+    for (int i = 0; i < 256 + 7; i++)
         a.add(i % 16);
 
     s1 = 0;
-    for(int i = 0; i < 256 + 7; i++)
+    for (int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
     CHECK_EQUAL(s1, a.sum(0, a.Size()));
 
     s1 = 0;
-    for(int i = 3; i < 100; i++)
+    for (int i = 3; i < 100; i++)
         s1 += a.Get(i);
     CHECK_EQUAL(s1, a.sum(3, 100));
 
@@ -853,16 +853,16 @@ TEST(Sum16)
 {
     int64_t s1 = 0;
     Array a;
-    for(int i = 0; i < 256 + 7; i++)
+    for (int i = 0; i < 256 + 7; i++)
         a.add(i % 30000);
 
     s1 = 0;
-    for(int i = 0; i < 256 + 7; i++)
+    for (int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
     CHECK_EQUAL(s1, a.sum(0, a.Size()));
 
     s1 = 0;
-    for(int i = 3; i < 100; i++)
+    for (int i = 3; i < 100; i++)
         s1 += a.Get(i);
     CHECK_EQUAL(s1, a.sum(3, 100));
 
@@ -875,11 +875,11 @@ TEST(Greater)
 
     size_t items = 400;
 
-    for(items = 2; items < 200; items += 7)
+    for (items = 2; items < 200; items += 7)
     {
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
         size_t t = a.find_first<GREATER>(0, 0, (size_t)-1);
@@ -887,35 +887,35 @@ TEST(Greater)
 
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 1);
 
 			size_t t = a.find_first<GREATER>(0, 0, (size_t)-1);
-            assert(i == t);
+            TIGHTDB_ASSERT(i == t);
 
             CHECK_EQUAL(i, t);
             a.Set(i, 0);
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(2);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 3);
             size_t t = a.find_first<GREATER>(2, 0, (size_t)-1);
-            assert(i == t);
+            CHECK_EQUAL(i, t);
             a.Set(i, 2);
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(10);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 11);
             size_t t = a.find_first<GREATER>(10, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -923,20 +923,20 @@ TEST(Greater)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(100);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 110);
             size_t t = a.find_first<GREATER>(100, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 100);
         }
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(200);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 210);
             size_t t = a.find_first<GREATER>(200, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -944,21 +944,21 @@ TEST(Greater)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(10000);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 11000);
             size_t t = a.find_first<GREATER>(10000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 10000);
         }
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(40000);
         }
 
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 41000);
             size_t t = a.find_first<GREATER>(40000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -966,10 +966,10 @@ TEST(Greater)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(1000000);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 1100000);
             size_t t = a.find_first<GREATER>(1000000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -977,10 +977,10 @@ TEST(Greater)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(1000ULL*1000ULL*1000ULL*1000ULL);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
             size_t t = a.find_first<GREATER>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1000,11 +1000,11 @@ TEST(Less)
 
     size_t items = 400;
 
-    for(items = 2; items < 200; items += 7)
+    for (items = 2; items < 200; items += 7)
     {
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
         size_t t = a.find_first<LESS>(0, 0, (size_t)-1);
@@ -1012,10 +1012,10 @@ TEST(Less)
 
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(1);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 0);
             size_t t = a.find_first<LESS>(1, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1023,10 +1023,10 @@ TEST(Less)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(3);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 2);
             size_t t = a.find_first<LESS>(3, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1034,10 +1034,10 @@ TEST(Less)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(11);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 10);
             size_t t = a.find_first<LESS>(11, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1045,20 +1045,20 @@ TEST(Less)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(110);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 100);
             size_t t = a.find_first<LESS>(110, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 110);
         }
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(210);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 200);
             size_t t = a.find_first<LESS>(210, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1066,21 +1066,21 @@ TEST(Less)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(11000);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 10000);
             size_t t = a.find_first<LESS>(11000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 11000);
         }
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(41000);
         }
 
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 40000);
             size_t t = a.find_first<LESS>(41000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1088,10 +1088,10 @@ TEST(Less)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(1100000);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000000);
             size_t t = a.find_first<LESS>(1100000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1099,10 +1099,10 @@ TEST(Less)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(1000ULL*1000ULL*1000ULL*1000ULL);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL - 1ULL);
             size_t t = a.find_first<LESS>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1119,7 +1119,7 @@ TEST(NotEqual1)
     Array a;
     
     a.Clear();
-    for(size_t i = 0; i < 100; i++) {
+    for (size_t i = 0; i < 100; i++) {
         a.add(0x33);
     }
     a.Set(50, 0x44);
@@ -1134,10 +1134,10 @@ TEST(NotEqual)
 
     size_t items = 400;
 
-    for(items = 2; items < 200; items += 7)
+    for (items = 2; items < 200; items += 7)
     {
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
         size_t t = a.find_first<NOTEQUAL>(0, 0, (size_t)-1);
@@ -1145,10 +1145,10 @@ TEST(NotEqual)
 
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 1);
             size_t t = a.find_first<NOTEQUAL>(0, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1156,10 +1156,10 @@ TEST(NotEqual)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(2);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 3);
             size_t t = a.find_first<NOTEQUAL>(2, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1167,10 +1167,10 @@ TEST(NotEqual)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(10);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 11);
             size_t t = a.find_first<NOTEQUAL>(10, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1178,20 +1178,20 @@ TEST(NotEqual)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(100);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 110);
             size_t t = a.find_first<NOTEQUAL>(100, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 100);
         }
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(200);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 210);
             size_t t = a.find_first<NOTEQUAL>(200, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1199,21 +1199,21 @@ TEST(NotEqual)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(10000);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 11000);
             size_t t = a.find_first<NOTEQUAL>(10000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 10000);
         }
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(40000);
         }
 
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 41000);
             size_t t = a.find_first<NOTEQUAL>(40000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1221,10 +1221,10 @@ TEST(NotEqual)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(1000000);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 1100000);
             size_t t = a.find_first<NOTEQUAL>(1000000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1232,10 +1232,10 @@ TEST(NotEqual)
         }
 
         a.Clear();
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.add(1000ULL*1000ULL*1000ULL*1000ULL);
         }
-        for(size_t i = 0; i < items; i++) {
+        for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
             size_t t = a.find_first<NOTEQUAL>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
@@ -1254,14 +1254,14 @@ TEST(ArraySort)
     // negative values
     Array a;
 
-    for(size_t t = 0; t < 400; t++)
+    for (size_t t = 0; t < 400; t++)
         a.add(rand() % 300 - 100);
 
     size_t orig_size = a.Size();
     a.sort();
 
     CHECK(a.Size() == orig_size);
-    for(size_t t = 1; t < a.Size(); t++)
+    for (size_t t = 1; t < a.Size(); t++)
         CHECK(a.Get(t) >= a.Get(t - 1));
 
     a.Destroy();
@@ -1273,14 +1273,14 @@ TEST(ArraySort2)
     // 64 bit values
     Array a;
 
-    for(size_t t = 0; t < 400; t++)
+    for (size_t t = 0; t < 400; t++)
         a.add((int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand());
 
     size_t orig_size = a.Size();
     a.sort();
 
     CHECK(a.Size() == orig_size);
-    for(size_t t = 1; t < a.Size(); t++)
+    for (size_t t = 1; t < a.Size(); t++)
         CHECK(a.Get(t) >= a.Get(t - 1));
 
     a.Destroy();
@@ -1291,14 +1291,14 @@ TEST(ArraySort3)
     // many values
     Array a;
 
-    for(size_t t = 0; t < 1000000ULL; t++)
+    for (size_t t = 0; t < 1000000ULL; t++)
         a.add(rand());
 
     size_t orig_size = a.Size();
     a.sort();
 
     CHECK(a.Size() == orig_size);
-    for(size_t t = 1; t < a.Size(); t++)
+    for (size_t t = 1; t < a.Size(); t++)
         CHECK(a.Get(t) >= a.Get(t - 1));
 
     a.Destroy();
@@ -1310,14 +1310,14 @@ TEST(ArraySort4)
     // same values
     Array a;
 
-    for(size_t t = 0; t < 1000; t++)
+    for (size_t t = 0; t < 1000; t++)
         a.add(0);
 
     size_t orig_size = a.Size();
     a.sort();
 
     CHECK(a.Size() == orig_size);
-    for(size_t t = 1; t < a.Size(); t++)
+    for (size_t t = 1; t < a.Size(); t++)
         CHECK(a.Get(t) == 0);
 
     a.Destroy();

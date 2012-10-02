@@ -1,6 +1,7 @@
 #include <UnitTest++.h>
 #include <tightdb/column_string.hpp>
 #include <tightdb/column_string_enum.hpp>
+#include <tightdb/index_string.hpp>
 
 using namespace tightdb;
 
@@ -397,6 +398,130 @@ TEST(ColumnStringAutoEnumerate)
     e.Destroy();
 }
 
+TEST(ColumnStringAutoEnumerateIndex)
+{
+    AdaptiveStringColumn c;
+
+    // Add duplicate values
+    for (size_t i = 0; i < 5; ++i) {
+        c.add("a");
+        c.add("bc");
+        c.add("def");
+        c.add("ghij");
+        c.add("klmop");
+    }
+
+    // Create StringEnum
+    size_t keys;
+    size_t values;
+    const bool res = c.AutoEnumerate(keys, values);
+    CHECK(res);
+    ColumnStringEnum e(keys, values);
+
+    // Set index
+    e.CreateIndex();
+    CHECK(e.HasIndex());
+
+    // Search for a value that does not exist
+    const size_t res1 = e.find_first("nonexist");
+    CHECK_EQUAL(not_found, res1);
+
+    Array results;
+    e.find_all(results, "nonexist");
+    CHECK(results.is_empty());
+
+    // Search for an existing value
+    const size_t res2 = e.find_first("klmop");
+    CHECK_EQUAL(4, res2);
+
+    e.find_all(results, "klmop");
+    CHECK_EQUAL(5, results.Size());
+    CHECK_EQUAL(4, results.Get(0));
+    CHECK_EQUAL(9, results.Get(1));
+    CHECK_EQUAL(14, results.Get(2));
+    CHECK_EQUAL(19, results.Get(3));
+    CHECK_EQUAL(24, results.Get(4));
+
+    // Set a value
+    e.Set(1, "newval");
+    const size_t res3 = e.count("a");
+    const size_t res4 = e.count("bc");
+    const size_t res5 = e.count("newval");
+    CHECK_EQUAL(5, res3);
+    CHECK_EQUAL(4, res4);
+    CHECK_EQUAL(1, res5);
+
+    results.Clear();
+    e.find_all(results, "newval");
+    CHECK_EQUAL(1, results.Size());
+    CHECK_EQUAL(1, results.Get(0));
+
+    // Insert a value
+    e.Insert(4, "newval");
+    const size_t res6 = e.count("newval");
+    CHECK_EQUAL(2, res6);
+
+    // Delete values
+    e.Delete(1);
+    e.Delete(0);
+    const size_t res7 = e.count("a");
+    const size_t res8 = e.count("newval");
+    CHECK_EQUAL(4, res7);
+    CHECK_EQUAL(1, res8);
+
+    // Clear all
+    e.Clear();
+    const size_t res9 = e.count("a");
+    CHECK_EQUAL(0, res9);
+
+    // Cleanup
+    c.Destroy();
+    e.Destroy();
+    results.Destroy();
+}
+
+TEST(ColumnStringAutoEnumerateIndexReuse)
+{
+    AdaptiveStringColumn c;
+
+    // Add duplicate values
+    for (size_t i = 0; i < 5; ++i) {
+        c.add("a");
+        c.add("bc");
+        c.add("def");
+        c.add("ghij");
+        c.add("klmop");
+    }
+
+    // Set index
+    c.CreateIndex();
+    CHECK(c.HasIndex());
+
+    // Create StringEnum
+    size_t keys;
+    size_t values;
+    const bool res = c.AutoEnumerate(keys, values);
+    CHECK(res);
+    ColumnStringEnum e(keys, values);
+
+    // Reuse the index from original column
+    StringIndex& ndx = c.PullIndex();
+    e.ReuseIndex(ndx);
+    CHECK(e.HasIndex());
+
+    // Search for a value that does not exist
+    const size_t res1 = e.find_first("nonexist");
+    CHECK_EQUAL(not_found, res1);
+
+    // Search for an existing value
+    const size_t res2 = e.find_first("klmop");
+    CHECK_EQUAL(4, res2);
+
+    // Cleanup
+    c.Destroy();
+    e.Destroy();
+}
+
 // Test "Replace string array with long string array" when doing it through LeafSet()
 TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
 {
@@ -586,6 +711,141 @@ TEST(AdaptiveStringColumnFindAllRanges)
     // Clean-up
     asc.Destroy();
     c.Destroy();
+}
+
+TEST(AdaptiveStringColumnCount)
+{
+    AdaptiveStringColumn asc;
+    
+    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+    asc.add("HEJSA"); // 0
+    asc.add("1");
+    asc.add("HEJSA");
+    asc.add("3");
+    asc.add("HEJSA");
+    asc.add("5");
+    asc.add("HEJSA");
+    asc.add("7");
+    asc.add("HEJSA");
+    asc.add("9");
+    asc.add("HEJSA");
+    asc.add("11");
+    asc.add("HEJSA");
+    asc.add("13");
+    asc.add("HEJSA");
+    asc.add("15");
+    asc.add("HEJSA"); // 16
+    
+    const size_t count = asc.count("HEJSA");
+    CHECK_EQUAL(9, count);
+    
+    // Create StringEnum
+    size_t keys;
+    size_t values;
+    const bool res = asc.AutoEnumerate(keys, values);
+    CHECK(res);
+    ColumnStringEnum e(keys, values);
+    
+    // Check that enumerated column return same result
+    const size_t ecount = e.count("HEJSA");
+    CHECK_EQUAL(9, ecount);
+    
+    // Clean-up
+    asc.Destroy();
+    e.Destroy();
+}
+
+TEST(AdaptiveStringColumnIndex)
+{
+    AdaptiveStringColumn asc;
+    
+    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+    asc.add("HEJSA"); // 0
+    asc.add("1");
+    asc.add("HEJSA");
+    asc.add("3");
+    asc.add("HEJSA");
+    asc.add("5");
+    asc.add("HEJSA");
+    asc.add("7");
+    asc.add("HEJSA");
+    asc.add("9");
+    asc.add("HEJSA");
+    asc.add("11");
+    asc.add("HEJSA");
+    asc.add("13");
+    asc.add("HEJSA");
+    asc.add("15");
+    asc.add("HEJSA"); // 16
+    
+    asc.CreateIndex();
+    CHECK(asc.HasIndex());
+    
+    const size_t count0 = asc.count("HEJ");
+    const size_t count1 = asc.count("HEJSA");
+    const size_t count2 = asc.count("1");
+    const size_t count3 = asc.count("15");
+    CHECK_EQUAL(0, count0);
+    CHECK_EQUAL(9, count1);
+    CHECK_EQUAL(1, count2);
+    CHECK_EQUAL(1, count3);
+    
+    const size_t ndx0 = asc.find_first("HEJS");
+    const size_t ndx1 = asc.find_first("HEJSA");
+    const size_t ndx2 = asc.find_first("1");
+    const size_t ndx3 = asc.find_first("15");
+    CHECK_EQUAL(not_found, ndx0);
+    CHECK_EQUAL(0, ndx1);
+    CHECK_EQUAL(1, ndx2);
+    CHECK_EQUAL(15, ndx3);
+    
+    // Set some values
+    asc.Set(1, "one");
+    asc.Set(15, "fifteen");
+    const size_t set1 = asc.find_first("1");
+    const size_t set2 = asc.find_first("15");
+    const size_t set3 = asc.find_first("one");
+    const size_t set4 = asc.find_first("fifteen");
+    CHECK_EQUAL(not_found, set1);
+    CHECK_EQUAL(not_found, set2);
+    CHECK_EQUAL(1, set3);
+    CHECK_EQUAL(15, set4);
+    
+    // Insert some values
+    asc.Insert(0, "top");
+    asc.Insert(8, "middle");
+    asc.add("bottom");
+    const size_t ins1 = asc.find_first("top");
+    const size_t ins2 = asc.find_first("middle");
+    const size_t ins3 = asc.find_first("bottom");
+    CHECK_EQUAL(0, ins1);
+    CHECK_EQUAL(8, ins2);
+    CHECK_EQUAL(19, ins3);
+    
+    // Delete some values
+    asc.Delete(0);  // top
+    asc.Delete(7);  // middle
+    asc.Delete(17); // bottom
+    const size_t del1 = asc.find_first("top");
+    const size_t del2 = asc.find_first("middle");
+    const size_t del3 = asc.find_first("bottom");
+    const size_t del4 = asc.find_first("HEJSA");
+    const size_t del5 = asc.find_first("fifteen");
+    CHECK_EQUAL(not_found, del1);
+    CHECK_EQUAL(not_found, del2);
+    CHECK_EQUAL(not_found, del3);
+    CHECK_EQUAL(0, del4);
+    CHECK_EQUAL(15, del5);
+    
+    // Remove all
+    asc.Clear();
+    const size_t c1 = asc.find_first("HEJSA");
+    const size_t c2 = asc.find_first("fifteen");
+    CHECK_EQUAL(not_found, c1);
+    CHECK_EQUAL(not_found, c2);
+    
+    // Clean-up
+    asc.Destroy();
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy)

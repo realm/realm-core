@@ -12,8 +12,16 @@ Format:
 
 ==================
 
-2012-??-??
+2012-09-07 (Alexander Stigsen)
 ----------
+
++ File format updated with bigger header and reordered column type [BREAKING]
++ Index is now enabled for string columns (handles string_enum columns as well).
++ 11 Added update_spec parameter in Table:: void set_index(size_t column_ndx, bool update_spec=true);
++ 11 Added Table::  size_t  count_string(size_t column_ndx, const char* target) const;
++ 11 Added Table accessor size_t count(const char* target) const to highlevel interface
++ 11 Spec::add_column now takes an optional parameter for attribute (like indexed).
++ 11 Added Table::to_string() and Group::to_string() for prettified string dump.
 
 2012-08-14 (Brian Munkholm)
 ----------

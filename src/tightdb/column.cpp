@@ -66,34 +66,34 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
     v0 = vals->Get(i0);
     v1 = vals->Get(i1);
 
-    for(;;) {
-        if(v0 < v1) {
+    for (;;) {
+        if (v0 < v1) {
             idxres->add(i0);
             // Only check p0 if it has been modified :)
-            if(p0 == s0)
+            if (p0 == s0)
                 break;
             i0 = idx0->GetAsRef(p0++);
             v0 = vals->Get(i0);
         }
         else {
             idxres->add(i1);
-            if(p1 == s1)
+            if (p1 == s1)
                 break;
             i1 = idx1->GetAsRef(p1++);
             v1 = vals->Get(i1);
         }
     }
 
-    if(p0 == s0)
+    if (p0 == s0)
         p0--;
     else
         p1--;
 
-    while(p0 < s0) {
+    while (p0 < s0) {
         i0 = idx0->GetAsRef(p0++);
         idxres->add(i0);
     }
-    while(p1 < s1) {
+    while (p1 < s1) {
         i1 = idx1->GetAsRef(p1++);
         idxres->add(i1);
     }
@@ -152,45 +152,46 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
 //     Merge-sorted array of all values
 Array* merge(const Array& arrayList)
 {
-    const size_t count = arrayList.Size();
+    const size_t size = arrayList.Size();
 
-    if (count == 1) return NULL; // already sorted
+    if (size == 1) 
+        return NULL; // already sorted
 
-    Array Left, Right;
-    const size_t left = count / 2;
-    for (size_t t = 0; t < left; ++t)
-        Left.add(arrayList.Get(t));
-    for (size_t t = left; t < count; ++t)
-        Right.add(arrayList.Get(t));
-
-    Array* l = NULL;
-    Array* r = NULL;
-    Array* res = new Array();
+    Array leftHalf, rightHalf;
+    const size_t leftSize = size / 2;
+    for (size_t t = 0; t < leftSize; ++t)
+        leftHalf.add(arrayList.Get(t));
+    for (size_t t = leftSize; t < size; ++t)
+        rightHalf.add(arrayList.Get(t));
 
     // We merge left-half-first instead of bottom-up so that we access the same data in each call
     // so that it's in cache, at least for the first few iterations until lists get too long
-    l = merge(Left);
-    r = merge(Right);
-    if (l && r)
-        merge_core(*l, *r, *res);
-    else if (l) {
-        const size_t ref = Right.GetAsRef(0);
-        Array r0(ref, NULL);
-        merge_core(*l, r0, *res);
+    Array* left = merge(leftHalf);
+    Array* right = merge(rightHalf);
+    Array* res = new Array();
+
+    if (left && right)
+        merge_core(*left, *right, *res);
+    else if (left) {
+        const size_t ref = rightHalf.GetAsRef(0);
+        Array right0(ref, NULL);
+        merge_core(*left, right0, *res);
     }
-    else if (r) {
-        const size_t ref = Left.GetAsRef(0);
-        Array l0(ref, NULL);
-        merge_core(l0, *r, *res);
+    else if (right) {
+        const size_t ref = leftHalf.GetAsRef(0);
+        Array left0(ref, NULL);
+        merge_core(left0, *right, *res);
     }
 
     // Clean-up
-    Left.Destroy();
-    Right.Destroy();
-    if (l) l->Destroy();
-    if (r) r->Destroy();
-    delete l;
-    delete r;
+    leftHalf.Destroy();
+    rightHalf.Destroy();
+    if (left) 
+        left->Destroy();
+    if (right) 
+        right->Destroy();
+    delete left;
+    delete right;
 
     return res; // receiver now own the array, and has to delete it when done
 }
@@ -203,36 +204,36 @@ Array* merge(const Array& arrayList)
 // TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 {
-    if(indexlists->Size() == 1) {
+    if (indexlists->Size() == 1) {
 //      size_t ref = valuelist->Get(0);
         *indexresult = (Array *)indexlists->Get(0);
         return;
     }
 
-    Array LeftV, RightV;
-    Array LeftI, RightI;
-    size_t left = indexlists->Size() / 2;
-    for(size_t t = 0; t < left; t++) {
-        LeftV.add(indexlists->Get(t));
-        LeftI.add(indexlists->Get(t));
+    Array leftV, rightV;
+    Array leftI, rightI;
+    size_t leftSize = indexlists->Size() / 2;
+    for (size_t t = 0; t < leftSize; t++) {
+        leftV.add(indexlists->Get(t));
+        leftI.add(indexlists->Get(t));
     }
-    for(size_t t = left; t < indexlists->Size(); t++) {
-        RightV.add(indexlists->Get(t));
-        RightI.add(indexlists->Get(t));
+    for (size_t t = leftSize; t < indexlists->Size(); t++) {
+        rightV.add(indexlists->Get(t));
+        rightI.add(indexlists->Get(t));
     }
 
     Array *li;
     Array *ri;
 
-    Array *ResI = new Array();
+    Array *resI = new Array();
 
     // We merge left-half-first instead of bottom-up so that we access the same data in each call
     // so that it's in cache, at least for the first few iterations until lists get too long
-    merge_references(valuelist, &LeftI, &ri);
-    merge_references(valuelist, &RightI, &li);
-    merge_core_references(valuelist, li, ri, ResI);
+    merge_references(valuelist, &leftI, &ri);
+    merge_references(valuelist, &rightI, &li);
+    merge_core_references(valuelist, li, ri, resI);
 
-    *indexresult = ResI;
+    *indexresult = resI;
 }
 
 bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
@@ -282,7 +283,7 @@ Column::Column(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc): 
     m_array = new Array(ref, parent, pndx, alloc);
 }
 
-Column::Column(const Column& column): m_index(0)
+Column::Column(const Column& column): ColumnBase(), m_index(0)
 {
     m_array = column.m_array; // we now own array
     column.m_array = 0;       // so invalidate source
@@ -337,11 +338,6 @@ size_t Column::Size() const
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
 
-void Column::SetParent(ArrayParent* parent, size_t pndx)
-{
-    m_array->SetParent(parent, pndx);
-}
-
 void Column::UpdateParentNdx(int diff)
 {
     m_array->UpdateParentNdx(diff);
@@ -386,7 +382,7 @@ int64_t Column::Get(size_t ndx) const
 
 size_t Column::GetAsRef(size_t ndx) const
 {
-    return TO_REF(TreeGet<int64_t, Column>(ndx));
+    return to_ref(TreeGet<int64_t, Column>(ndx));
 }
 
 bool Column::Set(size_t ndx, int64_t value)
@@ -430,27 +426,28 @@ bool Column::Insert(size_t ndx, int64_t value)
 template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, size_t start, size_t end, size_t *matchcount) const
 { 
 #if 1
-    if(end == size_t(-1)) end = ((Column*)this)->Size();
+    if (end == size_t(-1)) 
+        end = ((Column*)this)->Size();
     Column* m_column = (Column*)this;
    
-    // We must allocate N on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
+    // We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
     // slower because of initial overhead).
-    NODE<int64_t, Column, cond>* N = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
-    new (N) NODE<int64_t, Column, cond>(target, 0);
+    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
+    new (node) NODE<int64_t, Column, cond>(target, 0);
 
-//    static NODE<int64_t, Column, cond> N(target, NULL);
+//    static NODE<int64_t, Column, cond> node(target, NULL);
 
-    N->QuickInit(m_column, target); 
+    node->QuickInit(m_column, target); 
     state_state st;
     Array spare;
     st.init(action, NULL, m_column, &spare);
-    int64_t r = N->aggregate<action>(&st, start, end, size_t(-1), size_t(-1), matchcount);
+    int64_t r = node->aggregate<action>(&st, start, end, size_t(-1), size_t(-1), matchcount);
         
     return r;
 #else
     // Experimental
 
-    if(end == size_t(-1)) end = ((Column*)this)->Size();
+    if (end == size_t(-1)) end = ((Column*)this)->Size();
     Column* m_column = (Column*)this;
     // To make column aggregates fast on few number of values we need low initial overhead
     // so we allocate Array instance from stack and use fast constructor intended for read-only use
@@ -491,9 +488,9 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
             m_local_end = leaf_size < e ? leaf_size : e;
         }
 #ifdef ARRAYPTR
-        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tdb_dummy);
+        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
 #else
-        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tdb_dummy);
+        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
 #endif
         s = m_leaf_end;
     }
@@ -527,7 +524,7 @@ void Column::sort(size_t start, size_t end)
     Array arr;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
     for (size_t t = 0; t < arr.Size(); t++) {
-        const size_t ref = TO_REF(arr.Get(t));
+        const size_t ref = to_ref(arr.Get(t));
         Array a(ref);
         a.sort();
     }
@@ -536,7 +533,7 @@ void Column::sort(size_t start, size_t end)
     if (sorted) {
         // Todo, this is a bit slow. Add bulk insert or the like to Column
         const size_t count = sorted->Size();
-        for(size_t t = 0; t < count; ++t) {
+        for (size_t t = 0; t < count; ++t) {
             Set(t, sorted->Get(t));
         }
 
@@ -558,14 +555,14 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&values);
 
     size_t offset = 0;
-    for(size_t t = 0; t < values.Size(); t++) {
+    for (size_t t = 0; t < values.Size(); t++) {
         Array *i = new Array();
         size_t ref = values.GetAsRef(t);
         Array v(ref);
-        for(size_t j = 0; j < v.Size(); j++)
+        for (size_t j = 0; j < v.Size(); j++)
             all_values.add(v.Get(j));
         v.ReferenceSort(*i);
-        for(size_t n = 0; n < v.Size(); n++)
+        for (size_t n = 0; n < v.Size(); n++)
             i->Set(n, i->Get(n) + offset);
         offset += v.Size();
         indexes.add((int64_t)i);
@@ -575,7 +572,7 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
 
     merge_references(&all_values, &indexes, &ResI);
 
-    for(size_t t = 0; t < ResI->Size(); t++)
+    for (size_t t = 0; t < ResI->Size(); t++)
         ref.add(ResI->Get(t));
 }
 
@@ -675,11 +672,25 @@ bool Column::Increment64(int64_t value, size_t start, size_t end)
     else {
         //TODO: partial incr
         Array refs = NodeGetRefs();
-        for (size_t i = 0; i < refs.Size(); ++i) {
+        const size_t count = refs.Size();
+        for (size_t i = 0; i < count; ++i) {
             Column col = ::GetColumnFromRef(refs, i);
             if (!col.Increment64(value)) return false;
         }
         return true;
+    }
+}
+
+void Column::IncrementIf(int64_t limit, int64_t value)
+{
+    if (!IsNode()) m_array->IncrementIf(limit, value);
+    else {
+        Array refs = NodeGetRefs();
+        const size_t count = refs.Size();
+        for (size_t i = 0; i < count; ++i) {
+            Column col = ::GetColumnFromRef(refs, i);
+            col.IncrementIf(limit, value);
+        }
     }
 }
 
@@ -754,7 +765,33 @@ size_t Column::find_pos(int64_t target) const
         if (v > target) high = (int)probe;
         else            low = (int)probe;
     }
-    if (high == len) return (size_t)-1;
+    if (high == len) return not_found;
+    else return high;
+}
+
+size_t Column::find_pos2(int64_t target) const
+{
+    // NOTE: Binary search only works if the column is sorted
+
+    if (!IsNode()) {
+        return m_array->FindPos2(target);
+    }
+
+    const int len = (int)Size();
+    int low = -1;
+    int high = len;
+
+    // Binary search based on:
+    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+    // Finds position of closest value BIGGER OR EQUAL to the target
+    while (high - low > 1) {
+        const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+        const int64_t v = Get(probe);
+
+        if (v < target) low  = (int)probe;
+        else            high = (int)probe;
+    }
+    if (high == len) return not_found;
     else return high;
 }
 

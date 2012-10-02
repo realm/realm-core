@@ -346,7 +346,7 @@ public:
     // This function is called from Array::find() for each search result if action == TDB_CALLBACK_IDX
     // in the NODE::aggregate() call. Used if aggregate source column is different from search criteria column
     template <ACTION action>bool match_callback(int64_t v) {
-        size_t i = TO_SIZET(v);
+        size_t i = to_size_t(v);
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
         for (size_t c = 1; c < m_conds; c++) {
@@ -570,35 +570,15 @@ public:
         TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
-
-
-
-
             if(m_column->HasIndex()) {
-                m_index.FindGTE(s, last_indexed);
-
-                for(;;) {
-                    if(last_indexed >= m_index.Size()) {
-                        s = not_found;
-                        break;
-                    }
-                    size_t cand = m_index.GetAsSizeT(last_indexed);
-                    ++last_indexed;
-                    if(cand >= s && cand < end) {
-                        s = cand;
-                        break;
-                    }
-                    else if(cand >= end) {
-                        s = not_found;
-                        break;
-                    }
-                }
+                size_t f = m_index.FindGTE(s, last_indexed);
+                if(f != not_found)
+                    s = m_index.Get(f);
+                else
+                    s = not_found;
+                last_indexed = f;
             }
             else {
-
-
-
-
                 // todo, can be optimized by placing outside loop
                 if (m_column_type == COLUMN_TYPE_STRING)
                     s = ((const AdaptiveStringColumn*)m_column)->find_first(m_value, s, end);
@@ -609,19 +589,9 @@ public:
                         s = cse->find_first(m_key_ndx, s, end);
                     }
                 }
-
-
-
-
-
             }
-
-
-
-
             if (s == (size_t)-1)
                 s = end;
-
             return s;
         }
         return end;

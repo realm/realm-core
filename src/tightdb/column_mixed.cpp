@@ -16,7 +16,7 @@ ColumnMixed::~ColumnMixed()
 
 void ColumnMixed::Destroy()
 {
-    if(m_array != NULL)
+    if (m_array != NULL)
         m_array->Destroy();
 }
 

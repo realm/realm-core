@@ -189,6 +189,9 @@ public:
     /// Compare two subtable columns for equality.
     bool Compare(const ColumnTable&) const;
 
+    // Overriding virtual method.
+    void invalidate_subtables_virtual();
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
 #endif // TIGHTDB_DEBUG
@@ -200,6 +203,7 @@ protected:
 
     size_t m_ref_specSet;
 };
+
 
 
 
@@ -355,6 +359,11 @@ inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_
                                 std::size_t spec_ref, std::size_t column_ref):
     ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, column_ref),
     m_ref_specSet(spec_ref) {}
+
+inline void ColumnTable::invalidate_subtables_virtual()
+{
+    invalidate_subtables();
+}
 
 
 } // namespace tightdb

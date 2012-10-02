@@ -3,6 +3,16 @@
 #include <iomanip>
 #include <fstream>
 
+#include <tightdb/config.h>
+
+#ifndef TIGHTDB_HAVE_RTTI
+#pragma message("RTTI disabled")
+#endif
+
+#ifndef TIGHTDB_HAVE_EXCEPTIONS
+#pragma message("Exceptions disabled")
+#endif
+
 #include <tightdb/table.hpp>
 #include <tightdb/index.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -12,6 +22,7 @@
 #include <tightdb/column_binary.hpp>
 #include <tightdb/column_table.hpp>
 #include <tightdb/column_mixed.hpp>
+#include <tightdb/index_string.hpp>
 
 using namespace std;
 
@@ -127,23 +138,22 @@ void Table::CreateColumns()
         case COLUMN_ATTR_INDEXED:
         case COLUMN_ATTR_UNIQUE:
             attr = type;
-            break;
+            continue; // attr prefix column types)
 
         default:
             TIGHTDB_ASSERT(false);
         }
 
+        // Cache Columns
+        m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, not even in C++11
+
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
-            TIGHTDB_ASSERT(false); //TODO:
-            //const index_ref = new_col->CreateIndex(attr);
-            //m_columns.add(index_ref);
+            const size_t column_ndx = m_cols.Size()-1;
+            set_index(column_ndx, false);
 
             attr = COLUMN_ATTR_NONE;
         }
-
-        // Cache Columns
-        m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, not even in C++11
     }
 }
 
@@ -170,12 +180,7 @@ void Table::invalidate()
     const size_t n = m_cols.Size();
     for (size_t i=0; i<n; ++i) {
         ColumnBase* const c = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
-        if (ColumnTable* c2 = dynamic_cast<ColumnTable*>(c)) {
-            c2->invalidate_subtables();
-        }
-        else if (ColumnMixed* c2 = dynamic_cast<ColumnMixed*>(c)) {
-            c2->invalidate_subtables();
-        }
+        c->invalidate_subtables_virtual();
     }
 
     ClearCachedColumns();
@@ -262,11 +267,11 @@ void Table::CacheColumns()
             }
             break;
 
-            // Attributes
+            // Attributes (prefixing column types)
         case COLUMN_ATTR_INDEXED:
         case COLUMN_ATTR_UNIQUE:
             attr = type;
-            break;
+            continue;
 
         default:
             TIGHTDB_ASSERT(false);
@@ -276,8 +281,13 @@ void Table::CacheColumns()
 
         // Atributes on columns may define that they come with an index
         if (attr != COLUMN_ATTR_NONE) {
-            const size_t index_ref = m_columns.GetAsRef(ndx_in_parent+1);
-            new_col->SetIndexRef(index_ref);
+            TIGHTDB_ASSERT(attr == COLUMN_ATTR_INDEXED); // only attribute supported for now
+            TIGHTDB_ASSERT(type == COLUMN_TYPE_STRING ||
+                           type == COLUMN_TYPE_STRING_ENUM);  // index only for strings
+
+            const size_t pndx = ndx_in_parent+1;
+            const size_t index_ref = m_columns.GetAsRef(pndx);
+            new_col->SetIndexRef(index_ref, &m_columns, pndx);
 
             ++ndx_in_parent; // advance one matchcount pos to account for index
             attr = COLUMN_ATTR_NONE;
@@ -325,7 +335,9 @@ Table::~Table()
         ArrayParent* parent = m_columns.GetParent();
         TIGHTDB_ASSERT(parent);
         TIGHTDB_ASSERT(m_ref_count == 0);
+#ifdef TIGHTDB_HAVE_RTTI
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+#endif
         static_cast<Parent*>(parent)->child_destroyed(m_columns.GetParentNdx());
         ClearCachedColumns();
         return;
@@ -336,7 +348,9 @@ Table::~Table()
         // This is a table whose lifetime is managed by reference
         // counting, so we must let our parent know about our demise.
         TIGHTDB_ASSERT(m_ref_count == 0);
+#ifdef TIGHTDB_HAVE_RTTI
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+#endif
         static_cast<Parent*>(parent)->child_destroyed(m_top.GetParentNdx());
         ClearCachedColumns();
         return;
@@ -398,10 +412,10 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const
         const ColumnType type = (ColumnType)m_spec_set.get_type_attr(i);
         if (type >= COLUMN_ATTR_INDEXED)
             continue; // ignore attributes
-        if (type < COLUMN_TYPE_STRING_ENUM)
-            ++pos;
+        if (type == COLUMN_TYPE_STRING_ENUM)
+            pos += 2; // string enums take up two places in m_columns
         else
-            pos += 2;
+            ++pos;
 
         ++current_column;
     }
@@ -491,25 +505,43 @@ bool Table::has_index(size_t column_ndx) const
     return col.HasIndex();
 }
 
-void Table::set_index(size_t column_ndx)
+void Table::set_index(size_t column_ndx, bool update_spec)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     if (has_index(column_ndx)) return;
 
-/* FIXME: This fails to work together with Group::commit()
+    const ColumnType ct = GetRealColumnType(column_ndx);
+    const size_t column_pos = GetColumnRefPos(column_ndx);
+    size_t ndx_ref = -1;
 
-    ColumnBase& col = GetColumnBase(column_ndx);
+    if (ct == COLUMN_TYPE_STRING) {
+        AdaptiveStringColumn& col = GetColumnString(column_ndx);
 
-    if (col.IsIntColumn()) {
-        Column& c = static_cast<Column&>(col);
-        Index* index = new Index();
-        c.BuildIndex(*index);
-        m_columns.add((intptr_t)index->GetRef());
+        // Create the index
+        StringIndex& ndx = col.CreateIndex();
+        ndx.SetParent(&m_columns, column_pos+1);
+        ndx_ref = ndx.GetRef();
+    }
+    else if (ct == COLUMN_TYPE_STRING_ENUM) {
+        ColumnStringEnum& col = GetColumnStringEnum(column_ndx);
+
+        // Create the index
+        StringIndex& ndx = col.CreateIndex();
+        ndx.SetParent(&m_columns, column_pos+1);
+        ndx_ref = ndx.GetRef();
     }
     else {
         TIGHTDB_ASSERT(false);
+        return;
     }
-*/
+
+    // Insert ref into columns list after the owning column
+    m_columns.Insert(column_pos+1, ndx_ref);
+    UpdateColumnRefs(column_ndx+1, 1);
+
+    // Update spec
+    if (update_spec)
+        m_spec_set.set_column_attr(column_ndx, COLUMN_ATTR_INDEXED);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err = get_local_transact_log().add_index_to_column(column_ndx);
@@ -1133,13 +1165,31 @@ void Table::insert_done()
 #endif
 }
 
-size_t Table::count(size_t column_ndx, int64_t target)
+size_t Table::count(size_t column_ndx, int64_t target) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
 
-    Column& column = GetColumn(column_ndx);
+    const Column& column = GetColumn(column_ndx);
     return column.count(target);
+}
+
+size_t Table::count_string(size_t column_ndx, const char* value) const
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(value);
+    
+    const ColumnType type = GetRealColumnType(column_ndx);
+    
+    if (type == COLUMN_TYPE_STRING) {
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        return column.count(value);
+    }
+    else {
+        TIGHTDB_ASSERT(type == COLUMN_TYPE_STRING_ENUM);
+        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+        return column.count(value);
+    }
 }
 
 int64_t Table::sum(size_t column_ndx) const
@@ -1177,6 +1227,38 @@ int64_t Table::minimum(size_t column_ndx) const
         }
     }
     return mv;
+}
+
+size_t Table::lookup(const char* value) const
+{
+    // First time we do a lookup we check if we can cache the index
+    if (!m_lookup_index) {
+        if (get_column_count() < 1)
+            return not_found; // no column to lookup in
+
+        const ColumnType type = GetRealColumnType(0);
+
+        if (type == COLUMN_TYPE_STRING) {
+            const AdaptiveStringColumn& column = GetColumnString(0);
+            if (!column.HasIndex())
+                return column.find_first(value);
+            else {
+                m_lookup_index = &column.GetIndex();
+            }
+        }
+        else if (type == COLUMN_TYPE_STRING_ENUM) {
+            const ColumnStringEnum& column = GetColumnStringEnum(0);
+            if (!column.HasIndex())
+                return column.find_first(value);
+            else {
+                m_lookup_index = &column.GetIndex();
+            }
+        }
+        else return not_found; // invalid column type
+    }
+
+    // Do lookup directly on cached index
+    return m_lookup_index->find_first(value);
 }
 
 size_t Table::find_first_int(size_t column_ndx, int64_t value) const
@@ -1419,11 +1501,19 @@ void Table::optimize()
             // There are still same number of columns, but since
             // the enum type takes up two posistions in m_columns
             // we have to move refs in all following columns
-            UpdateColumnRefs(column_ndx+1, 1);
+            UpdateColumnRefs(i+1, 1);
 
             // Replace cached column
-            ColumnStringEnum* e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc); // FIXME: We may have to use 'new (nothrow)' here. It depends on whether we choose to allow exceptions.
+            ColumnStringEnum* const e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc); // FIXME: We may have to use 'new (nothrow)' here. It depends on whether we choose to allow exceptions.
             m_cols.Set(i, (intptr_t)e);
+
+            // Inherit any existing index
+            if (column->HasIndex()) {
+                StringIndex& ndx = column->PullIndex();
+                e->ReuseIndex(ndx);
+            }
+
+            // Clean up the old column
             column->Destroy();
             delete column;
         }
@@ -1552,7 +1642,7 @@ void Table::to_json(std::ostream& out)
                                 out << m.get_int();
                                 break;
                             case COLUMN_TYPE_BOOL:
-                                out << m.get_bool();
+                                out << (get_bool(i, r) ? "true" : "false");
                                 break;
                             case COLUMN_TYPE_STRING:
                                 out << "\"" << m.get_string() << "\"";
@@ -1597,6 +1687,165 @@ void Table::to_json(std::ostream& out)
     }
 
     out << "]";
+}
+
+static size_t chars_in_int(int64_t v)
+{
+    size_t count = 0;
+    while (v /= 10)
+        ++count;
+    return count+1;
+}
+
+void Table::to_string(std::ostream& out, size_t limit) const
+{
+    const size_t column_count = get_column_count();
+    const size_t row_count = size();
+
+    // Print header
+    std::vector<size_t> widths;
+    const size_t row_ndx_width = chars_in_int(row_count);
+    widths.push_back(row_ndx_width);
+    for (size_t i = 0; i < row_ndx_width; ++i)
+        out << " ";
+    for (size_t i = 0; i < column_count; ++i) {
+        const char* const name = get_column_name(i);
+        const ColumnType type = get_column_type(i);
+        size_t width = strlen(name);
+        switch (type) {
+        case COLUMN_TYPE_BOOL:
+            if (width < 5) width = 5;
+            break;
+        case COLUMN_TYPE_INT:
+            {
+                const size_t max = chars_in_int(maximum(i));
+                if (width < max) width = max;
+            }
+            break;
+        case COLUMN_TYPE_STRING:
+        case COLUMN_TYPE_MIXED:
+            // TODO: Calculate precise width needed
+            if (width < 10) width = 10;
+            break;
+        case COLUMN_TYPE_DATE:
+            if (width < 21) width = 21;
+            break;
+        case COLUMN_TYPE_TABLE:
+            if (width < 3) width = 3;
+            break;
+        default:
+            break;
+        }
+        widths.push_back(width);
+        out << "  "; // spacing
+
+        out.width(width);
+        out << name;
+    }
+    out << "\n";
+
+    // We need a buffer for formatting dates (and binary to hex). Max
+    // size is 21 bytes (incl quotes and zero byte) "YYYY-MM-DD HH:MM:SS"\0
+    char buffer[30];
+
+    // Set limit=-1 to print all rows, otherwise only print to limit
+    const size_t out_count = (limit == (size_t)-1) ? row_count
+                                                   : (row_count < limit) ? row_count : limit;
+
+    // Print rows
+    for (size_t i = 0; i < out_count; ++i) {
+        out.width(row_ndx_width);
+        out << i;
+
+        for (size_t n = 0; n < column_count; ++n) {
+            out << "  "; // spacing
+            out.width(widths[n+1]);
+
+            const ColumnType type = get_column_type(n);
+            switch (type) {
+                case COLUMN_TYPE_BOOL:
+                {
+                    const char* const s = get_bool(n, i) ? "true" : "false";
+                    out << s;
+                }
+                    break;
+                case COLUMN_TYPE_INT:
+                    out << get_int(n, i);
+                    break;
+                case COLUMN_TYPE_STRING:
+                    out.setf(std::ostream::left, std::ostream::adjustfield);
+                    out << get_string(n, i);
+                    out.unsetf(std::ostream::adjustfield);
+                    break;
+                case COLUMN_TYPE_DATE:
+                {
+                    const time_t rawtime = get_date(n, i);
+                    struct tm* const t = gmtime(&rawtime);
+                    const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
+                    if (!res) break;
+
+                    out << buffer;
+                    break;
+                }
+                case COLUMN_TYPE_TABLE:
+                    out.width(widths[n+1]-2); // adjust for first char only
+                    out << "[" << get_subtable_size(n, i) << "]";
+                    break;
+                case COLUMN_TYPE_MIXED:
+                {
+                    const ColumnType mtype = get_mixed_type(n, i);
+                    if (mtype == COLUMN_TYPE_TABLE) {
+                        out.width(widths[n+1]-2); // adjust for first char only
+                        out << "[" << get_subtable_size(n, i) << "]";
+                    }
+                    else {
+                        const Mixed m = get_mixed(n, i);
+                        switch (mtype) {
+                            case COLUMN_TYPE_INT:
+                                out << m.get_int();
+                                break;
+                            case COLUMN_TYPE_BOOL:
+                            {
+                                const char* const s = m.get_bool() ? "true" : "false";
+                                out << s;
+                                break;
+                            }
+                            case COLUMN_TYPE_STRING:
+                                out << m.get_string();
+                                break;
+                            case COLUMN_TYPE_DATE:
+                            {
+                                const time_t rawtime = m.get_date();
+                                struct tm* const t = gmtime(&rawtime);
+                                const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
+                                if (!res) break;
+
+                                out << buffer;
+                                break;
+                            }
+                            case COLUMN_TYPE_BINARY:
+                            {
+                                const BinaryData bin = m.get_binary();
+                                out << bin.len << "bytes";
+                                break;
+                            }
+                            default:
+                                TIGHTDB_ASSERT(false);
+                        }
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+        out << "\n";
+    }
+
+    if (out_count < row_count) {
+        const size_t rest = row_count - out_count;
+        out << "... and " << rest << " more rows (total " << row_count << ")";
+    }
 }
 
 bool Table::compare_rows(const Table& t) const

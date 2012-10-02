@@ -36,7 +36,6 @@ namespace tightdb {
 // Pre-definitions
 class Column;
 class Index;
-class StringIndex;
 
 class ColumnBase {
 public:
@@ -59,13 +58,16 @@ public:
     // Indexing
     virtual bool HasIndex() const = 0;
     //virtual Index& GetIndex() = 0;
-    virtual void BuildIndex(Index& index) = 0;
-    virtual void ClearIndex() = 0;
-    virtual void SetIndexRef(size_t ref) { static_cast<void>(ref); }
+    //virtual void BuildIndex(Index& index) = 0;
+    //virtual void ClearIndex() = 0;
+    virtual void SetIndexRef(size_t, ArrayParent*, size_t) {}
 
     virtual size_t GetRef() const = 0;
+    virtual void SetParent(ArrayParent* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
     virtual void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
     virtual void UpdateFromParent() {m_array->UpdateFromParent();}
+
+    virtual void invalidate_subtables_virtual() {}
 
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in ObjC
@@ -130,7 +132,7 @@ protected:
 
 class Column : public ColumnBase {
 public:
-    Column(Allocator& alloc);
+    explicit Column(Allocator& alloc);
     Column(ColumnDef type, Allocator& alloc);
     Column(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
     Column(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
@@ -143,7 +145,6 @@ public:
 
     bool operator==(const Column& column) const;
 
-    void SetParent(ArrayParent *parent, size_t pndx);
     void UpdateParentNdx(int diff);
     void SetHasRefs();
 
@@ -153,6 +154,7 @@ public:
     // Getting and setting values
     int64_t Get(size_t ndx) const;
     size_t GetAsRef(size_t ndx) const;
+    int64_t Back() const {return Get(Size()-1);}
     bool Set(size_t ndx, int64_t value);
     void insert(size_t ndx) { Insert(ndx, 0); } // FIXME: Ignoring boolean return value here!
     bool Insert(size_t ndx, int64_t value);
@@ -174,11 +176,13 @@ public:
     bool Reserve(size_t len, size_t width=8);
 
     bool Increment64(int64_t value, size_t start=0, size_t end=-1);
+    void IncrementIf(int64_t limit, int64_t value);
     size_t find_first(int64_t value, size_t start=0, size_t end=-1) const;
 
     void find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
     void find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     size_t find_pos(int64_t value) const;
+    size_t find_pos2(int64_t value) const;
 
     // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;

@@ -74,7 +74,7 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len)
             // Move the value
             char* data = (char*)m_data + (k * m_width);
             char* const end = data + m_width;
-            memmove(data, v, oldwidth);
+            memmove(data, v, oldwidth); // FIXME: Use std::copy() or std::copy_backward() instead.
             for (data += oldwidth; data < end; ++data) {
                 *data = '\0'; // pad with zeroes
             }
@@ -84,7 +84,7 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len)
     // Set the value
     char* data = (char*)m_data + (ndx * m_width);
     char* const end = data + m_width;
-    memmove(data, value, len);
+    memmove(data, value, len); // FIXME: Use std::copy() or std::copy_backward() instead.
     for (data += len; data < end; ++data) {
         *data = '\0'; // pad with zeroes
     }
@@ -138,7 +138,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
             // Move the value
             char* data = (char*)m_data + ((k+1) * m_width);
             char* const end = data + m_width;
-            memmove(data, v, oldwidth);
+            memmove(data, v, oldwidth); // FIXME: Use std::copy() or std::copy_backward() instead.
             for (data += oldwidth; data < end; ++data) {
                 *data = '\0'; // pad with zeroes
             }
@@ -149,7 +149,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
         unsigned char* src = m_data + (ndx * m_width);
         unsigned char* dst = src + m_width;
         const size_t count = (m_len - ndx) * m_width;
-        memmove(dst, src, count);
+        memmove(dst, src, count); // FIXME: Use std::copy() or std::copy_backward() instead.
     }
 
     // Set the value
@@ -171,7 +171,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
             // Move the value
             char* data = (char*)m_data + (k * m_width);
             char* const end = data + m_width;
-            memmove(data, v, oldwidth);
+            memmove(data, v, oldwidth); // FIXME: Use std::copy() or std::copy_backward() instead.
             for (data += oldwidth; data < end; ++data) {
                 *data = '\0'; // pad with zeroes
             }
@@ -196,7 +196,7 @@ void ArrayString::Delete(size_t ndx)
         char* src = (char*)m_data + ((ndx+1) * m_width);
         char* dst = (char*)m_data + (ndx * m_width);
         const size_t len = (m_len - ndx) * m_width;
-        memmove(dst, src, len);
+        memmove(dst, src, len); // FIXME: Use std::copy() or std::copy_backward() instead.
     }
 
     // Update length in header
@@ -215,6 +215,22 @@ size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const
 
     const size_t bytes_without_header = bytes - 8;
     return bytes_without_header / width;
+}
+
+size_t ArrayString::count(const char* value, size_t start, size_t end) const
+{
+    const size_t len = strlen(value);
+    size_t count = 0;
+    
+    size_t lastmatch = start - 1;
+    for (;;) {
+        lastmatch = FindWithLen(value, len, lastmatch+1, end);
+        if (lastmatch != not_found)
+            ++count;
+        else break;
+    }
+    
+    return count;
 }
 
 size_t ArrayString::find_first(const char* value, size_t start, size_t end) const

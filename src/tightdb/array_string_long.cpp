@@ -133,6 +133,22 @@ void ArrayStringLong::Clear()
     m_offsets.Clear();
 }
 
+size_t ArrayStringLong::count(const char* value, size_t start, size_t end) const
+{
+    const size_t len = strlen(value);
+    size_t count = 0;
+
+    size_t lastmatch = start - 1;
+    for (;;) {
+        lastmatch = FindWithLen(value, len, lastmatch+1, end);
+        if (lastmatch != not_found)
+            ++count;
+        else break;
+    }
+
+    return count;
+}
+
 size_t ArrayStringLong::find_first(const char* value, size_t start, size_t end) const
 {
     TIGHTDB_ASSERT(value);
