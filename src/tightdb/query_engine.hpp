@@ -230,8 +230,6 @@ public:
         return end;
     }
 
-
-
 protected:
     const Array& m_arr;
     size_t m_max;
@@ -541,7 +539,6 @@ public:
 
     void Init(const Table& table)
     {
-        dT = 10.0;
         dD = 1.0;
 
         m_table = &table;
@@ -549,7 +546,20 @@ public:
         m_column_type = table.GetRealColumnType(m_column_id);
 
         if (m_column_type == COLUMN_TYPE_STRING_ENUM) {
+            dT = 5.0;
             m_key_ndx =  ((const ColumnStringEnum*)m_column)->GetKeyNdx(m_value);
+        }
+        else {
+            dT = 10.0;
+        }
+
+        if(m_column->HasIndex()) {
+            if(m_column_type == COLUMN_TYPE_STRING_ENUM)
+                ((ColumnStringEnum*)m_column)->find_all(m_index, m_value);
+            else {
+                ((AdaptiveStringColumn*)m_column)->find_all(m_index, m_value);
+            }
+            last_indexed = 0;
         }
 
         if (m_child) m_child->Init(table);
@@ -560,16 +570,54 @@ public:
         TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
-            // todo, can be optimized by placing outside loop
-            if (m_column_type == COLUMN_TYPE_STRING)
-                s = ((const AdaptiveStringColumn*)m_column)->find_first(m_value, s, end);
-            else {
-                if (m_key_ndx == size_t(-1)) s = end; // not in key set
-                else {
-                    const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_column;
-                    s = cse->find_first(m_key_ndx, s, end);
+
+
+
+
+            if(m_column->HasIndex()) {
+                m_index.FindGTE(s, last_indexed);
+
+                for(;;) {
+                    if(last_indexed >= m_index.Size()) {
+                        s = not_found;
+                        break;
+                    }
+                    size_t cand = m_index.GetAsSizeT(last_indexed);
+                    ++last_indexed;
+                    if(cand >= s && cand < end) {
+                        s = cand;
+                        break;
+                    }
+                    else if(cand >= end) {
+                        s = not_found;
+                        break;
+                    }
                 }
             }
+            else {
+
+
+
+
+                // todo, can be optimized by placing outside loop
+                if (m_column_type == COLUMN_TYPE_STRING)
+                    s = ((const AdaptiveStringColumn*)m_column)->find_first(m_value, s, end);
+                else {
+                    if (m_key_ndx == size_t(-1)) s = end; // not in key set
+                    else {
+                        const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_column;
+                        s = cse->find_first(m_key_ndx, s, end);
+                    }
+                }
+
+
+
+
+
+            }
+
+
+
 
             if (s == (size_t)-1)
                 s = end;
@@ -586,6 +634,8 @@ private:
     const ColumnBase* m_column;
     ColumnType m_column_type;
     size_t m_key_ndx;
+    Array m_index;
+    size_t last_indexed;
 };
 
 

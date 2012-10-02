@@ -1,3 +1,4 @@
+#include <limits>
 #include <vector>
 #include <iostream>
 #include <iomanip>
@@ -14,22 +15,11 @@
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
-
-#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-	#define X86X64
-#endif
-
-#if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
-	#define PTR_64
-#endif
+using namespace std;
 
 namespace {
 
 const size_t initial_capacity = 128;
-
-size_t FirstSetBit(unsigned int v);
-size_t FirstSetBit64(int64_t v);
 
 inline void set_header_isnode(bool value, void* header)
 {
@@ -41,6 +31,12 @@ inline void set_header_hasrefs(bool value, void* header)
 {
     uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
     header2[0] = (header2[0] & ~0x40) | uint8_t(value << 6);
+}
+
+inline void set_header_indexflag(bool value, void* header)
+{
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x20) | uint8_t(value << 5);
 }
 
 inline void set_header_wtype(int value, void* header)
@@ -93,7 +89,7 @@ inline void init_header(void* header, bool is_node, bool has_refs, int width_typ
     // initially. Note also: The C++ standard does not
     // guarantee that int64_t is extactly 8 bytes wide. It
     // may be more, and it may be less. That is why we
-    // need the statinc assert.
+    // need the static assert.
     TIGHTDB_STATIC_ASSERT(sizeof(int64_t) == 8,
                           "Trouble if int64_t is not 8 bytes wide");
     *reinterpret_cast<int64_t*>(header) = 0;
@@ -108,19 +104,28 @@ inline void init_header(void* header, bool is_node, bool has_refs, int width_typ
 
 } // anonymous namespace
 
-bool tdb_dummy (int64_t t)
+
+
+namespace tightdb {
+
+bool tightdb_dummy (int64_t t)
 { 
 	(void)t;
     return true; 
 }
 
-namespace tightdb {
-
 // Header format (8 bytes):
 // |--------|--------|--------|--------|--------|--------|--------|--------|
-// |12-33444|          length          |         capacity         |reserved|
+// |12344555|          length          |         capacity         |reserved|
 //
-//  1: isNode  2: hasRefs  3: multiplier  4: width (packed in 3 bits)
+//  1: isNode  2: hasRefs  3: indexflag 4: multiplier 5: width (packed in 3 bits)
+
+bool IsArrayIndexNode(size_t ref, const Allocator& alloc)
+{
+    TIGHTDB_ASSERT(ref);
+    const uint8_t* const header = (const uint8_t*)alloc.Translate(ref);
+    return (header[0] & 0x20) != 0;
+}
 
 void Array::set_header_isnode(bool value)
 {
@@ -130,6 +135,11 @@ void Array::set_header_isnode(bool value)
 void Array::set_header_hasrefs(bool value)
 {
     ::set_header_hasrefs(value, m_data - 8);
+}
+
+void Array::set_header_indexflag(bool value)
+{
+    ::set_header_indexflag(value, m_data - 8);
 }
 
 void Array::set_header_wtype(WidthType value)
@@ -162,6 +172,12 @@ bool Array::get_header_hasrefs(const void* header) const
 {
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[0] & 0x40) != 0;
+}
+
+bool Array::get_header_indexflag(const void* header) const
+{
+    const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
+    return (header2[0] & 0x20) != 0;
 }
 
 Array::WidthType Array::get_header_wtype(const void* header) const
@@ -300,8 +316,11 @@ bool Array::UpdateFromParent()
  * For alignment this is rounded up to nearest log2.
  * Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
  */
+// FIXME: Deprecated use of 'static' - use anonymous namespace instead.
 static size_t BitWidth(int64_t v)
 {
+    // FIXME: Assuming there is a 64-bit CPU reverse bitscan instruction and it is fast, then this function could be implemented simply as (v<2 ? v : 2<<rev_bitscan(rev_bitscan(v))).
+
     if ((v >> 4) == 0) {
         static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
         return bits[(int8_t)v];
@@ -327,7 +346,7 @@ void Array::Preset(size_t bitwidth, size_t count)
 
 void Array::Preset(int64_t min, int64_t max, size_t count)
 {
-    size_t w = MAX(BitWidth(max), BitWidth(min));
+    size_t w = BitWidth(max) > BitWidth(min) ? BitWidth(max) : BitWidth(min);
     Preset(w, count);
 }
 
@@ -377,7 +396,7 @@ void Array::Destroy()
         }
     }
 
-    void* ref = m_data-8;
+    void* const ref = m_data-8;
     m_alloc.Free(m_ref, ref);
     m_data = NULL;
 }
@@ -423,10 +442,12 @@ void Array::Delete(size_t ndx)
     }
     else if (ndx < m_len-1) {
         // when byte sized, use memmove
+// FIXME: Should be optimized as a simple division by 8.
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
         unsigned char* dst = m_data + (ndx * w);
         unsigned char* src = dst + w;
         const size_t count = (m_len - ndx - 1) * w;
+// FIXME: Use std::copy() or std::copy_backward() instead.
         memmove(dst, src, count);
     }
 
@@ -483,7 +504,8 @@ bool Array::Set(size_t ndx, int64_t value)
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) return false;
+    if (!CopyOnWrite()) 
+        return false;
 
     // Make room for the new value
     size_t width = m_width;
@@ -493,9 +515,9 @@ bool Array::Set(size_t ndx, int64_t value)
 
     const bool doExpand = (width > m_width);
     if (doExpand) {
-
-        Getter oldGetter = m_getter;
-        if (!Alloc(m_len, width)) return false;
+        Getter oldGetter = m_getter;    // Save old getter before width expansion
+        if (!Alloc(m_len, width)) 
+            return false;
         SetWidth(width);
 
         // Expand the old values
@@ -512,9 +534,8 @@ bool Array::Set(size_t ndx, int64_t value)
     return true;
 }
 
-// Optimization for the common case of adding
-// positive values to a local array (happens a
-// lot when returning results to TableViews)
+// Optimization for the common case of adding positive values to a local array 
+// (happens a lot when returning results to TableViews)
 bool Array::AddPositiveLocal(int64_t value)
 {
     TIGHTDB_ASSERT(value >= 0);
@@ -537,9 +558,8 @@ bool Array::Insert(size_t ndx, int64_t value)
     TIGHTDB_ASSERT(ndx <= m_len);
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) return false;
-
-    Getter getter = m_getter;
+    if (!CopyOnWrite()) 
+        return false;
 
     // Make room for the new value
     size_t width = m_width;
@@ -547,29 +567,35 @@ bool Array::Insert(size_t ndx, int64_t value)
     if (value < m_lbound || value > m_ubound)
         width = BitWidth(value);
 
+    Getter oldGetter = m_getter;    // Save old getter before potential width expansion
+
     const bool doExpand = (width > m_width);
     if (doExpand) {
-        if (!Alloc(m_len+1, width)) return false;
+        if (!Alloc(m_len+1, width)) 
+            return false;
         SetWidth(width);
     }
     else {
-        if (!Alloc(m_len+1, m_width)) return false;
+        if (!Alloc(m_len+1, m_width)) 
+            return false;
     }
 
     // Move values below insertion (may expand)
     if (doExpand || m_width < 8) {
         int k = (int)m_len;
         while (--k >= (int)ndx) {
-            const int64_t v = (this->*getter)(k);
+            const int64_t v = (this->*oldGetter)(k);
             (this->*m_setter)(k+1, v);
         }
     }
     else if (ndx != m_len) {
         // when byte sized and no expansion, use memmove
+// FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
         unsigned char* src = m_data + (ndx * w);
         unsigned char* dst = src + w;
         const size_t count = (m_len - ndx) * w;
+// FIXME: Use std::copy() or std::copy_backward() instead.
         memmove(dst, src, count);
     }
 
@@ -580,7 +606,7 @@ bool Array::Insert(size_t ndx, int64_t value)
     if (doExpand) {
         int k = (int)ndx;
         while (--k >= 0) {
-            const int64_t v = (this->*getter)(k);
+            const int64_t v = (this->*oldGetter)(k);
             (this->*m_setter)(k, v);
         }
     }
@@ -638,7 +664,8 @@ bool Array::IncrementIf(int64_t limit, int64_t value)
     // Update (incr or decrement) values bigger or equal to the limit
     for (size_t i = 0; i < m_len; ++i) {
         const int64_t v = Get(i);
-        if (v >= limit) Set(i, v + value);
+        if (v >= limit) 
+            Set(i, v + value);
     }
     return true;
 }
@@ -658,10 +685,10 @@ void Array::Adjust(size_t start, int64_t diff)
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
 // Finds position of largest value SMALLER than the target (for lookups in
 // nodes)
-
+// Todo: rename to LastLessThan()
 template <size_t w> size_t Array::FindPos(int64_t target) const
 {
-    size_t low = -1;
+    size_t low = (size_t)-1;
     size_t high = m_len;
     
     // Binary search based on:
@@ -672,39 +699,45 @@ template <size_t w> size_t Array::FindPos(int64_t target) const
         const size_t probe = (low + high) >> 1;
         const int64_t v = Get<w>(probe);
 
-        if (v > target) high = probe;
-        else            low = probe;
+        if (v > target) 
+            high = probe;
+        else
+            low = probe;
     }
-    if (high == m_len) return not_found;
-    else return high;
+    if (high == m_len) 
+        return not_found;
+    else 
+        return high;
 }
-
-
 
 size_t Array::FindPos(int64_t target) const
 {
     TEMPEX(return FindPos, m_width, (target));
 }
 
-
+// BM FIXME: Rename to something better... // FirstGTE()
 size_t Array::FindPos2(int64_t target) const
 {
-    int low = -1;
-    int high = (int)m_len;
+    size_t low = (size_t)-1;
+    size_t high = m_len;
 
     // Binary search based on:
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
     // Finds position of closest value BIGGER OR EQUAL to the target (for
     // lookups in indexes)
     while (high - low > 1) {
-        const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+        const size_t probe = (low + high) >> 1;
         const int64_t v = Get(probe);
 
-        if (v < target) low = (int)probe;
-        else            high = (int)probe;
+        if (v < target) 
+            low = probe;
+        else
+            high = probe;
     }
-    if (high == (int)m_len) return (size_t)-1;
-    else return (size_t)high;
+    if (high == m_len) 
+        return not_found;
+    else 
+        return high;
 }
 
 // find FIRST element E for which E >= target or return -1 if none
@@ -750,55 +783,53 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     return start;
 
 }
-
-
-size_t FirstSetBit(unsigned int v) 
+size_t Array::FirstSetBit(unsigned int v) const
 {
-    #if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
-        unsigned long ul;
-        // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
-        _BitScanForward(&ul, v);
-        return ul;
-    #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
-        return __builtin_clz(v);
-    #else
-        int r;
-        static const int MultiplyDeBruijnBitPosition[32] = 
-        {
-            0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
-            31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
-        };
+#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
+    unsigned long ul;
+    // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
+    _BitScanForward(&ul, v);
+    return ul;
+#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
+    return __builtin_clz(v);
+#else
+    int r;
+    static const int MultiplyDeBruijnBitPosition[32] = 
+    {
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
+        31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+    };
 
-        r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
-        return r;
-    #endif
+r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -(int)v) * 0x077CB531U)) >> 27];
+return r;
+#endif
 }
 
-size_t FirstSetBit64(int64_t v) 
+size_t Array::FirstSetBit64(int64_t v) const
 {
-    #if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
-        unsigned long ul;
-        _BitScanForward64(&ul, v);
-        return ul;
+#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
+    unsigned long ul;
+    _BitScanForward64(&ul, v);
+    return ul;
 
-    #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
-        return __builtin_clzll(v);
-    #else
-        unsigned int v0 = (unsigned int)v;
-        unsigned int v1 = (unsigned int)(v >> 32);
-        size_t r;
+#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
+    return __builtin_clzll(v);
+#else
+    unsigned int v0 = (unsigned int)v;
+    unsigned int v1 = (unsigned int)(v >> 32);
+    size_t r;
 
-        if (v0 != 0)
-            r = FirstSetBit(v0);
-        else
-            r = FirstSetBit(v1) + 32;
+    if (v0 != 0)
+        r = FirstSetBit(v0);
+    else
+        r = FirstSetBit(v1) + 32;
 
-        return r;
+    return r;
 #endif
 }
 
 
-template <size_t width> inline int64_t LowerBits(void) 
+template <size_t width> inline int64_t LowerBits(void)
 {
     if (width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
@@ -815,12 +846,13 @@ template <size_t width> inline int64_t LowerBits(void)
     else if (width == 64)
         return 0x0000000000000001ULL;
     else {
-        assert(false);
+        TIGHTDB_ASSERT(false);
         return int64_t(-1);
     }
 }
 
-template <size_t width> inline bool TestZero(uint64_t value) {
+// Return true if 'value' has an element (of bit-width 'width') which is 0
+template <size_t width> inline bool has_zero_element(uint64_t value) {
     uint64_t hasZeroByte;
     uint64_t lower = LowerBits<width>();
     uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
@@ -830,7 +862,7 @@ template <size_t width> inline bool TestZero(uint64_t value) {
 
 
 // Finds zero element of bit width 'width'
-template <bool eq, size_t width>size_t FindZero(uint64_t v)
+template <bool eq, size_t width> size_t FindZero(uint64_t v)
 {
     size_t start = 0;
     uint64_t hasZeroByte;
@@ -839,41 +871,42 @@ template <bool eq, size_t width>size_t FindZero(uint64_t v)
     // the work done by TestZero() is wasted for the cases where the value exists in first half, but useful if it exists in last 
     // half. Sweet spot turns out to be the widths and partitions below.
     if (width <= 8) {
-        hasZeroByte = TestZero<width>(v | 0xffffffff00000000ULL);
+        hasZeroByte = has_zero_element<width>(v | 0xffffffff00000000ULL);
         if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
             // 00?? -> increasing
-            start += 64 / no0(width) / 2;
+            start += 64 / NO0(width) / 2;
             if (width <= 4) {
-                hasZeroByte = TestZero<width>(v | 0xffff000000000000ULL);
+                hasZeroByte = has_zero_element<width>(v | 0xffff000000000000ULL);
                 if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
                     // 000?
-                    start += 64 / no0(width) / 4;
+                    start += 64 / NO0(width) / 4;
                 }
             }
         }
         else {
             if (width <= 4) {
                 // ??00
-                hasZeroByte = TestZero<width>(v | 0xffffffffffff0000ULL);
+                hasZeroByte = has_zero_element<width>(v | 0xffffffffffff0000ULL);
                 if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
                     // 0?00
-                    start += 64 / no0(width) / 4;
+                    start += 64 / NO0(width) / 4;
                 }
             }
         }
     }
 
     uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
-    while(eq == (((v >> (width * start)) & mask) != 0)) {
+    while (eq == (((v >> (width * start)) & mask) != 0)) {
         start++;
     }
 
     return start;
 }
 
-template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
-{ 
-    if (end == (size_t)-1) end = m_len;
+template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
+{
+    if (end == (size_t)-1) 
+        end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     if (m_len == 0)
@@ -891,11 +924,11 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
 
     // Test manually until 128 bit aligned
     for (; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
-        if (max ? Get<w>(start) > m : Get<w>(start) < m)
+        if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
             m = Get<w>(start);
     }
 
-	if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / no0(w)) {
+	if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
         __m128i *data = (__m128i *)(m_data + start * w / 8);
         __m128i state = data[0];
         __m128i state2;
@@ -903,20 +936,20 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
         size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
         for (size_t t = 0; t < chunks; t++) {
             if (w == 8)
-                state = max ? _mm_max_epi8(data[t], state) : _mm_min_epi8(data[t], state);
+                state = find_max ? _mm_max_epi8(data[t], state) : _mm_min_epi8(data[t], state);
             else if (w == 16)
-                state = max ? _mm_max_epi16(data[t], state) : _mm_min_epi16(data[t], state);
+                state = find_max ? _mm_max_epi16(data[t], state) : _mm_min_epi16(data[t], state);
             else if (w == 32)
-                state = max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
+                state = find_max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
 
-            start += sizeof(__m128i) * 8 / no0(w);
+            start += sizeof(__m128i) * 8 / NO0(w);
         }
-        
+
         // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
         state2 = state; 
-        for (size_t t = 0; t < sizeof(__m128i) * 8 / no0(w); ++t) {
+        for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
             const int64_t v = GetUniversal<w>(((const char *)&state2), t);
-            if (max ? v > m : v < m) {
+            if (find_max ? v > m : v < m) {
                 m = v;
             }
         }        
@@ -925,7 +958,7 @@ template <bool max, size_t w> bool Array::minmax(int64_t& result, size_t start, 
 
     for (; start < end; ++start) {
         const int64_t v = Get<w>(start);
-        if (max ? v > m : v < m) {
+        if (find_max ? v > m : v < m) {
             m = v;
         }
     }
@@ -969,7 +1002,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
         // uses a divide and conquer algorithm that is a variation of popolation count:
         // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 
-        // staiic values needed for fast sums
+        // static values needed for fast sums
         const uint64_t m2  = 0x3333333333333333ULL;
         const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
         const uint64_t h01 = 0x0101010101010101ULL;
@@ -979,9 +1012,10 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
 
         for (size_t t = 0; t < chunks; t++) {
             if (w == 1) {
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(PTR_64)
+
+#if defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
                     s += __popcnt64(data[t]);
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(PTR_64)
+#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
 					s += __builtin_popcountll(data[t]);
 #else
                     uint64_t a = data[t];
@@ -991,37 +1025,33 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                     a = (a + (a >> 4)) & m4;
                     a = (a * h01) >> 56;
                     s += a;
-#endif               
-                }
-            
+#endif         
+            }
             else if (w == 2) {
-                    uint64_t a = data[t];
+                uint64_t a = data[t];
+                a = (a & m2) + ((a >> 2) & m2);
+                a = (a + (a >> 4)) & m4;
+                a = (a * h01) >> 56;
 
-                    a = (a & m2) + ((a >> 2) & m2);
-                    a = (a + (a >> 4)) & m4;
-                    a = (a * h01) >> 56;
-
-                    s += a;
+                s += a;
                 
             }
             else if (w == 4) {
-                    uint64_t a = data[t];
-
-                    a = (a & m4) + ((a >> 4) & m4);
-                    a = (a * h01) >> 56;
-
-                    s += a;
-                }
+                uint64_t a = data[t];
+                a = (a & m4) + ((a >> 4) & m4);
+                a = (a * h01) >> 56;
+                s += a;
             }
-            start += sizeof(int64_t) * 8 / no0(w) * chunks;
         }
+        start += sizeof(int64_t) * 8 / NO0(w) * chunks;
+    }
 
 #ifdef USE_SSE42
     // 2000 items summed 500000 times, 8/16/32 bits, miliseconds: 
     // Naive, templated Get<>: 391 371 374
     // SSE:                     97 148 282
 
-    if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
+    if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / NO0(w)) {
         __m128i *data = (__m128i *)(m_data + start * w / 8);
         __m128i sum = {0};
         __m128i sum2;
@@ -1084,7 +1114,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                 */
             }
         }
-        start += sizeof(__m128i) * 8 / no0(w) * chunks;
+        start += sizeof(__m128i) * 8 / NO0(w) * chunks;
 
         // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
         sum2 = sum;
@@ -1101,7 +1131,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
     }
 #endif
     
-
+    // Sum remaining elements
     for (; start < end; ++start)
         s += Get<w>(start);
 
@@ -1306,7 +1336,8 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
 
 size_t Array::CalcItemCount(size_t bytes, size_t width) const
 {
-    if (width == 0) return (size_t)-1; // zero width gives infinite space
+    if (width == 0) 
+        return size_t(-1); // zero width gives infinite space
 
     const size_t bytes_data = bytes - 8; // ignore 8 byte header
     const size_t total_bits = bytes_data * 8;
@@ -1411,44 +1442,45 @@ size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator
 bool Array::Alloc(size_t count, size_t width)
 {
     if (count > m_capacity || width != m_width) {
-        const size_t len      = CalcByteLen(count, width);              // bytes needed
-        const size_t capacity = m_capacity ? get_header_capacity() : 0; // bytes currently available
-        size_t new_capacity   = capacity;
+        const size_t needed_bytes = CalcByteLen(count, width);              
+        size_t capacity_bytes     = m_capacity ? get_header_capacity() : 0; // space currently available in bytes
 
-        if (len > capacity) {
-            // Double to avoid too many reallocs
-            new_capacity = capacity ? capacity * 2 : initial_capacity;
-            if (new_capacity < len) {
-                const size_t rest = (~len & 0x7)+1;
-                new_capacity = len;
-                if (rest < 8) new_capacity += rest; // 64bit align
+        if (needed_bytes > capacity_bytes) {
+            // Double to avoid too many reallocs (or initialize to initial size)
+            capacity_bytes = capacity_bytes ? capacity_bytes * 2 : initial_capacity;
+
+            // If doubling is not enough, expand enough to fit
+            if (capacity_bytes < needed_bytes) {
+                const size_t rest = (~needed_bytes & 0x7)+1;
+                capacity_bytes = needed_bytes;
+                if (rest < 8) capacity_bytes += rest; // 64bit align
             }
 
             // Allocate and initialize header
             MemRef mem_ref;
             if (!m_data) {
-                mem_ref = m_alloc.Alloc(new_capacity);
+                mem_ref = m_alloc.Alloc(capacity_bytes);
                 if (!mem_ref.pointer) return false;
                 init_header(mem_ref.pointer, m_isNode, m_hasRefs, GetWidthType(),
-                            width, count, new_capacity);
+                            width, count, capacity_bytes);
             }
             else {
-                mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, new_capacity);
+                mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, capacity_bytes);
                 if (!mem_ref.pointer) return false;
                 ::set_header_width(width, mem_ref.pointer);
                 ::set_header_len(count, mem_ref.pointer);
-                ::set_header_capacity(new_capacity, mem_ref.pointer);
+                ::set_header_capacity(capacity_bytes, mem_ref.pointer);
             }
 
             // Update wrapper objects
-            m_ref = mem_ref.ref;
-            m_data = reinterpret_cast<unsigned char*>(mem_ref.pointer) + 8;
-            m_capacity = CalcItemCount(new_capacity, width);
+            m_ref      = mem_ref.ref;
+            m_data     = reinterpret_cast<unsigned char*>(mem_ref.pointer) + 8;
+            m_capacity = CalcItemCount(capacity_bytes, width);
             update_ref_in_parent();
             return true;
         }
 
-        m_capacity = CalcItemCount(new_capacity, width);
+        m_capacity = CalcItemCount(capacity_bytes, width);
         set_header_width(width);
     }
 
@@ -1511,7 +1543,6 @@ template <size_t width> void Array::SetWidth(void)
     Setter temp_setter = &Array::Set<width>; 
     m_setter = temp_setter;
 
-    struct Callback {};
     Finder feq = &Array::find<EQUAL, TDB_RETURN_FIRST, width>;
     m_finder[COND_EQUAL] = feq;
 
@@ -1523,11 +1554,6 @@ template <size_t width> void Array::SetWidth(void)
 
     Finder fl =  &Array::find<LESS, TDB_RETURN_FIRST, width>;
     m_finder[COND_LESS] = fl;
-
-    EqualFinder ef =  &Array::equalfind<width>;
-    m_equalfinder = ef;
-
-
 }
 
 template <size_t w>int64_t Array::Get(size_t ndx) const
@@ -1536,7 +1562,8 @@ template <size_t w>int64_t Array::Get(size_t ndx) const
 }
 
 #ifdef _MSC_VER
-#pragma warning (disable : 4127)
+#pragma warning(push)
+#pragma warning(disable : 4127)
 #endif
 template <size_t w> void Array::Set(size_t ndx, int64_t value)
 {
@@ -1578,7 +1605,7 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
     }
 }
 #ifdef _MSC_VER
-#pragma warning (enable : 4127)
+#pragma warning(pop)
 #endif
 
 // Sort array.
@@ -1936,7 +1963,10 @@ void Array::ToDot(std::ostream& out, const char* title) const
 
 void Array::Stats(MemStats& stats) const
 {
-    const MemStats m(m_capacity, CalcByteLen(m_len, m_width), 1);
+    const size_t capacity_bytes = get_header_capacity();
+    const size_t bytes_used     = CalcByteLen(m_len, m_width);
+
+    const MemStats m(capacity_bytes, bytes_used, 1);
     stats.add(m);
 
     // Add stats for all sub-arrays
@@ -1963,6 +1993,7 @@ namespace {
 // Pre-declarations
 bool get_header_isnode_direct(const uint8_t* const header);
 bool get_header_hasrefs_direct(const uint8_t* const header);
+bool get_header_indexflag_direct(const uint8_t* const header);
 unsigned int get_header_width_direct(const uint8_t* const header);
 size_t get_header_len_direct(const uint8_t* const header);
 int64_t GetDirect(const char* const data, size_t width, const size_t ndx);
@@ -1970,6 +2001,7 @@ size_t FindPosDirect(const uint8_t* const header, const char* const data, const 
 template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target);
 size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, int32_t target);
 
+// FIXME: These should all be declared inline
 bool get_header_isnode_direct(const uint8_t* const header)
 {
     return (header[0] & 0x80) != 0;
@@ -1978,6 +2010,11 @@ bool get_header_isnode_direct(const uint8_t* const header)
 bool get_header_hasrefs_direct(const uint8_t* const header)
 {
     return (header[0] & 0x40) != 0;
+}
+
+bool get_header_indexflag_direct(const uint8_t* const header)
+{
+    return (header[0] & 0x20) != 0;
 }
 
 unsigned int get_header_width_direct(const uint8_t* const header)
@@ -2030,7 +2067,7 @@ template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx)
         return *(const int64_t*)(data + offset);
     }
     else {
-        assert(false);
+        TIGHTDB_ASSERT(false);
         return int64_t(-1);
     }
 }
@@ -2044,7 +2081,7 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 {
     const size_t len = get_header_len_direct(header);
 
-    size_t low = -1;
+    size_t low = (size_t)-1;
     size_t high = len;
 
     // Binary search based on:
@@ -2088,6 +2125,129 @@ size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, in
 }
 
 namespace tightdb {
+
+void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
+{
+    if (end == (size_t)-1) end = m_len;
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
+
+    state_state state;
+    state.state = (int64_t)&result;
+
+    TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, &tightdb_dummy));
+
+    return;
+}
+
+void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const
+{
+    if (cond == COND_EQUAL) {
+        if (action == TDB_SUM) {
+            TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MIN) {
+            TEMPEX3(find, EQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MAX) {
+            TEMPEX3(find, EQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_COUNT) {
+            TEMPEX3(find, EQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_FINDALL) {
+            TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_CALLBACK_IDX) {
+            TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+    }
+    if (cond == COND_NOTEQUAL) {
+        if (action == TDB_SUM) {
+            TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MIN) {
+            TEMPEX3(find, NOTEQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MAX) {
+            TEMPEX3(find, NOTEQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_COUNT) {
+            TEMPEX3(find, NOTEQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_FINDALL) {
+            TEMPEX3(find, NOTEQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_CALLBACK_IDX) {
+            TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+    }
+    if (cond == COND_GREATER) {
+        if (action == TDB_SUM) {
+            TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MIN) {
+            TEMPEX3(find, GREATER, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MAX) {
+            TEMPEX3(find, GREATER, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_COUNT) {
+            TEMPEX3(find, GREATER, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_FINDALL) {
+            TEMPEX3(find, GREATER, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_CALLBACK_IDX) {
+            TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+    }
+    if (cond == COND_LESS) {
+        if (action == TDB_SUM) {
+            TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MIN) {
+            TEMPEX3(find, LESS, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MAX) {
+            TEMPEX3(find, LESS, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_COUNT) {
+            TEMPEX3(find, LESS, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_FINDALL) {
+            TEMPEX3(find, LESS, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_CALLBACK_IDX) {
+            TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+    }
+    if (cond == COND_NONE) {
+        if (action == TDB_SUM) {
+            TEMPEX3(find, NONE, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MIN) {
+            TEMPEX3(find, NONE, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_MAX) {
+            TEMPEX3(find, NONE, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_COUNT) {
+            TEMPEX3(find, NONE, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_FINDALL) {
+            TEMPEX3(find, NONE, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+        else if (action == TDB_CALLBACK_IDX) {
+            TEMPEX3(find, NONE, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+		}
+    }
+}
+
+
+size_t Array::find_first(int64_t value, size_t start, size_t end) const
+{
+    return find_first<EQUAL>(value, start, end);
+}
 
 // Get containing array block direct through column b-tree without instatiating any Arrays. Calling with 
 // use_retval = true will return itself if leaf and avoid unneccesary header initialization. 
@@ -2295,7 +2455,7 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
     }
 }
 
-size_t Array::IndexStringFindFirst(const char* value, const AdaptiveStringColumn& column) const
+size_t Array::IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const
 {
     const char* v = value;
     const char* data   = (const char*)m_data;
@@ -2345,25 +2505,40 @@ top:
             // Literal row index
             if (ref & 1) {
                 const size_t row_ref = (ref >> 1);
-                if (*v == '\0') return row_ref; // full string has been compared
 
-                const char* const str = column.Get(row_ref);
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) return row_ref;
+
+                const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return row_ref;
                 else return not_found;
             }
 
             const uint8_t* const sub_header = (const uint8_t*)m_alloc.Translate(ref);
-            const bool sub_hasrefs = get_header_hasrefs_direct(sub_header);
+            const bool sub_isindex = get_header_indexflag_direct(sub_header);
 
             // List of matching row indexes
-            if (!sub_hasrefs) {
+            if (!sub_isindex) {
                 const char* const sub_data = (const char*)sub_header + 8;
                 const size_t sub_width  = get_header_width_direct(sub_header);
+                const bool sub_isnode = get_header_isnode_direct(sub_header);
 
-                const size_t row_ref = TO_SIZET(GetDirect(sub_data, sub_width, 0));
-                if (*v == '\0') return row_ref; // full string has been compared
+                // In most cases the row list will just be an array but there
+                // might be so many matches that it has branched into a column
+                size_t row_ref;
+                if (!sub_isnode)
+                    row_ref = GetDirect(sub_data, sub_width, 0);
+                else {
+                    const Array sub(ref, NULL, 0, m_alloc);
+                    row_ref = sub.ColumnGet(0);
+                }
 
-                const char* const str =column.Get(row_ref);
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) return row_ref;
+
+                const char* const str = (*get_func)(column, row_ref);
                 if (strcmp(str, value) == 0) return row_ref;
                 else return not_found;
             }
@@ -2376,6 +2551,245 @@ top:
             goto top;
         }
         else return not_found;
+    }
+}
+
+void Array::IndexStringFindAll(Array& result, const char* value, void* column, StringGetter get_func) const
+{
+    const char* v = value;
+    const char* data   = (const char*)m_data;
+    const uint8_t* header = m_data - 8;
+    size_t width = m_width;
+    bool isNode = m_isNode;
+
+top:
+    // Create 4 byte index key
+    int32_t key = 0;
+    if (*v) key  = ((int32_t)(*v++) << 24);
+    if (*v) key |= ((int32_t)(*v++) << 16);
+    if (*v) key |= ((int32_t)(*v++) << 8);
+    if (*v) key |=  (int32_t)(*v++);
+
+    for (;;) {
+        // Get subnode table
+        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
+        const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
+
+        // Find the position matching the key
+        const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+        const char* const offsets_data = (const char*)offsets_header + 8;
+        const size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == not_found) return; // not_found
+
+        // Get entry under key
+        const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+        const char* const refs_data = (const char*)refs_header + 8;
+        const size_t refs_width  = get_header_width_direct(refs_header);
+        const size_t ref = TO_REF(GetDirect(refs_data, refs_width, pos));
+
+        if (isNode) {
+            // Set vars for next iteration
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+            continue;
+        }
+
+        const int32_t stored_key = (int32_t)GetDirect<32>(offsets_data, pos);
+
+        if (stored_key == key) {
+            // Literal row index
+            if (ref & 1) {
+                const size_t row_ref = (ref >> 1);
+
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) {
+                    result.add(row_ref);
+                    return;
+                }
+
+                const char* const str = (*get_func)(column, row_ref);
+                if (strcmp(str, value) == 0) {
+                    result.add(row_ref);
+                    return;
+                }
+                else return; // not_found
+            }
+
+            const uint8_t* const sub_header = (const uint8_t*)m_alloc.Translate(ref);
+            const bool sub_isindex = get_header_indexflag_direct(sub_header);
+
+            // List of matching row indexes
+            if (!sub_isindex) {
+                const bool sub_isnode = get_header_isnode_direct(sub_header);
+
+                // In most cases the row list will just be an array but there
+                // might be so many matches that it has branched into a column
+                if (!sub_isnode) {
+                    const size_t sub_width  = get_header_width_direct(sub_header);
+                    const char* const sub_data = (const char*)sub_header + 8;
+                    const size_t first_row_ref = GetDirect(sub_data, sub_width, 0);
+
+                    // If the last byte in the stored key is not zero, we have
+                    // not yet compared against the entire (target) string
+                    if ((stored_key << 24)) {
+                        const char* const str = (*get_func)(column, first_row_ref);
+                        if (strcmp(str, value) != 0)
+                            return; // not_found
+                    }
+
+                    // Copy all matches into result array
+                    const size_t sub_len  = get_header_len_direct(sub_header);
+
+                    for (size_t i = 0; i < sub_len; ++i) {
+                        const size_t row_ref = GetDirect(sub_data, sub_width, i);
+                        result.add(row_ref);
+                    }
+                }
+                else {
+                    const Column sub(ref, NULL, 0, m_alloc);
+                    const size_t first_row_ref = sub.Get(0);
+
+                    // If the last byte in the stored key is not zero, we have
+                    // not yet compared against the entire (target) string
+                    if ((stored_key << 24)) {
+                        const char* const str = (*get_func)(column, first_row_ref);
+                        if (strcmp(str, value) != 0)
+                            return; // not_found
+                    }
+
+                    // Copy all matches into result array
+                    const size_t sub_len  = sub.Size();
+
+                    for (size_t i = 0; i < sub_len; ++i) {
+                        const size_t row_ref = sub.Get(i);
+                        result.add(row_ref);
+                    }
+                }
+                return;
+            }
+
+            // Recurse into sub-index;
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+            goto top;
+        }
+        else return; // not_found
+    }
+}
+
+size_t Array::IndexStringCount(const char* value, void* column, StringGetter get_func) const
+{
+    const char* v = value;
+    const char* data   = (const char*)m_data;
+    const uint8_t* header = m_data - 8;
+    size_t width = m_width;
+    bool isNode = m_isNode;
+
+top:
+    // Create 4 byte index key
+    int32_t key = 0;
+    if (*v) key  = ((int32_t)(*v++) << 24);
+    if (*v) key |= ((int32_t)(*v++) << 16);
+    if (*v) key |= ((int32_t)(*v++) << 8);
+    if (*v) key |=  (int32_t)(*v++);
+
+    for (;;) {
+        // Get subnode table
+        const size_t ref_offsets = TO_SIZET(GetDirect(data, width, 0));
+        const size_t ref_refs    = TO_REF(GetDirect(data, width, 1));
+
+        // Find the position matching the key
+        const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
+        const char* const offsets_data = (const char*)offsets_header + 8;
+        const size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == not_found) return 0;
+
+        // Get entry under key
+        const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
+        const char* const refs_data = (const char*)refs_header + 8;
+        const size_t refs_width  = get_header_width_direct(refs_header);
+        const size_t ref = TO_REF(GetDirect(refs_data, refs_width, pos));
+
+        if (isNode) {
+            // Set vars for next iteration
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+            continue;
+        }
+
+        const int32_t stored_key = (int32_t)GetDirect<32>(offsets_data, pos);
+
+        if (stored_key == key) {
+            // Literal row index
+            if (ref & 1) {
+                const size_t row_ref = (ref >> 1);
+
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) return 1;
+
+                const char* const str = (*get_func)(column, row_ref);
+                if (strcmp(str, value) == 0) return 1;
+                else return 0;
+            }
+
+            const uint8_t* const sub_header = (const uint8_t*)m_alloc.Translate(ref);
+            const bool sub_isindex = get_header_indexflag_direct(sub_header);
+
+            // List of matching row indexes
+            if (!sub_isindex) {
+                const bool sub_isnode = get_header_isnode_direct(sub_header);
+                size_t sub_count;
+                size_t row_ref;
+
+                // In most cases the row list will just be an array but there
+                // might be so many matches that it has branched into a column
+                if (!sub_isnode) {
+                    sub_count  = get_header_len_direct(sub_header);
+
+                    // If the last byte in the stored key is zero, we know that we have
+                    // compared against the entire (target) string
+                    if (!(stored_key << 24)) return sub_count;
+
+                    const char* const sub_data = (const char*)sub_header + 8;
+                    const size_t sub_width  = get_header_width_direct(sub_header);
+                    row_ref = GetDirect(sub_data, sub_width, 0);
+                }
+                else {
+                    const Column sub(ref, NULL, 0, m_alloc);
+                    sub_count = sub.Size();
+
+                    // If the last byte in the stored key is zero, we know that we have
+                    // compared against the entire (target) string
+                    if (!(stored_key << 24)) return sub_count;
+
+                    row_ref = sub.Get(0);
+                }
+
+                const char* const str = (*get_func)(column, row_ref);
+                if (strcmp(str, value) == 0) return sub_count;
+                else return 0;
+            }
+
+            // Recurse into sub-index;
+            header = (const uint8_t*)m_alloc.Translate(ref);
+            data   = (const char*)header + 8;
+            width  = get_header_width_direct(header);
+            isNode = get_header_isnode_direct(header);
+            goto top;
+        }
+        else return 0;
     }
 }
 
