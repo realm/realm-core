@@ -452,8 +452,8 @@ EOI
         if [ "$ERROR" ]; then
             cat 1>&2 <<EOF
 Some extensions failed to build. You may be missing one or more
-dependencies. Check the README file details. If this does not help,
-check the log file.
+dependencies. Check the README file for details. If this does not
+help, check the log file.
 The log file is here: $LOG_FILE
 EOF
             exit 1
