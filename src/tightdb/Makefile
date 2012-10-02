@@ -15,8 +15,6 @@ index.cpp index_string.cpp query.cpp c-table.cpp replication.cpp
 bin_PROGRAMS = tightdb-config
 tightdb_config_SOURCES = config.cpp
 
-INSTALL_DEBUG_PROGS = 1
-
 include ../../generic.mk
 
 # Code generation
