@@ -1,6 +1,5 @@
 SOURCE_ROOT = src
 
-
 # Construct fat binaries on Darwin when using Clang
 ifneq ($(TIGHTDB_ENABLE_FAT_BINARIES),)
 ifneq ($(call CC_CXX_AND_LD_ARE,clang),)
@@ -24,6 +23,10 @@ endif
 
 ifeq ($(TIGHTDB_DISABLE_SSE),)
 CFLAGS_DEFAULT   += -DUSE_SSE42
+endif
+
+ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
+CFLAGS_DEFAULT   += -DTIGHTDB_ENABLE_REPLICATION
 endif
 
 CFLAGS_DEBUG     += -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4

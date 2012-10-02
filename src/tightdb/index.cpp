@@ -1,8 +1,5 @@
+#include <tightdb/config.h>
 #include <tightdb/index.hpp>
-
-#ifndef MAX_LIST_SIZE
-#define MAX_LIST_SIZE 1000
-#endif
 
 namespace {
 

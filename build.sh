@@ -205,12 +205,14 @@ case "$MODE" in
         PKG_DIR="$TEMP_DIR/$NAME"
         mkdir "$PKG_DIR" || exit 1
         INSTALL_ROOT="$TEMP_DIR/install"
-
+        mkdir "$INSTALL_ROOT" || exit 1
+        mkdir "$INSTALL_ROOT/include" "$INSTALL_ROOT/lib" "$INSTALL_ROOT/bin" || exit 1
 
         path_list_prepend CPATH                   "$INSTALL_ROOT/include" || exit 1
         path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"     || exit 1
         path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib"     || exit 1
-        export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME"
+        path_list_prepend PATH                    "$INSTALL_ROOT/bin"     || exit 1
+        export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME" PATH
 
 
         if (
@@ -221,7 +223,7 @@ case "$MODE" in
                 sh build.sh test >>"$LOG_FILE" 2>&1 || exit 1
 
                 message "Transfering prebuilt core library to package"
-                tar czf "$TEMP_DIR/core.tar.gz" src/tightdb/Makefile src/tightdb/*.h src/tightdb/*.hpp src/tightdb/libtightdb* src/Makefile src/*.hpp test/Makefile test-installed/Makefile test-installed/*.cpp config.mk generic.mk Makefile build.sh || exit 1
+                tar czf "$TEMP_DIR/core.tar.gz" src/tightdb/Makefile src/tightdb/*.h src/tightdb/*.hpp src/tightdb/libtightdb* src/tightdb/tightdb-config* src/Makefile src/*.hpp test/Makefile test-installed/Makefile test-installed/*.cpp config.mk generic.mk Makefile build.sh || exit 1
                 mkdir "$PKG_DIR/tightdb" || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/core.tar.gz") || exit 1
                 printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
@@ -357,7 +359,7 @@ EOI
                 exit 0
 
             ); then
-            message 'Done!'
+            message 'SUCCESS!'
             message "Log file is here: $LOG_FILE"
             message "Package is here: $TEMP_DIR/$NAME.tar.gz"
         else
@@ -431,7 +433,8 @@ EOI
         path_list_prepend CPATH                   "$TIGHTDB_HOME/src"         || exit 1
         path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
         path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb" || exit 1
-        export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME"
+        path_list_prepend PATH                    "$TIGHTDB_HOME/src/tightdb" || exit 1
+        export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME" PATH
         ERROR=""
         for x in $EXTENSIONS; do
             if [ -e "$TEMP_DIR/select/$x" ]; then

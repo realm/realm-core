@@ -21,6 +21,18 @@
 #define TIGHTDB_CONFIG_H
 
 
+/* Avoid overriding a build specific setting. If you change this
+ * value, be sure to also change TIGHTDB_DEFAULT_MAX_LIST_SIZE. */
+/* FIXME: Must be prefixed with TIGHTDB_ */
+#ifndef MAX_LIST_SIZE
+#define MAX_LIST_SIZE 1000
+#endif
+/* This one is needed to allow tightdb-config to know whether a
+ * nondefault value is in effect. It MUST always be equal to the
+ * fallback value of MAX_LIST_SIZE as pecified above. */
+#define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
+
+
 /* GCC defines __GXX_RTTI when '-fno-rtti' is not specified. The same
  * is true for Clang >= v3.0. Microsoft Visual C++ defines _CPPRTTI
  * when '/GR' is specified. */

@@ -12,6 +12,11 @@ column.cpp column_string.cpp column_string_enum.cpp column_binary.cpp column_tab
 column_mixed.cpp spec.cpp table.cpp table_view.cpp group.cpp group_writer.cpp group_shared.cpp \
 index.cpp index_string.cpp query.cpp c-table.cpp replication.cpp
 
+bin_PROGRAMS = tightdb-config
+tightdb_config_SOURCES = config.cpp
+
+INSTALL_DEBUG_PROGS = 1
+
 include ../../generic.mk
 
 # Code generation
