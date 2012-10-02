@@ -282,3 +282,36 @@ TEST(StringIndex_Count)
     // Clean up
     col.Destroy();
 }
+
+TEST(StringIndex_Distinct)
+{
+    // Create a column with duplcate values
+    AdaptiveStringColumn col;
+    col.add(s1);
+    col.add(s2);
+    col.add(s2);
+    col.add(s3);
+    col.add(s3);
+    col.add(s3);
+    col.add(s4);
+    col.add(s4);
+    col.add(s4);
+    col.add(s4);
+
+    // Create a new index on column
+    StringIndex& ndx = col.CreateIndex();
+
+    // Get view of unique values
+    // (sorted in alphabetical order, each ref to first match)
+    Array result;
+    ndx.distinct(result);
+
+    CHECK_EQUAL(4, result.Size());
+    CHECK_EQUAL(1, result[0]); // s2 = Brian
+    CHECK_EQUAL(0, result[1]); // s1 = John
+    CHECK_EQUAL(3, result[2]); // s3 = Samantha
+    CHECK_EQUAL(6, result[3]); // s4 = Tom
+
+    // Clean up
+    col.Destroy();
+}
