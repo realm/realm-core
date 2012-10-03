@@ -110,8 +110,8 @@ INSTALL_PROGRAM = $(INSTALL)
 
 # PLATFORM SPECIFICS
 
-OS       = $(shell uname)
-ARCH     = $(shell uname -m)
+OS        = $(shell uname)
+ARCH      = $(shell uname -m)
 USE_LIB64 =
 ifeq ($(OS),Linux)
 IS_64BIT = $(filter x86_64 ia64,$(ARCH))
@@ -123,7 +123,6 @@ USE_LIB64 = 1
 endif
 endif
 endif
-$(info LIBDIR IS $(libdir))
 
 
 

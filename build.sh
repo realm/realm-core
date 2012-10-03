@@ -206,11 +206,13 @@ case "$MODE" in
         mkdir "$PKG_DIR" || exit 1
         INSTALL_ROOT="$TEMP_DIR/install"
         mkdir "$INSTALL_ROOT" || exit 1
-        mkdir "$INSTALL_ROOT/include" "$INSTALL_ROOT/lib" "$INSTALL_ROOT/bin" || exit 1
+        mkdir "$INSTALL_ROOT/include" "$INSTALL_ROOT/lib" "$INSTALL_ROOT/lib64" "$INSTALL_ROOT/bin" || exit 1
 
         path_list_prepend CPATH                   "$INSTALL_ROOT/include" || exit 1
         path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"     || exit 1
+        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib64"   || exit 1
         path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib"     || exit 1
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib64"   || exit 1
         path_list_prepend PATH                    "$INSTALL_ROOT/bin"     || exit 1
         export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME" PATH
 
