@@ -206,6 +206,9 @@ public:
     // FIXME: Need: TableView find_all_binary(size_t column_ndx, const char* value, size_t len);
     // FIXME: Need: ConstTableView find_all_binary(size_t column_ndx, const char* value, size_t len) const;
 
+    TableView      distinct(size_t column_ndx);
+    ConstTableView distinct(size_t column_ndx) const;
+
     TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
     ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const;
 
