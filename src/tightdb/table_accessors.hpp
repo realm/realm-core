@@ -836,6 +836,11 @@ public:
     {
         return Base::m_table->get_impl()->find_all_string(col_idx, value);
     }
+
+    BasicTableView<typename Base::RealTable> distinct() const
+    {
+        return Base::m_table->get_impl()->distinct(col_idx);
+    }
 };
 
 

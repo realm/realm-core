@@ -448,6 +448,45 @@ size_t StringIndex::count(const char* value) const
     return m_array->IndexStringCount(value, m_target_column, m_get_func);
 }
 
+void StringIndex::distinct(Array& result) const
+{
+    Array refs = m_array->GetSubArray(1);
+    const size_t count = refs.Size();
+    Allocator& alloc = m_array->GetAllocator();
+
+    // Get first matching row for every key
+    if (m_array->IsNode()) {
+        for (size_t i = 0; i < count; ++i) {
+            const size_t ref = (size_t)refs.Get(i);
+            const StringIndex ndx(ref, NULL, 0, m_target_column, m_get_func, alloc);
+            ndx.distinct(result);
+        }
+    }
+    else {
+        for (size_t i = 0; i < count; ++i) {
+            const int64_t ref = refs.Get(i);
+
+            // low bit set indicate literal ref (shifted)
+            if (ref & 1) {
+                const size_t r = (ref >> 1);
+                result.add(r);
+            }
+            else {
+                // A real ref either points to a list or a sub-index
+                if (IsArrayIndexNode(ref, alloc)) {
+                    const StringIndex ndx((size_t)ref, &refs, i, m_target_column, m_get_func, alloc);
+                    ndx.distinct(result);
+                }
+                else {
+                    const Column sub(ref, &refs, i, alloc);
+                    const size_t r = sub.Get(0); // get first match
+                    result.add(r);
+                }
+            }
+        }
+    }
+}
+
 void StringIndex::UpdateRefs(size_t pos, int diff)
 {
     TIGHTDB_ASSERT(diff == 1 || diff == -1); // only used by insert and delete

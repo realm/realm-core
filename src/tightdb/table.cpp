@@ -1447,6 +1447,52 @@ ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t
     return move(tv);
 }
 
+TableView Table::distinct(size_t column_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(has_index(column_ndx));
+
+    TableView tv(*this);
+    Array& refs = tv.get_ref_column();
+
+    const ColumnType type = GetRealColumnType(column_ndx);
+    if (type == COLUMN_TYPE_STRING) {
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        const StringIndex& ndx = column.GetIndex();
+        ndx.distinct(refs);
+    }
+    else {
+        TIGHTDB_ASSERT(type == COLUMN_TYPE_STRING_ENUM);
+        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+        const StringIndex& ndx = column.GetIndex();
+        ndx.distinct(refs);
+    }
+    return move(tv);
+}
+
+ConstTableView Table::distinct(size_t column_ndx) const
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(has_index(column_ndx));
+
+    ConstTableView tv(*this);
+    Array& refs = tv.get_ref_column();
+
+    const ColumnType type = GetRealColumnType(column_ndx);
+    if (type == COLUMN_TYPE_STRING) {
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        const StringIndex& ndx = column.GetIndex();
+        ndx.distinct(refs);
+    }
+    else {
+        TIGHTDB_ASSERT(type == COLUMN_TYPE_STRING_ENUM);
+        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+        const StringIndex& ndx = column.GetIndex();
+        ndx.distinct(refs);
+    }
+    return move(tv);
+}
+
 TableView Table::get_sorted_view(size_t column_ndx, bool ascending)
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.Size());
