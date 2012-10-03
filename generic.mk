@@ -74,18 +74,6 @@ LDFLAGS_COVERAGE = $(CFLAGS_COVERAGE)
 LDFLAGS_PTHREAD  = $(CFLAGS_PTHREAD)
 ARFLAGS_DEFAULT  = csr
 
-# Installation (GNU style)
-prefix          = /usr/local
-exec_prefix     = $(prefix)
-includedir      = $(prefix)/include
-bindir          = $(exec_prefix)/bin
-libdir          = $(exec_prefix)/lib
-INSTALL         = install
-INSTALL_DIR     = $(INSTALL) -d
-INSTALL_DATA    = $(INSTALL) -m 644
-INSTALL_LIBRARY = $(INSTALL)
-INSTALL_PROGRAM = $(INSTALL)
-
 SHARED_OBJ_DENOM    = .pic
 DEBUG_OBJ_DENOM     = .dbg
 COVERAGE_OBJ_DENOM  = .cov
@@ -105,6 +93,22 @@ NO_BUILD_ON_INSTALL =
 # plain 'make' will not even build them. When set to a nonempty value,
 # the opposite is true.
 INSTALL_DEBUG_PROGS =
+
+OS   = $(shell uname)
+ARCH = $(shell uname -m)
+USE_LIB64 = $(and $(filter x86_64 ia64,$(ARCH)),$(shell [ -e /etc/redhat-release -o -e /etc/fedora-release ] && echo y))
+
+# Installation (GNU style)
+prefix          = /usr/local
+exec_prefix     = $(prefix)
+includedir      = $(prefix)/include
+bindir          = $(exec_prefix)/bin
+libdir          = $(if $(USE_LIB64),$(exec_prefix)/lib64,$(exec_prefix)/lib)
+INSTALL         = install
+INSTALL_DIR     = $(INSTALL) -d
+INSTALL_DATA    = $(INSTALL) -m 644
+INSTALL_LIBRARY = $(INSTALL)
+INSTALL_PROGRAM = $(INSTALL)
 
 
 
