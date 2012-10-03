@@ -9,9 +9,9 @@ MODE="$1"
 EXTENSIONS="java python objc node php gui"
 
 
-
 # Setup OS specific stuff
 OS="$(uname)" || exit 1
+ARCH="$(uname -m)" || exit 1
 LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 if [ "$OS" = "Darwin" ]; then
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
@@ -30,6 +30,20 @@ if ! printf "%s\n" "$MODE" | grep '^dist' >/dev/null; then
     fi
     if [ "$NUM_PROCESSORS" ]; then
         export MAKEFLAGS="-j$NUM_PROCESSORS"
+    fi
+fi
+NEED_USR_LOCAL_LIB_NOTE=
+USE_LIB64=
+IS_REDHAT_DERIVATIVE=
+if [ -e /etc/redhat-release ] || grep "Amazon" /etc/system-release >/dev/null 2>&1; then
+    IS_REDHAT_DERIVATIVE=1
+fi
+if [ "$IS_REDHAT_DERIVATIVE" ]; then
+    NEED_USR_LOCAL_LIB_NOTE=1
+fi
+if [ "$IS_REDHAT_DERIVATIVE" -o -e /etc/SuSE-release ]; then
+    if [ "$ARCH" = "x86_64" -o "$ARCH" = "ia64" ]; then
+        USE_LIB64=1
     fi
 fi
 
@@ -95,11 +109,15 @@ case "$MODE" in
 
     "install")
         PREFIX="$1"
-        INSTALL=install
-        if [ "$PREFIX" ]; then
-            INSTALL="prefix=$PREFIX $INSTALL"
+        if ! [ "$PREFIX" ]; then
+            PREFIX="/usr/local"
         fi
-        make $INSTALL || exit 1
+        if [ "$USE_LIB64" ]; then
+            LIBDIR="$PREFIX/lib64"
+        else
+            LIBDIR="$PREFIX/lib"
+        fi
+        make prefix="$PREFIX" libdir="$LIBDIR" install || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig
         fi
@@ -472,6 +490,20 @@ EOF
         echo ">>>>>>>> INSTALLING 'tightdb'" | tee -a "$LOG_FILE"
         if sh build.sh install >>"$LOG_FILE" 2>&1; then
             touch "WAS_INSTALLED" || exit 1
+            if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
+                if [ "$USE_LIB64" ]; then
+                    LIBDIR="/usr/local/lib64"
+                else
+                    LIBDIR="/usr/local/lib"
+                fi
+                cat <<EOF
+
+NOTE:
+Libraries have been installed in $LIBDIR.
+On your system this directory is not in the library search path
+by default, so you may have to add it to /etc/ld.so.conf manually.
+EOF
+            fi
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                 if [ -e "$EXT_HOME/TO_BE_INSTALLED" ]; then
