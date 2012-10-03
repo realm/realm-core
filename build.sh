@@ -497,7 +497,6 @@ EOF
                     LIBDIR="/usr/local/lib"
                 fi
                 cat <<EOF
-
 NOTE:
 Libraries have been installed in $LIBDIR.
 On your system this directory is not in the library search path
