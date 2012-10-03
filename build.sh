@@ -98,7 +98,7 @@ case "$MODE" in
         ;;
 
     "build")
-        TIGHTDB_ENABLE_FAT_BINARIES=1 make || exit 1
+        TIGHTDB_ENABLE_FAT_BINARIES="1" make || exit 1
         exit 0
         ;;
 
