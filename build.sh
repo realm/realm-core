@@ -32,18 +32,18 @@ if ! printf "%s\n" "$MODE" | grep '^dist' >/dev/null; then
         export MAKEFLAGS="-j$NUM_PROCESSORS"
     fi
 fi
-NEED_USR_LOCAL_LIB_NOTE=
-USE_LIB64=
-IS_REDHAT_DERIVATIVE=
+NEED_USR_LOCAL_LIB_NOTE=""
+USE_LIB64=""
+IS_REDHAT_DERIVATIVE=""
 if [ -e /etc/redhat-release ] || grep "Amazon" /etc/system-release >/dev/null 2>&1; then
-    IS_REDHAT_DERIVATIVE=1
+    IS_REDHAT_DERIVATIVE="1"
 fi
 if [ "$IS_REDHAT_DERIVATIVE" ]; then
-    NEED_USR_LOCAL_LIB_NOTE=1
+    NEED_USR_LOCAL_LIB_NOTE="1"
 fi
 if [ "$IS_REDHAT_DERIVATIVE" -o -e /etc/SuSE-release ]; then
     if [ "$ARCH" = "x86_64" -o "$ARCH" = "ia64" ]; then
-        USE_LIB64=1
+        USE_LIB64="1"
     fi
 fi
 
@@ -309,7 +309,7 @@ Install what was built:      sudo  ./build  install
 Test installation:           ./build  test
 Start from scratch:          ./build  clean
 
-Available extensions are: $AVAIL_EXTENSIONS
+Available extensions are: ${AVAIL_EXTENSIONS:-None}
 
 During installation, the prebuilt core library will be installed along
 with all the extensions that you have built yourself.
