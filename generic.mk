@@ -94,10 +94,6 @@ NO_BUILD_ON_INSTALL =
 # the opposite is true.
 INSTALL_DEBUG_PROGS =
 
-OS   = $(shell uname)
-ARCH = $(shell uname -m)
-USE_LIB64 = $(and $(filter x86_64 ia64,$(ARCH)),$(shell [ -e /etc/redhat-release -o -e /etc/fedora-release ] && echo y))
-
 # Installation (GNU style)
 prefix          = /usr/local
 exec_prefix     = $(prefix)
@@ -109,6 +105,25 @@ INSTALL_DIR     = $(INSTALL) -d
 INSTALL_DATA    = $(INSTALL) -m 644
 INSTALL_LIBRARY = $(INSTALL)
 INSTALL_PROGRAM = $(INSTALL)
+
+
+
+# PLATFORM SPECIFICS
+
+OS       = $(shell uname)
+ARCH     = $(shell uname -m)
+USE_LIB64 =
+ifeq ($(OS),Linux)
+IS_64BIT = $(filter x86_64 ia64,$(ARCH))
+ifneq ($(IS_64BIT),)
+ifeq ($(shell [ -e /etc/redhat-release -o -e /etc/SuSE-release -o -e /etc/fedora-release ] && echo yes),yes)
+USE_LIB64 = 1
+else ifneq ($(shell [ -e /etc/system-release ] && grep Amazon /etc/system-release),)
+USE_LIB64 = 1
+endif
+endif
+endif
+$(info LIBDIR IS $(libdir))
 
 
 
