@@ -33,6 +33,8 @@
 
 namespace tightdb {
 
+// Distance between matches where performance no longer increases 
+const size_t bestdist = 100;
 
 class ParentNode {
 public:
@@ -309,6 +311,7 @@ public:
         dT = 1.0;
         dD = 1.0;
 
+        m_last_match = 0;
         m_column = column; 
         m_leaf_end = 0;
         m_value = value;
@@ -348,11 +351,18 @@ public:
     template <ACTION action>bool match_callback(int64_t v) {
         size_t i = to_size_t(v);
 
+        dD = m_last_match - i;
+        m_last_match = i;
+
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
         for (size_t c = 1; c < m_conds; c++) {
             size_t m = m_children[c]->find_first_local(i, i + 1);
             if (m != i) {
+                m_children[c]->dD += 1.0;
                 return true;
+            }
+            else {
+                m_children[c]->dD = m_children[c]->dD / 2.0;
             }
         }
 
@@ -368,8 +378,6 @@ public:
         int c = f.condition();
 
         state = st;
-
-
         for (size_t s = start; s < end; ) {    
 
             // Cache internal leafs
@@ -447,7 +455,7 @@ public:
 
 protected:
     state_state *state;
-
+    size_t m_last_match;
     C* m_column;                // Column on which search criteria is applied
     const Array* criteria_arr;
     Array m_array;              
