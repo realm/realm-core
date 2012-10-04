@@ -195,7 +195,7 @@ TEST(TestQueryFindAll_range1)
 TEST(TestQueryFindAll_range_or_monkey2)
 {
     const size_t ROWS = 20;
-    const size_t ITER = 1000;
+    const size_t ITER = 100;
 
     for (size_t u = 0; u < ITER; u++)
     {
