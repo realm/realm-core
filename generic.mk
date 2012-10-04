@@ -29,9 +29,21 @@
 # next, you should always start with a 'make clean'. MAKE does this
 # automatically when you change config.mk.
 #
-# In config.mk you may check the value of CC_AND_CXX_ARE_GCC_LIKE. If
-# it has a nonempty value, then both the C and the C++ compiler is
-# mostly command line compatible with GCC (gcc, llvm-gcc, clang).
+# A function CC_CXX_AND_LD_ARE is made available to check for a
+# specific compiler in config.mk. For example:
+#
+#   ifneq ($(call CC_CXX_AND_LD_ARE,clang),)
+#   # Clang specific stuff
+#   endif
+#
+# Likewise, a variable CC_CXX_AND_LD_ARE_GCC_LIKE is made available to
+# check for any GCC like compiler in config.mk (gcc, llvm-gcc,
+# clang). For example:
+#
+#   ifneq ($(CC_CXX_AND_LD_ARE_GCC_LIKE),)
+#   # GCC specific stuff
+#   endif
+
 
 
 # CONFIG VARIABLES
@@ -62,18 +74,6 @@ LDFLAGS_COVERAGE = $(CFLAGS_COVERAGE)
 LDFLAGS_PTHREAD  = $(CFLAGS_PTHREAD)
 ARFLAGS_DEFAULT  = csr
 
-# Installation (GNU style)
-prefix          = /usr/local
-exec_prefix     = $(prefix)
-includedir      = $(prefix)/include
-bindir          = $(exec_prefix)/bin
-libdir          = $(exec_prefix)/lib
-INSTALL         = install
-INSTALL_DIR     = $(INSTALL) -d
-INSTALL_DATA    = $(INSTALL) -m 644
-INSTALL_LIBRARY = $(INSTALL)
-INSTALL_PROGRAM = $(INSTALL)
-
 SHARED_OBJ_DENOM    = .pic
 DEBUG_OBJ_DENOM     = .dbg
 COVERAGE_OBJ_DENOM  = .cov
@@ -87,6 +87,44 @@ COVERAGE_PROG_DENOM = -cov
 # nonempty value if you would rather want 'install' to simply accept
 # what is there and attempt an installation from that.
 NO_BUILD_ON_INSTALL =
+
+# When set to an empty value, 'make install' will not install the
+# debug versions of the programs mentioned in bin_PROGRAMS, and a
+# plain 'make' will not even build them. When set to a nonempty value,
+# the opposite is true.
+INSTALL_DEBUG_PROGS =
+
+# Installation (GNU style)
+prefix          = /usr/local
+exec_prefix     = $(prefix)
+includedir      = $(prefix)/include
+bindir          = $(exec_prefix)/bin
+libdir          = $(if $(USE_LIB64),$(exec_prefix)/lib64,$(exec_prefix)/lib)
+INSTALL         = install
+INSTALL_DIR     = $(INSTALL) -d
+INSTALL_DATA    = $(INSTALL) -m 644
+INSTALL_LIBRARY = $(INSTALL)
+INSTALL_PROGRAM = $(INSTALL)
+
+# Alternative filesystem root for installation
+DESTDIR =
+
+
+# PLATFORM SPECIFICS
+
+OS        = $(shell uname)
+ARCH      = $(shell uname -m)
+USE_LIB64 =
+ifeq ($(OS),Linux)
+IS_64BIT = $(filter x86_64 ia64,$(ARCH))
+ifneq ($(IS_64BIT),)
+ifeq ($(shell [ -e /etc/redhat-release -o -e /etc/SuSE-release ] && echo yes),yes)
+USE_LIB64 = 1
+else ifneq ($(shell [ -e /etc/system-release ] && grep Amazon /etc/system-release),)
+USE_LIB64 = 1
+endif
+endif
+endif
 
 
 
@@ -119,9 +157,9 @@ MAP_CMD = $(if $(call MATCH_CMD,$(1),$(3)),$(if $(findstring /,$(3)),$(dir $(3))
 GCC_LIKE_COMPILERS = gcc llvm-gcc clang
 MAP_CC_TO_CXX = $(or $(call MAP_CMD,gcc,g++,$(1)),$(call MAP_CMD,llvm-gcc,llvm-g++,$(1)),$(call MAP_CMD,clang,clang++,$(1)))
 
-GXX_LIKE_COMPILERS = $(foreach x,$(GCC_LIKE_COMPILERS),$(call MAP_CC_TO_CXX,$(x)))
-IS_GCC_LIKE = $(foreach x,$(GCC_LIKE_COMPILERS),$(call MATCH_CMD,$(x),$(1)))
-IS_GXX_LIKE = $(foreach x,$(GXX_LIKE_COMPILERS),$(call MATCH_CMD,$(x),$(1)))
+GXX_LIKE_COMPILERS = $(strip $(foreach x,$(GCC_LIKE_COMPILERS),$(call MAP_CC_TO_CXX,$(x))))
+IS_GCC_LIKE = $(strip $(foreach x,$(GCC_LIKE_COMPILERS),$(call MATCH_CMD,$(x),$(1))))
+IS_GXX_LIKE = $(strip $(foreach x,$(GXX_LIKE_COMPILERS),$(call MATCH_CMD,$(x),$(1))))
 
 # C and C++
 CC_SPECIFIED        = $(filter-out undefined default,$(origin CC))
@@ -131,20 +169,20 @@ ifeq ($(CC_OR_CXX_SPECIFIED),)
 # Neither CC nor CXX is specified
 X := $(call FIND,$(GCC_LIKE_COMPILERS),HAVE_CMD)
 ifneq ($(X),)
-CC = $(X)
+CC := $(X)
 X := $(call MAP_CC_TO_CXX,$(CC))
 ifneq ($(X),)
-CXX = $(X)
+CXX := $(X)
 endif
 endif
 else ifeq ($(CXX_SPECIFIED),)
 # CXX is not specified, but CC is
 X := $(call MAP_CC_TO_CXX,$(CC))
 ifneq ($(X),)
-CXX = $(X)
+CXX := $(X)
 endif
 endif
-CC_AND_CXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(CC)),$(call IS_GXX_LIKE,$(CXX)))
+CC_AND_CXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(CC)),$(or $(call IS_GCC_LIKE,$(CXX)),$(call IS_GXX_LIKE,$(CXX))))
 ifneq ($(CC_AND_CXX_ARE_GCC_LIKE),)
 CFLAGS_DEFAULT   = -Wall
 CFLAGS_OPTIMIZE  = -O3
@@ -160,16 +198,16 @@ OCXX_SPECIFIED        = $(filter-out undefined default,$(origin OCXX))
 OCC_OR_OCXX_SPECIFIED = $(or $(OCC_SPECIFIED),$(OCXX_SPECIFIED))
 ifeq ($(OCC_OR_OCXX_SPECIFIED),)
 # Neither OCC nor OCXX is specified
-OCC  = $(CC)
-OCXX = $(CXX)
+OCC  := $(CC)
+OCXX := $(CXX)
 else ifeq ($(OCXX_SPECIFIED),)
 # OCXX is not specified, but OCC is
 X := $(call MAP_CC_TO_CXX,$(OCC))
 ifneq ($(X),)
-OCXX = $(X)
+OCXX := $(X)
 endif
 endif
-OCC_AND_OCXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(OCC)),$(call IS_GXX_LIKE,$(OCXX)))
+OCC_AND_OCXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(OCC)),$(or $(call IS_GCC_LIKE,$(OCXX)),$(call IS_GXX_LIKE,$(OCXX))))
 
 
 
@@ -177,7 +215,7 @@ OCC_AND_OCXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(OCC)),$(call IS_GXX_LIKE,
 
 ifneq ($(CC_AND_CXX_ARE_GCC_LIKE),)
 ifeq ($(LD_SPECIFIED),)
-LD = $(CXX)
+LD := $(CXX)
 endif
 endif
 LD_IS_GCC_LIKE = $(or $(call IS_GCC_LIKE,$(LD)),$(call IS_GXX_LIKE,$(LD)))
@@ -201,6 +239,10 @@ endif
 
 
 # LOAD PROJECT SPECIFIC CONFIGURATION
+
+CC_CXX_AND_LD_ARE = $(call CC_CXX_AND_LD_ARE_HELP,$(1),$(call MAP_CC_TO_CXX,$(1)))
+CC_CXX_AND_LD_ARE_HELP = $(and $(call MATCH_CMD,$(1),$(CC)),$(strip $(foreach x,$(1) $(2),$(call MATCH_CMD,$(x),$(CXX)))),$(strip $(foreach x,$(1) $(2),$(call MATCH_CMD,$(x),$(LD)))))
+CC_CXX_AND_LD_ARE_GCC_LIKE = $(strip $(foreach x,$(GCC_LIKE_COMPILERS),$(call CC_CXX_AND_LD_ARE,$(x))))
 
 THIS_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 ROOT = $(patsubst %/,%,$(dir $(THIS_MAKEFILE)))
@@ -316,7 +358,11 @@ TARGETS_TEST_PROG         = $(TEST_PROGRAMS)
 TARGETS_TEST_PROG_DEBUG   = $(foreach x,$(TEST_PROGRAMS),$(x)$(SUFFIX_PROG_DEBUG))
 TARGETS_TEST_PROG_COVER   = $(foreach x,$(TEST_PROGRAMS),$(x)$(SUFFIX_PROG_COVER))
 
+ifeq ($(INSTALL_DEBUG_PROGS),)
 TARGETS_DEFAULT    = $(TARGETS_LIB_SHARED) $(TARGETS_LIB_STATIC) $(TARGETS_LIB_DEBUG) $(TARGETS_NOINST_LIB) $(TARGETS_PROG) $(TARGETS_NOINST_PROG)
+else
+TARGETS_DEFAULT    = $(TARGETS_LIB_SHARED) $(TARGETS_LIB_STATIC) $(TARGETS_LIB_DEBUG) $(TARGETS_NOINST_LIB) $(TARGETS_PROG) $(TARGETS_PROG_DEBUG) $(TARGETS_NOINST_PROG)
+endif
 TARGETS_NODEBUG    = $(TARGETS_LIB_SHARED) $(TARGETS_LIB_STATIC) $(TARGETS_NOINST_LIB) $(TARGETS_PROG) $(TARGETS_NOINST_PROG)
 TARGETS_SHARED     = $(TARGETS_LIB_SHARED) $(TARGETS_NOINST_LIB) $(TARGETS_PROG) $(TARGETS_NOINST_PROG)
 TARGETS_STATIC     = $(TARGETS_LIB_STATIC) $(TARGETS_NOINST_LIB) $(TARGETS_PROG) $(TARGETS_NOINST_PROG)
@@ -452,7 +498,12 @@ UNINSTALL_RECIPE_LIB  = $(RM) $(call GET_LIB_INSTALL_DIR,$(1))/$(2)
 UNINSTALL_RECIPE_PROG = $(RM) $(call GET_PROG_INSTALL_DIR,$(1))/$(2)
 
 GET_INST_LIB_TARGETS  = $(foreach x,$($(1)_LIBRARIES),$(foreach y,$(SUFFIX_LIB_SHARED) $(SUFFIX_LIB_STATIC) $(SUFFIX_LIB_DEBUG),$(call GET_LIBRARY_NAME,$(x),$(y))))
+
+ifeq ($(INSTALL_DEBUG_PROGS),)
 GET_INST_PROG_TARGETS = $($(1)_PROGRAMS)
+else
+GET_INST_PROG_TARGETS = $(foreach x,$($(1)_PROGRAMS),$(x) $(x)$(SUFFIX_PROG_DEBUG))
+endif
 
 define INSTALL_RULES
 

@@ -12,6 +12,10 @@ Format:
 
 ==================
 
+2012-10-02 (Kristian Spangsege)
+----------
++ New program 'tightdb-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the TightDB core library.
+
 2012-10-01 (Brian Munkholm)
 ----------
 + 12 Added double Table::average(size_t column_ndx) const
@@ -25,6 +29,7 @@ Format:
 + 11 Added Table accessor size_t count(const char* target) const to highlevel interface
 + 11 Spec::add_column now takes an optional parameter for attribute (like indexed).
 + 11 Added Table::to_string() and Group::to_string() for prettified string dump.
+
 
 2012-08-14 (Brian Munkholm)
 ----------

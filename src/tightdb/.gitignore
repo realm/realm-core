@@ -9,3 +9,5 @@
 /libtightdb.a
 /libtightdb-dbg.a
 /libtightdb-cov.a
+/tightdb-config
+/tightdb-config-dbg

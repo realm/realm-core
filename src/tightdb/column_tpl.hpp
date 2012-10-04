@@ -22,13 +22,9 @@
 
 #include <cstdlib>
 
+#include <tightdb/config.h>
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
-
-// Has to be define to allow overload from build settings
-#ifndef MAX_LIST_SIZE
-#define MAX_LIST_SIZE 1000
-#endif
 
 namespace tightdb {
 

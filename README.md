@@ -48,3 +48,21 @@ If everything went well, consider tagging and then making the package again:
 
 This will produce a package whose name and whose top-level directory
 is named according to the tag.
+
+
+Configuration
+-------------
+
+To use a nondefault compiler, or a compiler in a nondefault location,
+set the environment variable `CC` before calling `sh build.sh build`
+or `sh build.sh dist`, as in the following example:
+
+    CC=clang sh build.sh dist
+
+There are also a number of environment variables that serve to enable
+or disable special features during building:
+
+Set `TIGHTDB_DISABLE_SSE` to a nonempty value to disable SSE.
+
+Set `TIGHTDB_ENABLE_REPLICATION` to a nonempty value to enable
+replication.
