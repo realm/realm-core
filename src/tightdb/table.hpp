@@ -186,6 +186,7 @@ public:
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;
+    double  average(size_t column_ndx) const;
 
     // Searching
     size_t         lookup(const char* value) const;
