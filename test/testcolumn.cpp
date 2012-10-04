@@ -578,7 +578,6 @@ TEST(Column_Sum_Average)
 {
     Column c;
     int64_t sum = 0;
-    double average = 0.0;
 
     // Sum of 0 elements
     CHECK_EQUAL(0, c.sum());

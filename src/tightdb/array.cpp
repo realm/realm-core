@@ -2240,9 +2240,7 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retva
     }
 
     char* data = (char*)m_data;
-    uint8_t* header = (uint8_t*)data-8; 
     size_t width  = m_width;
-    bool isNode   = m_isNode;
     size_t offset = 0;
 
     while (1) {
@@ -2268,16 +2266,17 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retva
         const size_t ref = to_size_t(GetDirect(refs_data, refs_width, node_ndx));
 
         // Set vars for next iteration
-        header = (uint8_t*)m_alloc.Translate(ref);
-        data   = (char*)header + 8;
-        width  = get_header_width_direct(header);
-        isNode = get_header_isnode_direct(header);
-        
+        uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
+        const bool isNode = get_header_isnode_direct(header);
+
         if (!isNode) {
             arr.CreateFromHeaderDirect(header);
             off = offset;
             return &arr;
         }
+
+        data   = (char*)header + 8;
+        width  = get_header_width_direct(header);
     }
 }
 
@@ -2437,7 +2436,7 @@ size_t Array::IndexStringFindFirst(const char* value, void* column, StringGetter
 {
     const char* v = value;
     const char* data   = (const char*)m_data;
-    const uint8_t* header = m_data - 8;
+    const uint8_t* header;
     size_t width = m_width;
     bool isNode = m_isNode;
 
@@ -2536,7 +2535,7 @@ void Array::IndexStringFindAll(Array& result, const char* value, void* column, S
 {
     const char* v = value;
     const char* data   = (const char*)m_data;
-    const uint8_t* header = m_data - 8;
+    const uint8_t* header;
     size_t width = m_width;
     bool isNode = m_isNode;
 
@@ -2666,7 +2665,7 @@ size_t Array::IndexStringCount(const char* value, void* column, StringGetter get
 {
     const char* v = value;
     const char* data   = (const char*)m_data;
-    const uint8_t* header = m_data - 8;
+    const uint8_t* header;
     size_t width = m_width;
     bool isNode = m_isNode;
 

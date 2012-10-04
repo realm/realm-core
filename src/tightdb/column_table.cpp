@@ -58,7 +58,7 @@ void ColumnTable::Delete(size_t ndx)
     invalidate_subtables();
 }
 
-void ColumnTable::Clear(size_t ndx)
+void ColumnTable::ClearTable(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
 
