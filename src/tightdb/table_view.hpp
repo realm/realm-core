@@ -76,6 +76,10 @@ public:
     // Get row index in the source table this view is "looking" at.
     size_t get_source_ndx(size_t row_ndx) const { return size_t(m_refs.Get(row_ndx)); }
 
+    // Conversion
+    void to_json(std::ostream& out);
+    void to_string(std::ostream& out, size_t limit=500) const;
+
 protected:
     friend class Table;
     template <class R, class V> static R find_all_integer(V*, size_t, int64_t);
