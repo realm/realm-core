@@ -1576,8 +1576,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
     {
         cond2 C;
         int cond = C.condition();
-
-        bool ret;
+        bool ret = false;
 
         if (cond == COND_EQUAL)
             ret = CompareEquality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);

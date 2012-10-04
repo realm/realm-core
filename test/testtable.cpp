@@ -3,6 +3,8 @@
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
 
+#include <ostream>
+
 using namespace tightdb;
 
 TEST(Table1)
@@ -273,6 +275,34 @@ TEST(Table_Delete_All_Types)
     table.Verify();
 #endif // TIGHTDB_DEBUG
 }
+
+TEST(Table_test_json)
+{
+    // Create table with all column types
+    Table table;
+    Spec& s = table.get_spec();
+    s.add_column(COLUMN_TYPE_INT,    "int");
+    s.add_column(COLUMN_TYPE_BOOL,   "bool");
+    s.add_column(COLUMN_TYPE_DATE,   "date");
+    s.add_column(COLUMN_TYPE_STRING, "string");
+    table.update_from_spec();
+
+    // Add some rows
+    for (size_t i = 0; i < 3; ++i) {
+        table.insert_int(0, i, i);
+        table.insert_bool(1, i, (i % 2 ? true : false));
+        table.insert_date(2, i, 12345);
+        table.insert_string(3, i, "helloooooo");
+        table.insert_done();
+    }
+
+     std::stringstream ss;
+     table.to_json(ss);
+     const std::string json = ss.str();
+     CHECK_EQUAL(true, json.length() > 0);
+     // std::cerr << "JSON:" << json << "\n";
+}
+
 
 TEST(Table_Find_Int)
 {
