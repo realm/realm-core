@@ -478,6 +478,31 @@ TEST(Table_Lookup)
     CHECK_EQUAL(not_found, b7);
 }
 
+TEST(Table_Distinct)
+{
+    TestTableEnum table;
+
+    table.add(Mon, "A");
+    table.add(Tue, "B");
+    table.add(Wed, "C");
+    table.add(Thu, "B");
+    table.add(Fri, "C");
+    table.add(Sat, "D");
+    table.add(Sun, "D");
+    table.add(Mon, "D");
+
+    table.column().second.set_index();
+    CHECK(table.column().second.has_index());
+
+    TestTableEnum::View view = table.column().second.distinct();
+
+    CHECK_EQUAL(4, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(0));
+    CHECK_EQUAL(1, view.get_source_ndx(1));
+    CHECK_EQUAL(2, view.get_source_ndx(2));
+    CHECK_EQUAL(5, view.get_source_ndx(3));
+}
+
 /*
 TEST(Table_Index_Int)
 {

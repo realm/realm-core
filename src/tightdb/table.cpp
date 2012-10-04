@@ -1201,6 +1201,15 @@ int64_t Table::sum(size_t column_ndx) const
     return column.sum();
 }
 
+double Table::average(size_t column_ndx) const
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
+
+    const Column& column = GetColumn(column_ndx);
+    return column.average();
+}
+
 int64_t Table::maximum(size_t column_ndx) const
 {
     if (is_empty()) return 0;
@@ -1435,6 +1444,52 @@ ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t
 
     ConstTableView tv(*this);
     column.find_all_hamming(tv.get_ref_column(), value, max);
+    return move(tv);
+}
+
+TableView Table::distinct(size_t column_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(has_index(column_ndx));
+
+    TableView tv(*this);
+    Array& refs = tv.get_ref_column();
+
+    const ColumnType type = GetRealColumnType(column_ndx);
+    if (type == COLUMN_TYPE_STRING) {
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        const StringIndex& ndx = column.GetIndex();
+        ndx.distinct(refs);
+    }
+    else {
+        TIGHTDB_ASSERT(type == COLUMN_TYPE_STRING_ENUM);
+        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+        const StringIndex& ndx = column.GetIndex();
+        ndx.distinct(refs);
+    }
+    return move(tv);
+}
+
+ConstTableView Table::distinct(size_t column_ndx) const
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(has_index(column_ndx));
+
+    ConstTableView tv(*this);
+    Array& refs = tv.get_ref_column();
+
+    const ColumnType type = GetRealColumnType(column_ndx);
+    if (type == COLUMN_TYPE_STRING) {
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        const StringIndex& ndx = column.GetIndex();
+        ndx.distinct(refs);
+    }
+    else {
+        TIGHTDB_ASSERT(type == COLUMN_TYPE_STRING_ENUM);
+        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+        const StringIndex& ndx = column.GetIndex();
+        ndx.distinct(refs);
+    }
     return move(tv);
 }
 

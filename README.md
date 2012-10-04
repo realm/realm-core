@@ -11,7 +11,16 @@ Dependencies
     sudo apt-get install python-cheetah
     #   For testing:
     sudo apt-get install libunittest++-dev
+    #   For benchmarking:
     sudo apt-get install libproc-dev
+
+### Fedora 17
+
+    sudo yum install gcc gcc-c++
+    #   For regenerating <tightdb/table-macros.hpp>
+    sudo yum install python-cheetah
+    #  For benchmarking:
+    sudo yum install procps-devel
 
 ### OS X 10.8
 

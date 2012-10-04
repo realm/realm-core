@@ -186,6 +186,7 @@ public:
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;
+    double  average(size_t column_ndx) const;
 
     // Searching
     size_t         lookup(const char* value) const;
@@ -205,6 +206,9 @@ public:
     ConstTableView find_all_string(size_t column_ndx, const char* value) const;
     // FIXME: Need: TableView find_all_binary(size_t column_ndx, const char* value, size_t len);
     // FIXME: Need: ConstTableView find_all_binary(size_t column_ndx, const char* value, size_t len) const;
+
+    TableView      distinct(size_t column_ndx);
+    ConstTableView distinct(size_t column_ndx) const;
 
     TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
     ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const;

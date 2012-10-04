@@ -574,17 +574,35 @@ TEST(Column_FindHamming)
 }
 */
 
-TEST(Column_Sum)
+
+TEST(Column_Average)
+{
+    Column c;
+    c.add(10);
+    CHECK_EQUAL(10, c.average());
+    
+    c.add(30);
+    CHECK_EQUAL(0, c.average(0,0));     // None
+    CHECK_EQUAL(10, c.average(0,1));    // first
+    CHECK_EQUAL(0, c.average(1,1));     // None
+    CHECK_EQUAL(30, c.average(1,2));    // second
+    CHECK_EQUAL(20, c.average(0,2));    // both
+}
+
+TEST(Column_Sum_Average)
 {
     Column c;
     int64_t sum = 0;
+    double average = 0.0;
 
     // Sum of 0 elements
     CHECK_EQUAL(0, c.sum());
+    CHECK_EQUAL(0, c.average());
 
     // Sum of 1 elements
     c.add(123);
     CHECK_EQUAL(123, c.sum());
+    CHECK_EQUAL(123, c.average());
 
     c.Clear();
 
@@ -598,6 +616,7 @@ TEST(Column_Sum)
         sum += c.Get(i);
     }
     CHECK_EQUAL(sum, c.sum());
+    CHECK_EQUAL(sum/100.0, c.average());
 
     // Sum of entire range, given explicit range
     sum = 0;
@@ -605,6 +624,7 @@ TEST(Column_Sum)
         sum += c.Get(i);
     }
     CHECK_EQUAL(sum, c.sum(0, 100));
+    CHECK_EQUAL(sum/100.0, c.average(0,100));
 
     // Start to N
     sum = 0;
@@ -612,6 +632,7 @@ TEST(Column_Sum)
         sum += c.Get(i);
     }
     CHECK_EQUAL(sum, c.sum(0, 63));
+    CHECK_EQUAL(sum/63.0, c.average(0, 63));
 
     // N to end
     sum = 0;
@@ -619,6 +640,7 @@ TEST(Column_Sum)
         sum += c.Get(i);
     }
     CHECK_EQUAL(sum, c.sum(47, 100));
+    CHECK_EQUAL(sum/(100.0-47.0), c.average(47, 100));
 
     // N to M
     sum = 0;
@@ -626,10 +648,11 @@ TEST(Column_Sum)
         sum += c.Get(i);
     }
     CHECK_EQUAL(sum, c.sum(55, 79));
+    CHECK_EQUAL(sum/(79.0-55.0), c.average(55, 79));
 
     c.Destroy();
-
 }
+
 
 TEST(Column_Max)
 {

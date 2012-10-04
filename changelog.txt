@@ -12,9 +12,12 @@ Format:
 
 ==================
 
+2012-10-01 (Brian Munkholm)
+----------
++ 12 Added double Table::average(size_t column_ndx) const
+
 2012-09-07 (Alexander Stigsen)
 ----------
-
 + File format updated with bigger header and reordered column type [BREAKING]
 + Index is now enabled for string columns (handles string_enum columns as well).
 + 11 Added update_spec parameter in Table:: void set_index(size_t column_ndx, bool update_spec=true);
