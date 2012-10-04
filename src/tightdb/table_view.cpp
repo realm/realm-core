@@ -159,6 +159,43 @@ void TableViewBase::sort(size_t column, bool Ascending)
     result.Destroy();
 }
 
+void TableViewBase::to_json(std::ostream& out)
+{
+    // Represent table as list of objects
+    out << "[";
+
+    const size_t row_count = size();
+    for (size_t r = 0; r < row_count; ++r) {
+        if (r) out << ",";
+        const size_t real_row_index = get_source_ndx(r);
+        m_table->to_json_row(real_row_index, out);
+    }
+
+    out << "]";
+}
+
+void TableViewBase::to_string(std::ostream& out, size_t limit) const
+{
+    // Print header (will also calculate widths)
+    std::vector<size_t> widths;
+    m_table->to_string_header(out, widths);
+
+    // Set limit=-1 to print all rows, otherwise only print to limit
+    const size_t row_count = size();
+    const size_t out_count = (limit == (size_t)-1) ? row_count
+                                                   : (row_count < limit) ? row_count : limit;
+
+    // Print rows
+    for (size_t i = 0; i < out_count; ++i) {
+        const size_t real_row_index = get_source_ndx(i);
+        m_table->to_string_row(real_row_index, out, widths);
+    }
+
+    if (out_count < row_count) {
+        const size_t rest = row_count - out_count;
+        out << "... and " << rest << " more rows (total " << row_count << ")";
+    }
+}
 
 void TableView::remove(size_t ndx)
 {

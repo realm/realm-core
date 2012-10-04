@@ -1628,120 +1628,125 @@ void Table::to_json(std::ostream& out)
     // Represent table as list of objects
     out << "[";
 
-    const size_t row_count    = size();
+    const size_t row_count = size();
+    for (size_t r = 0; r < row_count; ++r) {
+        if (r) out << ",";
+        to_json_row(r, out);
+    }
+
+    out << "]";
+}
+
+void Table::to_json_row(size_t row_ndx, std::ostream& out)
+{
     const size_t column_count = get_column_count();
 
     // We need a buffer for formatting dates (and binary to hex). Max
     // size is 21 bytes (incl quotes and zero byte) "YYYY-MM-DD HH:MM:SS"\0
     char buffer[30];
 
-    for (size_t r = 0; r < row_count; ++r) {
-        if (r) out << ",";
-        out << "{";
+    out << "{";
 
-        for (size_t i = 0; i < column_count; ++i) {
-            if (i) out << ",";
+    for (size_t i = 0; i < column_count; ++i) {
+        if (i) out << ",";
 
-            const char* const name = get_column_name(i);
-            out << "\"" << name << "\":";
+        const char* const name = get_column_name(i);
+        out << "\"" << name << "\":";
 
-            const ColumnType type = get_column_type(i);
-            switch (type) {
-                case COLUMN_TYPE_INT:
-                    out << get_int(i, r);
-                    break;
-                case COLUMN_TYPE_BOOL:
-                    out << (get_bool(i, r) ? "true" : "false");
-                    break;
-                case COLUMN_TYPE_STRING:
-                    out << "\"" << get_string(i, r) << "\"";
-                    break;
-                case COLUMN_TYPE_DATE:
-                {
-                    const time_t rawtime = get_date(i, r);
-                    struct tm* const t = gmtime(&rawtime);
-                    const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
-                    if (!res) break;
+        const ColumnType type = get_column_type(i);
+        switch (type) {
+            case COLUMN_TYPE_INT:
+                out << get_int(i, row_ndx);
+                break;
+            case COLUMN_TYPE_BOOL:
+                out << (get_bool(i, row_ndx) ? "true" : "false");
+                break;
+            case COLUMN_TYPE_STRING:
+                out << "\"" << get_string(i, row_ndx) << "\"";
+                break;
+            case COLUMN_TYPE_DATE:
+            {
+                const time_t rawtime = get_date(i, row_ndx);
+                struct tm* const t = gmtime(&rawtime);
+                const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
+                if (!res) break;
 
-                    out << buffer;
-                    break;
-                }
-                case COLUMN_TYPE_BINARY:
-                {
-                    const BinaryData bin = get_binary(i, r);
-                    const char* const p = (char*)bin.pointer;
-
-                    out << "\"";
-                    for (size_t i = 0; i < bin.len; ++i) {
-                        sprintf(buffer, "%02x", (unsigned int)p[i]);
-                        out << buffer;
-                    }
-                    out << "\"";
-                    break;
-                }
-                case COLUMN_TYPE_TABLE:
-                {
-                    get_subtable(i, r)->to_json(out);
-                    break;
-                }
-                case COLUMN_TYPE_MIXED:
-                {
-                    const ColumnType mtype = get_mixed_type(i, r);
-                    if (mtype == COLUMN_TYPE_TABLE) {
-                        get_subtable(i, r)->to_json(out);
-                    }
-                    else {
-                        const Mixed m = get_mixed(i, r);
-                        switch (mtype) {
-                            case COLUMN_TYPE_INT:
-                                out << m.get_int();
-                                break;
-                            case COLUMN_TYPE_BOOL:
-                                out << (get_bool(i, r) ? "true" : "false");
-                                break;
-                            case COLUMN_TYPE_STRING:
-                                out << "\"" << m.get_string() << "\"";
-                                break;
-                            case COLUMN_TYPE_DATE:
-                            {
-                                const time_t rawtime = m.get_date();
-                                struct tm* const t = gmtime(&rawtime);
-                                const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
-                                if (!res) break;
-
-                                out << buffer;
-                                break;
-                            }
-                            case COLUMN_TYPE_BINARY:
-                            {
-                                const BinaryData bin = m.get_binary();
-                                const char* const p = (char*)bin.pointer;
-
-                                out << "\"";
-                                for (size_t i = 0; i < bin.len; ++i) {
-                                    sprintf(buffer, "%02x", (unsigned int)p[i]);
-                                    out << buffer;
-                                }
-                                out << "\"";
-                                break;
-                            }
-                            default:
-                                TIGHTDB_ASSERT(false);
-                        }
-
-                    }
-                    break;
-                }
-
-                default:
-                    TIGHTDB_ASSERT(false);
+                out << buffer;
+                break;
             }
-        }
+            case COLUMN_TYPE_BINARY:
+            {
+                const BinaryData bin = get_binary(i, row_ndx);
+                const char* const p = (char*)bin.pointer;
 
-        out << "}";
+                out << "\"";
+                for (size_t i = 0; i < bin.len; ++i) {
+                    sprintf(buffer, "%02x", (unsigned int)p[i]);
+                    out << buffer;
+                }
+                out << "\"";
+                break;
+            }
+            case COLUMN_TYPE_TABLE:
+            {
+                get_subtable(i, row_ndx)->to_json(out);
+                break;
+            }
+            case COLUMN_TYPE_MIXED:
+            {
+                const ColumnType mtype = get_mixed_type(i, row_ndx);
+                if (mtype == COLUMN_TYPE_TABLE) {
+                    get_subtable(i, row_ndx)->to_json(out);
+                }
+                else {
+                    const Mixed m = get_mixed(i, row_ndx);
+                    switch (mtype) {
+                        case COLUMN_TYPE_INT:
+                            out << m.get_int();
+                            break;
+                        case COLUMN_TYPE_BOOL:
+                            out << (get_bool(i, row_ndx) ? "true" : "false");
+                            break;
+                        case COLUMN_TYPE_STRING:
+                            out << "\"" << m.get_string() << "\"";
+                            break;
+                        case COLUMN_TYPE_DATE:
+                        {
+                            const time_t rawtime = m.get_date();
+                            struct tm* const t = gmtime(&rawtime);
+                            const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
+                            if (!res) break;
+
+                            out << buffer;
+                            break;
+                        }
+                        case COLUMN_TYPE_BINARY:
+                        {
+                            const BinaryData bin = m.get_binary();
+                            const char* const p = (char*)bin.pointer;
+
+                            out << "\"";
+                            for (size_t i = 0; i < bin.len; ++i) {
+                                sprintf(buffer, "%02x", (unsigned int)p[i]);
+                                out << buffer;
+                            }
+                            out << "\"";
+                            break;
+                        }
+                        default:
+                            TIGHTDB_ASSERT(false);
+                    }
+
+                }
+                break;
+            }
+
+            default:
+                TIGHTDB_ASSERT(false);
+        }
     }
 
-    out << "]";
+    out << "}";
 }
 
 static size_t chars_in_int(int64_t v)
@@ -1754,42 +1759,77 @@ static size_t chars_in_int(int64_t v)
 
 void Table::to_string(std::ostream& out, size_t limit) const
 {
+    // Print header (will also calculate widths)
+    std::vector<size_t> widths;
+    to_string_header(out, widths);
+
+    // Set limit=-1 to print all rows, otherwise only print to limit
+    const size_t row_count = size();
+    const size_t out_count = (limit == (size_t)-1) ? row_count
+                                                   : (row_count < limit) ? row_count : limit;
+
+    // Print rows
+    for (size_t i = 0; i < out_count; ++i) {
+        to_string_row(i, out, widths);
+    }
+
+    if (out_count < row_count) {
+        const size_t rest = row_count - out_count;
+        out << "... and " << rest << " more rows (total " << row_count << ")";
+    }
+}
+
+void Table::row_to_string(size_t row_ndx, std::ostream& out) const
+{
+    TIGHTDB_ASSERT(row_ndx < size());
+
+    // Print header (will also calculate widths)
+    std::vector<size_t> widths;
+    to_string_header(out, widths);
+
+    // Print row contents
+    to_string_row(row_ndx, out, widths);
+}
+
+void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) const
+{
     const size_t column_count = get_column_count();
     const size_t row_count = size();
-
-    // Print header
-    std::vector<size_t> widths;
     const size_t row_ndx_width = chars_in_int(row_count);
     widths.push_back(row_ndx_width);
+
+    // Empty space over row numbers
     for (size_t i = 0; i < row_ndx_width; ++i)
         out << " ";
+
+    // Write header
     for (size_t i = 0; i < column_count; ++i) {
         const char* const name = get_column_name(i);
         const ColumnType type = get_column_type(i);
         size_t width = strlen(name);
         switch (type) {
-        case COLUMN_TYPE_BOOL:
-            if (width < 5) width = 5;
-            break;
-        case COLUMN_TYPE_INT:
+            case COLUMN_TYPE_BOOL:
+                if (width < 5) width = 5;
+                break;
+            case COLUMN_TYPE_INT:
             {
                 const size_t max = chars_in_int(maximum(i));
                 if (width < max) width = max;
             }
-            break;
-        case COLUMN_TYPE_STRING:
-        case COLUMN_TYPE_MIXED:
-            // TODO: Calculate precise width needed
-            if (width < 10) width = 10;
-            break;
-        case COLUMN_TYPE_DATE:
-            if (width < 21) width = 21;
-            break;
-        case COLUMN_TYPE_TABLE:
-            if (width < 3) width = 3;
-            break;
-        default:
-            break;
+                break;
+            case COLUMN_TYPE_STRING:
+            case COLUMN_TYPE_MIXED:
+                // TODO: Calculate precise width needed
+                if (width < 10) width = 10;
+                break;
+            case COLUMN_TYPE_DATE:
+                if (width < 21) width = 21;
+                break;
+            case COLUMN_TYPE_TABLE:
+                if (width < 3) width = 3;
+                break;
+            default:
+                break;
         }
         widths.push_back(width);
         out << "  "; // spacing
@@ -1798,109 +1838,103 @@ void Table::to_string(std::ostream& out, size_t limit) const
         out << name;
     }
     out << "\n";
+}
+
+void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<size_t>& widths) const
+{
+    const size_t column_count  = get_column_count();
+    const size_t row_ndx_width = widths[0];
 
     // We need a buffer for formatting dates (and binary to hex). Max
     // size is 21 bytes (incl quotes and zero byte) "YYYY-MM-DD HH:MM:SS"\0
     char buffer[30];
 
-    // Set limit=-1 to print all rows, otherwise only print to limit
-    const size_t out_count = (limit == (size_t)-1) ? row_count
-                                                   : (row_count < limit) ? row_count : limit;
+    out.width(row_ndx_width);
+    out << row_ndx;
 
-    // Print rows
-    for (size_t i = 0; i < out_count; ++i) {
-        out.width(row_ndx_width);
-        out << i;
+    for (size_t n = 0; n < column_count; ++n) {
+        out << "  "; // spacing
+        out.width(widths[n+1]);
 
-        for (size_t n = 0; n < column_count; ++n) {
-            out << "  "; // spacing
-            out.width(widths[n+1]);
-
-            const ColumnType type = get_column_type(n);
-            switch (type) {
-                case COLUMN_TYPE_BOOL:
-                {
-                    const char* const s = get_bool(n, i) ? "true" : "false";
-                    out << s;
-                }
-                    break;
-                case COLUMN_TYPE_INT:
-                    out << get_int(n, i);
-                    break;
-                case COLUMN_TYPE_STRING:
-                    out.setf(std::ostream::left, std::ostream::adjustfield);
-                    out << get_string(n, i);
-                    out.unsetf(std::ostream::adjustfield);
-                    break;
-                case COLUMN_TYPE_DATE:
-                {
-                    const time_t rawtime = get_date(n, i);
-                    struct tm* const t = gmtime(&rawtime);
-                    const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
-                    if (!res) break;
-
-                    out << buffer;
-                    break;
-                }
-                case COLUMN_TYPE_TABLE:
-                    out.width(widths[n+1]-2); // adjust for first char only
-                    out << "[" << get_subtable_size(n, i) << "]";
-                    break;
-                case COLUMN_TYPE_MIXED:
-                {
-                    const ColumnType mtype = get_mixed_type(n, i);
-                    if (mtype == COLUMN_TYPE_TABLE) {
-                        out.width(widths[n+1]-2); // adjust for first char only
-                        out << "[" << get_subtable_size(n, i) << "]";
-                    }
-                    else {
-                        const Mixed m = get_mixed(n, i);
-                        switch (mtype) {
-                            case COLUMN_TYPE_INT:
-                                out << m.get_int();
-                                break;
-                            case COLUMN_TYPE_BOOL:
-                            {
-                                const char* const s = m.get_bool() ? "true" : "false";
-                                out << s;
-                                break;
-                            }
-                            case COLUMN_TYPE_STRING:
-                                out << m.get_string();
-                                break;
-                            case COLUMN_TYPE_DATE:
-                            {
-                                const time_t rawtime = m.get_date();
-                                struct tm* const t = gmtime(&rawtime);
-                                const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
-                                if (!res) break;
-
-                                out << buffer;
-                                break;
-                            }
-                            case COLUMN_TYPE_BINARY:
-                            {
-                                const BinaryData bin = m.get_binary();
-                                out << bin.len << "bytes";
-                                break;
-                            }
-                            default:
-                                TIGHTDB_ASSERT(false);
-                        }
-                    }
-                    break;
-                }
-                default:
-                    break;
+        const ColumnType type = get_column_type(n);
+        switch (type) {
+            case COLUMN_TYPE_BOOL:
+            {
+                const char* const s = get_bool(n, row_ndx) ? "true" : "false";
+                out << s;
             }
-        }
-        out << "\n";
-    }
+                break;
+            case COLUMN_TYPE_INT:
+                out << get_int(n, row_ndx);
+                break;
+            case COLUMN_TYPE_STRING:
+                out.setf(std::ostream::left, std::ostream::adjustfield);
+                out << get_string(n, row_ndx);
+                out.unsetf(std::ostream::adjustfield);
+                break;
+            case COLUMN_TYPE_DATE:
+            {
+                const time_t rawtime = get_date(n, row_ndx);
+                struct tm* const t = gmtime(&rawtime);
+                const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
+                if (!res) break;
 
-    if (out_count < row_count) {
-        const size_t rest = row_count - out_count;
-        out << "... and " << rest << " more rows (total " << row_count << ")";
+                out << buffer;
+                break;
+            }
+            case COLUMN_TYPE_TABLE:
+                out.width(widths[n+1]-2); // adjust for first char only
+                out << "[" << get_subtable_size(n, row_ndx) << "]";
+                break;
+            case COLUMN_TYPE_MIXED:
+            {
+                const ColumnType mtype = get_mixed_type(n, row_ndx);
+                if (mtype == COLUMN_TYPE_TABLE) {
+                    out.width(widths[n+1]-2); // adjust for first char only
+                    out << "[" << get_subtable_size(n, row_ndx) << "]";
+                }
+                else {
+                    const Mixed m = get_mixed(n, row_ndx);
+                    switch (mtype) {
+                        case COLUMN_TYPE_INT:
+                            out << m.get_int();
+                            break;
+                        case COLUMN_TYPE_BOOL:
+                        {
+                            const char* const s = m.get_bool() ? "true" : "false";
+                            out << s;
+                            break;
+                        }
+                        case COLUMN_TYPE_STRING:
+                            out << m.get_string();
+                            break;
+                        case COLUMN_TYPE_DATE:
+                        {
+                            const time_t rawtime = m.get_date();
+                            struct tm* const t = gmtime(&rawtime);
+                            const size_t res = strftime(buffer, 30, "\"%Y-%m-%d %H:%M:%S\"", t);
+                            if (!res) break;
+
+                            out << buffer;
+                            break;
+                        }
+                        case COLUMN_TYPE_BINARY:
+                        {
+                            const BinaryData bin = m.get_binary();
+                            out << bin.len << "bytes";
+                            break;
+                        }
+                        default:
+                            TIGHTDB_ASSERT(false);
+                    }
+                }
+                break;
+            }
+            default:
+                break;
+        }
     }
+    out << "\n";
 }
 
 bool Table::compare_rows(const Table& t) const
