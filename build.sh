@@ -16,7 +16,7 @@ LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 if [ "$OS" = "Darwin" ]; then
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
 fi
-if ! printf "%s\n" "$MODE" | grep '^dist' >/dev/null; then
+if ! printf "%s\n" "$MODE" | grep -q '^dist'; then
     NUM_PROCESSORS=""
     if [ "$OS" = "Darwin" ]; then
         if [ "$CC" = "" ] && which clang >/dev/null; then
@@ -25,7 +25,7 @@ if ! printf "%s\n" "$MODE" | grep '^dist' >/dev/null; then
         NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
     else
         if [ -r /proc/cpuinfo ]; then
-            NUM_PROCESSORS="$(cat /proc/cpuinfo | egrep 'processor[[:space:]]*:' | wc -l)" || exit 1
+            NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
         fi
     fi
     if [ "$NUM_PROCESSORS" ]; then
@@ -35,7 +35,7 @@ fi
 NEED_USR_LOCAL_LIB_NOTE=""
 USE_LIB64=""
 IS_REDHAT_DERIVATIVE=""
-if [ -e /etc/redhat-release ] || grep "Amazon" /etc/system-release >/dev/null 2>&1; then
+if [ -e /etc/redhat-release ] || grep -q "Amazon" /etc/system-release 2>/dev/null; then
     IS_REDHAT_DERIVATIVE="1"
 fi
 if [ "$IS_REDHAT_DERIVATIVE" ]; then
