@@ -241,7 +241,7 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
         end = table.size();
 
     // User created query with no criteria; return everything
-    if (first[0] == 0) {
+    if (first.size() == 0 || first[0] == 0) {
         TableView tv(table);
         for (size_t i = start; i < end && i - start < limit; i++)
             tv.get_ref_column().add(i);
@@ -264,7 +264,7 @@ int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_
     if (end == size_t(-1)) 
         end = table.size();
 
-    if (first[0] == 0) {
+    if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; sum() range
         if (resultcount)
             *resultcount = end-start;
@@ -286,7 +286,7 @@ int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, s
     if (end == size_t(-1)) 
         end = table.size();
 
-    if (first[0] == 0) {
+    if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; max() range
         if (resultcount)
             *resultcount = end-start;
@@ -308,7 +308,7 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
     if (end == size_t(-1)) 
         end = table.size();
 
-    if (first[0] == 0) {
+    if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; min() range
         if (resultcount)
             *resultcount = end-start;
@@ -330,7 +330,7 @@ size_t Query::count(const Table& table, size_t start, size_t end, size_t limit) 
     if (end == size_t(-1)) 
         end = table.size();
 
-    if (first[0] == 0) {
+    if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; count all
         return (limit < end - start ? limit : end - start);
     }
@@ -349,9 +349,6 @@ double Query::average(const Table& table, size_t column_ndx, size_t* resultcount
     size_t resultcount2 = 0;
     const int64_t sum1 = sum(table, column_ndx, &resultcount2, start, end, limit);
     const double avg1 = (double)sum1 / (double)(resultcount2 > 0 ? resultcount2 : 1);
-
-    fprintf(stderr, "average (start %d, end %d) = %f (af %d items)\n", start, end, avg1, resultcount2);
-    fflush(stderr);
 
     if (resultcount != NULL)
         *resultcount = resultcount2;
