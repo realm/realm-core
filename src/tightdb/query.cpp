@@ -49,6 +49,13 @@ Query::~Query()
 }
 
 // Makes query search only in rows contained in tv
+Query& Query::tableview(const TableView& tv)
+{
+    const Array& arr = tv.get_ref_column();
+    return tableview(arr);
+}
+
+// Makes query search only in rows contained in tv
 Query& Query::tableview(const Array &arr)
 {
     ParentNode* const p = new ARRAYNODE(arr);
@@ -230,7 +237,7 @@ size_t Query::find_next(const Table& table, size_t lastmatch)
     const size_t end = table.size();
     const size_t res = first[0]->find_first(lastmatch + 1, end);
 
-    return (res == end) ? -1 : res;
+    return (res == end) ? not_found : res;
 }
 
 TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)

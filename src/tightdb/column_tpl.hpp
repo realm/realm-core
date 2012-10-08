@@ -377,13 +377,13 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
             size_t i = offsets.FindPos(start);
             size_t offset = i ? to_ref(offsets.Get(i-1)) : 0;
             size_t s = start - offset;
-            size_t e = (end == size_t(-1) || int(end) >= offsets.Get(i)) ? -1 : end - offset;
+            size_t e = (end == size_t(-1) || int(end) >= offsets.Get(i)) ? size_t(-1) : end - offset;
 
             for (;;) {
                 const C col(size_t(refs.Get(i)), NULL, 0, m_array->GetAllocator());
 
                 const size_t ndx = col.template TreeFind<T, C, F>(value, s, e);
-                if (ndx != size_t(-1)) {
+                if (ndx != not_found) {
                     const size_t offset = i ? to_ref(offsets.Get(i-1)) : 0;
                     return offset + ndx;
                 }
@@ -422,7 +422,7 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T valu
         size_t i = offsets.FindPos(start);
         size_t offset = i ? to_ref(offsets.Get(i-1)) : 0;
         size_t s = start - offset;
-        size_t e = (end == size_t(-1) || int(end) >= offsets.Get(i)) ? -1 : end - offset;
+        size_t e = (end == size_t(-1) || int(end) >= offsets.Get(i)) ? size_t(-1) : end - offset;
 
         for (;;) {
             const size_t ref = refs.GetAsRef(i);

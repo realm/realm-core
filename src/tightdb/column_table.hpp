@@ -174,7 +174,7 @@ public:
     bool add();
     void Insert(size_t ndx);
     void Delete(size_t ndx);
-    void Clear(size_t ndx);
+    void ClearTable(size_t ndx);
 
     // FIXME: This one is virtual and overrides
     // Column::insert(size_t). Insert(size_t) is not virtual. Do we

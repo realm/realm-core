@@ -805,7 +805,7 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     const ColumnType type = GetRealColumnType(col_idx);
     if (type == COLUMN_TYPE_TABLE) {
         ColumnTable& subtables = GetColumnTable(col_idx);
-        subtables.Clear(row_idx);
+        subtables.ClearTable(row_idx);
         subtables.invalidate_subtables();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

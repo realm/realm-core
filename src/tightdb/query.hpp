@@ -50,6 +50,7 @@ public:
     ~Query();
 
     // Conditions: Query only rows contained in tv
+    Query& tableview(const TableView& tv);
     Query& tableview(const Array& arr);
 
     // Conditions: int
