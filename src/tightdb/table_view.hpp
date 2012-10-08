@@ -82,6 +82,8 @@ public:
 
 protected:
     friend class Table;
+    friend class Query;
+
     template <class R, class V> static R find_all_integer(V*, size_t, int64_t);
     template <class R, class V> static R find_all_string(V*, size_t, const char*);
 

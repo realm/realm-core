@@ -49,6 +49,13 @@ Query::~Query()
 }
 
 // Makes query search only in rows contained in tv
+Query& Query::tableview(const TableView& tv)
+{
+    const Array& arr = tv.get_ref_column();
+    return tableview(arr);
+}
+
+// Makes query search only in rows contained in tv
 Query& Query::tableview(const Array &arr)
 {
     ParentNode* const p = new ARRAYNODE(arr);
