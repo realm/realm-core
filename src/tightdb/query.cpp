@@ -2,7 +2,7 @@
 #include <tightdb/query_engine.hpp>
 
 
-#define MULTITHREAD 1
+#define MULTITHREAD 0
 
 using namespace tightdb;
 
@@ -248,7 +248,7 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
         end = table.size();
 
     // User created query with no criteria; return everything
-    if (first[0] == 0) {
+    if (first.size() == 0 || first[0] == 0) {
         TableView tv(table);
         for (size_t i = start; i < end && i - start < limit; i++)
             tv.get_ref_column().add(i);
@@ -271,10 +271,10 @@ int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_
     if (end == size_t(-1)) 
         end = table.size();
 
-    if (first[0] == 0) {
+    if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; sum() range
         if (resultcount)
-            *resultcount = table.size();
+            *resultcount = end-start;
         const Column& c = table.GetColumn(column);  
         return c.sum(start, end);
     }
@@ -293,10 +293,10 @@ int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, s
     if (end == size_t(-1)) 
         end = table.size();
 
-    if (first[0] == 0) {
+    if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; max() range
         if (resultcount)
-            *resultcount = table.size();
+            *resultcount = end-start;
         const Column& c = table.GetColumn(column);  
         return c.maximum(start, end);
     }
@@ -315,10 +315,10 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
     if (end == size_t(-1)) 
         end = table.size();
 
-    if (first[0] == 0) {
+    if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; min() range
         if (resultcount)
-            *resultcount = table.size();
+            *resultcount = end-start;
         const Column& c = table.GetColumn(column);  
         return c.minimum(start, end);
     }
@@ -337,7 +337,7 @@ size_t Query::count(const Table& table, size_t start, size_t end, size_t limit) 
     if (end == size_t(-1)) 
         end = table.size();
 
-    if (first[0] == 0) {
+    if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; count all
         return (limit < end - start ? limit : end - start);
     }
@@ -347,13 +347,15 @@ size_t Query::count(const Table& table, size_t start, size_t end, size_t limit) 
     return size_t(r);
 }
 
+#include <cstdio>
+
 double Query::average(const Table& table, size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     Init(table);
 
     size_t resultcount2 = 0;
     const int64_t sum1 = sum(table, column_ndx, &resultcount2, start, end, limit);
-    const double avg1 = (float)sum1 / (float)resultcount2;
+    const double avg1 = (double)sum1 / (double)(resultcount2 > 0 ? resultcount2 : 1);
 
     if (resultcount != NULL)
         *resultcount = resultcount2;

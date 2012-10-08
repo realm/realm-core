@@ -195,7 +195,7 @@ TEST(TestQueryFindAll_range1)
 TEST(TestQueryFindAll_range_or_monkey2)
 {
     const size_t ROWS = 20;
-    const size_t ITER = 1000;
+    const size_t ITER = 100;
 
     for (size_t u = 0; u < ITER; u++)
     {
@@ -1320,7 +1320,6 @@ TEST(TestQuerySyntaxCheck)
 #endif
 }
 
-
 TEST(TestQuery_sum_min_max_avg)
 {
     TupleTableType t;
@@ -1328,10 +1327,94 @@ TEST(TestQuery_sum_min_max_avg)
     t.add(2, "b");
     t.add(3, "c");
 
-    CHECK_EQUAL(t.where().first.sum(t),     6);
-    CHECK_EQUAL(t.where().first.minimum(t), 1);
-    CHECK_EQUAL(t.where().first.maximum(t), 3);
-    CHECK_EQUAL(t.where().first.average(t), 2);
+    CHECK_EQUAL(6, t.where().first.sum(t));
+    CHECK_EQUAL(1, t.where().first.minimum(t));
+    CHECK_EQUAL(3, t.where().first.maximum(t));
+    CHECK_EQUAL(2, t.where().first.average(t));
+
+    size_t cnt;
+    CHECK_EQUAL(0, t.where().first.sum(t,&cnt, 0, 0));
+    CHECK_EQUAL(0, cnt);
+    CHECK_EQUAL(0, t.where().first.sum(t,&cnt, 1, 1));
+    CHECK_EQUAL(0, cnt);
+    CHECK_EQUAL(0, t.where().first.sum(t,&cnt, 2, 2));
+    CHECK_EQUAL(0, cnt);
+
+    CHECK_EQUAL(1, t.where().first.sum(t,&cnt, 0, 1));
+    CHECK_EQUAL(1, cnt);
+    CHECK_EQUAL(2, t.where().first.sum(t,&cnt, 1, 2));
+    CHECK_EQUAL(1, cnt);
+    CHECK_EQUAL(3, t.where().first.sum(t,&cnt, 2, 3));
+    CHECK_EQUAL(1, cnt);
+
+    CHECK_EQUAL(3, t.where().first.sum(t,&cnt, 0, 2));
+    CHECK_EQUAL(2, cnt);
+    CHECK_EQUAL(5, t.where().first.sum(t,&cnt, 1, 3));
+    CHECK_EQUAL(2, cnt);
+
+    CHECK_EQUAL(6, t.where().first.sum(t,&cnt, 0, 3));
+    CHECK_EQUAL(3, cnt);
+    CHECK_EQUAL(6, t.where().first.sum(t,&cnt, 0, size_t(-1)));
+    CHECK_EQUAL(3, cnt);
+}
+
+TEST(TestQuery_avg)
+{
+    TupleTableType t;
+    size_t cnt;
+    t.add(10, "a");
+    CHECK_EQUAL(10, t.where().first.average(t));
+    t.add(30, "b");
+    CHECK_EQUAL(20, t.where().first.average(t));
+
+    CHECK_EQUAL(0, t.where().first.average(t, NULL, 0, 0));     // none
+    CHECK_EQUAL(0, t.where().first.average(t, NULL, 1, 1));     // none
+    CHECK_EQUAL(20,t.where().first.average(t, NULL, 0, 2));     // both
+    CHECK_EQUAL(20,t.where().first.average(t, NULL, 0, -1));     // both
+
+    CHECK_EQUAL(10,t.where().first.average(t, &cnt, 0, 1));     // first
+    
+    CHECK_EQUAL(30,t.where().first.sum(t, NULL, 1, 2));     // second
+    CHECK_EQUAL(30,t.where().first.average(t, NULL, 1, 2));     // second
+}
+
+TEST(TestQuery_avg2)
+{
+    TupleTableType t;
+    size_t cnt;
+
+    t.add(10, "a");
+    t.add(100, "b");
+    t.add(20, "a");
+    t.add(100, "b");
+    t.add(100, "b");
+    t.add(30, "a");
+    TupleTableType::Query q = t.where().second.equal("a");
+    CHECK_EQUAL(3, q.count(t));
+// TODO: Crashes:    q.first.sum(t);
+
+    CHECK_EQUAL(60, t.where().second.equal("a").first.sum(t));
+
+    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 0, 0));     // none
+    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 1, 1));     // none
+    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 2, 2));     // none
+    CHECK_EQUAL(0, cnt);
+
+    CHECK_EQUAL(10, t.where().second.equal("a").first.average(t, &cnt, 0, 1));     // first
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 1, 2));     // second
+    CHECK_EQUAL(30, t.where().second.equal("a").first.average(t, &cnt, 2, 3));     // third
+    CHECK_EQUAL(1, cnt);
+
+    CHECK_EQUAL(15, t.where().second.equal("a").first.average(t, &cnt, 0, 2));     // first + second
+    CHECK_EQUAL(25, t.where().second.equal("a").first.average(t, &cnt, 1, 3));     // second + third
+    CHECK_EQUAL(2, cnt);
+
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t));                // all
+    CHECK_EQUAL(3, cnt);
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 0, 3));
+    CHECK_EQUAL(3, cnt);
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 0, size_t(-1)));
+    CHECK_EQUAL(3, cnt);
 }
 
 TEST(TestQuery_OfByOne)
