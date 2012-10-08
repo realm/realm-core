@@ -1320,6 +1320,31 @@ TEST(TestQuerySyntaxCheck)
 #endif
 }
 
+TEST(TestTV)
+{
+    TupleTableType t;
+    t.add(1, "a");
+    t.add(2, "a");
+    t.add(3, "c");
+
+    Array arr;
+    arr.add(0);
+    arr.add(2);
+    TupleTableType::Query q1 = t.where().tableview(arr);
+    CHECK_EQUAL(2, q1.count(t));
+
+    TupleTableType::Query q2 = t.where().second.equal("a").tableview(arr);
+    CHECK_EQUAL(1, q2.count(t));
+
+    TupleTableType::Query q3 = t.where().tableview(arr).second.equal("a");
+    CHECK_EQUAL(1, q3.count(t));
+
+    TupleTableType::Query q4 = t.where().tableview(arr).second.equal("a");
+    TupleTableType::View v4 = q4.find_all(t);
+    CHECK_EQUAL(1, v4.size());
+
+}
+ 
 TEST(TestQuery_sum_min_max_avg)
 {
     TupleTableType t;
@@ -1391,31 +1416,32 @@ TEST(TestQuery_avg2)
     t.add(30, "a");
     TupleTableType::Query q = t.where().second.equal("a");
     CHECK_EQUAL(3, q.count(t));
-// TODO: Crashes:    q.first.sum(t);
+    q.first.sum(t);
 
     CHECK_EQUAL(60, t.where().second.equal("a").first.sum(t));
 
-    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 0, 0));     // none
-    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 1, 1));     // none
-    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 2, 2));     // none
+    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 0, 0));    
+    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 1, 1));    
+    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 2, 2));     
     CHECK_EQUAL(0, cnt);
 
-    CHECK_EQUAL(10, t.where().second.equal("a").first.average(t, &cnt, 0, 1));     // first
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 1, 2));     // second
-    CHECK_EQUAL(30, t.where().second.equal("a").first.average(t, &cnt, 2, 3));     // third
+    CHECK_EQUAL(10, t.where().second.equal("a").first.average(t, &cnt, 0, 1));    
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 1, 5));    
+    CHECK_EQUAL(30, t.where().second.equal("a").first.average(t, &cnt, 5, 6));   
     CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(15, t.where().second.equal("a").first.average(t, &cnt, 0, 2));     // first + second
-    CHECK_EQUAL(25, t.where().second.equal("a").first.average(t, &cnt, 1, 3));     // second + third
-    CHECK_EQUAL(2, cnt);
+    CHECK_EQUAL(15, t.where().second.equal("a").first.average(t, &cnt, 0, 3));  
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 2, 5));  
+    CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t));                // all
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt));               
     CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 0, 3));
-    CHECK_EQUAL(3, cnt);
+    CHECK_EQUAL(15, t.where().second.equal("a").first.average(t, &cnt, 0, 3));
+    CHECK_EQUAL(2, cnt);
     CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 0, size_t(-1)));
     CHECK_EQUAL(3, cnt);
 }
+
 
 TEST(TestQuery_OfByOne)
 {
