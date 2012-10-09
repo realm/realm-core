@@ -257,8 +257,8 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
     TableView tv(table);
     state_state st;
     Array spare;
-    st.init(TDB_FINDALL, &tv.get_ref_column(), NULL, &spare);
-    first[0]->aggregate_super<TDB_FINDALL>(&st, start, end, limit);
+    st.init(TDB_FINDALL, &tv.get_ref_column(), NULL, &spare, limit);
+    first[0]->aggregate_super<TDB_FINDALL>(&st, start, end);
     return move(tv);
 }
 
@@ -279,8 +279,8 @@ int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_
     size_t matchcount = 0; 
     state_state st;
     Array spare;
-    st.init(TDB_SUM, NULL, (Column*)&c, &spare);
-    int64_t r = first[0]->aggregate_super<TDB_SUM>(&st, start, end, limit, column, &matchcount);
+    st.init(TDB_SUM, NULL, (Column*)&c, &spare, limit);
+    int64_t r = first[0]->aggregate_super<TDB_SUM>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
 
@@ -301,8 +301,8 @@ int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, s
     size_t matchcount = 0;
     state_state st;
     Array spare;
-    st.init(TDB_MAX, NULL, (Column*)&c, &spare);
-    int64_t r = first[0]->aggregate_super<TDB_MAX>(&st, start, end, limit, column, &matchcount);
+    st.init(TDB_MAX, NULL, (Column*)&c, &spare, limit);
+    int64_t r = first[0]->aggregate_super<TDB_MAX>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -320,8 +320,8 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
     size_t matchcount = 0;
     state_state st;
     Array spare;
-    st.init(TDB_MIN, NULL, (Column*)&c, &spare);
-    int64_t r = first[0]->aggregate_super<TDB_MIN>(&st, start, end, limit, not_found, &matchcount);
+    st.init(TDB_MIN, NULL, (Column*)&c, &spare, limit);
+    int64_t r = first[0]->aggregate_super<TDB_MIN>(&st, start, end, not_found, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -338,8 +338,8 @@ size_t Query::count(const Table& table, size_t start, size_t end, size_t limit) 
     Init(table);
     state_state st;
     Array spare;
-    st.init(TDB_COUNT, NULL, NULL, &spare);
-    int64_t r = first[0]->aggregate_super<TDB_COUNT>(&st, start, end, limit);
+    st.init(TDB_COUNT, NULL, NULL, &spare, limit);
+    int64_t r = first[0]->aggregate_super<TDB_COUNT>(&st, start, end);
     return size_t(r);
 }
 

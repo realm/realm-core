@@ -99,51 +99,96 @@ public:
         return m_child;
     }
 
-    template<ACTION action> int64_t aggregate_super(state_state* st, size_t start, size_t end, size_t limit, size_t agg_col = not_found, size_t* matchcount = 0) 
+
+    struct score_compare {
+        bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->dD / (1.0 + a->dT) < b->dD / (1.0 + b->dT)); }
+    };
+
+    template<ACTION action> int64_t aggregate_super(state_state* st, size_t start, size_t end, size_t agg_col = not_found, size_t* matchcount = 0) 
     {
+        size_t td;
         Array *insp = (Array*)st->state;
+        if(end == size_t(-1)) end = m_table->size();
 
-        if(end == size_t(-1)) 
-            end = m_table->size();
+        while(start < end) {
+            // Put best condition in m_children[0]
+            size_t best = std::distance(m_children.begin(), std::min_element(m_children.begin(), m_children.end(), score_compare()));
+            ParentNode* temp = m_children[0]; m_children[0] = m_children[best]; m_children[best] = temp;
 
-        size_t increment = (end - start) / 100;
-        if(increment < 6)
-            increment = 6;
+            // Find 10 local matches in best condition
+            td = m_children[0]->dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
+            start = m_children[0]->aggregate(st, start, td, 20, action, agg_col, matchcount);
 
-        size_t child = 0;
-
-        for(size_t s = start; s < end; s += increment) {
-            size_t e = s + increment;
-            if(e > end)
-                e = end;            
-
-            size_t c_best = 0;
-            for(size_t c = 0; c < m_children.size(); ++c) {
-                if(m_children[c]->dD / m_children[c]->dT > m_children[c_best]->dD / m_children[c_best]->dT) {
-                    c_best = c;
-                }
+            // Make remaining conditions compute their dD (statistics)
+            for(size_t c = 1; c < m_children.size(); c++) {
+                td = m_children[0]->dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
+                start = m_children[c]->aggregate(st, start, td, 2, action, agg_col, matchcount);
             }
-            m_children[c_best]->aggregate(st, s, e, limit, action, agg_col, matchcount); 
-
         }
+/*
+        // Blah blah blah and blah find something
+        size_t st = start;
+        size_t dd = end - start;
+        size_t en = end;
+        for(size_t n = 0; n < m_children.size(); n++) {            
+            en = m_children[n]->dT == 0.0 ? end : st + dd / m_children[n]->dT;
+            size_t t = m_children[n]->find_first_local(st, en);
+            dd = t - st;
+            m_children[n]->dD = dd;
+            st = t;
+        }
+*/
+
+            //std::sort(m_children.begin(), m_children.end(), score_compare());
+
+/*
+            for(n = 0; n < m_children.size(); n++) {
+                d = m_children[n]->find_first_local(st, en);
+                if(d == end)
+                    return st->state;
+                n++;
+                en = d;
+                m_children[n]->dD = d - st;
+            }
+*/
+//            std::vector<ParentNode*>::iterator best = std::min_element(m_children.begin(), m_children.end(), score_compare());
+//            (*best)->aggregate(st, s, e, action, agg_col, matchcount); 
+
+//            m_children[0]->aggregate(st, s, e, action, agg_col, matchcount); 
+
+//            for(n = 0; n < m_children.size(); n++) {
+//                float score = 
+//           }
+
+
 
         return st->state;
 
     }
 
-    virtual int64_t aggregate(state_state* st, size_t start, size_t end, size_t limit, ACTION action = TDB_FINDALL, size_t agg_col = not_found, size_t* matchcount = 0) 
+    virtual int64_t aggregate(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action = TDB_FINDALL, size_t agg_col = not_found, size_t* matchcount = 0) 
     {
 		// aggregate called on non-integer column type
 		(void)matchcount;
 		(void)agg_col;
+        size_t local_matches = 0;
 
         size_t r = start - 1;
         size_t count = 0;
         for (;;) {
+            if(local_matches == local_limit) { 
+                dD = (r - start) / local_matches; 
+                return r + 1;
+            }
+
             r = find_first_local(r + 1, end);
-             if (r == end || count == limit)
-                break;
-            
+            if (r == end) { 
+                dD = (r - start) / local_matches; 
+                return end;
+            }
+
+            local_matches++;
+
             size_t m = r;
             for (size_t c = 1; c < m_conds; c++) {
                 m = m_children[c]->find_first_local(r, r + 1);
@@ -169,10 +214,8 @@ public:
                     st->match<TDB_COUNT>(r);
                 if (action == TDB_FINDALL)
                     st->match<TDB_FINDALL>(r);
-            }                
+            }   
         }
-
-        return st->state;
     }
 
 
@@ -191,9 +234,13 @@ public:
     int cond;
     size_t m_column_id;
     size_t m_conds;
+    float dD;   // row distance between each match
+    float dT;   // time overhead inside aggregate()/find_first_local() for testing index i + 1 after testing index
+                // i. Is >= 1.0 for linear scans (large on string, small on enum/int, smallest on bool), and 0.0 
+                // for index/tableview
 
-    float dD;   // index distance between each match
-    float dT;   // time spent finding a match
+    size_t m_probes;
+    size_t m_matches;
 
 protected:
     const Table* m_table;
@@ -207,8 +254,10 @@ public:
 
     void Init(const Table& table)
     {
-        dT = 1.0;
+        dT = 0.0;
         dD =  m_table->size() / m_arr.Size();
+        m_probes = 0;
+        m_matches = 0;
 
         m_next = 0;
         if (m_size > 0)
@@ -251,7 +300,9 @@ public:
     void Init(const Table& table)
     {
         dT = 100.0;
-        dD = 1.0;
+        dD = 10.0;
+        m_probes = 0;
+        m_matches = 0;
 
         m_table = &table;
         
@@ -309,9 +360,10 @@ public:
     // be merged with Init somehowt to simplify
     void QuickInit(Column *column, int64_t value) {
         dT = 1.0;
-        dD = 1.0;
+        dD = 10.0;
+        m_probes = 0;
+        m_matches = 0;
 
-        m_last_match = 0;
         m_column = column; 
         m_leaf_end = 0;
         m_value = value;
@@ -322,7 +374,9 @@ public:
     void Init(const Table& table)
     {
         dT = 1.0;
-        dD = 1.0;
+        dD = 10.0;
+        m_probes = 0;
+        m_matches = 0;
 
         m_column = (C*)&table.GetColumnBase(m_column_id);
         m_table = &table;
@@ -330,17 +384,17 @@ public:
         if (m_child)m_child->Init(table);
     }
 
-    int64_t aggregate(state_state* st, size_t start, size_t end, size_t limit, ACTION action = TDB_FINDALL, size_t agg_col = not_found, size_t* matchcount = 0) {
+    int64_t aggregate(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action = TDB_FINDALL, size_t agg_col = not_found, size_t* matchcount = 0) {
         if (action == TDB_FINDALL)
-            return aggregate<TDB_FINDALL>(st, start, end, limit, agg_col, matchcount);
+            return aggregate<TDB_FINDALL>(st, start, end, local_limit, agg_col, matchcount);
         if (action == TDB_SUM)
-            return aggregate<TDB_SUM>(st, start, end, limit, agg_col, matchcount);
+            return aggregate<TDB_SUM>(st, start, end, local_limit, agg_col, matchcount);
         if (action == TDB_MAX)
-            return aggregate<TDB_MAX>(st, start, end, limit, agg_col, matchcount);
+            return aggregate<TDB_MAX>(st, start, end, local_limit, agg_col, matchcount);
         if (action == TDB_MIN)
-            return aggregate<TDB_MIN>(st, start, end, limit, agg_col, matchcount);
+            return aggregate<TDB_MIN>(st, start, end, local_limit, agg_col, matchcount);
         if (action == TDB_COUNT)
-            return aggregate<TDB_COUNT>(st, start, end, limit, agg_col, matchcount);
+            return aggregate<TDB_COUNT>(st, start, end, local_limit, agg_col, matchcount);
 
         assert(false);
         return uint64_t(-1);
@@ -351,41 +405,47 @@ public:
     template <ACTION action>bool match_callback(int64_t v) {
         size_t i = to_size_t(v);
 
-        dD = m_last_match - i;
-        m_last_match = i;
+        m_last_local_match = i;
+        m_local_matches++;
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
         for (size_t c = 1; c < m_conds; c++) {
+            m_children[c]->m_probes++;
             size_t m = m_children[c]->find_first_local(i, i + 1);
-            if (m != i) {
-                m_children[c]->dD += 1.0;
-                return true;
-            }
-            else {
-                m_children[c]->dD = m_children[c]->dD / 2.0;
-            }
+            if (m != i)
+                return (m_local_matches != m_local_limit);
         }
 
         bool b = state->match<action>(i);
 
-        return b;
+        if(m_local_matches == m_local_limit)
+            return false;
+        else
+            return b;
     }
 
     // m_column     Set in NODE constructor and is used as source for search criteria for this NODE
     // agg_col      column number in m_table which must act as source for aggreate action
-    template <ACTION action> int64_t aggregate(state_state* st, size_t start, size_t end, size_t limit, size_t agg_col, size_t* matchcount = 0) {
+    template <ACTION action> int64_t aggregate(state_state* st, size_t start, size_t end, size_t local_limit, size_t agg_col, size_t* matchcount = 0) {
         F f;
         int c = f.condition();
+        
+//        printf("%lld, %lld\n", start, end);
+
+
+        m_local_matches = 0;
+        m_local_limit = local_limit;
+        m_last_local_match = start - 1;
 
         state = st;
         for (size_t s = start; s < end; ) {    
-
             // Cache internal leafs
             if (s >= m_leaf_end) {                    
                 m_column->GetBlock(s, m_array, m_leaf_start);                                       
                 m_leaf_end = m_leaf_start + m_array.Size();
+                size_t w = m_array.GetBitWidth();
+                dT = 1.0 / (w == 0 ? 1.0 / float(MAX_LIST_SIZE) : w / 16.0); // todo, define what width must take "1" constant-time unit
             }
-
             size_t end2;
             if(end > m_leaf_end)
                 end2 = m_leaf_end - m_leaf_start; // == m_array.Size()
@@ -402,8 +462,19 @@ public:
 
         if (matchcount)
             *matchcount = int64_t(st->match_count);
-        return st->state;
 
+//        dD = m_local_matches;
+
+        // todo fixme stat upate dD
+
+        if(m_local_matches == m_local_limit) {
+            dD = (m_last_local_match + 1 - start) / (m_local_matches + 1);
+            return m_last_local_match + 1;
+        }
+        else {
+            dD = (end - start) / (m_local_matches + 1);
+            return end;
+        }
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -420,7 +491,6 @@ public:
             }
             
             // Do search directly on cached leaf array
-
             if (start + 1 == end) {
                 if (function(m_array.Get(start - m_leaf_start), m_value))
                     return start;
@@ -430,13 +500,11 @@ public:
 
             size_t end2;
             if(end > m_leaf_end)
-                end2 = m_leaf_end - m_leaf_start; // == m_array.Size()
+                end2 = m_leaf_end - m_leaf_start;
             else
                 end2 = end - m_leaf_start;
 
             size_t s = m_array.find_first<F>(m_value, start - m_leaf_start, end2);
-
-           // size_t s = m_array.equalfind(m_value, start - m_leaf_start, end2);
 
             if (s == not_found) {
                 start = m_leaf_end;
@@ -455,13 +523,16 @@ public:
 
 protected:
     state_state *state;
-    size_t m_last_match;
+    size_t m_last_local_match;
     C* m_column;                // Column on which search criteria is applied
     const Array* criteria_arr;
     Array m_array;              
     size_t m_leaf_start;
     size_t m_leaf_end;
     size_t m_local_end;
+
+    size_t m_local_matches;
+    size_t m_local_limit;
 };
 
 
@@ -491,7 +562,9 @@ public:
     void Init(const Table& table)
     {
         dT = 10.0;
-        dD = 1.0;
+        dD = 10.0;
+        m_probes = 0;
+        m_matches = 0;
 
         m_table = &table;
         m_column = &table.GetColumnBase(m_column_id);
@@ -547,14 +620,14 @@ public:
 
     void Init(const Table& table)
     {
-        dD = 1.0;
-
+        dD = 10.0;
+        
         m_table = &table;
         m_column = &table.GetColumnBase(m_column_id);
         m_column_type = table.GetRealColumnType(m_column_id);
 
         if (m_column_type == COLUMN_TYPE_STRING_ENUM) {
-            dT = 5.0;
+            dT = 1.0;
             m_key_ndx =  ((const ColumnStringEnum*)m_column)->GetKeyNdx(m_value);
         }
         else {
@@ -627,7 +700,7 @@ public:
     void Init(const Table& table)
     {
         dT = 50.0;
-        dD = 1.0;
+        dD = 10.0;
 
         std::vector<ParentNode*>v;
 

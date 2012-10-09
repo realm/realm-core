@@ -27,7 +27,7 @@
 
 // Has to be define to allow overload from build settings
 #ifndef MAX_LIST_SIZE
-#define MAX_LIST_SIZE 5
+#define MAX_LIST_SIZE 1000
 #endif
 
 namespace tightdb {

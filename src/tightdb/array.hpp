@@ -156,7 +156,7 @@ public:
     size_t m_leaf_end_agg;
     size_t m_local_end_agg;
     Column *m_column_agg;            // Column on which aggregate function is executed (can be same as m_column)
-    
+    size_t m_limit;
 
 
     // popcount
@@ -232,7 +232,7 @@ public:
         return b;
     }
 
-    void init(ACTION action, Array* akku, Column *agg_source, Array* spare_array) 
+    void init(ACTION action, Array* akku, Column *agg_source, Array* spare_array, size_t limit) 
     {
         m_array_agg = spare_array;
         m_column_agg = agg_source;
@@ -240,6 +240,8 @@ public:
         m_leaf_end_agg = 0;
         m_local_end_agg = 0;
         match_count = 0;
+        m_limit = limit;
+
 
         if (action == TDB_MAX)
             state = -0x7fffffffffffffffLL - 1LL;
@@ -542,29 +544,6 @@ public:
     template <bool gt, ACTION action, size_t width, class Callback>             
     bool FindGTLT(int64_t v, uint64_t chunk, state_state *state, size_t baseindex, Callback callback) const;
     
-    /*
-    // popcount
-    #if defined(_MSC_VER) && _MSC_VER >= 1500
-        inline int fast_popcount32(uint32_t x);
-        #if defined(_M_X64)
-            inline int fast_popcount64(unsigned __int64 x) const;
-        #else
-            inline int fast_popcount64(unsigned __int64 x) const;
-        #endif
-    #elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
-        #if ULONG_MAX == 0xffffffff
-            inline int fast_popcount64(unsigned long long x) const;
-        #else
-            inline int fast_popcount64(unsigned long long x) const;
-        #endif
-    #else
-        // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
-        inline int fast_popcount32(uint32_t x) const;
-
-        inline int fast_popcount64(uint64_t x) const;
-    #endif // select best popcount implementations
-    */
-
     // Debug
     size_t GetBitWidth() const {return m_width;}
 

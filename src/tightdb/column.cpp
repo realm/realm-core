@@ -440,7 +440,7 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
     node->QuickInit(m_column, target); 
     state_state st;
     Array spare;
-    st.init(action, NULL, m_column, &spare);
+    st.init(action, NULL, m_column, &spare, size_t(-1));
     int64_t r = node->aggregate<action>(&st, start, end, size_t(-1), size_t(-1), matchcount);
         
     return r;
