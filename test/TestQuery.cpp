@@ -3,6 +3,8 @@
 
 using namespace tightdb;
 
+namespace {
+
 TIGHTDB_TABLE_2(TwoIntTable,
                 first,  Int,
                 second, Int)
@@ -17,6 +19,9 @@ TIGHTDB_TABLE_2(TupleTableType,
 TIGHTDB_TABLE_2(BoolTupleTable,
                 first,  Int,
                 second, Bool)
+
+} // anonymous namespace
+
 
 TEST(TestQueryStrIndexed_enum)
 {
