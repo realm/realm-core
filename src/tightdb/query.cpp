@@ -387,6 +387,9 @@ size_t Query::remove(Table& table, size_t start, size_t end, size_t limit) const
 
 TableView Query::find_all_multi(Table& table, size_t start, size_t end)
 {
+    (void)start;
+    (void)end;
+    (void)table;
 #if MULTITHREAD
     // Initialization
     Init(table);
@@ -519,6 +522,7 @@ bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, siz
 
 void* Query::query_thread(void* arg)
 {
+    (void)arg;
 #if MULTITHREAD
     thread_state* ts = (thread_state*)arg;
 
