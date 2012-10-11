@@ -49,10 +49,10 @@ TIGHTDB_TABLE_11(TestTable,
 int main()
 {
 #ifndef _DEBUG
-    const size_t row_count = 250112; // should be dividable with 128
+    size_t row_count = 250112; // should be dividable with 128
     const size_t rounds = 1000;
 #else
-    const size_t row_count = 128*30; // should be dividable with 128
+    const size_t row_count = 128*100; // should be dividable with 128
     const size_t rounds = 1;
 #endif
 
@@ -785,7 +785,7 @@ seven:
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count(table);
                     if (res != expected) {
-               //         printf("error");
+                  //      printf("error");
                     }
                 }
             }
@@ -961,6 +961,5 @@ seven:
             printf("STL: c7: %fs\n", search_time);
         }
     }
-
     return 0;
 }

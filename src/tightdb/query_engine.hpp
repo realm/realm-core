@@ -101,66 +101,44 @@ public:
 
 
     struct score_compare {
-        bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->dD / (1.0 + a->dT) < b->dD / (1.0 + b->dT)); }
+//        bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->dD / (1.0 + a->dT) < b->dD / (1.0 + b->dT)); }
+        bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->cost() < b->cost()); }
     };
+
+    float cost(void) const
+    {
+        return 10.0 / dD + dT;
+    }
 
     template<ACTION action> int64_t aggregate_super(state_state* st, size_t start, size_t end, size_t agg_col = not_found, size_t* matchcount = 0) 
     {
-        size_t td;
+
         Array *insp = (Array*)st->state;
         if(end == size_t(-1)) end = m_table->size();
+
+        size_t td;
 
         while(start < end) {
             // Put best condition in m_children[0]
             size_t best = std::distance(m_children.begin(), std::min_element(m_children.begin(), m_children.end(), score_compare()));
             ParentNode* temp = m_children[0]; m_children[0] = m_children[best]; m_children[best] = temp;
 
-            // Find 10 local matches in best condition
+            // Find a large amount of local matches in best condition
             td = m_children[0]->dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
-            start = m_children[0]->aggregate(st, start, td, 20, action, agg_col, matchcount);
+            start = m_children[0]->aggregate(st, start, td, 10, action, agg_col, matchcount);
 
             // Make remaining conditions compute their dD (statistics)
             for(size_t c = 1; c < m_children.size(); c++) {
-                td = m_children[0]->dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
-                start = m_children[c]->aggregate(st, start, td, 2, action, agg_col, matchcount);
+                // Skip test if there is no way its cost can be better than best node's
+                if(m_children[c]->dT < m_children[0]->cost()) {
+                    size_t maxN = 1;
+                    size_t maxD = 1000;
+                    td = m_children[c]->dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
+                    start = m_children[c]->aggregate(st, start, td, maxN, action, agg_col, matchcount);
+                }
             }
+
         }
-/*
-        // Blah blah blah and blah find something
-        size_t st = start;
-        size_t dd = end - start;
-        size_t en = end;
-        for(size_t n = 0; n < m_children.size(); n++) {            
-            en = m_children[n]->dT == 0.0 ? end : st + dd / m_children[n]->dT;
-            size_t t = m_children[n]->find_first_local(st, en);
-            dd = t - st;
-            m_children[n]->dD = dd;
-            st = t;
-        }
-*/
-
-            //std::sort(m_children.begin(), m_children.end(), score_compare());
-
-/*
-            for(n = 0; n < m_children.size(); n++) {
-                d = m_children[n]->find_first_local(st, en);
-                if(d == end)
-                    return st->state;
-                n++;
-                en = d;
-                m_children[n]->dD = d - st;
-            }
-*/
-//            std::vector<ParentNode*>::iterator best = std::min_element(m_children.begin(), m_children.end(), score_compare());
-//            (*best)->aggregate(st, s, e, action, agg_col, matchcount); 
-
-//            m_children[0]->aggregate(st, s, e, action, agg_col, matchcount); 
-
-//            for(n = 0; n < m_children.size(); n++) {
-//                float score = 
-//           }
-
-
 
         return st->state;
 
@@ -360,7 +338,7 @@ public:
     // be merged with Init somehowt to simplify
     void QuickInit(Column *column, int64_t value) {
         dT = 1.0;
-        dD = 10.0;
+        dD = 100.0;
         m_probes = 0;
         m_matches = 0;
 
@@ -373,7 +351,7 @@ public:
     // This also allows to get rid of QuickInit()
     void Init(const Table& table)
     {
-        dT = 1.0;
+        dT = 1.0 / 8.0;
         dD = 10.0;
         m_probes = 0;
         m_matches = 0;
@@ -429,10 +407,7 @@ public:
     template <ACTION action> int64_t aggregate(state_state* st, size_t start, size_t end, size_t local_limit, size_t agg_col, size_t* matchcount = 0) {
         F f;
         int c = f.condition();
-        
-//        printf("%lld, %lld\n", start, end);
-
-
+       
         m_local_matches = 0;
         m_local_limit = local_limit;
         m_last_local_match = start - 1;
@@ -444,11 +419,12 @@ public:
                 m_column->GetBlock(s, m_array, m_leaf_start);                                       
                 m_leaf_end = m_leaf_start + m_array.Size();
                 size_t w = m_array.GetBitWidth();
-                dT = 1.0 / (w == 0 ? 1.0 / float(MAX_LIST_SIZE) : w / 16.0); // todo, define what width must take "1" constant-time unit
+                dT = (w == 0 ? 1.0 / float(MAX_LIST_SIZE) : w / 8.0); // todo, define what width must take "1" constant-time unit. Now it's 8 bit
             }
+
             size_t end2;
             if(end > m_leaf_end)
-                end2 = m_leaf_end - m_leaf_start; // == m_array.Size()
+                end2 = m_leaf_end - m_leaf_start;
             else
                 end2 = end - m_leaf_start;
 
@@ -457,15 +433,14 @@ public:
             else
                 m_array.find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, st, std::bind1st(std::mem_fun(&NODE::match_callback<action>), this));
                     
+            if(m_local_matches == m_local_limit)
+                break;
+
             s = end2 + m_leaf_start;
         }
 
         if (matchcount)
             *matchcount = int64_t(st->match_count);
-
-//        dD = m_local_matches;
-
-        // todo fixme stat upate dD
 
         if(m_local_matches == m_local_limit) {
             dD = (m_last_local_match + 1 - start) / (m_local_matches + 1);
