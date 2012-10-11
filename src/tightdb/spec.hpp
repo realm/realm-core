@@ -25,13 +25,23 @@
 #include <tightdb/column_type.hpp>
 
 namespace tightdb {
+
 using std::size_t;
+using std::vector;
+
 class Table;
 
 class Spec {
 public:
+    Spec(const Spec& s);
+    ~Spec();
+
     void add_column(ColumnType type, const char* name, ColumnType attr=COLUMN_ATTR_NONE);
     Spec add_subtable_column(const char* name);
+
+    void rename_column(size_t column_ndx, const char* newname);
+    void remove_column(size_t column_ndx);
+    void remove_column(const vector<size_t>& column_ids);
 
     // FIXME: It seems that the application must make sure that the
     // parent Spec object is kept alive for at least as long as the
@@ -69,10 +79,13 @@ public:
     void to_dot(std::ostream& out, const char* title=NULL) const;
 #endif // TIGHTDB_DEBUG
 
-    Spec(const Spec& s);
-    ~Spec();
-
 private:
+    friend class Table;
+
+    Spec(const Table*, Allocator&); // Uninitialized
+    Spec(const Table*, Allocator&, ArrayParent* parent, size_t ndx_in_parent);
+    Spec(const Table*, Allocator&, size_t ref, ArrayParent *parent, size_t ndx_in_parent);
+
     void init_from_ref(size_t ref, ArrayParent *parent, size_t pndx);
     void destroy();
 
@@ -94,16 +107,8 @@ private:
     // Serialization
     template<class S> size_t write(S& out, size_t& pos) const;
 
-    const Table* const m_table;
-    Array m_specSet;
-    Array m_spec;
-    ArrayString m_names;
-    Array m_subSpecs;
-
-    Spec(const Table*, Allocator&); // Uninitialized
-    Spec(const Table*, Allocator&, ArrayParent* parent, size_t ndx_in_parent);
-    Spec(const Table*, Allocator&, size_t ref, ArrayParent *parent, size_t ndx_in_parent);
-
+    size_t get_column_type_pos(size_t column_ndx) const;
+    size_t get_subspec_ndx(size_t column_ndx) const;
     size_t get_subspec_ref(size_t subspec_ndx) const;
     size_t get_num_subspecs() const { return m_subSpecs.IsValid() ? m_subSpecs.Size() : 0; }
     Spec get_subspec_by_ndx(size_t subspec_ndx);
@@ -115,13 +120,20 @@ private:
     ///
     static size_t create_empty_spec(Allocator&);
 
+    void do_remove_column(const vector<size_t>& column_ids, size_t pos);
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Precondition: 1 <= end - begin
     size_t* record_subspec_path(const Array* root_subspecs, size_t* begin, size_t* end) const;
     friend class Replication;
 #endif
 
-    friend class Table;
+    // Member variables
+    const Table* const m_table;
+    Array m_specSet;
+    Array m_spec;
+    ArrayString m_names;
+    Array m_subSpecs;
 };
 
 

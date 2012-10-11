@@ -40,6 +40,7 @@ class Index;
 class ColumnBase {
 public:
     virtual ~ColumnBase() {};
+    virtual void Destroy() = 0;
 
     virtual void SetHasRefs() {};
 

@@ -775,6 +775,92 @@ TEST(Table_Spec)
     }
 }
 
+TEST(Table_Spec_DeleteColumns)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    Spec& s = table->get_spec();
+    s.add_column(COLUMN_TYPE_INT,    "first");
+    s.add_column(COLUMN_TYPE_STRING, "second");
+    Spec sub = s.add_subtable_column("third");
+    sub.add_column(COLUMN_TYPE_INT,    "sub_first");
+    sub.add_column(COLUMN_TYPE_STRING, "sub_second");
+    table->update_from_spec();
+
+    // Put in an index as well
+    table->set_index(1);
+
+    CHECK_EQUAL(3, table->get_column_count());
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    CHECK_EQUAL(0, table->get_subtable_size(2, 0));
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_int(0, 0, 42);
+        subtable->insert_string(1, 0, "test");
+        subtable->insert_done();
+
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    CHECK_EQUAL(1, table->get_subtable_size(2, 0));
+
+    // Remove the first column
+    table->remove_column(0);
+    CHECK_EQUAL(2, table->get_column_count());
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(1, 0);
+
+        CHECK_EQUAL(2,      subtable->get_column_count());
+        CHECK_EQUAL(1,      subtable->size());
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    // Create path to column in sub-table
+    vector<size_t> column_path;
+    column_path.push_back(1); // third
+    column_path.push_back(1); // sub_second
+
+    // Remove a column in sub-table
+    table->remove_column(column_path);
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(1, 0);
+
+        CHECK_EQUAL(1,      subtable->get_column_count());
+        CHECK_EQUAL(1,      subtable->size());
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+    }
+
+    // Remove sub-table column (with all members)
+    table->remove_column(1);
+    CHECK_EQUAL(1, table->get_column_count());
+    CHECK_EQUAL("Hello", table->get_string(0, 0));
+
+    // Remove last column
+    table->remove_column(0);
+    CHECK_EQUAL(0, table->get_column_count());
+    CHECK(table->is_empty());
+}
+
 #endif
 
 TEST(Table_Mixed)

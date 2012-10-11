@@ -33,6 +33,7 @@ namespace tightdb {
 
 using std::size_t;
 using std::time_t;
+using std::vector;
 
 class TableView;
 class ConstTableView;
@@ -118,6 +119,8 @@ public:
     const Spec& get_spec() const;
     void        update_from_spec(); // Must not be called for a table with shared spec
     size_t      add_column(ColumnType type, const char* name); // Add a column dynamically
+    void        remove_column(size_t column_ndx);
+    void        remove_column(const vector<size_t>& column_ids);
 
     // Table size and deletion
     bool        is_empty() const {return m_size == 0;}
@@ -301,6 +304,8 @@ protected:
     size_t GetColumnRefPos(size_t column_ndx) const;
     void UpdateColumnRefs(size_t column_ndx, int diff);
     void UpdateFromParent();
+    void do_remove_column(const vector<size_t>& column_ids, size_t pos);
+    void do_remove_column(size_t column_ndx);
 
     // Support function for conversions
     void to_json_row(size_t row_ndx, std::ostream& out);

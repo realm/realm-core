@@ -498,6 +498,80 @@ size_t Table::add_column(ColumnType type, const char* name)
     return column_ndx;
 }
 
+void Table::remove_column(size_t column_ndx)
+{
+    // Remove from data layer and free all cached instances
+    do_remove_column(column_ndx);
+
+    // Update Spec
+    m_spec_set.remove_column(column_ndx);
+}
+
+void Table::remove_column(const vector<size_t>& column_ids)
+{
+    // Remove from data layer and free all cached instances
+    do_remove_column(column_ids, 0);
+
+    // Update Spec
+    m_spec_set.remove_column(column_ids);
+}
+
+void Table::do_remove_column(size_t column_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+
+    // Delete the cached column
+    ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(column_ndx));
+    const bool has_index = column->HasIndex();
+    column->Destroy();
+    delete column;
+    m_cols.Delete(column_ndx);
+
+    // Remove from column list
+    const size_t column_pos = GetColumnRefPos(column_ndx);
+    m_columns.Delete(column_pos);
+    int deleted = 1;
+
+    // If the column had an index we have to remove that as well
+    if (has_index) {
+        m_columns.Delete(column_pos);
+        ++deleted;
+    }
+
+    // Update parent refs in following columns
+    UpdateColumnRefs(column_ndx, -deleted);
+
+    // If there are no columns left, mark the table as empty
+    if (get_column_count() == 1) // not deleted in spec yet
+        m_size = 0;
+}
+
+void Table::do_remove_column(const vector<size_t>& column_ids, size_t pos)
+{
+    const size_t sub_count = column_ids.size();
+    const size_t column_ndx = column_ids[pos];
+
+    if (pos == sub_count-1) {
+        do_remove_column(column_ndx);
+    }
+    else {
+#ifdef TIGHTDB_DEBUG
+        const ColumnType type = GetRealColumnType(column_ndx);
+        TIGHTDB_ASSERT(type == COLUMN_TYPE_TABLE);
+#endif // TIGHTDB_DEBUG
+
+        const size_t row_count = size();
+        ColumnTable& subtables = GetColumnTable(column_ndx);
+
+        for (size_t i = 0; i < row_count; ++i) {
+            if (!subtables.has_subtable(i)) continue;
+
+            TableRef subtable = subtables.get_subtable_ptr(i)->get_table_ref();
+            subtable->do_remove_column(column_ids, pos+1);
+        }
+    }
+}
+
 bool Table::has_index(size_t column_ndx) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());

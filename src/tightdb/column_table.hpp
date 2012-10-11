@@ -162,6 +162,7 @@ public:
                 ArrayParent* parent, std::size_t idx_in_parent,
                 std::size_t spec_ref, std::size_t column_ref);
 
+    bool   has_subtable(size_t ndx) const;
     size_t get_subtable_size(size_t ndx) const;
 
     /// The returned table pointer must always end up being wrapped in

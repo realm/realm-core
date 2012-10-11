@@ -122,40 +122,99 @@ Spec Spec::add_subtable_column(const char* name)
     return get_subtable_spec(column_ndx);
 }
 
-Spec Spec::get_subtable_spec(size_t column_ndx)
+void Spec::rename_column(size_t column_ndx, const char* newname)
 {
     TIGHTDB_ASSERT(column_ndx < m_spec.Size());
-    TIGHTDB_ASSERT((ColumnType)m_spec.Get(column_ndx) == COLUMN_TYPE_TABLE);
 
-    // The subspec array only keep info for subtables
-    // so we need to count up to it's position
-    size_t pos = 0;
-    for (size_t i = 0; i < column_ndx; ++i) {
-        if ((ColumnType)m_spec.Get(i) == COLUMN_TYPE_TABLE) ++pos;
+    //TODO: Verify that new name is valid
+
+    m_names.Set(column_ndx, newname);
+}
+
+void Spec::remove_column(size_t column_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < m_spec.Size());
+
+    const size_t type_ndx = get_column_type_pos(column_ndx);
+
+    // If the column is a subtable column, we have to delete
+    // the subspec(s) as well
+    const ColumnType type = (ColumnType)m_spec.Get(type_ndx);
+    if (type == COLUMN_TYPE_TABLE) {
+        const size_t subspec_ndx = get_subspec_ndx(column_ndx);
+        const size_t subspec_ref = m_subSpecs.GetAsRef(subspec_ndx);
+
+        Array subspec_top(subspec_ref, NULL, 0, m_specSet.GetAllocator());
+        subspec_top.Destroy(); // recursively delete entire subspec
+        m_subSpecs.Delete(subspec_ndx);
     }
 
-    Allocator& alloc = m_specSet.GetAllocator();
-    const size_t ref = m_subSpecs.GetAsRef(pos);
+    // Delete the actual name and type entries
+    m_names.Delete(column_ndx);
+    m_spec.Delete(type_ndx);
 
-    return Spec(m_table, alloc, ref, &m_subSpecs, pos);
+    // If there are an attribute, we have to delete that as well
+    if (type_ndx > 0) {
+        const ColumnType type_prefix = (ColumnType)m_spec.Get(type_ndx-1);
+        if (type_prefix >= COLUMN_ATTR_INDEXED)
+            m_spec.Delete(type_ndx-1);
+    }
+}
+
+void Spec::remove_column(const vector<size_t>& column_ids) {
+    do_remove_column(column_ids, 0);
+}
+
+void Spec::do_remove_column(const vector<size_t>& column_ids, size_t pos)
+{
+    const size_t column_ndx = column_ids[pos];
+
+    if (pos == column_ids.size()-1) {
+        remove_column(column_ndx);
+    }
+    else {
+        Spec subspec = get_subtable_spec(column_ndx);
+        subspec.do_remove_column(column_ids, pos+1);
+    }
+}
+
+Spec Spec::get_subtable_spec(size_t column_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_TABLE);
+
+    const size_t subspec_ndx = get_subspec_ndx(column_ndx);
+
+    Allocator& alloc = m_specSet.GetAllocator();
+    const size_t ref = m_subSpecs.GetAsRef(subspec_ndx);
+
+    return Spec(m_table, alloc, ref, &m_subSpecs, subspec_ndx);
 }
 
 const Spec Spec::get_subtable_spec(size_t column_ndx) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_spec.Size());
-    TIGHTDB_ASSERT((ColumnType)m_spec.Get(column_ndx) == COLUMN_TYPE_TABLE);
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_TABLE);
+
+    const size_t subspec_ndx = get_subspec_ndx(column_ndx);
+
+    Allocator& alloc = m_specSet.GetAllocator();
+    const size_t ref = m_subSpecs.GetAsRef(subspec_ndx);
+
+    return Spec(m_table, alloc, ref, NULL, 0);
+}
+
+size_t Spec::get_subspec_ndx(size_t column_ndx) const
+{
+    const size_t type_ndx = get_column_type_pos(column_ndx);
 
     // The subspec array only keep info for subtables
     // so we need to count up to it's position
     size_t pos = 0;
-    for (size_t i = 0; i < column_ndx; ++i) {
+    for (size_t i = 0; i < type_ndx; ++i) {
         if ((ColumnType)m_spec.Get(i) == COLUMN_TYPE_TABLE) ++pos;
     }
-
-    Allocator& alloc = m_specSet.GetAllocator();
-    const size_t ref = m_subSpecs.GetAsRef(pos);
-
-    return Spec(m_table, alloc, ref, NULL, 0);
+    return pos;
 }
 
 size_t Spec::get_subspec_ref(std::size_t subspec_ndx) const
@@ -180,6 +239,23 @@ ColumnType Spec::get_type_attr(size_t ndx) const
 size_t Spec::get_column_count() const
 {
     return m_names.Size();
+}
+
+size_t Spec::get_column_type_pos(size_t column_ndx) const
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+
+    // Column types are optionally prefixed by attribute
+    // so to get the position of the type we have to ignore
+    // the attributes before it.
+    size_t i = 0;
+    size_t type_ndx = 0;
+    for (; type_ndx < column_ndx; ++i) {
+        const ColumnType type = (ColumnType)m_spec.Get(i);
+        if (type >= COLUMN_ATTR_INDEXED) continue; // ignore attributes
+        ++type_ndx;
+    }
+    return i;
 }
 
 ColumnType Spec::get_real_column_type(size_t ndx) const
@@ -318,7 +394,7 @@ void Spec::Verify() const
 {
     const size_t column_count = get_column_count();
     TIGHTDB_ASSERT(column_count == m_names.Size());
-    TIGHTDB_ASSERT(column_count == m_spec.Size());
+    TIGHTDB_ASSERT(column_count <= m_spec.Size());
 }
 
 void Spec::to_dot(std::ostream& out, const char*) const

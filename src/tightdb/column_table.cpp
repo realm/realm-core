@@ -12,6 +12,14 @@ void ColumnSubtableParent::child_destroyed(size_t subtable_ndx)
     if (m_table && m_subtable_map.empty()) m_table->unbind_ref();
 }
 
+bool ColumnTable::has_subtable(size_t ndx) const
+{
+    TIGHTDB_ASSERT(ndx < Size());
+
+    const size_t ref_columns = GetAsRef(ndx);
+    return (ref_columns != 0);
+}
+
 size_t ColumnTable::get_subtable_size(size_t ndx) const
 {
     // FIXME: If the table object is cached, it is possible to get the
