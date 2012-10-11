@@ -12,6 +12,10 @@ Format:
 
 ==================
 
+2012-10-10 (Kristian Spangsege)
+----------
+! Fix a peblem with MyTable::Query copy constructor that caused access to deallocated memory due to a pointer that was not updated.
+
 2012-10-02 (Kristian Spangsege)
 ----------
 + New program 'tightdb-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the TightDB core library.
