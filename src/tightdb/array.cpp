@@ -2096,8 +2096,10 @@ void Array::state_init(ACTION action, state_state *state, Array* akku)
     }
     if (action == TDB_RETURN_FIRST)
         state->state = not_found;
-    if (action == TDB_SUM)
+    if (action == TDB_SUM) {
         state->state = 0;
+        state->match_count = 0;
+    }
     if (action == TDB_COUNT)
         state->state = 0;
     if (action == TDB_FINDALL)

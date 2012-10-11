@@ -768,23 +768,23 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
     {
         if (pattern) {
             if (action == TDB_COUNT) {
-                state->state += fast_popcount64(indexpattern);
+                size_t c = fast_popcount64(indexpattern);
+                state->state += c;
+                state->match_count += c;
                 return true;
             }
             // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
             return false;
         }
 
+        state->match_count++;
+
         if (action == TDB_CALLBACK_IDX)
             return callback(index);
-        if (action == TDB_MAX && value > *(int64_t*)state) {
+        if (action == TDB_MAX && value > *(int64_t*)state)
             state->state = value;
-            state->match_count++;
-        }
-        if (action == TDB_MIN && value < *(int64_t*)state) {
+        if (action == TDB_MIN && value < *(int64_t*)state)
             state->state = value;
-            state->match_count++;
-        }
         if (action == TDB_SUM)
             state->state += value;
         if (action == TDB_COUNT)
