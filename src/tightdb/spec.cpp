@@ -67,7 +67,7 @@ bool Spec::update_from_parent()
     else return false;
 }
 
-void Spec::add_column(ColumnType type, const char* name, ColumnType attr)
+size_t Spec::add_column(ColumnType type, const char* name, ColumnType attr)
 {
     TIGHTDB_ASSERT(name);
 
@@ -112,6 +112,27 @@ void Spec::add_column(ColumnType type, const char* name, ColumnType attr)
         if (err) throw_error(err);
     }
 #endif
+
+    return (m_names.Size()-1); // column_ndx
+}
+
+size_t Spec::add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name)
+{
+    TIGHTDB_ASSERT(!column_path.empty());
+    return do_add_subcolumn(column_path, 0, type, name);
+}
+
+size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, ColumnType type, const char* name)
+{
+    const size_t column_ndx = column_ids[pos];
+    Spec subspec = get_subtable_spec(column_ndx);
+
+    if (pos == column_ids.size()-1) {
+        return subspec.add_column(type, name);
+    }
+    else {
+        return subspec.do_add_subcolumn(column_ids, pos+1, type, name);
+    }
 }
 
 Spec Spec::add_subtable_column(const char* name)

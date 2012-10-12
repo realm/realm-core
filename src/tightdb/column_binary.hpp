@@ -52,6 +52,7 @@ public:
     void Delete(size_t ndx);
     void Resize(size_t ndx);
     void Clear();
+    void fill(size_t count);
 
     // Index
     bool HasIndex() const {return false;}

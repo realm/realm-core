@@ -36,7 +36,8 @@ public:
     Spec(const Spec& s);
     ~Spec();
 
-    void add_column(ColumnType type, const char* name, ColumnType attr=COLUMN_ATTR_NONE);
+    size_t add_column(ColumnType type, const char* name, ColumnType attr=COLUMN_ATTR_NONE);
+    size_t add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name);
     Spec add_subtable_column(const char* name);
 
     void rename_column(size_t column_ndx, const char* newname);
@@ -120,6 +121,7 @@ private:
     ///
     static size_t create_empty_spec(Allocator&);
 
+    size_t do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, ColumnType type, const char* name);
     void do_remove_column(const vector<size_t>& column_ids, size_t pos);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

@@ -424,18 +424,80 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const
     return (size_t)-1;
 }
 
+size_t Table::add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name)
+{
+    TIGHTDB_ASSERT(!column_path.empty());
+
+    // Update existing tables
+    do_add_subcolumn(column_path, 0, type);
+
+    // Update spec
+    const size_t column_ndx = m_spec_set.add_subcolumn(column_path, type, name);
+
+    //TODO: go back over any live instances and set subspec ref
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    // TODO:
+    //error_code err = get_local_transact_log().add_column(type, name);
+    //if (err) throw_error(err);
+#endif
+
+    return column_ndx;
+}
+
+void Table::do_add_subcolumn(const vector<size_t>& column_path, size_t pos, ColumnType type)
+{
+    const size_t column_ndx = column_path[pos];
+    const bool   is_last    = (pos == column_path.size()-1);
+
+#ifdef TIGHTDB_DEBUG
+    const ColumnType stype = GetRealColumnType(column_ndx);
+    TIGHTDB_ASSERT(stype == COLUMN_TYPE_TABLE);
+#endif // TIGHTDB_DEBUG
+
+    const size_t row_count = size();
+    ColumnTable& subtables = GetColumnTable(column_ndx);
+
+    for (size_t i = 0; i < row_count; ++i) {
+        if (!subtables.has_subtable(i)) continue;
+
+        TableRef subtable = subtables.get_subtable_ptr(i)->get_table_ref();
+        if (is_last)
+            subtable->do_add_column(type);
+        else
+            subtable->do_add_subcolumn(column_path, pos+1, type);
+    }
+}
+
 size_t Table::add_column(ColumnType type, const char* name)
 {
-    // Currently it's not possible to dynamically add columns to a table with content.
-    TIGHTDB_ASSERT(size() == 0);
-    if (size() != 0)
-        return size_t(-1);
+    // Create column and add cached instance
+    const size_t column_ndx = do_add_column(type);
 
-    m_spec_set.add_column(type, name); // FIXME: May fail
+    // Update spec
+    m_spec_set.add_column(type, name);
 
+    // Since subspec was not set at creation time we have to set it now
+    if (type == COLUMN_TYPE_TABLE) {
+        const size_t subspec_ref = m_spec_set.get_subspec_ref(m_spec_set.get_num_subspecs()-1);
+        ColumnTable& c = GetColumnTable(column_ndx);
+        c.set_specref(subspec_ref);
+    }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    error_code err = get_local_transact_log().add_column(type, name);
+    if (err) throw_error(err);
+#endif
+
+    return column_ndx;
+}
+
+size_t Table::do_add_column(ColumnType type)
+{
+    const size_t count      = size();
     const size_t column_ndx = m_cols.Size();
 
-    ColumnBase* new_col = 0;
+    ColumnBase* new_col = NULL;
     Allocator& alloc = m_columns.GetAllocator();
 
     switch (type) {
@@ -447,6 +509,7 @@ size_t Table::add_column(ColumnType type, const char* name)
             m_columns.add(c->GetRef());
             c->SetParent(&m_columns, m_columns.Size()-1);
             new_col = c;
+            c->fill(count);
         }
         break;
     case COLUMN_TYPE_STRING:
@@ -455,6 +518,7 @@ size_t Table::add_column(ColumnType type, const char* name)
             m_columns.add(c->GetRef());
             c->SetParent(&m_columns, m_columns.Size()-1);
             new_col = c;
+            c->fill(count);
         }
         break;
     case COLUMN_TYPE_BINARY:
@@ -463,16 +527,17 @@ size_t Table::add_column(ColumnType type, const char* name)
             m_columns.add(c->GetRef());
             c->SetParent(&m_columns, m_columns.Size()-1);
             new_col = c;
+            c->fill(count);
         }
         break;
 
     case COLUMN_TYPE_TABLE:
         {
-            const size_t subspec_ref = m_spec_set.get_subspec_ref(m_spec_set.get_num_subspecs()-1);
-            ColumnTable* c = new ColumnTable(alloc, this, column_ndx, subspec_ref);
+            ColumnTable* c = new ColumnTable(alloc, this, column_ndx, -1); // subspec ref will be filled in later
             m_columns.add(c->GetRef());
             c->SetParent(&m_columns, m_columns.Size()-1);
             new_col = c;
+            c->fill(count);
         }
         break;
 
@@ -482,6 +547,7 @@ size_t Table::add_column(ColumnType type, const char* name)
             m_columns.add(c->GetRef());
             c->SetParent(&m_columns, m_columns.Size()-1);
             new_col = c;
+            c->fill(count);
         }
         break;
     default:
@@ -489,11 +555,6 @@ size_t Table::add_column(ColumnType type, const char* name)
     }
 
     m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().add_column(type, name);
-    if (err) throw_error(err);
-#endif
 
     return column_ndx;
 }
@@ -507,13 +568,13 @@ void Table::remove_column(size_t column_ndx)
     m_spec_set.remove_column(column_ndx);
 }
 
-void Table::remove_column(const vector<size_t>& column_ids)
+void Table::remove_column(const vector<size_t>& column_path)
 {
     // Remove from data layer and free all cached instances
-    do_remove_column(column_ids, 0);
+    do_remove_column(column_path, 0);
 
     // Update Spec
-    m_spec_set.remove_column(column_ids);
+    m_spec_set.remove_column(column_path);
 }
 
 void Table::do_remove_column(size_t column_ndx)
@@ -523,6 +584,7 @@ void Table::do_remove_column(size_t column_ndx)
     // Delete the cached column
     ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(column_ndx));
     const bool has_index = column->HasIndex();
+    column->invalidate_subtables_virtual();
     column->Destroy();
     delete column;
     m_cols.Delete(column_ndx);
@@ -546,10 +608,10 @@ void Table::do_remove_column(size_t column_ndx)
         m_size = 0;
 }
 
-void Table::do_remove_column(const vector<size_t>& column_ids, size_t pos)
+void Table::do_remove_column(const vector<size_t>& column_path, size_t pos)
 {
-    const size_t sub_count = column_ids.size();
-    const size_t column_ndx = column_ids[pos];
+    const size_t sub_count  = column_path.size();
+    const size_t column_ndx = column_path[pos];
 
     if (pos == sub_count-1) {
         do_remove_column(column_ndx);
@@ -567,7 +629,7 @@ void Table::do_remove_column(const vector<size_t>& column_ids, size_t pos)
             if (!subtables.has_subtable(i)) continue;
 
             TableRef subtable = subtables.get_subtable_ptr(i)->get_table_ref();
-            subtable->do_remove_column(column_ids, pos+1);
+            subtable->do_remove_column(column_path, pos+1);
         }
     }
 }
@@ -700,6 +762,7 @@ ColumnTable &Table::GetColumnTable(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
     InstantiateBeforeChange();
+    TIGHTDB_ASSERT(COLUMN_TYPE_TABLE == get_column_type(ndx));
     TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
     return *static_cast<ColumnTable*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
@@ -707,6 +770,7 @@ ColumnTable &Table::GetColumnTable(size_t ndx)
 const ColumnTable &Table::GetColumnTable(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
+    TIGHTDB_ASSERT(COLUMN_TYPE_TABLE == get_column_type(ndx));
     TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
     return *static_cast<ColumnTable*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
@@ -715,6 +779,7 @@ ColumnMixed& Table::GetColumnMixed(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
     InstantiateBeforeChange();
+    TIGHTDB_ASSERT(COLUMN_TYPE_MIXED == get_column_type(ndx));
     TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
     return *static_cast<ColumnMixed*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
@@ -723,6 +788,7 @@ const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
 {
     TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
     TIGHTDB_ASSERT(ndx < get_column_count());
+    TIGHTDB_ASSERT(COLUMN_TYPE_MIXED == get_column_type(ndx));
     return *static_cast<ColumnMixed*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
 }
 

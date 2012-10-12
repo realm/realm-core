@@ -161,6 +161,7 @@ public:
     bool Insert(size_t ndx, int64_t value);
     bool add() {return add(0);}
     bool add(int64_t value);
+    void fill(size_t count);
 
     size_t  count(int64_t target) const;
     int64_t sum(size_t start = 0, size_t end = -1) const;

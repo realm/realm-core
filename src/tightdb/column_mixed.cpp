@@ -176,6 +176,25 @@ BinaryData ColumnMixed::get_binary(size_t ndx) const
     return m_data->Get(ref);
 }
 
+void ColumnMixed::fill(size_t count)
+{
+    TIGHTDB_ASSERT(is_empty());
+
+    // Fill column with default values
+    // TODO: this is a very naive approach
+    // we could speedup by creating full nodes directly
+    for (size_t i = 0; i < count; ++i) {
+        m_types->Insert(i, COLUMN_TYPE_INT);
+    }
+    for (size_t i = 0; i < count; ++i) {
+        m_refs->Insert(i, 1); // 1 is zero shifted one and low bit set; 
+    }
+
+#ifdef TIGHTDB_DEBUG
+    Verify();
+#endif
+}
+
 void ColumnMixed::insert_int(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx <= m_types->Size());

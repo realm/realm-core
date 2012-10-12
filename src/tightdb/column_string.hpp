@@ -52,6 +52,7 @@ public:
     void Delete(size_t ndx);
     void Clear();
     void Resize(size_t ndx);
+    void fill(size_t count);
 
     size_t count(const char* value) const;
     size_t find_first(const char* value, size_t start=0 , size_t end=-1) const;

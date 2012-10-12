@@ -119,8 +119,9 @@ public:
     const Spec& get_spec() const;
     void        update_from_spec(); // Must not be called for a table with shared spec
     size_t      add_column(ColumnType type, const char* name); // Add a column dynamically
+    size_t      add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name);
     void        remove_column(size_t column_ndx);
-    void        remove_column(const vector<size_t>& column_ids);
+    void        remove_column(const vector<size_t>& column_path);
 
     // Table size and deletion
     bool        is_empty() const {return m_size == 0;}
@@ -302,10 +303,12 @@ protected:
 
     // Specification
     size_t GetColumnRefPos(size_t column_ndx) const;
-    void UpdateColumnRefs(size_t column_ndx, int diff);
-    void UpdateFromParent();
-    void do_remove_column(const vector<size_t>& column_ids, size_t pos);
-    void do_remove_column(size_t column_ndx);
+    void   UpdateColumnRefs(size_t column_ndx, int diff);
+    void   UpdateFromParent();
+    void   do_remove_column(const vector<size_t>& column_ids, size_t pos);
+    void   do_remove_column(size_t column_ndx);
+    size_t do_add_column(ColumnType type);
+    void   do_add_subcolumn(const vector<size_t>& column_path, size_t pos, ColumnType type);
 
     // Support function for conversions
     void to_json_row(size_t row_ndx, std::ostream& out);
