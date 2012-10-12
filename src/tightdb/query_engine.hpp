@@ -107,7 +107,7 @@ public:
 
     float cost(void) const
     {
-        return 10.0 / dD + dT;
+        return 16.0 / dD + dT;
     }
 
     template<ACTION action> int64_t aggregate_super(state_state* st, size_t start, size_t end, size_t agg_col = not_found, size_t* matchcount = 0) 
@@ -125,14 +125,18 @@ public:
 
             // Find a large amount of local matches in best condition
             td = m_children[0]->dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
-            start = m_children[0]->aggregate(st, start, td, 10, action, agg_col, matchcount);
+            start = m_children[0]->aggregate(st, start, td, 32, action, agg_col, matchcount);
 
             // Make remaining conditions compute their dD (statistics)
-            for(size_t c = 1; c < m_children.size(); c++) {
+            for(size_t c = 1; c < m_children.size() && start < end; c++) {
+
                 // Skip test if there is no way its cost can be better than best node's
-                if(m_children[c]->dT < m_children[0]->cost()) {
+                float cost = m_children[c]->cost();
+                if(m_children[c]->dT < cost) {
                     size_t maxN = 1;
-                    size_t maxD = 1000;
+
+                    // Limit to +256 in order not to skip too large parts of index nodes
+                    size_t maxD = m_children[c]->dT == 0.0 ? end - start : 256;
                     td = m_children[c]->dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
                     start = m_children[c]->aggregate(st, start, td, maxN, action, agg_col, matchcount);
                 }
@@ -212,10 +216,8 @@ public:
     int cond;
     size_t m_column_id;
     size_t m_conds;
-    float dD;   // row distance between each match
-    float dT;   // time overhead inside aggregate()/find_first_local() for testing index i + 1 after testing index
-                // i. Is >= 1.0 for linear scans (large on string, small on enum/int, smallest on bool), and 0.0 
-                // for index/tableview
+    float dD; // Average row distance between each local match at current position
+    float dT; // time overhead testing index i + 1 after testing index i. > 1 for linear scans, 0 for index/tableview
 
     size_t m_probes;
     size_t m_matches;
