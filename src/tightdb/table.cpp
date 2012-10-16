@@ -6,11 +6,19 @@
 #include <tightdb/config.h>
 
 #ifndef TIGHTDB_HAVE_RTTI
-#pragma message("RTTI disabled")
+#  ifdef __GNUC__
+#    warning RTTI appears to be disabled
+#  else
+#    pragma message("RTTI appears to be disabled")
+#  endif
 #endif
 
 #ifndef TIGHTDB_HAVE_EXCEPTIONS
-#pragma message("Exceptions disabled")
+#  ifdef __GNUC__
+#    warning Exceptions appear to be disabled
+#  else
+#    pragma message("Exceptions appear to be disabled")
+#  endif
 #endif
 
 #include <tightdb/table.hpp>
