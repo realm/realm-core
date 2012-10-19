@@ -11,10 +11,10 @@ test_tightdb_LDFLAGS = -lproc
 endif
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
-ADD_CFLAGS_INCLUDE    = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
+test_tightdb_CFLAGS  += -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
 test_tightdb_LDFLAGS += $(shell pkg-config unittest++ --libs)
 else
-ADD_CFLAGS_INCLUDE    = -I../UnitTest++/src
+test_tightdb_CFLAGS  += -I../UnitTest++/src
 test_tightdb_LDFLAGS += -L../UnitTest++ -lUnitTest++
 endif
 
