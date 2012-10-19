@@ -16,14 +16,11 @@ CFLAGS_DEFAULT += -Wextra -ansi -pedantic -Wno-long-long
 # FIXME: '-fno-elide-constructors' currently causes TightDB to fail
 #CFLAGS_DEBUG   += -fno-elide-constructors
 CFLAGS_PTHREAD += -pthread
-ifeq ($(TIGHTDB_DISABLE_SSE),)
-CFLAGS_DEFAULT += -msse4.2
-endif
 endif
 
 
 ifeq ($(TIGHTDB_DISABLE_SSE),)
-CFLAGS_DEFAULT += -DUSE_SSE42
+CFLAGS_DEFAULT += -msse4.2 -DUSE_SSE42
 endif
 
 ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
