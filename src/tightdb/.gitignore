@@ -1,5 +1,6 @@
 /*.d
 /*.o
+/*.libdeps
 
 # Coverage data
 /*.gcno
@@ -7,7 +8,9 @@
 
 /libtightdb.so
 /libtightdb.a
-/libtightdb-dbg.a
-/libtightdb-cov.a
+/libtightdb-dbg.so
+/libtightdb-cov.so
+
 /tightdb-config
 /tightdb-config-dbg
+/tightdb-config-cov

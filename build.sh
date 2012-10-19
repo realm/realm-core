@@ -19,9 +19,6 @@ fi
 if ! printf "%s\n" "$MODE" | grep -q '^dist'; then
     NUM_PROCESSORS=""
     if [ "$OS" = "Darwin" ]; then
-        if [ "$CC" = "" ] && which clang >/dev/null; then
-            export CC=clang
-        fi
         NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
     else
         if [ -r /proc/cpuinfo ]; then
@@ -126,7 +123,7 @@ case "$MODE" in
 
     "test-installed")
         PREFIX="$1"
-        make test-installed || exit 1
+        make -C test-installed test || exit 1
         exit 0
         ;;
 
@@ -243,9 +240,37 @@ case "$MODE" in
                 sh build.sh test >>"$LOG_FILE" 2>&1 || exit 1
 
                 message "Transfering prebuilt core library to package"
-                tar czf "$TEMP_DIR/core.tar.gz" src/tightdb/Makefile src/tightdb/*.h src/tightdb/*.hpp src/tightdb/libtightdb* src/tightdb/tightdb-config* src/Makefile src/*.hpp test/Makefile test-installed/Makefile test-installed/*.cpp config.mk generic.mk Makefile build.sh || exit 1
+                mkdir "$TEMP_DIR/transfer" || exit 1
+                cat >"$TEMP_DIR/transfer/include" <<EOF
+/README.md
+/build.sh
+/generic.mk
+/config.mk
+/Makefile
+/src/Makefile
+/src/tightdb.hpp
+/src/tightdb/Makefile
+/src/tightdb/*.h
+/src/tightdb/*.hpp
+/test/Makefile
+/test-installed
+/doc
+EOF
+                cat >"$TEMP_DIR/transfer/exclude" <<EOF
+.gitignore
+/doc/development
+EOF
+                grep -E -v '^(#.*)?$' "$TEMP_DIR/transfer/include" >"$TEMP_DIR/transfer/include2" || exit 1
+                grep -E -v '^(#.*)?$' "$TEMP_DIR/transfer/exclude" >"$TEMP_DIR/transfer/exclude2" || exit 1
+                sed -e 's/\([.\[^$]\)/\\\1/g' -e 's|\*|[^/]*|g' -e 's|^\([^/]\)|^\\(.*/\\)\\{0,1\\}\1|' -e 's|^/|^|' -e 's|$|\\(/.*\\)\\{0,1\\}$|' "$TEMP_DIR/transfer/include2" >"$TEMP_DIR/transfer/include.bre" || exit 1
+                sed -e 's/\([.\[^$]\)/\\\1/g' -e 's|\*|[^/]*|g' -e 's|^\([^/]\)|^\\(.*/\\)\\{0,1\\}\1|' -e 's|^/|^|' -e 's|$|\\(/.*\\)\\{0,1\\}$|' "$TEMP_DIR/transfer/exclude2" >"$TEMP_DIR/transfer/exclude.bre" || exit 1
+                git ls-files >"$TEMP_DIR/transfer/files1" || exit 1
+                grep -f "$TEMP_DIR/transfer/include.bre" "$TEMP_DIR/transfer/files1" >"$TEMP_DIR/transfer/files2" || exit 1
+                grep -v -f "$TEMP_DIR/transfer/exclude.bre" "$TEMP_DIR/transfer/files2" >"$TEMP_DIR/transfer/files3" || exit 1
+                ls src/tightdb/libtightdb.so src/tightdb/libtightdb.a src/tightdb/libtightdb-dbg.so src/tightdb/tightdb-config src/tightdb/tightdb-config-dbg >>"$TEMP_DIR/transfer/files3" || exit 1
+                tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files3" || exit 1
                 mkdir "$PKG_DIR/tightdb" || exit 1
-                (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/core.tar.gz") || exit 1
+                (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
                 printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
                 cat <<EOI > "$PKG_DIR/build"
 #!/bin/sh

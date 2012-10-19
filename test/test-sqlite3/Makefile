@@ -1,7 +1,6 @@
 NOINST_PROGRAMS = test-sqlite3
 
 test_sqlite3_SOURCES = sqlite3.c $(wildcard *.cpp)
-test_sqlite3_LIBADD  = ../../src/tightdb/libtightdb.a
 test_sqlite3_LDFLAGS = -ldl
 
 ifeq ($(MSYSTEM), MINGW32)

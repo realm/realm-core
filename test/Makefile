@@ -3,7 +3,7 @@ PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl
 TEST_PROGRAMS = tightdb-tests
 
 tightdb_tests_SOURCES = $(wildcard *.c *.cpp large_tests/*.cpp)
-tightdb_tests_LIBADD = ../src/tightdb/libtightdb.a
+tightdb_tests_LIBS = ../src/tightdb/libtightdb.a
 
 EXTRA_CLEAN_DIRS = large_tests
 

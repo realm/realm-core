@@ -1,7 +1,7 @@
 NOINST_PROGRAMS = test-tightdb
 
 test_tightdb_SOURCES = $(wildcard *.c *.cpp)
-test_tightdb_LIBADD  = ../../src/tightdb/libtightdb.a
+test_tightdb_LIBS  = ../../src/tightdb/libtightdb.a
 
 ifeq ($(MSYSTEM), MINGW32)
 test_tightdb_SOURCES += ../Support/win32/mem.cpp
