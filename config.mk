@@ -11,13 +11,10 @@ endif
 endif
 endif
 
-ifneq ($(CC_CXX_AND_LD_ARE_GCC_LIKE),)
 CFLAGS_DEFAULT += -Wextra -ansi -pedantic -Wno-long-long
 # FIXME: '-fno-elide-constructors' currently causes TightDB to fail
 #CFLAGS_DEBUG   += -fno-elide-constructors
 CFLAGS_PTHREAD += -pthread
-endif
-
 
 ifeq ($(TIGHTDB_DISABLE_SSE),)
 CFLAGS_DEFAULT += -msse4.2 -DUSE_SSE42
