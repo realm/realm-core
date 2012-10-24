@@ -1235,6 +1235,29 @@ TEST(Table_SubtableWithParentChange)
     CHECK(subtab->is_valid());
 }
 
+TEST(Table_HasSharedSpec)
+{
+    MyTable2 table1;
+    CHECK(!table1.has_shared_spec());
+    Group g;
+    MyTable2::Ref table2 = g.get_table<MyTable2>("foo");
+    CHECK(!table2->has_shared_spec());
+    table2->add();
+    CHECK(table2[0].subtab->has_shared_spec());
+
+    // Subtable in mixed column
+    TestTableMX::Ref table3 = g.get_table<TestTableMX>("bar");
+    CHECK(!table3->has_shared_spec());
+    table3->add();
+    table3[0].first.set_subtable<MyTable2>();
+    MyTable2::Ref table4 = table3[0].first.get_subtable<MyTable2>();
+    CHECK(table4);
+    CHECK(!table4->has_shared_spec());
+    table4->add();
+    CHECK(!table4->has_shared_spec());
+    CHECK(table4[0].subtab->has_shared_spec());
+}
+
 #include <tightdb/lang_bind_helper.hpp>
 
 TEST(Table_LanguageBindings)
