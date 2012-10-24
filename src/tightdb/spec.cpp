@@ -152,6 +152,23 @@ void Spec::rename_column(size_t column_ndx, const char* newname)
     m_names.Set(column_ndx, newname);
 }
 
+void Spec::rename_column(const vector<size_t>& column_ids, const char* name) {
+    do_rename_column(column_ids, 0, name);
+}
+
+void Spec::do_rename_column(const vector<size_t>& column_ids, size_t pos, const char* name)
+{
+    const size_t column_ndx = column_ids[pos];
+
+    if (pos == column_ids.size()-1) {
+        rename_column(column_ndx, name);
+    }
+    else {
+        Spec subspec = get_subtable_spec(column_ndx);
+        subspec.do_rename_column(column_ids, pos+1, name);
+    }
+}
+
 void Spec::remove_column(size_t column_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < m_spec.Size());

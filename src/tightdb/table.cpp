@@ -634,6 +634,14 @@ void Table::do_remove_column(const vector<size_t>& column_path, size_t pos)
     }
 }
 
+void Table::rename_column(size_t column_ndx, const char* name) {
+    m_spec_set.rename_column(column_ndx, name);
+}
+
+void Table::rename_column(const vector<size_t>& column_path, const char* name) {
+    m_spec_set.rename_column(column_path, name);
+}
+
 bool Table::has_index(size_t column_ndx) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());

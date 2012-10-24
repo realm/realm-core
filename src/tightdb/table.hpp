@@ -108,10 +108,6 @@ public:
     /// table (except ~Table()) has undefined behaviour and is
     /// considered an error on behalf of the application. Note that
     /// even Table::is_valid() is disallowed in this case.
-    ///
-    /// FIXME: When Spec changes become possible for non-empty tables,
-    /// such changes would generally have to invalidate subtables
-    /// (except add_column()).
     bool is_valid() const { return m_columns.HasParent(); }
 
     // Schema handling (see also <tightdb/spec.hpp>)
@@ -122,6 +118,8 @@ public:
     size_t      add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name);
     void        remove_column(size_t column_ndx);
     void        remove_column(const vector<size_t>& column_path);
+    void        rename_column(size_t column_ndx, const char* name);
+    void        rename_column(const vector<size_t>& column_path, const char* name);
 
     // Table size and deletion
     bool        is_empty() const {return m_size == 0;}

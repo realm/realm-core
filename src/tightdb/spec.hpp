@@ -41,6 +41,7 @@ public:
     Spec add_subtable_column(const char* name);
 
     void rename_column(size_t column_ndx, const char* newname);
+    void rename_column(const vector<size_t>& column_ids, const char* newname);
     void remove_column(size_t column_ndx);
     void remove_column(const vector<size_t>& column_ids);
 
@@ -123,6 +124,7 @@ private:
 
     size_t do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, ColumnType type, const char* name);
     void do_remove_column(const vector<size_t>& column_ids, size_t pos);
+    void do_rename_column(const vector<size_t>& column_ids, size_t pos, const char* name);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Precondition: 1 <= end - begin
