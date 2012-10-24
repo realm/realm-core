@@ -775,6 +775,269 @@ TEST(Table_Spec)
     }
 }
 
+TEST(Table_Spec_RenameColumns)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    table->add_column(COLUMN_TYPE_INT,    "first");
+    table->add_column(COLUMN_TYPE_STRING, "second");
+    table->add_column(COLUMN_TYPE_TABLE,  "third");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(2); // third
+
+    table->add_subcolumn(column_path, COLUMN_TYPE_INT,    "sub_first");
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "sub_second");
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_int(0, 0, 42);
+        subtable->insert_string(1, 0, "test");
+        subtable->insert_done();
+
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    // Rename first column
+    table->rename_column(0, "1st");
+    CHECK_EQUAL(0, table->get_column_index("1st"));
+
+    // Rename sub-column
+    column_path.push_back(0); // third
+    table->rename_column(column_path, "sub_1st");
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK_EQUAL(0, subtable->get_column_index("sub_1st"));
+    }
+}
+
+TEST(Table_Spec_DeleteColumns)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    table->add_column(COLUMN_TYPE_INT,    "first");
+    table->add_column(COLUMN_TYPE_STRING, "second");
+    table->add_column(COLUMN_TYPE_TABLE,  "third");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(2); // third
+
+    table->add_subcolumn(column_path, COLUMN_TYPE_INT,    "sub_first");
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "sub_second");
+
+    // Put in an index as well
+    table->set_index(1);
+
+    CHECK_EQUAL(3, table->get_column_count());
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    CHECK_EQUAL(0, table->get_subtable_size(2, 0));
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_int(0, 0, 42);
+        subtable->insert_string(1, 0, "test");
+        subtable->insert_done();
+
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    CHECK_EQUAL(1, table->get_subtable_size(2, 0));
+
+    // Remove the first column
+    table->remove_column(0);
+    CHECK_EQUAL(2, table->get_column_count());
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(1, 0);
+
+        CHECK_EQUAL(2,      subtable->get_column_count());
+        CHECK_EQUAL(1,      subtable->size());
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    // Create path to column in sub-table
+    column_path.clear();
+    column_path.push_back(1); // third
+    column_path.push_back(1); // sub_second
+
+    // Remove a column in sub-table
+    table->remove_column(column_path);
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(1, 0);
+
+        CHECK_EQUAL(1,      subtable->get_column_count());
+        CHECK_EQUAL(1,      subtable->size());
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+    }
+
+    // Remove sub-table column (with all members)
+    table->remove_column(1);
+    CHECK_EQUAL(1, table->get_column_count());
+    CHECK_EQUAL("Hello", table->get_string(0, 0));
+
+    // Remove last column
+    table->remove_column(0);
+    CHECK_EQUAL(0, table->get_column_count());
+    CHECK(table->is_empty());
+
+#ifdef TIGHTDB_DEBUG
+    table->Verify();
+#endif // TIGHTDB_DEBUG
+}
+
+TEST(Table_Spec_AddColumns)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    table->add_column(COLUMN_TYPE_INT,    "first");
+    table->add_column(COLUMN_TYPE_STRING, "second");
+    table->add_column(COLUMN_TYPE_TABLE,  "third");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(2); // third
+
+    table->add_subcolumn(column_path, COLUMN_TYPE_INT,    "sub_first");
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "sub_second");
+
+    // Put in an index as well
+    table->set_index(1);
+
+    CHECK_EQUAL(3, table->get_column_count());
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    CHECK_EQUAL(0, table->get_subtable_size(2, 0));
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_int(0, 0, 42);
+        subtable->insert_string(1, 0, "test");
+        subtable->insert_done();
+
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    CHECK_EQUAL(1, table->get_subtable_size(2, 0));
+
+    // Add a new bool column
+    table->add_column(COLUMN_TYPE_BOOL, "fourth");
+    CHECK_EQUAL(4, table->get_column_count());
+    CHECK_EQUAL(false, table->get_bool(3, 0));
+
+    // Add a new string column
+    table->add_column(COLUMN_TYPE_STRING, "fifth");
+    CHECK_EQUAL(5, table->get_column_count());
+    CHECK_EQUAL("", table->get_string(4, 0));
+
+    // Add a new table column
+    table->add_column(COLUMN_TYPE_TABLE, "sixth");
+    CHECK_EQUAL(6, table->get_column_count());
+    CHECK_EQUAL(0, table->get_subtable_size(5, 0));
+
+    // Add a new mixed column
+    table->add_column(COLUMN_TYPE_MIXED, "seventh");
+    CHECK_EQUAL(7, table->get_column_count());
+    CHECK_EQUAL(0, table->get_mixed(6, 0).get_int());
+
+    // Create path to column in sub-table
+    column_path.clear();
+    column_path.push_back(2); // third
+
+    // Add new int column to sub-table
+    table->add_subcolumn(column_path, COLUMN_TYPE_INT, "sub_third");
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+
+        CHECK_EQUAL(3,      subtable->get_column_count());
+        CHECK_EQUAL(1,      subtable->size());
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+        CHECK_EQUAL(0,      subtable->get_int(2, 0));
+    }
+
+    // Add new table column to sub-table
+    table->add_subcolumn(column_path, COLUMN_TYPE_TABLE, "sub_fourth");
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+
+        CHECK_EQUAL(4,      subtable->get_column_count());
+        CHECK_EQUAL(1,      subtable->size());
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+        CHECK_EQUAL(0,      subtable->get_int(2, 0));
+        CHECK_EQUAL(0,      subtable->get_subtable_size(3, 0));
+    }
+
+    // Add new column to new sub-table
+    column_path.push_back(3); // sub_forth
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "first");
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK_EQUAL(4,      subtable->get_column_count());
+
+        TableRef subsubtable = subtable->get_subtable(3, 0);
+        CHECK_EQUAL(1,      subsubtable->get_column_count());
+    }
+
+#ifdef TIGHTDB_DEBUG
+    table->Verify();
+#endif // TIGHTDB_DEBUG
+}
+
 #endif
 
 TEST(Table_Mixed)
