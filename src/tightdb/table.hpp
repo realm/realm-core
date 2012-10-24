@@ -114,7 +114,7 @@ public:
     /// applies to many tables. A table is not allowed to directly
     /// modify its own spec if it is shared. A shared spec may only be
     /// modified via the closest ancestor table that has a nonshared
-    /// spec. Such an ancestor is guaranteed to exist.
+    /// spec. Such an ancestor will always exist.
     bool has_shared_spec() const;
 
     // Schema handling (see also <tightdb/spec.hpp>)
