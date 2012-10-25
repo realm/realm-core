@@ -1,0 +1,91 @@
+#
+# C++ reference documentation for Group class
+#
+
+ID         : class_group
+TITLE      : Group
+SUMMARY    : The Group is a container for tables and it allows the tables to be serialized to disk and memory. 
+DESCR      : 
+SEE        : 
+EXAMPLES: 
+- DESCR    : 
+  CODE     : ex_cpp_group_intro
+IGNORE     : []                   # List of method-ids to ignore   
+CATEGORIES:
+- constructor:
+  METHODS:
+  - group_constructor_plain:
+  - group_constructor_file:
+  - group_constructor_memory:
+      NAMES    : Group
+      SUMMARY  : >
+Group objects can be created in various ways depending on use pattern. Groups stored on disk can be created in d ifferent modes. The possible modes are as follows.
+    GROUP_DEFAULT  :
+    GROUP_READONLY :
+    GROUP_SHARED   :
+    GROUP_APPEND   :
+    GROUP_ASYNC    :
+    GROUP_SWAPONLY :
+      DESCR    : Creates a table group.
+      SIGNATURE: |
+                 Group();
+                 Group(const char* filename, int mode=GROUP_DEFAULT);
+                 Group(const char* buffer, size_t len);
+      PARAMS:
+      - NAME   : filename
+        TYPES  : const char*
+        DESCR  : name of the file.
+      - NAME   : buffer
+        TYPES  : const char*
+        DESCR  : in-memory binary encoded representation of a group.
+      - NAME   : mode
+        TYPES  : int
+        DESCR  : Default value: GROUP_DEFAULT.
+      - NAME   : len
+        TYPE   : size_t
+        DESCR  : Length of buffer.
+      RETURN:
+        TYPES  : Group
+        DESCR  : A - possibly empty - group
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_constructor
+- table:
+  METHODS:
+  - group_table_count:
+      NAMES    : table_count
+      DESCR    : A group can be a container for many tables, and this method counts the number of tables currently stored within the group.
+      SUMMARY  : The number of tables.
+      RETURN:
+        TYPES  : size_t
+        DESCR  : The number of tables.
+      EXAMPLE:
+      - DESCR  :
+        CODE   : ex_cpp_group_table_count
+  - group_get_table:
+      NAMES    : get_table
+      PARAMS:
+      - NAME   : name
+        TYPES  : const char*
+        DESCR  : Name of the table you wish to retrieve.
+      RETURN:
+        TYPES  : Table
+        DESCR  : A table object, <code>NULL</code> if no matching table
+      EXAMPLES:
+      -  DESCR :
+         CODE  : ex_cpp_group_get_table
+  - group_has_table:
+      NAMES    : has_table
+      PARAMS:
+      - NAME   : name
+        TYPES  : const char*
+        DESCR  : Name of the table you wish to look for.
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if the table exits, otherwise <code>false</code>.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_has_table
+
+      
+        
