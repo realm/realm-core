@@ -6,10 +6,13 @@
 /*.gcno
 /*.gcda
 
-/libtightdb.so
 /libtightdb.a
+/libtightdb.so
+/libtightdb-dbg.a
 /libtightdb-dbg.so
 /libtightdb-cov.so
+/libtightdb-ios.a
+/libtightdb-ios-dbg.a
 
 /tightdb-config
 /tightdb-config-dbg
