@@ -159,6 +159,7 @@ case "$MODE" in
             done
             lipo "$TEMP_DIR"/*/"libtightdb.a"     -create -output "src/tightdb/libtightdb-ios.a"     || exit 1
             lipo "$TEMP_DIR"/*/"libtightdb-dbg.a" -create -output "src/tightdb/libtightdb-ios-dbg.a" || exit 1
+            TIGHTDB_DISABLE_SSE="1" make -C "src/tightdb" BASE_DENOM="ios" "tightdb-config-ios" "tightdb-config-ios-dbg" || exit 1
         fi
         exit 0
         ;;
