@@ -96,7 +96,7 @@ case "$MODE" in
             for x in $PLATFORMS; do
                 make -C "src/tightdb" BASE_DENOM="$x" clean || exit 1
             done
-            (cd "src/tightdb" && rm -f "libtightdb-ios.a" "libtightdb-ios-dbg.a") || exit 1
+            make -C "src/tightdb" BASE_DENOM="ios" clean || exit 1
         fi
         exit 0
         ;;
@@ -136,7 +136,7 @@ case "$MODE" in
                 LATEST="$(cat "$TEMP_DIR/$x/versions-sorted" | head -n 1)" || exit 1
                 (cd "$TEMP_DIR/$x" && ln "$LATEST" "sdk_root") || exit 1
                 if [ "$x" = "iPhoneSimulator" ]; then
-                ARCH="i386"
+                ARCH="x86_64"
                 else
                     TYPE="$(defaults read-type "$PLATFORM_HOME/Info" "DefaultProperties")" || exit 1
                     if [ "$TYPE" != "Type is dictionary" ]; then
@@ -288,12 +288,15 @@ case "$MODE" in
         mkdir "$INSTALL_ROOT" || exit 1
         mkdir "$INSTALL_ROOT/include" "$INSTALL_ROOT/lib" "$INSTALL_ROOT/lib64" "$INSTALL_ROOT/bin" || exit 1
 
-        path_list_prepend CPATH                   "$INSTALL_ROOT/include" || exit 1
-        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"     || exit 1
-        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib64"   || exit 1
-        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib"     || exit 1
-        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib64"   || exit 1
-        path_list_prepend PATH                    "$INSTALL_ROOT/bin"     || exit 1
+        path_list_prepend CPATH                   "$TIGHTDB_HOME/src"         || exit 1
+        path_list_prepend CPATH                   "$INSTALL_ROOT/include"     || exit 1
+        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
+        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"         || exit 1
+        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib64"       || exit 1
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib"         || exit 1
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib64"       || exit 1
+        path_list_prepend PATH                    "$TIGHTDB_HOME/src/tightdb" || exit 1
+        path_list_prepend PATH                    "$INSTALL_ROOT/bin"         || exit 1
         export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME" PATH
 
 
@@ -302,9 +305,11 @@ case "$MODE" in
                 (sh build.sh clean && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
                 mkdir "$TEMP_DIR/transfer" || exit 1
                 mkdir "$TEMP_DIR/transfer/targets" || exit 1
-                cp "src/tightdb/libtightdb.a" "src/tightdb/libtightdb.so" "src/tightdb/libtightdb-dbg.so" "src/tightdb/tightdb-config" "src/tightdb/tightdb-config-dbg" "$TEMP_DIR/transfer/targets/" || exit 1
+                cp "src/tightdb/libtightdb.a" "src/tightdb/libtightdb.so" "src/tightdb/libtightdb-dbg.so" "$TEMP_DIR/transfer/targets/" || exit 1
+                cp "src/tightdb/tightdb-config" "src/tightdb/tightdb-config-dbg" "$TEMP_DIR/transfer/targets/" || exit 1
                 if [ "$OS" = "Darwin" ]; then
                     cp "src/tightdb/libtightdb-ios.a" "src/tightdb/libtightdb-ios-dbg.a" "$TEMP_DIR/transfer/targets/" || exit 1
+                    cp "src/tightdb/tightdb-config-ios" "src/tightdb/tightdb-config-ios-dbg" "$TEMP_DIR/transfer/targets/" || exit 1
                 fi
 
                 message "Running test suite for core library"
@@ -545,11 +550,10 @@ EOI
                 fi
             done
         fi
-        path_list_prepend CPATH                   "$TIGHTDB_HOME/src"         || exit 1
-        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
-        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb" || exit 1
-        path_list_prepend PATH                    "$TIGHTDB_HOME/src/tightdb" || exit 1
-        export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME" PATH
+        path_list_prepend CPATH        "$TIGHTDB_HOME/src"         || exit 1
+        path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb" || exit 1
+        path_list_prepend PATH         "$TIGHTDB_HOME/src/tightdb" || exit 1
+        export CPATH LIBRARY_PATH PATH
         ERROR=""
         for x in $EXTENSIONS; do
             if [ -e "$TEMP_DIR/select/$x" ]; then
