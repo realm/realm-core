@@ -136,7 +136,7 @@ case "$MODE" in
                 LATEST="$(cat "$TEMP_DIR/$x/versions-sorted" | head -n 1)" || exit 1
                 (cd "$TEMP_DIR/$x" && ln "$LATEST" "sdk_root") || exit 1
                 if [ "$x" = "iPhoneSimulator" ]; then
-                ARCH="x86_64"
+                    ARCH="i386"
                 else
                     TYPE="$(defaults read-type "$PLATFORM_HOME/Info" "DefaultProperties")" || exit 1
                     if [ "$TYPE" != "Type is dictionary" ]; then
