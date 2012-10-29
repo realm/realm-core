@@ -5,7 +5,9 @@
 #UNDOCUMENTED: [commit, to_json, get_table_typed]
 ID         : class_group
 TITLE      : Group
-SUMMARY    : Container for tables.
+SUMMARY    : &group_summary
+             |
+             Container for tables.
 DESCR      : &group_descr
              |
              The Group is a container for tables and it allows the tables to be serialized to

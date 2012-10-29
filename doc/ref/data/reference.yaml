@@ -11,7 +11,7 @@ IMPORT    : []
 CATEGORIES:                       # list global class-id in order of appearence
 - Collection:
   - group
-
+  - query
 
 EXAMPLES  : 
 - DESCR   :  
