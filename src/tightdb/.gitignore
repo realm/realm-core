@@ -8,9 +8,12 @@
 
 /libtightdb.a
 /libtightdb.so
+/libtightdb.dylib
 /libtightdb-dbg.a
 /libtightdb-dbg.so
+/libtightdb-dbg.dylib
 /libtightdb-cov.so
+/libtightdb-cov.dylib
 
 /tightdb-config
 /tightdb-config-dbg

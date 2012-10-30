@@ -12,8 +12,10 @@ EXTENSIONS="java python objc node php gui"
 # Setup OS specific stuff
 OS="$(uname)" || exit 1
 ARCH="$(uname -m)" || exit 1
+LIB_SUFFIX_SHARED=".so"
 LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 if [ "$OS" = "Darwin" ]; then
+    LIB_SUFFIX_SHARED=".dylib"
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
 fi
 if ! printf "%s\n" "$MODE" | grep -q '^dist'; then
@@ -305,7 +307,7 @@ case "$MODE" in
                 (sh build.sh clean && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
                 mkdir "$TEMP_DIR/transfer" || exit 1
                 mkdir "$TEMP_DIR/transfer/targets" || exit 1
-                cp "src/tightdb/libtightdb.a" "src/tightdb/libtightdb.so" "src/tightdb/libtightdb-dbg.so" "$TEMP_DIR/transfer/targets/" || exit 1
+                cp "src/tightdb/libtightdb.a" "src/tightdb/libtightdb$LIB_SUFFIX_SHARED" "src/tightdb/libtightdb-dbg$LIB_SUFFIX_SHARED" "$TEMP_DIR/transfer/targets/" || exit 1
                 cp "src/tightdb/tightdb-config" "src/tightdb/tightdb-config-dbg" "$TEMP_DIR/transfer/targets/" || exit 1
                 if [ "$OS" = "Darwin" ]; then
                     cp "src/tightdb/libtightdb-ios.a" "src/tightdb/libtightdb-ios-dbg.a" "$TEMP_DIR/transfer/targets/" || exit 1
