@@ -45,7 +45,7 @@ CATEGORIES :
         DESCR  : &g_dyn_query_caseSensitive_descr
                  'String match can be performed case sensitive or not. Default: <code>true</code>.'
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -75,7 +75,7 @@ CATEGORIES :
         TYPES  : bool
         DESCR  : 'String match can be performed case sensitive or not. Default: <code>true</code>.'
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -96,7 +96,7 @@ CATEGORIES :
         TYPES  : int64_t
         DESCR  : The value
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -117,7 +117,7 @@ CATEGORIES :
         TYPES  : int64_t
         DESCR  : The value
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -138,7 +138,7 @@ CATEGORIES :
         TYPES  : int64_t
         DESCR  : The value
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -159,7 +159,7 @@ CATEGORIES :
         TYPES  : int64_t
         DESCR  : The value
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -183,7 +183,7 @@ CATEGORIES :
         TYPES  : int64_t
         DESCR  : Upper bound of range
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -204,7 +204,7 @@ CATEGORIES :
         TYPES  : time_t
         DESCR  : The value
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -225,7 +225,7 @@ CATEGORIES :
         TYPES  : time_t
         DESCR  : The value
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -246,7 +246,7 @@ CATEGORIES :
         TYPES  : time_t
         DESCR  : The value
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -267,7 +267,7 @@ CATEGORIES :
         TYPES  : time_t
         DESCR  : The value
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -288,7 +288,7 @@ CATEGORIES :
         TYPES  : time_t
         DESCR  : The value
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -309,7 +309,7 @@ CATEGORIES :
         TYPES  : time_t
         DESCR  : The value
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -333,7 +333,7 @@ CATEGORIES :
         TYPES  : time_t
         DESCR  : Upper bound of range
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -355,9 +355,9 @@ CATEGORIES :
         DESCR  : The value
       - NAME   : caseSensitive
         TYPES  : bool
-        DESCR  : *query_caseSensitive_descr
+        DESCR  : *g_dyn_query_caseSensitive_descr
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -379,9 +379,9 @@ CATEGORIES :
         DESCR  : The value
       - NAME   : caseSensitive
         TYPES  : bool
-        DESCR  : *query_caseSensitive_descr
+        DESCR  : *g_dyn_query_caseSensitive_descr
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -403,9 +403,9 @@ CATEGORIES :
         DESCR  : The value
       - NAME   : caseSensitive
         TYPES  : bool
-        DESCR  : *query_caseSensitive_descr
+        DESCR  : *g_dyn_query_caseSensitive_descr
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -430,9 +430,9 @@ CATEGORIES :
         DESCR  : Length of <code>value</code>
       - NAME   : caseSensitive
         TYPES  : bool
-        DESCR  : *query_caseSensitive_descr
+        DESCR  : *g_dyn_query_caseSensitive_descr
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -457,9 +457,9 @@ CATEGORIES :
         DESCR  : Length of <code>value</code>
       - NAME   : caseSensitive
         TYPES  : bool
-        DESCR  : *query_caseSensitive_descr
+        DESCR  : *g_dyn_query_caseSensitive_descr
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -484,9 +484,9 @@ CATEGORIES :
         DESCR  : Length of <code>value</code>
       - NAME   : caseSensitive
         TYPES  : bool
-        DESCR  : *query_caseSensitive_descr
+        DESCR  : *g_dyn_query_caseSensitive_descr
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -511,9 +511,9 @@ CATEGORIES :
         DESCR  : Length of <code>value</code>
       - NAME   : caseSensitive
         TYPES  : bool
-        DESCR  : *query_caseSensitive_descr
+        DESCR  : *g_dyn_query_caseSensitive_descr
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -538,9 +538,9 @@ CATEGORIES :
         DESCR  : Length of <code>value</code>
       - NAME   : caseSensitive
         TYPES  : bool
-        DESCR  : *query_caseSensitive_descr
+        DESCR  : *g_dyn_query_caseSensitive_descr
       RETURN:
-        TYPE   : Query&
+        TYPES  : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
@@ -557,7 +557,7 @@ CATEGORIES :
                  |
                  Start group ("left parenthesis").
       RETURN:
-        TYPE   : Query
+        TYPES  : Query
         DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
@@ -571,7 +571,7 @@ CATEGORIES :
                  |
                  Stop group ("right parenthesis")
       RETURN:
-        TYPE   : Query
+        TYPES  : Query
         DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
@@ -581,11 +581,11 @@ CATEGORIES :
       DESCR    : &g_dyn_query_or_descr
                  |
                  Logical-or.
-      SYMMARY  : &g_dyn_query_or_summary
+      SUMMARY  : &g_dyn_query_or_summary
                  |
                  Logical-or
       RETURN:
-        TYPE   : Query
+        TYPES  : Query
         DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
@@ -603,7 +603,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index
       RETURN:
-        TYPE   : Query
+        TYPES  : Query
         DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
@@ -617,7 +617,7 @@ CATEGORIES :
                  |
                  End of subtable query
       RETURN:  
-        TYPE   : Query
+        TYPES  : Query
         DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
@@ -626,6 +626,7 @@ CATEGORIES :
   METHODS:
   - g_dyn_query_find_all_const:
   - g_dyn_query_find_all:
+      NAMES    : find_all
       DESCR    : &g_dyn_query_find_all_descr
                  |
                  Execute a query. See the {@link class_tableview} class for further details. 
@@ -656,7 +657,7 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_findall
   - g_dyn_query_find_next:
-      NAME     : find_next
+      NAMES    : find_next
       DESCR    : &g_dyn_query_find_next_descr
                  |
                  Find next row
@@ -671,7 +672,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : "Row to stop search. Default: -1 (infinity)."
       RETURN:
-      - TYPES  : size_t
+        TYPES  : size_t
         DESCR  : Row number
       EXAMPLES:
       - DESCR  :
@@ -685,7 +686,7 @@ CATEGORIES :
                  |
                  Calculate sum.
       CONST    : true
-      PARAMS   :
+      PARAMS:
       - NAME   : table
         TYPES  : const Table&
         DESCR  : Reference to table     
@@ -719,7 +720,7 @@ CATEGORIES :
                  |
                  Number of matching rows.
       CONST    : true
-      PARAMS   :
+      PARAMS:
       - NAME   : table
         TYPES  : const Table&
         DESCR  : Reference to table     
@@ -746,7 +747,7 @@ CATEGORIES :
         CODE   : ex_cpp_dyn_query_size
   - g_dyn_query_maximum_date:
   - g_dyn_query_maximum:
-      NAMES    : sum
+      NAMES    : maximum
       DESCR    : &g_dyn_query_maximum_descr
                  |
                  This method finds the highest value.
@@ -757,7 +758,7 @@ CATEGORIES :
       SIGNATURE: |
                  int64_t maximum(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
                  time_t maximum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-      PARAMS   :
+      PARAMS:
       - NAME   : table
         TYPES  : const Table&
         DESCR  : Reference to table     
@@ -795,7 +796,7 @@ CATEGORIES :
       SIGNATURE: |
                  int64_t minimum(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
                  time_t minimum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-      PARAMS   :
+      PARAMS:
       - NAME   : table
         TYPES  : const Table&
         DESCR  : Reference to table     
@@ -829,7 +830,7 @@ CATEGORIES :
                  |
                  Calcualtes the average.
       CONST    : true
-      PARAMS   :
+      PARAMS:
       - NAME   : table
         TYPES  : const Table&
         DESCR  : Reference to table     
@@ -855,7 +856,7 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_average
   - g_dyn_query_remove:
-      NAME     : remove
+      NAMES    : remove
       DESCR    : &g_dyn_query_remove_descr
                  |
                  This method will remove all matching rows in the source table.
@@ -863,7 +864,7 @@ CATEGORIES :
                  |
                  Remove rows
       CONST    : true
-      PARAMS   :
+      PARAMS:
       - NAME   : table
         TYPES  : const Table&
         DESCR  : Reference to table     
@@ -892,6 +893,7 @@ CATEGORIES :
   METHODS:
   - g_dyn_query_find_all_multi:
   - g_dyn_query_find_all_const_multi:
+      NAMES    : find_all_multi
       DESCR    : &g_dyn_query_find_all_multi_descr
                  |
                  Execute a query using (POSIX) threads. See the {@link class_tableview} class for further details. 
@@ -934,8 +936,8 @@ CATEGORIES :
         TYPES  : unsigned int
         DESCR  : Number of threads
       RETURN:
-      - DESCR  : 
+        DESCR  : Success or not
         TYPES  : int
-      EXAMPLE:
+      EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_find_all_multi

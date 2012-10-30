@@ -85,7 +85,7 @@ CATEGORIES:
         CODE   : ex_cpp_group_operator_equal
   - g_group_operator_not_equal:
       NAMES    : operator!=
-      DESCR    : *group_operator_equal_descr
+      DESCR    : *g_group_operator_equal_descr
       SUMMARY  : Compare two groups.
       CONST    : true
       PARAMS:
