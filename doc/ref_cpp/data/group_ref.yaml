@@ -5,10 +5,10 @@
 #UNDOCUMENTED: [commit, to_json, get_table_typed]
 ID         : class_group
 TITLE      : Group
-SUMMARY    : &group_summary
+SUMMARY    : &g_group_summary
              |
              Container for tables.
-DESCR      : &group_descr
+DESCR      : &g_group_descr
              |
              The Group is a container for tables and it allows the tables to be serialized to
              disk and memory. 
@@ -20,9 +20,9 @@ IGNORE     : []                   # List of method-ids to ignore
 CATEGORIES:
 - constructor:
   METHODS:
-  - group_constructor_plain:
-  - group_constructor_file:
-  - group_constructor_memory:
+  - g_group_constructor_plain:
+  - g_group_constructor_file:
+  - g_group_constructor_memory:
       NAMES    : Group
       DESCR    : |
                  Group objects can be created in various ways depending on use pattern. 
@@ -35,7 +35,7 @@ CATEGORIES:
                  GROUP_APPEND   : TODO
                  GROUP_ASYNC    : TODO
                  GROUP_SWAPONLY : TODO
-      SUMMARY  : &group_constructor_summary
+      SUMMARY  : &g_group_constructor_summary
                  |
                  Creates a table group.
       SIGNATURE: |
@@ -63,9 +63,9 @@ CATEGORIES:
         CODE   : ex_cpp_group_constructor
 - operators:
   METHODS:
-  - group_operator_equal:
+  - g_group_operator_equal:
       NAMES    : operator==
-      DESCR    : &group_operator_equal_descr 
+      DESCR    : &g_group_operator_equal_descr 
                  |
                  Compare two groups for equality. Two groups are equal if, and
                  only if, they contain the same tables in the same order, that
@@ -83,7 +83,7 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_operator_equal
-  - group_operator_not_equal:
+  - g_group_operator_not_equal:
       NAMES    : operator!=
       DESCR    : *group_operator_equal_descr
       SUMMARY  : Compare two groups.
@@ -100,7 +100,7 @@ CATEGORIES:
         CODE   : ex_cpp_group_operator_not_equal
 - table:
   METHODS:
-  - group_table_count:
+  - g_group_table_count:
       NAMES    : table_count
       DESCR    : A group can be a container for many tables, and this method counts the number of tables currently stored within the group.
       SUMMARY  : The number of tables.
@@ -111,12 +111,12 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_table_count
-  - group_get_table:
+  - g_group_get_table:
       NAMES    : get_table
-      SUMMARY  : &group_get_table_summary
+      SUMMARY  : &g_group_get_table_summary
                  |
                  Get a table.
-      DESCR    : &group_get_table_descr
+      DESCR    : &g_group_get_table_descr
                  |
                  This method will find and return a named table.
       SIGNATURE: |
@@ -132,13 +132,13 @@ CATEGORIES:
       EXAMPLES:
       -  DESCR :
          CODE  : ex_cpp_group_get_table
-  - group_has_table:
+  - g_group_has_table:
       NAMES    : has_table
       CONST    : true
-      SUMMARY  : &group_has_table_summary
+      SUMMARY  : &g_group_has_table_summary
                  |
                  Does group have table.
-      DESCR    : &group_has_table_descr
+      DESCR    : &g_group_has_table_descr
                  |
                  This method checks if a group has a named tabled.
       PARAMS:
@@ -151,7 +151,7 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_has_table
-  - group_get_table_name:
+  - g_group_get_table_name:
       NAMES    : get_table_name
       DESCR    : This method will find the name of a table stored in the group.
       SUMMARY  : Get the name of a table.
@@ -168,12 +168,12 @@ CATEGORIES:
         CODE   : ex_cpp_group_get_table_name
 - io:
   METHODS:
-  - group_write_to_file:
+  - g_group_write_to_file:
       NAMES    : write
-      SUMMARY  : &group_write_to_file_summary
+      SUMMARY  : &g_group_write_to_file_summary
                  |
                  Write a group to disk.
-      DESCR    : &group_write_to_file_descr
+      DESCR    : &g_group_write_to_file_descr
                  |
                  This method will write the group to persistent storage (disk). Metadata and tables
                  will be stored, and can be retrieved at later times. 
@@ -187,12 +187,12 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_write_to_file
-  - group_write_to_mem:
+  - g_group_write_to_mem:
       NAMES    : write_to_mem
-      SUMMARY  : &group_write_to_mem_summary
+      SUMMARY  : &g_group_write_to_mem_summary
                  |
                  Write a group to an in-memory buffer.
-      DESCR    : &group_write_to_mem_descr
+      DESCR    : &g_group_write_to_mem_descr
                  |
                  This method will write the group to an in-memory buffer. This is useful if you
                  wish to transfer a group over a TCP connection.
@@ -208,12 +208,12 @@ CATEGORIES:
         CODE   : ex_cpp_group_write_to_mem
 - group:
   METHODS:
-  - group_is_valid:
+  - g_group_is_valid:
       NAMES    : is_valid
-      SUMMARY  : &group_is_valid_summary
+      SUMMARY  : &g_group_is_valid_summary
                  |
                  Is group consistent.
-      DESCR    : &group_is_valid_descr
+      DESCR    : &g_group_is_valid_descr
                  |
                  Check if group is valid (consistent).
       CONST    : true
@@ -223,12 +223,12 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_is_valid
-  - group_is_shared:
+  - g_group_is_shared:
       NAMES    : is_shared
-      SUMMARY  : &group_is_shared_summary
+      SUMMARY  : &g_group_is_shared_summary
                  |
                  Is group shared.
-      DESCR    : &group_is_shared_descr
+      DESCR    : &g_group_is_shared_descr
                  |
                  Check if group is shared.
       CONST    : true
@@ -238,12 +238,12 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_is_shared
-  - group_is_empty:
+  - g_group_is_empty:
       NAMES    : is_empty
-      SUMMARY  : &group_is_empty_summary
+      SUMMARY  : &g_group_is_empty_summary
                  |
                  Is group empty.
-      DESCR    : &group_is_empty_descr
+      DESCR    : &g_group_is_empty_descr
                  |
                  Check if group is empty that is, does it have zero tables.
       CONST    : true
@@ -253,12 +253,12 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_is_empty
-  - group_tostring:
+  - g_group_tostring:
       NAMES    : to_string
-      SUMMARY  : &group_to_string_summary
+      SUMMARY  : &g_group_to_string_summary
                  |
                  Get a string representation of the group.
-      DESCR    : &group_to_string_descr
+      DESCR    : &g_group_to_string_descr
                  |
                  This methods adds a string representation of information about the group to an
                  output stream.

@@ -2,35 +2,35 @@
 # C++ reference documentation for Query class
 #
 
-ID         : class_query
-TITLE      : Query
-SUMMARY    : &query_intro_summary
+ID         : class_dyn_query
+TITLE      : Dynamic Query
+SUMMARY    : &g_dyn_query_intro_summary
              |
              Query your TightDB table.
-DESCR      : &query_intro_descr
+DESCR      : &g_dyn_query_intro_descr
              |
              Query objects are used to build-up queries. Conditions can be added to a query 
              through a fluent interface.
 SEE        : 
 EXAMPLES   : 
 - DESCR: 
-  CODE: ex_cpp_query_intro
+  CODE: ex_cpp_dyn_query_intro
 IGNORE     : []                   # List of method-ids to ignore   
 CATEGORIES :
 - conditions:
   METHODS:
-  - query_equals_boolean:
-  - query_equals_integer:
-  - query_equals_string:
+  - g_dyn_query_equals_boolean:
+  - g_dyn_query_equals_integer:
+  - g_dyn_query_equals_string:
       NAMES    : equal
       SIGNATURE: |
                  Query& equal(size_t column_ndx, bool value);
                  Query& equal(size_t column_ndx, int64_t value);
                  Query& equal(size_t column_ndx, const char* value, bool caseSensitive=true);
-      SUMMARY  : &query_equals_summary
+      SUMMARY  : &g_dyn_query_equals_summary
                  |
                  Equal to
-      DESCR    : &query_equals_descr
+      DESCR    : &g_dyn_query_equals_descr
                  |
                  Queries for column values equals to a certain value.
       PARAMS:
@@ -42,26 +42,26 @@ CATEGORIES :
         DESCR  : The value
       - NAME   : caseSensitive
         TYPES  : bool
-        DESCR  : &query_caseSensitive_descr
+        DESCR  : &g_dyn_query_caseSensitive_descr
                  'String match can be performed case sensitive or not. Default: <code>true</code>.'
       RETURN:
         TYPE   : Query&
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_equals
-  - query_notEquals_boolean:
-  - query_notEquals_integer:
-  - query_notEquals_string:
+        CODE   : ex_cpp_dyn_query_equals
+  - g_dyn_query_notEquals_boolean:
+  - g_dyn_query_notEquals_integer:
+  - g_dyn_query_notEquals_string:
       NAMES    : not_equal
       SIGNATURE: |
                  Query& not_equal(size_t column_ndx, bool value);
                  Query& not_equal(size_t column_ndx, int64_t value);
                  Query& not_equal(size_t column_ndx, const char* value, bool caseSensitive=true);
-      SUMMARY  : &query_notEquals_summary
+      SUMMARY  : &g_dyn_query_notEquals_summary
                  |
                  Not equal to
-      DESCR    : &query_notEquals_descr
+      DESCR    : &g_dyn_query_notEquals_descr
                  |
                  Queries for column values not equals to a certain value.
       PARAMS:
@@ -79,13 +79,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_notEquals
-  - query_greaterThan:
+        CODE   : ex_cpp_dyn_query_notEquals
+  - g_dyn_query_greaterThan:
       NAMES    : greater
-      SUMMARY  : &query_greaterThan_summary
+      SUMMARY  : &g_dyn_query_greaterThan_summary
                  |
                  Greater than
-      DESCR    : &query_greaterThan_descr
+      DESCR    : &g_dyn_query_greaterThan_descr
                  |
                  Queries for column values greater than a certain value.
       PARAMS:
@@ -100,13 +100,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_greaterThan
-  - query_greaterThanOrEqual:
+        CODE   : ex_cpp_dyn_query_greaterThan
+  - g_dyn_query_greaterThanOrEqual:
       NAMES    : greater_equal
-      SUMMARY  : &query_greaterThanOrEqual_summary
+      SUMMARY  : &g_dyn_query_greaterThanOrEqual_summary
                  |
                  Greater than or equal to
-      DESCR    : &query_greaterThanOrEqual_descr
+      DESCR    : &g_dyn_query_greaterThanOrEqual_descr
                  |
                  Queries for column values greater than or equal to a certain value.
       PARAMS:
@@ -121,13 +121,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_greaterThanOrEqual
-  - query_lessThan:
+        CODE   : ex_cpp_dyn_query_greaterThanOrEqual
+  - g_dyn_query_lessThan:
       NAMES    : less
-      SUMMARY  : &query_lessThan_summary
+      SUMMARY  : &g_dyn_query_lessThan_summary
                  |
                  Less than
-      DESCR    : &query_lessThan_descr
+      DESCR    : &g_dyn_query_lessThan_descr
                  |
                  Queries for column values less than a certain value.
       PARAMS:
@@ -142,13 +142,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_lessThan
-  - query_lessThanOrEqual:
+        CODE   : ex_cpp_dyn_query_lessThan
+  - g_dyn_query_lessThanOrEqual:
       NAMES    : less_equal
-      SUMMARY  : &query_lessThanOrEqual_summary
+      SUMMARY  : &g_dyn_query_lessThanOrEqual_summary
                  |
                  Less than or equal to
-      DESCR    : &query_lessThanOrEqual_descr
+      DESCR    : &g_dyn_query_lessThanOrEqual_descr
                  |
                  Queries for column values less than or equal to a certain value.
       PARAMS:
@@ -163,13 +163,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_lessThanOrEqual
-  - query_between:
+        CODE   : ex_cpp_dyn_query_lessThanOrEqual
+  - g_dyn_query_between:
       NAMES    : between
-      DESCR    : &query_between_descr
+      DESCR    : &g_dyn_query_between_descr
                  |
                  Queries for column values in ranges.
-      SUMMARY  : &query_between_summary
+      SUMMARY  : &g_dyn_query_between_summary
                  |
                  Belongs to an interval.
       PARAMS:
@@ -187,13 +187,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_between
-  - query_equals_date:
+        CODE   : ex_cpp_dyn_query_between
+  - g_dyn_query_equals_date:
       NAMES    : equal_date
-      SUMMARY  : &query_equals_date_summary
+      SUMMARY  : &g_dyn_query_equals_date_summary
                  |
                  Equal to
-      DESCR    : &query_equals_date_descr
+      DESCR    : &g_dyn_query_equals_date_descr
                  |
                  Queries for column values equals a certain date/timestamp
       PARAMS:
@@ -208,13 +208,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_equals_date
-  - query_notEquals_date:
+        CODE   : ex_cpp_dyn_query_equals_date
+  - g_dyn_query_notEquals_date:
       NAMES    : not_equal_date
-      SUMMARY  : &query_notEquals_date_summary
+      SUMMARY  : &g_dyn_query_notEquals_date_summary
                  |
                  Not equal to
-      DESCR    : &query_notEquals_date_descr
+      DESCR    : &g_dyn_query_notEquals_date_descr
                  |
                  Queries for column values not equals to a certain date/timestamp.
       PARAMS:
@@ -229,13 +229,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_notEquals_date
-  - query_greaterThan_date:
+        CODE   : ex_cpp_dyn_query_notEquals_date
+  - g_dyn_query_greaterThan_date:
       NAMES    : greater
-      SUMMARY  : &query_greaterThan_date_summary
+      SUMMARY  : &g_dyn_query_greaterThan_date_summary
                  |
                  Greater than
-      DESCR    : &query_greaterThan_date_descr
+      DESCR    : &g_dyn_query_greaterThan_date_descr
                  |
                  Queries for column values greater than a certain date/timestamp.
       PARAMS:
@@ -250,13 +250,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_greaterThan_date
-  - query_greaterThanOrEqual_date:
+        CODE   : ex_cpp_dyn_query_greaterThan_date
+  - g_dyn_query_greaterThanOrEqual_date:
       NAMES    : greater_equal_date
-      SUMMARY  : &query_greaterThanOrEqual_date_summary
+      SUMMARY  : &g_dyn_query_greaterThanOrEqual_date_summary
                  |
                  Greater than or equal to
-      DESCR    : &query_greaterThanOrEqual_date_descr
+      DESCR    : &g_dyn_query_greaterThanOrEqual_date_descr
                  |
                  Queries for column values greater than or equal to a certain date/timestamp.
       PARAMS:
@@ -271,13 +271,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_greaterThanOrEqual_date
-  - query_lessThan:
+        CODE   : ex_cpp_dyn_query_greaterThanOrEqual_date
+  - g_dyn_query_lessThan:
       NAMES    : less_date
-      SUMMARY  : &query_lessThan_date_summary
+      SUMMARY  : &g_dyn_query_lessThan_date_summary
                  |
                  Less than
-      DESCR    : &query_lessThan_date_descr
+      DESCR    : &g_dyn_query_lessThan_date_descr
                  |
                  Queries for column values less than a certain date/timestamp.
       PARAMS:
@@ -292,13 +292,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_lessThan_date
-  - query_lessThanOrEqual_date:
+        CODE   : ex_cpp_dyn_query_lessThan_date
+  - g_dyn_query_lessThanOrEqual_date:
       NAMES    : less_equal_date
-      SUMMARY  : &query_lessThanOrEqual_date_summary
+      SUMMARY  : &g_dyn_query_lessThanOrEqual_date_summary
                  |
                  Less than or equal to
-      DESCR    : &query_lessThanOrEqual_date_descr
+      DESCR    : &g_dyn_query_lessThanOrEqual_date_descr
                  |
                  Queries for column values less than or equal to a certain date/timestamp.
       PARAMS:
@@ -313,13 +313,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_lessThanOrEqual_date
-  - query_between_date:
+        CODE   : ex_cpp_dyn_query_lessThanOrEqual_date
+  - g_dyn_query_between_date:
       NAMES    : between_date
-      DESCR    : &query_between_date_descr
+      DESCR    : &g_dyn_query_between_date_descr
                  |
                  Queries for column values in ranges.
-      SUMMARY  : &query_between_date_summary
+      SUMMARY  : &g_dyn_query_between_date_summary
                  |
                  Belongs to an interval.
       PARAMS:
@@ -337,13 +337,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_between_date
-  - query_startsWith:
+        CODE   : ex_cpp_dyn_query_between_date
+  - g_dyn_query_startsWith:
       NAMES    : begins_with
-      DESCR    : &query_startsWith_descr
+      DESCR    : &g_dyn_query_startsWith_descr
                  |
                  Queries for column values which begin with a certain prefix
-      SUMMARY  : &query_startsWith_summary
+      SUMMARY  : &g_dyn_query_startsWith_summary
                  |
                  Substring match at the begining of the attribute
       PARAMS:
@@ -361,13 +361,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_startsWith
-  - query_endsWith:
+        CODE   : ex_cpp_dyn_query_startsWith
+  - g_dyn_query_endsWith:
       NAMES    : ends_with
-      DESCR    : &query_endsWith_descr
+      DESCR    : &g_dyn_query_endsWith_descr
                  |
                  Queries for column values which end with a certain suffix.
-      SUMMARY  : &query_endsWith_summary
+      SUMMARY  : &g_dyn_query_endsWith_summary
                  |
                  Substring match at the end at the attribute.
       PARAMS:
@@ -385,13 +385,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_endsWith
-  - query_contains:
+        CODE   : ex_cpp_dyn_query_endsWith
+  - g_dyn_query_contains:
       NAMES    : contains
-      DESCR    : &query_contains_descr
+      DESCR    : &g_dyn_query_contains_descr
                  |
                  Queries for column values which contain a certian substring.
-      SUMMARY  : &query_contains_summary
+      SUMMARY  : &g_dyn_query_contains_summary
                  |
                  Substring search.
       PARAMS:
@@ -409,13 +409,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_contains
-  - query_equals_binary:
+        CODE   : ex_cpp_dyn_query_contains
+  - g_dyn_query_equals_binary:
       NAMES    : equal_binary
-      SUMMARY  : &query_equals_binary_summary
+      SUMMARY  : &g_dyn_query_equals_binary_summary
                  |
                  Equal to
-      DESCR    : &query_equals_binary_descr
+      DESCR    : &g_dyn_query_equals_binary_descr
                  |
                  Queries for column values equals to a certain value.
       PARAMS:
@@ -436,13 +436,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_equals_binary
-  - query_notEquals:
+        CODE   : ex_cpp_dyn_query_equals_binary
+  - g_dyn_query_notEquals:
       NAMES    : not_equal_binary
-      SUMMARY  : &query_notEquals_binary_summary
+      SUMMARY  : &g_dyn_query_notEquals_binary_summary
                  |
                  Not equal to
-      DESCR    : &query_notEquals_binary_descr
+      DESCR    : &g_dyn_query_notEquals_binary_descr
                  |
                  Queries for column values not equals to a certain value.
       PARAMS:
@@ -463,13 +463,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_notEquals_binary
-  - query_startsWith_binary:
+        CODE   : ex_cpp_dyn_query_notEquals_binary
+  - g_dyn_query_startsWith_binary:
       NAMES    : begins_with_binary
-      DESCR    : &query_startsWith_binary_descr
+      DESCR    : &g_dyn_query_startsWith_binary_descr
                  |
                  Queries for column values which begin with a certain prefix
-      SUMMARY  : &query_startsWith_binary_summary
+      SUMMARY  : &g_dyn_query_startsWith_binary_summary
                  |
                  Substring match at the begining of the attribute
       PARAMS:
@@ -490,13 +490,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_startsWith_binary
-  - query_endsWith:
+        CODE   : ex_cpp_dyn_query_startsWith_binary
+  - g_dyn_query_endsWith:
       NAMES    : ends_with_binary
-      DESCR    : &query_endsWith_binary_descr
+      DESCR    : &g_dyn_query_endsWith_binary_descr
                  |
                  Queries for column values which end with a certain suffix.
-      SUMMARY  : &query_endsWith_binary_summary
+      SUMMARY  : &g_dyn_query_endsWith_binary_summary
                  |
                  Substring match at the end at the attribute.
       PARAMS:
@@ -517,13 +517,13 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_endsWith_binary
-  - query_contains_binary:
+        CODE   : ex_cpp_dyn_query_endsWith_binary
+  - g_dyn_query_contains_binary:
       NAMES    : contains_binary
-      DESCR    : &query_contains_binary_descr
+      DESCR    : &g_dyn_query_contains_binary_descr
                  |
                  Queries for column values which contain a certian substring.
-      SUMMARY  : &query_contains_binary_summary
+      SUMMARY  : &g_dyn_query_contains_binary_summary
                  |
                  Substring search.
       PARAMS:
@@ -544,16 +544,16 @@ CATEGORIES :
         DESCR  : The query object
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_contains_binary
+        CODE   : ex_cpp_dyn_query_contains_binary
 - combiners:
   METHODS:
-  - query_group:
+  - g_dyn_query_group:
       NAMES    : group
-      DESCR    : &query_group_descr
+      DESCR    : &g_dyn_query_group_descr
                 |
                 Group conditions ("left" parenthesis). Group of conditions can be nested and they are 
                 conceptually a parenthesis (PHP does not allow overloading () as an operator or method). 
-      SUMMARY  : &query_group_summary
+      SUMMARY  : &g_dyn_query_group_summary
                  |
                  Start group ("left parenthesis").
       RETURN:
@@ -561,13 +561,13 @@ CATEGORIES :
         DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_group
-  - query_endGroup:
+        CODE   : ex_cpp_dyn_query_group
+  - g_dyn_query_endGroup:
       NAMES    : end_group
-      DESCR    : &query_endGroup_descr
+      DESCR    : &g_dyn_query_endGroup_descr
                  |
                  Group conditions ("right" parenthesis).
-      SUMMARY  : &query_endGroup_summary
+      SUMMARY  : &g_dyn_query_endGroup_summary
                  |
                  Stop group ("right parenthesis")
       RETURN:
@@ -575,13 +575,13 @@ CATEGORIES :
         DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_group
-  - query_or:
+        CODE   : ex_cpp_dyn_query_group
+  - g_dyn_query_or:
       NAMES    : Or
-      DESCR    : &query_or_descr
+      DESCR    : &g_dyn_query_or_descr
                  |
                  Logical-or.
-      SYMMARY  : &query_or_summary
+      SYMMARY  : &g_dyn_query_or_summary
                  |
                  Logical-or
       RETURN:
@@ -589,13 +589,13 @@ CATEGORIES :
         DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_or
-  - query_subtable:
+        CODE   : ex_cpp_dyn_query_or
+  - g_dyn_query_subtable:
       NAMES    : subtable
-      DESCR    : &query_subtable_descr
+      DESCR    : &g_dyn_query_subtable_descr
                  |
                  Query a subtable
-      SUMMARY  : &query_subtable_summary
+      SUMMARY  : &g_dyn_query_subtable_summary
                  |
                  Query a subtable
       PARAMS:
@@ -607,13 +607,13 @@ CATEGORIES :
         DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_subtable
-  - query_endSubtable:
+        CODE   : ex_cpp_dyn_query_subtable
+  - g_dyn_query_endSubtable:
       NAMES    : end_subtable
-      DESCR    : &query_endSubtable_descr
+      DESCR    : &g_dyn_query_endSubtable_descr
                  |
                  End of subtable query
-      SUMMARY  : &query_endSubtable_summary
+      SUMMARY  : &g_dyn_query_endSubtable_summary
                  |
                  End of subtable query
       RETURN:  
@@ -621,15 +621,15 @@ CATEGORIES :
         DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_subtable
+        CODE   : ex_cpp_dyn_query_subtable
 - actions:
   METHODS:
-  - query_find_all_const:
-  - query_find_all:
-      DESCR    : &query_find_all_descr
+  - g_dyn_query_find_all_const:
+  - g_dyn_query_find_all:
+      DESCR    : &g_dyn_query_find_all_descr
                  |
                  Execute a query. See the {@link class_tableview} class for further details. 
-      SUMMARY  : &query_find_all_summary
+      SUMMARY  : &g_dyn_query_find_all_summary
                  |
                  Execute query.
       SIGNATURE: |
@@ -654,13 +654,13 @@ CATEGORIES :
         DESCR  : The TableView object.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_findall
-  - query_find_next:
+        CODE   : ex_cpp_dyn_query_findall
+  - g_dyn_query_find_next:
       NAME     : find_next
-      DESCR    : &query_find_next_descr
+      DESCR    : &g_dyn_query_find_next_descr
                  |
                  Find next row
-      SUMMARY  : &query_find_next_summary
+      SUMMARY  : &g_dyn_query_find_next_summary
                  |
                  Find next row
       PARAMS:
@@ -675,13 +675,13 @@ CATEGORIES :
         DESCR  : Row number
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_find_next
-  - query_sum:
+        CODE   : ex_cpp_dyn_query_find_next
+  - g_dyn_query_sum:
       NAMES    : sum
-      DESCR    : &query_sum_descr
+      DESCR    : &g_dyn_query_sum_descr
                  |
                  Calculates the sum. This method can only be applied to numerical columns.
-      SUMMARY  : &query_sum_summary
+      SUMMARY  : &g_dyn_query_sum_summary
                  |
                  Calculate sum.
       CONST    : true
@@ -709,13 +709,13 @@ CATEGORIES :
         DESCR  : The sum.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_sum
-  - query_size:
+        CODE   : ex_cpp_dyn_query_sum
+  - g_dyn_query_size:
       NAMES    : count
-      DESCR    : &query_size_descr
+      DESCR    : &g_dyn_query_size_descr
                  |
                  FInd the number of matching rows
-      SUMMARY  : &query_size_summary
+      SUMMARY  : &g_dyn_query_size_summary
                  |
                  Number of matching rows.
       CONST    : true
@@ -743,14 +743,14 @@ CATEGORIES :
         DESCR  : The number of rows.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_size
-  - query_maximum_date:
-  - query_maximum:
+        CODE   : ex_cpp_dyn_query_size
+  - g_dyn_query_maximum_date:
+  - g_dyn_query_maximum:
       NAMES    : sum
-      DESCR    : &query_maximum_descr
+      DESCR    : &g_dyn_query_maximum_descr
                  |
                  This method finds the highest value.
-      SUMMARY  : &query_maximum_summary
+      SUMMARY  : &g_dyn_query_maximum_summary
                  |
                  Highest value.
       CONST    : true
@@ -781,14 +781,14 @@ CATEGORIES :
         DESCR  : The highest value.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_maximum
-  - query_minimum_date:
-  - query_minimum:
+        CODE   : ex_cpp_dyn_query_maximum
+  - g_dyn_query_minimum_date:
+  - g_dyn_query_minimum:
       NAMES    : sum
-      DESCR    : &query_minimum_descr
+      DESCR    : &g_dyn_query_minimum_descr
                  |
                  This method finds the lowest value.
-      SUMMARY  : &query_minimum_summary
+      SUMMARY  : &g_dyn_query_minimum_summary
                  |
                  Lowest value.
       CONST    : true
@@ -819,13 +819,13 @@ CATEGORIES :
         DESCR  : The lowest value.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_manimum
-  - query_average:
+        CODE   : ex_cpp_dyn_query_manimum
+  - g_dyn_query_average:
       NAMES    : average
-      SUMMARY  : &query_average_summary
+      SUMMARY  : &g_dyn_query_average_summary
                  |
                  Calcualtes the average.
-      DESCR    : &query_average_descr
+      DESCR    : &g_dyn_query_average_descr
                  |
                  Calcualtes the average.
       CONST    : true
@@ -853,13 +853,13 @@ CATEGORIES :
         DESCR  : The average.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_average
-  - query_remove:
+        CODE   : ex_cpp_dyn_query_average
+  - g_dyn_query_remove:
       NAME     : remove
-      DESCR    : &query_remove_descr
+      DESCR    : &g_dyn_query_remove_descr
                  |
                  This method will remove all matching rows in the source table.
-      SUMMARY  : &query_remove_summary
+      SUMMARY  : &g_dyn_query_remove_summary
                  |
                  Remove rows
       CONST    : true
@@ -887,15 +887,15 @@ CATEGORIES :
         DESCR  : The number of rows removed.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_remove
+        CODE   : ex_cpp_dyn_query_remove
 - Multithreaded:
   METHODS:
-  - query_find_all_multi:
-  - query_find_all_const_multi:
-      DESCR    : &query_find_all_multi_descr
+  - g_dyn_query_find_all_multi:
+  - g_dyn_query_find_all_const_multi:
+      DESCR    : &g_dyn_query_find_all_multi_descr
                  |
                  Execute a query using (POSIX) threads. See the {@link class_tableview} class for further details. 
-      SUMMARY  : &query_find_all_multi_summary
+      SUMMARY  : &g_dyn_query_find_all_multi_summary
                  |
                  Execute query.
       SIGNATURE: |
@@ -920,13 +920,13 @@ CATEGORIES :
         DESCR  : The TableView object.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_query_find_all_multi
-  - query_set_threads:
+        CODE   : ex_cpp_dyn_query_find_all_multi
+  - g_dyn_query_set_threads:
       NAMES    : set_threads
-      SUMMARY  : &query_set_threads_summary
+      SUMMARY  : &g_dyn_query_set_threads_summary
                  |
                  Set the number of threads
-      DESCR    : &query_set_threads_descr
+      DESCR    : &g_dyn_query_set_threads_descr
                  |
                  Set the number of threads
       PARAMS:
@@ -938,4 +938,4 @@ CATEGORIES :
         TYPES  : int
       EXAMPLE:
       - DESCR  :
-        CODE   : ex_cpp_query_find_all_multi
+        CODE   : ex_cpp_dyn_query_find_all_multi
