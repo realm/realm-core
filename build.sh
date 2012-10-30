@@ -9,44 +9,6 @@ MODE="$1"
 EXTENSIONS="java python objc node php gui"
 
 
-# Setup OS specific stuff
-OS="$(uname)" || exit 1
-ARCH="$(uname -m)" || exit 1
-LIB_SUFFIX_SHARED=".so"
-LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
-if [ "$OS" = "Darwin" ]; then
-    LIB_SUFFIX_SHARED=".dylib"
-    LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
-fi
-if ! printf "%s\n" "$MODE" | grep -q '^dist'; then
-    NUM_PROCESSORS=""
-    if [ "$OS" = "Darwin" ]; then
-        NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
-    else
-        if [ -r /proc/cpuinfo ]; then
-            NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
-        fi
-    fi
-    if [ "$NUM_PROCESSORS" ]; then
-        export MAKEFLAGS="-j$NUM_PROCESSORS"
-    fi
-fi
-NEED_USR_LOCAL_LIB_NOTE=""
-USE_LIB64=""
-IS_REDHAT_DERIVATIVE=""
-if [ -e /etc/redhat-release ] || grep -q "Amazon" /etc/system-release 2>/dev/null; then
-    IS_REDHAT_DERIVATIVE="1"
-fi
-if [ "$IS_REDHAT_DERIVATIVE" ]; then
-    NEED_USR_LOCAL_LIB_NOTE="1"
-fi
-if [ "$IS_REDHAT_DERIVATIVE" -o -e /etc/SuSE-release ]; then
-    if [ "$ARCH" = "x86_64" -o "$ARCH" = "ia64" ]; then
-        USE_LIB64="1"
-    fi
-fi
-
-
 
 map_ext_name_to_dir()
 {
@@ -73,6 +35,20 @@ word_list_append()
     return 0
 }
 
+word_list_prepend()
+{
+    local list_name new_word list
+    list_name="$1"
+    new_word="$2"
+    list="$(eval "printf \"%s\\n\" \"\${$list_name}\"")" || return 1
+    if [ "$list" ]; then
+        eval "$list_name=\"\$new_word \$list\""
+    else
+        eval "$list_name=\"\$new_word\""
+    fi
+    return 0
+}
+
 path_list_prepend()
 {
     local list_name new_path list
@@ -86,6 +62,47 @@ path_list_prepend()
     fi
     return 0
 }
+
+
+
+# Setup OS specific stuff
+OS="$(uname)" || exit 1
+ARCH="$(uname -m)" || exit 1
+LIB_SUFFIX_SHARED=".so"
+LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
+if [ "$OS" = "Darwin" ]; then
+    LIB_SUFFIX_SHARED=".dylib"
+    LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
+fi
+if ! printf "%s\n" "$MODE" | grep -q '^dist'; then
+    NUM_PROCESSORS=""
+    if [ "$OS" = "Darwin" ]; then
+        NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
+        word_list_prepend MAKEFLAGS "-w" || exit 1
+    else
+        if [ -r /proc/cpuinfo ]; then
+            NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
+        fi
+    fi
+    if [ "$NUM_PROCESSORS" ]; then
+        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS" || exit 1
+    fi
+    export MAKEFLAGS
+fi
+NEED_USR_LOCAL_LIB_NOTE=""
+USE_LIB64=""
+IS_REDHAT_DERIVATIVE=""
+if [ -e /etc/redhat-release ] || grep -q "Amazon" /etc/system-release 2>/dev/null; then
+    IS_REDHAT_DERIVATIVE="1"
+fi
+if [ "$IS_REDHAT_DERIVATIVE" ]; then
+    NEED_USR_LOCAL_LIB_NOTE="1"
+fi
+if [ "$IS_REDHAT_DERIVATIVE" -o -e /etc/SuSE-release ]; then
+    if [ "$ARCH" = "x86_64" -o "$ARCH" = "ia64" ]; then
+        USE_LIB64="1"
+    fi
+fi
 
 
 
