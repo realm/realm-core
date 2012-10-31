@@ -62,62 +62,6 @@ CATEGORIES :
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_is_valid
         DESCR  :
-- Dump:
-  METHODS:
-  - g_dyn_table_to_json:
-      NAMES    : to_json
-      SUMMARY  : &g_dyn_table_to_json_summary
-                 Convert table to JSON.
-      DESCR    : &g_dyn_table_to_json_descr
-                 |
-                 The JavaScript Object Notation (<a href="http://json.org">JSON</a>) is useful
-                 for web/mobile applications and serialization. This method will convert a table 
-                 and its columns and rows to a JSON compatible representation.
-      PARAMS:                 
-      - NAME   : out
-        TYPES  : std::ostream&
-        DESCR  : Output stream.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_to_json
-        DESCR  : 
-  - g_dyn_table_to_string:
-      NAMES    : to_string
-      SUMMARY  : &g_dyn_table_to_string_summary
-                 Convert table to a string.
-      DESCR    : &g_dyn_table_to_string_descr
-                 |
-                 This method will convert a table and its columns and rows to a format
-                 which is easily read by humans.
-      CONST    : true
-      PARAMS:                 
-      - NAME   : out
-        TYPES  : std::ostream&
-        DESCR  : Output stream.
-      - NAME   : limit
-        TYPES  : size_t
-        DESCR  : "The number of rows to convert. Default: 500."
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_to_string
-        DESCR  : 
-  - g_dyn_table_row_to_string:
-      NAMES    : to_string
-      SUMMARY  : &g_dyn_table_row_to_string_summary
-                 Convert a row to a string.
-      DESCR    : &g_dyn_table_row_to_string_descr
-                 |
-                 This method will convert a row to a format
-                 which is easily read by humans.
-      CONST    : true
-      PARAMS:                 
-      - NAME   : row_ndx
-        TYPES  : size_t
-        DESCR  : The row index.
-      - NAME   : out
-        TYPES  : std::ostream&
-        DESCR  : Output stream.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_to_string
-        DESCR  : 
 - Table:
   METHODS:
   - g_dyn_table_clear:
@@ -129,24 +73,6 @@ CATEGORIES :
                  This method will remove all rows in a table.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_clear
-        DESCR  : 
-  - g_dyn_table_clear_subtable:
-      NAMES    : get_subtable
-      SUMMARY  : &g_dyn_table_clear_subtable_summary
-                 Get subtable
-      DESCR    : &g_dyn_table_clear_subtable_descr
-                 |
-                 The value of a cell can be a table. Such a value is referred to
-                 a subtable. This method deletes all rows of such a subtable.
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : row_ndx
-        TYPES  : size_t
-        DESCR  : The row index.
-      EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_clear_subtable
         DESCR  :
   - g_dyn_table_optimize:
       NAMES    : optimize
@@ -205,44 +131,7 @@ CATEGORIES :
         DESCR  : <code>true</code> if the two tables are not identical, <code>false</code> otherwise,
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_operator!=
-        DESCR  : 
-- Index:
-  METHODS:
-  - g_dyn_table_set_index:
-      NAMES    : set_index
-      SUMMARY  : &g_dyn_table_set_index_summary
-                 Add an index to a column.
-      DESCR    : &g_dyn_table_set_index_descr
-                 |
-                 Adding an index to a column will make queries faster. 
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : Column index.
-      - NAME   : update_spec
-        TYPES  : bool
-        DESCR  : "If <code>true</code>, the spec will be updated. Default: <code>true</code>."
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_set_index
-        DESCR  : 
-  - g_dyn_table_has_index:
-      NAMES    : has_index
-      SUMMARY  : &g_dyn_table_has_index_summary
-                 Is column indexed?
-      DESCR    : &g_dyn_table_has_index_descr
-                 |
-                 Check if a column has an index.
-      CONST    : true
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : Column index.
-      RETURN:                 
-        TYPES  : bool
-        DESCR  : <code>true</code> if column is indexed, <code>false</code> otherwise.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_has_index
-        DESCR  : 
+        DESCR  :
 - Columns:
   METHODS:
   - g_dyn_table_get_column_count:
@@ -388,6 +277,24 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_insert_xxx
         DESCR  : 
       SEE      : "{@link insert_empty_row}"
+  - g_dyn_table_remove_row:
+      NAMES    : remove
+      SUMMARY  : &g_dyn_table_remove_row_summary
+                 Delete rows.
+      DESCR    : &g_dyn_table_remove_row_descr
+                 Delete rows.
+      SIGNATURE: void remove(size_t row_ndx);
+      PARAMS:
+      - NAME   : row_ndx
+        TYPES  : size_t
+        DESCR  : Position of row to delete.
+  - g_dyn_table_remove_last_row:
+      NAMES    : remove_last
+      SUMMARY  : &g_dyn_table_remove_last_row_summary
+                 Delete last row.
+      DESCR    : &g_dyn_table_remove_last_row_descr
+                 Delete last rows
+      SIGNATURE: void remove_last();
 - Cells:
   METHODS:
   - g_dyn_table_get_bool:
@@ -397,20 +304,25 @@ CATEGORIES :
   - g_dyn_table_get_binary:
   - g_dyn_table_get_mixed:
   - g_dyn_table_get_mixed_type:
-      NAMES    : [get_bool, get_int, get_date, get_string, get_binary, get_mixed, get_mixed_type]
+  - g_dyn_table_get_subtable:
+  - g_dyn_table_get_subtable_const:
+      NAMES    : get_*
       SUMMARY  : &g_dyn_table_get_xxx_summary
                  Get value
       DESCR    : &g_dyn_table_get_xxx_descr
                  |
                  This method will retrieve the value of a cell (row/column).
       SIGNATURE: |
-                 bool        get_bool(size_t column_ndx, size_t row_ndx) const;
-                 int64_t     get_int(size_t column_ndx, size_t row_ndx) const;
-                 time_t      get_date(size_t column_ndx, size_t row_ndx) const;
-                 const char* get_string(size_t column_ndx, size_t row_ndx) const;
-                 BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const;
-                 Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const;
-                 ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
+                 bool          get_bool(size_t column_ndx, size_t row_ndx) const;
+                 int64_t       get_int(size_t column_ndx, size_t row_ndx) const;
+                 time_t        get_date(size_t column_ndx, size_t row_ndx) const;
+                 const char*   get_string(size_t column_ndx, size_t row_ndx) const;
+                 BinaryData    get_binary(size_t column_ndx, size_t row_ndx) const;
+                 Mixed         get_mixed(size_t column_ndx, size_t row_ndx) const;
+                 ColumnType    get_mixed_type(size_t column_ndx, size_t row_ndx) const
+                 
+                 TableRef      get_subtable(size_t column_ndx, size_t row_ndx);
+                 ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
@@ -424,56 +336,15 @@ CATEGORIES :
         DESCR  : The value.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_xxx
-        DESCR  : 
-  - g_dyn_table_get_subtable:
-      NAMES    : get_subtable
-      SUMMARY  : &g_dyn_table_get_subtable_summary
-                 Get subtable
-      DESCR    : &g_dyn_table_get_subtable_descr
-                 |
-                 The value of a cell can be a table. Such a value is referred to
-                 a subtable. This method retrieves a subtable.
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : row_ndx
-        TYPES  : size_t
-        DESCR  : The row index.
-      RETURN:
-        TYPES  : TableRef
-        DESCR  : A reference to a table.
-      EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_get_subtable
-        DESCR  :
-  - g_dyn_table_get_subtable_const:
-      NAMES    : get_subtable
-      SUMMARY  : &g_dyn_table_get_subtable_const_summary
-                 Get subtable
-      DESCR    : &g_dyn_table_get_subtable_const_descr
-                 |
-                 The value of a cell can be a table. Such a value is referred to
-                 a subtable. This method retrieves a subtable.
-      CONST    : true
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : row_ndx
-        TYPES  : size_t
-        DESCR  : The row index.
-      RETURN:
-        TYPES  : ConstTableRef
-        DESCR  : A reference to a table.
-      EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_get_subtable_const
         DESCR  :
   - g_dyn_table_set_bool:
   - g_dyn_table_set_int:
+  - g_dyn_table_set_enum:
   - g_dyn_table_set_date:
   - g_dyn_table_set_string:
+  - g_dyn_table_set_binary:
   - g_dyn_table_set_mixed:
-      NAMES    : [set_bool, set_int, set_enum, set_date, set_string, set_binary, set_mixed, set_mixed_type]
+      NAMES    : set_*
       SUMMARY  : &g_dyn_table_set_xxx_summary
                  Set value
       DESCR    : &g_dyn_table_set_xxx_descr
@@ -502,7 +373,86 @@ CATEGORIES :
         DESCR  : Size in bytes of binary value.
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_set_xxx
+        DESCR  :
+- Sub-tables:
+  METHODS:
+  - g_dyn_table_get_subtable_size:
+      NAMES    : get_subtable_size
+      SUMMARY  : &g_dyn_table_get_subtable_size_summary
+                 Get subtable
+      DESCR    : &g_dyn_table_get_subtable_size_descr
+                 |
+                 The value of a cell can be a table. Such a value is referred to
+                 a subtable. This method retrieves the number of rows of a subtable.
+      CONST    : true
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : The column index.
+      - NAME   : row_ndx
+        TYPES  : size_t
+        DESCR  : The row index.
+      RETURN:
+        TYPES  : size_t
+        DESCR  : Number of rows.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_get_subtable
+        DESCR  :
+  - g_dyn_table_clear_subtable:
+      NAMES    : clear_subtable
+      SUMMARY  : &g_dyn_table_clear_subtable_summary
+                 Get subtable
+      DESCR    : &g_dyn_table_clear_subtable_descr
+                 |
+                 The value of a cell can be a table. Such a value is referred to
+                 a subtable. This method deletes all rows of such a subtable.
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : The column index.
+      - NAME   : row_ndx
+        TYPES  : size_t
+        DESCR  : The row index.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_clear_subtable
+        DESCR  :
+- Indexes:
+  METHODS:
+  - g_dyn_table_set_index:
+      NAMES    : set_index
+      SUMMARY  : &g_dyn_table_set_index_summary
+                 Add an index to a column.
+      DESCR    : &g_dyn_table_set_index_descr
+                 |
+                 Adding an index to a column will make queries faster.
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : Column index.
+      - NAME   : update_spec
+        TYPES  : bool
+        DESCR  : "If <code>true</code>, the spec will be updated. Default: <code>true</code>."
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_set_index
         DESCR  : 
+  - g_dyn_table_has_index:
+      NAMES    : has_index
+      SUMMARY  : &g_dyn_table_has_index_summary
+                 Is column indexed?
+      DESCR    : &g_dyn_table_has_index_descr
+                 |
+                 Check if a column has an index.
+      CONST    : true
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : Column index.
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if column is indexed, <code>false</code> otherwise.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_has_index
+        DESCR  :
 - Searching:
   METHODS:
   - g_dyn_table_lookup:
@@ -530,7 +480,7 @@ CATEGORIES :
   - g_find_first_int:
   - g_find_first_date:
   - g_find_first_string:
-      NAMES    : [find_first_bool, find_first_int, find_first_date, find_first_string]
+      NAMES    : find_first_*
       SUMMARY  : &g_find_first_xxx_summary
                  Find first matching row.
       DESCR    : &g_find_first_xxx_descr
@@ -559,7 +509,11 @@ CATEGORIES :
   - g_find_all_int:
   - g_find_all_date:
   - g_find_all_string:
-      NAMES    : [find_all_bool, find_all_int, find_all_date, find_all_string]
+  - g_find_all_bool_const:
+  - g_find_all_int_const:
+  - g_find_all_date_const:
+  - g_find_all_string_const:
+      NAMES    : find_all_*
       SUMMARY  : &g_find_all_xxx_summary
                  Find all matching rows.
       DESCR    : &g_find_all_xxx_descr
@@ -567,11 +521,15 @@ CATEGORIES :
                  Find all occurences of a given value in a column. The rows are
                  returned as a {@link TableView}.
       SIGNATURE: |
-                 TableView find_all_int(size_t column_ndx, int64_t value);
-                 TableView find_all_bool(size_t column_ndx, bool value);
-                 TableView find_all_date(size_t column_ndx, time_t value);
-                 TableView find_all_string(size_t column_ndx, const char* value);
-      CONST    : True
+                 TableView      find_all_int(size_t column_ndx, int64_t value);
+                 TableView      find_all_bool(size_t column_ndx, bool value);
+                 TableView      find_all_date(size_t column_ndx, time_t value);
+                 TableView      find_all_string(size_t column_ndx, const char* value);
+                 
+                 ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
+                 ConstTableView find_all_bool(size_t column_ndx, bool value) const;
+                 ConstTableView find_all_date(size_t column_ndx, time_t value) const;
+                 ConstTableView find_all_string(size_t column_ndx, const char* value) const;
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
@@ -585,43 +543,17 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_all_xxx
         DESCR  :
-  - g_find_all_bool_const:
-  - g_find_all_int_const:
-  - g_find_all_date_const:
-  - g_find_all_string_const:
-      NAMES    : [find_all_bool_const, find_all_int_const, find_all_date_const, find_all_string_const]
-      SUMMARY  : &g_find_all_xxx_const_summary
-                 Find all matching rows.
-      DESCR    : &g_find_all_xxx_const_descr
-                 |
-                 Find all occurences of a given value in a column. The rows are
-                 returned as a {@link ConstTableView}.
-      SIGNATURE: |
-                 ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
-                 ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-                 ConstTableView find_all_date(size_t column_ndx, time_t value) const;
-                 ConstTableView find_all_string(size_t column_ndx, const char* value) const;
-      CONST    : True
-      PARAMS:
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.
-      - NAME   : value
-        TYPES  : [bool, int64_t, time_t, const char*]
-        DESCR  : The value.
-      RETURN:
-        TYPES  : ConstTableView
-        DESCR  : The view.
-      EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_find_all_xxx_const
-        DESCR  :
   - g_dyn_table_get_sorted_view:
+  - g_dyn_table_get_sorted_view_const:
       NAMES    : get_sorted_view
       SUMMARY  : &g_dyn_table_get_sorted_view_summary
                  Sort the table.
       DESCR    : &g_dyn_table_get_sorted_view_desc
                  |
                  This method will sort the rows by using values of a given column.
+      SIGNATURE: |
+                 TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
+                 ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const;
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
@@ -636,25 +568,29 @@ CATEGORIES :
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_get_sorted_view
         DESCR  :
-  - g_dyn_table_get_sorted_view_const:
-      NAMES    : get_sorted_view
-      SUMMARY  : *g_dyn_table_get_sorted_view_summary
-      DESCR    : *g_dyn_table_get_sorted_view_desc
-      CONST    : true
+  - g_dyn_table_distinct:
+  - g_dyn_table_distinct_const:
+      NAMES    : distinct
+      SUMMARY  : &g_dyn_table_distinct_summary
+                 Get distinct rows.
+      DESCR    : &g_dyn_table_distinct_desc
+                 >
+                 This method will return a view with distinct rows for a given column
+                 (first matching row for each unique value in column).
+      SIGNATURE: |
+                 TableView      distinct(size_t column_ndx);
+                 ConstTableView distinct(size_t column_ndx) const;
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : The column index.
-      - NAME   : ascending
-        TYPES  : bool
-        DESCR  : *cpp_dyn_table_get_sorted_view_param
       RETURN:
-        TYPES  : ConstTableView
+        TYPES  : TableView
         DESCR  : A view.
-      EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_get_sorted_view_const
+      EXAMPLES:                  
+      - CODE   : ex_cpp_dyn_table_distinct
         DESCR  :
-- Aggregate:
+- Aggregates:
   METHODS:
   - g_dyn_table_count:
       NAMES    : count
@@ -769,26 +705,60 @@ CATEGORIES :
         DESCR  : The average
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_average
-        DESCR  : 
-  - g_dyn_table_get_subtable_size:
-      NAMES    : get_subtable_size
-      SUMMARY  : &g_dyn_table_get_subtable_size_summary
-                 Get subtable
-      DESCR    : &g_dyn_table_get_subtable_size_descr
+        DESCR  :
+- Dump:
+  METHODS:
+  - g_dyn_table_to_json:
+      NAMES    : to_json
+      SUMMARY  : &g_dyn_table_to_json_summary
+                 Convert table to JSON.
+      DESCR    : &g_dyn_table_to_json_descr
                  |
-                 The value of a cell can be a table. Such a value is referred to
-                 a subtable. This method retrieves the number of rows of a subtable.
+                 The JavaScript Object Notation (<a href="http://json.org">JSON</a>) is useful
+                 for web/mobile applications and serialization. This method will convert a table 
+                 and its columns and rows to a JSON compatible representation.
+      PARAMS:                 
+      - NAME   : out
+        TYPES  : std::ostream&
+        DESCR  : Output stream.
+      EXAMPLES:                  
+      - CODE   : ex_cpp_dyn_table_to_json
+        DESCR  : 
+  - g_dyn_table_to_string:
+      NAMES    : to_string
+      SUMMARY  : &g_dyn_table_to_string_summary
+                 Convert table to a string.
+      DESCR    : &g_dyn_table_to_string_descr
+                 |
+                 This method will convert a table and its columns and rows to a format
+                 which is easily read by humans.
       CONST    : true
-      PARAMS:
-      - NAME   : column_ndx
+      PARAMS:                 
+      - NAME   : out
+        TYPES  : std::ostream&
+        DESCR  : Output stream.
+      - NAME   : limit
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : "The number of rows to convert. Default: 500."
+      EXAMPLES:                  
+      - CODE   : ex_cpp_dyn_table_to_string
+        DESCR  : 
+  - g_dyn_table_row_to_string:
+      NAMES    : to_string
+      SUMMARY  : &g_dyn_table_row_to_string_summary
+                 Convert a row to a string.
+      DESCR    : &g_dyn_table_row_to_string_descr
+                 |
+                 This method will convert a row to a format
+                 which is easily read by humans.
+      CONST    : true
+      PARAMS:                 
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : The row index.
-      RETURN:
-        TYPES  : size_t
-        DESCR  : Number of rows.
-      EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_get_subtable
+      - NAME   : out
+        TYPES  : std::ostream&
+        DESCR  : Output stream.
+      EXAMPLES:                  
+      - CODE   : ex_cpp_dyn_table_to_string
         DESCR  :
