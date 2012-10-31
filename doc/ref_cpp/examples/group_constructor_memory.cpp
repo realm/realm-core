@@ -21,6 +21,7 @@ void func(const char* data, size_t size)
 
     g.write("people.tightdb");
 }
+// @@EndExample@@
 
 int main()
 {
@@ -37,4 +38,3 @@ int main()
     }
     free(data);
 }
-// @@EndExample@@
