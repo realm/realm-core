@@ -207,7 +207,8 @@ case "$MODE" in
 
     "test-installed")
         PREFIX="$1"
-        make -C "test-installed" test || exit 1
+        make -C "test-installed" clean || exit 1
+        make -C "test-installed" test  || exit 1
         exit 0
         ;;
 
@@ -569,10 +570,16 @@ EOI
                 fi
             done
         fi
+        if [ "$USE_LIB64" ]; then
+            LIBDIR="/usr/local/lib64"
+        else
+            LIBDIR="/usr/local/lib"
+        fi
         path_list_prepend CPATH        "$TIGHTDB_HOME/src"         || exit 1
         path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb" || exit 1
         path_list_prepend PATH         "$TIGHTDB_HOME/src/tightdb" || exit 1
-        export CPATH LIBRARY_PATH PATH
+        path_list_prepend LD_RUN_PATH  "$LIBDIR"                   || exit 1
+        export CPATH LIBRARY_PATH PATH LD_RUN_PATH
         ERROR=""
         for x in $EXTENSIONS; do
             if [ -e "$TEMP_DIR/select/$x" ]; then
