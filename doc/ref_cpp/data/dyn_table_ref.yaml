@@ -17,7 +17,7 @@ EXAMPLES   :
 IGNORE     : []                   # List of method-ids to ignore   
 CATEGORIES :
 #- constructors: 
-- Aggregate:
+- State:
   METHODS:
   - g_dyn_table_size:
       NAMES    : size
@@ -47,141 +47,20 @@ CATEGORIES :
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_is_empty
         DESCR  : 
-  - g_dyn_table_count:
-      NAMES    : count
-      SUMMARY  : &g_dyn_table_count_summary
-                 Number of matching rows.
-      DESCR    : &g_dyn_table_count_descr
+  - g_dyn_table_is_valid:
+      NAMES    : is_valid
+      SUMMARY  : &g_dyn_table_is_valid_summary
+                 Is table valid/consistent.
+      DESCR    : &g_dyn_table_is_valid_descr
                  |
-                 Get the number of rows matching a value.
-      CONST    : True             
-      PARAMS:
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : Column index.
-      - NAME   : target
-        TYPES  : int64_t 
-        DESCR  : The value.
-      RETURN:                 
-        TYPES  : size_t
-        DESCR  : The number of rows.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_count
-        DESCR  : 
-  - g_dyn_table_count_string:
-      NAMES    : count_string
-      SUMMARY  : &g_dyn_table_count_string_summary
-                 Number of matching rows.
-      DESCR    : &g_dyn_table_count_string_descr
-                 |
-                 Get the number of rows matching a string value
-      CONST    : True             
-      PARAMS:
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : Column index.
-      - NAME   : target
-        TYPES  : const char*
-        DESCR  : The value.
-      RETURN:                 
-        TYPES  : size_t
-        DESCR  : The number of rows.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_count_string
-        DESCR  : 
-  - g_dyn_table_sum:
-      NAMES    : sum
-      SUMMARY  : &g_dyn_table_sum_summary
-                 Calculate the sum.
-      DESCR    : &g_dyn_table_sum_descr
-                 |
-                 Calculate the sum of a column.
-      CONST    : True             
-      PARAMS:
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : Column index.
-      RETURN:                 
-        TYPES  : int64_t
-        DESCR  : The sum.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_sum
-        DESCR  : 
-  - g_dyn_table_maximum:
-      NAMES    : maximum
-      SUMMARY  : &g_dyn_table_maximum_summary
-                 Find highest value.
-      DESCR    : &g_dyn_table_maximum_descr
-                 |
-                 Find the highest value.
-      CONST    : True             
-      PARAMS:
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : Column index.
-      RETURN:                 
-        TYPES  : int64_t
-        DESCR  : The maximum value.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_maximum
-        DESCR  : 
-  - g_dyn_table_minimum:
-      NAMES    : minimum
-      SUMMARY  : &g_dyn_table_minimum_summary
-                 Find lowest value.
-      DESCR    : &g_dyn_table_minimum_descr
-                 |
-                 Find the lowest value.
-      CONST    : True             
-      PARAMS:
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : Column index.
-      RETURN:                 
-        TYPES  : int64_t
-        DESCR  : The minimum value.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_minimum
-        DESCR  : 
-  - g_dyn_table_average:
-      NAMES    : average
-      SUMMARY  : &g_dyn_table_average_summary
-                 Calculate the average.
-      DESCR    : &g_dyn_table_average_descr
-                 |
-                 Calculate the average for a column.
-      CONST    : True             
-      PARAMS:
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : Column index.
-      RETURN:                 
-        TYPES  : double
-        DESCR  : The average
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_average
-        DESCR  : 
-  - g_dyn_table_get_subtable_size:
-      NAMES    : get_subtable_size
-      SUMMARY  : &g_dyn_table_get_subtable_size_summary
-                 Get subtable
-      DESCR    : &g_dyn_table_get_subtable_size_descr
-                 |
-                 The value of a cell can be a table. Such a value is referred to
-                 a subtable. This method retrieves the number of rows of a subtable.
+                 This method will perform a number of consistency checks on a table and its
+                 columns.
       CONST    : true
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : row_ndx
-        TYPES  : size_t
-        DESCR  : The row index.
-      RETURN:
-        TYPES  : size_t
-        DESCR  : Number of rows.
-      EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_get_subtable
+      RETURN:                 
+        TYPES  : bool
+        DESCR  : <code>true</code> if table is valid, <code>false</code> otherwise.
+      EXAMPLES:                  
+      - CODE   : ex_cpp_dyn_table_is_valid
         DESCR  :
 - Dump:
   METHODS:
@@ -280,21 +159,6 @@ CATEGORIES :
                  be faster. 
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_optimize
-        DESCR  : 
-  - g_dyn_table_is_valid:
-      NAMES    : is_valid
-      SUMMARY  : &g_dyn_table_is_valid_summary
-                 Is table valid/consistent.
-      DESCR    : &g_dyn_table_is_valid_descr
-                 |
-                 This method will perform a number of consistency checks on a table and its
-                 columns.
-      CONST    : true
-      RETURN:                 
-        TYPES  : bool
-        DESCR  : <code>true</code> if table is valid, <code>false</code> otherwise.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_is_valid
         DESCR  : 
   - g_dyn_table_opertator==:
       NAMES    : operator==
@@ -449,177 +313,64 @@ CATEGORIES :
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_get_column_type
         DESCR  : 
-- Searching:
+- Rows:
   METHODS:
-  - g_dyn_table_lookup:
-      NAMES    : lookup
-      SUMMARY  : &g_dyn_table_lookup_summary
-                 Lookup a value.
-      DESCR    : &g_dyn_table_lookup_descr
-                 |
-                 This method will find the first row where the value of first column matches
-                 a given string value. Defining the first column as a string with unique values,
-                 it is possible to combine such a table with this method to emulate a hash
-                 array using TightDB.
-      CONST    : True             
-      PARAMS:                 
-      - NAME   : value
-        TYPES  : const char*
-        DESCR  : The value to search for.
-      RETURN:                 
+  - g_dyn_table_add_empty_row:
+      NAMES    : add_empty_row
+      SUMMARY  : &g_dyn_table_add_empty_row_summary
+                 Add empty rows.
+      DESCR    : &g_dyn_table_add_empty_row_descr
+                 Add empty rows.
+      SIGNATURE: void add_empty_row(size_t num_rows = 1)
+      PARAMS:
+      - NAME   : num_rows
         TYPES  : size_t
-        DESCR  : The row index.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_lookup
-        DESCR  : 
-  - g_find_first_bool:
-  - g_find_first_int:
-  - g_find_first_date:
-  - g_find_first_string:
-      NAMES    : [find_first_bool, find_first_int, find_first_date, find_first_string]
-      SUMMARY  : &g_find_first_xxx_summary
-                 Find first matching row.
-      DESCR    : &g_find_first_xxx_descr
-                 |
-                 Find the first occurence of a given value in a column.
-      SIGNATURE: |                  
-                 size_t find_first_int(size_t column_ndx, int64_t value) const;
-                 size_t find_first_bool(size_t column_ndx, bool value) const;
-                 size_t find_first_date(size_t column_ndx, time_t value) const;
-                 size_t find_first_string(size_t column_ndx, const char* value) const;
-      CONST    : True             
-      PARAMS:                 
-      - NAME   : column_ndx
+        DESCR  : Number of rows to insert (defaults to one).
+  - g_dyn_table_insert_empty_row:
+      NAMES    : insert_empty_row
+      SUMMARY  : &g_dyn_table_insert_empty_row_summary
+                 Insert empty rows.
+      DESCR    : &g_dyn_table_insert_empty_row_descr
+                 Insert empty rows.
+      SIGNATURE: void insert_empty_row(size_t row_ndx, size_t num_rows = 1)
+      PARAMS:
+      - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : value
-        TYPES  : [bool, int64_t, time_t, const char*]
-        DESCR  : The value.
-      RETURN:                 
+        DESCR  : Position to insert at.
+      - NAME   : num_rows
         TYPES  : size_t
-        DESCR  : The row index.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_find_first_xxx
-        DESCR  : 
-  - g_find_all_bool:
-  - g_find_all_int:
-  - g_find_all_date:
-  - g_find_all_string:
-      NAMES    : [find_all_bool, find_all_int, find_all_date, find_all_string]
-      SUMMARY  : &g_find_all_xxx_summary
-                 Find all matching rows.
-      DESCR    : &g_find_all_xxx_descr
-                 |
-                 Find all occurences of a given value in a column. The rows are
-                 returned as a {@link TableView}.
-      SIGNATURE: |                  
-                 TableView find_all_int(size_t column_ndx, int64_t value);
-                 TableView find_all_bool(size_t column_ndx, bool value);
-                 TableView find_all_date(size_t column_ndx, time_t value);
-                 TableView find_all_string(size_t column_ndx, const char* value);
-      CONST    : True             
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : value
-        TYPES  : [bool, int64_t, time_t, const char*]
-        DESCR  : The value.
-      RETURN:                 
-        TYPES  : TableView
-        DESCR  : The view.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_find_all_xxx
-        DESCR  : 
-  - g_find_all_bool_const:
-  - g_find_all_int_const:
-  - g_find_all_date_const:
-  - g_find_all_string_const:
-      NAMES    : [find_all_bool_const, find_all_int_const, find_all_date_const, find_all_string_const]
-      SUMMARY  : &g_find_all_xxx_const_summary
-                 Find all matching rows.
-      DESCR    : &g_find_all_xxx_const_descr
-                 |
-                 Find all occurences of a given value in a column. The rows are
-                 returned as a {@link ConstTableView}.
-      SIGNATURE: |                  
-                 ConstTableView find_all_int(size_t column_ndx, int64_t value) const; 
-                 ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-                 ConstTableView find_all_date(size_t column_ndx, time_t value) const;
-                 ConstTableView find_all_string(size_t column_ndx, const char* value) const;
-      CONST    : True             
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : value
-        TYPES  : [bool, int64_t, time_t, const char*]
-        DESCR  : The value.
-      RETURN:                 
-        TYPES  : ConstTableView
-        DESCR  : The view.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_find_all_xxx_const
-        DESCR  : 
-  - g_dyn_table_get_sorted_view:
-      NAMES    : get_sorted_view
-      SUMMARY  : &g_dyn_table_get_sorted_view_summary
-                 Sort the table.
-      DESCR    : &g_dyn_table_get_sorted_view_desc
-                 |
-                 This method will sort the rows by using values of a given column.
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : ascending
-        TYPES  : bool
-        DESCR  : &cpp_dyn_table_get_sorted_view_param
-                 "If <code>true</code>, rows are sorted ascending. Default: <code>true</code>."
-      RETURN:                 
-        TYPES  : TableView
-        DESCR  : A view.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_get_sorted_view
-        DESCR  : 
-  - g_dyn_table_get_sorted_view_const:
-      NAMES    : get_sorted_view
-      SUMMARY  : *g_dyn_table_get_sorted_view_summary
-      DESCR    : *g_dyn_table_get_sorted_view_desc
-      CONST    : true
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : ascending
-        TYPES  : bool
-        DESCR  : *cpp_dyn_table_get_sorted_view_param
-      RETURN:                 
-        TYPES  : ConstTableView
-        DESCR  : A view.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_get_sorted_view_const
-        DESCR  : 
-- Row:
-  METHODS:
+        DESCR  : Number of rows to insert (defaults to one).
   - g_dyn_table_insert_bool:
   - g_dyn_table_insert_int:
+  - g_dyn_table_insert_enum:
   - g_dyn_table_insert_date:
   - g_dyn_table_insert_string:
+  - g_dyn_table_insert_binary:
   - g_dyn_table_insert_mixed:
-      NAMES    : [insert_bool, insert_int, insert_date, insert_string, insert_mixed]
+  - g_dyn_table_insert_done:
+      NAMES    : insert_*
       SUMMARY  : &g_dyn_table_insert_xxx_summary
                  Insert a value.
       DESCR    : &g_dyn_table_insert_xxx_descr
-                 |
-                 This method inserts a value into a cell (row/column). Before inserting, you must create an
-                 empty row, and after inserting values, you must close the insert phase.
+                 >
+                 These methods are used to insert new rows.
+                 <p>
+                 WARNING: These methods are here for when you need max performance in inserts.
+                 But they can currupt the database if used incorrectly. When inserting a new row
+                 you have to call the corresponding insert method for <i>every</i> column in the table
+                 and end up with insert_done.
+                 <p>
+                 For a safe way to insert rows, use insert_empty_row, and then set individual values.
       SIGNATURE: |
-                 void insert_bool(size_t column_ndx, size_t row_ndx, bool value);
-                 void insert_int(size_t column_ndx, size_t row_ndx, int64_t value);
-                 void insert_date(size_t column_ndx, size_t row_ndx, time_t value);
-                 void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
-                 void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
+                 void insert_bool(size_t column_ndx, size_t row_ndx, bool value)
+                 void insert_int(size_t column_ndx, size_t row_ndx, int64_t value)
+                 void insert_enum(size_t column_ndx, size_t row_ndx, EnumType value)
+                 void insert_date(size_t column_ndx, size_t row_ndx, time_t value)
+                 void insert_string(size_t column_ndx, size_t row_ndx, const char* value)
+                 void insert_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len)
+                 void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
+                 void insert_subtable(size_t column_ndx, size_t row_ndx)
+                 void insert_done()
       PARAMS:                 
       - NAME   : column_ndx
         TYPES  : size_t
@@ -630,78 +381,14 @@ CATEGORIES :
       - NAME   : value
         TYPES  : [bool, int64_t, time_t, const char*, Mixed]
         DESCR  : The value.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_insert_xxx
-        DESCR  : 
-  - g_dyn_table_insert_enum:
-      NAMES    : insert_enum
-      SUMMARY  : *g_dyn_table_insert_xxx_summary
-      DESCR    : *g_dyn_table_insert_xxx_descr
-      SIGNATURE:
-               |
-               template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : row_ndx
-        TYPES  : size_t
-        DESCR  : The row index.
-      - NAME   : value
-        TYPES  : E
-        DESCR  : The value.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_insert_enum
-        DESCR  : 
-  - g_dyn_table_insert_binary:
-      NAMES    : insert_binary
-      SUMMARY  : *g_dyn_table_insert_xxx_summary
-      DESCR    : *g_dyn_table_insert_xxx_descr
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : row_ndx
-        TYPES  : size_t
-        DESCR  : The row index.
-      - NAME   : value
-        TYPES  : const char*
-        DESCR  : The value.
       - NAME   : len
         TYPES  : size_t
-        DESCR  : The length of the value array.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_insert_binary
+        DESCR  : Size in bytes of binary value.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_insert_xxx
         DESCR  : 
-  - g_dyn_table_insert_subtable:
-      NAMES    : insert_subtable
-      SUMMARY  : &g_dyn_table_insert_subtable_summary
-                 Insert an empty subtable.
-      DESCR    : &g_dyn_table_insert_subtable_descr
-                 |
-                 This method inserts an empty subtable into a cell (row/column). Before inserting, you must 
-                 create an empty row, and after inserting values, you must close the insert phase.
-      PARAMS:                 
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : row_ndx
-        TYPES  : size_t
-        DESCR  : The row index.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_insert_subtable
-        DESCR  : 
-  - g_dyn_table_insert_done:
-      NAMES    : insert_done
-      SUMMARY  : &g_dyn_table_insert_done_summary
-                 Close insert phase.
-      DESCR    : &g_dyn_table_insert_done_descr
-                 |
-                 This method finalizes the insert phase.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_insert_done
-        DESCR  : 
-- Cell:
+      SEE      : "{@link insert_empty_row}"
+- Cells:
   METHODS:
   - g_dyn_table_get_bool:
   - g_dyn_table_get_int:
@@ -724,18 +411,18 @@ CATEGORIES :
                  BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const;
                  Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const;
                  ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
-      CONST    : True             
-      PARAMS:                 
+      CONST    : True
+      PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.     
+        DESCR  : The column index.
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : The row index.
-      RETURN:                 
+      RETURN:
         TYPES  : [bool, int64_t, time_t, const char*, BinaryData, Mixed, ColumnType]
         DESCR  : The value.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_xxx
         DESCR  : 
   - g_dyn_table_get_subtable:
@@ -786,7 +473,7 @@ CATEGORIES :
   - g_dyn_table_set_date:
   - g_dyn_table_set_string:
   - g_dyn_table_set_mixed:
-      NAMES    : [set_bool, set_int, set_date, set_string, set_binary, set_mixed, set_mixed_type]
+      NAMES    : [set_bool, set_int, set_enum, set_date, set_string, set_binary, set_mixed, set_mixed_type]
       SUMMARY  : &g_dyn_table_set_xxx_summary
                  Set value
       DESCR    : &g_dyn_table_set_xxx_descr
@@ -795,8 +482,10 @@ CATEGORIES :
       SIGNATURE: |
                  void set_bool(size_t column_ndx, size_t row_ndx, bool value);
                  void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
+                 void set_enum(size_t column_ndx, size_t row_ndx, EnumType value);
                  void set_date(size_t column_ndx, size_t row_ndx, time_t value);
                  void set_string(size_t column_ndx, size_t row_ndx, const char* value);
+                 void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
                  void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
       PARAMS:                 
       - NAME   : column_ndx
@@ -808,49 +497,298 @@ CATEGORIES :
       - NAME   : value
         TYPES  : [bool, int64_t, time_t, const char*, Mixed]
         DESCR  : The value.
+      - NAME   : len
+        TYPES  : size_t
+        DESCR  : Size in bytes of binary value.
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_set_xxx
         DESCR  : 
-  - g_dyn_table_set_binary:
-      NAMES    : set_binary
-      SUMMARY  : &g_dyn_table_set_binary_summary
-                 Set value
-      DESCR    : &g_dyn_table_set_binary_descr
+- Searching:
+  METHODS:
+  - g_dyn_table_lookup:
+      NAMES    : lookup
+      SUMMARY  : &g_dyn_table_lookup_summary
+                 Lookup a value.
+      DESCR    : &g_dyn_table_lookup_descr
                  |
-                 This method will set the value of an existing cell (row/column).
-      PARAMS:                 
+                 This method will find the first row where the value of first column matches
+                 a given string value. Defining the first column as a string with unique values,
+                 it is possible to combine such a table with this method to emulate a hash
+                 array using TightDB.
+      CONST    : True
+      PARAMS:
+      - NAME   : value
+        TYPES  : const char*
+        DESCR  : The value to search for.
+      RETURN:
+        TYPES  : size_t
+        DESCR  : The row index.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_lookup
+        DESCR  :
+  - g_find_first_bool:
+  - g_find_first_int:
+  - g_find_first_date:
+  - g_find_first_string:
+      NAMES    : [find_first_bool, find_first_int, find_first_date, find_first_string]
+      SUMMARY  : &g_find_first_xxx_summary
+                 Find first matching row.
+      DESCR    : &g_find_first_xxx_descr
+                 |
+                 Find the first occurence of a given value in a column.
+      SIGNATURE: |
+                 size_t find_first_int(size_t column_ndx, int64_t value) const;
+                 size_t find_first_bool(size_t column_ndx, bool value) const;
+                 size_t find_first_date(size_t column_ndx, time_t value) const;
+                 size_t find_first_string(size_t column_ndx, const char* value) const;
+      CONST    : True
+      PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.     
+        DESCR  : The column index.
+      - NAME   : value
+        TYPES  : [bool, int64_t, time_t, const char*]
+        DESCR  : The value.
+      RETURN:
+        TYPES  : size_t
+        DESCR  : The row index.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_find_first_xxx
+        DESCR  :
+  - g_find_all_bool:
+  - g_find_all_int:
+  - g_find_all_date:
+  - g_find_all_string:
+      NAMES    : [find_all_bool, find_all_int, find_all_date, find_all_string]
+      SUMMARY  : &g_find_all_xxx_summary
+                 Find all matching rows.
+      DESCR    : &g_find_all_xxx_descr
+                 |
+                 Find all occurences of a given value in a column. The rows are
+                 returned as a {@link TableView}.
+      SIGNATURE: |
+                 TableView find_all_int(size_t column_ndx, int64_t value);
+                 TableView find_all_bool(size_t column_ndx, bool value);
+                 TableView find_all_date(size_t column_ndx, time_t value);
+                 TableView find_all_string(size_t column_ndx, const char* value);
+      CONST    : True
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : The column index.
+      - NAME   : value
+        TYPES  : [bool, int64_t, time_t, const char*]
+        DESCR  : The value.
+      RETURN:
+        TYPES  : TableView
+        DESCR  : The view.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_find_all_xxx
+        DESCR  :
+  - g_find_all_bool_const:
+  - g_find_all_int_const:
+  - g_find_all_date_const:
+  - g_find_all_string_const:
+      NAMES    : [find_all_bool_const, find_all_int_const, find_all_date_const, find_all_string_const]
+      SUMMARY  : &g_find_all_xxx_const_summary
+                 Find all matching rows.
+      DESCR    : &g_find_all_xxx_const_descr
+                 |
+                 Find all occurences of a given value in a column. The rows are
+                 returned as a {@link ConstTableView}.
+      SIGNATURE: |
+                 ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
+                 ConstTableView find_all_bool(size_t column_ndx, bool value) const;
+                 ConstTableView find_all_date(size_t column_ndx, time_t value) const;
+                 ConstTableView find_all_string(size_t column_ndx, const char* value) const;
+      CONST    : True
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : The column index.
+      - NAME   : value
+        TYPES  : [bool, int64_t, time_t, const char*]
+        DESCR  : The value.
+      RETURN:
+        TYPES  : ConstTableView
+        DESCR  : The view.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_find_all_xxx_const
+        DESCR  :
+  - g_dyn_table_get_sorted_view:
+      NAMES    : get_sorted_view
+      SUMMARY  : &g_dyn_table_get_sorted_view_summary
+                 Sort the table.
+      DESCR    : &g_dyn_table_get_sorted_view_desc
+                 |
+                 This method will sort the rows by using values of a given column.
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : The column index.
+      - NAME   : ascending
+        TYPES  : bool
+        DESCR  : &cpp_dyn_table_get_sorted_view_param
+                 "If <code>true</code>, rows are sorted ascending. Default: <code>true</code>."
+      RETURN:
+        TYPES  : TableView
+        DESCR  : A view.
+      EXAMPLES:                  
+      - CODE   : ex_cpp_dyn_table_get_sorted_view
+        DESCR  :
+  - g_dyn_table_get_sorted_view_const:
+      NAMES    : get_sorted_view
+      SUMMARY  : *g_dyn_table_get_sorted_view_summary
+      DESCR    : *g_dyn_table_get_sorted_view_desc
+      CONST    : true
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : The column index.
+      - NAME   : ascending
+        TYPES  : bool
+        DESCR  : *cpp_dyn_table_get_sorted_view_param
+      RETURN:
+        TYPES  : ConstTableView
+        DESCR  : A view.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_get_sorted_view_const
+        DESCR  :
+- Aggregate:
+  METHODS:
+  - g_dyn_table_count:
+      NAMES    : count
+      SUMMARY  : &g_dyn_table_count_summary
+                 Number of matching rows.
+      DESCR    : &g_dyn_table_count_descr
+                 |
+                 Get the number of rows matching a value.
+      CONST    : True
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : Column index.
+      - NAME   : target
+        TYPES  : int64_t
+        DESCR  : The value.
+      RETURN:
+        TYPES  : size_t
+        DESCR  : The number of rows.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_count
+        DESCR  :
+  - g_dyn_table_count_string:
+      NAMES    : count_string
+      SUMMARY  : &g_dyn_table_count_string_summary
+                 Number of matching rows.
+      DESCR    : &g_dyn_table_count_string_descr
+                 |
+                 Get the number of rows matching a string value
+      CONST    : True
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : Column index.
+      - NAME   : target
+        TYPES  : const char*
+        DESCR  : The value.
+      RETURN:
+        TYPES  : size_t
+        DESCR  : The number of rows.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_count_string
+        DESCR  :
+  - g_dyn_table_sum:
+      NAMES    : sum
+      SUMMARY  : &g_dyn_table_sum_summary
+                 Calculate the sum.
+      DESCR    : &g_dyn_table_sum_descr
+                 |
+                 Calculate the sum of a column.
+      CONST    : True
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : Column index.
+      RETURN:
+        TYPES  : int64_t
+        DESCR  : The sum.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_sum
+        DESCR  :
+  - g_dyn_table_maximum:
+      NAMES    : maximum
+      SUMMARY  : &g_dyn_table_maximum_summary
+                 Find highest value.
+      DESCR    : &g_dyn_table_maximum_descr
+                 |
+                 Find the highest value.
+      CONST    : True
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : Column index.
+      RETURN:
+        TYPES  : int64_t
+        DESCR  : The maximum value.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_maximum
+        DESCR  :
+  - g_dyn_table_minimum:
+      NAMES    : minimum
+      SUMMARY  : &g_dyn_table_minimum_summary
+                 Find lowest value.
+      DESCR    : &g_dyn_table_minimum_descr
+                 |
+                 Find the lowest value.
+      CONST    : True
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : Column index.
+      RETURN:
+        TYPES  : int64_t
+        DESCR  : The minimum value.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_minimum
+        DESCR  :
+  - g_dyn_table_average:
+      NAMES    : average
+      SUMMARY  : &g_dyn_table_average_summary
+                 Calculate the average.
+      DESCR    : &g_dyn_table_average_descr
+                 |
+                 Calculate the average for a column.
+      CONST    : True
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : Column index.
+      RETURN:
+        TYPES  : double
+        DESCR  : The average
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_average
+        DESCR  : 
+  - g_dyn_table_get_subtable_size:
+      NAMES    : get_subtable_size
+      SUMMARY  : &g_dyn_table_get_subtable_size_summary
+                 Get subtable
+      DESCR    : &g_dyn_table_get_subtable_size_descr
+                 |
+                 The value of a cell can be a table. Such a value is referred to
+                 a subtable. This method retrieves the number of rows of a subtable.
+      CONST    : true
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : The column index.
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : The row index.
-      - NAME   : value
-        TYPES  : const char*
-        DESCR  : The value.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_set_binary
-        DESCR  : 
-  - g_dyn_table_set_enum:
-      NAMES    : set_enum
-      SUMMARY  : &g_dyn_table_set_enum_summary
-                 Set value
-      DESCR    : &g_dyn_table_set_enum_descr
-                 |
-                 This method will set the value of an existing cell (row/column).
-      SIGNATURE:
-               |
-               template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
-      PARAMS:                 
-      - NAME   : column_ndx
+      RETURN:
         TYPES  : size_t
-        DESCR  : The column index.     
-      - NAME   : row_ndx
-        TYPES  : size_t
-        DESCR  : The row index.
-      - NAME   : value
-        TYPES  : const char*
-        DESCR  : The value.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_dyn_table_set_enum
-        DESCR  : 
+        DESCR  : Number of rows.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_get_subtable
+        DESCR  :
