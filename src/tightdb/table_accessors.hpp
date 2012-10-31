@@ -24,6 +24,7 @@
 #include <utility>
 
 #include <tightdb/mixed.hpp>
+#include <tightdb/table.hpp>
 
 namespace tightdb {
 
