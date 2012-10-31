@@ -5,6 +5,7 @@
 using namespace std;
 using namespace tightdb;
 
+// @@Example: ex_cpp_group_constructor_memory @@
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
@@ -36,3 +37,4 @@ int main()
     }
     free(data);
 }
+// @@EndExample@@
