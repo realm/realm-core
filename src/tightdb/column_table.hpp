@@ -207,6 +207,9 @@ protected:
 
     // Member variables
     size_t m_ref_specSet;
+
+    // Overriding virtual method in Table::Parent.
+    bool subtables_have_shared_spec() { return true; }
 };
 
 

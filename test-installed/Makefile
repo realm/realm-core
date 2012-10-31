@@ -1,6 +1,11 @@
 TEST_PROGRAMS = test-installed
 
-test_installed_SOURCES = test.cpp
-test_installed_LDFLAGS = -ltightdb
+test_installed_SOURCES       = test.cpp
+test_installed_CFLAGS_OPTIM  = $(shell tightdb-config     --cflags)
+test_installed_CFLAGS_DEBUG  = $(shell tightdb-config-dbg --cflags)
+test_installed_CFLAGS_COVER  = $(shell tightdb-config-dbg --cflags)
+test_installed_LDFLAGS_OPTIM = $(shell tightdb-config     --libs)
+test_installed_LDFLAGS_DEBUG = $(shell tightdb-config-dbg --libs)
+test_installed_LDFLAGS_COVER = $(shell tightdb-config-dbg --libs)
 
-include ../generic.mk
+include generic.mk

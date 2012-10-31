@@ -574,6 +574,21 @@ TEST(Column_FindHamming)
 }
 */
 
+
+TEST(Column_Average)
+{
+    Column c;
+    c.add(10);
+    CHECK_EQUAL(10, c.average());
+    
+    c.add(30);
+    CHECK_EQUAL(0, c.average(0,0));     // None
+    CHECK_EQUAL(10, c.average(0,1));    // first
+    CHECK_EQUAL(0, c.average(1,1));     // None
+    CHECK_EQUAL(30, c.average(1,2));    // second
+    CHECK_EQUAL(20, c.average(0,2));    // both
+}
+
 TEST(Column_Sum_Average)
 {
     Column c;

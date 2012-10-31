@@ -12,13 +12,25 @@ Format:
 
 ==================
 
+2012-10-24 (Kristian Spangsege)
+----------
++ Added Table::has_shared_spec().
+
+
+2012-10-10 (Kristian Spangsege)
+----------
+! Fix a problem with MyTable::Query copy constructor that caused access to deallocated memory due to a pointer that was not updated.
+
+
 2012-10-02 (Kristian Spangsege)
 ----------
 + New program 'tightdb-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the TightDB core library.
 
+
 2012-10-01 (Brian Munkholm)
 ----------
 + 12 Added double Table::average(size_t column_ndx) const
+
 
 2012-09-07 (Alexander Stigsen)
 ----------

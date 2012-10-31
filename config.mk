@@ -1,34 +1,30 @@
 SOURCE_ROOT = src
-INSTALL_DEBUG_PROGS = 1
+ENABLE_INSTALL_STATIC_LIBS = 1
+ENABLE_INSTALL_DEBUG_LIBS  = 1
+ENABLE_INSTALL_DEBUG_PROGS = 1
 
 # Construct fat binaries on Darwin when using Clang
 ifneq ($(TIGHTDB_ENABLE_FAT_BINARIES),)
 ifneq ($(call CC_CXX_AND_LD_ARE,clang),)
 ifeq ($(shell uname),Darwin)
-CFLAGS_DEFAULT   += -arch i386 -arch x86_64
-LDFLAGS_DEFAULT  += -arch i386 -arch x86_64
+CFLAGS_ARCH += -arch i386 -arch x86_64
 endif
 endif
 endif
 
-ifneq ($(CC_CXX_AND_LD_ARE_GCC_LIKE),)
-CFLAGS_DEFAULT   += -Wextra -ansi -pedantic -Wno-long-long
 # FIXME: '-fno-elide-constructors' currently causes TightDB to fail
-#CFLAGS_DEBUG     += -fno-elide-constructors
-CFLAGS_PTHREAD   += -pthread
-ifeq ($(TIGHTDB_DISABLE_SSE),)
-CFLAGS_DEFAULT   += -msse4.2
-endif
-endif
+#CFLAGS_DEBUG   += -fno-elide-constructors
+CFLAGS_PTHREAD += -pthread
+CFLAGS_GENERAL += -Wextra -ansi -pedantic -Wno-long-long
 
 
 ifeq ($(TIGHTDB_DISABLE_SSE),)
-CFLAGS_DEFAULT   += -DUSE_SSE42
+PROJECT_CFLAGS = -msse4.2 -DUSE_SSE42
 endif
 
 ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
-CFLAGS_DEFAULT   += -DTIGHTDB_ENABLE_REPLICATION
+PROJECT_CFLAGS += -DTIGHTDB_ENABLE_REPLICATION
 endif
 
-CFLAGS_DEBUG     += -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
-CFLAGS_COVERAGE  += -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
+PROJECT_CFLAGS_DEBUG = -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4
+PROJECT_CFLAGS_COVER = -DTIGHTDB_DEBUG -DMAX_LIST_SIZE=4

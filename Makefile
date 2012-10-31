@@ -1,12 +1,11 @@
 SUBDIRS = src test
 test_DEPS = src
-PASSIVE_SUBDIRS = test-installed
 
 include generic.mk
 
 # Run the benchmarking programs
 .PHONY: benchmark
-benchmark: static
+benchmark: minimal
 	@$(MAKE) -C test benchmark
 
 # Run coverage analysis after building everything, this time using LCOV
@@ -21,7 +20,3 @@ lcov: test-cover
 .PHONY: gcovr
 gcovr: test-cover
 	gcovr -r src -x >gcovr.xml
-
-.PHONY: test-installed
-test-installed:
-	@$(MAKE) -C test-installed test

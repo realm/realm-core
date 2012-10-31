@@ -73,6 +73,7 @@ public:
     typedef BasicTableView<const BasicTable> ConstView;
 
     using Table::is_valid;
+    using Table::has_shared_spec;
     using Table::is_empty;
     using Table::size;
     using Table::clear;
@@ -301,6 +302,8 @@ public:
     template<class, int, class> friend class _impl::QueryColumn;
 
     Query(): Spec::template ColNames<QueryCol, Query*>(this) {}
+
+    Query(const Query&q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
 
     Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
 

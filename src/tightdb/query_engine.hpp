@@ -65,10 +65,9 @@ public:
         }
 
         if (matchcount)
-            *matchcount = int64_t(m_state.match_count);
+            *matchcount = int64_t(m_state.match_count); // why this cast?
 
         return m_state.state;
-
     }
 
 
@@ -86,8 +85,7 @@ public:
             return agg<TDB_COUNT>(res, start, end, limit, agg_col, matchcount);
 
         TIGHTDB_ASSERT(false);
-        return uint64_t(-1);
-
+        return uint64_t(-1);    // why this cast?
     }
 
     virtual std::string Verify(void)
@@ -98,7 +96,7 @@ public:
             return "";
         else
             return m_child->Verify();
-    };
+    }
 
 protected:
     friend class Query;

@@ -11,8 +11,6 @@
 
 using namespace std;
 
-#include <tightdb/array.hpp>
-using namespace tightdb;
 
 int main(int argc, char* argv[])
 {
@@ -24,7 +22,7 @@ int main(int argc, char* argv[])
     cout << "Running Release unit tests\n\n";
 #endif
 
-    const int res =UnitTest::RunAllTests();
+    const int res = UnitTest::RunAllTests();
 
 #ifdef _MSC_VER
     getchar(); // wait for key
