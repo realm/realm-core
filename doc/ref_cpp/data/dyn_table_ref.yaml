@@ -138,7 +138,7 @@ CATEGORIES :
       NAMES    : get_column_count
       SUMMARY  : &g_dyn_table_get_column_count_summary
                  Get the number of columns.
-      DESCR    : g_dyn_table_get_column_count_descr
+      DESCR    : &g_dyn_table_get_column_count_descr
                  |
                  Get the number of columns.
       CONST    : True             
@@ -288,6 +288,9 @@ CATEGORIES :
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : Position of row to delete.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_remove
+        DESCR  :
   - g_dyn_table_remove_last_row:
       NAMES    : remove_last
       SUMMARY  : &g_dyn_table_remove_last_row_summary
@@ -295,6 +298,9 @@ CATEGORIES :
       DESCR    : &g_dyn_table_remove_last_row_descr
                  Delete last rows
       SIGNATURE: void remove_last();
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_remove_last_row
+        DESCR  :
 - Cells:
   METHODS:
   - g_dyn_table_get_bool:

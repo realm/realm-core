@@ -14,8 +14,8 @@ CATEGORIES:                       # list global class-id in order of appearence
 #  - typed_view
 #  - typed_query
 - Dynamic Table:
-  - dyn_table
-#  - dyn_view
+  - dyn_table                     # 85 %
+  - dyn_view
   - dyn_query                     # 90 %
 - Collection:
   - group                         # 97 %
