@@ -645,7 +645,7 @@ template<class S> void Array::WriteAt(size_t pos, S& out) const
 
     // TODO: replace capacity with checksum
 
-    // Calculate full lenght of array in bytes, including padding
+    // Calculate full length of array in bytes, including padding
     // for 64bit alignment (that may be composed of random bits)
     size_t len          = m_len;
     const WidthType wt  = get_header_wtype();

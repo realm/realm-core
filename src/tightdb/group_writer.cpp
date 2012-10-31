@@ -40,12 +40,15 @@ void GroupWriter::SetVersions(size_t current, size_t readlock) {
 
 size_t GroupWriter::Commit()
 {
+    merge_free_space();
+
     Array& top          = m_group.get_top_array();
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
     const bool isShared = m_group.is_shared();
     TIGHTDB_ASSERT(fpositions.Size() == flengths.Size());
+    TIGHTDB_ASSERT(!isShared || fversions.Size() == flengths.Size());
 
     // Recursively write all changed arrays
     // (but not top yet, as it contains refs to free lists which are changing)
@@ -57,11 +60,8 @@ size_t GroupWriter::Commit()
     const size_t fcount = freeSpace.size();
     for (size_t i = 0; i < fcount; ++i) {
         SlabAlloc::FreeSpace::ConstCursor r = freeSpace[i];
-        fpositions.add(r.ref);
-        flengths.add(r.size);
-        if (isShared) fversions.add(m_current_version);
+        add_free_space(r.ref, r.size, m_current_version);
     }
-    //TODO: Consolidate free list
 
     // We now have a bit of an chicken-and-egg problem. We need to write our free
     // lists to the file, but the act of writing them will affect the amount
@@ -71,70 +71,49 @@ size_t GroupWriter::Commit()
     // largest size they can get:
     // (64bit width + one possible ekstra entry per alloc and header)
     const size_t free_count = fpositions.Size() + 5;
-    size_t top_max_size = (5 + 1) * 8;
-    size_t flist_max_size = (free_count) * 8;
+    const size_t top_max_size = (5 + 1) * 8;
+    const size_t flist_max_size = (free_count) * 8;
+    const size_t total_reserve = top_max_size + (flist_max_size * (isShared ? 3 : 2));
 
     // Reserve space for each block. We explicitly ask for a bigger space than
-    // the block can occupy, so that we know that we will have to add the rest
-    // space later
-    const size_t top_pos = get_free_space(top_max_size, m_len);
-    const size_t fp_pos  = get_free_space(flist_max_size, m_len);
-    const size_t fl_pos  = get_free_space(flist_max_size, m_len);
-    const size_t fv_pos  = isShared ? get_free_space(flist_max_size, m_len) : 0;
+    // the blocks can occupy, so that later when we know the real size, we can
+    // adjust the segment size, without changing the width.
+    const size_t res_ndx = reserve_free_space(total_reserve, m_len);
+    const size_t res_pos = fpositions.Get(res_ndx); // top of reserved segments
 
-    // Update top and make sure that it is big enough to hold any position
-    // the free lists can get
+    // Get final sizes of free lists
+    const size_t fp_size  = fpositions.GetByteSize(true);
+    const size_t fl_size  = flengths.GetByteSize(true);
+    const size_t fv_size  = isShared ? fversions.GetByteSize(true) : 0;
+
+    // Calc write positions
+    const size_t fl_pos = res_pos + fp_size;
+    const size_t fv_pos = fl_pos + fl_size;
+    const size_t top_pos = fv_pos + fv_size;
+
+    // Update top to point to the reserved locations
     top.Set(0, n_pos);
     top.Set(1, t_pos);
-    top.Set(2, m_len); // just to expand width, values for free tracking set later
-
-    // Add dummy values to freelists so we can get the final size.
-    // The values are chosen to be so big that we are guaranteed that
-    // the list will not expand width when the real values are set later.
-    fpositions.add(m_len);
-    fpositions.add(m_len);
-    fpositions.add(m_len);
-    fpositions.add(m_len);
-    flengths.add(flist_max_size);
-    flengths.add(flist_max_size);
-    flengths.add(flist_max_size);
-    flengths.add(flist_max_size);
-    if (isShared) {
-        fversions.add(0);
-        fversions.add(0);
-        fversions.add(0);
-        fversions.add(0);
-    }
+    top.Set(2, res_pos);
+    top.Set(3, fl_pos);
+    if (isShared) top.Set(4, fv_pos);
+    else if (top.Size() == 5) top.Delete(4); // versions
 
     // Get final sizes
     const size_t top_size = top.GetByteSize(true);
-    const size_t fp_size  = fpositions.GetByteSize(true);
-    const size_t fl_size  = flengths.GetByteSize(true);
-    const size_t fv_size  = isShared ? flengths.GetByteSize(true) : 0;
+    const size_t end_pos = top_pos + top_size;
+    const size_t rest = total_reserve - (end_pos - res_pos);
 
     // Set the correct values for rest space
-    size_t fc = fpositions.Size()-1;
-    if (isShared) {
-        fpositions.Set(fc, fv_pos + fv_size);
-        flengths.Set(fc--, flist_max_size - fv_size);
-    }
-    fpositions.Set(fc, fl_pos + fl_size);
-    flengths.Set(fc--, flist_max_size - fl_size);
-    fpositions.Set(fc, fp_pos + fp_size);
-    flengths.Set(fc--, flist_max_size - fp_size);
-    fpositions.Set(fc, top_pos + top_size);
-    flengths.Set(fc, top_max_size - top_size);
+    fpositions.Set(res_ndx, end_pos);
+    flengths.Set(res_ndx, rest);
 
     // Write free lists
-    fpositions.WriteAt(fp_pos, *this);
+    fpositions.WriteAt(res_pos, *this);
     flengths.WriteAt(fl_pos, *this);
     if (isShared) fversions.WriteAt(fv_pos, *this);
 
     // Write top
-    top.Set(2, fp_pos);
-    top.Set(3, fl_pos);
-    if (isShared) top.Set(4, fv_pos);
-    else if (top.Size() == 5) top.Delete(4); // versions
     top.WriteAt(top_pos, *this);
 
     // Commit
@@ -144,6 +123,10 @@ size_t GroupWriter::Commit()
     // and remap if file size has changed
     SlabAlloc& alloc = m_group.get_allocator();
     alloc.FreeAll(m_len);
+
+#ifdef TIGHTDB_DEBUG
+    Verify();
+#endif
 
     return top_pos;
 }
@@ -209,6 +192,117 @@ void GroupWriter::DoCommit(uint64_t topPos)
 #endif
 }
 
+void GroupWriter::merge_free_space() {
+    Array& fpositions   = m_group.m_freePositions;
+    Array& flengths     = m_group.m_freeLengths;
+    Array& fversions    = m_group.m_freeVersions;
+    const bool isShared = m_group.is_shared();
+
+    size_t count = flengths.Size()-1;
+    for (size_t i = 0; i < count; ++i) {
+        const size_t i2 = i+1;
+        const size_t pos1 = fpositions.Get(i);
+        const size_t len1 = flengths.Get(i);
+        const size_t pos2 = fpositions.Get(i2);
+
+        if (pos2 == pos1 + len1) {
+            // If this is a shared db, we can only merge
+            // segments where no part is currently in use
+            if (isShared) {
+                const size_t v1 = fversions.Get(i);
+                if (v1 >= m_readlock_version) continue;
+                const size_t v2 = fversions.Get(i2);
+                if (v2 >= m_readlock_version) continue;
+            }
+
+            // Merge
+            const size_t len2 = flengths.Get(i2);
+            flengths.Set(i, len1 + len2);
+            fpositions.Delete(i2);
+            flengths.Delete(i2);
+            if (isShared) fversions.Delete(i2);
+
+            --count;
+            --i;
+        }
+    }
+}
+
+void GroupWriter::add_free_space(size_t pos, size_t len, size_t version) {
+    Array& fpositions   = m_group.m_freePositions;
+    Array& flengths     = m_group.m_freeLengths;
+    Array& fversions    = m_group.m_freeVersions;
+    const bool isShared = m_group.is_shared();
+
+    // We always want to keep the list of free space in
+    // sorted order (by position) to facilitate merge of
+    // adjecendant segments. We can find the correct
+    // insert postion by binary search
+    const size_t p = fpositions.FindPos2(pos);
+
+    if (p == not_found) {
+        fpositions.add(pos);
+        flengths.add(len);
+        if (isShared) fversions.add(version);
+    }
+    else {
+        fpositions.Insert(p, pos);
+        flengths.Insert(p, len);
+        if (isShared) fversions.Insert(p, version);
+    }
+}
+
+size_t GroupWriter::reserve_free_space(size_t len, size_t& filesize, size_t start) {
+    Array& fpositions   = m_group.m_freePositions;
+    Array& flengths     = m_group.m_freeLengths;
+    Array& fversions    = m_group.m_freeVersions;
+    const bool isShared = m_group.is_shared();
+
+    // Do we have a free space we can reuse?
+    const size_t count = flengths.Size();
+    for (size_t i = start; i < count; ++i) {
+        const size_t free_len = flengths.Get(i);
+        if (len <= free_len) {
+            // Only blocks that are not occupied by current
+            // readers are allowed to be used.
+            if (isShared) {
+                const size_t v = fversions.Get(i);
+                if (v >= m_readlock_version) continue;
+            }
+
+            // Split segment so we get exactly what was asked for
+            if (len != free_len) {
+                flengths.Set(i, len);
+
+                const size_t pos = fpositions.Get(i) + len;
+                const size_t rest = free_len - len;
+                fpositions.Insert(i+1, pos);
+                flengths.Insert(i+1, rest);
+                if (isShared) fversions.Insert(i+1, 0);
+            }
+
+            return i;
+        }
+    }
+
+    // No free space, so we have to extend the file.
+    const size_t ndx = extend_free_space(len, filesize);
+
+    // Split segment so we get exactly what was asked for
+    const size_t free_len = flengths.Get(ndx);
+    if (len != free_len) {
+        flengths.Set(ndx, len);
+
+        const size_t pos = fpositions.Get(ndx) + len;
+        const size_t rest = free_len - len;
+        fpositions.Insert(ndx+1, pos);
+        flengths.Insert(ndx+1, rest);
+        if (isShared) fversions.Insert(ndx+1, 0);
+    }
+
+    return ndx;
+}
+
 size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
 {
     TIGHTDB_ASSERT((len & 0x7) == 0); // 64bit alignment
@@ -219,9 +313,67 @@ size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
     Array& fversions    = m_group.m_freeVersions;
     const bool isShared = m_group.is_shared();
 
+    // Start by doing a perfect fit search
+    /*size_t res = flengths.find_first(len);
+    while (res != not_found) {
+        if (isShared) {
+            const size_t v = fversions.Get(res);
+            if (v >= m_readlock_version) {
+                res = flengths.find_first(len, res+1);
+                continue;
+            }
+        }
+
+        const size_t location = fpositions.Get(res);
+
+        fpositions.Delete(res);
+        flengths.Delete(res);
+        if (isShared)
+            fversions.Delete(res);
+
+        return location;
+    }*/
+
+    /*// Worst fit
+    size_t match_ref = not_found;
+    size_t match_len = len;
+    size_t res = flengths.find_first<GREATER>(len);
+    while (res != not_found) {
+        if (isShared) {
+            const size_t v = fversions.Get(res);
+            if (v >= m_readlock_version) {
+                res = flengths.find_first<GREATER>(match_len, res+1);
+                continue;
+            }
+        }
+        match_ref = res;
+        match_len = flengths.Get(res);
+        TIGHTDB_ASSERT(match_len > len);
+        res = flengths.find_first<GREATER>(match_len);
+    }
+    if (match_ref != not_found) {
+        const size_t location = fpositions.Get(match_ref);
+
+        // Update free list
+        const size_t rest = match_len - len;
+        if (rest == 0) {
+            fpositions.Delete(match_ref);
+            flengths.Delete(match_ref);
+            if (isShared) fversions.Delete(match_ref);
+        }
+        else {
+            //flengths.Set(match_ref, rest);
+            flengths.Set(match_ref, rest);
+            fpositions.Set(match_ref, location + len);
+        }
+
+        return location; // + rest;
+    }*/
+
     // Do we have a free space we can reuse?
     const size_t count = flengths.Size();
-    for (size_t i = 0; i < count; ++i) {
+    const size_t start = len < 1024 ? 0 : count / 2; // small pieces first
+    for (size_t i = start; i < count; ++i) {
         const size_t free_len = flengths.Get(i);
         if (len <= free_len) {
             // Only blocks that are not occupied by current
@@ -251,17 +403,43 @@ size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
     }
 
     // No free space, so we have to expand the file.
+    const size_t old_filesize = filesize;
+    const size_t ext_pos = extend_free_space(len, filesize);
+
+    // Claim space from new extension
+    const size_t end  = old_filesize + len;
+    const size_t rest = filesize - end;
+    if (rest) {
+        fpositions.Set(ext_pos, end);
+        flengths.Set(ext_pos, rest);
+    }
+    else {
+        fpositions.Delete(ext_pos);
+        flengths.Delete(ext_pos);
+        if (isShared) fversions.Delete(ext_pos);
+    }
+
+    return old_filesize;
+}
+
+size_t GroupWriter::extend_free_space(size_t len, size_t& filesize)
+{
+    Array& fpositions   = m_group.m_freePositions;
+    Array& flengths     = m_group.m_freeLengths;
+    Array& fversions    = m_group.m_freeVersions;
+    const bool isShared = m_group.is_shared();
+
     // we always expand megabytes at a time, both for
     // performance and to avoid excess fragmentation
     const size_t old_filesize = filesize;
     const size_t needed_size = old_filesize + len;
     while (filesize < needed_size) {
-#ifdef TIGHTDB_DEBUG
-        // in debug, increase in small intervals to force overwriting
-        filesize += 64;
-#else
+//#ifdef TIGHTDB_DEBUG
+//        // in debug, increase in small intervals to force overwriting
+//        filesize += 64;
+//#else
         filesize += 1024*1024;
-#endif
+//#endif
     }
 
 #if !defined(_MSC_VER) // write persistence
@@ -280,18 +458,66 @@ size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
 #endif
 
     // Add new free space
-    const size_t end  = old_filesize + len;
-    const size_t rest = filesize - end;
-    fpositions.add(end);
-    flengths.add(rest);
-    if (isShared)
-        fversions.add(0); // new space is always free for writing
+    const size_t ext_len = filesize - old_filesize;
+    fpositions.add(old_filesize);
+    flengths.add(ext_len);
+    if (isShared) fversions.add(0); // new space is always free for writing
 
-    return old_filesize;
+    return fpositions.Size()-1;
 }
 
 
 #ifdef TIGHTDB_DEBUG
+
+void GroupWriter::dump()
+{
+    Array& fpositions   = m_group.m_freePositions;
+    Array& flengths     = m_group.m_freeLengths;
+    Array& fversions    = m_group.m_freeVersions;
+    const bool isShared = m_group.is_shared();
+
+    const size_t count = flengths.Size();
+    printf("count: %d, m_len = %d, version >= %d\n", (int)count, (int)m_len, (int)m_readlock_version);
+    if (!isShared) {
+        for (size_t i = 0; i < count; ++i) {
+            printf("%d: %d, %d\n", (int)i, (int)fpositions.Get(i), (int)flengths.Get(i));
+        }
+    }
+    else {
+        for (size_t i = 0; i < count; ++i) {
+            printf("%d: %d, %d - %d\n", (int)i, (int)fpositions.Get(i), (int)flengths.Get(i), (int)fversions.Get(i));
+        }
+    }
+}
+
+void GroupWriter::Verify()
+{
+    Array& fpositions   = m_group.m_freePositions;
+    Array& flengths     = m_group.m_freeLengths;
+
+    const size_t count = fpositions.Size();
+    TIGHTDB_ASSERT(count == flengths.Size());
+    if (!count) return;
+
+    for (size_t i = 0; i < count-1; ++i) {
+        const size_t pos1 = fpositions.Get(i);
+        const size_t pos2 = fpositions.Get(i+1);
+        TIGHTDB_ASSERT(pos1 < pos2);
+
+        const size_t len1 = flengths.Get(i);
+        TIGHTDB_ASSERT(len1 != 0);
+        TIGHTDB_ASSERT(len1 < m_len);
+
+        const size_t end = pos1 + len1;
+        TIGHTDB_ASSERT(end <= pos2);
+    }
+
+    const size_t lastlen = flengths.back();
+    TIGHTDB_ASSERT(lastlen != 0 && lastlen <= m_len);
+
+    const size_t end = fpositions.back() + lastlen;
+    TIGHTDB_ASSERT(end <= m_len);
+}
 
 void GroupWriter::ZeroFreeSpace()
 {
