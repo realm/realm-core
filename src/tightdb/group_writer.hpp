@@ -48,7 +48,6 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void dump();
-    void Verify();
     void ZeroFreeSpace();
 #endif
 

@@ -125,7 +125,7 @@ size_t GroupWriter::Commit()
     alloc.FreeAll(m_len);
 
 #ifdef TIGHTDB_DEBUG
-    Verify();
+    m_group.Verify();
 #endif
 
     return top_pos;
@@ -488,35 +488,6 @@ void GroupWriter::dump()
             printf("%d: %d, %d - %d\n", (int)i, (int)fpositions.Get(i), (int)flengths.Get(i), (int)fversions.Get(i));
         }
     }
-}
-
-void GroupWriter::Verify()
-{
-    Array& fpositions   = m_group.m_freePositions;
-    Array& flengths     = m_group.m_freeLengths;
-
-    const size_t count = fpositions.Size();
-    TIGHTDB_ASSERT(count == flengths.Size());
-    if (!count) return;
-
-    for (size_t i = 0; i < count-1; ++i) {
-        const size_t pos1 = fpositions.Get(i);
-        const size_t pos2 = fpositions.Get(i+1);
-        TIGHTDB_ASSERT(pos1 < pos2);
-
-        const size_t len1 = flengths.Get(i);
-        TIGHTDB_ASSERT(len1 != 0);
-        TIGHTDB_ASSERT(len1 < m_len);
-
-        const size_t end = pos1 + len1;
-        TIGHTDB_ASSERT(end <= pos2);
-    }
-
-    const size_t lastlen = flengths.back();
-    TIGHTDB_ASSERT(lastlen != 0 && lastlen <= m_len);
-
-    const size_t end = fpositions.back() + lastlen;
-    TIGHTDB_ASSERT(end <= m_len);
 }
 
 void GroupWriter::ZeroFreeSpace()
