@@ -50,6 +50,12 @@ size_t GroupWriter::Commit()
     TIGHTDB_ASSERT(fpositions.Size() == flengths.Size());
     TIGHTDB_ASSERT(!isShared || fversions.Size() == flengths.Size());
 
+    // Ensure that the freelist arrays are are themselves added to
+    // (the allocator) free list
+    fpositions.CopyOnWrite();
+    flengths.CopyOnWrite();
+    if (isShared) fversions.CopyOnWrite();
+
     // Recursively write all changed arrays
     // (but not top yet, as it contains refs to free lists which are changing)
     const size_t n_pos = m_group.m_tableNames.Write(*this, true, true);
@@ -58,6 +64,7 @@ size_t GroupWriter::Commit()
     // Add free space created during this commit to free lists
     const SlabAlloc::FreeSpace& freeSpace = m_group.get_allocator().GetFreespace();
     const size_t fcount = freeSpace.size();
+
     for (size_t i = 0; i < fcount; ++i) {
         SlabAlloc::FreeSpace::ConstCursor r = freeSpace[i];
         add_free_space(r.ref, r.size, m_current_version);

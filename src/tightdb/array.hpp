@@ -136,6 +136,7 @@ const size_t not_found = size_t(-1);
 // Pre-definitions
 class Array;
 class AdaptiveStringColumn;
+class GroupWriter;
 
 struct state_state {
     int64_t state;
@@ -442,6 +443,8 @@ private:
     template <size_t w> size_t FindPos(int64_t target) const;
    
 protected:
+    friend class GroupWriter;
+
     bool AddPositiveLocal(int64_t value);
 
     void init_from_ref(size_t ref);
