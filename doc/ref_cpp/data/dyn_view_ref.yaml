@@ -8,8 +8,12 @@ SUMMARY    : &g_dyn_view_intro_summary
              The TableView class
 DESCR      : &g_dyn_view_intro_descr
              |
-             The <code>Query::do()</code> returns a <code>TableView</code> object. You can interact with 
-             the TableView just as a regular table, and all changes to it will propagate to the original table. 
+             Queries can return <code>TableView</code> objects, which works as virtual tables containing
+             just the matched rows. You can interact with a TableView just as a regular table, and all
+             changes to it will propagate to the original table.
+             
+             Note that this does not currently work the opposite way. Any change that adds or removes rows
+             from the original table will invalidate the view.
 SEE        : 
 EXAMPLES   : 
 - DESCR: 
@@ -153,7 +157,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove_last_row
         DESCR  :
-- Cells:
+- Values:
   METHODS:
   - g_dyn_view_get_bool:
   - g_dyn_view_get_int:
@@ -283,7 +287,7 @@ CATEGORIES :
         DESCR  : The value.
       RETURN:
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_find_first_xxx
         DESCR  :
