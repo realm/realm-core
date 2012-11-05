@@ -1,4 +1,4 @@
-PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl
+PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance
 
 TEST_PROGRAMS = tightdb-tests
 
