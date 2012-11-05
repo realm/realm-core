@@ -205,6 +205,15 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
+  - g_typed_table_add_empty_row:
+      NAMES    : add_empty_row
+      SUMMARY  : Add empty rows.
+      DESCR    : Add empty rows.
+      SIGNATURE: void add_empty_row(size_t num_rows = 1)
+      PARAMS:
+      - NAME   : num_rows
+        TYPES  : size_t
+        DESCR  : Number of rows to insert (defaults to one).
   - g_typed_table_operator_insert:
       NAMES    : insert
       SIGNATURE: |
@@ -221,6 +230,18 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
+  - g_typed_table_insert_empty_row:
+      NAMES    : insert_empty_row
+      SUMMARY  : Insert empty rows.
+      DESCR    : Insert empty rows.
+      SIGNATURE: void insert_empty_row(size_t row_ndx, size_t num_rows = 1)
+      PARAMS:
+      - NAME   : row_ndx
+        TYPES  : size_t
+        DESCR  : Position to insert at.
+      - NAME   : num_rows
+        TYPES  : size_t
+        DESCR  : Number of rows to insert (defaults to one).
   - g_typed_table_remove_row:
       NAMES    : remove
       SUMMARY  : Delete rows.
