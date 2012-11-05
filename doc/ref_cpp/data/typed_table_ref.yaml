@@ -1,0 +1,236 @@
+#
+# C++ reference documentation for TypedTable class
+#
+
+ID         : class_typed_table
+TITLE      : Table (typed)
+SUMMARY    : &g_typed_table_summary
+             |
+             Typed table
+DESCR      : &g_typed_table_descr
+             |
+             The Table class allows you to efficiently work with data in terms of rows and columns.
+             
+             When the number and types of columns are known beforehand, you can use a set of macros
+             to define type safe and efficient table classes.
+SEE        : 
+EXAMPLES: 
+- DESCR    : 
+  CODE     : ex_cpp_typed_table_intro
+IGNORE     : []                   # List of method-ids to ignore
+
+CATEGORIES:
+- Macros:
+  METHODS:
+  - g_typed_table_macros:
+      NAMES    : class_macros
+      DESCR    : Define type safe table classes.
+      SIGNATURE: |
+                 TIGHTDB_TABLE_*(ClassName,
+                                 ColumnName, ColumnType
+                                 ...)
+      SUMMARY  : Define type safe table classes.
+      PARAMS:
+      - NAME   : "*"
+        TYPES  : text
+        DESCR  : Number of columns in table.
+      - NAME   : ClassName
+        TYPES  : text
+        DESCR  : Name of the new class.
+      - NAME   : ColumnName
+        TYPES  : text
+        DESCR  : Name of column.
+      - NAME   : ColumnType
+        TYPES  : text
+        DESCR  : |
+                 Column type. Following types are available:
+                 <table>
+                 <tr><th>Name</th>              <th>Desc</th>         <th>C++ type</th></tr>
+                 <tr><td>Int</td>               <td>Integer</td>      <td>(int64_t)</td></tr>
+                 <tr><td>Bool</td>              <td>Boolean</td>      <td>(bool)</td></tr>
+                 <tr><td>String </td>           <td>Text</td>         <td>(char*)</td></tr>
+                 <tr><td>Date</td>              <td>UTC datetime</td> <td>(time_t)</td></tr>
+                 <tr><td>Enum&lt;T&gt;</td>     <td>Enum</td>         <td>(T as enum type)</td></tr>
+                 <tr><td>Subtable&lt;T&gt;</td> <td>Sub-tables</td>   <td>(T as table class)</td></tr>
+                 <tr><td>Mixed</td>             <td>Dynamic</td>      <td>(contains any of the above)</td></tr>
+                 </table>
+- State:
+  METHODS:
+  - g_typed_table_is_empty:
+      NAMES    : is_empty
+      DESCR    : Tells if the table is empty (contains no rows).
+      SUMMARY  : Is table empty?
+      CONST    : true
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if the two groups are not equal, <code>false</code> otherwise.
+  - g_typed_table_size:
+        NAMES    : size
+        DESCR    : Number of rows in table.
+        SUMMARY  : Number of rows in table.
+        CONST    : true
+        RETURN:
+          TYPES  : size_t
+          DESCR  : Number of rows in table
+- Table:
+  METHODS:
+  - g_typed_table_clear:
+      NAMES    : clear
+      SUMMARY  : Remove all rows.
+      DESCR    : This method will remove all rows in a table.
+      EXAMPLES:
+      - CODE   : ex_cpp_typed_table_clear
+        DESCR  :
+  - g_typed_table_optimize:
+      NAMES    : optimize
+      SUMMARY  : &g_typed_table_optimize_summary
+                 Optimize a table.
+      DESCR    : &g_typed_table_optimize_descr
+                 |
+                 This method will optimize the internal data structures of a table.
+                 The result is that the table will consume less memory and queries might 
+                 be faster.
+
+                 This should be called as soon as there is an representative amount of
+                 data in the table. The table will then reorganize itself into the most
+                 effective format.
+
+                 What is learned about the contents will be used in all future operations,
+                 so you only need to call optimize once.
+      EXAMPLES:
+      - CODE   : ex_cpp_typed_table_optimize
+        DESCR  : 
+  - g_typed_table_columns:
+      NAMES    : columns
+      SIGNATURE: |
+                 ColsAccessor      column()
+                 ConstColsAccessor column() const
+      SUMMARY  : Access and do operation on columns.
+      DESCR    : Access and do operation on columns.
+      RETURN:
+        TYPES  : ColumnAccesor
+        DESCR  : Cursor that lets you access and do operations on columns
+  - g_dyn_table_opertator==:
+      NAMES    : operator==
+      SUMMARY  : &g_typed_table_operator_eq_summary
+                 Compare two tables.
+      DESCR    : &g_typed_table_operator_eq_descr
+                 |
+                 Compare two tables for equality. Two tables are equal if, and
+                 only if, they contain the same columns and rows in the same
+                 order, that is, for each value V of type T at column index C
+                 and row index R in one of the tables, there is a value of type
+                 T at column index C and row index R in the other table that
+                 is equal to V. This method returns true if two tables are identical.
+      CONST    : True             
+      PARAMS:                 
+      - NAME   : table
+        TYPES  : const Table&
+        DESCR  : The other table.
+      RETURN:                 
+        TYPES  : bool
+        DESCR  : <code>true</code> if the two tables are identical, <code>false</code> otherwise,
+      EXAMPLES:                  
+      - CODE   : ex_cpp_dyn_table_operator==
+        DESCR  : 
+  - g_dyn_table_opertator!=:
+      NAMES    : operator!=
+      SUMMARY  : &g_typed_table_operator_neq_summary
+                 Compare two tables.
+      DESCR    : &g_typed_table_operator_neq_descr
+                 |
+                 Compare two tables for equality. Two tables are equal if, and
+                 only if, they contain the same columns and rows in the same
+                 order, that is, for each value V of type T at column index C
+                 and row index R in one of the tables, there is a value of type
+                 T at column index C and row index R in the other table that
+                 is equal to V. This method returns true if two tables are not identical.
+      CONST    : True             
+      PARAMS:                 
+      - NAME   : table
+        TYPES  : const Table&
+        DESCR  : The other table.
+      RETURN:                 
+        TYPES  : bool
+        DESCR  : <code>true</code> if the two tables are not identical, <code>false</code> otherwise,
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_operator!=
+        DESCR  :
+- Rows:
+  METHODS:
+  - g_typed_table_operator_brackets:
+      NAMES    : "operator[]"
+      SIGNATURE: |
+                 RowAccessor      operator[](size_t row_ndx)
+                 ConstRowAccessor operator[](size_t row_ndx) const
+      SUMMARY  : Access rows.
+      DESCR    : Access rows.
+      PARAMS:                 
+      - NAME   : row_ndx
+        TYPES  : size_t
+        DESCR  : Row index.
+      RETURN:
+        TYPES  : RowAccesor
+        DESCR  : Cursor that lets you access row values as members.
+  - g_typed_table_front:
+      NAMES    : front
+      SIGNATURE: |
+                 RowAccessor      front()
+                 ConstRowAccessor front() const
+      SUMMARY  : Get last row.
+      DESCR    : Get last row. Calling front() on an empty table is an error.
+      RETURN:
+        TYPES  : RowAccesor
+        DESCR  : Cursor that lets you access row values as members.
+  - g_typed_table_back:
+      NAMES    : back
+      SIGNATURE: |
+                 RowAccessor      back()
+                 ConstRowAccessor back() const
+      SUMMARY  : Get last row.
+      DESCR    : Get last row. Calling back() on an empty table is an error.
+      RETURN:
+        TYPES  : RowAccesor
+        DESCR  : Cursor that lets you access row values as members.
+  - g_typed_table_operator_add:
+      NAMES    : add
+      SIGNATURE: |
+                 RowAccesor add(values...)
+      SUMMARY  : Add new row.
+      DESCR    : Add new row.
+      PARAMS:
+      - NAME   : values...
+        TYPES  : various
+        DESCR  : Values for all columns in the row.
+      RETURN:
+        TYPES  : RowAccesor
+        DESCR  : Cursor that lets you access row values as members.
+  - g_typed_table_operator_insert:
+      NAMES    : insert
+      SIGNATURE: |
+                 RowAccesor insert(size_t row_ndx, values...)
+      SUMMARY  : Add new row.
+      DESCR    : Add new row.
+      PARAMS:
+      - NAME   : row_ndx
+        TYPES  : size_t
+        DESCR  : Insert position.
+      - NAME   : values...
+        TYPES  : various
+        DESCR  : Values for all columns in the row.
+      RETURN:
+        TYPES  : RowAccesor
+        DESCR  : Cursor that lets you access row values as members.
+  - g_typed_table_remove_row:
+      NAMES    : remove
+      SUMMARY  : Delete rows.
+      DESCR    : Delete rows.
+      SIGNATURE: void remove(size_t row_ndx);
+      PARAMS:
+      - NAME   : row_ndx
+        TYPES  : size_t
+        DESCR  : Position of row to delete.
+      EXAMPLES:
+      - CODE   : ex_cpp_typed_table_remove
+        DESCR  :
+      
