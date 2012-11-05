@@ -254,4 +254,12 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_remove
         DESCR  :
+  - g_typed_table_remove_last_row:
+      NAMES    : remove_last
+      SUMMARY  : Delete last row.
+      DESCR    : Delete last row. Calling this on an empty table is an error.
+      SIGNATURE: void remove_last();
+      EXAMPLES:
+      - CODE   : ex_cpp_typed_table_remove_last_row
+        DESCR  :
       

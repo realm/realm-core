@@ -303,7 +303,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_remove_last_row_summary
                  Delete last row.
       DESCR    : &g_dyn_table_remove_last_row_descr
-                 Delete last rows
+                 Delete last row.  Calling this on an empty table is an error.
       SIGNATURE: void remove_last();
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove_last_row
