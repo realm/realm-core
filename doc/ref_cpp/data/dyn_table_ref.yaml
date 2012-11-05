@@ -82,7 +82,14 @@ CATEGORIES :
                  |
                  This method will optimize the internal data structures of a table.
                  The result is that the table will consume less memory and queries might 
-                 be faster. 
+                 be faster.
+                 
+                 This should be called as soon as there is an representative amount of
+                 data in the table. The table will then reorganize itself into the most
+                 effective format.
+                 
+                 What is learned about the contents will be used in all future operations,
+                 so you only need to call optimize once.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_optimize
         DESCR  : 
@@ -301,7 +308,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove_last_row
         DESCR  :
-- Cells:
+- Values:
   METHODS:
   - g_dyn_table_get_bool:
   - g_dyn_table_get_int:
@@ -478,7 +485,7 @@ CATEGORIES :
         DESCR  : The value to search for.
       RETURN:
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_lookup
         DESCR  :
@@ -507,7 +514,7 @@ CATEGORIES :
         DESCR  : The value.
       RETURN:
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_first_xxx
         DESCR  :
