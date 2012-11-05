@@ -65,7 +65,7 @@ CATEGORIES:
   - g_mixed_get_date:
   - g_mixed_get_string:
   - g_mixed_get_binary:
-      NAMES    : [get_bool, get_int, get_date, get_string, get_binary]
+      NAMES    : get_*
       SUMMARY  : &g_mixed_get_value_summary
                  Get value of Mixed variable.
       DESCR    : &g_mixed_get_value_descr

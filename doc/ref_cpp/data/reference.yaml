@@ -20,8 +20,8 @@ CATEGORIES:                       # list global class-id in order of appearence
 - Collection:
   - group                         # 97 %
 #  - shared_group
-#- Helpers:
-#  - mixed
+- Helpers:
+  - mixed
 #  - cursor
 
 
