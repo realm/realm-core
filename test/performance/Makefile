@@ -1,6 +1,6 @@
 NOINST_PROGRAMS = performance
 
-performance_SOURCES = matrix.cpp
+performance_SOURCES = matrix.cpp timer.cpp
 performance_LIBS    = ../../src/tightdb/libtightdb.a
 performance_LDFLAGS = -lrt
 
