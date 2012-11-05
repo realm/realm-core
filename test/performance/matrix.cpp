@@ -1,23 +1,17 @@
-#include <stdio.h>
-#include "tightdb.hpp"
-#ifndef _MSC_VER
-    #include "timer.h"
-#endif
-
-#include <assert.h>
-#ifndef _MSC_VER
-    #include "../Support/mem.hpp"
-    #include "../Support/number_names.hpp"
-#else
-    #include <UnitTest++.h>
-#endif
-
+#include <cstdio>
 #include <string>
 #include <algorithm>
+#include <vector>
 #include <sstream>
+
+#include <tightdb.hpp>
+
+#include "timer.hpp"
 
 using namespace std;
 using namespace tightdb;
+
+namespace {
 
 TIGHTDB_TABLE_11(TestTable,
                 bits_0,    Int,
@@ -32,26 +26,167 @@ TIGHTDB_TABLE_11(TestTable,
                 long_str,  String,
                 enum_str,  String)
 
-#ifndef _MSC_VER
-    Timer timer;
-    double GetTime(Timer t) 
-    {
-        return t.GetTime();
-    }
-#else
-    UnitTest::Timer timer;
-    double GetTime(UnitTest::Timer t) 
-    {
-        return t.GetTimeInMs() / 1000.0;
-    }
-#endif
+struct Timer {
+    void start() { m_start = get_timer_millis(); }
+    double get_elapsed_millis() const { return get_timer_millis() - m_start; }
+private:
+    long m_start;
+};
+
+Timer timer;
+
+
+struct TestStruct {
+    bool    field1;
+    bool    field2;
+    int     field3;
+    int     field4;
+    int     field5;
+    int     field6;
+    int     field7;
+    int64_t field8;
+    string  field9;
+    string  field10;
+    string  field11;
+};
+
+class match1 {
+public:
+    match1(bool target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field1 == m_target;}
+private:
+    const bool m_target;
+};
+class match2 {
+public:
+    match2(bool target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field2 == m_target;}
+private:
+    const bool m_target;
+};
+class match3 {
+public:
+    match3(int target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field3 == m_target;}
+private:
+    const int m_target;
+};
+class match4 {
+public:
+    match4(int target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field4 == m_target;}
+private:
+    const int m_target;
+};
+class match5 {
+public:
+    match5(int target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field5 == m_target;}
+private:
+    const int m_target;
+};
+class match6 {
+public:
+    match6(int target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field6 == m_target;}
+private:
+    const int m_target;
+};
+class match7 {
+public:
+    match7(int target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field7 == m_target;}
+private:
+    const int m_target;
+};
+class match8 {
+public:
+    match8(int64_t target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field8 == m_target;}
+private:
+    const int64_t m_target;
+};
+class match9 {
+public:
+    match9(const string& target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field9 == m_target;}
+private:
+    const string& m_target;
+};
+class match10 {
+public:
+    match10(const string& target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field10 == m_target;}
+private:
+    const string& m_target;
+};
+class match11 {
+public:
+    match11(const string& target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field11 == m_target;}
+private:
+    const string& m_target;
+};
+class match9n {
+public:
+    match9n(const string& target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field9 != m_target;}
+private:
+    const string& m_target;
+};
+class match10n {
+public:
+    match10n(const string& target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field10 != m_target;}
+private:
+    const string& m_target;
+};
+class match11n {
+public:
+    match11n(const string& target) : m_target(target) {}
+    bool operator()(const TestStruct& v) const {return v.field11 != m_target;}
+private:
+    const string& m_target;
+};
+class columns2 {
+public:
+    columns2() {}
+    bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3;}
+};
+class columns3 {
+public:
+    columns3() {}
+    bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3 && v.field4 == 15;}
+};
+class columns4 {
+public:
+    columns4() {}
+    bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL;}
+};
+class columns5 {
+public:
+    columns5() {}
+    bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL;}
+};
+class columns6 {
+public:
+    columns6() {}
+    bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL && v.field7 == 0x7FFFFFFFLL;}
+};
+class columns7 {
+public:
+    columns7() {}
+    bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL && v.field7 == 0x7FFFFFFFLL && v.field8 == 0x7FFFFFFFFFFFFFFFLL;}
+};
+
+} // anonymous namespace
 
 int main()
 {
     const size_t row_count = 250112; // should be dividable with 128
     const size_t rounds = 1000;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     printf("Running Debug Build\n");
 #else
     printf("Running Release Build\n");
@@ -103,7 +238,7 @@ int main()
                 
                 const size_t expected = (i == 0) ? 0 : 1;
                 
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         const size_t res = q.count(table);
@@ -112,11 +247,11 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Sparse: %fs\n", (int)i, search_time);
                 
                 // Search with column intrinsic functions
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -134,7 +269,7 @@ int main()
                         }
                     }
                 }
-                const double search_time2 = GetTime(timer);
+                const double search_time2 = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Sparse2: %fs\n", (int)i, search_time2);
             }
             
@@ -154,7 +289,7 @@ int main()
                 size_t expected = row_count;
                 if (i == 0) ++expected;
                 
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         const size_t res = q.count(table);
@@ -163,11 +298,11 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Many:   %fs\n", (int)i, search_time);
                 
                 // Search with column intrinsic functions
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -185,7 +320,7 @@ int main()
                         }
                     }
                 }
-                const double search_time2 = GetTime(timer);
+                const double search_time2 = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Many2: %fs\n", (int)i, search_time2);
             }
             
@@ -202,7 +337,7 @@ int main()
                 else if (i == 6) expected = row_count * 0x7FFFFFFFLL;
                 else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;
                 
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -220,7 +355,7 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Sum:    %fs\n", (int)i, search_time);
             }
             
@@ -236,7 +371,7 @@ int main()
                 else if (i == 6) expected = row_count * 0x7FFFFFFFLL;
                 else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;
                 
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         int64_t res;
@@ -254,7 +389,7 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Sum2:   %fs\n", (int)i, search_time);
             }
         }
@@ -269,7 +404,7 @@ int main()
                 
                 const size_t expected = 1;
                 
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         const size_t res = q.count(table);
@@ -278,7 +413,7 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("TightDB: StringColumn %d: Sparse: %fs\n", (int)i, search_time);
             }
             
@@ -291,7 +426,7 @@ int main()
                 
                 const size_t expected = row_count;
                 
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         const size_t res = q.count(table);
@@ -300,128 +435,17 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("TightDB: StringColumn %d: Many: %fs\n", (int)i, search_time);
             }
         }
     }
     
-    struct TestStruct {
-        bool    field1;
-        bool    field2;
-        int     field3;
-        int     field4;
-        int     field5;
-        int     field6;
-        int     field7;
-        int64_t field8;
-        string  field9;
-        string  field10;
-        string  field11;
-    };
     
     // STL tests
     {
         vector<TestStruct> table;
         
-        class match1 {
-        public:
-            match1(bool target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field1 == m_target;}
-        private:
-            const bool m_target;
-        };
-        class match2 {
-        public:
-            match2(bool target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field2 == m_target;}
-        private:
-            const bool m_target;
-        };
-        class match3 {
-        public:
-            match3(int target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field3 == m_target;}
-        private:
-            const int m_target;
-        };
-        class match4 {
-        public:
-            match4(int target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field4 == m_target;}
-        private:
-            const int m_target;
-        };
-        class match5 {
-        public:
-            match5(int target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field5 == m_target;}
-        private:
-            const int m_target;
-        };
-        class match6 {
-        public:
-            match6(int target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field6 == m_target;}
-        private:
-            const int m_target;
-        };
-        class match7 {
-        public:
-            match7(int target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field7 == m_target;}
-        private:
-            const int m_target;
-        };
-        class match8 {
-        public:
-            match8(int64_t target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field8 == m_target;}
-        private:
-            const int64_t m_target;
-        };
-        class match9 {
-        public:
-            match9(const string& target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field9 == m_target;}
-        private:
-            const string& m_target;
-        };
-        class match10 {
-        public:
-            match10(const string& target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field10 == m_target;}
-        private:
-            const string& m_target;
-        };
-        class match11 {
-        public:
-            match11(const string& target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field11 == m_target;}
-        private:
-            const string& m_target;
-        };
-        class match9n {
-        public:
-            match9n(const string& target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field9 != m_target;}
-        private:
-            const string& m_target;
-        };
-        class match10n {
-        public:
-            match10n(const string& target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field10 != m_target;}
-        private:
-            const string& m_target;
-        };
-        class match11n {
-        public:
-            match11n(const string& target) : m_target(target) {}
-            bool operator()(const TestStruct& v) const {return v.field11 != m_target;}
-        private:
-            const string& m_target;
-        };
         
                 
         // Build large table
@@ -451,7 +475,7 @@ int main()
             {
                 const size_t expected = (i == 0) ? 0 : 1;
                 
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -469,7 +493,7 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("STL: Column %d: Sparse: %fs\n", (int)i, search_time);
             }
             
@@ -478,7 +502,7 @@ int main()
                 size_t expected = row_count;
                 if (i == 0) ++expected;
                 
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -496,7 +520,7 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("STL: Column %d: Many:   %fs\n", (int)i, search_time);
             }
             
@@ -513,7 +537,7 @@ int main()
                     else if (i == 6) expected = row_count * 0x7FFFFFFFLL;
                     else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;
                     
-                    timer.Start();
+                    timer.start();
                     {
                         int64_t res = 0;
                         if (i == 0) {
@@ -562,7 +586,7 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("STL: Column %d: Sum:    %fs\n", (int)i, search_time);
             }
         }
@@ -572,7 +596,7 @@ int main()
             {
                 const size_t expected = 1;
                 
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -585,7 +609,7 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("STL: StringColumn %d: Sparse: %fs\n", (int)i, search_time);
             }
             
@@ -593,7 +617,7 @@ int main()
             {
                 const size_t expected = row_count;
                 
-                timer.Start();
+                timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -606,7 +630,7 @@ int main()
                         }
                     }
                 }
-                const double search_time = GetTime(timer);
+                const double search_time = timer.get_elapsed_millis();
                 printf("STL: StringColumn %d: Many: %fs\n", (int)i, search_time);
             }
         }
@@ -651,7 +675,7 @@ int main()
             TestTable::Query q = table.where().bits_1.equal(1).bits_2.equal(3);
             const size_t expected = row_count / 4;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count(table);
@@ -660,7 +684,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c2: %fs\n", search_time);
         }
         
@@ -669,7 +693,7 @@ int main()
             TestTable::Query q = table.where().bits_1.equal(1).bits_2.equal(3).bits_4.equal(15);
             const size_t expected = row_count / 8;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count(table);
@@ -678,7 +702,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c3: %fs\n", search_time);
         }
         
@@ -690,7 +714,7 @@ int main()
                                               .bits_8.equal(0x7FLL);
             const size_t expected = row_count / 16;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count(table);
@@ -699,7 +723,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c4: %fs\n", search_time);
         }
         
@@ -712,7 +736,7 @@ int main()
                                               .bits_16.equal(0x7FFFLL);
             const size_t expected = row_count / 32;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count(table);
@@ -721,7 +745,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c5: %fs\n", search_time);
         }
         
@@ -735,7 +759,7 @@ int main()
                                               .bits_32.equal(0x7FFFFFFFLL);
             const size_t expected = row_count / 64;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count(table);
@@ -744,7 +768,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c6: %fs\n", search_time);
         }
         
@@ -759,7 +783,7 @@ int main()
                                               .bits_64.equal(0x7FFFFFFFFFFFFFFFLL);
             const size_t expected = row_count / 128;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count(table);
@@ -768,7 +792,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c7: %fs\n", search_time);
         }
     }
@@ -777,36 +801,6 @@ int main()
     {
         vector<TestStruct> table;
         
-        class columns2 {
-        public:
-            columns2() {}
-            bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3;}
-        };
-        class columns3 {
-        public:
-            columns3() {}
-            bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3 && v.field4 == 15;}
-        };
-        class columns4 {
-        public:
-            columns4() {}
-            bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL;}
-        };
-        class columns5 {
-        public:
-            columns5() {}
-            bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL;}
-        };
-        class columns6 {
-        public:
-            columns6() {}
-            bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL && v.field7 == 0x7FFFFFFFLL;}
-        };
-        class columns7 {
-        public:
-            columns7() {}
-            bool operator()(const TestStruct& v) const {return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL && v.field7 == 0x7FFFFFFFLL && v.field8 == 0x7FFFFFFFFFFFFFFFLL;}
-        };
 
         
         // Build large table
@@ -842,7 +836,7 @@ int main()
         {
             const size_t expected = row_count / 4;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns2());
@@ -851,7 +845,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("STL: c2: %fs\n", search_time);
         }
         
@@ -859,7 +853,7 @@ int main()
         {
             const size_t expected = row_count / 8;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns3());
@@ -868,7 +862,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("STL: c3: %fs\n", search_time);
         }
         
@@ -876,7 +870,7 @@ int main()
         {
             const size_t expected = row_count / 16;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns4());
@@ -885,7 +879,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("STL: c4: %fs\n", search_time);
         }
         
@@ -893,7 +887,7 @@ int main()
         {
             const size_t expected = row_count / 32;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns5());
@@ -902,7 +896,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("STL: c5: %fs\n", search_time);
         }
         
@@ -910,7 +904,7 @@ int main()
         {
             const size_t expected = row_count / 64;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns6());
@@ -919,7 +913,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("STL: c6: %fs\n", search_time);
         }
         
@@ -927,7 +921,7 @@ int main()
         {
             const size_t expected = row_count / 128;
             
-            timer.Start();
+            timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns7());
@@ -936,7 +930,7 @@ int main()
                     }
                 }
             }
-            const double search_time = GetTime(timer);
+            const double search_time = timer.get_elapsed_millis();
             printf("STL: c7: %fs\n", search_time);
         }
     }

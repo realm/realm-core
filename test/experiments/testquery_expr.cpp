@@ -1,7 +1,8 @@
 #include <iostream>
 
 #include <tightdb/table_accessors.hpp>
-#include <tightdb/query_expr.hpp>
+//#include <tightdb/query_expr.hpp>
+#include "query_expr.hpp"
 
 using namespace std;
 

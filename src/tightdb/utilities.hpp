@@ -34,14 +34,6 @@
     #define TIGHTDB_PTR_64
 #endif
 
-#if defined(TIGHTDB_X86X64) && (defined(__GNUC__) || defined(__INTEL_COMPILER))
-    #define tdb_likely(x) __builtin_expect (x, 1)
-    #define tdb_unlikely(x) __builtin_expect (x, 0)
-#else
-    #define tdb_likely(x) (x)
-    #define tdb_unlikely(x) (x)
-#endif
-
 namespace tightdb {
 
 typedef struct {

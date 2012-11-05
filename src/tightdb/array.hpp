@@ -76,6 +76,11 @@ Searching: The main finding function is:
 #include <stdio.h>
 #endif
 
+// FIXME: We cannot use all-uppercase names like 'ACTION' for enums
+// since the risk of colliding with one of the customers macro names
+// is too high. In short, the all-uppercase name space is reserved for
+// macros.
+//
 // todo, move
 enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
 
