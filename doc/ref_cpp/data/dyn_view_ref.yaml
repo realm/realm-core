@@ -5,15 +5,23 @@
 ID         : class_view
 TITLE      : TableView
 SUMMARY    : &g_dyn_view_intro_summary
-             The TableView class
+             The TableView class.
 DESCR      : &g_dyn_view_intro_descr
              |
-             Queries can return <code>TableView</code> objects, which works as virtual tables containing
-             just the matched rows. You can interact with a TableView just as a regular table, and all
-             changes to it will propagate to the original table.
+             Queries and searches can return <code>TableView</code> objects, which works as virtual 
+             tables containing just the matched rows. You can interact with a <code>TableView</code>
+             just as a regular table.
+
+             A <code>TableView</code> is implicitely linked to a {@link Table}.  All changes to the view
+             will propagate to the original table. This includes operations like updating values and 
+             deleting rows.
              
-             Note that this does not currently work the opposite way. Any change that adds or removes rows
-             from the original table will invalidate the view.
+             Notice that this does not imply that it will work the opposite direction. Any change that 
+             adds or removes rows in the original table will invalidate the view, and you will have an
+             inconsistent view of the table. This might lead to a serious data corruption.
+
+             It is possible to create two views for the table table as long as you do not change the
+             original table.
 SEE        : 
 EXAMPLES   : 
 - DESCR: 

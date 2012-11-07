@@ -9,7 +9,27 @@ SUMMARY    : &g_dyn_table_intro_summary
              TightDB table.
 DESCR      : &g_dyn_table_intro_descr
              |
-             The Table class allows you to efficiently work with data in terms of rows and columns. 
+             The Table class is the core class of the TightDB framework. It allows you 
+             to efficiently work with data in terms of rows and columns. The value of
+             a cell (specific column, specific row) is compacted in order to keep the
+             overall memory consumption as little as possible. The internal data structure
+             is optimized so retrieving a particular row in a table is as fast as possible 
+             (often faster than native data structures).
+             
+             The dynamic table can be used when the structure of the data is not known a
+             priori. This situation is common if you recieve data for different sources, and
+             these sources changes often. You can say that a dynamic table resembles the 
+             flexible data structures often found in dynamic languages like PHP and JavaScript.
+
+             You can add and remove columns at run time as your application requires it. When you
+             add a column, a type must be specified. The most common types including integers, 
+             timestamps and strings are suppotted. It is possible to use a TightDB table class 
+             as column type. This means that you can have tables of tables structure.
+
+             Moreover, TightDB introduces a column type called {@link: Mixed}. A value of the 
+             Mixed type can be any supported value of TightDB. This implies - as the name 
+             indicates - that you can mixed values: in one row the value is an integer, on another
+             row the value is a string or even a table.
 SEE        : 
 EXAMPLES   : 
 - DESCR: 
