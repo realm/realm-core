@@ -5,14 +5,31 @@
 ID         : class_typed_table
 TITLE      : Table (typed)
 SUMMARY    : &g_typed_table_summary
-             |
-             Typed table
+             Typed table.
 DESCR      : &g_typed_table_descr
              |
-             The Table class allows you to efficiently work with data in terms of rows and columns.
-             
-             When the number and types of columns are known beforehand, you can use a set of macros
-             to define type safe and efficient table classes.
+             The Table class is the core class of the TightDB framework. It allows you 
+             to efficiently work with data in terms of rows and columns. The value of
+             a cell (specific column, specific row) is compacted in order to keep the
+             overall memory consumption as little as possible. The internal data structure
+             is optimized so retrieving a particular row in a table is as fast as possible 
+             (often faster than native data structures).
+                          
+             When the number and types of columns are known a priori, you can use a set of macros
+             to define type safe and efficient table classes. The compiler can take avantage of 
+             a typed table and enforce type checking of the methods parameters at compile time.
+
+             The table supports the most common types including integers, timestamps and strings. 
+             It is possible to use a TightDB table class as column type. This means that you can 
+             have tables of tables structure.
+
+             Moreover, TightDB introduces a column type called {@link: Mixed}. A value of the 
+             Mixed type can be any supported value of TightDB. This implies - as the name 
+             indicates - that you can mixed values: in one row the value is an integer, on another
+             row the value is a string or even a table.
+
+             The aim of the TightDB table class is that it feels as close to the native data structures
+             (in particular arrays) as possible.
 SEE        : 
 EXAMPLES: 
 - DESCR    : 
@@ -54,6 +71,10 @@ CATEGORIES:
                  <tr><td>Subtable&lt;T&gt;</td> <td>Sub-tables</td>   <td>(T as table class)</td></tr>
                  <tr><td>Mixed</td>             <td>Dynamic</td>      <td>(contains any of the above)</td></tr>
                  </table>
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_macros
+        DESCR  : 
+
 - State:
   METHODS:
   - g_typed_table_is_empty:
@@ -63,7 +84,10 @@ CATEGORIES:
       CONST    : true
       RETURN:
         TYPES  : bool
-        DESCR  : <code>true</code> if the two groups are not equal, <code>false</code> otherwise.
+        DESCR  : <code>true</code> if table is empty, <code>false</code> otherwise.
+      EXAMPLES:                  
+      - CODE   :  ex_cpp_type_table_is_empty
+        DESCR  : 
   - g_typed_table_size:
         NAMES    : size
         DESCR    : Number of rows in table.
@@ -71,7 +95,11 @@ CATEGORIES:
         CONST    : true
         RETURN:
           TYPES  : size_t
-          DESCR  : Number of rows in table
+          DESCR  : Number of rows in table.
+      EXAMPLES:                  
+      - CODE   :  ex_cpp_type_table_size
+        DESCR  : 
+
 - Table:
   METHODS:
   - g_typed_table_clear:
@@ -129,7 +157,7 @@ CATEGORIES:
         DESCR  : The other table.
       RETURN:                 
         TYPES  : bool
-        DESCR  : <code>true</code> if the two tables are identical, <code>false</code> otherwise,
+        DESCR  : <code>true</code> if the two tables are identical, <code>false</code> otherwise.
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_operator==
         DESCR  : 
@@ -172,6 +200,10 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_operator_brackets
+        DESCR  :
+
   - g_typed_table_front:
       NAMES    : front
       SIGNATURE: |
@@ -182,6 +214,9 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_front
+        DESCR  :
   - g_typed_table_back:
       NAMES    : back
       SIGNATURE: |
@@ -192,7 +227,10 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
-  - g_typed_table_operator_add:
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_back
+        DESCR  :
+  - g_typed_table_add:
       NAMES    : add
       SIGNATURE: |
                  RowAccesor add(values...)
@@ -205,6 +243,9 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_add
+        DESCR  :
   - g_typed_table_add_empty_row:
       NAMES    : add_empty_row
       SUMMARY  : Add empty rows.
@@ -214,12 +255,15 @@ CATEGORIES:
       - NAME   : num_rows
         TYPES  : size_t
         DESCR  : Number of rows to insert (defaults to one).
-  - g_typed_table_operator_insert:
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_add_empty_row
+        DESCR  :
+  - g_typed_table_insert:
       NAMES    : insert
       SIGNATURE: |
                  RowAccesor insert(size_t row_ndx, values...)
       SUMMARY  : Add new row.
-      DESCR    : Add new row.
+      DESCR    : Add new row at a given position.
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
@@ -230,9 +274,12 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_insert
+        DESCR  :
   - g_typed_table_insert_empty_row:
       NAMES    : insert_empty_row
-      SUMMARY  : Insert empty rows.
+      SUMMARY  : Insert empty rows at a given position.
       DESCR    : Insert empty rows.
       SIGNATURE: void insert_empty_row(size_t row_ndx, size_t num_rows = 1)
       PARAMS:
@@ -242,10 +289,13 @@ CATEGORIES:
       - NAME   : num_rows
         TYPES  : size_t
         DESCR  : Number of rows to insert (defaults to one).
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_insert_empty_row
+        DESCR  :
   - g_typed_table_remove_row:
       NAMES    : remove
-      SUMMARY  : Delete rows.
-      DESCR    : Delete rows.
+      SUMMARY  : Delete row.
+      DESCR    : Delete row at a given position.
       SIGNATURE: void remove(size_t row_ndx);
       PARAMS:
       - NAME   : row_ndx
