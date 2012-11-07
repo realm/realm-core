@@ -1030,43 +1030,43 @@ public:
 
     Query& equal(std::time_t value) const
     {
-        Base::m_query->m_impl.equal_date(col_idx, value);
+        Base::m_query->m_impl.equal(col_idx, value); // fixme, missing equal_date
         return *Base::m_query;
     }
 
     Query& not_equal(std::time_t value) const
     {
-        Base::m_query->m_impl.not_equal_date(col_idx, value);
+        Base::m_query->m_impl.not_equal(col_idx, value); // fixme, missing not_equal_date
         return *Base::m_query;
     }
 
     Query& greater(std::time_t value) const
     {
-        Base::m_query->m_impl.greater_date(col_idx, value);
+        Base::m_query->m_impl.greater(col_idx, value); // fixme, missing greater_date
         return *Base::m_query;
     }
 
     Query& greater_equal(std::time_t value) const
     {
-        Base::m_query->m_impl.greater_equal_date(col_idx, value);
+        Base::m_query->m_impl.greater_equal(col_idx, value); // fixme, todo, missing greater_equal_date
         return *Base::m_query;
     }
 
     Query& less(std::time_t value) const
     {
-        Base::m_query->m_impl.less_date(col_idx, value);
+        Base::m_query->m_impl.less(col_idx, value); // fixme, todo, missing less_date
         return *Base::m_query;
     }
 
     Query& less_equal(std::time_t value) const
     {
-        Base::m_query->m_impl.less_equal_date(col_idx, value);
+        Base::m_query->m_impl.less_equal(col_idx, value);
         return *Base::m_query;
     }
 
     Query& between(std::time_t from, std::time_t to) const
     {
-        Base::m_query->m_impl.between_date(col_idx, from, to);
+        Base::m_query->m_impl.between(col_idx, from, to);
         return *Base::m_query;
     };
 
@@ -1138,9 +1138,9 @@ private:
 public:
     explicit QueryColumn(Query* q): Base(q) {}
 
-    Query& equal(const BinaryData& value, bool case_sensitive=true) const
+    Query& equal(const BinaryData& value) const
     {
-        Base::m_query->m_impl.equal_binary(col_idx, value.pointer, value.len, case_sensitive);
+        Base::m_query->m_impl.equal_binary(col_idx, value.pointer, value.len);
         return *Base::m_query;
     }
 

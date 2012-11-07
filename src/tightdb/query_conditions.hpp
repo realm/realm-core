@@ -75,6 +75,17 @@ struct EQUAL {
         (void)v1_upper;
         return std::strcmp(v1, v2) == 0;
     }
+    bool operator()(const char *v1, size_t len1, const char* v2, size_t len2) const
+    {
+        if(len1 != len2)
+            return false;
+        if(len1 == 0)
+            return true;
+        if(v1[len1 - 1] != v2[len1 - 1])
+            return false;
+        int i = memcmp(v1, v2, len1);
+        return (i == 0);
+    }
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
     int condition(void) {return COND_EQUAL;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (v >= lbound && v <= ubound); }

@@ -69,6 +69,14 @@ Query& Query::equal(size_t column_ndx, int64_t value)
     UpdatePointers(p, &p->m_child);
     return *this;
 }
+
+Query& Query::equal_binary(size_t column_ndx, const char* ptr, size_t len)
+{
+    ParentNode* const p = new BINARYNODE<EQUAL>(ptr, len, column_ndx);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new NODE<int64_t, Column, NOTEQUAL>(value, column_ndx);
