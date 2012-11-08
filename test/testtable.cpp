@@ -1040,6 +1040,78 @@ TEST(Table_Spec_AddColumns)
 
 #endif
 
+TEST(Table_Spec_DeleteColumnsBug)
+{
+    TableRef table;
+    table = Table::create();
+
+    // Create specification with sub-table
+    table->add_column(COLUMN_TYPE_STRING, "name");
+    table->add_column(COLUMN_TYPE_INT,    "age");
+    table->add_column(COLUMN_TYPE_BOOL,   "hired");
+    table->add_column(COLUMN_TYPE_TABLE,  "phones");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(3); // phones
+
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "type");
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "number");
+
+    // Add rows
+    table->add_empty_row();
+    table->set_string(0, 0, "jessica");
+    table->set_int(1, 0, 22);
+    table->set_bool(2, 0, true);
+    {
+        TableRef phones = table->get_subtable(3, 0);
+        phones->add_empty_row();
+        phones->set_string(0, 0, "home");
+        phones->set_string(1, 0, "232-323-3242");
+    }
+
+    table->add_empty_row();
+    table->set_string(0, 1, "joe");
+    table->set_int(1, 1, 42);
+    table->set_bool(2, 1, false);
+    {
+        TableRef phones = table->get_subtable(3, 0);
+        phones->add_empty_row();
+        phones->set_string(0, 0, "work");
+        phones->set_string(1, 0, "434-434-4343");
+    }
+
+    table->add_empty_row();
+    table->set_string(0, 1, "jared");
+    table->set_int(1, 1, 35);
+    table->set_bool(2, 1, true);
+    {
+        TableRef phones = table->get_subtable(3, 0);
+        phones->add_empty_row();
+        phones->set_string(0, 0, "home");
+        phones->set_string(1, 0, "342-323-3242");
+
+        phones->add_empty_row();
+        phones->set_string(0, 0, "school");
+        phones->set_string(1, 0, "434-432-5433");
+    }
+
+    // Add new column
+    table->add_column(COLUMN_TYPE_MIXED, "extra");
+    table->set_mixed(4, 0, true);
+    table->set_mixed(4, 2, "Random string!");
+
+    // Remove some columns
+    table->remove_column(1); // age
+    table->remove_column(3); // extra
+
+#ifdef TIGHTDB_DEBUG
+    table->Verify();
+#endif // TIGHTDB_DEBUG
+
+    table.reset();
+}
+
 TEST(Table_Mixed)
 {
     Table table;
