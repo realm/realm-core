@@ -5,11 +5,29 @@
 ID         : class_dyn_table
 TITLE      : Table
 SUMMARY    : &g_dyn_table_intro_summary
-             |
              TightDB table.
 DESCR      : &g_dyn_table_intro_descr
-             |
-             The Table class allows you to efficiently work with data in terms of rows and columns. 
+             The Table class is the core class of the TightDB framework. It allows you 
+             to efficiently work with data in terms of rows and columns. The value of
+             a cell (specific column, specific row) is compacted in order to keep the
+             overall memory consumption as little as possible. The internal data structure
+             is optimized so retrieving a particular row in a table is as fast as possible 
+             (often faster than native data structures).
+             
+             The dynamic table can be used when the structure of the data is not known a
+             priori. This situation is common if you recieve data for different sources, and
+             these sources changes often. You can say that a dynamic table resembles the 
+             flexible data structures often found in dynamic languages like PHP and JavaScript.
+
+             You can add and remove columns at run time as your application requires it. When you
+             add a column, a type must be specified. The most common types including integers, 
+             timestamps and strings are suppotted. It is possible to use a TightDB table class 
+             as column type. This means that you can have tables of tables structure.
+
+             Moreover, TightDB introduces a column type called {@link: Mixed}. A value of the 
+             Mixed type can be any supported value of TightDB. This implies - as the name 
+             indicates - that you can mixed values: in one row the value is an integer, on another
+             row the value is a string or even a table.
 SEE        : 
 EXAMPLES   : 
 - DESCR: 
@@ -24,7 +42,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_size_summary
                  Number of rows.
       DESCR    : &g_dyn_table_size_descr
-                 |
                  Get the number of rows in a table.
       CONST    : True             
       RETURN:                 
@@ -38,7 +55,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_is_empty_summary
                  Is table empty.
       DESCR    : &g_dyn_table_is_empty_descr
-                 |
                  Check if the table is empty that is, it has zero rows.
       CONST    : True             
       RETURN:                 
@@ -52,7 +68,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_is_valid_summary
                  Is table valid/consistent.
       DESCR    : &g_dyn_table_is_valid_descr
-                 |
                  This method will perform a number of consistency checks on a table and its
                  columns.
       CONST    : true
@@ -69,7 +84,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_clear_summary
                  Remove all rows.
       DESCR    : &g_dyn_table_clear_descr
-                 |
                  This method will remove all rows in a table.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_clear
@@ -79,10 +93,16 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_optimize_summary
                  Optimize a table.
       DESCR    : &g_dyn_table_optimize_descr
-                 |
                  This method will optimize the internal data structures of a table.
                  The result is that the table will consume less memory and queries might 
-                 be faster. 
+                 be faster.
+                 
+                 This should be called as soon as there is an representative amount of
+                 data in the table. The table will then reorganize itself into the most
+                 effective format.
+                 
+                 What is learned about the contents will be used in all future operations,
+                 so you only need to call optimize once.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_optimize
         DESCR  : 
@@ -91,7 +111,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_operator_eq_summary
                  Compare two tables.
       DESCR    : &g_dyn_table_operator_eq_descr
-                 |
                  Compare two tables for equality. Two tables are equal if, and
                  only if, they contain the same columns and rows in the same
                  order, that is, for each value V of type T at column index C
@@ -114,7 +133,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_operator_neq_summary
                  Compare two tables.
       DESCR    : &g_dyn_table_operator_neq_descr
-                 |
                  Compare two tables for equality. Two tables are equal if, and
                  only if, they contain the same columns and rows in the same
                  order, that is, for each value V of type T at column index C
@@ -138,8 +156,7 @@ CATEGORIES :
       NAMES    : get_column_count
       SUMMARY  : &g_dyn_table_get_column_count_summary
                  Get the number of columns.
-      DESCR    : g_dyn_table_get_column_count_descr
-                 |
+      DESCR    : &g_dyn_table_get_column_count_descr
                  Get the number of columns.
       CONST    : True             
       RETURN:                 
@@ -153,7 +170,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_get_column_name_summary
                  Get the name of a column.
       DESCR    : &g_dyn_table_get_column_name_descr
-                 |
                  Get the name of a column using the column index.
       CONST    : True             
       PARAMS:                 
@@ -171,7 +187,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_get_column_index_summary
                  Get the index of a column.
       DESCR    : &g_dyn_table_get_column_index_descr
-                 |
                  Get the index of a column using the column name.
       CONST    : True             
       PARAMS:                 
@@ -189,7 +204,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_get_column_type_summary
                  Get the type of a column.
       DESCR    : &g_dyn_table_get_column_type_descr
-                 |
                  Get the type of a column using the column index.
       CONST    : True             
       PARAMS:                 
@@ -243,13 +257,15 @@ CATEGORIES :
       DESCR    : &g_dyn_table_insert_xxx_descr
                  >
                  These methods are used to insert new rows.
-                 <p>
-                 WARNING: These methods are here for when you need max performance in inserts.
-                 But they can currupt the database if used incorrectly. When inserting a new row
-                 you have to call the corresponding insert method for <i>every</i> column in the table
+
+                 <strong>WARNING</strong>: These methods are here for when you need 
+                 maximal performance for inserts.
+                 But they can corrupt the database if used incorrectly. When inserting a new row
+                 you have to call the corresponding insert method for <em>every</em> column in the table
                  and end up with insert_done.
-                 <p>
-                 For a safe way to insert rows, use insert_empty_row, and then set individual values.
+
+                 For a safe way to insert rows, use {@link insert_empty_row}, 
+                 and then set individual values.
       SIGNATURE: |
                  void insert_bool(size_t column_ndx, size_t row_ndx, bool value)
                  void insert_int(size_t column_ndx, size_t row_ndx, int64_t value)
@@ -288,14 +304,20 @@ CATEGORIES :
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : Position of row to delete.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_remove
+        DESCR  :
   - g_dyn_table_remove_last_row:
       NAMES    : remove_last
       SUMMARY  : &g_dyn_table_remove_last_row_summary
                  Delete last row.
       DESCR    : &g_dyn_table_remove_last_row_descr
-                 Delete last rows
+                 Delete last row.  Calling this on an empty table is an error.
       SIGNATURE: void remove_last();
-- Cells:
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_remove_last_row
+        DESCR  :
+- Values:
   METHODS:
   - g_dyn_table_get_bool:
   - g_dyn_table_get_int:
@@ -308,9 +330,8 @@ CATEGORIES :
   - g_dyn_table_get_subtable_const:
       NAMES    : get_*
       SUMMARY  : &g_dyn_table_get_xxx_summary
-                 Get value
+                 Get value.
       DESCR    : &g_dyn_table_get_xxx_descr
-                 |
                  This method will retrieve the value of a cell (row/column).
       SIGNATURE: |
                  bool          get_bool(size_t column_ndx, size_t row_ndx) const;
@@ -346,9 +367,8 @@ CATEGORIES :
   - g_dyn_table_set_mixed:
       NAMES    : set_*
       SUMMARY  : &g_dyn_table_set_xxx_summary
-                 Set value
+                 Set value.
       DESCR    : &g_dyn_table_set_xxx_descr
-                 |
                  This method will set the value of an existing cell (row/column).
       SIGNATURE: |
                  void set_bool(size_t column_ndx, size_t row_ndx, bool value);
@@ -381,7 +401,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_get_subtable_size_summary
                  Get subtable
       DESCR    : &g_dyn_table_get_subtable_size_descr
-                 |
                  The value of a cell can be a table. Such a value is referred to
                  a subtable. This method retrieves the number of rows of a subtable.
       CONST    : true
@@ -403,9 +422,8 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_clear_subtable_summary
                  Get subtable
       DESCR    : &g_dyn_table_clear_subtable_descr
-                 |
                  The value of a cell can be a table. Such a value is referred to
-                 a subtable. This method deletes all rows of such a subtable.
+                 as a subtable. This method deletes all rows of such a subtable.
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
@@ -423,7 +441,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_set_index_summary
                  Add an index to a column.
       DESCR    : &g_dyn_table_set_index_descr
-                 |
                  Adding an index to a column will make queries faster.
       PARAMS:
       - NAME   : column_ndx
@@ -440,7 +457,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_has_index_summary
                  Is column indexed?
       DESCR    : &g_dyn_table_has_index_descr
-                 |
                  Check if a column has an index.
       CONST    : true
       PARAMS:
@@ -460,7 +476,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_lookup_summary
                  Lookup a value.
       DESCR    : &g_dyn_table_lookup_descr
-                 |
                  This method will find the first row where the value of first column matches
                  a given string value. Defining the first column as a string with unique values,
                  it is possible to combine such a table with this method to emulate a hash
@@ -472,7 +487,7 @@ CATEGORIES :
         DESCR  : The value to search for.
       RETURN:
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_lookup
         DESCR  :
@@ -484,7 +499,6 @@ CATEGORIES :
       SUMMARY  : &g_find_first_xxx_summary
                  Find first matching row.
       DESCR    : &g_find_first_xxx_descr
-                 |
                  Find the first occurence of a given value in a column.
       SIGNATURE: |
                  size_t find_first_int(size_t column_ndx, int64_t value) const;
@@ -501,7 +515,7 @@ CATEGORIES :
         DESCR  : The value.
       RETURN:
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_first_xxx
         DESCR  :
@@ -517,9 +531,8 @@ CATEGORIES :
       SUMMARY  : &g_find_all_xxx_summary
                  Find all matching rows.
       DESCR    : &g_find_all_xxx_descr
-                 |
                  Find all occurences of a given value in a column. The rows are
-                 returned as a {@link TableView}.
+                 returned as a {@link call_dyn_tableview}.
       SIGNATURE: |
                  TableView      find_all_int(size_t column_ndx, int64_t value);
                  TableView      find_all_bool(size_t column_ndx, bool value);
@@ -549,7 +562,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_get_sorted_view_summary
                  Sort the table.
       DESCR    : &g_dyn_table_get_sorted_view_desc
-                 |
                  This method will sort the rows by using values of a given column.
       SIGNATURE: |
                  TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
@@ -597,7 +609,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_count_summary
                  Number of matching rows.
       DESCR    : &g_dyn_table_count_descr
-                 |
                  Get the number of rows matching a value.
       CONST    : True
       PARAMS:
@@ -618,8 +629,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_count_string_summary
                  Number of matching rows.
       DESCR    : &g_dyn_table_count_string_descr
-                 |
-                 Get the number of rows matching a string value
+                 Get the number of rows matching a string value.
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
@@ -637,10 +647,9 @@ CATEGORIES :
   - g_dyn_table_sum:
       NAMES    : sum
       SUMMARY  : &g_dyn_table_sum_summary
-                 Calculate the sum.
+                 Calculates the sum.
       DESCR    : &g_dyn_table_sum_descr
-                 |
-                 Calculate the sum of a column.
+                 Calculates the sum of a column.
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
@@ -657,7 +666,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_maximum_summary
                  Find highest value.
       DESCR    : &g_dyn_table_maximum_descr
-                 |
                  Find the highest value.
       CONST    : True
       PARAMS:
@@ -675,7 +683,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_minimum_summary
                  Find lowest value.
       DESCR    : &g_dyn_table_minimum_descr
-                 |
                  Find the lowest value.
       CONST    : True
       PARAMS:
@@ -691,10 +698,9 @@ CATEGORIES :
   - g_dyn_table_average:
       NAMES    : average
       SUMMARY  : &g_dyn_table_average_summary
-                 Calculate the average.
+                 Calculates the average.
       DESCR    : &g_dyn_table_average_descr
-                 |
-                 Calculate the average for a column.
+                 This method calculates the average for a column.
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
@@ -713,7 +719,6 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_to_json_summary
                  Convert table to JSON.
       DESCR    : &g_dyn_table_to_json_descr
-                 |
                  The JavaScript Object Notation (<a href="http://json.org">JSON</a>) is useful
                  for web/mobile applications and serialization. This method will convert a table 
                  and its columns and rows to a JSON compatible representation.
@@ -729,7 +734,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_to_string_summary
                  Convert table to a string.
       DESCR    : &g_dyn_table_to_string_descr
-                 |
+                 >
                  This method will convert a table and its columns and rows to a format
                  which is easily read by humans.
       CONST    : true
@@ -748,7 +753,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_row_to_string_summary
                  Convert a row to a string.
       DESCR    : &g_dyn_table_row_to_string_descr
-                 |
+                 >
                  This method will convert a row to a format
                  which is easily read by humans.
       CONST    : true

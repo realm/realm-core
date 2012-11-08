@@ -78,8 +78,11 @@ public:
     using Table::size;
     using Table::clear;
     using Table::remove;
+    using Table::remove_last;
     using Table::optimize;
     using Table::lookup;
+    using Table::add_empty_row;
+    using Table::insert_empty_row;
 
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc) { set_dynamic_spec(); }
 

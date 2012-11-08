@@ -10,8 +10,22 @@ SUMMARY    : &g_group_summary
              Container for tables.
 DESCR      : &g_group_descr
              |
+             In order to store tables on disk or transfer tables over network, they must be
+             serialized. The TightDB framework provides various methods including 
+             <a href="http://www.json.org">JSON</a> for single tables.
+
              The Group is a container for tables and it allows the tables to be serialized to
-             disk and memory. 
+             disk and memory. The serialization format is highly optimized for TightDB tables,
+             which implies that the consumed resources are low.
+
+             A group can hold one or more tables. If a table is going to be serialized, you 
+             must create the table using the group. It is not possible to dynamically add a table
+             to a group.
+
+             Once a group has been serialized, it is possible to deserialize it using any supported
+             programming language, at any supported operating system and at any supported
+             hardware platform. This implies that the TightDB framework is true a polyglot 
+             framework where you can share data between applications.
 SEE        : 
 EXAMPLES: 
 - DESCR    : 

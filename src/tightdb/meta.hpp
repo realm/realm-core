@@ -154,10 +154,10 @@ private:
 
 namespace _impl {
     template<class T, bool is_signed> struct IsNegative {
-        static bool test(T value) { return value < 0; }
+        static bool __test(T value) { return value < 0; }
     };
     template<class T> struct IsNegative<T, false> {
-        static bool test(T) { return false; }
+        static bool __test(T) { return false; }
     };
 }
 
@@ -166,7 +166,7 @@ namespace _impl {
 /// produce a compiler warning.
 template<class T> inline bool is_negative(T value)
 {
-    return _impl::IsNegative<T, std::numeric_limits<T>::is_signed>::test(value);
+    return _impl::IsNegative<T, std::numeric_limits<T>::is_signed>::__test(value);
 }
 
 
