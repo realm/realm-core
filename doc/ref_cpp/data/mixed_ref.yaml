@@ -7,12 +7,11 @@ TITLE      : Mixed
 SUMMARY    : &g_mixed_summary
              Flexible data type.
 DESCR      : &g_mixed_descr
-             |
              The Mixed class is a light-weight implementation of a flexible type system. Once
              a variable is given a value via a constructor, it is not possible to modify the 
              value. Any supported type of TightDB can be used with the Mixed class. The current
              supported types are boolean, integer, timestamps, strings, binary data and 
-             {@link Table}.
+             {@link class_dyn_table}.
 SEE        : 
 EXAMPLES: 
 - DESCR    : 
@@ -26,7 +25,7 @@ CATEGORIES:
       SUMMARY  : &g_mixed_constructor_summary
                  Create a Mixed variable.
       DESCR    : &g_mixed_constructor_descr
-                 |
+                 >
                  Mixed typed variables are instances of the Mixed class. Mixed typed values add a high
                  degree of flexibility to schemas.
       SIGNATURE: |
@@ -54,7 +53,6 @@ CATEGORIES:
       SUMMARY  : &g_mixed_get_type_summary
                  Get the type.
       DESCR    : &g_mixed_get_type_descr
-                 |
                  This method retrieves the real type of a Mixed variable.
       CONST    : True             
       RETURN:                 
@@ -72,7 +70,6 @@ CATEGORIES:
       SUMMARY  : &g_mixed_get_value_summary
                  Get value of Mixed variable.
       DESCR    : &g_mixed_get_value_descr
-                 |
                  The value of a Mixed typed variable is retrieved by this method.
       SIGNATURE: |
                  bool        get_bool()   const;
