@@ -264,7 +264,8 @@ CATEGORIES :
                  you have to call the corresponding insert method for <em>every</em> column in the table
                  and end up with insert_done.
 
-                 For a safe way to insert rows, use {@link insert_empty_row}, 
+                 For a safe way to insert rows, 
+                 use {@link g_dyn_table_insert_empty_row}, 
                  and then set individual values.
       SIGNATURE: |
                  void insert_bool(size_t column_ndx, size_t row_ndx, bool value)
@@ -292,7 +293,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_insert_xxx
         DESCR  : 
-      SEE      : "{@link insert_empty_row}"
+      SEE      : "{@link g_dyn_table_insert_empty_row}"
   - g_dyn_table_remove_row:
       NAMES    : remove
       SUMMARY  : &g_dyn_table_remove_row_summary
@@ -532,7 +533,7 @@ CATEGORIES :
                  Find all matching rows.
       DESCR    : &g_find_all_xxx_descr
                  Find all occurences of a given value in a column. The rows are
-                 returned as a {@link call_dyn_tableview}.
+                 returned as a {@link class_dyn_tableview}.
       SIGNATURE: |
                  TableView      find_all_int(size_t column_ndx, int64_t value);
                  TableView      find_all_bool(size_t column_ndx, bool value);
