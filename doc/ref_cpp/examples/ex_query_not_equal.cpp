@@ -19,10 +19,11 @@ int main()
 // @@Fold@@
 
     assert(view1.size() == 1 && view1[0].name == "Mary");
+// @@EndFold@@
 
-// @@Fold@@
     // Find rows where name != "Frank"
     PeopleTable::View view2 = table.where().name.not_equal("Frank").find_all(table);
+// @@Fold@@
     assert(view2.size() == 1 && view2[0].name == "Mary");
 }
 // @@EndFold@@

@@ -10,13 +10,14 @@ int main()
 {
     PeopleTable table;
 
+// @@EndFold@@
     table.add("Mary",  14);  // match
     table.add("Joe",   17);  // match
     table.add("Alice", 42);     
     table.add("Jack",  22);  // match
     table.add("Bob",   50);
     table.add("Frank", 12);  // match
-// @@EndFold@@
+
     // Delete rows where age >= 13 && age <= 20
     PeopleTable::Query query = table.where().age.between(13, 20);
     size_t removed = query.remove(table);

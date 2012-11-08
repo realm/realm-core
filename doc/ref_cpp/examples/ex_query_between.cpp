@@ -11,12 +11,12 @@ int main()
 {
     PeopleTable table;
 
+// @@EndFold@@
     table.add("Mary", 59, tightdb::Date(1998,  6, 14));
     table.add("Joe",  40, tightdb::Date(2010,  4, 24));
     table.add("Jack", 41, tightdb::Date(2012, 10,  5));
     table.add("Jill", 37, tightdb::Date(2006,  7,  1));
 
-// @@EndFold@@
     // Find rows where age <= 37 && age >= 40
     PeopleTable::View view1 = table.where().age.between(37, 40).find_all(table);
 

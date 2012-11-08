@@ -1,4 +1,5 @@
 // @@Example: ex_cpp_tableview_max @@
+// @@Fold@@
 #include <tightdb.hpp>
 
 TIGHTDB_TABLE_3(PeopleTable,
@@ -10,7 +11,7 @@ void main()
 {
     PeopleTable table;
 
-// @@Fold@@
+// @@EndFold@@
     table.add("Joe",  17, 50);  // match
     table.add("Mary", 14, 60);
     table.add("Jack", 22, 70);  // match
@@ -19,7 +20,8 @@ void main()
     PeopleTable::View view = table.where().age.greater(15).find_all(table);
     
     int64_t heaviest = view.column().weight.maximum();
+// @@Fold@@
     assert(heaviest == 80);
-// @@EndFold@@
 }
+// @@EndFold@@
 // @@EndExample@@

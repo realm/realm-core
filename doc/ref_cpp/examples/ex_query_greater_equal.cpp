@@ -10,11 +10,12 @@ int main()
 {
     PeopleTable table;
 
+// @@EndFold@@
     table.add("Mary", 14);
     table.add("Joe",  40);  // match
     table.add("Jack", 41);  // match
     table.add("Jill", 37);
-// @@EndFold@@
+
     // Find rows where age >= 40
     PeopleTable::View view1 = table.where().age.greater_equal(40).find_all(table);
 // @@Fold@@

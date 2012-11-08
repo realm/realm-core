@@ -10,13 +10,14 @@ int main()
 {
     PeopleTable table;
 
+// @@EndFold@@
     table.add("Mary",  14);
     table.add("Joe",   17);
     table.add("Alice", 42);
     table.add("Jack",  22); 
     table.add("Bob",   50);
     table.add("Frank", 12);
-// @@EndFold@@
+
     // Select rows where age < 18
     PeopleTable::Query query = table.where().age.less(18);
 

@@ -10,8 +10,8 @@ int main()
 {
     PeopleTable table;
 
-    table.add("Mary", 14); // Match
-    table.add("Joe",  17); // Match
+    table.add("Mary", 14); // match
+    table.add("Joe",  17); // match
     table.add("Jack", 22);
 
 // @@EndFold@@
@@ -25,5 +25,5 @@ int main()
     assert(view[0].name == "Mary");
     assert(view[1].name == "Joe");
 }
-// @@Fold@@
+// @@EndFold@@
 // @@EndExample@@

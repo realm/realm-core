@@ -17,7 +17,7 @@ int main()
 
 // @@EndFold@@
     // Select rows where age < 18
-    PeopleTable::Query query = table.where().age (18);
+    PeopleTable::Query query = table.where().age.less(18);
 
     // Count all matching rows of entire table
     size_t count1 = query.count(table);

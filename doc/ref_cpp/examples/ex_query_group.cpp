@@ -10,13 +10,13 @@ void main()
 {
     PeopleTable table;
 
+// @@EndFold@@
     table.add("Mary",  14);  // Match
     table.add("Joe",   17);  // Match
     table.add("Jack",  22);      
     table.add("Bob",   80);       
     table.add("Alice", 71);  // Match
 
-// @@EndFold@@
     // Find rows where (age > 12 && age < 20) || name == "Alice"
     PeopleTable::Query query = table.where().group()
                                                 .age.greater(12)

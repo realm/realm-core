@@ -11,12 +11,12 @@ int main()
 {
     PeopleTable table;
 
+// @@EndFold@@
     table.add("Joe",  17, 50);
     table.add("Jack", 22, 60); 
     table.add("Mary", 14, 70);
     table.add("Jill", 21, 80);
 
-// @@EndFold@@
     // Find average weight for rows where age >= 13 && age <= 20
     PeopleTable::Query query1 = table.where().age.between(13, 20);
     double avg1 = query1.weight.average(table);

@@ -1,4 +1,5 @@
 // @@Example: ex_cpp_tableview_get_source_rowid @@
+// @@Fold@@
 #include <tightdb.hpp>
 
 TIGHTDB_TABLE_2(PeopleTable,
@@ -8,7 +9,8 @@ TIGHTDB_TABLE_2(PeopleTable,
 int main()
 {
     PeopleTable table;
-// @@Fold@@
+
+// @@EndFold@@
     table.add("Joe",   57); // match
     table.add("Mary",  14); 
     table.add("Alice", 42); // match
@@ -19,6 +21,7 @@ int main()
     assert(view.get_source_ndx(0) == 0);
     assert(view.get_source_ndx(1) == 2);
     assert(view.get_source_ndx(2) == 3);
-// @@EndFold@@
+// @@Fold@@
 }
+// @@EndFold@@
 // @@EndExample@@

@@ -1,4 +1,5 @@
 // @@Example: ex_cpp_tableview_clear @@
+// @@Fold@@
 #include <tightdb.hpp>
 
 TIGHTDB_TABLE_2(PeopleTable,
@@ -9,7 +10,7 @@ int main()
 {
     PeopleTable table;
 
-// @@Fold@@
+// @@EndFold@@
     table.add("Joe",   57); // match
     table.add("Mary",  14); 
     table.add("Alice", 42); // match
@@ -23,6 +24,7 @@ int main()
 
     assert(view[1].name == "Jack");
     assert(table.size() == 3);
-// @@EndFold@@
+// @@Fold@@
 }
+// @@EndFold@@
 // @@EndExample@@
