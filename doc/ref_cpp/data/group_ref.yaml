@@ -30,7 +30,7 @@ SEE        :
 EXAMPLES: 
 - DESCR    : 
   CODE     : ex_cpp_group_intro
-IGNORE     : []                   # List of method-ids to ignore   
+IGNORE     : []                   # List of method-ids to ignore
 CATEGORIES:
 - constructor:
   METHODS:
@@ -40,10 +40,10 @@ CATEGORIES:
       NAMES    : Group
       DESCR    : >
                  Group objects can be created in various ways depending on use pattern.
-                 
+
                  You can either just create a new (empty) group, or load it from an
                  existing database either from a file or memory buffer.
-                 
+
       SUMMARY  : &g_group_constructor_summary
                  |
                  Creates a table group.
@@ -81,7 +81,7 @@ CATEGORIES:
   METHODS:
   - g_group_operator_equal:
       NAMES    : operator==
-      DESCR    : &g_group_operator_equal_descr 
+      DESCR    : &g_group_operator_equal_descr
                  |
                  Compare two groups for equality. Two groups are equal if, and
                  only if, they contain the same tables in the same order, that
@@ -113,20 +113,20 @@ CATEGORIES:
         DESCR  : <code>true</code> if the two groups are not equal, <code>false</code> otherwise.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_group_operator_not_equal
+        CODE   : ex_cpp_group_operator_equal
 - table:
   METHODS:
   - g_group_table_count:
-      NAMES    : table_count
+      NAMES    : get_table_count
       DESCR    : A group can be a container for many tables, and this method counts the number of tables currently stored within the group.
-      SUMMARY  : The number of tables.
+      SUMMARY  : The number of tables in the group.
       CONST    : true
       RETURN:
         TYPES  : size_t
         DESCR  : The number of tables.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_group_table_count
+        CODE   : ex_cpp_group_traverse
   - g_group_get_table:
       NAMES    : get_table
       SUMMARY  : &g_group_get_table_summary
@@ -135,15 +135,27 @@ CATEGORIES:
       DESCR    : &g_group_get_table_descr
                  |
                  This method will find and return a named table.
-                 
-                 By default this returns a dynamic (untyped) table, but by specifying the class you can also get a typed table.
-                 
-                 If no table exists with the given name, a new (empty) table will be created.
+
+                 When no table class is specified, this function
+                 returns a dynamically typed table accessor. When a
+                 table class (<code>MyTable</code>) is specified as a
+                 template parameter, you get a statically typed table
+                 accessor.
+
+                 It is an error to specify mismatching table class for
+                 a table that is already in the group. Doing so will
+                 result in undefined behaviour. For this reason you
+                 should generally never call get_table<MyTable>()
+                 without first checking the type of the table with a
+                 call to has_table<MyTable>().
+
+                 If no table exists with the specified name, a new
+                 empty table will be created.
       SIGNATURE: |
-                 TableRef             get_table(const char* name);
-                 ConstTableRef        get_table(const char* name) const;
-                 tableclass::Ref      get_table<tableclass>(const char* name);
-                 tableclass::ConstRef get_table<tableclass>(const char* name) const;
+                 TableRef          get_table(const char* name);
+                 ConstTableRef     get_table(const char* name) const;
+                 MyTable::Ref      get_table<MyTable>(const char* name);
+                 MyTable::ConstRef get_table<MyTable>(const char* name) const;
       PARAMS:
       - NAME   : name
         TYPES  : const char*
@@ -156,7 +168,9 @@ CATEGORIES:
         DESCR  : A table reference object.
       EXAMPLES:
       -  DESCR :
-         CODE  : ex_cpp_group_get_table
+         CODE  : ex_cpp_group_traverse
+      -  DESCR :
+         CODE  : ex_cpp_group_optional_table
       SEE      : "{@link has_table}"
   - g_group_has_table:
       NAMES    : has_table
@@ -166,7 +180,16 @@ CATEGORIES:
                  Does group have table?
       DESCR    : &g_group_has_table_descr
                  |
-                 This method checks if a group has a named table.
+                 Check whether this group contains the specified table.
+
+                 When no table class is specified, this function
+                 returns true if the group contains a table with the
+                 specified name. When a table class
+                 (<code>MyTable</code>) is specified as a template
+                 parameter, it returns true if the group contains a
+                 table with the specified name, and the type of that
+                 table is compatible with the specified type. See
+                 {@link concepts_table_type_compatibility} for details.
       PARAMS:
       - NAME   : name
         TYPES  : const char*
@@ -176,7 +199,7 @@ CATEGORIES:
         DESCR  : <code>true</code> if the table exits, otherwise <code>false</code>.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_group_has_table
+        CODE   : ex_cpp_group_optional_table
   - g_group_get_table_name:
       NAMES    : get_table_name
       DESCR    : This method will find the name of a table stored in the group.
@@ -190,8 +213,8 @@ CATEGORIES:
         TYPES  : const char*
         DESCR  : The table name.
       EXAMPLES:
-      - DESCR  : 
-        CODE   : ex_cpp_group_get_table_name
+      - DESCR  :
+        CODE   : ex_cpp_group_traverse
 - io:
   METHODS:
   - g_group_write_to_file:
@@ -202,7 +225,7 @@ CATEGORIES:
       DESCR    : &g_group_write_to_file_descr
                  |
                  This method will write the group to persistent storage (disk). Metadata and tables
-                 will be stored, and can be retrieved at later times. 
+                 will be stored, and can be retrieved at later times.
       PARAMS:
       - NAME   : filepath
         TYPES  : const char*
