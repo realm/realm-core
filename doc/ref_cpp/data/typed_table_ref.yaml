@@ -7,7 +7,7 @@ TITLE      : Table (typed)
 SUMMARY    : &g_typed_table_summary
              Typed table.
 DESCR      : &g_typed_table_descr
-             |
+             >
              The Table class is the core class of the TightDB framework. It allows you 
              to efficiently work with data in terms of rows and columns. The value of
              a cell (specific column, specific row) is compacted in order to keep the
@@ -23,7 +23,7 @@ DESCR      : &g_typed_table_descr
              It is possible to use a TightDB table class as column type. This means that you can 
              have tables of tables structure.
 
-             Moreover, TightDB introduces a column type called {@link: Mixed}. A value of the 
+             Moreover, TightDB introduces a column type called {@link: class_mixed}. A value of the 
              Mixed type can be any supported value of TightDB. This implies - as the name 
              indicates - that you can mixed values: in one row the value is an integer, on another
              row the value is a string or even a table.
@@ -114,7 +114,7 @@ CATEGORIES:
       SUMMARY  : &g_typed_table_optimize_summary
                  Optimize a table.
       DESCR    : &g_typed_table_optimize_descr
-                 |
+                 >
                  This method will optimize the internal data structures of a table.
                  The result is that the table will consume less memory and queries might 
                  be faster.
@@ -143,7 +143,7 @@ CATEGORIES:
       SUMMARY  : &g_typed_table_operator_eq_summary
                  Compare two tables.
       DESCR    : &g_typed_table_operator_eq_descr
-                 |
+                 >
                  Compare two tables for equality. Two tables are equal if, and
                  only if, they contain the same columns and rows in the same
                  order, that is, for each value V of type T at column index C
@@ -166,7 +166,7 @@ CATEGORIES:
       SUMMARY  : &g_typed_table_operator_neq_summary
                  Compare two tables.
       DESCR    : &g_typed_table_operator_neq_descr
-                 |
+                 >
                  Compare two tables for equality. Two tables are equal if, and
                  only if, they contain the same columns and rows in the same
                  order, that is, for each value V of type T at column index C
@@ -210,7 +210,7 @@ CATEGORIES:
                  RowAccessor      front()
                  ConstRowAccessor front() const
       SUMMARY  : Get last row.
-      DESCR    : Get last row. Calling front() on an empty table is an error.
+      DESCR    : Get last row. Calling <code>front()</code> on an empty table is an error.
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
@@ -223,7 +223,7 @@ CATEGORIES:
                  RowAccessor      back()
                  ConstRowAccessor back() const
       SUMMARY  : Get last row.
-      DESCR    : Get last row. Calling back() on an empty table is an error.
+      DESCR    : Get last row. Calling <code>back()</code> on an empty table is an error.
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
