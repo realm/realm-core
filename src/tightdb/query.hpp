@@ -88,12 +88,13 @@ public:
     // Conditions: binary data
     // FIXME: We want case insensitivity here also, becaue these will be used for strings that are not zero-terminated such as regular C++ strings.
     // FIXME: The '_binary' suffix is needed to avoid ambiguity when third argument is neither bool nor size_t.
+
+    Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
 /*
     Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& begins_with_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& ends_with_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& contains_binary(size_t column_ndx, const char* ptr, size_t len);
-    Query& not_equal_binary(size_t column_ndx, const char* ptr, size_t len);
 */
 
     // Grouping
