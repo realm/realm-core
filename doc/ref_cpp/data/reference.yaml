@@ -1,7 +1,7 @@
 #
 # Reference documentation data for language xxx
 #
-ID        : 'cpp'               # TightDB reference
+ID        : cpp
 TITLE     : 'C++'
 DESCR     : &g_introduction_descr
             >
@@ -57,9 +57,9 @@ CATEGORIES:                       # list global class-id in order of appearence
   - mixed
 #  - cursor
 
-EXAMPLES  : ex_cpp_intro
-- DESCR   :  
-  CODE    :                       # id to example code
+EXAMPLES  : 
+- DESCR   : 
+  CODE    : ex_cpp_intro           # id to example code
 
 #
 # Syntax instructions:
