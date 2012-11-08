@@ -40,12 +40,12 @@ public:
 
     std::time_t set_date(size_t year, size_t month, size_t day, size_t hour = 0, size_t minute = 0, size_t second = 0) {
         memset(&m_date, 0, sizeof(m_date));
-        m_date.tm_year = year - 1900;
-        m_date.tm_mon = month;
-        m_date.tm_mday = day;
-        m_date.tm_hour = hour;
-        m_date.tm_min = minute;
-        m_date.tm_sec = second;
+        m_date.tm_year = (int)year - 1900;
+        m_date.tm_mon = (int)month;
+        m_date.tm_mday = (int)day;
+        m_date.tm_hour = (int)hour;
+        m_date.tm_min = (int)minute;
+        m_date.tm_sec = (int)second;
         m_date.tm_isdst = 0;
 #ifdef _MSC_VER
         m_time = _mkgmtime64(&m_date);  // fixme: verify that _mkgmtime64 interprets input time as UTC time zone. Verify how daylight saving behaves too
