@@ -31,27 +31,18 @@ struct BinaryData {
     BinaryData() : pointer(NULL), len(0) {}
     BinaryData(const char* data, std::size_t size): pointer(data), len(size) {}
 
-    bool operator==(const BinaryData&) const;
-    bool operator!=(const BinaryData&) const;
+    bool compare_payload(BinaryData b) {
+        if(b.pointer == pointer && b.len == len)
+            return true;
+        bool e = std::equal(pointer, pointer + len, b.pointer);
+        return e;
+    }
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const BinaryData&);
 };
 
-
-
 // Implementation:
-
-inline bool BinaryData::operator==(const BinaryData& d) const
-{
-    return len == d.len && std::equal(pointer, pointer+len, d.pointer);
-}
-
-inline bool BinaryData::operator!=(const BinaryData& d) const
-{
-    return len != d.len || !std::equal(pointer, pointer+len, d.pointer);
-}
-
 template<class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const BinaryData& d)
 {
