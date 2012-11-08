@@ -33,6 +33,10 @@ namespace tightdb {
 enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_LESS, COND_NONE, COND_COUNT};
 
 
+// FIXME: We cannot use all-uppercase names like 'CONTAINS' for
+// classes since the risk of colliding with one of the customers macro
+// names is too high. In short, the all-uppercase name space is
+// reserved for macros.
 struct CONTAINS {
     CONTAINS() {};
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const

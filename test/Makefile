@@ -1,21 +1,21 @@
-PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl
+PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance
 
 TEST_PROGRAMS = tightdb-tests
 
 tightdb_tests_SOURCES = $(wildcard *.c *.cpp large_tests/*.cpp)
-tightdb_tests_LIBADD = ../src/tightdb/libtightdb.a
+tightdb_tests_LIBS = ../src/tightdb/libtightdb.a
 
 EXTRA_CLEAN_DIRS = large_tests
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
-ADD_CFLAGS_INCLUDE    = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
+tightdb_tests_CFLAGS  = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
 tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
 else
 PASSIVE_SUBDIRS      += UnitTest++
 test_tightdb_DEPS     = UnitTest++
 test_sqlite3_DEPS     = UnitTest++
 test_stl              = UnitTest++
-ADD_CFLAGS_INCLUDE    = -IUnitTest++/src
+tightdb_tests_CFLAGS  = -IUnitTest++/src
 tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
 tightdb_tests_DEPS    = UnitTest++
 endif

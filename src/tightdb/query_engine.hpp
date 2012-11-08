@@ -112,6 +112,10 @@ protected:
 };
 
 
+// FIXME: We cannot use all-uppercase names like 'ARRAYNODE' for
+// classes since the risk of colliding with one of the customers macro
+// names is too high. In short, the all-uppercase name space is
+// reserved for macros.
 class ARRAYNODE: public ParentNode {
 public:
     ARRAYNODE(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.Size()) {m_child = 0;}
@@ -278,6 +282,10 @@ protected:
 };
 
 
+// FIXME: We cannot use all-uppercase names like 'NODE' for classes
+// since the risk of colliding with one of the customers macro names
+// is too high. In short, the all-uppercase name space is reserved for
+// macros.
 template <class T, class C, class F> class NODE: public ParentNode {
 public:
     // NOTE: Be careful to call Array(false) constructors on m_array and m_array_agg in the initializer list, otherwise
@@ -703,6 +711,10 @@ private:
 };
 
 
+// FIXME: We cannot use all-uppercase names like 'OR_NODE' for classes
+// since the risk of colliding with one of the customers macro names
+// is too high. In short, the all-uppercase name space is reserved for
+// macros.
 class OR_NODE: public ParentNode {
 public:
     template <ACTION action> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*agg_col*/) {TIGHTDB_ASSERT(false); return 0;}

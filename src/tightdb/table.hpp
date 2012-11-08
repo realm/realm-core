@@ -33,6 +33,7 @@ namespace tightdb {
 
 using std::size_t;
 using std::time_t;
+using std::vector;
 
 class TableView;
 class ConstTableView;
@@ -107,17 +108,25 @@ public:
     /// table (except ~Table()) has undefined behaviour and is
     /// considered an error on behalf of the application. Note that
     /// even Table::is_valid() is disallowed in this case.
-    ///
-    /// FIXME: When Spec changes become possible for non-empty tables,
-    /// such changes would generally have to invalidate subtables
-    /// (except add_column()).
     bool is_valid() const { return m_columns.HasParent(); }
+
+    /// A shared spec is a column specification that in general
+    /// applies to many tables. A table is not allowed to directly
+    /// modify its own spec if it is shared. A shared spec may only be
+    /// modified via the closest ancestor table that has a nonshared
+    /// spec. Such an ancestor will always exist.
+    bool has_shared_spec() const;
 
     // Schema handling (see also <tightdb/spec.hpp>)
     Spec&       get_spec();
     const Spec& get_spec() const;
     void        update_from_spec(); // Must not be called for a table with shared spec
     size_t      add_column(ColumnType type, const char* name); // Add a column dynamically
+    size_t      add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name);
+    void        remove_column(size_t column_ndx);
+    void        remove_column(const vector<size_t>& column_path);
+    void        rename_column(size_t column_ndx, const char* name);
+    void        rename_column(const vector<size_t>& column_path, const char* name);
 
     // Table size and deletion
     bool        is_empty() const {return m_size == 0;}
@@ -299,8 +308,12 @@ protected:
 
     // Specification
     size_t GetColumnRefPos(size_t column_ndx) const;
-    void UpdateColumnRefs(size_t column_ndx, int diff);
-    void UpdateFromParent();
+    void   UpdateColumnRefs(size_t column_ndx, int diff);
+    void   UpdateFromParent();
+    void   do_remove_column(const vector<size_t>& column_ids, size_t pos);
+    void   do_remove_column(size_t column_ndx);
+    size_t do_add_column(ColumnType type);
+    void   do_add_subcolumn(const vector<size_t>& column_path, size_t pos, ColumnType type);
 
     // Support function for conversions
     void to_json_row(size_t row_ndx, std::ostream& out);
@@ -382,9 +395,9 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct LocalTransactLog;
     LocalTransactLog get_local_transact_log();
-    // Precondition: 1 <= end - begin
+    // Condition: 1 <= end - begin
     size_t* record_subspec_path(const Spec*, size_t* begin, size_t* end) const;
-    // Precondition: 1 <= end - begin
+    // Condition: 1 <= end - begin
     size_t* record_subtable_path(size_t* begin, size_t* end) const;
     friend class Replication;
 #endif
@@ -404,6 +417,9 @@ class Table::Parent: public ArrayParent {
 protected:
     friend class Table;
 
+    // ColumnTable must override this method and return true.
+    virtual bool subtables_have_shared_spec() { return false; }
+
     /// Must be called whenever a child Table is destroyed.
     virtual void child_destroyed(size_t child_ndx) = 0;
 
@@ -417,6 +433,17 @@ protected:
 
 
 // Implementation:
+
+inline bool Table::has_shared_spec() const
+{
+    const Array& top_array = m_top.IsValid() ? m_top : m_columns;
+    ArrayParent* parent = top_array.GetParent();
+    if (!parent) return false;
+#ifdef TIGHTDB_HAVE_RTTI
+    TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+#endif
+    return static_cast<Parent*>(parent)->subtables_have_shared_spec();
+}
 
 inline size_t Table::create_empty_table(Allocator& alloc)
 {

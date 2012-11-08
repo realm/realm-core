@@ -1,0 +1,284 @@
+#
+# C++ reference documentation for Group class
+#
+
+#UNDOCUMENTED: [commit, to_json, get_table_typed]
+ID         : class_group
+TITLE      : Group
+SUMMARY    : &g_group_summary
+             |
+             Container for tables.
+DESCR      : &g_group_descr
+             |
+             The Group is a container for tables and it allows the tables to be serialized to
+             disk and memory. 
+SEE        : 
+EXAMPLES: 
+- DESCR    : 
+  CODE     : ex_cpp_group_intro
+IGNORE     : []                   # List of method-ids to ignore   
+CATEGORIES:
+- constructor:
+  METHODS:
+  - g_group_constructor_plain:
+  - g_group_constructor_file:
+  - g_group_constructor_memory:
+      NAMES    : Group
+      DESCR    : >
+                 Group objects can be created in various ways depending on use pattern.
+                 
+                 You can either just create a new (empty) group, or load it from an
+                 existing database either from a file or memory buffer.
+                 
+      SUMMARY  : &g_group_constructor_summary
+                 |
+                 Creates a table group.
+      SIGNATURE: |
+                 Group();
+                 Group(const char* filename, int mode=GROUP_DEFAULT);
+                 Group(const char* buffer, size_t len);
+      PARAMS:
+      - NAME   : filename
+        TYPES  : const char*
+        DESCR  : name of the file.
+      - NAME   : buffer
+        TYPES  : const char*
+        DESCR  : in-memory binary encoded representation of a group.
+      - NAME   : mode
+        TYPES  : int
+        DESCR  : |
+                 GROUP_DEFAULT:  File with both read and write permissions
+                 GROUP_READONLY: Read-only file.
+      - NAME   : len
+        TYPES  : size_t
+        DESCR  : Length of buffer.
+      RETURN:
+        TYPES  : Group
+        DESCR  : A - possibly empty - group
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_constructor_plain
+      - DESCR  :
+        CODE   : ex_cpp_group_constructor_file
+      - DESCR  :
+        CODE   : ex_cpp_group_constructor_memory
+      SEE      : "{@link is_valid}"
+- operators:
+  METHODS:
+  - g_group_operator_equal:
+      NAMES    : operator==
+      DESCR    : &g_group_operator_equal_descr 
+                 |
+                 Compare two groups for equality. Two groups are equal if, and
+                 only if, they contain the same tables in the same order, that
+                 is, for each table T at index I in one of the groups, there is
+                 a table at index I in the other group that is equal to T.
+      SUMMARY  : Compare two groups.
+      CONST    : true
+      PARAMS:
+      - TYPES  : const Group&
+        NAME   : g
+        DESCR  : The group to compare with.
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if the two groups are equal, <code>false</code> otherwise.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_operator_equal
+  - g_group_operator_not_equal:
+      NAMES    : operator!=
+      DESCR    : *g_group_operator_equal_descr
+      SUMMARY  : Compare two groups.
+      CONST    : true
+      PARAMS:
+      - TYPES  : const Group&
+        NAME   : g
+        DESCR  : The group to compare with.
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if the two groups are not equal, <code>false</code> otherwise.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_operator_not_equal
+- table:
+  METHODS:
+  - g_group_table_count:
+      NAMES    : table_count
+      DESCR    : A group can be a container for many tables, and this method counts the number of tables currently stored within the group.
+      SUMMARY  : The number of tables.
+      CONST    : true
+      RETURN:
+        TYPES  : size_t
+        DESCR  : The number of tables.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_table_count
+  - g_group_get_table:
+      NAMES    : get_table
+      SUMMARY  : &g_group_get_table_summary
+                 |
+                 Get a table.
+      DESCR    : &g_group_get_table_descr
+                 |
+                 This method will find and return a named table.
+                 
+                 By default this returns a dynamic (untyped) table, but by specifying the class you can also get a typed table.
+                 
+                 If no table exists with the given name, a new (empty) table will be created.
+      SIGNATURE: |
+                 TableRef             get_table(const char* name);
+                 ConstTableRef        get_table(const char* name) const;
+                 tableclass::Ref      get_table<tableclass>(const char* name);
+                 tableclass::ConstRef get_table<tableclass>(const char* name) const;
+      PARAMS:
+      - NAME   : name
+        TYPES  : const char*
+        DESCR  : Name of the table you wish to retrieve. Calling it with the name of a nonexistent table is an error.
+      - NAME   : tableclass
+        TYPES  : class definition
+        DESCR  : Typed table class
+      RETURN:
+        TYPES  : [TableRef, ConstTableRef]
+        DESCR  : A table reference object.
+      EXAMPLES:
+      -  DESCR :
+         CODE  : ex_cpp_group_get_table
+      SEE      : "{@link has_table}"
+  - g_group_has_table:
+      NAMES    : has_table
+      CONST    : true
+      SUMMARY  : &g_group_has_table_summary
+                 |
+                 Does group have table?
+      DESCR    : &g_group_has_table_descr
+                 |
+                 This method checks if a group has a named table.
+      PARAMS:
+      - NAME   : name
+        TYPES  : const char*
+        DESCR  : Name of the table you wish to look for.
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if the table exits, otherwise <code>false</code>.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_has_table
+  - g_group_get_table_name:
+      NAMES    : get_table_name
+      DESCR    : This method will find the name of a table stored in the group.
+      SUMMARY  : Get the name of a table.
+      CONST    : true
+      PARAMS:
+      - NAME   : table_ndx
+        TYPES  : size_t
+        DESCR  : Table index.
+      RETURN:
+        TYPES  : const char*
+        DESCR  : The table name.
+      EXAMPLES:
+      - DESCR  : 
+        CODE   : ex_cpp_group_get_table_name
+- io:
+  METHODS:
+  - g_group_write_to_file:
+      NAMES    : write
+      SUMMARY  : &g_group_write_to_file_summary
+                 |
+                 Write a group to disk.
+      DESCR    : &g_group_write_to_file_descr
+                 |
+                 This method will write the group to persistent storage (disk). Metadata and tables
+                 will be stored, and can be retrieved at later times. 
+      PARAMS:
+      - NAME   : filepath
+        TYPES  : const char*
+        DESCR  : File name, possibly a full path.
+      RETURN:
+        DESCR  : <code>true</code> is successful, <code>false</code> otherwise.
+        TYPES  : bool
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_write_to_file
+  - g_group_write_to_mem:
+      NAMES    : write_to_mem
+      SUMMARY  : &g_group_write_to_mem_summary
+                 |
+                 Write a group to an in-memory buffer.
+      DESCR    : &g_group_write_to_mem_descr
+                 |
+                 This method will write the group to an in-memory buffer. This is useful if you
+                 wish to transfer a group over a TCP connection.
+      PARAMS:
+      - NAME   : len
+        TYPES  : size_t&
+        DESCR  : The len value will be filled with the number of bytes written to the buffer.
+      RETURN:
+        DESCR  : Pointer to the buffer. You are now the owner of this and will have to free it after use.
+        TYPES  : char*
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_write_to_mem
+- group:
+  METHODS:
+  - g_group_is_valid:
+      NAMES    : is_valid
+      SUMMARY  : &g_group_is_valid_summary
+                 |
+                 Is group valid?
+      DESCR    : &g_group_is_valid_descr
+                 |
+                 Check if group is valid. When loading a group from disk or memory, you can use this to check that it was actually loaded.
+      CONST    : true
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if group is valid, <code>false</code> otherwise.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_is_valid
+  - g_group_is_shared:
+      NAMES    : is_shared
+      SUMMARY  : &g_group_is_shared_summary
+                 |
+                 Is group shared.
+      DESCR    : &g_group_is_shared_descr
+                 |
+                 Check if group is shared.
+      CONST    : true
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if group is shared, <code>false</code> otherwise.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_is_shared
+  - g_group_is_empty:
+      NAMES    : is_empty
+      SUMMARY  : &g_group_is_empty_summary
+                 |
+                 Is group empty.
+      DESCR    : &g_group_is_empty_descr
+                 |
+                 Check if group is empty. That is, does it have zero tables.
+      CONST    : true
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if group is empty, <code>false</code> otherwise.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_is_empty
+  - g_group_tostring:
+      NAMES    : to_string
+      SUMMARY  : &g_group_to_string_summary
+                 |
+                 Get a string representation of the group.
+      DESCR    : &g_group_to_string_descr
+                 |
+                 This methods adds a string representation of information about the group to an
+                 output stream.
+      CONST    : true
+      PARAMS:
+      - NAME   : out
+        TYPES  : std::ostream&
+        DESCR  : The output stream.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_php_group_tostring

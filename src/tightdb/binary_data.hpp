@@ -28,7 +28,7 @@ namespace tightdb {
 struct BinaryData {
     const char* pointer;
     std::size_t len;
-    BinaryData() {}
+    BinaryData() : pointer(NULL), len(0) {}
     BinaryData(const char* data, std::size_t size): pointer(data), len(size) {}
 
     bool operator==(const BinaryData&) const;

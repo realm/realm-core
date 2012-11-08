@@ -423,6 +423,23 @@ bool Column::Insert(size_t ndx, int64_t value)
     return true;
 }
 
+void Column::fill(size_t count)
+{
+    TIGHTDB_ASSERT(is_empty());
+    TIGHTDB_ASSERT(!m_index);
+
+    // Fill column with default values
+    // TODO: this is a very naive approach
+    // we could speedup by creating full nodes directly
+    for (size_t i = 0; i < count; ++i) {
+        TreeInsert<int64_t, Column>(i, 0);
+    }
+
+#ifdef TIGHTDB_DEBUG
+    Verify();
+#endif
+}
+
 template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, size_t start, size_t end, size_t *matchcount) const
 { 
 #if 1

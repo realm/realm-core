@@ -9,45 +9,6 @@ MODE="$1"
 EXTENSIONS="java python objc node php gui"
 
 
-# Setup OS specific stuff
-OS="$(uname)" || exit 1
-ARCH="$(uname -m)" || exit 1
-LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
-if [ "$OS" = "Darwin" ]; then
-    LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
-fi
-if ! printf "%s\n" "$MODE" | grep -q '^dist'; then
-    NUM_PROCESSORS=""
-    if [ "$OS" = "Darwin" ]; then
-        if [ "$CC" = "" ] && which clang >/dev/null; then
-            export CC=clang
-        fi
-        NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
-    else
-        if [ -r /proc/cpuinfo ]; then
-            NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
-        fi
-    fi
-    if [ "$NUM_PROCESSORS" ]; then
-        export MAKEFLAGS="-j$NUM_PROCESSORS"
-    fi
-fi
-NEED_USR_LOCAL_LIB_NOTE=""
-USE_LIB64=""
-IS_REDHAT_DERIVATIVE=""
-if [ -e /etc/redhat-release ] || grep -q "Amazon" /etc/system-release 2>/dev/null; then
-    IS_REDHAT_DERIVATIVE="1"
-fi
-if [ "$IS_REDHAT_DERIVATIVE" ]; then
-    NEED_USR_LOCAL_LIB_NOTE="1"
-fi
-if [ "$IS_REDHAT_DERIVATIVE" -o -e /etc/SuSE-release ]; then
-    if [ "$ARCH" = "x86_64" -o "$ARCH" = "ia64" ]; then
-        USE_LIB64="1"
-    fi
-fi
-
-
 
 map_ext_name_to_dir()
 {
@@ -74,6 +35,20 @@ word_list_append()
     return 0
 }
 
+word_list_prepend()
+{
+    local list_name new_word list
+    list_name="$1"
+    new_word="$2"
+    list="$(eval "printf \"%s\\n\" \"\${$list_name}\"")" || return 1
+    if [ "$list" ]; then
+        eval "$list_name=\"\$new_word \$list\""
+    else
+        eval "$list_name=\"\$new_word\""
+    fi
+    return 0
+}
+
 path_list_prepend()
 {
     local list_name new_path list
@@ -90,15 +65,121 @@ path_list_prepend()
 
 
 
+# Setup OS specific stuff
+OS="$(uname)" || exit 1
+ARCH="$(uname -m)" || exit 1
+LIB_SUFFIX_SHARED=".so"
+LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
+if [ "$OS" = "Darwin" ]; then
+    LIB_SUFFIX_SHARED=".dylib"
+    LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
+fi
+if ! printf "%s\n" "$MODE" | grep -q '^dist'; then
+    NUM_PROCESSORS=""
+    if [ "$OS" = "Darwin" ]; then
+        NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
+        word_list_prepend MAKEFLAGS "-w" || exit 1
+    else
+        if [ -r /proc/cpuinfo ]; then
+            NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
+        fi
+    fi
+    if [ "$NUM_PROCESSORS" ]; then
+        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS" || exit 1
+    fi
+    export MAKEFLAGS
+fi
+NEED_USR_LOCAL_LIB_NOTE=""
+USE_LIB64=""
+IS_REDHAT_DERIVATIVE=""
+if [ -e /etc/redhat-release ] || grep -q "Amazon" /etc/system-release 2>/dev/null; then
+    IS_REDHAT_DERIVATIVE="1"
+fi
+if [ "$IS_REDHAT_DERIVATIVE" ]; then
+    NEED_USR_LOCAL_LIB_NOTE="1"
+fi
+if [ "$IS_REDHAT_DERIVATIVE" -o -e /etc/SuSE-release ]; then
+    if [ "$ARCH" = "x86_64" -o "$ARCH" = "ia64" ]; then
+        USE_LIB64="1"
+    fi
+fi
+
+
+
 case "$MODE" in
 
     "clean")
         make clean || exit 1
+        if [ "$OS" = "Darwin" ]; then
+            PLATFORMS="iPhoneOS iPhoneSimulator"
+            for x in $PLATFORMS; do
+                make -C "src/tightdb" BASE_DENOM="$x" clean || exit 1
+            done
+            make -C "src/tightdb" BASE_DENOM="ios" clean || exit 1
+        fi
         exit 0
         ;;
 
     "build")
         TIGHTDB_ENABLE_FAT_BINARIES="1" make || exit 1
+        if [ "$OS" = "Darwin" ]; then
+            TEMP_DIR="$(mktemp -d /tmp/tightdb.build.XXXX)" || exit 1
+            # Xcode provides the iPhoneOS SDK
+            XCODE_HOME="$(xcode-select --print-path)" || exit 1
+            PLATFORMS="iPhoneOS iPhoneSimulator"
+            for x in $PLATFORMS; do
+                PLATFORM_HOME="$XCODE_HOME/Platforms/$x.platform"
+                if ! [ -e "$PLATFORM_HOME/Info.plist" ]; then
+                    echo "Failed to find '$PLATFORM_HOME/Info.plist'" 1>&2
+                    exit 1
+                fi
+                mkdir "$TEMP_DIR/$x" || exit 1
+                for y in "$PLATFORM_HOME/Developer/SDKs"/*; do
+                    VERSION="$(defaults read "$y/SDKSettings" Version)" || exit 1
+                    if ! printf "%s\n" "$VERSION" | grep -q '^[0-9][0-9]*\(\.[0-9][0-9]*\)\{0,3\}$'; then
+                        echo "Uninterpretable version '$VERSION' in '$y'" 1>&2
+                        exit 1
+                    fi
+                    if [ -e "$TEMP_DIR/$x/$VERSION" ]; then
+                        echo "Ambiguous version '$VERSION' in '$y'" 1>&2
+                        exit 1
+                    fi
+                    printf "%s\n" "$y" >"$TEMP_DIR/$x/$VERSION"
+                    printf "%s\n" "$VERSION" >>"$TEMP_DIR/$x/versions"
+                done
+                if ! [ -e "$TEMP_DIR/$x/versions" ]; then
+                    echo "Found no SDKs in '$PLATFORM_HOME'" 1>&2
+                    exit 1
+                fi
+                sort -t . -k 1,1nr -k 2,2nr -k 3,3nr -k 4,4nr "$TEMP_DIR/$x/versions" >"$TEMP_DIR/$x/versions-sorted" || exit 1
+                LATEST="$(cat "$TEMP_DIR/$x/versions-sorted" | head -n 1)" || exit 1
+                (cd "$TEMP_DIR/$x" && ln "$LATEST" "sdk_root") || exit 1
+                if [ "$x" = "iPhoneSimulator" ]; then
+                    ARCH="i386"
+                else
+                    TYPE="$(defaults read-type "$PLATFORM_HOME/Info" "DefaultProperties")" || exit 1
+                    if [ "$TYPE" != "Type is dictionary" ]; then
+                        echo "Unexpected type of value of key 'DefaultProperties' in '$PLATFORM_HOME/Info.plist'" 1>&2
+                        exit 1
+                    fi
+                    CHUNK="$(defaults read "$PLATFORM_HOME/Info" "DefaultProperties")" || exit 1
+                    defaults write "$TEMP_DIR/$x/chunk" "$CHUNK" || exit 1
+                    ARCH="$(defaults read "$TEMP_DIR/$x/chunk" NATIVE_ARCH)" || exit 1
+                fi
+                printf "%s\n" "$ARCH" >"$TEMP_DIR/$x/arch"
+            done
+            for x in $PLATFORMS; do
+                PLATFORM_HOME="$XCODE_HOME/Platforms/$x.platform"
+                SDK_ROOT="$(cat "$TEMP_DIR/$x/sdk_root")" || exit 1
+                ARCH="$(cat "$TEMP_DIR/$x/arch")" || exit 1
+                TIGHTDB_DISABLE_SSE="1" make -C "src/tightdb" BASE_DENOM="$x" CFLAGS_ARCH="-arch $ARCH -isysroot $SDK_ROOT" "libtightdb-$x.a" "libtightdb-$x-dbg.a" || exit 1
+                cp "src/tightdb/libtightdb-$x.a"     "$TEMP_DIR/$x/libtightdb.a"     || exit 1
+                cp "src/tightdb/libtightdb-$x-dbg.a" "$TEMP_DIR/$x/libtightdb-dbg.a" || exit 1
+            done
+            lipo "$TEMP_DIR"/*/"libtightdb.a"     -create -output "src/tightdb/libtightdb-ios.a"     || exit 1
+            lipo "$TEMP_DIR"/*/"libtightdb-dbg.a" -create -output "src/tightdb/libtightdb-ios-dbg.a" || exit 1
+            TIGHTDB_DISABLE_SSE="1" make -C "src/tightdb" BASE_DENOM="ios" "tightdb-config-ios" "tightdb-config-ios-dbg" || exit 1
+        fi
         exit 0
         ;;
 
@@ -126,7 +207,8 @@ case "$MODE" in
 
     "test-installed")
         PREFIX="$1"
-        make test-installed || exit 1
+        make -C "test-installed" clean || exit 1
+        make -C "test-installed" test  || exit 1
         exit 0
         ;;
 
@@ -226,27 +308,65 @@ case "$MODE" in
         mkdir "$INSTALL_ROOT" || exit 1
         mkdir "$INSTALL_ROOT/include" "$INSTALL_ROOT/lib" "$INSTALL_ROOT/lib64" "$INSTALL_ROOT/bin" || exit 1
 
-        path_list_prepend CPATH                   "$INSTALL_ROOT/include" || exit 1
-        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"     || exit 1
-        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib64"   || exit 1
-        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib"     || exit 1
-        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib64"   || exit 1
-        path_list_prepend PATH                    "$INSTALL_ROOT/bin"     || exit 1
+        path_list_prepend CPATH                   "$TIGHTDB_HOME/src"         || exit 1
+        path_list_prepend CPATH                   "$INSTALL_ROOT/include"     || exit 1
+        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
+        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"         || exit 1
+        path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib64"       || exit 1
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib"         || exit 1
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib64"       || exit 1
+        path_list_prepend PATH                    "$TIGHTDB_HOME/src/tightdb" || exit 1
+        path_list_prepend PATH                    "$INSTALL_ROOT/bin"         || exit 1
         export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME" PATH
 
 
         if (
                 message "Building core library"
                 (sh build.sh clean && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
+                mkdir "$TEMP_DIR/transfer" || exit 1
+                mkdir "$TEMP_DIR/transfer/targets" || exit 1
+                cp "src/tightdb/libtightdb.a" "src/tightdb/libtightdb$LIB_SUFFIX_SHARED" "src/tightdb/libtightdb-dbg$LIB_SUFFIX_SHARED" "$TEMP_DIR/transfer/targets/" || exit 1
+                cp "src/tightdb/tightdb-config" "src/tightdb/tightdb-config-dbg" "$TEMP_DIR/transfer/targets/" || exit 1
+                if [ "$OS" = "Darwin" ]; then
+                    cp "src/tightdb/libtightdb-ios.a" "src/tightdb/libtightdb-ios-dbg.a" "$TEMP_DIR/transfer/targets/" || exit 1
+                    cp "src/tightdb/tightdb-config-ios" "src/tightdb/tightdb-config-ios-dbg" "$TEMP_DIR/transfer/targets/" || exit 1
+                fi
 
                 message "Running test suite for core library"
                 sh build.sh test >>"$LOG_FILE" 2>&1 || exit 1
 
                 message "Transfering prebuilt core library to package"
-                tar czf "$TEMP_DIR/core.tar.gz" src/tightdb/Makefile src/tightdb/*.h src/tightdb/*.hpp src/tightdb/libtightdb* src/tightdb/tightdb-config* src/Makefile src/*.hpp test/Makefile test-installed/Makefile test-installed/*.cpp config.mk generic.mk Makefile build.sh || exit 1
+                cat >"$TEMP_DIR/transfer/include" <<EOF
+/README.md
+/build.sh
+/generic.mk
+/config.mk
+/Makefile
+/src/Makefile
+/src/tightdb.hpp
+/src/tightdb/Makefile
+/src/tightdb/*.h
+/src/tightdb/*.hpp
+/test/Makefile
+/test-installed
+/doc
+EOF
+                cat >"$TEMP_DIR/transfer/exclude" <<EOF
+.gitignore
+/doc/development
+EOF
+                grep -E -v '^(#.*)?$' "$TEMP_DIR/transfer/include" >"$TEMP_DIR/transfer/include2" || exit 1
+                grep -E -v '^(#.*)?$' "$TEMP_DIR/transfer/exclude" >"$TEMP_DIR/transfer/exclude2" || exit 1
+                sed -e 's/\([.\[^$]\)/\\\1/g' -e 's|\*|[^/]*|g' -e 's|^\([^/]\)|^\\(.*/\\)\\{0,1\\}\1|' -e 's|^/|^|' -e 's|$|\\(/.*\\)\\{0,1\\}$|' "$TEMP_DIR/transfer/include2" >"$TEMP_DIR/transfer/include.bre" || exit 1
+                sed -e 's/\([.\[^$]\)/\\\1/g' -e 's|\*|[^/]*|g' -e 's|^\([^/]\)|^\\(.*/\\)\\{0,1\\}\1|' -e 's|^/|^|' -e 's|$|\\(/.*\\)\\{0,1\\}$|' "$TEMP_DIR/transfer/exclude2" >"$TEMP_DIR/transfer/exclude.bre" || exit 1
+                git ls-files >"$TEMP_DIR/transfer/files1" || exit 1
+                grep -f "$TEMP_DIR/transfer/include.bre" "$TEMP_DIR/transfer/files1" >"$TEMP_DIR/transfer/files2" || exit 1
+                grep -v -f "$TEMP_DIR/transfer/exclude.bre" "$TEMP_DIR/transfer/files2" >"$TEMP_DIR/transfer/files3" || exit 1
+                tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files3" || exit 1
                 mkdir "$PKG_DIR/tightdb" || exit 1
-                (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/core.tar.gz") || exit 1
+                (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
                 printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
+                ln "$TEMP_DIR/transfer/targets"/* "$PKG_DIR/tightdb/src/tightdb/" || exit 1
                 cat <<EOI > "$PKG_DIR/build"
 #!/bin/sh
 
@@ -399,7 +519,7 @@ EOI
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -r "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> CLEANING '$x'" | tee -a "$LOG_FILE"
-                rm -f "$EXT_HOME/TO_BE_INSTALLED" || exit 1
+                rm -f "$EXT_HOME/.TO_BE_INSTALLED" || exit 1
                 if ! sh "$EXT_HOME/build.sh" clean >>"$LOG_FILE" 2>&1; then
                     echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
@@ -450,19 +570,24 @@ EOI
                 fi
             done
         fi
-        path_list_prepend CPATH                   "$TIGHTDB_HOME/src"         || exit 1
-        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
-        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb" || exit 1
-        path_list_prepend PATH                    "$TIGHTDB_HOME/src/tightdb" || exit 1
-        export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME" PATH
+        if [ "$USE_LIB64" ]; then
+            LIBDIR="/usr/local/lib64"
+        else
+            LIBDIR="/usr/local/lib"
+        fi
+        path_list_prepend CPATH        "$TIGHTDB_HOME/src"         || exit 1
+        path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb" || exit 1
+        path_list_prepend PATH         "$TIGHTDB_HOME/src/tightdb" || exit 1
+        path_list_prepend LD_RUN_PATH  "$LIBDIR"                   || exit 1
+        export CPATH LIBRARY_PATH PATH LD_RUN_PATH
         ERROR=""
         for x in $EXTENSIONS; do
             if [ -e "$TEMP_DIR/select/$x" ]; then
                 echo ">>>>>>>> BUILDING '$x'" | tee -a "$LOG_FILE"
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-                rm -f "$EXT_HOME/TO_BE_INSTALLED" || exit 1
+                rm -f "$EXT_HOME/.TO_BE_INSTALLED" || exit 1
                 if sh "$EXT_HOME/build.sh" build >>"$LOG_FILE" 2>&1; then
-                    touch "$EXT_HOME/TO_BE_INSTALLED" || exit 1
+                    touch "$EXT_HOME/.TO_BE_INSTALLED" || exit 1
                 else
                     echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
@@ -489,7 +614,7 @@ EOF
         ERROR=""
         echo ">>>>>>>> INSTALLING 'tightdb'" | tee -a "$LOG_FILE"
         if sh build.sh install >>"$LOG_FILE" 2>&1; then
-            touch "WAS_INSTALLED" || exit 1
+            touch ".WAS_INSTALLED" || exit 1
             if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
                 if [ "$USE_LIB64" ]; then
                     LIBDIR="/usr/local/lib64"
@@ -505,10 +630,10 @@ EOF
             fi
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-                if [ -e "$EXT_HOME/TO_BE_INSTALLED" ]; then
+                if [ -e "$EXT_HOME/.TO_BE_INSTALLED" ]; then
                     echo ">>>>>>>> INSTALLING '$x'" | tee -a "$LOG_FILE"
                     if sh "$EXT_HOME/build.sh" install >>"$LOG_FILE" 2>&1; then
-                        touch "$EXT_HOME/WAS_INSTALLED" || exit 1
+                        touch "$EXT_HOME/.WAS_INSTALLED" || exit 1
                     else
                         echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                         ERROR="1"
@@ -528,7 +653,7 @@ EOF
 
 
     "dist-test-installed")
-        if ! [ -e "WAS_INSTALLED" ]; then
+        if ! [ -e ".WAS_INSTALLED" ]; then
             echo "Nothing was installed" 1>&2
             exit 1
         fi
@@ -544,7 +669,7 @@ EOF
         fi
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if [ -e "$EXT_HOME/WAS_INSTALLED" ]; then
+            if [ -e "$EXT_HOME/.WAS_INSTALLED" ]; then
                 echo ">>>>>>>> TESTING INSTALLATION OF '$x'" | tee -a "$LOG_FILE"
                 if sh "$EXT_HOME/build.sh" test-installed >>"$LOG_FILE" 2>&1; then
                     echo "SUCCESS!"  | tee -a "$LOG_FILE"
@@ -592,7 +717,7 @@ EOF
 
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
-        echo "Available modes are: clean build test install test-installed" 1>&2
+        echo "Available modes are: clean build test install test-installed build-ios" 1>&2
         echo "As well as: dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull" 1>&2
         exit 1
         ;;
