@@ -1047,6 +1047,7 @@ TEST(Table_Spec_DeleteColumnsBug)
 
     // Create specification with sub-table
     table->add_column(COLUMN_TYPE_STRING, "name");
+    table->set_index(0);
     table->add_column(COLUMN_TYPE_INT,    "age");
     table->add_column(COLUMN_TYPE_BOOL,   "hired");
     table->add_column(COLUMN_TYPE_TABLE,  "phones");
