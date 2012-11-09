@@ -39,7 +39,7 @@ TEST(TestDateQuery)
 
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
     PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::Date(2012, 1, 1).get_date())
-                                           .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all(table); 
+                                           .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all(); 
 
     assert(view5.size() == 1 && view5[0].name == "Mary");
 
