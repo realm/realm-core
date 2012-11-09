@@ -21,7 +21,7 @@ CATEGORIES:
 - Constructors:
   METHODS:
   - g_mixed_conscructor:
-      NAMES    : Constructor
+      NAMES    : Mixed
       SUMMARY  : &g_mixed_constructor_summary
                  Create a Mixed variable.
       DESCR    : &g_mixed_constructor_descr

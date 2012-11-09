@@ -31,7 +31,7 @@ EXAMPLES   :
   CODE: ex_cpp_dyn_query_intro
 IGNORE     : []                   # List of method-ids to ignore   
 CATEGORIES :
-- conditions:
+- Conditions:
   METHODS:
   - g_dyn_query_equals_boolean:
   - g_dyn_query_equals_integer:
@@ -324,7 +324,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_contains
-- combiners:
+- Combiners:
   METHODS:
   - g_dyn_query_group:
       NAMES    : group
@@ -392,7 +392,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_subtable
-- actions:
+- Actions:
   METHODS:
   - g_dyn_query_find_all_const:
   - g_dyn_query_find_all:
