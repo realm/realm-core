@@ -23,13 +23,13 @@ DESCR      : &g_typed_table_descr
              It is possible to use a TightDB table class as column type. This means that you can 
              have tables of tables structure.
 
-             Moreover, TightDB introduces a column type called {@link: class_mixed}. A value of the 
+             Moreover, TightDB introduces a column type called {@link class_mixed}. A value of the 
              Mixed type can be any supported value of TightDB. This implies - as the name 
-             indicates - that you can mixed values: in one row the value is an integer, on another
-             row the value is a string or even a table.
+             indicates - that you can mix the type of values in the the column. In one row the 
+             value could be an integer, in another row the value could be a string or even a table.
 
-             The aim of the TightDB table class is that it feels as close to the native data structures
-             (in particular arrays) as possible.
+             The aim of the TightDB table class is that it feels as close to the native data
+             structures (in particular arrays) as possible.
 SEE        : 
 EXAMPLES: 
 - DESCR    : 
@@ -40,7 +40,7 @@ CATEGORIES:
 - Macros:
   METHODS:
   - g_typed_table_macros:
-      NAMES    : class_macros
+      NAMES    : class macros
       DESCR    : Define type safe table classes.
       SIGNATURE: |
                  TIGHTDB_TABLE_*(ClassName,
@@ -89,13 +89,13 @@ CATEGORIES:
       - CODE   :  ex_cpp_type_table_is_empty
         DESCR  : 
   - g_typed_table_size:
-        NAMES    : size
-        DESCR    : Number of rows in table.
-        SUMMARY  : Number of rows in table.
-        CONST    : true
-        RETURN:
-          TYPES  : size_t
-          DESCR  : Number of rows in table.
+      NAMES    : size
+      DESCR    : Number of rows in table.
+      SUMMARY  : Number of rows in table.
+      CONST    : true
+      RETURN:
+        TYPES  : size_t
+        DESCR  : Number of rows in table.
       EXAMPLES:                  
       - CODE   :  ex_cpp_type_table_size
         DESCR  : 

@@ -417,13 +417,12 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const
         if (current_column == column_ndx)
             return pos;
 
+        ++pos;
         const ColumnType type = (ColumnType)m_spec_set.get_type_attr(i);
         if (type >= COLUMN_ATTR_INDEXED)
             continue; // ignore attributes
         if (type == COLUMN_TYPE_STRING_ENUM)
-            pos += 2; // string enums take up two places in m_columns
-        else
-            ++pos;
+            ++pos; // string enums take up two places in m_columns
 
         ++current_column;
     }
