@@ -86,7 +86,7 @@ size_t GroupWriter::Commit()
     // the blocks can occupy, so that later when we know the real size, we can
     // adjust the segment size, without changing the width.
     const size_t res_ndx = reserve_free_space(total_reserve, m_len);
-    const size_t res_pos = fpositions.Get(res_ndx); // top of reserved segments
+    const size_t res_pos = fpositions.GetAsSizeT(res_ndx); // top of reserved segments
 
     // Get final sizes of free lists
     const size_t fp_size  = fpositions.GetByteSize(true);
@@ -205,25 +205,30 @@ void GroupWriter::merge_free_space() {
     Array& fversions    = m_group.m_freeVersions;
     const bool isShared = m_group.is_shared();
 
+    if (flengths.is_empty())
+        return;
+
     size_t count = flengths.Size()-1;
     for (size_t i = 0; i < count; ++i) {
         const size_t i2 = i+1;
-        const size_t pos1 = fpositions.Get(i);
-        const size_t len1 = flengths.Get(i);
-        const size_t pos2 = fpositions.Get(i2);
+        const size_t pos1 = fpositions.GetAsSizeT(i);
+        const size_t len1 = flengths.GetAsSizeT(i);
+        const size_t pos2 = fpositions.GetAsSizeT(i2);
 
         if (pos2 == pos1 + len1) {
             // If this is a shared db, we can only merge
             // segments where no part is currently in use
             if (isShared) {
-                const size_t v1 = fversions.Get(i);
-                if (v1 >= m_readlock_version) continue;
-                const size_t v2 = fversions.Get(i2);
-                if (v2 >= m_readlock_version) continue;
+                const size_t v1 = fversions.GetAsSizeT(i);
+                if (v1 >= m_readlock_version)
+                    continue;
+                const size_t v2 = fversions.GetAsSizeT(i2);
+                if (v2 >= m_readlock_version)
+                    continue;
             }
 
             // Merge
-            const size_t len2 = flengths.Get(i2);
+            const size_t len2 = flengths.GetAsSizeT(i2);
             flengths.Set(i, len1 + len2);
             fpositions.Delete(i2);
             flengths.Delete(i2);
@@ -268,12 +273,12 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t& filesize, size_t star
     // Do we have a free space we can reuse?
     const size_t count = flengths.Size();
     for (size_t i = start; i < count; ++i) {
-        const size_t free_len = flengths.Get(i);
+        const size_t free_len = flengths.GetAsSizeT(i);
         if (len <= free_len) {
             // Only blocks that are not occupied by current
             // readers are allowed to be used.
             if (isShared) {
-                const size_t v = fversions.Get(i);
+                const size_t v = fversions.GetAsSizeT(i);
                 if (v >= m_readlock_version) continue;
             }
 
@@ -281,7 +286,7 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t& filesize, size_t star
             if (len != free_len) {
                 flengths.Set(i, len);
 
-                const size_t pos = fpositions.Get(i) + len;
+                const size_t pos = fpositions.GetAsSizeT(i) + len;
                 const size_t rest = free_len - len;
                 fpositions.Insert(i+1, pos);
                 flengths.Insert(i+1, rest);
@@ -296,11 +301,11 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t& filesize, size_t star
     const size_t ndx = extend_free_space(len, filesize);
 
     // Split segment so we get exactly what was asked for
-    const size_t free_len = flengths.Get(ndx);
+    const size_t free_len = flengths.GetAsSizeT(ndx);
     if (len != free_len) {
         flengths.Set(ndx, len);
 
-        const size_t pos = fpositions.Get(ndx) + len;
+        const size_t pos = fpositions.GetAsSizeT(ndx) + len;
         const size_t rest = free_len - len;
         fpositions.Insert(ndx+1, pos);
         flengths.Insert(ndx+1, rest);
@@ -320,77 +325,20 @@ size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
     Array& fversions    = m_group.m_freeVersions;
     const bool isShared = m_group.is_shared();
 
-    // Start by doing a perfect fit search
-    /*size_t res = flengths.find_first(len);
-    while (res != not_found) {
-        if (isShared) {
-            const size_t v = fversions.Get(res);
-            if (v >= m_readlock_version) {
-                res = flengths.find_first(len, res+1);
-                continue;
-            }
-        }
-
-        const size_t location = fpositions.Get(res);
-
-        fpositions.Delete(res);
-        flengths.Delete(res);
-        if (isShared)
-            fversions.Delete(res);
-
-        return location;
-    }*/
-
-    /*// Worst fit
-    size_t match_ref = not_found;
-    size_t match_len = len;
-    size_t res = flengths.find_first<GREATER>(len);
-    while (res != not_found) {
-        if (isShared) {
-            const size_t v = fversions.Get(res);
-            if (v >= m_readlock_version) {
-                res = flengths.find_first<GREATER>(match_len, res+1);
-                continue;
-            }
-        }
-        match_ref = res;
-        match_len = flengths.Get(res);
-        TIGHTDB_ASSERT(match_len > len);
-        res = flengths.find_first<GREATER>(match_len);
-    }
-    if (match_ref != not_found) {
-        const size_t location = fpositions.Get(match_ref);
-
-        // Update free list
-        const size_t rest = match_len - len;
-        if (rest == 0) {
-            fpositions.Delete(match_ref);
-            flengths.Delete(match_ref);
-            if (isShared) fversions.Delete(match_ref);
-        }
-        else {
-            //flengths.Set(match_ref, rest);
-            flengths.Set(match_ref, rest);
-            fpositions.Set(match_ref, location + len);
-        }
-
-        return location; // + rest;
-    }*/
-
     // Do we have a free space we can reuse?
     const size_t count = flengths.Size();
     const size_t start = len < 1024 ? 0 : count / 2; // small pieces first
     for (size_t i = start; i < count; ++i) {
-        const size_t free_len = flengths.Get(i);
+        const size_t free_len = flengths.GetAsSizeT(i);
         if (len <= free_len) {
             // Only blocks that are not occupied by current
             // readers are allowed to be used.
             if (isShared) {
-                const size_t v = fversions.Get(i);
+                const size_t v = fversions.GetAsSizeT(i);
                 if (v >= m_readlock_version) continue;
             }
 
-            const size_t location = fpositions.Get(i);
+            const size_t location = fpositions.GetAsSizeT(i);
 
             // Update free list
             const size_t rest = free_len - len;
@@ -438,16 +386,11 @@ size_t GroupWriter::extend_free_space(size_t len, size_t& filesize)
 
     // we always expand megabytes at a time, both for
     // performance and to avoid excess fragmentation
+    const size_t megabyte = 1024 * 1024;
     const size_t old_filesize = filesize;
-    const size_t needed_size = old_filesize + len;
-    while (filesize < needed_size) {
-//#ifdef TIGHTDB_DEBUG
-//        // in debug, increase in small intervals to force overwriting
-//        filesize += 64;
-//#else
-        filesize += 1024*1024;
-//#endif
-    }
+    const size_t needed_size = filesize + len;
+    const size_t rest = needed_size % megabyte;
+    filesize = rest ? (needed_size + (megabyte - rest)) : needed_size;
 
 #if !defined(_MSC_VER) // write persistence
     // Extend the file
@@ -462,6 +405,8 @@ size_t GroupWriter::extend_free_space(size_t len, size_t& filesize)
     munmap(m_data, old_filesize);
     m_data = (char*)mmap(0, filesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     TIGHTDB_ASSERT(m_data != (char*)-1);
+#else
+    TIGHTDB_ASSERT(false); // not implemented yet
 #endif
 
     // Add new free space
