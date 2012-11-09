@@ -129,6 +129,8 @@ public:
     ConstTableView find_all_multi(size_t start=0, size_t end=size_t(-1)) const;
     int            set_threads(unsigned int threadcount);
 
+    TableRef& get_table() {return m_table;}
+
 #ifdef TIGHTDB_DEBUG
     std::string Verify(); // Must be upper case to avoid conflict with macro in ObjC
 #endif
