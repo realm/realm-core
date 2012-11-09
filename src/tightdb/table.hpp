@@ -24,6 +24,8 @@
 #include <tightdb/table_ref.hpp>
 #include <tightdb/spec.hpp>
 #include <tightdb/mixed.hpp>
+#include <tightdb/query.hpp>
+
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #include <tightdb/replication.hpp>
@@ -221,6 +223,10 @@ public:
 
     TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
     ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const;
+
+    // Queries
+    Query       where() {return Query(*this);}
+    const Query where() const {return Query(*this);}
 
     // Optimizing
     void optimize();

@@ -40,16 +40,16 @@ TEST(TestQueryStrIndexed_enum)
 
     ttt.column().second.set_index();
 
-    size_t s = ttt.where().second.equal("a").first.sum(ttt);
+    size_t s = ttt.where().second.equal("a").first.sum();
     CHECK_EQUAL(10*11, s);
 
-    s = ttt.where().second.equal("a").first.equal(10).first.sum(ttt);
+    s = ttt.where().second.equal("a").first.equal(10).first.sum();
     CHECK_EQUAL(100, s);
 
-    s = ttt.where().first.equal(10).second.equal("a").first.sum(ttt);
+    s = ttt.where().first.equal(10).second.equal("a").first.sum();
     CHECK_EQUAL(100, s);
 
-    TupleTableType::View tv = ttt.where().second.equal("a").find_all(ttt);
+    TupleTableType::View tv = ttt.where().second.equal("a").find_all();
     CHECK_EQUAL(10*2, tv.size());
 }
 
@@ -69,16 +69,16 @@ TEST(TestQueryStrIndexed_non_enum)
 
     ttt.column().second.set_index();
 
-    size_t s = ttt.where().second.equal("a").first.sum(ttt);
+    size_t s = ttt.where().second.equal("a").first.sum();
     CHECK_EQUAL(10*11, s);
 
-    s = ttt.where().second.equal("a").first.equal(10).first.sum(ttt);
+    s = ttt.where().second.equal("a").first.equal(10).first.sum();
     CHECK_EQUAL(100, s);
 
-    s = ttt.where().first.equal(10).second.equal("a").first.sum(ttt);
+    s = ttt.where().first.equal(10).second.equal("a").first.sum();
     CHECK_EQUAL(100, s);
 
-    TupleTableType::View tv = ttt.where().second.equal("a").find_all(ttt);
+    TupleTableType::View tv = ttt.where().second.equal("a").find_all();
     CHECK_EQUAL(10*2, tv.size());
 }
 
@@ -128,10 +128,10 @@ TEST(TestQuery_sum_new_aggregates)
         t.add(4);
         t.add(6);
     }
-    size_t c = t.where().first.equal(2).count(t);
+    size_t c = t.where().first.equal(2).count();
     CHECK_EQUAL(1000, c);
 
-    c = t.where().first.greater(2).count(t);
+    c = t.where().first.greater(2).count();
     CHECK_EQUAL(2000, c);
 
 }
@@ -144,7 +144,7 @@ TEST(TestQuery_sum_min_max_avg_foreign_col)
     t.add(2, 30);
     t.add(3, 40);
 
-    CHECK_EQUAL(50, t.where().first.equal(2).second.sum(t));
+    CHECK_EQUAL(50, t.where().first.equal(2).second.sum());
 }
 
 
@@ -159,16 +159,16 @@ TEST(TestAggregateSingleCond)
     ttt.add(3);
     ttt.add(4);
 
-    int64_t s = ttt.where().first.equal(2).first.sum(ttt);
+    int64_t s = ttt.where().first.equal(2).first.sum();
     CHECK_EQUAL(4, s);
 
-    s = ttt.where().first.greater(2).first.sum(ttt);
+    s = ttt.where().first.greater(2).first.sum();
     CHECK_EQUAL(10, s);
 
-    s = ttt.where().first.less(3).first.sum(ttt);
+    s = ttt.where().first.less(3).first.sum();
     CHECK_EQUAL(5, s);
 
-    s = ttt.where().first.not_equal(3).first.sum(ttt);
+    s = ttt.where().first.not_equal(3).first.sum();
     CHECK_EQUAL(9, s);
 
 
@@ -192,7 +192,7 @@ TEST(TestQueryFindAll_range1)
     ttt.add(10, "a");
 
     TupleTableType::Query q1 = ttt.where().second.equal("a");
-    TupleTableType::View tv1 = q1.find_all(ttt, 4, 10);
+    TupleTableType::View tv1 = q1.find_all(4, 10);
     CHECK_EQUAL(6, tv1.size());
 }
 
@@ -219,7 +219,7 @@ TEST(TestQueryFindAll_range_or_monkey2)
         }
 
         TwoIntTable::Query q1 = tit.where().group().first.equal(3).Or().first.equal(7).end_group().second.greater(5);
-        TwoIntTable::View tv1 = q1.find_all(tit, start, end);
+        TwoIntTable::View tv1 = q1.find_all(start, end);
 
         for (size_t t = start; t < end; t++) {
             if ((tit[t].first == 3 || tit[t].first == 7) && tit[t].second > 5) {
@@ -257,13 +257,13 @@ TEST(TestQueryFindAll_range_or)
     ttt.add(3, "b"); //
 
     TupleTableType::Query q1 = ttt.where().group().first.greater(1).Or().second.equal("a").end_group().first.less(3);
-    TupleTableType::View tv1 = q1.find_all(ttt, 1, 8);
+    TupleTableType::View tv1 = q1.find_all(1, 8);
     CHECK_EQUAL(4, tv1.size());
 
-    TupleTableType::View tv2 = q1.find_all(ttt, 2, 8);
+    TupleTableType::View tv2 = q1.find_all(2, 8);
     CHECK_EQUAL(3, tv2.size());
 
-    TupleTableType::View tv3 = q1.find_all(ttt, 1, 7);
+    TupleTableType::View tv3 = q1.find_all(1, 7);
     CHECK_EQUAL(3, tv3.size());
 }
 
@@ -280,7 +280,7 @@ TEST(TestQueryDelete)
     ttt.add(6, "X");
 
     TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(ttt);
+    size_t r = q.remove();
 
     CHECK_EQUAL(4, r);
     CHECK_EQUAL(2, ttt.size());
@@ -293,7 +293,7 @@ TEST(TestQueryDelete)
     ttt.add(2, "X");
     ttt.add(3, "X");
     TupleTableType::Query q2 = ttt.where().second.equal("X");
-    r = q2.remove(ttt);
+    r = q2.remove();
     CHECK_EQUAL(3, r);
     CHECK_EQUAL(0, ttt.size());
 }
@@ -310,7 +310,7 @@ TEST(TestQueryDeleteRange)
     ttt.add(5, "X");
 
     TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(ttt, 1, 4);
+    size_t r = q.remove(1, 4);
 
     CHECK_EQUAL(3, r);
     CHECK_EQUAL(3, ttt.size());
@@ -331,7 +331,7 @@ TEST(TestQueryDeleteLimit)
     ttt.add(5, "X");
 
     TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(ttt, 1, 4, 2);
+    size_t r = q.remove(1, 4, 2);
 
     CHECK_EQUAL(2, r);
     CHECK_EQUAL(4, ttt.size());
@@ -353,7 +353,7 @@ TEST(TestQuerySimple)
 
     TupleTableType::Query q1 = ttt.where().first.equal(2);
 
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
@@ -366,7 +366,7 @@ TEST(TestQuerySimpleBUGdetect)
 
 	TupleTableType::Query q1 = ttt.where();
 
-	TupleTableType::View tv1 = q1.find_all(ttt);
+	TupleTableType::View tv1 = q1.find_all();
 	CHECK_EQUAL(2, tv1.size());
 	CHECK_EQUAL(0, tv1.get_source_ndx(0));
 
@@ -441,54 +441,50 @@ TEST(TestQuerySubtable)
     subtable->insert_done();
 
 
-    Query *q1 = new Query;
-    q1->greater(0, 200);
-    q1->subtable(2);
-    q1->less(0, 50);
-    q1->end_subtable();
-    TableView t1 = q1->find_all(*table, 0, (size_t)-1);
+    Query q1 = table->where();
+    q1.greater(0, 200);
+    q1.subtable(2);
+    q1.less(0, 50);
+    q1.end_subtable();
+    TableView t1 = q1.find_all(0, (size_t)-1);
     CHECK_EQUAL(2, t1.size());
     CHECK_EQUAL(1, t1.get_source_ndx(0));
     CHECK_EQUAL(2, t1.get_source_ndx(1));
-    delete q1;
 
 
-    Query *q2 = new Query;
-    q2->subtable(2);
-    q2->greater(0, 50);
-    q2->Or();
-    q2->less(0, 20);
-    q2->end_subtable();
-    TableView t2 = q2->find_all(*table, 0, (size_t)-1);
+    Query q2 = table->where();
+    q2.subtable(2);
+    q2.greater(0, 50);
+    q2.Or();
+    q2.less(0, 20);
+    q2.end_subtable();
+    TableView t2 = q2.find_all(0, (size_t)-1);
     CHECK_EQUAL(2, t2.size());
     CHECK_EQUAL(0, t2.get_source_ndx(0));
     CHECK_EQUAL(3, t2.get_source_ndx(1));
-    delete q2;
 
 
-    Query *q3 = new Query;
-    q3->subtable(2);
-    q3->greater(0, 50);
-    q3->Or();
-    q3->less(0, 20);
-    q3->end_subtable();
-    q3->less(0, 300);
-    TableView t3 = q3->find_all(*table, 0, (size_t)-1);
+    Query q3 = table->where();
+    q3.subtable(2);
+    q3.greater(0, 50);
+    q3.Or();
+    q3.less(0, 20);
+    q3.end_subtable();
+    q3.less(0, 300);
+    TableView t3 = q3.find_all(0, (size_t)-1);
     CHECK_EQUAL(1, t3.size());
     CHECK_EQUAL(0, t3.get_source_ndx(0));
-    delete q3;
 
 
-    Query *q4 = new Query;
-    q4->equal(0, (int64_t)333);
-    q4->Or();
-    q4->subtable(2);
-    q4->greater(0, 50);
-    q4->Or();
-    q4->less(0, 20);
-    q4->end_subtable();
-    TableView t4 = q4->find_all(*table, 0, (size_t)-1);
-    delete q4;
+    Query q4 = table->where();
+    q4.equal(0, (int64_t)333);
+    q4.Or();
+    q4.subtable(2);
+    q4.greater(0, 50);
+    q4.Or();
+    q4.less(0, 20);
+    q4.end_subtable();
+    TableView t4 = q4.find_all(0, (size_t)-1);
 
 
     CHECK_EQUAL(3, t4.size());
@@ -519,7 +515,7 @@ TEST(TestQuerySort1)
     // result       = 3, 0, 5, 2, 8, 7, 6
 
     TupleTableType::Query q = ttt.where().first.not_equal(2);
-    TupleTableType::View tv = q.find_all(ttt);
+    TupleTableType::View tv = q.find_all();
     tv.column().first.sort();
 
     CHECK(tv.size() == 7);
@@ -543,7 +539,7 @@ TEST(TestQuerySort_QuickSort)
         ttt.add(rand() % 1100, "a"); // 0
 
     TupleTableType::Query q = ttt.where();
-    TupleTableType::View tv = q.find_all(ttt);
+    TupleTableType::View tv = q.find_all();
     tv.column().first.sort();
 
     CHECK(tv.size() == 1000);
@@ -561,7 +557,7 @@ TEST(TestQuerySort_CountSort)
         ttt.add(rand() % 900, "a"); // 0
 
     TupleTableType::Query q = ttt.where();
-    TupleTableType::View tv = q.find_all(ttt);
+    TupleTableType::View tv = q.find_all();
     tv.column().first.sort();
 
     CHECK(tv.size() == 1000);
@@ -579,7 +575,7 @@ TEST(TestQuerySort_Descending)
         ttt.add(rand() % 1100, "a"); // 0
 
     TupleTableType::Query q = ttt.where();
-    TupleTableType::View tv = q.find_all(ttt);
+    TupleTableType::View tv = q.find_all();
     tv.column().first.sort(false);
 
     CHECK(tv.size() == 1000);
@@ -601,9 +597,7 @@ TEST(TestQuerySort_Dates)
     table.insert_date(0, 2, 2000);
     table.insert_done();
 
-    Query *q = new Query();
-    TableView tv = q->find_all(table);
-    delete q;
+    TableView tv = table.where().find_all();
     CHECK(tv.size() == 3);
     CHECK(tv.get_source_ndx(0) == 0);
     CHECK(tv.get_source_ndx(1) == 1);
@@ -630,9 +624,7 @@ TEST(TestQuerySort_Bools)
     table.insert_bool(0, 0, true);
     table.insert_done();
 
-    Query *q = new Query();
-    TableView tv = q->find_all(table);
-    delete q;
+    TableView tv = table.where().find_all();
     tv.sort(0);
 
     CHECK(tv.size() == 3);
@@ -664,7 +656,7 @@ TEST(TestQueryThreads)
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
     //q1.set_threads(5);
-    TupleTableType::View tv = q1.find_all(ttt);
+    TupleTableType::View tv = q1.find_all();
 
     CHECK_EQUAL(100, tv.size());
     for (int i = 0; i < 100; i++) {
@@ -691,7 +683,7 @@ TEST(TestQuerySimple2)
     ttt.add(3, "X");
 
     TupleTableType::Query q1 = ttt.where().first.equal(2);
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
     CHECK_EQUAL(4, tv1.get_source_ndx(1));
@@ -721,27 +713,27 @@ TEST(TestQueryLimit)
 
     TupleTableType::Query q1 = ttt.where().first.equal(2);
 
-    TupleTableType::View tv1 = q1.find_all(ttt, 0, size_t(-1), 2);
+    TupleTableType::View tv1 = q1.find_all(0, size_t(-1), 2);
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
     CHECK_EQUAL(4, tv1.get_source_ndx(1));
 
-    TupleTableType::View tv2 = q1.find_all(ttt, tv1.get_source_ndx(tv1.size() - 1) + 1, size_t(-1), 2);
+    TupleTableType::View tv2 = q1.find_all(tv1.get_source_ndx(tv1.size() - 1) + 1, size_t(-1), 2);
     CHECK_EQUAL(2, tv2.size());
     CHECK_EQUAL(7, tv2.get_source_ndx(0));
     CHECK_EQUAL(10, tv2.get_source_ndx(1));
 
-    TupleTableType::View tv3 = q1.find_all(ttt, tv2.get_source_ndx(tv2.size() - 1) + 1, size_t(-1), 2);
+    TupleTableType::View tv3 = q1.find_all(tv2.get_source_ndx(tv2.size() - 1) + 1, size_t(-1), 2);
     CHECK_EQUAL(1, tv3.size());
     CHECK_EQUAL(13, tv3.get_source_ndx(0));
 
 
     TupleTableType::Query q2 = ttt.where();
-    TupleTableType::View tv4 = q2.find_all(ttt, 0, 5, 3);
+    TupleTableType::View tv4 = q2.find_all(0, 5, 3);
     CHECK_EQUAL(3, tv4.size());
 
     TupleTableType::Query q3 = ttt.where();
-    TupleTableType::View tv5 = q3.find_all(ttt, 0, 3, 5);
+    TupleTableType::View tv5 = q3.find_all(0, 3, 5);
     CHECK_EQUAL(3, tv5.size());
 }
 
@@ -759,9 +751,9 @@ TEST(TestQueryFindNext)
 
     TupleTableType::Query q1 = ttt.where().second.equal("X").first.greater(4);
 
-    const size_t res1 = q1.find_next(ttt);
-    const size_t res2 = q1.find_next(ttt, res1);
-    const size_t res3 = q1.find_next(ttt, res2);
+    const size_t res1 = q1.find_next();
+    const size_t res2 = q1.find_next(res1);
+    const size_t res3 = q1.find_next(res2);
 
     CHECK_EQUAL(5, res1);
     CHECK_EQUAL(6, res2);
@@ -781,11 +773,11 @@ TEST(TestQueryFindAll1)
     ttt.add(7, "X");
 
     TupleTableType::Query q1 = ttt.where().second.equal("a").first.greater(2).first.not_equal(4);
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.get_source_ndx(0));
 
     TupleTableType::Query q2 = ttt.where().second.equal("X").first.greater(4);
-    TupleTableType::View tv2 = q2.find_all(ttt);
+    TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(5, tv2.get_source_ndx(0));
     CHECK_EQUAL(6, tv2.get_source_ndx(1));
 
@@ -804,7 +796,7 @@ TEST(TestQueryFindAll2)
     ttt.add(0, "X");
 
     TupleTableType::Query q2 = ttt.where().second.not_equal("a").first.less(3);
-    TupleTableType::View tv2 = q2.find_all(ttt);
+    TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(6, tv2.get_source_ndx(0));
 }
 
@@ -821,7 +813,7 @@ TEST(TestQueryFindAllBetween)
     ttt.add(3, "X");
 
     TupleTableType::Query q2 = ttt.where().first.between(3, 5);
-    TupleTableType::View tv2 = q2.find_all(ttt);
+    TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(2, tv2.get_source_ndx(0));
     CHECK_EQUAL(3, tv2.get_source_ndx(1));
     CHECK_EQUAL(4, tv2.get_source_ndx(2));
@@ -838,7 +830,7 @@ TEST(TestQueryFindAll_Range)
     ttt.add(5, "a");
 
     TupleTableType::Query q1 = ttt.where().second.equal("a").first.greater(2).first.not_equal(4);
-    TupleTableType::View tv1 = q1.find_all(ttt, 1, 2);
+    TupleTableType::View tv1 = q1.find_all(1, 2);
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
 
@@ -857,7 +849,7 @@ TEST(TestQueryFindAll_Or)
 
     // first == 5 || second == X
     TupleTableType::Query q1 = ttt.where().first.equal(5).Or().second.equal("X");
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(2, tv1.get_source_ndx(0));
     CHECK_EQUAL(4, tv1.get_source_ndx(1));
@@ -879,7 +871,7 @@ TEST(TestQueryFindAll_Parans1)
 
     // first > 3 && (second == X)
     TupleTableType::Query q1 = ttt.where().first.greater(3).group().second.equal("X").end_group();
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(6, tv1.get_source_ndx(0));
 }
@@ -900,7 +892,7 @@ TEST(TestQueryFindAll_OrParan)
 
     // (first == 5 || second == X && first > 2)
     TupleTableType::Query q1 = ttt.where().group().first.equal(5).Or().second.equal("X").first.greater(2).end_group();
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(2, tv1.get_source_ndx(0));
     CHECK_EQUAL(4, tv1.get_source_ndx(1));
@@ -923,7 +915,7 @@ TEST(TestQueryFindAll_OrNested0)
 
     // first > 3 && (first == 5 || second == X)
     TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().second.equal("X").end_group();
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(5, tv1.get_source_ndx(0));
     CHECK_EQUAL(6, tv1.get_source_ndx(1));
@@ -944,7 +936,7 @@ TEST(TestQueryFindAll_OrNested)
 
     // first > 3 && (first == 5 || (second == X || second == Y))
     TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().group().second.equal("X").Or().second.equal("Y").end_group().end_group();
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(5, tv1.get_source_ndx(0));
     CHECK_EQUAL(6, tv1.get_source_ndx(1));
     CHECK_EQUAL(7, tv1.get_source_ndx(2));
@@ -960,7 +952,7 @@ TEST(TestQueryFindAll_OrPHP)
 
     // (second == Jim || second == Joe) && first = 1
     TupleTableType::Query q1 = ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(1);
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
 
@@ -974,7 +966,7 @@ TEST(TestQueryFindAllOr)
 
     // (second == Jim || second == Joe) && first = 1
     TupleTableType::Query q1 = ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(3);
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.get_source_ndx(0));
 }
 
@@ -996,7 +988,7 @@ TEST(TestQueryFindAll_Parans2)
 
     // ()((first > 3()) && (()))
     TupleTableType::Query q1 = ttt.where().group().end_group().group().group().first.greater(3).group().end_group().end_group().group().group().end_group().end_group().end_group();
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(4, tv1.get_source_ndx(0));
     CHECK_EQUAL(5, tv1.get_source_ndx(1));
@@ -1017,7 +1009,7 @@ TEST(TestQueryFindAll_Parans4)
 
     // ()
     TupleTableType::Query q1 = ttt.where().group().end_group();
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(7, tv1.size());
 }
 
@@ -1032,12 +1024,12 @@ TEST(TestQueryFindAll_Bool)
     btt.add(3, false);
 
     BoolTupleTable::Query q1 = btt.where().second.equal(true);
-    BoolTupleTable::View tv1 = q1.find_all(btt);
+    BoolTupleTable::View tv1 = q1.find_all();
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
 
     BoolTupleTable::Query q2 = btt.where().second.equal(false);
-    BoolTupleTable::View tv2 = q2.find_all(btt);
+    BoolTupleTable::View tv2 = q2.find_all();
     CHECK_EQUAL(1, tv2.get_source_ndx(0));
     CHECK_EQUAL(3, tv2.get_source_ndx(1));
 }
@@ -1051,7 +1043,7 @@ TEST(TestQueryFindAll_Begins)
     ttt.add(0, "foobar");
 
     TupleTableType::Query q1 = ttt.where().second.begins_with("foo");
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
@@ -1066,7 +1058,7 @@ TEST(TestQueryFindAll_Ends)
     ttt.add(0, "barfoobar");
 
     TupleTableType::Query q1 = ttt.where().second.ends_with("foo");
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
@@ -1085,7 +1077,7 @@ TEST(TestQueryFindAll_Contains)
     ttt.add(0, "barfo");
 
     TupleTableType::Query q1 = ttt.where().second.contains("foo");
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(1, tv1.get_source_ndx(1));
@@ -1108,7 +1100,7 @@ TEST(TestQueryEnums)
     table.optimize();
 
     TupleTableType::Query q1 = table.where().second.equal("eftg");
-    TupleTableType::View tv1 = q1.find_all(table);
+    TupleTableType::View tv1 = q1.find_all();
 
     CHECK_EQUAL(5, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
@@ -1336,16 +1328,16 @@ TEST(TestTV)
     arr.add(0);
     arr.add(2);
     TupleTableType::Query q1 = t.where().tableview(arr);
-    CHECK_EQUAL(2, q1.count(t));
+    CHECK_EQUAL(2, q1.count());
 
     TupleTableType::Query q2 = t.where().second.equal("a").tableview(arr);
-    CHECK_EQUAL(1, q2.count(t));
+    CHECK_EQUAL(1, q2.count());
 
     TupleTableType::Query q3 = t.where().tableview(arr).second.equal("a");
-    CHECK_EQUAL(1, q3.count(t));
+    CHECK_EQUAL(1, q3.count());
 
     TupleTableType::Query q4 = t.where().tableview(arr).second.equal("a");
-    TupleTableType::View v4 = q4.find_all(t);
+    TupleTableType::View v4 = q4.find_all();
     CHECK_EQUAL(1, v4.size());
 
 }
@@ -1357,34 +1349,34 @@ TEST(TestQuery_sum_min_max_avg)
     t.add(2, "b");
     t.add(3, "c");
 
-    CHECK_EQUAL(6, t.where().first.sum(t));
-    CHECK_EQUAL(1, t.where().first.minimum(t));
-    CHECK_EQUAL(3, t.where().first.maximum(t));
-    CHECK_EQUAL(2, t.where().first.average(t));
+    CHECK_EQUAL(6, t.where().first.sum());
+    CHECK_EQUAL(1, t.where().first.minimum());
+    CHECK_EQUAL(3, t.where().first.maximum());
+    CHECK_EQUAL(2, t.where().first.average());
 
     size_t cnt;
-    CHECK_EQUAL(0, t.where().first.sum(t,&cnt, 0, 0));
+    CHECK_EQUAL(0, t.where().first.sum(&cnt, 0, 0));
     CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where().first.sum(t,&cnt, 1, 1));
+    CHECK_EQUAL(0, t.where().first.sum(&cnt, 1, 1));
     CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where().first.sum(t,&cnt, 2, 2));
+    CHECK_EQUAL(0, t.where().first.sum(&cnt, 2, 2));
     CHECK_EQUAL(0, cnt);
 
-    CHECK_EQUAL(1, t.where().first.sum(t,&cnt, 0, 1));
+    CHECK_EQUAL(1, t.where().first.sum(&cnt, 0, 1));
     CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(2, t.where().first.sum(t,&cnt, 1, 2));
+    CHECK_EQUAL(2, t.where().first.sum(&cnt, 1, 2));
     CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(3, t.where().first.sum(t,&cnt, 2, 3));
+    CHECK_EQUAL(3, t.where().first.sum(&cnt, 2, 3));
     CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(3, t.where().first.sum(t,&cnt, 0, 2));
+    CHECK_EQUAL(3, t.where().first.sum(&cnt, 0, 2));
     CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(5, t.where().first.sum(t,&cnt, 1, 3));
+    CHECK_EQUAL(5, t.where().first.sum(&cnt, 1, 3));
     CHECK_EQUAL(2, cnt);
 
-    CHECK_EQUAL(6, t.where().first.sum(t,&cnt, 0, 3));
+    CHECK_EQUAL(6, t.where().first.sum(&cnt, 0, 3));
     CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(6, t.where().first.sum(t,&cnt, 0, size_t(-1)));
+    CHECK_EQUAL(6, t.where().first.sum(&cnt, 0, size_t(-1)));
     CHECK_EQUAL(3, cnt);
 }
 
@@ -1393,19 +1385,19 @@ TEST(TestQuery_avg)
     TupleTableType t;
     size_t cnt;
     t.add(10, "a");
-    CHECK_EQUAL(10, t.where().first.average(t));
+    CHECK_EQUAL(10, t.where().first.average());
     t.add(30, "b");
-    CHECK_EQUAL(20, t.where().first.average(t));
+    CHECK_EQUAL(20, t.where().first.average());
 
-    CHECK_EQUAL(0, t.where().first.average(t, NULL, 0, 0));     // none
-    CHECK_EQUAL(0, t.where().first.average(t, NULL, 1, 1));     // none
-    CHECK_EQUAL(20,t.where().first.average(t, NULL, 0, 2));     // both
-    CHECK_EQUAL(20,t.where().first.average(t, NULL, 0, -1));     // both
+    CHECK_EQUAL(0, t.where().first.average(NULL, 0, 0));     // none
+    CHECK_EQUAL(0, t.where().first.average(NULL, 1, 1));     // none
+    CHECK_EQUAL(20,t.where().first.average(NULL, 0, 2));     // both
+    CHECK_EQUAL(20,t.where().first.average(NULL, 0, -1));     // both
 
-    CHECK_EQUAL(10,t.where().first.average(t, &cnt, 0, 1));     // first
+    CHECK_EQUAL(10,t.where().first.average(&cnt, 0, 1));     // first
     
-    CHECK_EQUAL(30,t.where().first.sum(t, NULL, 1, 2));     // second
-    CHECK_EQUAL(30,t.where().first.average(t, NULL, 1, 2));     // second
+    CHECK_EQUAL(30,t.where().first.sum(NULL, 1, 2));     // second
+    CHECK_EQUAL(30,t.where().first.average(NULL, 1, 2));     // second
 }
 
 TEST(TestQuery_avg2)
@@ -1420,30 +1412,30 @@ TEST(TestQuery_avg2)
     t.add(100, "b");
     t.add(30, "a");
     TupleTableType::Query q = t.where().second.equal("a");
-    CHECK_EQUAL(3, q.count(t));
-    q.first.sum(t);
+    CHECK_EQUAL(3, q.count());
+    q.first.sum();
 
-    CHECK_EQUAL(60, t.where().second.equal("a").first.sum(t));
+    CHECK_EQUAL(60, t.where().second.equal("a").first.sum());
 
-    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 0, 0));    
-    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 1, 1));    
-    CHECK_EQUAL(0, t.where().second.equal("a").first.average(t, &cnt, 2, 2));     
+    CHECK_EQUAL(0, t.where().second.equal("a").first.average(&cnt, 0, 0));
+    CHECK_EQUAL(0, t.where().second.equal("a").first.average(&cnt, 1, 1));
+    CHECK_EQUAL(0, t.where().second.equal("a").first.average(&cnt, 2, 2));
     CHECK_EQUAL(0, cnt);
 
-    CHECK_EQUAL(10, t.where().second.equal("a").first.average(t, &cnt, 0, 1));    
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 1, 5));    
-    CHECK_EQUAL(30, t.where().second.equal("a").first.average(t, &cnt, 5, 6));   
+    CHECK_EQUAL(10, t.where().second.equal("a").first.average(&cnt, 0, 1));
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(&cnt, 1, 5));
+    CHECK_EQUAL(30, t.where().second.equal("a").first.average(&cnt, 5, 6));
     CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(15, t.where().second.equal("a").first.average(t, &cnt, 0, 3));  
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 2, 5));  
+    CHECK_EQUAL(15, t.where().second.equal("a").first.average(&cnt, 0, 3));
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(&cnt, 2, 5));
     CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt));               
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(&cnt));
     CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(15, t.where().second.equal("a").first.average(t, &cnt, 0, 3));
+    CHECK_EQUAL(15, t.where().second.equal("a").first.average(&cnt, 0, 3));
     CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(t, &cnt, 0, size_t(-1)));
+    CHECK_EQUAL(20, t.where().second.equal("a").first.average(&cnt, 0, size_t(-1)));
     CHECK_EQUAL(3, cnt);
 }
 
@@ -1457,25 +1449,41 @@ TEST(TestQuery_OfByOne)
 
     // Top
     t[0].first = 0;
-    size_t res = t.where().first.equal(0).find_next(t);
+    size_t res = t.where().first.equal(0).find_next();
     CHECK_EQUAL(0, res);
     t[0].first = 1; // reset
 
     // Before split
     t[MAX_LIST_SIZE-1].first = 0;
-    res = t.where().first.equal(0).find_next(t);
+    res = t.where().first.equal(0).find_next();
     CHECK_EQUAL(MAX_LIST_SIZE-1, res);
     t[MAX_LIST_SIZE-1].first = 1; // reset
 
     // After split
     t[MAX_LIST_SIZE].first = 0;
-    res = t.where().first.equal(0).find_next(t);
+    res = t.where().first.equal(0).find_next();
     CHECK_EQUAL(MAX_LIST_SIZE, res);
     t[MAX_LIST_SIZE].first = 1; // reset
 
     // Before end
     const size_t last_pos = (MAX_LIST_SIZE*2)-1;
     t[last_pos].first = 0;
-    res = t.where().first.equal(0).find_next(t);
+    res = t.where().first.equal(0).find_next();
     CHECK_EQUAL(last_pos, res);
+}
+
+TEST(TestQuery_Const)
+{
+    TupleTableType t;
+    t.add(10, "a");
+    t.add(100, "b");
+    t.add(20, "a");
+
+    const TupleTableType& const_table = t;
+
+    const size_t count = const_table.where().second.equal("a").count();
+    CHECK_EQUAL(2, count);
+
+    //TODO: Should not be possible
+    const_table.where().second.equal("a").remove();
 }
