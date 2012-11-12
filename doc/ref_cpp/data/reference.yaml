@@ -52,7 +52,7 @@ CATEGORIES:                       # list global class-id in order of appearence
   - dyn_query
 - Collection:
   - group
-#  - shared_group
+  - shared_group
 - Helpers:
   - mixed
 #  - cursor

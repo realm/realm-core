@@ -20,7 +20,7 @@ IGNORE     : []                   # List of method-ids to ignore
 CATEGORIES:
 - Constructors:
   METHODS:
-  - g_mixed_conscructor:
+  - g_mixed_constructor:
       NAMES    : Mixed
       SUMMARY  : &g_mixed_constructor_summary
                  Create a Mixed variable.
