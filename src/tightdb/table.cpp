@@ -372,8 +372,9 @@ Table::~Table()
     // LangBindHelper::new_table(), and then the reference count must
     // be zero, because that is what has caused the destructor to be
     // called. In the latter case, there can be no subtables to
-    // invalidate, because they would have kept the parent alive.
+    // invalidate, because they would have kept their parent alive.
     if (0 < m_ref_count) invalidate();
+    else ClearCachedColumns();
     m_top.Destroy();
 }
 
