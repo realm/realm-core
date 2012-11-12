@@ -488,7 +488,6 @@
 		3647DEEA14209C1200D56FD7 /* src */ = {
 			isa = PBXGroup;
 			children = (
-				365CCDF1157CC37D00172BF8 /* alloc_slab.cpp */,
 				36D6FC3115E3813700B02534 /* assert.hpp */,
 				36D6FC3215E3813700B02534 /* pthread_helpers.hpp */,
 				36D6FC3315E3813700B02534 /* replication.cpp */,
@@ -499,6 +498,7 @@
 				36D6FC3815E3813700B02534 /* table_basic_fwd.hpp */,
 				36D6FC3915E3813700B02534 /* terminate.cpp */,
 				36D6FC3A15E3813700B02534 /* terminate.hpp */,
+				365CCDF1157CC37D00172BF8 /* alloc_slab.cpp */,
 				365CCDF2157CC37D00172BF8 /* alloc_slab.hpp */,
 				365CCDF3157CC37D00172BF8 /* alloc.hpp */,
 				365CCDF4157CC37D00172BF8 /* array_binary.cpp */,
