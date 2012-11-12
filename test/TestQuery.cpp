@@ -123,7 +123,7 @@ TEST(TestQueryFindAll_Contains2_2)
 // utf8 case handling is only implemented on msw for now
 #if defined(_MSC_VER)
     TupleTableType::Query q1 = ttt.where().second.contains("foO", false);
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(6, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(1, tv1.get_source_ndx(1));
@@ -132,7 +132,7 @@ TEST(TestQueryFindAll_Contains2_2)
     CHECK_EQUAL(4, tv1.get_source_ndx(4));
     CHECK_EQUAL(5, tv1.get_source_ndx(5));
     TupleTableType::Query q2 = ttt.where().second.contains("foO", true);
-    TupleTableType::View tv2 = q2.find_all(ttt);
+    TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(3, tv2.size());
     CHECK_EQUAL(3, tv2.get_source_ndx(0));
     CHECK_EQUAL(4, tv2.get_source_ndx(1));
@@ -1149,7 +1149,7 @@ TEST(TestQueryCaseSensitivity)
     ttt.add(1, "BLAAbaergroed2");
 
     TupleTableType::Query q1 = ttt.where().second.equal("blaabaerGROED", false);
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
@@ -1164,19 +1164,19 @@ TEST(TestQueryUnicode2)
     ttt.add(1, uyd);
 
     TupleTableType::Query q1 = ttt.where().second.equal(uY, false);
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
 
     TupleTableType::Query q2 = ttt.where().second.equal(uYd, false);
-    TupleTableType::View tv2 = q2.find_all(ttt);
+    TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(2, tv2.size());
     CHECK_EQUAL(1, tv2.get_source_ndx(0));
     CHECK_EQUAL(3, tv2.get_source_ndx(1));
 
     TupleTableType::Query q3 = ttt.where().second.equal(uYd, true);
-    TupleTableType::View tv3 = q3.find_all(ttt);
+    TupleTableType::View tv3 = q3.find_all();
     CHECK_EQUAL(1, tv3.size());
     CHECK_EQUAL(1, tv3.get_source_ndx(0));
 }
@@ -1196,26 +1196,26 @@ TEST(TestQueryUnicode3)
     ttt.add(1, uad);
 
     TupleTableType::Query q1 = ttt.where().second.equal(uA, false);
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
 
     TupleTableType::Query q2 = ttt.where().second.equal(ua, false);
-    TupleTableType::View tv2 = q2.find_all(ttt);
+    TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(2, tv2.size());
     CHECK_EQUAL(0, tv2.get_source_ndx(0));
     CHECK_EQUAL(2, tv2.get_source_ndx(1));
 
 
     TupleTableType::Query q3 = ttt.where().second.equal(uad, false);
-    TupleTableType::View tv3 = q3.find_all(ttt);
+    TupleTableType::View tv3 = q3.find_all();
     CHECK_EQUAL(2, tv3.size());
     CHECK_EQUAL(1, tv3.get_source_ndx(0));
     CHECK_EQUAL(3, tv3.get_source_ndx(1));
 
     TupleTableType::Query q4 = ttt.where().second.equal(uad, true);
-    TupleTableType::View tv4 = q4.find_all(ttt);
+    TupleTableType::View tv4 = q4.find_all();
     CHECK_EQUAL(1, tv4.size());
     CHECK_EQUAL(3, tv4.get_source_ndx(0));
 }
@@ -1230,7 +1230,7 @@ TEST(TestQueryFindAll_BeginsUNICODE)
     ttt.add(0, uad "foobar");
 
     TupleTableType::Query q1 = ttt.where().second.begins_with(uad "foo");
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
@@ -1246,12 +1246,12 @@ TEST(TestQueryFindAll_EndsUNICODE)
     ttt.add(0, "barfoobar");
 
     TupleTableType::Query q1 = ttt.where().second.ends_with("foo" uad);
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 
     TupleTableType::Query q2 = ttt.where().second.ends_with("foo" uAd, false);
-    TupleTableType::View tv2 = q2.find_all(ttt);
+    TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(1, tv2.size());
     CHECK_EQUAL(1, tv2.get_source_ndx(0));
 }
@@ -1270,7 +1270,7 @@ TEST(TestQueryFindAll_ContainsUNICODE)
     ttt.add(0, uad "barfo");
 
     TupleTableType::Query q1 = ttt.where().second.contains(uad "foo");
-    TupleTableType::View tv1 = q1.find_all(ttt);
+    TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(1, tv1.get_source_ndx(1));
@@ -1278,7 +1278,7 @@ TEST(TestQueryFindAll_ContainsUNICODE)
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 
     TupleTableType::Query q2 = ttt.where().second.contains(uAd "foo", false);
-    TupleTableType::View tv2 = q1.find_all(ttt);
+    TupleTableType::View tv2 = q1.find_all();
     CHECK_EQUAL(4, tv2.size());
     CHECK_EQUAL(0, tv2.get_source_ndx(0));
     CHECK_EQUAL(1, tv2.get_source_ndx(1));
