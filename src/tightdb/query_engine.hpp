@@ -98,6 +98,13 @@ public:
             return m_child->Verify();
     }
 
+    virtual void Destroy() {
+        // This destructor must be called if, and only if, caller has created a NODE object with non-allocating version 
+        // of new() - i.e. the fast method to create an instance to perform fast queries with no time overhead like in 
+        // Column::aggregate. Todo: Rewrite into not using std::string.
+        m_error_code.~basic_string();
+    }
+
 protected:
     friend class Query;
     ParentNode* m_child;
@@ -617,6 +624,7 @@ public:
     }
     ~STRINGNODE() {
         free((void*)m_value);
+        m_index.Destroy();
     }
 
     void Init(const Table& table)

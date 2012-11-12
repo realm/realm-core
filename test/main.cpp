@@ -6,7 +6,7 @@
 #include <tightdb/column.hpp>
 
 #if defined(_MSC_VER) && defined(_DEBUG)
-//    #include <vld.h>
+#include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
 using namespace std;
