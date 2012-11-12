@@ -154,7 +154,7 @@ public:
     void insert_date(size_t column_ndx, size_t row_ndx, time_t value);
     template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
     void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
-    void insert_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+    void insert_binary(size_t column_ndx, size_t row_ndx, const char* data, size_t size);
     void insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
     void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void insert_done();
@@ -195,9 +195,9 @@ public:
     size_t  count(size_t column_ndx, int64_t target) const;
     size_t  count_string(size_t column_ndx, const char* target) const;
     int64_t sum(size_t column_ndx) const;
-    int64_t maximum(size_t column_ndx) const;
-    int64_t minimum(size_t column_ndx) const;
-    double  average(size_t column_ndx) const;
+    int64_t maximum(size_t column_ndx) const; // FIXME: When table is empty?
+    int64_t minimum(size_t column_ndx) const; // FIXME: When table is empty?
+    double  average(size_t column_ndx) const; // FIXME: When table is empty?
 
     // Searching
     size_t         lookup(const char* value) const;
