@@ -303,6 +303,8 @@ void Group::invalidate()
     // to clean up
     // TODO: This is also done in commit(), fix to do it only once
     m_alloc.FreeAll();
+
+    m_isValid = false;
 }
 
 bool Group::is_empty() const
@@ -448,6 +450,10 @@ bool Group::commit(size_t current_version, size_t readlock_version)
         invalidate();
         TIGHTDB_ASSERT(m_alloc.IsAllFree());
     }
+
+#ifdef TIGHTDB_DEBUG
+    Verify();
+#endif
 
     return true;
 }
@@ -604,6 +610,8 @@ void Group::to_string(std::ostream& out) const
 
 void Group::Verify() const
 {
+    if (!is_valid()) return;
+
     // Verify free lists
     if (m_freePositions.IsValid()) {
         TIGHTDB_ASSERT(m_freeLengths.IsValid());
