@@ -43,15 +43,29 @@ size_t GetSizeFromHeader(void* p)
     const uint8_t* const header = (uint8_t*)p;
     const size_t width = (1 << (header[0] & 0x07)) >> 1;
     const size_t count = (header[1] << 16) + (header[2] << 8) + header[3];
+    const size_t wt    = (header[0] & 0x18) >> 3; // Array::WidthType
 
     // Calculate bytes used by array
-    const size_t bits = (count * width);
-    size_t bytes = (bits / 8) + 8; // add room for 8 byte header
-    if (bits & 0x7) ++bytes;       // include partial bytes
+    size_t bytes = 0;
+    if (wt == 0) { // TDB_BITS
+        const size_t bits = (count * width);
+        bytes = bits / 8;
+        if (bits & 0x7) ++bytes; // include partial bytes
+    }
+    else if (wt == 1) { // TDB_MULTIPLY
+        bytes = count * width;
+    }
+    else if (wt == 2) { // TDB_IGNORE
+        bytes = count;
+    }
+    else TIGHTDB_ASSERT(false);
 
     // Arrays are always padded to 64 bit alignment
     const size_t rest = (~bytes & 0x7)+1;
     if (rest < 8) bytes += rest; // 64bit blocks
+
+    // include header in total
+    bytes += 8;
 
     return bytes;
 }
