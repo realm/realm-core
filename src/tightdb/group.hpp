@@ -117,17 +117,17 @@ protected:
     void update_from_shared(size_t top_ref, size_t len);
     void reset_to_new();
 
-    // Overriding method in ArrayParent
-    virtual void update_child_ref(size_t subtable_ndx, size_t new_ref)
+    // Overriding virtual method in ArrayParent
+    void update_child_ref(size_t subtable_ndx, size_t new_ref)
     {
         m_tables.Set(subtable_ndx, new_ref);
     }
 
-    // Overriding method in Table::Parent
-    virtual void child_destroyed(std::size_t) {} // Ignore
+    // Overriding virtual method in Table::Parent
+    void child_destroyed(std::size_t) {} // Ignore
 
-    // Overriding method in ArrayParent
-    virtual size_t get_child_ref(size_t subtable_ndx) const
+    // Overriding virtual method in ArrayParent
+    size_t get_child_ref(size_t subtable_ndx) const
     {
         return m_tables.GetAsRef(subtable_ndx);
     }

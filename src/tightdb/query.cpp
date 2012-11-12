@@ -11,7 +11,17 @@ const size_t THREAD_CHUNK_SIZE = 1000;
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
 
-Query::Query()
+Query::Query(Table& table) : m_table(table.get_table_ref())
+{
+    Create();
+}
+
+Query::Query(const Table& table) : m_table(((Table&)table).get_table_ref())
+{
+    Create();
+}
+
+void Query::Create()
 {
     update.push_back(0);
     update_override.push_back(0);
@@ -23,6 +33,7 @@ Query::Query()
 // FIXME: Try to remove this
 Query::Query(const Query& copy)
 {
+    m_table = copy.m_table;
     all_nodes = copy.all_nodes;
     update = copy.update;
     update_override = copy.update_override;
@@ -69,6 +80,14 @@ Query& Query::equal(size_t column_ndx, int64_t value)
     UpdatePointers(p, &p->m_child);
     return *this;
 }
+
+Query& Query::equal_binary(size_t column_ndx, const char* ptr, size_t len)
+{
+    ParentNode* const p = new BINARYNODE<EQUAL>(ptr, len, column_ndx);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new NODE<int64_t, Column, NOTEQUAL>(value, column_ndx);
@@ -230,26 +249,26 @@ void Query::end_group()
     update_override.pop_back();
 }
 
-size_t Query::find_next(const Table& table, size_t lastmatch)
+size_t Query::find_next(size_t lastmatch)
 {
-    if (lastmatch == size_t(-1)) Init(table);
+    if (lastmatch == size_t(-1)) Init(*m_table);
 
-    const size_t end = table.size();
+    const size_t end = m_table->size();
     const size_t res = first[0]->find_first(lastmatch + 1, end);
 
     return (res == end) ? not_found : res;
 }
 
-TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
+TableView Query::find_all(size_t start, size_t end, size_t limit)
 {
-    Init(table);
+    Init(*m_table);
 
     if (end == size_t(-1))
-        end = table.size();
+        end = m_table->size();
 
     // User created query with no criteria; return everything
     if (first.size() == 0 || first[0] == 0) {
-        TableView tv(table);
+        TableView tv(*m_table);
         for (size_t i = start; i < end && i - start < limit; i++)
             tv.get_ref_column().add(i);
         return move(tv);
@@ -257,29 +276,29 @@ TableView Query::find_all(Table& table, size_t start, size_t end, size_t limit)
 
     if (m_threadcount > 0) {
         // Use multithreading
-        return find_all_multi(table, start, end);
+        return find_all_multi(start, end);
     }
 
     // Use single threading
-    TableView tv(table);
+    TableView tv(*m_table);
     first[0]->aggregate(&tv.get_ref_column(), start, end, limit);
     return move(tv);
 }
 
-int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
+int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (end == size_t(-1)) 
-        end = table.size();
+        end = m_table->size();
 
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; sum() range
         if (resultcount)
             *resultcount = end-start;
-        const Column& c = table.GetColumn(column);  
+        const Column& c = m_table->GetColumn(column);
         return c.sum(start, end);
     }
 
-    Init(table);
+    Init(*m_table);
     size_t matchcount = 0;
 
     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_SUM, column, &matchcount);
@@ -288,20 +307,20 @@ int64_t Query::sum(const Table& table, size_t column, size_t* resultcount, size_
     return r;
 }
 
-int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
+int64_t Query::maximum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (end == size_t(-1)) 
-        end = table.size();
+        end = m_table->size();
 
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; max() range
         if (resultcount)
             *resultcount = end-start;
-        const Column& c = table.GetColumn(column);  
+        const Column& c = m_table->GetColumn(column);
         return c.maximum(start, end);
     }
         
-    Init(table);
+    Init(*m_table);
     size_t matchcount = 0;
 
     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MAX, column, &matchcount);
@@ -310,20 +329,20 @@ int64_t Query::maximum(const Table& table, size_t column, size_t* resultcount, s
     return r;
 }
 
-int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
+int64_t Query::minimum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (end == size_t(-1)) 
-        end = table.size();
+        end = m_table->size();
 
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; min() range
         if (resultcount)
             *resultcount = end-start;
-        const Column& c = table.GetColumn(column);  
+        const Column& c = m_table->GetColumn(column);
         return c.minimum(start, end);
     }
 
-    Init(table);
+    Init(*m_table);
     size_t matchcount = 0;
 
     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MIN, column, &matchcount);
@@ -332,29 +351,29 @@ int64_t Query::minimum(const Table& table, size_t column, size_t* resultcount, s
     return r;
 }
 
-size_t Query::count(const Table& table, size_t start, size_t end, size_t limit) const
+size_t Query::count(size_t start, size_t end, size_t limit) const
 {
     if (end == size_t(-1)) 
-        end = table.size();
+        end = m_table->size();
 
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; count all
         return (limit < end - start ? limit : end - start);
     }
 
-    Init(table);
+    Init(*m_table);
     int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_COUNT);
     return size_t(r);
 }
 
 #include <cstdio>
 
-double Query::average(const Table& table, size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    Init(table);
+    Init(*m_table);
 
     size_t resultcount2 = 0;
-    const int64_t sum1 = sum(table, column_ndx, &resultcount2, start, end, limit);
+    const int64_t sum1 = sum(column_ndx, &resultcount2, start, end, limit);
     const double avg1 = (double)sum1 / (double)(resultcount2 > 0 ? resultcount2 : 1);
 
     if (resultcount != NULL)
@@ -363,10 +382,10 @@ double Query::average(const Table& table, size_t column_ndx, size_t* resultcount
 }
 
 // todo, not sure if start, end and limit could be useful for delete.
-size_t Query::remove(Table& table, size_t start, size_t end, size_t limit) const
+size_t Query::remove(size_t start, size_t end, size_t limit)
 {
     if (end == not_found)
-        end = table.size();
+        end = m_table->size();
 
     size_t r = start;
     size_t results = 0;
@@ -374,25 +393,24 @@ size_t Query::remove(Table& table, size_t start, size_t end, size_t limit) const
     for (;;) {
         // Every remove invalidates the array cache in the nodes
         // so we have to re-initialize it before searching
-        Init(table);
+        Init(*m_table);
 
-        r = FindInternal(table, r, end - results);
-        if (r == not_found || r == table.size() || results == limit)
+        r = FindInternal(r, end - results);
+        if (r == not_found || r == m_table->size() || results == limit)
             break;
         ++results;
-        table.remove(r);
+        m_table->remove(r);
     }
     return results;
 }
 
-TableView Query::find_all_multi(Table& table, size_t start, size_t end)
+TableView Query::find_all_multi(size_t start, size_t end)
 {
     (void)start;
     (void)end;
-    (void)table;
 #if MULTITHREAD
     // Initialization
-    Init(table);
+    Init(*m_table);
     ts.next_job = start;
     ts.end_job = end;
     ts.done_job = 0;
@@ -411,7 +429,7 @@ TableView Query::find_all_multi(Table& table, size_t start, size_t end)
     pthread_mutex_lock(&ts.jobs_mutex);
     pthread_mutex_unlock(&ts.completed_mutex);
 
-    TableView tv(table);
+    TableView tv(*m_table);
 
     // Sort search results because user expects ascending order
     std::sort (ts.chunks.begin(), ts.chunks.end(), &Query::comp);
@@ -483,10 +501,10 @@ void Query::Init(const Table& table) const
     }
 }
 
-size_t Query::FindInternal(const Table& table, size_t start, size_t end) const
+size_t Query::FindInternal(size_t start, size_t end) const
 {
     if (end == size_t(-1)) 
-        end = table.size();
+        end = m_table->size();
     if (start == end) 
         return not_found;
 
@@ -496,7 +514,7 @@ size_t Query::FindInternal(const Table& table, size_t start, size_t end) const
     else
         r = start; // user built an empty query; return any first
 
-    if (r == table.size())
+    if (r == m_table->size())
         return not_found;
     else
         return r;

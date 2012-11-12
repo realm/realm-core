@@ -10,11 +10,11 @@ test_stl_LDFLAGS = -lproc
 endif
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
-ADD_CFLAGS_INCLUDE = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
-test_stl_LDFLAGS  += $(shell pkg-config unittest++ --libs)
+test_stl_CFLAGS  += -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
+test_stl_LDFLAGS += $(shell pkg-config unittest++ --libs)
 else
-ADD_CFLAGS_INCLUDE = -I../UnitTest++/src
-test_stl_LDFLAGS  += -L../UnitTest++ -lUnitTest++
+test_stl_CFLAGS  += -I../UnitTest++/src
+test_stl_LDFLAGS += -L../UnitTest++ -lUnitTest++
 endif
 
 include ../../generic.mk

@@ -216,6 +216,23 @@ bool AdaptiveStringColumn::Insert(size_t ndx, const char* value)
     return true;
 }
 
+void AdaptiveStringColumn::fill(size_t count)
+{
+    TIGHTDB_ASSERT(is_empty());
+    TIGHTDB_ASSERT(!m_index);
+
+    // Fill column with default values
+    // TODO: this is a very naive approach
+    // we could speedup by creating full nodes directly
+    for (size_t i = 0; i < count; ++i) {
+        TreeInsert<const char*, AdaptiveStringColumn>(i, "");
+    }
+
+#ifdef TIGHTDB_DEBUG
+    Verify();
+#endif
+}
+
 void AdaptiveStringColumn::Delete(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
