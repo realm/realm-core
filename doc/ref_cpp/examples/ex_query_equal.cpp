@@ -14,9 +14,9 @@ int main()
     PeopleTable table;
 
 // @@EndFold@@
-    table.add("Mary",  28, false, tightdb::Date(2012,  1, 24), tightdb::BinaryData("bin \0\n data 1", 13));
-    table.add("Frank", 56, true,  tightdb::Date(2008,  4, 15), tightdb::BinaryData("bin \0\n data 2", 13));
-    table.add("Bob",   24, true,  tightdb::Date(2010, 12,  1), tightdb::BinaryData("bin \0\n data 3", 13));
+    table.add("Mary",  28, false, tightdb::Date(2012,  1, 24), tightdb::BinaryData("bin \0 data 1", 12));
+    table.add("Frank", 56, true,  tightdb::Date(2008,  4, 15), tightdb::BinaryData("bin \0 data 2", 12));
+    table.add("Bob",   24, true,  tightdb::Date(2010, 12,  1), tightdb::BinaryData("bin \0 data 3", 12));
 
     // Find rows where age == 56
     PeopleTable::View view1 = table.where().age.equal(56).find_all(table);
@@ -49,7 +49,7 @@ int main()
 // @@EndFold@@
 
     // Find people where photo equals the binary data "bin \0\n data 1"
-    PeopleTable::View view6 = table.where().photo.equal(tightdb::BinaryData("bin \0\n data 3", 13)).find_all(table);
+    PeopleTable::View view6 = table.where().photo.equal(tightdb::BinaryData("bin \0 data 3", 12)).find_all(table);
 // @@Fold@@
     assert(view6.size() == 1 && view6[0].name == "Bob");
 }
