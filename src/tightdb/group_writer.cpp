@@ -264,7 +264,8 @@ void GroupWriter::add_free_space(size_t pos, size_t len, size_t version) {
     }
 }
 
-size_t GroupWriter::reserve_free_space(size_t len, size_t& filesize, size_t start) {
+size_t GroupWriter::reserve_free_space(size_t len, size_t& filesize, size_t start)
+{
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
@@ -272,6 +273,7 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t& filesize, size_t star
 
     // Do we have a free space we can reuse?
     const size_t count = flengths.Size();
+    size_t ndx = not_found;
     for (size_t i = start; i < count; ++i) {
         const size_t free_len = flengths.GetAsSizeT(i);
         if (len <= free_len) {
@@ -282,23 +284,16 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t& filesize, size_t star
                 if (v >= m_readlock_version) continue;
             }
 
-            // Split segment so we get exactly what was asked for
-            if (len != free_len) {
-                flengths.Set(i, len);
-
-                const size_t pos = fpositions.GetAsSizeT(i) + len;
-                const size_t rest = free_len - len;
-                fpositions.Insert(i+1, pos);
-                flengths.Insert(i+1, rest);
-                if (isShared) fversions.Insert(i+1, 0);
-            }
-
-            return i;
+            // Match found!
+            ndx = i;
+            break;
         }
     }
 
-    // No free space, so we have to extend the file.
-    const size_t ndx = extend_free_space(len, filesize);
+    if (ndx == not_found) {
+        // No free space, so we have to extend the file.
+        ndx = extend_free_space(len, filesize);
+    }
 
     // Split segment so we get exactly what was asked for
     const size_t free_len = flengths.GetAsSizeT(ndx);
@@ -325,9 +320,14 @@ size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
     Array& fversions    = m_group.m_freeVersions;
     const bool isShared = m_group.is_shared();
 
-    // Do we have a free space we can reuse?
     const size_t count = flengths.Size();
-    const size_t start = len < 1024 ? 0 : count / 2; // small pieces first
+
+    // Since we do a 'first fit' search, the top pieces are likely
+    // to get smaller and smaller. So if we are looking for a bigger piece
+    // we may find it faster by looking further down in the list.
+    const size_t start = len < 1024 ? 0 : count / 2;
+
+    // Do we have a free space we can reuse?
     for (size_t i = start; i < count; ++i) {
         const size_t free_len = flengths.GetAsSizeT(i);
         if (len <= free_len) {
@@ -409,8 +409,21 @@ size_t GroupWriter::extend_free_space(size_t len, size_t& filesize)
     TIGHTDB_ASSERT(false); // not implemented yet
 #endif
 
-    // Add new free space
     const size_t ext_len = filesize - old_filesize;
+
+    // See if we can merge in new space
+    if (!fpositions.is_empty()) {
+        const size_t last_ndx = fpositions.Size()-1;
+        const size_t last_len = flengths[last_ndx];
+        const size_t end  = fpositions[last_ndx] + last_len;
+        const size_t ver  = isShared ? fversions[last_ndx] : 0;
+        if (end == old_filesize && ver == 0) {
+            flengths.Set(last_ndx, last_len + ext_len);
+            return last_ndx;
+        }
+    }
+
+    // Else add new free space
     fpositions.add(old_filesize);
     flengths.add(ext_len);
     if (isShared) fversions.add(0); // new space is always free for writing
