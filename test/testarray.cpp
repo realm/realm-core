@@ -1125,7 +1125,7 @@ TEST(NotEqual1)
     a.Set(50, 0x44);
     size_t t = a.find_first<NOTEQUAL>(0x33, 0, (size_t)-1);
     CHECK_EQUAL(50, t);
-
+    a.Destroy();
 }
 
 TEST(NotEqual)

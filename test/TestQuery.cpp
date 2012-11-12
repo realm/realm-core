@@ -1362,7 +1362,7 @@ TEST(TestTV)
     TupleTableType::Query q4 = t.where().tableview(arr).second.equal("a");
     TupleTableType::View v4 = q4.find_all();
     CHECK_EQUAL(1, v4.size());
-
+    arr.Destroy();
 }
  
 TEST(TestQuery_sum_min_max_avg)
