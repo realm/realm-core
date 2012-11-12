@@ -58,7 +58,7 @@ public:
                 break;
             count++;
             
-            if (agg_col != size_t(-1) && m_array.USES_VAL<action>())
+            if (agg_col != not_found && m_array.USES_VAL<action>())
                 m_array.FIND_ACTION<action>(r, column_agg->Get(r), &m_state, &tightdb_dummy);
             else
                 m_array.FIND_ACTION<action>(r, 0, &m_state, &tightdb_dummy);  
@@ -96,6 +96,13 @@ public:
             return "";
         else
             return m_child->Verify();
+    }
+
+    virtual void Destroy() {
+        // This destructor must be called if, and only if, caller has created a NODE object with non-allocating version 
+        // of new() - i.e. the fast method to create an instance to perform fast queries with no time overhead like in 
+        // Column::aggregate. Todo: Rewrite into not using std::string.
+        m_error_code.~basic_string();
     }
 
 protected:
@@ -617,6 +624,7 @@ public:
     }
     ~STRINGNODE() {
         free((void*)m_value);
+        m_index.Destroy();
     }
 
     void Init(const Table& table)

@@ -145,7 +145,7 @@ protected:
     friend class XQueryAccessorString;
 
     Query(Table& table);
-    Query(const Table& table);
+    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void Create();
 
     void   Init(const Table& table) const;
