@@ -61,7 +61,7 @@ public:
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Date& d)
     {
-        out << "Date("<<d.m_date<<")";
+        out << "Date("<<d.m_time<<")";
         return out;
     }
 
