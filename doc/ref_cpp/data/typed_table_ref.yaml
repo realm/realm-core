@@ -37,10 +37,10 @@ EXAMPLES:
 IGNORE     : []                   # List of method-ids to ignore
 
 CATEGORIES:
-- Macros:
+- Definition:
   METHODS:
   - g_typed_table_macros:
-      NAMES    : class macros
+      NAMES    : TIGHTDB_TABLE_*
       DESCR    : Define type safe table classes.
       SIGNATURE: |
                  TIGHTDB_TABLE_*(ClassName,
