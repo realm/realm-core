@@ -15,7 +15,9 @@ DESCR      : &g_dyn_query_intro_descr
              Conditions is added to a query through a 
              <a href="http://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a>. 
              This means that the methods representing the conditions will return the
-             query object.
+             query object. In general, the predicate functions require a column index
+             as parameter. The compiler cannot infer the correct types as tables are
+             declared at run time. Using wrong types might lead to run time errors.
 
              Once the query is ready, it is possible to reuse by multiple calls to
              the action methods.
@@ -52,10 +54,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       - NAME   : value
         TYPES  : [bool, int64_t, const char*, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : &g_dyn_query_case_sensitive_descr
@@ -68,7 +70,7 @@ CATEGORIES :
         DESCR  : Size of binary data chunk.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_equals
@@ -91,10 +93,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       - NAME   : value
         TYPES  : [bool, int64_t, const char*, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : 'String match can be performed case sensitive or not. Default: <code>true</code>.'
@@ -106,7 +108,7 @@ CATEGORIES :
         DESCR  : Size of binary data chunk.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_notEquals
@@ -123,13 +125,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       - NAME   : value
         TYPES  : [int64_t, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_greaterThan
@@ -146,13 +148,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       - NAME   : value
         TYPES  : [int64_t, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_greaterThanOrEqual
@@ -169,13 +171,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       - NAME   : value
         TYPES  : [int64_t, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_lessThan
@@ -192,13 +194,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       - NAME   : value
         TYPES  : [int64_t, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_lessThanOrEqual
@@ -215,16 +217,16 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       - NAME   : from
         TYPES  : [int64_t, time_t]
-        DESCR  : Lower bound of range
+        DESCR  : Lower bound of range.
       - NAME   : to
         TYPES  : [int64_t, time_t]
-        DESCR  : Upper bound of range
+        DESCR  : Upper bound of range.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_between
@@ -241,10 +243,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       - NAME   : value
         TYPES  : const char*
-        DESCR  : The value
+        DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_dyn_query_case_sensitive_descr
@@ -256,7 +258,7 @@ CATEGORIES :
         DESCR  : Size of binary data chunk.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_startsWith
@@ -273,10 +275,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       - NAME   : value
         TYPES  : const char*
-        DESCR  : The value
+        DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_dyn_query_case_sensitive_descr
@@ -288,7 +290,7 @@ CATEGORIES :
         DESCR  : Size of binary data chunk.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_endsWith
@@ -305,7 +307,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       - NAME   : value
         TYPES  : const char*
         DESCR  : The value
@@ -320,7 +322,7 @@ CATEGORIES :
         DESCR  : Size of binary data chunk.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_contains
@@ -331,7 +333,7 @@ CATEGORIES :
       DESCR    : &g_dyn_query_group_descr
                  >
                  Group conditions ("left" parenthesis). Group of conditions can be nested and they are 
-                 conceptually a parenthesis (PHP does not allow overloading () as an operator or method). 
+                 conceptually a parenthesis. 
       SUMMARY  : &g_dyn_query_group_summary
                  Start group ("left parenthesis").
       RETURN:
@@ -355,7 +357,7 @@ CATEGORIES :
   - g_dyn_query_or:
       NAMES    : Or
       DESCR    : &g_dyn_query_or_descr
-                 Logical-or.
+                 Conditions to the left and right are folded using logical-or.
       SUMMARY  : &g_dyn_query_or_summary
                  Logical-or.
       RETURN:
@@ -373,7 +375,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : column
         TYPES  : size_t
-        DESCR  : Column index
+        DESCR  : Column index.
       RETURN:
         TYPES  : Query
         DESCR  : The query object.
@@ -398,7 +400,7 @@ CATEGORIES :
   - g_dyn_query_find_all:
       NAMES    : find_all
       DESCR    : &g_dyn_query_find_all_descr
-                 Execute a query. See the {@link class_tableview} class for further details. 
+                 Execute a query. See the {@link class_dyn_tableview} class for further details. 
       SUMMARY  : &g_dyn_query_find_all_summary
                  Execute query.
       SIGNATURE: |
@@ -439,13 +441,13 @@ CATEGORIES :
   - g_dyn_query_sum:
       NAMES    : sum
       DESCR    : &g_dyn_query_sum_descr
-                 Calculates the sum. This method can only be applied to numerical columns.
+                 This methods calculates the sum of the values in a specific column.
       SUMMARY  : &g_dyn_query_sum_summary
                  Calculate sum.
       CONST    : true
       PARAMS:
       - NAME   : column
-        DESCR  : Column index
+        DESCR  : Column index.
         TYPES  : size_t
       - NAME   : resultcount
         DESCR  : The number of rows used to calculate the sum.
@@ -468,17 +470,14 @@ CATEGORIES :
   - g_dyn_query_size:
       NAMES    : count
       DESCR    : &g_dyn_query_size_descr
-                 Find the number of matching rows
+                 The method finds the number of matching rows.
       SUMMARY  : &g_dyn_query_size_summary
                  Number of matching rows.
       CONST    : true
       PARAMS:
       - NAME   : column
-        DESCR  : Column index
+        DESCR  : Column index.
         TYPES  : size_t
-      - NAME   : resultcount
-        DESCR  : The number of rows used to calculate the sum.
-        TYPES  : size_t*
       - NAME   : start
         TYPES  : size_t
         DESCR  : "Row to begin search. Default: 0."
@@ -507,7 +506,7 @@ CATEGORIES :
                  time_t maximum_date(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
       PARAMS:
       - NAME   : column
-        DESCR  : Column index
+        DESCR  : Column index.
         TYPES  : size_t
       - NAME   : resultcount
         DESCR  : The number of rows used to find the highest value.
@@ -540,7 +539,7 @@ CATEGORIES :
                  time_t minimum_date(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
       PARAMS:
       - NAME   : column
-        DESCR  : Column index
+        DESCR  : Column index.
         TYPES  : size_t
       - NAME   : resultcount
         DESCR  : The number of rows used to find the value.
@@ -565,14 +564,14 @@ CATEGORIES :
       SUMMARY  : &g_dyn_query_average_summary
                  Calcualtes the average.
       DESCR    : &g_dyn_query_average_descr
-                 Calcualtes the average.
+                 The method calcualtes the average of a specific column.
       CONST    : true
       PARAMS:
       - NAME   : column
-        DESCR  : Column index
+        DESCR  : Column index.
         TYPES  : size_t
       - NAME   : resultcount
-        DESCR  : The number of rows used to calculate the average.
+        DESCR  : The number of rows used to calculate the average. If zero, the return value is undefined.
         TYPES  : size_t*
       - NAME   : start
         TYPES  : size_t
@@ -594,11 +593,11 @@ CATEGORIES :
       DESCR    : &g_dyn_query_remove_descr
                  This method will remove all matching rows in the source table.
       SUMMARY  : &g_dyn_query_remove_summary
-                 Remove rows
+                 Remove rows.
       CONST    : true
       PARAMS:
       - NAME   : column
-        DESCR  : Column index
+        DESCR  : Column index.
         TYPES  : size_t
       - NAME   : resultcount
         DESCR  : The number of rows used to calculate the average.
@@ -624,7 +623,10 @@ CATEGORIES :
   - g_dyn_query_find_all_const_multi:
       NAMES    : find_all_multi
       DESCR    : &g_dyn_query_find_all_multi_descr
-                 Execute a query using (POSIX) threads. See the {@link class_tableview} class for further details. 
+                 >
+                 This method execute a query using (POSIX) threads that is, the query is parallellized and 
+                 can lower the search time on a multi-core computer. See the {@link class_dyn_tableview} class 
+                 for further details. 
       SUMMARY  : &g_dyn_query_find_all_multi_summary
                  Execute query.
       SIGNATURE: |
@@ -652,13 +654,13 @@ CATEGORIES :
       SUMMARY  : &g_dyn_query_set_threads_summary
                  Set the number of threads.
       DESCR    : &g_dyn_query_set_threads_descr
-                 Set the number of threads.
+                 The method sets the number of threads used by {@link g_dyn_query_find_all_multi}.
       PARAMS:
       - NAME   : threadcount
         TYPES  : unsigned int
-        DESCR  : Number of threads
+        DESCR  : Number of threads.
       RETURN:
-        DESCR  : Success or not
+        DESCR  : <code>true</code> if succesfull, <code>false</code> otherwise.
         TYPES  : int
       EXAMPLES:
       - DESCR  :

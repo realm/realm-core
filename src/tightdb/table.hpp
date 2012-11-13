@@ -189,7 +189,7 @@ public:
 
     // Indexing
     bool has_index(size_t column_ndx) const;
-    void set_index(size_t column_ndx, bool update_spec=true);
+    void set_index(size_t column_ndx) {set_index(column_ndx, true);}
 
     // Aggregate functions
     size_t  count_int(size_t column_ndx, int64_t target) const;
@@ -320,6 +320,8 @@ protected:
     void   do_remove_column(size_t column_ndx);
     size_t do_add_column(ColumnType type);
     void   do_add_subcolumn(const vector<size_t>& column_path, size_t pos, ColumnType type);
+
+    void   set_index(size_t column_ndx, bool update_spec);
 
     // Support function for conversions
     void to_json_row(size_t row_ndx, std::ostream& out);

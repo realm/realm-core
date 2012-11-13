@@ -32,7 +32,6 @@ EXAMPLES   :
   CODE: ex_cpp_dyn_view_intro
 IGNORE     : []                   # List of method-ids to ignore   
 CATEGORIES :
-#- constructors: 
 - State:
   METHODS:
   - g_dyn_view_size:
@@ -49,9 +48,9 @@ CATEGORIES :
   - g_dyn_view_is_empty:
       NAMES    : is_empty
       SUMMARY  : &g_dyn_view_is_empty_summary
-                 Is view empty.
+                 Is view empty?
       DESCR    : &g_dyn_view_is_empty_descr
-                 Check if the view is empty that is, it has zero rows.
+                 The method checks if the view is empty that is, it has zero rows.
       CONST    : True             
       RETURN:                 
         TYPES  : bool

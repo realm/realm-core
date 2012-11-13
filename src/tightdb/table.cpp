@@ -659,6 +659,7 @@ bool Table::has_index(size_t column_ndx) const
 
 void Table::set_index(size_t column_ndx, bool update_spec)
 {
+    TIGHTDB_ASSERT(!has_shared_spec());
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     if (has_index(column_ndx)) return;
 
