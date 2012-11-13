@@ -1321,7 +1321,7 @@ void Table::insert_done()
 #endif
 }
 
-size_t Table::count(size_t column_ndx, int64_t target) const
+size_t Table::count_int(size_t column_ndx, int64_t target) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
