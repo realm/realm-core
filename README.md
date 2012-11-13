@@ -65,7 +65,4 @@ or disable special features during building:
 Set `TIGHTDB_DISABLE_SSE` to a nonempty value to disable SSE.
 
 Set `TIGHTDB_ENABLE_REPLICATION` to a nonempty value to enable
-replication:
-
-    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh build
-    sudo TIGHTDB_ENABLE_REPLICATION=1 sh build.sh install
+replication.
