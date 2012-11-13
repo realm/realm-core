@@ -46,7 +46,6 @@ Format:
 ----------
 + File format updated with bigger header and reordered column type [BREAKING]
 + Index is now enabled for string columns (handles string_enum columns as well).
-+ 11 Added update_spec parameter in Table::set_index(size_t column_ndx, bool update_spec=true);
 + 11 Added Table::count_string(size_t column_ndx, const char* target) const;
 + 11 Added Table accessor size_t count(const char* target) const to highlevel interface
 + 11 Spec::add_column(...) now takes an optional parameter for attribute (like indexed).

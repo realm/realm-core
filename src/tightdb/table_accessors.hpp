@@ -723,7 +723,7 @@ public:
 
     size_t count(int64_t target) const
     {
-        return Base::m_table->get_impl()->count(col_idx, target);
+        return Base::m_table->get_impl()->count_int(col_idx, target);
     }
 
     int64_t sum() const
