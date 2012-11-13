@@ -14,7 +14,7 @@ DESCR     : &g_introduction_descr
             complex structure, you interface to TightDB as easily as using a
             standard array or vector like container. But in addition you can
             handle much more data in much less space, you get powerful query
-            possibilities in a intuitive language and the ability to share your data
+            possibilities in an intuitive language and the ability to share your data
             across all supported languages and platforms.
 
             The core of the framework is the classes {@link class_typed_table} and 
@@ -32,8 +32,8 @@ DESCR     : &g_introduction_descr
             It is possible to query data using the {@link class_typed_query} and 
             {@link class_dyn_query} classes. Queries can be complex - involving
             any columns and values. You can either apply aggregate functions to you
-            resulting data set or use the set in your application as a {@link class_dyn_tableview}
-            or {@link class_typed_tableview} object.
+            resulting data set or use the data set in your application as a
+            {@link class_dyn_tableview} or {@link class_typed_tableview} object.
 
             The {@link class_group} class lets you serialize tables to disk or memory. The
             TightDB data format is consistent across operating systems, hardware platforms,
@@ -44,15 +44,15 @@ IMPORT    : []
 CATEGORIES:                       # list global class-id in order of appearence
 - Typed Table:                    # Category header name
   - typed_table                   # Global Class name. File: 'typed_table_ref.yaml'
-#  - typed_view
-#  - typed_query
+  - typed_view
+  - typed_query
 - Dynamic Table:
   - dyn_table
   - dyn_view
   - dyn_query
 - Collection:
   - group
-#  - shared_group
+  - shared_group
 - Helpers:
   - mixed
 #  - cursor

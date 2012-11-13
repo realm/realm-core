@@ -76,6 +76,11 @@ Searching: The main finding function is:
 #include <stdio.h>
 #endif
 
+// FIXME: We cannot use all-uppercase names like 'ACTION' for enums
+// since the risk of colliding with one of the customers macro names
+// is too high. In short, the all-uppercase name space is reserved for
+// macros.
+//
 // todo, move
 enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
 
@@ -136,6 +141,7 @@ const size_t not_found = size_t(-1);
 // Pre-definitions
 class Array;
 class AdaptiveStringColumn;
+class GroupWriter;
 
 struct state_state {
     int64_t state;
@@ -442,6 +448,8 @@ private:
     template <size_t w> size_t FindPos(int64_t target) const;
    
 protected:
+    friend class GroupWriter;
+
     bool AddPositiveLocal(int64_t value);
 
     void init_from_ref(size_t ref);
@@ -645,7 +653,7 @@ template<class S> void Array::WriteAt(size_t pos, S& out) const
 
     // TODO: replace capacity with checksum
 
-    // Calculate full lenght of array in bytes, including padding
+    // Calculate full length of array in bytes, including padding
     // for 64bit alignment (that may be composed of random bits)
     size_t len          = m_len;
     const WidthType wt  = get_header_wtype();
@@ -1576,8 +1584,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
     {
         cond2 C;
         int cond = C.condition();
-
-        bool ret;
+        bool ret = false;
 
         if (cond == COND_EQUAL)
             ret = CompareEquality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);

@@ -313,5 +313,6 @@ TEST(StringIndex_Distinct)
     CHECK_EQUAL(6, result[3]); // s4 = Tom
 
     // Clean up
+    result.Destroy();
     col.Destroy();
 }

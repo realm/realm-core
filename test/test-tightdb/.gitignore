@@ -6,5 +6,5 @@
 /*.gcda
 
 /test-tightdb
-/test-tightdb-debug
-/test-tightdb-cover
+/test-tightdb-dbg
+/test-tightdb-cov

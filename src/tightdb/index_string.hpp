@@ -39,6 +39,8 @@ public:
     void Delete(size_t row_ndx, const char* value, bool isLast=false);
     void Clear();
 
+    using Column::Delete;
+
     size_t count(const char* value) const;
     size_t find_first(const char* value) const;
     void   find_all(Array& result, const char* value) const;

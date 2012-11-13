@@ -669,11 +669,6 @@ char* group_write_to_mem(Group* group, size_t* len)
 /**** Query *********************************************************************/
 
 
-Query* query_new()
-{
-    return new Query();
-}
-
 void query_delete(Query* q)
 {
     delete q;
@@ -767,70 +762,70 @@ Query*  query_string_contains(Query* q, size_t column_ndx, const char* value, Ca
 /* ??? Currently missing support for Query on Mixed and Binary */
 
 
-TableView* query_find_all(Query* q, Table* t)
+TableView* query_find_all(Query* q)
 {
-    return new TableView(q->find_all(*t, 0, size_t(-1), size_t(-1)));
+    return new TableView(q->find_all(0, size_t(-1), size_t(-1)));
 }
 
-TableView* query_find_all_range(Query* q, Table* t, size_t start, size_t end, size_t limit)
+TableView* query_find_all_range(Query* q, size_t start, size_t end, size_t limit)
 {
-    return new TableView(q->find_all(*t, start, end, limit));
+    return new TableView(q->find_all(start, end, limit));
 }
 
 /* Aggregations */
 
-size_t query_count(Query* q, const Table* t)
+size_t query_count(Query* q)
 {
-    return q->count(*t, 0U, size_t(-1), size_t(-1));
+    return q->count(0U, size_t(-1), size_t(-1));
 }
 
-size_t query_count_range(Query* q, const Table* t, size_t start, size_t end, size_t limit)
+size_t query_count_range(Query* q, size_t start, size_t end, size_t limit)
 {
-    return q->count(*t, start, end, limit);
+    return q->count(start, end, limit);
 }
 
-int64_t query_min(Query* q, const Table* t, size_t column_ndx, size_t* resultcount)
+int64_t query_min(Query* q, size_t column_ndx, size_t* resultcount)
 {
-    return q->minimum(*t, column_ndx, resultcount, 0, size_t(-1), size_t(-1));
+    return q->minimum(column_ndx, resultcount, 0, size_t(-1), size_t(-1));
 }
 
-int64_t query_min_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
+int64_t query_min_range(Query* q, size_t column_ndx, size_t* resultcount,
                         size_t start, size_t end, size_t limit)
 {
-    return q->minimum(*t, column_ndx, resultcount, start, end, limit);
+    return q->minimum(column_ndx, resultcount, start, end, limit);
 }
 
-int64_t  query_max(Query* q, const Table* t, size_t column_ndx, size_t* resultcount)
+int64_t  query_max(Query* q, size_t column_ndx, size_t* resultcount)
 {
-    return q->maximum(*t, column_ndx, resultcount, 0, size_t(-1), size_t(-1));
+    return q->maximum(column_ndx, resultcount, 0, size_t(-1), size_t(-1));
 }
 
-int64_t  query_max_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
+int64_t  query_max_range(Query* q, size_t column_ndx, size_t* resultcount,
                          size_t start, size_t end, size_t limit)
 {
-    return q->maximum(*t, column_ndx, resultcount, start, end, limit);
+    return q->maximum(column_ndx, resultcount, start, end, limit);
 }
 
-int64_t  query_sum(Query* q, const Table* t, size_t column_ndx, size_t* resultcount)
+int64_t  query_sum(Query* q, size_t column_ndx, size_t* resultcount)
 {
-    return q->sum(*t, column_ndx, resultcount, 0, size_t(-1), size_t(-1));
+    return q->sum(column_ndx, resultcount, 0, size_t(-1), size_t(-1));
 }
 
-int64_t  query_sum_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
+int64_t  query_sum_range(Query* q, size_t column_ndx, size_t* resultcount,
                          size_t start, size_t end, size_t limit)
 {
-    return q->sum(*t, column_ndx, resultcount, start, end, limit);
+    return q->sum(column_ndx, resultcount, start, end, limit);
 }
 
-double  query_avg(Query* q, const Table* t, size_t column_ndx, size_t* resultcount)
+double  query_avg(Query* q, size_t column_ndx, size_t* resultcount)
 {
-    return q->average(*t, column_ndx, resultcount, 0, size_t(-1), size_t(-1));
+    return q->average(column_ndx, resultcount, 0, size_t(-1), size_t(-1));
 }
 
-double  query_avg_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
+double  query_avg_range(Query* q, size_t column_ndx, size_t* resultcount,
                          size_t start, size_t end, size_t limit)
 {
-    return q->average(*t, column_ndx, resultcount, start, end, limit);
+    return q->average(column_ndx, resultcount, start, end, limit);
 }
 
 

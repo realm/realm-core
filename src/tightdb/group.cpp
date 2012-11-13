@@ -303,6 +303,8 @@ void Group::invalidate()
     // to clean up
     // TODO: This is also done in commit(), fix to do it only once
     m_alloc.FreeAll();
+
+    m_isValid = false;
 }
 
 bool Group::is_empty() const
@@ -448,6 +450,10 @@ bool Group::commit(size_t current_version, size_t readlock_version)
         invalidate();
         TIGHTDB_ASSERT(m_alloc.IsAllFree());
     }
+
+#ifdef TIGHTDB_DEBUG
+    Verify();
+#endif
 
     return true;
 }
@@ -604,6 +610,8 @@ void Group::to_string(std::ostream& out) const
 
 void Group::Verify() const
 {
+    if (!is_valid()) return;
+
     // Verify free lists
     if (m_freePositions.IsValid()) {
         TIGHTDB_ASSERT(m_freeLengths.IsValid());
@@ -612,11 +620,41 @@ void Group::Verify() const
         const size_t count_l = m_freeLengths.Size();
         TIGHTDB_ASSERT(count_p == count_l);
 
-        for (size_t i = 0; i < count_p; ++i) {
-            const size_t p = m_freePositions.Get(i);
-            const size_t l = m_freeLengths.Get(i);
-            TIGHTDB_ASSERT((p & 0x7) == 0); // 64bit alignment
-            TIGHTDB_ASSERT((l & 0x7) == 0); // 64bit alignment
+        if (is_shared()) {
+            TIGHTDB_ASSERT(m_freeVersions.IsValid());
+            TIGHTDB_ASSERT(count_p == m_freeVersions.Size());
+        }
+
+        if (count_p) {
+            // Check for alignment
+            for (size_t i = 0; i < count_p; ++i) {
+                const size_t p = m_freePositions.Get(i);
+                const size_t l = m_freeLengths.Get(i);
+                TIGHTDB_ASSERT((p & 0x7) == 0); // 64bit alignment
+                TIGHTDB_ASSERT((l & 0x7) == 0); // 64bit alignment
+            }
+
+            const size_t filelen = m_alloc.GetFileLen();
+
+            // Segments should be ordered and without overlap
+            for (size_t i = 0; i < count_p-1; ++i) {
+                const size_t pos1 = m_freePositions.Get(i);
+                const size_t pos2 = m_freePositions.Get(i+1);
+                TIGHTDB_ASSERT(pos1 < pos2);
+
+                const size_t len1 = m_freeLengths.Get(i);
+                TIGHTDB_ASSERT(len1 != 0);
+                TIGHTDB_ASSERT(len1 < filelen);
+
+                const size_t end = pos1 + len1;
+                TIGHTDB_ASSERT(end <= pos2);
+            }
+
+            const size_t lastlen = m_freeLengths.back();
+            TIGHTDB_ASSERT(lastlen != 0 && lastlen <= filelen);
+
+            const size_t end = m_freePositions.back() + lastlen;
+            TIGHTDB_ASSERT(end <= filelen);
         }
     }
 

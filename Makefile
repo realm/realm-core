@@ -8,6 +8,11 @@ include generic.mk
 benchmark: minimal
 	@$(MAKE) -C test benchmark
 
+# Run the performance matrix benchmarking program
+.PHONY: performance
+performance: minimal
+	@$(MAKE) -C test/performance run
+
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
 lcov: test-cover

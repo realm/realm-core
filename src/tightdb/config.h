@@ -84,4 +84,13 @@
 #endif
 
 
+#if defined __GNUC__ || defined __INTEL_COMPILER
+#  define TIGHTDB_UNLIKELY(expr) __builtin_expect(!!(expr), 0)
+#  define TIGHTDB_LIKELY(expr)   __builtin_expect(!!(expr), 1)
+#else
+#  define TIGHTDB_UNLIKELY(expr) (expr)
+#  define TIGHTDB_LIKELY(expr)   (expr)
+#endif
+
+
 #endif /* TIGHTDB_CONFIG_H */

@@ -3,6 +3,8 @@
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
 
+#include <ostream>
+
 using namespace tightdb;
 
 TEST(Table1)
@@ -273,6 +275,34 @@ TEST(Table_Delete_All_Types)
     table.Verify();
 #endif // TIGHTDB_DEBUG
 }
+
+TEST(Table_test_json)
+{
+    // Create table with all column types
+    Table table;
+    Spec& s = table.get_spec();
+    s.add_column(COLUMN_TYPE_INT,    "int");
+    s.add_column(COLUMN_TYPE_BOOL,   "bool");
+    s.add_column(COLUMN_TYPE_DATE,   "date");
+    s.add_column(COLUMN_TYPE_STRING, "string");
+    table.update_from_spec();
+
+    // Add some rows
+    for (size_t i = 0; i < 3; ++i) {
+        table.insert_int(0, i, i);
+        table.insert_bool(1, i, (i % 2 ? true : false));
+        table.insert_date(2, i, 12345);
+        table.insert_string(3, i, "helloooooo");
+        table.insert_done();
+    }
+
+     std::stringstream ss;
+     table.to_json(ss);
+     const std::string json = ss.str();
+     CHECK_EQUAL(true, json.length() > 0);
+     // std::cerr << "JSON:" << json << "\n";
+}
+
 
 TEST(Table_Find_Int)
 {
@@ -1039,6 +1069,79 @@ TEST(Table_Spec_AddColumns)
 }
 
 #endif
+
+TEST(Table_Spec_DeleteColumnsBug)
+{
+    TableRef table;
+    table = Table::create();
+
+    // Create specification with sub-table
+    table->add_column(COLUMN_TYPE_STRING, "name");
+    table->set_index(0);
+    table->add_column(COLUMN_TYPE_INT,    "age");
+    table->add_column(COLUMN_TYPE_BOOL,   "hired");
+    table->add_column(COLUMN_TYPE_TABLE,  "phones");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(3); // phones
+
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "type");
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "number");
+
+    // Add rows
+    table->add_empty_row();
+    table->set_string(0, 0, "jessica");
+    table->set_int(1, 0, 22);
+    table->set_bool(2, 0, true);
+    {
+        TableRef phones = table->get_subtable(3, 0);
+        phones->add_empty_row();
+        phones->set_string(0, 0, "home");
+        phones->set_string(1, 0, "232-323-3242");
+    }
+
+    table->add_empty_row();
+    table->set_string(0, 1, "joe");
+    table->set_int(1, 1, 42);
+    table->set_bool(2, 1, false);
+    {
+        TableRef phones = table->get_subtable(3, 0);
+        phones->add_empty_row();
+        phones->set_string(0, 0, "work");
+        phones->set_string(1, 0, "434-434-4343");
+    }
+
+    table->add_empty_row();
+    table->set_string(0, 1, "jared");
+    table->set_int(1, 1, 35);
+    table->set_bool(2, 1, true);
+    {
+        TableRef phones = table->get_subtable(3, 0);
+        phones->add_empty_row();
+        phones->set_string(0, 0, "home");
+        phones->set_string(1, 0, "342-323-3242");
+
+        phones->add_empty_row();
+        phones->set_string(0, 0, "school");
+        phones->set_string(1, 0, "434-432-5433");
+    }
+
+    // Add new column
+    table->add_column(COLUMN_TYPE_MIXED, "extra");
+    table->set_mixed(4, 0, true);
+    table->set_mixed(4, 2, "Random string!");
+
+    // Remove some columns
+    table->remove_column(1); // age
+    table->remove_column(3); // extra
+
+#ifdef TIGHTDB_DEBUG
+    table->Verify();
+#endif // TIGHTDB_DEBUG
+
+    table.reset();
+}
 
 TEST(Table_Mixed)
 {

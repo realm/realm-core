@@ -12,6 +12,11 @@ Format:
 
 ==================
 
+2012-11-12 (Kristian Spangsege)
+----------
+! Fixed a memory leak when using Table::create()
+
+
 2012-10-24 (Kristian Spangsege)
 ----------
 + Added Table::has_shared_spec().

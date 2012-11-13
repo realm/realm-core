@@ -177,17 +177,17 @@ template<class T> inline bool operator==(Wrap<Mixed> a, const T& b)
 
 template<class T> inline bool operator!=(Wrap<Mixed> a, const T& b)
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_INT && Mixed(a).get_int() != b;
+    return !(a == b);
 }
 
 template<class T> inline bool operator==(const T& a, Wrap<Mixed> b)
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_INT && a == Mixed(b).get_int();
+    return b == a;
 }
 
 template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b)
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_INT && a != Mixed(b).get_int();
+    return b != a;
 }
 
 
@@ -284,22 +284,22 @@ inline bool operator!=(char* a, Wrap<Mixed> b)
 
 inline bool operator==(Wrap<Mixed> a, BinaryData b)
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_BINARY && Mixed(a).get_binary() == b;
+    return Mixed(a).get_type() == COLUMN_TYPE_BINARY && Mixed(a).get_binary().compare_payload(b);
 }
 
 inline bool operator!=(Wrap<Mixed> a, BinaryData b)
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_BINARY && Mixed(a).get_binary() != b;
+    return Mixed(a).get_type() == COLUMN_TYPE_BINARY && !Mixed(a).get_binary().compare_payload(b);
 }
 
 inline bool operator==(BinaryData a, Wrap<Mixed> b)
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_BINARY && a == Mixed(b).get_binary();
+    return Mixed(b).get_type() == COLUMN_TYPE_BINARY && a.compare_payload(Mixed(b).get_binary());
 }
 
 inline bool operator!=(BinaryData a, Wrap<Mixed> b)
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_BINARY && a != Mixed(b).get_binary();
+    return Mixed(b).get_type() == COLUMN_TYPE_BINARY && !a.compare_payload(Mixed(b).get_binary());
 }
 
 

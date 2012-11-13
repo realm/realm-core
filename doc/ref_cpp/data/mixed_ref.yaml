@@ -12,6 +12,10 @@ DESCR      : &g_mixed_descr
              value. Any supported type of TightDB can be used with the Mixed class. The current
              supported types are boolean, integer, timestamps, strings, binary data and 
              {@link class_dyn_table}.
+
+             Using the Mixed class resembles using a dynamic typed language. The flexibility
+             of mixing types has a cost as compacting data is harder and queries will generally
+             be slower.
 SEE        : 
 EXAMPLES: 
 - DESCR    : 
@@ -20,7 +24,7 @@ IGNORE     : []                   # List of method-ids to ignore
 CATEGORIES:
 - Constructors:
   METHODS:
-  - g_mixed_conscructor:
+  - g_mixed_constructor:
       NAMES    : Mixed
       SUMMARY  : &g_mixed_constructor_summary
                  Create a Mixed variable.

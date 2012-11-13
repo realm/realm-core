@@ -27,12 +27,12 @@
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/column_string.hpp>
+#include <tightdb/column_binary.hpp>
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 
 namespace tightdb {
-
 
 class ParentNode {
 public:
@@ -58,7 +58,7 @@ public:
                 break;
             count++;
             
-            if (agg_col != size_t(-1) && m_array.USES_VAL<action>())
+            if (agg_col != not_found && m_array.USES_VAL<action>())
                 m_array.FIND_ACTION<action>(r, column_agg->Get(r), &m_state, &tightdb_dummy);
             else
                 m_array.FIND_ACTION<action>(r, 0, &m_state, &tightdb_dummy);  
@@ -112,6 +112,10 @@ protected:
 };
 
 
+// FIXME: We cannot use all-uppercase names like 'ARRAYNODE' for
+// classes since the risk of colliding with one of the customers macro
+// names is too high. In short, the all-uppercase name space is
+// reserved for macros.
 class ARRAYNODE: public ParentNode {
 public:
     ARRAYNODE(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.Size()) {m_child = 0;}
@@ -278,6 +282,10 @@ protected:
 };
 
 
+// FIXME: We cannot use all-uppercase names like 'NODE' for classes
+// since the risk of colliding with one of the customers macro names
+// is too high. In short, the all-uppercase name space is reserved for
+// macros.
 template <class T, class C, class F> class NODE: public ParentNode {
 public:
     // NOTE: Be careful to call Array(false) constructors on m_array and m_array_agg in the initializer list, otherwise
@@ -467,6 +475,63 @@ protected:
 };
 
 
+template <class F> class BINARYNODE: public ParentNode {
+public:
+    template <ACTION action> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*agg_col*/) {TIGHTDB_ASSERT(false); return 0;}
+
+    BINARYNODE(const char* v, size_t len, size_t column)
+    {
+        m_column_id = column;
+        m_child = 0;
+        m_len = len;
+        m_value = (char *)malloc(len);
+        memcpy(m_value, v, len);
+    }
+    ~BINARYNODE() {
+        free((void*)m_value);
+    }
+
+    void Init(const Table& table)
+    {
+        m_table = &table;
+        m_column = &table.GetColumnBase(m_column_id);
+        m_column_type = table.GetRealColumnType(m_column_id);
+
+        if (m_child) 
+            m_child->Init(table);
+    }
+
+    size_t find_first(size_t start, size_t end)
+    {
+        F function;
+
+        for (size_t s = start; s < end; ++s) {
+            const char* t = ((const ColumnBinary*)m_column)->Get(s).pointer;
+            size_t len2 = ((const ColumnBinary*)m_column)->Get(s).len;
+
+            if (function(m_value, m_len, t, len2)) {
+                if (m_child == 0)
+                    return s;
+                else {
+                    const size_t a = m_child->find_first(s, end);
+                    if (s == a)
+                        return s;
+                    else
+                        s = a - 1;
+                }
+            }
+        }
+        return end;
+    }
+
+protected:
+    char* m_value;
+    size_t m_len;
+    const ColumnBase* m_column;
+    ColumnType m_column_type;
+};
+
+
 template <class F> class STRINGNODE: public ParentNode {
 public:
     template <ACTION action> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*agg_col*/) {TIGHTDB_ASSERT(false); return 0;}
@@ -646,6 +711,10 @@ private:
 };
 
 
+// FIXME: We cannot use all-uppercase names like 'OR_NODE' for classes
+// since the risk of colliding with one of the customers macro names
+// is too high. In short, the all-uppercase name space is reserved for
+// macros.
 class OR_NODE: public ParentNode {
 public:
     template <ACTION action> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*agg_col*/) {TIGHTDB_ASSERT(false); return 0;}

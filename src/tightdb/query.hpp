@@ -32,7 +32,7 @@
     #include <pthread.h>
 #endif
 
-#include <tightdb/table_view.hpp>
+#include <tightdb/table_ref.hpp>
 
 namespace tightdb {
 
@@ -40,12 +40,14 @@ namespace tightdb {
 // Pre-declarations
 class ParentNode;
 class Table;
+class TableView;
+class ConstTableView;
+class Array;
 
 const size_t MAX_THREADS = 128;
 
 class Query {
 public:
-    Query();
     Query(const Query& copy); // FIXME: Try to remove this
     ~Query();
 
@@ -88,12 +90,13 @@ public:
     // Conditions: binary data
     // FIXME: We want case insensitivity here also, becaue these will be used for strings that are not zero-terminated such as regular C++ strings.
     // FIXME: The '_binary' suffix is needed to avoid ambiguity when third argument is neither bool nor size_t.
+
+    Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
 /*
     Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& begins_with_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& ends_with_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& contains_binary(size_t column_ndx, const char* ptr, size_t len);
-    Query& not_equal_binary(size_t column_ndx, const char* ptr, size_t len);
 */
 
     // Grouping
@@ -104,28 +107,30 @@ public:
     void Or();
 
     // Searching
-    size_t         find_next(const Table& table, size_t lastmatch=-1);
-    TableView      find_all(Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
-    ConstTableView find_all(const Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
+    size_t         find_next(size_t lastmatch=-1);
+    TableView      find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
+    ConstTableView find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
     // Aggregates
-    int64_t sum(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    int64_t maximum(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    int64_t minimum(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    double  average(const Table& table, size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
-    size_t  count(const Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t sum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t maximum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t minimum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double  average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+    size_t  count(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 /*
     time_t maximum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     time_t minimum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 */
 
     // Deletion
-    size_t  remove(Table& table, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+    size_t  remove(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
 
     // Multi-threading
-    TableView      find_all_multi(Table& table, size_t start=0, size_t end=size_t(-1));
-    ConstTableView find_all_multi(const Table& table, size_t start=0, size_t end=size_t(-1));
+    TableView      find_all_multi(size_t start=0, size_t end=size_t(-1));
+    ConstTableView find_all_multi(size_t start=0, size_t end=size_t(-1)) const;
     int            set_threads(unsigned int threadcount);
+
+    TableRef& get_table() {return m_table;}
 
 #ifdef TIGHTDB_DEBUG
     std::string Verify(); // Must be upper case to avoid conflict with macro in ObjC
@@ -134,11 +139,17 @@ public:
     std::string error_code;
 
 protected:
+    friend class Table;
+    template <typename T> friend class BasicTable;
     friend class XQueryAccessorInt;
     friend class XQueryAccessorString;
 
+    Query(Table& table);
+    Query(const Table& table);
+    void Create();
+
     void   Init(const Table& table) const;
-    size_t FindInternal(const Table& table, size_t start=0, size_t end=size_t(-1)) const;
+    size_t FindInternal(size_t start=0, size_t end=size_t(-1)) const;
     void   UpdatePointers(ParentNode* p, ParentNode** newnode);
 
     static bool  comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
@@ -161,6 +172,7 @@ protected:
     } ts;
     pthread_t threads[MAX_THREADS];
 
+    TableRef m_table;
     std::vector<ParentNode*> first;
     std::vector<ParentNode**> update;
     std::vector<ParentNode**> update_override;

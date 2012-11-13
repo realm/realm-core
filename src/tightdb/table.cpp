@@ -372,8 +372,9 @@ Table::~Table()
     // LangBindHelper::new_table(), and then the reference count must
     // be zero, because that is what has caused the destructor to be
     // called. In the latter case, there can be no subtables to
-    // invalidate, because they would have kept the parent alive.
+    // invalidate, because they would have kept their parent alive.
     if (0 < m_ref_count) invalidate();
+    else ClearCachedColumns();
     m_top.Destroy();
 }
 
@@ -417,13 +418,12 @@ size_t Table::GetColumnRefPos(size_t column_ndx) const
         if (current_column == column_ndx)
             return pos;
 
+        ++pos;
         const ColumnType type = (ColumnType)m_spec_set.get_type_attr(i);
         if (type >= COLUMN_ATTR_INDEXED)
             continue; // ignore attributes
         if (type == COLUMN_TYPE_STRING_ENUM)
-            pos += 2; // string enums take up two places in m_columns
-        else
-            ++pos;
+            ++pos; // string enums take up two places in m_columns
 
         ++current_column;
     }
@@ -659,6 +659,7 @@ bool Table::has_index(size_t column_ndx) const
 
 void Table::set_index(size_t column_ndx, bool update_spec)
 {
+    TIGHTDB_ASSERT(!has_shared_spec());
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     if (has_index(column_ndx)) return;
 
