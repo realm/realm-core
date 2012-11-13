@@ -177,17 +177,17 @@ template<class T> inline bool operator==(Wrap<Mixed> a, const T& b)
 
 template<class T> inline bool operator!=(Wrap<Mixed> a, const T& b)
 {
-    return !(a == b);
+    return Mixed(a).get_type() == COLUMN_TYPE_INT && Mixed(a).get_int() != b;
 }
 
 template<class T> inline bool operator==(const T& a, Wrap<Mixed> b)
 {
-    return b == a;
+    return Mixed(b).get_type() == COLUMN_TYPE_INT && a == Mixed(b).get_int();
 }
 
 template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b)
 {
-    return b != a;
+    return Mixed(b).get_type() == COLUMN_TYPE_INT && a != Mixed(b).get_int();
 }
 
 
