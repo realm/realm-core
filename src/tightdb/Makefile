@@ -10,7 +10,7 @@ column_string.hpp column_string_enum.hpp column_binary.hpp column_table.hpp colu
 spec.hpp date.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp \
 table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp $(TABLE_MACROS_HPP) \
 group.hpp group_writer.hpp group_shared.hpp index.hpp index_string.hpp query.hpp \
-query_conditions.hpp lang_bind_helper.hpp c-table.h
+query_conditions.hpp replication.hpp lang_bind_helper.hpp c-table.h
 
 lib_LIBRARIES = libtightdb.a
 bin_PROGRAMS  = tightdb-config
@@ -22,7 +22,6 @@ column_mixed.cpp spec.cpp table.cpp table_view.cpp group.cpp group_writer.cpp gr
 index.cpp index_string.cpp query.cpp c-table.cpp
 
 ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
-INST_HEADERS         += replication.hpp
 libtightdb_a_SOURCES += replication.cpp
 endif
 
