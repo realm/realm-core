@@ -9,14 +9,16 @@ SUMMARY    : &g_typed_query_intro_summary
 DESCR      : &g_typed_query_intro_descr
              >
              Query objects are used to build up queries. A query is tied to a
-             {@link class_typed_table}. The typed query class is used in conjunction with the
-             typed table class.
+             {@link class_typed_table}. The typed query class is used in conjunction with
+             {@link class_typed_table}.
 
              Conditions is added to a query through a 
-             <a href="http://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a> 
-             as a method to a column name.
+             <a href="http://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a>. 
              This means that the methods representing the conditions will return the
-             query object. Th
+             query object.
+
+             Conditions are split in two parts: the column name and a method for each
+             predicate. Conditions are folded with logical-and if not stated otherwise.
 
              Once the query is ready, it is possible to reuse by multiple calls to
              the action methods.
@@ -53,7 +55,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [bool, int64_t, const char*, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : &g_typed_query_case_sensitive_descr
@@ -66,7 +68,7 @@ CATEGORIES :
         DESCR  : Size of binary data chunk.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_equals
@@ -89,7 +91,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [bool, int64_t, const char*, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : 'String match can be performed case sensitive or not. Default: <code>true</code>.'
@@ -101,7 +103,7 @@ CATEGORIES :
         DESCR  : Size of binary data chunk.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_notEquals
@@ -118,10 +120,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [int64_t, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_greaterThan
@@ -138,10 +140,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [int64_t, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_greaterThanOrEqual
@@ -158,10 +160,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [int64_t, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_lessThan
@@ -178,10 +180,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [int64_t, time_t]
-        DESCR  : The value
+        DESCR  : The value.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_lessThanOrEqual
@@ -198,13 +200,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : from
         TYPES  : [int64_t, time_t]
-        DESCR  : Lower bound of range
+        DESCR  : Lower bound of range.
       - NAME   : to
         TYPES  : [int64_t, time_t]
-        DESCR  : Upper bound of range
+        DESCR  : Upper bound of range.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_between
@@ -221,7 +223,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : const char*
-        DESCR  : The value
+        DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_typed_query_case_sensitive_descr
@@ -233,7 +235,7 @@ CATEGORIES :
         DESCR  : Size of binary data chunk.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_startsWith
@@ -250,7 +252,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : const char*
-        DESCR  : The value
+        DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_typed_query_case_sensitive_descr
@@ -262,7 +264,7 @@ CATEGORIES :
         DESCR  : Size of binary data chunk.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_endsWith
@@ -279,7 +281,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : const char*
-        DESCR  : The value
+        DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_typed_query_case_sensitive_descr
@@ -291,7 +293,7 @@ CATEGORIES :
         DESCR  : Size of binary data chunk.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object
+        DESCR  : The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_contains
@@ -302,7 +304,7 @@ CATEGORIES :
       DESCR    : &g_typed_query_group_descr
                  >
                  Group conditions ("left" parenthesis). Group of conditions can be nested and they are 
-                 conceptually a parenthesis (PHP does not allow overloading () as an operator or method). 
+                 conceptually a parenthesis. 
       SUMMARY  : &g_typed_query_group_summary
                  Start group ("left parenthesis").
       RETURN:
@@ -326,7 +328,7 @@ CATEGORIES :
   - g_typed_query_or:
       NAMES    : Or
       DESCR    : &g_typed_query_or_descr
-                 Logical-or.
+                 Two conditions will be folded by logical-or.
       SUMMARY  : &g_typed_query_or_summary
                  Logical-or.
       RETURN:
@@ -365,7 +367,7 @@ CATEGORIES :
   - g_typed_query_find_all:
       NAMES    : find_all
       DESCR    : &g_typed_query_find_all_descr
-                 Execute a query. See the {@link class_tableview} class for further details. 
+                 Execute a query. See the {@link class_dyn_tableview} class for further details. 
       SUMMARY  : &g_typed_query_find_all_summary
                  Execute query.
       SIGNATURE: |
@@ -406,7 +408,7 @@ CATEGORIES :
   - g_typed_query_sum:
       NAMES    : sum
       DESCR    : &g_typed_query_sum_descr
-                 Calculates the sum. This method can only be applied to numerical columns.
+                 This method calculates the sum.
       SUMMARY  : &g_typed_query_sum_summary
                  Calculate sum.
       CONST    : true
@@ -432,14 +434,11 @@ CATEGORIES :
   - g_typed_query_size:
       NAMES    : count
       DESCR    : &g_typed_query_size_descr
-                 Find the number of matching rows
+                 Find the number of matching rows.
       SUMMARY  : &g_typed_query_size_summary
                  Number of matching rows.
       CONST    : true
       PARAMS:
-      - NAME   : resultcount
-        DESCR  : The number of rows used to calculate the sum.
-        TYPES  : size_t*
       - NAME   : start
         TYPES  : size_t
         DESCR  : "Row to begin search. Default: 0."
@@ -520,7 +519,7 @@ CATEGORIES :
       SUMMARY  : &g_typed_query_average_summary
                  Calcualtes the average.
       DESCR    : &g_typed_query_average_descr
-                 Calcualtes the average.
+                 This method calcualtes the average.
       CONST    : true
       PARAMS:
       - NAME   : resultcount
@@ -546,7 +545,7 @@ CATEGORIES :
       DESCR    : &g_typed_query_remove_descr
                  This method will remove all matching rows in the source table.
       SUMMARY  : &g_typed_query_remove_summary
-                 Remove rows
+                 Remove rows.
       CONST    : true
       PARAMS:
       - NAME   : resultcount
@@ -573,7 +572,7 @@ CATEGORIES :
   - g_typed_query_find_all_const_multi:
       NAMES    : find_all_multi
       DESCR    : &g_typed_query_find_all_multi_descr
-                 Execute a query using (POSIX) threads. See the {@link class_tableview} class for further details. 
+                 Execute a query using (POSIX) threads. See the {@link class_dyn_tableview} class for further details. 
       SUMMARY  : &g_typed_query_find_all_multi_summary
                  Execute query.
       SIGNATURE: |
@@ -605,7 +604,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : threadcount
         TYPES  : unsigned int
-        DESCR  : Number of threads
+        DESCR  : Number of threads.
       RETURN:
         DESCR  : Success or not
         TYPES  : int
