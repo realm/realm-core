@@ -8,8 +8,78 @@
 
 #include <tightdb/assert.hpp>
 #include <tightdb/utilities.hpp>
+#include <intrin.h>
 
 namespace tightdb {
+
+
+bool sse42()
+{
+    static char SSE42 = -1;
+
+    if(SSE42 != -1)
+        return SSE42 != 0;  // Faster than == 1 (requires no immediate value)
+
+    int cret = 0;
+
+#ifdef _MSC_VER
+    int CPUInfo[4];
+    __cpuid(CPUInfo, 1);
+    cret = CPUInfo[2];
+#else
+    int a = 1;
+    __asm ( "mov %1, %%eax; "            // a into eax
+          "cpuid;"
+          "mov %%ecx, %0;"             // ecx into b
+          :"=r"(cret)                     // output
+          :"r"(a)                      // input
+          :"%eax","%ebx","%ecx","%edx" // clobbered register
+         );
+#endif
+
+// Byte is atomic. Race can/will occur but that will not make sse42 return a wrong value
+    if(cret & 0x100000)
+        SSE42 = 1;
+    else
+        SSE42 = 0;
+
+    return SSE42 == 1;
+}
+
+
+bool sse3()
+{
+    static volatile char SSE42 = -1;
+
+    if(SSE42 != -1)
+        return SSE42 != 0;  // Faster than == 1 (requires no immediate value)
+
+    int cret = 0;
+
+#ifdef _MSC_VER
+    int CPUInfo[4];
+    __cpuid(CPUInfo, 1);
+    cret = CPUInfo[2];
+#else
+    int a = 1;
+    __asm ( "mov %1, %%eax; "            // a into eax
+          "cpuid;"
+          "mov %%ecx, %0;"             // ecx into b
+          :"=r"(cret)                     // output
+          :"r"(a)                      // input
+          :"%eax","%ebx","%ecx","%edx" // clobbered register
+         );
+#endif
+
+// Byte is atomic. Race can/will occur but that will not make sse42 return a wrong value
+    if(cret & 0x1)
+        SSE42 = 1;
+    else
+        SSE42 = 0;
+
+    return SSE42 == 1;
+}
+
 
 size_t to_ref(int64_t v)
 {

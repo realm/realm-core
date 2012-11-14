@@ -34,7 +34,14 @@
     #define TIGHTDB_PTR_64
 #endif
 
+#if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86X64) 
+    #define TIGHTDB_COMPILER_SSE42  // Compiler supports SSE 4.2 intrinsics
+#endif
+
 namespace tightdb {
+
+bool sse42();
+bool sse3();
 
 typedef struct {
     unsigned long long remainder;

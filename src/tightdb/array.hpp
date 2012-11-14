@@ -66,10 +66,73 @@ Searching: The main finding function is:
     SSE4.1: smmintrin.h
     SSE4.2: nmmintrin.h
 */
-#ifdef USE_SSE42
-    #include <nmmintrin.h> // __SSE42__
-#elif defined (USE_SSE3)
-    #include <pmmintrin.h> // __SSE3__
+
+#include <emmintrin.h>
+
+
+#ifndef _MSC_VER
+static inline __m128i __attribute__((always_inline)) _mm_cmpgt_epi64(__m128i xmm1, __m128i xmm2)
+{
+    __asm__("pcmpgtq %1, %0" : "+x" (xmm1) : "xm" (xmm2));
+    return xmm1;
+}
+
+static inline __m128i __attribute__((always_inline)) _mm_cmpeq_epi64(__m128i xmm1, __m128i xmm2)
+{
+    __asm__("pcmpeqq %1, %0" : "+x" (xmm1) : "xm" (xmm2));
+    return xmm1;
+}
+
+static inline __m128i __attribute__((always_inline)) _mm_min_epi8(__m128i xmm1, __m128i xmm2)
+{
+    __asm__("pminsb %1, %0" : "+x" (xmm1) : "xm" (xmm2));
+    return xmm1;
+}
+
+static inline __m128i __attribute__((always_inline)) _mm_max_epi8(__m128i xmm1, __m128i xmm2)
+{
+    __asm__("pmaxsb %1, %0" : "+x" (xmm1) : "xm" (xmm2));
+    return xmm1;
+}
+
+static inline __m128i __attribute__((always_inline)) _mm_max_epi32(__m128i xmm1, __m128i xmm2)
+{
+    __asm__("pmaxsd %1, %0" : "+x" (xmm1) : "xm" (xmm2));
+    return xmm1;
+}
+
+static inline __m128i __attribute__((always_inline)) _mm_min_epi32(__m128i xmm1, __m128i xmm2)
+{
+    __asm__("pminsd %1, %0" : "+x" (xmm1) : "xm" (xmm2));
+    return xmm1;
+}
+
+#pragma GCC diagnostic ignored "-Wuninitialized"
+static inline __m128i __attribute__((always_inline)) _mm_cvtepi8_epi16(__m128i xmm2)
+{
+    __m128i xmm1;
+    __asm__("pmovsxbw %1, %0" : "+x" (xmm1) : "xm" (xmm2));
+    return xmm1;
+}
+static inline __m128i __attribute__((always_inline)) _mm_cvtepi16_epi32(__m128i xmm2)
+{
+    __m128i xmm1;
+    __asm__("pmovsxwd %1, %0" : "+x" (xmm1) : "xm" (xmm2));
+    return xmm1;
+}
+
+static inline __m128i __attribute__((always_inline)) _mm_cvtepi32_epi64(__m128i xmm2)
+{
+    __m128i xmm1;
+    __asm__("pmovsxdq %1, %0" : "+x" (xmm1) : "xm" (xmm2));
+    return xmm1;
+}
+
+#endif
+
+
+#ifdef TIGHTDB_COMPILER_SSE42
+    #include <emmintrin.h> // __SSE2__
 #endif
 
 #ifdef TIGHTDB_DEBUG
@@ -373,7 +436,7 @@ public:
     bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
     
     // SSE find for the four functions EQUAL/NOTEQUAL/LESS/GREATER 
-#ifdef USE_SSE42
+#ifdef TIGHTDB_COMPILER_SSE42
     template <class cond2, ACTION action, size_t width, class Callback> 
     size_t FindSSE(int64_t value, __m128i *data, size_t items, state_state *state, size_t baseindex, Callback callback) const;
 #endif
@@ -978,45 +1041,46 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
         // finder cannot handle this bitwidth
         TIGHTDB_ASSERT(m_width != 0);
 
-    #if defined(USE_SSE42) || defined(USE_SSE3)
+#if defined(TIGHTDB_COMPILER_SSE42)
 
-    #if defined(USE_SSE42)
-        if (end - start < sizeof(__m128i) || m_width < 8) {
-    #elif defined(USE_SSE3)
-        if (!SameType<cond2, EQUAL>::value || end - start < sizeof(__m128i) || m_width < 8 || m_width == 64) {
-    #endif
+        if ((sse42() &&                                  (end - start < sizeof(__m128i) || m_width < 8))
+        || (sse3()  && (!SameType<cond2, EQUAL>::value || end - start < sizeof(__m128i) || m_width < 8 || m_width == 64))) {
             Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
             return;
         }
+        else
+        {
+            // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
+            __m128i* const a = (__m128i *)round_up(m_data + start * bitwidth / 8, sizeof(__m128i));
+            __m128i* const b = (__m128i *)round_down(m_data + end * bitwidth / 8, sizeof(__m128i));
 
-        // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
-        __m128i* const a = (__m128i *)round_up(m_data + start * bitwidth / 8, sizeof(__m128i));
-        __m128i* const b = (__m128i *)round_down(m_data + end * bitwidth / 8, sizeof(__m128i));
-
-        if (!Compare<cond2, action, bitwidth, Callback>(value, start, ((unsigned char *)a - m_data) * 8 / NO0(bitwidth), baseindex, state, callback))
-            return;
+            if (!Compare<cond2, action, bitwidth, Callback>(value, start, ((unsigned char *)a - m_data) * 8 / NO0(bitwidth), baseindex, state, callback))
+                return;
    
-        // Search aligned area with SSE
-        if (b > a) {
-    #if defined(USE_SSE42)
-            if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth)), callback))
-                return;
-    #elif defined(USE_SSE3)
-            if (!FindSSE<EQUAL, bitwidth, accumulate>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth))))
-                return;
-    #endif
-        }
+            // Search aligned area with SSE
+            if (b > a) {
+                if(sse42()) {
+                    if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth)), callback))
+                        return;
+                    }
+                    else if(sse3()) {
 
-        // Search remainder with CompareEquality()
-        if (!Compare<cond2, action, bitwidth, Callback>(value, ((unsigned char *)b - m_data) * 8 / NO0(bitwidth), end, baseindex, state, callback))
+                    if (!FindSSE<EQUAL, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth)), callback))
+                        return;
+                    }
+            }
+
+            // Search remainder with CompareEquality()
+            if (!Compare<cond2, action, bitwidth, Callback>(value, ((unsigned char *)b - m_data) * 8 / NO0(bitwidth), end, baseindex, state, callback))
+                return;
+
             return;
-
-        return;
-    #else
-        Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-        return;
-    #endif
     }
+}
+#else
+    Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+    return;
+#endif
 
     // popcount
     #if defined(_MSC_VER) && _MSC_VER >= 1500
@@ -1479,7 +1543,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
             return true;
     }
 
-#if defined(USE_SSE42) || defined(USE_SSE3)
+#ifdef TIGHTDB_COMPILER_SSE42
 
     // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
     template <class cond2, ACTION action, size_t width, class Callback> size_t Array::FindSSE(int64_t value, __m128i *data, size_t items, state_state *state, size_t baseindex, Callback callback) const
@@ -1516,15 +1580,10 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
                 if (width == 32)
                     compare = _mm_cmpeq_epi32(data[i], search);
                 if (width == 64) {
-    #ifdef USE_SSE42
-                    compare = _mm_cmpeq_epi64(data[i], search);
-    #else
-                TIGHTDB_ASSERT(false);
-                return int64_t(-1);
-    #endif
+                    compare = _mm_cmpeq_epi64(data[i], search); // SSE 4.2 only
                 }
             }
-    #ifdef USE_SSE42
+
             // greater
             else if (cond == COND_GREATER) {
                 if (width == 8)
@@ -1550,7 +1609,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
                     compare = _mm_andnot_si128(compare, _mm_set1_epi32(0xffffffff));
                 }
             }
-    #endif
+
             resmask = _mm_movemask_epi8(compare);
 
             if (cond == COND_NOTEQUAL)
@@ -1576,7 +1635,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
 
         return true;
     }
-    #endif //USE_SSE
+    #endif //TIGHTDB_COMPILER_SSE42
 
     // If gt = true: Find element(s) which are greater than value
     // If gt = false: Find element(s) which are smaller than value
