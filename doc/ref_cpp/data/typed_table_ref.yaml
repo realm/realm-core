@@ -85,12 +85,15 @@ CATEGORIES:
   METHODS:
   - g_typed_table_is_empty:
       NAMES    : is_empty
-      DESCR    : This method checks if the table is empty (contains no rows).
-      SUMMARY  : Is table empty?
+      DESCR    : &g_typed_table_is_empty_descr
+                 This method checks if the table is empty (contains no rows).
+      SUMMARY  : &g_typed_table_is_empty_summary
+                 Is table empty?
       CONST    : true
       RETURN:
         TYPES  : bool
-        DESCR  : <code>true</code> if table is empty, <code>false</code> otherwise.
+        DESCR  : &g_typed_table_true_false
+                 <code>true</code> if table is empty, <code>false</code> otherwise.
       EXAMPLES:                  
       - CODE   :  ex_cpp_type_table_is_empty
         DESCR  : 
@@ -244,7 +247,8 @@ CATEGORIES:
       SIGNATURE: |
                  RowAccesor add(value, ...)
       SUMMARY  : Add new row.
-      DESCR    : >
+      DESCR    : &g_typed_table_add_descr
+                 >
                  This method adds new row. The types of the parameters must match the
                  types of the columns.
       PARAMS:
@@ -330,3 +334,140 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_remove_last_row
         DESCR  :
       
+- Searching:
+  METHODS:
+  - g_typed_table_lookup:
+      NAMES    : lookup
+      SUMMARY  : &g_typed_table_lookup_summary
+                 Lookup a value.
+      DESCR    : &g_typed_table_lookup_descr
+                 This method will find the first row where the value of first column matches
+                 a given string value. Defining the first column as a string with unique values,
+                 it is possible to combine such a table with this method to emulate a hash
+                 array using TightDB.
+      CONST    : True
+      PARAMS:
+      - NAME   : value
+        TYPES  : const char*
+        DESCR  : The value to search for.
+      RETURN:
+        TYPES  : size_t
+        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
+      EXAMPLES:
+      - CODE   : ex_cpp_typed_table_lookup
+        DESCR  :
+  - g_find_first_bool:
+  - g_find_first_int:
+  - g_find_first_date:
+  - g_find_first_string:
+      NAMES    : find_first_*
+      SUMMARY  : &g_find_first_xxx_summary
+                 Find first matching row.
+      DESCR    : &g_find_first_xxx_descr
+                 The method finds the first occurence of a given value in a column.
+      SIGNATURE: |
+                 size_t find_first_int(int64_t value) const;
+                 size_t find_first_bool(bool value) const;
+                 size_t find_first_date(time_t value) const;
+                 size_t find_first_string(const char* value) const;
+      CONST    : True
+      PARAMS:
+      - NAME   : value
+        TYPES  : [bool, int64_t, time_t, const char*]
+        DESCR  : The value.
+      RETURN:
+        TYPES  : size_t
+        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
+      EXAMPLES:
+      - CODE   : ex_cpp_typed_table_find_first_xxx
+        DESCR  :
+  - g_find_all_bool:
+  - g_find_all_int:
+  - g_find_all_date:
+  - g_find_all_string:
+  - g_find_all_bool_const:
+  - g_find_all_int_const:
+  - g_find_all_date_const:
+  - g_find_all_string_const:
+      NAMES    : find_all_*
+      SUMMARY  : &g_find_all_xxx_summary
+                 Find all matching rows.
+      DESCR    : &g_find_all_xxx_descr
+                 The method finds all occurences of a given value in a specific column. 
+                 The rows are returned as a {@link class_typed_tableview} object.
+      SIGNATURE: |
+                 TableView      find_all_int(int64_t value);
+                 TableView      find_all_bool(bool value);
+                 TableView      find_all_date(time_t value);
+                 TableView      find_all_string(const char* value);
+                 
+                 ConstTableView find_all_int(int64_t value) const;
+                 ConstTableView find_all_bool(bool value) const;
+                 ConstTableView find_all_date(time_t value) const;
+                 ConstTableView find_all_string(const char* value) const;
+      PARAMS:
+      - NAME   : value
+        TYPES  : [bool, int64_t, time_t, const char*]
+        DESCR  : The value.
+      RETURN:
+        TYPES  : TableView
+        DESCR  : The view.
+      EXAMPLES:
+      - CODE   : ex_cpp_typed_table_find_all_xxx
+        DESCR  :
+  - g_typed_table_get_sorted_view:
+  - g_typed_table_get_sorted_view_const:
+      NAMES    : get_sorted_view
+      SUMMARY  : &g_typed_table_get_sorted_view_summary
+                 Sort the table.
+      DESCR    : &g_typed_table_get_sorted_view_desc
+                 This method will sort the rows by using values of a given column.
+                 The rows are returned as a {@link class_typed_tableview} object.
+      SIGNATURE: |
+                 TableView      get_sorted_view(bool ascending=true);
+                 ConstTableView get_sorted_view(bool ascending=true) const;
+      PARAMS:
+      - NAME   : ascending
+        TYPES  : bool
+        DESCR  : &cpp_typed_table_get_sorted_view_param
+                 "If <code>true</code>, rows are sorted ascending. Default: <code>true</code>."
+      RETURN:
+        TYPES  : TableView
+        DESCR  : A view.
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_get_sorted_view
+        DESCR  :
+  - g_typed_table_distinct:
+  - g_typed_table_distinct_const:
+      NAMES    : distinct
+      SUMMARY  : &g_typed_table_distinct_summary
+                 Get distinct rows.
+      DESCR    : &g_typed_table_distinct_desc
+                 >
+                 This method will return a view with distinct rows for a given column
+                 (first matching row for each unique value in column).
+                 The rows are returned as a {@link class_typed_tableview} object.
+      SIGNATURE: |
+                 TableView      distinct();
+                 ConstTableView distinct() const;
+      RETURN:
+        TYPES  : TableView
+        DESCR  : A view.
+      EXAMPLES:                  
+      - CODE   : ex_cpp_typed_table_distinct
+        DESCR  :
+  - g_typed_table_where:
+  - g_typed_table_where_const:
+      NAMES    : [where, where]
+      SIGNATURE: |
+                 Query       where()                 
+                 const Query where() const
+      SUMMARY  : Query table.
+      DESCR    : This method initiates a query. See {@link class_typed_query}.
+      RETURN:
+        TYPES  : [Query, const Query]
+        DESCR  : The query object.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_typed_table_where
+        
