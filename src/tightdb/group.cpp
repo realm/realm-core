@@ -4,10 +4,21 @@
 
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
+#include <tightdb/utilities.hpp>
 
 using namespace std;
 
 namespace {
+
+class Initialization {
+public:
+    Initialization() 
+    {
+        tightdb::cpuid_init();
+    }
+};
+
+Initialization initialization;
 
 class MemoryOStream {
 public:

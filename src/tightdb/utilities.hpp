@@ -21,9 +21,23 @@
 #define TIGHTDB_UTILITIES_HPP
 
 #include <cstdlib>
+#include "assert.hpp"
 #ifdef _MSC_VER
     #include <win32/types.h>
     #include <win32/stdint.h>
+    #include <intrin.h>
+#endif
+
+#if defined(__GNUC__)
+	#define TIGHTDB_INLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+	#define TIGHTDB_INLINE __forceinline
+#elif defined(__HP_aCC)
+	#define TIGHTDB_INLINE inline __attribute__((always_inline))
+#elif defined(__xlC__ )
+	#define TIGHTDB_INLINE inline 
+#else
+	#error TEXT("Compiler version not detectable")
 #endif
 
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
@@ -35,13 +49,21 @@
 #endif
 
 #if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86X64) 
-    #define TIGHTDB_COMPILER_SSE42  // Compiler supports SSE 4.2 intrinsics
+    #define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 thorugh __builtin_ accessors or back-end assembler 
 #endif
 
 namespace tightdb {
 
-bool sse42();
-bool sse3();
+extern char sse_support; // 1 = sse42, 0 = sse3, -2 = cpu does not support sse
+
+template <int version>TIGHTDB_INLINE bool cpuid_sse()
+{
+    TIGHTDB_STATIC_ASSERT(version == 30 || version == 42, "Only SSE 3 and 42 supported for detection");
+    if(version == 30)
+        return (sse_support >= 0);
+    else if(version == 42)
+        return (sse_support > 0);   // faster than == 1 (0 requres no immediate operand)
+}
 
 typedef struct {
     unsigned long long remainder;
@@ -53,7 +75,7 @@ typedef struct {
 
 size_t to_ref(int64_t v);
 size_t to_size_t(int64_t v);
-
+void cpuid_init();
 unsigned long long checksum(unsigned char* data, size_t len);
 void checksum_rolling(unsigned char* data, size_t len, checksum_t* t);
 void* round_up(void* p, size_t align);

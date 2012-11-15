@@ -878,8 +878,8 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
     int64_t m = Get<w>(start);
     ++start;
 
-#ifdef TIGHTDB_COMPILER_SSE42
-    if(sse42()) {
+#ifdef TIGHTDB_COMPILER_SSE
+    if(cpuid_sse<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
             if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
@@ -1011,8 +1011,8 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
         start += sizeof(int64_t) * 8 / NO0(w) * chunks;
     }
 
-#ifdef TIGHTDB_COMPILER_SSE42
-    if(sse42()) {
+#ifdef TIGHTDB_COMPILER_SSE
+    if(cpuid_sse<42>()) {
 
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds: 
         // Naive, templated Get<>: 391 371 374
