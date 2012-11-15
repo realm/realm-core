@@ -157,9 +157,9 @@ CATEGORIES :
   - g_dyn_table_get_column_count:
       NAMES    : get_column_count
       SUMMARY  : &g_dyn_table_get_column_count_summary
-                 This method retrieves the number of columns.
+                 Get the number of columns.                 
       DESCR    : &g_dyn_table_get_column_count_descr
-                 Get the number of columns.
+                 This method retrieves the number of columns.                 
       CONST    : True             
       RETURN:                 
         TYPES  : size_t
@@ -511,10 +511,8 @@ CATEGORIES :
   - g_find_first_date:
   - g_find_first_string:
       NAMES    : find_first_*
-      SUMMARY  : &g_find_first_xxx_summary
-                 Find first matching row.
-      DESCR    : &g_find_first_xxx_descr
-                 The method finds the first occurence of a given value in a column.
+      SUMMARY  : Find first matching row.
+      DESCR    : The method finds the first occurence of a given value in a column.
       SIGNATURE: |
                  size_t find_first_int(size_t column_ndx, int64_t value) const;
                  size_t find_first_bool(size_t column_ndx, bool value) const;
@@ -543,9 +541,8 @@ CATEGORIES :
   - g_find_all_date_const:
   - g_find_all_string_const:
       NAMES    : find_all_*
-      SUMMARY  : &g_find_all_xxx_summary
-                 Find all matching rows.
-      DESCR    : &g_find_all_xxx_descr
+      SUMMARY  : *g_find_all_xxx_summary
+      DESCR    : >
                  The method finds all occurences of a given value in a specific column. 
                  The rows are returned as a {@link class_dyn_tableview} object.
       SIGNATURE: |
@@ -619,6 +616,20 @@ CATEGORIES :
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_distinct
         DESCR  :
+  - g_dyn_table_where:
+  - g_dyn_table_where_const:
+      NAMES    : [where, where]
+      SIGNATURE: |
+                 Query       where()                 
+                 const Query where() const
+      SUMMARY  : Query table.
+      DESCR    : This method initiates a query. See {@link class_dyn_query}.
+      RETURN:
+        TYPES  : [Query, const Query]
+        DESCR  : The query object.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_dyn_table_where
 - Aggregates:
   METHODS:
   - g_dyn_table_count:

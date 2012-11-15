@@ -400,7 +400,7 @@ CATEGORIES :
   - g_dyn_query_find_all:
       NAMES    : find_all
       DESCR    : &g_dyn_query_find_all_descr
-                 Execute a query. See the {@link class_dyn_tableview} class for further details. 
+                 This method executes the query. See the {@link class_dyn_tableview} class for further details. 
       SUMMARY  : &g_dyn_query_find_all_summary
                  Execute query.
       SIGNATURE: |
