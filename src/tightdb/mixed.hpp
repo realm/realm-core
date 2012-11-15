@@ -40,6 +40,7 @@ namespace tightdb {
 
 class Mixed {
 public:
+    Mixed()     {m_type = COLUMN_TYPE_INT;    m_int  = 0;}
     Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
     Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
     Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.get_date();}
