@@ -63,7 +63,7 @@ TEST(TestQueryStrIndexed_enum)
 
     ttt.column().second.set_index();
 
-    size_t s = ttt.where().second.equal("a").first.sum();
+    int64_t s = ttt.where().second.equal("a").first.sum();
     CHECK_EQUAL(10*11, s);
 
     s = ttt.where().second.equal("a").first.equal(10).first.sum();
@@ -92,7 +92,7 @@ TEST(TestQueryStrIndexed_non_enum)
 
     ttt.column().second.set_index();
 
-    size_t s = ttt.where().second.equal("a").first.sum();
+    int64_t s = ttt.where().second.equal("a").first.sum();
     CHECK_EQUAL(10*11, s);
 
     s = ttt.where().second.equal("a").first.equal(10).first.sum();

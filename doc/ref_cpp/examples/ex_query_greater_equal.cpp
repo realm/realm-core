@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_greaterThanOrEqual @@
+// @@Example: ex_cpp_typed_query_greaterThanOrEqual @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -17,7 +17,7 @@ int main()
     table.add("Jill", 37);
 
     // Find rows where age >= 40
-    PeopleTable::View view1 = table.where().age.greater_equal(40).find_all(table);
+    PeopleTable::View view1 = table.where().age.greater_equal(40).find_all();
 // @@Fold@@
     assert(view1.size() == 2);
     assert(view1[0].name == "Joe");

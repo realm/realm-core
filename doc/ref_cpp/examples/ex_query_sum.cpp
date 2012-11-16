@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_sum @@
+// @@Example: ex_cpp_typed_query_sum @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -19,7 +19,7 @@ int main()
 // @@EndFold@@
     // Calculate sum of weight where age >= 13 && age <= 19
     PeopleTable::Query query = table.where().age.between(13, 19);
-    int64_t weight = query.weight.sum(table);
+    int64_t weight = query.weight.sum();
 // @@Fold@@
     // Expected result
     assert(weight == 75);

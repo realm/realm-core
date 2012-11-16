@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_intro @@
+// @@Example: ex_cpp_typed_query_intro @@
 #include <tightdb.hpp>
 
 TIGHTDB_TABLE_2(PeopleTable,
@@ -15,7 +15,7 @@ void main()
 
     // Find rows where age >= 13 && age <= 19
     PeopleTable::Query query = table.where().age.between(13, 19);
-    PeopleTable::View view = query.find_all(table);
+    PeopleTable::View view = query.find_all();
 
     // Expected result
     assert(view.size() == 2);

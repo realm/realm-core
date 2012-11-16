@@ -17,11 +17,6 @@ endif
 CFLAGS_PTHREAD += -pthread
 CFLAGS_GENERAL += -Wextra -ansi -pedantic -Wno-long-long
 
-
-ifeq ($(TIGHTDB_DISABLE_SSE),)
-PROJECT_CFLAGS = -msse4.2 -DUSE_SSE42
-endif
-
 ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
 PROJECT_CFLAGS += -DTIGHTDB_ENABLE_REPLICATION
 endif

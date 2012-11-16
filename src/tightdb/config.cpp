@@ -88,16 +88,6 @@ int main(int argc, char* argv[])
 
 
     if (emit_cflags) {
-#if defined USE_SSE3 || defined USE_SSE42
-        emit_flags("-msse4.2");
-#endif
-#ifdef USE_SSE3
-        emit_flags("-DUSE_SSE3");
-#endif
-#ifdef USE_SSE42
-        emit_flags("-DUSE_SSE42");
-#endif
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
         emit_flags("-DTIGHTDB_ENABLE_REPLICATION");
 #endif

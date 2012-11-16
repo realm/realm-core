@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_or @@
+// @@Example: ex_cpp_typed_query_or @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -17,7 +17,7 @@ int main()
 // @@EndFold@@
     // Find rows where age == 14 || age == 17
     PeopleTable::Query query = table.where().age.equal(14).Or().age.equal(17);
-    PeopleTable::View view = query.find_all(table);
+    PeopleTable::View view = query.find_all();
 // @@Fold@@
 
     // Expected result

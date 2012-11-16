@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_max @@
+// @@Example: ex_cpp_typed_query_max @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -20,7 +20,7 @@ void main()
     // Calculate sum of weight where age >= 13 && age <= 19
     PeopleTable::Query query = table.where().age.between(13, 19);
     size_t matchcount;
-    int64_t weight = query.weight.maximum(table, &matchcount);
+    int64_t weight = query.weight.maximum(&matchcount);
 // @@Fold@@
     // Verify that matchcount > 0 for the return value to make sense
     assert(matchcount == 2);

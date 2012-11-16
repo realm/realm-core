@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_count @@
+// @@Example: ex_cpp_typed_query_count @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -22,19 +22,19 @@ int main()
     PeopleTable::Query query = table.where().age.less(18);
 
     // Count all matching rows of entire table
-    size_t count1 = query.count(table);
+    size_t count1 = query.count();
 // @@Fold@@
     assert(count1 == 3);
 // @@EndFold@@
 
     // Very fast way to test if there are at least 2 matches in the table
-    size_t count2 = query.count(table, 0, size_t(-1), 2);                
+    size_t count2 = query.count(0, size_t(-1), 2);                
 // @@Fold@@
     assert(count2 == 2);
 // @@EndFold@@
 
     // Count matches in latest 3 rows                             
-    size_t count3 = query.count(table, table.size() - 3, table.size());  
+    size_t count3 = query.count(table.size() - 3, table.size());  
 // @@Fold@@
     assert(count3 == 1);
 }
