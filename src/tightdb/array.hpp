@@ -47,14 +47,14 @@ Searching: The main finding function is:
 #include <cstring> // memmove
 #include <vector>
 #include <ostream>
+#include <assert.h>
 
 #include <tightdb/assert.hpp>
 #include <tightdb/error.hpp>
 #include <tightdb/alloc.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/query_conditions.hpp>
-#include <assert.h>
-#include "meta.hpp"
+#include <tightdb/meta.hpp>
 
 /*
     MMX: mmintrin.h
@@ -69,7 +69,7 @@ Searching: The main finding function is:
 
 #ifdef TIGHTDB_COMPILER_SSE
     #include <emmintrin.h> // SSE2
-    #include "tightdb_nmmintrin.h" // SSE42
+    #include <tightdb/tightdb_nmmintrin.h> // SSE42
 #endif
 
 #ifdef TIGHTDB_DEBUG
