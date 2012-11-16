@@ -4,7 +4,7 @@
 #include <tightdb/utilities.hpp>
 #include <tightdb/tightdb_nmmintrin.h>
 #if defined(_MSC_VER) && defined(_DEBUG)
-    #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
+//    #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
 using namespace std;
