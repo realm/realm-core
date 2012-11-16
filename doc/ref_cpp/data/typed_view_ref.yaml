@@ -80,7 +80,7 @@ CATEGORIES :
       PARAMS:                 
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index in the view
+        DESCR  : The row index in the view.
       RETURN:                 
         TYPES  : size_t
         DESCR  : The row index in the table.

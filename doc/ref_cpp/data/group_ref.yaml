@@ -37,7 +37,8 @@ CATEGORIES:
   - g_group_constructor_file:
   - g_group_constructor_memory:
       NAMES    : Group
-      DESCR    : >
+      DESCR    : &g_group_constructor_descr
+                 >
                  Group objects can be created in various ways depending on use pattern.
 
                  You can either just create a new (empty) group, or load an
