@@ -19,7 +19,7 @@ CFLAGS_GENERAL += -Wextra -ansi -pedantic -Wno-long-long
 
 
 ifeq ($(TIGHTDB_DISABLE_SSE),)
-PROJECT_CFLAGS = -msse2 -DUSE_SSE42
+PROJECT_CFLAGS = -msse2
 endif
 
 ifneq ($(TIGHTDB_ENABLE_REPLICATION),)

@@ -67,11 +67,6 @@ Searching: The main finding function is:
     SSE4.2: nmmintrin.h
 */
 
-#include <emmintrin.h>
-
-
-
-
 #ifdef TIGHTDB_COMPILER_SSE
     #include <emmintrin.h> // SSE2
     #include "tightdb_nmmintrin.h" // SSE42
@@ -986,6 +981,7 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
 #if defined(TIGHTDB_COMPILER_SSE)
         if ((cpuid_sse<42>() &&                                  (end - start >= sizeof(__m128i) && m_width >= 8))
         ||  (cpuid_sse<30>() && (SameType<cond2, EQUAL>::value && end - start >= sizeof(__m128i) && m_width >= 8 && m_width < 64))) {
+
             // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
             __m128i* const a = (__m128i *)round_up(m_data + start * bitwidth / 8, sizeof(__m128i));
             __m128i* const b = (__m128i *)round_down(m_data + end * bitwidth / 8, sizeof(__m128i));
@@ -1016,12 +1012,11 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
             Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
             return;
         }
-
-    }
 #else
     Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     return;
 #endif
+    }
 
     // popcount
     #if defined(_MSC_VER) && _MSC_VER >= 1500
@@ -1485,7 +1480,6 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
     }
 
 #ifdef TIGHTDB_COMPILER_SSE
-
     // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
     template <class cond2, ACTION action, size_t width, class Callback> size_t Array::FindSSE(int64_t value, __m128i *data, size_t items, state_state *state, size_t baseindex, Callback callback) const
     {

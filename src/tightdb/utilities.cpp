@@ -9,7 +9,10 @@
 #include <iostream>
 #include <tightdb/assert.hpp>
 #include <tightdb/utilities.hpp>
-#include <intrin.h>
+
+#ifdef _MSC_VER
+    #include <intrin.h>
+#endif
 
 namespace tightdb {
 
@@ -17,6 +20,7 @@ char sse_support = -1;
 
 void cpuid_init()
 {
+#ifdef TIGHTDB_COMPILER_SSE
     int cret;
 #ifdef _MSC_VER
     int CPUInfo[4];
@@ -40,7 +44,7 @@ void cpuid_init()
         sse_support = 0;
     else
         sse_support = -2;
-//    std::cout << "sse_supprt set to " << (int)sse_support << "\n";
+#endif
 }
 
 size_t to_ref(int64_t v)

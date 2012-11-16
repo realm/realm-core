@@ -29,13 +29,13 @@
 #endif
 
 #if defined(__GNUC__)
-	#define TIGHTDB_INLINE inline __attribute__((always_inline))
+	#define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
 #elif defined(_MSC_VER)
-	#define TIGHTDB_INLINE __forceinline
+	#define TIGHTDB_FORCEINLINE __forceinline
 #elif defined(__HP_aCC)
-	#define TIGHTDB_INLINE inline __attribute__((always_inline))
+	#define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
 #elif defined(__xlC__ )
-	#define TIGHTDB_INLINE inline 
+	#define TIGHTDB_FORCEINLINE inline 
 #else
 	#error TEXT("Compiler version not detectable")
 #endif
@@ -54,15 +54,34 @@
 
 namespace tightdb {
 
-extern char sse_support; // 1 = sse42, 0 = sse3, -2 = cpu does not support sse
+extern char sse_support;
 
-template <int version>TIGHTDB_INLINE bool cpuid_sse()
+template <int version>TIGHTDB_FORCEINLINE bool cpuid_sse()
 {
+/*
+    Return wether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
+    is based on the CPUID instruction.
+
+    sse_support = -1: No SSE support
+    sse_support = 0: SSE3 
+    sse_support = 1: SSE42 
+
+    This lets us test very rapidly at runtime because we just need 1 compare instruction (with 0) to test both for
+    3 and 4.2 by caller (compiler optimizes if calls are concecutive), and can decide branch with ja/jl/je because 
+    sse_support is signed type. Also, 0 requires no immediate operand
+
+    We runtime-initialize sse_support in a constructor of a static variable which is not guaranteed to be called
+    prior to cpu_sse(). So we compile-time initialize sse_support to -2 as fallback.
+*/
     TIGHTDB_STATIC_ASSERT(version == 30 || version == 42, "Only SSE 3 and 42 supported for detection");
+#ifdef TIGHTDB_COMPILER_SSE
     if(version == 30)
         return (sse_support >= 0);
     else if(version == 42)
         return (sse_support > 0);   // faster than == 1 (0 requres no immediate operand)
+#else
+    return false;
+#endif
 }
 
 typedef struct {
