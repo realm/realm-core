@@ -81,9 +81,9 @@ Query& Query::equal(size_t column_ndx, int64_t value)
     return *this;
 }
 
-Query& Query::equal_binary(size_t column_ndx, const char* ptr, size_t len)
+Query& Query::equal(size_t column_ndx, BinaryData b)
 {
-    ParentNode* const p = new BINARYNODE<EQUAL>(ptr, len, column_ndx);
+    ParentNode* const p = new BINARYNODE<EQUAL>(b.pointer, b.len, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }

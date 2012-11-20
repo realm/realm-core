@@ -33,6 +33,7 @@
 #endif
 
 #include <tightdb/table_ref.hpp>
+#include <tightdb/binary_data.hpp>
 
 namespace tightdb {
 
