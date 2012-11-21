@@ -228,11 +228,11 @@ void Query::end_subtable()
     subtables.pop_back();
 }
 
-void Query::end_group()
+Query& Query::end_group()
 {
     if (first.size() < 2) {
         error_code = "Unbalanced blockBegin/blockEnd";
-        return;
+        return *this;
     }
 
     if (update[update.size()-2] != 0)
@@ -249,6 +249,7 @@ void Query::end_group()
     first.pop_back();
     update.pop_back();
     update_override.pop_back();
+    return *this;
 }
 
 size_t Query::find_next(size_t lastmatch)

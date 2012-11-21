@@ -17,11 +17,31 @@ CATEGORIES:
 - Constructor:
   METHODS:
   - g_shared_group_constructor:
-      NAMES    : Group
+      NAMES    : SharedGroup
       SUMMARY  : &g_shared_group_constructor_summary
                  Create a shared group.
       DESCR    : &g_shared_group_constructor_descr
-                 Groups can be shared across running applications.
+                 >
+                 Database files can be shared across running applications.
+
+                 When two threads or processes want to access the same
+                 database file, they must each create their own
+                 instance of SharedGroup.
+
+                 If the database file does not already exist, it will
+                 be created. When multiple threads are involved, it is
+                 safe to let the first thread, that gets to it, create
+                 the file.
+
+                 While at least one instance of SharedGroup exists for
+                 a specific database file, a lock file will exist
+                 too. The lock file will be placed in the same
+                 directory as the database file, and its name is
+                 derived by adding the suffix '.lock' to the name of
+                 the database file.
+
+                 Processes that share a database file must reside on
+                 the same host.
       SIGNATURE: >
                  SharedGroup(const char* path_to_database_file);
                  struct replication_tag {};

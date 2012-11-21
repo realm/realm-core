@@ -31,7 +31,7 @@
 namespace tightdb {
 
 
-// FIXME: Rename 'ERROR_NONE' to 'error_None', and so fourth. This is
+// FIXME: Rename 'ERROR_NONE' to 'error_None', and so forth. This is
 // to avoid collision with macros. The namespace of all-upper-case
 // names must be considered reserved for macros.
 enum error_code {

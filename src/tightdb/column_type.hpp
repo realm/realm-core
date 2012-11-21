@@ -36,7 +36,7 @@ namespace tightdb {
 // FIXME: The namespace of all-upper-case names must be considered
 // reserved for macros. Consider renaming 'COLUMN_TYPE_INT' to
 // 'type_Int', COLUMN_TYPE_STRING_ENUM to 'type_StringEnum', and so
-// fourth. In C-mode this becomes 'tightdb_type_Int'. That is, a
+// forth. In C-mode this becomes 'tightdb_type_Int'. That is, a
 // qualifying prefix followed by the enumeration name in
 // CamelCase. This is a reasonably common naming scheme for enumration
 // values. Note that I am also suggesting that we drop 'column' from

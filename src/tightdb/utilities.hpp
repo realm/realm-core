@@ -54,6 +54,7 @@
 
 namespace tightdb {
 
+// FIXME: Type should probably be 'signed char', since 'char' is unsigned on some systems.
 extern char sse_support;
 
 template <int version>TIGHTDB_FORCEINLINE bool cpuid_sse()
