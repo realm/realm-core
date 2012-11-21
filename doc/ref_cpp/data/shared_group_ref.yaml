@@ -53,6 +53,23 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_is_valid
         DESCR  :
+  - g_shared_group_has_changed:
+      NAMES    : has_changed
+      SUMMARY  : &g_shared_group_has_changed_summary
+                 Has shared group been changed since last transaction?
+      DESCR    : &g_shared_group_has_changed_descr
+                 >
+                 This method tests if the shared group has been modified (by another process),
+                 since the last transaction.
+                 
+                 It has very little overhead and does not affect other processes, so it is
+                 ok to call it at regular intervals (like in the idle handler of an application).
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if it has changed, <code>false</code> otherwise.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_has_changed
+        DESCR  :
 - Transactions:
   METHODS:
   - g_shared_group_begin_write:
