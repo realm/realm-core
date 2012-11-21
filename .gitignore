@@ -1,4 +1,5 @@
 *.tightdb
+*.tightdb.lock
 
 *.ncb
 *.suo
