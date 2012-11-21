@@ -20,8 +20,8 @@ int main()
     PeopleTable::View view1 = table.where().age.greater(37).find_all();
 // @@Fold@@
     assert(view1.size() == 2);
-    assert(view1[0].name == "Joe");
-    assert(view1[1].name == "Jack");
+    assert(!strcmp(view1[0].name, "Joe"));
+    assert(!strcmp(view1[1].name, "Jack"));
 }
 // @@EndExample@@
 // @@EndFold@@

@@ -18,7 +18,7 @@ int main()
     PeopleTable::View view1 = table.where().name.contains("ac").find_all();
 // @@Fold@@
     assert(view1.size() == 1);
-    assert(view1[0].name == "Jack");
+    assert(!strcmp(view1[0].name, "Jack"));
 // @@EndFold@@
 
     // Will find none because it's case sensitive
@@ -33,7 +33,7 @@ int main()
 // @@Fold@@
 
     assert(view3.size() == 1);
-    assert(view3[0].name == "Jack");
+    assert(!strcmp(view3[0].name, "Jack"));
 #endif
 }
 // @@EndFold@@

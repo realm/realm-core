@@ -15,15 +15,15 @@ int main()
     table.add("Jill");
     table.add("oe");
 
-    // Find names beginning with "Jo"
+    // Find names ending with "oe", case sensitive
     PeopleTable::View view1 = table.where().name.ends_with("oe").find_all();
 // @@Fold@@
     assert(view1.size() == 2);
-    assert(view1[0].name == "Joe");
-    assert(view1[1].name == "oe");
+    assert(!strcmp(view1[0].name, "Joe"));
+    assert(!strcmp(view1[1].name, "oe"));
 // @@EndFold@@
 
-    // Will find none because it's case sensitive
+    // Will find none because search is case sensitive
     PeopleTable::View view2 = table.where().name.ends_with("OE").find_all();
 // @@Fold@@
     assert(view2.size() == 0);
@@ -34,8 +34,8 @@ int main()
     PeopleTable::View view3 = table.where().name.ends_with("oE", false).find_all();
 // @@Fold@@
     assert(view3.size() == 2);
-    assert(view3[0].name == "Joe");
-    assert(view3[1].name == "oe");
+    assert(!strcmp(view3[0].name, "Joe"));
+    assert(!strcmp(view3[1].name, "oe"));
 #endif
 }
 // @@EndExample@@

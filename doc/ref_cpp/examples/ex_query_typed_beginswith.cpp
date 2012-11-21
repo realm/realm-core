@@ -30,8 +30,8 @@ int main()
     PeopleTable::View view3 = table.where().name.begins_with("JO", false).find_all();
 // @@Fold@@
     assert(view3.size() == 2);
-    assert(view3[0].name == "Joe");
-    assert(view3[1].name == "Jo");
+    assert(!strcmp(view3[0].name, "Joe"));
+    assert(!strcmp(view3[1].name, "Jo"));
 // @@EndFold@@
 #endif
 // @@Fold@@
