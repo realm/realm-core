@@ -581,10 +581,9 @@ public:
         return get_subtable();
     }
 
-    /// This function assumes that if the current value is a subtable,
-    /// then it is a subtable of the specified type. If this is not
-    /// the case, anything can happend when you call this function,
-    /// including memory corruption.
+    /// This function makes the following assumption: If the current
+    /// value is a subtable, then it is a subtable of the specified
+    /// type. If this is not the case, your computer may catch fire.
     ///
     /// To safely and efficiently check whether the current value is a
     /// subtable of any of a set of specific table types, you may do
