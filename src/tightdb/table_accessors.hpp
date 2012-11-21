@@ -377,6 +377,26 @@ public:
         return *this;
     }
 
+    friend bool operator==(const FieldAccessor& a, const BinaryData& b)
+    {
+        return BinaryData(a).compare_payload(b);
+    }
+
+    friend bool operator!=(const FieldAccessor& a, const BinaryData& b)
+    {
+        return !BinaryData(a).compare_payload(b);
+    }
+
+    friend bool operator==(const BinaryData& a, const FieldAccessor& b)
+    {
+        return a.compare_payload(BinaryData(b));
+    }
+
+    friend bool operator!=(const BinaryData& a, const FieldAccessor& b)
+    {
+        return !a.compare_payload(BinaryData(b));
+    }
+
     const char* get_pointer() const { return BinaryData(*this).pointer; }
     std::size_t get_len() const { return BinaryData(*this).len; }
 };
