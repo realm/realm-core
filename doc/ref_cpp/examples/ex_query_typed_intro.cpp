@@ -19,7 +19,7 @@ void main()
 
     // Expected result
     assert(view.size() == 2);
-    assert(view1[0].name == "Mary");
-    assert(view1[1].name == "Joe");
+    assert(!strcmp(view1[0].name, "Mary"));
+    assert(!strcmp(view1[1].name, "Joe"));
 }
 // @@EndExample@@

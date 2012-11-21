@@ -21,8 +21,8 @@ int main()
 // @@Fold@@
 
     assert(view1.size() == 2);
-    assert(view1[0].name == "Mary");
-    assert(view1[1].name == "Jill");
+    assert(!strcmp(view1[0].name, "Mary"));
+    assert(!strcmp(view1[1].name, "Jill"));
 }
 // @@EndFold@@
 // @@EndExample@@

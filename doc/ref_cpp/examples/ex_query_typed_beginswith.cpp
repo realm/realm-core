@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_typed_query_endsWith @@
+// @@Example: ex_cpp_typed_query_startsWith @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -7,36 +7,34 @@ TIGHTDB_TABLE_1(PeopleTable,
 
 int main()
 {
-    PeopleTable table;
 // @@EndFold@@
+    PeopleTable table;
     table.add("Mary");
     table.add("Joe");
     table.add("Jack");
     table.add("Jill");
-    table.add("oe");
+    table.add("Jo");
 
     // Find names beginning with "Jo"
-    PeopleTable::View view1 = table.where().name.ends_with("oe").find_all();
-// @@Fold@@
+    PeopleTable::View view1 = table.where().name.begins_with("Jo").find_all();
     assert(view1.size() == 2);
     assert(view1[0].name == "Joe");
-    assert(view1[1].name == "oe");
-// @@EndFold@@
+    assert(view1[1].name == "Jo");
 
     // Will find none because it's case sensitive
-    PeopleTable::View view2 = table.where().name.ends_with("OE").find_all();
-// @@Fold@@
+    PeopleTable::View view2 = table.where().name.begins_with("JO").find_all();
     assert(view2.size() == 0);
-// @@EndFold@@
 
 #ifdef _MSC_VER
     // Case insensitive search only supported on Windows
-    PeopleTable::View view3 = table.where().name.ends_with("oE", false).find_all();
+    PeopleTable::View view3 = table.where().name.begins_with("JO", false).find_all();
 // @@Fold@@
     assert(view3.size() == 2);
-    assert(view3[0].name == "Joe");
-    assert(view3[1].name == "oe");
-#endif
-}
-// @@EndExample@@
+    assert(!strcmp(view3[0].name, "Joe"));
+    assert(!strcmp(view3[1].name, "Jo"));
 // @@EndFold@@
+#endif
+// @@Fold@@
+}
+// @@EndFold@@
+// @@EndExample@@

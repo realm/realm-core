@@ -22,7 +22,7 @@ int main()
 
     view.remove(1);
 
-    assert(view[1].name == "Jack");
+    assert(!strcmp(view[1].name, "Jack"));
     assert(table.size() == 3);
 // @@Fold@@
 }
