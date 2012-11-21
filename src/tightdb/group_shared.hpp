@@ -34,6 +34,14 @@ struct SharedInfo;
 
 class SharedGroup {
 public:
+    /// When two threads or processes want to access the same database
+    /// file, they must each create their own instance of SharedGroup.
+    ///
+    /// FIXME: Documentation must answer this question: When two
+    /// threads or processes want to access the same database file,
+    /// must the database file be created before the two threads
+    /// create their SharedGroup instances, or is it safe to let
+    /// whatever thread gets to it first, create the file?
     SharedGroup(const char* path_to_database_file);
     ~SharedGroup();
 
