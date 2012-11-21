@@ -191,13 +191,14 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
     return *this;
 }
 
-void Query::group()
+Query& Query::group()
 {
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
+    return *this;
 }
-void Query::Or()
+Query& Query::Or()
 {
     ParentNode* const o = new OR_NODE(first[first.size()-1]);
     all_nodes.push_back(o);
@@ -205,6 +206,7 @@ void Query::Or()
     first[first.size()-1] = o;
     update[update.size()-1] = &((OR_NODE*)o)->m_cond[1];
     update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
+    return *this;
 }
 
 void Query::subtable(size_t column)

@@ -89,10 +89,9 @@ public:
 */
 
     // Conditions: binary data
-    // FIXME: We want case insensitivity here also, becaue these will be used for strings that are not zero-terminated such as regular C++ strings.
-    // FIXME: The '_binary' suffix is needed to avoid ambiguity when third argument is neither bool nor size_t.
+    // Only BinaryData prototype can exist, else it would conflict with equal() for strings 
 
-    Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
+    Query& equal(size_t column_ndx, BinaryData b);
 /*
     Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& begins_with_binary(size_t column_ndx, const char* ptr, size_t len);
@@ -101,11 +100,11 @@ public:
 */
 
     // Grouping
-    void group();
-    void end_group();
+    Query& group();
+    Query& end_group();
     void subtable(size_t column);
     void end_subtable();
-    void Or();
+    Query& Or();
 
     // Searching
     size_t         find_next(size_t lastmatch=-1);
