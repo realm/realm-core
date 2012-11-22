@@ -212,6 +212,7 @@ SharedGroup::~SharedGroup()
 bool SharedGroup::has_changed() const
 {
     // Have we changed since last transaction?
+    TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
     const bool is_changed = (m_version != m_info->current_version);
     return is_changed;
 }
