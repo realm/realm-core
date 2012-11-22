@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <vector>
 #include <sstream>
 #include <fstream>
@@ -421,6 +422,7 @@ private:
 TEST(Replication)
 {
     const char* database_path = "transactions.tightdb";
+    remove(database_path);
 
     // Run N rounds in each thread
     {
