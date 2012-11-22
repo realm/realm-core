@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_ARRAY_BINARY_HPP
 #define TIGHTDB_ARRAY_BINARY_HPP
 
-#include "array_blob.hpp"
+#include <tightdb/array_blob.hpp>
 
 namespace tightdb {
 
@@ -45,9 +45,9 @@ public:
     void Resize(size_t ndx);
     void Clear();
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 private:
     Array m_offsets;

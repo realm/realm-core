@@ -2,7 +2,7 @@
 #include <limits>
 #include <algorithm>
 
-#include <tightdb/overflow.hpp>
+#include <tightdb/safe_int_ops.hpp>
 #include <tightdb/string_buffer.hpp>
 
 using namespace std;
@@ -16,7 +16,7 @@ char StringBuffer::m_zero = 0;
 error_code StringBuffer::append(const char* data, size_t size)
 {
     size_t new_size = m_size;
-    if (add_with_overflow_detect(new_size, size)) {
+    if (int_add_with_overflow_detect(new_size, size)) {
         return ERROR_NO_RESOURCE;
     }
     error_code err = reserve(new_size);
@@ -32,11 +32,11 @@ error_code StringBuffer::reallocate(std::size_t capacity)
 {
     size_t min_allocated = capacity;
     // Make space of zero termination
-    if (add_with_overflow_detect(min_allocated, size_t(1))) {
+    if (int_add_with_overflow_detect(min_allocated, 1)) {
         return ERROR_NO_RESOURCE;
     }
     size_t new_allocated = m_allocated;
-    if (multiply_with_overflow_detect(new_allocated, size_t(2)))
+    if (int_multiply_with_overflow_detect(new_allocated, 2))
         new_allocated = numeric_limits<size_t>::max();
     if (new_allocated < min_allocated) new_allocated = min_allocated;
     char* new_data = new (nothrow) char[new_allocated];

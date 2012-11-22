@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <assert.h>
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
 #include "../Support/mem.hpp"
@@ -64,7 +63,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.cols().fourth.find_first(Tue);
+            const size_t res = table.column().fourth.find_first(Tue);
             if (res != size_t(-1)) {
                 printf("error");
             }
@@ -80,7 +79,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.cols().third.find_first(50);
+            const size_t res = table.column().third.find_first(50);
             if (res != size_t(-1)) {
                 printf("error");
             }
@@ -96,7 +95,7 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
-            const size_t res = table.cols().second.find_first("abcde");
+            const size_t res = table.column().second.find_first("abcde");
             if (res != 250000) {
                 printf("error");
             }
@@ -110,7 +109,7 @@ int main()
     {
         timer.Start();
 
-        table.cols().first.set_index();
+        table.column().first.set_index();
 
         const int search_time = timer.GetTimeInMs();
         printf("Add index: %dms\n", search_time);
@@ -124,7 +123,7 @@ int main()
 
         for (size_t i = 0; i < 100000; ++i) {
             const size_t n = rand() % 1000;
-            const size_t res = table.cols().first.find_first(n);
+            const size_t res = table.column().first.find_first(n);
             if (res == 2500002) { // to avoid above find being optimized away
                 printf("error");
             }

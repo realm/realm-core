@@ -1,3 +1,5 @@
+#if 0
+
 #include <UnitTest++.h>
 #include <tightdb/index.hpp>
 
@@ -251,3 +253,4 @@ TEST(Index_Set)
     col.Destroy();
     ndx.Destroy();
 }
+#endif

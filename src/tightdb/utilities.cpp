@@ -1,7 +1,4 @@
-
-#include "utilities.hpp"
 #include <string>
-#include <assert.h>
 #include <cstdlib> // size_t
 #ifndef _MSC_VER
 #include <stdint.h>
@@ -9,16 +6,37 @@
 #include <win32/stdint.h>
 #endif
 
+#include <tightdb/assert.hpp>
+#include <tightdb/utilities.hpp>
+
 namespace tightdb {
 
-size_t TO_REF(int64_t v)
+size_t to_ref(int64_t v)
 {
-#if !defined(NDEBUG) && defined(_DEBUG)
-    uint64_t m = (size_t)(-1);
-    assert((uint64_t)v <= m);
+#ifdef TIGHTDB_DEBUG
+    uint64_t m = size_t(-1);
+    TIGHTDB_ASSERT(uint64_t(v) <= m);
+    // FIXME: This misbehaves for negative v when size_t is 64-bits.
+    // FIXME: This misbehaves on architectures that do not use 2's complement represenation of negative numbers.
+    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
+    // FIXME: Must also check that v is divisible by 8 (64-bit aligned).
 #endif
-    return (size_t)v;
+    return size_t(v);
 }
+
+// Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
+size_t to_size_t(int64_t v)
+{
+#ifdef TIGHTDB_DEBUG
+    uint64_t m = size_t(-1);
+    TIGHTDB_ASSERT(uint64_t(v) <= m);
+    // FIXME: This misbehaves for negative v when size_t is 64-bits.
+    // FIXME: This misbehaves on architectures that do not use 2's complement represenation of negative numbers.
+    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
+#endif
+    return size_t(v);
+}
+
 
 void* round_up(void* p, size_t align)
 {
@@ -64,7 +82,7 @@ unsigned long long checksum(unsigned char* data, size_t len)
 
 void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
 {
-    while(t->remainder_len < 8 && len > 0)
+    while (t->remainder_len < 8 && len > 0)
     {
         t->remainder = t->remainder >> 8;
         t->remainder = t->remainder | (unsigned long long)*data << (7*8);
@@ -73,7 +91,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
         len--;
     }
 
-    if(t->remainder_len < 8)
+    if (t->remainder_len < 8)
     {
         t->result = t->a_val + t->b_val;
         return;
@@ -84,13 +102,13 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     t->remainder_len = 0;
     t->remainder = 0;
 
-    while(len >= 8)
+    while (len >= 8)
     {
-#ifdef X86X64
+#ifdef TIGHTDB_X86X64
         t->a_val += (*(unsigned long long *)data) * t->b_val;
 #else
         unsigned long long l = 0;
-        for(unsigned int i = 0; i < 8; i++)
+        for (unsigned int i = 0; i < 8; i++)
         {
             l = l >> 8;
             l = l | (unsigned long long)*(data + i) << (7*8);
@@ -102,7 +120,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
         data += 8;
     }
 
-    while(len > 0)
+    while (len > 0)
     {
         t->remainder = t->remainder >> 8;
         t->remainder = t->remainder | (unsigned long long)*data << (7*8);

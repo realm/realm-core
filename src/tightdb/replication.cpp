@@ -1,7 +1,8 @@
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-#include <cassert>
 #include <utility>
+#include <ostream>
+#include <iomanip>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -9,7 +10,7 @@
 #include <sys/mman.h>
 
 #include <tightdb/terminate.hpp>
-#include <tightdb/overflow.hpp>
+#include <tightdb/safe_int_ops.hpp>
 #include <tightdb/string_buffer.hpp>
 #include <tightdb/pthread_helpers.hpp>
 #include <tightdb/table.hpp>
@@ -25,7 +26,7 @@ namespace {
 // Note: The sum of this value and sizeof(SharedState) must not
 // exceed the maximum values of any of the types 'size_t',
 // 'ptrdiff_t', or 'off_t'.
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 const size_t initial_transact_log_buffer_size = 128;
 #else
 const size_t initial_transact_log_buffer_size = 16*1024;
@@ -40,7 +41,7 @@ struct CloseGuard {
     {
         if (0 <= m_fd) {
             int r = close(m_fd);
-            assert(r == 0);
+            TIGHTDB_ASSERT(r == 0);
             static_cast<void>(r);
         }
     }
@@ -72,7 +73,7 @@ struct FileLockGuard {
     {
         if (0 <= m_fd) {
             int r = flock(m_fd, LOCK_UN);
-            assert(r == 0);
+            TIGHTDB_ASSERT(r == 0);
             static_cast<void>(r);
         }
     }
@@ -88,7 +89,7 @@ struct UnmapGuard {
     {
         if (m_addr) {
             int r = munmap(m_addr, m_size);
-            assert(r == 0);
+            TIGHTDB_ASSERT(r == 0);
             static_cast<void>(r);
         }
     }
@@ -106,11 +107,11 @@ error_code expand_file(int fd, off_t size)
     int res = ftruncate(fd, size);
     if (res<0) {
         switch (errno) {
-        case EFBIG:
-        case EINVAL: return ERROR_NO_RESOURCE;
-        case EIO:    return ERROR_IO;
-        case EROFS:  return ERROR_PERMISSION;
-        default:     return ERROR_OTHER;
+            case EFBIG:
+            case EINVAL: return ERROR_NO_RESOURCE;
+            case EIO:    return ERROR_IO;
+            case EROFS:  return ERROR_PERMISSION;
+            default:     return ERROR_OTHER;
         }
     }
     return ERROR_NONE;
@@ -122,12 +123,12 @@ error_code map_file(int fd, off_t size, void** addr)
     void* const a = mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if (a == MAP_FAILED) {
         switch (errno) {
-        case EAGAIN:
-        case EMFILE: return ERROR_NO_RESOURCE;
-        case ENOMEM: return ERROR_OUT_OF_MEMORY;
-        case ENODEV:
-        case ENXIO:  return ERROR_BAD_FILESYS_PATH;
-        default:     return ERROR_OTHER;
+            case EAGAIN:
+            case EMFILE: return ERROR_NO_RESOURCE;
+            case ENOMEM: return ERROR_OUT_OF_MEMORY;
+            case ENODEV:
+            case ENXIO:  return ERROR_BAD_FILESYS_PATH;
+            default:     return ERROR_OTHER;
         }
     }
     *addr = a;
@@ -147,7 +148,18 @@ struct Replication::SharedState {
     int m_want_write_transact;
     bool m_write_transact_available, m_write_transact_finished;
     Condition m_cond_want_write_transact, m_cond_write_transact_available,
-        m_cond_write_transact_finished, m_cond_transact_log_free;
+        m_cond_write_transact_finished, m_cond_transact_log_free, m_cond_persisted_db_version;
+
+    /// Valid when m_write_transact_available is true, and is the
+    /// version that the database will have after completion of the
+    /// 'write' transaction that is made available.
+    db_version_type m_write_transact_db_version;
+
+    /// The version of the database that has been made
+    /// persistent. After a commit, a client must wait for this
+    /// version to reach the value of m_write_transact_db_version as
+    /// it was at the time the transaction was initiated.
+    db_version_type m_persisted_db_version;
 
     /// Size of the file. Invariant: 'm_size <= s' where 's' is the
     /// actual size of the file. This obviously assumes that the file
@@ -183,6 +195,7 @@ struct Replication::SharedState {
         m_want_write_transact = 0;
         m_write_transact_available = false;
         m_write_transact_finished  = false;
+        m_persisted_db_version = 0;
         m_size = file_size;
         m_transact_log_used_begin = sizeof(SharedState);
         m_transact_log_used_end = m_transact_log_used_begin;
@@ -200,6 +213,10 @@ struct Replication::SharedState {
         ConditionDestroyGuard cdg3(m_cond_write_transact_finished);
         err = m_cond_transact_log_free.init_shared();
         if (err) return err;
+        ConditionDestroyGuard cdg4(m_cond_transact_log_free);
+        err = m_cond_persisted_db_version.init_shared();
+        if (err) return err;
+        cdg4.release();
         cdg3.release();
         cdg2.release();
         cdg1.release();
@@ -213,6 +230,7 @@ struct Replication::SharedState {
         m_cond_write_transact_available.destroy();
         m_cond_write_transact_finished.destroy();
         m_cond_transact_log_free.destroy();
+        m_cond_persisted_db_version.destroy();
         m_mutex.destroy();
     }
 };
@@ -302,14 +320,14 @@ Replication::~Replication()
             if (--m_shared_state->m_use_count == 0) {
                 m_shared_state->destroy();
                 int r = ftruncate(m_fd, 0);
-                assert(r == 0);
+                TIGHTDB_ASSERT(r == 0);
                 static_cast<void>(r); // Deliberately ignoring errors here
             }
         }
         int r = munmap(m_shared_state, m_shared_state_mapped_size);
-        assert(r == 0);
+        TIGHTDB_ASSERT(r == 0);
         r = close(m_fd);
-        assert(r == 0);
+        TIGHTDB_ASSERT(r == 0);
         static_cast<void>(r);
     }
 }
@@ -323,10 +341,11 @@ void Replication::interrupt()
     m_shared_state->m_cond_write_transact_available.notify_all();
     m_shared_state->m_cond_write_transact_finished.notify_all();
     m_shared_state->m_cond_transact_log_free.notify_all();
+    m_shared_state->m_cond_persisted_db_version.notify_all();
 }
 
 
-error_code Replication::acquire_write_access()
+error_code Replication::begin_write_transact()
 {
     size_t file_size, transact_log_used_begin, transact_log_used_end;
     {
@@ -334,28 +353,27 @@ error_code Replication::acquire_write_access()
         ++m_shared_state->m_want_write_transact;
         m_shared_state->m_cond_want_write_transact.notify_all();
         while (!m_shared_state->m_write_transact_available) {
-            if (!m_interrupt) {
-                m_shared_state->m_cond_write_transact_available.wait(lg);
-            }
             if (m_interrupt) {
                 // FIXME: Retracting the request for a write transaction may create problems fo the local coordinator
                 --m_shared_state->m_want_write_transact;
                 return ERROR_INTERRUPTED;
             }
+            m_shared_state->m_cond_write_transact_available.wait(lg);
         }
         m_shared_state->m_write_transact_available = false;
         --m_shared_state->m_want_write_transact;
         file_size = m_shared_state->m_size;
         transact_log_used_begin = m_shared_state->m_transact_log_used_begin;
         transact_log_used_end   = m_shared_state->m_transact_log_used_end;
+        m_write_transact_db_version = m_shared_state->m_write_transact_db_version;
     }
     // At this point we know that the file size cannot change because
     // this cleint is the only one who may change it.
-    assert(m_shared_state_mapped_size <= file_size);
+    TIGHTDB_ASSERT(m_shared_state_mapped_size <= file_size);
     if (m_shared_state_mapped_size < file_size) {
         error_code err = remap_file(file_size);
         if (err) {
-            release_write_access(true); // Rollback
+            rollback_write_transact();
             return err;
         }
     }
@@ -376,14 +394,29 @@ error_code Replication::acquire_write_access()
 }
 
 
-void Replication::release_write_access(bool rollback)
+bool Replication::commit_write_transact()
 {
     LockGuard lg(m_shared_state->m_mutex);
     m_shared_state->m_transact_log_new_begin = m_shared_state->m_transact_log_used_end;
-    if (!rollback) {
-        m_shared_state->m_transact_log_used_end =
-            m_transact_log_free_begin - static_cast<char*>(static_cast<void*>(m_shared_state));
+    m_shared_state->m_transact_log_used_end =
+        m_transact_log_free_begin - static_cast<char*>(static_cast<void*>(m_shared_state));
+    m_shared_state->m_write_transact_finished = true;
+    m_shared_state->m_cond_write_transact_finished.notify_all();
+
+    // Wait for the transaction log to be made persistent
+    while (m_shared_state->m_persisted_db_version < m_write_transact_db_version) {
+        if (m_interrupt) return false;
+        m_shared_state->m_cond_persisted_db_version.wait(lg);
     }
+
+    return true;
+}
+
+
+void Replication::rollback_write_transact()
+{
+    LockGuard lg(m_shared_state->m_mutex);
+    m_shared_state->m_transact_log_new_begin = m_shared_state->m_transact_log_used_end;
     m_shared_state->m_write_transact_finished = true;
     m_shared_state->m_cond_write_transact_finished.notify_all();
 }
@@ -400,46 +433,44 @@ bool Replication::wait_for_write_request()
 {
     LockGuard lg(m_shared_state->m_mutex);
     while (m_shared_state->m_want_write_transact == 0) {
-        if (!m_interrupt) {
-            m_shared_state->m_cond_want_write_transact.wait(lg);
-        }
         if (m_interrupt) return false;
+        m_shared_state->m_cond_want_write_transact.wait(lg);
     }
     return true;
 }
 
 
 // FIXME: Consider what should happen if nobody remains interested in this write transaction
-bool Replication::grant_write_access_and_wait_for_completion(TransactLog& l)
+bool Replication::grant_write_access_and_wait_for_completion(TransactLog& transact_log)
 {
     LockGuard lg(m_shared_state->m_mutex);
+    m_shared_state->m_write_transact_db_version = transact_log.m_db_version;
     m_shared_state->m_write_transact_available = true;
     m_shared_state->m_cond_write_transact_available.notify_all();
     while (!m_shared_state->m_write_transact_finished) {
-        if (!m_interrupt) {
-            m_shared_state->m_cond_write_transact_finished.wait(lg);
-        }
         if (m_interrupt) return false;
+        m_shared_state->m_cond_write_transact_finished.wait(lg);
     }
     m_shared_state->m_write_transact_finished = false;
-    l.offset1 = m_shared_state->m_transact_log_new_begin;
+    transact_log.m_offset1 = m_shared_state->m_transact_log_new_begin;
     if (m_shared_state->m_transact_log_used_end < m_shared_state->m_transact_log_new_begin) {
-        l.size1   = m_shared_state->m_transact_log_used_wrap - l.offset1;
-        l.offset2 = sizeof(SharedState);
-        l.size2   = m_shared_state->m_transact_log_used_end - sizeof(SharedState);
+        transact_log.m_size1   = m_shared_state->m_transact_log_used_wrap - transact_log.m_offset1;
+        transact_log.m_offset2 = sizeof(SharedState);
+        transact_log.m_size2   = m_shared_state->m_transact_log_used_end - sizeof(SharedState);
     }
     else {
-        l.size1   = m_shared_state->m_transact_log_used_end - l.offset1;
-        l.offset2 = l.size2 = 0;
+        transact_log.m_size1   = m_shared_state->m_transact_log_used_end - transact_log.m_offset1;
+        transact_log.m_offset2 = transact_log.m_size2 = 0;
     }
     return true;
 }
 
 
-error_code Replication::map(const TransactLog& l, const char** addr1, const char** addr2)
+error_code Replication::map_transact_log(const TransactLog& transact_log,
+                                         const char** addr1, const char** addr2)
 {
-    if (m_shared_state_mapped_size < l.offset1+l.size1 ||
-        m_shared_state_mapped_size < l.offset2+l.size2) {
+    if (m_shared_state_mapped_size < transact_log.m_offset1+transact_log.m_size1 ||
+        m_shared_state_mapped_size < transact_log.m_offset2+transact_log.m_size2) {
         size_t file_size;
         {
             LockGuard lg(m_shared_state->m_mutex);
@@ -448,9 +479,17 @@ error_code Replication::map(const TransactLog& l, const char** addr1, const char
         error_code err = remap_file(file_size);
         if (err) return err;
     }
-    *addr1 = static_cast<char*>(static_cast<void*>(m_shared_state)) + l.offset1;
-    *addr2 = static_cast<char*>(static_cast<void*>(m_shared_state)) + l.offset2;
+    *addr1 = static_cast<char*>(static_cast<void*>(m_shared_state)) + transact_log.m_offset1;
+    *addr2 = static_cast<char*>(static_cast<void*>(m_shared_state)) + transact_log.m_offset2;
     return ERROR_NONE;
+}
+
+
+void Replication::update_persisted_db_version(db_version_type version)
+{
+    LockGuard lg(m_shared_state->m_mutex);
+    m_shared_state->m_persisted_db_version = version;
+    m_shared_state->m_cond_persisted_db_version.notify_all();
 }
 
 
@@ -525,10 +564,8 @@ error_code Replication::transact_log_reserve_contig(size_t n)
             // we will simply wait.
             if (m_shared_state->m_transact_log_used_begin ==
                 m_shared_state->m_transact_log_used_end) break;
-            if (!m_interrupt) {
-                m_shared_state->m_cond_transact_log_free.wait(lg);
-            }
             if (m_interrupt) return ERROR_INTERRUPTED;
+            m_shared_state->m_cond_transact_log_free.wait(lg);
         }
     }
     // At this point we know that we have to expand the file. We also
@@ -586,10 +623,8 @@ error_code Replication::transact_log_append_overflow(const char* data, std::size
                 break;
             }
 
-            if (!m_interrupt) {
-                m_shared_state->m_cond_transact_log_free.wait(lg);
-            }
             if (m_interrupt) return ERROR_INTERRUPTED;
+            m_shared_state->m_cond_transact_log_free.wait(lg);
         }
     }
     if (need_expand) {
@@ -642,16 +677,16 @@ error_code Replication::transact_log_expand(size_t free, bool contig)
         if (used_lower < used_upper) {
             // Move lower section
             min_size = used_wrap;
-            if (add_with_overflow_detect(min_size, used_lower)) return ERROR_NO_RESOURCE;
+            if (int_add_with_overflow_detect(min_size, used_lower)) return ERROR_NO_RESOURCE;
             const size_t avail_lower = used_begin - buffer_begin;
             if (avail_lower <= free) { // Require one unused byte
-                if (add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
+                if (int_add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
             }
         }
         else {
             // Move upper section
             min_size = used_end + 1 + used_upper; // Require one unused byte
-            if (add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
+            if (int_add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
         }
     }
     else {
@@ -663,11 +698,11 @@ error_code Replication::transact_log_expand(size_t free, bool contig)
             // Require one unused byte
             min_size = buffer_begin + (used_end-used_begin) + 1;
         }
-        if (add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
+        if (int_add_with_overflow_detect(min_size, free)) return ERROR_NO_RESOURCE;
     }
 
     size_t new_size = m_shared_state->m_size;
-    if (multiply_with_overflow_detect(new_size, size_t(2))) {
+    if (int_multiply_with_overflow_detect(new_size, 2)) {
         new_size = numeric_limits<size_t>::max();
     }
     if (new_size < min_size) new_size = min_size;
@@ -742,7 +777,7 @@ error_code Replication::remap_file(size_t size)
     if (err) return err;
 
     int r = munmap(m_shared_state, m_shared_state_mapped_size);
-    assert(r == 0);
+    TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);
 
     m_shared_state = static_cast<SharedState*>(addr);
@@ -760,15 +795,15 @@ error_code Replication::select_table(const Table* table)
         end = table->record_subtable_path(begin, begin+m_subtab_path_buf.m_size);
         if (end) break;
         size_t new_size = m_subtab_path_buf.m_size;
-        if (multiply_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
+        if (int_multiply_with_overflow_detect(new_size, 2)) return ERROR_NO_RESOURCE;
         if (!m_subtab_path_buf.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
     }
     char* buf;
-    const int max_elems_per_chunk = 8;
+    const int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
     error_code err = transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int);
     if (err) return err;
     *buf++ = 'T';
-    assert(1 <= end - begin);
+    TIGHTDB_ASSERT(1 <= end - begin);
     const ptrdiff_t level = (end - begin) / 2;
     buf = encode_int(buf, level);
     for (;;) {
@@ -800,17 +835,17 @@ error_code Replication::select_spec(const Table* table, const Spec* spec)
         end = table->record_subspec_path(spec, begin, begin+m_subtab_path_buf.m_size);
         if (end) break;
         size_t new_size = m_subtab_path_buf.m_size;
-        if (multiply_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
+        if (int_multiply_with_overflow_detect(new_size, 2)) return ERROR_NO_RESOURCE;
         if (!m_subtab_path_buf.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
     }
     char* buf;
-    const int max_elems_per_chunk = 8;
+    const int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
     err = transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int);
     if (err) return err;
     *buf++ = 'S';
-    assert(1 <= end - begin);
-    const ptrdiff_t level = end - begin - 1;
+    const ptrdiff_t level = end - begin;
     buf = encode_int(buf, level);
+    if (begin == end) goto good;
     for (;;) {
         for (int i=0; i<max_elems_per_chunk; ++i) {
             buf = encode_int(buf, *--end);
@@ -830,7 +865,8 @@ good:
 
 struct Replication::TransactLogApplier {
     TransactLogApplier(InputStream& transact_log, Group& group):
-        m_input(transact_log), m_group(group), m_input_buffer(0), m_num_subspecs(0) {}
+        m_input(transact_log), m_group(group), m_input_buffer(0),
+        m_num_subspecs(0), m_dirty_spec(false) {}
 
     ~TransactLogApplier()
     {
@@ -838,18 +874,27 @@ struct Replication::TransactLogApplier {
         delete_subspecs();
     }
 
+#ifdef TIGHTDB_DEBUG
+    void set_apply_log(ostream* log) { m_log = log; if (m_log) *m_log << boolalpha; }
+#endif
+
     error_code apply();
 
 private:
     InputStream& m_input;
     Group& m_group;
-    static const size_t m_input_buffer_size = 4096;
+    static const size_t m_input_buffer_size = 4096; // FIXME: Use smaller number when compiling in debug mode
     char* m_input_buffer;
     const char* m_input_begin;
     const char* m_input_end;
     TableRef m_table;
     Buffer<Spec*> m_subspecs;
     size_t m_num_subspecs;
+    bool m_dirty_spec;
+    StringBuffer m_string_buffer;
+#ifdef TIGHTDB_DEBUG
+    ostream* m_log;
+#endif
 
     // Returns false on end-of-input
     bool fill_input_buffer()
@@ -876,11 +921,23 @@ private:
 
     error_code add_subspec(Spec*);
 
+    template<bool insert> error_code set_or_insert(int column_ndx, size_t ndx);
+
     void delete_subspecs()
     {
         const size_t n = m_num_subspecs;
         for (size_t i=0; i<n; ++i) delete m_subspecs[i];
         m_num_subspecs = 0;
+    }
+
+    void finalize_spec() // FIXME: May fail
+    {
+        TIGHTDB_ASSERT(m_table);
+        m_table->update_from_spec();
+#ifdef TIGHTDB_DEBUG
+        if (m_log) *m_log << "table->update_from_spec()\n";
+#endif
+        m_dirty_spec = false;
     }
 
     bool is_valid_column_type(int type)
@@ -903,21 +960,28 @@ private:
 template<class T> bool Replication::TransactLogApplier::read_int(T& v)
 {
     T value = 0;
-    char c;
-    for (;;) {
+    int part;
+    const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
+    for (int i=0; i<max_bytes; ++i) {
+        char c;
         if (!read_char(c)) return false;
-        if ((static_cast<unsigned char>(c) & 0x80) == 0) break;
-        if (shift_left_with_overflow_detect(value, 7)) return false;
-        value |= static_cast<unsigned char>(c) & 0x7F;
+        part = static_cast<unsigned char>(c);
+        if (0xFF < part) return false; // Only the first 8 bits may be used in each byte
+        if ((part & 0x80) == 0) {
+            T p = part & 0x3F;
+            if (int_shift_left_with_overflow_detect(p, i*7)) return false;
+            value |= p;
+            break;
+        }
+        if (i == max_bytes-1) return false; // Two many bytes
+        value |= T(part & 0x7F) << (i*7);
     }
-    if (shift_left_with_overflow_detect(value, 6)) return false;
-    value |= static_cast<unsigned char>(c) & 0x3F;
-    if (static_cast<unsigned char>(c) & 0x40) {
+    if (part & 0x40) {
         // The real value is negative. Because 'value' is positive at
         // this point, the following negation is guaranteed by the
         // standard to never overflow.
         value = -value;
-        if (subtract_with_overflow_detect(value, T(1))) return false;
+        if (int_subtract_with_overflow_detect(value, 1)) return false;
     }
     v = value;
     return true;
@@ -937,8 +1001,9 @@ error_code Replication::TransactLogApplier::read_string(StringBuffer& buf)
         if (size <= avail) break;
         const char* to = m_input_begin + avail;
         copy(m_input_begin, to, str_end);
-        str_end += avail;
         if (!fill_input_buffer()) return ERROR_IO;
+        str_end += avail;
+        size -= avail;
     }
     const char* to = m_input_begin + size;
     copy(m_input_begin, to, str_end);
@@ -956,7 +1021,7 @@ error_code Replication::TransactLogApplier::add_subspec(Spec* spec)
             new_size = 16; // FIXME: Use a small value (1) when compiling in debug mode
         }
         else {
-            if (multiply_with_overflow_detect(new_size, size_t(2))) return ERROR_NO_RESOURCE;
+            if (int_multiply_with_overflow_detect(new_size, 2)) return ERROR_NO_RESOURCE;
         }
         if (!new_subspecs.set_size(new_size)) return ERROR_OUT_OF_MEMORY;
         copy(m_subspecs.m_data, m_subspecs.m_data+m_num_subspecs, new_subspecs.m_data);
@@ -964,6 +1029,192 @@ error_code Replication::TransactLogApplier::add_subspec(Spec* spec)
         swap(m_subspecs, new_subspecs);
     }
     m_subspecs[m_num_subspecs++] = spec;
+    return ERROR_NONE;
+}
+
+
+template<bool insert>
+error_code Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
+{
+    switch (m_table->get_column_type(column_ndx)) {
+    case COLUMN_TYPE_INT:
+        {
+            int64_t value;
+            if (!read_int(value)) return ERROR_IO;
+            if (insert) m_table->insert_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else m_table->set_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert) *m_log << "table->insert_int("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                else *m_log << "table->set_int("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+            }
+#endif
+        }
+        break;
+    case COLUMN_TYPE_BOOL:
+        {
+            bool value;
+            if (!read_int(value)) return ERROR_IO;
+            if (insert) m_table->insert_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else m_table->set_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert) *m_log << "table->insert_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                else *m_log << "table->set_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+            }
+#endif
+        }
+        break;
+    case COLUMN_TYPE_DATE:
+        {
+            time_t value;
+            if (!read_int(value)) return ERROR_IO;
+            if (insert) m_table->insert_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else m_table->set_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert) *m_log << "table->insert_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                else *m_log << "table->set_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+            }
+#endif
+        }
+        break;
+    case COLUMN_TYPE_STRING:
+        {
+            const error_code err = read_string(m_string_buffer);
+            if (err) return err;
+            const char* const value = m_string_buffer.c_str();
+            if (insert) m_table->insert_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else m_table->set_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert) *m_log << "table->insert_string("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
+                else *m_log << "table->set_string("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
+            }
+#endif
+        }
+        break;
+    case COLUMN_TYPE_BINARY:
+        {
+            const error_code err = read_string(m_string_buffer);
+            if (err) return err;
+            if (insert) m_table->insert_binary(column_ndx, ndx, m_string_buffer.data(),
+                                               m_string_buffer.size()); // FIXME: Memory allocation failure!!!
+            else m_table->set_binary(column_ndx, ndx, m_string_buffer.data(),
+                                     m_string_buffer.size()); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert) *m_log << "table->insert_binary("<<column_ndx<<", "<<ndx<<", ...)\n";
+                else *m_log << "table->set_binary("<<column_ndx<<", "<<ndx<<", ...)\n";
+            }
+#endif
+        }
+        break;
+    case COLUMN_TYPE_TABLE:
+        if (insert) m_table->insert_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
+        else m_table->clear_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+        if (m_log) {
+            if (insert) *m_log << "table->insert_subtable("<<column_ndx<<", "<<ndx<<")\n";
+            else *m_log << "table->clear_subtable("<<column_ndx<<", "<<ndx<<")\n";
+        }
+#endif
+        break;
+    case COLUMN_TYPE_MIXED:
+        {
+            int type;
+            if (!read_int(type)) return ERROR_IO;
+            switch (type) {
+            case COLUMN_TYPE_INT:
+                {
+                    int64_t value;
+                    if (!read_int(value)) return ERROR_IO;
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                    }
+#endif
+                }
+                break;
+            case COLUMN_TYPE_BOOL:
+                {
+                    bool value;
+                    if (!read_int(value)) return ERROR_IO;
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                    }
+#endif
+                }
+                break;
+            case COLUMN_TYPE_DATE:
+                {
+                    time_t value;
+                    if (!read_int(value)) return ERROR_IO;
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", Date("<<value<<"))\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Date("<<value<<"))\n";
+                    }
+#endif
+                }
+                break;
+            case COLUMN_TYPE_STRING:
+                {
+                    const error_code err = read_string(m_string_buffer);
+                    if (err) return err;
+                    const char* const value = m_string_buffer.c_str();
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
+                    }
+#endif
+                }
+                break;
+            case COLUMN_TYPE_BINARY:
+                {
+                    const error_code err = read_string(m_string_buffer);
+                    if (err) return err;
+                    const BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", BinaryData(...))\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", BinaryData(...))\n";
+                    }
+#endif
+                }
+                break;
+            case COLUMN_TYPE_TABLE:
+                if (insert) m_table->insert_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
+                else m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+                if (m_log) {
+                    if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
+                    else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
+                }
+#endif
+                break;
+            default:
+                return ERROR_IO;
+            }
+        }
+        break;
+    default:
+        return ERROR_IO;
+    }
     return ERROR_NONE;
 }
 
@@ -976,17 +1227,18 @@ error_code Replication::TransactLogApplier::apply()
     }
     m_input_begin = m_input_end = m_input_buffer;
 
-    // FIXME: Problem: modifying group, table, and spec methods generally throw.
-    StringBuffer string_buffer;
+    // FIXME: Problem: The modifying methods of group, table, and spec generally throw.
     Spec* spec = 0;
     for (;;) {
         char instr;
         if (!read_char(instr)) {
             break;
         }
+// cerr << "["<<instr<<"]";
         switch (instr) {
         case 's':  // Set value
             {
+                if (m_dirty_spec) finalize_spec();
                 int column_ndx;
                 if (!read_int(column_ndx)) return ERROR_IO;
                 size_t ndx;
@@ -995,100 +1247,142 @@ error_code Replication::TransactLogApplier::apply()
                 if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
                     return ERROR_IO;
                 if (m_table->size() <= ndx) return ERROR_IO;
-                switch (m_table->get_column_type(column_ndx)) {
-                case COLUMN_TYPE_INT:
-                    {
-                        int64_t value;
-                        if (!read_int(value)) return ERROR_IO;
-                        m_table->set_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    break;
-                case COLUMN_TYPE_BOOL:
-                    {
-                        bool value;
-                        if (!read_int(value)) return ERROR_IO;
-                        m_table->set_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    break;
-                case COLUMN_TYPE_DATE:
-                    {
-                        time_t value;
-                        if (!read_int(value)) return ERROR_IO;
-                        m_table->set_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    break;
-                case COLUMN_TYPE_STRING:
-                    {
-                        const error_code err = read_string(string_buffer);
-                        if (err) return err;
-                        const char* const value = string_buffer.c_str();
-                        m_table->set_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    break;
-                case COLUMN_TYPE_BINARY:
-                    {
-                        const error_code err = read_string(string_buffer);
-                        if (err) return err;
-                        m_table->set_binary(column_ndx, ndx, string_buffer.data(),
-                                            string_buffer.size()); // FIXME: Memory allocation failure!!!
-                    }
-                    break;
-                case COLUMN_TYPE_TABLE:
-                    m_table->clear_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
-                    break;
-                case COLUMN_TYPE_MIXED:
-                    {
-                        int type;
-                        if (!read_int(type)) return ERROR_IO;
-                        switch (type) {
-                        case COLUMN_TYPE_INT:
-                            {
-                                int64_t value;
-                                if (!read_int(value)) return ERROR_IO;
-                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                            }
-                            break;
-                        case COLUMN_TYPE_BOOL:
-                            {
-                                bool value;
-                                if (!read_int(value)) return ERROR_IO;
-                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                            }
-                            break;
-                        case COLUMN_TYPE_DATE:
-                            {
-                                time_t value;
-                                if (!read_int(value)) return ERROR_IO;
-                                m_table->set_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
-                            }
-                            break;
-                        case COLUMN_TYPE_STRING:
-                            {
-                                const error_code err = read_string(string_buffer);
-                                if (err) return err;
-                                const char* const value = string_buffer.c_str();
-                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                            }
-                            break;
-                        case COLUMN_TYPE_BINARY:
-                            {
-                                const error_code err = read_string(string_buffer);
-                                if (err) return err;
-                                const BinaryData value(string_buffer.data(), string_buffer.size());
-                                m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                            }
-                            break;
-                        case COLUMN_TYPE_TABLE:
-                            m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
-                            break;
-                        default:
-                            return ERROR_IO;
-                        }
-                    }
-                    break;
-                default:
+                const bool insert = false;
+                const error_code err = set_or_insert<insert>(column_ndx, ndx);
+                if (err) return err;
+            }
+            break;
+
+        case 'i':  // Insert value
+            {
+                if (m_dirty_spec) finalize_spec();
+                int column_ndx;
+                if (!read_int(column_ndx)) return ERROR_IO;
+                size_t ndx;
+                if (!read_int(ndx)) return ERROR_IO;
+                if (!m_table) return ERROR_IO;
+                if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
                     return ERROR_IO;
+                if (m_table->size() < ndx) return ERROR_IO;
+                const bool insert = true;
+                const error_code err = set_or_insert<insert>(column_ndx, ndx);
+                if (err) return err;
+            }
+            break;
+
+        case 'c':  // Row insert complete
+            if (m_dirty_spec) finalize_spec();
+            if (!m_table) return ERROR_IO;
+            m_table->insert_done(); // FIXME: May fail
+#ifdef TIGHTDB_DEBUG
+            if (m_log) *m_log << "table->insert_done()\n";
+#endif
+            break;
+
+        case 'I':  // Insert empty rows
+            {
+                if (m_dirty_spec) finalize_spec();
+                size_t ndx, num_rows;
+                if (!read_int(ndx) || !read_int(num_rows)) return ERROR_IO;
+                if (!m_table || m_table->size() < ndx) return ERROR_IO;
+                m_table->insert_empty_row(ndx, num_rows); // FIXME: May fail
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table->insert_empty_row("<<ndx<<", "<<num_rows<<")\n";
+#endif
+            }
+            break;
+
+        case 'R':  // Remove row
+            {
+                if (m_dirty_spec) finalize_spec();
+                size_t ndx;
+                if (!read_int(ndx)) return ERROR_IO;
+                if (!m_table || m_table->size() < ndx) return ERROR_IO;
+                m_table->remove(ndx); // FIXME: May fail
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table->remove("<<ndx<<")\n";
+#endif
+            }
+            break;
+
+        case 'a':  // Add int to column
+            {
+                if (m_dirty_spec) finalize_spec();
+                int column_ndx;
+                if (!read_int(column_ndx)) return ERROR_IO;
+                if (!m_table) return ERROR_IO;
+                if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                    return ERROR_IO;
+                int64_t value;
+                if (!read_int(value)) return ERROR_IO;
+                m_table->add_int(column_ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table->add_int("<<column_ndx<<", "<<value<<")\n";
+#endif
+            }
+            break;
+
+        case 'T':  // Select table
+            {
+                if (m_dirty_spec) finalize_spec();
+                int levels;
+                if (!read_int(levels)) return ERROR_IO;
+                size_t ndx;
+                if (!read_int(ndx)) return ERROR_IO;
+                if (m_group.get_table_count() <= ndx) return ERROR_IO;
+                m_table = m_group.get_table_ptr(ndx)->get_table_ref();
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table = group->get_table_by_ndx("<<ndx<<")\n";
+#endif
+                spec = 0;
+                for (int i=0; i<levels; ++i) {
+                    int column_ndx;
+                    if (!read_int(column_ndx)) return ERROR_IO;
+                    if (!read_int(ndx)) return ERROR_IO;
+                    if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                        return ERROR_IO;
+                    if (m_table->size() <= ndx) return ERROR_IO;
+                    switch (m_table->get_column_type(column_ndx)) {
+                    case COLUMN_TYPE_TABLE:
+                        m_table = m_table->get_subtable(column_ndx, ndx);
+                        break;
+                    case COLUMN_TYPE_MIXED:
+                        m_table = m_table->get_subtable(column_ndx, ndx);
+                        if (!m_table) return ERROR_IO;
+                        break;
+                    default:
+                        return ERROR_IO;
+                    }
+#ifdef TIGHTDB_DEBUG
+                    if (m_log) *m_log << "table = table->get_subtable("<<column_ndx<<", "<<ndx<<")\n";
+#endif
                 }
+            }
+            break;
+
+        case 'C':  // Clear table
+            {
+                if (m_dirty_spec) finalize_spec();
+                if (!m_table) return ERROR_IO;
+                m_table->clear(); // FIXME: Can probably fail!
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table->clear()\n";
+#endif
+            }
+            break;
+
+        case 'x':  // Add index to column
+            {
+                if (m_dirty_spec) finalize_spec();
+                int column_ndx;
+                if (!read_int(column_ndx)) return ERROR_IO;
+                if (!m_table) return ERROR_IO;
+                if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                    return ERROR_IO;
+                m_table->set_index(column_ndx); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table->set_index("<<column_ndx<<")\n";
+#endif
             }
             break;
 
@@ -1097,13 +1391,17 @@ error_code Replication::TransactLogApplier::apply()
                 int type;
                 if (!read_int(type)) return ERROR_IO;
                 if (!is_valid_column_type(type)) return ERROR_IO;
-                const error_code err = read_string(string_buffer);
+                const error_code err = read_string(m_string_buffer);
                 if (err) return err;
-                const char* const name = string_buffer.c_str();
+                const char* const name = m_string_buffer.c_str();
                 if (!spec) return ERROR_IO;
                 // FIXME: Is it legal to have multiple columns with the same name?
                 if (spec->get_column_index(name) != size_t(-1)) return ERROR_IO;
                 spec->add_column(ColumnType(type), name);
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "spec->add_column("<<type<<", \""<<name<<"\")\n";
+#endif
+                m_dirty_spec = true;
             }
             break;
 
@@ -1112,70 +1410,78 @@ error_code Replication::TransactLogApplier::apply()
                 delete_subspecs();
                 if (!m_table) return ERROR_IO;
                 spec = &m_table->get_spec();
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "spec = table->get_spec()\n";
+#endif
                 int levels;
                 if (!read_int(levels)) return ERROR_IO;
                 for (int i=0; i<levels; ++i) {
-                    int column_ndx;
-                    if (!read_int(column_ndx)) return ERROR_IO;
-                    if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
+                    int subspec_ndx;
+                    if (!read_int(subspec_ndx)) return ERROR_IO;
+                    if (subspec_ndx < 0 || int(spec->get_num_subspecs()) <= subspec_ndx)
                         return ERROR_IO;
-                    if (m_table->get_column_type(column_ndx) != COLUMN_TYPE_TABLE) return ERROR_IO;
-                    spec = new (nothrow) Spec(spec->get_subspec(column_ndx)); // FIXME: Can Spec::get_subspec() or Spec copy constructor fail/throw?
+                    spec = new (nothrow) Spec(spec->get_subspec_by_ndx(subspec_ndx));
                     if (!spec) return ERROR_OUT_OF_MEMORY;
                     const error_code err = add_subspec(spec);
                     if (err) {
                         delete spec;
                         return err;
                     }
-                }
-            }
-            break;
-
-        case 'T':  // Select table
-            {
-                int levels;
-                if (!read_int(levels)) return ERROR_IO;
-                size_t ndx;
-                if (!read_int(ndx)) return ERROR_IO;
-                if (m_group.get_table_count() <= ndx) return ERROR_IO;
-                m_table = m_group.get_table_ptr(ndx)->get_table_ref();
-                spec = 0;
-                for (int i=0; i<levels; ++i) {
-                    int column_ndx;
-                    if (!read_int(column_ndx)) return ERROR_IO;
-                    if (!read_int(ndx)) return ERROR_IO;
-                    if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
-                        return ERROR_IO;
-                    if (m_table->get_column_type(column_ndx) != COLUMN_TYPE_TABLE) return ERROR_IO;
-                    if (m_table->size() <= ndx) return ERROR_IO;
-                    m_table = m_table->get_subtable(column_ndx, ndx);
+#ifdef TIGHTDB_DEBUG
+                    if (m_log) *m_log << "spec = spec->get_subspec_by_ndx("<<subspec_ndx<<")\n";
+#endif
                 }
             }
             break;
 
         case 'N':  // New top level table
             {
-                const error_code err = read_string(string_buffer);
+                const error_code err = read_string(m_string_buffer);
                 if (err) return err;
-                const char* const name = string_buffer.c_str();
+                const char* const name = m_string_buffer.c_str();
                 if (m_group.has_table(name)) return ERROR_IO;
-                if (!m_group.create_new_table(name)) ERROR_OUT_OF_MEMORY;
+                if (!m_group.create_new_table(name)) return ERROR_OUT_OF_MEMORY;
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "group->create_new_table(\""<<name<<"\")\n";
+#endif
             }
+            break;
+
+        case 'Z':  // Optimize table
+            {
+                if (m_dirty_spec) finalize_spec();
+                if (!m_table) return ERROR_IO;
+                m_table->optimize(); // FIXME: May fail
+#ifdef TIGHTDB_DEBUG
+                if (m_log) *m_log << "table->optimize()\n";
+#endif
+            }
+            break;
 
         default:
             return ERROR_IO;
         }
     }
 
+    if (m_dirty_spec) finalize_spec(); // FIXME: Why is this necessary?
     return ERROR_NONE;
 }
 
 
+#ifdef TIGHTDB_DEBUG
+error_code Replication::apply_transact_log(InputStream& transact_log, Group& group, ostream* log)
+{
+    TransactLogApplier applier(transact_log, group);
+    applier.set_apply_log(log);
+    return applier.apply();
+}
+#else
 error_code Replication::apply_transact_log(InputStream& transact_log, Group& group)
 {
     TransactLogApplier applier(transact_log, group);
     return applier.apply();
 }
+#endif
 
 
 } // namespace tightdb

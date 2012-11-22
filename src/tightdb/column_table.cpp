@@ -1,4 +1,4 @@
-#include "column_table.hpp"
+#include <tightdb/column_table.hpp>
 
 using namespace std;
 
@@ -12,22 +12,20 @@ void ColumnSubtableParent::child_destroyed(size_t subtable_ndx)
     if (m_table && m_subtable_map.empty()) m_table->unbind_ref();
 }
 
+bool ColumnTable::has_subtable(size_t ndx) const
+{
+    TIGHTDB_ASSERT(ndx < Size());
 
-
-ColumnTable::ColumnTable(size_t ref_specSet, ArrayParent *parent, size_t pndx,
-                         Allocator &alloc, Table const *tab):
-    ColumnSubtableParent(parent, pndx, alloc, tab), m_ref_specSet(ref_specSet) {}
-
-ColumnTable::ColumnTable(size_t ref_column, size_t ref_specSet, ArrayParent *parent, size_t pndx,
-                         Allocator& alloc, Table const *tab):
-    ColumnSubtableParent(ref_column, parent, pndx, alloc, tab), m_ref_specSet(ref_specSet) {}
+    const size_t ref_columns = GetAsRef(ndx);
+    return (ref_columns != 0);
+}
 
 size_t ColumnTable::get_subtable_size(size_t ndx) const
 {
     // FIXME: If the table object is cached, it is possible to get the
     // size from it. Maybe it is faster in general to check for the
     // presence of the cached object and use it when available.
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);
     if (ref_columns == 0) return 0;
@@ -44,15 +42,27 @@ bool ColumnTable::add()
 
 void ColumnTable::Insert(size_t ndx)
 {
-    assert(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= Size());
 
     // zero-ref indicates empty table
     Column::Insert(ndx, 0);
 }
 
+void ColumnTable::fill(size_t count)
+{
+    TIGHTDB_ASSERT(is_empty());
+
+    // Fill column with default values
+    // TODO: this is a very naive approach
+    // we could speedup by creating full nodes directly
+    for (size_t i = 0; i < count; ++i) {
+        TreeInsert<int64_t, Column>(i, 0); // zero-ref indicates empty table
+    }
+}
+
 void ColumnTable::Delete(size_t ndx)
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);
 
@@ -68,9 +78,9 @@ void ColumnTable::Delete(size_t ndx)
     invalidate_subtables();
 }
 
-void ColumnTable::Clear(size_t ndx)
+void ColumnTable::ClearTable(size_t ndx)
 {
-    assert(ndx < Size());
+    TIGHTDB_ASSERT(ndx < Size());
 
     const size_t ref_columns = GetAsRef(ndx);
     if (ref_columns == 0) return; // already empty
@@ -84,7 +94,20 @@ void ColumnTable::Clear(size_t ndx)
     Set(ndx, 0);
 }
 
-#ifdef _DEBUG
+bool ColumnTable::Compare(const ColumnTable& c) const
+{
+    const size_t n = Size();
+    if (c.Size() != n) return false;
+    for (size_t i=0; i<n; ++i) {
+        ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
+        ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
+        if (!compare_subtable_rows(*t1, *t2)) return false;
+    }
+    return true;
+}
+
+
+#ifdef TIGHTDB_DEBUG
 
 void ColumnTable::Verify() const
 {
@@ -112,6 +135,6 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const
     }
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 } // namespace tightdb

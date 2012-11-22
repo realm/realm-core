@@ -20,24 +20,18 @@
 #ifndef TIGHTDB_COLUMN_TPL_HPP
 #define TIGHTDB_COLUMN_TPL_HPP
 
-#include <assert.h>
-
-#include "array.hpp"
-#include "column.hpp"
-
 #include <cstdlib>
 
-// Has to be define to allow overload from build settings
-#ifndef MAX_LIST_SIZE
-#define MAX_LIST_SIZE 1000
-#endif
+#include <tightdb/config.h>
+#include <tightdb/array.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 
 template<class T> T GetColumnFromRef(Array& parent, size_t ndx)
 {
-    //assert(parent.HasRefs());
-    //assert(ndx < parent.Size());
+    //TIGHTDB_ASSERT(parent.HasRefs());
+    //TIGHTDB_ASSERT(ndx < parent.Size());
     return T(size_t(parent.Get(ndx)), &parent, ndx, parent.GetAllocator());
 }
 
@@ -52,7 +46,7 @@ template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const
         const size_t node_ndx = offsets.FindPos(ndx);
 
         // Calc index in subnode
-        const size_t offset = node_ndx ? TO_REF(offsets.Get(node_ndx-1)) : 0;
+        const size_t offset = node_ndx ? to_ref(offsets.Get(node_ndx-1)) : 0;
         const size_t local_ndx = ndx - offset;
 
         // Get item
@@ -77,7 +71,7 @@ template<typename T, class C> bool ColumnBase::TreeSet(size_t ndx, T value)
         const size_t node_ndx = offsets.FindPos(ndx);
 
         // Calc index in subnode
-        const size_t offset = node_ndx ? TO_REF(offsets.Get(node_ndx-1)) : 0;
+        const size_t offset = node_ndx ? to_ref(offsets.Get(node_ndx-1)) : 0;
         const size_t local_ndx = ndx - offset;
 
         // Set item
@@ -126,7 +120,7 @@ template<typename T, class C> bool ColumnBase::TreeInsert(size_t ndx, T value)
         break;
     }
     default:
-        assert(false);
+        TIGHTDB_ASSERT(false);
         return false;
     }
 
@@ -148,7 +142,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         }
 
         // Calc index in subnode
-        const size_t offset = node_ndx ? TO_REF(offsets.Get(node_ndx-1)) : 0;
+        const size_t offset = node_ndx ? to_ref(offsets.Get(node_ndx-1)) : 0;
         const size_t local_ndx = ndx - offset;
 
         // Get sublist
@@ -175,7 +169,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         if (nc.type == NodeChange::CT_SPLIT) {
             // update offset for left node
             const size_t newsize = target.Size();
-            const size_t preoffset = node_ndx ? TO_REF(offsets.Get(node_ndx-1)) : 0;
+            const size_t preoffset = node_ndx ? to_ref(offsets.Get(node_ndx-1)) : 0;
             offsets.Set(node_ndx, preoffset + newsize);
 
             newNode.NodeAdd<C>(nc.ref2);
@@ -234,25 +228,25 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 
 template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
 {
-    assert(IsNode());
-    assert(new_ref);
+    TIGHTDB_ASSERT(IsNode());
+    TIGHTDB_ASSERT(new_ref);
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
 
-    assert(ndx < offsets.Size());
-    assert(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(ndx < offsets.Size());
+    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
 
     // Get sublists
     const C orig_col = GetColumnFromRef<C>(refs, ndx);
     const C new_col(new_ref, NULL, 0, m_array->GetAllocator());
 
     // Update original size
-    const size_t offset = ndx ? TO_REF(offsets.Get(ndx-1)) : 0;
+    const size_t offset = ndx ? to_ref(offsets.Get(ndx-1)) : 0;
     const size_t newSize = orig_col.Size();
     const size_t newOffset = offset + newSize;
-#ifdef _DEBUG
-    const size_t oldSize = TO_REF(offsets.Get(ndx)) - offset;
+#ifdef TIGHTDB_DEBUG
+    const size_t oldSize = to_ref(offsets.Get(ndx)) - offset;
 #endif
     offsets.Set(ndx, newOffset);
 
@@ -261,8 +255,8 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
     offsets.Insert(ndx+1, newOffset + refSize);
     refs.Insert(ndx+1, new_ref);
 
-#ifdef _DEBUG
-    assert((newSize + refSize) - oldSize == 1); // insert should only add one item
+#ifdef TIGHTDB_DEBUG
+    TIGHTDB_ASSERT((newSize + refSize) - oldSize == 1); // insert should only add one item
 #endif
 
     // Update following offsets
@@ -274,14 +268,14 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
 
 template<class C> bool ColumnBase::NodeInsert(size_t ndx, size_t ref)
 {
-    assert(ref);
-    assert(IsNode());
+    TIGHTDB_ASSERT(ref);
+    TIGHTDB_ASSERT(IsNode());
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
 
-    assert(ndx <= offsets.Size());
-    assert(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(ndx <= offsets.Size());
+    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
 
     const C col(ref, (Array*)NULL, 0, m_array->GetAllocator());
     const size_t refSize = col.Size();
@@ -296,14 +290,14 @@ template<class C> bool ColumnBase::NodeInsert(size_t ndx, size_t ref)
 
 template<class C> bool ColumnBase::NodeAdd(size_t ref)
 {
-    assert(ref);
-    assert(IsNode());
+    TIGHTDB_ASSERT(ref);
+    TIGHTDB_ASSERT(IsNode());
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
     const C col(ref, (Array*)NULL, 0, m_array->GetAllocator());
 
-    assert(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
 
     const int64_t newOffset = (offsets.is_empty() ? 0 : offsets.back()) + col.Size();
     if (!offsets.add(newOffset)) return false;
@@ -322,10 +316,10 @@ template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
 
         // Find the subnode containing the item
         const size_t node_ndx = offsets.FindPos(ndx);
-        assert(node_ndx != (size_t)-1);
+        TIGHTDB_ASSERT(node_ndx != (size_t)-1);
 
         // Calc index in subnode
-        const size_t offset = node_ndx ? TO_REF(offsets.Get(node_ndx-1)) : 0;
+        const size_t offset = node_ndx ? to_ref(offsets.Get(node_ndx-1)) : 0;
         const size_t local_ndx = ndx - offset;
 
         // Get sublist
@@ -373,7 +367,7 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
                 const C col(size_t(refs.Get(i)), NULL, 0, m_array->GetAllocator());
                 const size_t ndx = col.template TreeFind<T, C, F>(value, 0, size_t(-1));
                 if (ndx != size_t(-1)) {
-                    const size_t offset = i ? TO_REF(offsets.Get(i-1)) : 0;
+                    const size_t offset = i ? to_ref(offsets.Get(i-1)) : 0;
                     return offset + ndx;
                 }
             }
@@ -381,16 +375,16 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
         else {
             // partial search
             size_t i = offsets.FindPos(start);
-            size_t offset = i ? TO_REF(offsets.Get(i-1)) : 0;
+            size_t offset = i ? to_ref(offsets.Get(i-1)) : 0;
             size_t s = start - offset;
-            size_t e = (end == size_t(-1) || int(end) >= offsets.Get(i)) ? -1 : end - offset;
+            size_t e = (end == size_t(-1) || int(end) >= offsets.Get(i)) ? size_t(-1) : end - offset;
 
             for (;;) {
                 const C col(size_t(refs.Get(i)), NULL, 0, m_array->GetAllocator());
 
                 const size_t ndx = col.template TreeFind<T, C, F>(value, s, e);
-                if (ndx != size_t(-1)) {
-                    const size_t offset = i ? TO_REF(offsets.Get(i-1)) : 0;
+                if (ndx != not_found) {
+                    const size_t offset = i ? to_ref(offsets.Get(i-1)) : 0;
                     return offset + ndx;
                 }
 
@@ -399,11 +393,11 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
 
                 s = 0;
                 if (end != size_t(-1)) {
-                    if (end >= TO_REF(offsets.Get(i)))
+                    if (end >= to_ref(offsets.Get(i)))
                         e = size_t(-1);
                     else {
-                        offset = TO_REF(offsets.Get(i-1));
-                        if(offset >= end)
+                        offset = to_ref(offsets.Get(i-1));
+                        if (offset >= end)
                             break;
                         e = end - offset;
                     }
@@ -415,11 +409,7 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
     }
 }
 
-
-
-template<typename T, class C>
-void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset,
-                             size_t start, size_t end) const
+template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const
 {
     if (!IsNode()) {
         return static_cast<const C*>(this)->LeafFindAll(result, value, add_offset, start, end);
@@ -430,15 +420,15 @@ void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset,
         const Array refs = NodeGetRefs();
         const size_t count = refs.Size();
         size_t i = offsets.FindPos(start);
-        size_t offset = i ? TO_REF(offsets.Get(i-1)) : 0;
+        size_t offset = i ? to_ref(offsets.Get(i-1)) : 0;
         size_t s = start - offset;
-        size_t e = (end == size_t(-1) || int(end) >= offsets.Get(i)) ? -1 : end - offset;
+        size_t e = (end == size_t(-1) || int(end) >= offsets.Get(i)) ? size_t(-1) : end - offset;
 
         for (;;) {
             const size_t ref = refs.GetAsRef(i);
             const C col(ref, NULL, 0, m_array->GetAllocator());
 
-            size_t add = i ? TO_REF(offsets.Get(i-1)) : 0;
+            size_t add = i ? to_ref(offsets.Get(i-1)) : 0;
             add += add_offset;
             col.template TreeFindAll<T, C>(result, value, add, s, e);
             ++i;
@@ -446,10 +436,10 @@ void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset,
 
             s = 0;
             if (end != size_t(-1)) {
-                if (end >= TO_REF(offsets.Get(i))) e = size_t(-1);
+                if (end >= to_ref(offsets.Get(i))) e = size_t(-1);
                 else {
-                    offset = TO_REF(offsets.Get(i-1));
-                    if(offset >= end)
+                    offset = to_ref(offsets.Get(i-1));
+                    if (offset >= end)
                         return;
                     e = end - offset;
                 }
@@ -467,9 +457,9 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
                                 void *state) const
 {
     if (!IsNode()) {
-        if(end == size_t(-1))
+        if (end == size_t(-1))
             end = m_array->Size();
-        if(m_array->Size() > 0)
+        if (m_array->Size() > 0)
             call(m_array, start, end, caller_offset, state);
     }
     else {
@@ -477,7 +467,7 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
         const Array refs = NodeGetRefs();
         const size_t count = refs.Size();
         size_t i = offsets.FindPos(start);
-        size_t offset = i ? TO_REF(offsets.Get(i-1)) : 0;
+        size_t offset = i ? to_ref(offsets.Get(i-1)) : 0;
         size_t s = start - offset;
         size_t e = (end == size_t(-1) || int(end) >= offsets.Get(i)) ? size_t(-1) : end - offset;
 
@@ -485,7 +475,7 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
             const size_t ref = refs.GetAsRef(i);
             const C col(ref, NULL, 0, m_array->GetAllocator());
 
-            size_t add = i ? TO_REF(offsets.Get(i-1)) : 0;
+            size_t add = i ? to_ref(offsets.Get(i-1)) : 0;
             add += caller_offset;
             col.template TreeVisitLeafs<T, C>(s, e, add, call, state);
             ++i;
@@ -493,10 +483,10 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
 
             s = 0;
             if (end != size_t(-1)) {
-                if (end >= TO_REF(offsets.Get(i))) e = size_t(-1);
+                if (end >= to_ref(offsets.Get(i))) e = size_t(-1);
                 else {
-                    offset = TO_REF(offsets.Get(i-1));
-                    if(offset >= end)
+                    offset = to_ref(offsets.Get(i-1));
+                    if (offset >= end)
                         return;
                     e = end - offset;
                 }

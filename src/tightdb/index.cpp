@@ -1,9 +1,5 @@
-#include "index.hpp"
-#include <cassert>
-
-#ifndef MAX_LIST_SIZE
-#define MAX_LIST_SIZE 1000
-#endif
+#include <tightdb/config.h>
+#include <tightdb/index.hpp>
 
 namespace {
 
@@ -11,15 +7,15 @@ using namespace tightdb;
 
 Index GetIndexFromRef(Array& parent, size_t ndx)
 {
-    assert(parent.HasRefs());
-    assert(ndx < parent.Size());
+    TIGHTDB_ASSERT(parent.HasRefs());
+    TIGHTDB_ASSERT(ndx < parent.Size());
     return Index((size_t)parent.Get(ndx), &parent, ndx);
 }
 
 const Index GetIndexFromRef(const Array& parent, size_t ndx)
 {
-    assert(parent.HasRefs());
-    assert(ndx < parent.Size());
+    TIGHTDB_ASSERT(parent.HasRefs());
+    TIGHTDB_ASSERT(ndx < parent.Size());
     return Index((size_t)parent.Get(ndx));
 }
 
@@ -52,7 +48,7 @@ bool Index::is_empty() const
 
 void Index::BuildIndex(const Column& src)
 {
-    //assert(is_empty());
+    //TIGHTDB_ASSERT(is_empty());
 
     // Brute-force build-up
     // TODO: sort and merge
@@ -60,9 +56,9 @@ void Index::BuildIndex(const Column& src)
         Insert(i, src.Get(i), true);
     }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 void Index::Set(size_t ndx, int64_t oldValue, int64_t newValue)
@@ -78,7 +74,7 @@ void Index::Delete(size_t ndx, int64_t value, bool isLast)
     // Collapse top nodes with single item
     while (IsNode()) {
         Array refs = m_array->GetSubArray(1);
-        assert(refs.Size() != 0); // node cannot be empty
+        TIGHTDB_ASSERT(refs.Size() != 0); // node cannot be empty
         if (refs.Size() > 1) break;
 
         const size_t ref = (size_t)refs.Get(0);
@@ -97,7 +93,7 @@ bool Index::DoDelete(size_t ndx, int64_t value)
     Array refs = m_array->GetSubArray(1);
 
     size_t pos = values.FindPos2(value);
-    assert(pos != (size_t)-1);
+    TIGHTDB_ASSERT(pos != (size_t)-1);
 
     // There may be several nodes with the same values,
     // so we have to find the one with the matching ref
@@ -118,7 +114,7 @@ bool Index::DoDelete(size_t ndx, int64_t value)
             }
             else ++pos;
         } while (pos < refs.Size());
-        assert(false); // we should never reach here
+        TIGHTDB_ASSERT(false); // we should never reach here
     }
     else {
         do {
@@ -169,7 +165,7 @@ bool Index::Insert(size_t ndx, int64_t value, bool isLast)
             break;
         }
     default:
-        assert(false);
+        TIGHTDB_ASSERT(false);
         return false;
     }
 
@@ -178,7 +174,7 @@ bool Index::Insert(size_t ndx, int64_t value, bool isLast)
 
 bool Index::LeafInsert(size_t ref, int64_t value)
 {
-    assert(!IsNode());
+    TIGHTDB_ASSERT(!IsNode());
 
     // Get subnode table
     Array values = m_array->GetSubArray(0);
@@ -200,11 +196,11 @@ bool Index::LeafInsert(size_t ref, int64_t value)
 
 bool Index::NodeAdd(size_t ref)
 {
-    assert(ref);
-    assert(IsNode());
+    TIGHTDB_ASSERT(ref);
+    TIGHTDB_ASSERT(IsNode());
 
     const Index col(ref);
-    assert(!col.is_empty());
+    TIGHTDB_ASSERT(!col.is_empty());
     const int64_t maxval = col.MaxValue();
 
     Array offsets = m_array->GetSubArray(0);
@@ -340,7 +336,7 @@ bool Index::find_all(Column& result, int64_t value) const
     const Array refs = m_array->GetSubArray(1);
 
     size_t pos = values.FindPos2(value);
-    assert(pos != (size_t)-1);
+    TIGHTDB_ASSERT(pos != (size_t)-1);
 
     // There may be several nodes with the same values,
     if (m_array->IsNode()) {
@@ -369,7 +365,7 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const
     const Array refs = m_array->GetSubArray(1);
 
     size_t pos = values.FindPos2(start);
-    assert(pos != (size_t)-1);
+    TIGHTDB_ASSERT(pos != (size_t)-1);
 
     // There may be several nodes with the same values,
     if (m_array->IsNode()) {
@@ -395,7 +391,7 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const
 
 void Index::UpdateRefs(size_t pos, int diff)
 {
-    assert(diff == 1 || diff == -1); // only used by insert and delete
+    TIGHTDB_ASSERT(diff == 1 || diff == -1); // only used by insert and delete
 
     Array refs = m_array->GetSubArray(1);
 
@@ -411,40 +407,40 @@ void Index::UpdateRefs(size_t pos, int diff)
     }
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void Index::Verify() const
 {
-    assert(m_array->Size() == 2);
-    assert(m_array->HasRefs());
+    TIGHTDB_ASSERT(m_array->Size() == 2);
+    TIGHTDB_ASSERT(m_array->HasRefs());
 
     const Array offsets = m_array->GetSubArray(0);
     const Array refs = m_array->GetSubArray(1);
     offsets.Verify();
     refs.Verify();
-    assert(offsets.Size() == refs.Size());
+    TIGHTDB_ASSERT(offsets.Size() == refs.Size());
 
     if (m_array->IsNode()) {
-        assert(refs.HasRefs());
+        TIGHTDB_ASSERT(refs.HasRefs());
 
         // Make sure that all offsets matches biggest value in ref
         for (size_t i = 0; i < refs.Size(); ++i) {
             const size_t ref = (size_t)refs.Get(i);
-            assert(ref);
+            TIGHTDB_ASSERT(ref);
 
             const Index col(ref);
             col.Verify();
 
             if (offsets.Get(i) != col.MaxValue()) {
-                assert(false);
+                TIGHTDB_ASSERT(false);
             }
         }
     }
     else {
-        assert(!refs.HasRefs());
+        TIGHTDB_ASSERT(!refs.HasRefs());
     }
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

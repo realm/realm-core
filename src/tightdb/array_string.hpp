@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_ARRAY_STRING_HPP
 #define TIGHTDB_ARRAY_STRING_HPP
 
-#include "array.hpp"
+#include <tightdb/array.hpp>
 
 namespace tightdb {
 
@@ -40,6 +40,7 @@ public:
     bool Insert(size_t ndx, const char* value, size_t len);
     void Delete(size_t ndx);
 
+    size_t count(const char* value, size_t start=0, size_t end=-1) const;
     size_t find_first(const char* value, size_t start=0 , size_t end=-1) const;
     void find_all(Array& result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1);
 
@@ -50,12 +51,14 @@ public:
     ///
     static size_t create_empty_string_array(Allocator&);
 
-#ifdef _DEBUG
-    bool Compare(const ArrayString& c) const;
+    /// Compare two string arrays for equality.
+    bool Compare(const ArrayString&) const;
+
+#ifdef TIGHTDB_DEBUG
     void StringStats() const;
     //void ToDot(FILE* f) const;
     void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 private:
     size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;

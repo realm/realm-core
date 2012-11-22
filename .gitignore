@@ -12,6 +12,7 @@ tags
 
 /cover_html
 /gcovr.xml
+/tmp
 
 #ignore thumbnails created by windows
 Thumbs.db

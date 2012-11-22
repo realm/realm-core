@@ -20,33 +20,43 @@
 #ifndef __TDB_INDEX_STRING__
 #define __TDB_INDEX_STRING__
 
-#include "column.hpp"
-#include "column_string.hpp"
+#include <tightdb/column.hpp>
+#include <tightdb/column_string.hpp>
 
 namespace tightdb {
 
+typedef const char*(*StringGetter)(void*, size_t);
+
 class StringIndex : public Column {
 public:
-    StringIndex(const AdaptiveStringColumn& c);
-    StringIndex(size_t ref, ArrayParent* parent, size_t pndx, const AdaptiveStringColumn& c);
-
-    void BuildIndex();
+    StringIndex(void* target_column, StringGetter get_func, Allocator& alloc);
+    StringIndex(ColumnDef type, Allocator& alloc);
+    StringIndex(size_t ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc);
+    void SetTarget(void* target_column, StringGetter get_func);
 
     void Insert(size_t row_ndx, const char* value, bool isLast=false);
     void Set(size_t row_ndx, const char* oldValue, const char* newValue);
     void Delete(size_t row_ndx, const char* value, bool isLast=false);
+    void Clear();
 
+    using Column::Delete;
+
+    size_t count(const char* value) const;
     size_t find_first(const char* value) const;
+    void   find_all(Array& result, const char* value) const;
+    void   distinct(Array& result) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     bool is_empty() const;
-    void to_dot(std::ostream& out = std::cerr);
+    void to_dot(std::ostream& out);
 #endif
 
 protected:
+    void Create();
+
     bool InsertWithOffset(size_t row_ndx, size_t offset, const char* value);
     bool InsertRowList(size_t ref, size_t offset, const char* value);
-    int64_t GetLastKey() const;
+    int32_t GetLastKey() const;
     void UpdateRefs(size_t pos, int diff);
 
     // B-Tree functions
@@ -57,10 +67,13 @@ protected:
     bool NodeInsert(size_t ndx, size_t ref);
     void DoDelete(size_t ndx, const char* value, size_t offset);
 
-    // Member variables
-    const AdaptiveStringColumn& m_column;
+    const char* Get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
 
-#ifdef _DEBUG
+    // Member variables
+    void* m_target_column;
+    StringGetter m_get_func;
+
+#ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
     void ArrayToDot(std::ostream& out, const Array& array) const;
     void KeysToDot(std::ostream& out, const Array& array, const char* title=NULL) const;

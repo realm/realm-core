@@ -1,11 +1,11 @@
 #include <cstdlib>
-#include <cassert>
 #include <cstring>
 #include <cstdio> // debug
 #include <iostream>
-#include "utilities.hpp"
-#include "column.hpp"
-#include "array_string.hpp"
+
+#include <tightdb/utilities.hpp>
+#include <tightdb/column.hpp>
+#include <tightdb/array_string.hpp>
 
 using namespace std;
 
@@ -34,7 +34,7 @@ namespace tightdb {
 
 const char* ArrayString::Get(size_t ndx) const
 {
-    assert(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_len);
 
     if (m_width == 0) return "";
     else return (const char*)(m_data + (ndx * m_width));
@@ -42,17 +42,17 @@ const char* ArrayString::Get(size_t ndx) const
 
 bool ArrayString::Set(size_t ndx, const char* value)
 {
-    assert(ndx < m_len);
-    assert(value);
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(value);
 
     return Set(ndx, value, strlen(value));
 }
 
 bool ArrayString::Set(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx < m_len);
-    assert(value);
-    assert(len < 64); // otherwise we have to use another column type
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(value);
+    TIGHTDB_ASSERT(len < 64); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     if (!CopyOnWrite()) return false;
@@ -74,7 +74,7 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len)
             // Move the value
             char* data = (char*)m_data + (k * m_width);
             char* const end = data + m_width;
-            memmove(data, v, oldwidth);
+            memmove(data, v, oldwidth); // FIXME: Use std::copy() or std::copy_backward() instead.
             for (data += oldwidth; data < end; ++data) {
                 *data = '\0'; // pad with zeroes
             }
@@ -84,7 +84,7 @@ bool ArrayString::Set(size_t ndx, const char* value, size_t len)
     // Set the value
     char* data = (char*)m_data + (ndx * m_width);
     char* const end = data + m_width;
-    memmove(data, value, len);
+    memmove(data, value, len); // FIXME: Use std::copy() or std::copy_backward() instead.
     for (data += len; data < end; ++data) {
         *data = '\0'; // pad with zeroes
     }
@@ -111,9 +111,9 @@ bool ArrayString::Insert(size_t ndx, const char* value)
 
 bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
 {
-    assert(ndx <= m_len);
-    assert(value);
-    assert(len < 64); // otherwise we have to use another column type
+    TIGHTDB_ASSERT(ndx <= m_len);
+    TIGHTDB_ASSERT(value);
+    TIGHTDB_ASSERT(len < 64); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     if (!CopyOnWrite()) return false;
@@ -138,7 +138,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
             // Move the value
             char* data = (char*)m_data + ((k+1) * m_width);
             char* const end = data + m_width;
-            memmove(data, v, oldwidth);
+            memmove(data, v, oldwidth); // FIXME: Use std::copy() or std::copy_backward() instead.
             for (data += oldwidth; data < end; ++data) {
                 *data = '\0'; // pad with zeroes
             }
@@ -149,7 +149,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
         unsigned char* src = m_data + (ndx * m_width);
         unsigned char* dst = src + m_width;
         const size_t count = (m_len - ndx) * m_width;
-        memmove(dst, src, count);
+        memmove(dst, src, count); // FIXME: Use std::copy() or std::copy_backward() instead.
     }
 
     // Set the value
@@ -171,7 +171,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
             // Move the value
             char* data = (char*)m_data + (k * m_width);
             char* const end = data + m_width;
-            memmove(data, v, oldwidth);
+            memmove(data, v, oldwidth); // FIXME: Use std::copy() or std::copy_backward() instead.
             for (data += oldwidth; data < end; ++data) {
                 *data = '\0'; // pad with zeroes
             }
@@ -184,7 +184,7 @@ bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
 
 void ArrayString::Delete(size_t ndx)
 {
-    assert(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
     CopyOnWrite();
@@ -196,7 +196,7 @@ void ArrayString::Delete(size_t ndx)
         char* src = (char*)m_data + ((ndx+1) * m_width);
         char* dst = (char*)m_data + (ndx * m_width);
         const size_t len = (m_len - ndx) * m_width;
-        memmove(dst, src, len);
+        memmove(dst, src, len); // FIXME: Use std::copy() or std::copy_backward() instead.
     }
 
     // Update length in header
@@ -217,15 +217,31 @@ size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const
     return bytes_without_header / width;
 }
 
+size_t ArrayString::count(const char* value, size_t start, size_t end) const
+{
+    const size_t len = strlen(value);
+    size_t count = 0;
+    
+    size_t lastmatch = start - 1;
+    for (;;) {
+        lastmatch = FindWithLen(value, len, lastmatch+1, end);
+        if (lastmatch != not_found)
+            ++count;
+        else break;
+    }
+    
+    return count;
+}
+
 size_t ArrayString::find_first(const char* value, size_t start, size_t end) const
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
     return FindWithLen(value, strlen(value), start, end);
 }
 
 void ArrayString::find_all(Array& result, const char* value, size_t add_offset, size_t start, size_t end)
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
 
     const size_t len = strlen(value);
 
@@ -240,11 +256,11 @@ void ArrayString::find_all(Array& result, const char* value, size_t add_offset, 
 
 size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, size_t end) const
 {
-    assert(value);
+    TIGHTDB_ASSERT(value);
 
     if (end == (size_t)-1) end = m_len;
     if (start == end) return (size_t)-1;
-    assert(start < m_len && end <= m_len && start < end);
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
     if (m_len == 0) return (size_t)-1; // empty list
     if (len >= m_width) return (size_t)-1; // A string can never be wider than the column width
 
@@ -260,9 +276,6 @@ size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, siz
     return (size_t)-1; // not found
 }
 
-#ifdef _DEBUG
-#include "stdio.h"
-
 bool ArrayString::Compare(const ArrayString& c) const
 {
     if (c.Size() != Size()) return false;
@@ -273,6 +286,9 @@ bool ArrayString::Compare(const ArrayString& c) const
 
     return true;
 }
+
+
+#ifdef TIGHTDB_DEBUG
 
 void ArrayString::StringStats() const
 {
@@ -343,6 +359,6 @@ void ArrayString::ToDot(std::ostream& out, const char* title) const
     if (title) out << "}" << std::endl;
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

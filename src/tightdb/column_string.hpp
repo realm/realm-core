@@ -20,12 +20,14 @@
 #ifndef TIGHTDB_COLUMN_STRING_HPP
 #define TIGHTDB_COLUMN_STRING_HPP
 
-#include "column.hpp"
-#include "array_string.hpp"
-#include "array_string_long.hpp"
+#include <tightdb/column.hpp>
+#include <tightdb/array_string.hpp>
+#include <tightdb/array_string_long.hpp>
 
 namespace tightdb {
 
+// Pre-declarations
+class StringIndex;
 
 class AdaptiveStringColumn : public ColumnBase {
 public:
@@ -50,15 +52,19 @@ public:
     void Delete(size_t ndx);
     void Clear();
     void Resize(size_t ndx);
+    void fill(size_t count);
 
+    size_t count(const char* value) const;
     size_t find_first(const char* value, size_t start=0 , size_t end=-1) const;
     void find_all(Array& result, const char* value, size_t start = 0, size_t end = -1) const;
 
     // Index
-    bool HasIndex() const {return false;}
-    void BuildIndex(Index&) {}
-    void ClearIndex() {}
-    size_t FindWithIndex(int64_t) const {return (size_t)-1;}
+    bool HasIndex() const {return m_index != NULL;}
+    const StringIndex& GetIndex() const {return *m_index;}
+    StringIndex& PullIndex() {StringIndex& ndx = *m_index; m_index = NULL; return ndx;}
+    StringIndex& CreateIndex();
+    void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
+    void RemoveIndex() {m_index = NULL;}
 
     size_t GetRef() const {return m_array->GetRef();}
     Allocator& GetAllocator() const {return m_array->GetAllocator();}
@@ -67,10 +73,12 @@ public:
     // Optimizing data layout
     bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
 
-#ifdef _DEBUG
-    bool Compare(const AdaptiveStringColumn& c) const;
+    /// Compare two string columns for equality.
+    bool Compare(const AdaptiveStringColumn&) const;
+
+#ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 protected:
     friend class ColumnBase;
@@ -88,9 +96,12 @@ protected:
 
     bool FindKeyPos(const char* target, size_t& pos) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
+
+private:
+    StringIndex* m_index;
 };
 
 

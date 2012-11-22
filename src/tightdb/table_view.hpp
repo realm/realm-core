@@ -21,7 +21,8 @@
 #define TIGHTDB_TABLE_VIEW_HPP
 
 #include <iostream>
-#include "table.hpp"
+
+#include <tightdb/table.hpp>
 
 namespace tightdb {
 
@@ -64,6 +65,7 @@ public:
     // FIXME: Need: size_t find_first_binary(size_t column_ndx, const char* value, size_t len) const;
 
     // Aggregate functions
+    template <int function>int64_t aggregate(size_t column_ndx) const;
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;
@@ -74,9 +76,14 @@ public:
     // Get row index in the source table this view is "looking" at.
     size_t get_source_ndx(size_t row_ndx) const { return size_t(m_refs.Get(row_ndx)); }
 
+    // Conversion
+    void to_json(std::ostream& out);
+    void to_string(std::ostream& out, size_t limit=500) const;
+
 protected:
     friend class Table;
     friend class Query;
+
     template <class R, class V> static R find_all_integer(V*, size_t, int64_t);
     template <class R, class V> static R find_all_string(V*, size_t, const char*);
 
@@ -259,20 +266,20 @@ private:
 // TableViewBase Implementation:
 
 #define TIGHTDB_ASSERT_COLUMN(column_ndx)                                   \
-    assert(m_table);                                                        \
-    assert(column_ndx < m_table->get_column_count());
+    TIGHTDB_ASSERT(m_table);                                                \
+    TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
 
 #define TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)             \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
-    assert(m_table->get_column_type(column_ndx) == column_type);
+    TIGHTDB_ASSERT(m_table->get_column_type(column_ndx) == column_type);
 
 #define TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx)                           \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
-    assert(row_ndx < m_refs.Size());
+    TIGHTDB_ASSERT(row_ndx < m_refs.Size());
 
 #define TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, column_type)     \
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)                 \
-    assert(row_ndx < m_refs.Size());
+    TIGHTDB_ASSERT(row_ndx < m_refs.Size());
 
 
 inline TableViewBase::TableViewBase(TableViewBase* tv):
@@ -295,25 +302,25 @@ inline void TableViewBase::move_assign(TableViewBase* tv)
 
 inline size_t TableViewBase::get_column_count() const
 {
-    assert(m_table);
+    TIGHTDB_ASSERT(m_table);
     return m_table->get_column_count();
 }
 
 inline const char* TableViewBase::get_column_name(size_t column_ndx) const
 {
-    assert(m_table);
+    TIGHTDB_ASSERT(m_table);
     return m_table->get_column_name(column_ndx);
 }
 
 inline size_t TableViewBase::get_column_index(const char* name) const
 {
-    assert(m_table);
+    TIGHTDB_ASSERT(m_table);
     return m_table->get_column_index(name);
 }
 
 inline ColumnType TableViewBase::get_column_type(size_t column_ndx) const
 {
-    assert(m_table);
+    TIGHTDB_ASSERT(m_table);
     return m_table->get_column_type(column_ndx);
 }
 
@@ -421,9 +428,9 @@ R TableViewBase::find_all_integer(V* view, size_t column_ndx, int64_t value)
 template <class R, class V>
 R TableViewBase::find_all_string(V* view, size_t column_ndx, const char* value)
 {
-    assert(view->m_table);
-    assert(column_ndx < view->m_table->get_column_count());
-    assert(view->m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
+    TIGHTDB_ASSERT(view->m_table);
+    TIGHTDB_ASSERT(column_ndx < view->m_table->get_column_count());
+    TIGHTDB_ASSERT(view->m_table->get_column_type(column_ndx) == COLUMN_TYPE_STRING);
 
     R tv(*view->m_table);
     for (size_t i = 0; i < view->m_refs.Size(); i++)

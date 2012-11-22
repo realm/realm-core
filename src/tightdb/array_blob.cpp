@@ -1,5 +1,4 @@
-#include "array_blob.hpp"
-#include <assert.h>
+#include <tightdb/array_blob.hpp>
 
 namespace tightdb {
 
@@ -42,9 +41,9 @@ void ArrayBlob::Insert(size_t pos, const char* data, size_t len)
 
 void ArrayBlob::Replace(size_t start, size_t end, const char* data, size_t len)
 {
-    assert(start <= end);
-    assert(end <= m_len);
-    assert(len == 0 || data);
+    TIGHTDB_ASSERT(start <= end);
+    TIGHTDB_ASSERT(end <= m_len);
+    TIGHTDB_ASSERT(len == 0 || data);
 
     CopyOnWrite();
 
@@ -58,11 +57,11 @@ void ArrayBlob::Replace(size_t start, size_t end, const char* data, size_t len)
     if (start != m_len && gapsize != len) {
         const size_t dst = start + len;
         const size_t src_len = m_len - end;
-        memmove(m_data + dst, m_data + end, src_len);
+        memmove(m_data + dst, m_data + end, src_len); // FIXME: Use std::copy() or std::copy_backward() instead!
     }
 
     // Insert the data
-    memcpy(m_data + start, data, len);
+    memcpy(m_data + start, data, len); // FIXME: Use std::copy() instead!
 
     m_len = newsize;
 }
@@ -74,7 +73,7 @@ void ArrayBlob::Delete(size_t start, size_t end)
 
 void ArrayBlob::Resize(size_t len)
 {
-    assert(len <= m_len);
+    TIGHTDB_ASSERT(len <= m_len);
     Replace(len, m_len, NULL, 0);
 }
 
@@ -93,7 +92,7 @@ size_t ArrayBlob::CalcItemCount(size_t bytes, size_t) const
     return bytes - 8;
 }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
 
 void ArrayBlob::ToDot(std::ostream& out, const char* title) const
 {
@@ -124,6 +123,6 @@ void ArrayBlob::ToDot(std::ostream& out, const char* title) const
     out << std::endl;
 }
 
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 }

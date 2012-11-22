@@ -5,6 +5,8 @@
 // Does not work for windows yet
 #ifndef _MSC_VER
 
+#include <unistd.h>
+
 using namespace tightdb;
 
 namespace {
@@ -34,7 +36,7 @@ TEST(Shared_Initial)
             shared.end_read();
         }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
         // Also do a basic ringbuffer test
         shared.test_ringbuf();
 #endif
@@ -453,4 +455,232 @@ TEST(Shared_WriterThreads)
     CHECK_EQUAL(-1, rc);
 }
 
-#endif //_MSV_VER
+
+TEST(Shared_FormerErrorCase1)
+{
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock");
+    SharedGroup db("test_shared.tdb");
+    CHECK(db.is_valid());
+    {
+        Group& group = db.begin_write();
+        TableRef table = group.get_table("my_table");
+        {
+            Spec& spec = table->get_spec();
+            spec.add_column(COLUMN_TYPE_INT, "alpha");
+            spec.add_column(COLUMN_TYPE_BOOL, "beta");
+            spec.add_column(COLUMN_TYPE_INT, "gamma");
+            spec.add_column(COLUMN_TYPE_DATE, "delta");
+            spec.add_column(COLUMN_TYPE_STRING, "epsilon");
+            spec.add_column(COLUMN_TYPE_BINARY, "zeta");
+            {
+                Spec subspec = spec.add_subtable_column("eta");
+                subspec.add_column(COLUMN_TYPE_INT, "foo");
+                {
+                    Spec subsubspec = subspec.add_subtable_column("bar");
+                    subsubspec.add_column(COLUMN_TYPE_INT, "value");
+                }
+            }
+            spec.add_column(COLUMN_TYPE_MIXED, "theta");
+        }
+        table->update_from_spec();
+        table->insert_empty_row(0, 1);
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        static_cast<void>(group);
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 1);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 2);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            table2->insert_int(0, 0, 0);
+            table2->insert_subtable(1, 0);
+            table2->insert_done();
+        }
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 3);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 4);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            TableRef table3 = table2->get_subtable(1, 0);
+            table3->insert_empty_row(0, 1);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            TableRef table3 = table2->get_subtable(1, 0);
+            table3->insert_empty_row(1, 1);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            TableRef table3 = table2->get_subtable(1, 0);
+            table3->set_int(0, 0, 0);
+        }
+        {
+            TableRef table = group.get_table("my_table");
+            table->set_int(0, 0, 5);
+        }
+        {
+            TableRef table = group.get_table("my_table");
+            TableRef table2 = table->get_subtable(6, 0);
+            table2->set_int(0, 0, 1);
+        }
+    }
+    db.commit();
+
+    {
+        Group& group = db.begin_write();
+        TableRef table = group.get_table("my_table");
+        table = table->get_subtable(6, 0);
+        table = table->get_subtable(1, 0);
+        table->set_int(0, 1, 1);
+        table = group.get_table("my_table");
+        table->set_int(0, 0, 6);
+        table = group.get_table("my_table");
+        table = table->get_subtable(6, 0);
+        table->set_int(0, 0, 2);
+    }
+    db.commit();
+}
+
+
+
+namespace {
+
+TIGHTDB_TABLE_1(FormerErrorCase2_Subtable,
+                value,  Int)
+
+TIGHTDB_TABLE_1(FormerErrorCase2_Table,
+                bar, Subtable<FormerErrorCase2_Subtable>)
+
+} // namespace
+
+TEST(Shared_FormerErrorCase2)
+{
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock");
+
+    for (int i=0; i<10; ++i) {
+        SharedGroup db("test_shared.tdb");
+        CHECK(db.is_valid());
+        {
+            Group& group = db.begin_write();
+            FormerErrorCase2_Table::Ref table = group.get_table<FormerErrorCase2_Table>("table");
+            table->add();
+            table->add();
+            table->add();
+            table->add();
+            table->add();
+            table->clear();
+            table->add();
+            table[0].bar->add();
+        }
+        db.commit();
+    }
+}
+
+namespace {
+
+TIGHTDB_TABLE_1(OverAllocTable,
+                text, String)
+
+} // namespace
+
+TEST(Shared_SpaceOveruse)
+{
+    const int n_outer = 3000;
+    const int n_inner = 42;
+
+    // Many transactions
+    {
+        remove("over_alloc_1.db");
+        remove("over_alloc_1.db.lock");
+        SharedGroup db("over_alloc_1.db");
+        CHECK(db.is_valid());
+
+        // Do a lot of sequential transactions
+        for (int i = 0; i < n_outer; ++i) {
+            {
+                Group& group = db.begin_write();
+                OverAllocTable::Ref table = group.get_table<OverAllocTable>("my_table");
+                for (int j = 0; j < n_inner; ++j) {
+                    table->add("x");
+                }
+            }
+            db.commit();
+        }
+
+        // Verify that all was added correctly
+        {
+            const Group& group = db.begin_read();
+            OverAllocTable::ConstRef table = group.get_table<OverAllocTable>("my_table");
+
+            const size_t count = table->size();
+            CHECK_EQUAL(n_outer * n_inner, count);
+
+            for (size_t i = 0; i < count; ++i) {
+                CHECK_EQUAL("x", table[i].text);
+            }
+
+#ifdef TIGHTDB_DEBUG
+            table->Verify();
+#endif
+
+            db.end_read();
+        }
+    }
+}
+
+
+#endif // !_MSV_VER

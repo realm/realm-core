@@ -41,18 +41,24 @@ public:
     bool IsValid() const;
     void SetVersions(size_t current, size_t readlock);
 
-    void Commit();
+    size_t Commit();
 
     size_t write(const char* p, size_t n);
     void WriteAt(size_t pos, const char* p, size_t n);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
+    void dump();
     void ZeroFreeSpace();
 #endif
 
 private:
     void DoCommit(uint64_t topPos);
+
     size_t get_free_space(size_t len, size_t& filesize);
+    size_t reserve_free_space(size_t len, size_t& filesize, size_t start=0);
+    void   add_free_space(size_t pos, size_t len, size_t version=0);
+    void   merge_free_space();
+    size_t extend_free_space(size_t len, size_t& filesize);
 
     // Member variables
     Group&     m_group;

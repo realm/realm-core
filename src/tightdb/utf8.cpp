@@ -1,6 +1,9 @@
-#include <string>
-#include <assert.h>
-#include "utf8.hpp"
+#include <cstring>
+#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+#include <Windows.h>
+#endif
+
+#include <tightdb/utf8.hpp>
 
 namespace tightdb {
 
@@ -26,10 +29,10 @@ size_t comparechars(const char* c1, const char* c2)
 {
     size_t p = 0;
     do {
-        if(c1[p] != c2[p])
+        if (c1[p] != c2[p])
             return 0;
         p++;
-    } while((c1[p] & 0x80) == 0x80);
+    } while ((c1[p] & 0x80) == 0x80);
 
     return p;
 }
@@ -42,16 +45,16 @@ size_t case_prefix(const char* constant_upper, const char* constant_lower, const
     size_t matchlen = 0;
     do {
         size_t m = comparechars(&constant_lower[matchlen], &source[matchlen]);
-        if(m == 0)
+        if (m == 0)
             m = comparechars(&constant_upper[matchlen], &source[matchlen]);
-        if(m != 0)
+        if (m != 0)
             matchlen += m;
         else
             return (size_t)-1;
     }
-    while(constant_lower[matchlen] != 0 && source[matchlen] != 0);
+    while (constant_lower[matchlen] != 0 && source[matchlen] != 0);
 
-    if(constant_lower[matchlen] == 0 && source[matchlen] != 0)
+    if (constant_lower[matchlen] == 0 && source[matchlen] != 0)
         return 0;
     else if (constant_lower[matchlen] == 0 && source[matchlen] == 0)
         return 1;
@@ -67,13 +70,15 @@ bool case_cmp(const char* constant_upper, const char* constant_lower, const char
 {
     size_t matchlen = 0;
     do {
-        if(constant_lower[matchlen] == source[matchlen] || constant_upper[matchlen] == source[matchlen])
+        if (constant_lower[matchlen] == source[matchlen] || constant_upper[matchlen] == source[matchlen])
             matchlen++;
         else
             return false;
     } while (constant_lower[matchlen] != 0 && source[matchlen] != 0);
+    if (constant_lower[matchlen] != 0 || source[matchlen] != 0)
+        return false;
 
-    if(case_prefix(constant_upper, constant_lower, source) != (size_t)-1)
+    if (case_prefix(constant_upper, constant_lower, source) != (size_t)-1)
         return true;
     else
         return false;
@@ -83,10 +88,10 @@ bool case_cmp(const char* constant_upper, const char* constant_lower, const char
 bool case_strstr(const char *constant_upper, const char *constant_lower, const char *source) {
     size_t source_pos = 0;
     do {
-        if(case_cmp(constant_upper, constant_lower, source + source_pos))
+        if (case_prefix(constant_upper, constant_lower, source + source_pos) != size_t(-1))
             return true;
         source_pos++;
-    } while(source[source_pos] != 0);
+    } while (source[source_pos] != 0);
 
     return false;
 }
@@ -98,18 +103,18 @@ bool utf8case_single(const char* source, char* destination, int upper)
     wchar_t tmp[2];
 
     int i = MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)source, (int)sequence_length(source), &tmp[0], 1);
-    if(i == 0)
+    if (i == 0)
         return false;
 
     tmp[1] = 0;
 
-    if(upper)
+    if (upper)
         CharUpperW((LPWSTR)&tmp);
     else
         CharLowerW((LPWSTR)&tmp);
 
     i = WideCharToMultiByte(CP_UTF8, 0, (LPCWSTR)&tmp, 1, (LPSTR)destination, 6, 0, 0);
-    if(i == 0)
+    if (i == 0)
         return false;
 
     return true;
@@ -125,16 +130,16 @@ bool utf8case_single(const char* source, char* destination, int upper)
 // original character. This may of course give wrong search results in very special cases. Todo.
 bool utf8case(const char* source, char* destination, int upper)
 {
-    while(*source != 0) {
-        if(sequence_length(source) == 0)
+    while (*source != 0) {
+        if (sequence_length(source) == 0)
             return false;
 
         bool b = utf8case_single(source, destination, upper);
-        if(!b) {
+        if (!b) {
             return false;
         }
 
-        if(sequence_length(destination) != sequence_length(source)) {
+        if (sequence_length(destination) != sequence_length(source)) {
             memcpy(destination, source, sequence_length(source));
             destination += sequence_length(source);
         }

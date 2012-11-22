@@ -28,16 +28,27 @@ namespace tightdb {
 struct BinaryData {
     const char* pointer;
     std::size_t len;
-    BinaryData() {}
-    BinaryData(const char* p, std::size_t l): pointer(p), len(l) {}
+    BinaryData() : pointer(NULL), len(0) {}
+    BinaryData(const char* data, std::size_t size): pointer(data), len(size) {}
+
+    bool compare_payload(BinaryData b) {
+        if(b.pointer == pointer && b.len == len)
+            return true;
+        bool e = std::equal(pointer, pointer + len, b.pointer);
+        return e;
+    }
 
     template<class Ch, class Tr>
-    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const BinaryData& d)
-    {
-        out << "BinaryData("<<static_cast<const void*>(d.pointer)<<", "<<d.len<<")";
-        return out;
-    }
+    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const BinaryData&);
 };
+
+// Implementation:
+template<class Ch, class Tr>
+inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const BinaryData& d)
+{
+    out << "BinaryData("<<static_cast<const void*>(d.pointer)<<", "<<d.len<<")";
+    return out;
+}
 
 } // namespace tightdb
 

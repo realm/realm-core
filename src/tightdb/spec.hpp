@@ -20,28 +20,39 @@
 #ifndef TIGHTDB_SPEC_HPP
 #define TIGHTDB_SPEC_HPP
 
-#include "array.hpp"
-#include "array_string.hpp"
-#include "column_type.hpp"
+#include <tightdb/array.hpp>
+#include <tightdb/array_string.hpp>
+#include <tightdb/column_type.hpp>
 
 namespace tightdb {
+
 using std::size_t;
+using std::vector;
+
 class Table;
 
 class Spec {
 public:
-    void add_column(ColumnType type, const char* name);
+    Spec(const Spec& s);
+    ~Spec();
+
+    size_t add_column(ColumnType type, const char* name, ColumnType attr=COLUMN_ATTR_NONE);
+    size_t add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name);
     Spec add_subtable_column(const char* name);
+
+    void rename_column(size_t column_ndx, const char* newname);
+    void rename_column(const vector<size_t>& column_ids, const char* newname);
+    void remove_column(size_t column_ndx);
+    void remove_column(const vector<size_t>& column_ids);
 
     // FIXME: It seems that the application must make sure that the
     // parent Spec object is kept alive for at least as long as the
     // spec that is returned. This also has implications for language
     // bindings such as Java.
-    Spec get_subspec(size_t column_ndx);
-    const Spec get_subspec(size_t column_ndx) const;
-private:
-    size_t get_subspec_ref(size_t column_ndx) const;
-public:
+    Spec get_subtable_spec(size_t column_ndx);
+    // FIXME: Returning a const Spec is futile since Spec has a public
+    // copy constructor.
+    const Spec get_subtable_spec(size_t column_ndx) const;
 
     // Direct access to type and attribute list
     size_t get_type_attr_count() const;
@@ -58,25 +69,25 @@ public:
 
     // Column Attributes
     ColumnType get_column_attr(size_t column_ndx) const;
-    // FIXME: What is the purpose of this one? Should it be public? It
-    // is not called from anywhere. If it must be public, it must aslo
-    // be made to emit a transaction log instruction. If it must also
-    // be internally callable from a function that itself emits a
-    // transaction log instruction, then the internal call must be to
-    // a version of this function that does not emit a transaction log
-    // instruction.
-    void set_column_attr(size_t column_ndx, ColumnType attr);
 
-#ifdef _DEBUG
-    bool compare(const Spec& spec) const;
+    /// Compare two table specs for equality.
+    bool operator==(const Spec&) const;
+
+    /// Compare two tables specs for inequality. See operator==().
+    bool operator!=(const Spec& s) const { return !(*this == s); }
+
+#ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream& out, const char* title=NULL) const;
-#endif //_DEBUG
-
-    Spec(const Spec& s);
-    ~Spec();
+#endif // TIGHTDB_DEBUG
 
 private:
+    friend class Table;
+
+    Spec(const Table*, Allocator&); // Uninitialized
+    Spec(const Table*, Allocator&, ArrayParent* parent, size_t ndx_in_parent);
+    Spec(const Table*, Allocator&, size_t ref, ArrayParent *parent, size_t ndx_in_parent);
+
     void init_from_ref(size_t ref, ArrayParent *parent, size_t pndx);
     void destroy();
 
@@ -87,25 +98,22 @@ private:
     void set_parent(ArrayParent* parent, size_t pndx);
 
     // FIXME: This one was made private because it is called
-    // internally from Table::optimize(), and it is not call from any
-    // test case. If it must be public, it must aslo be made to emit a
-    // transaction log instruction, but the internal call must then
-    // call a different version that does not emit such an
+    // internally from Table::optimize(), and it is not called from
+    // any test case. If it must be public, it must also be made to
+    // emit a transaction log instruction, but the internal call must
+    // then call a different version that does not emit such an
     // instruction.
     void set_column_type(size_t column_ndx, ColumnType type);
+    void set_column_attr(size_t column_ndx, ColumnType attr);
 
     // Serialization
     template<class S> size_t write(S& out, size_t& pos) const;
 
-    const Table* const m_table;
-    Array m_specSet;
-    Array m_spec;
-    ArrayString m_names;
-    Array m_subSpecs;
-
-    Spec(const Table*, Allocator&); // Uninitialized
-    Spec(const Table*, Allocator&, ArrayParent* parent, size_t pndx);
-    Spec(const Table*, Allocator&, size_t ref, ArrayParent *parent, size_t pndx);
+    size_t get_column_type_pos(size_t column_ndx) const;
+    size_t get_subspec_ndx(size_t column_ndx) const;
+    size_t get_subspec_ref(size_t subspec_ndx) const;
+    size_t get_num_subspecs() const { return m_subSpecs.IsValid() ? m_subSpecs.Size() : 0; }
+    Spec get_subspec_by_ndx(size_t subspec_ndx);
 
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
@@ -114,11 +122,22 @@ private:
     ///
     static size_t create_empty_spec(Allocator&);
 
+    size_t do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, ColumnType type, const char* name);
+    void do_remove_column(const vector<size_t>& column_ids, size_t pos);
+    void do_rename_column(const vector<size_t>& column_ids, size_t pos, const char* name);
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    size_t* record_subspec_path(const ArrayParent* root, size_t* begin, size_t* end) const;
+    // Precondition: 1 <= end - begin
+    size_t* record_subspec_path(const Array* root_subspecs, size_t* begin, size_t* end) const;
+    friend class Replication;
 #endif
 
-    friend class Table;
+    // Member variables
+    const Table* const m_table;
+    Array m_specSet;
+    Array m_spec;
+    ArrayString m_names;
+    Array m_subSpecs;
 };
 
 
@@ -135,6 +154,7 @@ inline size_t Spec::create_empty_spec(Allocator& alloc)
     spec_set.add(ArrayString::create_empty_string_array(alloc)); // One name for each column
     return spec_set.GetRef();
 }
+
 
 // Uninitialized Spec (call UpdateRef to init)
 inline Spec::Spec(const Table* table, Allocator& alloc):
@@ -165,6 +185,14 @@ inline Spec::Spec(const Spec& s):
     const size_t pndx   = s.m_specSet.GetParentNdx();
 
     init_from_ref(ref, parent, pndx);
+}
+
+
+inline Spec Spec::get_subspec_by_ndx(size_t subspec_ndx)
+{
+    Allocator& alloc = m_specSet.GetAllocator();
+    const size_t ref = m_subSpecs.GetAsRef(subspec_ndx);
+    return Spec(m_table, alloc, ref, &m_subSpecs, subspec_ndx);
 }
 
 

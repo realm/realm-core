@@ -15,8 +15,8 @@
 /UnitTest++/src/tests/*.o
 
 /tightdb-tests
-/tightdb-tests-debug
-/tightdb-tests-cover
+/tightdb-tests-dbg
+/tightdb-tests-cov
 /subtables*.tdb
 /subtables.tightdb
 /table_test.tbl

@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_INDEX_HPP
 #define TIGHTDB_INDEX_HPP
 
-#include "column.hpp"
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 
@@ -39,13 +39,15 @@ public:
     void Delete(size_t ndx, int64_t value, bool isLast=false);
     void Set(size_t ndx, int64_t oldValue, int64_t newValue);
 
+    using Column::Delete;
+
     size_t find_first(int64_t value) const;
     bool find_all(Column& result, int64_t value) const;
     bool FindAllRange(Column& result, int64_t start, int64_t end) const;
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     void Verify() const;
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
 protected:
     // B-Tree functions

@@ -1,0 +1,105 @@
+#
+# Reference documentation data for language xxx
+#
+ID        : cpp
+TITLE     : 'C++'
+DESCR     : &g_introduction_descr
+            >
+            The goal of TightDB is to provide a high performance
+            data storage for your applications. 
+
+            TightDB integrates seamless in your programming language, making it
+            fast to learn and easy to use.  You can replace your traditional data
+            structures with TightDB. Whether it is a simple array of integers or a
+            complex structure, you interface to TightDB as easily as using a
+            standard array or vector like container. But in addition you can
+            handle much more data in much less space, you get powerful query
+            possibilities in an intuitive language and the ability to share your data
+            across all supported languages and platforms.
+
+            The core of the framework is the classes {@link class_typed_table} and 
+            {@link class_dyn_table}. Both classes are a representation of the
+            fundamental concept <strong>Table</strong>. {@link class_typed_table}
+            is used if you know the table structure a priori while {@link class_dyn_table}
+            provides the flexibility for situation where data model changes 
+            dynamically. 
+
+            Tables organize data in columns and rows and data is compacted for
+            low memory usage. The interface to the data resembles the native
+            data structures. Moreover, tables can have tables as data. Using subtables
+            you can build complex data structures.
+
+            It is possible to query data using the {@link class_typed_query} and 
+            {@link class_dyn_query} classes. Queries can be complex - involving
+            any columns and values. You can either apply aggregate functions to you
+            resulting data set or use the data set in your application as a
+            {@link class_dyn_tableview} or {@link class_typed_tableview} object.
+
+            The {@link class_group} class lets you serialize tables to disk or memory. The
+            TightDB data format is consistent across operating systems, hardware platforms,
+            and programming languages. This implies that you can share data across applications
+            and environments.
+IMPORT    : []
+
+CATEGORIES:                       # list global class-id in order of appearence
+- Typed Table:                    # Category header name
+  - typed_table                   # Global Class name. File: 'typed_table_ref.yaml'
+  - typed_view
+  - typed_query
+- Dynamic Table:
+  - dyn_table
+  - dyn_view
+  - dyn_query
+- Collection:
+  - group
+  - shared_group
+- Helpers:
+  - mixed
+#  - cursor
+
+EXAMPLES  : 
+- DESCR   : 
+  CODE    : ex_cpp_intro           # id to example code
+
+#
+# Syntax instructions:
+#
+
+# TODO!!!
+
+# Text quotation
+# -------------- 
+# Examples:
+# plain: unqouted text can't contain colon character
+# single-quoted: 'quoted text can contain :'
+# double-quoted: "double quoted can contain special characters - apparently"
+# literal: |   
+#    multiple lines, 
+#    each with newline at end
+# folded: >
+#    only 1 newline at 
+#    end of last line.
+#
+
+
+
+# Text tags
+# ----------
+# @link global-id 
+
+# Aliases:
+# --------
+# Alias anchors are denoted '&' and aliases as '*'.
+#
+# Example:
+# RETURNS:       &php_table_size_returns    # anchor next to Key
+#                'returns size of table'    # Value of Key
+# SOMEWHEREELSE: *php_table_size_returns    # Value of above key is inserted
+#
+# Anchor identifiers are global with this structure:
+# xxx_class_method_key for global keys where
+# xxx   = 'g', 'php', 'cpp',... with 'g' used for gloabl references
+# (class, method, key) refers to the specific 'key' in the 'method' from the 'class'.
+
+
+

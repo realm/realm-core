@@ -16,7 +16,7 @@ namespace {
 uint64_t rand2(int bitwidth = 64)
 {
     uint64_t i = (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand();
-    if(bitwidth < 64) {
+    if (bitwidth < 64) {
         const uint64_t mask = ((1ULL << bitwidth) - 1ULL);
         i &= mask;
     }
@@ -33,7 +33,7 @@ std::string randstring(void)
     int64_t t = (rand() % 100) * 100;
     size_t len = (rand() % 10) * 100 + 1;
     std::string s;
-    while(s.length() < len)
+    while (s.length() < len)
         s += number_name(t);
 
     s = s.substr(0, len);
@@ -51,9 +51,9 @@ TEST(ColumnString_monkeytest2)
     srand(SEED);
     unsigned int trend = 5;
 
-    for(size_t iter = 0; iter < ITER; iter++) {
+    for (size_t iter = 0; iter < ITER; iter++) {
 
-//          if(rand() % 10 == 0) printf("Input bitwidth around ~%d, , a.Size()=%d\n", (int)current_bitwidth, (int)a.Size());
+//          if (rand() % 10 == 0) printf("Input bitwidth around ~%d, , a.Size()=%d\n", (int)current_bitwidth, (int)a.Size());
 
         if (!(rand2() % (ITER / 100))) {
             trend = (unsigned int)rand2() % 10;
@@ -63,7 +63,7 @@ TEST(ColumnString_monkeytest2)
         }
 
         if (rand2() % 10 > trend && a.Size() < ITER / 100) {
-            if(rand2() % 2 == 0) {
+            if (rand2() % 2 == 0) {
                 // Insert
                 const size_t pos = rand2() % (a.Size() + 1);
                 a.Insert(pos, randstring().c_str());
@@ -73,7 +73,7 @@ TEST(ColumnString_monkeytest2)
                 a.add(randstring().c_str());
             }
         }
-        else if(a.Size() > 0) {
+        else if (a.Size() > 0) {
             // Delete
             const size_t i = rand2() % a.Size();
             a.Delete(i);

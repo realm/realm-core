@@ -49,7 +49,7 @@ void tightdb2(void)
         std::string indexed;
         integers.clear();
         if(index == 1) {
-            integers.cols().first.set_index();
+            integers.column().first.set_index();
             indexed = "Indexed ";
         }
 
@@ -93,7 +93,7 @@ void tightdb2(void)
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
             uint64_t f = rand2() % RANGE;
-            integers.cols().first.find_first(f);
+            integers.column().first.find_first(f);
 
             // Sanity test to ensure that average distance between matches is the same as in the STL tests
 /*
@@ -110,7 +110,7 @@ void tightdb2(void)
 
         timer.Start();
         for (size_t i = 0; i < ITEMS; ++i) {
-            integers.cols().first.find_all(rand2() % RANGE);
+            integers.column().first.find_all(rand2() % RANGE);
         }
         printf((indexed + "FindAll: %dms\n").c_str(), timer.GetTimeInMs() - overhead);
 

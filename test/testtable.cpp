@@ -3,6 +3,8 @@
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
 
+#include <ostream>
+
 using namespace tightdb;
 
 TEST(Table1)
@@ -39,9 +41,9 @@ TEST(Table1)
         CHECK_EQUAL(v2, table.get_int(1, i));
     }
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 enum Days {
@@ -72,9 +74,9 @@ TEST(Table2)
     CHECK_EQUAL(true, r.third);
     CHECK_EQUAL(Wed, r.fourth);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Table3)
@@ -86,23 +88,23 @@ TEST(Table3)
     }
 
     // Test column searching
-    CHECK_EQUAL(size_t(0),  table.cols().first.find_first(0));
-    CHECK_EQUAL(size_t(-1), table.cols().first.find_first(1));
-    CHECK_EQUAL(size_t(0),  table.cols().second.find_first(10));
-    CHECK_EQUAL(size_t(-1), table.cols().second.find_first(100));
-    CHECK_EQUAL(size_t(0),  table.cols().third.find_first(true));
-    CHECK_EQUAL(size_t(-1), table.cols().third.find_first(false));
-    CHECK_EQUAL(size_t(0) , table.cols().fourth.find_first(Wed));
-    CHECK_EQUAL(size_t(-1), table.cols().fourth.find_first(Mon));
+    CHECK_EQUAL(size_t(0),  table.column().first.find_first(0));
+    CHECK_EQUAL(size_t(-1), table.column().first.find_first(1));
+    CHECK_EQUAL(size_t(0),  table.column().second.find_first(10));
+    CHECK_EQUAL(size_t(-1), table.column().second.find_first(100));
+    CHECK_EQUAL(size_t(0),  table.column().third.find_first(true));
+    CHECK_EQUAL(size_t(-1), table.column().third.find_first(false));
+    CHECK_EQUAL(size_t(0) , table.column().fourth.find_first(Wed));
+    CHECK_EQUAL(size_t(-1), table.column().fourth.find_first(Mon));
 
     // Test column incrementing
-    table.cols().first += 3;
+    table.column().first += 3;
     CHECK_EQUAL(3, table[0].first);
     CHECK_EQUAL(3, table[99].first);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TIGHTDB_TABLE_2(TestTableEnum,
@@ -121,12 +123,12 @@ TEST(Table4)
     CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello", (const char*)r.second);
 
     // Test string column searching
-    CHECK_EQUAL(size_t(1),  table.cols().second.find_first("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
-    CHECK_EQUAL(size_t(-1), table.cols().second.find_first("Foo"));
+    CHECK_EQUAL(size_t(1),  table.column().second.find_first("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
+    CHECK_EQUAL(size_t(-1), table.column().second.find_first("Foo"));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Table_Delete)
@@ -149,9 +151,9 @@ TEST(Table_Delete)
     CHECK_EQUAL(7, table[5].second);
     CHECK_EQUAL(8, table[6].second);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Delete all items one at a time
     for (size_t i = 0; i < 7; ++i) {
@@ -161,9 +163,9 @@ TEST(Table_Delete)
     CHECK(table.is_empty());
     CHECK_EQUAL(0, table.size());
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Table_Delete_All_Types)
@@ -226,7 +228,7 @@ TEST(Table_Delete_All_Types)
                 // Add subtable to mixed column
                 // We can first set schema and contents when the entire
                 // row has been inserted
-                table.insert_mixed(7, i, Mixed(COLUMN_TYPE_TABLE));
+                table.insert_mixed(7, i, Mixed::subtable_tag());
                 break;
             }
         }
@@ -261,18 +263,46 @@ TEST(Table_Delete_All_Types)
 
     CHECK_EQUAL(12, table.size());
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 
     // Test Clear
     table.clear();
     CHECK_EQUAL(0, table.size());
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
+
+TEST(Table_test_json)
+{
+    // Create table with all column types
+    Table table;
+    Spec& s = table.get_spec();
+    s.add_column(COLUMN_TYPE_INT,    "int");
+    s.add_column(COLUMN_TYPE_BOOL,   "bool");
+    s.add_column(COLUMN_TYPE_DATE,   "date");
+    s.add_column(COLUMN_TYPE_STRING, "string");
+    table.update_from_spec();
+
+    // Add some rows
+    for (size_t i = 0; i < 3; ++i) {
+        table.insert_int(0, i, i);
+        table.insert_bool(1, i, (i % 2 ? true : false));
+        table.insert_date(2, i, 12345);
+        table.insert_string(3, i, "helloooooo");
+        table.insert_done();
+    }
+
+     std::stringstream ss;
+     table.to_json(ss);
+     const std::string json = ss.str();
+     CHECK_EQUAL(true, json.length() > 0);
+     // std::cerr << "JSON:" << json << "\n";
+}
+
 
 TEST(Table_Find_Int)
 {
@@ -282,13 +312,13 @@ TEST(Table_Find_Int)
         table.add(0, i, true, Wed);
     }
 
-    CHECK_EQUAL(size_t(0),    table.cols().second.find_first(1000));
-    CHECK_EQUAL(size_t(1000), table.cols().second.find_first(0));
-    CHECK_EQUAL(size_t(-1),   table.cols().second.find_first(1001));
+    CHECK_EQUAL(size_t(0),    table.column().second.find_first(1000));
+    CHECK_EQUAL(size_t(1000), table.column().second.find_first(0));
+    CHECK_EQUAL(size_t(-1),   table.column().second.find_first(1001));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 
@@ -313,9 +343,9 @@ TEST(Table6)
     //size_t result2 = table.Range(10, 200).find_first(TestQuery());
     //CHECK_EQUAL((size_t)-1, result2);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 */
 
@@ -336,11 +366,11 @@ TEST(Table_FindAll_Int)
     table.add(0, 20, true, Wed);
 
     // Search for a value that does not exits
-    const TestTable::View v0 = table.cols().second.find_all(5);
+    const TestTable::View v0 = table.column().second.find_all(5);
     CHECK_EQUAL(0, v0.size());
 
     // Search for a value with several matches
-    const TestTable::View v = table.cols().second.find_all(20);
+    const TestTable::View v = table.column().second.find_all(20);
 
     CHECK_EQUAL(5, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
@@ -349,9 +379,9 @@ TEST(Table_FindAll_Int)
     CHECK_EQUAL(7, v.get_source_ndx(3));
     CHECK_EQUAL(9, v.get_source_ndx(4));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TEST(Table_Sorted_Int)
@@ -370,7 +400,7 @@ TEST(Table_Sorted_Int)
     table.add(0,  2, true, Wed); // 9: 1
 
     // Search for a value that does not exits
-    TestTable::View v = table.cols().second.get_sorted_view();
+    TestTable::View v = table.column().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v.size());
 
     CHECK_EQUAL(2, v.get_source_ndx(0));
@@ -384,12 +414,126 @@ TEST(Table_Sorted_Int)
     CHECK_EQUAL(3, v.get_source_ndx(8));
     CHECK_EQUAL(8, v.get_source_ndx(9));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
+TEST(Table_Index_String)
+{
+    TestTableEnum table;
+    
+    table.add(Mon, "jeff");
+    table.add(Tue, "jim");
+    table.add(Wed, "jennifer");
+    table.add(Thu, "john");
+    table.add(Fri, "jimmy");
+    table.add(Sat, "jimbo");
+    table.add(Sun, "johnny");
+    table.add(Mon, "jennifer"); //duplicate
+    
+    table.column().second.set_index();
+    CHECK(table.column().second.has_index());
+    
+    const size_t r1 = table.column().second.find_first("jimmi");
+    CHECK_EQUAL(not_found, r1);
+    
+    const size_t r2 = table.column().second.find_first("jeff");
+    const size_t r3 = table.column().second.find_first("jim");
+    const size_t r4 = table.column().second.find_first("jimbo");
+    const size_t r5 = table.column().second.find_first("johnny");
+    CHECK_EQUAL(0, r2);
+    CHECK_EQUAL(1, r3);
+    CHECK_EQUAL(5, r4);
+    CHECK_EQUAL(6, r5);
+    
+    const size_t c1 = table.column().second.count("jennifer");
+    CHECK_EQUAL(2, c1);
+}
 
+TIGHTDB_TABLE_2(LookupTable,
+                first,  String,
+                second, Int)
+
+TEST(Table_Lookup)
+{
+    LookupTable table;
+
+    table.add("jeff",     0);
+    table.add("jim",      1);
+    table.add("jennifer", 2);
+    table.add("john",     3);
+    table.add("jimmy",    4);
+    table.add("jimbo",    5);
+    table.add("johnny",   6);
+    table.add("jennifer", 7); //duplicate
+
+    // Do lookups with manual search
+    const size_t a0 = table.lookup("jeff");
+    const size_t a1 = table.lookup("jim");
+    const size_t a2 = table.lookup("jennifer");
+    const size_t a3 = table.lookup("john");
+    const size_t a4 = table.lookup("jimmy");
+    const size_t a5 = table.lookup("jimbo");
+    const size_t a6 = table.lookup("johnny");
+    const size_t a7 = table.lookup("jerry");
+    CHECK_EQUAL(0, a0);
+    CHECK_EQUAL(1, a1);
+    CHECK_EQUAL(2, a2);
+    CHECK_EQUAL(3, a3);
+    CHECK_EQUAL(4, a4);
+    CHECK_EQUAL(5, a5);
+    CHECK_EQUAL(6, a6);
+    CHECK_EQUAL(not_found, a7);
+
+    table.column().first.set_index();
+    CHECK(table.column().first.has_index());
+
+    // Do lookups using (cached) index
+    const size_t b0 = table.lookup("jeff");
+    const size_t b1 = table.lookup("jim");
+    const size_t b2 = table.lookup("jennifer");
+    const size_t b3 = table.lookup("john");
+    const size_t b4 = table.lookup("jimmy");
+    const size_t b5 = table.lookup("jimbo");
+    const size_t b6 = table.lookup("johnny");
+    const size_t b7 = table.lookup("jerry");
+    CHECK_EQUAL(0, b0);
+    CHECK_EQUAL(1, b1);
+    CHECK_EQUAL(2, b2);
+    CHECK_EQUAL(3, b3);
+    CHECK_EQUAL(4, b4);
+    CHECK_EQUAL(5, b5);
+    CHECK_EQUAL(6, b6);
+    CHECK_EQUAL(not_found, b7);
+}
+
+TEST(Table_Distinct)
+{
+    TestTableEnum table;
+
+    table.add(Mon, "A");
+    table.add(Tue, "B");
+    table.add(Wed, "C");
+    table.add(Thu, "B");
+    table.add(Fri, "C");
+    table.add(Sat, "D");
+    table.add(Sun, "D");
+    table.add(Mon, "D");
+
+    table.column().second.set_index();
+    CHECK(table.column().second.has_index());
+
+    TestTableEnum::View view = table.column().second.distinct();
+
+    CHECK_EQUAL(4, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(0));
+    CHECK_EQUAL(1, view.get_source_ndx(1));
+    CHECK_EQUAL(2, view.get_source_ndx(2));
+    CHECK_EQUAL(5, view.get_source_ndx(3));
+}
+
+/*
 TEST(Table_Index_Int)
 {
     TestTable table;
@@ -406,73 +550,74 @@ TEST(Table_Index_Int)
     table.add(0,  9, true, Wed);
 
     // Create index for column two
-    table.cols().second.set_index();
+//    table.cols().second.set_index();
 
     // Search for a value that does not exits
-    const size_t r1 = table.cols().second.find_first(2);
+    const size_t r1 = table.column().second.find_first(2);
     CHECK_EQUAL(-1, r1);
 
     // Find existing values
-    CHECK_EQUAL(0, table.cols().second.find_first(1));
-    CHECK_EQUAL(1, table.cols().second.find_first(15));
-    CHECK_EQUAL(2, table.cols().second.find_first(10));
-    CHECK_EQUAL(3, table.cols().second.find_first(20));
-    CHECK_EQUAL(4, table.cols().second.find_first(11));
-    CHECK_EQUAL(5, table.cols().second.find_first(45));
-    //CHECK_EQUAL(6, table.cols().second.find_first(10)); // only finds first match
-    CHECK_EQUAL(7, table.cols().second.find_first(0));
-    CHECK_EQUAL(8, table.cols().second.find_first(30));
-    CHECK_EQUAL(9, table.cols().second.find_first(9));
+    CHECK_EQUAL(0, table.column().second.find_first(1));
+    CHECK_EQUAL(1, table.column().second.find_first(15));
+    CHECK_EQUAL(2, table.column().second.find_first(10));
+    CHECK_EQUAL(3, table.column().second.find_first(20));
+    CHECK_EQUAL(4, table.column().second.find_first(11));
+    CHECK_EQUAL(5, table.column().second.find_first(45));
+    //CHECK_EQUAL(6, table.column().second.find_first(10)); // only finds first match
+    CHECK_EQUAL(7, table.column().second.find_first(0));
+    CHECK_EQUAL(8, table.column().second.find_first(30));
+    CHECK_EQUAL(9, table.column().second.find_first(9));
 
     // Change some values
     table[2].second = 13;
     table[9].second = 100;
 
-    CHECK_EQUAL(0, table.cols().second.find_first(1));
-    CHECK_EQUAL(1, table.cols().second.find_first(15));
-    CHECK_EQUAL(2, table.cols().second.find_first(13));
-    CHECK_EQUAL(3, table.cols().second.find_first(20));
-    CHECK_EQUAL(4, table.cols().second.find_first(11));
-    CHECK_EQUAL(5, table.cols().second.find_first(45));
-    CHECK_EQUAL(6, table.cols().second.find_first(10));
-    CHECK_EQUAL(7, table.cols().second.find_first(0));
-    CHECK_EQUAL(8, table.cols().second.find_first(30));
-    CHECK_EQUAL(9, table.cols().second.find_first(100));
+    CHECK_EQUAL(0, table.column().second.find_first(1));
+    CHECK_EQUAL(1, table.column().second.find_first(15));
+    CHECK_EQUAL(2, table.column().second.find_first(13));
+    CHECK_EQUAL(3, table.column().second.find_first(20));
+    CHECK_EQUAL(4, table.column().second.find_first(11));
+    CHECK_EQUAL(5, table.column().second.find_first(45));
+    CHECK_EQUAL(6, table.column().second.find_first(10));
+    CHECK_EQUAL(7, table.column().second.find_first(0));
+    CHECK_EQUAL(8, table.column().second.find_first(30));
+    CHECK_EQUAL(9, table.column().second.find_first(100));
 
     // Insert values
     table.add(0, 29, true, Wed);
     //TODO: More than add
 
-    CHECK_EQUAL(0, table.cols().second.find_first(1));
-    CHECK_EQUAL(1, table.cols().second.find_first(15));
-    CHECK_EQUAL(2, table.cols().second.find_first(13));
-    CHECK_EQUAL(3, table.cols().second.find_first(20));
-    CHECK_EQUAL(4, table.cols().second.find_first(11));
-    CHECK_EQUAL(5, table.cols().second.find_first(45));
-    CHECK_EQUAL(6, table.cols().second.find_first(10));
-    CHECK_EQUAL(7, table.cols().second.find_first(0));
-    CHECK_EQUAL(8, table.cols().second.find_first(30));
-    CHECK_EQUAL(9, table.cols().second.find_first(100));
-    CHECK_EQUAL(10, table.cols().second.find_first(29));
+    CHECK_EQUAL(0, table.column().second.find_first(1));
+    CHECK_EQUAL(1, table.column().second.find_first(15));
+    CHECK_EQUAL(2, table.column().second.find_first(13));
+    CHECK_EQUAL(3, table.column().second.find_first(20));
+    CHECK_EQUAL(4, table.column().second.find_first(11));
+    CHECK_EQUAL(5, table.column().second.find_first(45));
+    CHECK_EQUAL(6, table.column().second.find_first(10));
+    CHECK_EQUAL(7, table.column().second.find_first(0));
+    CHECK_EQUAL(8, table.column().second.find_first(30));
+    CHECK_EQUAL(9, table.column().second.find_first(100));
+    CHECK_EQUAL(10, table.column().second.find_first(29));
 
     // Delete some values
     table.remove(0);
     table.remove(5);
     table.remove(8);
 
-    CHECK_EQUAL(0, table.cols().second.find_first(15));
-    CHECK_EQUAL(1, table.cols().second.find_first(13));
-    CHECK_EQUAL(2, table.cols().second.find_first(20));
-    CHECK_EQUAL(3, table.cols().second.find_first(11));
-    CHECK_EQUAL(4, table.cols().second.find_first(45));
-    CHECK_EQUAL(5, table.cols().second.find_first(0));
-    CHECK_EQUAL(6, table.cols().second.find_first(30));
-    CHECK_EQUAL(7, table.cols().second.find_first(100));
+    CHECK_EQUAL(0, table.column().second.find_first(15));
+    CHECK_EQUAL(1, table.column().second.find_first(13));
+    CHECK_EQUAL(2, table.column().second.find_first(20));
+    CHECK_EQUAL(3, table.column().second.find_first(11));
+    CHECK_EQUAL(4, table.column().second.find_first(45));
+    CHECK_EQUAL(5, table.column().second.find_first(0));
+    CHECK_EQUAL(6, table.column().second.find_first(30));
+    CHECK_EQUAL(7, table.column().second.find_first(100));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
+*/
 
 TIGHTDB_TABLE_4(TestTableAE,
                 first,  Int,
@@ -521,7 +666,17 @@ TEST(TableAutoEnumeration)
         CHECK_EQUAL(Fri, table[4+n].fourth);
     }
 
-
+    // Verify counts
+    const size_t count1 = table.column().second.count("abd");
+    const size_t count2 = table.column().second.count("eftg");
+    const size_t count3 = table.column().second.count("hijkl");
+    const size_t count4 = table.column().second.count("mnopqr");
+    const size_t count5 = table.column().second.count("stuvxyz");
+    CHECK_EQUAL(5, count1);
+    CHECK_EQUAL(5, count2);
+    CHECK_EQUAL(5, count3);
+    CHECK_EQUAL(5, count4);
+    CHECK_EQUAL(5, count5);
 }
 
 
@@ -539,10 +694,10 @@ TEST(TableAutoEnumerationFindFindAll)
 
     table.optimize();
 
-    size_t t = table.cols().second.find_first("eftg");
+    size_t t = table.column().second.find_first("eftg");
     CHECK_EQUAL(1, t);
 
-    TestTableAE::View tv = table.cols().second.find_all("eftg");
+    TestTableAE::View tv = table.column().second.find_all("eftg");
     CHECK_EQUAL(5, tv.size());
     CHECK_EQUAL("eftg", static_cast<const char*>(tv[0].second));
     CHECK_EQUAL("eftg", static_cast<const char*>(tv[1].second));
@@ -576,12 +731,15 @@ TEST(Table_SlabAlloc)
     table.remove(2);
     table.remove(4);
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 #include <tightdb/group.hpp>
+
+#ifndef _MSC_VER
+
 TEST(Table_Spec)
 {
     Group group;
@@ -645,6 +803,344 @@ TEST(Table_Spec)
         CHECK_EQUAL(42,     subtable2->get_int(0, 0));
         CHECK_EQUAL("test", subtable2->get_string(1, 0));
     }
+}
+
+TEST(Table_Spec_RenameColumns)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    table->add_column(COLUMN_TYPE_INT,    "first");
+    table->add_column(COLUMN_TYPE_STRING, "second");
+    table->add_column(COLUMN_TYPE_TABLE,  "third");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(2); // third
+
+    table->add_subcolumn(column_path, COLUMN_TYPE_INT,    "sub_first");
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "sub_second");
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_int(0, 0, 42);
+        subtable->insert_string(1, 0, "test");
+        subtable->insert_done();
+
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    // Rename first column
+    table->rename_column(0, "1st");
+    CHECK_EQUAL(0, table->get_column_index("1st"));
+
+    // Rename sub-column
+    column_path.push_back(0); // third
+    table->rename_column(column_path, "sub_1st");
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK_EQUAL(0, subtable->get_column_index("sub_1st"));
+    }
+}
+
+TEST(Table_Spec_DeleteColumns)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    table->add_column(COLUMN_TYPE_INT,    "first");
+    table->add_column(COLUMN_TYPE_STRING, "second");
+    table->add_column(COLUMN_TYPE_TABLE,  "third");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(2); // third
+
+    table->add_subcolumn(column_path, COLUMN_TYPE_INT,    "sub_first");
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "sub_second");
+
+    // Put in an index as well
+    table->set_index(1);
+
+    CHECK_EQUAL(3, table->get_column_count());
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    CHECK_EQUAL(0, table->get_subtable_size(2, 0));
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_int(0, 0, 42);
+        subtable->insert_string(1, 0, "test");
+        subtable->insert_done();
+
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    CHECK_EQUAL(1, table->get_subtable_size(2, 0));
+
+    // Remove the first column
+    table->remove_column(0);
+    CHECK_EQUAL(2, table->get_column_count());
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(1, 0);
+
+        CHECK_EQUAL(2,      subtable->get_column_count());
+        CHECK_EQUAL(1,      subtable->size());
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    // Create path to column in sub-table
+    column_path.clear();
+    column_path.push_back(1); // third
+    column_path.push_back(1); // sub_second
+
+    // Remove a column in sub-table
+    table->remove_column(column_path);
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(1, 0);
+
+        CHECK_EQUAL(1,      subtable->get_column_count());
+        CHECK_EQUAL(1,      subtable->size());
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+    }
+
+    // Remove sub-table column (with all members)
+    table->remove_column(1);
+    CHECK_EQUAL(1, table->get_column_count());
+    CHECK_EQUAL("Hello", table->get_string(0, 0));
+
+    // Remove last column
+    table->remove_column(0);
+    CHECK_EQUAL(0, table->get_column_count());
+    CHECK(table->is_empty());
+
+#ifdef TIGHTDB_DEBUG
+    table->Verify();
+#endif // TIGHTDB_DEBUG
+}
+
+TEST(Table_Spec_AddColumns)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    table->add_column(COLUMN_TYPE_INT,    "first");
+    table->add_column(COLUMN_TYPE_STRING, "second");
+    table->add_column(COLUMN_TYPE_TABLE,  "third");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(2); // third
+
+    table->add_subcolumn(column_path, COLUMN_TYPE_INT,    "sub_first");
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "sub_second");
+
+    // Put in an index as well
+    table->set_index(1);
+
+    CHECK_EQUAL(3, table->get_column_count());
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    CHECK_EQUAL(0, table->get_subtable_size(2, 0));
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_int(0, 0, 42);
+        subtable->insert_string(1, 0, "test");
+        subtable->insert_done();
+
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    CHECK_EQUAL(1, table->get_subtable_size(2, 0));
+
+    // Add a new bool column
+    table->add_column(COLUMN_TYPE_BOOL, "fourth");
+    CHECK_EQUAL(4, table->get_column_count());
+    CHECK_EQUAL(false, table->get_bool(3, 0));
+
+    // Add a new string column
+    table->add_column(COLUMN_TYPE_STRING, "fifth");
+    CHECK_EQUAL(5, table->get_column_count());
+    CHECK_EQUAL("", table->get_string(4, 0));
+
+    // Add a new table column
+    table->add_column(COLUMN_TYPE_TABLE, "sixth");
+    CHECK_EQUAL(6, table->get_column_count());
+    CHECK_EQUAL(0, table->get_subtable_size(5, 0));
+
+    // Add a new mixed column
+    table->add_column(COLUMN_TYPE_MIXED, "seventh");
+    CHECK_EQUAL(7, table->get_column_count());
+    CHECK_EQUAL(0, table->get_mixed(6, 0).get_int());
+
+    // Create path to column in sub-table
+    column_path.clear();
+    column_path.push_back(2); // third
+
+    // Add new int column to sub-table
+    table->add_subcolumn(column_path, COLUMN_TYPE_INT, "sub_third");
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+
+        CHECK_EQUAL(3,      subtable->get_column_count());
+        CHECK_EQUAL(1,      subtable->size());
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+        CHECK_EQUAL(0,      subtable->get_int(2, 0));
+    }
+
+    // Add new table column to sub-table
+    table->add_subcolumn(column_path, COLUMN_TYPE_TABLE, "sub_fourth");
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+
+        CHECK_EQUAL(4,      subtable->get_column_count());
+        CHECK_EQUAL(1,      subtable->size());
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+        CHECK_EQUAL(0,      subtable->get_int(2, 0));
+        CHECK_EQUAL(0,      subtable->get_subtable_size(3, 0));
+    }
+
+    // Add new column to new sub-table
+    column_path.push_back(3); // sub_forth
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "first");
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK_EQUAL(4,      subtable->get_column_count());
+
+        TableRef subsubtable = subtable->get_subtable(3, 0);
+        CHECK_EQUAL(1,      subsubtable->get_column_count());
+    }
+
+#ifdef TIGHTDB_DEBUG
+    table->Verify();
+#endif // TIGHTDB_DEBUG
+}
+
+#endif
+
+TEST(Table_Spec_DeleteColumnsBug)
+{
+    TableRef table;
+    table = Table::create();
+
+    // Create specification with sub-table
+    table->add_column(COLUMN_TYPE_STRING, "name");
+    table->set_index(0);
+    table->add_column(COLUMN_TYPE_INT,    "age");
+    table->add_column(COLUMN_TYPE_BOOL,   "hired");
+    table->add_column(COLUMN_TYPE_TABLE,  "phones");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(3); // phones
+
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "type");
+    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "number");
+
+    // Add rows
+    table->add_empty_row();
+    table->set_string(0, 0, "jessica");
+    table->set_int(1, 0, 22);
+    table->set_bool(2, 0, true);
+    {
+        TableRef phones = table->get_subtable(3, 0);
+        phones->add_empty_row();
+        phones->set_string(0, 0, "home");
+        phones->set_string(1, 0, "232-323-3242");
+    }
+
+    table->add_empty_row();
+    table->set_string(0, 1, "joe");
+    table->set_int(1, 1, 42);
+    table->set_bool(2, 1, false);
+    {
+        TableRef phones = table->get_subtable(3, 0);
+        phones->add_empty_row();
+        phones->set_string(0, 0, "work");
+        phones->set_string(1, 0, "434-434-4343");
+    }
+
+    table->add_empty_row();
+    table->set_string(0, 1, "jared");
+    table->set_int(1, 1, 35);
+    table->set_bool(2, 1, true);
+    {
+        TableRef phones = table->get_subtable(3, 0);
+        phones->add_empty_row();
+        phones->set_string(0, 0, "home");
+        phones->set_string(1, 0, "342-323-3242");
+
+        phones->add_empty_row();
+        phones->set_string(0, 0, "school");
+        phones->set_string(1, 0, "434-432-5433");
+    }
+
+    // Add new column
+    table->add_column(COLUMN_TYPE_MIXED, "extra");
+    table->set_mixed(4, 0, true);
+    table->set_mixed(4, 2, "Random string!");
+
+    // Remove some columns
+    table->remove_column(1); // age
+    table->remove_column(3); // extra
+
+#ifdef TIGHTDB_DEBUG
+    table->Verify();
+#endif // TIGHTDB_DEBUG
+
+    table.reset();
 }
 
 TEST(Table_Mixed)
@@ -727,7 +1223,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
 
     table.insert_int(0, 5, 0);
-    table.insert_mixed(1, 5, Mixed(COLUMN_TYPE_TABLE));
+    table.insert_mixed(1, 5, Mixed::subtable_tag());
     table.insert_done();
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
@@ -763,9 +1259,9 @@ TEST(Table_Mixed)
     CHECK_EQUAL("John", subtable2->get_string(0, 0));
     CHECK_EQUAL(40, subtable2->get_int(1, 0));
 
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif //_DEBUG
+#endif // TIGHTDB_DEBUG
 }
 
 TIGHTDB_TABLE_1(TestTableMX,
@@ -809,7 +1305,7 @@ TEST(Table_SubtableSizeAndClear)
     table.insert_done();
 
     table.insert_subtable(0, 1);
-    table.insert_mixed(1, 1, Mixed(COLUMN_TYPE_TABLE));
+    table.insert_mixed(1, 1, Mixed::subtable_tag());
     table.insert_done();
 
     CHECK_EQUAL(table.get_subtable_size(0,0), 0); // Subtable column
@@ -820,7 +1316,7 @@ TEST(Table_SubtableSizeAndClear)
     CHECK(!table.get_subtable(1, 0)); // Mixed column, bool value, must return NULL
     CHECK(table.get_subtable(1, 1));  // Mixed column, table value
 
-    table.set_mixed(1, 0, Mixed(COLUMN_TYPE_TABLE));
+    table.set_mixed(1, 0, Mixed::subtable_tag());
     table.set_mixed(1, 1, false);
     CHECK(table.get_subtable(1, 0));
     CHECK(!table.get_subtable(1, 1));
@@ -901,14 +1397,14 @@ TEST(Table_HighLevelSubtables)
         MyTable2::ConstRef  s2 = t[0].subtab;
         MyTable2::Ref       s3 = t[0].subtab->get_table_ref();
         MyTable2::ConstRef  s4 = t[0].subtab->get_table_ref();
-        MyTable2::Ref       s5 = t.cols().subtab[0];
-        MyTable2::ConstRef  s6 = t.cols().subtab[0];
-        MyTable2::Ref       s7 = t.cols().subtab[0]->get_table_ref();
-        MyTable2::ConstRef  s8 = t.cols().subtab[0]->get_table_ref();
+        MyTable2::Ref       s5 = t.column().subtab[0];
+        MyTable2::ConstRef  s6 = t.column().subtab[0];
+        MyTable2::Ref       s7 = t.column().subtab[0]->get_table_ref();
+        MyTable2::ConstRef  s8 = t.column().subtab[0]->get_table_ref();
         MyTable2::ConstRef cs1 = ct[0].subtab;
         MyTable2::ConstRef cs2 = ct[0].subtab->get_table_ref();
-        MyTable2::ConstRef cs3 = ct.cols().subtab[0];
-        MyTable2::ConstRef cs4 = ct.cols().subtab[0]->get_table_ref();
+        MyTable2::ConstRef cs3 = ct.column().subtab[0];
+        MyTable2::ConstRef cs4 = ct.column().subtab[0]->get_table_ref();
         s1 = t[0].subtab;
         s2 = t[0].subtab; // Also test assigment that converts to const
         static_cast<void>(s1);
@@ -931,14 +1427,14 @@ TEST(Table_HighLevelSubtables)
         MyTable1::ConstRef  s2 = t[0].subtab[0].subtab;
         MyTable1::Ref       s3 = t[0].subtab[0].subtab->get_table_ref();
         MyTable1::ConstRef  s4 = t[0].subtab[0].subtab->get_table_ref();
-        MyTable1::Ref       s5 = t.cols().subtab[0]->cols().subtab[0];
-        MyTable1::ConstRef  s6 = t.cols().subtab[0]->cols().subtab[0];
-        MyTable1::Ref       s7 = t.cols().subtab[0]->cols().subtab[0]->get_table_ref();
-        MyTable1::ConstRef  s8 = t.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        MyTable1::Ref       s5 = t.column().subtab[0]->column().subtab[0];
+        MyTable1::ConstRef  s6 = t.column().subtab[0]->column().subtab[0];
+        MyTable1::Ref       s7 = t.column().subtab[0]->column().subtab[0]->get_table_ref();
+        MyTable1::ConstRef  s8 = t.column().subtab[0]->column().subtab[0]->get_table_ref();
         MyTable1::ConstRef cs1 = ct[0].subtab[0].subtab;
         MyTable1::ConstRef cs2 = ct[0].subtab[0].subtab->get_table_ref();
-        MyTable1::ConstRef cs3 = ct.cols().subtab[0]->cols().subtab[0];
-        MyTable1::ConstRef cs4 = ct.cols().subtab[0]->cols().subtab[0]->get_table_ref();
+        MyTable1::ConstRef cs3 = ct.column().subtab[0]->column().subtab[0];
+        MyTable1::ConstRef cs4 = ct.column().subtab[0]->column().subtab[0]->get_table_ref();
         s1 = t[0].subtab[0].subtab;
         s2 = t[0].subtab[0].subtab; // Also test assigment that converts to const
         static_cast<void>(s1);
@@ -956,45 +1452,45 @@ TEST(Table_HighLevelSubtables)
     }
 
     t[0].subtab[0].val = 1;
-    CHECK_EQUAL(t[0].subtab[0].val,                 1);
-    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  1);
-    CHECK_EQUAL(t[0].subtab->cols().val[0],         1);
-    CHECK_EQUAL(t.cols().subtab[0][0].val,          1);
+    CHECK_EQUAL(t[0].subtab[0].val,                     1);
+    CHECK_EQUAL(t.column().subtab[0]->column().val[0],  1);
+    CHECK_EQUAL(t[0].subtab->column().val[0],           1);
+    CHECK_EQUAL(t.column().subtab[0][0].val,            1);
 
-    t.cols().subtab[0]->cols().val[0] = 2;
-    CHECK_EQUAL(t[0].subtab[0].val,                 2);
-    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  2);
-    CHECK_EQUAL(t[0].subtab->cols().val[0],         2);
-    CHECK_EQUAL(t.cols().subtab[0][0].val,          2);
+    t.column().subtab[0]->column().val[0] = 2;
+    CHECK_EQUAL(t[0].subtab[0].val,                     2);
+    CHECK_EQUAL(t.column().subtab[0]->column().val[0],  2);
+    CHECK_EQUAL(t[0].subtab->column().val[0],           2);
+    CHECK_EQUAL(t.column().subtab[0][0].val,            2);
 
-    t[0].subtab->cols().val[0] = 3;
-    CHECK_EQUAL(t[0].subtab[0].val,                 3);
-    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  3);
-    CHECK_EQUAL(t[0].subtab->cols().val[0],         3);
-    CHECK_EQUAL(t.cols().subtab[0][0].val,          3);
+    t[0].subtab->column().val[0] = 3;
+    CHECK_EQUAL(t[0].subtab[0].val,                     3);
+    CHECK_EQUAL(t.column().subtab[0]->column().val[0],  3);
+    CHECK_EQUAL(t[0].subtab->column().val[0],           3);
+    CHECK_EQUAL(t.column().subtab[0][0].val,            3);
 
-    t.cols().subtab[0][0].val = 4;
-    CHECK_EQUAL(t[0].subtab[0].val,                 4);
-    CHECK_EQUAL(t.cols().subtab[0]->cols().val[0],  4);
-    CHECK_EQUAL(t[0].subtab->cols().val[0],         4);
-    CHECK_EQUAL(t.cols().subtab[0][0].val,          4);
-    CHECK_EQUAL(ct[0].subtab[0].val,                4);
-    CHECK_EQUAL(ct.cols().subtab[0]->cols().val[0], 4);
-    CHECK_EQUAL(ct[0].subtab->cols().val[0],        4);
-    CHECK_EQUAL(ct.cols().subtab[0][0].val,         4);
+    t.column().subtab[0][0].val = 4;
+    CHECK_EQUAL(t[0].subtab[0].val,                     4);
+    CHECK_EQUAL(t.column().subtab[0]->column().val[0],  4);
+    CHECK_EQUAL(t[0].subtab->column().val[0],           4);
+    CHECK_EQUAL(t.column().subtab[0][0].val,            4);
+    CHECK_EQUAL(ct[0].subtab[0].val,                    4);
+    CHECK_EQUAL(ct.column().subtab[0]->column().val[0], 4);
+    CHECK_EQUAL(ct[0].subtab->column().val[0],          4);
+    CHECK_EQUAL(ct.column().subtab[0][0].val,           4);
 
     t[0].subtab[0].subtab->add();
     t[0].subtab[0].subtab[0].val = 5;
-    CHECK_EQUAL(t[0].subtab[0].subtab[0].val,                         5);
-    CHECK_EQUAL(t.cols().subtab[0]->cols().subtab[0]->cols().val[0],  5);
-    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                        5);
-    CHECK_EQUAL(ct.cols().subtab[0]->cols().subtab[0]->cols().val[0], 5);
+    CHECK_EQUAL(t[0].subtab[0].subtab[0].val,                               5);
+    CHECK_EQUAL(t.column().subtab[0]->column().subtab[0]->column().val[0],  5);
+    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                              5);
+    CHECK_EQUAL(ct.column().subtab[0]->column().subtab[0]->column().val[0], 5);
 
-    t.cols().subtab[0]->cols().subtab[0]->cols().val[0] = 6;
-    CHECK_EQUAL(t[0].subtab[0].subtab[0].val,                         6);
-    CHECK_EQUAL(t.cols().subtab[0]->cols().subtab[0]->cols().val[0],  6);
-    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                        6);
-    CHECK_EQUAL(ct.cols().subtab[0]->cols().subtab[0]->cols().val[0], 6);
+    t.column().subtab[0]->column().subtab[0]->column().val[0] = 6;
+    CHECK_EQUAL(t[0].subtab[0].subtab[0].val,                               6);
+    CHECK_EQUAL(t.column().subtab[0]->column().subtab[0]->column().val[0],  6);
+    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                              6);
+    CHECK_EQUAL(ct.column().subtab[0]->column().subtab[0]->column().val[0], 6);
 
 /*
   Idea for compile time failure tests:
@@ -1003,11 +1499,11 @@ TEST(Table_HighLevelSubtables)
 #if    TEST_INDEX == 0
     t[0].val = 7;
 #elsif TEST_INDEX == 1
-    t.cols().val[0] = 7;
+    t.column().val[0] = 7;
 #elsif TEST_INDEX == 2
     t[0].subtab[0].val = 7;
 #elsif TEST_INDEX == 3
-    t[0].subtab->cols().val[0] = 7;
+    t[0].subtab->column().val[0] = 7;
 #endif
 */
 }
@@ -1087,7 +1583,7 @@ TEST(Table_SubtableWithParentChange)
     CHECK_EQUAL(table[1].subtab[0].val, 7);
     CHECK_EQUAL(subtab[0].val, 7);
     CHECK(subtab->is_valid());
-#ifdef _DEBUG
+#ifdef TIGHTDB_DEBUG
     table.Verify();
     subtab->Verify();
 #endif
@@ -1103,4 +1599,36 @@ TEST(Table_SubtableWithParentChange)
     subtab = table[1].subtab;
     CHECK(table.is_valid());
     CHECK(subtab->is_valid());
+}
+
+TEST(Table_HasSharedSpec)
+{
+    MyTable2 table1;
+    CHECK(!table1.has_shared_spec());
+    Group g;
+    MyTable2::Ref table2 = g.get_table<MyTable2>("foo");
+    CHECK(!table2->has_shared_spec());
+    table2->add();
+    CHECK(table2[0].subtab->has_shared_spec());
+
+    // Subtable in mixed column
+    TestTableMX::Ref table3 = g.get_table<TestTableMX>("bar");
+    CHECK(!table3->has_shared_spec());
+    table3->add();
+    table3[0].first.set_subtable<MyTable2>();
+    MyTable2::Ref table4 = table3[0].first.get_subtable<MyTable2>();
+    CHECK(table4);
+    CHECK(!table4->has_shared_spec());
+    table4->add();
+    CHECK(!table4->has_shared_spec());
+    CHECK(table4[0].subtab->has_shared_spec());
+}
+
+#include <tightdb/lang_bind_helper.hpp>
+
+TEST(Table_LanguageBindings)
+{
+   Table* table = LangBindHelper::new_table();
+   CHECK(table->is_valid());
+   LangBindHelper::unbind_table_ref(table);
 }

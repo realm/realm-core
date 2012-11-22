@@ -20,10 +20,12 @@
 #ifndef TIGHTDB_COLUMN_STRING_ENUM_HPP
 #define TIGHTDB_COLUMN_STRING_ENUM_HPP
 
-#include "column_string.hpp"
+#include <tightdb/column_string.hpp>
 
 namespace tightdb {
 
+// Pre-declarations
+class StringIndex;
 
 class ColumnStringEnum : public Column {
 public:
@@ -42,20 +44,34 @@ public:
     void Delete(size_t ndx);
     void Clear();
 
+    using Column::add;
+
+    size_t count(const char* value) const;
     size_t find_first(const char* value, size_t start=0, size_t end=-1) const;
     void find_all(Array& res, const char* value, size_t start=0, size_t end=-1) const;
 
+    size_t count(size_t key_index) const;
     size_t find_first(size_t key_index, size_t start=0, size_t end=-1) const;
     void find_all(Array& res, size_t key_index, size_t start=0, size_t end=-1) const;
 
     void UpdateParentNdx(int diff);
-    void  UpdateFromParent();
+    void UpdateFromParent();
 
-#ifdef _DEBUG
-    bool Compare(const ColumnStringEnum& c) const;
+    // Index
+    bool HasIndex() const {return m_index != NULL;}
+    const StringIndex& GetIndex() const {return *m_index;}
+    StringIndex& CreateIndex();
+    void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
+    void ReuseIndex(StringIndex& index);
+    void RemoveIndex() {m_index = NULL;}
+
+    /// Compare two string enumeration columns for equality
+    bool Compare(const ColumnStringEnum&) const;
+
+#ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void ToDot(std::ostream& out, const char* title) const;
-#endif // _DEBUG
+#endif // TIGHTDB_DEBUG
 
     size_t GetKeyNdx(const char* value) const;
     size_t GetKeyNdxOrAdd(const char* value);
@@ -64,6 +80,7 @@ private:
 
     // Member variables
     AdaptiveStringColumn m_keys;
+    StringIndex* m_index;
 };
 
 

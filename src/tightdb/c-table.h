@@ -38,16 +38,17 @@
 */
 
 
+#include <time.h>
+#include <stdlib.h> // size_t
+
 #ifdef _MSC_VER
-#include "win32/stdint.h"
+#include <win32/stdint.h>
 #else
 #include <inttypes.h>
 #include <stdint.h>
 #endif
 
-#include <time.h>
-#include <stdlib.h> // size_t
-#include "column_type.hpp"
+#include <tightdb/column_type.hpp>
 
 #ifdef __cplusplus
 
@@ -89,6 +90,7 @@ typedef struct TableView TableView;
 typedef struct Spec Spec;
 typedef struct Group Group;
 typedef struct Query Query;
+typedef struct TableRef TableRef;
 
 #endif // __cplusplus
 
@@ -297,7 +299,7 @@ typedef struct Query Query;
 
 /*** Query ************************************/
 
-    Query*  query_new();
+    //Query*  query_new(Table* table); // -> table_get_query()
     void    query_delete(Query* q);
 
     void    query_group(Query* q);
@@ -330,24 +332,23 @@ typedef struct Query Query;
 
 /* Currently missing support for Query on Mixed and Binary */
 
-    TableView*  query_find_all(Query* q, Table* t);
-    TableView*  query_find_all_range(Query* q, Table* t, size_t start, size_t end, size_t limit);
+    TableView*  query_find_all(Query* q);
+    TableView*  query_find_all_range(Query* q, size_t start, size_t end, size_t limit);
             /* Use tableview_delete(); to delete the tableview after use */
 
-    size_t   query_count(Query* q, const Table* t);
-    size_t   query_count_range(Query* q, const Table* t,
-                               size_t start, size_t end, size_t limit);
-    int64_t  query_min(Query* q, const Table* t, size_t column_ndx, size_t* resultcount);
-    int64_t  query_min_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
+    size_t   query_count(Query* q);
+    size_t   query_count_range(Query* q, size_t start, size_t end, size_t limit);
+    int64_t  query_min(Query* q, size_t column_ndx, size_t* resultcount);
+    int64_t  query_min_range(Query* q, size_t column_ndx, size_t* resultcount,
                              size_t start, size_t end, size_t limit);
-    int64_t  query_max(Query* q, const Table* t, size_t column_ndx, size_t* resultcount);
-    int64_t  query_max_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
+    int64_t  query_max(Query* q, size_t column_ndx, size_t* resultcount);
+    int64_t  query_max_range(Query* q, size_t column_ndx, size_t* resultcount,
                              size_t start, size_t end, size_t limit);
-    int64_t  query_sum(Query* q, const Table* t, size_t column_ndx, size_t* resultcount);
-    int64_t  query_sum_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
+    int64_t  query_sum(Query* q, size_t column_ndx, size_t* resultcount);
+    int64_t  query_sum_range(Query* q, size_t column_ndx, size_t* resultcount,
                              size_t start, size_t end, size_t limit);
-    double   query_avg(Query* q, const Table* t, size_t column_ndx, size_t* resultcount);
-    double   query_avg_range(Query* q, const Table* t, size_t column_ndx, size_t* resultcount,
+    double   query_avg(Query* q, size_t column_ndx, size_t* resultcount);
+    double   query_avg_range(Query* q, size_t column_ndx, size_t* resultcount,
                              size_t start, size_t end, size_t limit);
 
 #ifdef __cplusplus
