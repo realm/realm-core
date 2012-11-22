@@ -34,7 +34,7 @@
     #define TIGHTDB_PTR_64
 #endif
 
-// On platforms with cache coherence this macro sould not do anything
+// On platforms with cache coherence this macro should not do anything
 // on all other platforms it should implement a sync or memory barrier
 #if defined(TIGHTDB_X86X64)
 #define TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
