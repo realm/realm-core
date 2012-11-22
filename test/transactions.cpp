@@ -419,10 +419,11 @@ private:
 
 
 
-TEST(Replication)
+TEST(Transactions)
 {
     const char* database_path = "transactions.tightdb";
     remove(database_path);
+    remove((database_path+string(".lock")).c_str());
 
     // Run N rounds in each thread
     {
