@@ -18,6 +18,23 @@ TIGHTDB_TABLE_2(BoolTupleTable,
                 first,  Int,
                 second, Bool)
 
+
+TEST(TestQueryAggStrCond)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "a");
+    ttt.add(4, "b");
+    ttt.add(7, "c");
+    ttt.add(10, "a");
+    ttt.add(1, "b");
+    ttt.add(4, "c");
+
+    int64_t sum = ttt.where().second.equal("a").first.greater(4).first.sum(ttt);
+    CHECK_EQUAL(10, sum);
+}
+
+
 TEST(TestQueryStrIndexed_enum)
 {
     TupleTableType ttt;

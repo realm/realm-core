@@ -12,7 +12,7 @@
 using namespace tightdb;
 
 #define LL_MAX (9223372036854775807LL)
-#define LL_MIN (-LLMAX - 1)
+#define LL_MIN (-LL_MAX - 1)
 
 
 namespace {

@@ -337,7 +337,7 @@ size_t Query::count(const Table& table, size_t start, size_t end, size_t limit) 
 
     Init(table);
     state_state st;
-    Array spare;
+    Array spare; 
     st.init(TDB_COUNT, NULL, NULL, &spare, limit);
     int64_t r = first[0]->aggregate_super<TDB_COUNT>(&st, start, end);
     return size_t(r);

@@ -119,21 +119,21 @@ public:
         size_t td;
 
         while(start < end) {
-            // Put best condition in m_children[0]
             size_t best = std::distance(m_children.begin(), std::min_element(m_children.begin(), m_children.end(), score_compare()));
-            ParentNode* temp = m_children[0]; m_children[0] = m_children[best]; m_children[best] = temp;
 
             // Find a large amount of local matches in best condition
-            td = m_children[0]->dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
-            start = m_children[0]->aggregate(st, start, td, 32, action, agg_col, matchcount);
+            td = m_children[best]->dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
+            start = m_children[best]->aggregate(st, start, td, 16, action, agg_col, matchcount);
 
             // Make remaining conditions compute their dD (statistics)
-            for(size_t c = 1; c < m_children.size() && start < end; c++) {
+            for(size_t c = 0; c < m_children.size() && start < end; c++) {
+                if(c == best)
+                    continue;
 
-                // Skip test if there is no way its cost can be better than best node's
-                float cost = m_children[c]->cost();
+                // Skip test if there is no way its cost can ever be better than best node's
+                float cost = m_children[c]->cost(); // cost() = 16.0 / dD + dT;
                 if(m_children[c]->dT < cost) {
-                    size_t maxN = 1;
+                    size_t maxN = 2;
 
                     // Limit to +256 in order not to skip too large parts of index nodes
                     size_t maxD = m_children[c]->dT == 0.0 ? end - start : 256;
@@ -270,8 +270,6 @@ protected:
 };
 
 
-
-
 // Not finished
 class SUBTABLE: public ParentNode {
 public:
@@ -384,7 +382,6 @@ public:
     // in the NODE::aggregate() call. Used if aggregate source column is different from search criteria column
     template <ACTION action>bool match_callback(int64_t v) {
         size_t i = to_size_t(v);
-
         m_last_local_match = i;
         m_local_matches++;
 
@@ -494,7 +491,6 @@ public:
 
         return end;
     }
-
 
     T m_value;
 
