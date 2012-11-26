@@ -162,6 +162,7 @@ public:
                 ArrayParent* parent, std::size_t idx_in_parent,
                 std::size_t spec_ref, std::size_t column_ref);
 
+    bool   has_subtable(size_t ndx) const;
     size_t get_subtable_size(size_t ndx) const;
 
     /// The returned table pointer must always end up being wrapped in
@@ -174,7 +175,8 @@ public:
     bool add();
     void Insert(size_t ndx);
     void Delete(size_t ndx);
-    void Clear(size_t ndx);
+    void ClearTable(size_t ndx);
+    void fill(size_t count);
 
     // FIXME: This one is virtual and overrides
     // Column::insert(size_t). Insert(size_t) is not virtual. Do we
@@ -192,6 +194,8 @@ public:
     // Overriding virtual method.
     void invalidate_subtables_virtual();
 
+    void set_specref(size_t ref) {m_ref_specSet = ref;}
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
 #endif // TIGHTDB_DEBUG
@@ -201,7 +205,11 @@ protected:
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif // TIGHTDB_DEBUG
 
+    // Member variables
     size_t m_ref_specSet;
+
+    // Overriding virtual method in Table::Parent.
+    bool subtables_have_shared_spec() { return true; }
 };
 
 

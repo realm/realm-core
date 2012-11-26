@@ -630,5 +630,57 @@ TEST(Shared_FormerErrorCase2)
     }
 }
 
+namespace {
+
+TIGHTDB_TABLE_1(OverAllocTable,
+                text, String)
+
+} // namespace
+
+TEST(Shared_SpaceOveruse)
+{
+    const int n_outer = 3000;
+    const int n_inner = 42;
+
+    // Many transactions
+    {
+        remove("over_alloc_1.db");
+        remove("over_alloc_1.db.lock");
+        SharedGroup db("over_alloc_1.db");
+        CHECK(db.is_valid());
+
+        // Do a lot of sequential transactions
+        for (int i = 0; i < n_outer; ++i) {
+            {
+                Group& group = db.begin_write();
+                OverAllocTable::Ref table = group.get_table<OverAllocTable>("my_table");
+                for (int j = 0; j < n_inner; ++j) {
+                    table->add("x");
+                }
+            }
+            db.commit();
+        }
+
+        // Verify that all was added correctly
+        {
+            const Group& group = db.begin_read();
+            OverAllocTable::ConstRef table = group.get_table<OverAllocTable>("my_table");
+
+            const size_t count = table->size();
+            CHECK_EQUAL(n_outer * n_inner, count);
+
+            for (size_t i = 0; i < count; ++i) {
+                CHECK_EQUAL("x", table[i].text);
+            }
+
+#ifdef TIGHTDB_DEBUG
+            table->Verify();
+#endif
+
+            db.end_read();
+        }
+    }
+}
+
 
 #endif // !_MSV_VER

@@ -73,12 +73,16 @@ public:
     typedef BasicTableView<const BasicTable> ConstView;
 
     using Table::is_valid;
+    using Table::has_shared_spec;
     using Table::is_empty;
     using Table::size;
     using Table::clear;
     using Table::remove;
+    using Table::remove_last;
     using Table::optimize;
     using Table::lookup;
+    using Table::add_empty_row;
+    using Table::insert_empty_row;
 
     BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc) { set_dynamic_spec(); }
 
@@ -192,11 +196,8 @@ public:
 
 
     class Query;
-
-    Query where() const
-    {
-        return Query(); // FIXME: Bad thing to copy queries
-    }
+    Query       where() {return Query(*this);}
+    const Query where() const {return Query(*this);}
 
     /// Compare two tables for equality. Two tables are equal if, and
     /// only if, they contain the same rows in the same order, that
@@ -300,7 +301,7 @@ public:
     template<class, int, class> friend class _impl::QueryColumnBase;
     template<class, int, class> friend class _impl::QueryColumn;
 
-    Query(): Spec::template ColNames<QueryCol, Query*>(this) {}
+    Query(const Query&q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
 
     Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
 
@@ -312,42 +313,46 @@ public:
 
     Query& Or() { m_impl.Or(); return *this; }
 
-    std::size_t find_next(const BasicTable<Spec>& table, std::size_t lastmatch=std::size_t(-1))
+    std::size_t find_next(std::size_t lastmatch=std::size_t(-1))
     {
-        return m_impl.find_next(table, lastmatch);
+        return m_impl.find_next(lastmatch);
     }
 
-    typename BasicTable<Spec>::View find_all(BasicTable<Spec>& table, std::size_t start=0,
+    typename BasicTable<Spec>::View find_all(std::size_t start=0,
                                              std::size_t end=std::size_t(-1),
                                              std::size_t limit=std::size_t(-1))
     {
-        return m_impl.find_all(table, start, end, limit);
+        return m_impl.find_all(start, end, limit);
     }
 
-    typename BasicTable<Spec>::ConstView find_all(const BasicTable<Spec>& table,
-                                                  std::size_t start=0,
+    typename BasicTable<Spec>::ConstView find_all(std::size_t start=0,
                                                   std::size_t end=std::size_t(-1),
-                                                  std::size_t limit=std::size_t(-1))
+                                                  std::size_t limit=std::size_t(-1)) const
     {
-        return m_impl.find_all(table, start, end, limit);
+        return m_impl.find_all(start, end, limit);
     }
 
-    std::size_t count(const BasicTable<Spec>& table, std::size_t start=0,
+    std::size_t count(std::size_t start=0,
                       std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return m_impl.count(table, start, end, limit);
+        return m_impl.count(start, end, limit);
     }
 
-    std::size_t remove(BasicTable<Spec>& table, std::size_t start = 0,
+    std::size_t remove(std::size_t start = 0,
                        std::size_t end = std::size_t(-1),
-                       std::size_t limit = std::size_t(-1)) const
+                       std::size_t limit = std::size_t(-1))
     {
-        return m_impl.remove(table, start, end, limit);
+        return m_impl.remove(start, end, limit);
     }
 
 #ifdef TIGHTDB_DEBUG
     std::string Verify() { return m_impl.Verify(); }
 #endif
+
+protected:
+    friend class BasicTable;
+
+    Query(const BasicTable<Spec>& table): Spec::template ColNames<QueryCol, Query*>(this), m_impl((Table&)table) {}
 
 private:
     tightdb::Query m_impl;

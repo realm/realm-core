@@ -43,15 +43,29 @@ size_t GetSizeFromHeader(void* p)
     const uint8_t* const header = (uint8_t*)p;
     const size_t width = (1 << (header[0] & 0x07)) >> 1;
     const size_t count = (header[1] << 16) + (header[2] << 8) + header[3];
+    const size_t wt    = (header[0] & 0x18) >> 3; // Array::WidthType
 
     // Calculate bytes used by array
-    const size_t bits = (count * width);
-    size_t bytes = (bits / 8) + 8; // add room for 8 byte header
-    if (bits & 0x7) ++bytes;       // include partial bytes
+    size_t bytes = 0;
+    if (wt == 0) { // TDB_BITS
+        const size_t bits = (count * width);
+        bytes = bits / 8;
+        if (bits & 0x7) ++bytes; // include partial bytes
+    }
+    else if (wt == 1) { // TDB_MULTIPLY
+        bytes = count * width;
+    }
+    else if (wt == 2) { // TDB_IGNORE
+        bytes = count;
+    }
+    else TIGHTDB_ASSERT(false);
 
     // Arrays are always padded to 64 bit alignment
     const size_t rest = (~bytes & 0x7)+1;
     if (rest < 8) bytes += rest; // 64bit blocks
+
+    // include header in total
+    bytes += 8;
 
     return bytes;
 }
@@ -140,13 +154,13 @@ MemRef SlabAlloc::Alloc(size_t size)
 
     // Else, allocate new slab
     const size_t multible = 256 * ((size / 256) + 1); // FIXME: Not an english word. Also, is this the intended rounding behavior?
-    const size_t slabsBack = m_slabs.is_empty() ? m_baseline : m_slabs.back().offset;
+    const size_t slabsBack = m_slabs.is_empty() ? m_baseline : size_t(m_slabs.back().offset);
     const size_t doubleLast = m_slabs.is_empty() ? 0 :
-        (slabsBack - ((m_slabs.size() == 1) ? size_t(0) : m_slabs.back(-2).offset)) * 2;
+        (slabsBack - ((m_slabs.size() == 1) ? size_t(0) : size_t(m_slabs.back(-2).offset))) * 2;
     const size_t newsize = multible > doubleLast ? multible : doubleLast;
 
     // Allocate memory
-    void* slab = newsize ? malloc(newsize): NULL;
+    void* const slab = newsize ? malloc(newsize): NULL;
     if (!slab) return MemRef(NULL, 0);
 
     // Add to slab table
@@ -259,7 +273,7 @@ void* SlabAlloc::Translate(size_t ref) const
         const size_t ndx = m_slabs.column().offset.find_pos(ref);
         TIGHTDB_ASSERT(ndx != not_found);
 
-        const size_t offset = ndx ? m_slabs[ndx-1].offset : m_baseline;
+        const size_t offset = ndx ? size_t(m_slabs[ndx-1].offset) : m_baseline;
         return (char*)(intptr_t)m_slabs[ndx].pointer + (ref - offset);
     }
 }

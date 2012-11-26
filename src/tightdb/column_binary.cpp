@@ -163,6 +163,25 @@ bool ColumnBinary::Insert(size_t ndx, BinaryData bin)
     return TreeInsert<BinaryData,ColumnBinary>(ndx, bin);
 }
 
+void ColumnBinary::fill(size_t count)
+{
+    TIGHTDB_ASSERT(is_empty());
+
+    BinaryData empty_bin; // default value
+
+    // Fill column with default values
+    // TODO: this is a very naive approach
+    // we could speedup by creating full nodes directly
+    for (size_t i = 0; i < count; ++i) {
+        TreeInsert<BinaryData, ColumnBinary>(i, empty_bin);
+    }
+
+#ifdef TIGHTDB_DEBUG
+    Verify();
+#endif
+}
+
+
 void ColumnBinary::Delete(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());

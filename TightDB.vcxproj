@@ -158,7 +158,7 @@
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">$(ProjectName)64</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">$(ProjectName)32d</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">$(ProjectName)32</TargetName>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\include;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(IncludePath)</IncludePath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -173,7 +173,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -222,7 +222,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG /DUSE_SSE42 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -275,7 +275,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalOptions>/DUSE_SSE42 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -332,6 +332,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>WS2_32.lib;x64\Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -598,6 +599,7 @@
     <ClInclude Include="src\tightdb\table_view.hpp" />
     <ClInclude Include="src\tightdb\table_view_basic.hpp" />
     <ClInclude Include="src\tightdb\tightdb-c.h" />
+    <ClInclude Include="src\tightdb\tightdb_nmmintrin.h" />
     <ClInclude Include="src\tightdb\tuple.hpp" />
     <ClInclude Include="src\tightdb\type_list.hpp" />
     <ClInclude Include="src\tightdb\utf8.hpp" />

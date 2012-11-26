@@ -40,6 +40,7 @@ class Index;
 class ColumnBase {
 public:
     virtual ~ColumnBase() {};
+    virtual void Destroy() = 0;
 
     virtual void SetHasRefs() {};
 
@@ -160,11 +161,14 @@ public:
     bool Insert(size_t ndx, int64_t value);
     bool add() {return add(0);}
     bool add(int64_t value);
+    void fill(size_t count);
 
     size_t  count(int64_t target) const;
     int64_t sum(size_t start = 0, size_t end = -1) const;
     int64_t maximum(size_t start = 0, size_t end = -1) const;
     int64_t minimum(size_t start = 0, size_t end = -1) const;
+    double  average(size_t start = 0, size_t end = -1) const;
+
     void sort(size_t start, size_t end);
     void ReferenceSort(size_t start, size_t end, Column &ref);
 

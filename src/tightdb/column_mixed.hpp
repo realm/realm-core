@@ -105,6 +105,7 @@ public:
     void insert(size_t ndx) { insert_int(ndx, 0); invalidate_subtables(); }
     void Clear(); // Overriding virtual method.
     void Delete(size_t ndx);
+    void fill(size_t count);
 
     // Indexing
     bool HasIndex() const {return false;}

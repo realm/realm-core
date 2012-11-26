@@ -33,6 +33,10 @@ namespace tightdb {
 enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_LESS, COND_NONE, COND_COUNT};
 
 
+// FIXME: We cannot use all-uppercase names like 'CONTAINS' for
+// classes since the risk of colliding with one of the customers macro
+// names is too high. In short, the all-uppercase name space is
+// reserved for macros.
 struct CONTAINS {
     CONTAINS() {};
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
@@ -69,13 +73,28 @@ struct ENDSWITH {
 };
 
 struct EQUAL {
+    bool operator()(const bool v1, const bool v2) const
+    {
+        return v1 == v2;
+    }
+
     bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
         (void)v1_lower;
         (void)v1_upper;
         return std::strcmp(v1, v2) == 0;
     }
-    bool operator()(bool v1, bool v2) const {return v1 == v2;}
+    bool operator()(const char *v1, size_t len1, const char* v2, size_t len2) const
+    {
+        if(len1 != len2)
+            return false;
+        if(len1 == 0)
+            return true;
+        if(v1[len1 - 1] != v2[len1 - 1])
+            return false;
+        int i = memcmp(v1, v2, len1);
+        return (i == 0);
+    }
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
     int condition(void) {return COND_EQUAL;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (v >= lbound && v <= ubound); }

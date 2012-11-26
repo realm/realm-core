@@ -6,17 +6,52 @@
 #include <win32/stdint.h>
 #endif
 
+#include <iostream>
 #include <tightdb/assert.hpp>
 #include <tightdb/utilities.hpp>
 
+#ifdef _MSC_VER
+    #include <intrin.h>
+#endif
+
 namespace tightdb {
 
+char sse_support = -1;
+
+void cpuid_init()
+{
+#ifdef TIGHTDB_COMPILER_SSE
+    int cret;
+#ifdef _MSC_VER
+    int CPUInfo[4];
+    __cpuid(CPUInfo, 1);
+    cret = CPUInfo[2];
+#else
+    int a = 1;
+    __asm ( "mov %1, %%eax; "            // a into eax
+          "cpuid;"
+          "mov %%ecx, %0;"             // ecx into b
+          :"=r"(cret)                     // output
+          :"r"(a)                      // input
+          :"%eax","%ebx","%ecx","%edx" // clobbered register
+         );
+#endif
+
+// Byte is atomic. Race can/will occur but that's fine
+    if(cret & 0x100000) // test for 4.2
+        sse_support = 1;
+    else if(cret & 0x1) // Test for 3
+        sse_support = 0;
+    else
+        sse_support = -2;
+#endif
+}
 
 size_t to_ref(int64_t v)
 {
 #ifdef TIGHTDB_DEBUG
     uint64_t m = size_t(-1);
-    TIGHTDB_ASSERT(uint64_t(v) <= m); // todo, use int_cast_with_overflow_detect
+    TIGHTDB_ASSERT(uint64_t(v) <= m);
     // FIXME: This misbehaves for negative v when size_t is 64-bits.
     // FIXME: This misbehaves on architectures that do not use 2's complement represenation of negative numbers.
     // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
