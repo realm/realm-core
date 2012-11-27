@@ -632,6 +632,14 @@ void Group::Verify() const
 {
     if (!is_valid()) return;
 
+    // The file may have been created but not yet used
+    // (so no structure has been initialized)
+    const bool isShared = m_persistMode & GROUP_SHARED;
+    if (isShared && m_alloc.GetTopRef() == 0 && !m_top.IsValid()) {
+        TIGHTDB_ASSERT(!m_tables.IsValid());
+        return;
+    }
+
     // Verify free lists
     if (m_freePositions.IsValid()) {
         TIGHTDB_ASSERT(m_freeLengths.IsValid());
