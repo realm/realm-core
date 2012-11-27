@@ -92,18 +92,12 @@ Group::Group(const char* filename, int mode):
 {
     TIGHTDB_ASSERT(filename);
 
-    // Memory map file
-    const bool readOnly = mode & GROUP_READONLY;
-    m_isValid = m_alloc.SetShared(filename, readOnly);
+    // With shared groups, we might want to start in invalid state
+    // and then initialize later
+    if (mode & GROUP_INVALID)
+        return;
 
-    if (m_isValid) {
-        // if we just created shared group, we have to wait with
-        // actually creating it's datastructures until first write
-        if (m_persistMode == GROUP_SHARED && m_alloc.GetTopRef() == 0)
-            return;
-        else
-            create_from_ref();
-    }
+    create_from_file(filename, true);
 }
 
 Group::Group(const char* buffer, size_t len):
@@ -116,6 +110,29 @@ Group::Group(const char* buffer, size_t len):
     m_isValid = m_alloc.SetSharedBuffer(buffer, len);
 
     if (m_isValid) create_from_ref();
+}
+
+bool Group::create_from_file(const char* filename, bool doInit)
+{
+    TIGHTDB_ASSERT(!m_isValid);
+
+    // Memory map file
+    // This leaves the group ready, but in invalid state
+    const bool readOnly = m_persistMode & GROUP_READONLY;
+    const bool isValid = m_alloc.SetShared(filename, readOnly);
+
+    if (isValid && doInit) {
+        m_isValid = true;
+
+        // if we just created shared group, we have to wait with
+        // actually creating it's datastructures until first write
+        if (m_persistMode == GROUP_SHARED && m_alloc.GetTopRef() == 0)
+            return true;
+        else
+            create_from_ref();
+    }
+
+    return isValid;
 }
 
 void Group::create()
@@ -234,7 +251,10 @@ void Group::init_shared() {
 void Group::reset_to_new()
 {
     TIGHTDB_ASSERT(m_alloc.GetTopRef() == 0);
-    if (!m_top.IsValid()) return; // already in new state
+    if (!m_top.IsValid()) {
+        m_isValid = true;
+        return; // already in new state
+    }
 
     // A shared group that has just been created and not yet
     // written to does not have any internal structures yet
