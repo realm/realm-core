@@ -232,6 +232,14 @@ public:
 
     virtual ~Array();
 
+    // FIXME: This operator does not compare the arrays, it compares
+    // just the data pointers. This is hugely counterintuitive. If
+    // this kind of comparison is needed, it should be provided as
+    // an ordinary function. Proper (deep) array comparison is
+    // probably something that we want too, and that is what we should
+    // use operator==() for. For example, proper array comparison
+    // would be usefull for checking whether two tables have the same
+    // sequence of column types.
     bool operator==(const Array& a) const;
 
     void SetType(ColumnDef type);
@@ -322,7 +330,7 @@ public:
     template<class S> size_t Write(S& target, bool recurse=true, bool persist=false) const;
     template<class S> void WriteAt(size_t pos, S& out) const;
     size_t GetByteSize(bool align=false) const;
-    std::vector<int64_t> ToVector(void) const; // FIXME: We cannot use std::vector (or any other STL data structure) if we choose to disallow exceptions.
+    std::vector<int64_t> ToVector(void) const; // FIXME: We cannot use std::vector (or any other STL data structure) if we choose to support disabling of exceptions.
 
     /// Compare two arrays for equality.
     bool Compare(const Array&) const;
