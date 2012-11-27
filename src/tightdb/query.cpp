@@ -394,7 +394,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
 
     size_t resultcount2 = 0;
     const int64_t sum1 = sum(column_ndx, &resultcount2, start, end, limit);
-    const double avg1 = (float)sum1 / (float)resultcount2;
+    const double avg1 = (double)sum1 / (double)(resultcount2 > 0 ? resultcount2 : 1);
 
     if (resultcount != NULL)
         *resultcount = resultcount2;

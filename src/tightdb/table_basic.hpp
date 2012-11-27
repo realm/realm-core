@@ -305,6 +305,15 @@ public:
 
     Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
 
+// Query& Query::tableview(const TableView& tv)
+// Query& Query::tableview(const Array &arr)
+
+    Query& tableview(const typename BasicTable<Spec>::View& v) { 
+        m_impl.tableview(*v.get_impl());
+        return *this; 
+    }
+
+
     Query& group() { m_impl.group(); return *this; }
 
     Query& end_group() { m_impl.end_group(); return *this; }

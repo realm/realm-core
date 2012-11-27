@@ -740,19 +740,21 @@ size_t Array::FindPos2(int64_t target) const
         return high;
 }
 
-// return first element E for which E >= target or return -1 if none
+// return first element E for which E >= target or return -1 if none. Array must be sorted
 size_t Array::FindGTE(int64_t target, size_t start) const
 {
 #if TIGHTDB_DEBUG
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
-    for(size_t idx = start; idx < m_len; ++idx) {
+    size_t idx;
+    for(idx = start; idx < m_len; ++idx) {
         if(Get(idx) >= target) {
             ref = idx;
             break;
         }
-        ref = not_found;
     }
+    if(idx == m_len)
+        ref = not_found;
 #endif
 
     size_t ret;
@@ -767,19 +769,26 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     // Todo, use templated Get<width> from this point for performance
     if (target > Get(m_len - 1)) {ret = not_found; goto exit;}
 
-    // Find bounds
-    --start;
     size_t add = 1;
-    while(start + add < m_len && Get(start + add) < target)
-        add *= 2;
 
-    // Do binary search inside bounds
-    assert(Get(m_len - 1) >= start);
+    for(;;) {
+        if(start + add < m_len && Get(start + add) < target)
+            start += add;
+        else
+            break;
+       add *= 2;
+    }
 
-    size_t high = start + add + 1 <= m_len ? start + add + 1 : m_len;
+    size_t high = start + add + 1;
+    if(high > m_len)
+        high = m_len;
+
+   // if(start > 0)
+        start--;
+
+    //start og high
+
     size_t orig_high = high;
-
-    start = start + add / 2 - 1;
 
     while (high - start > 1) {
         const size_t probe = (start + high) / 2;

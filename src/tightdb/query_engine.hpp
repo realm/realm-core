@@ -144,6 +144,8 @@ public:
 
         }
 
+        if(matchcount != 0)
+            *matchcount = st->match_count;
         return st->state;
 
     }
@@ -234,8 +236,10 @@ public:
 
     void Init(const Table& table)
     {
+        m_table = &table;
+
         dT = 0.0;
-        dD =  m_table->size() / m_arr.Size();
+        dD =  m_table->size() / (m_arr.Size() + 1);
         m_probes = 0;
         m_matches = 0;
 
@@ -247,18 +251,14 @@ public:
 
     size_t find_first_local(size_t start, size_t end)
     {
-        for (size_t s = start; s < end; ++s) {
-            // Test first few values and end
-            if (m_size == 0)
-                return end;               
+        if(start == 3 && m_next == 2 && m_arr.Size() == 2)
+            printf("");
+        size_t r = m_arr.FindGTE(start, m_next);
+        if(r == not_found)
+            return end;
 
-
-            s = m_arr.Get(m_next);
-            ++m_next;
-
-            return s;
-        }
-        return end;
+        m_next = r;
+        return m_arr.Get(r);
     }
 
 protected:
