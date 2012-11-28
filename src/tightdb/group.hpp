@@ -133,7 +133,7 @@ protected:
     }
 
     void create(); // FIXME: Could be private
-    void create_from_ref();
+    void create_from_ref(size_t top_ref);
 
     template<class S> size_t write(S& out);
 
