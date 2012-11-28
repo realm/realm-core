@@ -34,6 +34,8 @@ class SharedGroup;
 enum GroupMode {
     GROUP_DEFAULT  =  0,
     GROUP_READONLY =  1,
+
+    // Rest are internal use only
     GROUP_SHARED   =  2,
     GROUP_INVALID  =  4,
     GROUP_ASYNC    =  8,
