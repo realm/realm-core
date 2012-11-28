@@ -384,17 +384,17 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
                   file_header[17] == '-' &&
                   file_header[18] == 'D' &&
                   file_header[19] == 'B'))
-                return false; // Not a tightdb file
+                goto error; // Not a tightdb file
 
             // Last bit in info block indicates which top_ref block is valid
             const size_t valid_part = file_header[23] & 0x1;
             if (valid_part != 0 && valid_part != 1)
-                return false; // invalid header
+                goto error; // invalid header
 
             // Byte 4 and 5 (depending on valid_part) in the info block is version
             const uint8_t version = file_header[valid_part ? 21 : 20];
             if (version != 0)
-                return false; // unsupported version
+                goto error; // unsupported version
         }
 
         m_shared = static_cast<char*>(p);
