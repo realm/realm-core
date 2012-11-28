@@ -254,6 +254,7 @@ const Group& SharedGroup::begin_read()
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READING;
+    m_group.Verify();
 #endif
 
     return m_group;
@@ -322,6 +323,7 @@ Group& SharedGroup::begin_write()
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_WRITING;
+    m_group.Verify();
 #endif
 
     return m_group;
