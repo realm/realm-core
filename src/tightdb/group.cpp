@@ -144,8 +144,10 @@ bool Group::create_from_file(const char* filename, bool doInit)
         // actually creating it's datastructures until first write
         if (m_persistMode == GROUP_SHARED && m_alloc.GetTopRef() == 0)
             return true;
-        else
-            create_from_ref();
+        else {
+            const size_t top_ref = m_alloc.GetTopRef();
+            create_from_ref(top_ref);
+	}
     }
 
     return isValid;
