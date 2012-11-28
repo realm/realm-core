@@ -141,7 +141,7 @@ void SharedGroup::init(const char* path_to_database_file)
         // but we invalidate the internals right after to avoid conflicting
         // with old state when starting transactions
         if (!m_group.create_from_file(path_to_database_file, true)) {
-            flock(m_fd, LOCK_SH);
+            close(m_fd);
             return;
         }
         m_group.invalidate();
@@ -171,8 +171,10 @@ void SharedGroup::init(const char* path_to_database_file)
     }
     else {
         // Setup the group, but leave it in invalid state
-        if (!m_group.create_from_file(path_to_database_file, false))
+        if (!m_group.create_from_file(path_to_database_file, false)) {
+            close(m_fd);
             return;
+        }
     }
 
     m_isValid = true;
