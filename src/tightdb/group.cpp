@@ -109,7 +109,10 @@ Group::Group(const char* buffer, size_t len):
     // Memory map file
     m_isValid = m_alloc.SetSharedBuffer(buffer, len);
 
-    if (m_isValid) create_from_ref();
+    if (m_isValid) {
+        const size_t top_ref = m_alloc.GetTopRef();
+        create_from_ref(top_ref);
+    }
 }
 
 bool Group::create_from_file(const char* filename, bool doInit)
@@ -128,8 +131,10 @@ bool Group::create_from_file(const char* filename, bool doInit)
         // actually creating it's datastructures until first write
         if (m_persistMode == GROUP_SHARED && m_alloc.GetTopRef() == 0)
             return true;
-        else
-            create_from_ref();
+        else {
+            const size_t top_ref = m_alloc.GetTopRef();
+            create_from_ref(top_ref);
+        }
     }
 
     return isValid;
@@ -156,11 +161,8 @@ void Group::create()
     }
 }
 
-void Group::create_from_ref()
+void Group::create_from_ref(size_t top_ref)
 {
-    // Get ref for table top array
-    const size_t top_ref = m_alloc.GetTopRef();
-
     // Instantiate top arrays
     if (top_ref == 0) {
         m_top.SetType(COLUMN_HASREFS);
@@ -520,6 +522,8 @@ void Group::update_refs(size_t topRef)
 
 void Group::update_from_shared(size_t top_ref, size_t len)
 {
+    TIGHTDB_ASSERT(top_ref < len);
+
     // Update memory mapping if needed
     const bool isRemapped = m_alloc.ReMap(len);
 
@@ -528,7 +532,7 @@ void Group::update_from_shared(size_t top_ref, size_t len)
     if (in_inital_state() || top_ref == 0) {
         if (top_ref == 0)
             reset_to_new();    // may have been a rollback
-        create_from_ref();
+        create_from_ref(top_ref);
         return;
     }
 
