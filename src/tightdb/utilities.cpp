@@ -104,7 +104,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
 
     while (len >= 8)
     {
-#ifdef TIGHTDB_X86X64
+#ifdef TIGHTDB_X86_OR_X64
         t->a_val += (*(unsigned long long *)data) * t->b_val;
 #else
         unsigned long long l = 0;
