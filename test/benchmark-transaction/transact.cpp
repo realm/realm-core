@@ -299,7 +299,7 @@ void tdb_create(const char *f, long n) {
 
 
 void benchmark(int database, const char *datfile, long n_readers, long n_writers, unsigned int duration, 
-                double& tps_readers, double& tps_writers) {
+                double& tps_readers, double& tps_writers, double& tps_total) {
     pthread_attr_t attr;
     struct thread_info *tinfo;
     void *res;
@@ -373,7 +373,10 @@ void benchmark(int database, const char *datfile, long n_readers, long n_writers
         tps_writers = (double)(iteration_writers)/dt_writers;    
     else
         tps_writers = 0.0;
-
+	if (n_writers+n_readers > 0)
+		tps_total = (double)(iteration_writers+iteration_readers)/(dt_readers+dt_writers);
+	else
+		tps_total = 0.0;
     unlink(("tmp"+string(datfile)).c_str());
     unlink(("tmp"+string(datfile)+".lock").c_str());
     free((void *)tinfo); 
@@ -459,17 +462,23 @@ int main(int argc, char *argv[]) {
     }
 
     if (single) {
-        double tps_readers, tps_writers;
-        benchmark(database, datfile, n_readers, n_writers, duration, tps_readers, tps_writers);
-        cout << tps_readers << " " << tps_writers << endl;
+        double tps_readers, tps_writers, tps_total;
+        benchmark(database, datfile, n_readers, n_writers, duration, tps_readers, tps_writers, tps_total);
+        cout << tps_readers << " " << tps_writers << " " << tps_total << endl;
     }
     else {
+		cout << "# Columns: "<< endl;
+		cout << "# 1. number of readers" << endl;
+		cout << "# 2. number of writers" << endl;
+		cout << "# 3. speedup (readers)" << endl;
+		cout << "# 4. speedup (writers)" << endl;
+		cout << "# 5. speedup (total)" << endl;
         for(int i=0; i<=n_readers; ++i) {
             for(int j=0; j<=n_writers; ++j) {
-                double tps_readers_sqlite, tps_writers_sqlite;
-                double tps_readers_tdb, tps_writers_tdb;
-                benchmark(0, "test.tdb", i, j, duration, tps_readers_tdb, tps_writers_tdb);
-                benchmark(1, "test.sqlite", i, j, duration, tps_readers_sqlite, tps_writers_sqlite);
+                double tps_readers_sqlite, tps_writers_sqlite, tps_sqlite;
+                double tps_readers_tdb, tps_writers_tdb, tps_tdb;
+                benchmark(0, "test.tdb", i, j, duration, tps_readers_tdb, tps_writers_tdb, tps_tdb);
+                benchmark(1, "test.sqlite", i, j, duration, tps_readers_sqlite, tps_writers_sqlite, tps_sqlite);
                 cout << i << " " << j << " ";
                 if (i == 0)
                     cout << "0.0";
@@ -480,6 +489,12 @@ int main(int argc, char *argv[]) {
                     cout << "0.0";
                 else
                     cout << tps_writers_tdb/tps_writers_sqlite;
+                cout << " ";
+                if (i == 0 && j == 0)
+					cout << 0.0;
+				else
+					cout << tps_tdb/tps_sqlite;
+                
                 cout << endl;
             }
         }
