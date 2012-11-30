@@ -67,7 +67,6 @@ void copy(const char *src, const char *dst) {
     int fd_to, fd_from;
     char buf[4096];
     ssize_t nread;
-    int saved_errno;
 
     fd_from = open(src, O_RDONLY);
     fd_to = open(dst, O_WRONLY | O_CREAT | O_EXCL, 0666);
@@ -124,6 +123,7 @@ static void *sqlite_reader(void *arg) {
 
     struct thread_info *tinfo = (struct thread_info *)arg;
     srandom(tinfo->thread_num);
+    //sqlite3_open_v2(tinfo->datfile, &db, SQLITE_OPEN_FULLMUTEX, "unix");
     sqlite3_open(tinfo->datfile, &db);
     sqlite3_busy_handler(db, &db_retry, NULL);
     while (true) {
@@ -191,6 +191,7 @@ static void *sqlite_writer(void *arg) {
     struct thread_info *tinfo = (struct thread_info *) arg;
     srandom(tinfo->thread_num);
 
+    //sqlite3_open_v2(tinfo->datfile, &db, SQLITE_OPEN_FULLMUTEX, "unix");
     sqlite3_open(tinfo->datfile, &db);
     sqlite3_busy_handler(db, &db_retry, NULL);
     while (true) {
@@ -206,8 +207,10 @@ static void *sqlite_writer(void *arg) {
         sqlite3_exec(db, "BEGIN EXCLUSIVE TRANSACTION", NULL, NULL, &errmsg);
         randx = random() % 1000;
         randy = random() % 1000;
-        sprintf(sql, "UPDATE test VALUES (%ld, %ld) WHERE y = %ld", randx, randy, randy);
-        sqlite3_exec(db, sql, NULL, NULL, &errmsg);
+        sprintf(sql, "UPDATE test SET x= %ld, y=%ld WHERE y = %ld", randx, randy, randy);
+        if (sqlite3_exec(db, sql, NULL, NULL, &errmsg) != SQLITE_OK) 
+			cout << errmsg;
+		sqlite3_free(errmsg);
         if (sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &errmsg) == SQLITE_BUSY) {
             cout << "Ooops" << endl;
         }
@@ -437,6 +440,7 @@ int main(int argc, char *argv[]) {
     if (datfile == NULL && single)
         usage("-f missing");
 
+	sqlite3_config(SQLITE_CONFIG_SERIALIZED);
 
     if (verbose) cout << "Creating test data" << endl;
     if (single) {
