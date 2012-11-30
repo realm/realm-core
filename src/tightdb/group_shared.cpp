@@ -212,6 +212,11 @@ SharedGroup::~SharedGroup()
 bool SharedGroup::has_changed() const
 {
     // Have we changed since last transaction?
+    // Visibility of changes can be delayed when using has_changed() because m_info->current_version is tested
+    // outside mutexes. However, the delay is finite on architectures that have hardware cache coherency (ARM, x64, x86, 
+    // POWER, UltraSPARC, etc) because it guarantees write propagation (writes to m_info->current_version occur on 
+    // system bus and make cache controllers invalidate caches of reader). Some excotic architectures may need
+    // explicit synchronization which isn't implemented yet.
     TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
     const bool is_changed = (m_version != m_info->current_version);
     return is_changed;
