@@ -392,7 +392,7 @@ bool SlabAlloc::ValidateBuffer(const char* data, size_t len) const
     // File header is 24 bytes, composed of three 64bit
     // blocks. The two first being top_refs (only one valid
     // at a time) and the last being the info block.
-    const char* const file_header = (char*)data;
+    const char* const file_header = data;
 
     // First four bytes of info block is file format id
     if (!(file_header[16] == 'T' &&
@@ -403,19 +403,17 @@ bool SlabAlloc::ValidateBuffer(const char* data, size_t len) const
 
     // Last bit in info block indicates which top_ref block is valid
     const size_t valid_part = file_header[23] & 0x1;
-    if (valid_part != 0 && valid_part != 1)
-        return false; // invalid header
 
     // Byte 4 and 5 (depending on valid_part) in the info block is version
     const uint8_t version = file_header[valid_part ? 21 : 20];
     if (version != 0)
         return false; // unsupported version
 
-    // Top ref should always point within buffer
+    // Top_ref should always point within buffer
     const uint64_t* const top_refs = (uint64_t*)data;
     const size_t ref = to_ref(top_refs[valid_part]);
     if (ref >= len)
-        return false; // invalid top ref
+        return false; // invalid top_ref
 
     return true;
 }
