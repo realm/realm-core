@@ -205,7 +205,7 @@ public:
     size_t         find_first_bool(size_t column_ndx, bool value) const;
     size_t         find_first_date(size_t column_ndx, time_t value) const;
     size_t         find_first_string(size_t column_ndx, const char* value) const;
-    // FIXME: Need: size_t find_first_binary(size_t column_ndx, const char* value, size_t len) const;
+    size_t         find_first_binary(size_t column_ndx, const char* value, size_t len) const;
 
     TableView      find_all_int(size_t column_ndx, int64_t value);
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
@@ -215,8 +215,8 @@ public:
     ConstTableView find_all_date(size_t column_ndx, time_t value) const;
     TableView      find_all_string(size_t column_ndx, const char* value);
     ConstTableView find_all_string(size_t column_ndx, const char* value) const;
-    // FIXME: Need: TableView find_all_binary(size_t column_ndx, const char* value, size_t len);
-    // FIXME: Need: ConstTableView find_all_binary(size_t column_ndx, const char* value, size_t len) const;
+    TableView      find_all_binary(size_t column_ndx, const char* value, size_t len);
+    ConstTableView find_all_binary(size_t column_ndx, const char* value, size_t len) const;
 
     TableView      distinct(size_t column_ndx);
     ConstTableView distinct(size_t column_ndx) const;
