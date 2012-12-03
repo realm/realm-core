@@ -285,15 +285,9 @@ bool SlabAlloc::IsReadOnly(size_t ref) const
 
 bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len)
 {
-    // Verify that the topref points to a location within buffer.
-    // This is currently the only integrity check we make
-    size_t ref = (size_t)(*(uint64_t*)buffer);
-    if (ref > len) return false;
-
-    // There is a unit test that calls this function with an invalid buffer
-    // so we can't size_t-test range with to_ref until now
-    ref = to_ref(*(uint64_t*)buffer);
-    (void)ref; // the above macro contains an assert, this avoids warning for unused var
+    // Verify the data structures
+    if (!ValidateBuffer(buffer, len))
+        return false;
 
     m_shared = (char*)buffer;
     m_baseline = len;
@@ -373,29 +367,8 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
         if (p == (void*)-1) goto error;
 
         // Verify the data structures
-        {
-            // File header is 24 bytes, composed of three 64bit
-            // blocks. The two first being top_refs (only one valid
-            // at a time) and the last being the info block.
-            const char* const file_header = (char*)p;
-
-            // First four bytes of info block is file format id
-            if (!(file_header[16] == 'T' &&
-                  file_header[17] == '-' &&
-                  file_header[18] == 'D' &&
-                  file_header[19] == 'B'))
-                goto error; // Not a tightdb file
-
-            // Last bit in info block indicates which top_ref block is valid
-            const size_t valid_part = file_header[23] & 0x1;
-            if (valid_part != 0 && valid_part != 1)
-                goto error; // invalid header
-
-            // Byte 4 and 5 (depending on valid_part) in the info block is version
-            const uint8_t version = file_header[valid_part ? 21 : 20];
-            if (version != 0)
-                goto error; // unsupported version
-        }
+        if (!ValidateBuffer((char*)p, len))
+            goto error;
 
         m_shared = static_cast<char*>(p);
         m_baseline = len;
@@ -408,6 +381,43 @@ error:
         close(m_fd);
     return false;
 #endif
+}
+
+bool SlabAlloc::ValidateBuffer(const char* data, size_t len) const
+{
+    // Verify that data is 64bit aligned
+    if ((len & 0x7) != 0)
+        return false;
+
+    // File header is 24 bytes, composed of three 64bit
+    // blocks. The two first being top_refs (only one valid
+    // at a time) and the last being the info block.
+    const char* const file_header = (char*)data;
+
+    // First four bytes of info block is file format id
+    if (!(file_header[16] == 'T' &&
+          file_header[17] == '-' &&
+          file_header[18] == 'D' &&
+          file_header[19] == 'B'))
+        return false; // Not a tightdb file
+
+    // Last bit in info block indicates which top_ref block is valid
+    const size_t valid_part = file_header[23] & 0x1;
+    if (valid_part != 0 && valid_part != 1)
+        return false; // invalid header
+
+    // Byte 4 and 5 (depending on valid_part) in the info block is version
+    const uint8_t version = file_header[valid_part ? 21 : 20];
+    if (version != 0)
+        return false; // unsupported version
+
+    // Top ref should always point within buffer
+    const uint64_t* const top_refs = (uint64_t*)data;
+    const size_t ref = to_ref(top_refs[valid_part]);
+    if (ref >= len)
+        return false; // invalid top ref
+
+    return true;
 }
 
 bool SlabAlloc::RefreshMapping()
