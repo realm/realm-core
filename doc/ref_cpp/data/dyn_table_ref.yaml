@@ -632,8 +632,8 @@ CATEGORIES :
         CODE   : ex_cpp_dyn_table_where
 - Aggregates:
   METHODS:
-  - g_dyn_table_count:
-      NAMES    : count
+  - g_dyn_table_count_int:
+      NAMES    : count_int
       SUMMARY  : &g_dyn_table_count_summary
                  Number of matching rows.
       DESCR    : &g_dyn_table_count_descr

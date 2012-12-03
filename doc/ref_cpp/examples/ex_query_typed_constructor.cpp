@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_constructor @@
+// @@Example: ex_cpp_typed_query_constructor @@
 #include <tightdb.hpp>
 
 TIGHTDB_TABLE_2(PeopleTable,
@@ -17,6 +17,6 @@ void main()
     PeopleTable::Query query = table.where();
 
     // Expected result
-    assert(query.count(table) == 3);
+    assert(query.count() == 3);
 }
 // @@EndExample@@

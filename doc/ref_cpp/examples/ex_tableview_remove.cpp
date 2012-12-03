@@ -16,13 +16,13 @@ int main()
     table.add("Alice", 42); // match
     table.add("Jack",  32); // match
 
-    PeopleTable::View view = table.where().age.greater(18).find_all(table);
+    PeopleTable::View view = table.where().age.greater(18).find_all();
 
     assert(view[1].name == "Alice");
 
     view.remove(1);
 
-    assert(view[1].name == "Jack");
+    assert(!strcmp(view[1].name, "Jack"));
     assert(table.size() == 3);
 // @@Fold@@
 }

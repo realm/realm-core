@@ -17,7 +17,7 @@ int main()
     table.add("Jack",  32); 
 
     // Create 1-to-1 view of table
-    PeopleTable::View view = table.where().find_all(table);
+    PeopleTable::View view = table.where().find_all();
     assert(view.size() == 4);
 // @@Fold@@
 }

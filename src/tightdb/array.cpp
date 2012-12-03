@@ -878,39 +878,40 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
     int64_t m = Get<w>(start);
     ++start;
 
-#ifdef USE_SSE42
-
-    // Test manually until 128 bit aligned
-    for (; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
-        if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
-            m = Get<w>(start);
-    }
-
-	if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
-        __m128i *data = (__m128i *)(m_data + start * w / 8);
-        __m128i state = data[0];
-        __m128i state2;
-
-        size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
-        for (size_t t = 0; t < chunks; t++) {
-            if (w == 8)
-                state = find_max ? _mm_max_epi8(data[t], state) : _mm_min_epi8(data[t], state);
-            else if (w == 16)
-                state = find_max ? _mm_max_epi16(data[t], state) : _mm_min_epi16(data[t], state);
-            else if (w == 32)
-                state = find_max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
-
-            start += sizeof(__m128i) * 8 / NO0(w);
+#ifdef TIGHTDB_COMPILER_SSE
+    if(cpuid_sse<42>()) {
+        // Test manually until 128 bit aligned
+        for (; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
+            if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
+                m = Get<w>(start);
         }
 
-        // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
-        state2 = state; 
-        for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
-            const int64_t v = GetUniversal<w>(((const char *)&state2), t);
-            if (find_max ? v > m : v < m) {
-                m = v;
+	    if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
+            __m128i *data = (__m128i *)(m_data + start * w / 8);
+            __m128i state = data[0];
+            __m128i state2;
+
+            size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
+            for (size_t t = 0; t < chunks; t++) {
+                if (w == 8)
+                    state = find_max ? _mm_max_epi8(data[t], state) : _mm_min_epi8(data[t], state);
+                else if (w == 16)
+                    state = find_max ? _mm_max_epi16(data[t], state) : _mm_min_epi16(data[t], state);
+                else if (w == 32)
+                    state = find_max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
+
+                start += sizeof(__m128i) * 8 / NO0(w);
             }
-        }        
+
+            // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
+            state2 = state; 
+            for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
+                const int64_t v = GetUniversal<w>(((const char *)&state2), t);
+                if (find_max ? v > m : v < m) {
+                    m = v;
+                }
+            }        
+        }
     }
 #endif
 
@@ -971,6 +972,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
         for (size_t t = 0; t < chunks; t++) {
             if (w == 1) {
 
+/*
 #if defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
                     s += __popcnt64(data[t]);
 #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
@@ -984,6 +986,11 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                     a = (a * h01) >> 56;
                     s += a;
 #endif         
+*/
+
+                s += fast_popcount64(data[t]);
+
+
             }
             else if (w == 2) {
                 uint64_t a = data[t];
@@ -1004,87 +1011,90 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
         start += sizeof(int64_t) * 8 / NO0(w) * chunks;
     }
 
-#ifdef USE_SSE42
-    // 2000 items summed 500000 times, 8/16/32 bits, miliseconds: 
-    // Naive, templated Get<>: 391 371 374
-    // SSE:                     97 148 282
+#ifdef TIGHTDB_COMPILER_SSE
+    if(cpuid_sse<42>()) {
 
-    if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / NO0(w)) {
-        __m128i *data = (__m128i *)(m_data + start * w / 8);
-        __m128i sum = {0};
-        __m128i sum2;
+        // 2000 items summed 500000 times, 8/16/32 bits, miliseconds: 
+        // Naive, templated Get<>: 391 371 374
+        // SSE:                     97 148 282
 
-        size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
+        if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / NO0(w)) {
+            __m128i *data = (__m128i *)(m_data + start * w / 8);
+            __m128i sum = {0};
+            __m128i sum2;
 
-        for (size_t t = 0; t < chunks; t++) {
-            if (w == 8) {
-                /* 
-                // 469 ms AND disadvantage of handling max 64k elements before overflow
-                __m128i vl = _mm_cvtepi8_epi16(data[t]);
-                __m128i vh = data[t];
-                vh.m128i_i64[0] = vh.m128i_i64[1];
-                vh = _mm_cvtepi8_epi16(vh);
-                sum = _mm_add_epi16(sum, vl);
-                sum = _mm_add_epi16(sum, vh); 
-                */
+            size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
+
+            for (size_t t = 0; t < chunks; t++) {
+                if (w == 8) {
+                    /* 
+                    // 469 ms AND disadvantage of handling max 64k elements before overflow
+                    __m128i vl = _mm_cvtepi8_epi16(data[t]);
+                    __m128i vh = data[t];
+                    vh.m128i_i64[0] = vh.m128i_i64[1];
+                    vh = _mm_cvtepi8_epi16(vh);
+                    sum = _mm_add_epi16(sum, vl);
+                    sum = _mm_add_epi16(sum, vh); 
+                    */
                 
-                /*
-                // 424 ms
-                __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0)); 
-                __m128i vh = _mm_unpackhi_epi8(data[t], _mm_set1_epi8(0));
-                sum = _mm_add_epi32(sum, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
-                sum = _mm_add_epi32(sum, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
-                */
+                    /*
+                    // 424 ms
+                    __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0)); 
+                    __m128i vh = _mm_unpackhi_epi8(data[t], _mm_set1_epi8(0));
+                    sum = _mm_add_epi32(sum, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
+                    sum = _mm_add_epi32(sum, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
+                    */
                 
-                __m128i vl = _mm_cvtepi8_epi16(data[t]);        // sign extend lower words 8->16
-                __m128i vh = data[t];
-                vh = _mm_srli_si128(vh, 8);                     // v >>= 64
-                vh = _mm_cvtepi8_epi16(vh);                     // sign extend lower words 8->16
-                __m128i sum1 = _mm_add_epi16(vl, vh);
-                __m128i sumH = _mm_cvtepi16_epi32(sum1);
-                __m128i sumL = _mm_srli_si128(sum1, 8);         // v >>= 64
-                sumL = _mm_cvtepi16_epi32(sumL);
-                sum = _mm_add_epi32(sum, sumL);
-                sum = _mm_add_epi32(sum, sumH);
+                    __m128i vl = _mm_cvtepi8_epi16(data[t]);        // sign extend lower words 8->16
+                    __m128i vh = data[t];
+                    vh = _mm_srli_si128(vh, 8);                     // v >>= 64
+                    vh = _mm_cvtepi8_epi16(vh);                     // sign extend lower words 8->16
+                    __m128i sum1 = _mm_add_epi16(vl, vh);
+                    __m128i sumH = _mm_cvtepi16_epi32(sum1);
+                    __m128i sumL = _mm_srli_si128(sum1, 8);         // v >>= 64
+                    sumL = _mm_cvtepi16_epi32(sumL);
+                    sum = _mm_add_epi32(sum, sumL);
+                    sum = _mm_add_epi32(sum, sumH);
+                }
+                else if (w == 16) {
+                    // todo, can overflow for array size > 2^32 
+                    __m128i vl = _mm_cvtepi16_epi32(data[t]);       // sign extend lower words 16->32
+                    __m128i vh = data[t];
+                    vh = _mm_srli_si128(vh, 8);                     // v >>= 64
+                    vh = _mm_cvtepi16_epi32(vh);                    // sign extend lower words 16->32
+                    sum = _mm_add_epi32(sum, vl);
+                    sum = _mm_add_epi32(sum, vh);
+                }
+                else if (w == 32) {
+                    __m128i v = data[t];
+                    __m128i v0 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
+                    v = _mm_srli_si128(v, 8);                       // v >>= 64
+                    __m128i v1 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
+                    sum = _mm_add_epi64(sum, v0);
+                    sum = _mm_add_epi64(sum, v1);
+
+                    /*
+                    __m128i m = _mm_set1_epi32(0xc000);             // test if overflow could happen (still need underflow test).
+                    __m128i mm = _mm_and_si128(data[t], m);
+                    zz = _mm_or_si128(mm, zz);
+                    sum = _mm_add_epi32(sum, data[t]);
+                    */
+                }
             }
-            else if (w == 16) {
-                // todo, can overflow for array size > 2^32 
-                __m128i vl = _mm_cvtepi16_epi32(data[t]);       // sign extend lower words 16->32
-                __m128i vh = data[t];
-                vh = _mm_srli_si128(vh, 8);                     // v >>= 64
-                vh = _mm_cvtepi16_epi32(vh);                    // sign extend lower words 16->32
-                sum = _mm_add_epi32(sum, vl);
-                sum = _mm_add_epi32(sum, vh);
+            start += sizeof(__m128i) * 8 / NO0(w) * chunks;
+
+            // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
+            sum2 = sum;
+
+            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by GetUniversal 
+            char sum3[sizeof(sum2)];
+            memcpy(&sum3, &sum2, sizeof(sum2));
+
+            // Sum elements of sum
+            for (size_t t = 0; t < sizeof(__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
+                int64_t v = GetUniversal<(w == 8 || w == 16) ? 32 : 64>(((const char *)&sum3), t);
+                s += v;
             }
-            else if (w == 32) {
-                __m128i v = data[t];
-                __m128i v0 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
-                v = _mm_srli_si128(v, 8);                       // v >>= 64
-                __m128i v1 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
-                sum = _mm_add_epi64(sum, v0);
-                sum = _mm_add_epi64(sum, v1);
-
-                /*
-                __m128i m = _mm_set1_epi32(0xc000);             // test if overflow could happen (still need underflow test).
-                __m128i mm = _mm_and_si128(data[t], m);
-                zz = _mm_or_si128(mm, zz);
-                sum = _mm_add_epi32(sum, data[t]);
-                */
-            }
-        }
-        start += sizeof(__m128i) * 8 / NO0(w) * chunks;
-
-        // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
-        sum2 = sum;
-
-        // Avoid aliasing bug where sum2 might not yet be initialized when accessed by GetUniversal 
-        char sum3[sizeof(sum2)];
-        memcpy(&sum3, &sum2, sizeof(sum2));
-
-        // Sum elements of sum
-        for (size_t t = 0; t < sizeof(__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
-            int64_t v = GetUniversal<(w == 8 || w == 16) ? 32 : 64>(((const char *)&sum3), t);
-            s += v;
         }
     }
 #endif

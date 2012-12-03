@@ -27,13 +27,48 @@ Dependencies
     Install Xcode
     Install command line tools (via Xcode)
 
+Note: The TightDB source code comes bundled with a fallback version of
+UnitTest++ which will be used when testing, if the 'pkg-config'
+program does not exists, or if 'pkg-config unittest++ --exists' does
+not succeed.
 
-Building and installing
------------------------
+
+Building, testing, and installing
+---------------------------------
 
     sh build.sh clean
     sh build.sh build
+    sh build.sh test
     sudo sh build.sh install
+    sh build.sh test-intalled
+
+Headers are installed in:
+
+    /usr/local/include/tightdb/
+
+Except for `tightdb.hpp` which is installed as:
+
+    /usr/local/include/tightdb.hpp
+
+The following libraries are installed:
+
+    /usr/local/lib/libtightdb.so
+    /usr/local/lib/libtightdb-dbg.so
+    /usr/local/lib/libtightdb.a
+
+Note: '.so' is replaced by '.dylib' on OS X.
+
+The following programs are installed:
+
+    /usr/local/bin/tightdb-config
+    /usr/local/bin/tightdb-config-dbg
+
+These programs provide the necessary compiler flags for an application
+that needs to link against TightDB. They work with GCC and other
+compilers, such as Clang, that are mostly command line compatible with
+GCC. Here is an example:
+
+    g++  my_app.cpp  `tightdb-config --cflags --libs`
 
 
 Building a distribution package
@@ -61,8 +96,6 @@ or `sh build.sh dist`, as in the following example:
 
 There are also a number of environment variables that serve to enable
 or disable special features during building:
-
-Set `TIGHTDB_DISABLE_SSE` to a nonempty value to disable SSE.
 
 Set `TIGHTDB_ENABLE_REPLICATION` to a nonempty value to enable
 replication.

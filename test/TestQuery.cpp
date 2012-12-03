@@ -63,7 +63,7 @@ TEST(TestQueryStrIndexed_enum)
 
     ttt.column().second.set_index();
 
-    size_t s = ttt.where().second.equal("a").first.sum();
+    int64_t s = ttt.where().second.equal("a").first.sum();
     CHECK_EQUAL(10*11, s);
 
     s = ttt.where().second.equal("a").first.equal(10).first.sum();
@@ -92,7 +92,7 @@ TEST(TestQueryStrIndexed_non_enum)
 
     ttt.column().second.set_index();
 
-    size_t s = ttt.where().second.equal("a").first.sum();
+    int64_t s = ttt.where().second.equal("a").first.sum();
     CHECK_EQUAL(10*11, s);
 
     s = ttt.where().second.equal("a").first.equal(10).first.sum();
@@ -1362,7 +1362,7 @@ TEST(TestTV)
     TupleTableType::Query q4 = t.where().tableview(arr).second.equal("a");
     TupleTableType::View v4 = q4.find_all();
     CHECK_EQUAL(1, v4.size());
-
+    arr.Destroy();
 }
  
 TEST(TestQuery_sum_min_max_avg)

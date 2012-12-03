@@ -587,6 +587,8 @@ TEST(Column_Average)
     CHECK_EQUAL(0, c.average(1,1));     // None
     CHECK_EQUAL(30, c.average(1,2));    // second
     CHECK_EQUAL(20, c.average(0,2));    // both
+
+    c.Destroy();
 }
 
 TEST(Column_Sum_Average)

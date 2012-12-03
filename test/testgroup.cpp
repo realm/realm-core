@@ -42,11 +42,11 @@ TEST(Group_GetTable)
 TEST(Group_Invalid1)
 {
     // Delete old file if there
-    remove("table_test.tbl");
+    remove("table_test.tightdb");
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    Group fromDisk("table_test.tbl", GROUP_READONLY);
+    Group fromDisk("table_test.tightdb", GROUP_READONLY);
     CHECK(!fromDisk.is_valid());
 }
 
@@ -62,10 +62,10 @@ TEST(Group_Serialize0)
 {
     // Create empty group and serialize to disk
     Group toDisk;
-    toDisk.write("table_test.tbl");
+    toDisk.write("table_test.tightdb");
 
     // Load the group
-    Group fromDisk("table_test.tbl", GROUP_READONLY);
+    Group fromDisk("table_test.tightdb", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
 
     // Create new table in group
@@ -87,7 +87,7 @@ TEST(Group_Read0)
 {
     // Load the group and let it clean up without loading
     // any tables
-    Group fromDisk("table_test.tbl", GROUP_READONLY);
+    Group fromDisk("table_test.tightdb", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
 }
 
@@ -112,13 +112,13 @@ TEST(Group_Serialize1)
 #endif // TIGHTDB_DEBUG
 
     // Delete old file if there
-    remove("table_test.tbl");
+    remove("table_test.tightdb");
 
     // Serialize to disk
-    toDisk.write("table_test.tbl");
+    toDisk.write("table_test.tightdb");
 
     // Load the table
-    Group fromDisk("table_test.tbl", GROUP_READONLY);
+    Group fromDisk("table_test.tightdb", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
 
@@ -150,7 +150,7 @@ TEST(Group_Read1)
 {
     // Load the group and let it clean up without loading
     // any tables
-    Group fromDisk("table_test.tbl", GROUP_READONLY);
+    Group fromDisk("table_test.tightdb", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
 }
 
@@ -172,13 +172,13 @@ TEST(Group_Serialize2)
 #endif // TIGHTDB_DEBUG
 
     // Delete old file if there
-    remove("table_test.tbl");
+    remove("table_test.tightdb");
 
     // Serialize to disk
-    toDisk.write("table_test.tbl");
+    toDisk.write("table_test.tightdb");
 
     // Load the tables
-    Group fromDisk("table_test.tbl", GROUP_READONLY);
+    Group fromDisk("table_test.tightdb", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
     TestTableGroup::Ref t1 = fromDisk.get_table<TestTableGroup>("test1");
     TestTableGroup::Ref t2 = fromDisk.get_table<TestTableGroup>("test2");
@@ -207,13 +207,13 @@ TEST(Group_Serialize3)
 #endif // TIGHTDB_DEBUG
 
     // Delete old file if there
-    remove("table_test.tbl");
+    remove("table_test.tightdb");
 
     // Serialize to disk
-    toDisk.write("table_test.tbl");
+    toDisk.write("table_test.tightdb");
 
     // Load the table
-    Group fromDisk("table_test.tbl", GROUP_READONLY);
+    Group fromDisk("table_test.tightdb", GROUP_READONLY);
     CHECK(fromDisk.is_valid());
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
     (void)t;
@@ -378,10 +378,10 @@ TEST(Group_Serialize_All)
 
 TEST(Group_Persist) {
     // Delete old file if there
-    remove("testdb.tdb");
+    remove("testdb.tightdb");
 
     // Create new database
-    Group db("testdb.tdb");
+    Group db("testdb.tightdb");
 
     // Insert some data
     TableRef table = db.get_table("test");
@@ -533,10 +533,10 @@ TEST(Group_Subtable)
         }
     }
 
-    g.write("subtables.tdb");
+    g.write("subtables.tightdb");
 
     // Read back tables
-    Group g2("subtables.tdb", GROUP_READONLY);
+    Group g2("subtables.tightdb", GROUP_READONLY);
     TableRef table2 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -624,10 +624,10 @@ TEST(Group_Subtable)
         }
     }
 
-    g2.write("subtables2.tdb");
+    g2.write("subtables2.tightdb");
 
     // Read back tables
-    Group g3("subtables2.tdb", GROUP_READONLY);
+    Group g3("subtables2.tightdb", GROUP_READONLY);
     TableRef table3 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -721,12 +721,12 @@ TEST(Group_MultiLevelSubtables)
             }
             b->add_empty_row();
         }
-        g.write("subtables.tdb");
+        g.write("subtables.tightdb");
     }
 
     // Non-mixed
     {
-        Group g("subtables.tdb", GROUP_READONLY);
+        Group g("subtables.tightdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -744,10 +744,10 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
-        g.write("subtables2.tdb");
+        g.write("subtables2.tightdb");
     }
     {
-        Group g("subtables2.tdb", GROUP_READONLY);
+        Group g("subtables2.tightdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -763,12 +763,12 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
-        g.write("subtables3.tdb");
+        g.write("subtables3.tightdb");
     }
 
     // Mixed
     {
-        Group g("subtables3.tdb", GROUP_READONLY);
+        Group g("subtables3.tightdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -786,10 +786,10 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
-        g.write("subtables4.tdb");
+        g.write("subtables4.tightdb");
     }
     {
-        Group g("subtables4.tdb", GROUP_READONLY);
+        Group g("subtables4.tightdb", GROUP_READONLY);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -805,7 +805,7 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
-        g.write("subtables5.tdb");
+        g.write("subtables5.tightdb");
     }
 }
 

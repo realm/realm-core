@@ -34,6 +34,21 @@ struct SharedInfo;
 
 class SharedGroup {
 public:
+    /// When two threads or processes want to access the same database
+    /// file, they must each create their own instance of SharedGroup.
+    ///
+    /// If the database file does not already exist, it will be
+    /// created. When multiple threads are involved, it is safe to let
+    /// the first thread, that gets to it, create the file.
+    ///
+    /// While at least one instance of SharedGroup exists for a
+    /// specific database file, a lock file will exist too. The lock
+    /// file will be placed in the same directory as the database
+    /// file, and its name is derived by adding the suffix '.lock' to
+    /// the name of the database file.
+    ///
+    /// Processes that share a database file must reside on the same
+    /// host.
     SharedGroup(const char* path_to_database_file);
     ~SharedGroup();
 
@@ -43,13 +58,13 @@ public:
 
     /// This function may be called asynchronously to interrupt any
     /// blocking call that is part of a transaction in a replication
-    /// setup. Only begin_write() and modifying function that are part
-    /// of a write transaction can block. The transaction is
-    /// interrupted only if such a call is blocked or would
+    /// setup. Only begin_write() and modifying functions, that are
+    /// part of a write transaction, can block. The transaction is
+    /// interrupted only if such a call is blocked, or would
     /// block. This function may be called from a diffrent thread. It
-    /// may not be called directly from a system signal handler. When
-    /// a transaction is interrupted, the only valid member function
-    /// to call is rollback(). If a client calls
+    /// may not be called from a system signal handler. When a
+    /// transaction is interrupted, the only member function, that is
+    /// allowed to be called, is rollback(). If a client calls
     /// clear_interrupt_transact() after having called rollback(), it
     /// may then resume normal operation on this database. Currently,
     /// transaction interruption works by throwing an exception from
@@ -63,7 +78,7 @@ public:
     void clear_interrupt_transact() { m_replication.clear_interrupt(); }
 #endif
 
-    bool is_valid() const {return m_isValid;}
+    bool is_valid() const { return m_isValid; }
 
     // Read transactions
     const Group& begin_read();
