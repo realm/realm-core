@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_delete @@
+// @@Example: ex_cpp_typed_query_delete @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -20,7 +20,7 @@ int main()
 
     // Delete rows where age >= 13 && age <= 20
     PeopleTable::Query query = table.where().age.between(13, 20);
-    size_t removed = query.remove(table);
+    size_t removed = query.remove();
 // @@Fold@@
 
     // 4 rows deleted

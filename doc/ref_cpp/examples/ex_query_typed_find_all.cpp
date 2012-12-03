@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_do @@
+// @@Example: ex_cpp_typed_query_do @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -22,7 +22,7 @@ int main()
     PeopleTable::Query query = table.where().age.greater_equal(18);
 
     // Find all matching rows of entire table
-    PeopleTable::View view1 = query.find_all(table);
+    PeopleTable::View view1 = query.find_all();
 // @@Fold@@
     
     assert(view1.size() == 4);
@@ -33,7 +33,7 @@ int main()
 // @@EndFold@@
 
     // Find matches between 2'nd (Joe) and 4'th (Jack) row, both inclusive.
-    PeopleTable::View view2 = query.find_all(table, 1, 4);
+    PeopleTable::View view2 = query.find_all(1, 4);
 
 // @@Fold@@
     assert(view2.size() == 2);
@@ -43,7 +43,7 @@ int main()
 // @@EndFold@@
     // Find first 2 matches of table
     size_t start = 0;
-    PeopleTable::View view3 = query.find_all(table, start, size_t(-1), 2);
+    PeopleTable::View view3 = query.find_all(start, size_t(-1), 2);
 
 // @@Fold@@
     assert(view3.size() == 2);
@@ -53,7 +53,7 @@ int main()
 // @@EndFold@@
     // Find next 2 matches of table
     start = view3.get_source_ndx(view3.size() - 1) + 1; // start = 1 + 1 = 2
-    PeopleTable::View view4 = query.find_all(table, start, size_t(-1), 2);
+    PeopleTable::View view4 = query.find_all(start, size_t(-1), 2);
     
 // @@Fold@@
     assert(view4.size() == 2);

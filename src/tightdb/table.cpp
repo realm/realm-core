@@ -1322,7 +1322,7 @@ void Table::insert_done()
 #endif
 }
 
-size_t Table::count(size_t column_ndx, int64_t target) const
+size_t Table::count_int(size_t column_ndx, int64_t target) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
@@ -1471,6 +1471,16 @@ size_t Table::find_first_string(size_t column_ndx, const char* value) const
     }
 }
 
+size_t Table::find_first_binary(size_t column_ndx, const char* value, size_t len) const
+{
+    // FIXME: Implement this!
+    static_cast<void>(column_ndx);
+    static_cast<void>(value);
+    static_cast<void>(len);
+    throw_error(ERROR_NOT_IMPLEMENTED);
+    return 0;
+}
+
 size_t Table::find_pos_int(size_t column_ndx, int64_t value) const
 {
     return GetColumn(column_ndx).find_pos(value);
@@ -1579,6 +1589,27 @@ ConstTableView Table::find_all_string(size_t column_ndx, const char *value) cons
     }
     return move(tv);
 }
+
+TableView Table::find_all_binary(size_t column_ndx, const char* value, size_t len)
+{
+    // FIXME: Implement this!
+    static_cast<void>(column_ndx);
+    static_cast<void>(value);
+    static_cast<void>(len);
+    throw_error(ERROR_NOT_IMPLEMENTED);
+    return TableView(*this);
+}
+
+ConstTableView Table::find_all_binary(size_t column_ndx, const char* value, size_t len) const
+{
+    // FIXME: Implement this!
+    static_cast<void>(column_ndx);
+    static_cast<void>(value);
+    static_cast<void>(len);
+    throw_error(ERROR_NOT_IMPLEMENTED);
+    return ConstTableView(*this);
+}
+
 
 
 

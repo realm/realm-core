@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_startsWith @@
+// @@Example: ex_cpp_typed_query_startsWith @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -16,22 +16,22 @@ int main()
     table.add("Jo");
 
     // Find names beginning with "Jo"
-    PeopleTable::View view1 = table.where().name.begins_with("Jo").find_all(table);
+    PeopleTable::View view1 = table.where().name.begins_with("Jo").find_all();
     assert(view1.size() == 2);
     assert(view1[0].name == "Joe");
     assert(view1[1].name == "Jo");
 
     // Will find none because it's case sensitive
-    PeopleTable::View view2 = table.where().name.begins_with("JO").find_all(table);
+    PeopleTable::View view2 = table.where().name.begins_with("JO").find_all();
     assert(view2.size() == 0);
 
 #ifdef _MSC_VER
     // Case insensitive search only supported on Windows
-    PeopleTable::View view3 = table.where().name.begins_with("JO", false).find_all(table);
+    PeopleTable::View view3 = table.where().name.begins_with("JO", false).find_all();
 // @@Fold@@
     assert(view3.size() == 2);
-    assert(view3[0].name == "Joe");
-    assert(view3[1].name == "Jo");
+    assert(!strcmp(view3[0].name, "Joe"));
+    assert(!strcmp(view3[1].name, "Jo"));
 // @@EndFold@@
 #endif
 // @@Fold@@

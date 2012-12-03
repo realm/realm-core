@@ -4,10 +4,21 @@
 
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
+#include <tightdb/utilities.hpp>
 
 using namespace std;
 
 namespace {
+
+class Initialization {
+public:
+    Initialization() 
+    {
+        tightdb::cpuid_init();
+    }
+};
+
+Initialization initialization;
 
 class MemoryOStream {
 public:
@@ -100,7 +111,7 @@ Group::Group(const char* filename, int mode):
     create_from_file(filename, true);
 }
 
-Group::Group(const char* buffer, size_t len):
+Group::Group(const char* buffer, size_t len, bool take_ownership):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
 {

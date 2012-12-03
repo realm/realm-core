@@ -15,7 +15,7 @@ int main()
     table.add("Jack",  32); 
 
     // Select rows where age > 18
-    PeopleTable::View view = table.where().age.greater(18).find_all(table);
+    PeopleTable::View view = table.where().age.greater(18).find_all();
 
     assert(view.size() == 3);
     assert(view[0].name == "Joe");

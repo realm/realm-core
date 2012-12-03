@@ -20,12 +20,12 @@ TIGHTDB_TABLE_4(TestTableShared,
 TEST(Shared_Initial)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         // Verify that new group is empty
@@ -43,7 +43,7 @@ TEST(Shared_Initial)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
@@ -52,17 +52,17 @@ TEST(Shared_Initial)
 TEST(Shared_Initial2)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         {
             // Open the same db again (in empty state)
-            SharedGroup shared2("test_shared.tdb");
+            SharedGroup shared2("test_shared.tightdb");
             CHECK(shared2.is_valid());
 
             // Verify that new group is empty
@@ -96,19 +96,19 @@ TEST(Shared_Initial2)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
 TEST(Shared1)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         // Create first table in group
@@ -120,7 +120,7 @@ TEST(Shared1)
         }
 
         // Open same db again
-        SharedGroup shared2("test_shared.tdb");
+        SharedGroup shared2("test_shared.tightdb");
         CHECK(shared2.is_valid());
         {
             const Group& g2 = shared2.begin_read();
@@ -195,19 +195,19 @@ TEST(Shared1)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
 TEST(Shared_rollback)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         // Create first table in group (but rollback)
@@ -267,19 +267,19 @@ TEST(Shared_rollback)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
 TEST(Shared_Writes)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         // Create first table in group
@@ -309,7 +309,7 @@ TEST(Shared_Writes)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
@@ -370,7 +370,7 @@ void* IncrementEntry(void* arg )
     const size_t row_id = (size_t)arg;
 
     // Open shared db
-    SharedGroup shared("test_shared.tdb");
+    SharedGroup shared("test_shared.tightdb");
     CHECK(shared.is_valid());
 
     for (size_t i = 0; i < 100; ++i) {
@@ -403,12 +403,12 @@ void* IncrementEntry(void* arg )
 TEST(Shared_WriterThreads)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         const size_t thread_count = 10;
@@ -451,16 +451,16 @@ TEST(Shared_WriterThreads)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
 
 TEST(Shared_FormerErrorCase1)
 {
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock");
-    SharedGroup db("test_shared.tdb");
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock");
+    SharedGroup db("test_shared.tightdb");
     CHECK(db.is_valid());
     {
         Group& group = db.begin_write();
@@ -608,11 +608,11 @@ TIGHTDB_TABLE_1(FormerErrorCase2_Table,
 
 TEST(Shared_FormerErrorCase2)
 {
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock");
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock");
 
     for (int i=0; i<10; ++i) {
-        SharedGroup db("test_shared.tdb");
+        SharedGroup db("test_shared.tightdb");
         CHECK(db.is_valid());
         {
             Group& group = db.begin_write();
@@ -644,9 +644,9 @@ TEST(Shared_SpaceOveruse)
 
     // Many transactions
     {
-        remove("over_alloc_1.db");
-        remove("over_alloc_1.db.lock");
-        SharedGroup db("over_alloc_1.db");
+        remove("over_alloc_1.tightdb");
+        remove("over_alloc_1.tightdb.lock");
+        SharedGroup db("over_alloc_1.tightdb");
         CHECK(db.is_valid());
 
         // Do a lot of sequential transactions

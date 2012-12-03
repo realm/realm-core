@@ -154,7 +154,7 @@ public:
     void insert_date(size_t column_ndx, size_t row_ndx, time_t value);
     template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
     void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
-    void insert_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+    void insert_binary(size_t column_ndx, size_t row_ndx, const char* data, size_t size);
     void insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
     void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void insert_done();
@@ -192,12 +192,12 @@ public:
     void set_index(size_t column_ndx) {set_index(column_ndx, true);}
 
     // Aggregate functions
-    size_t  count(size_t column_ndx, int64_t target) const;
+    size_t  count_int(size_t column_ndx, int64_t target) const;
     size_t  count_string(size_t column_ndx, const char* target) const;
     int64_t sum(size_t column_ndx) const;
-    int64_t maximum(size_t column_ndx) const;
-    int64_t minimum(size_t column_ndx) const;
-    double  average(size_t column_ndx) const;
+    int64_t maximum(size_t column_ndx) const; // FIXME: When table is empty?
+    int64_t minimum(size_t column_ndx) const; // FIXME: When table is empty?
+    double  average(size_t column_ndx) const; // FIXME: When table is empty?
 
     // Searching
     size_t         lookup(const char* value) const;
@@ -205,7 +205,7 @@ public:
     size_t         find_first_bool(size_t column_ndx, bool value) const;
     size_t         find_first_date(size_t column_ndx, time_t value) const;
     size_t         find_first_string(size_t column_ndx, const char* value) const;
-    // FIXME: Need: size_t find_first_binary(size_t column_ndx, const char* value, size_t len) const;
+    size_t         find_first_binary(size_t column_ndx, const char* value, size_t len) const;
 
     TableView      find_all_int(size_t column_ndx, int64_t value);
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
@@ -215,8 +215,8 @@ public:
     ConstTableView find_all_date(size_t column_ndx, time_t value) const;
     TableView      find_all_string(size_t column_ndx, const char* value);
     ConstTableView find_all_string(size_t column_ndx, const char* value) const;
-    // FIXME: Need: TableView find_all_binary(size_t column_ndx, const char* value, size_t len);
-    // FIXME: Need: ConstTableView find_all_binary(size_t column_ndx, const char* value, size_t len) const;
+    TableView      find_all_binary(size_t column_ndx, const char* value, size_t len);
+    ConstTableView find_all_binary(size_t column_ndx, const char* value, size_t len) const;
 
     TableView      distinct(size_t column_ndx);
     ConstTableView distinct(size_t column_ndx) const;
@@ -226,7 +226,7 @@ public:
 
     // Queries
     Query       where() {return Query(*this);}
-    const Query where() const {return Query(*this);}
+    const Query where() const {return Query(*this);} // FIXME: There is no point in returning a const Query. We need a ConstQuery class.
 
     // Optimizing
     void optimize();

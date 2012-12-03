@@ -43,8 +43,8 @@ public:
     SlabAlloc();
     ~SlabAlloc();
 
-    bool   SetShared(const char* path, bool readOnly=true);
-    bool   SetSharedBuffer(const char* buffer, size_t len);
+    bool   SetShared(const char* path, bool read_only=true);
+    bool   SetSharedBuffer(const char* buffer, size_t len, bool take_ownership=true);
 
     MemRef Alloc(size_t size);
     MemRef ReAlloc(size_t ref, void* p, size_t size);

@@ -219,10 +219,21 @@ public:
     ///
     /// \tparam T The static table type. It makes no difference
     /// whether it is const-qualified or not.
+    ///
+    /// FIXME: Consider dropping the requirement that column names
+    /// must be equal. There does not seem to be any value for the
+    /// user in that requirement. Further more, there may be cases
+    /// where it is desirable to be able to cast to a table type with
+    /// different column names. Similar changes are needed in the Java
+    /// and Objective-C language bindings.
     template<class T> friend bool is_a(const Table&);
 
+    //@{
+    /// These functions return null if the specified table is not
+    /// compatible with the specified table type.
     template<class T> friend BasicTableRef<T> checked_cast(TableRef);
     template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef);
+    //@}
 
 #ifdef TIGHTDB_DEBUG
     using Table::Verify;

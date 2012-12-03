@@ -17,10 +17,6 @@
 /tightdb-tests
 /tightdb-tests-dbg
 /tightdb-tests-cov
-/subtables*.tdb
-/subtables.tightdb
-/table_test.tbl
-/*.lock
 
 /benchmark/x64
 /benchmark

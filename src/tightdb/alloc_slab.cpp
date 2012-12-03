@@ -283,7 +283,7 @@ bool SlabAlloc::IsReadOnly(size_t ref) const
     return ref < m_baseline;
 }
 
-bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len)
+bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len, bool take_ownership)
 {
     // Verify the data structures
     if (!ValidateBuffer(buffer, len))
@@ -291,14 +291,14 @@ bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len)
 
     m_shared = (char*)buffer;
     m_baseline = len;
-    m_owned = true; // we now own the buffer
+    m_owned = take_ownership; // we now own the buffer
     return true;
 }
 
-bool SlabAlloc::SetShared(const char* path, bool readOnly)
+bool SlabAlloc::SetShared(const char* path, bool read_only)
 {
 #ifdef _MSC_VER
-    TIGHTDB_ASSERT(readOnly); // write persistence is not implemented for windows yet
+    TIGHTDB_ASSERT(read_only); // write persistence is not implemented for windows yet
     // Open file
     m_fd = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, NULL, NULL);
 
@@ -325,7 +325,7 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
 #else
     // Open file
     {
-        m_fd = open(path, readOnly ? O_RDONLY : O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        m_fd = open(path, read_only ? O_RDONLY : O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         if (m_fd < 0) return false;
 
         // Get size
@@ -335,7 +335,7 @@ bool SlabAlloc::SetShared(const char* path, bool readOnly)
 
         // Handle empty files (new database)
         if (len == 0) {
-            if (readOnly) goto error; // non-existing or empty file
+            if (read_only) goto error; // non-existing or empty file
 
             // We dont want multiple processes creating files at the same time
             if (flock(m_fd, LOCK_EX) != 0) goto error;
