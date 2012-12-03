@@ -53,7 +53,7 @@ struct tightdb::SharedInfo {
 
 
 SharedGroup::SharedGroup(const char* path_to_database_file):
-    m_group(path_to_database_file, GROUP_SHARED), m_info(NULL), m_isValid(false), m_version(-1),
+m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID), m_info(NULL), m_isValid(false), m_version(-1),
     m_lockfile_path(NULL)
 {
     init(path_to_database_file);
@@ -64,7 +64,7 @@ SharedGroup::SharedGroup(const char* path_to_database_file):
 
 SharedGroup::SharedGroup(replication_tag, const char* path_to_database_file):
     m_group(path_to_database_file ? path_to_database_file :
-            Replication::get_path_to_database_file(), GROUP_SHARED), m_info(NULL),
+            Replication::get_path_to_database_file(), GROUP_SHARED|GROUP_INVALID), m_info(NULL),
     m_isValid(false), m_version(-1), m_lockfile_path(NULL)
 {
     error_code err = m_replication.init(path_to_database_file);
@@ -79,8 +79,6 @@ SharedGroup::SharedGroup(replication_tag, const char* path_to_database_file):
 
 void SharedGroup::init(const char* path_to_database_file)
 {
-    if (!m_group.is_valid()) return;
-
     // Open shared coordination buffer
     m_lockfile_path = concat_strings(path_to_database_file, ".lock");
     m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -139,6 +137,15 @@ void SharedGroup::init(const char* path_to_database_file)
     m_info = (SharedInfo*)p;
 
     if (needInit) {
+        // If we are the first we may have to create the database file
+        // but we invalidate the internals right after to avoid conflicting
+        // with old state when starting transactions
+        if (!m_group.create_from_file(path_to_database_file, true)) {
+            close(m_fd);
+            return;
+        }
+        m_group.invalidate();
+
         // Initialize mutexes so that they can be shared between processes
         pthread_mutexattr_t mattr;
         pthread_mutexattr_init(&mattr);
@@ -148,10 +155,6 @@ void SharedGroup::init(const char* path_to_database_file)
         pthread_mutexattr_destroy(&mattr);
 
         SlabAlloc& alloc = m_group.get_allocator();
-
-        // The file may be in the process of being created by another
-        // thread. So we have to ensure that we get the correct size.
-        alloc.RefreshMapping();
 
         // Set initial values
         m_info->filesize = alloc.GetFileLen();
@@ -165,6 +168,13 @@ void SharedGroup::init(const char* path_to_database_file)
         // Downgrade lock to shared now that it is initialized,
         // so other processes can share it as well
         flock(m_fd, LOCK_SH);
+    }
+    else {
+        // Setup the group, but leave it in invalid state
+        if (!m_group.create_from_file(path_to_database_file, false)) {
+            close(m_fd);
+            return;
+        }
     }
 
     m_isValid = true;
@@ -246,6 +256,7 @@ const Group& SharedGroup::begin_read()
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READING;
+    m_group.Verify();
 #endif
 
     return m_group;
@@ -314,6 +325,7 @@ Group& SharedGroup::begin_write()
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_WRITING;
+    m_group.Verify();
 #endif
 
     return m_group;

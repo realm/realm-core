@@ -34,8 +34,10 @@ class SharedGroup;
 enum GroupMode {
     GROUP_DEFAULT  =  0,
     GROUP_READONLY =  1,
+
+    // Rest are internal use only
     GROUP_SHARED   =  2,
-    GROUP_APPEND   =  4,
+    GROUP_INVALID  =  4,
     GROUP_ASYNC    =  8,
     GROUP_SWAPONLY = 16
 };
@@ -98,6 +100,8 @@ protected:
     friend class GroupWriter;
     friend class SharedGroup;
 
+    bool create_from_file(const char* filename, bool doInit);
+
     void invalidate();
     bool in_inital_state() const;
     void init_shared();
@@ -133,7 +137,7 @@ protected:
     }
 
     void create(); // FIXME: Could be private
-    void create_from_ref();
+    void create_from_ref(size_t top_ref);
 
     template<class S> size_t write(S& out);
 
