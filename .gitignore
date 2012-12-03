@@ -1,3 +1,4 @@
+doc/ref_cpp/*.html
 *.tdb
 *.tightdb
 *.tbl

@@ -270,16 +270,15 @@ CATEGORIES :
                  Insert a value.
       DESCR    : &g_dyn_table_insert_xxx_descr
                  >
-                 These methods are used to insert new rows.
+                 These methods are used to insert new rows in a table.
 
-                 <strong>WARNING</strong>: These methods are support for the situation where 
-                 you need maximal performance for inserts.
-                 But these methods can easily corrupt the database if used incorrectly. When inserting 
+                 <strong>WARNING</strong>: These methods support inserts with maximal performance.
+                 But they can easily corrupt the database if used incorrectly! When inserting 
                  a new row, you have to call the corresponding insert method for <em>every</em> column in the table
-                 and end the insert sequence by calling {@link g_dyn_table_insert_done}.
-
-                 For a safe way to insert rows, use {@link g_dyn_table_insert_empty_row}, 
-                 and then set individual values.
+                 and end the insert sequence by calling {@link g_dyn_table_insert_done insert_done()}.
+                 
+                 <code>insert_binary()</code> will copy the data provided.
+                 
       SIGNATURE: |
                  void insert_bool(size_t column_ndx, size_t row_ndx, bool value)
                  void insert_int(size_t column_ndx, size_t row_ndx, int64_t value)
@@ -299,18 +298,19 @@ CATEGORIES :
         DESCR  : The row index.
       - NAME   : value
         TYPES  : [bool, int64_t, time_t, const char*, Mixed]
-        DESCR  : The value.
+        DESCR  : The value to insert.
       - NAME   : len
         TYPES  : size_t
         DESCR  : Size in bytes of binary value.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_insert_xxx
         DESCR  : 
-      SEE      : "{@link g_dyn_table_insert_empty_row}"
+      SEE      : "For a safe way to insert rows, use {@link g_dyn_table_insert_empty_row}, and then set individual values in the columns."
+                 
   - g_dyn_table_remove_row:
       NAMES    : remove
       SUMMARY  : &g_dyn_table_remove_row_summary
-                 Delete rows.
+                 Delete row.
       DESCR    : &g_dyn_table_remove_row_descr
                  This method delete a specific row.
       SIGNATURE: void remove(size_t row_ndx);
@@ -326,7 +326,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_remove_last_row_summary
                  Delete last row.
       DESCR    : &g_dyn_table_remove_last_row_descr
-                 This method deletes the last row.  Calling it on an empty table is an error.
+                 This method deletes the last row. Calling it on an empty table is an error.
       SIGNATURE: void remove_last();
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove_last_row
