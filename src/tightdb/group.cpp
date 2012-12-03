@@ -106,7 +106,7 @@ Group::Group(const char* filename, int mode):
     }
 }
 
-Group::Group(const char* buffer, size_t len):
+Group::Group(const char* buffer, size_t len, bool take_ownership):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
 {

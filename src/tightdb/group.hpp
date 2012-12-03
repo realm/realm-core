@@ -44,7 +44,7 @@ class Group: private Table::Parent {
 public:
     Group();
     Group(const char* filename, int mode=GROUP_DEFAULT);
-    Group(const char* buffer, size_t len);
+    Group(const char* buffer, size_t len, bool take_ownership=true);
     ~Group();
 
     bool is_valid() const {return m_isValid;}
