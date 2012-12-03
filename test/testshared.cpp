@@ -685,12 +685,12 @@ TEST(Shared_SpaceOveruse)
 TEST(Shared_Notifications)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         // No other instance have changed db since last transaction
@@ -698,7 +698,7 @@ TEST(Shared_Notifications)
 
         {
             // Open the same db again (in empty state)
-            SharedGroup shared2("test_shared.tdb");
+            SharedGroup shared2("test_shared.tightdb");
             CHECK(shared2.is_valid());
 
             // Verify that new group is empty
