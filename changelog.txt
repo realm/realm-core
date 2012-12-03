@@ -12,6 +12,9 @@ Format:
 
 ==================
 
+2012-11-21
++ Added ShareGroup::has_changed() to detect if there has been changes to the db since last transaction.
+
 2012-11-12 (Kristian Spangsege)
 ----------
 ! Fixed a memory leak when using Table::create()
