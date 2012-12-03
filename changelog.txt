@@ -12,6 +12,10 @@ Format:
 
 ==================
 
+2012-12-03 (Brian Munkholm)
+----------
++ 13 Updated Group() constructor to take an optional 3'rd parameter 'take_ownership', which allows the caller to keep owenership of the provided data: Group::Group(const char* buffer, size_t len, bool take_ownership=true).
+
 2012-11-12 (Kristian Spangsege)
 ----------
 ! Fixed a memory leak when using Table::create()
