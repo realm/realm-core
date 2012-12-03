@@ -87,6 +87,7 @@ protected:
                     size,   Int)
 
     const FreeSpace& GetFreespace() const {return m_freeReadOnly;}
+    bool ValidateBuffer(const char* data, size_t len) const;
 
     // Member variables
     char*     m_shared;

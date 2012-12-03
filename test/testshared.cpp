@@ -682,5 +682,64 @@ TEST(Shared_SpaceOveruse)
     }
 }
 
+TEST(Shared_Notifications)
+{
+    // Delete old files if there
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock"); // also the info file
+
+    {
+        // Create a new shared db
+        SharedGroup shared("test_shared.tdb");
+        CHECK(shared.is_valid());
+
+        // No other instance have changed db since last transaction
+        CHECK(!shared.has_changed());
+
+        {
+            // Open the same db again (in empty state)
+            SharedGroup shared2("test_shared.tdb");
+            CHECK(shared2.is_valid());
+
+            // Verify that new group is empty
+            {
+                const Group& g1 = shared2.begin_read();
+                CHECK(g1.is_valid());
+                CHECK(g1.is_empty());
+                shared2.end_read();
+            }
+
+            // No other instance have changed db since last transaction
+            CHECK(!shared2.has_changed());
+
+            // Add a new table
+            {
+                Group& g1 = shared2.begin_write();
+                TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+                t1->add(1, 2, false, "test");
+                shared2.commit();
+            }
+        }
+
+        // Db has been changed by other instance
+        CHECK(shared.has_changed());
+
+        // Verify that the new table has been added
+        {
+            const Group& g1 = shared.begin_read();
+            TestTableShared::ConstRef t1 = g1.get_table<TestTableShared>("test");
+            CHECK_EQUAL(1, t1->size());
+            CHECK_EQUAL(1, t1[0].first);
+            CHECK_EQUAL(2, t1[0].second);
+            CHECK_EQUAL(false, t1[0].third);
+            CHECK_EQUAL("test", (const char*)t1[0].fourth);
+            shared.end_read();
+        }
+
+        // No other instance have changed db since last transaction
+        CHECK(!shared.has_changed());
+    }
+}
+
 
 #endif // !_MSV_VER

@@ -80,6 +80,9 @@ public:
 
     bool is_valid() const { return m_isValid; }
 
+    // Has db been modified since last transaction?
+    bool has_changed() const;
+
     // Read transactions
     const Group& begin_read();
     void end_read();
@@ -112,7 +115,7 @@ private:
     SharedInfo* m_info;
     size_t      m_info_len;
     bool        m_isValid;
-    uint32_t    m_version;
+    size_t      m_version;
     int         m_fd;
     const char* m_lockfile_path;
 
