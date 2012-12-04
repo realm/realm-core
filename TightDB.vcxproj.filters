@@ -160,6 +160,9 @@
     <ClCompile Include="src\tightdb\terminate.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="test\transactions.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">

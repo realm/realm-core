@@ -1,6 +1,7 @@
 #include <UnitTest++.h>
 #include "tightdb.hpp"
 #include "tightdb/group_shared.hpp"
+#include <sys/stat.h>
 
 // Does not work for windows yet
 #ifndef _MSC_VER
@@ -20,12 +21,12 @@ TIGHTDB_TABLE_4(TestTableShared,
 TEST(Shared_Initial)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         // Verify that new group is empty
@@ -43,7 +44,7 @@ TEST(Shared_Initial)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
@@ -52,17 +53,17 @@ TEST(Shared_Initial)
 TEST(Shared_Initial2)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         {
             // Open the same db again (in empty state)
-            SharedGroup shared2("test_shared.tdb");
+            SharedGroup shared2("test_shared.tightdb");
             CHECK(shared2.is_valid());
 
             // Verify that new group is empty
@@ -96,19 +97,19 @@ TEST(Shared_Initial2)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
 TEST(Shared1)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         // Create first table in group
@@ -120,7 +121,7 @@ TEST(Shared1)
         }
 
         // Open same db again
-        SharedGroup shared2("test_shared.tdb");
+        SharedGroup shared2("test_shared.tightdb");
         CHECK(shared2.is_valid());
         {
             const Group& g2 = shared2.begin_read();
@@ -195,19 +196,19 @@ TEST(Shared1)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
 TEST(Shared_rollback)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         // Create first table in group (but rollback)
@@ -267,19 +268,19 @@ TEST(Shared_rollback)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
 TEST(Shared_Writes)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         // Create first table in group
@@ -309,7 +310,7 @@ TEST(Shared_Writes)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
@@ -370,7 +371,7 @@ void* IncrementEntry(void* arg )
     const size_t row_id = (size_t)arg;
 
     // Open shared db
-    SharedGroup shared("test_shared.tdb");
+    SharedGroup shared("test_shared.tightdb");
     CHECK(shared.is_valid());
 
     for (size_t i = 0; i < 100; ++i) {
@@ -403,12 +404,12 @@ void* IncrementEntry(void* arg )
 TEST(Shared_WriterThreads)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tdb");
+        SharedGroup shared("test_shared.tightdb");
         CHECK(shared.is_valid());
 
         const size_t thread_count = 10;
@@ -451,16 +452,16 @@ TEST(Shared_WriterThreads)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tdb.lock", F_OK);
+    const int rc = access("test_shared.tightdb.lock", F_OK);
     CHECK_EQUAL(-1, rc);
 }
 
 
 TEST(Shared_FormerErrorCase1)
 {
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock");
-    SharedGroup db("test_shared.tdb");
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock");
+    SharedGroup db("test_shared.tightdb");
     CHECK(db.is_valid());
     {
         Group& group = db.begin_write();
@@ -608,11 +609,11 @@ TIGHTDB_TABLE_1(FormerErrorCase2_Table,
 
 TEST(Shared_FormerErrorCase2)
 {
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock");
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock");
 
     for (int i=0; i<10; ++i) {
-        SharedGroup db("test_shared.tdb");
+        SharedGroup db("test_shared.tightdb");
         CHECK(db.is_valid());
         {
             Group& group = db.begin_write();
@@ -644,9 +645,9 @@ TEST(Shared_SpaceOveruse)
 
     // Many transactions
     {
-        remove("over_alloc_1.db");
-        remove("over_alloc_1.db.lock");
-        SharedGroup db("over_alloc_1.db");
+        remove("over_alloc_1.tightdb");
+        remove("over_alloc_1.tightdb.lock");
+        SharedGroup db("over_alloc_1.tightdb");
         CHECK(db.is_valid());
 
         // Do a lot of sequential transactions
@@ -681,6 +682,204 @@ TEST(Shared_SpaceOveruse)
         }
     }
 }
+
+TEST(Shared_Notifications)
+{
+    // Delete old files if there
+    remove("test_shared.tdb");
+    remove("test_shared.tdb.lock"); // also the info file
+
+    {
+        // Create a new shared db
+        SharedGroup shared("test_shared.tdb");
+        CHECK(shared.is_valid());
+
+        // No other instance have changed db since last transaction
+        CHECK(!shared.has_changed());
+
+        {
+            // Open the same db again (in empty state)
+            SharedGroup shared2("test_shared.tdb");
+            CHECK(shared2.is_valid());
+
+            // Verify that new group is empty
+            {
+                const Group& g1 = shared2.begin_read();
+                CHECK(g1.is_valid());
+                CHECK(g1.is_empty());
+                shared2.end_read();
+            }
+
+            // No other instance have changed db since last transaction
+            CHECK(!shared2.has_changed());
+
+            // Add a new table
+            {
+                Group& g1 = shared2.begin_write();
+                TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+                t1->add(1, 2, false, "test");
+                shared2.commit();
+            }
+        }
+
+        // Db has been changed by other instance
+        CHECK(shared.has_changed());
+
+        // Verify that the new table has been added
+        {
+            const Group& g1 = shared.begin_read();
+            TestTableShared::ConstRef t1 = g1.get_table<TestTableShared>("test");
+            CHECK_EQUAL(1, t1->size());
+            CHECK_EQUAL(1, t1[0].first);
+            CHECK_EQUAL(2, t1[0].second);
+            CHECK_EQUAL(false, t1[0].third);
+            CHECK_EQUAL("test", (const char*)t1[0].fourth);
+            shared.end_read();
+        }
+
+        // No other instance have changed db since last transaction
+        CHECK(!shared.has_changed());
+    }
+}
+
+
+const size_t READERS = 20;
+const size_t WRITERS = 20;
+const size_t ROUNDS = 20000;
+
+pthread_t read_threads[READERS];
+pthread_t write_threads[WRITERS];
+
+void* write_thread1(void* arg)
+{
+    int64_t w = int64_t(arg);
+    int id = w;
+    (void)id;
+
+    SharedGroup db("database.tdb");
+
+    for(size_t r = 0; r < ROUNDS; ++r)
+    {
+        {
+            Group& group = db.begin_write(); 
+            TableRef table = group.get_table("table");
+            table->set_int(0, 0, w);
+            int64_t r = table->get_int(0, 0);
+            CHECK(r == w);
+            db.commit();
+//            fprintf(stderr, "%d ", id); fflush(stderr);
+        }
+
+        // All writes by all threads must be unique so that it can be detected if they're spurious
+        w += WRITERS;
+
+    }    
+    return 0;
+}
+
+void* read_thread1(void* arg)
+{
+    (void)arg;
+    int64_t r1;
+    int64_t r2;
+
+    SharedGroup db("database.tdb");
+
+    for(size_t r = 0; r < ROUNDS; ++r)
+    {
+        {
+            const Group& group = db.begin_read();
+            r1 = group.get_table("table")->get_int(0, 0);
+            r2 = group.get_table("table")->get_int(0, 0);
+            CHECK_EQUAL(r1, r2);
+            db.end_read();        
+        }
+    }
+
+    return 0;
+}
+
+
+
+TEST(Shared_StressTest1)
+{ 
+    srand(123);
+
+    remove("database.tdb");
+    remove("database.tdb.lock");
+
+    struct stat buf;
+    CHECK((stat("database.tdb", &buf) != 0));
+    CHECK((stat("database.tdb.lock", &buf) != 0));
+
+    SharedGroup db("database.tdb");
+
+    {
+        Group& group = db.begin_write(); 
+        TableRef table = group.get_table("table");
+        Spec& spec = table->get_spec();
+        spec.add_column(COLUMN_TYPE_INT, "row");
+        table->update_from_spec();
+        table->insert_empty_row(0, 1);
+        table->set_int(0, 0, 0);
+    }
+
+    db.commit();
+
+    #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+        pthread_win32_process_attach_np ();
+    #endif
+
+    for(size_t t = 0; t < READERS; t++)
+        pthread_create(&read_threads[t], NULL, read_thread1, (void*)t);
+
+    for(size_t t = 0; t < WRITERS; t++)
+        pthread_create(&write_threads[t], NULL, write_thread1, (void*)t);
+
+    for(size_t t = 0; t < READERS; t++)
+        pthread_join(read_threads[t], NULL);
+
+    for(size_t t = 0; t < WRITERS; t++)
+        pthread_join(write_threads[t], NULL);
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #endif // !_MSV_VER

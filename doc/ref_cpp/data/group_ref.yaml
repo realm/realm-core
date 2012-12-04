@@ -37,11 +37,12 @@ CATEGORIES:
   - g_group_constructor_file:
   - g_group_constructor_memory:
       NAMES    : Group
-      DESCR    : >
+      DESCR    : &g_group_constructor_descr
+                 >
                  Group objects can be created in various ways depending on use pattern.
 
-                 You can either just create a new (empty) group, or load it from an
-                 existing database either from a file or memory buffer.
+                 You can either just create a new (empty) group, or load an
+                 existing group either from a file or memory buffer.
 
       SUMMARY  : &g_group_constructor_summary
                  Creates a table group.
@@ -52,14 +53,14 @@ CATEGORIES:
       PARAMS:
       - NAME   : filename
         TYPES  : const char*
-        DESCR  : name of the file.
+        DESCR  : The name of the file.
       - NAME   : buffer
         TYPES  : const char*
-        DESCR  : in-memory binary encoded representation of a group.
+        DESCR  : In-memory binary encoded representation of a group.
       - NAME   : mode
         TYPES  : int
         DESCR  : |
-                 GROUP_DEFAULT:  File with both read and write permissions
+                 GROUP_DEFAULT:  File with both read and write permissions.
                  GROUP_READONLY: Read-only file.
       - NAME   : len
         TYPES  : size_t
@@ -116,7 +117,9 @@ CATEGORIES:
   METHODS:
   - g_group_table_count:
       NAMES    : get_table_count
-      DESCR    : A group can be a container for many tables, and this method counts the number of tables currently stored within the group.
+      DESCR    : >
+                 A group can be a container for many tables, and this method counts 
+                 the number of tables currently stored in the group.
       SUMMARY  : The number of tables in the group.
       CONST    : true
       RETURN:
@@ -139,12 +142,13 @@ CATEGORIES:
                  template parameter, you get a statically typed table
                  accessor.
 
-                 It is an error to specify mismatching table class for
-                 a table that is already in the group. Doing so will
+                 It is an error to specify unmatching table class for
+                 an existing table in the group. Doing so will
                  result in undefined behaviour. For this reason you
-                 should generally never call get_table<MyTable>()
+                 should generally never call 
+                 <code>get_table<MyTable>()</code>
                  without first checking the type of the table with a
-                 call to has_table<MyTable>().
+                 call to <code>has_table<MyTable>()</code>.
 
                  If no table exists with the specified name, a new
                  empty table will be created.
@@ -160,7 +164,7 @@ CATEGORIES:
                  Name of the table you wish to retrieve. 
       - NAME   : tableclass
         TYPES  : class definition
-        DESCR  : Typed table class
+        DESCR  : Typed table class.
       RETURN:
         TYPES  : [TableRef, ConstTableRef]
         DESCR  : A table reference object.
@@ -177,10 +181,12 @@ CATEGORIES:
                  Does group have table?
       DESCR    : &g_group_has_table_descr
                  >
-                 Check whether this group contains the specified table.
+                 The method checks whether this group contains 
+                 the specified table.
 
                  When no table class is specified, this function
-                 returns true if the group contains a table with the
+                 returns <code>true</code> if the group contains a
+                 table with the
                  specified name. When a table class
                  (<code>MyTable</code>) is specified as a template
                  parameter, it returns true if the group contains a
@@ -255,7 +261,7 @@ CATEGORIES:
       SUMMARY  : &g_group_is_valid_summary
                  Is group valid?
       DESCR    : &g_group_is_valid_descr
-                 Check if group is valid. When loading a group from disk or memory, 
+                 The method checks if group is valid. When loading a group from disk or memory, 
                  you can use this to check that it was actually loaded.
       CONST    : true
       RETURN:
@@ -267,9 +273,9 @@ CATEGORIES:
   - g_group_is_shared:
       NAMES    : is_shared
       SUMMARY  : &g_group_is_shared_summary
-                 Is group shared.
+                 Is group shared?
       DESCR    : &g_group_is_shared_descr
-                 Check if group is shared.
+                 The method checks if group is shared.
       CONST    : true
       RETURN:
         TYPES  : bool
@@ -280,9 +286,9 @@ CATEGORIES:
   - g_group_is_empty:
       NAMES    : is_empty
       SUMMARY  : &g_group_is_empty_summary
-                 Is group empty.
+                 Is group empty?
       DESCR    : &g_group_is_empty_descr
-                 Check if group is empty. That is, does it have zero tables.
+                 This method checks if group is empty that is, does it have zero tables.
       CONST    : true
       RETURN:
         TYPES  : bool

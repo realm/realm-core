@@ -548,6 +548,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="test\transactions.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\tightdb.hpp" />

@@ -19,6 +19,8 @@ int main(int argc, char* argv[])
     cout << "Running Release unit tests\n";
 #endif
 
+    cout << "MAX_LIST_SIZE = " << MAX_LIST_SIZE << "\n";
+
 #ifdef TIGHTDB_COMPILER_SSE
     cout << "Compiler supported SSE (auto detect): Yes\n";
 #else
