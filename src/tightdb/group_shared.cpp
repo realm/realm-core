@@ -43,7 +43,7 @@ struct tightdb::SharedInfo {
     uint32_t infosize;
 
     uint64_t current_top;
-    uint32_t current_version;
+    volatile uint32_t current_version;
 
     uint32_t capacity; // -1 so it can also be used as mask
     uint32_t put_pos;
@@ -53,7 +53,7 @@ struct tightdb::SharedInfo {
 
 
 SharedGroup::SharedGroup(const char* path_to_database_file):
-    m_group(path_to_database_file, GROUP_SHARED), m_info(NULL), m_isValid(false), m_version(-1),
+m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID), m_info(NULL), m_isValid(false), m_version(-1),
     m_lockfile_path(NULL)
 {
     init(path_to_database_file);
@@ -64,7 +64,7 @@ SharedGroup::SharedGroup(const char* path_to_database_file):
 
 SharedGroup::SharedGroup(replication_tag, const char* path_to_database_file):
     m_group(path_to_database_file ? path_to_database_file :
-            Replication::get_path_to_database_file(), GROUP_SHARED), m_info(NULL),
+            Replication::get_path_to_database_file(), GROUP_SHARED|GROUP_INVALID), m_info(NULL),
     m_isValid(false), m_version(-1), m_lockfile_path(NULL)
 {
     error_code err = m_replication.init(path_to_database_file);
@@ -79,8 +79,6 @@ SharedGroup::SharedGroup(replication_tag, const char* path_to_database_file):
 
 void SharedGroup::init(const char* path_to_database_file)
 {
-    if (!m_group.is_valid()) return;
-
     // Open shared coordination buffer
     m_lockfile_path = concat_strings(path_to_database_file, ".lock");
     m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -139,6 +137,15 @@ void SharedGroup::init(const char* path_to_database_file)
     m_info = (SharedInfo*)p;
 
     if (needInit) {
+        // If we are the first we may have to create the database file
+        // but we invalidate the internals right after to avoid conflicting
+        // with old state when starting transactions
+        if (!m_group.create_from_file(path_to_database_file, true)) {
+            close(m_fd);
+            return;
+        }
+        m_group.invalidate();
+
         // Initialize mutexes so that they can be shared between processes
         pthread_mutexattr_t mattr;
         pthread_mutexattr_init(&mattr);
@@ -149,10 +156,6 @@ void SharedGroup::init(const char* path_to_database_file)
 
         SlabAlloc& alloc = m_group.get_allocator();
 
-        // The file may be in the process of being created by another
-        // thread. So we have to ensure that we get the correct size.
-        alloc.RefreshMapping();
-
         // Set initial values
         m_info->filesize = alloc.GetFileLen();
         m_info->infosize = (uint32_t)len;
@@ -162,9 +165,20 @@ void SharedGroup::init(const char* path_to_database_file)
         m_info->put_pos = 0;
         m_info->get_pos = 0;
 
+        // Set initial version so we can track if other instances
+        // change the db
+        m_version = 0;
+
         // Downgrade lock to shared now that it is initialized,
         // so other processes can share it as well
         flock(m_fd, LOCK_SH);
+    }
+    else {
+        // Setup the group, but leave it in invalid state
+        if (!m_group.create_from_file(path_to_database_file, false)) {
+            close(m_fd);
+            return;
+        }
     }
 
     m_isValid = true;
@@ -203,6 +217,19 @@ SharedGroup::~SharedGroup()
 
     if (m_lockfile_path)
         free((void*)m_lockfile_path);
+}
+
+bool SharedGroup::has_changed() const
+{
+    // Have we changed since last transaction?
+    // Visibility of changes can be delayed when using has_changed() because m_info->current_version is tested
+    // outside mutexes. However, the delay is finite on architectures that have hardware cache coherency (ARM, x64, x86, 
+    // POWER, UltraSPARC, etc) because it guarantees write propagation (writes to m_info->current_version occur on 
+    // system bus and make cache controllers invalidate caches of reader). Some excotic architectures may need
+    // explicit synchronization which isn't implemented yet.
+    TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
+    const bool is_changed = (m_version != m_info->current_version);
+    return is_changed;
 }
 
 const Group& SharedGroup::begin_read()
@@ -246,6 +273,7 @@ const Group& SharedGroup::begin_read()
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READING;
+    m_group.Verify();
 #endif
 
     return m_group;
@@ -259,7 +287,7 @@ void SharedGroup::end_read()
     pthread_mutex_lock(&m_info->readmutex);
     {
         // Find entry for current version
-        const size_t ndx = ringbuf_find(m_version);
+        const size_t ndx = ringbuf_find((uint32_t)m_version);
         TIGHTDB_ASSERT(ndx != (size_t)-1);
         ReadCount& r = ringbuf_get(ndx);
 
@@ -276,8 +304,6 @@ void SharedGroup::end_read()
         }
     }
     pthread_mutex_unlock(&m_info->readmutex);
-
-    m_version = (uint32_t)-1;
 
     // The read may have allocated some temporary state
     m_group.invalidate();
@@ -314,6 +340,7 @@ Group& SharedGroup::begin_write()
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_WRITING;
+    m_group.Verify();
 #endif
 
     return m_group;
@@ -364,6 +391,9 @@ void SharedGroup::commit()
 
     // Release write lock
     pthread_mutex_unlock(&m_info->writemutex);
+
+    // Save last version for has_changed()
+    m_version = current_version;
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;

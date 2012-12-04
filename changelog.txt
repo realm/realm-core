@@ -12,6 +12,19 @@ Format:
 
 ==================
 
+
+2012-12-03 (Brian Munkholm)
+----------
++ 15 Updated Group() constructor to take an optional 3'rd parameter 'take_ownership', which allows the caller to keep owenership of the provided data: Group::Group(const char* buffer, size_t len, bool take_ownership=true).
+
+2012-11-13 (Kristian Spangsege)
+----------
++ 14 Renamed Table::count() to Table::count_int()
+
+2012-11-21
+----------
++ Added ShareGroup::has_changed() to detect if there has been changes to the db since last transaction.
+
 2012-11-12 (Kristian Spangsege)
 ----------
 ! Fixed a memory leak when using Table::create()
@@ -19,7 +32,7 @@ Format:
 
 2012-10-24 (Kristian Spangsege)
 ----------
-+ Added Table::has_shared_spec().
++ 13 Added Table::has_shared_spec().
 
 
 2012-10-10 (Kristian Spangsege)
@@ -41,10 +54,9 @@ Format:
 ----------
 + File format updated with bigger header and reordered column type [BREAKING]
 + Index is now enabled for string columns (handles string_enum columns as well).
-+ 11 Added update_spec parameter in Table:: void set_index(size_t column_ndx, bool update_spec=true);
-+ 11 Added Table::  size_t  count_string(size_t column_ndx, const char* target) const;
++ 11 Added Table::count_string(size_t column_ndx, const char* target) const;
 + 11 Added Table accessor size_t count(const char* target) const to highlevel interface
-+ 11 Spec::add_column now takes an optional parameter for attribute (like indexed).
++ 11 Spec::add_column(...) now takes an optional parameter for attribute (like indexed).
 + 11 Added Table::to_string() and Group::to_string() for prettified string dump.
 
 
@@ -52,7 +64,7 @@ Format:
 ----------
 + 10 Renamed FindAllMulti() to find_all_multe(). And SetThreads() to set_threads()
 + 10 Renamed cols() to column().
-+ 10 Renamed get_subspec() to get_subtable_spec(). 
++ 10 Renamed get_subspec() to get_subtable_spec().
 + 10 Renamed parent() to end_subtable().
 
 
@@ -127,7 +139,7 @@ Format:
 -+ Table::sorted(...) changed name to get_sorted_view(...)
 - Removed Table::find_pos_int(...) from public API
 
-+ Added a the following methods to a TableView:  
++ Added a the following methods to a TableView:
 	template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
 	ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
 	size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const;

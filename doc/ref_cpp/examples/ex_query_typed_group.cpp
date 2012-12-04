@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_group @@
+// @@Example: ex_cpp_typed_query_group @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -25,13 +25,13 @@ void main()
                                             .Or()
                                             .name.equal("Alice");
 
-    PeopleTable::View view = query.find_all(table);
+    PeopleTable::View view = query.find_all();
 // @@Fold@@
     // Expected result
     assert(view.size() == 3);
-    assert(view[0].name == "Mary");
-    assert(view[1].name == "Joe");
-    assert(view[2].name == "Alice");
+    assert(!strcmp(view[0].name, "Mary"));
+    assert(!strcmp(view[1].name, "Joe"));
+    assert(!strcmp(view[2].name, "Alice"));
 }
 // @@EndFold@@
 // @@EndExample@@

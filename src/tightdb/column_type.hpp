@@ -32,9 +32,19 @@
 namespace tightdb {
 #endif
 
+
+// FIXME: The namespace of all-upper-case names must be considered
+// reserved for macros. Consider renaming 'COLUMN_TYPE_INT' to
+// 'type_Int', COLUMN_TYPE_STRING_ENUM to 'type_StringEnum', and so
+// forth. In C-mode this becomes 'tightdb_type_Int'. That is, a
+// qualifying prefix followed by the enumeration name in
+// CamelCase. This is a reasonably common naming scheme for enumration
+// values. Note that I am also suggesting that we drop 'column' from
+// the names, since these types a used much more generally than as
+// just 'column types'.
+//
 // Note: tightdb_objc/Deliv/ColumnType.h must be kept in sync with his file.
 // Note: tightdb_java2/src/main/java/ColumnType.java must be kept in sync with his file.
-
 enum TIGHTDB_QUAL_CC(ColumnType) {
     // Column types
     TIGHTDB_QUAL_UC(COLUMN_TYPE_INT)         =  0,

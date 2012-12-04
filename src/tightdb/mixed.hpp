@@ -40,6 +40,7 @@ namespace tightdb {
 
 class Mixed {
 public:
+    Mixed()     {m_type = COLUMN_TYPE_INT;    m_int  = 0;}
     Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
     Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
     Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.get_date();}
@@ -177,17 +178,17 @@ template<class T> inline bool operator==(Wrap<Mixed> a, const T& b)
 
 template<class T> inline bool operator!=(Wrap<Mixed> a, const T& b)
 {
-    return !(a == b);
+    return Mixed(a).get_type() == COLUMN_TYPE_INT && Mixed(a).get_int() != b;
 }
 
 template<class T> inline bool operator==(const T& a, Wrap<Mixed> b)
 {
-    return b == a;
+    return Mixed(b).get_type() == COLUMN_TYPE_INT && a == Mixed(b).get_int();
 }
 
 template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b)
 {
-    return b != a;
+    return Mixed(b).get_type() == COLUMN_TYPE_INT && a != Mixed(b).get_int();
 }
 
 

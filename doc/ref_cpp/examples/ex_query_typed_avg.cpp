@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_query_avg @@
+// @@Example: ex_cpp_typed_query_avg @@
 // @@Fold@@
 #include <tightdb.hpp>
 
@@ -19,14 +19,14 @@ int main()
 
     // Find average weight for rows where age >= 13 && age <= 20
     PeopleTable::Query query1 = table.where().age.between(13, 20);
-    double avg1 = query1.weight.average(table);
+    double avg1 = query1.weight.average();
 // @@Fold@@
     assert(avg1 == (50.0 + 70.0) / 2.0);
 // @@EndFold@@
 
     // Find average weight of 2'nd to 3'rd row of table, both inclusive
     PeopleTable::Query query2 = table.where();
-    double avg2 = query2.weight.average(table, NULL, 1, 3);
+    double avg2 = query2.weight.average(NULL, 1, 3);
 // @@Fold@@
 
     assert(avg2 == (60.0 + 70.0) / 2.0);
