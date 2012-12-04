@@ -1,6 +1,7 @@
 #include <UnitTest++.h>
 #include "tightdb.hpp"
 #include "tightdb/group_shared.hpp"
+#include <sys/stat.h>
 
 // Does not work for windows yet
 #ifndef _MSC_VER
@@ -742,38 +743,77 @@ TEST(Shared_Notifications)
 }
 
 
-const size_t ITER = 20;
+const size_t READERS = 20;
 const size_t WRITERS = 20;
+const size_t ROUNDS = 20000;
 
-void* write_thread(void* arg)
+pthread_t read_threads[READERS];
+pthread_t write_threads[WRITERS];
+
+void* write_thread1(void* arg)
 {
-    int id = (int64_t)arg;
+    int64_t w = int64_t(arg);
+    int id = w;
     (void)id;
 
-//    fprintf(stderr, "[start %d] ", id); fflush(stderr);
     SharedGroup db("database.tdb");
 
-    for(size_t t = 0; t < ITER; t++)
+    for(size_t r = 0; r < ROUNDS; ++r)
     {
-        Group& group = db.begin_write(); 
-        TableRef table = group.get_table("table");
-        volatile int64_t r = table->get_int(0, 0);
-        (void)r;
-        db.commit();
-        fprintf(stderr, "[%d] ", id); fflush(stderr);
+        {
+            Group& group = db.begin_write(); 
+            TableRef table = group.get_table("table");
+            table->set_int(0, 0, w);
+            int64_t r = table->get_int(0, 0);
+            CHECK(r == w);
+            db.commit();
+//            fprintf(stderr, "%d ", id); fflush(stderr);
+        }
+
+        // All writes by all threads must be unique so that it can be detected if they're spurious
+        w += WRITERS;
+
     }    
     return 0;
 }
 
-TEST(Shared_ReadRingbufFindBug) 
+void* read_thread1(void* arg)
+{
+    (void)arg;
+    int64_t r1;
+    int64_t r2;
+
+    SharedGroup db("database.tdb");
+
+    for(size_t r = 0; r < ROUNDS; ++r)
+    {
+        {
+            const Group& group = db.begin_read();
+            r1 = group.get_table("table")->get_int(0, 0);
+            r2 = group.get_table("table")->get_int(0, 0);
+            CHECK_EQUAL(r1, r2);
+            db.end_read();        
+        }
+    }
+
+    return 0;
+}
+
+
+
+TEST(Shared_StressTest1)
 { 
     srand(123);
-    pthread_t write_threads[WRITERS];
 
     remove("database.tdb");
     remove("database.tdb.lock");
 
-    tightdb::SharedGroup db("database.tdb");
+    struct stat buf;
+    CHECK((stat("database.tdb", &buf) != 0));
+    CHECK((stat("database.tdb.lock", &buf) != 0));
+
+    SharedGroup db("database.tdb");
+
     {
         Group& group = db.begin_write(); 
         TableRef table = group.get_table("table");
@@ -790,19 +830,56 @@ TEST(Shared_ReadRingbufFindBug)
         pthread_win32_process_attach_np ();
     #endif
 
+    for(size_t t = 0; t < READERS; t++)
+        pthread_create(&read_threads[t], NULL, read_thread1, (void*)t);
 
-//    for(size_t i = 0; i < 100; i ++)
-    {
-        for(size_t t = 0; t < WRITERS; t++)
-            pthread_create(&write_threads[t], NULL, write_thread, (void*)t);
+    for(size_t t = 0; t < WRITERS; t++)
+        pthread_create(&write_threads[t], NULL, write_thread1, (void*)t);
 
-//        fprintf(stderr, "\n"); fflush(stderr);
+    for(size_t t = 0; t < READERS; t++)
+        pthread_join(read_threads[t], NULL);
 
-        for(size_t t = 0; t < WRITERS; t++)
-            pthread_join(write_threads[t], NULL);
-    }
-
+    for(size_t t = 0; t < WRITERS; t++)
+        pthread_join(write_threads[t], NULL);
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #endif // !_MSV_VER
