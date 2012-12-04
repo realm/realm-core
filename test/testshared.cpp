@@ -683,4 +683,67 @@ TEST(Shared_SpaceOveruse)
 }
 
 
+const size_t ITER = 20;
+const size_t WRITERS = 20;
+
+void* write_thread(void* arg)
+{
+    int id = (int64_t)arg;
+    (void)id;
+
+//    fprintf(stderr, "[start %d] ", id); fflush(stderr);
+    SharedGroup db("database.tdb");
+
+    for(size_t t = 0; t < ITER; t++)
+    {
+        Group& group = db.begin_write(); 
+        TableRef table = group.get_table("table");
+        volatile int64_t r = table->get_int(0, 0);
+        (void)r;
+        db.commit();
+        fprintf(stderr, "[%d] ", id); fflush(stderr);
+    }    
+    return 0;
+}
+
+TEST(Shared_ReadRingbufFindBug) 
+{ 
+    srand(123);
+    pthread_t write_threads[WRITERS];
+
+    remove("database.tdb");
+    remove("database.tdb.lock");
+
+    tightdb::SharedGroup db("database.tdb");
+    {
+        Group& group = db.begin_write(); 
+        TableRef table = group.get_table("table");
+        Spec& spec = table->get_spec();
+        spec.add_column(COLUMN_TYPE_INT, "row");
+        table->update_from_spec();
+        table->insert_empty_row(0, 1);
+        table->set_int(0, 0, 0);
+    }
+
+    db.commit();
+
+    #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+        pthread_win32_process_attach_np ();
+    #endif
+
+
+//    for(size_t i = 0; i < 100; i ++)
+    {
+        for(size_t t = 0; t < WRITERS; t++)
+            pthread_create(&write_threads[t], NULL, write_thread, (void*)t);
+
+//        fprintf(stderr, "\n"); fflush(stderr);
+
+        for(size_t t = 0; t < WRITERS; t++)
+            pthread_join(write_threads[t], NULL);
+    }
+
+
+}
+
 #endif // !_MSV_VER
