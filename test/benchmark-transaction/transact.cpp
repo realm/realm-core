@@ -150,11 +150,16 @@ static void *sqlite_reader(void *arg) {
     long int randy;
     char *errmsg;
     char sql[128];
+    sqlite3_stmt *s;
+    char *tail;
 
     struct thread_info *tinfo = (struct thread_info *)arg;
     srandom(tinfo->thread_num);
     sqlite3_open(tinfo->datfile, &db);
     sqlite3_busy_handler(db, &db_retry, NULL);
+
+    sprintf(sql, "SELECT COUNT(*) FROM test WHERE y = @Y");
+    sqlite3_prepare_v2(db, sql, 128, &s, (const char **)&tail);
     while (true) {
         pthread_mutex_lock(&mtx_runnable);
         bool local_runnable = runnable;
@@ -167,11 +172,14 @@ static void *sqlite_reader(void *arg) {
         // execute transaction
         sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &errmsg);
         randy = random() % 1000;
-        sprintf(sql, "SELECT COUNT(*) FROM test WHERE y = %ld", randy);
-        sqlite3_exec(db, sql, NULL, NULL, &errmsg);
+        sqlite3_bind_int(s, 1, randy);
+        sqlite3_step(s);
+
         if (sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &errmsg) == SQLITE_BUSY) {
             cout << "Oops" << endl;
         }
+        sqlite3_clear_bindings(s);
+        sqlite3_reset(s);
 
         // update statistics
         clock_gettime(CLOCK_REALTIME, &ts_2);
@@ -263,12 +271,16 @@ static void *sqlite_writer(void *arg) {
     char *errmsg;
     char sql[128];
     struct timespec ts_1, ts_2;
+    sqlite3_stmt *s;
+    char *tail;
 
     struct thread_info *tinfo = (struct thread_info *) arg;
     srandom(tinfo->thread_num);
 
     sqlite3_open(tinfo->datfile, &db);
     sqlite3_busy_handler(db, &db_retry, NULL);
+    sprintf(sql, "UPDATE test SET x=@X WHERE y = @Y");
+    sqlite3_prepare_v2(db, sql, 128, &s, (const char **)&tail);
     while (true) {
         pthread_mutex_lock(&mtx_runnable);
         bool local_runnable = runnable;
@@ -282,13 +294,15 @@ static void *sqlite_writer(void *arg) {
         sqlite3_exec(db, "BEGIN EXCLUSIVE TRANSACTION", NULL, NULL, &errmsg);
         randx = random() % 1000;
         randy = random() % 1000;
-        sprintf(sql, "UPDATE test SET x=%ld WHERE y = %ld", randx, randy);
-        if (sqlite3_exec(db, sql, NULL, NULL, &errmsg) != SQLITE_OK) 
-			cout << errmsg;
+        sqlite3_bind_int(s, 1, randx);
+        sqlite3_bind_int(s, 2, randy);
+        sqlite3_step(s);
 		sqlite3_free(errmsg);
         if (sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &errmsg) == SQLITE_BUSY) {
             cout << "Ooops" << endl;
         }
+        sqlite3_clear_bindings(s);
+        sqlite3_reset(s);
 
         // update statistics    
         clock_gettime(CLOCK_REALTIME, &ts_2);
