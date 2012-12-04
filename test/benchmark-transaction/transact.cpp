@@ -27,6 +27,7 @@ using namespace std;
 #define DB_TIGHTDB 0
 #define DB_SQLITE  1
 #define DB_MYSQL   2
+#define DB_SQLITE_WAL 3
 
 // database parameters - primarily for MySQL
 #define DB_HOST "localhost"
@@ -68,7 +69,7 @@ void usage(const char *msg) {
     cout << " -w   : number of writers" << endl;
     cout << " -r   : number of readers" << endl;
     cout << " -f   : database file" << endl;
-    cout << " -d   : database (tdb, sqlite or mysql)" << endl;
+    cout << " -d   : database (tdb, sqlite, sqlite-wal or mysql)" << endl;
     cout << " -t   : duration (in secs)" << endl;
     cout << " -n   : number of rows" << endl;
     cout << " -v   : verbose" << endl;
@@ -297,7 +298,7 @@ static void *sqlite_writer(void *arg) {
         sqlite3_bind_int(s, 1, randx);
         sqlite3_bind_int(s, 2, randy);
         sqlite3_step(s);
-		sqlite3_free(errmsg);
+        sqlite3_free(errmsg);
         if (sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &errmsg) == SQLITE_BUSY) {
             cout << "Ooops" << endl;
         }
@@ -388,7 +389,7 @@ static void *tdb_writer(void *arg) {
     return NULL;
 }
 
-void sqlite_create(const char *f, long n) {
+void sqlite_create(const char *f, long n, bool wal) {
     int      i;
     long     randx, randy;
     char     sql[128];
@@ -402,7 +403,13 @@ void sqlite_create(const char *f, long n) {
         cout << "SQLite has no multi-threading support" << endl;
     }
     sqlite3_open(f, &db);
-    sqlite3_exec(db, "CREATE TABLE test (x INT, y INT)", NULL, NULL, &errmsg);
+    if (wal) {
+        sqlite3_exec(db, "CREATE TABLE test (x INT, y INT)", NULL, NULL, &errmsg);
+        sqlite3_exec(db, "PRAGMA journal_mode=wal", NULL, NULL, &errmsg);
+    }
+    else {
+        sqlite3_exec(db, "CREATE TABLE test (x INT, y INT)", NULL, NULL, &errmsg);
+    }
     sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &errmsg);
     for(i=0; i<n; ++i) {
         randx = random() % 1000;
@@ -490,6 +497,7 @@ void benchmark(int database, const char *datfile, long n_readers, long n_writers
             pthread_create(&tinfo[i].thread_id, &attr, &tdb_reader, &tinfo[i]);
             break;
         case DB_SQLITE:
+        case DB_SQLITE_WAL:
             pthread_create(&tinfo[i].thread_id, &attr, &sqlite_reader, &tinfo[i]);
             break;
         case DB_MYSQL:
@@ -504,6 +512,7 @@ void benchmark(int database, const char *datfile, long n_readers, long n_writers
             pthread_create(&tinfo[j].thread_id, &attr, &tdb_writer, &tinfo[j]);
             break;
         case DB_SQLITE:
+        case DB_SQLITE_WAL:
             pthread_create(&tinfo[j].thread_id, &attr, &sqlite_writer, &tinfo[j]);
             break;
         case DB_MYSQL:
@@ -539,10 +548,10 @@ void benchmark(int database, const char *datfile, long n_readers, long n_writers
         tps_writers = (double)(iteration_writers)/dt_writers;    
     else
         tps_writers = 0.0;
-	if (n_writers+n_readers > 0)
-		tps_total = (double)(iteration_writers+iteration_readers)/(dt_readers+dt_writers);
-	else
-		tps_total = 0.0;
+    if (n_writers+n_readers > 0)
+        tps_total = (double)(iteration_writers+iteration_readers)/(dt_readers+dt_writers);
+    else
+        tps_total = 0.0;
     if (database == DB_TIGHTDB || database == DB_SQLITE) {
         unlink(("tmp"+string(datfile)).c_str());
         unlink(("tmp"+string(datfile)+".lock").c_str());
@@ -583,13 +592,14 @@ int main(int argc, char *argv[]) {
             if (strcmp(optarg, "tdb") == 0) {
                 database = DB_TIGHTDB;
             }
-            else {
-                if (strcmp(optarg, "sqlite") == 0) {
-                    database = DB_SQLITE;
-                }
-                else {
-                    database = DB_MYSQL;
-                }
+            if (strcmp(optarg, "sqlite") == 0) {
+                database = DB_SQLITE;
+            }
+            if (strcmp(optarg, "sqlite-wal") == 0) {
+                database = DB_SQLITE_WAL;
+            }
+            if (strcmp(optarg, "mysql") == 0) {
+                database = DB_MYSQL;
             }
             break;
         case 'v':
@@ -627,7 +637,8 @@ int main(int argc, char *argv[]) {
             tdb_create(datfile, n_records);
             break;
         case DB_SQLITE:
-            sqlite_create(datfile, n_records);
+        case DB_SQLITE_WAL:
+            sqlite_create(datfile, n_records, database == DB_SQLITE_WAL);
             break;
         case DB_MYSQL:
             mysql_create(datfile, n_records);
@@ -636,24 +647,29 @@ int main(int argc, char *argv[]) {
     }
     else {
         tdb_create("test.tdb", n_records);
-        sqlite_create("test.sqlite", n_records);
+        sqlite_create("test.sqlite", n_records, database == DB_SQLITE_WAL);
         mysql_create("thread_benchmark", n_records);
     }
-
+    
+    // SQLite WAL is used
+    if (database == DB_SQLITE_WAL) {
+        database = DB_SQLITE;
+    }
+    
     if (single) {
         double tps_readers, tps_writers, tps_total;
         benchmark(database, datfile, n_readers, n_writers, duration, tps_readers, tps_writers, tps_total);
         cout << tps_readers << " " << tps_writers << " " << tps_total << endl;
     }
     else {
-		cout << "# Columns: "                   << endl;
-		cout << "# 1. number of readers"        << endl;
-		cout << "# 2. number of writers"        << endl;
-		cout << "# 3. SQLite speedup (readers)" << endl;
+        cout << "# Columns: "                   << endl;
+        cout << "# 1. number of readers"        << endl;
+        cout << "# 2. number of writers"        << endl;
+        cout << "# 3. SQLite speedup (readers)" << endl;
         cout << "# 4. MySQL speedup (readers)"  << endl;
-		cout << "# 5. SQLite speedup (writers)" << endl;
+        cout << "# 5. SQLite speedup (writers)" << endl;
         cout << "# 6. MySQL speedup (writers)"  << endl;
-		cout << "# 7. SQLite speedup (total)"   << endl;
+        cout << "# 7. SQLite speedup (total)"   << endl;
         cout << "# 8. MySQL speedup (total)"    << endl;
         for(int i=0; i<=n_readers; ++i) {
             for(int j=0; j<=n_writers; ++j) {
@@ -679,9 +695,9 @@ int main(int argc, char *argv[]) {
                          << tps_writers_tdb/tps_writers_mysql;
                 cout << " ";
                 if (i == 0 && j == 0)
-					cout << "0.0 0.0";
-				else
-					cout << tps_tdb/tps_sqlite
+                    cout << "0.0 0.0";
+                else
+                    cout << tps_tdb/tps_sqlite
                          << " "
                          << tps_tdb/tps_mysql;
                 cout << endl;
