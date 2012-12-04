@@ -101,11 +101,10 @@ public:
 
 
     struct score_compare {
-//        bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->dD / (1.0 + a->dT) < b->dD / (1.0 + b->dT)); }
         bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->cost() < b->cost()); }
     };
 
-    float cost(void) const
+    double cost(void) const
     {
         return 16.0 / dD + dT;
     }
@@ -123,7 +122,7 @@ public:
 
             // Find a large amount of local matches in best condition
             td = m_children[best]->dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
-            start = m_children[best]->aggregate(st, start, td, 16, action, agg_col, matchcount);
+            start = (size_t)m_children[best]->aggregate(st, start, td, 16, action, agg_col, matchcount);
 
             // Make remaining conditions compute their dD (statistics)
             for(size_t c = 0; c < m_children.size() && start < end; c++) {
@@ -131,14 +130,14 @@ public:
                     continue;
 
                 // Skip test if there is no way its cost can ever be better than best node's
-                float cost = m_children[c]->cost(); // cost() = 16.0 / dD + dT;
+                double cost = m_children[c]->cost(); // cost() = 16.0 / dD + dT;
                 if(m_children[c]->dT < cost) {
                     size_t maxN = 2;
 
                     // Limit to +256 in order not to skip too large parts of index nodes
                     size_t maxD = m_children[c]->dT == 0.0 ? end - start : 256;
                     td = m_children[c]->dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = m_children[c]->aggregate(st, start, td, maxN, action, agg_col, matchcount);
+                    start = (size_t)m_children[c]->aggregate(st, start, td, maxN, action, agg_col, matchcount);
                 }
             }
 
@@ -218,8 +217,8 @@ public:
     int cond;
     size_t m_column_id;
     size_t m_conds;
-    float dD; // Average row distance between each local match at current position
-    float dT; // time overhead testing index i + 1 after testing index i. > 1 for linear scans, 0 for index/tableview
+    double dD; // Average row distance between each local match at current position
+    double dT; // time overhead testing index i + 1 after testing index i. > 1 for linear scans, 0 for index/tableview
 
     size_t m_probes;
     size_t m_matches;
@@ -418,7 +417,7 @@ public:
                 m_column->GetBlock(s, m_array, m_leaf_start);                                       
                 m_leaf_end = m_leaf_start + m_array.Size();
                 size_t w = m_array.GetBitWidth();
-                dT = (w == 0 ? 1.0 / float(MAX_LIST_SIZE) : w / 8.0); // todo, define what width must take "1" constant-time unit. Now it's 8 bit
+                dT = (w == 0 ? 1.0 / MAX_LIST_SIZE : w / 8.0); // todo, define what width must take "1" constant-time unit. Now it's 8 bit
             }
 
             size_t end2;

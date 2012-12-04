@@ -261,7 +261,7 @@ public:
         if (pattern) {
             if (action == TDB_COUNT) {
                 state += fast_popcount64(indexpattern);
-                match_count = state;
+                match_count = size_t(state);
                 return true;
             }
             // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
