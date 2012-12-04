@@ -730,6 +730,7 @@ public:
         return Base::m_table->get_impl()->find_first_int(col_idx, value);
     }
 
+    // FIXME: What does this function do? It is used by SlabAlloc. Table::find_pos_int() is protected. Something is not right!
     std::size_t find_pos(int64_t value) const
     {
         return Base::m_table->find_pos_int(col_idx, value);
