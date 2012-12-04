@@ -104,18 +104,18 @@ void copy(const char *src, const char *dst) {
 
 // copy table in mysql
 void copy_db(const char *src, const char *dst) {
-    MYSQL    db;
+    MYSQL    *db;
     char sql[128];
 
-    mysql_init(&db);
-    mysql_real_connect(&db, DB_HOST, DB_USER, DB_PASS, DB_NAME, 0, NULL, 0);
+    db = mysql_init(NULL);
+    mysql_real_connect(db, DB_HOST, DB_USER, DB_PASS, DB_NAME, 0, NULL, 0);
     sprintf(sql, "DROP TABLE IF EXISTS %s", dst);
-    assert(!mysql_query(&db, sql));
+    mysql_query(db, sql);
     sprintf(sql, "CREATE TABLE %s LIKE %s", dst, src);
-    assert(!mysql_query(&db, sql));
+    mysql_query(db, sql);
     sprintf(sql, "INSERT INTO %s SELECT * FROM %s", dst, src);
-    assert(!mysql_query(&db, sql));
-    mysql_close(&db);
+    mysql_query(db, sql);
+    mysql_close(db);
 }
 
 double delta_time(struct timespec ts_1, struct timespec ts_2) {
@@ -434,11 +434,17 @@ void mysql_create(const char *f, long n) {
     mysql_query(db, sql);
     sprintf(sql, "CREATE TABLE %s (x INT, y INT) ENGINE=innodb", f);
     mysql_query(db, sql);
+    if (mysql_query(db, "START TRANSACTION;")) {
+        cout << "MySQL error: " << mysql_errno(db) << endl;
+    }    
     for(i=0; i<n; ++i) {
         randx = random() % 1000;
         randy = random() % 1000;
         sprintf(sql, "INSERT INTO %s VALUES (%ld, %ld)", f, randx, randy);
         mysql_query(db, sql);
+    }
+    if (mysql_query(db, "COMMIT;")) {
+        cout << "Cannot commit" << endl;
     }
     mysql_close(db);
 }
@@ -630,7 +636,7 @@ int main(int argc, char *argv[]) {
         sqlite3_config(SQLITE_CONFIG_SERIALIZED);
     }
     
-    if (verbose) cout << "Creating test data" << endl;
+    if (verbose) cout << "Creating test data for " << database << endl;
     if (single) {
         switch (database) {
         case DB_TIGHTDB: 

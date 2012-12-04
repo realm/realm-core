@@ -7,8 +7,8 @@
 PATH=/bin:/usr/bin
 
 Nrec=100000 # number of records
-Nwrit=1000  # number of write transactions (per write thread)
-Nread=1000  # number of read transactions (per read thread)
+duration=120 # run time in secords
+Nmax=10 # max number of threads
 
 function bench {
     db=$1
@@ -16,20 +16,21 @@ function bench {
     out=${db}-tps.dat
     rm -f $out
     echo "# Database: ${db}"  >> $out
-    echo "# Nwriters: $Nwrit" >> $out
-    echo "# Nreaders: $Nread" >> $out
-    echo "# Nrecords: $Nrec"  >> $out
-    echo "# Readers Writers TPS(Reader) TPS(Writer)" >> $out
-    for i in $(seq 0 10)
+    echo "# Duration: ${duration}" >> $out
+    echo "# Readers Writers TPS(Reader) TPS(Writer) TPS(total)" >> $out
+    for i in $(seq 0 $Nmax)
     do 
-        for j in $(seq 0 10)
+        for j in $(seq 0 $Nmax)
         do
             echo -n "$j $i " >> $out
-            rm -f test.${db}*
-            ./transact -w $i -r $j -f test.${db} -W $Nwrit -R $Nread -n $Nrec -d ${db} >> $out
+            rm -f test_${db}*
+            ./transact -w $i -r $j -f test_${db} -d ${db} -s -n $Nrec -t $duration >> $out
+            rm -f test_${db}*
         done
     done
 }
 
 bench "tdb"
 bench "sqlite"
+bench "mysql"
+bench "sqlite-wal"
