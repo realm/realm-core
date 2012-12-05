@@ -1893,7 +1893,7 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
                             out << m.get_int();
                             break;
                         case COLUMN_TYPE_BOOL:
-                            out << (get_bool(i, row_ndx) ? "true" : "false");
+                            out << (m.get_bool() ? "true" : "false");
                             break;
                         case COLUMN_TYPE_STRING:
                             out << "\"" << m.get_string() << "\"";
