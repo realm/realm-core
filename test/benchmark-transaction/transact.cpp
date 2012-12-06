@@ -61,6 +61,8 @@ static double dt_writers;
 static long iteration_writers;
 static pthread_mutex_t mtx_writers = PTHREAD_MUTEX_INITIALIZER;
 
+double wall_time;
+
 void usage(const char *msg) {
     if (strlen(msg) > 0)
         cout << "Error: " << msg << endl << endl;
@@ -153,6 +155,7 @@ static void *sqlite_reader(void *arg) {
     char sql[128];
     sqlite3_stmt *s;
     char *tail;
+    long int c = 0;
 
     struct thread_info *tinfo = (struct thread_info *)arg;
     srandom(tinfo->thread_num);
@@ -175,6 +178,7 @@ static void *sqlite_reader(void *arg) {
         randy = random() % 1000;
         sqlite3_bind_int(s, 1, randy);
         sqlite3_step(s);
+        c += sqlite3_column_int(s, 0);
 
         if (sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &errmsg) == SQLITE_BUSY) {
             cout << "Oops" << endl;
@@ -187,6 +191,9 @@ static void *sqlite_reader(void *arg) {
         update_reader(ts_1, ts_2);
     }        
     sqlite3_close(db);
+    if (verbose) {
+        cout << "Reader threads " << tinfo->thread_num << ":" << c << endl;
+    }
     return NULL;
 }
 
@@ -195,6 +202,7 @@ static void *mysql_reader(void *arg) {
     long int randy;
     char sql[128];
     MYSQL *db;
+    long int c = 0;
     
     struct thread_info *tinfo = (struct thread_info *)arg;
     srandom(tinfo->thread_num);
@@ -225,6 +233,8 @@ static void *mysql_reader(void *arg) {
             cout << "MySQL error in " << sql << ": " << mysql_errno(db) << endl;
         }
         MYSQL_RES *res = mysql_use_result(db);
+        MYSQL_ROW row = mysql_fetch_row(res);
+        c += atoi(row[0]);
         mysql_free_result(res);
         if (mysql_query(db, "COMMIT;")) {
             cout << "Cannot commit" << endl;
@@ -234,12 +244,16 @@ static void *mysql_reader(void *arg) {
         clock_gettime(CLOCK_REALTIME, &ts_2);
         update_reader(ts_1, ts_2);        
     }
+    if (verbose) {
+        cout << "Reader threads " << tinfo->thread_num << ":" << c << endl;
+    }
     mysql_close(db);
 }
 
 static void *tdb_reader(void *arg) {
     struct timespec ts_1, ts_2;
     struct thread_info *tinfo = (struct thread_info *)arg;
+    size_t c = 0;
     srandom(tinfo->thread_num);
     clock_gettime(CLOCK_REALTIME, &ts_1);
     SharedGroup shared(tinfo->datfile);
@@ -256,12 +270,15 @@ static void *tdb_reader(void *arg) {
         const Group& g = shared.begin_read();
         TestTable::ConstRef t = g.get_table<TestTable>("test");
         long randy = random() % 1000;
-        size_t count = t->where().y.equal(randy).count();
+        c += t->where().y.equal(randy).count();
         shared.end_read();
 
         // update statistics
         clock_gettime(CLOCK_REALTIME, &ts_2);
         update_reader(ts_1, ts_2);
+    }
+    if (verbose) {
+        cout << "Reader threads " << tinfo->thread_num << ":" << c << endl;
     }
     return NULL;
 }
@@ -466,37 +483,48 @@ void tdb_create(const char *f, long n) {
 }
 
 
-void benchmark(int database, const char *datfile, long n_readers, long n_writers, unsigned int duration, 
-                double& tps_readers, double& tps_writers, double& tps_total) {
+void benchmark(bool single, int database, const char *datfile, long n_readers, long n_writers, unsigned int duration) { 
     pthread_attr_t attr;
     struct thread_info *tinfo;
     void *res;
 
+    wall_time         = 0.0;
     dt_readers        = 0.0;
     iteration_readers = 0;
     dt_writers        = 0.0;
     iteration_writers = 0;
     runnable          = true;
 
-    if (verbose) cout << "Copying file" << endl;
-    if (database == DB_MYSQL) {
-        copy_db(datfile, ("tmp"+string(datfile)).c_str());
+    if (!single) {
+        if (verbose) cout << "Copying file" << endl;
+        if (database == DB_MYSQL) {
+            copy_db(datfile, ("tmp"+string(datfile)).c_str());
+        }
+        else {
+            copy(datfile, ("tmp"+string(datfile)).c_str());
+        }
     }
-    else {
+    if (database != DB_MYSQL) {
         unlink(("tmp"+string(datfile)).c_str());
         unlink(("tmp"+string(datfile)+".lock").c_str());
-        copy(datfile, ("tmp"+string(datfile)).c_str());
     }
-
+    
     assert(pthread_attr_init(&attr) == 0);
     assert((tinfo = (struct thread_info *)calloc(sizeof(struct thread_info), n_readers+n_writers)) != NULL);
    
     for(int i=0; i<(n_readers+n_writers); ++i) {
         tinfo[i].thread_num = i+1;
-        tinfo[i].datfile = strdup(("tmp"+string(datfile)).c_str());
+        if (single) {
+            tinfo[i].datfile = strdup(datfile);
+        }
+        else {
+            tinfo[i].datfile = strdup(("tmp"+string(datfile)).c_str());
+        }
     }
 
     if (verbose) cout << "Starting threads" << endl;
+    struct timespec ts_1;
+    clock_gettime(CLOCK_REALTIME, &ts_1);
     for(int i=0; i<n_readers; ++i) {
         switch (database) {
         case DB_TIGHTDB:
@@ -504,7 +532,8 @@ void benchmark(int database, const char *datfile, long n_readers, long n_writers
             break;
         case DB_SQLITE:
         case DB_SQLITE_WAL:
-            pthread_create(&tinfo[i].thread_id, &attr, &sqlite_reader, &tinfo[i]);
+            pthread_create(&
+            tinfo[i].thread_id, &attr, &sqlite_reader, &tinfo[i]);
             break;
         case DB_MYSQL:
             pthread_create(&tinfo[i].thread_id, &attr, &mysql_reader, &tinfo[i]);
@@ -541,23 +570,14 @@ void benchmark(int database, const char *datfile, long n_readers, long n_writers
         pthread_join(tinfo[i].thread_id, &res);
     }
 
-    if (n_readers > 0) 
-        tps_readers = (double)(iteration_readers)/dt_readers;
-    else
-        tps_readers = 0.0;
-
     for(int i=0; i<n_writers; ++i) {
         int j = i+n_readers;
         pthread_join(tinfo[j].thread_id, &res);
     }
-    if (n_writers > 0)
-        tps_writers = (double)(iteration_writers)/dt_writers;    
-    else
-        tps_writers = 0.0;
-    if (n_writers+n_readers > 0)
-        tps_total = (double)(iteration_writers+iteration_readers)/(dt_readers+dt_writers);
-    else
-        tps_total = 0.0;
+    struct timespec ts_2;
+    clock_gettime(CLOCK_REALTIME, &ts_2);
+    wall_time = delta_time(ts_1, ts_2);
+
     if (database == DB_TIGHTDB || database == DB_SQLITE) {
         unlink(("tmp"+string(datfile)).c_str());
         unlink(("tmp"+string(datfile)+".lock").c_str());
@@ -570,7 +590,7 @@ int main(int argc, char *argv[]) {
     long n_readers = -1, n_writers = -1, n_records = -1;
     unsigned int duration = 0;
     int database = -1;
-    bool single  = false;
+    bool single  = true;
     extern char *optarg;
     char *datfile = NULL;
 
@@ -620,41 +640,34 @@ int main(int argc, char *argv[]) {
     }
 
     if (n_writers == -1) 
-        usage("-w missing");
+        n_writers = 2;
     if (n_readers == -1) 
-        usage("-r missing");
+        n_readers = 2;
     if (n_records == -1)
-        usage("-n missing");
+        n_records = 10000;
     if (duration < 1)
-        usage("-t missing");
+        duration = 10;
     if (database == -1 && single)
         usage("-d missing");
-    if (datfile == NULL && single)
-        usage("-f missing");
+    if (datfile == NULL)
+        datfile = strdup("test_db");
 
     if (database == DB_SQLITE) {
         sqlite3_config(SQLITE_CONFIG_SERIALIZED);
     }
     
     if (verbose) cout << "Creating test data for " << database << endl;
-    if (single) {
-        switch (database) {
-        case DB_TIGHTDB: 
-            tdb_create(datfile, n_records);
-            break;
-        case DB_SQLITE:
-        case DB_SQLITE_WAL:
-            sqlite_create(datfile, n_records, database == DB_SQLITE_WAL);
-            break;
-        case DB_MYSQL:
-            mysql_create(datfile, n_records);
-            break;
-        }
-    }
-    else {
-        tdb_create("test.tdb", n_records);
-        sqlite_create("test.sqlite", n_records, database == DB_SQLITE_WAL);
-        mysql_create("thread_benchmark", n_records);
+    switch (database) {
+    case DB_TIGHTDB: 
+        tdb_create(datfile, n_records);
+        break;
+    case DB_SQLITE:
+    case DB_SQLITE_WAL:
+        sqlite_create(datfile, n_records, database == DB_SQLITE_WAL);
+        break;
+    case DB_MYSQL:
+        mysql_create(datfile, n_records);
+        break;
     }
     
     // SQLite WAL is used
@@ -663,50 +676,26 @@ int main(int argc, char *argv[]) {
     }
     
     if (single) {
-        double tps_readers, tps_writers, tps_total;
-        benchmark(database, datfile, n_readers, n_writers, duration, tps_readers, tps_writers, tps_total);
-        cout << tps_readers << " " << tps_writers << " " << tps_total << endl;
+        benchmark(true, database, datfile, n_readers, n_writers, duration);
+        cout << wall_time << " " << iteration_readers << " " << dt_readers
+             << " " << iteration_writers << " " << dt_writers << endl;
     }
     else {
         cout << "# Columns: "                   << endl;
         cout << "# 1. number of readers"        << endl;
         cout << "# 2. number of writers"        << endl;
-        cout << "# 3. SQLite speedup (readers)" << endl;
-        cout << "# 4. MySQL speedup (readers)"  << endl;
-        cout << "# 5. SQLite speedup (writers)" << endl;
-        cout << "# 6. MySQL speedup (writers)"  << endl;
-        cout << "# 7. SQLite speedup (total)"   << endl;
-        cout << "# 8. MySQL speedup (total)"    << endl;
+        cout << "# 3. wall time"                << endl;
+        cout << "# 4. read transactions"        << endl;
+        cout << "# 5. read time"                << endl;
+        cout << "# 6. writer transactions"      << endl;
+        cout << "# 7. writer time"              << endl;
         for(int i=0; i<=n_readers; ++i) {
             for(int j=0; j<=n_writers; ++j) {
-                double tps_readers_sqlite, tps_writers_sqlite, tps_sqlite;
-                double tps_readers_tdb, tps_writers_tdb, tps_tdb;
-                double tps_readers_mysql, tps_writers_mysql, tps_mysql;
-                benchmark(DB_TIGHTDB, "test.tdb", i, j, duration, tps_readers_tdb, tps_writers_tdb, tps_tdb);
-                benchmark(DB_SQLITE, "test.sqlite", i, j, duration, tps_readers_sqlite, tps_writers_sqlite, tps_sqlite);
-                benchmark(DB_MYSQL, "thread_benchmark", i, j, duration, tps_readers_mysql, tps_writers_mysql, tps_mysql); 
+                benchmark(false, database, "test_db", i, j, duration);
                 cout << i << " " << j << " ";
-                if (i == 0)
-                    cout << "0.0 0.0";
-                else
-                    cout << tps_readers_tdb/tps_readers_sqlite 
-                         << " "
-                         << tps_readers_tdb/tps_readers_mysql;
-                cout << " ";
-                if (j == 0)
-                    cout << "0.0 0.0";
-                else
-                    cout << tps_writers_tdb/tps_writers_sqlite
-                         << " "
-                         << tps_writers_tdb/tps_writers_mysql;
-                cout << " ";
-                if (i == 0 && j == 0)
-                    cout << "0.0 0.0";
-                else
-                    cout << tps_tdb/tps_sqlite
-                         << " "
-                         << tps_tdb/tps_mysql;
-                cout << endl;
+                cout << wall_time << " " << iteration_readers 
+                     << " " << dt_readers << " " << iteration_writers 
+                     << " " << dt_writers << endl;
             }
         }
     }       
