@@ -200,7 +200,7 @@ case "$MODE" in
         fi
         make prefix="$PREFIX" libdir="$LIBDIR" install || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
-            ldconfig
+            ldconfig || exit 1
         fi
         exit 0
         ;;
