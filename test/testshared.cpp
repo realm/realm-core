@@ -742,6 +742,7 @@ TEST(Shared_Notifications)
     }
 }
 
+#if 0
 
 const size_t READERS = 20;
 const size_t WRITERS = 20;
@@ -844,42 +845,6 @@ TEST(Shared_StressTest1)
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#endif // #if 0
 
 #endif // !_MSV_VER
