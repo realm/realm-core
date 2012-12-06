@@ -13,6 +13,11 @@ Format:
 ==================
 
 
+2012-12-06 (Kristian Spangsege)
+----------
+. "C" API moved to its own repository "tightdb_c".
+
+
 2012-12-03 (Brian Munkholm)
 ----------
 + 15 Updated Group() constructor to take an optional 3'rd parameter 'take_ownership', which allows the caller to keep owenership of the provided data: Group::Group(const char* buffer, size_t len, bool take_ownership=true).

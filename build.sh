@@ -6,7 +6,7 @@ TIGHTDB_HOME="$(pwd)"
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-EXTENSIONS="java python objc node php gui"
+EXTENSIONS="java python objc node php c gui"
 
 
 
