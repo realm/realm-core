@@ -160,7 +160,7 @@ MemRef SlabAlloc::Alloc(size_t size)
     const size_t newsize = multible > doubleLast ? multible : doubleLast;
 
     // Allocate memory
-    void* const slab = newsize ? malloc(newsize): NULL;
+    void* const slab = newsize ? new char[newsize]: 0;
     if (!slab) return MemRef(NULL, 0);
 
     // Add to slab table
