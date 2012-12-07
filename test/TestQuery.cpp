@@ -33,15 +33,16 @@ TEST(TestDateQuery)
 {
     PeopleTable table;
 
-    table.add("Mary",  28, false, 100500L, BinaryData("bin \0\n data 1", 13));
-    table.add("Frank", 56, true,  100100L, BinaryData("bin \0\n data 2", 13));
-    table.add("Bob",   24, true,  100300L, BinaryData("bin \0\n data 3", 13));
+    table.add("Mary",  28, false, tightdb::Date(2012,  1, 24), tightdb::BinaryData("bin \0\n data 1", 13));
+    table.add("Frank", 56, true,  tightdb::Date(2008,  4, 15), tightdb::BinaryData("bin \0\n data 2", 13));
+    table.add("Bob",   24, true,  tightdb::Date(2010, 12,  1), tightdb::BinaryData("bin \0\n data 3", 13));
 
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
-    PeopleTable::View view5 = table.where().hired.greater_equal(100400L)
-                                           .hired.less(         100600L).find_all();
+    PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::Date(2012, 1, 1).get_date())
+                                           .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all(); 
 
     assert(view5.size() == 1 && view5[0].name == "Mary");
+
 }
 
 
