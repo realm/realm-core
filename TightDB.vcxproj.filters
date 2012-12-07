@@ -342,6 +342,9 @@
     <ClInclude Include="src\tightdb\tightdb_nmmintrin.h">
       <Filter>src\include</Filter>
     </ClInclude>
+    <ClInclude Include="test\pthreads_test.hpp">
+      <Filter>test</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">

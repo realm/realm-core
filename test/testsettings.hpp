@@ -8,4 +8,12 @@
     //#define TEST_DURATION 3
 #endif
 
+// Wrap pthread function calls with the pthread bug finding tool (program execution will be slower) by 
+// #including pthread_test.h. Works both in debug and release mode.
+//#define TIGHTDB_PTHREADS_TEST
+
+// Two transaction stress tests in testtransactions_lasse.cpp that take a long time to run
+//#define STRESSTEST1
+//#define STRESSTEST2
+
 #endif

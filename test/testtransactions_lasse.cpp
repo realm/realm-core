@@ -1,5 +1,3 @@
-#if 1
-
 #include <cstring>
 #include <iostream>
 #include "tightdb.hpp"
@@ -9,12 +7,12 @@
 #include <stdarg.h>
 #include <sys/stat.h>
 #include "tightdb/utilities.hpp"
+#include "testsettings.hpp"
 
 using namespace std;
 using namespace tightdb;
 
-//#define STRESSTEST1
-//#define STRESSTEST2
+// The tests in this file are run if you #define STRESSTEST1 and/or #define STRESSTEST2. Please define them in testsettings.hpp
 
 TIGHTDB_FORCEINLINE void randsleep(void)
 {
@@ -76,6 +74,7 @@ void* write_thread(void* arg)
 {
     int64_t w = int64_t(arg);
     int id = w;
+    (void)id;
     SharedGroup db("database.tdb");
 
     for(;;)
@@ -177,6 +176,7 @@ TEST(Transactions_Stress1)
 
 void* create_groups(void* arg)
 {
+    (void)arg;
     const size_t ITER = 2000;
     const size_t GROUPS = 30;
 
@@ -195,6 +195,7 @@ void* create_groups(void* arg)
             group.erase(group.begin() + g);
         }
     }
+    return NULL;
 }
 
 TEST(Transactions_Stress2)
@@ -262,6 +263,3 @@ TEST(Transactions_Stress3)
         pthread_join(threads[t], NULL);
 }
 #endif
-
-
-#endif // if 0
