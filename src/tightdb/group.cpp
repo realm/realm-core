@@ -118,7 +118,7 @@ Group::Group(const char* buffer, size_t len, bool take_ownership):
     TIGHTDB_ASSERT(buffer);
 
     // Memory map file
-    m_isValid = m_alloc.SetSharedBuffer(buffer, len);
+    m_isValid = m_alloc.SetSharedBuffer(buffer, len, take_ownership);
 
     if (m_isValid) {
         const size_t top_ref = m_alloc.GetTopRef();
