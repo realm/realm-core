@@ -79,8 +79,10 @@ SharedGroup::SharedGroup(replication_tag, const char* path_to_database_file):
 
 void SharedGroup::init(const char* path_to_database_file)
 {
-    // Open shared coordination buffer
     m_lockfile_path = concat_strings(path_to_database_file, ".lock");
+
+open_start:
+    // Open shared coordination buffer
     m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return;
 
@@ -96,7 +98,7 @@ void SharedGroup::init(const char* path_to_database_file)
         // lock where another process could have deleted the file
         if (fstat(m_fd, &statbuf) < 0 || statbuf.st_nlink == 0) {
             close(m_fd);
-            return;
+            goto open_start; // retry
         }
         // Get size
         len = statbuf.st_size;
@@ -114,11 +116,13 @@ void SharedGroup::init(const char* path_to_database_file)
         needInit = true;
     }
     else if (flock(m_fd, LOCK_SH) == 0) {
-        // Get size
-        if (fstat(m_fd, &statbuf) < 0) {
+        // There is a slight window between opening the file and getting the
+        // lock where another process could have deleted the file
+        if (fstat(m_fd, &statbuf) < 0 || statbuf.st_nlink == 0 || statbuf.st_size == 0) {
             close(m_fd);
-            return;
+            goto open_start; // retry
         }
+
         len = statbuf.st_size;
     }
     else {
