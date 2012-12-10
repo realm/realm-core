@@ -9,6 +9,10 @@
 #include "tightdb/utilities.hpp"
 #include "testsettings.hpp"
 
+#ifdef _MSC_VER
+#include <Windows.h>
+#endif
+
 using namespace std;
 using namespace tightdb;
 
@@ -70,6 +74,10 @@ void deletefile(const char* file)
 // *
 // *************************************************************************************
 
+const size_t ITER1 =    2000;
+const size_t READERS1 =   20;
+const size_t WRITERS1 =   20;
+
 void* write_thread(void* arg)
 {
     int64_t w = int64_t(arg);
@@ -77,8 +85,7 @@ void* write_thread(void* arg)
     (void)id;
     SharedGroup db("database.tdb");
 
-    for(;;)
-    {
+    for(size_t t = 0; t < ITER1; ++t) {
         {
             Group& group = db.begin_write(); 
             TableRef table = group.get_table("table");
@@ -102,8 +109,7 @@ void* read_thread(void* arg)
     int64_t r2;
 
     SharedGroup db("database.tdb");
-    for(;;)
-    {
+    for(size_t t = 0; t < ITER1; ++t) {
         {
             const Group& group = db.begin_read();
             r1 = group.get_table("table")->get_int(0, 0);
@@ -119,11 +125,8 @@ void* read_thread(void* arg)
 
 TEST(Transactions_Stress1)
 { 
-    const size_t READERS = 20;
-    const size_t WRITERS = 20;
-
-    pthread_t read_threads[READERS];
-    pthread_t write_threads[WRITERS];
+    pthread_t read_threads[READERS1];
+    pthread_t write_threads[WRITERS1];
 
     srand(123);
 
@@ -148,16 +151,16 @@ TEST(Transactions_Stress1)
         pthread_win32_process_attach_np ();
     #endif
 
-    for(size_t t = 0; t < READERS; t++)
+    for(size_t t = 0; t < READERS1; t++)
         pthread_create(&read_threads[t], NULL, read_thread, (void*)t);
 
-    for(size_t t = 0; t < WRITERS; t++)
+    for(size_t t = 0; t < WRITERS1; t++)
         pthread_create(&write_threads[t], NULL, write_thread, (void*)t);
 
-    for(size_t t = 0; t < READERS; t++)
+    for(size_t t = 0; t < READERS1; t++)
         pthread_join(read_threads[t], NULL);
 
-    for(size_t t = 0; t < WRITERS; t++)
+    for(size_t t = 0; t < WRITERS1; t++)
         pthread_join(write_threads[t], NULL);
 
 }
@@ -174,19 +177,21 @@ TEST(Transactions_Stress1)
 // *
 // *************************************************************************************
 
+const size_t THREADS2 =   30;
+const size_t ITER2 =    2000;
+const size_t GROUPS2 =    30;
+
 void* create_groups(void* arg)
 {
     (void)arg;
-    const size_t ITER = 2000;
-    const size_t GROUPS = 30;
 
     std::vector<SharedGroup*> group;
 
-    for(size_t t = 0; t < ITER; ++t) {
+    for(size_t t = 0; t < ITER2; ++t) {
         // Repeatedly create a group or destroy a group or do nothing
         int action = rand() % 2;
 
-        if(action == 0 && group.size() < GROUPS) {
+        if(action == 0 && group.size() < GROUPS2) {
             group.push_back(new SharedGroup("database.tdb"));
         }
         else if(action == 1 && group.size() > 0) {
@@ -200,66 +205,17 @@ void* create_groups(void* arg)
 
 TEST(Transactions_Stress2)
 {
-    const size_t THREADS = 30;
     srand(123);
-    pthread_t threads[THREADS];
+    pthread_t threads[THREADS2];
 
     deletefile("database.tdb");
     deletefile("database.tdb.lock");
 
-    for(size_t t = 0; t < THREADS; t++)
+    for(size_t t = 0; t < THREADS2; t++)
         pthread_create(&threads[t], NULL, create_groups, (void*)t);
 
-    for(size_t t = 0; t < THREADS; t++)
+    for(size_t t = 0; t < THREADS2; t++)
         pthread_join(threads[t], NULL);
 }
 #endif
 
-
-
-#ifdef STRESSTEST3
-
-// *************************************************************************************
-// *
-// *        Stress test 3
-// *
-// *************************************************************************************
-
-void* create_groups3(void* arg)
-{
-    const size_t ITER = 2000;
-    const size_t GROUPS = 30;
-
-    std::vector<SharedGroup*> group;
-
-    for(size_t t = 0; t < ITER; ++t) {
-        // Repeatedly create a group or destroy a group or do nothing
-        int action = rand() % 2;
-
-        if(action == 0 && group.size() < GROUPS) {
-            group.push_back(new SharedGroup("database.tdb"));
-        }
-        else if(action == 1 && group.size() > 0) {
-            size_t g = rand() % group.size();
-            delete group[g];
-            group.erase(group.begin() + g);
-        }
-    }
-}
-
-TEST(Transactions_Stress3)
-{
-    const size_t THREADS = 30;
-    srand(123);
-    pthread_t threads[THREADS];
-
-    deletefile("database.tdb");
-    deletefile("database.tdb.lock");
-
-    for(size_t t = 0; t < THREADS; t++)
-        pthread_create(&threads[t], NULL, create_groups, (void*)t);
-
-    for(size_t t = 0; t < THREADS; t++)
-        pthread_join(threads[t], NULL);
-}
-#endif
