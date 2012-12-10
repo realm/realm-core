@@ -169,7 +169,7 @@ TEST(Table_Delete)
 #endif // TIGHTDB_DEBUG
 }
 
-void setup_multi_table(Table& table)
+void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 {
     // Create table with all column types
     Spec& s = table.get_spec();
@@ -187,7 +187,7 @@ void setup_multi_table(Table& table)
     table.update_from_spec();
 
     // Add some rows
-    for (size_t i = 0; i < 15; ++i) {
+    for (size_t i = 0; i < rows; ++i) {
         table.insert_int(0, i, i);
         table.insert_bool(1, i, (i % 2 ? true : false));
         table.insert_date(2, i, 12345);
@@ -248,16 +248,16 @@ void setup_multi_table(Table& table)
             subtable->add_column(COLUMN_TYPE_INT,    "first");
             subtable->add_column(COLUMN_TYPE_STRING, "second");
             for (size_t j=0; j<2; j++) {
-                subtable->insert_int(0, j, 42+j);
+                subtable->insert_int(0, j, i*i*j);
                 subtable->insert_string(1, j, "mixed sub");
                 subtable->insert_done();
             }
         }
 
         // Add sub-tables to table column
-        for (size_t j=0; j<2; j++) {
+        for (size_t j=0; j<sub_rows; j++) {
             TableRef subtable = table.get_subtable(8, i);
-            subtable->insert_int(0, j, 42+j);
+            subtable->insert_int(0, j, 42+i*i*j*1234567890);
             subtable->insert_string(1, j, "sub");
             subtable->insert_done();
         }
@@ -270,7 +270,7 @@ void setup_multi_table(Table& table)
 TEST(Table_Delete_All_Types)
 {
     Table table;
-    setup_multi_table(table);
+    setup_multi_table(table, 15, 2);
 
     // Test Deletes
     table.remove(14);
@@ -295,7 +295,7 @@ TEST(Table_Delete_All_Types)
 TEST(Table_test_to_string)
 {
     Table table;
-    setup_multi_table(table);
+    setup_multi_table(table, 15, 2);
 
     std::stringstream ss;
     table.to_string(ss);
@@ -318,7 +318,7 @@ TEST(Table_test_to_string)
 TEST(Table_test_json_all_data)
 {
     Table table;
-    setup_multi_table(table);
+    setup_multi_table(table, 15, 2);
 
     std::stringstream ss;
     table.to_json(ss);

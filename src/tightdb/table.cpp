@@ -1837,7 +1837,7 @@ static inline void out_binary(std::ostream& out, const BinaryData bin)
 {
     const char* const p = (char*)bin.pointer;
     for (size_t i = 0; i < bin.len; ++i)
-        out << setw(2) << setfill('0') << hex << (unsigned int)p[i];
+        out << setw(2) << setfill('0') << hex << (unsigned int)p[i] << dec;
 }
 
 void Table::to_json(std::ostream& out)
@@ -1847,7 +1847,7 @@ void Table::to_json(std::ostream& out)
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        if (r) 
+        if (r > 0) 
             out << ",";
         to_json_row(r, out);
     }
@@ -1860,7 +1860,7 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
     out << "{";
     const size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
-        if (i) 
+        if (i > 0) 
             out << ",";
 
         const char* const name = get_column_name(i);
