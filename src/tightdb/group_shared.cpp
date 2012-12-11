@@ -40,11 +40,11 @@ struct tightdb::SharedInfo {
     pthread_mutex_t readmutex;
     pthread_mutex_t writemutex;
     uint64_t filesize;
-    uint32_t infosize;
 
     uint64_t current_top;
     volatile uint32_t current_version;
 
+    uint32_t infosize;
     uint32_t capacity; // -1 so it can also be used as mask
     uint32_t put_pos;
     uint32_t get_pos;
@@ -270,10 +270,7 @@ const Group& SharedGroup::begin_read()
 
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
-    if (new_topref == 0)
-        m_group.reset_to_new(); // there might have been a rollback
-    else
-        m_group.update_from_shared(new_topref, new_filesize);
+    m_group.update_from_shared(new_topref, new_filesize);
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READING;
@@ -399,6 +396,8 @@ void SharedGroup::commit()
     // Save last version for has_changed()
     m_version = current_version;
 
+    m_group.invalidate();
+
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;
 #endif
@@ -419,6 +418,8 @@ void SharedGroup::rollback()
 
     // Release write lock
     pthread_mutex_unlock(&m_info->writemutex);
+
+    m_group.invalidate();
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;
