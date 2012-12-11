@@ -40,11 +40,11 @@ struct tightdb::SharedInfo {
     pthread_mutex_t readmutex;
     pthread_mutex_t writemutex;
     uint64_t filesize;
-    uint32_t infosize;
 
     uint64_t current_top;
     volatile uint32_t current_version;
 
+    uint32_t infosize;
     uint32_t capacity; // -1 so it can also be used as mask
     uint32_t put_pos;
     uint32_t get_pos;
@@ -79,8 +79,10 @@ SharedGroup::SharedGroup(replication_tag, const char* path_to_database_file):
 
 void SharedGroup::init(const char* path_to_database_file)
 {
-    // Open shared coordination buffer
     m_lockfile_path = concat_strings(path_to_database_file, ".lock");
+
+open_start:
+    // Open shared coordination buffer
     m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return;
 
@@ -96,7 +98,7 @@ void SharedGroup::init(const char* path_to_database_file)
         // lock where another process could have deleted the file
         if (fstat(m_fd, &statbuf) < 0 || statbuf.st_nlink == 0) {
             close(m_fd);
-            return;
+            goto open_start; // retry
         }
         // Get size
         len = statbuf.st_size;
@@ -114,11 +116,13 @@ void SharedGroup::init(const char* path_to_database_file)
         needInit = true;
     }
     else if (flock(m_fd, LOCK_SH) == 0) {
-        // Get size
-        if (fstat(m_fd, &statbuf) < 0) {
+        // There is a slight window between opening the file and getting the
+        // lock where another process could have deleted the file
+        if (fstat(m_fd, &statbuf) < 0 || statbuf.st_nlink == 0 || statbuf.st_size == 0) {
             close(m_fd);
-            return;
+            goto open_start; // retry
         }
+
         len = statbuf.st_size;
     }
     else {
@@ -266,10 +270,7 @@ const Group& SharedGroup::begin_read()
 
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
-    if (new_topref == 0)
-        m_group.reset_to_new(); // there might have been a rollback
-    else
-        m_group.update_from_shared(new_topref, new_filesize);
+    m_group.update_from_shared(new_topref, new_filesize);
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READING;
@@ -395,6 +396,8 @@ void SharedGroup::commit()
     // Save last version for has_changed()
     m_version = current_version;
 
+    m_group.invalidate();
+
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;
 #endif
@@ -415,6 +418,8 @@ void SharedGroup::rollback()
 
     // Release write lock
     pthread_mutex_unlock(&m_info->writemutex);
+
+    m_group.invalidate();
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;
