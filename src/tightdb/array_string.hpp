@@ -34,10 +34,10 @@ public:
     const char* Get(size_t ndx) const;
     bool add();
     bool add(const char* value);
-    bool Set(size_t ndx, const char* value);
-    bool Set(size_t ndx, const char* value, size_t len);
-    bool Insert(size_t ndx, const char* value);
-    bool Insert(size_t ndx, const char* value, size_t len);
+    bool Set(size_t ndx, const char* c_str);
+    bool Set(size_t ndx, const char* data, size_t size);
+    bool Insert(size_t ndx, const char* c_str);
+    bool Insert(size_t ndx, const char* data, size_t size);
     void Delete(size_t ndx);
 
     size_t count(const char* value, size_t start=0, size_t end=-1) const;

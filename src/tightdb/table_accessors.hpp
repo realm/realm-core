@@ -377,6 +377,26 @@ public:
         return *this;
     }
 
+    friend bool operator==(const FieldAccessor& a, const BinaryData& b)
+    {
+        return BinaryData(a).compare_payload(b);
+    }
+
+    friend bool operator!=(const FieldAccessor& a, const BinaryData& b)
+    {
+        return !BinaryData(a).compare_payload(b);
+    }
+
+    friend bool operator==(const BinaryData& a, const FieldAccessor& b)
+    {
+        return a.compare_payload(BinaryData(b));
+    }
+
+    friend bool operator!=(const BinaryData& a, const FieldAccessor& b)
+    {
+        return !a.compare_payload(BinaryData(b));
+    }
+
     const char* get_pointer() const { return BinaryData(*this).pointer; }
     std::size_t get_len() const { return BinaryData(*this).len; }
 };
@@ -581,10 +601,9 @@ public:
         return get_subtable();
     }
 
-    /// This function assumes that if the current value is a subtable,
-    /// then it is a subtable of the specified type. If this is not
-    /// the case, anything can happend when you call this function,
-    /// including memory corruption.
+    /// This function makes the following assumption: If the current
+    /// value is a subtable, then it is a subtable of the specified
+    /// type. If this is not the case, your computer may catch fire.
     ///
     /// To safely and efficiently check whether the current value is a
     /// subtable of any of a set of specific table types, you may do
@@ -723,7 +742,7 @@ public:
 
     size_t count(int64_t target) const
     {
-        return Base::m_table->get_impl()->count(col_idx, target);
+        return Base::m_table->get_impl()->count_int(col_idx, target);
     }
 
     int64_t sum() const

@@ -81,9 +81,9 @@ Query& Query::equal(size_t column_ndx, int64_t value)
     return *this;
 }
 
-Query& Query::equal_binary(size_t column_ndx, const char* ptr, size_t len)
+Query& Query::equal(size_t column_ndx, BinaryData b)
 {
-    ParentNode* const p = new BINARYNODE<EQUAL>(ptr, len, column_ndx);
+    ParentNode* const p = new BINARYNODE<EQUAL>(b.pointer, b.len, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -191,13 +191,14 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
     return *this;
 }
 
-void Query::group()
+Query& Query::group()
 {
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
+    return *this;
 }
-void Query::Or()
+Query& Query::Or()
 {
     ParentNode* const o = new OR_NODE(first[first.size()-1]);
     all_nodes.push_back(o);
@@ -205,6 +206,7 @@ void Query::Or()
     first[first.size()-1] = o;
     update[update.size()-1] = &((OR_NODE*)o)->m_cond[1];
     update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
+    return *this;
 }
 
 void Query::subtable(size_t column)
@@ -226,11 +228,11 @@ void Query::end_subtable()
     subtables.pop_back();
 }
 
-void Query::end_group()
+Query& Query::end_group()
 {
     if (first.size() < 2) {
         error_code = "Unbalanced blockBegin/blockEnd";
-        return;
+        return *this;
     }
 
     if (update[update.size()-2] != 0)
@@ -247,6 +249,7 @@ void Query::end_group()
     first.pop_back();
     update.pop_back();
     update_override.pop_back();
+    return *this;
 }
 
 size_t Query::find_next(size_t lastmatch)

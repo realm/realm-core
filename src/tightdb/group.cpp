@@ -4,10 +4,21 @@
 
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
+#include <tightdb/utilities.hpp>
 
 using namespace std;
 
 namespace {
+
+class Initialization {
+public:
+    Initialization() 
+    {
+        tightdb::cpuid_init();
+    }
+};
+
+Initialization initialization;
 
 class MemoryOStream {
 public:
@@ -96,31 +107,17 @@ Group::Group(const char* filename, int mode):
     // and then initialize later
     if (mode & GROUP_INVALID)
         return;
-    // Memory map file
-    const bool readOnly = mode & GROUP_READONLY;
-    m_isValid = m_alloc.SetShared(filename, readOnly);
-
-
-    if (m_isValid) {
-        // if we just created shared group, we have to wait with
-        // actually creating it's datastructures until first write
-        if (m_persistMode == GROUP_SHARED && m_alloc.GetTopRef() == 0)
-            return;
-        else {
-            const size_t top_ref = m_alloc.GetTopRef();
-            create_from_ref(top_ref);
-        }
-    }
+    create_from_file(filename, true);
 }
 
-Group::Group(const char* buffer, size_t len):
+Group::Group(const char* buffer, size_t len, bool take_ownership):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
 {
     TIGHTDB_ASSERT(buffer);
 
     // Memory map file
-    m_isValid = m_alloc.SetSharedBuffer(buffer, len);
+    m_isValid = m_alloc.SetSharedBuffer(buffer, len, take_ownership);
 
     if (m_isValid) {
         const size_t top_ref = m_alloc.GetTopRef();
@@ -147,7 +144,7 @@ bool Group::create_from_file(const char* filename, bool doInit)
         else {
             const size_t top_ref = m_alloc.GetTopRef();
             create_from_ref(top_ref);
-	}
+        }
     }
 
     return isValid;

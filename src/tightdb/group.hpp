@@ -34,6 +34,8 @@ class SharedGroup;
 enum GroupMode {
     GROUP_DEFAULT  =  0,
     GROUP_READONLY =  1,
+
+    // Rest are internal use only
     GROUP_SHARED   =  2,
     GROUP_INVALID  =  4,
     GROUP_ASYNC    =  8,
@@ -44,7 +46,7 @@ class Group: private Table::Parent {
 public:
     Group();
     Group(const char* filename, int mode=GROUP_DEFAULT);
-    Group(const char* buffer, size_t len);
+    Group(const char* buffer, size_t len, bool take_ownership=true);
     ~Group();
 
     bool is_valid() const {return m_isValid;}
@@ -154,6 +156,7 @@ protected:
 
 private:
     Table* get_table_ptr(const char* name);
+    Table* get_table_ptr(const char* name, bool& was_created);
     const Table* get_table_ptr(const char* name) const;
     template<class T> T* get_table_ptr(const char* name);
     template<class T> const T* get_table_ptr(const char* name) const;
@@ -206,6 +209,20 @@ inline Table* Group::get_table_ptr(const char* name)
         return get_table_ptr(ndx);
     }
 
+    return create_new_table(name);
+}
+
+inline Table* Group::get_table_ptr(const char* name, bool& was_created)
+{
+    TIGHTDB_ASSERT(m_top.IsValid());
+    const size_t ndx = m_tableNames.find_first(name);
+    if (ndx != size_t(-1)) {
+        was_created = false;
+        // Get table from cache
+        return get_table_ptr(ndx);
+    }
+
+    was_created = true;
     return create_new_table(name);
 }
 

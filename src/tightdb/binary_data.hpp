@@ -21,6 +21,7 @@
 #define TIGHTDB_BINARY_DATA_HPP
 
 #include <cstddef>
+#include <algorithm>
 #include <ostream>
 
 namespace tightdb {
@@ -28,10 +29,11 @@ namespace tightdb {
 struct BinaryData {
     const char* pointer;
     std::size_t len;
-    BinaryData() : pointer(NULL), len(0) {}
+    BinaryData(): pointer(0), len(0) {}
     BinaryData(const char* data, std::size_t size): pointer(data), len(size) {}
 
-    bool compare_payload(BinaryData b) {
+    bool compare_payload(const BinaryData &b) const
+    {
         if(b.pointer == pointer && b.len == len)
             return true;
         bool e = std::equal(pointer, pointer + len, b.pointer);

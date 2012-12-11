@@ -172,13 +172,13 @@ case "$MODE" in
                 PLATFORM_HOME="$XCODE_HOME/Platforms/$x.platform"
                 SDK_ROOT="$(cat "$TEMP_DIR/$x/sdk_root")" || exit 1
                 ARCH="$(cat "$TEMP_DIR/$x/arch")" || exit 1
-                TIGHTDB_DISABLE_SSE="1" make -C "src/tightdb" BASE_DENOM="$x" CFLAGS_ARCH="-arch $ARCH -isysroot $SDK_ROOT" "libtightdb-$x.a" "libtightdb-$x-dbg.a" || exit 1
+                make -C "src/tightdb" BASE_DENOM="$x" CFLAGS_ARCH="-arch $ARCH -isysroot $SDK_ROOT" "libtightdb-$x.a" "libtightdb-$x-dbg.a" || exit 1
                 cp "src/tightdb/libtightdb-$x.a"     "$TEMP_DIR/$x/libtightdb.a"     || exit 1
                 cp "src/tightdb/libtightdb-$x-dbg.a" "$TEMP_DIR/$x/libtightdb-dbg.a" || exit 1
             done
             lipo "$TEMP_DIR"/*/"libtightdb.a"     -create -output "src/tightdb/libtightdb-ios.a"     || exit 1
             lipo "$TEMP_DIR"/*/"libtightdb-dbg.a" -create -output "src/tightdb/libtightdb-ios-dbg.a" || exit 1
-            TIGHTDB_DISABLE_SSE="1" make -C "src/tightdb" BASE_DENOM="ios" "tightdb-config-ios" "tightdb-config-ios-dbg" || exit 1
+            make -C "src/tightdb" BASE_DENOM="ios" "tightdb-config-ios" "tightdb-config-ios-dbg" || exit 1
         fi
         exit 0
         ;;
