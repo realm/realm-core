@@ -1,9 +1,12 @@
 /*
 Thread bug detector. Background:
 
-Existing thread bug detectors can only identify a non-exclusive access (r/w ) in the moment it occurs at runtime. However
-a few data races only occur under certain rare conditions. This wrapper can force some of these conditions to reveal
-and is perfect to use in combination with existing thread bug detectors but can also be used alone.
+Existing thread bug detectors can only identify a non-exclusive access (r/w) in the moment it occurs at runtime. However
+a few data races only occur under certain rare conditions. This wrapper can force some of these conditions to reveal and
+is perfect to use in combination with existing thread bug detectors but can also be used alone.
+
+Use by #including this file in the file(s) that call pthreads functions. If you #include pthread.h then include this file
+*after* it because it works by wrapping pthread functions by macro-redefining their function names.
 */
 
 #ifndef TIGHTDB_PTHREAD_TEST_HPP
