@@ -152,7 +152,6 @@ var App = {};
 								<ul style="display: block;">
 									<li><a href="#table-constructor">constructor</a></li>
                                     <li><a href="#table-bracket">square bracket notation</a></li>
-                                    <li><a href="#table-objectAtIndex">at</a></li>
                                     <li><a href="#table-lastObject">back</a></li>
 									<li><a href="#table-is_empty">is_empty</a></li>
 									<li><a href="#table-count">size</a></li>
@@ -168,7 +167,7 @@ var App = {};
 							</li>
 
                             <li data-section="tablecursor" class="major">
-							  <strong class="first"><a class="" href="#tablecursor">Cursor Class</a></strong>                                <ul style="display: block;">
+							  <strong class="first"><a class="" href="#tablecursor">Cursor Class</a></strong>                                   <ul style="display: block;">
                               </ul>
                             </li>
 
@@ -180,7 +179,7 @@ var App = {};
 									<li><a href="#tablequery-do">find_all</a></li>
 									<li><a href="#tablequery-count">size</a></li>
 									<li><a href="#tablequery-sum">sum</a></li>
-									<li><a href="#tablequery-avg">avg</a></li>
+									<li><a href="#tablequery-avg">average</a></li>
 									<li><a href="#tablequery-min">min</a></li>
 									<li><a href="#tablequery-max">max</a></li>
                                 </ul>
@@ -212,7 +211,13 @@ var App = {};
 			</div>
 			<div class="left_col">
 				
-				<h1>TightDB Objective-C Reference</h1>
+				<h1>TightDB C++ Reference</h1>
+     <p>
+     This reference manual documents the high-level C++ interface to 
+     <a href="http://www.tightdb.com">TightDB</a>. The low-level interface is documented elsewhere.
+     The TightDB classes have a common namespace: <pre>tightdb</pre>.
+     </p>
+
 
                 <a href="#" name="table" id="table"></a>
                 <a href="#" class="section section_minor" name="table_anchor" id="table_anchor"></a>
@@ -367,7 +372,8 @@ var App = {};
 	                Note: Only tables which are part of a <a href="#group">group</a> can be serialized to memory or disk.
                 	</p>
                     <p>
-                      Note: Tables should be allocated and instantiated using the <code>TDB_TABLE_<i>x</i></code> macros.
+                      Note: Tables should be allocated and instantiated using the 
+                      <code>TDB_TABLE_<i>x</i></code> macros (<code><i>x</i></code> = 1 .. 15).
                     </p>
                 	<dl>
                 		<dt><b>Parameters:</b></dt>
@@ -412,7 +418,7 @@ TDB_TABLE_3(PeopleTable,
 						                <p><div class="eks">
 						                <pre class="prettyprint" lang-php style="font-size: 16px">mixed table[row_id].column_name</pre>
 						            </div>
-					                <p>To access the individual rows of our table, we can use the brackets syntax with an index. This gives us direct access to the values in the row.</p>
+					                <p>To access the individual rows of your table, you can use the brackets syntax with an index. This gives you direct access to the values in the row.</p>
 				                	<dl>
 				               		<dd><b>Example:</b>
 									<pre class="prettyprint" lang-cpp>
@@ -430,45 +436,26 @@ bool hired       = table[5].hired;
 				                	<dl>
 				                    <dd><b>Example:</b>
 									<pre class="prettyprint" lang-cpp>
-
 // Changing values
 table[5].age = 43;
 									</pre>
 				                     </dd>
 				            	</dl>
+				            	 <h5>Getting a row</h5>
+				            	 <p>The backets syntax can also be used to fetch a row which is wrapped as a 
+				            	 cursor object.
+				            	 </p>
+				            	 <dl>
+				            	   <dd><b>Example:</b>
+				            	   <pre class="prettyprint" lang-cpp>
+people::Cursor pc = table[5];
+pc.age = 43;
+                         </pre>
+                        </dd>
+                      </dl>
 				          </dd></dl>
 
 
-
-				<a href="#" name="table-objectAtIndex" id="table-objectAtIndex"></a>
-				<a href="#" class="section section_minor" name="table-objectAtIndex_anchor" id="table-objectAtIndex_anchor"></a>
-				<h4>at</h4>
-
-                <p><div class="eks">
-                <pre class="prettyprint" lang-cpp style="font-size: 16px"><i>Table</i>_Cursor <b>at</b>(size_t index)</pre>
-            </div>
-            </p>
-                <dl><dd>
-                	<p>
-                      Get the row at specific index as object
-                	</p>
-                	<dl>
-                		<dt><b>Parameters:</b></dt>
-                		<dd><code>index</code>: the index</dd>
-                	</dl>
-                	<dl>
-                		<dt><b>Returns:</b></dt>
-                		<dd><p>a row as object</p></dd>
-                	</dl>
-                	<dl>
-                		<dt><b>Example:</b></dt>
-                		<dd>
-							<pre class="prettyprint" lang-cpp>
-people_Cursor pc = people.at(42);
-							</pre>
-                         </dd>
-                	</dl>
-                </dd></dl>
 
 				<a href="#" name="table-is_empty" id="table-is_empty"></a>
 				<a href="#" class="section section_minor" name="table-is_empty_anchor" id="table-is_empty_anchor"></a>
@@ -534,7 +521,7 @@ size_t cnt = people.size();
 				<a href="#" class="section section_major" name="table-lastObject_anchor" id="table-lastObject_anchor"></a>
 				<h4>back</h4>
                 <p><div class="eks">
-                <pre class="prettyprint" lang-cpp style="font-size: 16px"><i>Table</i>_Cursor <b>back</b>(size_t i)</pre>
+                <pre class="prettyprint" lang-cpp style="font-size: 16px"><i>Table</i>::Cursor <b>back</b>(size_t i)</pre>
             </div>
             </p>
                 <dl><dd>
@@ -547,14 +534,14 @@ size_t cnt = people.size();
                 	</dl>
                 	<dl>
                 		<dt><b>Returns:</b></dt>
-                		<dd><p><code><i>Table_</i>Cursor</code>: Last row in the table</p></dd>
+                		<dd><p><code><i>Table</i>::Cursor</code>: Last row in the table</p></dd>
                 	</dl>
                 	<dl>
                 		<dt><b>Example:</b></dt>
                 		<dd>
 							<pre class="prettyprint" lang-cpp>
-people_cursor last_person = people.back();
-people_cursor second_last = people.back(-2);
+people::Cursor last_person = people.back();
+people::Cursor second_last = people.back(-2);
 							</pre>
                          </dd>
                 	</dl>
@@ -674,7 +661,7 @@ table.add("Anni", 54, true);
 
                 <a href="#" name="table-find" id="table-find"></a>
 				<a href="#" class="section section_major" name="table-find_anchor" id="table-find_anchor"></a>
-				<h4>find</h4>
+				<h4>find_first</h4>
                 <p><div class="eks">
                 <pre class="prettyprint" lang-cpp style="font-size: 16px">size_t <b>find</b>(char *|int64_t|time_t|bool value)</pre>
                 </div>
@@ -697,7 +684,7 @@ table.add("Anni", 54, true);
                 		<dt><b>Example:</b></dt>
                 		<dd>
 							<pre class="prettyprint"  lang-cpp>
-row = table.name.find("Mary");
+row = table.cols().name.find_first("Mary");
 							</pre>
 	                    </dd>
                 	</dl>
@@ -729,7 +716,7 @@ row = table.name.find("Mary");
                 		<dd>
 							<pre class="prettyprint"  lang-cpp>
 // Find all entries with age == 19
-TableView view = t2.age.find_all(19);
+TableView view = t2.cols().age.find_all(19);
 							</pre>
 	                    </dd>
                 	</dl>
@@ -759,7 +746,7 @@ TableView view = t2.age.find_all(19);
                 		<dt><b>Example:</b></dt>
                 		<dd>
 							<pre class="prettyprint" lang-cpp>
-int64_t total_age = table.age.sum();
+int64_t total_age = table.cols().age.sum();
 							</pre>
                          </dd>
                 	</dl>
@@ -788,7 +775,7 @@ int64_t total_age = table.age.sum();
 	                		<dt><b>Example:</b></dt>
 	                		<dd>
 								<pre class="prettyprint" lang-cpp>
-int64_t youngest = table.age.min();
+int64_t youngest = table.cols().age.min();
 								</pre>
 	                         </dd>
 	                	</dl>
@@ -818,7 +805,7 @@ int64_t youngest = table.age.min();
 		                		<dd>
 									<pre class="prettyprint" lang-cpp>
 
-int64_t oldest = table.age.max();
+int64_t oldest = table.cols().age.max();
 									</pre>
 		                         </dd>
 		                	</dl>
@@ -909,8 +896,8 @@ table.optimize();
 
                 <p><b>Example:</b></p>
       			<pre class="prettyprint"  lang-cpp>
-people_cursor pc = [people lastObject]; // pc is a cursor object
-pc.Name = "Hans"; // the name is updated
+people::Cursor pc = people.back(); // pc is a cursor object
+pc.name = "Hans"; // the name is updated
                 </pre>
                 	
 
@@ -939,7 +926,7 @@ pc.Name = "Hans"; // the name is updated
                 <a href="#" class="section section_major" name="table-query_anchor" id="table-query_anchor"></a>
                 <h3>where</h3>
                 <p><div class="eks">
-                    <pre class="prettyprint" lang-cpp style="font-size: 16px">TableQuery Table::<b>where</b>()</pre>
+                    <pre class="prettyprint" lang-cpp style="font-size: 16px">Query Table::<b>where</b>()</pre>
                   </div>
                 </p>
                 <dl><dd>
@@ -956,7 +943,7 @@ pc.Name = "Hans"; // the name is updated
                     </dl>
                     <dl>
                       <dt><b>Query interface:</b></dt>
-                      <dd><p>Query objects are created by and associated with table objects. Query is build using a <a href="http://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a> (method invocations can be daisy chained). Conditions are by default folded using logical-and. Query objects can be reused, and queries can be repeatly executed by the <tt>find_all()</tt> method (resembles the prepare/execute pattern in SQL clients).<p> The table shows the declared methods on TableQuery objects.</p></dd>
+                      <dd><p>Query objects are created by and associated with table objects. Query is build using a <a href="http://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a> (method invocations can be daisy chained). Conditions are by default folded using logical-and. Query objects can be reused, and queries can be repeatly executed by the <tt>find_all()</tt> method (resembles the prepare/execute pattern in SQL clients).<p> The table shows the declared methods on <code>Query</code> objects.</p></dd>
 
                       <dd><p>For boolean columns:</p></dd>
                       <dd><p><table border="1" width="100%" cellpadding="3" cellspacing="0" summary="">
@@ -1020,6 +1007,7 @@ pc.Name = "Hans"; // the name is updated
                         <pre class="prettyprint" lang-cpp>
 Query q = table.where().hired.equal(true)
                        .age.between(20, 30);
+TableView v = q.find_all(table);
                         </pre>
                       </dd>
                     </dl>
@@ -1048,12 +1036,12 @@ Query q = table.where().hired.equal(true)
                       <dt><b>Example:</b></dt>
                       <dd>
                         <pre class="prettyprint" lang-cpp>
-view = table.where().group()
+TableView view = table.where().group()
                           .age.eq(19)
                           .or()
                           .age.eq(20)
                        .group_end()
-                       .find_all();
+                       .find_all(table);
                         </pre>
 
                       </dd>
@@ -1083,12 +1071,12 @@ view = table.where().group()
                       <dt><b>Example:</b></dt>
                       <dd>
                         <pre class="prettyprint" lang-cpp>
-view = table.where().group()
+TableView view = table.where().group()
                           .age.eq(19)
                           .or()
                           .age.eq(20)
                        .group_end()
-                       .find_all();
+                       .find_all(table);
                         </pre>
                       </dd>
                     </dl>
@@ -1117,12 +1105,12 @@ view = table.where().group()
                       <dt><b>Example:</b></dt>
                       <dd>
                         <pre class="prettyprint" lang-cpp>
-view = table.where().group()
+TableView view = table.where().group()
                           .age.eq(19)
                           .or()
                           .age.eq(20)
                        .group_end()
-                       .find_all();
+                       .find_all(table);
                         </pre>
                       </dd>
                     </dl>
@@ -1141,7 +1129,7 @@ view = table.where().group()
                     </p>
                     <dl>
                       <dt><b>Parameters:</b></dt>
-                      <dd><p>N/A</p></dd>
+                      <dd><p><b>table</b>: the table</p></dd>
                     </dl>
                     <dl>
                       <dt><b>Returns:</b></dt>
@@ -1150,8 +1138,8 @@ view = table.where().group()
                     <dt><b>Example:</b></dt>
                   <dd>
                     <pre class="prettyprint" lang-cpp>
-query = table.where().age.eq(19);
-view = query.find_all();
+Query query = table.where().age.eq(19);
+TableView view = query.find_all(table);
                     </pre>
                   </dd>
                 </dl>
@@ -1162,7 +1150,7 @@ view = query.find_all();
                 <a href="#" class="section section_major" name="tablequery-count_anchor" id="tablequery-count_anchor"></a>
                 <h4>size</h4>
                 <p><div class="eks">
-                    <pre class="prettyprint" lang-cpp style="font-size: 16px">size_t <b>count</b></pre>
+                    <pre class="prettyprint" lang-cpp style="font-size: 16px">size_t <b>count</b>(table)</pre>
                   </div>
                 </p>
                 <dl><dd>
@@ -1171,7 +1159,7 @@ view = query.find_all();
                     </p>
                     <dl>
                       <dt><b>Parameters:</b></dt>
-                      <dd><p>N/A</p></dd>
+                      <dd><p><b>table</b>: the table</p></dd>
                     </dl>
                     <dl>
                       <dt><b>Returns:</b></dt>
@@ -1187,7 +1175,7 @@ size_t cnt = table.where().group()
                            .or()
                            .age.eq(20)
                        .group_end()
-                       .size();
+                       .count(table);
                         </pre>
 
                       </dd>
@@ -1199,7 +1187,7 @@ size_t cnt = table.where().group()
                 <a href="#" class="section section_major" name="tablequery-sum_anchor" id="tablequery-sum_anchor"></a>
                 <h4>sum</h4>
                 <p><div class="eks">
-                    <pre class="prettyprint" lang-cpp style="font-size: 16px">int64_t <b>sum</b></pre>
+                    <pre class="prettyprint" lang-cpp style="font-size: 16px">int64_t <b>sum</b>(table)</pre>
                   </div>
                 </p>
                 <dl><dd>
@@ -1208,7 +1196,7 @@ size_t cnt = table.where().group()
                     </p>
                     <dl>
                       <dt><b>Parameters:</b></dt>
-                      <dd><p><b></b>: the name of the column</p></dd>
+                      <dd><p><b>table</b>: the table</p></dd>
                     </dl>
                     <dl>
                       <dt><b>Returns:</b></dt>
@@ -1222,7 +1210,7 @@ int64_t total = table.where().group()
                            .or()
                            .age.eq(20)
                        .group_end()
-                       .weight.sum();
+                       .weight.sum(table);
                       </dd>
                     </dl>
                 </dd></dl>
@@ -1231,7 +1219,7 @@ int64_t total = table.where().group()
                 <a href="#" class="section section_major" name="tablequery-avg_anchor" id="tablequery-avg_anchor"></a>
                 <h4>avg</h4>
                 <p><div class="eks">
-                    <pre class="prettyprint" lang-cpp style="font-size: 16px">double <b>avg</b></pre>
+                    <pre class="prettyprint" lang-cpp style="font-size: 16px">double <b>average</b>(table)</pre>
                   </div>
                 </p>
                 <dl><dd>
@@ -1240,7 +1228,7 @@ int64_t total = table.where().group()
                     </p>
                     <dl>
                       <dt><b>Parameters:</b></dt>
-                      <dd><p><b></b>: the column name</p></dd>
+                      <dd><p><b>table</b>: the table</p></dd>
                     </dl>
                     <dl>
                       <dt><b>Returns:</b></dt>
@@ -1249,12 +1237,12 @@ int64_t total = table.where().group()
                     <dl>
                       <dt><b>Example:</b></dt>
                       <dd>
-int64_t average = table.where().group()
+double average = table.where().group()
                            .age.eq(19)
                            .or()
                            .age.eq(20)
                        .group_end()
-                       .weight.avg();
+                       .weight.average(table);
                       </dd>
                     </dl>
                 </dd></dl>
@@ -1263,7 +1251,7 @@ int64_t average = table.where().group()
                 <a href="#" class="section section_major" name="tablequery-max_anchor" id="tablequery-max_anchor"></a>
                 <h4>max</h4>
                 <p><div class="eks">
-                    <pre class="prettyprint" lang-cpp style="font-size: 16px">int64_t <b>max</b></pre>
+                    <pre class="prettyprint" lang-cpp style="font-size: 16px">int64_t <b>max</b>(table)</pre>
                   </div>
                 </p>
                 <dl><dd>
@@ -1272,11 +1260,11 @@ int64_t average = table.where().group()
                     </p>
                     <dl>
                       <dt><b>Parameters:</b></dt>
-                      <dd><p><b></b>: the column name</p></dd>
+                      <dd><p><b>table</b>: the table</p></dd>
                     </dl>
                     <dl>
                       <dt><b>Returns:</b></dt>
-                      <dd><p><b>int64_t</b>: the miximal value</p></dd>
+                      <dd><p><b>int64_t</b>: the maximal value</p></dd>
                     </dl>
                     <dl>
                       <dt><b>Example:</b></dt>
@@ -1286,7 +1274,7 @@ int64_t heavy = table.where().group()
                            .or()
                            .age.eq(20)
                        .group_end()
-                       .weight.max();
+                       .weight.max(table);
                       </dd>
                     </dl>
                 </dd></dl>
@@ -1295,7 +1283,7 @@ int64_t heavy = table.where().group()
                 <a href="#" class="section section_major" name="tablequery-min_anchor" id="tablequery-min_anchor"></a>
                 <h4>min</h4>
                 <p><div class="eks">
-                    <pre class="prettyprint" lang-cpp style="font-size: 16px">int64_t <b>min</b></pre>
+                    <pre class="prettyprint" lang-cpp style="font-size: 16px">int64_t <b>min</b>(table)</pre>
                   </div>
                 </p>
                 <dl><dd>
@@ -1304,7 +1292,7 @@ int64_t heavy = table.where().group()
                     </p>
                     <dl>
                       <dt><b>Parameters:</b></dt>
-                      <dd><p><b></b>: the column name</p></dd>
+                      <dd><p><b>table</b>: the table</p></dd>
                     </dl>
                     <dl>
                       <dt><b>Returns:</b></dt>
@@ -1318,7 +1306,7 @@ int64_t lite = table.where().group()
                            .or()
                            .age.eq(20)
                        .group_end()
-                       .weight.min();
+                       .weight.min(table);
                       </dd>
                     </dl>
                 </dd></dl>
@@ -1337,7 +1325,7 @@ int64_t lite = table.where().group()
 				<b>Constructor Summary</b></font></th>
 				</tr>
 				<tr bgcolor="white" class="TableRowColor">
-				<td><code><b><a href="#tableview">TableView</a></b> Query::find_all()</code>
+				<td><code><b><a href="#tableview">TableView</a></b> Query::find_all(table)</code>
 
 				<br>
 				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TableView class.</td>
@@ -1409,7 +1397,7 @@ int64_t lite = table.where().group()
 	                		<dt><b>Example:</b></dt>
 	                		<dd>
 								<pre class="prettyprint" lang-cpp>
-TableView view = t.age.find_all(19);
+TableView view = t.query.age.eq(19).find_all(table);
 view.clear();
 								</pre>
 	                         </dd>
@@ -1440,7 +1428,7 @@ view.clear();
 	                		<dd>
 								<pre class="prettyprint" lang-cpp>
 
-view = table.name.find_all("Jimmy");
+TableView view = table.query.name.eq("Jimmy").find_all(table);
 view.remove(5);
 
 								</pre>
@@ -1472,7 +1460,7 @@ view.remove(5);
 	                		<dt><b>Example:</b></dt>
 	                		<dd>
 								<pre class="prettyprint" lang-cpp>
-view = table.name.find_all("Jimmy");
+TableView view = table.query().name.eq("Jimmy").find_all(table);
 if (view.is_empty()) {
   ...
 }
@@ -1505,7 +1493,7 @@ if (view.is_empty()) {
 	                		<dt><b>Example:</b></dt>
 	                		<dd>
 								<pre class="prettyprint" lang-cpp>
-view = table.name.find_all("Jimmy");
+TableView view = table.query().name.eq("Jimmy").find_all(table);
 size_t cnt = view.size();
 								</pre>
 	                         </dd>
@@ -1625,7 +1613,7 @@ PeopleTable& table = group.get_table<PeopleTable>("My great table");
 					<a href="#" class="section section_minor" name="group-has_table_anchor" id="group-has_table_anchor"></a>
 					<h4>has_table()</h4>
 	                <p><div class="eks">
-	                <pre class="prettyprint" lang-cpp style="font-size: 16px">bool <b>has_table</b>:(char * table_name)</pre>
+	                <pre class="prettyprint" lang-cpp style="font-size: 16px">bool <b>has_table</b>(char * table_name)</pre>
 	            </div>
 	            </p>
 	                <dl><dd>
@@ -1638,7 +1626,7 @@ PeopleTable& table = group.get_table<PeopleTable>("My great table");
 	                	</dl>
 	                	<dl>
 	                		<dt><b>Returns:</b></dt>
-	                		<dd><p><code>YES</code> if the table exists, otherwise <code>NO</code>.</p></dd>
+	                		<dd><p><code>true</code> if the table exists, otherwise <code>false</code>.</p></dd>
 	                	</dl>
 	                	<dl>
 	                		<dt><b>Example:</b></dt>
@@ -1695,7 +1683,7 @@ PeopleTable& table = group.get_table<PeopleTable>("My great table");
 
 				<h4>write</h4>
                 <p><div class="eks">
-                <pre class="prettyprint" lang-cpp style="font-size: 16px">void <b>write</b></pre>
+                <pre class="prettyprint" lang-cpp style="font-size: 16px">void <b>write</b>(char *filename)</pre>
             </div>
             </p>
                 <dl><dd>
@@ -1725,7 +1713,7 @@ group.write("employees.tightdb");
 				<a href="#" class="section section_minor" name="group-write_to_mem_anchor" id="group-write_to_mem_anchor"></a>
 				<h4>write_to_mem</h4>
                 <p><div class="eks">
-                <pre class="prettyprint" lang-cpp style="font-size: 16px">char *<b>writeToMem</b>(size_t *len)</pre>
+                <pre class="prettyprint" lang-cpp style="font-size: 16px">char *<b>write_to_mem</b>(size_t &len)</pre>
             </div>
             </p>
                 <dl><dd>

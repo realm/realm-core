@@ -107,7 +107,6 @@ Group::Group(const char* filename, int mode):
     // and then initialize later
     if (mode & GROUP_INVALID)
         return;
-
     create_from_file(filename, true);
 }
 
