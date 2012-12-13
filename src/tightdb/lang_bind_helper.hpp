@@ -39,9 +39,7 @@ namespace tightdb {
 ///
 /// The application must make sure that the unbind_table_ref() function is
 /// called to decrement the reference count when it no longer needs
-/// access to that table. The order of unbinding is important as you must
-/// unbind subtables to a table before unbinding the table itself.
-///
+/// access to that table.
 class LangBindHelper {
 public:
     /// Construct a freestanding table. Returns null on memory

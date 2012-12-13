@@ -35,7 +35,7 @@
 #elif defined(__HP_aCC)
 	#define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
 #elif defined(__xlC__ )
-	#define TIGHTDB_FORCEINLINE inline 
+	#define TIGHTDB_FORCEINLINE inline
 #else
 	#error TEXT("Compiler version not detectable")
 #endif
@@ -64,14 +64,13 @@
 #  define TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
 #endif
 
-#if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86_OR_X64) 
+#if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86_OR_X64)
     #define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 thorugh __builtin_ accessors or back-end assembler
 #endif
 
 namespace tightdb {
 
-// FIXME: Type should probably be 'signed char', since 'char' is unsigned on some systems.
-extern char sse_support;
+extern signed char sse_support;
 
 template <int version>TIGHTDB_FORCEINLINE bool cpuid_sse()
 {
@@ -80,11 +79,11 @@ template <int version>TIGHTDB_FORCEINLINE bool cpuid_sse()
     is based on the CPUID instruction.
 
     sse_support = -1: No SSE support
-    sse_support = 0: SSE3 
-    sse_support = 1: SSE42 
+    sse_support = 0: SSE3
+    sse_support = 1: SSE42
 
     This lets us test very rapidly at runtime because we just need 1 compare instruction (with 0) to test both for
-    3 and 4.2 by caller (compiler optimizes if calls are concecutive), and can decide branch with ja/jl/je because 
+    3 and 4.2 by caller (compiler optimizes if calls are concecutive), and can decide branch with ja/jl/je because
     sse_support is signed type. Also, 0 requires no immediate operand
 
     We runtime-initialize sse_support in a constructor of a static variable which is not guaranteed to be called

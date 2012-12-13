@@ -16,7 +16,7 @@
 
 namespace tightdb {
 
-char sse_support = -1;
+signed char sse_support = -1;
 
 void cpuid_init()
 {
