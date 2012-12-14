@@ -805,7 +805,6 @@ TEST(Table_SlabAlloc)
 
 #include <tightdb/group.hpp>
 
-#ifndef _MSC_VER
 
 TEST(Table_Spec)
 {
@@ -1135,7 +1134,6 @@ TEST(Table_Spec_AddColumns)
 #endif // TIGHTDB_DEBUG
 }
 
-#endif
 
 TEST(Table_Spec_DeleteColumnsBug)
 {
