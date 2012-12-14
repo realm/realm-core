@@ -302,11 +302,11 @@ TEST(Table_test_to_string)
     const std::string result = ss.str();
     if (0) { 
         std::cerr << "to_string:" << "\n" << result << "\n";
-        std::ofstream testFile("test/expect_string.txt");
+        std::ofstream testFile("test/expect_string.txt", std::ios::out | std::ios::binary);
         testFile << result;
         testFile.close();
     } else {
-        std::ifstream testFile("test/expect_string.txt");
+        std::ifstream testFile("test/expect_string.txt", std::ios::in | std::ios::binary);
         std::string expected;
         expected.assign( std::istreambuf_iterator<char>(testFile),
                          std::istreambuf_iterator<char>() );
@@ -328,12 +328,12 @@ TEST(Table_test_json_all_data)
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
         std::cerr << "JSON:" << json << "\n";
-        std::ofstream testFile("test/expect_json.json");
+        std::ofstream testFile("test/expect_json.json", std::ios::out | std::ios::binary);
         testFile << json;
         testFile.close();
     } else {
         std::string expected;
-        std::ifstream testFile("test/expect_json.json");
+        std::ifstream testFile("test/expect_json.json", std::ios::in | std::ios::binary);
         std::getline(testFile,expected);
         testFile.close();
         CHECK_EQUAL(true, json == expected);
