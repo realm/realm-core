@@ -13,6 +13,12 @@ Format:
 ==================
 
 
+2012-12-16 (Kristian Spangsege)
+----------
++ my_table[i].foo.get() added for all column types except subtables. This is to avoid having to repeat the explicit column type in cast expressions when the actual value is needed.
++ my_table[i].foo.set(...) added for all column types except subtables. This is for completeness.
+
+
 2012-12-06 (Kristian Spangsege)
 ----------
 . "C" API moved to its own repository "tightdb_c".
