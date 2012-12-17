@@ -105,7 +105,6 @@ Group::Group(string filename, int mode):
     // and then initialize later
     if (mode & GROUP_INVALID)
         return;
-
     create_from_file(filename, true);
 }
 
@@ -225,6 +224,8 @@ void Group::create_from_ref(size_t top_ref)
             m_cachedtables.add(0);
         }
     }
+
+    m_isValid = true;
 }
 
 void Group::init_shared() {
@@ -285,6 +286,8 @@ void Group::reset_to_new()
     m_freePositions.SetParent(NULL, 0);
     m_freeLengths.SetParent(NULL, 0);
     m_freeVersions.SetParent(NULL, 0);
+
+    m_isValid = true;
 }
 
 void Group::rollback()
@@ -584,6 +587,8 @@ void Group::update_from_shared(size_t top_ref, size_t len)
             }
         }
     }
+
+    m_isValid = true;
 }
 
 bool Group::operator==(const Group& g) const

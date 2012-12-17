@@ -42,6 +42,14 @@ CATEGORIES:
 
                  Processes that share a database file must reside on
                  the same host.
+                 
+                 Moreover, the class also provide a transactional 
+                 interface to TightDB. Transactions are divided into 
+                 read and write transactions. While read transactions
+                 do not modify the table and thereby the group, write
+                 transactions do. This division is important to remember
+                 as derived objects (tables, views, etc.) are either 
+                 writable or not.
       SIGNATURE: >
                  SharedGroup(string path_to_database_file);
                  struct replication_tag {};

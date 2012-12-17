@@ -1,0 +1,9 @@
+@@Overlay: accessing_rows @@
+To get the last row the <tt>back()</tt> method can be used. The
+default argument is -1 which means the last row. -2 means the second
+last, etc.
+@@EndOverlay
+
+@@Overlay: bracket @@
+the brackets syntax with an index. This gives us direct access to the values in the row
+@@EndOverlay
