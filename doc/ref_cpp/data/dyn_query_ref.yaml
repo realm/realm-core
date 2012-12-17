@@ -562,9 +562,9 @@ CATEGORIES :
   - g_dyn_query_average:
       NAMES    : average
       SUMMARY  : &g_dyn_query_average_summary
-                 Calcualtes the average.
+                 Calculates the average.
       DESCR    : &g_dyn_query_average_descr
-                 The method calcualtes the average of a specific column.
+                 The method calculates the average of a specific column.
       CONST    : true
       PARAMS:
       - NAME   : column
