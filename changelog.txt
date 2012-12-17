@@ -12,6 +12,9 @@ Format:
 
 ==================
 
+2012-12-06 (Brian Munkholm)
+----------
++ 16 New Table:get_string_length(col_ndx, row_ndx) added in Dynamic Table. Missing in Typed Table.
 
 2012-12-16 (Kristian Spangsege)
 ----------

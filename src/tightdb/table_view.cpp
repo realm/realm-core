@@ -166,7 +166,8 @@ void TableViewBase::to_json(std::ostream& out)
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        if (r) out << ",";
+        if (r > 0) 
+            out << ",";
         const size_t real_row_index = get_source_ndx(r);
         m_table->to_json_row(real_row_index, out);
     }

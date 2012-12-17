@@ -164,6 +164,7 @@ public:
     bool        get_bool(size_t column_ndx, size_t row_ndx) const;
     time_t      get_date(size_t column_ndx, size_t row_ndx) const;
     const char* get_string(size_t column_ndx, size_t row_ndx) const;
+    size_t      get_string_length(size_t column_ndx, size_t row_ndx) const;
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const;
     ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;

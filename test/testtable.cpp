@@ -4,6 +4,7 @@
 #include <tightdb/table_macros.hpp>
 
 #include <ostream>
+#include <fstream>
 
 using namespace tightdb;
 
@@ -168,10 +169,9 @@ TEST(Table_Delete)
 #endif // TIGHTDB_DEBUG
 }
 
-TEST(Table_Delete_All_Types)
+void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 {
     // Create table with all column types
-    Table table;
     Spec& s = table.get_spec();
     s.add_column(COLUMN_TYPE_INT,    "int");
     s.add_column(COLUMN_TYPE_BOOL,   "bool");
@@ -187,7 +187,7 @@ TEST(Table_Delete_All_Types)
     table.update_from_spec();
 
     // Add some rows
-    for (size_t i = 0; i < 15; ++i) {
+    for (size_t i = 0; i < rows; ++i) {
         table.insert_int(0, i, i);
         table.insert_bool(1, i, (i % 2 ? true : false));
         table.insert_date(2, i, 12345);
@@ -201,29 +201,35 @@ TEST(Table_Delete_All_Types)
 
         switch (i % 3) {
             case 0:
-                table.insert_string(5, i, "test1");
+                table.insert_string(5, i, "enum1");
                 break;
             case 1:
-                table.insert_string(5, i, "test2");
+                table.insert_string(5, i, "enum2");
                 break;
             case 2:
-                table.insert_string(5, i, "test3");
+                table.insert_string(5, i, "enum3");
                 break;
         }
 
         table.insert_binary(6, i, "binary", 7);
 
-        switch (i % 4) {
+        switch (i % 6) {
             case 0:
-                table.insert_mixed(7, i, false);
+                table.insert_mixed(7, i, (bool)false);
                 break;
             case 1:
-                table.insert_mixed(7, i, (int64_t)i);
+                table.insert_mixed(7, i, (int64_t)(i*i));
                 break;
             case 2:
                 table.insert_mixed(7, i, "string");
                 break;
             case 3:
+                table.insert_mixed(7, i, Date(123456789));
+                break;
+            case 4:
+                table.insert_mixed(7, i, Mixed("binary", 7));
+                break;
+            case 5:
             {
                 // Add subtable to mixed column
                 // We can first set schema and contents when the entire
@@ -237,24 +243,34 @@ TEST(Table_Delete_All_Types)
         table.insert_done();
 
         // Add subtable to mixed column
-        if (i % 4 == 3) {
+        if (i % 6 == 5) {
             TableRef subtable = table.get_subtable(7, i);
             subtable->add_column(COLUMN_TYPE_INT,    "first");
             subtable->add_column(COLUMN_TYPE_STRING, "second");
-            subtable->insert_int(0, 0, 42);
-            subtable->insert_string(1, 0, "meaning");
-            subtable->insert_done();
+            for (size_t j=0; j<2; j++) {
+                subtable->insert_int(0, j, i*i*j);
+                subtable->insert_string(1, j, "mixed sub");
+                subtable->insert_done();
+            }
         }
 
         // Add sub-tables to table column
-        TableRef subtable = table.get_subtable(8, i);
-        subtable->insert_int(0, 0, 42);
-        subtable->insert_string(1, 0, "meaning");
-        subtable->insert_done();
+        for (size_t j=0; j<sub_rows; j++) {
+            TableRef subtable = table.get_subtable(8, i);
+            subtable->insert_int(0, j, 42+i*i*j*1234567890);
+            subtable->insert_string(1, j, "sub");
+            subtable->insert_done();
+        }
     }
-
     // We also want a ColumnStringEnum
     table.optimize();
+}
+
+
+TEST(Table_Delete_All_Types)
+{
+    Table table;
+    setup_multi_table(table, 15, 2);
 
     // Test Deletes
     table.remove(14);
@@ -276,7 +292,55 @@ TEST(Table_Delete_All_Types)
 #endif // TIGHTDB_DEBUG
 }
 
-TEST(Table_test_json)
+TEST(Table_test_to_string)
+{
+    Table table;
+    setup_multi_table(table, 15, 2);
+
+    std::stringstream ss;
+    table.to_string(ss);
+    const std::string result = ss.str();
+    if (0) { 
+        std::cerr << "to_string:" << "\n" << result << "\n";
+        std::ofstream testFile("test/expect_string.txt", std::ios::out | std::ios::binary);
+        testFile << result;
+        testFile.close();
+    } else {
+        std::ifstream testFile("test/expect_string.txt", std::ios::in | std::ios::binary);
+        std::string expected;
+        expected.assign( std::istreambuf_iterator<char>(testFile),
+                         std::istreambuf_iterator<char>() );
+        testFile.close();
+        CHECK_EQUAL(true, result == expected);
+    }
+}
+
+TEST(Table_test_json_all_data)
+{
+    Table table;
+    setup_multi_table(table, 15, 2);
+
+    std::stringstream ss;
+    table.to_json(ss);
+    const std::string json = ss.str();
+    if (0) { 
+        // Generate the testdata to compare. After doing this, 
+        // verify that the output is correct with a json validator:
+        // http://jsonformatter.curiousconcept.com/
+        std::cerr << "JSON:" << json << "\n";
+        std::ofstream testFile("test/expect_json.json", std::ios::out | std::ios::binary);
+        testFile << json;
+        testFile.close();
+    } else {
+        std::string expected;
+        std::ifstream testFile("test/expect_json.json", std::ios::in | std::ios::binary);
+        std::getline(testFile,expected);
+        testFile.close();
+        CHECK_EQUAL(true, json == expected);
+    }
+}
+
+TEST(Table_test_json_simple)
 {
     // Create table with all column types
     Table table;
@@ -285,14 +349,17 @@ TEST(Table_test_json)
     s.add_column(COLUMN_TYPE_BOOL,   "bool");
     s.add_column(COLUMN_TYPE_DATE,   "date");
     s.add_column(COLUMN_TYPE_STRING, "string");
+    s.add_column(COLUMN_TYPE_BINARY, "binary");
     table.update_from_spec();
 
     // Add some rows
-    for (size_t i = 0; i < 3; ++i) {
+    for (size_t i = 0; i < 1; ++i) {
         table.insert_int(0, i, i);
         table.insert_bool(1, i, (i % 2 ? true : false));
-        table.insert_date(2, i, 12345);
+        table.insert_date(2, i, 0xffffeeeeffffeeee);
         table.insert_string(3, i, "helloooooo");
+        const char bin[] = "123456789012345678901234567890nopq";
+        table.insert_binary(4, i, bin, sizeof(bin) );
         table.insert_done();
     }
 
@@ -300,7 +367,7 @@ TEST(Table_test_json)
      table.to_json(ss);
      const std::string json = ss.str();
      CHECK_EQUAL(true, json.length() > 0);
-     // std::cerr << "JSON:" << json << "\n";
+     //std::cerr << "JSON:" << json << "\n";
 }
 
 
@@ -738,7 +805,6 @@ TEST(Table_SlabAlloc)
 
 #include <tightdb/group.hpp>
 
-#ifndef _MSC_VER
 
 TEST(Table_Spec)
 {
@@ -1068,7 +1134,6 @@ TEST(Table_Spec_AddColumns)
 #endif // TIGHTDB_DEBUG
 }
 
-#endif
 
 TEST(Table_Spec_DeleteColumnsBug)
 {
