@@ -300,17 +300,17 @@ TEST(Table_test_to_string)
     std::stringstream ss;
     table.to_string(ss);
     const std::string result = ss.str();
-    if (0) { 
+    if (0) {
         std::cerr << "to_string:" << "\n" << result << "\n";
-        std::ofstream testFile("test/expect_string.txt", std::ios::out | std::ios::binary);
+        std::ofstream testFile("expect_string.txt", std::ios::out | std::ios::binary);
         testFile << result;
-        testFile.close();
-    } else {
-        std::ifstream testFile("test/expect_string.txt", std::ios::in | std::ios::binary);
+    }
+    else {
+        std::ifstream testFile("expect_string.txt", std::ios::in | std::ios::binary);
+        CHECK(bool(testFile));
         std::string expected;
         expected.assign( std::istreambuf_iterator<char>(testFile),
                          std::istreambuf_iterator<char>() );
-        testFile.close();
         CHECK_EQUAL(true, result == expected);
     }
 }
@@ -323,19 +323,19 @@ TEST(Table_test_json_all_data)
     std::stringstream ss;
     table.to_json(ss);
     const std::string json = ss.str();
-    if (0) { 
-        // Generate the testdata to compare. After doing this, 
+    if (0) {
+        // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
         std::cerr << "JSON:" << json << "\n";
-        std::ofstream testFile("test/expect_json.json", std::ios::out | std::ios::binary);
+        std::ofstream testFile("expect_json.json", std::ios::out | std::ios::binary);
         testFile << json;
-        testFile.close();
-    } else {
+    }
+    else {
         std::string expected;
-        std::ifstream testFile("test/expect_json.json", std::ios::in | std::ios::binary);
+        std::ifstream testFile("expect_json.json", std::ios::in | std::ios::binary);
+        CHECK(bool(testFile));
         std::getline(testFile,expected);
-        testFile.close();
         CHECK_EQUAL(true, json == expected);
     }
 }

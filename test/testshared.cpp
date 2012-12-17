@@ -747,19 +747,19 @@ TEST(Shared_Notifications)
 TEST(Shared_FromSerialized)
 {
     // Delete old files if there
-    remove("test_shared.tdb");
-    remove("test_shared.tdb.lock"); // also the info file
+    remove("test_shared.tightdb");
+    remove("test_shared.tightdb.lock"); // also the info file
 
     // Create new group and serialize to disk
     {
         Group g1;
         TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
         t1->add(1, 2, false, "test");
-        g1.write("test_shared.tdb");
+        g1.write("test_shared.tightdb");
     }
 
     // Open same file as shared group
-    SharedGroup shared("test_shared.tdb");
+    SharedGroup shared("test_shared.tightdb");
     CHECK(shared.is_valid());
 
     // Verify that contents is there when shared
