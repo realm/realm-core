@@ -73,7 +73,7 @@ void SharedGroup::init(string path_to_database_file)
 
 open_start:
     // Open shared coordination buffer
-    m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    m_fd = open(m_lockfile_path.c_str(), O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return;
 
     bool needInit = false;
