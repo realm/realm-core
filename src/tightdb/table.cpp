@@ -2069,21 +2069,25 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
     out << "\n";
 }
 
-static inline void out_string(std::ostream& out, const std::string text, const int max_len)
+namespace {
+
+inline void out_string(std::ostream& out, const std::string text, const size_t max_len)
 {
     out.setf(std::ostream::left, std::ostream::adjustfield);
-    if (text.length() > max_len)
+    if (text.size() > max_len)
         out << text.substr(0, max_len) + "..."; 
     else
         out << text;
     out.unsetf(std::ostream::adjustfield);
 }
 
-static inline void out_table(std::ostream& out, const size_t len)
+inline void out_table(std::ostream& out, const size_t len)
 {
     const size_t width = out.width() - chars_in_int(len) - 1;
     out.width(width);
     out << "[" << len << "]";
+}
+
 }
 
 void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<size_t>& widths) const
