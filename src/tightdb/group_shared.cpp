@@ -1,3 +1,4 @@
+#include <tightdb/string_buffer.hpp>
 #include <tightdb/group_shared.hpp>
 
 // Does not work for windows yet
@@ -9,26 +10,8 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 
+using namespace std;
 using namespace tightdb;
-
-namespace {
-
-// Pre-declare local functions
-char* concat_strings(const char* str1, const char* str2);
-
-// Support methods
-char* concat_strings(const char* str1, const char* str2) {
-    const size_t len1 = strlen(str1);
-    const size_t len2 = strlen(str2) + 1; // includes terminating null
-
-    char* const s = (char*)malloc(len1 + len2);
-    memcpy(s, str1, len1);
-    memcpy(s + len1, str2, len2);
-
-    return s;
-}
-
-} // anonymous namespace
 
 
 struct tightdb::ReadCount {
@@ -52,36 +35,43 @@ struct tightdb::SharedInfo {
 };
 
 
-SharedGroup::SharedGroup(const char* path_to_database_file):
-m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID), m_info(NULL), m_isValid(false), m_version(-1),
-    m_lockfile_path(NULL)
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+SharedGroup::SharedGroup(string path_to_database_file):
+    m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID),
+    m_info(NULL), m_isValid(false), m_version(-1), m_replication(Replication::degenerate_tag())
 {
     init(path_to_database_file);
 }
 
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-SharedGroup::SharedGroup(replication_tag, const char* path_to_database_file):
-    m_group(path_to_database_file ? path_to_database_file :
+SharedGroup::SharedGroup(replication_tag, string path_to_database_file):
+    m_group(!path_to_database_file.empty() ? path_to_database_file :
             Replication::get_path_to_database_file(), GROUP_SHARED|GROUP_INVALID), m_info(NULL),
-    m_isValid(false), m_version(-1), m_lockfile_path(NULL)
+    m_isValid(false), m_version(-1), m_replication(path_to_database_file)
 {
-    error_code err = m_replication.init(path_to_database_file);
-    if (err) return; // FIXME: Reveal the error code somehow
     m_group.set_replication(&m_replication);
 
-    init(path_to_database_file ? path_to_database_file : Replication::get_path_to_database_file());
+    init(!path_to_database_file.empty() ? path_to_database_file :
+         Replication::get_path_to_database_file());
 }
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#else // ! TIGHTDB_ENABLE_REPLICATION
+
+SharedGroup::SharedGroup(string path_to_database_file):
+    m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID),
+    m_info(NULL), m_isValid(false), m_version(-1)
+{
+    init(path_to_database_file);
+}
+
+#endif // ! TIGHTDB_ENABLE_REPLICATION
 
 
-void SharedGroup::init(const char* path_to_database_file)
+void SharedGroup::init(string path_to_database_file)
 {
     // Open shared coordination buffer
-    m_lockfile_path = concat_strings(path_to_database_file, ".lock");
-    m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    m_lockfile_path = path_to_database_file + ".lock";
+    m_fd = open(m_lockfile_path.c_str(), O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return;
 
     bool needInit = false;
@@ -206,7 +196,7 @@ SharedGroup::~SharedGroup()
 
             munmap((void*)m_info, m_info->infosize);
 
-            remove(m_lockfile_path);
+            remove(m_lockfile_path.c_str());
         }
         else {
             munmap((void*)m_info, m_info->infosize);
@@ -214,9 +204,6 @@ SharedGroup::~SharedGroup()
 
         close(m_fd); // also releases lock
     }
-
-    if (m_lockfile_path)
-        free((void*)m_lockfile_path);
 }
 
 bool SharedGroup::has_changed() const

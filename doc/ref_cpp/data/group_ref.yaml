@@ -48,14 +48,14 @@ CATEGORIES:
                  Creates a table group.
       SIGNATURE: |
                  Group();
-                 Group(const char* filename, int mode=GROUP_DEFAULT);
-                 Group(const char* buffer, size_t len);
+                 Group(string filename, int mode=GROUP_DEFAULT);
+                 Group(from_mem_tag, char* buffer, size_t len);
       PARAMS:
       - NAME   : filename
-        TYPES  : const char*
+        TYPES  : string
         DESCR  : The name of the file.
       - NAME   : buffer
-        TYPES  : const char*
+        TYPES  : char*
         DESCR  : In-memory binary encoded representation of a group.
       - NAME   : mode
         TYPES  : int

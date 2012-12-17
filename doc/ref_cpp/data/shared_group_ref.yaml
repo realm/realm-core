@@ -43,12 +43,12 @@ CATEGORIES:
                  Processes that share a database file must reside on
                  the same host.
       SIGNATURE: >
-                 SharedGroup(const char* path_to_database_file);
+                 SharedGroup(string path_to_database_file);
                  struct replication_tag {};
-                 SharedGroup(replication_tag, const char* path_to_database_file = 0);
+                 SharedGroup(replication_tag, string path_to_database_file = 0);
       PARAMS:                 
       - NAME   : path_to_database_file
-        TYPES  : const char* 
+        TYPES  : string
         DESCR  : Path to a TightDB data file.
       RETURN:                 
         TYPES  : SharedGroup

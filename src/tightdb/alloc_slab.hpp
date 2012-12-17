@@ -20,6 +20,8 @@
 #ifndef TIGHTDB_ALLOC_SLAB_HPP
 #define TIGHTDB_ALLOC_SLAB_HPP
 
+#include <string>
+
 #ifdef _MSC_VER
 #include <win32/stdint.h>
 #else
@@ -43,8 +45,8 @@ public:
     SlabAlloc();
     ~SlabAlloc();
 
-    bool   SetShared(const char* path, bool read_only=true);
-    bool   SetSharedBuffer(const char* buffer, size_t len, bool take_ownership=true);
+    bool   SetShared(std::string path, bool read_only=true);
+    bool   SetSharedBuffer(char* buffer, size_t len, bool take_ownership=true);
 
     MemRef Alloc(size_t size);
     MemRef ReAlloc(size_t ref, void* p, size_t size);

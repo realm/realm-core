@@ -64,19 +64,29 @@ class Group;
 /// Replication also requires that a local coordinator process is
 /// running on the same host as the client. At most one local
 /// coordinator process may run on each host.
-///
 struct Replication {
-    Replication();
+    struct degenerate_tag {};
+    /// This constructor may be used to create a degenerate instance
+    /// which can be validly destroyed, but not otherwise used for
+    /// replication.
+    Replication(degenerate_tag) TIGHTDB_NOTHROW;
+
+    /// Construct a proper instance.
+    ///
+    /// \param The file system path to the database file. This is used
+    /// only to derive a path for a replication specific shared memory
+    /// file object. Its path is derived by appending ".repl" to the
+    /// specified path.
+    ///
+    /// \param map_transact_log_buf When true, all of the replication
+    /// specific shared memory is mapped. When false, the transaction
+    /// log buffer is not mapped. When used in conjunction with an
+    /// instance of SharedGroup, this must always be true.
+    Replication(std::string path_to_database_file = "", bool map_transact_log_buf = true);
+
     ~Replication();
 
-    static const char* get_path_to_database_file() { return "/var/lib/tightdb/replication.db"; }
-
-    /// This function must be called before using an instance of this
-    /// class. It must not be called more than once. It is legal to
-    /// destroy an instance of this class without this function having
-    /// been called.
-    error_code init(const char* path_to_database_file = 0,
-                    bool map_transact_log_buf = true);
+    static std::string get_path_to_database_file() { return "/var/lib/tightdb/replication.db"; }
 
     /// Interrupt any blocking call to a function in this class. This
     /// function may be called asyncronously from any thread, but it
@@ -302,6 +312,12 @@ private:
     const Table* m_selected_table;
     const Spec*  m_selected_spec;
 
+    /// This function must be called before using an instance of this
+    /// class. It must not be called more than once. It is legal to
+    /// destroy an instance of this class without this function having
+    /// been called.
+    error_code init(std::string path_to_database_file, bool map_transact_log_buf);
+
     /// \param n Must be small (probably not greater than 1024)
     error_code transact_log_reserve(char** buf, int n);
 
@@ -338,7 +354,7 @@ private:
 
     template<class T> static char* encode_int(char* ptr, T value);
 
-    // Make sure this is in agreement with the integer encoding scheme
+    // Make sure this is in agreement with the actual integer encoding scheme
     static const int max_enc_bytes_per_int = (std::numeric_limits<int64_t>::digits+1+6)/7;
 };
 
@@ -348,8 +364,15 @@ private:
 
 // Implementation:
 
-inline Replication::Replication():
+inline Replication::Replication(degenerate_tag) TIGHTDB_NOTHROW:
     m_shared_state(0), m_interrupt(false), m_selected_table(0), m_selected_spec(0) {}
+
+inline Replication::Replication(std::string path_to_database_file, bool map_transact_log_buf):
+    m_shared_state(0), m_interrupt(false), m_selected_table(0), m_selected_spec(0)
+{
+    error_code err = init(path_to_database_file, map_transact_log_buf);
+    if (err) throw_error(err);
+}
 
 
 inline error_code Replication::transact_log_reserve(char** buf, int n)

@@ -100,8 +100,7 @@ SlabAlloc::~SlabAlloc()
 
     // Release all allocated memory
     for (size_t i = 0; i < m_slabs.size(); ++i) {
-        void* p = (void*)(intptr_t)m_slabs[i].pointer;
-        free(p);
+        delete[] reinterpret_cast<char*>(m_slabs[i].pointer.get());
     }
 
     // Release any shared memory
@@ -283,24 +282,24 @@ bool SlabAlloc::IsReadOnly(size_t ref) const
     return ref < m_baseline;
 }
 
-bool SlabAlloc::SetSharedBuffer(const char* buffer, size_t len, bool take_ownership)
+bool SlabAlloc::SetSharedBuffer(char* buffer, size_t len, bool take_ownership)
 {
     // Verify the data structures
     if (!ValidateBuffer(buffer, len))
         return false;
 
-    m_shared = (char*)buffer;
+    m_shared = buffer;
     m_baseline = len;
     m_owned = take_ownership; // we now own the buffer
     return true;
 }
 
-bool SlabAlloc::SetShared(const char* path, bool read_only)
+bool SlabAlloc::SetShared(string path, bool read_only)
 {
 #ifdef _MSC_VER
     TIGHTDB_ASSERT(read_only); // write persistence is not implemented for windows yet
     // Open file
-    m_fd = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, NULL, NULL);
+    m_fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, NULL, NULL);
 
     // Map to memory (read only)
     const HANDLE hMapFile = CreateFileMapping(m_fd, NULL, PAGE_WRITECOPY, 0, 0, 0);
@@ -325,7 +324,8 @@ bool SlabAlloc::SetShared(const char* path, bool read_only)
 #else
     // Open file
     {
-        m_fd = open(path, read_only ? O_RDONLY : O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        m_fd = open(path.c_str(), read_only ? O_RDONLY : O_RDWR|O_CREAT,
+                    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         if (m_fd < 0) return false;
 
         // Get size
