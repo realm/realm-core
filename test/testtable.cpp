@@ -169,6 +169,9 @@ TEST(Table_Delete)
 #endif // TIGHTDB_DEBUG
 }
 
+// Pre-declare free standing function
+void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows);
+
 void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 {
     // Create table with all column types
