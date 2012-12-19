@@ -37,9 +37,6 @@
     <ClCompile Include="test\testtable.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\test_c_api.c">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="test\main.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -131,9 +128,6 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\array_string_long.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\tightdb\c-table.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="test\testshared.cpp">
