@@ -28,11 +28,46 @@
 #include <tightdb/table_view.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/column_string_enum.hpp>
+#include <tightdb/column_binary.hpp>
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 
+
 namespace tightdb {
 
+class SequentialGetter {
+public:
+    SequentialGetter(const Table& table, size_t column) 
+    {
+        if(column != not_found)
+            m_column = (Column*)&table.GetColumnBase(column);
+        m_leaf_end = 0;
+    }
+
+    int64_t GetNext(size_t index)
+    {
+        if (index >= m_leaf_end) {
+            m_array = (Array*)(m_column->GetBlock(index, *m_array, m_leaf_start, true));
+            const size_t leaf_size = m_array->Size();
+            m_leaf_end = m_leaf_start + leaf_size;
+        }
+
+        int64_t av = m_array->Get(index - m_leaf_start);
+        return av;
+    }
+
+    size_t m_leaf_start;
+    size_t m_leaf_end;
+    Column* m_column;
+    Array* m_array;
+};
+
+/*bool tightdb_dummy (int64_t t)
+{ 
+	(void)t;
+    return true; 
+}
+*/
 // Distance between matches where performance no longer increases 
 const size_t bestdist = 100;
 
@@ -109,11 +144,14 @@ public:
         return 16.0 / dD + dT;
     }
 
-    template<ACTION action> int64_t aggregate_super(state_state* st, size_t start, size_t end, size_t agg_col = not_found, size_t* matchcount = 0) 
+    template<ACTION action> int64_t aggregate_super(state_state* st, size_t start, size_t end, size_t agg_col2 = not_found, size_t* matchcount = 0) 
     {
-
-        Array *insp = (Array*)st->state;
         if(end == size_t(-1)) end = m_table->size();
+
+        SequentialGetter* agg_col = NULL;
+        
+        if(agg_col2 != not_found)
+            agg_col = new SequentialGetter(*m_table, agg_col2);
 
         size_t td;
 
@@ -149,7 +187,7 @@ public:
 
     }
 
-    virtual int64_t aggregate(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action = TDB_FINDALL, size_t agg_col = not_found, size_t* matchcount = 0) 
+    virtual int64_t aggregate(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action = TDB_FINDALL, SequentialGetter* agg_col = NULL, size_t* matchcount = 0) 
     {
 		// aggregate called on non-integer column type
 		(void)matchcount;
@@ -181,23 +219,27 @@ public:
             }
 
             if (m == r) {
+                int64_t av = 0;
+                if(agg_col != NULL)
+                    av = agg_col->GetNext(r); // todo, avoid getting if not needed (if !uses_val)
+                
                 if (action == TDB_RETURN_FIRST)
-                    st->match<TDB_RETURN_FIRST>(r);
-                if (action == TDB_CALLBACK_IDX)
-                    st->match<TDB_CALLBACK_IDX>(r);
-                if (action == TDB_SUM)
-                    st->match<TDB_SUM>(r);
-                if (action == TDB_MAX)
-                    st->match<TDB_MAX>(r);
-                if (action == TDB_MAX)
-                    st->match<TDB_MAX>(r);
-                if (action == TDB_MIN)
-                    st->match<TDB_MIN>(r);
-                if (action == TDB_COUNT)
-                    st->match<TDB_COUNT>(r);
-                if (action == TDB_FINDALL)
-                    st->match<TDB_FINDALL>(r);
-            }   
+                    st->state_match<TDB_RETURN_FIRST, 0>(r, 0, av, &tightdb_dummy);
+                else if (action == TDB_CALLBACK_IDX)
+                    st->state_match<TDB_CALLBACK_IDX, 0>(r, 0, av, &tightdb_dummy);
+                else if (action == TDB_COUNT)
+                   st->state_match<TDB_COUNT, 0>(r, 0, av, &tightdb_dummy);
+                else if (action == TDB_FINDALL)
+                   st->state_match<TDB_FINDALL, 0>(r, 0, av, &tightdb_dummy);
+                else if (action == TDB_MAX)
+                   st->state_match<TDB_MAX, 0>(r, 0, av, &tightdb_dummy);
+                else if (action == TDB_MIN)
+                   st->state_match<TDB_MIN, 0>(r, 0, av, &tightdb_dummy);
+                else if (action == TDB_SUM)
+                   st->state_match<TDB_SUM, 0>(r, 0, av, &tightdb_dummy);
+                else
+                    TIGHTDB_ASSERT(false);
+             }   
         }
     }
 
@@ -250,8 +292,6 @@ public:
 
     size_t find_first_local(size_t start, size_t end)
     {
-        if(start == 3 && m_next == 2 && m_arr.Size() == 2)
-            printf("");
         size_t r = m_arr.FindGTE(start, m_next);
         if(r == not_found)
             return end;
@@ -343,6 +383,7 @@ public:
 
         m_column = column; 
         m_leaf_end = 0;
+        m_leaf_end_agg = 0;
         m_value = value;
     }
 
@@ -356,12 +397,14 @@ public:
         m_matches = 0;
 
         m_column = (C*)&table.GetColumnBase(m_column_id);
+
         m_table = &table;
         m_leaf_end = 0;
+        m_leaf_end_agg = 0;
         if (m_child)m_child->Init(table);
     }
 
-    int64_t aggregate(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action = TDB_FINDALL, size_t agg_col = not_found, size_t* matchcount = 0) {
+    int64_t aggregate(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action = TDB_FINDALL, SequentialGetter* agg_col = NULL, size_t* matchcount = 0) {
         if (action == TDB_FINDALL)
             return aggregate<TDB_FINDALL>(st, start, end, local_limit, agg_col, matchcount);
         if (action == TDB_SUM)
@@ -392,7 +435,11 @@ public:
                 return (m_local_matches != m_local_limit);
         }
 
-        bool b = state->match<action>(i);
+        int64_t av = NULL;        
+        if (state->uses_val<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded         
+            av = m_column_agg->GetNext(i);
+
+        bool b = state->state_match<action, false>(i, 0, av, &tightdb_dummy);  
 
         if(m_local_matches == m_local_limit)
             return false;
@@ -402,13 +449,15 @@ public:
 
     // m_column     Set in NODE constructor and is used as source for search criteria for this NODE
     // agg_col      column number in m_table which must act as source for aggreate action
-    template <ACTION action> int64_t aggregate(state_state* st, size_t start, size_t end, size_t local_limit, size_t agg_col, size_t* matchcount = 0) {
+    template <ACTION action> int64_t aggregate(state_state* st, size_t start, size_t end, size_t local_limit, SequentialGetter* agg_col, size_t* matchcount = 0) {
         F f;
         int c = f.condition();
        
         m_local_matches = 0;
         m_local_limit = local_limit;
         m_last_local_match = start - 1;
+
+        m_column_agg = agg_col;
 
         state = st;
         for (size_t s = start; s < end; ) {    
@@ -426,7 +475,7 @@ public:
             else
                 end2 = end - m_leaf_start;
 
-            if (m_conds <= 1 && (agg_col == m_column_id || agg_col == size_t(-1)))
+            if (m_conds <= 1 && agg_col == NULL)
                 m_array.find(c, action, m_value, s - m_leaf_start, end2, m_leaf_start, st);
             else
                 m_array.find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, st, std::bind1st(std::mem_fun(&NODE::match_callback<action>), this));
@@ -494,6 +543,7 @@ public:
     T m_value;
 
 protected:
+
     state_state *state;
     size_t m_last_local_match;
     C* m_column;                // Column on which search criteria is applied
@@ -505,6 +555,14 @@ protected:
 
     size_t m_local_matches;
     size_t m_local_limit;
+
+
+
+    Array* m_array_agg;              
+    size_t m_leaf_start_agg;
+    size_t m_leaf_end_agg;
+    SequentialGetter* m_column_agg;
+
 };
 
 
@@ -627,6 +685,9 @@ public:
     }
 
     size_t find_first_local(size_t start, size_t end) {
+        assert(false);
+        (void)start;
+        (void)end;
         return 0;
     }
 

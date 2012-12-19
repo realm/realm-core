@@ -742,7 +742,7 @@ TEST(Shared_Notifications)
     }
 }
 
-
+/*
 const size_t READERS = 20;
 const size_t WRITERS = 20;
 const size_t ROUNDS = 20000;
@@ -844,17 +844,7 @@ TEST(Shared_StressTest1)
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
+*/
 
 
 

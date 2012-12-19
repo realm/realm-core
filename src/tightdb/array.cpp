@@ -769,7 +769,8 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     // Todo, use templated Get<width> from this point for performance
     if (target > Get(m_len - 1)) {ret = not_found; goto exit;}
 
-    size_t add = 1;
+    size_t add;
+    add = 1;
 
     for(;;) {
         if(start + add < m_len && Get(start + add) < target)
@@ -779,7 +780,9 @@ size_t Array::FindGTE(int64_t target, size_t start) const
        add *= 2;
     }
 
-    size_t high = start + add + 1;
+    size_t high;
+    high = start + add + 1;
+
     if(high > m_len)
         high = m_len;
 
@@ -788,7 +791,8 @@ size_t Array::FindGTE(int64_t target, size_t start) const
 
     //start og high
 
-    size_t orig_high = high;
+    size_t orig_high;
+    orig_high = high;
 
     while (high - start > 1) {
         const size_t probe = (start + high) / 2;

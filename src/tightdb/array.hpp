@@ -214,22 +214,6 @@ public:
             return false;
     }
     
-    template <ACTION action> bool match(size_t i) {
-        if (uses_val<action>() && i >= m_leaf_end_agg) {
-            m_array_agg = (Array*)m_column_agg->GetBlock(i, *m_array_agg, m_leaf_start_agg, true);
-            const size_t leaf_size = m_array_agg->Size();
-            m_leaf_end_agg = m_leaf_start_agg + leaf_size;
-        }
-        
-        int64_t av = NULL;        
-        if (uses_val<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded         
-            av = m_array_agg->Get(i - m_leaf_start_agg);
-        
-        bool b = state_match<action, false>(i, 0, av, &tightdb_dummy);
-
-        return b;
-    }
-
     void init(ACTION action, Array* akku, Column *agg_source, Array* spare_array, size_t limit) 
     {
         m_array_agg = spare_array;
@@ -255,40 +239,8 @@ public:
             state = (int64_t)akku;
     }
 
-
-    template <ACTION action, bool pattern, class Callback> bool state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback)
-    {
-        if (pattern) {
-            if (action == TDB_COUNT) {
-                state += fast_popcount64(indexpattern);
-                match_count = size_t(state);
-                return true;
-            }
-            // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
-            return false;
-        }
-
-        ++match_count;
-
-        if (action == TDB_CALLBACK_IDX)
-            return callback(index);
-        if (action == TDB_MAX && value > state)
-            state = value;
-        if (action == TDB_MIN && value < state)
-            state = value;
-        if (action == TDB_SUM)
-            state += value;
-        if (action == TDB_COUNT)
-            state++;
-        if (action == TDB_FINDALL)
-            ((Array*)state)->add(index);
-        if (action == TDB_RETURN_FIRST) {
-            state = index;
-            return false;
-        }
-        return true;
-    }
-
+   template <ACTION action> bool match(size_t i);
+    template <ACTION action, bool pattern, class Callback> bool state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback);
 
 };
 
@@ -504,7 +456,6 @@ public:
     void state_init(ACTION action, state_state *state, Array* akku);
 
     // Called for each search result
-    template <ACTION action, bool pattern, class Callback> bool state_match(size_t index, uint64_t indexpattern, int64_t value, state_state *state, Callback callback) const;
     template <ACTION action, class Callback> bool FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const;
     template <ACTION action, class Callback> bool FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const;
 
@@ -533,7 +484,6 @@ public:
 
     template <size_t width> inline bool TestZero(uint64_t value) const;         // Tests value for 0-elements
     template <bool eq, size_t width>size_t FindZero(uint64_t v) const;          // Finds position of 0/non-zero element
-    template <ACTION action> bool USES_VAL(void);                               // Helps compiler knowing that a Get()'ed value is unused
     template<size_t width> uint64_t cascade(uint64_t a) const;                  // Sets uppermost bits of non-zero elements
     template <bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
     template <size_t width> inline int64_t LowerBits(void) const;               // Return chunk with lower bit set in each element 
@@ -679,7 +629,44 @@ protected:
 
 };
 
+
+
 // Implementation:
+
+
+    template <ACTION action, bool pattern, class Callback> inline bool state_state::state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback)
+    {
+        if (pattern) {
+            if (action == TDB_COUNT) {
+                state += fast_popcount64(indexpattern);
+                match_count = size_t(state);
+                return true;
+            }
+            // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
+            return false;
+        }
+
+        ++match_count;
+
+        if (action == TDB_CALLBACK_IDX)
+            return callback(index);
+        if (action == TDB_MAX && value > state)
+            state = value;
+        if (action == TDB_MIN && value < state)
+            state = value;
+        if (action == TDB_SUM)
+            state += value;
+        if (action == TDB_COUNT)
+            state++;
+        if (action == TDB_FINDALL)
+            ((Array*)state)->add(index);
+        if (action == TDB_RETURN_FIRST) {
+            state = index;
+            return false;
+        }
+        return true;
+    }
+
 
 inline Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
     m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
@@ -925,58 +912,16 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
     computations for the given search criteria makes it feasible to construct such a pattern.
     */
 
-    template <ACTION action, bool pattern, class Callback> bool Array::state_match(size_t index, uint64_t indexpattern, int64_t value, state_state *state, Callback callback) const
-    {
-        if (pattern) {
-            if (action == TDB_COUNT) {
-                size_t c = fast_popcount64(indexpattern);
-                state->state += c;
-                state->match_count += c;
-                return true;
-            }
-            // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
-            return false;
-        }
-
-        state->match_count++;
-
-        if (action == TDB_CALLBACK_IDX)
-            return callback(index);
-        if (action == TDB_MAX && value > *(int64_t*)state)
-            state->state = value;
-        if (action == TDB_MIN && value < *(int64_t*)state)
-            state->state = value;
-        if (action == TDB_SUM)
-            state->state += value;
-        if (action == TDB_COUNT)
-            state->state++;
-        if (action == TDB_FINDALL)
-            ((Array*)state->state)->add(index);
-        if (action == TDB_RETURN_FIRST) {
-            state->state = index;
-            return false;
-        }
-        return true;
-    }
-
-    template <ACTION action> bool Array::USES_VAL(void) 
-    {
-        if (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM)
-            return true;
-        else
-            return false;
-    }
-
     // These wrapper functions only exist to enable a possibility to make the compiler see that 'value' and/or 'index' are unused, such that caller's 
     // computation of these values will not be made. Only works if FIND_ACTION and FIND_ACTION_PATTERN rewritten as macros. Note: This problem has been fixed in
     // next upcoming array.hpp version
     template <ACTION action, class Callback> bool Array::FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const
     {
-        return state_match<action, false, Callback>(index, 0, value, state, callback);
+        return state->state_match<action, false, Callback>(index, 0, value, callback);
     }
     template <ACTION action, class Callback> bool Array::FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const
     {
-        return state_match<action, true, Callback>(index, pattern, 0, state, callback);
+        return state->state_match<action, true, Callback>(index, pattern, 0, callback);
     }
 
 
