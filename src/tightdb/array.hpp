@@ -465,11 +465,6 @@ protected:
     void CreateFromHeaderDirect(uint8_t* header, size_t ref=0);
     void update_ref_in_parent();
 
-    // Getters and Setters for adaptive-packed arrays
-    typedef int64_t(Array::*Getter)(size_t) const;
-    typedef void(Array::*Setter)(size_t, int64_t);
-    typedef void (Array::*Finder)(int64_t, size_t, size_t, size_t, state_state*) const;
-
     enum WidthType {
         TDB_BITS     = 0,
         TDB_MULTIPLY = 1,
@@ -495,26 +490,32 @@ protected:
     size_t get_header_len(const void* header=NULL) const;
     size_t get_header_capacity(const void* header=NULL) const;
 
+    static void set_header_isnode(bool value, void* header);
+    static void set_header_hasrefs(bool value, void* header);
+    static void set_header_indexflag(bool value, void* header);
+    static void set_header_wtype(int value, void* header);
+    static void set_header_width(size_t value, void* header);
+    static void set_header_len(size_t value, void* header);
+    static void set_header_capacity(size_t value, void* header);
+    static void init_header(void* header, bool is_node, bool has_refs, int width_type,
+                     size_t width, size_t length, size_t capacity);
+
     template <size_t width> void SetWidth(void);
     void SetWidth(size_t width);
     bool Alloc(size_t count, size_t width);
     bool CopyOnWrite();
-
-    // Member variables
-    Getter m_getter;
-    Setter m_setter;
-    Finder m_finder[COND_COUNT]; // one for each COND_XXX enum
 
 private:
     size_t m_ref;
     template <bool max, size_t w> bool minmax(int64_t& result, size_t start, size_t end) const;
 
 protected:
-    size_t m_len;
-    size_t m_capacity;
-    size_t m_width; // FIXME: Should be an 'int'
-    bool m_isNode;
-    bool m_hasRefs;
+    size_t m_len;           // items currently stored
+    size_t m_capacity;      // max item capacity
+// FIXME: m_width Should be an 'int'
+    size_t m_width;         // size of an item in bits or bytes depending on 
+    bool m_isNode;          // is it a Node or Leaf array
+    bool m_hasRefs;         //
 
 private:
     ArrayParent *m_parent;
@@ -523,15 +524,26 @@ private:
     Allocator& m_alloc;
 
 protected:
-    int64_t m_lbound;
-    int64_t m_ubound;
-
+    static const size_t initial_capacity = 128;
     static size_t create_empty_array(ColumnDef, WidthType, Allocator&);
 
     // Overriding methods in ArrayParent
     virtual void update_child_ref(size_t child_ndx, size_t new_ref);
     virtual size_t get_child_ref(size_t child_ndx) const;
 
+// FIXME: below should be moved to a specific ArrayNumber class
+protected:
+    // Getters and Setters for adaptive-packed arrays
+    typedef int64_t(Array::*Getter)(size_t) const;
+    typedef void(Array::*Setter)(size_t, int64_t);
+    typedef void (Array::*Finder)(int64_t, size_t, size_t, size_t, state_state*) const;
+
+    Getter m_getter;
+    Setter m_setter;
+    Finder m_finder[COND_COUNT]; // one for each COND_XXX enum
+
+    int64_t m_lbound;       // min number that can be stored with current m_width
+    int64_t m_ubound;       // max number that can be stored with current m_width
 };
 
 // Implementation:
@@ -578,6 +590,93 @@ inline Array::Array(bool b) : m_alloc(GetDefaultAllocator()) {
 
 
 inline Array::~Array() {}
+
+
+//-------------------------------------------------
+
+inline void Array::set_header_isnode(bool value, void* header)
+{
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x80) | uint8_t(value << 7);
+}
+
+inline void Array::set_header_hasrefs(bool value, void* header)
+{
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x40) | uint8_t(value << 6);
+}
+
+inline void Array::set_header_indexflag(bool value, void* header)
+{
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x20) | uint8_t(value << 5);
+}
+
+inline void Array::set_header_wtype(int value, void* header)
+{
+    // Indicates how to calculate size in bytes based on width
+    // 0: bits      (width/8) * length
+    // 1: multiply  width * length
+    // 2: ignore    1 * length
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x18) | uint8_t(value << 3);
+}
+
+inline void Array::set_header_width(size_t value, void* header)
+{
+    // Pack width in 3 bits (log2)
+    size_t w = 0;
+    size_t b = size_t(value);
+    while (b) {++w; b >>= 1;}
+    TIGHTDB_ASSERT(w < 8);
+
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[0] = (header2[0] & ~0x7) | uint8_t(w);
+}
+
+inline void Array::set_header_len(size_t value, void* header)
+{
+    TIGHTDB_ASSERT(value <= 0xFFFFFF);
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[1] = (value >> 16) & 0x000000FF;
+    header2[2] = (value >>  8) & 0x000000FF;
+    header2[3] =  value        & 0x000000FF;
+}
+
+inline void Array::set_header_capacity(size_t value, void* header)
+{
+    TIGHTDB_ASSERT(value <= 0xFFFFFF);
+    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
+    header2[4] = (value >> 16) & 0x000000FF;
+    header2[5] = (value >>  8) & 0x000000FF;
+    header2[6] =  value        & 0x000000FF;
+}
+
+
+inline void Array::init_header(void* header, bool is_node, bool has_refs, int width_type,
+                               size_t width, size_t length, size_t capacity)
+{
+    // Note: Since the header layout contains unallocated
+    // bit and/or bytes, it is important that we put the
+    // entire 8 byte header into a well defined state
+    // initially. Note also: The C++ standard does not
+    // guarantee that int64_t is extactly 8 bytes wide. It
+    // may be more, and it may be less. That is why we
+    // need the static assert.
+    TIGHTDB_STATIC_ASSERT(sizeof(int64_t) == 8,
+                          "Trouble if int64_t is not 8 bytes wide");
+    *reinterpret_cast<int64_t*>(header) = 0;
+    set_header_isnode(is_node, header);
+    set_header_hasrefs(has_refs, header);
+    set_header_wtype(width_type, header);
+    set_header_width(width, header);
+    set_header_len(length, header);
+    set_header_capacity(capacity, header);
+}
+
+
+//-------------------------------------------------
+
 
 template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 {

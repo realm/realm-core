@@ -17,94 +17,6 @@
 
 using namespace std;
 
-namespace {
-
-const size_t initial_capacity = 128;
-
-inline void set_header_isnode(bool value, void* header)
-{
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x80) | uint8_t(value << 7);
-}
-
-inline void set_header_hasrefs(bool value, void* header)
-{
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x40) | uint8_t(value << 6);
-}
-
-inline void set_header_indexflag(bool value, void* header)
-{
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x20) | uint8_t(value << 5);
-}
-
-inline void set_header_wtype(int value, void* header)
-{
-    // Indicates how to calculate size in bytes based on width
-    // 0: bits      (width/8) * length
-    // 1: multiply  width * length
-    // 2: ignore    1 * length
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x18) | uint8_t(value << 3);
-}
-
-inline void set_header_width(size_t value, void* header)
-{
-    // Pack width in 3 bits (log2)
-    size_t w = 0;
-    size_t b = size_t(value);
-    while (b) {++w; b >>= 1;}
-    TIGHTDB_ASSERT(w < 8);
-
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x7) | uint8_t(w);
-}
-
-inline void set_header_len(size_t value, void* header)
-{
-    TIGHTDB_ASSERT(value <= 0xFFFFFF);
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[1] = (value >> 16) & 0x000000FF;
-    header2[2] = (value >>  8) & 0x000000FF;
-    header2[3] =  value        & 0x000000FF;
-}
-
-inline void set_header_capacity(size_t value, void* header)
-{
-    TIGHTDB_ASSERT(value <= 0xFFFFFF);
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[4] = (value >> 16) & 0x000000FF;
-    header2[5] = (value >>  8) & 0x000000FF;
-    header2[6] =  value        & 0x000000FF;
-}
-
-
-inline void init_header(void* header, bool is_node, bool has_refs, int width_type,
-                        size_t width, size_t length, size_t capacity)
-{
-    // Note: Since the header layout contains unallocated
-    // bit and/or bytes, it is important that we put the
-    // entire 8 byte header into a well defined state
-    // initially. Note also: The C++ standard does not
-    // guarantee that int64_t is extactly 8 bytes wide. It
-    // may be more, and it may be less. That is why we
-    // need the static assert.
-    TIGHTDB_STATIC_ASSERT(sizeof(int64_t) == 8,
-                          "Trouble if int64_t is not 8 bytes wide");
-    *reinterpret_cast<int64_t*>(header) = 0;
-    set_header_isnode(is_node, header);
-    set_header_hasrefs(has_refs, header);
-    set_header_wtype(width_type, header);
-    set_header_width(width, header);
-    set_header_len(length, header);
-    set_header_capacity(capacity, header);
-}
-
-
-} // anonymous namespace
-
-
 
 namespace tightdb {
 
@@ -129,37 +41,37 @@ bool IsArrayIndexNode(size_t ref, const Allocator& alloc)
 
 void Array::set_header_isnode(bool value)
 {
-    ::set_header_isnode(value, m_data - 8);
+    set_header_isnode(value, m_data - 8);
 }
 
 void Array::set_header_hasrefs(bool value)
 {
-    ::set_header_hasrefs(value, m_data - 8);
+    set_header_hasrefs(value, m_data - 8);
 }
 
 void Array::set_header_indexflag(bool value)
 {
-    ::set_header_indexflag(value, m_data - 8);
+    set_header_indexflag(value, m_data - 8);
 }
 
 void Array::set_header_wtype(WidthType value)
 {
-    ::set_header_wtype(value, m_data - 8);
+    set_header_wtype(value, m_data - 8);
 }
 
 void Array::set_header_width(size_t value)
 {
-    ::set_header_width(value, m_data - 8);
+    set_header_width(value, m_data - 8);
 }
 
 void Array::set_header_len(size_t value)
 {
-    ::set_header_len(value, m_data - 8);
+    set_header_len(value, m_data - 8);
 }
 
 void Array::set_header_capacity(size_t value)
 {
-    ::set_header_capacity(value, m_data - 8);
+    set_header_capacity(value, m_data - 8);
 }
 
 bool Array::get_header_isnode(const void* header) const
@@ -1394,12 +1306,15 @@ bool Array::CopyOnWrite()
 size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator& alloc)
 {
     bool is_node = false, has_refs = false;
-    if (type == COLUMN_NODE) is_node = has_refs = true;
-    else if (type == COLUMN_HASREFS) has_refs = true;
+    if (type == COLUMN_NODE) 
+        is_node = has_refs = true;
+    else if (type == COLUMN_HASREFS) 
+        has_refs = true;
 
     const size_t capacity = initial_capacity;
-    MemRef mem_ref = alloc.Alloc(capacity);
-    if (!mem_ref.pointer) return 0;
+    const MemRef mem_ref = alloc.Alloc(capacity);
+    if (!mem_ref.pointer) 
+        return 0;
 
     init_header(mem_ref.pointer, is_node, has_refs, width_type, 0, 0, capacity);
 
@@ -1435,9 +1350,9 @@ bool Array::Alloc(size_t count, size_t width)
             else {
                 mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, capacity_bytes);
                 if (!mem_ref.pointer) return false;
-                ::set_header_width(width, mem_ref.pointer);
-                ::set_header_len(count, mem_ref.pointer);
-                ::set_header_capacity(capacity_bytes, mem_ref.pointer);
+                set_header_width(width, mem_ref.pointer);
+                set_header_len(count, mem_ref.pointer);
+                set_header_capacity(capacity_bytes, mem_ref.pointer);
             }
 
             // Update wrapper objects
