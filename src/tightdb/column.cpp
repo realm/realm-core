@@ -458,7 +458,7 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
     state_state st;
     Array spare;
     st.init(action, NULL, m_column, &spare, size_t(-1));
-    node->aggregate<action>(&st, start, end, size_t(-1), NULL, matchcount);
+    node->aggregate_local<action>(&st, start, end, size_t(-1), NULL, matchcount);
     return st.state;
 #else
     // Experimental
@@ -504,9 +504,9 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
             m_local_end = leaf_size < e ? leaf_size : e;
         }
 #ifdef ARRAYPTR
-        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
+        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, CallbackDummy());
 #else
-        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
+        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, CallbackDummy());
 #endif
         s = m_leaf_end;
     }

@@ -86,8 +86,6 @@ enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL
 
 namespace tightdb {
 
-bool tightdb_dummy (int64_t t);
-
 #define NO0(v) ((v) == 0 ? 1 : (v))
 
 const size_t not_found = size_t(-1);
@@ -144,105 +142,7 @@ class AdaptiveStringColumn;
 class GroupWriter;
 class Column;
 
-class state_state {
-public:
-
-    int64_t state;
-    size_t match_count;
-    Array *m_array_agg;
-    size_t m_leaf_start_agg;
-    size_t m_leaf_end_agg;
-    size_t m_local_end_agg;
-    Column *m_column_agg;            // Column on which aggregate function is executed (can be same as m_column)
-    size_t m_limit;
-
-
-    // popcount
-    #if defined(_MSC_VER) && _MSC_VER >= 1500
-        int fast_popcount32(uint32_t x)
-        {
-            return __popcnt(x);
-        }
-        #if defined(_M_X64)
-            int fast_popcount64(unsigned __int64 x)
-            {
-                return (int)__popcnt64(x);
-            }
-        #else
-            inline int fast_popcount64(unsigned __int64 x)
-            {
-                return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
-            }
-        #endif
-    #elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
-        #define fast_popcount32 __builtin_popcount
-        #if ULONG_MAX == 0xffffffff
-            inline int fast_popcount64(unsigned long long x)
-            {
-                return __builtin_popcount((unsigned)(x)) + __builtin_popcount((unsigned)(x >> 32));
-            }
-        #else
-            inline int fast_popcount64(unsigned long long x)
-            {
-                return __builtin_popcountll(x);
-            }
-        #endif
-    #else
-        static const char a_popcount_bits[256] = {
-            0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
-        };
-
-        // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
-        inline int fast_popcount32(uint32_t x)
-        {
-            return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
-        }
-        inline int fast_popcount64(uint64_t x)
-        {
-            return fast_popcount32(x) + fast_popcount32(x >> 32);
-        }
-
-    #endif // select best popcount implementations
-
-
-
-    template <ACTION action> bool uses_val(void) 
-    {
-        if (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM)
-            return true;
-        else
-            return false;
-    }
-    
-    void init(ACTION action, Array* akku, Column *agg_source, Array* spare_array, size_t limit) 
-    {
-        m_array_agg = spare_array;
-        m_column_agg = agg_source;
-        m_leaf_start_agg = 0;
-        m_leaf_end_agg = 0;
-        m_local_end_agg = 0;
-        match_count = 0;
-        m_limit = limit;
-
-
-        if (action == TDB_MAX)
-            state = -0x7fffffffffffffffLL - 1LL;
-        if (action == TDB_MIN)
-            state = 0x7fffffffffffffffLL;
-        if (action == TDB_RETURN_FIRST)
-            state = not_found;
-        if (action == TDB_SUM)
-            state = 0;
-        if (action == TDB_COUNT)
-            state = 0;
-        if (action == TDB_FINDALL)
-            state = (int64_t)akku;
-    }
-
-   template <ACTION action> bool match(size_t i);
-    template <ACTION action, bool pattern, class Callback> bool state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback);
-
-};
+   class state_state;
 
 #ifdef TIGHTDB_DEBUG
 class MemStats {
@@ -634,7 +534,106 @@ protected:
 // Implementation:
 
 
-    template <ACTION action, bool pattern, class Callback> inline bool state_state::state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback)
+
+class state_state {
+public:
+
+    int64_t state;
+    size_t match_count;
+    Array *m_array_agg;
+    size_t m_leaf_start_agg;
+    size_t m_leaf_end_agg;
+    size_t m_local_end_agg;
+    Column *m_column_agg;            // Column on which aggregate function is executed (can be same as m_column)
+    size_t m_limit;
+
+
+    // popcount
+    #if defined(_MSC_VER) && _MSC_VER >= 1500
+        int fast_popcount32(uint32_t x)
+        {
+            return __popcnt(x);
+        }
+        #if defined(_M_X64)
+            int fast_popcount64(unsigned __int64 x)
+            {
+                return (int)__popcnt64(x);
+            }
+        #else
+            inline int fast_popcount64(unsigned __int64 x)
+            {
+                return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
+            }
+        #endif
+    #elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
+        #define fast_popcount32 __builtin_popcount
+        #if ULONG_MAX == 0xffffffff
+            inline int fast_popcount64(unsigned long long x)
+            {
+                return __builtin_popcount((unsigned)(x)) + __builtin_popcount((unsigned)(x >> 32));
+            }
+        #else
+            inline int fast_popcount64(unsigned long long x)
+            {
+                return __builtin_popcountll(x);
+            }
+        #endif
+    #else
+        static const char a_popcount_bits[256] = {
+            0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+        };
+
+        // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
+        inline int fast_popcount32(uint32_t x)
+        {
+            return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
+        }
+        inline int fast_popcount64(uint64_t x)
+        {
+            return fast_popcount32(x) + fast_popcount32(x >> 32);
+        }
+
+    #endif // select best popcount implementations
+
+
+
+    template <ACTION action> bool uses_val(void) 
+    {
+        if (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM)
+            return true;
+        else
+            return false;
+    }
+    
+    void init(ACTION action, Array* akku, Column *agg_source, Array* spare_array, size_t limit) 
+    {
+        m_array_agg = spare_array;
+        m_column_agg = agg_source;
+        m_leaf_start_agg = 0;
+        m_leaf_end_agg = 0;
+        m_local_end_agg = 0;
+        match_count = 0;
+        m_limit = limit;
+
+
+        if (action == TDB_MAX)
+            state = -0x7fffffffffffffffLL - 1LL;
+        if (action == TDB_MIN)
+            state = 0x7fffffffffffffffLL;
+        if (action == TDB_RETURN_FIRST)
+            state = not_found;
+        if (action == TDB_SUM)
+            state = 0;
+        if (action == TDB_COUNT)
+            state = 0;
+        if (action == TDB_FINDALL)
+            state = (int64_t)akku;
+    }
+
+   template <ACTION action> bool match(size_t i);
+  //  template <ACTION action, bool pattern, class Callback> bool state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback);
+
+    template <ACTION action, bool pattern, class Callback> inline bool state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback)
     {
         if (pattern) {
             if (action == TDB_COUNT) {
@@ -666,6 +665,8 @@ protected:
         }
         return true;
     }
+
+};
 
 
 inline Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):

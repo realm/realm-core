@@ -287,7 +287,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     state_state st;
     Array spare;
     st.init(TDB_FINDALL, &tv.get_ref_column(), NULL, &spare, limit);
-    first[0]->aggregate_super<TDB_FINDALL>(&st, start, end);
+    first[0]->aggregate<TDB_FINDALL>(&st, start, end);
     return move(tv);
 }
 
@@ -311,7 +311,7 @@ int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end,
     state_state st;
     Array spare;
     st.init(TDB_SUM, NULL, (Column*)&c, &spare, limit);
-    int64_t r = first[0]->aggregate_super<TDB_SUM>(&st, start, end, column, &matchcount);
+    int64_t r = first[0]->aggregate<TDB_SUM>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -336,7 +336,7 @@ int64_t Query::maximum(size_t column, size_t* resultcount, size_t start, size_t 
     state_state st;
     Array spare;
     st.init(TDB_MAX, NULL, (Column*)&c, &spare, limit);
-    int64_t r = first[0]->aggregate_super<TDB_MAX>(&st, start, end, column, &matchcount);
+    int64_t r = first[0]->aggregate<TDB_MAX>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -362,7 +362,7 @@ int64_t Query::minimum(size_t column, size_t* resultcount, size_t start, size_t 
     state_state st;
     Array spare;
     st.init(TDB_MIN, NULL, (Column*)&c, &spare, limit);
-    int64_t r = first[0]->aggregate_super<TDB_MIN>(&st, start, end, not_found, &matchcount);
+    int64_t r = first[0]->aggregate<TDB_MIN>(&st, start, end, not_found, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -382,7 +382,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     state_state st;
     Array spare; 
     st.init(TDB_COUNT, NULL, NULL, &spare, limit);
-    int64_t r = first[0]->aggregate_super<TDB_COUNT>(&st, start, end);
+    int64_t r = first[0]->aggregate<TDB_COUNT>(&st, start, end);
     return size_t(r);
 }
 
