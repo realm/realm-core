@@ -295,8 +295,6 @@ TEST(Table_Delete_All_Types)
 #endif // TIGHTDB_DEBUG
 }
 
-lav test virke under windows...
-
 TEST(Table_test_to_string)
 {
     Table table;
