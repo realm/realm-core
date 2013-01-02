@@ -32,11 +32,19 @@
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 
-
 namespace tightdb {
+
+// Number of matches to find in best condition loop before breaking out to peek at other conditions
+const size_t findlocals = 16;   
+
+// Distance between matches from which performance begins to flatten out because various initial overheads become insignificant
+const size_t bestdist = 100;    
+
+
 
 typedef bool (*CallbackDummy)(int64_t);
 
+// Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
 class SequentialGetter {
 public:
     SequentialGetter(const Table& table, size_t column) 
@@ -49,8 +57,8 @@ public:
     inline int64_t GetNext(size_t index)
     {
         if (index >= m_leaf_end) {
-            // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and leave m_array untouched. Else 
-            // call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
+            // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
+            // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
             m_array_ptr = (Array*)(m_column->GetBlock(index, m_array, m_leaf_start, true));
             const size_t leaf_size = m_array.Size();
             m_leaf_end = m_leaf_start + leaf_size;
@@ -68,9 +76,6 @@ public:
     Array m_array;
     Array *m_array_ptr;
 };
-
-// Distance between matches where performance no longer increases 
-const size_t bestdist = 100;
 
 class ParentNode {
 public:
@@ -159,7 +164,7 @@ public:
 
             // Find a large amount of local matches in best condition
             td = m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
-            start = (size_t)m_children[best]->aggregate_local(st, start, td, 16, action, agg_col, matchcount);
+            start = (size_t)m_children[best]->aggregate_local(st, start, td, findlocals, action, agg_col, matchcount);
 
             // Make remaining conditions compute their m_dD (statistics)
             for(size_t c = 0; c < m_children.size() && start < end; c++) {
@@ -167,12 +172,12 @@ public:
                     continue;
 
                 // Skip test if there is no way its cost can ever be better than best node's
-                double cost = m_children[c]->cost(); // cost() = 16.0 / m_dD + m_dT;
+                double cost = m_children[c]->cost();
                 if(m_children[c]->m_dT < cost) {
                     size_t maxN = 2;
 
-                    // Limit to +256 in order not to skip too large parts of index nodes
-                    size_t maxD = m_children[c]->m_dT == 0.0 ? end - start : 256;
+                    // Limit to bestdist in order not to skip too large parts of index nodes
+                    size_t maxD = m_children[c]->m_dT == 0.0 ? end - start : bestdist;
                     td = m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
                     start = (size_t)m_children[c]->aggregate_local(st, start, td, maxN, action, agg_col, matchcount);
                 }
@@ -186,7 +191,7 @@ public:
 
     }
 
-    virtual int64_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action = TDB_FINDALL, SequentialGetter* agg_col = NULL, size_t* matchcount = 0) 
+    virtual int64_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action, SequentialGetter* agg_col, size_t* matchcount) 
     {
 		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the integer version, because
         // find_first_local() is relatively slower here (because it's non-integers).
@@ -197,14 +202,14 @@ public:
         size_t r = start - 1;
         for (;;) {
             if(local_matches == local_limit) { 
-                m_dD = (r - start) / local_matches; 
+                m_dD = double(r - start) / local_matches; 
                 return r + 1;
             }
 
             // Find first match in this condition node
             r = find_first_local(r + 1, end);
             if (r == end) { 
-                m_dD = (r - start) / local_matches; 
+                m_dD = double(r - start) / local_matches; 
                 return end;
             }
 
@@ -219,7 +224,7 @@ public:
                 }
             }
 
-            // If first match in this node equals first match in remaining nodes, we have a real match
+            // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
                 int64_t av = 0;
                 if(agg_col != NULL)
@@ -259,10 +264,10 @@ public:
     ParentNode* m_child;
     std::vector<ParentNode*>m_children;
     int cond;
-    size_t m_column_id;
+    size_t m_column_id; // Column of search criteria
     size_t m_conds;
     double m_dD; // Average row distance between each local match at current position
-    double m_dT; // Time overhead testing index i + 1 after testing index i. > 1 for linear scans, 0 for index/tableview
+    double m_dT; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0 for index/tableview
 
     size_t m_probes;
     size_t m_matches;
@@ -271,7 +276,7 @@ protected:
     const Table* m_table;
     std::string error_code;
 
-    SequentialGetter* m_column_agg;
+    SequentialGetter* m_column_agg; // Column of values used in aggregate (TDB_FINDALL, TDB_RETURN_FIRST, TDB_SUM, etc)
 };
 
 
@@ -284,7 +289,7 @@ public:
         m_table = &table;
 
         m_dT = 0.0;
-        m_dD =  m_table->size() / (m_arr.Size() + 1);
+        m_dD =  m_table->size() / (m_arr.Size() + 1.0);
         m_probes = 0;
         m_matches = 0;
 
@@ -312,7 +317,6 @@ protected:
 };
 
 
-// Not finished
 class SUBTABLE: public ParentNode {
 public:
     SUBTABLE(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
@@ -366,7 +370,7 @@ template <class T, class C, class F> class NODE: public ParentNode {
 public:
     // NOTE: Be careful to call Array(false) constructors on m_array in the initializer list, otherwise
     // their default constructors are called which are slow
-    NODE(T v, size_t column) : m_value(v), m_array(false) { // ,m_leaf_start(0), m_leaf_end(0), m_local_end(0) {
+    NODE(T v, size_t column) : m_value(v), m_array(false) { 
         m_column_id = column;
         m_child = 0;
         F f;
@@ -396,7 +400,7 @@ public:
         if (m_child)m_child->Init(table);
     }
     
-    int64_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action = TDB_FINDALL, SequentialGetter* agg_col = NULL, size_t* matchcount = 0) {
+    int64_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action, SequentialGetter* agg_col, size_t* matchcount) {
         if (action == TDB_FINDALL)
             return aggregate_local<TDB_FINDALL>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_RETURN_FIRST)
@@ -445,7 +449,7 @@ public:
 
     // m_column     Set in NODE constructor and is used as source for search criteria for this NODE
     // agg_col      column number in m_table which must act as source for aggreate action
-    template <ACTION action> int64_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, SequentialGetter* agg_col, size_t* matchcount = 0) {
+    template <ACTION action> int64_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, SequentialGetter* agg_col, size_t* matchcount) {
         F f;
         int c = f.condition();
        
@@ -486,11 +490,11 @@ public:
             *matchcount = int64_t(st->match_count);
 
         if(m_local_matches == m_local_limit) {
-            m_dD = (m_last_local_match + 1 - start) / (m_local_matches + 1);
+            m_dD = (m_last_local_match + 1 - start) / (m_local_matches + 1.0);
             return m_last_local_match + 1;
         }
         else {
-            m_dD = (end - start) / (m_local_matches + 1);
+            m_dD = (end - start) / (m_local_matches + 1.0);
             return end;
         }
     }
@@ -510,7 +514,7 @@ public:
             
             // Do search directly on cached leaf array
             if (start + 1 == end) {
-                if (function(m_array.Get(start - m_leaf_start), m_value))
+                if (function(m_array.Get(start - m_leaf_start), m_value) != 0)
                     return start;
                 else
                     return end;

@@ -446,18 +446,22 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
     if (end == size_t(-1)) 
         end = ((Column*)this)->Size();
     Column* m_column = (Column*)this;
-   
+
     // We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
     // slower because of initial overhead).
-    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
-    new (node) NODE<int64_t, Column, cond>(target, 0);
 
-//    static NODE<int64_t, Column, cond> node(target, NULL);
+    
+//    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
+//    new (node) NODE<int64_t, Column, cond>(target, 0);
 
-    node->QuickInit(m_column, target); 
+    NODE<int64_t, Column, cond> node(target, NULL);
+
+    node.QuickInit(m_column, target); 
     state_state st;
     st.init(action, NULL, m_column, size_t(-1));
-    node->aggregate_local<action>(&st, start, end, size_t(-1), NULL, matchcount);
+
+    node.aggregate_local(&st, start, end, size_t(-1), action, NULL, matchcount);
+
     return st.state;
 #else
     // Experimental
