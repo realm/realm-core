@@ -1,0 +1,52 @@
+// @@Example: ex_cpp_dyn_query_or @@
+#include <tightdb.hpp>
+
+using namespace tightdb;
+using namespace std;
+
+int main()
+{
+    // Create following table dynamically:
+
+// @@Show@@
+    // name    age
+    // ------------
+    // Mary    14
+    // Joe     17
+    // Jack    22
+    // Bob     80
+
+
+// @@EndShow@@
+    Group group;
+    TableRef table = group.get_table("test");
+
+    Spec& s = table->get_spec();
+    s.add_column(COLUMN_TYPE_STRING, "name");
+    s.add_column(COLUMN_TYPE_INT,    "age");
+    table->update_from_spec();
+
+    table->add_empty_row(4);
+    table->set_string(0, 0, "Mary");
+    table->insert_int(1, 0, 14);
+
+    table->set_string(0, 1, "Joe");
+    table->insert_int(1, 1, 17);
+
+    table->set_string(0, 2, "Jack");
+    table->insert_int(1, 2, 22);
+
+    table->set_string(0, 3, "Bob");
+    table->insert_int(1, 3, 80);
+
+// @@Show@@
+    // Find rows where age < 15 || name == "Jack"
+    Query query = table->where().less(1, 15).Or().equal(0, "Jack");
+ 
+    TableView view = query.find_all();
+    assert(view.size() == 2);
+    assert(!strcmp(view.get_string(0, 0), "Mary"));
+    assert(!strcmp(view.get_string(0, 1), "Jack"));
+// @@EndShow@@
+}
+// @@EndExample@@

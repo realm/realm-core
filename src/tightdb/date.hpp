@@ -28,35 +28,39 @@ namespace tightdb {
 
 class Date {
 public:
-    Date(std::time_t d) { set_date(d); }
-    Date(size_t year, size_t month, size_t day, size_t hour = 0, size_t minute = 0, size_t second = 0) { set_date(year, month, day, hour, minute, second); }
+    Date(): m_time(0) {}
 
+    /// Construct from the number of seconds since Jan 1 00:00:00 UTC
+    /// 1970.
+    Date(std::time_t d): m_time(d) {}
+
+    /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.
     std::time_t get_date() const { return m_time; }
-
-    bool set_date(time_t date) {
-        m_time = date;
-        return true;
-    }
-
-    std::time_t set_date(size_t year, size_t month, size_t day, size_t hour = 0, size_t minute = 0, size_t second = 0) {
-        memset(&m_date, 0, sizeof(m_date));
-        m_date.tm_year = (int)year - 1900;
-        m_date.tm_mon = (int)month;
-        m_date.tm_mday = (int)day;
-        m_date.tm_hour = (int)hour;
-        m_date.tm_min = (int)minute;
-        m_date.tm_sec = (int)second;
-        m_date.tm_isdst = 0;
-#ifdef _MSC_VER
-        m_time = _mkgmtime64(&m_date);  // fixme: verify that _mkgmtime64 interprets input time as UTC time zone. Verify how daylight saving behaves too
-#else
-        m_time = mktime (&m_date);
-#endif
-        return m_time;
-    }
 
     bool operator==(const Date& d) const { return m_time == d.m_time; }
     bool operator!=(const Date& d) const { return m_time != d.m_time; }
+
+    /// Construct from broken down local time.
+    ///
+    /// \note This constructor uses std::mktime() to convert the
+    /// specified local time to seconds since the Epoch, that is, the
+    /// result depends on the current globally specified time zone
+    /// setting.
+    ///
+    /// \param year The year (the minimum valid value is 1970).
+    ///
+    /// \param month The month in the range [1, 12].
+    ///
+    /// \param day The day of the month in the range [1, 31].
+    ///
+    /// \param hours Hours since midnight in the range [0, 23].
+    ///
+    /// \param minutes Minutes after the hour in the range [0, 59].
+    ///
+    /// \param seconds Seconds after the minute in the range [0,
+    /// 60]. Note that the range allows for leap seconds.
+    Date(int year, int month, int day, int hours = 0, int minutes = 0, int seconds = 0):
+        m_time(assemble(year, month, day, hours, minutes, seconds)) {}
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Date& d)
@@ -65,10 +69,21 @@ public:
         return out;
     }
 
-
 private:
-    std::time_t m_time;
-    tm m_date;
+    std::time_t m_time; // Seconds since Jan 1 00:00:00 UTC 1970.
+
+    static std::time_t assemble(int year, int month, int day, int hours, int minutes, int seconds)
+    {
+        std::tm local_time;
+        local_time.tm_year  = year  - 1900;
+        local_time.tm_mon   = month - 1;
+        local_time.tm_mday  = day;
+        local_time.tm_hour  = hours;
+        local_time.tm_min   = minutes;
+        local_time.tm_sec   = seconds;
+        local_time.tm_isdst = -1;
+        return std::mktime(&local_time);
+    }
 };
 
 

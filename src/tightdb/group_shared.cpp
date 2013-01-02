@@ -1,3 +1,4 @@
+#include <tightdb/string_buffer.hpp>
 #include <tightdb/group_shared.hpp>
 
 // Does not work for windows yet
@@ -9,26 +10,15 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 
+#include "../test/testsettings.hpp"
+
+// Wrap pthread function calls with the pthread bug finding tool (program execution will be slower). 
+// Works both in debug and release mode. Define the flag in testsettings.h
+#ifdef TIGHTDB_PTHREADS_TEST
+#include "../test/pthread_test.hpp"
+#endif
+
 using namespace tightdb;
-
-namespace {
-
-// Pre-declare local functions
-char* concat_strings(const char* str1, const char* str2);
-
-// Support methods
-char* concat_strings(const char* str1, const char* str2) {
-    const size_t len1 = strlen(str1);
-    const size_t len2 = strlen(str2) + 1; // includes terminating null
-
-    char* const s = (char*)malloc(len1 + len2);
-    memcpy(s, str1, len1);
-    memcpy(s + len1, str2, len2);
-
-    return s;
-}
-
-} // anonymous namespace
 
 
 struct tightdb::ReadCount {
@@ -40,11 +30,11 @@ struct tightdb::SharedInfo {
     pthread_mutex_t readmutex;
     pthread_mutex_t writemutex;
     uint64_t filesize;
-    uint32_t infosize;
 
     uint64_t current_top;
     volatile uint32_t current_version;
 
+    uint32_t infosize;
     uint32_t capacity; // -1 so it can also be used as mask
     uint32_t put_pos;
     uint32_t get_pos;
@@ -52,36 +42,45 @@ struct tightdb::SharedInfo {
 };
 
 
-SharedGroup::SharedGroup(const char* path_to_database_file):
-m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID), m_info(NULL), m_isValid(false), m_version(-1),
-    m_lockfile_path(NULL)
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+SharedGroup::SharedGroup(string path_to_database_file):
+    m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID),
+    m_info(NULL), m_isValid(false), m_version(-1), m_replication(Replication::degenerate_tag())
 {
     init(path_to_database_file);
 }
 
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-SharedGroup::SharedGroup(replication_tag, const char* path_to_database_file):
-    m_group(path_to_database_file ? path_to_database_file :
+SharedGroup::SharedGroup(replication_tag, string path_to_database_file):
+    m_group(!path_to_database_file.empty() ? path_to_database_file :
             Replication::get_path_to_database_file(), GROUP_SHARED|GROUP_INVALID), m_info(NULL),
-    m_isValid(false), m_version(-1), m_lockfile_path(NULL)
+    m_isValid(false), m_version(-1), m_replication(path_to_database_file)
 {
-    error_code err = m_replication.init(path_to_database_file);
-    if (err) return; // FIXME: Reveal the error code somehow
     m_group.set_replication(&m_replication);
 
-    init(path_to_database_file ? path_to_database_file : Replication::get_path_to_database_file());
+    init(!path_to_database_file.empty() ? path_to_database_file :
+         Replication::get_path_to_database_file());
 }
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#else // ! TIGHTDB_ENABLE_REPLICATION
 
-
-void SharedGroup::init(const char* path_to_database_file)
+SharedGroup::SharedGroup(string path_to_database_file):
+    m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID),
+    m_info(NULL), m_isValid(false), m_version(-1)
 {
+    init(path_to_database_file);
+}
+
+#endif // ! TIGHTDB_ENABLE_REPLICATION
+
+
+void SharedGroup::init(string path_to_database_file)
+{
+    m_lockfile_path = path_to_database_file + ".lock";
+
+open_start:
     // Open shared coordination buffer
-    m_lockfile_path = concat_strings(path_to_database_file, ".lock");
-    m_fd = open(m_lockfile_path, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    m_fd = open(m_lockfile_path.c_str(), O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (m_fd < 0) return;
 
     bool needInit = false;
@@ -96,7 +95,7 @@ void SharedGroup::init(const char* path_to_database_file)
         // lock where another process could have deleted the file
         if (fstat(m_fd, &statbuf) < 0 || statbuf.st_nlink == 0) {
             close(m_fd);
-            return;
+            goto open_start; // retry
         }
         // Get size
         len = statbuf.st_size;
@@ -114,11 +113,13 @@ void SharedGroup::init(const char* path_to_database_file)
         needInit = true;
     }
     else if (flock(m_fd, LOCK_SH) == 0) {
-        // Get size
-        if (fstat(m_fd, &statbuf) < 0) {
+        // There is a slight window between opening the file and getting the
+        // lock where another process could have deleted the file
+        if (fstat(m_fd, &statbuf) < 0 || statbuf.st_nlink == 0 || statbuf.st_size == 0) {
             close(m_fd);
-            return;
+            goto open_start; // retry
         }
+
         len = statbuf.st_size;
     }
     else {
@@ -206,7 +207,7 @@ SharedGroup::~SharedGroup()
 
             munmap((void*)m_info, m_info->infosize);
 
-            remove(m_lockfile_path);
+            remove(m_lockfile_path.c_str());
         }
         else {
             munmap((void*)m_info, m_info->infosize);
@@ -214,9 +215,6 @@ SharedGroup::~SharedGroup()
 
         close(m_fd); // also releases lock
     }
-
-    if (m_lockfile_path)
-        free((void*)m_lockfile_path);
 }
 
 bool SharedGroup::has_changed() const
@@ -266,10 +264,7 @@ const Group& SharedGroup::begin_read()
 
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
-    if (new_topref == 0)
-        m_group.reset_to_new(); // there might have been a rollback
-    else
-        m_group.update_from_shared(new_topref, new_filesize);
+    m_group.update_from_shared(new_topref, new_filesize);
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READING;
@@ -395,6 +390,8 @@ void SharedGroup::commit()
     // Save last version for has_changed()
     m_version = current_version;
 
+    m_group.invalidate();
+
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;
 #endif
@@ -415,6 +412,8 @@ void SharedGroup::rollback()
 
     // Release write lock
     pthread_mutex_unlock(&m_info->writemutex);
+
+    m_group.invalidate();
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;

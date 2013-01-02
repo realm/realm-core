@@ -163,6 +163,9 @@
     <ClCompile Include="test\transactions.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="test\testtransactions_lasse.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -338,6 +341,9 @@
     </ClInclude>
     <ClInclude Include="src\tightdb\tightdb_nmmintrin.h">
       <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="test\pthread_test.hpp">
+      <Filter>test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

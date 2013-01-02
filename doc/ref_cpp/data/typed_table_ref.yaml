@@ -174,7 +174,7 @@ CATEGORIES:
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_operator==
         DESCR  : 
-  - g_dyn_table_opertator!=:
+  - g_dyn_table_operator!=:
       NAMES    : operator!=
       SUMMARY  : &g_typed_table_operator_neq_summary
                  Compare two tables.

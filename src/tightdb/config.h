@@ -72,7 +72,7 @@
  * that fully supports C++11. */
 #if defined __cplusplus && __cplusplus >= 201103 || \
     defined __GXX_EXPERIMENTAL_CXX0X__ && __GXX_EXPERIMENTAL_CXX0X__ && defined __GNUC__ && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 5)
-#define TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS 1
+#  define TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS 1
 #endif
 
 
@@ -81,6 +81,18 @@
 #if defined __cplusplus && __cplusplus >= 201103 || \
     defined __GXX_EXPERIMENTAL_CXX0X__ && __GXX_EXPERIMENTAL_CXX0X__ && defined __GNUC__ && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 6)
 #  define TIGHTDB_HAVE_CXX11_CONSTEXPR 1
+#endif
+
+
+/* This one works for both GCC and Clang, and of course any compiler
+ * that fully supports C++11. */
+#if defined __cplusplus && __cplusplus >= 201103 || \
+    defined __GXX_EXPERIMENTAL_CXX0X__ && __GXX_EXPERIMENTAL_CXX0X__ && defined __GNUC__ && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+#  define TIGHTDB_NOTHROW nothrow
+#elif defined TIGHTDB_DEBUG
+#  define TIGHTDB_NOTHROW throw()
+#else
+#  define TIGHTDB_NOTHROW
 #endif
 
 
