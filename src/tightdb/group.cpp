@@ -97,21 +97,18 @@ Group::Group():
     create();
 }
 
-Group::Group(const char* filename, int mode):
+Group::Group(string filename, int mode):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(mode), m_isValid(false)
 {
-    TIGHTDB_ASSERT(filename);
-
     // With shared groups, we might want to start in invalid state
     // and then initialize later
     if (mode & GROUP_INVALID)
         return;
-
     create_from_file(filename, true);
 }
 
-Group::Group(const char* buffer, size_t len, bool take_ownership):
+Group::Group(from_mem_tag, char* buffer, size_t len, bool take_ownership):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
 {
@@ -126,7 +123,7 @@ Group::Group(const char* buffer, size_t len, bool take_ownership):
     }
 }
 
-bool Group::create_from_file(const char* filename, bool doInit)
+bool Group::create_from_file(string filename, bool doInit)
 {
     TIGHTDB_ASSERT(!m_isValid);
 
@@ -227,6 +224,8 @@ void Group::create_from_ref(size_t top_ref)
             m_cachedtables.add(0);
         }
     }
+
+    m_isValid = true;
 }
 
 void Group::init_shared() {
@@ -287,6 +286,8 @@ void Group::reset_to_new()
     m_freePositions.SetParent(NULL, 0);
     m_freeLengths.SetParent(NULL, 0);
     m_freeVersions.SetParent(NULL, 0);
+
+    m_isValid = true;
 }
 
 void Group::rollback()
@@ -586,6 +587,8 @@ void Group::update_from_shared(size_t top_ref, size_t len)
             }
         }
     }
+
+    m_isValid = true;
 }
 
 bool Group::operator==(const Group& g) const

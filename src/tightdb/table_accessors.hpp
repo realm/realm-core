@@ -193,25 +193,24 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
-
-    operator int64_t() const
+    int64_t get() const
     {
         return Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx);
     }
 
-    const FieldAccessor& operator=(int64_t value) const
+    void set(int64_t value) const
     {
         Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
-        return *this;
     }
+
+    operator int64_t() const { return get(); }
+    const FieldAccessor& operator=(int64_t value) const { set(value); return *this; }
 
     const FieldAccessor& operator+=(int64_t value) const
     {
         // FIXME: Should be optimized (can be both optimized and
         // generalized by using a form of expression templates).
-        value = Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx) + value;
-        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
+        set(get() + value);
         return *this;
     }
 
@@ -219,21 +218,19 @@ public:
     {
         // FIXME: Should be optimized (can be both optimized and
         // generalized by using a form of expression templates).
-        value = Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx) - value;
-        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
+        set(get() - value);
         return *this;
     }
 
-    const FieldAccessor& operator++() const { return (*this) += 1; }
-
-    const FieldAccessor& operator--() const { return (*this) -= 1; }
+    const FieldAccessor& operator++() const { return *this += 1; }
+    const FieldAccessor& operator--() const { return *this -= 1; }
 
     int64_t operator++(int) const
     {
         // FIXME: Should be optimized (can be both optimized and
         // generalized by using a form of expression templates).
-        const int64_t value = Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx);
-        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value+1);
+        const int64_t value = get();
+        set(value + 1);
         return value;
     }
 
@@ -241,10 +238,13 @@ public:
     {
         // FIXME: Should be optimized (can be both optimized and
         // generalized by using a form of expression templates).
-        const int64_t value = Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx);
-        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value-1);
+        const int64_t value = get();
+        set(value - 1);
         return value;
     }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 };
 
 
@@ -255,18 +255,21 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
-
-    operator bool() const
+    bool get() const
     {
         return Base::m_table->get_impl()->get_bool(col_idx, Base::m_row_idx);
     }
 
-    const FieldAccessor& operator=(bool value) const
+    void set(bool value) const
     {
         Base::m_table->get_impl()->set_bool(col_idx, Base::m_row_idx, value);
-        return *this;
     }
+
+    operator bool() const { return get(); }
+    const FieldAccessor& operator=(bool value) const { set(value); return *this; }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 };
 
 
@@ -278,18 +281,21 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
-
-    operator E() const
+    E get() const
     {
         return static_cast<E>(Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx));
     }
 
-    const FieldAccessor& operator=(E value) const
+    void set(E value) const
     {
         Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
-        return *this;
     }
+
+    operator E() const { return get(); }
+    const FieldAccessor& operator=(E value) const { set(value); return *this; }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 };
 
 
@@ -300,18 +306,21 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
-
-    operator std::time_t() const
+    std::time_t get() const
     {
         return Base::m_table->get_impl()->get_date(col_idx, Base::m_row_idx);
     }
 
-    const FieldAccessor& operator=(const std::time_t& value) const
+    void set(const std::time_t& value) const
     {
         Base::m_table->get_impl()->set_date(col_idx, Base::m_row_idx, value);
-        return *this;
     }
+
+    operator std::time_t() const { return get(); }
+    const FieldAccessor& operator=(const std::time_t& value) const { set(value); return *this; }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 };
 
 
@@ -322,38 +331,41 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
-
-    operator const char*() const
+    const char* get() const
     {
         return Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx);
     }
 
-    const FieldAccessor& operator=(const char* value) const
+    void set(const char* value) const
     {
         Base::m_table->get_impl()->set_string(col_idx, Base::m_row_idx, value);
-        return *this;
     }
+
+    operator const char*() const { return get(); }
+    const FieldAccessor& operator=(const char* value) const { set(value); return *this; }
 
     friend bool operator==(const FieldAccessor& a, const char* b)
     {
-        return std::strcmp(static_cast<const char*>(a), b) == 0;
+        return std::strcmp(a.get(), b) == 0;
     }
 
     friend bool operator!=(const FieldAccessor& a, const char* b)
     {
-        return std::strcmp(static_cast<const char*>(a), b) != 0;
+        return std::strcmp(a.get(), b) != 0;
     }
 
     friend bool operator==(const char* a, const FieldAccessor& b)
     {
-        return std::strcmp(a, static_cast<const char*>(b)) == 0;
+        return std::strcmp(a, b.get()) == 0;
     }
 
     friend bool operator!=(const char* a, const FieldAccessor& b)
     {
-        return std::strcmp(a, static_cast<const char*>(b)) != 0;
+        return std::strcmp(a, b.get()) != 0;
     }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 };
 
 
@@ -364,41 +376,44 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
-
-    operator BinaryData() const
+    BinaryData get() const
     {
         return Base::m_table->get_impl()->get_binary(col_idx, Base::m_row_idx);
     }
 
-    const FieldAccessor& operator=(const BinaryData& value) const
+    void set(const BinaryData& value) const
     {
         Base::m_table->get_impl()->set_binary(col_idx, Base::m_row_idx, value.pointer, value.len);
-        return *this;
     }
+
+    operator BinaryData() const { return get(); }
+    const FieldAccessor& operator=(const BinaryData& value) const { set(value); return *this; }
 
     friend bool operator==(const FieldAccessor& a, const BinaryData& b)
     {
-        return BinaryData(a).compare_payload(b);
+        return a.get().compare_payload(b);
     }
 
     friend bool operator!=(const FieldAccessor& a, const BinaryData& b)
     {
-        return !BinaryData(a).compare_payload(b);
+        return !a.get().compare_payload(b);
     }
 
     friend bool operator==(const BinaryData& a, const FieldAccessor& b)
     {
-        return a.compare_payload(BinaryData(b));
+        return a.compare_payload(b.get());
     }
 
     friend bool operator!=(const BinaryData& a, const FieldAccessor& b)
     {
-        return !a.compare_payload(BinaryData(b));
+        return !a.compare_payload(b.get());
     }
 
-    const char* get_pointer() const { return BinaryData(*this).pointer; }
-    std::size_t get_len() const { return BinaryData(*this).len; }
+    const char* get_pointer() const { return get().pointer; }
+    std::size_t get_len() const { return get().len; }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 };
 
 
@@ -422,8 +437,6 @@ private:
     };
 
 public:
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
-
     operator typename Subtab::Ref() const
     {
         Subtab* subtab =
@@ -451,6 +464,9 @@ public:
             Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
         return SubtabRowAccessor(subtab, row_idx);
     }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 };
 
 
@@ -503,18 +519,22 @@ class MixedFieldAccessorBase: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
-protected:
-    MixedFieldAccessorBase(typename Base::Init i): Base(i) {}
-
 public:
-    operator Mixed() const
+    Mixed get() const
     {
         return Base::m_table->get_impl()->get_mixed(col_idx, Base::m_row_idx);
     }
 
-    const FieldAccessor& operator=(const Mixed& value) const
+    void set(const Mixed& value) const
     {
         Base::m_table->get_impl()->set_mixed(col_idx, Base::m_row_idx, value);
+    }
+
+    operator Mixed() const { return get(); }
+
+    const FieldAccessor& operator=(const Mixed& value) const
+    {
+        set(value);
         return static_cast<FieldAccessor&>(*this);
     }
 
@@ -523,15 +543,15 @@ public:
         return Base::m_table->get_impl()->get_mixed_type(col_idx, Base::m_row_idx);
     }
 
-    int64_t get_int() const { return Mixed(*this).get_int(); }
+    int64_t get_int() const { return get().get_int(); }
 
-    bool get_bool() const { return Mixed(*this).get_bool(); }
+    bool get_bool() const { return get().get_bool(); }
 
-    std::time_t get_date() const { return Mixed(*this).get_date(); }
+    std::time_t get_date() const { return get().get_date(); }
 
-    const char* get_string() const { return Mixed(*this).get_string(); }
+    const char* get_string() const { return get().get_string(); }
 
-    BinaryData get_binary() const { return Mixed(*this).get_binary(); }
+    BinaryData get_binary() const { return get().get_binary(); }
 
     bool is_subtable() const { return get_type() == COLUMN_TYPE_TABLE; }
 
@@ -556,23 +576,26 @@ public:
 
     template<class T> friend bool operator==(const FieldAccessor& a, const T& b)
     {
-        return Mixed(a) == b;
+        return a.get() == b;
     }
 
     template<class T> friend bool operator!=(const FieldAccessor& a, const T& b)
     {
-        return Mixed(a) != b;
+        return a.get() != b;
     }
 
     template<class T> friend bool operator==(const T& a, const FieldAccessor& b)
     {
-        return a == Mixed(b);
+        return a == b.get();
     }
 
     template<class T> friend bool operator!=(const T& a, const FieldAccessor& b)
     {
-        return a != Mixed(b);
+        return a != b.get();
     }
+
+protected:
+    MixedFieldAccessorBase(typename Base::Init i): Base(i) {}
 };
 
 
@@ -585,8 +608,6 @@ private:
     typedef MixedFieldAccessorBase<Taboid, col_idx, This> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
-
     /// Returns null if the current value is not a subtable.
     TableRef get_subtable() const
     {
@@ -648,6 +669,9 @@ public:
         t->set_dynamic_spec();
         return move(t);
     }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 };
 
 
@@ -660,8 +684,6 @@ private:
     typedef MixedFieldAccessorBase<Taboid, col_idx, This> Base;
 
 public:
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
-
     ConstTableRef get_subtable() const
     {
         return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx);
@@ -674,6 +696,9 @@ public:
         TIGHTDB_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
         return unchecked_cast<const T>(get_subtable());
     }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
 };
 
 
@@ -730,6 +755,7 @@ public:
         return Base::m_table->get_impl()->find_first_int(col_idx, value);
     }
 
+    // FIXME: What does this function do? It is used by SlabAlloc. Table::find_pos_int() is protected. Something is not right!
     std::size_t find_pos(int64_t value) const
     {
         return Base::m_table->find_pos_int(col_idx, value);

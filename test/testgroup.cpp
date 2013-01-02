@@ -1,7 +1,10 @@
+#include <algorithm>
 
 #include <UnitTest++.h>
+
 #include <tightdb.hpp>
 
+using namespace std;
 using namespace tightdb;
 
 namespace {
@@ -53,9 +56,13 @@ TEST(Group_Invalid1)
 TEST(Group_Invalid2)
 {
     // Try to open buffer with invalid data
-    const char* const buffer = "invalid data";
-    Group fromMen(buffer, strlen(buffer));
+    const char* const str = "invalid data";
+    const size_t size = strlen(str);
+    char* const data = new char[strlen(str)];
+    copy(str, str+size, data);
+    Group fromMen(Group::from_mem_tag(), data, size);
     CHECK(!fromMen.is_valid());
+    delete[] data;
 }
 
 TEST(Group_Serialize0)
@@ -249,10 +256,10 @@ TEST(Group_Serialize_Mem)
 
     // Serialize to memory (we now own the buffer)
     size_t len;
-    const char* const buffer = toMem.write_to_mem(len);
+    char* const buffer = toMem.write_to_mem(len);
 
     // Load the table
-    Group fromMem(buffer, len);
+    Group fromMem(Group::from_mem_tag(), buffer, len);
     CHECK(fromMem.is_valid());
     TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
 
@@ -277,9 +284,9 @@ TEST(Group_Close)
 
     // Serialize to memory (we now own the buffer)
     size_t len;
-    const char* const buffer = toMem->write_to_mem(len);
+    char* const buffer = toMem->write_to_mem(len);
 
-    Group *fromMem = new Group(buffer, len);
+    Group *fromMem = new Group(Group::from_mem_tag(), buffer, len);
     delete toMem;
     delete fromMem;
 }
@@ -306,10 +313,10 @@ TEST(Group_Serialize_Optimized)
 
     // Serialize to memory (we now own the buffer)
     size_t len;
-    const char* const buffer = toMem.write_to_mem(len);
+    char* const buffer = toMem.write_to_mem(len);
 
     // Load the table
-    Group fromMem(buffer, len);
+    Group fromMem(Group::from_mem_tag(), buffer, len);
     CHECK(fromMem.is_valid());
     TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
 
@@ -355,10 +362,10 @@ TEST(Group_Serialize_All)
 
     // Serialize to memory (we now own the buffer)
     size_t len;
-    const char* const buffer = toMem.write_to_mem(len);
+    char* const buffer = toMem.write_to_mem(len);
 
     // Load the table
-    Group fromMem(buffer, len);
+    Group fromMem(Group::from_mem_tag(), buffer, len);
     CHECK(fromMem.is_valid());
     TableRef t = fromMem.get_table("test");
 
@@ -894,10 +901,10 @@ TEST(Group_Index_String)
     
     // Serialize to memory (we now own the buffer)
     size_t len;
-    const char* const buffer = toMem.write_to_mem(len);
+    char* const buffer = toMem.write_to_mem(len);
     
     // Load the table
-    Group fromMem(buffer, len);
+    Group fromMem(Group::from_mem_tag(), buffer, len);
     CHECK(fromMem.is_valid());
     TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
     CHECK_EQUAL(4, t->get_column_count());

@@ -49,12 +49,12 @@ public:
     ///
     /// Processes that share a database file must reside on the same
     /// host.
-    SharedGroup(const char* path_to_database_file);
+    SharedGroup(std::string path_to_database_file);
     ~SharedGroup();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct replication_tag {};
-    SharedGroup(replication_tag, const char* path_to_database_file = 0);
+    SharedGroup(replication_tag, std::string path_to_database_file = "");
 
     /// This function may be called asynchronously to interrupt any
     /// blocking call that is part of a transaction in a replication
@@ -78,6 +78,7 @@ public:
     void clear_interrupt_transact() { m_replication.clear_interrupt(); }
 #endif
 
+    // FIXME: Eliminate this. All construction errors must be reported using exceptions.
     bool is_valid() const { return m_isValid; }
 
     // Has db been modified since last transaction?
@@ -117,9 +118,9 @@ private:
     bool        m_isValid;
     size_t      m_version;
     int         m_fd;
-    const char* m_lockfile_path;
+    std::string m_lockfile_path;
 
-    void init(const char* path_to_database_file);
+    void init(std::string path_to_database_file);
 
 #ifdef TIGHTDB_DEBUG
     // In debug mode we want to track state

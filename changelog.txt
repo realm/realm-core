@@ -12,6 +12,22 @@ Format:
 
 ==================
 
+2012-12-06 (Brian Munkholm)
+----------
++ 16 New Table:get_string_length(col_ndx, row_ndx) added in Dynamic Table. Missing in Typed Table.
+
+2012-12-16 (Kristian Spangsege)
+----------
++ my_table[i].foo.get() added for all column types except subtables. This is to avoid having to repeat the explicit column type in cast expressions when the actual value is needed.
++ my_table[i].foo.set(...) added for all column types except subtables. This is for completeness.
++ When passing a file name to a Group or a SharedGroup constructor, the type is now a std::string. This is made possible by allowing exception handling. It simplifies the implementation in a few places, and in general it simplifies application code.
++ A 'tag' argument has ben added to the Group constructor that takes a memory buffer as argument. Without this change, two Group constructors were way too similar.
+
+
+2012-12-06 (Kristian Spangsege)
+----------
+. "C" API moved to its own repository "tightdb_c".
+
 
 2012-12-03 (Brian Munkholm)
 ----------

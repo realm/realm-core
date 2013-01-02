@@ -23,6 +23,7 @@
 #include <new>
 
 #include <tightdb/table.hpp>
+#include <tightdb/column_table.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/group.hpp>
 
@@ -39,9 +40,7 @@ namespace tightdb {
 ///
 /// The application must make sure that the unbind_table_ref() function is
 /// called to decrement the reference count when it no longer needs
-/// access to that table. The order of unbinding is important as you must
-/// unbind subtables to a table before unbinding the table itself.
-///
+/// access to that table.
 class LangBindHelper {
 public:
     /// Construct a freestanding table. Returns null on memory
@@ -50,6 +49,8 @@ public:
 
     static Table* get_subtable_ptr(Table*, size_t column_ndx, size_t row_ndx);
     static const Table* get_subtable_ptr(const Table*, size_t column_ndx, size_t row_ndx);
+
+    static Table* get_subtable_ptr_during_insert(Table*, size_t col_ndx, size_t row_ndx);
 
     static Table* get_subtable_ptr(TableView*, size_t column_ndx, size_t row_ndx);
     static const Table* get_subtable_ptr(const TableView*, size_t column_ndx, size_t row_ndx);
@@ -61,8 +62,6 @@ public:
 
     static void unbind_table_ref(const Table*);
 };
-
-
 
 
 // Implementation:
@@ -88,6 +87,15 @@ inline Table* LangBindHelper::get_subtable_ptr(Table* t, size_t column_ndx, size
 inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, size_t column_ndx, size_t row_ndx)
 {
     const Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx);
+    subtab->bind_ref();
+    return subtab;
+}
+
+inline Table* LangBindHelper::get_subtable_ptr_during_insert(Table* t, size_t col_ndx, size_t row_ndx) {
+    TIGHTDB_ASSERT(col_ndx < t->get_column_count());
+    ColumnTable& subtables =  t->GetColumnTable(col_ndx);
+    TIGHTDB_ASSERT(row_ndx < subtables.Size());
+    Table* subtab = subtables.get_subtable_ptr(row_ndx);
     subtab->bind_ref();
     return subtab;
 }

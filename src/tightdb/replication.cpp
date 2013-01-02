@@ -236,18 +236,13 @@ struct Replication::SharedState {
 };
 
 
-error_code Replication::init(const char* path_to_database_file,
-                             bool map_transact_log_buf)
+error_code Replication::init(string path_to_database_file, bool map_transact_log_buf)
 {
-    if (!path_to_database_file) path_to_database_file = get_path_to_database_file();
+    if (path_to_database_file.empty()) path_to_database_file = get_path_to_database_file();
     if (!m_subtab_path_buf.set_size(init_subtab_path_buf_size)) return ERROR_OUT_OF_MEMORY;
-    StringBuffer str_buf;
-    error_code err = str_buf.append_c_str(path_to_database_file);
-    if (err) return err;
-    err = str_buf.append_c_str(".repl");
-    if (err) return err;
+    const string repl_path = path_to_database_file + ".repl";
 again:
-    m_fd = open(str_buf.c_str(), O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    m_fd = open(repl_path.c_str(), O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (m_fd<0) {
         switch (errno) {
         case EACCES:
@@ -275,7 +270,7 @@ again:
     {
         // Acquire a lock on the file
         FileLockGuard flg;
-        err = flg.init(m_fd);
+        error_code err = flg.init(m_fd);
         if (err) return err;
         // If empty, expand its size
         struct stat statbuf;

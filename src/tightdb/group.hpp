@@ -21,6 +21,8 @@
 #ifndef TIGHTDB_GROUP_HPP
 #define TIGHTDB_GROUP_HPP
 
+#include <string>
+
 #include <tightdb/table.hpp>
 #include <tightdb/table_basic_fwd.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -45,11 +47,15 @@ enum GroupMode {
 class Group: private Table::Parent {
 public:
     Group();
-    Group(const char* filename, int mode=GROUP_DEFAULT);
-    Group(const char* buffer, size_t len, bool take_ownership=true);
+    explicit Group(std::string filename, int mode = GROUP_DEFAULT);
     ~Group();
 
+    struct from_mem_tag {};
+    Group(from_mem_tag, char* buffer, size_t len, bool take_ownership = true);
+
+    // FIXME: Eliminate this. All construction errors must be reported using exceptions.
     bool is_valid() const {return m_isValid;}
+
     bool is_shared() const {return (m_persistMode & GROUP_SHARED) != 0;}
     bool is_empty() const;
 
@@ -100,7 +106,7 @@ protected:
     friend class GroupWriter;
     friend class SharedGroup;
 
-    bool create_from_file(const char* filename, bool doInit);
+    bool create_from_file(std::string filename, bool do_init);
 
     void invalidate();
     bool in_inital_state() const;

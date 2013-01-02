@@ -1,5 +1,3 @@
-doc/ref_cpp/*.html
-*.tdb
 *.tightdb
 *.tightdb.lock
 

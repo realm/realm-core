@@ -6,7 +6,7 @@ TIGHTDB_HOME="$(pwd)"
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-EXTENSIONS="java python objc node php gui"
+EXTENSIONS="java python objc node php c gui"
 
 
 
@@ -200,7 +200,7 @@ case "$MODE" in
         fi
         make prefix="$PREFIX" libdir="$LIBDIR" install || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
-            ldconfig
+            ldconfig || exit 1
         fi
         exit 0
         ;;
