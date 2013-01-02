@@ -285,8 +285,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     // Use single threading
     TableView tv(*m_table);
     state_state st;
-    Array spare;
-    st.init(TDB_FINDALL, &tv.get_ref_column(), NULL, &spare, limit);
+    st.init(TDB_FINDALL, &tv.get_ref_column(), NULL, limit);
     first[0]->aggregate<TDB_FINDALL>(&st, start, end);
     return move(tv);
 }
@@ -309,8 +308,7 @@ int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end,
     Init(*m_table);
     size_t matchcount = 0; 
     state_state st;
-    Array spare;
-    st.init(TDB_SUM, NULL, (Column*)&c, &spare, limit);
+    st.init(TDB_SUM, NULL, (Column*)&c, limit);
     int64_t r = first[0]->aggregate<TDB_SUM>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
@@ -334,8 +332,7 @@ int64_t Query::maximum(size_t column, size_t* resultcount, size_t start, size_t 
     Init(*m_table);
     size_t matchcount = 0;
     state_state st;
-    Array spare;
-    st.init(TDB_MAX, NULL, (Column*)&c, &spare, limit);
+    st.init(TDB_MAX, NULL, (Column*)&c, limit);
     int64_t r = first[0]->aggregate<TDB_MAX>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
@@ -360,8 +357,7 @@ int64_t Query::minimum(size_t column, size_t* resultcount, size_t start, size_t 
     Init(*m_table);
     size_t matchcount = 0;
     state_state st;
-    Array spare;
-    st.init(TDB_MIN, NULL, (Column*)&c, &spare, limit);
+    st.init(TDB_MIN, NULL, (Column*)&c, limit);
     int64_t r = first[0]->aggregate<TDB_MIN>(&st, start, end, not_found, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
@@ -380,8 +376,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 
     Init(*m_table);
     state_state st;
-    Array spare; 
-    st.init(TDB_COUNT, NULL, NULL, &spare, limit);
+    st.init(TDB_COUNT, NULL, NULL, limit);
     int64_t r = first[0]->aggregate<TDB_COUNT>(&st, start, end);
     return size_t(r);
 }

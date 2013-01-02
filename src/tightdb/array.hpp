@@ -540,7 +540,6 @@ public:
 
     int64_t state;
     size_t match_count;
-    Array *m_array_agg;
     size_t m_leaf_start_agg;
     size_t m_leaf_end_agg;
     size_t m_local_end_agg;
@@ -605,9 +604,8 @@ public:
             return false;
     }
     
-    void init(ACTION action, Array* akku, Column *agg_source, Array* spare_array, size_t limit) 
+    void init(ACTION action, Array* akku, Column *agg_source, size_t limit) 
     {
-        m_array_agg = spare_array;
         m_column_agg = agg_source;
         m_leaf_start_agg = 0;
         m_leaf_end_agg = 0;

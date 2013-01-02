@@ -49,19 +49,24 @@ public:
     inline int64_t GetNext(size_t index)
     {
         if (index >= m_leaf_end) {
-            m_array = (Array*)(m_column->GetBlock(index, *m_array, m_leaf_start, true));
-            const size_t leaf_size = m_array->Size();
+            // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and leave m_array untouched. Else 
+            // call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
+            m_array_ptr = (Array*)(m_column->GetBlock(index, m_array, m_leaf_start, true));
+            const size_t leaf_size = m_array.Size();
             m_leaf_end = m_leaf_start + leaf_size;
         }
 
-        int64_t av = m_array->Get(index - m_leaf_start);
+        int64_t av = m_array_ptr->Get(index - m_leaf_start);
         return av;
     }
 
     size_t m_leaf_start;
     size_t m_leaf_end;
     Column* m_column;
-    Array* m_array;
+
+    // See reason for having pointer and instance above
+    Array m_array;
+    Array *m_array_ptr;
 };
 
 // Distance between matches where performance no longer increases 
@@ -196,6 +201,7 @@ public:
                 return r + 1;
             }
 
+            // Find first match in this condition node
             r = find_first_local(r + 1, end);
             if (r == end) { 
                 m_dD = (r - start) / local_matches; 
@@ -204,6 +210,7 @@ public:
 
             local_matches++;
 
+            // Find first match in remaining condition nodes
             size_t m = r;
             for (size_t c = 1; c < m_conds; c++) {
                 m = m_children[c]->find_first_local(r, r + 1);
@@ -212,10 +219,11 @@ public:
                 }
             }
 
+            // If first match in this node equals first match in remaining nodes, we have a real match
             if (m == r) {
                 int64_t av = 0;
                 if(agg_col != NULL)
-                    av = agg_col->GetNext(r); // todo, avoid getting if not needed (if !uses_val)
+                    av = agg_col->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
                 
                 if (action == TDB_RETURN_FIRST)
                     st->state_match<TDB_RETURN_FIRST, 0>(r, 0, av, CallbackDummy());
@@ -254,7 +262,7 @@ public:
     size_t m_column_id;
     size_t m_conds;
     double m_dD; // Average row distance between each local match at current position
-    double m_dT; // time overhead testing index i + 1 after testing index i. > 1 for linear scans, 0 for index/tableview
+    double m_dT; // Time overhead testing index i + 1 after testing index i. > 1 for linear scans, 0 for index/tableview
 
     size_t m_probes;
     size_t m_matches;
@@ -301,7 +309,6 @@ protected:
     size_t m_max;
     size_t m_next;
     size_t m_size;
-
 };
 
 
@@ -357,49 +364,43 @@ public:
 // NODE is for conditions for types stored as integers in a tightdb::Array (int, date, bool)
 template <class T, class C, class F> class NODE: public ParentNode {
 public:
-    // NOTE: Be careful to call Array(false) constructors on m_array and m_array_agg in the initializer list, otherwise
+    // NOTE: Be careful to call Array(false) constructors on m_array in the initializer list, otherwise
     // their default constructors are called which are slow
-    NODE(T v, size_t column) : m_value(v), m_array(false),m_leaf_start(0), m_leaf_end(0), m_local_end(0) {
+    NODE(T v, size_t column) : m_value(v), m_array(false) { // ,m_leaf_start(0), m_leaf_end(0), m_local_end(0) {
         m_column_id = column;
         m_child = 0;
         F f;
         cond = f.condition();
         m_conds = 0;
-    }
 
-
-    // Only purpose of this function is to let you quickly create a NODE object and call aggregate_local() on it to aggregate
-    // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
-    // be merged with Init somehowt to simplify
-    void QuickInit(Column *column, int64_t value) {
         m_dT = 1.0;
         m_dD = 100.0;
         m_probes = 0;
         m_matches = 0;
+    }
 
+    // Only purpose of this function is to let you quickly create a NODE object and call aggregate_local() on it to aggregate
+    // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
+    // be merged with Init somehow to simplify
+    void QuickInit(Column *column, int64_t value) {
         m_column = column; 
         m_leaf_end = 0;
         m_value = value;
     }
 
-    // Todo, Make caller set m_column_id through this function instead of through constructor, to simplify code. 
-    // This also allows to get rid of QuickInit()
     void Init(const Table& table)
     {
-        m_dT = 1.0 / 8.0;
-        m_dD = 10.0;
-        m_probes = 0;
-        m_matches = 0;
-
         m_column = (C*)&table.GetColumnBase(m_column_id);
         m_table = &table;
         m_leaf_end = 0;
         if (m_child)m_child->Init(table);
     }
-
+    
     int64_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action = TDB_FINDALL, SequentialGetter* agg_col = NULL, size_t* matchcount = 0) {
         if (action == TDB_FINDALL)
             return aggregate_local<TDB_FINDALL>(st, start, end, local_limit, agg_col, matchcount);
+        else if (action == TDB_RETURN_FIRST)
+            return aggregate_local<TDB_RETURN_FIRST>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_SUM)
             return aggregate_local<TDB_SUM>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_MAX)
