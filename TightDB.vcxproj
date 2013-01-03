@@ -222,7 +222,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG /DMAX_LIST_SIZE=1000 %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -388,6 +388,7 @@
     <ClCompile Include="src\tightdb\array_blob.cpp" />
     <ClCompile Include="src\tightdb\array_float.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="src\tightdb\array_string.cpp" />
     <ClCompile Include="src\tightdb\array_string_long.cpp" />
@@ -464,7 +465,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="test\testarrayfloat.cpp" />
+    <ClCompile Include="test\testarrayfloat.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="test\testarraystring.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
@@ -489,6 +495,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="test\testcolumnfloat.cpp" />
     <ClCompile Include="test\testcolumnmixed.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
@@ -557,7 +564,9 @@
     <ClInclude Include="src\tightdb\array.hpp" />
     <ClInclude Include="src\tightdb\array_binary.hpp" />
     <ClInclude Include="src\tightdb\array_blob.hpp" />
+    <ClInclude Include="src\tightdb\array_double.hpp" />
     <ClInclude Include="src\tightdb\array_float.hpp" />
+    <ClInclude Include="src\tightdb\array_generic.hpp" />
     <ClInclude Include="src\tightdb\array_string.hpp" />
     <ClInclude Include="src\tightdb\array_string_long.hpp" />
     <ClInclude Include="src\tightdb\binary_data.hpp" />
@@ -566,7 +575,10 @@
     <ClInclude Include="src\tightdb\c-tightdb.h" />
     <ClInclude Include="src\tightdb\column.hpp" />
     <ClInclude Include="src\tightdb\column_binary.hpp" />
+    <ClInclude Include="src\tightdb\column_double.hpp" />
+    <ClInclude Include="src\tightdb\column_float.hpp" />
     <ClInclude Include="src\tightdb\column_fwd.hpp" />
+    <ClInclude Include="src\tightdb\column_generic.hpp" />
     <ClInclude Include="src\tightdb\column_mixed.hpp" />
     <ClInclude Include="src\tightdb\column_string.hpp" />
     <ClInclude Include="src\tightdb\column_string_enum.hpp" />

@@ -76,9 +76,11 @@ template<typename T, class C> bool ColumnBase::TreeSet(size_t ndx, T value)
 
         // Set item
         C target = GetColumnFromRef<C>(refs, node_ndx);
-        if (!target.Set(local_ndx, value)) return false;
+        if (!target.Set(local_ndx, value)) 
+            return false;
     }
-    else if (!static_cast<C*>(this)->LeafSet(ndx, value)) return false;
+    else if (!static_cast<C*>(this)->LeafSet(ndx, value)) 
+        return false;
 
     // Update index
     //if (m_index) m_index->Set(ndx, oldVal, value);

@@ -17,23 +17,25 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_FWD_HPP
-#define TIGHTDB_COLUMN_FWD_HPP
+#ifndef TIGHTDB_COLUMN_DOUBLE_HPP
+#define TIGHTDB_COLUMN_DOUBLE_HPP
+
+#include <tightdb/column.hpp>
+#include <tightdb/column_generic.hpp>
+#include <tightdb/array_double.hpp>
 
 namespace tightdb {
+    
+class ColumnDouble : public ColumnGeneric<double> {
+public:
+    ColumnDouble(Allocator& alloc=GetDefaultAllocator()) : 
+        ColumnGeneric<double>(alloc) {};
+    ColumnDouble(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator()) :
+        ColumnGeneric<double>(ref, parent, pndx, alloc) {};
 
-
-class ColumnBase;
-class Column;
-class ColumnFloat;
-class ColumnDouble;
-class AdaptiveStringColumn;
-class ColumnStringEnum;
-class ColumnBinary;
-class ColumnTable;
-class ColumnMixed;
-
+    bool IsDoubleColumn() const {return true;}
+};
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_FWD_HPP
+#endif // TIGHTDB_COLUMN_DOUBLE_HPP

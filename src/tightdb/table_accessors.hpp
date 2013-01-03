@@ -41,6 +41,8 @@ struct SpecBase {
     typedef int64_t             Int;
     typedef bool                Bool;
     typedef tightdb::Date       Date;
+    typedef float               Float;
+    typedef double              Double;
     typedef const char*         String;
     typedef tightdb::BinaryData Binary;
     typedef tightdb::Mixed      Mixed;
@@ -241,6 +243,88 @@ public:
         const int64_t value = get();
         set(value - 1);
         return value;
+    }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
+};
+
+
+/// Field accessor specialization for floats.
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, float, const_tab>: public FieldAccessorBase<Taboid> {
+private:
+    typedef FieldAccessorBase<Taboid> Base;
+
+public:
+    float get() const
+    {
+        return Base::m_table->get_impl()->get_float(col_idx, Base::m_row_idx);
+    }
+
+    void set(float value) const
+    {
+        Base::m_table->get_impl()->set_float(col_idx, Base::m_row_idx, value);
+    }
+
+    operator float() const { return get(); }
+    const FieldAccessor& operator=(float value) const { set(value); return *this; }
+
+    const FieldAccessor& operator+=(float value) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        set(get() + value);
+        return *this;
+    }
+
+    const FieldAccessor& operator-=(float value) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        set(get() - value);
+        return *this;
+    }
+
+
+    explicit FieldAccessor(typename Base::Init i): Base(i) {}
+};
+
+
+/// Field accessor specialization for doubles.
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, double, const_tab>: public FieldAccessorBase<Taboid> {
+private:
+    typedef FieldAccessorBase<Taboid> Base;
+
+public:
+    double get() const
+    {
+        return Base::m_table->get_impl()->get_double(col_idx, Base::m_row_idx);
+    }
+
+    void set(double value) const
+    {
+        Base::m_table->get_impl()->set_double(col_idx, Base::m_row_idx, value);
+    }
+
+    operator double() const { return get(); }
+    const FieldAccessor& operator=(double value) const { set(value); return *this; }
+
+    const FieldAccessor& operator+=(double value) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        set(get() + value);
+        return *this;
+    }
+
+    const FieldAccessor& operator-=(double value) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        set(get() - value);
+        return *this;
     }
 
 
@@ -549,6 +633,10 @@ public:
 
     std::time_t get_date() const { return get().get_date(); }
 
+    float get_float() const { return get().get_float(); }
+
+    double get_double() const { return get().get_double(); }
+
     const char* get_string() const { return get().get_string(); }
 
     BinaryData get_binary() const { return get().get_binary(); }
@@ -794,6 +882,9 @@ public:
 };
 
 
+// TODO: Add accessor for float and double
+
+
 /// Column accessor specialization for booleans.
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, bool>: public ColumnAccessorBase<Taboid, col_idx, bool> {
@@ -1033,6 +1124,9 @@ public:
         return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
     }
 };
+
+
+// TODO: Add float, double support
 
 
 /// QueryColumn specialization for booleans.

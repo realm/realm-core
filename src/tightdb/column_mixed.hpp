@@ -75,6 +75,8 @@ public:
     int64_t GetInt(size_t ndx) const;
     bool get_bool(size_t ndx) const;
     time_t get_date(size_t ndx) const;
+    float get_float(size_t ndx) const;
+    double get_double(size_t ndx) const;
     const char* get_string(size_t ndx) const;
     BinaryData get_binary(size_t ndx) const;
 
@@ -90,6 +92,8 @@ public:
     void SetInt(size_t ndx, int64_t value);
     void set_bool(size_t ndx, bool value);
     void set_date(size_t ndx, time_t value);
+    void set_float(size_t ndx, float value);
+    void set_double(size_t ndx, double value);
     void set_string(size_t ndx, const char* value);
     void set_binary(size_t ndx, const char* value, size_t len);
     bool set_subtable(size_t ndx);
@@ -97,6 +101,8 @@ public:
     void insert_int(size_t ndx, int64_t value);
     void insert_bool(size_t ndx, bool value);
     void insert_date(size_t ndx, time_t value);
+    void insert_float(size_t ndx, float value);
+    void insert_double(size_t ndx, double value);
     void insert_string(size_t ndx, const char* value);
     void insert_binary(size_t ndx, const char* value, size_t len);
     bool insert_subtable(size_t ndx);

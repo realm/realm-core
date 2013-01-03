@@ -40,10 +40,12 @@ namespace tightdb {
 
 class Mixed {
 public:
-    Mixed()     {m_type = COLUMN_TYPE_INT;    m_int  = 0;}
+    Mixed()              {m_type = COLUMN_TYPE_INT;    m_int  = 0;}
     Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
     Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
     Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.get_date();}
+    Mixed(float v)       {m_type = COLUMN_TYPE_FLOAT;  m_float = v;}
+    Mixed(double v)      {m_type = COLUMN_TYPE_DOUBLE; m_double = v;}
     Mixed(const char* v) {m_type = COLUMN_TYPE_STRING; m_str  = v;}
     Mixed(BinaryData v)  {m_type = COLUMN_TYPE_BINARY; m_str = v.pointer; m_len = v.len;}
     Mixed(const char* v, std::size_t len) {m_type = COLUMN_TYPE_BINARY; m_str = v; m_len = len;}
@@ -56,6 +58,8 @@ public:
     int64_t     get_int()    const;
     bool        get_bool()   const;
     std::time_t get_date()   const;
+    float       get_float()  const;
+    double      get_double() const;
     const char* get_string() const;
     BinaryData  get_binary() const;
 
@@ -65,10 +69,12 @@ public:
 private:
     ColumnType m_type;
     union {
-        int64_t m_int;
-        bool    m_bool;
+        int64_t      m_int;
+        bool         m_bool;
         std::time_t  m_date;
-        const char* m_str;
+        float        m_float;
+        double       m_double;
+        const char*  m_str;
     };
     std::size_t m_len;
 };
@@ -99,6 +105,18 @@ bool operator==(Wrap<Mixed>, Date);
 bool operator!=(Wrap<Mixed>, Date);
 bool operator==(Date, Wrap<Mixed>);
 bool operator!=(Date, Wrap<Mixed>);
+
+// Compare mixed with float
+bool operator==(Wrap<Mixed>, float);
+bool operator!=(Wrap<Mixed>, float);
+bool operator==(float, Wrap<Mixed>);
+bool operator!=(float, Wrap<Mixed>);
+
+// Compare mixed with double
+bool operator==(Wrap<Mixed>, double);
+bool operator!=(Wrap<Mixed>, double);
+bool operator==(double, Wrap<Mixed>);
+bool operator!=(double, Wrap<Mixed>);
 
 // Compare mixed with zero-terminated string
 bool operator==(Wrap<Mixed>, const char*);
@@ -139,6 +157,18 @@ inline std::time_t Mixed::get_date() const
     return m_date;
 }
 
+inline float Mixed::get_float() const
+{
+    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_FLOAT);
+    return m_float;
+}
+
+inline double Mixed::get_double() const
+{
+    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_DOUBLE);
+    return m_double;
+}
+
 inline const char* Mixed::get_string() const
 {
     TIGHTDB_ASSERT(m_type == COLUMN_TYPE_STRING);
@@ -156,12 +186,14 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 {
     out << "Mixed(";
     switch (m.m_type) {
-    case COLUMN_TYPE_INT: out << m.m_int; break;
-    case COLUMN_TYPE_BOOL: out << m.m_bool; break;
-    case COLUMN_TYPE_DATE: out << Date(m.m_date); break;
+    case COLUMN_TYPE_INT:    out << m.m_int; break;
+    case COLUMN_TYPE_BOOL:   out << m.m_bool; break;
+    case COLUMN_TYPE_DATE:   out << Date(m.m_date); break;
+    case COLUMN_TYPE_FLOAT:  out << m.m_float; break;
+    case COLUMN_TYPE_DOUBLE: out << m.m_double; break;
     case COLUMN_TYPE_STRING: out << m.m_str; break;
     case COLUMN_TYPE_BINARY: out << BinaryData(m.m_str, m.m_len); break;
-    case COLUMN_TYPE_TABLE: out << "subtable"; break;
+    case COLUMN_TYPE_TABLE:  out << "subtable"; break;
     default: TIGHTDB_ASSERT(false); break;
     }
     out << ")";
@@ -189,6 +221,52 @@ template<class T> inline bool operator==(const T& a, Wrap<Mixed> b)
 template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b)
 {
     return Mixed(b).get_type() == COLUMN_TYPE_INT && a != Mixed(b).get_int();
+}
+
+
+// Compare mixed with float
+
+inline bool operator==(Wrap<Mixed> a, float b)
+{
+    return Mixed(a).get_type() == COLUMN_TYPE_FLOAT && Mixed(a).get_float() == b;
+}
+
+inline bool operator!=(Wrap<Mixed> a, float b)
+{
+    return Mixed(a).get_type() == COLUMN_TYPE_FLOAT && Mixed(a).get_float() != b;
+}
+
+inline bool operator==(float a, Wrap<Mixed> b)
+{
+    return Mixed(b).get_type() == COLUMN_TYPE_FLOAT && a == Mixed(b).get_float();
+}
+
+inline bool operator!=(float a, Wrap<Mixed> b)
+{
+    return Mixed(b).get_type() == COLUMN_TYPE_FLOAT && a != Mixed(b).get_float();
+}
+
+
+// Compare mixed with double
+
+inline bool operator==(Wrap<Mixed> a, double b)
+{
+    return Mixed(a).get_type() == COLUMN_TYPE_DOUBLE && Mixed(a).get_double() == b;
+}
+
+inline bool operator!=(Wrap<Mixed> a, double b)
+{
+    return Mixed(a).get_type() == COLUMN_TYPE_DOUBLE && Mixed(a).get_double() != b;
+}
+
+inline bool operator==(double a, Wrap<Mixed> b)
+{
+    return Mixed(b).get_type() == COLUMN_TYPE_DOUBLE && a == Mixed(b).get_double();
+}
+
+inline bool operator!=(double a, Wrap<Mixed> b)
+{
+    return Mixed(b).get_type() == COLUMN_TYPE_DOUBLE && a != Mixed(b).get_double();
 }
 
 

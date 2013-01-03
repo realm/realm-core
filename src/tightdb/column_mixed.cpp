@@ -93,6 +93,8 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype)
         switch (type) {
             case COLUMN_TYPE_BOOL:
             case COLUMN_TYPE_DATE:
+            case COLUMN_TYPE_FLOAT:
+            case COLUMN_TYPE_DOUBLE:
                 break;
             case COLUMN_TYPE_STRING:
             case COLUMN_TYPE_BINARY:
@@ -100,8 +102,10 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype)
                 // If item is in middle of the column, we just clear
                 // it to avoid having to adjust refs to following items
                 const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-                if (ref == m_data->Size()-1) m_data->Delete(ref);
-                else m_data->Set(ref, "", 0);
+                if (ref == m_data->Size()-1) 
+                    m_data->Delete(ref);
+                else 
+                    m_data->Set(ref, "", 0);
                 break;
             }
             case COLUMN_TYPE_TABLE:
@@ -117,7 +121,8 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype)
         }
     }
 
-    if (type != newtype) m_types->Set(ndx, newtype);
+    if (type != newtype) 
+        m_types->Set(ndx, newtype);
 }
 
 ColumnType ColumnMixed::GetType(size_t ndx) const
@@ -150,6 +155,24 @@ time_t ColumnMixed::get_date(size_t ndx) const
     TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_DATE);
 
     const time_t value = m_refs->Get(ndx) >> 1;
+    return value;
+}
+
+float ColumnMixed::get_float(size_t ndx) const
+{
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_FLOAT);
+
+    const float value = m_refs->Get(ndx) >> 1;  // FIXME!!!
+    return value;
+}
+
+double ColumnMixed::get_double(size_t ndx) const
+{
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_DOUBLE);
+
+    const double value = m_refs->Get(ndx) >> 1;  // FIXME!!!
     return value;
 }
 
@@ -231,6 +254,30 @@ void ColumnMixed::insert_date(size_t ndx, time_t value)
     m_refs->Insert(ndx, v);
 }
 
+void ColumnMixed::insert_float(size_t ndx, float value)
+{
+    TIGHTDB_ASSERT(ndx <= m_types->Size());
+
+    // Shift value one bit and set lowest bit to indicate
+    // that this is not a ref
+    const int64_t v = (static_cast<int64_t>(value) << 1) + 1;    // FIXME!!!
+
+    m_types->Insert(ndx, COLUMN_TYPE_FLOAT);
+    m_refs->Insert(ndx, v);
+}
+
+void ColumnMixed::insert_double(size_t ndx, double value)
+{
+    TIGHTDB_ASSERT(ndx <= m_types->Size());
+
+    // Shift value one bit and set lowest bit to indicate
+    // that this is not a ref
+    const int64_t v = (static_cast<int64_t>(value) << 1) + 1;    // FIXME!!!
+
+    m_types->Insert(ndx, COLUMN_TYPE_DOUBLE);
+    m_refs->Insert(ndx, v);
+}
+
 void ColumnMixed::insert_string(size_t ndx, const char* value)
 {
     TIGHTDB_ASSERT(ndx <= m_types->Size());
@@ -303,6 +350,32 @@ void ColumnMixed::set_date(size_t ndx, time_t value)
     // that this is not a ref
     const int64_t v = (value << 1) + 1;
 
+    m_refs->Set(ndx, v);
+}
+
+void ColumnMixed::set_float(size_t ndx, float value)
+{
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+
+    // Remove refs or binary data (sets type to float)
+    ClearValue(ndx, COLUMN_TYPE_FLOAT);
+
+    // Shift value one bit and set lowest bit to indicate
+    // that this is not a ref
+    const int64_t v = (static_cast<int64_t>(value) << 1) + 1;
+    m_refs->Set(ndx, v);
+}
+
+void ColumnMixed::set_double(size_t ndx, double value)
+{
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+
+    // Remove refs or binary data (sets type to int)
+    ClearValue(ndx, COLUMN_TYPE_DOUBLE);
+
+    // Shift value one bit and set lowest bit to indicate
+    // that this is not a ref
+    const int64_t v = (static_cast<int64_t>(value) << 1) + 1;
     m_refs->Set(ndx, v);
 }
 
@@ -435,6 +508,12 @@ bool ColumnMixed::Compare(const ColumnMixed& c) const
             break;
         case COLUMN_TYPE_DATE:
             if (get_date(i) != c.get_date(i)) return false;
+            break;
+        case COLUMN_TYPE_FLOAT:
+            if (get_float(i) != c.get_float(i)) return false;
+            break;
+        case COLUMN_TYPE_DOUBLE:
+            if (get_double(i) != c.get_double(i)) return false;
             break;
         case COLUMN_TYPE_STRING:
             if (strcmp(get_string(i), c.get_string(i)) != 0) return false;

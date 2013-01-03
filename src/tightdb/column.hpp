@@ -47,6 +47,8 @@ public:
     virtual bool IsIntColumn() const {return false;}
     virtual bool IsStringColumn() const {return false;}
     virtual bool IsBinaryColumn() const {return false;}
+    virtual bool IsFloatColumn() const {return false;}
+    virtual bool IsDoubleColumn() const {return false;}
 
     virtual size_t Size() const = 0;
 

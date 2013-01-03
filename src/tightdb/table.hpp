@@ -153,6 +153,8 @@ public:
     void insert_bool(size_t column_ndx, size_t row_ndx, bool value);
     void insert_date(size_t column_ndx, size_t row_ndx, time_t value);
     template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
+    void insert_float(size_t column_ndx, size_t row_ndx, float value);
+    void insert_double(size_t column_ndx, size_t row_ndx, double value);
     void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
     void insert_binary(size_t column_ndx, size_t row_ndx, const char* data, size_t size);
     void insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
@@ -163,6 +165,8 @@ public:
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const;
     time_t      get_date(size_t column_ndx, size_t row_ndx) const;
+    float       get_float(size_t column_ndx, size_t row_ndx) const;
+    double      get_double(size_t column_ndx, size_t row_ndx) const;
     const char* get_string(size_t column_ndx, size_t row_ndx) const;
     size_t      get_string_length(size_t column_ndx, size_t row_ndx) const;
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const;
@@ -174,6 +178,8 @@ public:
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_date(size_t column_ndx, size_t row_ndx, time_t value);
     template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
+    void set_float(size_t column_ndx, size_t row_ndx, float value);
+    void set_double(size_t column_ndx, size_t row_ndx, double value);
     void set_string(size_t column_ndx, size_t row_ndx, const char* value);
     void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
@@ -273,6 +279,10 @@ protected:
     // Direct Column access
     Column& GetColumn(size_t column_ndx);
     const Column& GetColumn(size_t column_ndx) const;
+    ColumnFloat& GetColumnFloat(size_t column_ndx);
+    const ColumnFloat& GetColumnFloat(size_t column_ndx) const;
+    ColumnDouble& GetColumnDouble(size_t column_ndx);
+    const ColumnDouble& GetColumnDouble(size_t column_ndx) const;
     AdaptiveStringColumn& GetColumnString(size_t column_ndx);
     const AdaptiveStringColumn& GetColumnString(size_t column_ndx) const;
     ColumnBinary& GetColumnBinary(size_t column_ndx);

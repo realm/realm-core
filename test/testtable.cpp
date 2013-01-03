@@ -47,6 +47,45 @@ TEST(Table1)
 #endif // TIGHTDB_DEBUG
 }
 
+TEST(Table_float)
+{
+    Table table;
+    table.add_column(COLUMN_TYPE_FLOAT, "first");
+    table.add_column(COLUMN_TYPE_DOUBLE, "second");
+
+    CHECK_EQUAL(COLUMN_TYPE_FLOAT, table.get_column_type(0));
+    CHECK_EQUAL(COLUMN_TYPE_DOUBLE, table.get_column_type(1));
+    CHECK_EQUAL("first", table.get_column_name(0));
+    CHECK_EQUAL("second", table.get_column_name(1));
+
+    // Test adding a single empty row
+    // and filling it with values
+    size_t ndx = table.add_empty_row();
+    table.set_float(0, ndx, float(1.12));
+    table.set_double(1, ndx, double(102.13));
+
+    CHECK_EQUAL(float(1.12), table.get_float(0, ndx));
+    CHECK_EQUAL(double(102.13), table.get_double(1, ndx));
+
+    // Test adding multiple rows
+    ndx = table.add_empty_row(7);
+    for (size_t i = ndx; i < 7; ++i) {
+        table.set_float(0, i, float(1.12) + 100*i);
+        table.set_double(1, i, double(102.13)*200*i);
+    }
+
+    for (size_t i = ndx; i < 7; ++i) {
+        const float v1  = float(1.12) + 100*i;
+        const double v2 = double(102.13)*200*i;
+        CHECK_EQUAL(v1, table.get_float(0, i));
+        CHECK_EQUAL(v2, table.get_double(1, i));
+    }
+
+#ifdef TIGHTDB_DEBUG
+    table.Verify();
+#endif // TIGHTDB_DEBUG
+}
+
 enum Days {
     Mon,
     Tue,
@@ -62,7 +101,6 @@ TIGHTDB_TABLE_4(TestTable,
                 second, Int,
                 third,  Bool,
                 fourth, Enum<Days>)
-
 TEST(Table2)
 {
     TestTable table;
@@ -131,6 +169,30 @@ TEST(Table4)
     table.Verify();
 #endif // TIGHTDB_DEBUG
 }
+
+TIGHTDB_TABLE_2(TestTableFloats,
+                first,      Float,
+                second,     Double)
+
+TEST(Table_float2)
+{
+    TestTableFloats table;
+
+    table.add(1.1f, 2.2);
+    table.add(1.1f, 2.2);
+    const TestTableFloats::Cursor r = table.back(); // last item
+
+    CHECK_EQUAL(1.1f, r.first);
+    CHECK_EQUAL(2.2, r.second);
+
+//    CHECK_EQUAL(size_t(1),  table.column().second.find_first("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
+//    CHECK_EQUAL(size_t(-1), table.column().second.find_first("Foo"));
+
+#ifdef TIGHTDB_DEBUG
+    table.Verify();
+#endif // TIGHTDB_DEBUG
+}
+
 
 TEST(Table_Delete)
 {
@@ -310,7 +372,7 @@ TEST(Table_test_to_string)
     }
     else {
         std::ifstream testFile("expect_string.txt", std::ios::in | std::ios::binary);
-        CHECK(bool(testFile) == true);
+        CHECK(testFile != NULL);
         std::string expected;
         expected.assign( std::istreambuf_iterator<char>(testFile),
                          std::istreambuf_iterator<char>() );
@@ -337,7 +399,7 @@ TEST(Table_test_json_all_data)
     else {
         std::string expected;
         std::ifstream testFile("expect_json.json", std::ios::in | std::ios::binary);
-        CHECK(bool(testFile) == true);
+        CHECK(testFile != NULL);
         std::getline(testFile,expected);
         CHECK_EQUAL(true, json == expected);
     }
@@ -351,6 +413,7 @@ TEST(Table_test_json_simple)
     s.add_column(COLUMN_TYPE_INT,    "int");
     s.add_column(COLUMN_TYPE_BOOL,   "bool");
     s.add_column(COLUMN_TYPE_DATE,   "date");
+    // FIXME: Add float, double
     s.add_column(COLUMN_TYPE_STRING, "string");
     s.add_column(COLUMN_TYPE_BINARY, "binary");
     table.update_from_spec();
@@ -1326,6 +1389,38 @@ TEST(Table_Mixed)
     CHECK_EQUAL(1, subtable2->size());
     CHECK_EQUAL("John", subtable2->get_string(0, 0));
     CHECK_EQUAL(40, subtable2->get_int(1, 0));
+
+    // Insert float, double
+    table.insert_int(0, 6, 31);
+    table.insert_mixed(1, 6, float(1.1));
+    table.insert_done();
+    table.insert_int(0, 7, 0);
+    table.insert_mixed(1, 7, double(2.2));
+    table.insert_done();
+
+    CHECK_EQUAL(0,  table.get_int(0, 0));
+    CHECK_EQUAL(43, table.get_int(0, 1));
+    CHECK_EQUAL(0,  table.get_int(0, 3));
+    CHECK_EQUAL(43, table.get_int(0, 4));
+    CHECK_EQUAL(0,  table.get_int(0, 5));
+    CHECK_EQUAL(31, table.get_int(0, 6));
+    CHECK_EQUAL(0,  table.get_int(0, 7));
+    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_INT,    table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_STRING, table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_BINARY, table.get_mixed(1, 4).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_TABLE,  table.get_mixed(1, 5).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_FLOAT,  table.get_mixed(1, 6).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_DOUBLE, table.get_mixed(1, 7).get_type());
+    CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
+    CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
+    CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL("binary", (const char*)table.get_mixed(1, 4).get_binary().pointer);
+    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
+    CHECK_EQUAL(float(1.1),  table.get_mixed(1, 6).get_float());
+    CHECK_EQUAL(double(2.2), table.get_mixed(1, 7).get_double());
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
