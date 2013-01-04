@@ -73,6 +73,11 @@ struct ENDSWITH {
 };
 
 struct EQUAL {
+    bool operator()(const bool v1, const bool v2) const
+    {
+        return v1 == v2;
+    }
+
     bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
         (void)v1_lower;

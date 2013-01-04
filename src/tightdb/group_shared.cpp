@@ -10,7 +10,14 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 
-using namespace std;
+#include "../test/testsettings.hpp"
+
+// Wrap pthread function calls with the pthread bug finding tool (program execution will be slower). 
+// Works both in debug and release mode. Define the flag in testsettings.h
+#ifdef TIGHTDB_PTHREADS_TEST
+#include "../test/pthread_test.hpp"
+#endif
+
 using namespace tightdb;
 
 
@@ -57,7 +64,7 @@ SharedGroup::SharedGroup(replication_tag, string path_to_database_file):
 
 #else // ! TIGHTDB_ENABLE_REPLICATION
 
-SharedGroup::SharedGroup(string path_to_database_file):
+SharedGroup::SharedGroup(std::string path_to_database_file):
     m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID),
     m_info(NULL), m_isValid(false), m_version(-1)
 {
@@ -67,7 +74,7 @@ SharedGroup::SharedGroup(string path_to_database_file):
 #endif // ! TIGHTDB_ENABLE_REPLICATION
 
 
-void SharedGroup::init(string path_to_database_file)
+void SharedGroup::init(std::string path_to_database_file)
 {
     m_lockfile_path = path_to_database_file + ".lock";
 

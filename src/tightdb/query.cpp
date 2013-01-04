@@ -284,7 +284,9 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
     // Use single threading
     TableView tv(*m_table);
-    first[0]->aggregate(&tv.get_ref_column(), start, end, limit);
+    state_state st;
+    st.init(TDB_FINDALL, &tv.get_ref_column(), NULL, limit);
+    first[0]->aggregate<TDB_FINDALL>(&st, start, end);
     return move(tv);
 }
 
@@ -293,18 +295,21 @@ int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end,
     if (end == size_t(-1)) 
         end = m_table->size();
 
+    const Column& c = m_table->GetColumn(column);
+
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; sum() range
         if (resultcount)
             *resultcount = end-start;
-        const Column& c = m_table->GetColumn(column);
+
         return c.sum(start, end);
     }
 
     Init(*m_table);
-    size_t matchcount = 0;
-
-    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_SUM, column, &matchcount);
+    size_t matchcount = 0; 
+    state_state st;
+    st.init(TDB_SUM, NULL, (Column*)&c, limit);
+    int64_t r = first[0]->aggregate<TDB_SUM>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -315,18 +320,20 @@ int64_t Query::maximum(size_t column, size_t* resultcount, size_t start, size_t 
     if (end == size_t(-1)) 
         end = m_table->size();
 
+    const Column& c = m_table->GetColumn(column);
+
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; max() range
         if (resultcount)
             *resultcount = end-start;
-        const Column& c = m_table->GetColumn(column);
         return c.maximum(start, end);
     }
         
     Init(*m_table);
     size_t matchcount = 0;
-
-    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MAX, column, &matchcount);
+    state_state st;
+    st.init(TDB_MAX, NULL, (Column*)&c, limit);
+    int64_t r = first[0]->aggregate<TDB_MAX>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -337,18 +344,21 @@ int64_t Query::minimum(size_t column, size_t* resultcount, size_t start, size_t 
     if (end == size_t(-1)) 
         end = m_table->size();
 
+    const Column& c = m_table->GetColumn(column);
+
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; min() range
         if (resultcount)
             *resultcount = end-start;
-        const Column& c = m_table->GetColumn(column);
+
         return c.minimum(start, end);
     }
 
     Init(*m_table);
     size_t matchcount = 0;
-
-    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_MIN, column, &matchcount);
+    state_state st;
+    st.init(TDB_MIN, NULL, (Column*)&c, limit);
+    int64_t r = first[0]->aggregate<TDB_MIN>(&st, start, end, not_found, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -365,7 +375,9 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     }
 
     Init(*m_table);
-    int64_t r = first[0]->aggregate(NULL, start, end, limit, TDB_COUNT);
+    state_state st;
+    st.init(TDB_COUNT, NULL, NULL, limit);
+    int64_t r = first[0]->aggregate<TDB_COUNT>(&st, start, end);
     return size_t(r);
 }
 
@@ -411,6 +423,7 @@ TableView Query::find_all_multi(size_t start, size_t end)
 {
     (void)start;
     (void)end;
+
 #if MULTITHREAD
     // Initialization
     Init(*m_table);
@@ -501,6 +514,8 @@ void Query::Init(const Table& table) const
     if (first[0] != NULL) {
         ParentNode* const top = (ParentNode*)first[0];
         top->Init(table);
+        std::vector<ParentNode*>v;
+        top->gather_children(v);
     }
 }
 

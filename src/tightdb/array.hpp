@@ -86,8 +86,6 @@ enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL
 
 namespace tightdb {
 
-bool tightdb_dummy (int64_t t);
-
 #define NO0(v) ((v) == 0 ? 1 : (v))
 
 const size_t not_found = size_t(-1);
@@ -142,11 +140,9 @@ const size_t not_found = size_t(-1);
 class Array;
 class AdaptiveStringColumn;
 class GroupWriter;
+class Column;
 
-struct state_state {
-    int64_t state;
-    size_t match_count;
-};
+   class state_state;
 
 #ifdef TIGHTDB_DEBUG
 class MemStats {
@@ -303,6 +299,7 @@ public:
 
     size_t FindPos(int64_t value) const;
     size_t FindPos2(int64_t value) const;
+    size_t FindGTE(int64_t target, size_t start) const;
     void Preset(int64_t min, int64_t max, size_t count);
     void Preset(size_t bitwidth, size_t count);
 
@@ -359,7 +356,6 @@ public:
     void state_init(ACTION action, state_state *state, Array* akku);
 
     // Called for each search result
-    template <ACTION action, bool pattern, class Callback> bool state_match(size_t index, uint64_t indexpattern, int64_t value, state_state *state, Callback callback) const;
     template <ACTION action, class Callback> bool FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const;
     template <ACTION action, class Callback> bool FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const;
 
@@ -388,7 +384,6 @@ public:
 
     template <size_t width> inline bool TestZero(uint64_t value) const;         // Tests value for 0-elements
     template <bool eq, size_t width>size_t FindZero(uint64_t v) const;          // Finds position of 0/non-zero element
-    template <ACTION action> bool USES_VAL(void);                               // Helps compiler knowing that a Get()'ed value is unused
     template<size_t width> uint64_t cascade(uint64_t a) const;                  // Sets uppermost bits of non-zero elements
     template <bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
     template <size_t width> inline int64_t LowerBits(void) const;               // Return chunk with lower bit set in each element 
@@ -546,7 +541,143 @@ protected:
     int64_t m_ubound;       // max number that can be stored with current m_width
 };
 
+
+
 // Implementation:
+
+
+
+class state_state {
+public:
+
+    int64_t state;
+    size_t match_count;
+    size_t m_leaf_start_agg;
+    size_t m_leaf_end_agg;
+    size_t m_local_end_agg;
+    Column *m_column_agg;            // Column on which aggregate function is executed (can be same as m_column)
+    size_t m_limit;
+
+
+    // popcount
+    #if defined(_MSC_VER) && _MSC_VER >= 1500
+        int fast_popcount32(uint32_t x)
+        {
+            return __popcnt(x);
+        }
+        #if defined(_M_X64)
+            int fast_popcount64(unsigned __int64 x)
+            {
+                return (int)__popcnt64(x);
+            }
+        #else
+            inline int fast_popcount64(unsigned __int64 x)
+            {
+                return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
+            }
+        #endif
+    #elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
+        #define fast_popcount32 __builtin_popcount
+        #if ULONG_MAX == 0xffffffff
+            inline int fast_popcount64(unsigned long long x)
+            {
+                return __builtin_popcount((unsigned)(x)) + __builtin_popcount((unsigned)(x >> 32));
+            }
+        #else
+            inline int fast_popcount64(unsigned long long x)
+            {
+                return __builtin_popcountll(x);
+            }
+        #endif
+    #else
+        static const char a_popcount_bits[256] = {
+            0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+        };
+
+        // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
+        inline int fast_popcount32(uint32_t x)
+        {
+            return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
+        }
+        inline int fast_popcount64(uint64_t x)
+        {
+            return fast_popcount32(x) + fast_popcount32(x >> 32);
+        }
+
+    #endif // select best popcount implementations
+
+
+
+    template <ACTION action> bool uses_val(void) 
+    {
+        if (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM)
+            return true;
+        else
+            return false;
+    }
+    
+    void init(ACTION action, Array* akku, Column *agg_source, size_t limit) 
+    {
+        m_column_agg = agg_source;
+        m_leaf_start_agg = 0;
+        m_leaf_end_agg = 0;
+        m_local_end_agg = 0;
+        match_count = 0;
+        m_limit = limit;
+
+
+        if (action == TDB_MAX)
+            state = -0x7fffffffffffffffLL - 1LL;
+        if (action == TDB_MIN)
+            state = 0x7fffffffffffffffLL;
+        if (action == TDB_RETURN_FIRST)
+            state = not_found;
+        if (action == TDB_SUM)
+            state = 0;
+        if (action == TDB_COUNT)
+            state = 0;
+        if (action == TDB_FINDALL)
+            state = (int64_t)akku;
+    }
+
+   template <ACTION action> bool match(size_t i);
+  //  template <ACTION action, bool pattern, class Callback> bool state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback);
+
+    template <ACTION action, bool pattern, class Callback> inline bool state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback)
+    {
+        if (pattern) {
+            if (action == TDB_COUNT) {
+                state += fast_popcount64(indexpattern);
+                match_count = size_t(state);
+                return true;
+            }
+            // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
+            return false;
+        }
+
+        ++match_count;
+
+        if (action == TDB_CALLBACK_IDX)
+            return callback(index);
+        if (action == TDB_MAX && value > state)
+            state = value;
+        if (action == TDB_MIN && value < state)
+            state = value;
+        if (action == TDB_SUM)
+            state += value;
+        if (action == TDB_COUNT)
+            state++;
+        if (action == TDB_FINDALL)
+            ((Array*)state)->add(index);
+        if (action == TDB_RETURN_FIRST) {
+            state = index;
+            return false;
+        }
+        return true;
+    }
+
+};
+
 
 inline Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
     m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
@@ -879,58 +1010,16 @@ inline size_t Array::get_child_ref(size_t child_ndx) const
     computations for the given search criteria makes it feasible to construct such a pattern.
     */
 
-    template <ACTION action, bool pattern, class Callback> bool Array::state_match(size_t index, uint64_t indexpattern, int64_t value, state_state *state, Callback callback) const
-    {
-        if (pattern) {
-            if (action == TDB_COUNT) {
-                size_t c = fast_popcount64(indexpattern);
-                state->state += c;
-                state->match_count += c;
-                return true;
-            }
-            // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
-            return false;
-        }
-
-        state->match_count++;
-
-        if (action == TDB_CALLBACK_IDX)
-            return callback(index);
-        if (action == TDB_MAX && value > *(int64_t*)state)
-            state->state = value;
-        if (action == TDB_MIN && value < *(int64_t*)state)
-            state->state = value;
-        if (action == TDB_SUM)
-            state->state += value;
-        if (action == TDB_COUNT)
-            state->state++;
-        if (action == TDB_FINDALL)
-            ((Array*)state->state)->add(index);
-        if (action == TDB_RETURN_FIRST) {
-            state->state = index;
-            return false;
-        }
-        return true;
-    }
-
-    template <ACTION action> bool Array::USES_VAL(void) 
-    {
-        if (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM)
-            return true;
-        else
-            return false;
-    }
-
     // These wrapper functions only exist to enable a possibility to make the compiler see that 'value' and/or 'index' are unused, such that caller's 
     // computation of these values will not be made. Only works if FIND_ACTION and FIND_ACTION_PATTERN rewritten as macros. Note: This problem has been fixed in
     // next upcoming array.hpp version
     template <ACTION action, class Callback> bool Array::FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const
     {
-        return state_match<action, false, Callback>(index, 0, value, state, callback);
+        return state->state_match<action, false, Callback>(index, 0, value, callback);
     }
     template <ACTION action, class Callback> bool Array::FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const
     {
-        return state_match<action, true, Callback>(index, pattern, 0, state, callback);
+        return state->state_match<action, true, Callback>(index, pattern, 0, callback);
     }
 
 

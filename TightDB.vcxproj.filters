@@ -154,10 +154,16 @@
     <ClCompile Include="src\tightdb\terminate.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="test\transactions.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
     <ClCompile Include="test\testarrayfloat.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\testcolumnfloat.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testtransactions_lasse.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\experiments\float.cpp">
@@ -339,6 +345,9 @@
     <ClInclude Include="src\tightdb\tightdb_nmmintrin.h">
       <Filter>src\include</Filter>
     </ClInclude>
+    <ClInclude Include="test\pthread_test.hpp">
+      <Filter>test</Filter>
+    </ClInclude>
     <ClInclude Include="src\tightdb\array_float.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
@@ -377,8 +386,5 @@
     <Filter Include="src\include">
       <UniqueIdentifier>{4436af4e-59db-4e36-9b8c-acb6e5d85aea}</UniqueIdentifier>
     </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="ClassDiagram1.cd" />
   </ItemGroup>
 </Project>

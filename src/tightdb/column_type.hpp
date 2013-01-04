@@ -22,6 +22,8 @@
 
 namespace tightdb {
 
+// Note: tightdb_objc/Deliv/ColumnType.h must be kept in sync with his file.
+// Note: tightdb_java2/src/main/java/ColumnType.java must be kept in sync with his file.
 
 // FIXME: The namespace of all-upper-case names must be considered
 // reserved for macros. Consider renaming 'COLUMN_TYPE_INT' to

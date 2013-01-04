@@ -131,6 +131,10 @@ size_t GroupWriter::Commit()
     SlabAlloc& alloc = m_group.get_allocator();
     alloc.FreeAll(m_len);
 
+#ifdef TIGHTDB_DEBUG
+    m_group.Verify();
+#endif
+
     return top_pos;
 }
 

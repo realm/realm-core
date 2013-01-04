@@ -446,19 +446,23 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
     if (end == size_t(-1)) 
         end = ((Column*)this)->Size();
     Column* m_column = (Column*)this;
-   
+
     // We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
     // slower because of initial overhead).
-    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
-    new (node) NODE<int64_t, Column, cond>(target, 0);
 
-//    static NODE<int64_t, Column, cond> node(target, NULL);
+    
+//    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
+//    new (node) NODE<int64_t, Column, cond>(target, 0);
 
-    node->QuickInit(m_column, target);
-    // TODO: Erase matchcount
-    int64_t r = node->template aggregate<action>(0, start, end, size_t(-1), size_t(-1), matchcount);
-    node->Destroy();
-    return r;
+    NODE<int64_t, Column, cond> node(target, NULL);
+
+    node.QuickInit(m_column, target); 
+    state_state st;
+    st.init(action, NULL, m_column, size_t(-1));
+
+    node.aggregate_local(&st, start, end, size_t(-1), action, NULL, matchcount);
+
+    return st.state;
 #else
     // Experimental
 
@@ -503,9 +507,9 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
             m_local_end = leaf_size < e ? leaf_size : e;
         }
 #ifdef ARRAYPTR
-        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
+        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, CallbackDummy());
 #else
-        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
+        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, CallbackDummy());
 #endif
         s = m_leaf_end;
     }

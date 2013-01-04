@@ -139,7 +139,7 @@ TEST(TestQueryFindAll_Contains2_2)
     CHECK_EQUAL(5, tv2.get_source_ndx(2));
 #endif
 }
-
+/*
 TEST(TestQuery_sum_new_aggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
@@ -158,6 +158,7 @@ TEST(TestQuery_sum_new_aggregates)
     CHECK_EQUAL(2000, c);
 
 }
+*/
 
 TEST(TestQuery_sum_min_max_avg_foreign_col)
 {
@@ -713,7 +714,7 @@ TEST(TestQuerySimple2)
     CHECK_EQUAL(7, tv1.get_source_ndx(2));
 }
 
-
+/*
 TEST(TestQueryLimit)
 {
     TupleTableType ttt;
@@ -759,6 +760,7 @@ TEST(TestQueryLimit)
     TupleTableType::View tv5 = q3.find_all(0, 3, 5);
     CHECK_EQUAL(3, tv5.size());
 }
+*/
 
 TEST(TestQueryFindNext)
 {
@@ -1346,23 +1348,14 @@ TEST(TestTV)
     t.add(1, "a");
     t.add(2, "a");
     t.add(3, "c");
+     
+    TupleTableType::View v = t.where().first.greater(1).find_all();
 
-    Array arr;
-    arr.add(0);
-    arr.add(2);
-    TupleTableType::Query q1 = t.where().tableview(arr);
+    TupleTableType::Query q1 = t.where().tableview(v);
     CHECK_EQUAL(2, q1.count());
 
-    TupleTableType::Query q2 = t.where().second.equal("a").tableview(arr);
-    CHECK_EQUAL(1, q2.count());
-
-    TupleTableType::Query q3 = t.where().tableview(arr).second.equal("a");
+    TupleTableType::Query q3 = t.where().tableview(v).second.equal("a");
     CHECK_EQUAL(1, q3.count());
-
-    TupleTableType::Query q4 = t.where().tableview(arr).second.equal("a");
-    TupleTableType::View v4 = q4.find_all();
-    CHECK_EQUAL(1, v4.size());
-    arr.Destroy();
 }
  
 TEST(TestQuery_sum_min_max_avg)

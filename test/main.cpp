@@ -4,7 +4,7 @@
 #include <tightdb/utilities.hpp>
 #include <tightdb/tightdb_nmmintrin.h>
 #if defined(_MSC_VER) && defined(_DEBUG)
-//    #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
+    #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
 using namespace std;
@@ -18,6 +18,8 @@ int main(int argc, char* argv[])
 #else
     cout << "Running Release unit tests\n";
 #endif
+
+    cout << "MAX_LIST_SIZE = " << MAX_LIST_SIZE << "\n";
 
 #ifdef TIGHTDB_COMPILER_SSE
     cout << "Compiler supported SSE (auto detect): Yes\n";
