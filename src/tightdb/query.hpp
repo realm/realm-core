@@ -65,6 +65,24 @@ public:
     Query& less_equal(size_t column_ndx, int64_t value);
     Query& between(size_t column_ndx, int64_t from, int64_t to);
 
+    // Conditions: float
+    Query& equal(size_t column_ndx, float value);
+    Query& not_equal(size_t column_ndx, float value);
+    Query& greater(size_t column_ndx, float value);
+    Query& greater_equal(size_t column_ndx, float value);
+    Query& less(size_t column_ndx, float value);
+    Query& less_equal(size_t column_ndx, float value);
+    Query& between(size_t column_ndx, float from, float to);
+
+     // Conditions: double
+    Query& equal(size_t column_ndx, double value);
+    Query& not_equal(size_t column_ndx, double value);
+    Query& greater(size_t column_ndx, double value);
+    Query& greater_equal(size_t column_ndx, double value);
+    Query& less(size_t column_ndx, double value);
+    Query& less_equal(size_t column_ndx, double value);
+    Query& between(size_t column_ndx, double from, double to);
+
     // Conditions: bool
     Query& equal(size_t column_ndx, bool value);
 
