@@ -211,6 +211,8 @@ public:
     size_t         find_first_int(size_t column_ndx, int64_t value) const;
     size_t         find_first_bool(size_t column_ndx, bool value) const;
     size_t         find_first_date(size_t column_ndx, time_t value) const;
+    size_t         find_first_float(size_t column_ndx, float value) const;
+    size_t         find_first_double(size_t column_ndx, double value) const;
     size_t         find_first_string(size_t column_ndx, const char* value) const;
     size_t         find_first_binary(size_t column_ndx, const char* value, size_t len) const;
 
@@ -220,6 +222,10 @@ public:
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
     TableView      find_all_date(size_t column_ndx, time_t value);
     ConstTableView find_all_date(size_t column_ndx, time_t value) const;
+    TableView      find_all_float(size_t column_ndx, float value);
+    ConstTableView find_all_float(size_t column_ndx, float value) const;
+    TableView      find_all_double(size_t column_ndx, double value);
+    ConstTableView find_all_double(size_t column_ndx, double value) const;
     TableView      find_all_string(size_t column_ndx, const char* value);
     ConstTableView find_all_string(size_t column_ndx, const char* value) const;
     TableView      find_all_binary(size_t column_ndx, const char* value, size_t len);

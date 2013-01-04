@@ -874,6 +874,11 @@ public:
         return Base::m_table->get_impl()->minimum(col_idx);
     }
 
+    double average() const
+    {
+        return Base::m_table->get_impl()->average(col_idx);
+    }
+
     const ColumnAccessor& operator+=(int64_t value) const
     {
         Base::m_table->get_impl()->add_int(col_idx, value);
@@ -882,7 +887,100 @@ public:
 };
 
 
-// TODO: Add accessor for float and double
+/// Column accessor specialization for float
+template<class Taboid, int col_idx>
+class ColumnAccessor<Taboid, col_idx, float>:
+    public ColumnAccessorBase<Taboid, col_idx, float> {
+private:
+    typedef ColumnAccessorBase<Taboid, col_idx, float> Base;
+
+public:
+    explicit ColumnAccessor(Taboid* t): Base(t) {}
+
+    std::size_t find_first(float value) const
+    {
+        return Base::m_table->get_impl()->find_first_float(col_idx, value);
+    }
+
+    BasicTableView<typename Base::RealTable> find_all(float value) const
+    {
+        return Base::m_table->get_impl()->find_all_float(col_idx, value);
+    }
+
+    size_t count(float target) const
+    {
+        return Base::m_table->get_impl()->count_float(col_idx, target);
+    }
+/*
+    int64_t sum() const
+    {
+        return Base::m_table->get_impl()->sum(col_idx);
+    }
+
+    int64_t maximum() const
+    {
+        return Base::m_table->get_impl()->maximum(col_idx);
+    }
+
+    int64_t minimum() const
+    {
+        return Base::m_table->get_impl()->minimum(col_idx);
+    }
+*/
+    const ColumnAccessor& operator+=(float value) const
+    {
+        Base::m_table->get_impl()->add_float(col_idx, value);
+        return *this;
+    }
+};
+
+
+/// Column accessor specialization for double
+template<class Taboid, int col_idx>
+class ColumnAccessor<Taboid, col_idx, double>:
+    public ColumnAccessorBase<Taboid, col_idx, double> {
+private:
+    typedef ColumnAccessorBase<Taboid, col_idx, double> Base;
+
+public:
+    explicit ColumnAccessor(Taboid* t): Base(t) {}
+
+    std::size_t find_first(double value) const
+    {
+        return Base::m_table->get_impl()->find_first_double(col_idx, value);
+    }
+
+    BasicTableView<typename Base::RealTable> find_all(double value) const
+    {
+        return Base::m_table->get_impl()->find_all_double(col_idx, value);
+    }
+
+    size_t count(double target) const
+    {
+        return Base::m_table->get_impl()->count_double(col_idx, target);
+    }
+/*
+    int64_t sum() const
+    {
+        return Base::m_table->get_impl()->sum(col_idx);
+    }
+
+    int64_t maximum() const
+    {
+        return Base::m_table->get_impl()->maximum(col_idx);
+    }
+
+    int64_t minimum() const
+    {
+        return Base::m_table->get_impl()->minimum(col_idx);
+    }
+*/
+    const ColumnAccessor& operator+=(double value) const
+    {
+        Base::m_table->get_impl()->add_double(col_idx, value);
+        return *this;
+    }
+};
 
 
 /// Column accessor specialization for booleans.
@@ -1126,7 +1224,143 @@ public:
 };
 
 
-// TODO: Add float, double support
+
+/// QueryColumn specialization for floats.
+template<class Taboid, int col_idx>
+class QueryColumn<Taboid, col_idx, float>: public QueryColumnBase<Taboid, col_idx, float> {
+private:
+    typedef QueryColumnBase<Taboid, col_idx, float> Base;
+    typedef typename Taboid::Query Query;
+
+public:
+    explicit QueryColumn(Query* q): Base(q) {}
+    using Base::equal;
+    using Base::not_equal;
+
+    Query& greater(float value) const
+    {
+        Base::m_query->m_impl.greater(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& greater_equal(float value) const
+    {
+        Base::m_query->m_impl.greater_equal(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& less(float value) const
+    {
+        Base::m_query->m_impl.less(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& less_equal(float value) const
+    {
+        Base::m_query->m_impl.less_equal(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& between(float from, float to) const
+    {
+        Base::m_query->m_impl.between(col_idx, from, to);
+        return *Base::m_query;
+    };
+
+    double sum(std::size_t* resultcount=NULL, std::size_t start=0,
+               std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+    }
+
+    float maximum(std::size_t* resultcount=NULL, std::size_t start=0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.maximum(col_idx, resultcount, start, end, limit);
+    }
+
+    float minimum(std::size_t* resultcount=NULL, std::size_t start=0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.minimum(col_idx, resultcount, start, end, limit);
+    }
+
+    double average(std::size_t* resultcount=NULL, std::size_t start=0,
+                   std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
+    }
+};
+
+
+
+/// QueryColumn specialization for doubles.
+template<class Taboid, int col_idx>
+class QueryColumn<Taboid, col_idx, double>: public QueryColumnBase<Taboid, col_idx, double> {
+private:
+    typedef QueryColumnBase<Taboid, col_idx, double> Base;
+    typedef typename Taboid::Query Query;
+
+public:
+    explicit QueryColumn(Query* q): Base(q) {}
+    using Base::equal;
+    using Base::not_equal;
+
+    Query& greater(double value) const
+    {
+        Base::m_query->m_impl.greater(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& greater_equal(double value) const
+    {
+        Base::m_query->m_impl.greater_equal(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& less(double value) const
+    {
+        Base::m_query->m_impl.less(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& less_equal(double value) const
+    {
+        Base::m_query->m_impl.less_equal(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& between(double from, double to) const
+    {
+        Base::m_query->m_impl.between(col_idx, from, to);
+        return *Base::m_query;
+    };
+
+    double sum(std::size_t* resultcount=NULL, std::size_t start=0,
+               std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+    }
+
+    double maximum(std::size_t* resultcount=NULL, std::size_t start=0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.maximum(col_idx, resultcount, start, end, limit);
+    }
+
+    double minimum(std::size_t* resultcount=NULL, std::size_t start=0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.minimum(col_idx, resultcount, start, end, limit);
+    }
+
+    double average(std::size_t* resultcount=NULL, std::size_t start=0,
+                   std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
+    }
+};
+
 
 
 /// QueryColumn specialization for booleans.

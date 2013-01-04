@@ -1643,6 +1643,24 @@ size_t Table::find_first_date(size_t column_ndx, time_t value) const
     return column.find_first((int64_t)value);
 }
 
+size_t Table::find_first_float(size_t column_ndx, float value) const
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(GetRealColumnType(column_ndx) == COLUMN_TYPE_FLOAT);
+    const ColumnFloat& column = GetColumnFloat(column_ndx);
+
+    return column.find_first(value);
+}
+
+size_t Table::find_first_double(size_t column_ndx, double value) const
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(GetRealColumnType(column_ndx) == COLUMN_TYPE_DOUBLE);
+    const ColumnDouble& column = GetColumnDouble(column_ndx);
+
+    return column.find_first(value);
+}
+
 size_t Table::find_first_string(size_t column_ndx, const char* value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.Size());
@@ -1716,6 +1734,51 @@ ConstTableView Table::find_all_bool(size_t column_ndx, bool value) const
 
     ConstTableView tv(*this);
     column.find_all(tv.get_ref_column(), value ? 1 :0);
+    return move(tv);
+}
+
+
+TableView Table::find_all_float(size_t column_ndx, float value)
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+
+    const ColumnFloat& column = GetColumnFloat(column_ndx);
+
+    TableView tv(*this);
+    column.find_all(tv.get_ref_column(), value);
+    return move(tv);
+}
+
+ConstTableView Table::find_all_float(size_t column_ndx, float value) const
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+
+    const ColumnFloat& column = GetColumnFloat(column_ndx);
+
+    ConstTableView tv(*this);
+    column.find_all(tv.get_ref_column(), value);
+    return move(tv);
+}
+
+TableView Table::find_all_double(size_t column_ndx, double value)
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+
+    const ColumnDouble& column = GetColumnDouble(column_ndx);
+
+    TableView tv(*this);
+    column.find_all(tv.get_ref_column(), value);
+    return move(tv);
+}
+
+ConstTableView Table::find_all_double(size_t column_ndx, double value) const
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+
+    const ColumnDouble& column = GetColumnDouble(column_ndx);
+
+    ConstTableView tv(*this);
+    column.find_all(tv.get_ref_column(), value);
     return move(tv);
 }
 

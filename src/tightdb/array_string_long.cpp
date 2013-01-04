@@ -165,7 +165,7 @@ void ArrayStringLong::find_all(Array& result, const char* value, size_t add_offs
     size_t first = start - 1;
     for (;;) {
         first = FindWithLen(value, len, first + 1, end);
-        if (first != (size_t)-1)
+        if (first != not_found)
             result.add(first + add_offset);
         else break;
     }
@@ -190,7 +190,7 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
         offset = end;
     }
 
-    return (size_t)-1; // not found
+    return not_found; 
 }
 
 #ifdef TIGHTDB_DEBUG

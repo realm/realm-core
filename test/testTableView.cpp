@@ -31,6 +31,32 @@ TEST(GetSetInteger)
     CHECK_EQUAL(123, v[0].first);
 }
 
+TIGHTDB_TABLE_1(TestTableFloats,
+                first, Float) //, second, Double)
+
+TEST(GetSetFloats)
+{
+    TestTableFloats table;
+
+    table.add(1.1f);
+    table.add(2.2f);
+    table.add(3.3f);
+    table.add(1.1f);
+    table.add(2.2f);
+
+    TestTableFloats::View v; // Test empty construction
+    v = table.column().first.find_all(2.2f); // Test assignment
+
+    CHECK_EQUAL(2, v.size());
+
+    // Test of Get
+    CHECK_EQUAL(2.2f, v[0].first);
+    CHECK_EQUAL(2.2f, v[1].first);
+
+    // Test of Set
+    v[0].first = 123.321f;
+    CHECK_EQUAL(123.321f, v[0].first);
+}
 
 TEST(TableViewSum)
 {

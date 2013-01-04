@@ -48,11 +48,9 @@ public:
     void Resize(size_t ndx);
     void fill(size_t count);
 
-    /*
     size_t count(T value) const;
     size_t find_first(T value, size_t start=0 , size_t end=-1) const;
     void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
-    */
 
     // Index
     bool HasIndex() const {return false;}
@@ -80,13 +78,13 @@ protected:
     T LeafGet(size_t ndx) const;
     bool LeafSet(size_t ndx, T value);
     bool LeafInsert(size_t ndx, T value);
-
-    template<class F> size_t LeafFind(T value, size_t start, size_t end) const;
-    void LeafFindAll(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
-
     void LeafDelete(size_t ndx);
 
-//    bool FindKeyPos(const char* target, size_t& pos) const;
+    template<class F>
+    size_t LeafFind(T value, size_t start, size_t end) const;
+    void LeafFindAll(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+
+//FIXME: Remove?    bool FindKeyPos(const char* target, size_t& pos) const;
 
 #ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;

@@ -249,8 +249,7 @@ void ColumnGeneric<T>::LeafToDot(std::ostream& out, const Array& array) const
 #endif // TIGHTDB_DEBUG
 
 
-/*
-template<typename T>
+template<typename T> template<class F>
 size_t ColumnGeneric<T>::LeafFind(T value, size_t start, size_t end) const
 {
     return ((ArrayGeneric<T>*)m_array)->find_first(value, start, end);
@@ -261,40 +260,23 @@ void ColumnGeneric<T>::LeafFindAll(Array &result, T value, size_t add_offset, si
 {
     return ((ArrayGeneric<T>*)m_array)->find_all(result, value, add_offset, start, end);
 }
-*/
 
-/*
 template<typename T>
-bool ColumnGeneric<T>::FindKeyPos(T target, size_t& pos) const
+size_t ColumnGeneric<T>::find_first(T value, size_t start, size_t end) const
 {
-    const int len = (int)Size();
-    bool found = false;
-    ssize_t low  = -1;
-    ssize_t high = len;
+    TIGHTDB_ASSERT(value);
 
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of closest value BIGGER OR EQUAL to the target (for
-    // lookups in indexes)
-    while (high - low > 1) {
-        const ssize_t probe = ((size_t)low + (size_t)high) >> 1;
-        const char* v = Get(probe);
-
-        const int cmp = strcmp(v, target);
-
-        if (cmp < 0) low  = probe;
-        else {
-            high = probe;
-            if (cmp == 0) found = true;
-        }
-    }
-
-    pos = high;
-    return found;
+    return TreeFind<T, ColumnGeneric<T>, EQUAL>(value, start, end);
 }
-*/
 
-/*
+template<typename T>
+void ColumnGeneric<T>::find_all(Array &result, T value, size_t start, size_t end) const
+{
+    TIGHTDB_ASSERT(value);
+
+    TreeFindAll<T, ColumnGeneric<T>>(result, value, 0, start, end);
+}
+
 template<typename T>
 size_t ColumnGeneric<T>::count(T target) const
 {
@@ -316,22 +298,5 @@ size_t ColumnGeneric<T>::count(T target) const
     }
     return count;
 }
-
-template<typename T>
-size_t ColumnGeneric<T>::find_first(T value, size_t start, size_t end) const
-{
-    TIGHTDB_ASSERT(value);
-
-    return TreeFind<T, ColumnGeneric<T>, EQUAL>(value, start, end);
-}
-
-template<typename T>
-void ColumnGeneric<T>::find_all(Array &result, T value, size_t start, size_t end) const
-{
-    TIGHTDB_ASSERT(value);
-
-    TreeFindAll<T, ColumnGeneric<T>>(result, value, 0, start, end);
-}
-*/
 
 }

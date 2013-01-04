@@ -154,13 +154,13 @@
     <ClCompile Include="src\tightdb\terminate.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\array_float.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="test\testarrayfloat.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\testcolumnfloat.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\experiments\float.cpp">
       <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>
@@ -355,6 +355,9 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\column_double.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array_generic_tpl.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
