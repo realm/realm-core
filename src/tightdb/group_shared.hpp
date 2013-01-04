@@ -34,6 +34,11 @@ struct SharedInfo;
 
 class SharedGroup {
 public:
+    enum DurabiltyLevel {
+        DURA_FULL,
+        DURA_MEM_ONLY
+    };
+
     /// When two threads or processes want to access the same database
     /// file, they must each create their own instance of SharedGroup.
     ///
@@ -49,7 +54,7 @@ public:
     ///
     /// Processes that share a database file must reside on the same
     /// host.
-    SharedGroup(std::string path_to_database_file);
+    SharedGroup(std::string path_to_database_file, DurabiltyLevel dlevel=DURA_FULL);
     ~SharedGroup();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -99,6 +104,8 @@ public:
 #endif
 
 private:
+    void init(std::string path_to_database_file, DurabiltyLevel dlevel);
+
     // Ring buffer managment
     bool       ringbuf_is_empty() const;
     size_t     ringbuf_size() const;
@@ -119,8 +126,6 @@ private:
     size_t      m_version;
     int         m_fd;
     std::string m_lockfile_path;
-
-    void init(std::string path_to_database_file);
 
 #ifdef TIGHTDB_DEBUG
     // In debug mode we want to track state

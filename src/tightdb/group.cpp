@@ -449,21 +449,22 @@ char* Group::write_to_mem(size_t& len)
 
 bool Group::commit()
 {
-    return commit(-1, -1);
+    const size_t top_pos = commit(-1, -1, true);
+    return top_pos != size_t(-1);
 }
 
-bool Group::commit(size_t current_version, size_t readlock_version)
+size_t Group::commit(size_t current_version, size_t readlock_version, bool doPersist)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     TIGHTDB_ASSERT(readlock_version <= current_version);
 
-    if (!m_alloc.CanPersist()) return false;
+    if (!m_alloc.CanPersist()) return size_t(-1);
 
     // If we have an empty db file, we can just serialize directly
     //if (m_alloc.GetTopRef() == 0) {}
 
-    GroupWriter out(*this);
-    if (!out.IsValid()) return false;
+    GroupWriter out(*this, doPersist);
+    if (!out.IsValid()) return size_t(-1);
 
     if (is_shared()) {
         m_readlock_version = readlock_version;
@@ -489,7 +490,7 @@ bool Group::commit(size_t current_version, size_t readlock_version)
     Verify();
 #endif
 
-    return true;
+    return top_pos;
 }
 
 void Group::update_refs(size_t topRef)
