@@ -29,6 +29,8 @@
 #include <tightdb/column_string.hpp>
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/column_binary.hpp>
+#include <tightdb/column_float.hpp>
+#include <tightdb/column_double.hpp>
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 
@@ -150,16 +152,17 @@ public:
 
     template<ACTION action> int64_t aggregate(state_state* st, size_t start, size_t end, size_t agg_col2 = not_found, size_t* matchcount = 0) 
     {
-        if(end == size_t(-1)) end = m_table->size();
+        if (end == size_t(-1)) 
+            end = m_table->size();
 
         SequentialGetter* agg_col = NULL;
         
-        if(agg_col2 != not_found)
+        if (agg_col2 != not_found)
             agg_col = new SequentialGetter(*m_table, agg_col2);
 
         size_t td;
 
-        while(start < end) {
+        while (start < end) {
             size_t best = std::distance(m_children.begin(), std::min_element(m_children.begin(), m_children.end(), score_compare()));
 
             // Find a large amount of local matches in best condition
@@ -167,13 +170,13 @@ public:
             start = (size_t)m_children[best]->aggregate_local(st, start, td, findlocals, action, agg_col, matchcount);
 
             // Make remaining conditions compute their m_dD (statistics)
-            for(size_t c = 0; c < m_children.size() && start < end; c++) {
-                if(c == best)
+            for (size_t c = 0; c < m_children.size() && start < end; c++) {
+                if (c == best)
                     continue;
 
                 // Skip test if there is no way its cost can ever be better than best node's
                 double cost = m_children[c]->cost();
-                if(m_children[c]->m_dT < cost) {
+                if (m_children[c]->m_dT < cost) {
                     size_t maxN = 2;
 
                     // Limit to bestdist in order not to skip too large parts of index nodes
@@ -182,26 +185,26 @@ public:
                     start = (size_t)m_children[c]->aggregate_local(st, start, td, maxN, action, agg_col, matchcount);
                 }
             }
-
         }
 
-        if(matchcount != 0)
+        if (matchcount != 0)
             *matchcount = st->match_count;
         return st->state;
 
     }
 
-    virtual int64_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action, SequentialGetter* agg_col, size_t* matchcount) 
+    virtual int64_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, 
+                                    ACTION action, SequentialGetter* agg_col, size_t* matchcount) 
     {
-		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the integer version, because
-        // find_first_local() is relatively slower here (because it's non-integers).
+		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
+        // integer version, because find_first_local() is relatively slower here (because it's non-integers).
 		(void)matchcount;
 		(void)agg_col;
         size_t local_matches = 0;
 
         size_t r = start - 1;
         for (;;) {
-            if(local_matches == local_limit) { 
+            if (local_matches == local_limit) { 
                 m_dD = double(r - start) / local_matches; 
                 return r + 1;
             }
@@ -227,7 +230,7 @@ public:
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
                 int64_t av = 0;
-                if(agg_col != NULL)
+                if (agg_col != NULL)
                     av = agg_col->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
                 
                 if (action == TDB_RETURN_FIRST)
@@ -302,7 +305,7 @@ public:
     size_t find_first_local(size_t start, size_t end)
     {
         size_t r = m_arr.FindGTE(start, m_next);
-        if(r == not_found)
+        if (r == not_found)
             return end;
 
         m_next = r;
@@ -336,7 +339,8 @@ public:
             m_child->gather_children(v);
         }
 
-        if (m_child2) m_child2->Init(table);
+        if (m_child2) 
+            m_child2->Init(table);
     }
     
     size_t find_first_local(size_t start, size_t end)
@@ -441,7 +445,7 @@ public:
 
         bool b = m_state->state_match<action, false>(i, 0, av, CallbackDummy());  
 
-        if(m_local_matches == m_local_limit)
+        if (m_local_matches == m_local_limit)
             return false;
         else
             return b;
@@ -470,7 +474,7 @@ public:
             }
 
             size_t end2;
-            if(end > m_leaf_end)
+            if (end > m_leaf_end)
                 end2 = m_leaf_end - m_leaf_start;
             else
                 end2 = end - m_leaf_start;
@@ -480,7 +484,7 @@ public:
             else
                 m_array.find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, st, std::bind1st(std::mem_fun(&NODE::match_callback<action>), this));
                     
-            if(m_local_matches == m_local_limit)
+            if (m_local_matches == m_local_limit)
                 break;
 
             s = end2 + m_leaf_start;
@@ -489,7 +493,7 @@ public:
         if (matchcount)
             *matchcount = int64_t(st->match_count);
 
-        if(m_local_matches == m_local_limit) {
+        if (m_local_matches == m_local_limit) {
             m_dD = (m_last_local_match + 1 - start) / (m_local_matches + 1.0);
             return m_last_local_match + 1;
         }
@@ -504,7 +508,7 @@ public:
         F function;
         TIGHTDB_ASSERT(m_table);
 
-        while(start < end) {
+        while (start < end) {
 
             // Cache internal leafs
             if (start >= m_leaf_end) {
@@ -521,7 +525,7 @@ public:
             }
 
             size_t end2;
-            if(end > m_leaf_end)
+            if (end > m_leaf_end)
                 end2 = m_leaf_end - m_leaf_start;
             else
                 end2 = end - m_leaf_start;
@@ -626,6 +630,60 @@ protected:
 };
 
 
+// Can be used for simple types (currently float and double)
+template <class T, class C, class F> class BASICNODE: public ParentNode {
+public:
+    template <ACTION action> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*agg_col*/) {TIGHTDB_ASSERT(false); return 0;}
+
+    BASICNODE(T v, size_t column) : m_value(v)
+    {
+        m_column_id = column;
+        m_child = 0;
+    }
+
+    void Init(const Table& table)
+    {
+        m_table = &table;
+        m_column = (C*)(&table.GetColumnBase(m_column_id));
+
+        if (m_child) 
+            m_child->Init(table);
+    }
+
+    size_t find_first(size_t start, size_t end)
+    {
+        F function;
+
+        for (size_t s = start; s < end; ++s) {
+            T t = m_column->Get(s);
+
+            if (function<C>(m_value, t)) {
+                if (m_child == 0)
+                    return s;
+                else {
+                    const size_t a = m_child->find_first(s, end);
+                    if (s == a)
+                        return s;
+                    else
+                        s = a - 1;
+                }
+            }
+        }
+        return end;
+    }
+    
+    size_t find_first_local(size_t start, size_t end) {
+        assert(false);
+        (void)start;
+        (void)end;
+        return 0;
+    }
+
+protected:
+    T m_value;
+
+    const C* m_column;
+};
 
 
 template <class F> class BINARYNODE: public ParentNode {
@@ -716,14 +774,14 @@ public:
 
         if (m_column_type == COLUMN_TYPE_STRING_ENUM) {
             m_dT = 1.0;
-            m_key_ndx =  ((const ColumnStringEnum*)m_column)->GetKeyNdx(m_value);
+            m_key_ndx = ((const ColumnStringEnum*)m_column)->GetKeyNdx(m_value);
         }
         else {
             m_dT = 10.0;
         }
 
-        if(m_column->HasIndex()) {
-            if(m_column_type == COLUMN_TYPE_STRING_ENUM)
+        if (m_column->HasIndex()) {
+            if (m_column_type == COLUMN_TYPE_STRING_ENUM)
                 ((ColumnStringEnum*)m_column)->find_all(m_index, m_value);
             else {
                 ((AdaptiveStringColumn*)m_column)->find_all(m_index, m_value);
@@ -731,7 +789,8 @@ public:
             last_indexed = 0;
         }
 
-        if (m_child) m_child->Init(table);
+        if (m_child) 
+            m_child->Init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -739,9 +798,9 @@ public:
         TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
-            if(m_column->HasIndex()) {
+            if (m_column->HasIndex()) {
                 size_t f = m_index.FindGTE(s, last_indexed);
-                if(f != not_found)
+                if (f != not_found)
                     s = m_index.Get(f);
                 else
                     s = not_found;
@@ -752,7 +811,8 @@ public:
                 if (m_column_type == COLUMN_TYPE_STRING)
                     s = ((const AdaptiveStringColumn*)m_column)->find_first(m_value, s, end);
                 else {
-                    if (m_key_ndx == size_t(-1)) s = end; // not in key set
+                    if (m_key_ndx == size_t(-1)) 
+                        s = end; // not in key set
                     else {
                         const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_column;
                         s = cse->find_first(m_key_ndx, s, end);
@@ -792,7 +852,7 @@ public:
 
         std::vector<ParentNode*>v;
 
-        for(size_t c = 0; c < 2; ++c) {
+        for (size_t c = 0; c < 2; ++c) {
             m_cond[c]->Init(table);
             m_cond[c]->gather_children(v);
             m_last[c] = 0;
@@ -810,10 +870,10 @@ public:
         for (size_t s = start; s < end; ++s) {
             size_t f[2];
 
-            for(size_t c = 0; c < 2; ++c) {
-                if(m_last[c] >= end)
+            for (size_t c = 0; c < 2; ++c) {
+                if (m_last[c] >= end)
                     f[c] = end;
-                else if(m_was_match[c] && m_last[c] >= s)
+                else if (m_was_match[c] && m_last[c] >= s)
                     f[c] = m_last[c];
                 else {
                     size_t fmax = m_last[c] > s ? m_last[c] : s;

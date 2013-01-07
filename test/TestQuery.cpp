@@ -27,7 +27,28 @@ TIGHTDB_TABLE_5(PeopleTable,
                 hired, Date,
                 photo, Binary)
 
+TIGHTDB_TABLE_2(FloatTable,
+                first,  Float,
+                second, Double)
+
 } // anonymous namespace
+
+TEST(TestQueryFloat)
+{
+    FloatTable t;
+
+    t.add(1.1f, 2.2);
+    t.add(1.13f, 2.21);
+    t.add(1.13f, 2.22);
+    t.add(1.1f, 2.2);
+    t.add(1.1f, 2.2);
+
+    int64_t cnt = t.where().first.equal(1.13f).count();
+    CHECK_EQUAL(2, cnt);
+
+    //FloatTable::View v = t.where().first.equal(1.13f).find_all();
+    //CHECK_EQUAL(2, v.size());
+}
 
 TEST(TestDateQuery)
 {
@@ -40,9 +61,8 @@ TEST(TestDateQuery)
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
     PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::Date(2012, 1, 1).get_date())
                                            .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all(); 
-
-    assert(view5.size() == 1 && view5[0].name == "Mary");
-
+    CHECK_EQUAL(1, view5.size());
+    CHECK_EQUAL("Mary", view5[0].name);
 }
 
 
@@ -465,10 +485,15 @@ TEST(TestQuerySubtable)
     subtable->insert_done();
 
 
+    int64_t val50 = 50;
+    int64_t val200 = 200;
+    int64_t val20 = 20;
+    int64_t val300 = 300;
+
     Query q1 = table->where();
-    q1.greater(0, 200);
+    q1.greater(0, val200);
     q1.subtable(2);
-    q1.less(0, 50);
+    q1.less(0, val50);
     q1.end_subtable();
     TableView t1 = q1.find_all(0, (size_t)-1);
     CHECK_EQUAL(2, t1.size());
@@ -478,9 +503,9 @@ TEST(TestQuerySubtable)
 
     Query q2 = table->where();
     q2.subtable(2);
-    q2.greater(0, 50);
+    q2.greater(0, val50);
     q2.Or();
-    q2.less(0, 20);
+    q2.less(0, val20);
     q2.end_subtable();
     TableView t2 = q2.find_all(0, (size_t)-1);
     CHECK_EQUAL(2, t2.size());
@@ -490,11 +515,11 @@ TEST(TestQuerySubtable)
 
     Query q3 = table->where();
     q3.subtable(2);
-    q3.greater(0, 50);
+    q3.greater(0, val50);
     q3.Or();
-    q3.less(0, 20);
+    q3.less(0, val20);
     q3.end_subtable();
-    q3.less(0, 300);
+    q3.less(0, val300);
     TableView t3 = q3.find_all(0, (size_t)-1);
     CHECK_EQUAL(1, t3.size());
     CHECK_EQUAL(0, t3.get_source_ndx(0));
@@ -504,11 +529,12 @@ TEST(TestQuerySubtable)
     q4.equal(0, (int64_t)333);
     q4.Or();
     q4.subtable(2);
-    q4.greater(0, 50);
+    q4.greater(0, val50);
     q4.Or();
-    q4.less(0, 20);
+    q4.less(0, val20);
     q4.end_subtable();
     TableView t4 = q4.find_all(0, (size_t)-1);
+
 
 
     CHECK_EQUAL(3, t4.size());

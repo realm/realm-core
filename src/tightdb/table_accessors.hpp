@@ -911,22 +911,27 @@ public:
     {
         return Base::m_table->get_impl()->count_float(col_idx, target);
     }
-/*
-    int64_t sum() const
+
+    double sum() const
     {
-        return Base::m_table->get_impl()->sum(col_idx);
+        return Base::m_table->get_impl()->sum_float(col_idx);
     }
 
-    int64_t maximum() const
+    float maximum() const
     {
-        return Base::m_table->get_impl()->maximum(col_idx);
+        return Base::m_table->get_impl()->maximum_float(col_idx);
     }
 
-    int64_t minimum() const
+    float minimum() const
     {
-        return Base::m_table->get_impl()->minimum(col_idx);
+        return Base::m_table->get_impl()->minimum_float(col_idx);
     }
-*/
+    
+    double average() const
+    {
+        return Base::m_table->get_impl()->average_float(col_idx);
+    }
+
     const ColumnAccessor& operator+=(float value) const
     {
         Base::m_table->get_impl()->add_float(col_idx, value);
@@ -959,22 +964,27 @@ public:
     {
         return Base::m_table->get_impl()->count_double(col_idx, target);
     }
-/*
-    int64_t sum() const
+
+    double sum() const
     {
-        return Base::m_table->get_impl()->sum(col_idx);
+        return Base::m_table->get_impl()->sum_double(col_idx);
     }
 
-    int64_t maximum() const
+    double maximum() const
     {
-        return Base::m_table->get_impl()->maximum(col_idx);
+        return Base::m_table->get_impl()->maximum_double(col_idx);
     }
 
-    int64_t minimum() const
+    double minimum() const
     {
-        return Base::m_table->get_impl()->minimum(col_idx);
+        return Base::m_table->get_impl()->minimum_double(col_idx);
     }
-*/
+    
+    double average() const
+    {
+        return Base::m_table->get_impl()->average_double(col_idx);
+    }
+
     const ColumnAccessor& operator+=(double value) const
     {
         Base::m_table->get_impl()->add_double(col_idx, value);

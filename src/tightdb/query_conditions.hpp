@@ -95,6 +95,7 @@ struct EQUAL {
         int i = memcmp(v1, v2, len1);
         return (i == 0);
     }
+
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
     int condition(void) {return COND_EQUAL;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (v >= lbound && v <= ubound); }
@@ -185,7 +186,7 @@ struct NONE {
 
 struct LESS {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 < v2;}
-    int condition(void) {return  COND_LESS;}
+    int condition(void) {return COND_LESS;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { (void)ubound; return (lbound < v); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { (void)lbound; return (ubound < v); }
 };
@@ -204,3 +205,6 @@ struct GREATEREQUAL {
 } // namespace tightdb
 
 #endif // TIGHTDB_QUERY_CONDITIONS_HPP
+
+
+

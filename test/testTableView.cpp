@@ -3,9 +3,10 @@
 
 using namespace tightdb;
 
+namespace {
 TIGHTDB_TABLE_1(TestTableInt,
                 first, Int)
-
+}
 
 TEST(GetSetInteger)
 {
@@ -31,12 +32,13 @@ TEST(GetSetInteger)
     CHECK_EQUAL(123, v[0].first);
 }
 
-TIGHTDB_TABLE_1(TestTableFloats,
-                first, Float) //, second, Double)
-
+namespace {
+TIGHTDB_TABLE_1(TestTableViewFloats,
+                first, Float)
+}
 TEST(GetSetFloats)
 {
-    TestTableFloats table;
+    TestTableViewFloats table;
 
     table.add(1.1f);
     table.add(2.2f);
@@ -44,7 +46,7 @@ TEST(GetSetFloats)
     table.add(1.1f);
     table.add(2.2f);
 
-    TestTableFloats::View v; // Test empty construction
+    TestTableViewFloats::View v; // Test empty construction
     v = table.column().first.find_all(2.2f); // Test assignment
 
     CHECK_EQUAL(2, v.size());
@@ -73,6 +75,32 @@ TEST(TableViewSum)
 
     int64_t sum = v.column().first.sum();
     CHECK_EQUAL(10, sum);
+}
+/*
+template <class C, class V, typename T>
+void setup_tableview(C& table, V& view, T[] values, size_t size, T target)
+{
+    for (size_t i=0; i<size; i++) {
+        table.add(values[i]);
+    }
+    view = table.column().first.find_all(target);
+}
+*/
+TEST(TableViewSumNegative_2)
+{
+    TestTableInt table;
+    TestTableInt::View v;
+
+    table.add(0);
+    table.add(0);
+    table.add(0);
+
+    v = table.column().first.find_all(0);
+    v[0].first = 11;
+    v[2].first = -20;
+
+    int64_t sum = v.column().first.sum();
+    CHECK_EQUAL(-9, sum);
 }
 
 TEST(TableViewSumNegative)
@@ -202,8 +230,10 @@ TEST(TableViewFindAll)
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
 
+namespace {
 TIGHTDB_TABLE_1(TestTableString,
                 first, String)
+}
 
 TEST(TableViewFindAllString)
 {

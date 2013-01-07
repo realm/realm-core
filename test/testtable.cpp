@@ -86,6 +86,7 @@ TEST(Table_float)
 #endif // TIGHTDB_DEBUG
 }
 
+namespace {
 enum Days {
     Mon,
     Tue,
@@ -101,6 +102,8 @@ TIGHTDB_TABLE_4(TestTable,
                 second, Int,
                 third,  Bool,
                 fourth, Enum<Days>)
+}
+
 TEST(Table2)
 {
     TestTable table;
@@ -146,10 +149,11 @@ TEST(Table3)
 #endif // TIGHTDB_DEBUG
 }
 
+namespace {
 TIGHTDB_TABLE_2(TestTableEnum,
                 first,      Enum<Days>,
                 second,     String)
-
+}
 TEST(Table4)
 {
     TestTableEnum table;
@@ -170,9 +174,11 @@ TEST(Table4)
 #endif // TIGHTDB_DEBUG
 }
 
+namespace {
 TIGHTDB_TABLE_2(TestTableFloats,
                 first,      Float,
                 second,     Double)
+}
 
 TEST(Table_float2)
 {
@@ -584,10 +590,11 @@ TEST(Table_Index_String)
     CHECK_EQUAL(2, c1);
 }
 
+namespace {
 TIGHTDB_TABLE_2(LookupTable,
                 first,  String,
                 second, Int)
-
+}
 TEST(Table_Lookup)
 {
     LookupTable table;
@@ -752,12 +759,13 @@ TEST(Table_Index_Int)
 }
 */
 
+namespace {
 TIGHTDB_TABLE_4(TestTableAE,
                 first,  Int,
                 second, String,
                 third,  Bool,
                 fourth, Enum<Days>)
-
+}
 TEST(TableAutoEnumeration)
 {
     TestTableAE table;
@@ -1427,9 +1435,10 @@ TEST(Table_Mixed)
 #endif // TIGHTDB_DEBUG
 }
 
+namespace {
 TIGHTDB_TABLE_1(TestTableMX,
                 first, Mixed)
-
+}
 
 TEST(Table_Mixed2)
 {

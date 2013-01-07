@@ -772,6 +772,16 @@ const ColumnBase& Table::GetColumnBase(size_t ndx) const
     return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
 }
 
+template <class T, class COL_TYPE>
+T GetColumn2(size_t ndx)
+{
+    ColumnBase& column = GetColumnBase(ndx);
+    TIGHTDB_ASSERT(COL_TYPE == get_column_type(ndx));
+    return static_cast<T&>(column);
+}
+// TODO - replace with above...
+
+
 Column& Table::GetColumn(size_t ndx)
 {
     ColumnBase& column = GetColumnBase(ndx);
@@ -1510,14 +1520,28 @@ void Table::insert_done()
 #endif
 }
 
+// FIXME: remove the ColumnType from parameter-list for performance
+template <class T>
+size_t Table::count(size_t column_ndx, T target, ColumnType expect) const
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == expect);
+
+    return GetColumn(column_ndx).count(target);
+}
+// TODO:
+
 
 size_t Table::count_int(size_t column_ndx, int64_t target) const
 {
+    return count<int64_t>(column_ndx, target, COLUMN_TYPE_INT);
+    /*
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
 
     const Column& column = GetColumn(column_ndx);
     return column.count(target);
+    */
 }
 
 size_t Table::count_string(size_t column_ndx, const char* value) const
@@ -1537,6 +1561,8 @@ size_t Table::count_string(size_t column_ndx, const char* value) const
         return column.count(value);
     }
 }
+
+// TODO: add float, double here...
 
 int64_t Table::sum(size_t column_ndx) const
 {

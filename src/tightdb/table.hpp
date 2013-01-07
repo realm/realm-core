@@ -201,10 +201,21 @@ public:
     // Aggregate functions
     size_t  count_int(size_t column_ndx, int64_t target) const;
     size_t  count_string(size_t column_ndx, const char* target) const;
+    size_t  count_float(size_t column_ndx, float target) const;
+    size_t  count_double(size_t column_ndx, float target) const;
     int64_t sum(size_t column_ndx) const;
-    int64_t maximum(size_t column_ndx) const; // FIXME: When table is empty?
-    int64_t minimum(size_t column_ndx) const; // FIXME: When table is empty?
-    double  average(size_t column_ndx) const; // FIXME: When table is empty?
+    float   sum_float(size_t column_ndx) const;
+    double  sum_double(size_t column_ndx) const;
+        // FIXME: What to return for below when table empty? 0?
+    int64_t maximum(size_t column_ndx) const; 
+    float   maximum_float(size_t column_ndx) const;
+    double  maximum_double(size_t column_ndx) const;
+    int64_t minimum(size_t column_ndx) const;
+    float   minimum_float(size_t column_ndx) const;
+    double  minimum_double(size_t column_ndx) const;
+    double  average(size_t column_ndx) const;
+    double  average_float(size_t column_ndx) const;
+    double  average_double(size_t column_ndx) const;
 
     // Searching
     size_t         lookup(const char* value) const;
@@ -300,6 +311,8 @@ protected:
     ColumnMixed& GetColumnMixed(size_t column_ndx);
     const ColumnMixed& GetColumnMixed(size_t column_ndx) const;
 
+
+    template <class T> size_t count(size_t column_ndx, T target, ColumnType expect) const;
 
     /// Used when the lifetime of a table is managed by reference
     /// counting. The lifetime of free-standing tables allocated on

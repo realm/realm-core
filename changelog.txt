@@ -12,6 +12,11 @@ Format:
 
 ==================
 
+
+2013-01-08 (Brian Munkholm)
+----------
++ 17 New: Added a bunch of methods to support two new column types: float and double.
+
 2012-12-06 (Brian Munkholm)
 ----------
 + 16 New Table:get_string_length(col_ndx, row_ndx) added in Dynamic Table. Missing in Typed Table.

@@ -66,6 +66,8 @@ public:
     Query& between(size_t column_ndx, int64_t from, int64_t to);
 
     // Conditions: float
+  
+
     Query& equal(size_t column_ndx, float value);
     Query& not_equal(size_t column_ndx, float value);
     Query& greater(size_t column_ndx, float value);
@@ -199,6 +201,10 @@ protected:
     mutable bool do_delete;
 private:
     size_t m_threadcount;
+
+    template <typename T, class N>
+    Query& add_condition(size_t column_ndx, T value);
+
 };
 
 

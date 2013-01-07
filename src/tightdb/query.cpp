@@ -74,13 +74,8 @@ Query& Query::tableview(const Array &arr)
     return *this;
 }
 
-Query& Query::equal(size_t column_ndx, int64_t value)
-{
-    ParentNode* const p = new NODE<int64_t, Column, EQUAL>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
-    return *this;
-}
 
+// Binary
 Query& Query::equal(size_t column_ndx, BinaryData b)
 {
     ParentNode* const p = new BINARYNODE<EQUAL>(b.pointer, b.len, column_ndx);
@@ -88,6 +83,22 @@ Query& Query::equal(size_t column_ndx, BinaryData b)
     return *this;
 }
 
+// Generic 'simple type' condition
+template <typename T, class N>
+Query& Query::add_condition(size_t column_ndx, T value)
+{
+    ParentNode* const parent = new N(value, column_ndx);
+    UpdatePointers(parent, &parent->m_child);
+    return *this;
+}
+
+// int64
+Query& Query::equal(size_t column_ndx, int64_t value)
+{
+    ParentNode* const p = new NODE<int64_t, Column, EQUAL>(value, column_ndx);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new NODE<int64_t, Column, NOTEQUAL>(value, column_ndx);
@@ -124,7 +135,6 @@ Query& Query::less(size_t column_ndx, int64_t value)
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-
 Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 {
     greater_equal(column_ndx, from);
@@ -135,6 +145,38 @@ Query& Query::equal(size_t column_ndx, bool value)
 {
     ParentNode* const p = new NODE<bool, Column, EQUAL>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
+    return *this;
+}
+
+// ------------- float
+Query& Query::equal(size_t column_ndx, float value)
+{
+    return add_condition<float, BASICNODE<float, ColumnFloat, EQUAL> >(column_ndx, value);
+}
+Query& Query::not_equal(size_t column_ndx, float value)
+{
+    return add_condition<float, BASICNODE<float, ColumnFloat, NOTEQUAL> >(column_ndx, value);
+}
+Query& Query::greater(size_t column_ndx, float value)
+{
+    return add_condition<float, BASICNODE<float, ColumnFloat, GREATER> >(column_ndx, value);
+}
+Query& Query::greater_equal(size_t column_ndx, float value)
+{
+    return add_condition<float, BASICNODE<float, ColumnFloat, GREATER> >(column_ndx, value-1);
+}
+Query& Query::less_equal(size_t column_ndx, float value)
+{
+    return add_condition<float, BASICNODE<float, ColumnFloat, LESS> >(column_ndx, value+1);
+}
+Query& Query::less(size_t column_ndx, float value)
+{
+    return add_condition<float, BASICNODE<float, ColumnFloat, LESS> >(column_ndx, value);
+}
+Query& Query::between(size_t column_ndx, float from, float to)
+{
+    greater_equal(column_ndx, from);
+    less_equal(column_ndx, to);
     return *this;
 }
 
@@ -191,6 +233,7 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
     return *this;
 }
 
+// Grouping
 Query& Query::group()
 {
     update.push_back(0);
@@ -198,6 +241,30 @@ Query& Query::group()
     first.push_back(0);
     return *this;
 }
+Query& Query::end_group()
+{
+    if (first.size() < 2) {
+        error_code = "Unbalanced blockBegin/blockEnd";
+        return *this;
+    }
+
+    if (update[update.size()-2] != 0)
+        *update[update.size()-2] = first[first.size()-1];
+
+    if (first[first.size()-2] == 0)
+        first[first.size()-2] = first[first.size()-1];
+
+    if (update_override[update_override.size()-1] != 0)
+        update[update.size() - 2] = update_override[update_override.size()-1];
+    else if (update[update.size()-1] != 0)
+        update[update.size() - 2] = update[update.size()-1];
+
+    first.pop_back();
+    update.pop_back();
+    update_override.pop_back();
+    return *this;
+}
+
 Query& Query::Or()
 {
     ParentNode* const o = new OR_NODE(first[first.size()-1]);
@@ -228,29 +295,6 @@ void Query::end_subtable()
     subtables.pop_back();
 }
 
-Query& Query::end_group()
-{
-    if (first.size() < 2) {
-        error_code = "Unbalanced blockBegin/blockEnd";
-        return *this;
-    }
-
-    if (update[update.size()-2] != 0)
-        *update[update.size()-2] = first[first.size()-1];
-
-    if (first[first.size()-2] == 0)
-        first[first.size()-2] = first[first.size()-1];
-
-    if (update_override[update_override.size()-1] != 0)
-        update[update.size() - 2] = update_override[update_override.size()-1];
-    else if (update[update.size()-1] != 0)
-        update[update.size() - 2] = update[update.size()-1];
-
-    first.pop_back();
-    update.pop_back();
-    update_override.pop_back();
-    return *this;
-}
 
 size_t Query::find_next(size_t lastmatch)
 {
@@ -314,6 +358,8 @@ int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end,
         *resultcount = matchcount;
     return r;
 }
+
+// Aggregates:
 
 int64_t Query::maximum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
