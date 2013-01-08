@@ -18,6 +18,7 @@
 #include "../test/pthread_test.hpp"
 #endif
 
+using namespace std;
 using namespace tightdb;
 
 
