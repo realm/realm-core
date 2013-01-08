@@ -49,7 +49,11 @@ template <int function>int64_t TableViewBase::aggregate(size_t column_ndx) const
             return m_column.sum();
     }
 
-    Array m_array;
+    // Array object instantiation must NOT allocate initial memory (capacity) with 'new' because it will lead to mem leak. 
+    // The m_column keeps ownership of the payload in m_array and will free it itself later, so we must not call Destroy() on m_array.
+    // Todo, create tag constructor for array instead of using 'false'. 
+    Array m_array(false);
+
     size_t m_leaf_start = 0;
     size_t m_leaf_end = 0;
     size_t s;
@@ -71,7 +75,7 @@ template <int function>int64_t TableViewBase::aggregate(size_t column_ndx) const
         else if (function == TDB_MAX ? v > res : v < res)
             res = v;
     }
-    
+
     return res;
 }
 

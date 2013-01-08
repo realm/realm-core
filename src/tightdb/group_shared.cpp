@@ -10,7 +10,14 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 
-using namespace std;
+#include "../test/testsettings.hpp"
+
+// Wrap pthread function calls with the pthread bug finding tool (program execution will be slower). 
+// Works both in debug and release mode. Define the flag in testsettings.h
+#ifdef TIGHTDB_PTHREADS_TEST
+#include "../test/pthread_test.hpp"
+#endif
+
 using namespace tightdb;
 
 
