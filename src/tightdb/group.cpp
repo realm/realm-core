@@ -653,7 +653,7 @@ void Group::Verify() const
 
     // The file may have been created but not yet used
     // (so no structure has been initialized)
-    const bool isShared = m_persistMode & GROUP_SHARED;
+    const bool isShared = (m_persistMode & GROUP_SHARED) == 1;
     if (isShared && m_alloc.GetTopRef() == 0 && !m_top.IsValid()) {
         TIGHTDB_ASSERT(!m_tables.IsValid());
         return;
