@@ -57,7 +57,7 @@ TEST(Shared_Initial_Mem)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb", SharedGroup::DURA_MEM_ONLY);
+        SharedGroup shared("test_shared.tightdb", SharedGroup::durability_MemOnly);
         CHECK(shared.is_valid());
 
         // Verify that new group is empty
@@ -140,12 +140,12 @@ TEST(Shared_Initial2_Mem)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb", SharedGroup::DURA_MEM_ONLY);
+        SharedGroup shared("test_shared.tightdb", SharedGroup::durability_MemOnly);
         CHECK(shared.is_valid());
 
         {
             // Open the same db again (in empty state)
-            SharedGroup shared2("test_shared.tightdb", SharedGroup::DURA_MEM_ONLY);
+            SharedGroup shared2("test_shared.tightdb", SharedGroup::durability_MemOnly);
             CHECK(shared2.is_valid());
 
             // Verify that new group is empty
