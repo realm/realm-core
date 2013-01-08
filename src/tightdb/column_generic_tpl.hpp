@@ -277,6 +277,18 @@ void ColumnGeneric<T>::find_all(Array &result, T value, size_t start, size_t end
     TreeFindAll<T, ColumnGeneric<T>>(result, value, 0, start, end);
 }
 
+
+#ifdef FAST
+... TODO:..
+Also add sum ,average, min, max
+
+size_t Column::count(T target) const
+{
+    return size_t(aggregate<TDB_COUNT, EQUAL>(target, 0, ((Column*)this)->Size()));
+}
+
+#else
+
 template<typename T>
 size_t ColumnGeneric<T>::count(T target) const
 {
@@ -298,5 +310,7 @@ size_t ColumnGeneric<T>::count(T target) const
     }
     return count;
 }
+
+#endif
 
 }

@@ -2319,6 +2319,8 @@ int64_t Array::ColumnGet(size_t ndx) const
     }
 }
 
+// FIXME: Shouldn't this be locaterd in ColumnString?
+//
 const char* Array::ColumnStringGet(size_t ndx) const
 {
     const char* data   = (const char*)m_data;

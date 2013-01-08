@@ -32,8 +32,6 @@ public:
         ColumnGeneric<double>(alloc) {};
     ColumnDouble(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator()) :
         ColumnGeneric<double>(ref, parent, pndx, alloc) {};
-
-    bool IsDoubleColumn() const {return true;}
 };
 
 } // namespace tightdb

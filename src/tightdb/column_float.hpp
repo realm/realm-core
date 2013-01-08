@@ -32,8 +32,6 @@ public:
         ColumnGeneric<float>(alloc) {};
     ColumnFloat(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator()) :
         ColumnGeneric<float>(ref, parent, pndx, alloc) {};
-
-    bool IsFloatColumn() const {return true;}
 };
 
 } // namespace tightdb

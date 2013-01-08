@@ -440,7 +440,8 @@ void Column::fill(size_t count)
 #endif
 }
 
-template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, size_t start, size_t end, size_t *matchcount) const
+template <ACTION action, class cond, class T>
+T Column::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
 { 
 #if 1
     if (end == size_t(-1)) 
@@ -454,7 +455,7 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
 //    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
 //    new (node) NODE<int64_t, Column, cond>(target, 0);
 
-    NODE<int64_t, Column, cond> node(target, NULL);
+    NODE<T, Column, cond> node(target, NULL);
 
     node.QuickInit(m_column, target); 
     state_state st;
@@ -518,14 +519,16 @@ template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, si
 #endif
 }
 
+// int64_t specific:
+
 size_t Column::count(int64_t target) const
 {
-    return size_t(aggregate<TDB_COUNT, EQUAL>(target, 0, ((Column*)this)->Size()));
+    return size_t(aggregate<TDB_COUNT, EQUAL, int64_t>(target, 0, ((Column*)this)->Size()));
 }
 
 int64_t Column::sum(size_t start, size_t end) const
 {
-    return aggregate<TDB_SUM, NONE>(0, start, end);
+    return aggregate<TDB_SUM, NONE, int64_t>(0, start, end);
 }
 
 double Column::average(size_t start, size_t end) const
@@ -533,19 +536,19 @@ double Column::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = ((Column*)this)->Size();
     size_t size = end - start;
-    size_t sum = aggregate<TDB_SUM, NONE>(0, start, end);
+    size_t sum = aggregate<TDB_SUM, NONE, int64_t>(0, start, end);
     double avg = double( sum ) / double( size == 0 ? 1 : size );
     return avg;
 }
 
 int64_t Column::minimum(size_t start, size_t end) const
 {
-    return aggregate<TDB_MIN, NONE>(0, start, end);
+    return aggregate<TDB_MIN, NONE, int64_t>(0, start, end);
 }
 
 int64_t Column::maximum(size_t start, size_t end) const
 {
-    return aggregate<TDB_MAX, NONE>(0, start, end);
+    return aggregate<TDB_MAX, NONE, int64_t>(0, start, end);
 }
 
 void Column::sort(size_t start, size_t end)

@@ -202,7 +202,7 @@ public:
     size_t  count_int(size_t column_ndx, int64_t target) const;
     size_t  count_string(size_t column_ndx, const char* target) const;
     size_t  count_float(size_t column_ndx, float target) const;
-    size_t  count_double(size_t column_ndx, float target) const;
+    size_t  count_double(size_t column_ndx, double target) const;
     int64_t sum(size_t column_ndx) const;
     float   sum_float(size_t column_ndx) const;
     double  sum_double(size_t column_ndx) const;
@@ -294,6 +294,10 @@ protected:
 
     // FIXME: Most of the things that are protected here, could instead be private
     // Direct Column access
+    template <class T, ColumnType COL_TYPE>
+        T& GetColumnT(size_t ndx);
+    template <class T, ColumnType COL_TYPE>
+        const T& GetColumnT(size_t ndx) const;
     Column& GetColumn(size_t column_ndx);
     const Column& GetColumn(size_t column_ndx) const;
     ColumnFloat& GetColumnFloat(size_t column_ndx);
@@ -312,7 +316,8 @@ protected:
     const ColumnMixed& GetColumnMixed(size_t column_ndx) const;
 
 
-    template <class T> size_t count(size_t column_ndx, T target, ColumnType expect) const;
+    template <class T, class C, ColumnType expect> 
+        size_t count(size_t column_ndx, T target) const;
 
     /// Used when the lifetime of a table is managed by reference
     /// counting. The lifetime of free-standing tables allocated on
@@ -419,6 +424,8 @@ private:
 
     ColumnBase& GetColumnBase(size_t column_ndx);
     void InstantiateBeforeChange();
+    void validate_column_type(const ColumnBase& column, ColumnType expected_type, size_t ndx) const;
+
 
     /// Construct an empty table with independent spec and return just
     /// the reference to the underlying memory.

@@ -241,6 +241,7 @@ size_t ArrayGeneric<T>::count(T value, size_t start, size_t end) const
 }
 
 
+
 } // namespace tightdb
 
 #endif // TIGHTDB_ARRAY_GENERIC_TPL_HPP
