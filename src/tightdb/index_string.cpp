@@ -622,13 +622,13 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
     }
 }
 
-#ifdef TIGHTDB_DEBUG
-
 bool StringIndex::is_empty() const
 {
     const Array values = m_array->GetSubArray(0);
     return values.is_empty();
 }
+
+#ifdef TIGHTDB_DEBUG
 
 void StringIndex::to_dot(std::ostream& out)
 {
