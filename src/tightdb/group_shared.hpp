@@ -59,7 +59,8 @@ public:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct replication_tag {};
-    SharedGroup(replication_tag, std::string path_to_database_file = "");
+    SharedGroup(replication_tag, std::string path_to_database_file = "",
+                DurabiltyLevel dlevel=durability_Full);
 
     /// This function may be called asynchronously to interrupt any
     /// blocking call that is part of a transaction in a replication

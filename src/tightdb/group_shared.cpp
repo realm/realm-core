@@ -48,14 +48,14 @@ struct tightdb::SharedInfo {
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-SharedGroup::SharedGroup(string path_to_database_file):
+SharedGroup::SharedGroup(string path_to_database_file, DurabiltyLevel dlevel):
     m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID),
     m_info(NULL), m_isValid(false), m_version(-1), m_replication(Replication::degenerate_tag())
 {
-    init(path_to_database_file);
+    init(path_to_database_file, dlevel);
 }
 
-SharedGroup::SharedGroup(replication_tag, string path_to_database_file):
+SharedGroup::SharedGroup(replication_tag, string path_to_database_file, DurabiltyLevel dlevel):
     m_group(!path_to_database_file.empty() ? path_to_database_file :
             Replication::get_path_to_database_file(), GROUP_SHARED|GROUP_INVALID), m_info(NULL),
     m_isValid(false), m_version(-1), m_replication(path_to_database_file)
@@ -63,7 +63,7 @@ SharedGroup::SharedGroup(replication_tag, string path_to_database_file):
     m_group.set_replication(&m_replication);
 
     init(!path_to_database_file.empty() ? path_to_database_file :
-         Replication::get_path_to_database_file());
+         Replication::get_path_to_database_file(), dlevel);
 }
 
 #else // ! TIGHTDB_ENABLE_REPLICATION
