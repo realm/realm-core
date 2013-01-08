@@ -20,14 +20,15 @@ struct tightdb::ReadCount {
 };
 
 struct tightdb::SharedInfo {
+    uint16_t version;
+    uint16_t flags;
+
     pthread_mutex_t readmutex;
     pthread_mutex_t writemutex;
     uint64_t filesize;
 
     uint64_t current_top;
     volatile uint32_t current_version;
-    uint16_t version;
-    uint16_t flags;
 
     uint32_t infosize;
     uint32_t capacity; // -1 so it can also be used as mask
@@ -208,7 +209,7 @@ SharedGroup::~SharedGroup()
         if (flock(m_fd, LOCK_EX|LOCK_NB) == 0) {
             // If the db file is just backing for a transient
             // data structure, we can delete it when done.
-            if (m_info->flags == DURA_MEM_ONLY) {
+            if (m_info->flags == durability_MemOnly) {
                 const size_t path_len = m_lockfile_path.size()-5; // remove ".lock"
                 const std::string db_path = m_lockfile_path.substr(0, path_len);
                 remove(db_path.c_str());
@@ -380,7 +381,7 @@ void SharedGroup::commit()
     }
 
     // Do the actual commit
-    const bool doPersist = (m_info->flags == DURA_FULL);
+    const bool doPersist = (m_info->flags == durability_Full);
     const size_t new_topref = m_group.commit(current_version, readlock_version, doPersist);
 
     // Get the new top ref

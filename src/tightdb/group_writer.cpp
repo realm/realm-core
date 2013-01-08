@@ -127,10 +127,6 @@ size_t GroupWriter::Commit()
     // memory. So we never actually flush the data to disk (the OS may do
     // so for swapping though). Note that this means that the file on disk
     // may very likely be in an invalid state.
-    //
-    // In async mode, the file is persisted in regular intervals. This means
-    // that the file on disk will always be in a valid state, but it may be
-    // slightly out of sync with the latest changes.
     if (m_doPersist)
         DoCommit(top_pos);
 
@@ -139,6 +135,8 @@ size_t GroupWriter::Commit()
     SlabAlloc& alloc = m_group.get_allocator();
     alloc.FreeAll(m_len);
 
+    // Return top_pos so that it can be saved in lock file used
+    // for coordination
     return top_pos;
 }
 

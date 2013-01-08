@@ -35,8 +35,8 @@ struct SharedInfo;
 class SharedGroup {
 public:
     enum DurabiltyLevel {
-        DURA_FULL,
-        DURA_MEM_ONLY
+        durability_Full,
+        durability_MemOnly
     };
 
     /// When two threads or processes want to access the same database
@@ -54,7 +54,7 @@ public:
     ///
     /// Processes that share a database file must reside on the same
     /// host.
-    SharedGroup(std::string path_to_database_file, DurabiltyLevel dlevel=DURA_FULL);
+    SharedGroup(std::string path_to_database_file, DurabiltyLevel dlevel=durability_Full);
     ~SharedGroup();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
