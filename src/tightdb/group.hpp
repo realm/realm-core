@@ -111,7 +111,7 @@ protected:
     void invalidate();
     bool in_inital_state() const;
     void init_shared();
-    bool commit(size_t current_version, size_t readlock_version);
+    size_t commit(size_t current_version, size_t readlock_version, bool doPersist);
     void rollback();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

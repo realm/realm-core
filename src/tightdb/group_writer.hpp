@@ -35,7 +35,7 @@ class SlabAlloc;
 
 class GroupWriter {
 public:
-    GroupWriter(Group& group);
+    GroupWriter(Group& group, bool doPersist);
     ~GroupWriter();
 
     bool IsValid() const;
@@ -67,6 +67,7 @@ private:
     size_t     m_readlock_version;
     size_t     m_len;
     char*      m_data;
+    bool       m_doPersist;
 };
 
 

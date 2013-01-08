@@ -35,7 +35,7 @@ namespace tightdb {
 ///
 /// \note An application must never call these functions directly.
 ///
-/// All the get_*_ptr() functions in this class will return a Table
+/// All the get_*_ptr() functions and new_table in this class will return a Table
 /// pointer where the reference count has already been incremented.
 ///
 /// The application must make sure that the unbind_table_ref() function is
@@ -61,6 +61,7 @@ public:
     static const Table* get_table_ptr(const Group* grp, const char* name);
 
     static void unbind_table_ref(const Table*);
+    static void bind_table_ref(const Table*);
 };
 
 
@@ -139,6 +140,11 @@ inline const Table* LangBindHelper::get_table_ptr(const Group* grp, const char* 
 inline void LangBindHelper::unbind_table_ref(const Table* t)
 {
    t->unbind_ref();
+}
+
+inline void LangBindHelper::bind_table_ref(const Table* t)
+{
+   t->bind_ref();
 }
 
 

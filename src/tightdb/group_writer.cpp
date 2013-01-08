@@ -10,8 +10,8 @@
 using namespace tightdb;
 
 // todo, test (int) cast
-GroupWriter::GroupWriter(Group& group) :
-    m_group(group), m_alloc(group.get_allocator()), m_len(m_alloc.GetFileLen()), m_data((char*)-1)
+GroupWriter::GroupWriter(Group& group, bool doPersist) :
+    m_group(group), m_alloc(group.get_allocator()), m_len(m_alloc.GetFileLen()), m_data((char*)-1), m_doPersist(doPersist)
 {
 #if !defined(_MSC_VER)
     const int fd = m_alloc.GetFileDescriptor();
@@ -123,14 +123,20 @@ size_t GroupWriter::Commit()
     // Write top
     top.WriteAt(top_pos, *this);
 
-    // Commit
-    DoCommit(top_pos);
+    // In swap-only mode, we just use the file as backing for the shared
+    // memory. So we never actually flush the data to disk (the OS may do
+    // so for swapping though). Note that this means that the file on disk
+    // may very likely be in an invalid state.
+    if (m_doPersist)
+        DoCommit(top_pos);
 
     // Clear old allocs
     // and remap if file size has changed
     SlabAlloc& alloc = m_group.get_allocator();
     alloc.FreeAll(m_len);
 
+    // Return top_pos so that it can be saved in lock file used
+    // for coordination
     return top_pos;
 }
 
@@ -161,16 +167,6 @@ void GroupWriter::WriteAt(size_t pos, const char* p, size_t n) {
 
 void GroupWriter::DoCommit(uint64_t topPos)
 {
-    // In swap-only mode, we just use the file as backing for the shared
-    // memory. So we never actually flush the data to disk (the OS may do
-    // so for swapping though). Note that this means that the file on disk
-    // may very likely be in an invalid state.
-    //
-    // In async mode, the file is persisted in regular intervals. This means
-    // that the file on disk will always be in a valid state, but it may be
-    // slightly out of sync with the latest changes.
-    //if (isSwapOnly || isAsync) return;
-
 #if !defined(_MSC_VER) // write persistence
     // Write data
     msync(m_data, m_len, MS_SYNC);

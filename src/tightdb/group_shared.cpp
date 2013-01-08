@@ -27,6 +27,9 @@ struct tightdb::ReadCount {
 };
 
 struct tightdb::SharedInfo {
+    uint16_t version;
+    uint16_t flags;
+
     pthread_mutex_t readmutex;
     pthread_mutex_t writemutex;
     uint64_t filesize;
@@ -64,17 +67,17 @@ SharedGroup::SharedGroup(replication_tag, string path_to_database_file):
 
 #else // ! TIGHTDB_ENABLE_REPLICATION
 
-SharedGroup::SharedGroup(string path_to_database_file):
+SharedGroup::SharedGroup(string path_to_database_file, DurabiltyLevel dlevel):
     m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID),
     m_info(NULL), m_isValid(false), m_version(-1)
 {
-    init(path_to_database_file);
+    init(path_to_database_file, dlevel);
 }
 
 #endif // ! TIGHTDB_ENABLE_REPLICATION
 
 
-void SharedGroup::init(string path_to_database_file)
+void SharedGroup::init(string path_to_database_file, DurabiltyLevel dlevel)
 {
     m_lockfile_path = path_to_database_file + ".lock";
 
@@ -158,13 +161,15 @@ open_start:
         SlabAlloc& alloc = m_group.get_allocator();
 
         // Set initial values
+        m_info->version  = 0;
+        m_info->flags    = dlevel; // durability level is fixed from creation
         m_info->filesize = alloc.GetFileLen();
         m_info->infosize = (uint32_t)len;
         m_info->current_top = alloc.GetTopRef();
         m_info->current_version = 0;
         m_info->capacity = 32-1;
-        m_info->put_pos = 0;
-        m_info->get_pos = 0;
+        m_info->put_pos  = 0;
+        m_info->get_pos  = 0;
 
         // Set initial version so we can track if other instances
         // change the db
@@ -175,6 +180,13 @@ open_start:
         flock(m_fd, LOCK_SH);
     }
     else {
+        if (m_info->version != 0)
+            return; // unsupported version
+
+        // Durability level cannot be changed at runtime
+        if (m_info->flags != dlevel)
+            return;
+
         // Setup the group, but leave it in invalid state
         if (!m_group.create_from_file(path_to_database_file, false)) {
             close(m_fd);
@@ -202,6 +214,14 @@ SharedGroup::~SharedGroup()
         // (to avoid someone later opening a stale file
         // with uinitialized mutexes)
         if (flock(m_fd, LOCK_EX|LOCK_NB) == 0) {
+            // If the db file is just backing for a transient
+            // data structure, we can delete it when done.
+            if (m_info->flags == durability_MemOnly) {
+                const size_t path_len = m_lockfile_path.size()-5; // remove ".lock"
+                const std::string db_path = m_lockfile_path.substr(0, path_len);
+                remove(db_path.c_str());
+            }
+
             pthread_mutex_destroy(&m_info->readmutex);
             pthread_mutex_destroy(&m_info->writemutex);
 
@@ -368,11 +388,11 @@ void SharedGroup::commit()
     }
 
     // Do the actual commit
-    m_group.commit(current_version, readlock_version);
+    const bool doPersist = (m_info->flags == durability_Full);
+    const size_t new_topref = m_group.commit(current_version, readlock_version, doPersist);
 
     // Get the new top ref
     const SlabAlloc& alloc = m_group.get_allocator();
-    const size_t new_topref   = alloc.GetTopRef();
     const size_t new_filesize = alloc.GetFileLen();
 
     // Update reader info
