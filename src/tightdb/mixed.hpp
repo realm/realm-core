@@ -80,8 +80,8 @@ private:
 };
 
 // Note: We cannot compare two mixed values, since when the type of
-// both would be COLUMN_TYPE_TABLE, we would have to compare the two
-// tables, but the mixed values do not provide access to those tables.
+// both is COLUMN_TYPE_TABLE, we would have to compare the two tables,
+// but the mixed values do not provide access to those tables.
 
 // Note: The mixed values are specified as Wrap<Mixed>. If they were
 // not, these operators would apply to simple comparisons, such as int
