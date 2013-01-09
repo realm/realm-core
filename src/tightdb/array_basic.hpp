@@ -17,20 +17,20 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_ARRAY_GENERIC_HPP
-#define TIGHTDB_ARRAY_GENERIC_HPP
+#ifndef TIGHTDB_ARRAY_BASIC_HPP
+#define TIGHTDB_ARRAY_BASIC_HPP
 
 #include <tightdb/array.hpp>
 
 namespace tightdb {
 
 template<typename T> 
-class ArrayGeneric : public Array {
+class ArrayBasic : public Array {
 public:
-    ArrayGeneric(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    ArrayGeneric(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
-    //ArrayGeneric(Allocator& alloc);
-    ~ArrayGeneric();
+    ArrayBasic(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+    ArrayBasic(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+    //ArrayBasic(Allocator& alloc);
+    ~ArrayBasic();
 
     T Get(size_t ndx) const;
     void add(T value);
@@ -44,9 +44,12 @@ public:
     void find_all(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1);
 
     size_t count(T value, size_t start=0, size_t end=-1) const;
+    double sum(size_t start=0, size_t end=-1) const;
+    bool maximum(T& result, size_t start=0, size_t end=-1) const;
+    bool minimum(T& result, size_t start=0, size_t end=-1) const;
 
     /// Compare two arrays for equality.
-    bool Compare(const ArrayGeneric<T>&) const;
+    bool Compare(const ArrayBasic<T>&) const;
 
     static size_t create_empty_basic_array(Allocator& alloc);
 
@@ -54,9 +57,12 @@ private:
     virtual size_t CalcByteLen(size_t count, size_t width) const;
     virtual size_t CalcItemCount(size_t bytes, size_t width) const;
     virtual WidthType GetWidthType() const {return TDB_MULTIPLY;}
+
+    template <bool find_max> bool minmax(T& result, size_t start, size_t end) const;
+
 };
 
 
-#include <tightdb/array_generic_tpl.hpp>
+#include <tightdb/array_basic.tpp>
 
-#endif TIGHTDB_ARRAY_GENERIC_HPP
+#endif TIGHTDB_ARRAY_BASIC_HPP

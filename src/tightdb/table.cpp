@@ -775,59 +775,59 @@ const ColumnBase& Table::GetColumnBase(size_t ndx) const
 }
 
 
-void Table::validate_column_type(const ColumnBase& column, ColumnType expected_type, size_t ndx) const
+void Table::validate_column_type(const ColumnBase& column, ColumnType type, size_t ndx) const
 {
-    if (expected_type == COLUMN_TYPE_INT || expected_type == COLUMN_TYPE_DATE || expected_type == COLUMN_TYPE_BOOL)
+    if (type == COLUMN_TYPE_INT || type == COLUMN_TYPE_DATE || type == COLUMN_TYPE_BOOL)
         TIGHTDB_ASSERT(column.IsIntColumn());
     else {
-        ColumnType column_type = GetRealColumnType(ndx);
-        TIGHTDB_ASSERT(expected_type == column_type); 
+        ColumnType this_type = GetRealColumnType(ndx);
+        TIGHTDB_ASSERT(type == this_type); 
     }
 }
 
-template <class C, ColumnType expected_type>
-C& Table::GetColumnT(size_t ndx)
+template <class C, ColumnType type>
+C& Table::GetColumn(size_t ndx)
 {
     ColumnBase& column = GetColumnBase(ndx);
 #ifdef TIGHTDB_DEBUG
-    validate_column_type(column, expected_type, ndx);
+    validate_column_type(column, type, ndx);
 #endif
     return static_cast<C&>(column);
 }
 
-template <class C, ColumnType expected_type>
-const C& Table::GetColumnT(size_t ndx) const
+template <class C, ColumnType type>
+const C& Table::GetColumn(size_t ndx) const
 {
     const ColumnBase& column = GetColumnBase(ndx);
 #ifdef TIGHTDB_DEBUG
-    validate_column_type(column, expected_type, ndx);
+    validate_column_type(column, type, ndx);
 #endif
     return static_cast<const C&>(column);
 }
 
-Column& Table::GetColumn(size_t ndx)             { return GetColumnT<Column, COLUMN_TYPE_INT>(ndx); }
-const Column& Table::GetColumn(size_t ndx) const { return GetColumnT<Column, COLUMN_TYPE_INT>(ndx); }
+Column& Table::GetColumn(size_t ndx)             { return GetColumn<Column, COLUMN_TYPE_INT>(ndx); }
+const Column& Table::GetColumn(size_t ndx) const { return GetColumn<Column, COLUMN_TYPE_INT>(ndx); }
 
-AdaptiveStringColumn& Table::GetColumnString(size_t ndx)             { return GetColumnT<AdaptiveStringColumn, COLUMN_TYPE_STRING>(ndx); }
-const AdaptiveStringColumn& Table::GetColumnString(size_t ndx) const { return GetColumnT<AdaptiveStringColumn, COLUMN_TYPE_STRING>(ndx); }
+AdaptiveStringColumn& Table::GetColumnString(size_t ndx)             { return GetColumn<AdaptiveStringColumn, COLUMN_TYPE_STRING>(ndx); }
+const AdaptiveStringColumn& Table::GetColumnString(size_t ndx) const { return GetColumn<AdaptiveStringColumn, COLUMN_TYPE_STRING>(ndx); }
 
-ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx)             { return GetColumnT<ColumnStringEnum, COLUMN_TYPE_STRING_ENUM>(ndx); }
-const ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) const { return GetColumnT<ColumnStringEnum, COLUMN_TYPE_STRING_ENUM>(ndx); }
+ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx)             { return GetColumn<ColumnStringEnum, COLUMN_TYPE_STRING_ENUM>(ndx); }
+const ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) const { return GetColumn<ColumnStringEnum, COLUMN_TYPE_STRING_ENUM>(ndx); }
 
-ColumnFloat& Table::GetColumnFloat(size_t ndx)               { return GetColumnT<ColumnFloat, COLUMN_TYPE_FLOAT>(ndx); }
-const ColumnFloat& Table::GetColumnFloat(size_t ndx) const   { return GetColumnT<ColumnFloat, COLUMN_TYPE_FLOAT>(ndx); }
+ColumnFloat& Table::GetColumnFloat(size_t ndx)               { return GetColumn<ColumnFloat, COLUMN_TYPE_FLOAT>(ndx); }
+const ColumnFloat& Table::GetColumnFloat(size_t ndx) const   { return GetColumn<ColumnFloat, COLUMN_TYPE_FLOAT>(ndx); }
 
-ColumnDouble& Table::GetColumnDouble(size_t ndx)             { return GetColumnT<ColumnDouble, COLUMN_TYPE_DOUBLE>(ndx); }
-const ColumnDouble& Table::GetColumnDouble(size_t ndx) const { return GetColumnT<ColumnDouble, COLUMN_TYPE_DOUBLE>(ndx); }
+ColumnDouble& Table::GetColumnDouble(size_t ndx)             { return GetColumn<ColumnDouble, COLUMN_TYPE_DOUBLE>(ndx); }
+const ColumnDouble& Table::GetColumnDouble(size_t ndx) const { return GetColumn<ColumnDouble, COLUMN_TYPE_DOUBLE>(ndx); }
 
-ColumnBinary& Table::GetColumnBinary(size_t ndx)             { return GetColumnT<ColumnBinary, COLUMN_TYPE_BINARY>(ndx); }
-const ColumnBinary& Table::GetColumnBinary(size_t ndx) const { return GetColumnT<ColumnBinary, COLUMN_TYPE_BINARY>(ndx); }
+ColumnBinary& Table::GetColumnBinary(size_t ndx)             { return GetColumn<ColumnBinary, COLUMN_TYPE_BINARY>(ndx); }
+const ColumnBinary& Table::GetColumnBinary(size_t ndx) const { return GetColumn<ColumnBinary, COLUMN_TYPE_BINARY>(ndx); }
 
-ColumnTable &Table::GetColumnTable(size_t ndx)               { return GetColumnT<ColumnTable, COLUMN_TYPE_TABLE>(ndx); }
-const ColumnTable &Table::GetColumnTable(size_t ndx) const   { return GetColumnT<ColumnTable, COLUMN_TYPE_TABLE>(ndx); }
+ColumnTable &Table::GetColumnTable(size_t ndx)               { return GetColumn<ColumnTable, COLUMN_TYPE_TABLE>(ndx); }
+const ColumnTable &Table::GetColumnTable(size_t ndx) const   { return GetColumn<ColumnTable, COLUMN_TYPE_TABLE>(ndx); }
 
-ColumnMixed& Table::GetColumnMixed(size_t ndx)               { return GetColumnT<ColumnMixed, COLUMN_TYPE_MIXED>(ndx); }
-const ColumnMixed& Table::GetColumnMixed(size_t ndx) const   { return GetColumnT<ColumnMixed, COLUMN_TYPE_MIXED>(ndx); }
+ColumnMixed& Table::GetColumnMixed(size_t ndx)               { return GetColumn<ColumnMixed, COLUMN_TYPE_MIXED>(ndx); }
+const ColumnMixed& Table::GetColumnMixed(size_t ndx) const   { return GetColumn<ColumnMixed, COLUMN_TYPE_MIXED>(ndx); }
 
 
 
@@ -1454,7 +1454,7 @@ size_t Table::count(size_t column_ndx, T target) const
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == expect);
 
-    return GetColumnT<C, expect>(column_ndx).count(target);
+    return GetColumn<C, expect>(column_ndx).count(target);
 }
 
 size_t Table::count_int(size_t column_ndx, int64_t target) const
@@ -1490,28 +1490,72 @@ size_t Table::count_string(size_t column_ndx, const char* value) const
     }
 }
 
-// TODO: add float, double here...
+
+template <typename T, class C, ColumnType type, typename R>
+R Table::sum(size_t column_ndx) const
+{
+    // asserts are done in GetColumnT
+    const C& column = GetColumn<C, type>(column_ndx);
+    return column.sum();
+}
 
 int64_t Table::sum(size_t column_ndx) const
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
+    return sum<int64_t, Column, COLUMN_TYPE_INT, int64_t>(column_ndx);
+}
 
-    const Column& column = GetColumn(column_ndx);
-    return column.sum();
+double Table::sum_float(size_t column_ndx) const
+{
+    return sum<float, ColumnFloat, COLUMN_TYPE_FLOAT, double>(column_ndx);
+}
+double Table::sum_double(size_t column_ndx) const
+{
+    return sum<double, ColumnDouble, COLUMN_TYPE_DOUBLE, double>(column_ndx);
+}
+
+
+
+template <typename T, class C, ColumnType type>
+double Table::average(size_t column_ndx) const
+{
+    const C& column = GetColumn<C, type>(column_ndx);
+    return column.average();
 }
 
 double Table::average(size_t column_ndx) const
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
-
-    const Column& column = GetColumn(column_ndx);
-    return column.average();
+    return average<int64_t, Column, COLUMN_TYPE_INT>(column_ndx);
 }
+#if 0
+template <typename T>
+T get()
+{
+
+}
+// TODO: add float, double here...
+
+
+template <typename T, class F>
+T Table::maximumT(size_t column_ndx) const
+{
+    if (is_empty()) 
+        return 0;
+    T max_val = get<T>(column_ndx, 0);
+    for (size_t ndx = 1; ndx < size(); ++ndx) {
+        const T val = get<T>(column_ndx, ndx);
+        if (val > max_val) {
+            max_val = val;
+        }
+    }
+    return max_val;
+}
+#endif
 
 int64_t Table::maximum(size_t column_ndx) const
 {
+#if 0
+    return maximumT<int64_t, get_int>(column_ndx);
+#else
     if (is_empty()) return 0;
 
     int64_t mv = get_int(column_ndx, 0);
@@ -1522,6 +1566,7 @@ int64_t Table::maximum(size_t column_ndx) const
         }
     }
     return mv;
+#endif
 }
 
 int64_t Table::minimum(size_t column_ndx) const

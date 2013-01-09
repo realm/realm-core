@@ -1094,7 +1094,7 @@ size_t Array::count(int64_t value) const
     const size_t end = m_len;
     size_t i = 0;
 
-    // staiic values needed for fast population count
+    // static values needed for fast population count
     const uint64_t m1  = 0x5555555555555555ULL;
     const uint64_t m2  = 0x3333333333333333ULL;
     const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;

@@ -412,6 +412,7 @@
     <ClCompile Include="src\tightdb\utilities.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c" />
     <ClCompile Include="test\experiments\float.cpp" />
+    <ClCompile Include="test\experiments\fp_print.c" />
     <ClCompile Include="test\large_tests\test_column.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
@@ -565,8 +566,10 @@
     <ClInclude Include="src\tightdb\array_blob.hpp" />
     <ClInclude Include="src\tightdb\array_double.hpp" />
     <ClInclude Include="src\tightdb\array_float.hpp" />
-    <ClInclude Include="src\tightdb\array_generic.hpp" />
-    <ClInclude Include="src\tightdb\array_generic_tpl.hpp" />
+    <ClInclude Include="src\tightdb\array_basic.hpp" />
+    <ClInclude Include="src\tightdb\array_basic.tpp">
+      <FileType>CppHeader</FileType>
+    </ClInclude>
     <ClInclude Include="src\tightdb\array_string.hpp" />
     <ClInclude Include="src\tightdb\array_string_long.hpp" />
     <ClInclude Include="src\tightdb\binary_data.hpp" />
@@ -578,7 +581,8 @@
     <ClInclude Include="src\tightdb\column_double.hpp" />
     <ClInclude Include="src\tightdb\column_float.hpp" />
     <ClInclude Include="src\tightdb\column_fwd.hpp" />
-    <ClInclude Include="src\tightdb\column_generic.hpp" />
+    <ClInclude Include="src\tightdb\column_basic.hpp" />
+    <ClInclude Include="src\tightdb\column_basic.tpp" />
     <ClInclude Include="src\tightdb\column_mixed.hpp" />
     <ClInclude Include="src\tightdb\column_string.hpp" />
     <ClInclude Include="src\tightdb\column_string_enum.hpp" />

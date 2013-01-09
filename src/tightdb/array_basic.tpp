@@ -17,11 +17,11 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_ARRAY_GENERIC_TPL_HPP
-#define TIGHTDB_ARRAY_GENERIC_TPL_HPP
+#ifndef TIGHTDB_ARRAY_BASIC_TPL_HPP
+#define TIGHTDB_ARRAY_BASIC_TPL_HPP
 
 template<typename T>
-inline size_t ArrayGeneric<T>::create_empty_basic_array(Allocator& alloc) 
+inline size_t ArrayBasic<T>::create_empty_basic_array(Allocator& alloc) 
 {
     const size_t capacity = Array::initial_capacity;
     const MemRef mem_ref = alloc.Alloc(capacity);
@@ -34,7 +34,7 @@ inline size_t ArrayGeneric<T>::create_empty_basic_array(Allocator& alloc)
 }
 
 template<typename T> 
-inline ArrayGeneric<T>::ArrayGeneric(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc)
+inline ArrayBasic<T>::ArrayBasic(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc)
                                :Array(alloc)
 {
     const size_t ref = create_empty_basic_array(alloc);
@@ -46,7 +46,7 @@ inline ArrayGeneric<T>::ArrayGeneric(ArrayParent *parent, size_t ndx_in_parent, 
 }
 
 template<typename T>
-inline ArrayGeneric<T>::ArrayGeneric(size_t ref, ArrayParent *parent, size_t ndx_in_parent,
+inline ArrayBasic<T>::ArrayBasic(size_t ref, ArrayParent *parent, size_t ndx_in_parent,
                                Allocator& alloc): Array(alloc)
 {
     // Manually create array as doing it in initializer list
@@ -58,19 +58,19 @@ inline ArrayGeneric<T>::ArrayGeneric(size_t ref, ArrayParent *parent, size_t ndx
 // Creates new array (but invalid, call UpdateRef to init)
 #if 0
 template<typename T> 
-inline ArrayGeneric<T>::ArrayGeneric(Allocator& alloc): Array(alloc) 
+inline ArrayBasic<T>::ArrayBasic(Allocator& alloc): Array(alloc) 
 {
 }
 #endif
 
 template<typename T> 
-inline ArrayGeneric<T>::~ArrayGeneric() 
+inline ArrayBasic<T>::~ArrayBasic() 
 {
 }
 
 
 template<typename T> 
-inline void ArrayGeneric<T>::Clear()
+inline void ArrayBasic<T>::Clear()
 {
     CopyOnWrite();
 
@@ -80,20 +80,20 @@ inline void ArrayGeneric<T>::Clear()
 }
 
 template<typename T> 
-inline void ArrayGeneric<T>::add(T value)
+inline void ArrayBasic<T>::add(T value)
 {
     Insert(m_len, value);
 }
 
 template<typename T> 
-inline T ArrayGeneric<T>::Get(size_t ndx) const
+inline T ArrayBasic<T>::Get(size_t ndx) const
 {
     T* dataPtr = (T *)m_data + ndx;
     return *dataPtr;
 }
 
 template<typename T> 
-inline void ArrayGeneric<T>::Set(size_t ndx, T value)
+inline void ArrayBasic<T>::Set(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
@@ -107,7 +107,7 @@ inline void ArrayGeneric<T>::Set(size_t ndx, T value)
 }
 
 template<typename T> 
-void ArrayGeneric<T>::Insert(size_t ndx, T value)
+void ArrayBasic<T>::Insert(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
 
@@ -134,7 +134,7 @@ void ArrayGeneric<T>::Insert(size_t ndx, T value)
 }
 
 template<typename T> 
-void ArrayGeneric<T>::Delete(size_t ndx)
+void ArrayBasic<T>::Delete(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
@@ -156,7 +156,7 @@ void ArrayGeneric<T>::Delete(size_t ndx)
 }
 
 template<typename T>
-bool ArrayGeneric<T>::Compare(const ArrayGeneric<T>& c) const
+bool ArrayBasic<T>::Compare(const ArrayBasic<T>& c) const
 {
     for (size_t i = 0; i < Size(); ++i) {
         if (Get(i) != c.Get(i)) 
@@ -167,14 +167,14 @@ bool ArrayGeneric<T>::Compare(const ArrayGeneric<T>& c) const
 
 
 template<typename T> 
-size_t ArrayGeneric<T>::CalcByteLen(size_t count, size_t width) const
+size_t ArrayBasic<T>::CalcByteLen(size_t count, size_t width) const
 {
     // FIXME: This arithemtic could overflow. Consider using <tightdb/overflow.hpp>
     return 8 + (count * sizeof(T));
 }
 
 template<typename T> 
-size_t ArrayGeneric<T>::CalcItemCount(size_t bytes, size_t width) const
+size_t ArrayBasic<T>::CalcItemCount(size_t bytes, size_t width) const
 {
     // ??? what about width = 0? return -1?
 
@@ -183,7 +183,7 @@ size_t ArrayGeneric<T>::CalcItemCount(size_t bytes, size_t width) const
 }
 
 template<typename T> 
-size_t ArrayGeneric<T>::Find(T target, size_t start, size_t end) const
+size_t ArrayBasic<T>::Find(T target, size_t start, size_t end) const
 {
     TIGHTDB_ASSERT(target);
 
@@ -203,14 +203,14 @@ size_t ArrayGeneric<T>::Find(T target, size_t start, size_t end) const
 }
 
 template<typename T> 
-size_t ArrayGeneric<T>::find_first(T value, size_t start, size_t end) const
+size_t ArrayBasic<T>::find_first(T value, size_t start, size_t end) const
 {
     TIGHTDB_ASSERT(value);
     return Find(value, start, end);
 }
 
 template<typename T> 
-void ArrayGeneric<T>::find_all(Array& result, T value, size_t add_offset, size_t start, size_t end)
+void ArrayBasic<T>::find_all(Array& result, T value, size_t add_offset, size_t start, size_t end)
 {
     TIGHTDB_ASSERT(value);
 
@@ -225,7 +225,7 @@ void ArrayGeneric<T>::find_all(Array& result, T value, size_t add_offset, size_t
 }
 
 template<typename T> 
-size_t ArrayGeneric<T>::count(T value, size_t start, size_t end) const
+size_t ArrayBasic<T>::count(T value, size_t start, size_t end) const
 {
     size_t count = 0;
     size_t lastmatch = start - 1;
@@ -240,8 +240,54 @@ size_t ArrayGeneric<T>::count(T value, size_t start, size_t end) const
     return count;
 }
 
+template<typename T> 
+double ArrayBasic<T>::sum(size_t start, size_t end) const
+{
+    if (end == (size_t)-1)
+        end = m_len;
+    if (m_len == 0)
+        return 0;
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
+    double sum = 0;
+    for (size_t i = start; i < end; ++i) {
+        sum += Get(i);
+    }
+    return sum;
+}
+
+template <typename T> template<bool find_max>
+bool ArrayBasic<T>::minmax(T& result, size_t start, size_t end) const
+{
+    if (end == (size_t)-1)
+        end = m_len;
+    if (m_len == 0)
+        return false;
+    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
+
+    T m = Get(start);
+    ++start;
+    for (; start < end; ++start) {
+        const T val = Get(start);
+        if (find_max ? val > m : val < m)
+            m = val;
+    }
+    result = m;
+    return true;
+}
+
+template <typename T>
+bool ArrayBasic<T>::maximum(T& result, size_t start, size_t end) const
+{
+    return minmax<true>(result, start, end);
+}
+
+template <typename T>
+bool ArrayBasic<T>::minimum(T& result, size_t start, size_t end) const
+{
+    return minmax<false>(result, start, end);
+}
 
 } // namespace tightdb
 
-#endif // TIGHTDB_ARRAY_GENERIC_TPL_HPP
+#endif // TIGHTDB_ARRAY_BASIC_TPL_HPP
