@@ -197,7 +197,7 @@ CATEGORIES :
         DESCR  : The column name.     
       RETURN:                 
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : The column index or std::size_t(-1) if there is no column with the specified name.
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_get_column_index
         DESCR  : 

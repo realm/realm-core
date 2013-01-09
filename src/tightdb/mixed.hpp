@@ -40,24 +40,30 @@ namespace tightdb {
 
 class Mixed {
 public:
-    Mixed()     {m_type = COLUMN_TYPE_INT;    m_int  = 0;}
-    Mixed(int64_t v)     {m_type = COLUMN_TYPE_INT;    m_int  = v;}
-    Mixed(bool v)        {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
-    Mixed(Date v)        {m_type = COLUMN_TYPE_DATE;   m_date = v.get_date();}
-    Mixed(const char* v) {m_type = COLUMN_TYPE_STRING; m_str  = v;}
-    Mixed(BinaryData v)  {m_type = COLUMN_TYPE_BINARY; m_str = v.pointer; m_len = v.len;}
-    Mixed(const char* v, std::size_t len) {m_type = COLUMN_TYPE_BINARY; m_str = v; m_len = len;}
+    Mixed()               {m_type = COLUMN_TYPE_INT;    m_int  = 0;}
+    Mixed(bool v)         {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
+    Mixed(int64_t v)      {m_type = COLUMN_TYPE_INT;    m_int  = v;}
+    Mixed(const char* v)  {m_type = COLUMN_TYPE_STRING; m_str  = v;}
+    Mixed(BinaryData v)   {m_type = COLUMN_TYPE_BINARY; m_str = v.pointer; m_len = v.len;}
+    Mixed(Date v)         {m_type = COLUMN_TYPE_DATE;   m_date = v.get_date();}
 
     struct subtable_tag {};
     Mixed(subtable_tag): m_type(COLUMN_TYPE_TABLE) {}
 
     ColumnType get_type() const {return m_type;}
 
-    int64_t     get_int()    const;
-    bool        get_bool()   const;
-    std::time_t get_date()   const;
-    const char* get_string() const;
-    BinaryData  get_binary() const;
+    bool         get_bool()   const;
+    int64_t      get_int()    const;
+    const char*  get_string() const;
+    BinaryData   get_binary() const;
+    std::time_t  get_date()   const;
+
+    void set_bool(bool);
+    void set_int(int64_t);
+    void set_string(const char*);
+    void set_binary(BinaryData);
+    void set_binary(const char* data, std::size_t size);
+    void set_date(std::time_t);
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
@@ -65,10 +71,10 @@ public:
 private:
     ColumnType m_type;
     union {
-        int64_t m_int;
-        bool    m_bool;
-        std::time_t  m_date;
+        int64_t     m_int;
+        bool        m_bool;
         const char* m_str;
+        std::time_t m_date;
     };
     std::size_t m_len;
 };
@@ -82,23 +88,17 @@ private:
 // vs int64_t, and cause ambiguity. This is because the constructors
 // of Mixed are not explicit.
 
-// Compare mixed with integer
-template<class T> bool operator==(Wrap<Mixed>, const T&);
-template<class T> bool operator!=(Wrap<Mixed>, const T&);
-template<class T> bool operator==(const T&, Wrap<Mixed>);
-template<class T> bool operator!=(const T&, Wrap<Mixed>);
-
 // Compare mixed with boolean
 bool operator==(Wrap<Mixed>, bool);
 bool operator!=(Wrap<Mixed>, bool);
 bool operator==(bool, Wrap<Mixed>);
 bool operator!=(bool, Wrap<Mixed>);
 
-// Compare mixed with date
-bool operator==(Wrap<Mixed>, Date);
-bool operator!=(Wrap<Mixed>, Date);
-bool operator==(Date, Wrap<Mixed>);
-bool operator!=(Date, Wrap<Mixed>);
+// Compare mixed with integer
+template<class T> bool operator==(Wrap<Mixed>, const T&);
+template<class T> bool operator!=(Wrap<Mixed>, const T&);
+template<class T> bool operator==(const T&, Wrap<Mixed>);
+template<class T> bool operator!=(const T&, Wrap<Mixed>);
 
 // Compare mixed with zero-terminated string
 bool operator==(Wrap<Mixed>, const char*);
@@ -116,16 +116,16 @@ bool operator!=(Wrap<Mixed>, BinaryData);
 bool operator==(BinaryData, Wrap<Mixed>);
 bool operator!=(BinaryData, Wrap<Mixed>);
 
+// Compare mixed with date
+bool operator==(Wrap<Mixed>, Date);
+bool operator!=(Wrap<Mixed>, Date);
+bool operator==(Date, Wrap<Mixed>);
+bool operator!=(Date, Wrap<Mixed>);
+
 
 
 
 // Implementation:
-
-inline int64_t Mixed::get_int() const
-{
-    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_INT);
-    return m_int;
-}
 
 inline bool Mixed::get_bool() const
 {
@@ -133,10 +133,10 @@ inline bool Mixed::get_bool() const
     return m_bool;
 }
 
-inline std::time_t Mixed::get_date() const
+inline int64_t Mixed::get_int() const
 {
-    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_DATE);
-    return m_date;
+    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_INT);
+    return m_int;
 }
 
 inline const char* Mixed::get_string() const
@@ -151,44 +151,64 @@ inline BinaryData Mixed::get_binary() const
     return BinaryData(m_str, m_len);
 }
 
+inline std::time_t Mixed::get_date() const
+{
+    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_DATE);
+    return m_date;
+}
+
+inline void Mixed::set_bool(bool v)
+{
+    m_type = COLUMN_TYPE_BOOL;
+    m_bool = v;
+}
+
+inline void Mixed::set_int(int64_t v)
+{
+    m_type = COLUMN_TYPE_INT;
+    m_int = v;
+}
+
+inline void Mixed::set_string(const char* v)
+{
+    m_type = COLUMN_TYPE_STRING;
+    m_str = v;
+}
+
+inline void Mixed::set_binary(BinaryData v)
+{
+    set_binary(v.pointer, v.len);
+}
+
+inline void Mixed::set_binary(const char* data, std::size_t size)
+{
+    m_type = COLUMN_TYPE_BINARY;
+    m_str = data;
+    m_len = size;
+}
+
+inline void Mixed::set_date(std::time_t v)
+{
+    m_type = COLUMN_TYPE_DATE;
+    m_date = v;
+}
+
+
 template<class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Mixed& m)
 {
     out << "Mixed(";
     switch (m.m_type) {
-    case COLUMN_TYPE_INT: out << m.m_int; break;
     case COLUMN_TYPE_BOOL: out << m.m_bool; break;
-    case COLUMN_TYPE_DATE: out << Date(m.m_date); break;
+    case COLUMN_TYPE_INT: out << m.m_int; break;
     case COLUMN_TYPE_STRING: out << m.m_str; break;
     case COLUMN_TYPE_BINARY: out << BinaryData(m.m_str, m.m_len); break;
+    case COLUMN_TYPE_DATE: out << Date(m.m_date); break;
     case COLUMN_TYPE_TABLE: out << "subtable"; break;
     default: TIGHTDB_ASSERT(false); break;
     }
     out << ")";
     return out;
-}
-
-
-// Compare mixed with integer
-
-template<class T> inline bool operator==(Wrap<Mixed> a, const T& b)
-{
-    return Mixed(a).get_type() == COLUMN_TYPE_INT && Mixed(a).get_int() == b;
-}
-
-template<class T> inline bool operator!=(Wrap<Mixed> a, const T& b)
-{
-    return Mixed(a).get_type() == COLUMN_TYPE_INT && Mixed(a).get_int() != b;
-}
-
-template<class T> inline bool operator==(const T& a, Wrap<Mixed> b)
-{
-    return Mixed(b).get_type() == COLUMN_TYPE_INT && a == Mixed(b).get_int();
-}
-
-template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b)
-{
-    return Mixed(b).get_type() == COLUMN_TYPE_INT && a != Mixed(b).get_int();
 }
 
 
@@ -215,26 +235,26 @@ inline bool operator!=(bool a, Wrap<Mixed> b)
 }
 
 
-// Compare mixed with date
+// Compare mixed with integer
 
-inline bool operator==(Wrap<Mixed> a, Date b)
+template<class T> inline bool operator==(Wrap<Mixed> a, const T& b)
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_DATE && Date(Mixed(a).get_date()) == b;
+    return Mixed(a).get_type() == COLUMN_TYPE_INT && Mixed(a).get_int() == b;
 }
 
-inline bool operator!=(Wrap<Mixed> a, Date b)
+template<class T> inline bool operator!=(Wrap<Mixed> a, const T& b)
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_DATE && Date(Mixed(a).get_date()) != b;
+    return Mixed(a).get_type() == COLUMN_TYPE_INT && Mixed(a).get_int() != b;
 }
 
-inline bool operator==(Date a, Wrap<Mixed> b)
+template<class T> inline bool operator==(const T& a, Wrap<Mixed> b)
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_DATE && a == Date(Mixed(b).get_date());
+    return Mixed(b).get_type() == COLUMN_TYPE_INT && a == Mixed(b).get_int();
 }
 
-inline bool operator!=(Date a, Wrap<Mixed> b)
+template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b)
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_DATE && a != Date(Mixed(b).get_date());
+    return Mixed(b).get_type() == COLUMN_TYPE_INT && a != Mixed(b).get_int();
 }
 
 
@@ -301,6 +321,29 @@ inline bool operator==(BinaryData a, Wrap<Mixed> b)
 inline bool operator!=(BinaryData a, Wrap<Mixed> b)
 {
     return Mixed(b).get_type() == COLUMN_TYPE_BINARY && !a.compare_payload(Mixed(b).get_binary());
+}
+
+
+// Compare mixed with date
+
+inline bool operator==(Wrap<Mixed> a, Date b)
+{
+    return Mixed(a).get_type() == COLUMN_TYPE_DATE && Date(Mixed(a).get_date()) == b;
+}
+
+inline bool operator!=(Wrap<Mixed> a, Date b)
+{
+    return Mixed(a).get_type() == COLUMN_TYPE_DATE && Date(Mixed(a).get_date()) != b;
+}
+
+inline bool operator==(Date a, Wrap<Mixed> b)
+{
+    return Mixed(b).get_type() == COLUMN_TYPE_DATE && a == Date(Mixed(b).get_date());
+}
+
+inline bool operator!=(Date a, Wrap<Mixed> b)
+{
+    return Mixed(b).get_type() == COLUMN_TYPE_DATE && a != Date(Mixed(b).get_date());
 }
 
 

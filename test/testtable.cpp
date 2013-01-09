@@ -230,7 +230,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
                 table.insert_mixed(7, i, Date(123456789));
                 break;
             case 4:
-                table.insert_mixed(7, i, Mixed("binary", 7));
+                table.insert_mixed(7, i, Mixed(BinaryData("binary", 7)));
                 break;
             case 5:
             {
@@ -1271,7 +1271,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
 
     table.insert_int(0, 4, 43);
-    table.insert_mixed(1, 4, Mixed("binary", 7));
+    table.insert_mixed(1, 4, Mixed(BinaryData("binary", 7)));
     table.insert_done();
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
