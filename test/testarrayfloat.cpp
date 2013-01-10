@@ -11,156 +11,173 @@ size_t SizeOfArray( const T(&)[ N ] )
 
 using namespace tightdb;
 
-struct db_setup_float {
-    static ArrayFloat f;
-};
-ArrayFloat db_setup_float::f;
-
-
-// NOTE: Comapring floats is difficult. Strait comparison is usually wrong 
-// unless you know the numbers excactly and the precision they are can represent.
-// See also this article about comparing floats: 
+// Article about comparing floats:
 // http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
 
 namespace {
-float testval[] = {float(0.0),
-                   float(1.0),
-                   float(2.12345),
-                   float(12345.12),
-                   float(-12345.12)
+float floatVal[] = {0.0f,
+                   1.0f,
+                   2.12345f,
+                   12345.12f,
+                   -12345.12f
                   };
-const size_t testvalLen = SizeOfArray(testval);
+const size_t floatValLen = SizeOfArray(floatVal);
+
+double doubleVal[] = {0.0,
+                      1.0,
+                      2.12345,
+                      12345.12,
+                      -12345.12
+                     };
+const size_t doubleValLen = SizeOfArray(doubleVal);
 }
 
-TEST_FIXTURE(db_setup_float, ArrayFloat_AddGet)
+// Add test of full range of floats.
+
+template <class C, typename T>
+void ArrayBasic_AddGet(T val[], size_t valLen)
 {
-    for (int i=0; i<testvalLen; ++i) {
-        f.add(testval[i]);
+    C f;
+    for (int i=0; i<valLen; ++i) {
+        f.add(val[i]);
 
         CHECK_EQUAL(i+1, f.Size());
 
         for (int j=0; j<i; ++j) {
-            float val = f.Get(j);
-            CHECK_EQUAL(testval[j], val);
+            CHECK_EQUAL(val[j], f.Get(j));
         }
     }
 
     f.Clear();
     CHECK_EQUAL(0, f.Size());
 }
+TEST(ArrayFloat_AddGet) { ArrayBasic_AddGet<ArrayFloat, float>(floatVal, floatValLen); }
+TEST(ArrayDouble_AddGet){ ArrayBasic_AddGet<ArrayDouble, double>(doubleVal, doubleValLen); }
 
-TEST_FIXTURE(db_setup_float, ArrayFloat_AddManyValues)
+
+template <class C, typename T>
+void ArrayBasic_AddManyValues()
 {
+    C f;
     const size_t repeats = 1100;
     for (size_t i=0; i<repeats; ++i) {
-        f.add(float(i));
-        float val = f.Get(i);
-        //printf("%d: %f\n", i, val);
-        CHECK_EQUAL(i, val);
+        f.add(T(i));
+        T val = f.Get(i);
+        CHECK_EQUAL(T(i), val);
         CHECK_EQUAL(i+1, f.Size());
     }
     for (size_t i=0; i<repeats; ++i) {
-        float val = f.Get(i);
-        CHECK_EQUAL(i, val);
+        T val = f.Get(i);
+        CHECK_EQUAL(T(i), val);
     }
 
     f.Clear();
     CHECK_EQUAL(0, f.Size());
 }
+TEST(ArrayFloat_AddManyValues) { ArrayBasic_AddManyValues<ArrayFloat, float>(); }
+TEST(ArrayDouble_AddManyValues){ ArrayBasic_AddManyValues<ArrayDouble, double>(); }
 
-TEST_FIXTURE(db_setup_float, ArrayFloat_Set)
+
+template <class C, typename T>
+void ArrayBasic_Set(T val[], size_t valLen)
 {
+    C f;
     CHECK_EQUAL(0, f.Size());
-    for (int i=0; i<testvalLen; ++i)
-        f.add(testval[i]);
-    CHECK_EQUAL(testvalLen, f.Size());
+    for (int i=0; i<valLen; ++i)
+        f.add(val[i]);
+    CHECK_EQUAL(valLen, f.Size());
 
-    f.Set(0, float(1.6));
-    CHECK_EQUAL(float(1.6), f.Get(0));
-    f.Set(3, float(987.23));
-    CHECK_EQUAL(float(987.23), f.Get(3));
+    f.Set(0, T(1.6));
+    CHECK_EQUAL(T(1.6), f.Get(0));
+    f.Set(3, T(987.23));
+    CHECK_EQUAL(T(987.23), f.Get(3));
 
-    CHECK_EQUAL(testval[1], f.Get(1));
-    CHECK_EQUAL(testval[2], f.Get(2));
-    CHECK_EQUAL(testval[4], f.Get(4));
+    CHECK_EQUAL(val[1], f.Get(1));
+    CHECK_EQUAL(val[2], f.Get(2));
+    CHECK_EQUAL(val[4], f.Get(4));
+    CHECK_EQUAL(valLen, f.Size());
 }
+TEST(ArrayFloat_Set) { ArrayBasic_Set<ArrayFloat, float>(floatVal, floatValLen); }
+TEST(ArrayDouble_Set){ ArrayBasic_Set<ArrayDouble, double>(doubleVal, doubleValLen); }
 
-TEST_FIXTURE(db_setup_float, ArrayFloat_Insert)
+
+template <class C, typename T>
+void ArrayBasic_Insert(T val[])
 {
-    f.Clear();
-    CHECK(f.is_empty());
-    
+    C f;
+    const T v0 = T(123.970);
+    const T v1 = T(-321.971);
+    T v2 = T(555.972);
+    T v3 = T(-999.973);
+
     // Insert in empty array
-    f.Insert(0, 123.97f);
-    CHECK_EQUAL(123.97f, f.Get(0));
+    f.Insert(0, v0);
+    CHECK_EQUAL(v0, f.Get(0));
     CHECK_EQUAL(1, f.Size());
 
     // Insert in top
-    f.Insert(0, 321.97f);
-    CHECK_EQUAL(321.97f, f.Get(0));
-    CHECK_EQUAL(123.97f, f.Get(1));
+    f.Insert(0, v1);
+    CHECK_EQUAL(v1, f.Get(0));
+    CHECK_EQUAL(v0, f.Get(1));
     CHECK_EQUAL(2, f.Size());
 
     // Insert in middle
-    f.Insert(1, 555.97f);
-    CHECK_EQUAL(321.97f, f.Get(0));
-    CHECK_EQUAL(555.97f, f.Get(1));
-    CHECK_EQUAL(123.97f, f.Get(2));
+    f.Insert(1, v2);
+    CHECK_EQUAL(v1, f.Get(0));
+    CHECK_EQUAL(v2, f.Get(1));
+    CHECK_EQUAL(v0, f.Get(2));
     CHECK_EQUAL(3, f.Size());
 
     // Insert at buttom
-    f.Insert(3, 999.97f);
-    CHECK_EQUAL(321.97f, f.Get(0));
-    CHECK_EQUAL(555.97f, f.Get(1));
-    CHECK_EQUAL(123.97f, f.Get(2));
-    CHECK_EQUAL(999.97f, f.Get(3));
+    f.Insert(3, v3);
+    CHECK_EQUAL(v1, f.Get(0));
+    CHECK_EQUAL(v2, f.Get(1));
+    CHECK_EQUAL(v0, f.Get(2));
+    CHECK_EQUAL(v3, f.Get(3));
     CHECK_EQUAL(4, f.Size());
 }
+TEST(ArrayFloat_Insert) { ArrayBasic_Insert<ArrayFloat, float>(floatVal); }
+TEST(ArrayDouble_Insert){ ArrayBasic_Insert<ArrayDouble, double>(doubleVal); }
 
-TEST_FIXTURE(db_setup_float, ArrayFloat_Delete)
+
+template <class C, typename T>
+void ArrayBasic_Delete(T val[])
 {
-    f.Clear();
-    CHECK_EQUAL(0, f.Size());
-
-    f.add(float(1.1));
-    f.add(float(2.2));
-    f.add(float(3.3));
-    f.add(float(4.4));
-    f.add(float(5.5));
-    CHECK_EQUAL(5, f.Size());
-    CHECK_EQUAL(1.1f, f.Get(0));
-    CHECK_EQUAL(2.2f, f.Get(1));
-    CHECK_EQUAL(3.3f, f.Get(2));
-    CHECK_EQUAL(4.4f, f.Get(3));
-    CHECK_EQUAL(5.5f, f.Get(4));
+    C f;
+    for (int i=0; i<5; ++i)
+        f.add(val[i]);
 
     // Delete first
     f.Delete(0);
     CHECK_EQUAL(4, f.Size());
-    CHECK_EQUAL(2.2f, f.Get(0));
-    CHECK_EQUAL(3.3f, f.Get(1));
-    CHECK_EQUAL(4.4f, f.Get(2));
-    CHECK_EQUAL(5.5f, f.Get(3));
+    CHECK_EQUAL(val[1], f.Get(0));
+    CHECK_EQUAL(val[2], f.Get(1));
+    CHECK_EQUAL(val[3], f.Get(2));
+    CHECK_EQUAL(val[4], f.Get(3));
 
     // Delete middle
     f.Delete(2);
     CHECK_EQUAL(3, f.Size());
-    CHECK_EQUAL(2.2f, f.Get(0));
-    CHECK_EQUAL(3.3f, f.Get(1));
-    CHECK_EQUAL(5.5f, f.Get(2));
+    CHECK_EQUAL(val[1], f.Get(0));
+    CHECK_EQUAL(val[2], f.Get(1));
+    CHECK_EQUAL(val[4], f.Get(2));
 
     // Delete buttom
     f.Delete(2);
     CHECK_EQUAL(2, f.Size());
-    CHECK_EQUAL(2.2f, f.Get(0));
-    CHECK_EQUAL(3.3f, f.Get(1));
+    CHECK_EQUAL(val[1], f.Get(0));
+    CHECK_EQUAL(val[2], f.Get(1));
 }
+TEST(ArrayFloat_Delete) { ArrayBasic_Delete<ArrayFloat, float>(floatVal); }
+TEST(ArrayDouble_Delete){ ArrayBasic_Delete<ArrayDouble, double>(doubleVal); }
 
-TEST_FIXTURE(db_setup_float, ArrayFloat_sum)
+
+template <class C, typename T>
+void ArrayBasic_Sum(T val[])
 {
-    f.Clear();
-    CHECK_EQUAL(0, f.Size());
-    float values[] = {1.1f, 2.2f, 3.3f, 4.4f, 5.5f};
+    C f;
+
+    T values[] = { T(1.1), T(2.2), T(3.3), T(4.4), T(5.5)};
     double sum = 0.0;
     for (size_t i=0; i<5; ++i) {
         f.add(values[i]);
@@ -171,24 +188,27 @@ TEST_FIXTURE(db_setup_float, ArrayFloat_sum)
     // all
     CHECK_EQUAL(sum, f.sum());
     // first
-    CHECK_EQUAL(double(values[0]), f.sum(0,1));
+    CHECK_EQUAL(double(values[0]), f.sum(0, 1));
     // last
-    CHECK_EQUAL(double(values[4]), f.sum(4,5));
+    CHECK_EQUAL(double(values[4]), f.sum(4, 5));
     // middle range
     CHECK_EQUAL(double(values[2]) + double(values[3]) + double(values[4]), f.sum(2));
     // single middle
-    CHECK_EQUAL(double(values[2]), f.sum(2,3));
+    CHECK_EQUAL(double(values[2]), f.sum(2, 3));
 }
+TEST(ArrayFloat_Sum) { ArrayBasic_Sum<ArrayFloat, float>(floatVal); }
+TEST(ArrayDouble_Sum){ ArrayBasic_Sum<ArrayDouble, double>(doubleVal); }
 
-TEST_FIXTURE(db_setup_float, ArrayFloat_minimum)
+
+template <class C, typename T>
+void ArrayBasic_Minimum(T val[])
 {
-    float res;
-    f.Clear();
-    CHECK_EQUAL(0, f.Size());
+    C f;
+    T res;
 
     CHECK_EQUAL(false, f.minimum(res));
 
-    float values[] = {1.1f, 2.2f, -1.0f, 5.5f, 4.4f};
+    T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(4.4)};
     for (size_t i=0; i<5; ++i) {
         f.add(values[i]);
     }
@@ -210,16 +230,19 @@ TEST_FIXTURE(db_setup_float, ArrayFloat_minimum)
     CHECK_EQUAL(true, f.minimum(res, 3, size_t(-1)));
     CHECK_EQUAL(values[4], res);
 }
+TEST(ArrayFloat_Minimum) { ArrayBasic_Minimum<ArrayFloat, float>(floatVal); }
+TEST(ArrayDouble_Minimum){ ArrayBasic_Minimum<ArrayDouble, double>(doubleVal); }
 
-TEST_FIXTURE(db_setup_float, ArrayFloat_maximum)
+
+template <class C, typename T>
+void ArrayBasic_Maximum(T val[])
 {
-    float res;
-    f.Clear();
-    CHECK_EQUAL(0, f.Size());
+    C f;
+    T res;
 
     CHECK_EQUAL(false, f.maximum(res));
 
-    float values[] = {1.1f, 2.2f, -1.0f, 5.5f, 4.4f};
+    T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(4.4)};
     for (size_t i=0; i<5; ++i) {
         f.add(values[i]);
     }
@@ -241,36 +264,7 @@ TEST_FIXTURE(db_setup_float, ArrayFloat_maximum)
     CHECK_EQUAL(true, f.maximum(res, 3, size_t(-1)));
     CHECK_EQUAL(values[3], res);
 }
+TEST(ArrayFloat_Maximum) { ArrayBasic_Maximum<ArrayFloat, float>(floatVal); }
+TEST(ArrayDouble_Maximum){ ArrayBasic_Maximum<ArrayDouble, double>(doubleVal); }
 
-#if 1
-
-struct db_setup_double {
-    static ArrayDouble d;
-};
-ArrayDouble db_setup_double::d;
-
-
-TEST_FIXTURE(db_setup_double, ArrayDoubleStoreRetrieveValues)
-{
-    double test[] = {double(0.0),
-                     double(1.0),
-                     double(2.12345),
-                     double(12345.12),
-                     double(-12345.12)
-                    };
-
-    for (int i=0; i<5; ++i) {
-        d.add(test[i]);
-    }
-    CHECK_EQUAL(5, d.Size());
-
-    for (int i=0; i<5; ++i) {
-        double val = d.Get(i);
-        CHECK_EQUAL(test[i], val);
-    }
-
-    d.Clear();
-    CHECK_EQUAL(0, d.Size());
-}
-
-#endif
+// TODO: count, find, fird_first, find_all, Compare

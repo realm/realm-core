@@ -567,7 +567,7 @@
     <ClInclude Include="src\tightdb\array_double.hpp" />
     <ClInclude Include="src\tightdb\array_float.hpp" />
     <ClInclude Include="src\tightdb\array_basic.hpp" />
-    <ClInclude Include="src\tightdb\array_basic.tpp">
+    <ClInclude Include="src\tightdb\array_basic_tpl.hpp">
       <FileType>CppHeader</FileType>
     </ClInclude>
     <ClInclude Include="src\tightdb\array_string.hpp" />
@@ -582,7 +582,7 @@
     <ClInclude Include="src\tightdb\column_float.hpp" />
     <ClInclude Include="src\tightdb\column_fwd.hpp" />
     <ClInclude Include="src\tightdb\column_basic.hpp" />
-    <ClInclude Include="src\tightdb\column_basic.tpp" />
+    <ClInclude Include="src\tightdb\column_basic_tpl.hpp" />
     <ClInclude Include="src\tightdb\column_mixed.hpp" />
     <ClInclude Include="src\tightdb\column_string.hpp" />
     <ClInclude Include="src\tightdb\column_string_enum.hpp" />

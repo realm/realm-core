@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <UnitTest++.h>
 #include <tightdb/column_float.hpp>
+#include <tightdb/column_double.hpp>
 
 template <typename T, size_t N> inline
 size_t SizeOfArray( const T(&)[ N ] )
@@ -8,66 +9,25 @@ size_t SizeOfArray( const T(&)[ N ] )
   return N;
 }
 
-#if 1
-
-using namespace tightdb;
-
-struct db_setup_column_float {
-    static ColumnFloat c;
-};
-
-ColumnFloat db_setup_column_float::c;
-
-TEST_FIXTURE(db_setup_column_float, ColumnFloat_IsEmpty)
-{
-    CHECK(c.is_empty());
-    CHECK_EQUAL(c.Size(), (size_t)0);
-}
-
 namespace {
-float testval[] = {float(0.0),
-                   float(1.0),
-                   float(2.12345),
-                   float(12345.12),
-                   float(-12345.12)
+float floatVal[] = {0.0f,
+                   1.0f,
+                   2.12345f,
+                   12345.12f,
+                   -12345.12f
                   };
-const size_t testvalLen = SizeOfArray(testval);
+const size_t floatValLen = SizeOfArray(floatVal);
+
+double doubleVal[] = {0.0,
+                      1.0,
+                      2.12345,
+                      12345.12,
+                      -12345.12
+                     };
+const size_t doubleValLen = SizeOfArray(doubleVal);
+
 }
 
-TEST_FIXTURE(db_setup_column_float, ColumnFloat_AddGetValues)
-{
-    for (int i=0; i<testvalLen; ++i) {
-        c.add(testval[i]);
-
-        CHECK_EQUAL(i+1, c.Size());
-
-        for (int j=0; j<i; ++j) {
-            float val = c.Get(j);
-            CHECK_EQUAL(testval[j], val);
-        }
-    }
-}
-
-TEST_FIXTURE(db_setup_column_float, ColumnFloat_Set)
-{
-    CHECK_EQUAL(testvalLen, c.Size());
-
-    c.Set(0, float(1.6));
-    CHECK_EQUAL(float(1.6), c.Get(0));
-    c.Set(3, float(987.23));
-    CHECK_EQUAL(float(987.23), c.Get(3));
-
-    CHECK_EQUAL(testval[1], c.Get(1));
-    CHECK_EQUAL(testval[2], c.Get(2));
-    CHECK_EQUAL(testval[4], c.Get(4));
-}
-
-TEST_FIXTURE(db_setup_column_float, ColumnFloat_Clear)
-{
-    CHECK(!c.is_empty());
-    c.Clear();
-    CHECK(c.is_empty());
-}
 void printCol(ColumnFloat& c)
 {
     for (int i=0; i < c.Size(); ++i) {
@@ -75,96 +35,165 @@ void printCol(ColumnFloat& c)
     }
 }
 
+using namespace tightdb;
 
-TEST_FIXTURE(db_setup_column_float, ColumnFloatInsert)
+
+template <class C>
+void ColumnBasic_IsEmpty()
 {
+    C c;
     CHECK(c.is_empty());
+    CHECK_EQUAL(c.Size(), (size_t)0);
+}
+TEST(ColumnFloat_IsEmpty) { ColumnBasic_IsEmpty<ColumnFloat>(); }
+TEST(ColumnDouble_IsEmpty){ ColumnBasic_IsEmpty<ColumnDouble>(); }
+
+
+template <class C, typename T>
+void ColumnBasic_AddGet(T val[], size_t valLen)
+{
+    C c;
+    for (int i=0; i<valLen; ++i) {
+        c.add(val[i]);
+
+        CHECK_EQUAL(i+1, c.Size());
+
+        for (int j=0; j<i; ++j) {
+            CHECK_EQUAL(val[j], c.Get(j));
+        }
+    }
+}
+TEST(ColumnFloat_AddGet) { ColumnBasic_AddGet<ColumnFloat, float>(floatVal, floatValLen); }
+TEST(ColumnDouble_AddGet){ ColumnBasic_AddGet<ColumnDouble, double>(doubleVal, doubleValLen); }
+
+
+template <class C, typename T>
+void ColumnBasic_Clear()
+{
+    C c;
+    CHECK(c.is_empty());
+
+    for (size_t i=0; i<100; ++i)
+        c.add();
+    CHECK(!c.is_empty());
+
+    c.Clear();
+    CHECK(c.is_empty());
+}
+TEST(ColumnFloat_Clear) { ColumnBasic_Clear<ColumnFloat, float>(); }
+TEST(ColumnDouble_Clear){ ColumnBasic_Clear<ColumnDouble, double>(); }
+
+
+template <class C, typename T>
+void ColumnBasic_Set(T val[], size_t valLen)
+{
+    C c;
+    for (int i=0; i<valLen; ++i)
+        c.add(val[i]);
+    CHECK_EQUAL(valLen, c.Size());
+    
+    T v0 = T(1.6);
+    T v3 = T(-987.23);
+    c.Set(0, v0);
+    CHECK_EQUAL(v0, c.Get(0));
+    c.Set(3, v3);
+    CHECK_EQUAL(v3, c.Get(3));
+
+    CHECK_EQUAL(val[1], c.Get(1));
+    CHECK_EQUAL(val[2], c.Get(2));
+    CHECK_EQUAL(val[4], c.Get(4));
+}
+TEST(ColumnFloat_Set) { ColumnBasic_Set<ColumnFloat, float>(floatVal, floatValLen); }
+TEST(ColumnDouble_Set){ ColumnBasic_Set<ColumnDouble, double>(doubleVal, doubleValLen); }
+
+
+template <class C, typename T>
+void ColumnBasic_Insert(T val[], size_t valLen)
+{
+    C c;
     
     // Insert in empty column
-    c.Insert(0, 123.91f);
-    CHECK_EQUAL(123.91f, c.Get(0));
+    c.Insert(0, val[0]);
+    CHECK_EQUAL(val[0], c.Get(0));
     CHECK_EQUAL(1, c.Size());
 
     // Insert in top
-    c.Insert(0, 321.93f);
-    CHECK_EQUAL(321.93f, c.Get(0));
-    CHECK_EQUAL(123.91f, c.Get(1));
+    c.Insert(0, val[1]);
+    CHECK_EQUAL(val[1], c.Get(0));
+    CHECK_EQUAL(val[0], c.Get(1));
     CHECK_EQUAL(2, c.Size());
 
     // Insert in middle
-    c.Insert(1, 555.95f);
-    CHECK_EQUAL(321.93f, c.Get(0));
-    CHECK_EQUAL(555.95f, c.Get(1));
-    CHECK_EQUAL(123.91f, c.Get(2));
+    c.Insert(1, val[2]);
+    CHECK_EQUAL(val[1], c.Get(0));
+    CHECK_EQUAL(val[2], c.Get(1));
+    CHECK_EQUAL(val[0], c.Get(2));
     CHECK_EQUAL(3, c.Size());
 
     // Insert at buttom
-    c.Insert(3, 999.99f);
-    CHECK_EQUAL(321.93f, c.Get(0));
-    CHECK_EQUAL(555.95f, c.Get(1));
-    CHECK_EQUAL(123.91f, c.Get(2));
-    CHECK_EQUAL(999.99f, c.Get(3));
+    c.Insert(3, val[3]);
+    CHECK_EQUAL(val[1], c.Get(0));
+    CHECK_EQUAL(val[2], c.Get(1));
+    CHECK_EQUAL(val[0], c.Get(2));
+    CHECK_EQUAL(val[3], c.Get(3));
     CHECK_EQUAL(4, c.Size());   
 
     // Insert at top
-    c.Insert(0, 888.98f);
-    CHECK_EQUAL(888.98f, c.Get(0));
-    CHECK_EQUAL(321.93f, c.Get(1));
-    CHECK_EQUAL(555.95f, c.Get(2));
-    CHECK_EQUAL(123.91f, c.Get(3));
-    CHECK_EQUAL(999.99f, c.Get(4));
+    c.Insert(0, val[4]);
+    CHECK_EQUAL(val[4], c.Get(0));
+    CHECK_EQUAL(val[1], c.Get(1));
+    CHECK_EQUAL(val[2], c.Get(2));
+    CHECK_EQUAL(val[0], c.Get(3));
+    CHECK_EQUAL(val[3], c.Get(4));
     CHECK_EQUAL(5, c.Size());   
 }
+TEST(ColumnFloat_Insert) { ColumnBasic_Insert<ColumnFloat, float>(floatVal, floatValLen); }
+TEST(ColumnDouble_Insert){ ColumnBasic_Insert<ColumnDouble, double>(doubleVal, doubleValLen); }
 
 
-TEST_FIXTURE(db_setup_column_float, ColumnFloatDelete)
+template <class C, typename T>
+void ColumnBasic_Delete(T val[], size_t valLen)
 {
-    c.Clear();
-    for (int i=0; i<5; ++i)
-        c.add(testval[i]);
+    C c;
+    for (int i=0; i<valLen; ++i)
+        c.add(val[i]);
     CHECK_EQUAL(5, c.Size());
-    CHECK_EQUAL(testval[0], c.Get(0));
-    CHECK_EQUAL(testval[1], c.Get(1));
-    CHECK_EQUAL(testval[2], c.Get(2));
-    CHECK_EQUAL(testval[3], c.Get(3));
-    CHECK_EQUAL(testval[4], c.Get(4));
+    CHECK_EQUAL(val[0], c.Get(0));
+    CHECK_EQUAL(val[1], c.Get(1));
+    CHECK_EQUAL(val[2], c.Get(2));
+    CHECK_EQUAL(val[3], c.Get(3));
+    CHECK_EQUAL(val[4], c.Get(4));
 
     // Delete first
     c.Delete(0);
     CHECK_EQUAL(4, c.Size());
-    CHECK_EQUAL(testval[1], c.Get(0));
-    CHECK_EQUAL(testval[2], c.Get(1));
-    CHECK_EQUAL(testval[3], c.Get(2));
-    CHECK_EQUAL(testval[4], c.Get(3));
+    CHECK_EQUAL(val[1], c.Get(0));
+    CHECK_EQUAL(val[2], c.Get(1));
+    CHECK_EQUAL(val[3], c.Get(2));
+    CHECK_EQUAL(val[4], c.Get(3));
 
     // Delete middle
     c.Delete(2);
     CHECK_EQUAL(3, c.Size());
-    CHECK_EQUAL(testval[1], c.Get(0));
-    CHECK_EQUAL(testval[2], c.Get(1));
-    CHECK_EQUAL(testval[4], c.Get(2));
+    CHECK_EQUAL(val[1], c.Get(0));
+    CHECK_EQUAL(val[2], c.Get(1));
+    CHECK_EQUAL(val[4], c.Get(2));
 
     // Delete last
     c.Delete(2);
     CHECK_EQUAL(2, c.Size());
-    CHECK_EQUAL(testval[1], c.Get(0));
-    CHECK_EQUAL(testval[2], c.Get(1));
+    CHECK_EQUAL(val[1], c.Get(0));
+    CHECK_EQUAL(val[2], c.Get(1));
 
     // Delete single
     c.Delete(0);
     CHECK_EQUAL(1, c.Size());
-    CHECK_EQUAL(testval[2], c.Get(0));
+    CHECK_EQUAL(val[2], c.Get(0));
 
     // Delete all
     c.Delete(0);
     CHECK_EQUAL(0, c.Size());
 }
+TEST(ColumnFloat_Delete) { ColumnBasic_Delete<ColumnFloat, float>(floatVal, floatValLen); }
+TEST(ColumnDouble_Delete){ ColumnBasic_Delete<ColumnDouble, double>(doubleVal, doubleValLen); }
 
-
-// clean up (ALWAYS PUT THIS LAST)
-TEST_FIXTURE(db_setup_column_float, ColumnFloat_Destroy)
-{
-    c.Destroy();
-}
-
-#endif

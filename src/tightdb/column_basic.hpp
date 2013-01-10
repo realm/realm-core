@@ -65,8 +65,6 @@ public:
     size_t GetRef() const {return m_array->GetRef();}
     void SetParent(ArrayParent* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 
-//??FIXME: NEEDED?    Allocator& GetAllocator() const {return m_array->GetAllocator();}
-
     /// Compare two columns for equality.
     bool Compare(const ColumnBasic&) const;
 
@@ -88,8 +86,6 @@ protected:
     size_t LeafFind(T value, size_t start, size_t end) const;
     void LeafFindAll(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
-//FIXME: Remove?    bool FindKeyPos(const char* target, size_t& pos) const;
-
 #ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif // TIGHTDB_DEBUG
@@ -99,7 +95,7 @@ protected:
 } // namespace tightdb
 
 // Templates
-#include <tightdb/column_basic.tpp>
+#include <tightdb/column_basic_tpl.hpp>
 
 
 #endif // TIGHTDB_COLUMN_BASIC_HPP
