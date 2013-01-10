@@ -68,7 +68,7 @@ SharedGroup::SharedGroup(replication_tag, string path_to_database_file, Durabilt
 
 #else // ! TIGHTDB_ENABLE_REPLICATION
 
-SharedGroup::SharedGroup(string path_to_database_file, DurabiltyLevel dlevel):
+SharedGroup::SharedGroup(string path_to_database_file, DurabilityLevel dlevel):
     m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID),
     m_info(NULL), m_isValid(false), m_version(-1)
 {
@@ -78,7 +78,7 @@ SharedGroup::SharedGroup(string path_to_database_file, DurabiltyLevel dlevel):
 #endif // ! TIGHTDB_ENABLE_REPLICATION
 
 
-void SharedGroup::init(string path_to_database_file, DurabiltyLevel dlevel)
+void SharedGroup::init(string path_to_database_file, DurabilityLevel dlevel)
 {
     m_lockfile_path = path_to_database_file + ".lock";
 
