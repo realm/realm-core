@@ -352,9 +352,6 @@ public:
     template <class cond2, ACTION action, size_t bitwidth, class Callback>
     int64_t find_reference(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
 
-    // Initialize state before calling find()
-    void state_init(ACTION action, state_state *state, Array* akku);
-
     // Called for each search result
     template <ACTION action, class Callback> bool FIND_ACTION(size_t index, int64_t value, state_state *state, Callback callback) const;
     template <ACTION action, class Callback> bool FIND_ACTION_PATTERN(size_t index, uint64_t pattern, state_state *state, Callback callback) const;
@@ -552,12 +549,7 @@ public:
 
     int64_t state;
     size_t match_count;
-    size_t m_leaf_start_agg;
-    size_t m_leaf_end_agg;
-    size_t m_local_end_agg;
-    Column *m_column_agg;            // Column on which aggregate function is executed (can be same as m_column)
     size_t m_limit;
-
 
     // popcount
     #if defined(_MSC_VER) && _MSC_VER >= 1500
@@ -606,7 +598,7 @@ public:
 
     #endif // select best popcount implementations
 
-
+    
 
     template <ACTION action> bool uses_val(void) 
     {
@@ -616,15 +608,10 @@ public:
             return false;
     }
     
-    void init(ACTION action, Array* akku, Column *agg_source, size_t limit) 
+    void init(ACTION action, Array* akku, size_t limit) 
     {
-        m_column_agg = agg_source;
-        m_leaf_start_agg = 0;
-        m_leaf_end_agg = 0;
-        m_local_end_agg = 0;
         match_count = 0;
         m_limit = limit;
-
 
         if (action == TDB_MAX)
             state = -0x7fffffffffffffffLL - 1LL;
@@ -639,9 +626,6 @@ public:
         if (action == TDB_FINDALL)
             state = (int64_t)akku;
     }
-
-   template <ACTION action> bool match(size_t i);
-  //  template <ACTION action, bool pattern, class Callback> bool state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback);
 
     template <ACTION action, bool pattern, class Callback> inline bool state_match(size_t index, uint64_t indexpattern, int64_t value, Callback callback)
     {
@@ -665,8 +649,10 @@ public:
             state = value;
         if (action == TDB_SUM)
             state += value;
-        if (action == TDB_COUNT)
+        if (action == TDB_COUNT) {
             state++;
+            match_count = size_t(state);
+        }
         if (action == TDB_FINDALL)
             ((Array*)state)->add(index);
         if (action == TDB_RETURN_FIRST) {

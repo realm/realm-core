@@ -46,8 +46,9 @@ public:
     void   find_all(Array& result, const char* value) const;
     void   distinct(Array& result) const;
 
-#ifdef TIGHTDB_DEBUG
     bool is_empty() const;
+
+#ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream& out);
 #endif
 

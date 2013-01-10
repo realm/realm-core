@@ -144,14 +144,14 @@ T ColumnGeneric<T>::Get(size_t ndx) const
     TIGHTDB_ASSERT(ndx < Size());
     // return m_array->Column???StringGet(ndx);
     // FIXME??? why different in stringColumn?
-    return TreeGet<T, ColumnGeneric<T>>(ndx);
+    return TreeGet<T, ColumnGeneric<T> >(ndx);
 }
 
 template<typename T>
 bool ColumnGeneric<T>::Set(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < Size());
-    return TreeSet<T,ColumnGeneric<T>>(ndx, value);
+    return TreeSet<T,ColumnGeneric<T> >(ndx, value);
 }
 
 template<typename T>
@@ -164,7 +164,7 @@ template<typename T>
 bool ColumnGeneric<T>::Insert(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= Size());
-    return TreeInsert<T, ColumnGeneric<T>>(ndx, value);
+    return TreeInsert<T, ColumnGeneric<T> >(ndx, value);
 }
 
 template<typename T>
@@ -176,7 +176,7 @@ void ColumnGeneric<T>::fill(size_t count)
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
     for (size_t i = 0; i < count; ++i) {
-        TreeInsert<T, ColumnGeneric<T>>(i, 0);
+        TreeInsert<T, ColumnGeneric<T> >(i, 0);
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -204,7 +204,7 @@ template<typename T>
 void ColumnGeneric<T>::Delete(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
-    TreeDelete<T, ColumnGeneric<T>>(ndx);
+    TreeDelete<T, ColumnGeneric<T> >(ndx);
 }
 
 template<typename T>
@@ -274,7 +274,7 @@ void ColumnGeneric<T>::find_all(Array &result, T value, size_t start, size_t end
 {
     TIGHTDB_ASSERT(value);
 
-    TreeFindAll<T, ColumnGeneric<T>>(result, value, 0, start, end);
+    TreeFindAll<T, ColumnGeneric<T> >(result, value, 0, start, end);
 }
 
 template<typename T>

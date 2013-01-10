@@ -411,7 +411,6 @@
     <ClCompile Include="src\tightdb\utf8.cpp" />
     <ClCompile Include="src\tightdb\utilities.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c" />
-    <ClCompile Include="test\experiments\float.cpp" />
     <ClCompile Include="test\large_tests\test_column.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>

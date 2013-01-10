@@ -2078,28 +2078,6 @@ size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, in
 
 namespace tightdb {
 
-void Array::state_init(ACTION action, state_state *state, Array* akku) 
-{
-    if (action == TDB_MAX) {
-        state->state = -0x7fffffffffffffffLL - 1LL;
-        state->match_count = 0;
-    }
-    if (action == TDB_MIN) {
-        state->state = 0x7fffffffffffffffLL;
-        state->match_count = 0;
-    }
-    if (action == TDB_RETURN_FIRST)
-        state->state = not_found;
-    if (action == TDB_SUM) {
-        state->state = 0;
-        state->match_count = 0;
-    }
-    if (action == TDB_COUNT)
-        state->state = 0;
-    if (action == TDB_FINDALL)
-        state->state = (int64_t)akku;
-}
-
 void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
 {
     if (end == (size_t)-1) end = m_len;

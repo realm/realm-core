@@ -166,9 +166,6 @@
     <ClCompile Include="test\testtransactions_lasse.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\experiments\float.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
