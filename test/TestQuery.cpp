@@ -28,12 +28,12 @@ TIGHTDB_TABLE_5(PeopleTable,
                 photo, Binary)
 
 TIGHTDB_TABLE_2(FloatTable,
-                first,  Float,
-                second, Double)
+                col_float,  Float,
+                col_double, Double)
 
 } // anonymous namespace
 
-#if 1
+
 TEST(TestQueryFloat)
 {
     FloatTable t;
@@ -42,15 +42,30 @@ TEST(TestQueryFloat)
     t.add(1.13f, 2.21);
     t.add(1.13f, 2.22);
     t.add(1.1f, 2.2);
-    t.add(1.1f, 2.2);
+    t.add(1.2f, 3.2);
 
-    int64_t cnt = t.where().first.equal(1.13f).count();
-    CHECK_EQUAL(2, cnt);
+    FloatTable::View v = t.where().col_float.equal(1.13f).find_all();
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(1.13f, v[0].col_float.get());
+    CHECK_EQUAL(1.13f, v[1].col_float.get());
 
-    //FloatTable::View v = t.where().first.equal(1.13f).find_all();
-    //CHECK_EQUAL(2, v.size());
+    // Test operators (and count)
+    CHECK_EQUAL(2, t.where().col_float.equal(1.13f).count());
+    CHECK_EQUAL(3, t.where().col_float.greater(1.1f).count());
+    CHECK_EQUAL(3, t.where().col_float.greater_equal(1.13f).count());
+    CHECK_EQUAL(4, t.where().col_float.less_equal(1.13f).count());
+    CHECK_EQUAL(2, t.where().col_float.less(1.13f).count());
+    CHECK_EQUAL(3, t.where().col_float.between(1.13f, 1.2f).count());
+
+    FloatTable::View v2 = t.where().col_double.equal(3.2).find_all();
+    CHECK_EQUAL(1, v2.size());
+    CHECK_EQUAL(3.2, v2[0].col_double.get());
+
+
+    // Test sum
+
+    // todo sum: max, min, average, +=, -=
 }
-#endif
 
 TEST(TestDateQuery)
 {

@@ -163,11 +163,11 @@ Query& Query::greater(size_t column_ndx, float value)
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, GREATER, ArrayFloat> >(column_ndx, value-1);
+    return add_condition<float, BASICNODE<float, ColumnFloat, GREATER_EQUAL, ArrayFloat> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, LESS, ArrayFloat> >(column_ndx, value+1);
+    return add_condition<float, BASICNODE<float, ColumnFloat, LESS_EQUAL, ArrayFloat> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
@@ -180,6 +180,37 @@ Query& Query::between(size_t column_ndx, float from, float to)
     return *this;
 }
 
+// ------------- double
+Query& Query::equal(size_t column_ndx, double value)
+{
+    return add_condition<double, BASICNODE<double, ColumnFloat, EQUAL, ArrayDouble> >(column_ndx, value);
+}
+Query& Query::not_equal(size_t column_ndx, double value)
+{
+    return add_condition<double, BASICNODE<double, ColumnFloat, NOTEQUAL, ArrayDouble> >(column_ndx, value);
+}
+Query& Query::greater(size_t column_ndx, double value)
+{
+    return add_condition<double, BASICNODE<double, ColumnFloat, GREATER, ArrayDouble> >(column_ndx, value);
+}
+Query& Query::greater_equal(size_t column_ndx, double value)
+{
+    return add_condition<double, BASICNODE<double, ColumnFloat, GREATER_EQUAL, ArrayDouble> >(column_ndx, value);
+}
+Query& Query::less_equal(size_t column_ndx, double value)
+{
+    return add_condition<double, BASICNODE<double, ColumnFloat, LESS_EQUAL, ArrayDouble> >(column_ndx, value);
+}
+Query& Query::less(size_t column_ndx, double value)
+{
+    return add_condition<double, BASICNODE<double, ColumnFloat, LESS, ArrayDouble> >(column_ndx, value);
+}
+Query& Query::between(size_t column_ndx, double from, double to)
+{
+    greater_equal(column_ndx, from);
+    less_equal(column_ndx, to);
+    return *this;
+}
 
 // STRINGS
 Query& Query::equal(size_t column_ndx, const char* value, bool caseSensitive)

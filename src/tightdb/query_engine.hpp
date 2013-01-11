@@ -709,17 +709,14 @@ public:
     }
     
     size_t find_first_local(size_t start, size_t end) {
-        
 //        m_col.CacheNext(start);
         F function;
-
 
         for (size_t s = start; s < end; ++s) {            
             T v = m_col.GetNext(s);
             if(function(v, m_value))
                 return s;
         }
-
         return end;
     }
 
