@@ -62,10 +62,10 @@ CATEGORIES:
 
                  Note that a shared group can only be opened in the mode it was created in.
       SIGNATURE: >
-                 SharedGroup(string path_to_database_file, DurabilityLevel dlevel);
+                 SharedGroup(const std::string& path_to_database_file, DurabilityLevel dlevel);
       PARAMS:                 
       - NAME   : path_to_database_file
-        TYPES  : string
+        TYPES  : const std::string&
         DESCR  : Path to a TightDB data file.
       - NAME   : dlevel
         TYPES  : DurabilityLevel

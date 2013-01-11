@@ -13,6 +13,14 @@ Format:
 ==================
 
 
+2013-01-11 (Kristian Spangsege)
++ Simplified open-mode for Group constructor.
+- Group::is_valid() removed. Errors are now reported as exceptions from the constructor.
++ Now using Group::BufferSpec to pass a memory buffer to the Group constructor.
++ Group::write_to_mem() now returnis a Group::BufferSpec.
++ Addition of 'bool no_create' arguemnt to SharedGroup constructor.
+
+
 2013-01-08 (Kristian Spangsege)
 + Mixed::set_int() added (same for other value types except subtables).
 + Removed two-argument Mixed constructor for binary data since its signature is expected to be used for strings that are not zero-terminated.

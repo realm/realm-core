@@ -43,8 +43,10 @@ public:
     /// file, they must each create their own instance of SharedGroup.
     ///
     /// If the database file does not already exist, it will be
-    /// created. When multiple threads are involved, it is safe to let
-    /// the first thread, that gets to it, create the file.
+    /// created unless \a no_create is set to true. When multiple
+    /// threads are involved, it is safe to let the first thread, that
+    /// gets to it, create the file. If \a no_create is set to false,
+    /// and the file does not already exist, NoSuchFile is thrown.
     ///
     /// While at least one instance of SharedGroup exists for a
     /// specific database file, a lock file will exist too. The lock
@@ -54,12 +56,13 @@ public:
     ///
     /// Processes that share a database file must reside on the same
     /// host.
-    SharedGroup(std::string path_to_database_file, DurabilityLevel dlevel=durability_Full);
+    SharedGroup(const std::string& path_to_database_file, bool no_create = false,
+                DurabilityLevel dlevel=durability_Full);
     ~SharedGroup();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct replication_tag {};
-    SharedGroup(replication_tag, std::string path_to_database_file = "",
+    SharedGroup(replication_tag, const std::string& path_to_database_file = "",
                 DurabiltyLevel dlevel=durability_Full);
 
     /// This function may be called asynchronously to interrupt any
@@ -105,8 +108,6 @@ public:
 #endif
 
 private:
-    void init(std::string path_to_database_file, DurabilityLevel dlevel);
-
     // Ring buffer managment
     bool       ringbuf_is_empty() const;
     size_t     ringbuf_size() const;
@@ -127,6 +128,8 @@ private:
     size_t      m_version;
     int         m_fd;
     std::string m_lockfile_path;
+
+    void init(const std::string& path_to_database_file, bool no_create, DurabilityLevel);
 
 #ifdef TIGHTDB_DEBUG
     // In debug mode we want to track state

@@ -48,20 +48,21 @@ CATEGORIES:
                  Creates a table group.
       SIGNATURE: |
                  Group();
-                 Group(string filename, int mode=GROUP_DEFAULT);
-                 Group(from_mem_tag, char* buffer, size_t len);
+                 Group(const std::string& path, OpenMode mode = mode_Normal);
+                 Group(BufferSpec buffer, bool take_ownership = true);
       PARAMS:
-      - NAME   : filename
-        TYPES  : string
+      - NAME   : path
+        TYPES  : const std::string&
         DESCR  : The name of the file.
       - NAME   : buffer
-        TYPES  : char*
+        TYPES  : Group::BufferSpec
         DESCR  : In-memory binary encoded representation of a group.
       - NAME   : mode
-        TYPES  : int
+        TYPES  : Group::OpenMode
         DESCR  : |
-                 GROUP_DEFAULT:  File with both read and write permissions.
-                 GROUP_READONLY: Read-only file.
+                 Group::mode_Normal:   Open in read/write mode, create the file if it does not already exist.
+                 Group::mode_ReadOnly: Open in read-only mode, fail if the file does not already exist.
+                 Group::mode_NoCreate: Open in read/write mode, fail if the file does not already exist.
       - NAME   : len
         TYPES  : size_t
         DESCR  : Length of buffer.
@@ -75,7 +76,6 @@ CATEGORIES:
         CODE   : ex_cpp_group_constructor_file
       - DESCR  :
         CODE   : ex_cpp_group_constructor_memory
-      SEE      : "{@link g_group_is_valid}"
 - Operators:
   METHODS:
   - g_group_operator_equal:
@@ -229,11 +229,11 @@ CATEGORIES:
                  will be stored, and can be retrieved at later times.
       PARAMS:
       - NAME   : filepath
-        TYPES  : const char*
+        TYPES  : const std::string&
         DESCR  : File name, possibly a full path.
-      RETURN:
-        DESCR  : <code>true</code> is successful, <code>false</code> otherwise.
-        TYPES  : bool
+      THROWS:
+      - EXCEPT : PermissionDenied
+        DESCR  : If the file could not be opened due to a permission issue.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_write_to_file
@@ -242,34 +242,17 @@ CATEGORIES:
       SUMMARY  : &g_group_write_to_mem_summary
                  Write a group to an in-memory buffer.
       DESCR    : &g_group_write_to_mem_descr
-                 This method will write the group to an in-memory buffer. This is useful if you
-                 wish to transfer a group over a TCP connection.
-      PARAMS:
-      - NAME   : len
-        TYPES  : size_t&
-        DESCR  : The len value will be filled with the number of bytes written to the buffer.
+                 This method will write the group to an in-memory buffer. This may be useful if you
+                 want to transfer a group over a TCP connection. The returned buffer will have been
+                 allocated using std::malloc(). The ownership of the buffer is passed to the caller.
       RETURN:
-        DESCR  : Pointer to the buffer. You are now the owner of this and will have to free it after use.
-        TYPES  : char*
+        DESCR  : The allocated buffer. You will have to call std::free() when you are done with it.
+        TYPES  : Group::BufferSpec
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_write_to_mem
 - Group:
   METHODS:
-  - g_group_is_valid:
-      NAMES    : is_valid
-      SUMMARY  : &g_group_is_valid_summary
-                 Is group valid?
-      DESCR    : &g_group_is_valid_descr
-                 The method checks if group is valid. When loading a group from disk or memory, 
-                 you can use this to check that it was actually loaded.
-      CONST    : true
-      RETURN:
-        TYPES  : bool
-        DESCR  : <code>true</code> if group is valid, <code>false</code> otherwise.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_is_valid
   - g_group_is_shared:
       NAMES    : is_shared
       SUMMARY  : &g_group_is_shared_summary

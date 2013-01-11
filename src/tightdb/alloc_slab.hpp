@@ -28,6 +28,7 @@
 #include <stdint.h> // unint8_t etc
 #endif
 
+#include <tightdb/exceptions.hpp>
 #include <tightdb/table_macros.hpp>
 
 namespace tightdb {
@@ -45,8 +46,21 @@ public:
     SlabAlloc();
     ~SlabAlloc();
 
-    bool   SetShared(std::string path, bool read_only=true);
-    bool   SetSharedBuffer(char* buffer, size_t len, bool take_ownership=true);
+    /// This function is used by free-standing Group instances as well
+    /// as by groups that a managed by SharedGroup instances. When
+    /// used by free-standing Group instances, no concurrency is
+    /// allowed. When used by SharedGroup, concurrency is allowed, but
+    /// read_only and no_create must both be false in this case.
+    ///
+    /// \param read_only Open the file in read-only mode. This implies \a no_create.
+    ///
+    /// \param no_create Fail if the file does not already exist.
+    ///
+    /// Throws InvalidDatabaseFile
+    void set_shared(const std::string& path, bool read_only, bool no_create);
+
+    /// Throws InvalidDatabaseFile
+    void set_shared_buffer(char* data, size_t size, bool take_ownership);
 
     MemRef Alloc(size_t size);
     MemRef ReAlloc(size_t ref, void* p, size_t size);
@@ -89,7 +103,7 @@ protected:
                     size,   Int)
 
     const FreeSpace& GetFreespace() const {return m_freeReadOnly;}
-    bool ValidateBuffer(const char* data, size_t len) const;
+    bool validate_buffer(const char* data, size_t len) const;
 
     // Member variables
     char*     m_shared;
@@ -99,12 +113,12 @@ protected:
     FreeSpace m_freeSpace;
     FreeSpace m_freeReadOnly;
 
-#ifndef _MSC_VER
+#ifndef _MSC_VER // POSIX
     int       m_fd;
-#else
+#else // Windows
     //TODO: Something in a tightdb header won't let us include windows.h, so we can't use HANDLE
-    void*     m_mapfile;
-    void*     m_fd;
+    void*     m_file;
+    void*     m_map_file;
 #endif
 
 #ifdef TIGHTDB_DEBUG
