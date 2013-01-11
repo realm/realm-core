@@ -93,7 +93,7 @@ private:
 
 class ParentNode {
 public:
-    ParentNode() : cond(-1), m_table(NULL) {}
+    ParentNode() : cond(-1), m_table(NULL), has_optimized_aggregate(false) {}
 
     std::vector<ParentNode*> gather_children(std::vector<ParentNode*> v) {
         m_children.clear();
@@ -111,6 +111,15 @@ public:
 
         m_conds = m_children.size();        
         return v;                              
+    }
+
+    struct score_compare {
+        bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->cost() < b->cost()); }
+    };
+
+    double cost(void) const
+    {
+        return 16.0 / m_dD + m_dT;
     }
 
     size_t find_first(size_t start, size_t end) {
@@ -153,13 +162,10 @@ public:
     }
 
 
-    struct score_compare {
-        bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->cost() < b->cost()); }
-    };
-
-    double cost(void) const
+    virtual size_t aggregate_call_specialized(ACTION action, void* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount) 
     {
-        return 16.0 / m_dD + m_dT;
+        TIGHTDB_ASSERT(false);
+        return 0;
     }
 
     template<ACTION action, class resulttype>size_t aggregate_local_selector(ParentNode* node, state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount)
@@ -168,14 +174,8 @@ public:
         // of aggregate result (size_t for Find, Array for FindAll, int64_t for sum of integers, float for sum of floats, size_t for count, etc).
         size_t r;
 
-        if(     dynamic_cast<NODE<int64_t, Column, EQUAL>* >(node) != NULL)
-            r = dynamic_cast<NODE<int64_t, Column, EQUAL>* >(node)->aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount);
-        else if(dynamic_cast<NODE<int64_t, Column, NOTEQUAL>* >(node) != NULL)
-            r = dynamic_cast<NODE<int64_t, Column, NOTEQUAL>* >(node)->aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount);
-        else if(dynamic_cast<NODE<int64_t, Column, LESS>* >(node) != NULL)
-            r = dynamic_cast<NODE<int64_t, Column, LESS>* >(node)->aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount);
-        else if(dynamic_cast<NODE<int64_t, Column, GREATER>* >(node) != NULL)
-            r = dynamic_cast<NODE<int64_t, Column, GREATER>* >(node)->aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount);
+        if(node->has_optimized_aggregate)
+            r = node->aggregate_call_specialized(action, st, start, end, local_limit, agg_col, matchcount);
         else
             r = aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount); // call method in parent class
 
@@ -301,6 +301,8 @@ public:
     size_t m_probes;
     size_t m_matches;
 
+    bool has_optimized_aggregate;
+
 protected:
     const Table* m_table;
     std::string error_code;
@@ -400,7 +402,8 @@ template <class T, class C, class F> class NODE: public ParentNode {
 public:
     // NOTE: Be careful to call Array(false) constructors on m_array in the initializer list, otherwise
     // their default constructors are called which are slow
-    NODE(T v, size_t column) : m_value(v), m_array(false) { 
+    NODE(T v, size_t column) : m_value(v), m_array(false) {
+        has_optimized_aggregate = true;
         m_column_id = column;
         m_child = 0;
         F f;
@@ -455,6 +458,32 @@ public:
             return false;
         else
             return b;
+    }
+
+
+    size_t aggregate_call_specialized(ACTION action, void* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount) 
+    {
+        state_state<int64_t>* st2 = (state_state<int64_t>*)st;
+        size_t ret;
+
+        if(action == TDB_RETURN_FIRST)
+            ret = aggregate_local<TDB_RETURN_FIRST, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_SUM)
+            ret = aggregate_local<TDB_SUM, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_MAX)
+            ret = aggregate_local<TDB_MAX, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_MIN)
+            ret = aggregate_local<TDB_MIN, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_COUNT)
+            ret = aggregate_local<TDB_COUNT, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_FINDALL)
+            ret = aggregate_local<TDB_FINDALL, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_CALLBACK_IDX)
+            ret = aggregate_local<TDB_CALLBACK_IDX, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+        else 
+            TIGHTDB_ASSERT(false);
+
+        return ret;
     }
 
     // agg_col      column number in m_table which must act as source for aggreate action
@@ -664,8 +693,7 @@ public:
         for (size_t s = start; s < end; ++s) {
             T t = m_column->Get(s);
 
-//            if (function<C>(m_value, t)) {
-            if (true) {
+            if (function(m_value, t)) {
                 if (m_child == 0)
                     return s;
                 else {

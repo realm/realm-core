@@ -55,6 +55,7 @@ Searching: The main finding function is:
 #include <tightdb/utilities.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/meta.hpp>
+#include <math.h>
 
 /*
     MMX: mmintrin.h
@@ -610,11 +611,11 @@ public:
         m_limit = limit;
 
         if (action == TDB_MAX)
-            state = -1000000000.0; // todo fixme now;
+            state = -std::numeric_limits<float>::infinity(); // todo, verify that this is correct and that you musn't use any minusinfinity() or something
         if (action == TDB_MIN)
-            state = 1000000000.0;
+            state = std::numeric_limits<float>::infinity();
         if (action == TDB_RETURN_FIRST)
-            state = not_found;
+            state = float(not_found); // fixme, bad way to return a size_t
         if (action == TDB_SUM)
             state = 0.0;
         if (action == TDB_COUNT)

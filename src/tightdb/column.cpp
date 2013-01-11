@@ -457,7 +457,7 @@ T Column::aggregate(T target, size_t start, size_t end, size_t *matchcount) cons
     state_state<T> st;
     st.init(action, NULL, size_t(-1));
 
-    node.aggregate_local<action, T>(&st, start, end, size_t(-1), NULL, matchcount);
+    node.template aggregate_local<action, T>(&st, start, end, size_t(-1), NULL, matchcount);
 
     return st.state;
 #else
