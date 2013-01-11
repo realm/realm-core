@@ -1094,7 +1094,7 @@ size_t Array::count(int64_t value) const
     const size_t end = m_len;
     size_t i = 0;
 
-    // staiic values needed for fast population count
+    // static values needed for fast population count
     const uint64_t m1  = 0x5555555555555555ULL;
     const uint64_t m2  = 0x3333333333333333ULL;
     const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
@@ -2083,7 +2083,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     if (end == (size_t)-1) end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
-    state_state state;
+    state_state<int64_t> state;
     state.state = (int64_t)&result;
 
     TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
@@ -2091,7 +2091,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     return;
 }
 
-void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const
+void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, state_state<int64_t> *state) const
 {
     if (cond == COND_EQUAL) {
         if (action == TDB_SUM) {
@@ -2297,6 +2297,8 @@ int64_t Array::ColumnGet(size_t ndx) const
     }
 }
 
+// FIXME: Shouldn't this be locaterd in ColumnString?
+//
 const char* Array::ColumnStringGet(size_t ndx) const
 {
     const char* data   = (const char*)m_data;

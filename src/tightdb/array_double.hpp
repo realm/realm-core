@@ -20,11 +20,11 @@
 #ifndef TIGHTDB_ARRAY_DOUBLE_HPP
 #define TIGHTDB_ARRAY_DOUBLE_HPP
 
-#include <tightdb/array_generic.hpp>
+#include <tightdb/array_basic.hpp>
 
 namespace tightdb {
 
-class ArrayDouble : public ArrayGeneric<double> {
+class ArrayDouble : public ArrayBasic<double> {
 
 };
 

@@ -17,20 +17,20 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_GENERIC_HPP
-#define TIGHTDB_COLUMN_GENERIC_HPP
+#ifndef TIGHTDB_COLUMN_BASIC_HPP
+#define TIGHTDB_COLUMN_BASIC_HPP
 
 #include <tightdb/column.hpp>
-#include <tightdb/array_generic.hpp>
+#include <tightdb/array_basic.hpp>
 
 namespace tightdb {
 
 template<typename T>
-class ColumnGeneric : public ColumnBase {
+class ColumnBasic : public ColumnBase {
 public:
-    ColumnGeneric(Allocator& alloc=GetDefaultAllocator());
-    ColumnGeneric(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    ~ColumnGeneric();
+    ColumnBasic(Allocator& alloc=GetDefaultAllocator());
+    ColumnBasic(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+    ~ColumnBasic();
 
     void Destroy();
 
@@ -49,6 +49,10 @@ public:
     void fill(size_t count);
 
     size_t count(T value) const;
+    double sum(size_t start = 0, size_t end = -1) const;
+    double average(size_t start = 0, size_t end = -1) const;
+    T maximum(size_t start = 0, size_t end = -1) const;
+    T minimum(size_t start = 0, size_t end = -1) const;
     size_t find_first(T value, size_t start=0 , size_t end=-1) const;
     void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
 
@@ -64,7 +68,7 @@ public:
 //??FIXME: NEEDED?    Allocator& GetAllocator() const {return m_array->GetAllocator();}
 
     /// Compare two columns for equality.
-    bool Compare(const ColumnGeneric&) const;
+    bool Compare(const ColumnBasic&) const;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
@@ -95,7 +99,7 @@ protected:
 } // namespace tightdb
 
 // Templates
-#include <tightdb/column_generic_tpl.hpp>
+#include <tightdb/column_basic_tpl.hpp>
 
 
-#endif // TIGHTDB_COLUMN_GENERIC_HPP
+#endif // TIGHTDB_COLUMN_BASIC_HPP

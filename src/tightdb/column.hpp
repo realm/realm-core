@@ -45,10 +45,6 @@ public:
     virtual void SetHasRefs() {};
 
     virtual bool IsIntColumn() const {return false;}
-    virtual bool IsStringColumn() const {return false;}
-    virtual bool IsBinaryColumn() const {return false;}
-    virtual bool IsFloatColumn() const {return false;}
-    virtual bool IsDoubleColumn() const {return false;}
 
     virtual size_t Size() const = 0;
 
@@ -235,7 +231,8 @@ protected:
     }
 
     void DoSort(size_t lo, size_t hi);
-    template <ACTION action, class cond>int64_t aggregate(int64_t target, size_t start, size_t end, size_t *matchcount = 0) const;
+    template <ACTION action, class cond, class T>
+        T aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;
     // Member variables
     Index* m_index;
 

@@ -62,7 +62,8 @@ public:
         if (index >= m_leaf_end) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
-            m_array_ptr = (A*)(m_column->GetBlock(index, m_array, m_leaf_start, true));
+            m_array.Destroy();
+            m_array_ptr = (A*)(((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
             const size_t leaf_size = m_array_ptr->Size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
@@ -87,6 +88,8 @@ private:
     // Never access through m_array because it's uninitialized if column is just a leaf
     A m_array;
 };
+
+//template <class x, class y, class z> class NODE;
 
 class ParentNode {
 public:
@@ -159,38 +162,28 @@ public:
         return 16.0 / m_dD + m_dT;
     }
 
-    template<ACTION action, class T>size_t aggregate_local_selector(ParentNode* node, state_state* st, size_t start, size_t end, size_t local_limit, ACTION action222, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount)
+    template<ACTION action, class resulttype>size_t aggregate_local_selector(ParentNode* node, state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount)
     {
         // Workaround that emulates templated vitual methods. Very very slow (dynamic_cast performs ~300 instructions, and the if..else are slow too). Real fix: Make ParentNode a templated class according to type
         // of aggregate result (size_t for Find, Array for FindAll, int64_t for sum of integers, float for sum of floats, size_t for count, etc).
         size_t r;
 
         if(     dynamic_cast<NODE<int64_t, Column, EQUAL>* >(node) != NULL)
-            r = dynamic_cast<NODE<int64_t, Column, EQUAL>* >(node)->aggregate_local<action, T>(st, start, end, local_limit, agg_col, matchcount);
+            r = dynamic_cast<NODE<int64_t, Column, EQUAL>* >(node)->aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount);
         else if(dynamic_cast<NODE<int64_t, Column, NOTEQUAL>* >(node) != NULL)
-            r = dynamic_cast<NODE<int64_t, Column, NOTEQUAL>* >(node)->aggregate_local<action, T>(st, start, end, local_limit, agg_col, matchcount);
+            r = dynamic_cast<NODE<int64_t, Column, NOTEQUAL>* >(node)->aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount);
         else if(dynamic_cast<NODE<int64_t, Column, LESS>* >(node) != NULL)
-            r = dynamic_cast<NODE<int64_t, Column, LESS>* >(node)->aggregate_local<action, T>(st, start, end, local_limit, agg_col, matchcount);
+            r = dynamic_cast<NODE<int64_t, Column, LESS>* >(node)->aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount);
         else if(dynamic_cast<NODE<int64_t, Column, GREATER>* >(node) != NULL)
-            r = dynamic_cast<NODE<int64_t, Column, GREATER>* >(node)->aggregate_local<action, T>(st, start, end, local_limit, agg_col, matchcount);
-
-        else if(dynamic_cast<BASICNODE<double, ColumnDouble, EQUAL, ArrayFloat>* >(node) != NULL)
-            r = dynamic_cast<BASICNODE<double, ColumnDouble, EQUAL, ArrayFloat>* >(node)->aggregate_local<action, T>(st, start, end, local_limit, action222, agg_col, matchcount);
-        else if(dynamic_cast<BASICNODE<double, ColumnDouble, NOTEQUAL, ArrayFloat>* >(node) != NULL)
-            r = dynamic_cast<BASICNODE<double, ColumnDouble, NOTEQUAL, ArrayFloat>* >(node)->aggregate_local<action, T>(st, start, end, local_limit, action222, agg_col, matchcount);
-        else if(dynamic_cast<BASICNODE<double, ColumnDouble, LESS, ArrayFloat>* >(node) != NULL)
-            r = dynamic_cast<BASICNODE<double, ColumnDouble, LESS, ArrayFloat>* >(node)->aggregate_local<action, T>(st, start, end, local_limit, action222, agg_col, matchcount);
-        else if(dynamic_cast<BASICNODE<double, ColumnDouble, GREATER, ArrayFloat>* >(node) != NULL)
-            r = dynamic_cast<BASICNODE<double, ColumnDouble, GREATER, ArrayFloat>* >(node)->aggregate_local<action, T>(st, start, end, local_limit, action222, agg_col, matchcount);
-
+            r = dynamic_cast<NODE<int64_t, Column, GREATER>* >(node)->aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount);
         else
-            r = aggregate_local<action, T>(st, start, end, local_limit, action222, agg_col, matchcount); // call method in parent class
+            r = aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount); // call method in parent class
 
         return r;
     }
 
 
-    template<ACTION action, class T> int64_t aggregate(state_state* st, size_t start, size_t end, size_t agg_col2 = not_found, size_t* matchcount = 0) 
+    template<ACTION action, class resulttype> int64_t aggregate(state_state<resulttype>* st, size_t start, size_t end, size_t agg_col2 = not_found, size_t* matchcount = 0) 
     {
         if (end == size_t(-1)) 
             end = m_table->size();
@@ -208,7 +201,7 @@ public:
             // Find a large amount of local matches in best condition
             td = m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
 
-            start = aggregate_local_selector<action, T>(m_children[best], st, start, td, findlocals, action, agg_col, matchcount);
+            start = aggregate_local_selector<action, resulttype>(m_children[best], st, start, td, findlocals, agg_col, matchcount);
 
             // Make remaining conditions compute their m_dD (statistics)
             for (size_t c = 0; c < m_children.size() && start < end; c++) {
@@ -223,18 +216,20 @@ public:
                     // Limit to bestdist in order not to skip too large parts of index nodes
                     size_t maxD = m_children[c]->m_dT == 0.0 ? end - start : bestdist;
                     td = m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = aggregate_local_selector<action, T>(m_children[best], st, start, td, maxN, action, agg_col, matchcount);
+                    start = aggregate_local_selector<action, resulttype>(m_children[best], st, start, td, maxN, agg_col, matchcount);
                 }
             }
         }
 
         if (matchcount != 0)
             *matchcount = st->match_count;
+        delete agg_col;
+
         return st->state;
 
     }
 
-    template<ACTION action, class T>size_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, ACTION action222, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount) 
+    template<ACTION action, class resulttype>size_t aggregate_local(state_state<int64_t>* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount) 
     {
 		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
         // integer version, because find_first_local() is relatively slower here (because it's non-integers).
@@ -277,7 +272,6 @@ public:
                 int64_t av = 0;
                 if (agg_col != NULL)  
                     av = agg_col->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
-                
 
                     st->state_match<action, 0>(r, 0, av, CallbackDummy());
 
@@ -438,7 +432,7 @@ public:
 
     // This function is called from Array::find() for each search result if action == TDB_CALLBACK_IDX
     // in the NODE::aggregate_local() call. Used if aggregate source column is different from search criteria column
-    template <ACTION action>bool match_callback(int64_t v) {
+    template <ACTION action, class resulttype>bool match_callback(int64_t v) {
         size_t i = to_size_t(v);
         m_last_local_match = i;
         m_local_matches++;
@@ -464,7 +458,7 @@ public:
     }
 
     // agg_col      column number in m_table which must act as source for aggreate action
-    template <ACTION action, class AGGTYPE> size_t aggregate_local(state_state* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount) {
+    template <ACTION action, class resulttype> size_t aggregate_local(state_state<int64_t>* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount) {
         F f;
         int c = f.condition();
        
@@ -493,7 +487,7 @@ public:
             if (m_conds <= 1 && agg_col == NULL)
                 m_array.find(c, action, m_value, s - m_leaf_start, end2, m_leaf_start, st);
             else
-                m_array.find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, st, std::bind1st(std::mem_fun(&NODE::match_callback<action>), this));
+                m_array.find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, st, std::bind1st(std::mem_fun(&NODE::match_callback<action, resulttype>), this));
                     
             if (m_local_matches == m_local_limit)
                 break;
@@ -559,7 +553,7 @@ public:
 
 protected:
 
-    state_state *m_state;
+    state_state<int64_t> *m_state;
     size_t m_last_local_match;
     C* m_column;                // Column on which search criteria is applied
     const Array* criteria_arr;

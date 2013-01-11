@@ -21,19 +21,17 @@
 #define TIGHTDB_COLUMN_DOUBLE_HPP
 
 #include <tightdb/column.hpp>
-#include <tightdb/column_generic.hpp>
+#include <tightdb/column_basic.hpp>
 #include <tightdb/array_double.hpp>
 
 namespace tightdb {
     
-class ColumnDouble : public ColumnGeneric<double> {
+class ColumnDouble : public ColumnBasic<double> {
 public:
     ColumnDouble(Allocator& alloc=GetDefaultAllocator()) : 
-        ColumnGeneric<double>(alloc) {};
+        ColumnBasic<double>(alloc) {};
     ColumnDouble(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator()) :
-        ColumnGeneric<double>(ref, parent, pndx, alloc) {};
-
-    bool IsDoubleColumn() const {return true;}
+        ColumnBasic<double>(ref, parent, pndx, alloc) {};
 };
 
 } // namespace tightdb

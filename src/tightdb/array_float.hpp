@@ -20,11 +20,11 @@
 #ifndef TIGHTDB_ARRAY_FLOAT_HPP
 #define TIGHTDB_ARRAY_FLOAT_HPP
 
-#include <tightdb/array_generic.hpp>
+#include <tightdb/array_basic.hpp>
 
 namespace tightdb {
 
-class ArrayFloat : public ArrayGeneric<float> {
+class ArrayFloat : public ArrayBasic<float> {
 
 };
 

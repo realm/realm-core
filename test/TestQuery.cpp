@@ -33,6 +33,7 @@ TIGHTDB_TABLE_2(FloatTable,
 
 } // anonymous namespace
 
+#if 1
 TEST(TestQueryFloat)
 {
     FloatTable t;
@@ -49,6 +50,7 @@ TEST(TestQueryFloat)
     //FloatTable::View v = t.where().first.equal(1.13f).find_all();
     //CHECK_EQUAL(2, v.size());
 }
+#endif
 
 TEST(TestDateQuery)
 {

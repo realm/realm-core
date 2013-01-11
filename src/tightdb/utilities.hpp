@@ -22,6 +22,8 @@
 
 #include <cstdlib>
 #include "assert.hpp"
+#include <cstdlib> // size_t
+
 #ifdef _MSC_VER
     #include <win32/types.h>
     #include <win32/stdint.h>
@@ -119,6 +121,9 @@ size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
 void checksum_init(checksum_t* t);
 
+// popcount
+int fast_popcount32(int32_t x);
+int fast_popcount64(int64_t x);
 }
 
 #endif // TIGHTDB_UTILITIES_HPP

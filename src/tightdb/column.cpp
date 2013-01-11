@@ -440,31 +440,91 @@ void Column::fill(size_t count)
 #endif
 }
 
-template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, size_t start, size_t end, size_t *matchcount) const
+template <ACTION action, class cond, class T>
+T Column::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
 { 
+#if 1
     if (end == size_t(-1)) 
-        end = ((Column*)this)->Size();
-    Column* m_column = (Column*)this;
+        end = Size();
 
-    NODE<int64_t, Column, cond> node(target, NULL);
+    // We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
+    // slower because of initial overhead).
+        //    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
+        //    new (node) NODE<int64_t, Column, cond>(target, 0);
+    NODE<T, Column, cond> node(target, NULL);
 
-    node.QuickInit(m_column, target); 
-    state_state st;
+    node.QuickInit((Column*)this, target); 
+    state_state<T> st;
     st.init(action, NULL, size_t(-1));
 
-    node.template aggregate_local<action, int64_t>(&st, start, end, size_t(-1), NULL, matchcount);
+    node.aggregate_local<action, T>(&st, start, end, size_t(-1), NULL, matchcount);
 
     return st.state;
+#else
+    // Experimental
+
+    if (end == size_t(-1)) end = Size();
+    Column* m_column = (Column*)this;
+    // To make column aggregates fast on few number of values we need low initial overhead
+    // so we allocate Array instance from stack and use fast constructor intended for read-only use
+    // with GetDirect():
+
+//    #define ARRAYPTR
+
+//    Array *m_array = (Array*)alloca(sizeof(Array));     // Fast
+//    new (m_array) Array(false);
+
+    static Array m_array;                            // Fast but very bad practise
+    // Array m_array;                                   // Around 10 times slower for 1000 items
+    // Array *m_array = new Array(false);               // Also 10 times slower
+
+    size_t m_leaf_start = 0;
+    size_t m_leaf_end = 0;
+    size_t m_local_end = 0;
+    state_state state;
+
+#ifdef ARRAYPTR
+    m_array->state_init(action, &state, NULL);
+#else
+    m_array.state_init(action, &state, NULL);
+#endif
+
+    for (size_t s = start; s < end; ) {
+        // Cache internal leafs
+        if (s >= m_leaf_end) {
+#ifdef ARRAYPTR
+            m_column->GetBlock(s, *m_array, m_leaf_start);
+            const size_t leaf_size = m_array->Size();
+#else
+            m_column->GetBlock(s, m_array, m_leaf_start);
+            const size_t leaf_size = m_array.Size();
+#endif
+            m_leaf_end = m_leaf_start + leaf_size;
+            const size_t e = end - m_leaf_start;
+            m_local_end = leaf_size < e ? leaf_size : e;
+        }
+#ifdef ARRAYPTR
+        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, CallbackDummy());
+#else
+        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, CallbackDummy());
+#endif
+        s = m_leaf_end;
+    }
+
+    return state.state;
+#endif
 }
+
+// int64_t specific:
 
 size_t Column::count(int64_t target) const
 {
-    return size_t(aggregate<TDB_COUNT, EQUAL>(target, 0, ((Column*)this)->Size()));
+    return size_t(aggregate<TDB_COUNT, EQUAL, int64_t>(target, 0, ((Column*)this)->Size()));
 }
 
 int64_t Column::sum(size_t start, size_t end) const
 {
-    return aggregate<TDB_SUM, NONE>(0, start, end);
+    return aggregate<TDB_SUM, NONE, int64_t>(0, start, end);
 }
 
 double Column::average(size_t start, size_t end) const
@@ -472,20 +532,23 @@ double Column::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = ((Column*)this)->Size();
     size_t size = end - start;
-    size_t sum = aggregate<TDB_SUM, NONE>(0, start, end);
+    //FIXME: shouldn't sum be int64_t? it was size_t
+    int64_t sum = aggregate<TDB_SUM, NONE, int64_t>(0, start, end);
     double avg = double( sum ) / double( size == 0 ? 1 : size );
     return avg;
 }
 
 int64_t Column::minimum(size_t start, size_t end) const
 {
-    return aggregate<TDB_MIN, NONE>(0, start, end);
+    return aggregate<TDB_MIN, NONE, int64_t>(0, start, end);
 }
 
 int64_t Column::maximum(size_t start, size_t end) const
 {
-    return aggregate<TDB_MAX, NONE>(0, start, end);
+    return aggregate<TDB_MAX, NONE, int64_t>(0, start, end);
 }
+
+
 
 void Column::sort(size_t start, size_t end)
 {

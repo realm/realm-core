@@ -151,27 +151,27 @@ Query& Query::equal(size_t column_ndx, bool value)
 // ------------- float
 Query& Query::equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, EQUAL> >(column_ndx, value);
+    return add_condition<float, BASICNODE<float, ColumnFloat, EQUAL, ArrayFloat> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, NOTEQUAL> >(column_ndx, value);
+    return add_condition<float, BASICNODE<float, ColumnFloat, NOTEQUAL, ArrayFloat> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, GREATER> >(column_ndx, value);
+    return add_condition<float, BASICNODE<float, ColumnFloat, GREATER, ArrayFloat> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, GREATER> >(column_ndx, value-1);
+    return add_condition<float, BASICNODE<float, ColumnFloat, GREATER, ArrayFloat> >(column_ndx, value-1);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, LESS> >(column_ndx, value+1);
+    return add_condition<float, BASICNODE<float, ColumnFloat, LESS, ArrayFloat> >(column_ndx, value+1);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, LESS> >(column_ndx, value);
+    return add_condition<float, BASICNODE<float, ColumnFloat, LESS, ArrayFloat> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
@@ -328,9 +328,9 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
     // Use single threading
     TableView tv(*m_table);
-    state_state st;
-    st.init(TDB_FINDALL, &tv.get_ref_column(), NULL, limit);
-    first[0]->aggregate<TDB_FINDALL>(&st, start, end);
+    state_state<int64_t> st;
+    st.init(TDB_FINDALL, &tv.get_ref_column(), limit);
+    first[0]->aggregate<TDB_FINDALL, int64_t>(&st, start, end);
     return move(tv);
 }
 
@@ -351,9 +351,9 @@ int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end,
 
     Init(*m_table);
     size_t matchcount = 0; 
-    state_state st;
-    st.init(TDB_SUM, NULL, (Column*)&c, limit);
-    int64_t r = first[0]->aggregate<TDB_SUM>(&st, start, end, column, &matchcount);
+    state_state<int64_t> st;
+    st.init(TDB_SUM, NULL, limit);
+    int64_t r = first[0]->aggregate<TDB_SUM, int64_t>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -377,9 +377,9 @@ int64_t Query::maximum(size_t column, size_t* resultcount, size_t start, size_t 
         
     Init(*m_table);
     size_t matchcount = 0;
-    state_state st;
-    st.init(TDB_MAX, NULL, (Column*)&c, limit);
-    int64_t r = first[0]->aggregate<TDB_MAX>(&st, start, end, column, &matchcount);
+    state_state<int64_t> st;
+    st.init(TDB_MAX, NULL, limit);
+    int64_t r = first[0]->aggregate<TDB_MAX, int64_t>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -402,9 +402,9 @@ int64_t Query::minimum(size_t column, size_t* resultcount, size_t start, size_t 
 
     Init(*m_table);
     size_t matchcount = 0;
-    state_state st;
-    st.init(TDB_MIN, NULL, (Column*)&c, limit);
-    int64_t r = first[0]->aggregate<TDB_MIN>(&st, start, end, not_found, &matchcount);
+    state_state<int64_t> st;
+    st.init(TDB_MIN, NULL, limit);
+    int64_t r = first[0]->aggregate<TDB_MIN, int64_t>(&st, start, end, not_found, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -421,9 +421,9 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     }
 
     Init(*m_table);
-    state_state st;
-    st.init(TDB_COUNT, NULL, NULL, limit);
-    int64_t r = first[0]->aggregate<TDB_COUNT>(&st, start, end);
+    state_state<int64_t> st;
+    st.init(TDB_COUNT, NULL, limit);
+    int64_t r = first[0]->aggregate<TDB_COUNT, int64_t>(&st, start, end);
     return size_t(r);
 }
 

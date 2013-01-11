@@ -218,7 +218,8 @@ void Table::invalidate()
 void Table::InstantiateBeforeChange()
 {
     // Empty (zero-ref'ed) tables need to be instantiated before first modification
-    if (!m_columns.IsValid()) CreateColumns();
+    if (!m_columns.IsValid()) 
+        CreateColumns();
 }
 
 void Table::CacheColumns()
@@ -757,6 +758,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 }
 
 
+
 ColumnBase& Table::GetColumnBase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
@@ -772,134 +774,60 @@ const ColumnBase& Table::GetColumnBase(size_t ndx) const
     return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
 }
 
-template <class T, class COL_TYPE>
-T GetColumn2(size_t ndx)
-{
-    ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(COL_TYPE == get_column_type(ndx));
-    return static_cast<T&>(column);
-}
-// TODO - replace with above...
 
-
-Column& Table::GetColumn(size_t ndx)
+void Table::validate_column_type(const ColumnBase& column, ColumnType type, size_t ndx) const
 {
-    ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(column.IsIntColumn());
-    return static_cast<Column&>(column);
+    if (type == COLUMN_TYPE_INT || type == COLUMN_TYPE_DATE || type == COLUMN_TYPE_BOOL)
+        TIGHTDB_ASSERT(column.IsIntColumn());
+    else {
+        ColumnType this_type = GetRealColumnType(ndx);
+        TIGHTDB_ASSERT(type == this_type); 
+    }
 }
 
-const Column& Table::GetColumn(size_t ndx) const
+template <class C, ColumnType type>
+C& Table::GetColumn(size_t ndx)
+{
+    ColumnBase& column = GetColumnBase(ndx);
+#ifdef TIGHTDB_DEBUG
+    validate_column_type(column, type, ndx);
+#endif
+    return static_cast<C&>(column);
+}
+
+template <class C, ColumnType type>
+const C& Table::GetColumn(size_t ndx) const
 {
     const ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(column.IsIntColumn());
-    return static_cast<const Column&>(column);
+#ifdef TIGHTDB_DEBUG
+    validate_column_type(column, type, ndx);
+#endif
+    return static_cast<const C&>(column);
 }
 
-AdaptiveStringColumn& Table::GetColumnString(size_t ndx)
-{
-    ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(column.IsStringColumn());
-    return static_cast<AdaptiveStringColumn&>(column);
-}
+Column& Table::GetColumn(size_t ndx)             { return GetColumn<Column, COLUMN_TYPE_INT>(ndx); }
+const Column& Table::GetColumn(size_t ndx) const { return GetColumn<Column, COLUMN_TYPE_INT>(ndx); }
 
-const AdaptiveStringColumn& Table::GetColumnString(size_t ndx) const
-{
-    const ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(column.IsStringColumn());
-    return static_cast<const AdaptiveStringColumn&>(column);
-}
+AdaptiveStringColumn& Table::GetColumnString(size_t ndx)             { return GetColumn<AdaptiveStringColumn, COLUMN_TYPE_STRING>(ndx); }
+const AdaptiveStringColumn& Table::GetColumnString(size_t ndx) const { return GetColumn<AdaptiveStringColumn, COLUMN_TYPE_STRING>(ndx); }
 
-ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx)
-{
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    InstantiateBeforeChange();
-    TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
-    return *reinterpret_cast<ColumnStringEnum*>(m_cols.Get(ndx));
-}
+ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx)             { return GetColumn<ColumnStringEnum, COLUMN_TYPE_STRING_ENUM>(ndx); }
+const ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) const { return GetColumn<ColumnStringEnum, COLUMN_TYPE_STRING_ENUM>(ndx); }
 
-const ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
-    return *reinterpret_cast<ColumnStringEnum*>(m_cols.Get(ndx));
-}
+ColumnFloat& Table::GetColumnFloat(size_t ndx)               { return GetColumn<ColumnFloat, COLUMN_TYPE_FLOAT>(ndx); }
+const ColumnFloat& Table::GetColumnFloat(size_t ndx) const   { return GetColumn<ColumnFloat, COLUMN_TYPE_FLOAT>(ndx); }
 
-ColumnFloat& Table::GetColumnFloat(size_t ndx)
-{
-    ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(column.IsFloatColumn());
-    return static_cast<ColumnFloat&>(column);
-}
+ColumnDouble& Table::GetColumnDouble(size_t ndx)             { return GetColumn<ColumnDouble, COLUMN_TYPE_DOUBLE>(ndx); }
+const ColumnDouble& Table::GetColumnDouble(size_t ndx) const { return GetColumn<ColumnDouble, COLUMN_TYPE_DOUBLE>(ndx); }
 
-const ColumnFloat& Table::GetColumnFloat(size_t ndx) const
-{
-    const ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(column.IsFloatColumn());
-    return static_cast<const ColumnFloat&>(column);
-}
+ColumnBinary& Table::GetColumnBinary(size_t ndx)             { return GetColumn<ColumnBinary, COLUMN_TYPE_BINARY>(ndx); }
+const ColumnBinary& Table::GetColumnBinary(size_t ndx) const { return GetColumn<ColumnBinary, COLUMN_TYPE_BINARY>(ndx); }
 
-ColumnDouble& Table::GetColumnDouble(size_t ndx)
-{
-    ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(column.IsDoubleColumn());
-    return static_cast<ColumnDouble&>(column);
-}
+ColumnTable &Table::GetColumnTable(size_t ndx)               { return GetColumn<ColumnTable, COLUMN_TYPE_TABLE>(ndx); }
+const ColumnTable &Table::GetColumnTable(size_t ndx) const   { return GetColumn<ColumnTable, COLUMN_TYPE_TABLE>(ndx); }
 
-const ColumnDouble& Table::GetColumnDouble(size_t ndx) const
-{
-    const ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(column.IsDoubleColumn());
-    return static_cast<const ColumnDouble&>(column);
-}
-
-ColumnBinary& Table::GetColumnBinary(size_t ndx)
-{
-    ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(column.IsBinaryColumn());
-    return static_cast<ColumnBinary&>(column);
-}
-
-const ColumnBinary& Table::GetColumnBinary(size_t ndx) const
-{
-    const ColumnBase& column = GetColumnBase(ndx);
-    TIGHTDB_ASSERT(column.IsBinaryColumn());
-    return static_cast<const ColumnBinary&>(column);
-}
-
-ColumnTable &Table::GetColumnTable(size_t ndx)
-{
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    InstantiateBeforeChange();
-    TIGHTDB_ASSERT(COLUMN_TYPE_TABLE == get_column_type(ndx));
-    TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
-    return *static_cast<ColumnTable*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
-}
-
-const ColumnTable &Table::GetColumnTable(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    TIGHTDB_ASSERT(COLUMN_TYPE_TABLE == get_column_type(ndx));
-    TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
-    return *static_cast<ColumnTable*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
-}
-
-ColumnMixed& Table::GetColumnMixed(size_t ndx)
-{
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    InstantiateBeforeChange();
-    TIGHTDB_ASSERT(COLUMN_TYPE_MIXED == get_column_type(ndx));
-    TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
-    return *static_cast<ColumnMixed*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
-}
-
-const ColumnMixed& Table::GetColumnMixed(size_t ndx) const
-{
-    TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    TIGHTDB_ASSERT(COLUMN_TYPE_MIXED == get_column_type(ndx));
-    return *static_cast<ColumnMixed*>(reinterpret_cast<ColumnBase*>(m_cols.Get(ndx)));
-}
+ColumnMixed& Table::GetColumnMixed(size_t ndx)               { return GetColumn<ColumnMixed, COLUMN_TYPE_MIXED>(ndx); }
+const ColumnMixed& Table::GetColumnMixed(size_t ndx) const   { return GetColumn<ColumnMixed, COLUMN_TYPE_MIXED>(ndx); }
 
 
 
@@ -1520,28 +1448,28 @@ void Table::insert_done()
 #endif
 }
 
-// FIXME: remove the ColumnType from parameter-list for performance
-template <class T>
-size_t Table::count(size_t column_ndx, T target, ColumnType expect) const
+template <class T, class C, ColumnType expect>
+size_t Table::count(size_t column_ndx, T target) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == expect);
 
-    return GetColumn(column_ndx).count(target);
+    return GetColumn<C, expect>(column_ndx).count(target);
 }
-// TODO:
-
 
 size_t Table::count_int(size_t column_ndx, int64_t target) const
 {
-    return count<int64_t>(column_ndx, target, COLUMN_TYPE_INT);
-    /*
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
+    return count<int64_t, Column, COLUMN_TYPE_INT>(column_ndx, target);
+}
 
-    const Column& column = GetColumn(column_ndx);
-    return column.count(target);
-    */
+size_t Table::count_float(size_t column_ndx, float target) const
+{
+    return count<float, ColumnFloat, COLUMN_TYPE_FLOAT>(column_ndx, target);
+}
+
+size_t Table::count_double(size_t column_ndx, double target) const
+{
+    return count<double, ColumnDouble, COLUMN_TYPE_DOUBLE>(column_ndx, target);
 }
 
 size_t Table::count_string(size_t column_ndx, const char* value) const
@@ -1562,28 +1490,72 @@ size_t Table::count_string(size_t column_ndx, const char* value) const
     }
 }
 
-// TODO: add float, double here...
+
+template <typename T, class C, ColumnType type, typename R>
+R Table::sum(size_t column_ndx) const
+{
+    // asserts are done in GetColumnT
+    const C& column = GetColumn<C, type>(column_ndx);
+    return column.sum();
+}
 
 int64_t Table::sum(size_t column_ndx) const
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
+    return sum<int64_t, Column, COLUMN_TYPE_INT, int64_t>(column_ndx);
+}
 
-    const Column& column = GetColumn(column_ndx);
-    return column.sum();
+double Table::sum_float(size_t column_ndx) const
+{
+    return sum<float, ColumnFloat, COLUMN_TYPE_FLOAT, double>(column_ndx);
+}
+double Table::sum_double(size_t column_ndx) const
+{
+    return sum<double, ColumnDouble, COLUMN_TYPE_DOUBLE, double>(column_ndx);
+}
+
+
+
+template <typename T, class C, ColumnType type>
+double Table::average(size_t column_ndx) const
+{
+    const C& column = GetColumn<C, type>(column_ndx);
+    return column.average();
 }
 
 double Table::average(size_t column_ndx) const
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == COLUMN_TYPE_INT);
-
-    const Column& column = GetColumn(column_ndx);
-    return column.average();
+    return average<int64_t, Column, COLUMN_TYPE_INT>(column_ndx);
 }
+#if 0
+template <typename T>
+T get()
+{
+
+}
+// TODO: add float, double here...
+
+
+template <typename T, class F>
+T Table::maximumT(size_t column_ndx) const
+{
+    if (is_empty()) 
+        return 0;
+    T max_val = get<T>(column_ndx, 0);
+    for (size_t ndx = 1; ndx < size(); ++ndx) {
+        const T val = get<T>(column_ndx, ndx);
+        if (val > max_val) {
+            max_val = val;
+        }
+    }
+    return max_val;
+}
+#endif
 
 int64_t Table::maximum(size_t column_ndx) const
 {
+#if 0
+    return maximumT<int64_t, get_int>(column_ndx);
+#else
     if (is_empty()) return 0;
 
     int64_t mv = get_int(column_ndx, 0);
@@ -1594,6 +1566,7 @@ int64_t Table::maximum(size_t column_ndx) const
         }
     }
     return mv;
+#endif
 }
 
 int64_t Table::minimum(size_t column_ndx) const
