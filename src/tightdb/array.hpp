@@ -55,6 +55,7 @@ Searching: The main finding function is:
 #include <tightdb/utilities.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/meta.hpp>
+#include <math.h>
 
 /*
     MMX: mmintrin.h
@@ -518,6 +519,8 @@ protected:
 
 // Implementation:
 
+
+
 template <> class state_state<int64_t> {
 public:
 
@@ -589,7 +592,7 @@ public:
 
 };
 
-template <> class state_state<float> {
+template <> class state_state<class T> {
 public:
 
     float state;
@@ -610,48 +613,30 @@ public:
         m_limit = limit;
 
         if (action == TDB_MAX)
-            state = -1000000000.0; // todo fixme now;
-        if (action == TDB_MIN)
-            state = 1000000000.0;
-        if (action == TDB_RETURN_FIRST)
-            state = float(not_found);
-        if (action == TDB_SUM)
+            state = -std::numeric_limits<float>::infinity(); // verify -(inf()) is correct and there is no minusinf()
+        else if (action == TDB_MIN)
+            state = std::numeric_limits<float>::infinity();
+        else if (action == TDB_SUM)
             state = 0.0;
-        if (action == TDB_COUNT)
-            match_count = 0;
-        if (action == TDB_FINDALL)
-            state = (int64_t)akku;
+        else
+            TIGHTDB_ASSERT(false);
     }
 
     template <ACTION action, bool pattern, class Callback> inline bool state_match(size_t index, uint64_t indexpattern, float value, Callback callback)
     {
-        if (pattern) {
-            if (action == TDB_COUNT) {
-                match_count = fast_popcount64(indexpattern);
-                return true;
-            }
-            // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
-            return false;
-        }
+        TIGHTDB_STATIC_ASSERT(pattern == false && (action == TDB_SUM || action == TDB_MAX || action == TDB_MIN), "pattern or action not supported");
 
         ++match_count;
 
-        if (action == TDB_CALLBACK_IDX)
-            return callback(index);
         if (action == TDB_MAX && value > state)
             state = value;
-        if (action == TDB_MIN && value < state)
+        else if (action == TDB_MIN && value < state)
             state = value;
-        if (action == TDB_SUM)
+        else if (action == TDB_SUM)
             state += value;
-        if (action == TDB_COUNT) {
-        }
-        if (action == TDB_FINDALL)
-            ((Array*)state)->add(index);
-        if (action == TDB_RETURN_FIRST) {
-            state = index;
-            return false;
-        }
+        else
+            TIGHTDB_ASSERT(false);
+
         return true;
     }
 
