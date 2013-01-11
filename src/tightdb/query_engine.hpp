@@ -162,7 +162,7 @@ public:
     }
 
 
-    virtual size_t aggregate_call_specialized(ACTION action, void* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount) 
+    virtual size_t aggregate_call_specialized(ACTION action, void* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount)
     {
         TIGHTDB_ASSERT(false);
         return 0;
