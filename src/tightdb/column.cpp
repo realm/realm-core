@@ -462,10 +462,10 @@ T Column::aggregate(T target, size_t start, size_t end, size_t *matchcount) cons
     NODE<T, Column, cond> node(target, NULL);
 
     node.QuickInit((Column*)this, target); 
-    state_state st;
-    st.init(action, NULL, (Column*)this, size_t(-1));
+    state_state<T> st;
+    st.init(action, NULL, size_t(-1));
 
-    node.aggregate_local(&st, start, end, size_t(-1), action, NULL, matchcount);
+    node.aggregate_local<action, T>(&st, start, end, size_t(-1), NULL, matchcount);
 
     return st.state;
 #else
@@ -540,7 +540,6 @@ double Column::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = ((Column*)this)->Size();
     size_t size = end - start;
-    //FIXME: shouldn't sum be int64_t? it was size_t
     int64_t sum = aggregate<TDB_SUM, NONE, int64_t>(0, start, end);
     double avg = double( sum ) / double( size == 0 ? 1 : size );
     return avg;
@@ -555,6 +554,8 @@ int64_t Column::maximum(size_t start, size_t end) const
 {
     return aggregate<TDB_MAX, NONE, int64_t>(0, start, end);
 }
+
+
 
 void Column::sort(size_t start, size_t end)
 {

@@ -343,8 +343,8 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
         end = Size();
         // end = ((Column??*)this)->Size();
     size_t size = end - start;
-    double sum = sum(start, end);
-    double avg = sum / double( size == 0 ? 1 : size );
+    double sum2 = sum(start, end);
+    double avg = sum2 / double( size == 0 ? 1 : size );
     return avg;
 }
 

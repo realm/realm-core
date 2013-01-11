@@ -33,7 +33,7 @@ TIGHTDB_TABLE_2(FloatTable,
 
 } // anonymous namespace
 
-#if 0
+#if 1
 TEST(TestQueryFloat)
 {
     FloatTable t;

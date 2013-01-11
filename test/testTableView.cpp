@@ -32,32 +32,88 @@ TEST(GetSetInteger)
     CHECK_EQUAL(123, v[0].first);
 }
 
+
+
 namespace {
-TIGHTDB_TABLE_1(TestTableViewFloats,
-                first, Float)
+TIGHTDB_TABLE_2(TableFloats,
+                col_float, Float,
+                col_double, Double)
 }
-TEST(GetSetFloats)
+
+TEST(TableView_Floats_GetSet)
 {
-    TestTableViewFloats table;
+    TableFloats table;
 
-    table.add(1.1f);
-    table.add(2.2f);
-    table.add(3.3f);
-    table.add(1.1f);
-    table.add(2.2f);
+    float  f_val[] = { 1.1f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f };
+    double d_val[] = { 1.2 , 2.2 , 3.2 , -1.2 , 2.3, 0.0  };
 
-    TestTableViewFloats::View v; // Test empty construction
-    v = table.column().first.find_all(2.2f); // Test assignment
+    CHECK_EQUAL(1, table.is_empty());
 
+    // Test add(?,?) with parameters
+    for (size_t i=0; i<5; ++i)
+        table.add(f_val[i], d_val[i]);
+    table.add();
+    CHECK_EQUAL(6, table.size());
+    for (size_t i=0; i<6; ++i) {
+        CHECK_EQUAL(f_val[i], table.column().col_float[i]);
+        CHECK_EQUAL(d_val[i], table.column().col_double[i]);
+    }
+
+    TableFloats::View v; // Test empty construction
+    v = table.column().col_float.find_all(2.1f); // Test assignment
     CHECK_EQUAL(2, v.size());
 
     // Test of Get
-    CHECK_EQUAL(2.2f, v[0].first);
-    CHECK_EQUAL(2.2f, v[1].first);
+    CHECK_EQUAL(2.1f, v[0].col_float);
+    CHECK_EQUAL(2.1f, v[1].col_float);
+    CHECK_EQUAL(2.2, v[0].col_double);
+    CHECK_EQUAL(2.3, v[1].col_double);
 
     // Test of Set
-    v[0].first = 123.321f;
-    CHECK_EQUAL(123.321f, v[0].first);
+    v[0].col_float = 123.321f;
+    CHECK_EQUAL(123.321f, v[0].col_float);
+    v[0].col_double = 123.3219;
+    CHECK_EQUAL(123.3219, v[0].col_double);
+
+}
+
+TEST(TableView_Floats_Find_and_Aggregations)
+{
+    TableFloats table;
+    float  f_val[] = { 1.1f, 1.1f, 1.1f, 1.1f, 1.1f, 1.1f };
+    double d_val[] = { -1.2, 2.2 , 3.2 ,-1.2 , 2.3 , 0.0  };
+    double sum = 0.0;
+    for (size_t i=0; i<6; ++i) {
+        table.add(f_val[i], d_val[i]);
+        sum += d_val[i];
+    }
+
+    // Test find_all()
+    TableFloats::View v_all = table.column().col_float.find_all(1.1f);
+    CHECK_EQUAL(6, v_all.size());
+
+    TableFloats::View v_some = table.column().col_double.find_all(-1.2);
+    CHECK_EQUAL(2, v_some.size());
+    CHECK_EQUAL(0, v_some.get_source_ndx(0));
+    CHECK_EQUAL(3, v_some.get_source_ndx(1));
+
+#if 0
+    // TODO: enable
+    // Test find_first
+    CHECK_EQUAL(0, v_all.column().col_double.find_first(-1.2) );
+    CHECK_EQUAL(5, v_all.column().col_double.find_first(0.0) );
+    CHECK_EQUAL(2, v_all.column().col_double.find_first(3.2) );
+
+    // Test sum
+    CHECK_EQUAL(sum, v_all.column().col_double.sum());
+
+    // Test max
+    CHECK_EQUAL(3.2, v_all.column().col_double.maximum());
+
+    // Test min
+    CHECK_EQUAL(-1.2, v_all.column().col_double.minimum());
+#endif
+    // TODO: Test +=, average, count
 }
 
 TEST(TableViewSum)
@@ -75,32 +131,6 @@ TEST(TableViewSum)
 
     int64_t sum = v.column().first.sum();
     CHECK_EQUAL(10, sum);
-}
-/*
-template <class C, class V, typename T>
-void setup_tableview(C& table, V& view, T[] values, size_t size, T target)
-{
-    for (size_t i=0; i<size; i++) {
-        table.add(values[i]);
-    }
-    view = table.column().first.find_all(target);
-}
-*/
-TEST(TableViewSumNegative_2)
-{
-    TestTableInt table;
-    TestTableInt::View v;
-
-    table.add(0);
-    table.add(0);
-    table.add(0);
-
-    v = table.column().first.find_all(0);
-    v[0].first = 11;
-    v[2].first = -20;
-
-    int64_t sum = v.column().first.sum();
-    CHECK_EQUAL(-9, sum);
 }
 
 TEST(TableViewSumNegative)
@@ -135,8 +165,6 @@ TEST(TableViewMax)
     int64_t max = v.column().first.maximum();
     CHECK_EQUAL(2, max);
 }
-
-
 
 TEST(TableViewMax2)
 {
@@ -173,7 +201,6 @@ TEST(TableViewMin)
     CHECK_EQUAL(-1, min);
 }
 
-
 TEST(TableViewMin2)
 {
     TestTableInt table;
@@ -190,7 +217,6 @@ TEST(TableViewMin2)
     int64_t min = v.column().first.minimum();
     CHECK_EQUAL(-3, min);
 }
-
 
 
 TEST(TableViewFind)
