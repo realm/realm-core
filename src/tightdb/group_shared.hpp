@@ -34,7 +34,7 @@ struct SharedInfo;
 
 class SharedGroup {
 public:
-    enum DurabiltyLevel {
+    enum DurabilityLevel {
         durability_Full,
         durability_MemOnly
     };
@@ -54,7 +54,7 @@ public:
     ///
     /// Processes that share a database file must reside on the same
     /// host.
-    SharedGroup(std::string path_to_database_file, DurabiltyLevel dlevel=durability_Full);
+    SharedGroup(std::string path_to_database_file, DurabilityLevel dlevel=durability_Full);
     ~SharedGroup();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -105,7 +105,7 @@ public:
 #endif
 
 private:
-    void init(std::string path_to_database_file, DurabiltyLevel dlevel);
+    void init(std::string path_to_database_file, DurabilityLevel dlevel);
 
     // Ring buffer managment
     bool       ringbuf_is_empty() const;
