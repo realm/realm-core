@@ -369,11 +369,11 @@
     <ClInclude Include="src\tightdb\column_basic.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\column_basic_tpl.hpp">
-      <Filter>src</Filter>
-    </ClInclude>
     <ClInclude Include="src\tightdb\array_basic_tpl.hpp">
-      <Filter>src</Filter>
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_basic_tpl.hpp">
+      <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

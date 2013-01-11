@@ -29,7 +29,6 @@ class ArrayBasic : public Array {
 public:
     ArrayBasic(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
     ArrayBasic(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
-    //ArrayBasic(Allocator& alloc);
     ~ArrayBasic();
 
     T Get(size_t ndx) const;
@@ -51,7 +50,6 @@ public:
     /// Compare two arrays for equality.
     bool Compare(const ArrayBasic<T>&) const;
 
-    static size_t create_empty_basic_array(Allocator& alloc);
 
 private:
     virtual size_t CalcByteLen(size_t count, size_t width) const;
@@ -59,7 +57,7 @@ private:
     virtual WidthType GetWidthType() const {return TDB_MULTIPLY;}
 
     template <bool find_max> bool minmax(T& result, size_t start, size_t end) const;
-
+    static size_t create_empty_basic_array(Allocator& alloc);
 };
 
 

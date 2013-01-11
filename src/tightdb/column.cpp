@@ -255,7 +255,8 @@ namespace tightdb {
 size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc)
 {
     Array a(ref, 0, 0, alloc);
-    if (!a.IsNode()) return a.Size();
+    if (!a.IsNode())
+        return a.Size();
     Array offsets(a.Get(0), 0, 0, alloc);
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
@@ -326,14 +327,16 @@ void Column::Destroy()
 
 bool Column::is_empty() const
 {
-    if (!IsNode()) return m_array->is_empty();
+    if (!IsNode())
+        return m_array->is_empty();
     const Array offsets = NodeGetOffsets();
     return offsets.is_empty();
 }
 
 size_t Column::Size() const
 {
-    if (!IsNode()) return m_array->Size();
+    if (!IsNode())
+        return m_array->Size();
     const Array offsets = NodeGetOffsets();
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
@@ -341,7 +344,8 @@ size_t Column::Size() const
 void Column::UpdateParentNdx(int diff)
 {
     m_array->UpdateParentNdx(diff);
-    if (m_index) m_index->UpdateParentNdx(diff);
+    if (m_index)
+        m_index->UpdateParentNdx(diff);
 }
 
 // Used by column b-tree code to ensure all leaf having same type
@@ -371,7 +375,8 @@ const Column Column::GetSubColumn(size_t ndx) const
 void Column::Clear()
 {
     m_array->Clear();
-    if (m_array->IsNode()) m_array->SetType(COLUMN_NORMAL);
+    if (m_array->IsNode())
+        m_array->SetType(COLUMN_NORMAL);
 }
 
 int64_t Column::Get(size_t ndx) const
@@ -390,10 +395,12 @@ bool Column::Set(size_t ndx, int64_t value)
     const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
 
     const bool res = TreeSet<int64_t, Column>(ndx, value);
-    if (!res) return false;
+    if (!res)
+        return false;
 
     // Update index
-    if (m_index) m_index->Set(ndx, oldVal, value);
+    if (m_index)
+        m_index->Set(ndx, oldVal, value);
 
     return true;
 }
@@ -408,7 +415,8 @@ bool Column::Insert(size_t ndx, int64_t value)
     TIGHTDB_ASSERT(ndx <= Size());
 
     const bool res = TreeInsert<int64_t, Column>(ndx, value);
-    if (!res) return false;
+    if (!res)
+        return false;
 
     // Update index
     if (m_index) {
@@ -532,7 +540,6 @@ double Column::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = ((Column*)this)->Size();
     size_t size = end - start;
-    //FIXME: shouldn't sum be int64_t? it was size_t
     int64_t sum = aggregate<TDB_SUM, NONE, int64_t>(0, start, end);
     double avg = double( sum ) / double( size == 0 ? 1 : size );
     return avg;

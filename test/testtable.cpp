@@ -47,7 +47,7 @@ TEST(Table1)
 #endif // TIGHTDB_DEBUG
 }
 
-TEST(Table_float)
+TEST(Table_floats)
 {
     Table table;
     table.add_column(COLUMN_TYPE_FLOAT, "first");
