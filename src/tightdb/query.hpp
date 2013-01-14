@@ -141,6 +141,7 @@ public:
     time_t maximum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     time_t minimum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 */
+    float sum_float(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 
     // Deletion
     size_t  remove(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));

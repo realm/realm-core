@@ -592,10 +592,10 @@ public:
 
 };
 
-template <> class state_state<class T> {
+template <class T> class state_state {
 public:
 
-    float state;
+    T state;
     size_t match_count;
     size_t m_limit;
 
@@ -613,9 +613,9 @@ public:
         m_limit = limit;
 
         if (action == TDB_MAX)
-            state = -std::numeric_limits<float>::infinity(); // verify -(inf()) is correct and there is no minusinf()
+            state = -std::numeric_limits<T>::infinity(); // verify -(inf()) is correct and there is no minusinf()
         else if (action == TDB_MIN)
-            state = std::numeric_limits<float>::infinity();
+            state = std::numeric_limits<T>::infinity();
         else if (action == TDB_SUM)
             state = 0.0;
         else
