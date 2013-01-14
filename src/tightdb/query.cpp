@@ -365,6 +365,33 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     return move(tv);
 }
 
+#if 1
+double Query::sum_double(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    if (end == size_t(-1)) 
+        end = m_table->size();
+
+    const ColumnDouble& c = m_table->GetColumnDouble(column);
+
+    if (first.size() == 0 || first[0] == 0) {
+        // User created query with no criteria; sum() range
+        if (resultcount)
+            *resultcount = end-start;
+
+        return c.sum(start, end);
+    }
+
+    Init(*m_table);
+    size_t matchcount = 0; 
+    state_state<double> st;
+    st.init(TDB_SUM, NULL, limit);
+    double r = first[0]->aggregate<TDB_SUM, int64_t>(&st, start, end, column, &matchcount);
+    if (resultcount)
+        *resultcount = matchcount;
+    return r;
+}
+#endif
+
 int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (end == size_t(-1)) 
@@ -389,8 +416,6 @@ int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end,
         *resultcount = matchcount;
     return r;
 }
-
-// Aggregates:
 
 int64_t Query::maximum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
