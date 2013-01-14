@@ -46,7 +46,7 @@ size_t GroupWriter::Commit()
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.is_shared();
+    const bool isShared = m_group.m_is_shared;
     TIGHTDB_ASSERT(fpositions.Size() == flengths.Size());
     TIGHTDB_ASSERT(!isShared || fversions.Size() == flengths.Size());
 
@@ -195,7 +195,7 @@ void GroupWriter::merge_free_space() {
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.is_shared();
+    const bool isShared = m_group.m_is_shared;
 
     if (flengths.is_empty())
         return;
@@ -236,7 +236,7 @@ void GroupWriter::add_free_space(size_t pos, size_t len, size_t version) {
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.is_shared();
+    const bool isShared = m_group.m_is_shared;
 
     // We always want to keep the list of free space in
     // sorted order (by position) to facilitate merge of
@@ -261,7 +261,7 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t& filesize, size_t star
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.is_shared();
+    const bool isShared = m_group.m_is_shared;
 
     // Do we have a free space we can reuse?
     const size_t count = flengths.Size();
@@ -310,7 +310,7 @@ size_t GroupWriter::get_free_space(size_t len, size_t& filesize)
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.is_shared();
+    const bool isShared = m_group.m_is_shared;
 
     const size_t count = flengths.Size();
 
@@ -374,7 +374,7 @@ size_t GroupWriter::extend_free_space(size_t len, size_t& filesize)
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.is_shared();
+    const bool isShared = m_group.m_is_shared;
 
     // we always expand megabytes at a time, both for
     // performance and to avoid excess fragmentation
@@ -431,7 +431,7 @@ void GroupWriter::dump()
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.is_shared();
+    const bool isShared = m_group.m_is_shared;
 
     const size_t count = flengths.Size();
     printf("count: %d, m_len = %d, version >= %d\n", (int)count, (int)m_len, (int)m_readlock_version);

@@ -87,9 +87,6 @@ public:
     void clear_interrupt_transact() { m_replication.clear_interrupt(); }
 #endif
 
-    // FIXME: Eliminate this. All construction errors must be reported using exceptions.
-    bool is_valid() const { return m_isValid; }
-
     // Has db been modified since last transaction?
     bool has_changed() const;
 
@@ -124,7 +121,6 @@ private:
     Group       m_group;
     SharedInfo* m_info;
     size_t      m_info_len;
-    bool        m_isValid;
     size_t      m_version;
     int         m_fd;
     std::string m_lockfile_path;

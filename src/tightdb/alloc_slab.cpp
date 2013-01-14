@@ -375,7 +375,8 @@ bool SlabAlloc::IsReadOnly(size_t ref) const
     return ref < m_baseline;
 }
 
-void SlabAlloc::set_shared_buffer(char* data, size_t size, bool take_ownership)
+
+void SlabAlloc::set_buffer(char* data, size_t size, bool take_ownership)
 {
     // Verify the data structures
     if (!validate_buffer(data, size)) throw InvalidDatabase();
@@ -386,78 +387,81 @@ void SlabAlloc::set_shared_buffer(char* data, size_t size, bool take_ownership)
 }
 
 
-// FIXME: Maybe we should pass a (bool is_shared) argument
-void SlabAlloc::set_shared(const string& path, bool read_only, bool no_create)
+// FIXME: There is probably no need to use a file lock below, since when concurrency is allowd this function is called in a mutex controlled manner from SharedGroup via Group.
+void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, bool no_create)
 {
+    // When 'read_only' is true, this function will throw
+    // InvalidDatabaseFile if the file exists already but is
+    // empty. This can happen if another process is currently creating
+    // it. Note however, that it is only legal for multiple processes
+    // to access a database file concurrently if it is done via a
+    // SharedGroup, and in that case 'read_only' can never be true.
+    TIGHTDB_ASSERT(!(is_shared && read_only));
+    static_cast<void>(is_shared);
+
 #ifndef _MSC_VER // POSIX version (+ Linux file locks)
 
-    // Open file
     int errno_copy;
     {
+        // Open file
         const int open_mode = read_only ? O_RDONLY : no_create ? O_RDWR : O_RDWR|O_CREAT;
-        m_fd = open(path.c_str(), open_mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        if (m_fd < 0) {
+        const int fd = open(path.c_str(), open_mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (fd < 0) {
             errno_copy = errno;
             goto open_error;
         }
 
-        CloseGuard cg(m_fd);
+        CloseGuard cg(fd);
 
         // Get size
         struct stat statbuf;
-        if (fstat(m_fd, &statbuf) < 0) goto fstat_error;
-        size_t len = statbuf.st_size;
+        if (fstat(fd, &statbuf) < 0) goto fstat_error;
+        size_t size = statbuf.st_size;
 
         // Handle empty files (new database)
-        if (len == 0) {
-            // When 'read_only' is true, this function will throw
-            // InvalidDatabaseFile if the file exists already but is
-            // empty. This can happen if another process is currently
-            // in creating it. Note however, that it is only legal for
-            // multiple processes to access a database file
-            // concurrently if it is done via a SharedGroup, and in
-            // that case 'read_only' can never be true.
+        if (size == 0) {
             if (read_only) goto invalid_database;
 
             // We don't want multiple processes creating files at the same time
-            if (flock(m_fd, LOCK_EX) < 0) goto flock_error;
+            if (flock(fd, LOCK_EX) < 0) goto flock_error;
 
-            FileUnlockGuard fug(m_fd);
+            FileUnlockGuard fug(fd);
 
             // Verify that file has not been created by other process while
             // we waited for lock
-            if (fstat(m_fd, &statbuf) < 0) goto fstat_error;
-            len = statbuf.st_size;
+            if (fstat(fd, &statbuf) < 0) goto fstat_error;
+            size = statbuf.st_size;
 
-            if (len == 0) {
+            if (size == 0) {
                 // write file header
-                const ssize_t r = write(m_fd, default_header, header_len);
+                const ssize_t r = write(fd, default_header, header_len);
                 if (r < 0) goto write_error;
 
                 // pre-alloc initial space when mmapping
-                len = 1024*1024;
-                const int r2 = ftruncate(m_fd, len);
+                size = 1024*1024;
+                const int r2 = ftruncate(fd, size);
                 if (r2 < 0) goto ftruncate_error;
             }
         }
 
         // Verify that data is 64bit aligned
-        if ((len & 0x7) != 0) goto invalid_database;
+        if ((size & 0x7) != 0) goto invalid_database;
 
         // Map to memory (read only)
-        void* const p = mmap(0, len, PROT_READ, MAP_SHARED, m_fd, 0);
-        if (p == MAP_FAILED) goto mmap_error;
+        void* const addr = mmap(0, size, PROT_READ, MAP_SHARED, fd, 0);
+        if (addr == MAP_FAILED) goto mmap_error;
 
-        UnmapGuard ug(p, len);
+        UnmapGuard ug(addr, size);
 
         // Verify the data structures
-        if (!validate_buffer(static_cast<char*>(p), len)) goto invalid_database;
-
-        m_shared = static_cast<char*>(p);
-        m_baseline = len;
+        if (!validate_buffer(static_cast<char*>(addr), size)) goto invalid_database;
 
         cg.release();
         ug.release();
+
+        m_fd = fd;
+        m_shared = static_cast<char*>(addr);
+        m_baseline = size;
     }
 
     return;
@@ -497,39 +501,41 @@ void SlabAlloc::set_shared(const string& path, bool read_only, bool no_create)
         const DWORD desired_access = read_only ? GENERIC_READ : GENERIC_READ|GENERIC_WRITE;
         const DWORD share_mode = FILE_SHARE_READ | FILE_SHARE_WRITE; // FIXME: Should probably be zero if we are called from a group that is not managed by a SharedGroup instance, since in this case concurrenct access is prohibited anyway.
         const DWORD creation_disposition = read_only || no_create ? OPEN_EXISTING : OPEN_ALWAYS;
-        m_file = CreateFileA(path.c_str(), desired_access, share_mode, NULL,
-                             creation_disposition, NULL, NULL);
-        if (m_file == INVALID_HANDLE_VALUE) {
+        const HANDLE file = CreateFileA(path.c_str(), desired_access, share_mode, NULL,
+                                        creation_disposition, NULL, NULL);
+        if (file == INVALID_HANDLE_VALUE) {
             error_copy = GetLastError();
             goto open_error;
         }
 
-        CloseGuard cg(m_file);
+        CloseGuard cg(file);
 
         // Map to memory (read only)
-        const HANDLE m_map_file = CreateFileMapping(m_file, NULL, PAGE_WRITECOPY, 0, 0, 0);
+        const HANDLE map_file = CreateFileMapping(file, NULL, PAGE_WRITECOPY, 0, 0, 0);
         if (map_file == NULL) goto create_map_error;
 
-        CloseGuard cg2(m_map_file);
+        CloseGuard cg2(map_file);
 
-        const LPVOID p = MapViewOfFile(m_map_file, FILE_MAP_COPY, 0, 0, 0);
-        if (!p) goto map_view_error;
+        const LPVOID addr = MapViewOfFile(map_file, FILE_MAP_COPY, 0, 0, 0);
+        if (!addr) goto map_view_error;
 
         // Get Size
-        LARGE_INTEGER size;
-        if (!GetFileSizeEx(m_file, &size)) goto get_size_error;
-        m_baseline = to_ref(size.QuadPart);
+        LARGE_INTEGER large_int;
+        if (!GetFileSizeEx(file, &large_int)) goto get_size_error;
+        const size_t size = to_ref(large_int.QuadPart); // FIXME: Really use to_ref() here? It looks like a misuse.
 
-        UnmapGuard ug(p);
+        UnmapGuard ug(addr);
 
         // Verify the data structures
-        if (!validate_buffer(static_cast<char*>(p), m_baseline)) goto invalid_database;
-
-        m_shared = static_cast<char*>(p);
+        if (!validate_buffer(static_cast<char*>(addr), size)) goto invalid_database;
 
         cg.release();
         cg2.release();
         ug.release();
+
+        m_file = file;
+        m_shared = static_cast<char*>(addr);
+        m_baseline = size;
     }
 
     return;

@@ -28,7 +28,6 @@ TEST(Shared_Initial)
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
 
         // Verify that new group is empty
         {
@@ -57,7 +56,6 @@ TEST(Shared_Initial_Mem)
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
-        CHECK(shared.is_valid());
 
         // Verify that new group is empty
         {
@@ -88,12 +86,10 @@ TEST(Shared_Initial2)
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
 
         {
             // Open the same db again (in empty state)
             SharedGroup shared2("test_shared.tightdb");
-            CHECK(shared2.is_valid());
 
             // Verify that new group is empty
             {
@@ -138,12 +134,10 @@ TEST(Shared_Initial2_Mem)
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
-        CHECK(shared.is_valid());
 
         {
             // Open the same db again (in empty state)
             SharedGroup shared2("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
-            CHECK(shared2.is_valid());
 
             // Verify that new group is empty
             {
@@ -190,7 +184,6 @@ TEST(Shared1)
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
 
         // Create first table in group
         {
@@ -202,7 +195,6 @@ TEST(Shared1)
 
         // Open same db again
         SharedGroup shared2("test_shared.tightdb");
-        CHECK(shared2.is_valid());
         {
             const Group& g2 = shared2.begin_read();
 
@@ -289,7 +281,6 @@ TEST(Shared_rollback)
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
 
         // Create first table in group (but rollback)
         {
@@ -361,7 +352,6 @@ TEST(Shared_Writes)
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
 
         // Create first table in group
         {
@@ -406,7 +396,6 @@ TEST(Shared_Writes_SpecialOrder)
     remove("test.tightdb.lock");
 
     SharedGroup db("test.tightdb");
-    CHECK(db.is_valid());
 
     const int num_rows = 5; // FIXME: Should be strictly greater than MAX_LIST_SIZE, but that takes a loooooong time!
     const int num_reps = 25;
@@ -452,7 +441,6 @@ void* IncrementEntry(void* arg )
 
     // Open shared db
     SharedGroup shared("test_shared.tightdb");
-    CHECK(shared.is_valid());
 
     for (size_t i = 0; i < 100; ++i) {
         // Increment cell
@@ -490,7 +478,6 @@ TEST(Shared_WriterThreads)
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
 
         const size_t thread_count = 10;
 
@@ -542,7 +529,6 @@ TEST(Shared_FormerErrorCase1)
     remove("test_shared.tightdb");
     remove("test_shared.tightdb.lock");
     SharedGroup db("test_shared.tightdb");
-    CHECK(db.is_valid());
     {
         Group& group = db.begin_write();
         TableRef table = group.get_table("my_table");
@@ -694,7 +680,6 @@ TEST(Shared_FormerErrorCase2)
 
     for (int i=0; i<10; ++i) {
         SharedGroup db("test_shared.tightdb");
-        CHECK(db.is_valid());
         {
             Group& group = db.begin_write();
             FormerErrorCase2_Table::Ref table = group.get_table<FormerErrorCase2_Table>("table");
@@ -728,7 +713,6 @@ TEST(Shared_SpaceOveruse)
         remove("over_alloc_1.tightdb");
         remove("over_alloc_1.tightdb.lock");
         SharedGroup db("over_alloc_1.tightdb");
-        CHECK(db.is_valid());
 
         // Do a lot of sequential transactions
         for (int i = 0; i < n_outer; ++i) {
@@ -772,7 +756,6 @@ TEST(Shared_Notifications)
     {
         // Create a new shared db
         SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
 
         // No other instance have changed db since last transaction
         CHECK(!shared.has_changed());
@@ -780,7 +763,6 @@ TEST(Shared_Notifications)
         {
             // Open the same db again (in empty state)
             SharedGroup shared2("test_shared.tightdb");
-            CHECK(shared2.is_valid());
 
             // Verify that new group is empty
             {
@@ -838,7 +820,6 @@ TEST(Shared_FromSerialized)
 
     // Open same file as shared group
     SharedGroup shared("test_shared.tightdb");
-    CHECK(shared.is_valid());
 
     // Verify that contents is there when shared
     {

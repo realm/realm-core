@@ -375,7 +375,6 @@ void thread(int index, const char* database_path)
 {
     for (int i=0; i<num_rounds; ++i) {
         SharedGroup db(database_path);
-        if (!db.is_valid()) throw_error(ERROR_OTHER);
         round(&db, index);
     }
 }
@@ -451,7 +450,6 @@ TEST(Transactions)
         table1_theta_size += 2;
 
         SharedGroup db(database_path);
-        CHECK(db.is_valid());
         {
             const Group& group = db.begin_read();
             MyTable::ConstRef table = group.get_table<MyTable>("my_table");

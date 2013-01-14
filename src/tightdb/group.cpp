@@ -131,7 +131,7 @@ Group::Group(BufferSpec buffer, bool take_ownership):
     TIGHTDB_ASSERT(buffer.m_data);
 
     // Memory map file
-    m_alloc.set_shared_buffer(buffer.m_data, buffer.m_size, take_ownership);
+    m_alloc.set_buffer(buffer.m_data, buffer.m_size, take_ownership);
 
     const size_t top_ref = m_alloc.GetTopRef();
     create_from_ref(top_ref);
@@ -145,7 +145,7 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 {
     // Memory map file
     // This leaves the group ready, but in invalid state
-    m_alloc.set_shared(filename, mode == mode_ReadOnly, mode == mode_NoCreate);
+    m_alloc.map_file(filename, m_is_shared, mode == mode_ReadOnly, mode == mode_NoCreate);
 
     if (!do_init)  return;
 
@@ -189,7 +189,7 @@ void Group::create_from_ref(size_t top_ref)
         m_tableNames.SetType(COLUMN_NORMAL);
         m_freePositions.SetType(COLUMN_NORMAL);
         m_freeLengths.SetType(COLUMN_NORMAL);
-        if (is_shared()) {
+        if (m_is_shared) {
             m_freeVersions.SetType(COLUMN_NORMAL);
         }
 
@@ -198,7 +198,7 @@ void Group::create_from_ref(size_t top_ref)
         // Everything but header is free space
         m_freePositions.add(header_len);
         m_freeLengths.add(m_alloc.GetFileLen() - header_len);
-        if (is_shared())
+        if (m_is_shared)
             m_freeVersions.add(0);
     }
     else {
@@ -299,7 +299,7 @@ void Group::reset_to_new()
 
 void Group::rollback()
 {
-    TIGHTDB_ASSERT(is_shared());
+    TIGHTDB_ASSERT(m_is_shared);
 
     // FIXME: I (Kristian) had to add this to avoid double deallocation in ~Group(), but is this the right fix? Alexander?
     invalidate();
@@ -471,7 +471,7 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool doPer
     GroupWriter out(*this, doPersist);
     if (!out.IsValid()) return size_t(-1);
 
-    if (is_shared()) {
+    if (m_is_shared) {
         m_readlock_version = readlock_version;
         out.SetVersions(current_version, readlock_version);
     }
@@ -481,7 +481,7 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool doPer
 
     // If the group is persisiting in single-thread (un-shared) mode
     // we have to make sure that the group stays valid after commit
-    if (!is_shared()) {
+    if (!m_is_shared) {
         // Recusively update refs in all active tables (columns, arrays..)
         update_refs(top_pos);
 
@@ -667,7 +667,7 @@ void Group::Verify() const
         const size_t count_l = m_freeLengths.Size();
         TIGHTDB_ASSERT(count_p == count_l);
 
-        if (is_shared()) {
+        if (m_is_shared) {
             TIGHTDB_ASSERT(m_freeVersions.IsValid());
             TIGHTDB_ASSERT(count_p == m_freeVersions.Size());
         }
@@ -783,7 +783,7 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
 {
     static_cast<void>(readlock_version); // FIXME: Why is this parameter not used?
 
-    if (!is_shared()) return;
+    if (!m_is_shared) return;
 
 #if !defined(_MSC_VER)
     const int fd = m_alloc.GetFileDescriptor();

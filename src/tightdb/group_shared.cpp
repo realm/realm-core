@@ -50,7 +50,7 @@ struct tightdb::SharedInfo {
 
 SharedGroup::SharedGroup(const string& path_to_database_file, bool no_create,
                          DurabiltyLevel dlevel):
-    m_group(Group::shared_tag()), m_info(NULL), m_isValid(false), m_version(-1),
+    m_group(Group::shared_tag()), m_info(NULL), m_version(-1),
     m_replication(Replication::degenerate_tag())
 {
     init(path_to_database_file, no_create, dlevel);
@@ -58,7 +58,7 @@ SharedGroup::SharedGroup(const string& path_to_database_file, bool no_create,
 
 SharedGroup::SharedGroup(replication_tag, const string& path_to_database_file,
                          DurabiltyLevel dlevel):
-    m_group(Group::shared_tag()), m_info(NULL), m_isValid(false), m_version(-1),
+    m_group(Group::shared_tag()), m_info(NULL), m_version(-1),
     m_replication(path_to_database_file)
 {
     m_group.set_replication(&m_replication);
@@ -71,7 +71,7 @@ SharedGroup::SharedGroup(replication_tag, const string& path_to_database_file,
 
 SharedGroup::SharedGroup(const string& path_to_database_file, bool no_create,
                          DurabilityLevel dlevel):
-    m_group(Group::shared_tag()), m_info(NULL), m_isValid(false), m_version(-1)
+    m_group(Group::shared_tag()), m_info(NULL), m_version(-1)
 {
     init(path_to_database_file, no_create, dlevel);
 }
@@ -97,7 +97,7 @@ SharedGroup::SharedGroup(const string& path_to_database_file, bool no_create,
 
 // Issues with current implementation:
 //
-// - Possible reinitialization due to unlocking during downgrade of file lock
+// - Possible reinitialization due to temporary unlocking during downgrade of file lock
 
 void SharedGroup::init(const string& path_to_database_file, bool no_create_file,
                        DurabilityLevel dlevel)
@@ -165,11 +165,12 @@ open_start:
     }
     m_info = (SharedInfo*)p;
 
-    const Group::OpenMode group_open_mode = no_create_file ? Group::mode_NoCreate : Group::mode_Normal;
     if (need_init) {
         // If we are the first we may have to create the database file
         // but we invalidate the internals right after to avoid conflicting
         // with old state when starting transactions
+        const Group::OpenMode group_open_mode =
+            no_create_file ? Group::mode_NoCreate : Group::mode_Normal;
         m_group.create_from_file(path_to_database_file, group_open_mode, true);
         m_group.invalidate();
 
@@ -214,10 +215,10 @@ open_start:
             return;
 
         // Setup the group, but leave it in invalid state
-        m_group.create_from_file(path_to_database_file, group_open_mode, false);
+        m_group.create_from_file(path_to_database_file, Group::mode_NoCreate, false);
     }
 
-    m_isValid = true;
+//    m_isValid = true;
 
 #ifdef TIGHTDB_DEBUG
     m_state = SHARED_STATE_READY;

@@ -102,7 +102,6 @@ public:
 
     ~Group();
 
-    bool is_shared() const {return m_is_shared;}
     bool is_empty() const;
 
     size_t get_table_count() const;
@@ -212,7 +211,7 @@ protected:
     Array m_freeLengths;
     Array m_freeVersions;
     mutable Array m_cachedtables;
-    bool m_is_shared;
+    const bool m_is_shared;
     size_t m_readlock_version;
 
 private:

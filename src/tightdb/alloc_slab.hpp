@@ -52,15 +52,17 @@ public:
     /// allowed. When used by SharedGroup, concurrency is allowed, but
     /// read_only and no_create must both be false in this case.
     ///
+    /// \param is_shared Must be true iff we are called on behalf of SharedGroup.
+    ///
     /// \param read_only Open the file in read-only mode. This implies \a no_create.
     ///
     /// \param no_create Fail if the file does not already exist.
     ///
-    /// Throws InvalidDatabaseFile
-    void set_shared(const std::string& path, bool read_only, bool no_create);
+    /// \throw InvalidDatabase
+    void map_file(const std::string& path, bool is_shared, bool read_only, bool no_create);
 
-    /// Throws InvalidDatabaseFile
-    void set_shared_buffer(char* data, size_t size, bool take_ownership);
+    /// \throw InvalidDatabase
+    void set_buffer(char* data, size_t size, bool take_ownership);
 
     MemRef Alloc(size_t size);
     MemRef ReAlloc(size_t ref, void* p, size_t size);

@@ -13,6 +13,11 @@ Format:
 ==================
 
 
+2013-01-14 (Kristian Spangsege)
+- Group::set_shared() removed.
+- SharedGroup::is_valid() removed. Errors are now reported as exceptions from the constructor.
+
+
 2013-01-11 (Kristian Spangsege)
 + Simplified open-mode for Group constructor.
 - Group::is_valid() removed. Errors are now reported as exceptions from the constructor.

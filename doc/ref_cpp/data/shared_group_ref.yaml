@@ -78,19 +78,6 @@ CATEGORIES:
         DESCR  : 
 - Utilities:
   METHODS:
-  - g_shared_group_is_valid:
-      NAMES    : is_valid
-      SUMMARY  : &g_shared_group_is_valid_summary
-                 Is shared group valid?
-      DESCR    : &g_shared_group_is_valid_descr
-                 >
-                 This method tests the consistency/validity of a shared group.
-      RETURN:
-        TYPES  : bool
-        DESCR  : <code>true</code> is consistent/valid, <code>false</code> otherwise.
-      EXAMPLES:
-      - CODE   : ex_cpp_shared_group_is_valid
-        DESCR  :
   - g_shared_group_has_changed:
       NAMES    : has_changed
       SUMMARY  : &g_shared_group_has_changed_summary

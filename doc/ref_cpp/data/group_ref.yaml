@@ -253,19 +253,6 @@ CATEGORIES:
         CODE   : ex_cpp_group_write_to_mem
 - Group:
   METHODS:
-  - g_group_is_shared:
-      NAMES    : is_shared
-      SUMMARY  : &g_group_is_shared_summary
-                 Is group shared?
-      DESCR    : &g_group_is_shared_descr
-                 The method checks if group is shared.
-      CONST    : true
-      RETURN:
-        TYPES  : bool
-        DESCR  : <code>true</code> if group is shared, <code>false</code> otherwise.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_is_shared
   - g_group_is_empty:
       NAMES    : is_empty
       SUMMARY  : &g_group_is_empty_summary
