@@ -89,8 +89,6 @@ private:
     A m_array;
 };
 
-//template <class x, class y, class z> class NODE;
-
 class ParentNode {
 public:
     ParentNode() : cond(-1), m_table(NULL), has_optimized_aggregate(false) {}
@@ -183,7 +181,7 @@ public:
     }
 
 
-    template<ACTION action, class resulttype> int64_t aggregate(state_state<resulttype>* st, size_t start, size_t end, size_t agg_col2 = not_found, size_t* matchcount = 0) 
+    template<ACTION action, class resulttype> resulttype aggregate(state_state<resulttype>* st, size_t start, size_t end, size_t agg_col2 = not_found, size_t* matchcount = 0) 
     {
         if (end == size_t(-1)) 
             end = m_table->size();
@@ -229,7 +227,7 @@ public:
 
     }
 
-    template<ACTION action, class resulttype>size_t aggregate_local(state_state<int64_t>* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t, Column, Array>* agg_col, size_t* matchcount) 
+    template<ACTION action, class resulttype>size_t aggregate_local(state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, SequentialGetter<resulttype, Column, Array>* agg_col, size_t* matchcount) 
     {
 		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
         // integer version, because find_first_local() is relatively slower here (because it's non-integers).
@@ -269,12 +267,10 @@ public:
 
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
-                int64_t av = 0;
+                resulttype av = 0;
                 if (agg_col != NULL)  
                     av = agg_col->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
-
                     st->state_match<action, 0>(r, 0, av, CallbackDummy());
-
              }   
         }
     }
@@ -448,11 +444,16 @@ public:
                 return (m_local_matches != m_local_limit);
         }
 
-        int64_t av = NULL;        
-        if (m_state->uses_val<action>()) // Compiler cannot see that Column::Get has no side effect and result is discarded         
-            av = m_column_agg->GetNext(i);
+        resulttype av;
+        bool b;
 
-        bool b = m_state->state_match<action, false>(i, 0, av, CallbackDummy());  
+        if (m_state->uses_val<action>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
+            av = m_column_agg->GetNext(i);
+            b = m_state->state_match<action, false>(i, 0, av, CallbackDummy());  
+        }
+        else {
+            b = m_state->state_match<action, false>(i, 0, 0, CallbackDummy());  
+        }
 
         if (m_local_matches == m_local_limit)
             return false;

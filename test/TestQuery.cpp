@@ -44,8 +44,9 @@ TEST(TestQueryFloat_lasse1)
     t.add(4.5f, 10.1f);
     t.add(5.5f, 0.1f);
 
- //   int64_t cnt = t.where().first.greater(3.0f);
- //   CHECK_EQUAL(2, cnt);
+//    double d = t.where().first.greater(3.0).second.sum();
+
+   // CHECK_EQUAL(2, cnt);
 
 }
 
