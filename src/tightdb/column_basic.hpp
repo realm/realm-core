@@ -89,6 +89,10 @@ protected:
 #ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif // TIGHTDB_DEBUG
+
+//private:
+    template <ACTION action, class cond> T aggregate(T target, size_t start, size_t end, size_t *matchcount = (size_t*)0) const;
+
 };
 
 
