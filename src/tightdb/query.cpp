@@ -183,27 +183,27 @@ Query& Query::between(size_t column_ndx, float from, float to)
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnFloat, EQUAL, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, ColumnDouble, EQUAL, ArrayDouble> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnFloat, NOTEQUAL, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, ColumnDouble, NOTEQUAL, ArrayDouble> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnFloat, GREATER, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, ColumnDouble, GREATER, ArrayDouble> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnFloat, GREATER_EQUAL, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, ColumnDouble, GREATER_EQUAL, ArrayDouble> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnFloat, LESS_EQUAL, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, ColumnDouble, LESS_EQUAL, ArrayDouble> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnFloat, LESS, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, ColumnDouble, LESS, ArrayDouble> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {

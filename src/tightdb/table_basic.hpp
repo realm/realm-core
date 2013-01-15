@@ -390,6 +390,7 @@ private:
 namespace _impl
 {
     template<class T> struct GetColumnTypeId;
+
     template<> struct GetColumnTypeId<int64_t> {
         static const ColumnType id = COLUMN_TYPE_INT;
     };
