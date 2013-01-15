@@ -385,7 +385,7 @@ double Query::sum_double(size_t column, size_t* resultcount, size_t start, size_
     size_t matchcount = 0; 
     state_state<double> st;
     st.init(TDB_SUM, NULL, limit);
-    double r = first[0]->aggregate<TDB_SUM, int64_t>(&st, start, end, column, &matchcount);
+    double r = first[0]->aggregate<TDB_SUM, double>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;

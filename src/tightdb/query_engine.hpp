@@ -68,7 +68,7 @@ public:
     SequentialGetter(const Table& table, size_t column) 
     {
         if(column != not_found)
-            m_column = (Column*)&table.GetColumnBase(column);
+            m_column = (typename ColArrType<T>::coltype *)&table.GetColumnBase(column);
         m_leaf_end = 0;
     }
 
@@ -189,7 +189,7 @@ public:
         size_t r;
 
         if(node->has_optimized_aggregate)
-            r = node->aggregate_call_specialized(action, st, start, end, local_limit, agg_col, matchcount);
+            r = node->aggregate_call_specialized(action, st, start, end, local_limit, (SequentialGetter<int64_t>*)agg_col, matchcount);
         else
             r = aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount); // call method in parent class
 
