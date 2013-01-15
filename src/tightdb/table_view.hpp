@@ -73,6 +73,7 @@ public:
 
     template <int function>int64_t aggregate(size_t column_ndx) const;
     // TODO, FIXME: rename int versions
+    // TODO: Add maximum, minimum for date
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;

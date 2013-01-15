@@ -66,8 +66,6 @@ public:
     Query& between(size_t column_ndx, int64_t from, int64_t to);
 
     // Conditions: float
-  
-
     Query& equal(size_t column_ndx, float value);
     Query& not_equal(size_t column_ndx, float value);
     Query& greater(size_t column_ndx, float value);

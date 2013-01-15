@@ -30,7 +30,7 @@
 
 namespace tightdb {
 
-enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_LESS, COND_NONE, COND_COUNT};
+enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_GREATER_EQUAL, COND_LESS, COND_LESS_EQUAL, COND_NONE, COND_COUNT};
 
 
 // FIXME: We cannot use all-uppercase names like 'CONTAINS' for
@@ -191,14 +191,14 @@ struct LESS {
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { (void)lbound; return (ubound < v); }
 };
 
-struct LESSEQUAL {
+struct LESS_EQUAL {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 <= v2;}
-    int condition(void) {return -1;}
+    int condition(void) {return COND_LESS_EQUAL;}
 };
 
-struct GREATEREQUAL {
+struct GREATER_EQUAL {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
-    int condition(void) {return -1;}
+    int condition(void) {return COND_GREATER_EQUAL;}
 };
 
 
