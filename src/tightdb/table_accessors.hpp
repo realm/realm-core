@@ -1211,7 +1211,7 @@ public:
     int64_t sum(std::size_t* resultcount=NULL, std::size_t start=0,
                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.sum<int64_t, int64_t, Column>(col_idx, resultcount, start, end, limit);
     }
 
     int64_t maximum(std::size_t* resultcount=NULL, std::size_t start=0,
@@ -1280,25 +1280,25 @@ public:
     double sum(std::size_t* resultcount=NULL, std::size_t start=0,
                std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.sum_float(col_idx, resultcount, start, end, limit);
     }
 
     float maximum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_float(col_idx, resultcount, start, end, limit);
     }
 
     float minimum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_float(col_idx, resultcount, start, end, limit);
     }
 
     double average(std::size_t* resultcount=NULL, std::size_t start=0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.average_float(col_idx, resultcount, start, end, limit);
     }
 };
 
@@ -1349,7 +1349,7 @@ public:
     double sum(std::size_t* resultcount=NULL, std::size_t start=0,
                std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.sum<double, double, ColumnDouble>(col_idx, resultcount, start, end, limit);
     }
 
     double maximum(std::size_t* resultcount=NULL, std::size_t start=0,

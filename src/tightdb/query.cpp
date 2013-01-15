@@ -366,12 +366,13 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 }
 
 #if 1
-double Query::sum_double(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
+template <typename R, typename T, class C>
+R Query::sum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (end == size_t(-1)) 
         end = m_table->size();
 
-    const ColumnDouble& c = m_table->GetColumnDouble(column);
+    const C& c = m_table->GetColumn<T>(column);
 
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; sum() range
@@ -383,14 +384,15 @@ double Query::sum_double(size_t column, size_t* resultcount, size_t start, size_
 
     Init(*m_table);
     size_t matchcount = 0; 
-    state_state<double> st;
+    state_state<R> st;
     st.init(TDB_SUM, NULL, limit);
-    double r = first[0]->aggregate<TDB_SUM, int64_t>(&st, start, end, column, &matchcount);
+    double r = first[0]->aggregate<TDB_SUM, T>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
 }
-#endif
+
+#else
 
 int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
@@ -416,6 +418,8 @@ int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end,
         *resultcount = matchcount;
     return r;
 }
+
+#endif
 
 int64_t Query::maximum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
@@ -490,7 +494,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     Init(*m_table);
 
     size_t resultcount2 = 0;
-    const int64_t sum1 = sum(column_ndx, &resultcount2, start, end, limit);
+    const int64_t sum1 = sum<int64_t, int64_t, Column>(column_ndx, &resultcount2, start, end, limit);
     const double avg1 = (double)sum1 / (double)(resultcount2 > 0 ? resultcount2 : 1);
 
     if (resultcount != NULL)
