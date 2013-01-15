@@ -37,8 +37,6 @@ class SharedGroup;
 
 class Group: private Table::Parent {
 public:
-    /// Throws std::bad_alloc in the event of a memory allocation
-    /// error.
     Group();
 
     enum OpenMode {
@@ -64,8 +62,7 @@ public:
     /// not mode_Normal. Throws PermissionDenied if the file could not
     /// be opened or created due to a permission constraint. Throws
     /// InvalidDatabase if the specified file does not appear to
-    /// contain a valid database. May also throw std::bad_alloc and
-    /// std::runtime_error.
+    /// contain a valid database.
     explicit Group(const std::string& path, OpenMode mode = mode_Normal);
 
     /// Specification of a memory buffer. The purpose of this class is
@@ -96,8 +93,7 @@ public:
     /// responsibility too.
     ///
     /// Throws InvalidDatabase if the specified buffer does not appear
-    /// to contain a valid database. Throws std::bad_alloc in the
-    /// event of a memory allocation error.
+    /// to contain a valid database.
     Group(BufferSpec buffer, bool take_ownership = true);
 
     ~Group();
@@ -120,14 +116,12 @@ public:
     // Serialization
 
     /// Throws PermissionDenied if the file could not be opened or
-    /// created due to a permission constraint. May also throw
-    /// std::bad_alloc and std::runtime_error.
+    /// created due to a permission constraint.
     void write(const std::string& path);
 
     /// Ownership of the returned memory buffer is transferred to the
     /// caller. The memory will have been allocated using
-    /// std::malloc(). Throws std::bad_alloc in the event of a memory
-    /// allocation error.
+    /// std::malloc().
     BufferSpec write_to_mem();
 
     bool commit();
