@@ -1,6 +1,5 @@
 #include <UnitTest++.h>
 #include "tightdb.hpp"
-#include "tightdb/group_shared.hpp"
 
 // Does not work for windows yet
 #ifndef _MSC_VER
