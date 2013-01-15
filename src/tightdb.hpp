@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_HPP
 #define TIGHTDB_HPP
 
-#include <tightdb/group.hpp>
+#include <tightdb/group_shared.hpp>
 #include <tightdb/table_macros.hpp>
 
 #endif // TIGHTDB_HPP
