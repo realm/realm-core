@@ -631,9 +631,6 @@ public:
             state = value;
         else if (action == TDB_SUM)
             state += value;
-        else
-            return false;
-        // TODO??? Lasse?    TIGHTDB_ASSERT(false);
 
         return true;
     }

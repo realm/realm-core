@@ -111,7 +111,7 @@ T Query::minimum(size_t column, size_t* resultcount, size_t start, size_t end, s
     size_t matchcount = 0;
     state_state<T> st;
     st.init(TDB_MIN, NULL, limit);
-    T r = first[0]->aggregate<TDB_MIN, T>(&st, start, end, not_found, &matchcount);
+    T r = first[0]->aggregate<TDB_MIN, T>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;

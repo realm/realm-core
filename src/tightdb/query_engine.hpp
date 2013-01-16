@@ -44,23 +44,24 @@ const size_t bestdist = 100;
 
 typedef bool (*CallbackDummy)(int64_t);
 
-    template<class T> struct ColArrType;
+template<class T> struct ColumnTypeTraits;
 
-    template<> struct ColArrType<int64_t> {
-        typedef Column coltype;
-        typedef Array arrtype;
-        const static ColumnType type = COLUMN_TYPE_INT;
-    };
-    template<> struct ColArrType<float> {
-        typedef ColumnFloat coltype;
-        typedef ArrayFloat arrtype;
-        const static ColumnType type = COLUMN_TYPE_FLOAT;
-    };
-    template<> struct ColArrType<double> {
-        typedef ColumnDouble coltype;
-        typedef ArrayDouble arrtype;
-        const static ColumnType type = COLUMN_TYPE_DOUBLE;
-    };
+template<> struct ColumnTypeTraits<int64_t> {
+    typedef Column column_type;
+    typedef Array array_type;
+    static const ColumnType id = COLUMN_TYPE_INT;
+};
+template<> struct ColumnTypeTraits<float> {
+    typedef ColumnFloat column_type;
+    typedef ArrayFloat array_type;
+    static const ColumnType id = COLUMN_TYPE_FLOAT;
+};
+template<> struct ColumnTypeTraits<double> {
+    typedef ColumnDouble column_type;
+    typedef ArrayDouble array_type;
+    static const ColumnType id = COLUMN_TYPE_DOUBLE;
+};
+
 
 
 // Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
@@ -69,13 +70,13 @@ class SequentialGetterParent {};
 template<class T>class SequentialGetter : public SequentialGetterParent {
 public:
     SequentialGetter() {};
-    typedef typename ColArrType<T>::coltype ColumnType;
-    typedef typename ColArrType<T>::arrtype ArrayType;
+    typedef typename ColumnTypeTraits<T>::column_type ColumnType;
+    typedef typename ColumnTypeTraits<T>::array_type ArrayType;
 
     SequentialGetter(const Table& table, size_t column) 
     {
         if(column != not_found)
-            m_column = (typename ColArrType<T>::coltype *)&table.GetColumnBase(column);
+            m_column = (typename ColumnTypeTraits<T>::column_type *)&table.GetColumnBase(column);
         m_leaf_end = 0;
     }
 
@@ -196,7 +197,7 @@ public:
         size_t r;
         
         if(node->has_optimized_aggregate)
-            r = node->aggregate_call_specialized(action, ColArrType<resulttype>::type, (state_state_parent*)st, start, end, local_limit, agg_col, matchcount);
+            r = node->aggregate_call_specialized(action, ColumnTypeTraits<resulttype>::id, (state_state_parent*)st, start, end, local_limit, agg_col, matchcount);
         else
             r = aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount); // call method in parent class
 
