@@ -38,40 +38,58 @@ TEST(TestQueryFloat)
 {
     FloatTable t;
 
-    t.add(1.1f, 2.2);
+    t.add(1.10f, 2.20);
     t.add(1.13f, 2.21);
     t.add(1.13f, 2.22);
-    t.add(1.1f, 2.2);
-    t.add(1.2f, 3.2);
+    t.add(1.10f, 2.20);
+    t.add(1.20f, 3.20);
 
+    // Test find_all()
     FloatTable::View v = t.where().col_float.equal(1.13f).find_all();
     CHECK_EQUAL(2, v.size());
     CHECK_EQUAL(1.13f, v[0].col_float.get());
     CHECK_EQUAL(1.13f, v[1].col_float.get());
 
+    FloatTable::View v2 = t.where().col_double.equal(3.2).find_all();
+    CHECK_EQUAL(1, v2.size());
+    CHECK_EQUAL(3.2, v2[0].col_double.get());
+
     // Test operators (and count)
     CHECK_EQUAL(2, t.where().col_float.equal(1.13f).count());
+    CHECK_EQUAL(3, t.where().col_float.not_equal(1.13f).count());
     CHECK_EQUAL(3, t.where().col_float.greater(1.1f).count());
     CHECK_EQUAL(3, t.where().col_float.greater_equal(1.13f).count());
     CHECK_EQUAL(4, t.where().col_float.less_equal(1.13f).count());
     CHECK_EQUAL(2, t.where().col_float.less(1.13f).count());
     CHECK_EQUAL(3, t.where().col_float.between(1.13f, 1.2f).count());
 
-    FloatTable::View v2 = t.where().col_double.equal(3.2).find_all();
-    CHECK_EQUAL(1, v2.size());
-    CHECK_EQUAL(3.2, v2[0].col_double.get());
+    CHECK_EQUAL(2, t.where().col_double.equal(2.20).count());
+    CHECK_EQUAL(3, t.where().col_double.not_equal(2.20).count());
+    CHECK_EQUAL(2, t.where().col_double.greater(2.21).count());
+    CHECK_EQUAL(3, t.where().col_double.greater_equal(2.21).count());
+    CHECK_EQUAL(4, t.where().col_double.less_equal(2.22).count());
+    CHECK_EQUAL(3, t.where().col_double.less(2.22).count());
+    CHECK_EQUAL(4, t.where().col_double.between(2.20, 2.22).count());
 
     // Test sum
-    double sum1 = 2.21 + 2.22 + 3.2;
-    FloatTable::Query q1 = t.where().col_float.between(1.13f, 1.2f);
+    double sum1 = 2.21 + 3.20;
+    FloatTable::Query q1 = t.where().col_float.between(1.13f, 1.20f).col_double.not_equal(2.22);
     CHECK_EQUAL(sum1, q1.col_double.sum());
+    double sum2 = 1.13f + 1.20f;
+    CHECK_EQUAL(sum2, q1.col_float.sum());
 
     // Test max, min, average
     CHECK_EQUAL(2.21, q1.col_double.minimum());
-    CHECK_EQUAL(3.2, q1.col_double.maximum());
-    CHECK_EQUAL(sum1/double(3), q1.col_double.average());
 
-    // todo: +=, -=
+    CHECK_EQUAL(sum2/2.0f, q1.col_float.average());
+    CHECK_EQUAL(1.20f, t.where().col_float.maximum());
+    CHECK_EQUAL(1.10f, t.where().col_float.minimum());
+
+    // todo: same for double
+    CHECK_EQUAL(3.2, q1.col_double.maximum());
+    CHECK_EQUAL(sum1/2.0, q1.col_double.average());
+
+    // todo: +=, -=, in other tests
 
 }
 

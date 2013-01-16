@@ -151,6 +151,20 @@ TEST(ColumnFloat_Insert) { ColumnBasic_Insert<ColumnFloat, float>(floatVal, floa
 TEST(ColumnDouble_Insert){ ColumnBasic_Insert<ColumnDouble, double>(doubleVal, doubleValLen); }
 
 
+
+template <class C, typename T>
+void ColumnBasic_Aggregates(T val[], size_t valLen)
+{
+    C c;
+
+//    double sum = c.sum();
+//    CHECK_EQUAL(0, sum);   
+
+    // todo: add tests for minimum, maximum, 
+}
+TEST(ColumnFloat_Aggregates) { ColumnBasic_Aggregates<ColumnFloat, float>(floatVal, floatValLen); }
+TEST(ColumnDouble_Aggregates){ ColumnBasic_Aggregates<ColumnDouble, double>(doubleVal, doubleValLen); }
+
 template <class C, typename T>
 void ColumnBasic_Delete(T val[], size_t valLen)
 {

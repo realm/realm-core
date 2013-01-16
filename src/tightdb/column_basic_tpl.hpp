@@ -278,11 +278,11 @@ void ColumnBasic<T>::find_all(Array &result, T value, size_t start, size_t end) 
 }
 
 
-#if 0
+#if 1
 
 // TODO: Move to ColumnBase?
-template<typename T> template <ACTION action, class cond>
-T ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
+template<typename T> template <typename R, ACTION action, class condition>
+R ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
 { 
     if (end == size_t(-1)) 
         end = Size();
@@ -291,13 +291,13 @@ T ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcou
     // slower because of initial overhead).
         //    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
         //    new (node) NODE<int64_t, Column, cond>(target, 0);
-    NODE<T, ColumnBasic<T>, cond> node(target, NULL);
+    BASICNODE<T, condition> node(target, NULL);
 
     node.QuickInit((ColumnBasic<T>*)this, target); 
-    state_state<T> st;
+    state_state<R> st;
     st.init(action, NULL, size_t(-1));
 
-    node.template aggregate_local<action, T>(&st, start, end, size_t(-1), NULL, matchcount);
+    node.template aggregate_local<action, R, T>(&st, start, end, size_t(-1), NULL, matchcount);
 
     return st.state;
 }
@@ -305,13 +305,13 @@ T ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcou
 template<typename T>
 size_t ColumnBasic<T>::count(T target) const
 {
-    return size_t(aggregate<TDB_COUNT, EQUAL>(target, 0, Size()));
+    return size_t(aggregate<size_t, TDB_COUNT, EQUAL>(target, 0, Size()));
 }
 
 template<typename T>
 double ColumnBasic<T>::sum(size_t start, size_t end) const
 {
-    return aggregate<TDB_SUM, NONE>(0, start, end);
+    return aggregate<double, TDB_SUM, NONE>(0, start, end);
 }
 
 template<typename T>
@@ -320,7 +320,7 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = Size();
     size_t size = end - start;
-    double sum1 = aggregate<TDB_SUM, NONE>(0, start, end);
+    double sum1 = aggregate<double, TDB_SUM, NONE>(0, start, end);
     double avg = sum1 / double( size == 0 ? 1 : size );
     return avg;
 }
@@ -328,13 +328,13 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
 template<typename T>
 T ColumnBasic<T>::minimum(size_t start, size_t end) const
 {
-    return aggregate<TDB_MIN, NONE>(0, start, end);
+    return aggregate<T, TDB_MIN, NONE>(0, start, end);
 }
 
 template<typename T>
 T ColumnBasic<T>::maximum(size_t start, size_t end) const
 {
-    return aggregate<TDB_MAX, NONE>(0, start, end);
+    return aggregate<T, TDB_MAX, NONE>(0, start, end);
 }
 
 /*
@@ -348,6 +348,7 @@ void ColumnBasic<T>::sort(size_t start, size_t end)
 
 #else
 
+// TODO: test performance of column aggregates, remove slowest
 template<typename T>
 size_t ColumnBasic<T>::count(T target) const
 {

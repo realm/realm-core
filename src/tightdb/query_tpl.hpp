@@ -41,7 +41,7 @@ R Query::sum(size_t column, size_t* resultcount, size_t start, size_t end, size_
     size_t matchcount = 0; 
     state_state<R> st;
     st.init(TDB_SUM, NULL, limit);
-    R r = first[0]->aggregate<TDB_SUM, T>(&st, start, end, column, &matchcount);
+    R r = first[0]->aggregate<TDB_SUM, R, T>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -57,7 +57,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     const R sum1 = sum<R, T>(column_ndx, &resultcount2, start, end, limit);
     const double avg1 = (double)sum1 / (double)(resultcount2 > 0 ? resultcount2 : 1);
 
-    if (resultcount != NULL)
+    if (resultcount)
         *resultcount = resultcount2;
     return avg1;
 }
@@ -84,7 +84,7 @@ T Query::maximum(size_t column, size_t* resultcount, size_t start, size_t end, s
     size_t matchcount = 0;
     state_state<T> st;
     st.init(TDB_MAX, NULL, limit);
-    T r = first[0]->aggregate<TDB_MAX, T>(&st, start, end, column, &matchcount);
+    T r = first[0]->aggregate<TDB_MAX, T, T>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;
@@ -111,7 +111,7 @@ T Query::minimum(size_t column, size_t* resultcount, size_t start, size_t end, s
     size_t matchcount = 0;
     state_state<T> st;
     st.init(TDB_MIN, NULL, limit);
-    T r = first[0]->aggregate<TDB_MIN, T>(&st, start, end, not_found, &matchcount);
+    T r = first[0]->aggregate<TDB_MIN, T, T>(&st, start, end, column, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
     return r;

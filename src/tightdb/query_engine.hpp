@@ -66,15 +66,17 @@ template<> struct ColumnTypeTraits<double> {
 
 
 // Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
-template<class T>class SequentialGetter {
+template<class T> class SequentialGetter {
 public:
-    typedef typename ColumnTypeTraits<T>::column_type T_Column;
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    typedef typename ColumnTypeTraits<T>::array_type ArrayType;
+
     SequentialGetter() {};
 
     SequentialGetter(const Table& table, size_t column) 
     {
         if (column != not_found)
-            m_column = (typename ColumnTypeTraits<T>::column_type *)&table.GetColumnBase(column);
+            m_column = (ColType *)&table.GetColumnBase(column);
         m_leaf_end = 0;
     }
 
@@ -85,7 +87,7 @@ public:
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
             m_array.Destroy();
-            m_array_ptr = (typename ColumnTypeTraits<T>::array_type *)(((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
+            m_array_ptr = (ArrayType*) (((Column *)m_column)->GetBlock(index, m_array, m_leaf_start, true));
             const size_t leaf_size = m_array_ptr->Size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
@@ -102,13 +104,13 @@ public:
 
     size_t m_leaf_start;
     size_t m_leaf_end;
-    typename ColumnTypeTraits<T>::column_type * m_column;
+    ColType* m_column;
 
     // See reason for having pointer and instance above
-    typename ColumnTypeTraits<T>::array_type *m_array_ptr;
+    ArrayType *m_array_ptr;
 private:
     // Never access through m_array because it's uninitialized if column is just a leaf
-    typename ColumnTypeTraits<T>::array_type m_array;
+    typename ArrayType m_array;
 };
 
 
@@ -190,9 +192,9 @@ public:
         return 0;
     }
 
-    template<ACTION action, class resulttype>
+    template<ACTION action, class resulttype, class T>
     size_t aggregate_local_selector(ParentNode* node, state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, 
-                                    SequentialGetter<resulttype>* agg_col, size_t* matchcount)
+                                    SequentialGetter<T>* agg_col, size_t* matchcount)
     {
         // Workaround that emulates templated vitual methods. Very very slow (dynamic_cast performs ~300 instructions, 
         // and the if..else are slow too). 
@@ -203,22 +205,22 @@ public:
         if (node->has_optimized_aggregate)
             r = node->aggregate_call_specialized(action, st, start, end, local_limit, (SequentialGetter<int64_t>*)agg_col, matchcount);
         else
-            r = aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount); // call method in parent class
+            r = aggregate_local<action, resulttype, T>(st, start, end, local_limit, agg_col, matchcount); // call method in parent class
 
         return r;
     }
 
 
-    template<ACTION action, class resulttype>
+    template<ACTION action, class resulttype, class T>
     resulttype aggregate(state_state<resulttype>* st, size_t start, size_t end, size_t agg_col2 = not_found, size_t* matchcount = 0) 
     {
         if (end == size_t(-1)) 
             end = m_table->size();
 
-        SequentialGetter<resulttype>* agg_col = NULL;
+        SequentialGetter<T>* agg_col = NULL;
         
         if (agg_col2 != not_found)
-            agg_col = new SequentialGetter<resulttype>(*m_table, agg_col2);
+            agg_col = new SequentialGetter<T>(*m_table, agg_col2);
 
         size_t td;
 
@@ -228,7 +230,7 @@ public:
             // Find a large amount of local matches in best condition
             td = m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
 
-            start = aggregate_local_selector<action, resulttype>(m_children[best], st, start, td, findlocals, agg_col, matchcount);
+            start = aggregate_local_selector<action, resulttype, T>(m_children[best], st, start, td, findlocals, agg_col, matchcount);
 
             // Make remaining conditions compute their m_dD (statistics)
             for (size_t c = 0; c < m_children.size() && start < end; c++) {
@@ -243,12 +245,12 @@ public:
                     // Limit to bestdist in order not to skip too large parts of index nodes
                     size_t maxD = m_children[c]->m_dT == 0.0 ? end - start : bestdist;
                     td = m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = aggregate_local_selector<action, resulttype>(m_children[best], st, start, td, maxN, agg_col, matchcount);
+                    start = aggregate_local_selector<action, resulttype, T>(m_children[best], st, start, td, maxN, agg_col, matchcount);
                 }
             }
         }
 
-        if (matchcount != 0)
+        if (matchcount)
             *matchcount = st->match_count;
         delete agg_col;
 
@@ -256,7 +258,9 @@ public:
 
     }
 
-    template<ACTION action, class resulttype>size_t aggregate_local(state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, SequentialGetter<resulttype>* agg_col, size_t* matchcount) 
+    template<ACTION action, class resulttype, class T>
+    size_t aggregate_local(state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, 
+                           SequentialGetter<T>* agg_col, size_t* matchcount) 
     {
 		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
         // integer version, because find_first_local() is relatively slower here (because it's non-integers).
@@ -296,8 +300,8 @@ public:
 
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
-                resulttype av = (resulttype)0; //???Lasse? TODO
-                if (agg_col != NULL)  
+                T av = (T)0;
+                if (agg_col != NULL)
                     av = agg_col->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
                 st->state_match<action, 0>(r, 0, av, CallbackDummy());
              }   
@@ -455,7 +459,8 @@ public:
         m_column = (C*)&table.GetColumnBase(m_column_id);
         m_table = &table;
         m_leaf_end = 0;
-        if (m_child)m_child->Init(table);
+        if (m_child)
+            m_child->Init(table);
     }
 
     // This function is called from Array::find() for each search result if action == TDB_CALLBACK_IDX
@@ -473,11 +478,9 @@ public:
                 return (m_local_matches != m_local_limit);
         }
 
-        resulttype av;
         bool b;
-
         if (m_state->uses_val<action>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
-            av = m_column_agg->GetNext(i);
+            resulttype av = m_column_agg->GetNext(i);
             b = m_state->state_match<action, false>(i, 0, av, CallbackDummy());  
         }
         else {
@@ -491,7 +494,8 @@ public:
     }
 
 
-    size_t aggregate_call_specialized(ACTION action, void* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t>* agg_col, size_t* matchcount) 
+    size_t aggregate_call_specialized(ACTION action, void* st, size_t start, size_t end, size_t local_limit, 
+                                      SequentialGetter<int64_t>* agg_col, size_t* matchcount) 
     {
         state_state<int64_t>* st2 = (state_state<int64_t>*)st;
         size_t ret;
@@ -604,7 +608,6 @@ public:
                 return s + m_leaf_start;
         }  
 
-
         return end;
     }
 
@@ -623,7 +626,6 @@ protected:
 
     size_t m_local_matches;
     size_t m_local_limit;
-
 };
 
 
@@ -695,14 +697,24 @@ protected:
 
 
 // Can be used for simple types (currently float and double)
-template <class T, class C, class F, class A> class BASICNODE: public ParentNode {
+template <class T, class F> class BASICNODE: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*agg_col*/) {TIGHTDB_ASSERT(false); return 0;}
-
+    typedef typename ColumnTypeTraits<T>::column_type C;
+    
     BASICNODE(T v, size_t column) : m_value(v)
     {
         m_column_id = column;
         m_child = 0;
+    }
+
+    // Only purpose of this function is to let you quickly create a NODE object and call aggregate_local() on it to aggregate
+    // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
+    // be merged with Init somehow to simplify
+    void QuickInit(ColumnBasic<T> *column, T value) {
+        m_column = (C*)column; 
+        m_col.m_column = (C*)column;
+        m_col.m_leaf_end = 0;
+        m_value = value;
     }
 
     void Init(const Table& table)
@@ -739,7 +751,6 @@ public:
     }
     
     size_t find_first_local(size_t start, size_t end) {
-//        m_col.CacheNext(start);
         F condition;
 
         for (size_t s = start; s < end; ++s) {            

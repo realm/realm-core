@@ -610,19 +610,22 @@ public:
         m_limit = limit;
 
         if (action == TDB_MAX)
+            // TODO: FIXME
             state = -std::numeric_limits<T>::infinity(); // verify -(inf()) is correct and there is no minusinf()
         else if (action == TDB_MIN)
             state = std::numeric_limits<T>::infinity();
         else if (action == TDB_SUM)
             state = T(0);
+        else if (action == TDB_COUNT)
+            state = 0;
         else
             TIGHTDB_ASSERT(false);
     }
 
     template <ACTION action, bool pattern, class Callback> inline bool state_match(size_t index, uint64_t indexpattern, T value, Callback callback)
     {
-        TIGHTDB_STATIC_ASSERT(pattern == false && (action == TDB_SUM || action == TDB_MAX || action == TDB_MIN), "pattern or action not supported");
-
+        TIGHTDB_STATIC_ASSERT(pattern == false && (action == TDB_SUM || action == TDB_MAX || action == TDB_MIN || action == TDB_COUNT), 
+                              "pattern or action not supported");
         ++match_count;
 
         if (action == TDB_MAX && value > state)
@@ -631,9 +634,10 @@ public:
             state = value;
         else if (action == TDB_SUM)
             state += value;
-        else
-            return false;
-        // TODO??? Lasse?    TIGHTDB_ASSERT(false);
+        else if (action == TDB_COUNT) {
+            state++;
+            match_count = size_t(state);
+        }
 
         return true;
     }

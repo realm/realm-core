@@ -119,6 +119,8 @@ protected:
     template<class C> bool NodeInsertSplit(size_t ndx, size_t newRef);
     size_t GetRefSize(size_t ref) const;
 
+    static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
+
 #ifdef TIGHTDB_DEBUG
     void ArrayToDot(std::ostream& out, const Array& array) const;
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
@@ -126,7 +128,6 @@ protected:
 
     // Member variables
     mutable Array* m_array;
-    static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
 };
 
 
@@ -235,6 +236,7 @@ protected:
     void DoSort(size_t lo, size_t hi);
     template <ACTION action, class cond, class T>
         T aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;
+
     // Member variables
     Index* m_index;
 

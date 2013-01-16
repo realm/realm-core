@@ -1284,7 +1284,7 @@ public:
     double sum(std::size_t* resultcount=NULL, std::size_t start=0,
                std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.sum<float, float>(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.sum<double, float>(col_idx, resultcount, start, end, limit);
     }
 
     float maximum(std::size_t* resultcount=NULL, std::size_t start=0,

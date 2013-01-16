@@ -151,27 +151,27 @@ Query& Query::equal(size_t column_ndx, bool value)
 // ------------- float
 Query& Query::equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, EQUAL, ArrayFloat> >(column_ndx, value);
+    return add_condition<float, BASICNODE<float, EQUAL> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, NOTEQUAL, ArrayFloat> >(column_ndx, value);
+    return add_condition<float, BASICNODE<float, NOTEQUAL> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, GREATER, ArrayFloat> >(column_ndx, value);
+    return add_condition<float, BASICNODE<float, GREATER> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, GREATER_EQUAL, ArrayFloat> >(column_ndx, value);
+    return add_condition<float, BASICNODE<float, GREATER_EQUAL> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, LESS_EQUAL, ArrayFloat> >(column_ndx, value);
+    return add_condition<float, BASICNODE<float, LESS_EQUAL> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, ColumnFloat, LESS, ArrayFloat> >(column_ndx, value);
+    return add_condition<float, BASICNODE<float, LESS> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
@@ -183,27 +183,27 @@ Query& Query::between(size_t column_ndx, float from, float to)
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnDouble, EQUAL, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, EQUAL> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnDouble, NOTEQUAL, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, NOTEQUAL> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnDouble, GREATER, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, GREATER> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnDouble, GREATER_EQUAL, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, GREATER_EQUAL> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnDouble, LESS_EQUAL, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, LESS_EQUAL> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, ColumnDouble, LESS, ArrayDouble> >(column_ndx, value);
+    return add_condition<double, BASICNODE<double, LESS> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
@@ -361,7 +361,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     TableView tv(*m_table);
     state_state<int64_t> st;
     st.init(TDB_FINDALL, &tv.get_ref_column(), limit);
-    first[0]->aggregate<TDB_FINDALL, int64_t>(&st, start, end);
+    first[0]->aggregate<TDB_FINDALL, int64_t, int64_t>(&st, start, end);
     return move(tv);
 }
 
@@ -379,7 +379,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     Init(*m_table);
     state_state<int64_t> st;
     st.init(TDB_COUNT, NULL, limit);
-    int64_t r = first[0]->aggregate<TDB_COUNT, int64_t>(&st, start, end);
+    int64_t r = first[0]->aggregate<TDB_COUNT, int64_t, int64_t>(&st, start, end);
     return size_t(r);
 }
 
