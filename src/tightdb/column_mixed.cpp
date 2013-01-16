@@ -163,6 +163,7 @@ float ColumnMixed::get_float(size_t ndx) const
     TIGHTDB_ASSERT(ndx < m_types->Size());
     TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_FLOAT);
 
+    TIGHTDB_ASSERT(false);
     const float value = m_refs->Get(ndx) >> 1;  // FIXME!!!
     return value;
 }
@@ -172,6 +173,7 @@ double ColumnMixed::get_double(size_t ndx) const
     TIGHTDB_ASSERT(ndx < m_types->Size());
     TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_DOUBLE);
 
+    TIGHTDB_ASSERT(false);
     const double value = m_refs->Get(ndx) >> 1;  // FIXME!!!
     return value;
 }

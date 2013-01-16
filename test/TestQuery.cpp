@@ -62,14 +62,14 @@ TEST(TestQueryFloat)
     CHECK_EQUAL(3.2, v2[0].col_double.get());
 
     // Test sum
-    double sum1 = 2.21+2.22+3.2;
+    double sum1 = 2.21 + 2.22 + 3.2;
     FloatTable::Query q1 = t.where().col_float.between(1.13f, 1.2f);
-//    CHECK_EQUAL(sum1, q1.col_double.sum());
+    CHECK_EQUAL(sum1, q1.col_double.sum());
 
     // Test max, min, average
-    CHECK_EQUAL(sum1/3, q1.col_double.average());
     CHECK_EQUAL(2.21, q1.col_double.minimum());
     CHECK_EQUAL(3.2, q1.col_double.maximum());
+    CHECK_EQUAL(sum1/double(3), q1.col_double.average());
 
     // todo: +=, -=
 

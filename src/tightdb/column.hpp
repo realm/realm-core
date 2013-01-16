@@ -129,6 +129,8 @@ protected:
     static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
 };
 
+
+
 class Column : public ColumnBase {
 public:
     explicit Column(Allocator& alloc);
