@@ -26,6 +26,9 @@
 #include <tightdb/mixed.hpp>
 #include <tightdb/table.hpp>
 
+#include <tightdb/query_engine.hpp>
+#include <tightdb/query.hpp>
+
 namespace tightdb {
 
 
@@ -1135,12 +1138,13 @@ public:
 
 
 
-
+/// ***********************************************************************************************
 /// This class implements a column of a table as used in a table query.
 ///
 /// \tparam Taboid Matches either 'BasicTable<Spec>' or
 /// 'BasicTableView<Tab>'. Neither may be const-qualified.
 ///
+
 /// FIXME: These do not belong in this file!
 template<class Taboid, int col_idx, class Type> class QueryColumn;
 
@@ -1211,25 +1215,25 @@ public:
     int64_t sum(std::size_t* resultcount=NULL, std::size_t start=0,
                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.sum<int64_t, int64_t>(col_idx, resultcount, start, end, limit);
     }
 
     int64_t maximum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum<int64_t>(col_idx, resultcount, start, end, limit);
     }
 
     int64_t minimum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum<int64_t>(col_idx, resultcount, start, end, limit);
     }
 
     double average(std::size_t* resultcount=NULL, std::size_t start=0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.average<int64_t, int64_t>(col_idx, resultcount, start, end, limit);
     }
 };
 
@@ -1280,25 +1284,25 @@ public:
     double sum(std::size_t* resultcount=NULL, std::size_t start=0,
                std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.sum<float, float>(col_idx, resultcount, start, end, limit);
     }
 
     float maximum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum<float>(col_idx, resultcount, start, end, limit);
     }
 
     float minimum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum<float>(col_idx, resultcount, start, end, limit);
     }
 
     double average(std::size_t* resultcount=NULL, std::size_t start=0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.average<double, float>(col_idx, resultcount, start, end, limit);
     }
 };
 
@@ -1349,25 +1353,25 @@ public:
     double sum(std::size_t* resultcount=NULL, std::size_t start=0,
                std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.sum<double, double>(col_idx, resultcount, start, end, limit);
     }
 
     double maximum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum<double>(col_idx, resultcount, start, end, limit);
     }
 
     double minimum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum<double>(col_idx, resultcount, start, end, limit);
     }
 
     double average(std::size_t* resultcount=NULL, std::size_t start=0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.average<double, double>(col_idx, resultcount, start, end, limit);
     }
 };
 

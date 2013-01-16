@@ -38,9 +38,9 @@ void cpuid_init()
 #endif
 
 // Byte is atomic. Race can/will occur but that's fine
-    if(cret & 0x100000) // test for 4.2
+    if (cret & 0x100000) // test for 4.2
         sse_support = 1;
-    else if(cret & 0x1) // Test for 3
+    else if (cret & 0x1) // Test for 3
         sse_support = 0;
     else
         sse_support = -2;

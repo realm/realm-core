@@ -86,11 +86,11 @@ struct EQUAL {
     }
     bool operator()(const char *v1, size_t len1, const char* v2, size_t len2) const
     {
-        if(len1 != len2)
+        if (len1 != len2)
             return false;
-        if(len1 == 0)
+        if (len1 == 0)
             return true;
-        if(v1[len1 - 1] != v2[len1 - 1])
+        if (v1[len1 - 1] != v2[len1 - 1])
             return false;
         int i = memcmp(v1, v2, len1);
         return (i == 0);

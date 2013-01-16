@@ -125,23 +125,22 @@ public:
     Query& Or();
 
     // Searching
-    size_t         find_next(size_t lastmatch=-1);
+    size_t         find_next(size_t lastmatch=size_t(-1));
     TableView      find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
     ConstTableView find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
     // Aggregates
-    double sum_double(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-
-    int64_t sum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    int64_t maximum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    int64_t minimum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    double  average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
-    size_t  count(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+    template<typename R, typename T>
+    R sum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    template<typename R, typename T> 
+    double average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+    template<typename T> T maximum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    template<typename T> T minimum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    size_t count(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 /*
     time_t maximum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     time_t minimum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 */
-    float sum_float(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 
     // Deletion
     size_t  remove(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
@@ -209,6 +208,10 @@ private:
 };
 
 
+// template implementation
+#include <tightdb/query_tpl.hpp>
+
 } // namespace tightdb
+
 
 #endif // TIGHTDB_QUERY_HPP

@@ -805,6 +805,8 @@ const C& Table::GetColumn(size_t ndx) const
     return static_cast<const C&>(column);
 }
 
+// TODO: get rid of the COLUMN_TYPE tempalte parameter
+
 Column& Table::GetColumn(size_t ndx)             { return GetColumn<Column, COLUMN_TYPE_INT>(ndx); }
 const Column& Table::GetColumn(size_t ndx) const { return GetColumn<Column, COLUMN_TYPE_INT>(ndx); }
 

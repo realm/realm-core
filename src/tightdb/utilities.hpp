@@ -93,9 +93,9 @@ template <int version>TIGHTDB_FORCEINLINE bool cpuid_sse()
 */
     TIGHTDB_STATIC_ASSERT(version == 30 || version == 42, "Only SSE 3 and 42 supported for detection");
 #ifdef TIGHTDB_COMPILER_SSE
-    if(version == 30)
+    if (version == 30)
         return (sse_support >= 0);
-    else if(version == 42)
+    else if (version == 42)
         return (sse_support > 0);   // faster than == 1 (0 requres no immediate operand)
 #else
     return false;

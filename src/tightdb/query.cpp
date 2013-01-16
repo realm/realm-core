@@ -365,106 +365,6 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     return move(tv);
 }
 
-#if 1
-double Query::sum_double(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
-{
-    if (end == size_t(-1)) 
-        end = m_table->size();
-
-    const ColumnDouble& c = m_table->GetColumnDouble(column);
-
-    if (first.size() == 0 || first[0] == 0) {
-        // User created query with no criteria; sum() range
-        if (resultcount)
-            *resultcount = end-start;
-
-        return c.sum(start, end);
-    }
-
-    Init(*m_table);
-    size_t matchcount = 0; 
-    state_state<double> st;
-    st.init(TDB_SUM, NULL, limit);
-    double r = first[0]->aggregate<TDB_SUM, double>(&st, start, end, column, &matchcount);
-    if (resultcount)
-        *resultcount = matchcount;
-    return r;
-}
-#endif
-
-int64_t Query::sum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
-{
-    if (end == size_t(-1)) 
-        end = m_table->size();
-
-    const Column& c = m_table->GetColumn(column);
-
-    if (first.size() == 0 || first[0] == 0) {
-        // User created query with no criteria; sum() range
-        if (resultcount)
-            *resultcount = end-start;
-
-        return c.sum(start, end);
-    }
-
-    Init(*m_table);
-    size_t matchcount = 0; 
-    state_state<int64_t> st;
-    st.init(TDB_SUM, NULL, limit);
-    int64_t r = first[0]->aggregate<TDB_SUM, int64_t>(&st, start, end, column, &matchcount);
-    if (resultcount)
-        *resultcount = matchcount;
-    return r;
-}
-
-int64_t Query::maximum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
-{
-    if (end == size_t(-1)) 
-        end = m_table->size();
-
-    const Column& c = m_table->GetColumn(column);
-
-    if (first.size() == 0 || first[0] == 0) {
-        // User created query with no criteria; max() range
-        if (resultcount)
-            *resultcount = end-start;
-        return c.maximum(start, end);
-    }
-        
-    Init(*m_table);
-    size_t matchcount = 0;
-    state_state<int64_t> st;
-    st.init(TDB_MAX, NULL, limit);
-    int64_t r = first[0]->aggregate<TDB_MAX, int64_t>(&st, start, end, column, &matchcount);
-    if (resultcount)
-        *resultcount = matchcount;
-    return r;
-}
-
-int64_t Query::minimum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
-{
-    if (end == size_t(-1)) 
-        end = m_table->size();
-
-    const Column& c = m_table->GetColumn(column);
-
-    if (first.size() == 0 || first[0] == 0) {
-        // User created query with no criteria; min() range
-        if (resultcount)
-            *resultcount = end-start;
-
-        return c.minimum(start, end);
-    }
-
-    Init(*m_table);
-    size_t matchcount = 0;
-    state_state<int64_t> st;
-    st.init(TDB_MIN, NULL, limit);
-    int64_t r = first[0]->aggregate<TDB_MIN, int64_t>(&st, start, end, not_found, &matchcount);
-    if (resultcount)
-        *resultcount = matchcount;
-    return r;
-}
 
 size_t Query::count(size_t start, size_t end, size_t limit) const
 {
@@ -484,19 +384,6 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 }
 
 #include <cstdio>
-
-double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
-{
-    Init(*m_table);
-
-    size_t resultcount2 = 0;
-    const int64_t sum1 = sum(column_ndx, &resultcount2, start, end, limit);
-    const double avg1 = (double)sum1 / (double)(resultcount2 > 0 ? resultcount2 : 1);
-
-    if (resultcount != NULL)
-        *resultcount = resultcount2;
-    return avg1;
-}
 
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove(size_t start, size_t end, size_t limit)

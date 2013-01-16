@@ -601,10 +601,7 @@ public:
 
     template <ACTION action> bool uses_val(void) 
     {
-        if (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM)
-            return true;
-        else
-            return false;
+        return (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM);
     }
     
     void init(ACTION action, Array* akku, size_t limit) 
@@ -617,12 +614,12 @@ public:
         else if (action == TDB_MIN)
             state = std::numeric_limits<T>::infinity();
         else if (action == TDB_SUM)
-            state = 0.0;
+            state = T(0);
         else
             TIGHTDB_ASSERT(false);
     }
 
-    template <ACTION action, bool pattern, class Callback> inline bool state_match(size_t index, uint64_t indexpattern, float value, Callback callback)
+    template <ACTION action, bool pattern, class Callback> inline bool state_match(size_t index, uint64_t indexpattern, T value, Callback callback)
     {
         TIGHTDB_STATIC_ASSERT(pattern == false && (action == TDB_SUM || action == TDB_MAX || action == TDB_MIN), "pattern or action not supported");
 
@@ -635,7 +632,8 @@ public:
         else if (action == TDB_SUM)
             state += value;
         else
-            TIGHTDB_ASSERT(false);
+            return false;
+        // TODO??? Lasse?    TIGHTDB_ASSERT(false);
 
         return true;
     }
@@ -1152,11 +1150,11 @@ template <class cond2, ACTION action, size_t bitwidth, class Callback> void Arra
    
         // Search aligned area with SSE
         if (b > a) {
-            if(cpuid_sse<42>()) {
+            if (cpuid_sse<42>()) {
                 if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth)), callback))
                     return;
                 }
-                else if(cpuid_sse<30>()) {
+                else if (cpuid_sse<30>()) {
 
                 if (!FindSSE<EQUAL, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth)), callback))
                     return;

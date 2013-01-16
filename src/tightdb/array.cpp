@@ -653,21 +653,21 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
     size_t idx;
-    for(idx = start; idx < m_len; ++idx) {
-        if(Get(idx) >= target) {
+    for (idx = start; idx < m_len; ++idx) {
+        if (Get(idx) >= target) {
             ref = idx;
             break;
         }
     }
-    if(idx == m_len)
+    if (idx == m_len)
         ref = not_found;
 #endif
 
     size_t ret;
 
-    if(start >= m_len) {ret = not_found; goto exit;}
+    if (start >= m_len) {ret = not_found; goto exit;}
 
-    if(start + 2 < m_len) {
+    if (start + 2 < m_len) {
         if (Get(start) >= target) {ret = start; goto exit;} else ++start;
         if (Get(start) >= target) {ret = start; goto exit;} else ++start;
     }
@@ -679,7 +679,7 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     add = 1;
 
     for(;;) {
-        if(start + add < m_len && Get(start + add) < target)
+        if (start + add < m_len && Get(start + add) < target)
             start += add;
         else
             break;
@@ -689,10 +689,10 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     size_t high;
     high = start + add + 1;
 
-    if(high > m_len)
+    if (high > m_len)
         high = m_len;
 
-   // if(start > 0)
+   // if (start > 0)
         start--;
 
     //start og high
@@ -860,7 +860,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
     ++start;
 
 #ifdef TIGHTDB_COMPILER_SSE
-    if(cpuid_sse<42>()) {
+    if (cpuid_sse<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
             if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
@@ -993,7 +993,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
     }
 
 #ifdef TIGHTDB_COMPILER_SSE
-    if(cpuid_sse<42>()) {
+    if (cpuid_sse<42>()) {
 
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds: 
         // Naive, templated Get<>: 391 371 374
