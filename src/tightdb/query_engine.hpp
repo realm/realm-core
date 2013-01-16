@@ -472,7 +472,7 @@ public:
 
         bool b;
 
-        if (state->uses_val<action>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
+        if (state->template uses_val<action>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
             resulttype av = column_agg->GetNext(i);
             b = state->state_match<action, false>(i, 0, av, CallbackDummy());  
         }
