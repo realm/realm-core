@@ -49,21 +49,28 @@ typedef bool (*CallbackDummy)(int64_t);
     template<> struct ColArrType<int64_t> {
         typedef Column coltype;
         typedef Array arrtype;
+        const static ColumnType type = COLUMN_TYPE_INT;
     };
     template<> struct ColArrType<float> {
         typedef ColumnFloat coltype;
         typedef ArrayFloat arrtype;
+        const static ColumnType type = COLUMN_TYPE_FLOAT;
     };
     template<> struct ColArrType<double> {
         typedef ColumnDouble coltype;
         typedef ArrayDouble arrtype;
+        const static ColumnType type = COLUMN_TYPE_DOUBLE;
     };
 
 
 // Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
-template<class T>class SequentialGetter {
+class SequentialGetterParent {};
+
+template<class T>class SequentialGetter : public SequentialGetterParent {
 public:
     SequentialGetter() {};
+    typedef typename ColArrType<T>::coltype ColumnType;
+    typedef typename ColArrType<T>::arrtype ArrayType;
 
     SequentialGetter(const Table& table, size_t column) 
     {
@@ -79,7 +86,7 @@ public:
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
             m_array.Destroy();
-            m_array_ptr = (typename ColArrType<T>::arrtype *)(((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
+            m_array_ptr = (ArrayType*)(((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
             const size_t leaf_size = m_array_ptr->Size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
@@ -96,13 +103,13 @@ public:
 
     size_t m_leaf_start;
     size_t m_leaf_end;
-    typename ColArrType<T>::coltype * m_column;
+    ColumnType* m_column;
 
-    // See reason for having pointer and instance above
-    typename ColArrType<T>::arrtype *m_array_ptr;
+    // See reason for having both a pointer and instance above
+    ArrayType* m_array_ptr;
 private:
     // Never access through m_array because it's uninitialized if column is just a leaf
-    typename ColArrType<T>::arrtype m_array;
+    ArrayType m_array;
 };
 
 class ParentNode {
@@ -176,20 +183,20 @@ public:
     }
 
 
-    virtual size_t aggregate_call_specialized(ACTION action, void* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t>* agg_col, size_t* matchcount)
+    virtual size_t aggregate_call_specialized(ACTION action, ColumnType resulttype, state_state_parent* st, size_t start, size_t end, size_t local_limit, SequentialGetterParent* agg_col, size_t* matchcount)
     {
         TIGHTDB_ASSERT(false);
         return 0;
     }
 
-    template<ACTION action, class resulttype>size_t aggregate_local_selector(ParentNode* node, state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, SequentialGetter<resulttype>* agg_col, size_t* matchcount)
+    template<ACTION action, class resulttype>size_t aggregate_local_selector(ParentNode* node, state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, SequentialGetterParent* agg_col, size_t* matchcount)
     {
         // Workaround that emulates templated vitual methods. Very very slow (dynamic_cast performs ~300 instructions, and the if..else are slow too). Real fix: Make ParentNode a templated class according to type
         // of aggregate result (size_t for Find, Array for FindAll, int64_t for sum of integers, float for sum of floats, size_t for count, etc).
         size_t r;
-
+        
         if(node->has_optimized_aggregate)
-            r = node->aggregate_call_specialized(action, st, start, end, local_limit, (SequentialGetter<int64_t>*)agg_col, matchcount);
+            r = node->aggregate_call_specialized(action, ColArrType<resulttype>::type, (state_state_parent*)st, start, end, local_limit, agg_col, matchcount);
         else
             r = aggregate_local<action, resulttype>(st, start, end, local_limit, agg_col, matchcount); // call method in parent class
 
@@ -243,7 +250,7 @@ public:
 
     }
 
-    template<ACTION action, class resulttype>size_t aggregate_local(state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, SequentialGetter<resulttype>* agg_col, size_t* matchcount) 
+    template<ACTION action, class resulttype>size_t aggregate_local(state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, SequentialGetterParent* agg_col, size_t* matchcount) 
     {
 		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
         // integer version, because find_first_local() is relatively slower here (because it's non-integers).
@@ -285,7 +292,7 @@ public:
             if (m == r) {
                 resulttype av = (resulttype)0;
                 if (agg_col != NULL)  
-                    av = agg_col->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
+                    av = static_cast<SequentialGetter<resulttype>*>(agg_col)->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
                 st->state_match<action, 0>(r, 0, av, CallbackDummy());
              }   
         }
@@ -319,7 +326,7 @@ protected:
     const Table* m_table;
     std::string error_code;
 
-    SequentialGetter<int64_t>* m_column_agg; // Column of values used in aggregate (TDB_FINDALL, TDB_RETURN_FIRST, TDB_SUM, etc)
+
 };
 
 
@@ -451,6 +458,8 @@ public:
         size_t i = to_size_t(v);
         m_last_local_match = i;
         m_local_matches++;
+        state_state<resulttype>* state = static_cast<state_state<resulttype>*>(m_state);
+        SequentialGetter<resulttype>* column_agg = static_cast<SequentialGetter<resulttype>*>(m_column_agg);
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
         for (size_t c = 1; c < m_conds; c++) {
@@ -460,15 +469,14 @@ public:
                 return (m_local_matches != m_local_limit);
         }
 
-        resulttype av;
         bool b;
 
-        if (m_state->uses_val<action>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
-            av = m_column_agg->GetNext(i);
-            b = m_state->state_match<action, false>(i, 0, av, CallbackDummy());  
+        if (state->uses_val<action>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
+            resulttype av = column_agg->GetNext(i);
+            b = state->state_match<action, false>(i, 0, av, CallbackDummy());  
         }
         else {
-            b = m_state->state_match<action, false>(i, 0, (resulttype)0, CallbackDummy());  
+            b = state->state_match<action, false>(i, 0, resulttype(0), CallbackDummy());  
         }
 
         if (m_local_matches == m_local_limit)
@@ -478,25 +486,44 @@ public:
     }
 
 
-    size_t aggregate_call_specialized(ACTION action, void* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t>* agg_col, size_t* matchcount) 
+    size_t aggregate_call_specialized(ACTION action, ColumnType returntype, state_state_parent* st, size_t start, size_t end, size_t local_limit, SequentialGetterParent* agg_col, size_t* matchcount) 
     {
-        state_state<int64_t>* st2 = (state_state<int64_t>*)st;
         size_t ret;
 
         if(action == TDB_RETURN_FIRST)
-            ret = aggregate_local<TDB_RETURN_FIRST, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
-        else if(action == TDB_SUM)
-            ret = aggregate_local<TDB_SUM, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
-        else if(action == TDB_MAX)
-            ret = aggregate_local<TDB_MAX, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
-        else if(action == TDB_MIN)
-            ret = aggregate_local<TDB_MIN, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_RETURN_FIRST, int64_t>(st, start, end, local_limit, agg_col, matchcount);        
+
+        else if(action == TDB_SUM && returntype == COLUMN_TYPE_INT)
+            ret = aggregate_local<TDB_SUM, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_SUM && returntype == COLUMN_TYPE_FLOAT)
+            ret = aggregate_local<TDB_SUM, float>(st, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_SUM && returntype == COLUMN_TYPE_DOUBLE)
+            ret = aggregate_local<TDB_SUM, double>(st, start, end, local_limit, agg_col, matchcount);
+
+
+        else if(action == TDB_MAX && returntype == COLUMN_TYPE_INT)
+            ret = aggregate_local<TDB_MAX, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_MAX && returntype == COLUMN_TYPE_FLOAT)
+            ret = aggregate_local<TDB_MAX, float>(st, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_MAX && returntype == COLUMN_TYPE_DOUBLE)
+            ret = aggregate_local<TDB_MAX, double>(st, start, end, local_limit, agg_col, matchcount);
+
+        else if(action == TDB_MIN && returntype == COLUMN_TYPE_INT)
+            ret = aggregate_local<TDB_MIN, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_MIN && returntype == COLUMN_TYPE_FLOAT)
+            ret = aggregate_local<TDB_MIN, float>(st, start, end, local_limit, agg_col, matchcount);
+        else if(action == TDB_MIN && returntype == COLUMN_TYPE_DOUBLE)
+            ret = aggregate_local<TDB_MIN, double>(st, start, end, local_limit, agg_col, matchcount);
+
         else if(action == TDB_COUNT)
-            ret = aggregate_local<TDB_COUNT, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_COUNT, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+
         else if(action == TDB_FINDALL)
-            ret = aggregate_local<TDB_FINDALL, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_FINDALL, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+
         else if(action == TDB_CALLBACK_IDX)
-            ret = aggregate_local<TDB_CALLBACK_IDX, int64_t>(st2, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_CALLBACK_IDX, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+
         else 
             TIGHTDB_ASSERT(false);
 
@@ -504,15 +531,13 @@ public:
     }
 
     // agg_col      column number in m_table which must act as source for aggreate action
-    template <ACTION action, class resulttype> size_t aggregate_local(state_state<int64_t>* st, size_t start, size_t end, size_t local_limit, SequentialGetter<int64_t>* agg_col, size_t* matchcount) {
+    template <ACTION action, class resulttype> size_t aggregate_local(state_state_parent* st, size_t start, size_t end, size_t local_limit, SequentialGetterParent* agg_col, size_t* matchcount) {
         F f;
         int c = f.condition();
-       
+
         m_local_matches = 0;
         m_local_limit = local_limit;
         m_last_local_match = start - 1;
-
-        m_column_agg = agg_col;
 
         m_state = st;
         for (size_t s = start; s < end; ) {    
@@ -531,9 +556,12 @@ public:
                 end2 = end - m_leaf_start;
 
             if (m_conds <= 1 && agg_col == NULL)
-                m_array.find(c, action, m_value, s - m_leaf_start, end2, m_leaf_start, st);
-            else
-                m_array.find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, st, std::bind1st(std::mem_fun(&NODE::match_callback<action, resulttype>), this));
+                m_array.find(c, action, m_value, s - m_leaf_start, end2, m_leaf_start, (state_state<int64_t>*)st);
+            else {
+                state_state<int64_t> jumpstate; // todo optimize by moving outside for loop
+                m_column_agg = agg_col; 
+                m_array.find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate, std::bind1st(std::mem_fun(&NODE::match_callback<action, resulttype>), this));
+            }
                     
             if (m_local_matches == m_local_limit)
                 break;
@@ -542,7 +570,7 @@ public:
         }
 
         if (matchcount)
-            *matchcount = int64_t(st->match_count);
+            *matchcount = int64_t(static_cast<state_state<resulttype>*>(st)->match_count);
 
         if (m_local_matches == m_local_limit) {
             m_dD = (m_last_local_match + 1 - start) / (m_local_matches + 1.0);
@@ -599,7 +627,6 @@ public:
 
 protected:
 
-    state_state<int64_t> *m_state;
     size_t m_last_local_match;
     C* m_column;                // Column on which search criteria is applied
     const Array* criteria_arr;
@@ -610,7 +637,9 @@ protected:
 
     size_t m_local_matches;
     size_t m_local_limit;
-
+ 
+    state_state_parent* m_state;
+    SequentialGetterParent* m_column_agg; // Column of values used in aggregate (TDB_FINDALL, TDB_RETURN_FIRST, TDB_SUM, etc)
 };
 
 

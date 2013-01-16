@@ -67,9 +67,9 @@ TEST(TestQueryFloat)
 //    CHECK_EQUAL(sum1, q1.col_double.sum());
 
     // Test max, min, average
-    CHECK_EQUAL(sum1/3, q1.col_double.average());
-    CHECK_EQUAL(2.21, q1.col_double.minimum());
-    CHECK_EQUAL(3.2, q1.col_double.maximum());
+//    CHECK_EQUAL(sum1/3, q1.col_double.average());
+//    CHECK_EQUAL(2.21, q1.col_double.minimum());
+//    CHECK_EQUAL(3.2, q1.col_double.maximum());
 
     // todo: +=, -=
 

@@ -115,9 +115,6 @@
     <ClCompile Include="src\tightdb\alloc_slab.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\array.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\tightdb\array_binary.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -166,11 +163,11 @@
     <ClCompile Include="test\testtransactions_lasse.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\experiments\float.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="test\experiments\fp_print.c">
       <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\array.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
