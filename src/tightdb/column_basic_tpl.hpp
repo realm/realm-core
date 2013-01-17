@@ -297,7 +297,8 @@ R ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcou
     state_state<R> st;
     st.init(action, NULL, size_t(-1));
 
-    node.template aggregate_local<action, R, T>(&st, start, end, size_t(-1), NULL, matchcount);
+    SequentialGetter<T> sg((ColumnTypeTraits<T>::column_type*)this); 
+    node.template aggregate_local<action, R, T>(&st, start, end, size_t(-1), &sg, matchcount);
 
     return st.state;
 }

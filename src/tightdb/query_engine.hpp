@@ -86,6 +86,12 @@ public:
         m_leaf_end = 0;
     }
 
+    SequentialGetter(ColType* column) 
+    {
+        m_column = column;
+        m_leaf_end = 0;
+    }
+
     inline bool CacheNext(size_t index)
     {
         // Return wether or not leaf array has changed (could be useful to know for caller)
@@ -460,6 +466,7 @@ public:
         m_column = column; 
         m_leaf_end = 0;
         m_value = value;
+        m_conds = 1;
     }
 
     void Init(const Table& table)
@@ -747,16 +754,15 @@ public:
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
     // be merged with Init somehow to simplify
     void QuickInit(ColumnBasic<T> *column, T value) {
-        m_column = (C*)column; 
         m_col.m_column = (C*)column;
         m_col.m_leaf_end = 0;
         m_value = value;
+        m_conds = 1;
     }
 
     void Init(const Table& table)
     {
         m_table = &table;
-        m_column = (C*)(&table.GetColumnBase(m_column_id));
         m_col.m_column = (C*)(&table.GetColumnBase(m_column_id));
         m_col.m_leaf_end = 0;
 
@@ -800,7 +806,6 @@ public:
 protected:
     T m_value;
     SequentialGetter<T> m_col;
-    const C* m_column;
 };
 
 
