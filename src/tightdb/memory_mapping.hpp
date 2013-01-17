@@ -105,3 +105,50 @@ void destroy()
   }
   close(m_fd); // FIXME: Failures here?
 }
+
+
+
+
+
+struct SharedData {
+  pthread_mutex_t mutex;
+  bool is_initialized; // Protected by the mutex
+  // Other members protected by the mutex
+};
+
+int main()
+{
+  SharedData* shared_data;
+  int fd = open(...); // Create it with sero size if it does not exist
+
+  // First initialize just the mutex
+  {
+    exclusive_file_lock efl;
+    if (efl.try_lock(fd)) {
+        if (get_file_size_using_stat(fd) < sizeof ShareData) {
+            ftruncate(fd, sizeof pthread_mutex_t);
+            shared_data = mmap(0, sizeof pthread_mutex_t, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+            // Initialize mutex
+            msync(MS_SYNC);
+            munmap(shared_data, sizeof pthread_mutex_t);
+            ftruncate(fd, sizeof ShareData);
+        }
+    }
+  }
+
+  acquire_shared_file_lock_which_must_be_released_by_destructor();
+
+  if (file_has_been_deleted(fd))
+
+  shared_data = mmap(0, sizeof ShareData, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+
+  // Initialize the rest of the file if we have to
+  pthread_mutex_lock(&shared_data->mutex);
+  if (!shared_data->is_initialized) {
+    // Initialize other members
+    shared_data->is_initialized = true;
+  }
+  pthread_mutex_lock(&shared_data->mutex);
+
+  // Do stuff
+}
