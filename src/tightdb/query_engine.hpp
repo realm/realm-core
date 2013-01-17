@@ -77,10 +77,16 @@ public:
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::array_type ArrayType;
 
-    SequentialGetter() {};
+    // We must destroy m_array immediately after its instantiation to avoid leak of what it preallocates. We cannot 
+    // wait until a SequentialGetter destructor because GetBlock() maps it to data that we don't have ownership of.
+    SequentialGetter() 
+    {        
+        m_array.Destroy(); 
+    }
 
     SequentialGetter(const Table& table, size_t column) 
     {
+        m_array.Destroy();
         if (column != not_found)
             m_column = (ColType *)&table.GetColumnBase(column);
         m_leaf_end = 0;
@@ -88,6 +94,7 @@ public:
 
     SequentialGetter(ColType* column) 
     {
+        m_array.Destroy();
         m_column = column;
         m_leaf_end = 0;
     }
@@ -98,7 +105,6 @@ public:
         if (index >= m_leaf_end) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
-            m_array.Destroy();
             m_array_ptr = (ArrayType*) (((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
             const size_t leaf_size = m_array_ptr->Size();
             m_leaf_end = m_leaf_start + leaf_size;
@@ -318,7 +324,7 @@ public:
                 T av = (T)0;
                 if (agg_col != NULL)
                     av = static_cast<SequentialGetter<T>*>(agg_col)->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
-                st->state_match<action, 0>(r, 0, av, CallbackDummy());
+                st->state_match<action, 0>(r, 0, resulttype(av), CallbackDummy());
              }   
         }
     }
@@ -485,7 +491,7 @@ public:
         m_last_local_match = i;
         m_local_matches++;
         state_state<resulttype>* state = static_cast<state_state<resulttype>*>(m_state);
-        SequentialGetter<T>* column_agg = static_cast<SequentialGetter<T>*>(m_column_agg);
+        SequentialGetter<resulttype>* column_agg = static_cast<SequentialGetter<resulttype>*>(m_column_agg);
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
         for (size_t c = 1; c < m_conds; c++) {
@@ -497,11 +503,11 @@ public:
 
         bool b;
         if (state->template uses_val<action>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
-            T av = column_agg->GetNext(i);
+            resulttype av = column_agg->GetNext(i);
             b = state->state_match<action, false>(i, 0, av, CallbackDummy());  
         }
         else {
-            b = state->state_match<action, false>(i, 0, T(0), CallbackDummy());  
+            b = state->state_match<action, false>(i, 0, resulttype(0), CallbackDummy());  
         }
 
         if (m_local_matches == m_local_limit)
@@ -885,6 +891,7 @@ public:
     }
     ~STRINGNODE() {
         free((void*)m_value);
+        m_index.Destroy();
     }
 
     void Init(const Table& table)
