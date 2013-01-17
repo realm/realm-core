@@ -305,7 +305,7 @@ R ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcou
 template<typename T>
 size_t ColumnBasic<T>::count(T target) const
 {
-    return size_t(aggregate<size_t, TDB_COUNT, EQUAL>(target, 0, Size()));
+    return size_t(aggregate<int64_t, TDB_COUNT, EQUAL>(target, 0, Size()));
 }
 
 template<typename T>
