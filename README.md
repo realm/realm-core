@@ -74,7 +74,7 @@ GCC. Here is an example:
 Building a distribution package
 -------------------------------
 
-    sh build.sh dist
+    sh build.sh dist all
 
 If everything went well, consider tagging and then making the package again:
 
@@ -92,7 +92,7 @@ To use a nondefault compiler, or a compiler in a nondefault location,
 set the environment variable `CC` before calling `sh build.sh build`
 or `sh build.sh dist`, as in the following example:
 
-    CC=clang sh build.sh dist
+    CC=clang sh build.sh dist all
 
 There are also a number of environment variables that serve to enable
 or disable special features during building:

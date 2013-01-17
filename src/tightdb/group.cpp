@@ -1,18 +1,23 @@
+#include <cerrno>
+#include <cstdio>
 #include <new>
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 
+#include <tightdb/terminate.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/utilities.hpp>
 
 using namespace std;
+using namespace tightdb;
 
 namespace {
 
 class Initialization {
 public:
-    Initialization() 
+    Initialization()
     {
         tightdb::cpuid_init();
     }
@@ -22,29 +27,35 @@ Initialization initialization;
 
 class MemoryOStream {
 public:
-    MemoryOStream(size_t size): m_pos(0), m_buffer(NULL)
+    MemoryOStream(size_t buffer_size): m_pos(0)
     {
-        m_buffer = (char*)malloc(size);
+        m_buffer = static_cast<char*>(malloc(buffer_size));
+        if (!m_buffer) throw bad_alloc();
     }
 
-    bool   is_valid() const {return m_buffer != NULL;}
+    ~MemoryOStream()
+    {
+        free(m_buffer);
+    }
+
     size_t getpos() const {return m_pos;}
 
     size_t write(const char* p, size_t n)
     {
         const size_t pos = m_pos;
-        memcpy(m_buffer+m_pos, p, n);
+        copy(p, p+n, m_buffer+m_pos);
         m_pos += n;
         return pos;
     }
     void seek(size_t pos) {m_pos = pos;}
 
-    char* release_buffer()
+    char* release_buffer() TIGHTDB_NOEXCEPT
     {
-        char* tmp = m_buffer;
-        m_buffer = NULL; // invalidate
-        return tmp;
+        char* const buffer = m_buffer;
+        m_buffer = 0;
+        return buffer;
     }
+
 private:
     size_t m_pos;
     char* m_buffer;
@@ -52,30 +63,39 @@ private:
 
 class FileOStream {
 public:
-    FileOStream(const char* filepath) : m_pos(0), m_file(NULL)
+    FileOStream(const string& path) : m_pos(0), m_file(NULL)
     {
-        m_file = fopen(filepath, "wb");
+        m_file = fopen(path.c_str(), "wb");
+        if (m_file) return;
+        // Note: Microsoft Windows defines all the error codes of
+        // POSIX but uses only a small subset of them. It has been
+        // observed to produce at least EACCES.
+        if (errno == EACCES) throw PermissionDenied();
+        throw runtime_error("std::fopen() failed");
     }
 
     ~FileOStream()
     {
-        fclose(m_file);
+        int r = fclose(m_file);
+        TIGHTDB_ASSERT(r == 0);
+        static_cast<void>(r);
     }
 
-    bool is_valid() const {return m_file != NULL;}
     size_t getpos() const {return m_pos;}
 
     size_t write(const char* p, size_t n)
     {
         const size_t pos = m_pos;
-        fwrite(p, 1, n, m_file);
+        if (fwrite(p, 1, n, m_file) < n)
+            throw runtime_error("std::fwrite() failed");
         m_pos += n;
         return pos;
     }
 
     void seek(size_t pos)
     {
-        fseek(m_file, static_cast<long>(pos), SEEK_SET);
+        if (fseek(m_file, static_cast<long>(pos), SEEK_SET) != 0)
+            throw runtime_error("std::fseek() failed");
     }
 
 private:
@@ -92,62 +112,52 @@ Group::Group():
     m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
     m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc),
     m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc),
-    m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_persistMode(0), m_isValid(true)
+    m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_is_shared(false)
 {
     create();
 }
 
-Group::Group(string filename, int mode):
+Group::Group(const string& filename, OpenMode mode):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
-    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(mode), m_isValid(false)
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
 {
-    // With shared groups, we might want to start in invalid state
-    // and then initialize later
-    if (mode & GROUP_INVALID)
-        return;
-    create_from_file(filename, true);
+    create_from_file(filename, mode, true);
 }
 
-Group::Group(from_mem_tag, char* buffer, size_t len, bool take_ownership):
+Group::Group(BufferSpec buffer, bool take_ownership):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
-    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_persistMode(0), m_isValid(false)
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
 {
-    TIGHTDB_ASSERT(buffer);
+    TIGHTDB_ASSERT(buffer.m_data);
 
     // Memory map file
-    m_isValid = m_alloc.SetSharedBuffer(buffer, len, take_ownership);
+    m_alloc.set_shared_buffer(buffer.m_data, buffer.m_size, take_ownership);
 
-    if (m_isValid) {
-        const size_t top_ref = m_alloc.GetTopRef();
-        create_from_ref(top_ref);
-    }
+    const size_t top_ref = m_alloc.GetTopRef();
+    create_from_ref(top_ref);
 }
 
-bool Group::create_from_file(string filename, bool doInit)
-{
-    TIGHTDB_ASSERT(!m_isValid);
+Group::Group(shared_tag):
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(true) {}
 
+void Group::create_from_file(const string& filename, OpenMode mode, bool do_init)
+{
     // Memory map file
     // This leaves the group ready, but in invalid state
-    const bool readOnly = m_persistMode & GROUP_READONLY;
-    const bool isValid = m_alloc.SetShared(filename, readOnly);
+    m_alloc.set_shared(filename, mode == mode_ReadOnly, mode == mode_NoCreate);
 
-    if (isValid && doInit) {
-        m_isValid = true;
+    if (!do_init)  return;
 
-        // if we just created shared group, we have to wait with
-        // actually creating it's datastructures until first write
-        if (m_persistMode == GROUP_SHARED && m_alloc.GetTopRef() == 0)
-            return true;
-        else {
-            const size_t top_ref = m_alloc.GetTopRef();
-            create_from_ref(top_ref);
-        }
-    }
+    // if we just created shared group, we have to wait with
+    // actually creating it's datastructures until first write
+    if (m_is_shared && m_alloc.GetTopRef() == 0) return;
 
-    return isValid;
+    const size_t top_ref = m_alloc.GetTopRef();
+    create_from_ref(top_ref);
 }
 
+// Create a new memory structure and attach this group instance to it.
 void Group::create()
 {
     m_tables.SetType(COLUMN_HASREFS); // FIXME: Why is this not done in Group() like the rest of the arrays?
@@ -169,6 +179,7 @@ void Group::create()
     }
 }
 
+// Attach this group instance to a preexisting memory structure.
 void Group::create_from_ref(size_t top_ref)
 {
     // Instantiate top arrays
@@ -224,11 +235,10 @@ void Group::create_from_ref(size_t top_ref)
             m_cachedtables.add(0);
         }
     }
-
-    m_isValid = true;
 }
 
-void Group::init_shared() {
+void Group::init_shared()
+{
     if (m_freeVersions.IsValid()) {
         // If free space tracking is enabled
         // we just have to reset it
@@ -264,7 +274,6 @@ void Group::reset_to_new()
 {
     TIGHTDB_ASSERT(m_alloc.GetTopRef() == 0);
     if (!m_top.IsValid()) {
-        m_isValid = true;
         return; // already in new state
     }
 
@@ -286,8 +295,6 @@ void Group::reset_to_new()
     m_freePositions.SetParent(NULL, 0);
     m_freeLengths.SetParent(NULL, 0);
     m_freeVersions.SetParent(NULL, 0);
-
-    m_isValid = true;
 }
 
 void Group::rollback()
@@ -337,10 +344,9 @@ void Group::invalidate()
     // to clean up
     // TODO: This is also done in commit(), fix to do it only once
     m_alloc.FreeAll();
-
-    m_isValid = false;
 }
 
+// FIXME: Should be moved to header file and be made inlineable
 bool Group::is_empty() const
 {
     if (!m_top.IsValid()) return true;
@@ -348,11 +354,13 @@ bool Group::is_empty() const
     return m_tableNames.is_empty();
 }
 
-bool Group::in_inital_state() const
+// FIXME: Should be moved to header file and be made inlineable
+bool Group::in_initial_state() const
 {
     return !m_top.IsValid();
 }
 
+// FIXME: Should be moved to header file and be made inlineable
 size_t Group::get_table_count() const
 {
     if (!m_top.IsValid()) return 0;
@@ -360,6 +368,7 @@ size_t Group::get_table_count() const
     return m_tableNames.Size();
 }
 
+// FIXME: Should be moved to header file and be made inlineable
 const char* Group::get_table_name(size_t table_ndx) const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
@@ -420,20 +429,15 @@ Table* Group::create_new_table(const char* name)
 }
 
 
-bool Group::write(const char* filepath)
+void Group::write(const string& path)
 {
-    TIGHTDB_ASSERT(filepath);
     TIGHTDB_ASSERT(m_top.IsValid());
 
-    FileOStream out(filepath);
-    if (!out.is_valid()) return false;
-
-    write(out);
-
-    return true;
+    FileOStream out(path);
+    write_to_stream(out);
 }
 
-char* Group::write_to_mem(size_t& len)
+Group::BufferSpec Group::write_to_mem()
 {
     TIGHTDB_ASSERT(m_top.IsValid());
 
@@ -441,12 +445,13 @@ char* Group::write_to_mem(size_t& len)
     const size_t max_size = m_alloc.GetTotalSize();
 
     MemoryOStream out(max_size);
-    if (!out.is_valid()) return NULL; // alloc failed
+    const size_t size = write_to_stream(out);
 
-    len = write(out);
-    return out.release_buffer();
+    char* const data = out.release_buffer();
+    return BufferSpec(data, size);
 }
 
+// FIXME: Should be moved to header file and be made inlineable
 bool Group::commit()
 {
     const size_t top_pos = commit(-1, -1, true);
@@ -479,16 +484,16 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool doPer
     if (!is_shared()) {
         // Recusively update refs in all active tables (columns, arrays..)
         update_refs(top_pos);
+
+#ifdef TIGHTDB_DEBUG
+        Verify();
+#endif
     }
     else {
         TIGHTDB_ASSERT(m_alloc.IsAllFree());
         invalidate();
         TIGHTDB_ASSERT(m_alloc.IsAllFree());
     }
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 
     return top_pos;
 }
@@ -542,7 +547,7 @@ void Group::update_from_shared(size_t top_ref, size_t len)
 
     // If our last look at the file was when it
     // was empty, we may have to re-create the group
-    if (in_inital_state() || top_ref == 0) {
+    if (in_initial_state() || top_ref == 0) {
         if (top_ref == 0)
             reset_to_new();    // may have been a rollback
         create_from_ref(top_ref);
@@ -588,8 +593,6 @@ void Group::update_from_shared(size_t top_ref, size_t len)
             }
         }
     }
-
-    m_isValid = true;
 }
 
 bool Group::operator==(const Group& g) const
@@ -649,12 +652,9 @@ void Group::to_string(std::ostream& out) const
 
 void Group::Verify() const
 {
-    if (!is_valid()) return;
-
     // The file may have been created but not yet used
     // (so no structure has been initialized)
-    const bool isShared = (m_persistMode & GROUP_SHARED) == 1;
-    if (isShared && m_alloc.GetTopRef() == 0 && !m_top.IsValid()) {
+    if (m_is_shared && m_alloc.GetTopRef() == 0 && !m_top.IsValid()) {
         TIGHTDB_ASSERT(!m_tables.IsValid());
         return;
     }

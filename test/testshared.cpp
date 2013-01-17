@@ -32,7 +32,6 @@ TEST(Shared_Initial)
         // Verify that new group is empty
         {
             const Group& g1 = shared.begin_read();
-            CHECK(g1.is_valid());
             CHECK(g1.is_empty());
             shared.end_read();
         }
@@ -56,13 +55,12 @@ TEST(Shared_Initial_Mem)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb", SharedGroup::durability_MemOnly);
+        SharedGroup shared("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
         CHECK(shared.is_valid());
 
         // Verify that new group is empty
         {
             const Group& g1 = shared.begin_read();
-            CHECK(g1.is_valid());
             CHECK(g1.is_empty());
             shared.end_read();
         }
@@ -99,7 +97,6 @@ TEST(Shared_Initial2)
             // Verify that new group is empty
             {
                 const Group& g1 = shared2.begin_read();
-                CHECK(g1.is_valid());
                 CHECK(g1.is_empty());
                 shared2.end_read();
             }
@@ -139,18 +136,17 @@ TEST(Shared_Initial2_Mem)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb", SharedGroup::durability_MemOnly);
+        SharedGroup shared("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
         CHECK(shared.is_valid());
 
         {
             // Open the same db again (in empty state)
-            SharedGroup shared2("test_shared.tightdb", SharedGroup::durability_MemOnly);
+            SharedGroup shared2("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
             CHECK(shared2.is_valid());
 
             // Verify that new group is empty
             {
                 const Group& g1 = shared2.begin_read();
-                CHECK(g1.is_valid());
                 CHECK(g1.is_empty());
                 shared2.end_read();
             }
@@ -788,7 +784,6 @@ TEST(Shared_Notifications)
             // Verify that new group is empty
             {
                 const Group& g1 = shared2.begin_read();
-                CHECK(g1.is_valid());
                 CHECK(g1.is_empty());
                 shared2.end_read();
             }
@@ -799,7 +794,6 @@ TEST(Shared_Notifications)
             // Add a new table
             {
                 Group& g1 = shared2.begin_write();
-                CHECK(g1.is_valid());
                 TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
                 t1->add(1, 2, false, "test");
                 shared2.commit();
@@ -812,7 +806,6 @@ TEST(Shared_Notifications)
         // Verify that the new table has been added
         {
             const Group& g1 = shared.begin_read();
-            CHECK(g1.is_valid());
 
             TestTableShared::ConstRef t1 = g1.get_table<TestTableShared>("test");
             CHECK_EQUAL(1, t1->size());
@@ -849,7 +842,6 @@ TEST(Shared_FromSerialized)
     // Verify that contents is there when shared
     {
         const Group& g1 = shared.begin_read();
-        CHECK(g1.is_valid());
 
         TestTableShared::ConstRef t1 = g1.get_table<TestTableShared>("test");
         CHECK_EQUAL(1, t1->size());

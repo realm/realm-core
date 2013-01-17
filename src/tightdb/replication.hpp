@@ -69,7 +69,7 @@ struct Replication {
     /// This constructor may be used to create a degenerate instance
     /// which can be validly destroyed, but not otherwise used for
     /// replication.
-    Replication(degenerate_tag) TIGHTDB_NOTHROW;
+    Replication(degenerate_tag) TIGHTDB_NOEXCEPT;
 
     /// Construct a proper instance.
     ///
@@ -364,7 +364,7 @@ private:
 
 // Implementation:
 
-inline Replication::Replication(degenerate_tag) TIGHTDB_NOTHROW:
+inline Replication::Replication(degenerate_tag) TIGHTDB_NOEXCEPT:
     m_shared_state(0), m_interrupt(false), m_selected_table(0), m_selected_spec(0) {}
 
 inline Replication::Replication(std::string path_to_database_file, bool map_transact_log_buf):

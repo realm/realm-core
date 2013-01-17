@@ -245,25 +245,25 @@ again:
     m_fd = open(repl_path.c_str(), O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (m_fd<0) {
         switch (errno) {
-        case EACCES:
-        case EROFS:        return ERROR_PERMISSION;
-        case EIO:
-        case EISDIR:
-        case ELOOP:
-        case ENAMETOOLONG:
-        case ENOSR:
-        case ENOTDIR:
-        case ENXIO:
-        case EOVERFLOW:
-        case EAGAIN:
-        case ENOMEM:
-        case ETXTBSY:      return ERROR_BAD_FILESYS_PATH;
-        case ENOENT:       return ERROR_NO_SUCH_FILE;
-        case EMFILE:
-        case ENFILE:
-        case ENOSPC:       return ERROR_NO_RESOURCE;
-        case EINTR:        goto again;
-        default:           return ERROR_OTHER;
+            case EACCES:
+            case EROFS:        return ERROR_PERMISSION;
+            case EIO:
+            case EISDIR:
+            case ELOOP:
+            case ENAMETOOLONG:
+            case ENOSR:
+            case ENOTDIR:
+            case ENXIO:
+            case EOVERFLOW:
+            case EAGAIN:
+            case ENOMEM:
+            case ETXTBSY:      return ERROR_BAD_FILESYS_PATH;
+            case ENOENT:       return ERROR_NO_SUCH_FILE;
+            case EMFILE:
+            case ENFILE:
+            case ENOSPC:       return ERROR_NO_RESOURCE;
+            case EINTR:        goto again;
+            default:           return ERROR_OTHER;
         }
     }
     CloseGuard cg(m_fd);

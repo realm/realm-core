@@ -54,8 +54,10 @@ struct Mutex {
             if (r == ENOMEM) return ERROR_OUT_OF_MEMORY;
             else return ERROR_OTHER;
         }
+        // FIXME: Must verify availability of optional feature: #ifdef _POSIX_THREAD_PROCESS_SHARED
         r = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
         TIGHTDB_ASSERT(r == 0);
+        // FIXME: Should also do pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST). Check for availability with: #if _POSIX_THREADS >= 200809L
         r = pthread_mutex_init(&m_impl, &attr);
         int r2 = pthread_mutexattr_destroy(&attr);
         TIGHTDB_ASSERT(r2 == 0);
