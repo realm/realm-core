@@ -13,6 +13,10 @@ Format:
 ==================
 
 
+2013-01-18 (Kristian Spangsege)
++ Classes ReadTransaction and WriteTransaction added for handling safe scoped transaction.
+
+
 2013-01-14 (Kristian Spangsege)
 - Group::set_shared() removed.
 - SharedGroup::is_valid() removed. Errors are now reported as exceptions from the constructor.
