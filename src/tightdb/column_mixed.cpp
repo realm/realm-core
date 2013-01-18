@@ -301,7 +301,7 @@ void ColumnMixed::set_date(size_t ndx, time_t value)
 
     // Shift value one bit and set lowest bit to indicate
     // that this is not a ref
-    const int64_t v = (value << 1) + 1;
+    const int64_t v = (int64_t(value) << 1) + 1;
 
     m_refs->Set(ndx, v);
 }
