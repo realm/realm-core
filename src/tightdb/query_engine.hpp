@@ -36,11 +36,16 @@
 
 namespace tightdb {
 
-// Number of matches to find in best condition loop before breaking out to peek at other conditions
-const size_t findlocals = 16;   
+// Number of matches to find in best condition loop before breaking out to probe other conditions
+const size_t findlocals = 1;   
 
 // Distance between matches from which performance begins to flatten out because various initial overheads become insignificant
-const size_t bestdist = 100;    
+const size_t bestdist = 2;    
+
+// Minimum number of matches in a certain condition before using it in statistics. Too high value can spent too much time in 
+// bad node (bad = high match frequency). Too low value gives inaccurate statistics.
+const size_t probe_matches = 2;
+
 
 typedef bool (*CallbackDummy)(int64_t);
 
@@ -77,10 +82,16 @@ public:
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::array_type ArrayType;
 
-    SequentialGetter() {};
+    // We must destroy m_array immediately after its instantiation to avoid leak of what it preallocates. We cannot 
+    // wait until a SequentialGetter destructor because GetBlock() maps it to data that we don't have ownership of.
+    SequentialGetter() 
+    {        
+        m_array.Destroy(); 
+    }
 
     SequentialGetter(const Table& table, size_t column) 
     {
+        m_array.Destroy();
         if (column != not_found)
             m_column = (ColType *)&table.GetColumnBase(column);
         m_leaf_end = 0;
@@ -88,6 +99,7 @@ public:
 
     SequentialGetter(ColType* column) 
     {
+        m_array.Destroy();
         m_column = column;
         m_leaf_end = 0;
     }
@@ -98,7 +110,6 @@ public:
         if (index >= m_leaf_end) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
-            m_array.Destroy();
             m_array_ptr = (ArrayType*) (((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
             const size_t leaf_size = m_array_ptr->Size();
             m_leaf_end = m_leaf_start + leaf_size;
@@ -255,12 +266,11 @@ public:
                 // Skip test if there is no way its cost can ever be better than best node's
                 double cost = m_children[c]->cost();
                 if (m_children[c]->m_dT < cost) {
-                    size_t maxN = 2;
 
                     // Limit to bestdist in order not to skip too large parts of index nodes
                     size_t maxD = m_children[c]->m_dT == 0.0 ? end - start : bestdist;
                     td = m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = aggregate_local_selector<action, resulttype, T>(m_children[best], st, start, td, maxN, agg_col, matchcount);
+                    start = aggregate_local_selector<action, resulttype, T>(m_children[best], st, start, td, probe_matches, agg_col, matchcount);
                 }
             }
         }
@@ -318,7 +328,7 @@ public:
                 T av = (T)0;
                 if (agg_col != NULL)
                     av = static_cast<SequentialGetter<T>*>(agg_col)->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
-                st->state_match<action, 0>(r, 0, av, CallbackDummy());
+                st->state_match<action, 0>(r, 0, resulttype(av), CallbackDummy());
              }   
         }
     }
@@ -485,7 +495,7 @@ public:
         m_last_local_match = i;
         m_local_matches++;
         state_state<resulttype>* state = static_cast<state_state<resulttype>*>(m_state);
-        SequentialGetter<T>* column_agg = static_cast<SequentialGetter<T>*>(m_column_agg);
+        SequentialGetter<resulttype>* column_agg = static_cast<SequentialGetter<resulttype>*>(m_column_agg);
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
         for (size_t c = 1; c < m_conds; c++) {
@@ -497,11 +507,11 @@ public:
 
         bool b;
         if (state->template uses_val<action>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
-            T av = column_agg->GetNext(i);
+            resulttype av = column_agg->GetNext(i);
             b = state->state_match<action, false>(i, 0, av, CallbackDummy());  
         }
         else {
-            b = state->state_match<action, false>(i, 0, T(0), CallbackDummy());  
+            b = state->state_match<action, false>(i, 0, resulttype(0), CallbackDummy());  
         }
 
         if (m_local_matches == m_local_limit)
@@ -523,8 +533,8 @@ public:
         else if (action == TDB_SUM && col_id == COLUMN_TYPE_INT)
             ret = aggregate_local<TDB_SUM, int64_t>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_SUM && col_id == COLUMN_TYPE_FLOAT)
-            // template parameter is intentionally 'double' for 'float', since it returns double.
-            ret = aggregate_local<TDB_SUM, double>(st, start, end, local_limit, agg_col, matchcount);
+            // todo, fixme, see if we must let sum return a double even when summing a float coltype 
+            ret = aggregate_local<TDB_SUM, float>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_SUM && col_id == COLUMN_TYPE_DOUBLE)
             ret = aggregate_local<TDB_SUM, double>(st, start, end, local_limit, agg_col, matchcount);
 
@@ -885,6 +895,7 @@ public:
     }
     ~STRINGNODE() {
         free((void*)m_value);
+        m_index.Destroy();
     }
 
     void Init(const Table& table)
@@ -1039,9 +1050,7 @@ public:
     ParentNode* m_cond[2];
 private:
     size_t m_last[2];
-
     bool m_was_match[2];
-
     const Table* m_table;
 };
 

@@ -322,7 +322,7 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
         end = Size();
     size_t size = end - start;
     double sum1 = aggregate<double, TDB_SUM, NONE>(0, start, end);
-    double avg = sum1 / double( size == 0 ? 1 : size );
+    double avg = sum1 / double( size == 0 ? 1 : size ); 
     return avg;
 }
 

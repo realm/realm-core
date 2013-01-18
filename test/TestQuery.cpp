@@ -31,7 +31,57 @@ TIGHTDB_TABLE_2(FloatTable,
                 col_float,  Float,
                 col_double, Double)
 
+TIGHTDB_TABLE_3(FloatTable3,
+                col_float,  Float,
+                col_double, Double,
+                col_int, Int)
+
 } // anonymous namespace
+
+TEST(TestQueryFloat3)
+{
+    FloatTable3 t;
+
+    t.add(float(1.1), double(2.1), 1);
+    t.add(float(1.2), double(2.2), 2);
+    t.add(float(1.3), double(2.3), 3);
+    t.add(float(1.4), double(2.4), 4); // match
+    t.add(float(1.5), double(2.5), 5); // match
+    t.add(float(1.6), double(2.6), 6); // match
+    t.add(float(1.7), double(2.7), 7);
+    t.add(float(1.8), double(2.8), 8);
+    t.add(float(1.9), double(2.9), 9);
+
+    FloatTable3::Query q1 = t.where().col_float.greater(1.35).col_double.less(2.65);
+    int64_t a1 = q1.col_int.sum();
+    CHECK_EQUAL(15, a1);
+
+    FloatTable3::Query q2 = t.where().col_double.less(2.65).col_float.greater(1.35);
+    int64_t a2 = q2.col_int.sum();
+    CHECK_EQUAL(15, a2);
+
+    FloatTable3::Query q3 = t.where().col_double.less(2.65).col_float.greater(1.35);
+    double a3 = q3.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a3);
+
+    FloatTable3::Query q4 = t.where().col_float.greater(1.35).col_double.less(2.65);
+    double a4 = q4.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a4);
+
+    FloatTable3::Query q5 = t.where().col_int.greater_equal(4).col_double.less(2.65);
+    double a5 = q5.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a5);
+
+    FloatTable3::Query q6 = t.where().col_double.less(2.65).col_int.greater_equal(4);
+    double a6 = q6.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a6);
+
+    FloatTable3::Query q7 = t.where().col_int.greater(3).col_int.less(7);
+    int64_t a7 = q7.col_int.sum();
+    CHECK_EQUAL(15, a7);
+
+
+}
 
 
 TEST(TestQueryFloat)
