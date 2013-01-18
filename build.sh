@@ -804,10 +804,29 @@ EOF
         ;;
 
 
+    "dist-checkout")
+        if [ "$#" -ne 1 ]; then
+            echo "Please specify what you want to checkout" 1>&2
+            exit 1
+        fi
+        WHAT="$1"
+        echo ">>>>>>>> CHECKING OUT '$WHAT' OF 'tightdb'"
+        git checkout "$WHAT"
+        for x in $EXTENSIONS; do
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+            if [ -r "$EXT_HOME/build.sh" ]; then
+                echo ">>>>>>>> CHECKING OUT '$WHAT' OF '$EXT_HOME'"
+                (cd "$EXT_HOME/"; git checkout "$WHAT")
+            fi
+        done
+        exit 0
+        ;;
+
+
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: clean build test install test-installed build-ios" 1>&2
-        echo "As well as: dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull" 1>&2
+        echo "As well as: dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull dist-checkout" 1>&2
         exit 1
         ;;
 

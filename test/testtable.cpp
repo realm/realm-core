@@ -359,7 +359,7 @@ TEST(Table_test_json_simple)
     for (size_t i = 0; i < 1; ++i) {
         table.insert_int(0, i, i);
         table.insert_bool(1, i, (i % 2 ? true : false));
-        table.insert_date(2, i, 0xffffeeeeffffeeee);
+        table.insert_date(2, i, 0x7fffeeeeL);
         table.insert_string(3, i, "helloooooo");
         const char bin[] = "123456789012345678901234567890nopq";
         table.insert_binary(4, i, bin, sizeof(bin) );
