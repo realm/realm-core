@@ -79,6 +79,35 @@ TEST(TestQueryFloat3)
     FloatTable3::Query q7 = t.where().col_int.greater(3).col_int.less(7);
     int64_t a7 = q7.col_int.sum();
     CHECK_EQUAL(15, a7);
+    FloatTable3::Query q8 = t.where().col_int.greater(3).col_int.less(7);
+    int64_t a8 = q8.col_int.sum();
+    CHECK_EQUAL(15, a8);
+
+
+
+}
+
+
+TEST(TestQueryFloat4)
+{
+    FloatTable3 t;
+
+    t.add(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
+    t.add(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
+    t.add(12345.0, 12345.0, 11111);
+    
+    FloatTable3::Query q1 = t.where();
+    float a1 = q1.col_float.maximum();
+    double a2 = q1.col_double.maximum();
+    CHECK_EQUAL(std::numeric_limits<float>::infinity(), a1);
+    CHECK_EQUAL(std::numeric_limits<double>::infinity(), a2);
+
+
+    FloatTable3::Query q2 = t.where();
+    float a3 = q1.col_float.minimum();
+    double a4 = q1.col_double.minimum();
+    CHECK_EQUAL(12345.0, a3);
+    CHECK_EQUAL(12345.0, a4);
 }
 
 
