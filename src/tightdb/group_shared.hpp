@@ -28,9 +28,6 @@
 
 namespace tightdb {
 
-// Pre-declarations
-struct ReadCount;
-struct SharedInfo;
 
 class SharedGroup {
 public:
@@ -105,17 +102,11 @@ public:
 #endif
 
 private:
-    // Ring buffer managment
-    bool       ringbuf_is_empty() const;
-    size_t     ringbuf_size() const;
-    size_t     ringbuf_capacity() const;
-    bool       ringbuf_is_first(size_t ndx) const;
-    void       ringbuf_put(const ReadCount& v);
-    void       ringbuf_remove_first();
-    size_t     ringbuf_find(uint32_t version) const;
-    ReadCount& ringbuf_get(size_t ndx);
-    ReadCount& ringbuf_get_first();
-    ReadCount& ringbuf_get_last();
+    friend class ReadTransaction;
+    friend class WriteTransaction;
+
+    struct ReadCount;
+    struct SharedInfo;
 
     // Member variables
     Group       m_group;
@@ -140,7 +131,90 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication m_replication;
 #endif
+
+    // Ring buffer managment
+    bool       ringbuf_is_empty() const;
+    size_t     ringbuf_size() const;
+    size_t     ringbuf_capacity() const;
+    bool       ringbuf_is_first(size_t ndx) const;
+    void       ringbuf_put(const ReadCount& v);
+    void       ringbuf_remove_first();
+    size_t     ringbuf_find(uint32_t version) const;
+    ReadCount& ringbuf_get(size_t ndx);
+    ReadCount& ringbuf_get_first();
+    ReadCount& ringbuf_get_last();
 };
+
+
+class ReadTransaction {
+public:
+    ReadTransaction(SharedGroup& sg): m_shared_group(sg)
+    {
+        m_shared_group.begin_read();
+    }
+
+    ~ReadTransaction()
+    {
+        m_shared_group.end_read();
+    }
+
+    ConstTableRef get_table(const char* name) const
+    {
+        return get_group().get_table(name);
+    }
+
+    template<class T> typename T::ConstRef get_table(const char* name) const
+    {
+        return get_group().get_table<T>(name);
+    }
+
+    const Group& get_group() const
+    {
+        return m_shared_group.m_group;
+    }
+
+private:
+    SharedGroup& m_shared_group;
+};
+
+
+class WriteTransaction {
+public:
+    WriteTransaction(SharedGroup& sg): m_shared_group(&sg)
+    {
+        m_shared_group->begin_write();
+    }
+
+    ~WriteTransaction()
+    {
+        if (m_shared_group) m_shared_group->rollback();
+    }
+
+    TableRef get_table(const char* name) const
+    {
+        return get_group().get_table(name);
+    }
+
+    template<class T> typename T::Ref get_table(const char* name) const
+    {
+        return get_group().get_table<T>(name);
+    }
+
+    Group& get_group() const
+    {
+        return m_shared_group->m_group;
+    }
+
+    void commit()
+    {
+        m_shared_group->commit();
+        m_shared_group = 0;
+    }
+
+private:
+    SharedGroup* m_shared_group;
+};
+
 
 } // namespace tightdb
 

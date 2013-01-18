@@ -124,7 +124,7 @@ public:
     /// std::malloc().
     BufferSpec write_to_mem();
 
-    bool commit();
+    bool commit(); // FIXME: Should not return a bool - throw exceptions instead
 
     // Conversion
     template<class S> void to_json(S& out) const;

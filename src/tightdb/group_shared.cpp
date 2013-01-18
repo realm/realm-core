@@ -22,12 +22,12 @@ using namespace std;
 using namespace tightdb;
 
 
-struct tightdb::ReadCount {
+struct SharedGroup::ReadCount {
     uint32_t version;
     uint32_t count;
 };
 
-struct tightdb::SharedInfo {
+struct SharedGroup::SharedInfo {
     uint16_t version;
     uint16_t flags;
 
@@ -488,17 +488,17 @@ bool SharedGroup::ringbuf_is_first(size_t ndx) const {
     return (ndx == m_info->get_pos);
 }
 
-ReadCount& SharedGroup::ringbuf_get(size_t ndx)
+SharedGroup::ReadCount& SharedGroup::ringbuf_get(size_t ndx)
 {
     return m_info->readers[ndx];
 }
 
-ReadCount& SharedGroup::ringbuf_get_first()
+SharedGroup::ReadCount& SharedGroup::ringbuf_get_first()
 {
     return m_info->readers[m_info->get_pos];
 }
 
-ReadCount& SharedGroup::ringbuf_get_last()
+SharedGroup::ReadCount& SharedGroup::ringbuf_get_last()
 {
     const uint32_t lastPos = (m_info->put_pos - 1) & m_info->capacity;
     return m_info->readers[lastPos];
