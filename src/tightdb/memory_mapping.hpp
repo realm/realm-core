@@ -110,45 +110,113 @@ void destroy()
 
 
 
+struct file {
+    file()  TIGHTDB_NOEXCEPT: m_fd(-1) {}
+    ~file() TIGHTDB_NOEXCEPT { close(); }
+
+    void open(...) { ...; }
+    void close() TIGHTDB_NOEXCEPT { ...; m_fd = -1; }
+
+    // File must be open
+    bool try_lock_exclusive();
+    void lock_shared();
+    void unlock();
+
+    struct close_guard;
+    struct unlock_guard;
+
+private:
+    int m_fd;
+};
+
+struct file::close_guard {
+    close_guard(file& f) TIGHTDB_NOEXCEPT: m_file(&f) {}
+    ~close_guard()  TIGHTDB_NOEXCEPT { if (m_file) m_file->close(); }
+    release() TIGHTDB_NOEXCEPT { m_file = 0; }
+private:
+    file* m_file;
+};
+
+struct file::unlock_guard {
+    unlock_guard(file& f) TIGHTDB_NOEXCEPT: m_file(&f) {}
+    ~unlock_guard()  TIGHTDB_NOEXCEPT { if (m_file) m_file->unlock(); }
+    release() TIGHTDB_NOEXCEPT { m_file = 0; }
+private:
+    file* m_file;
+};
+
+/* WinAPI:
+
+OVERLAPPED dummy;
+memset(&dummy, 0, sizeof dummy);
+LockFileEx(file, (excl?LOCKFILE_EXCLUSIVE_LOCK:0), 0, 1, 0, &dummy); // Success if non-zero
+
+UnlockFile(file, 0, 0, 1, 0); // Success if non-zero
+
+*/
+
+template<class T> struct mappable_file: file {
+    mappable_file()  TIGHTDB_NOEXCEPT: m_addr(0) {}
+    ~mappable_file() TIGHTDB_NOEXCEPT { close(); }
+
+    T* map(std:size_t s = sizeof T) { ...; m_size = s; }
+    void unmap() TIGHTDB_NOEXCEPT { ...; m_addr = 0; }
+
+    void close() TIGHTDB_NOEXCEPT { unmap(); file::close(); }
+
+private:
+    T* m_addr;
+    std::size_t m_size;
+};
+
+
 struct SharedData {
   pthread_mutex_t mutex;
   bool is_initialized; // Protected by the mutex
   // Other members protected by the mutex
 };
 
-int main()
+void init()
 {
-  SharedData* shared_data;
-  int fd = open(...); // Create it with sero size if it does not exist
+    m_file.open(...); // Create it with sero size if it does not exist
+    file::close_guard fcg(m_file);
 
-  // First initialize just the mutex
-  {
-    exclusive_file_lock efl;
-    if (efl.try_lock(fd)) {
-        if (get_file_size_using_stat(fd) < sizeof ShareData) {
-            ftruncate(fd, sizeof pthread_mutex_t);
-            shared_data = mmap(0, sizeof pthread_mutex_t, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-            // Initialize mutex
-            msync(MS_SYNC);
-            munmap(shared_data, sizeof pthread_mutex_t);
-            ftruncate(fd, sizeof ShareData);
+    // First initialize just the mutex
+    if (m_file.try_lock_exclusive()) {
+        file::unlock_guard fulg(m_file);
+        if (m_file.get_size() < sizeof ShareData) {
+            m_file.resize(sizeof pthread_mutex_t);
+            {
+                SharedData* const shared_data = m_file.map(for_read_write, sizeof pthread_mutex_t);
+                mappable_file::unmap_guard fumg(m_file);
+
+                // Initialize mutex
+
+                // FIXME: Must also initialize m_is_initialized if the resizing operation does not guarantee zero-fill.
+
+                msync(MS_SYNC); // FIXME: Win-API???
+            }
+            m_file.resize(sizeof ShareData);
         }
     }
-  }
 
-  acquire_shared_file_lock_which_must_be_released_by_destructor();
+    m_file.lock_shared();
+    file::unlock_guard fulg(m_file);
 
-  if (file_has_been_deleted(fd))
+    SharedData* const shared_data = m_file.map(for_read_write);
+    mappable_file::unmap_guard fumg(m_file);
 
-  shared_data = mmap(0, sizeof ShareData, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if (file_has_been_deleted(fd))   ; // FIXME: Could this be based simply on a flag in SharedData?
 
-  // Initialize the rest of the file if we have to
-  pthread_mutex_lock(&shared_data->mutex);
-  if (!shared_data->is_initialized) {
-    // Initialize other members
-    shared_data->is_initialized = true;
-  }
-  pthread_mutex_lock(&shared_data->mutex);
+    // Initialize the rest of the file if we have to
+    pthread_mutex_lock(&shared_data->mutex);
+    if (!shared_data->m_is_initialized) {
+        // Initialize other members
+        shared_data->m_is_initialized = true;
+    }
+    pthread_mutex_lock(&shared_data->mutex);
 
-  // Do stuff
+    fumg.release(); // Don't unmap
+    fulg.release(); // Don't unlock
+    fcg.release(); // Don't close
 }
