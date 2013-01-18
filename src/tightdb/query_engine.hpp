@@ -36,11 +36,16 @@
 
 namespace tightdb {
 
-// Number of matches to find in best condition loop before breaking out to peek at other conditions
-const size_t findlocals = 16;   
+// Number of matches to find in best condition loop before breaking out to probe other conditions
+const size_t findlocals = 1;   
 
 // Distance between matches from which performance begins to flatten out because various initial overheads become insignificant
-const size_t bestdist = 100;    
+const size_t bestdist = 2;    
+
+// Minimum number of matches in a certain condition before using it in statistics. Too high value can spent too much time in 
+// bad node (bad = high match frequency). Too low value gives inaccurate statistics.
+const size_t probe_matches = 2;
+
 
 typedef bool (*CallbackDummy)(int64_t);
 
@@ -261,12 +266,11 @@ public:
                 // Skip test if there is no way its cost can ever be better than best node's
                 double cost = m_children[c]->cost();
                 if (m_children[c]->m_dT < cost) {
-                    size_t maxN = 2;
 
                     // Limit to bestdist in order not to skip too large parts of index nodes
                     size_t maxD = m_children[c]->m_dT == 0.0 ? end - start : bestdist;
                     td = m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = aggregate_local_selector<action, resulttype, T>(m_children[best], st, start, td, maxN, agg_col, matchcount);
+                    start = aggregate_local_selector<action, resulttype, T>(m_children[best], st, start, td, probe_matches, agg_col, matchcount);
                 }
             }
         }
@@ -529,8 +533,8 @@ public:
         else if (action == TDB_SUM && col_id == COLUMN_TYPE_INT)
             ret = aggregate_local<TDB_SUM, int64_t>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_SUM && col_id == COLUMN_TYPE_FLOAT)
-            // template parameter is intentionally 'double' for 'float', since it returns double.
-            ret = aggregate_local<TDB_SUM, double>(st, start, end, local_limit, agg_col, matchcount);
+            // todo, fixme, see if we must let sum return a double even when summing a float coltype 
+            ret = aggregate_local<TDB_SUM, float>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_SUM && col_id == COLUMN_TYPE_DOUBLE)
             ret = aggregate_local<TDB_SUM, double>(st, start, end, local_limit, agg_col, matchcount);
 
@@ -1046,9 +1050,7 @@ public:
     ParentNode* m_cond[2];
 private:
     size_t m_last[2];
-
     bool m_was_match[2];
-
     const Table* m_table;
 };
 
