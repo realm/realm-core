@@ -12,13 +12,14 @@ TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
-void func(const char* data, size_t size)
+void func(Group::BufferSpec buffer)
 {
-    Group g(data, size);
+    bool take_ownership = false;
+    Group g(buffer, take_ownership);
     PeopleTable::Ref table = g.get_table<PeopleTable>("people");
 
     table->add("Mary", 14);
-    table->add("Joe", 17);
+    table->add("Joe",  17);
     table->add("Jack", 22);
 
     g.write("people.tightdb");
@@ -27,18 +28,15 @@ void func(const char* data, size_t size)
 
 int main()
 {
-    Group g;
-    size_t size;
-    char* data = g.write_to_mem(size);
-    if (!data) return 1;
+    Group::BufferSpec buffer = g.write_to_mem();
     try {
-        func(data, size);
+        func(buffer);
     }
     catch (...) {
-        free(data);
+        free(buffer.m_data);
         throw;
     }
-    free(data);
+    free(buffer.m_data);
 }
 // @@EndFold@@
 // @@EndExample@@

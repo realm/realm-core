@@ -2,8 +2,8 @@ TABLE_MACROS_HPP = table_macros.hpp
 
 GENERATED_SOURCES = $(TABLE_MACROS_HPP)
 
-INST_HEADERS = config.h meta.hpp assert.hpp error.hpp terminate.hpp type_list.hpp tuple.hpp \
-safe_int_ops.hpp bind_ptr.hpp string_buffer.hpp file.hpp pthread_helpers.hpp utf8.hpp \
+INST_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp error.hpp terminate.hpp type_list.hpp \
+tuple.hpp safe_int_ops.hpp bind_ptr.hpp string_buffer.hpp file.hpp pthread_helpers.hpp utf8.hpp \
 utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp array_string_long.hpp \
 array_binary.hpp array_blob.hpp column_type.hpp column_fwd.hpp column.hpp column_tpl.hpp \
 column_string.hpp column_string_enum.hpp column_binary.hpp column_table.hpp column_mixed.hpp \

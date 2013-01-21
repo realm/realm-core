@@ -37,16 +37,12 @@ CATEGORIES:
                  Mixed(int64_t v)    
                  Mixed(Date v)       
                  Mixed(const char* v)
-                 Mixed(BinaryData v) 
-                 Mixed(const char* v, std::size_t len)
+                 Mixed(BinaryData v)
                  Mixed(subtable_tag)
       PARAMS:                 
       - NAME   : v
         TYPES  : [bool, int64_t, Date, const char*, BinaryData]
         DESCR  : The value.
-      - NAME   : len
-        TYPES  : size_t
-        DESCR  : Length of binary data.
       EXAMPLES:                  
       - CODE   : ex_cpp_mixed_constructor
         DESCR  : 
