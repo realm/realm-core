@@ -593,7 +593,7 @@ public:
 
 };
 
-template <class T> class state_state : state_state_parent {
+template <class T> class state_state : public state_state_parent {
 public:
 
     T state;
@@ -624,7 +624,7 @@ public:
     }
 
     template <ACTION action, bool pattern, class Callback, typename resulttype> 
-    inline bool state_match(size_t index, uint64_t indexpattern, resulttype value, Callback callback)
+    inline bool state_match(size_t /*index*/, uint64_t /*indexpattern*/, resulttype value, Callback /*callback*/)
     {
         TIGHTDB_STATIC_ASSERT(pattern == false && (action == TDB_SUM || action == TDB_MAX || action == TDB_MIN || action == TDB_COUNT), 
                               "pattern or action not supported");

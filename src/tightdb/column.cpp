@@ -13,7 +13,6 @@
 
 #include <tightdb/column.hpp>
 #include <tightdb/index.hpp>
-#include <tightdb/query_conditions.hpp>
 #include <tightdb/query_engine.hpp>
 
 using namespace std;
@@ -44,7 +43,7 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
 void merge_core(const Array& a0, const Array& a1, Array& res);
 Array* merge(const Array& ArrayList);
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
-
+    
 // Input:
 //     vals:   An array of values
 //     idx0:   Array of indexes pointing into vals, sorted with respect to vals
@@ -458,7 +457,7 @@ T Column::aggregate(T target, size_t start, size_t end, size_t *matchcount) cons
     // slower because of initial overhead).
         //    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
         //    new (node) NODE<int64_t, Column, cond>(target, 0);
-    NODE<T, Column, cond> node(target, NULL);
+    NODE<T, Column, cond> node(target, 0);
 
     node.QuickInit((Column*)this, target); 
     state_state<T> st;

@@ -20,6 +20,8 @@
 #ifndef TIGHTDB_QUERY_TPL_HPP
 #define TIGHTDB_QUERY_TPL_HPP
 
+namespace tightdb {
+    
 template <typename R, typename T>
 R Query::sum(size_t column, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
@@ -117,5 +119,6 @@ T Query::minimum(size_t column, size_t* resultcount, size_t start, size_t end, s
     return r;
 }
 
+} // namespace tightdb
 
 #endif // TIGHTDB_QUERY_TPL_HPP

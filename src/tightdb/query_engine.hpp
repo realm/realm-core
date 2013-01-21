@@ -36,6 +36,9 @@
 
 namespace tightdb {
 
+class ArrayFloat;
+class ArrayDouble;
+
 // Number of matches to find in best condition loop before breaking out to peek at other conditions
 const size_t findlocals = 16;   
 
@@ -121,7 +124,7 @@ private:
 
 class ParentNode {
 public:
-    ParentNode() : cond(-1), m_table(NULL), has_optimized_aggregate(false) {}
+    ParentNode() : cond(-1), has_optimized_aggregate(false), m_table(NULL) {}
 
     std::vector<ParentNode*> gather_children(std::vector<ParentNode*> v) {
         m_children.clear();
@@ -190,11 +193,16 @@ public:
     }
 
 
-    virtual size_t aggregate_call_specialized(ACTION action, ColumnType resulttype, state_state_parent* st, 
-                                              size_t start, size_t end, size_t local_limit, 
-                                              SequentialGetterParent* agg_col, size_t* matchcount)
+    virtual size_t aggregate_call_specialized(ACTION /*action*/, ColumnType /*resulttype*/, 
+                                              state_state_parent* /*st*/, 
+                                              size_t /*start*/, size_t /*end*/, size_t /*local_limit*/, 
+                                              SequentialGetterParent* /*agg_col*/, size_t* /*matchcount*/)
     {
         TIGHTDB_ASSERT(false);
+        /*
+        void(action); void(resulttype); void(st);
+        void(start); void(end); void(local_limit);
+        void(agg_col); void(matchcount);*/
         return 0;
     }
 
@@ -312,7 +320,7 @@ public:
                 T av = (T)0;
                 if (agg_col != NULL)
                     av = static_cast<SequentialGetter<T>*>(agg_col)->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
-                st->state_match<action, 0>(r, 0, av, CallbackDummy());
+                st->template state_match<action, 0>(r, 0, av, CallbackDummy());
              }   
         }
     }
@@ -491,10 +499,10 @@ public:
         bool b;
         if (state->template uses_val<action>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
             T av = column_agg->GetNext(i);
-            b = state->state_match<action, false>(i, 0, av, CallbackDummy());  
+            b = state->template state_match<action, false>(i, 0, av, CallbackDummy());  
         }
         else {
-            b = state->state_match<action, false>(i, 0, T(0), CallbackDummy());  
+            b = state->template state_match<action, false>(i, 0, T(0), CallbackDummy());  
         }
 
         if (m_local_matches == m_local_limit)
@@ -544,8 +552,10 @@ public:
         else if (action == TDB_CALLBACK_IDX)
             ret = aggregate_local<TDB_CALLBACK_IDX, int64_t>(st, start, end, local_limit, agg_col, matchcount);
 
-        else 
+        else { 
             TIGHTDB_ASSERT(false);
+            return 0;
+        }
 
         return ret;
     }
@@ -593,7 +603,7 @@ public:
         }
 
         if (matchcount)
-            *matchcount = int64_t(static_cast<state_state<resulttype>*>(st)->match_count);
+            *matchcount = int64_t(static_cast< state_state<resulttype>* >(st)->match_count);
 
         if (m_local_matches == m_local_limit) {
             m_dD = (m_last_local_match + 1 - start) / (m_local_matches + 1.0);

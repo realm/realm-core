@@ -63,4 +63,4 @@ private:
 
 #include <tightdb/array_basic_tpl.hpp>
 
-#endif TIGHTDB_ARRAY_BASIC_HPP
+#endif // TIGHTDB_ARRAY_BASIC_HPP

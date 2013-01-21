@@ -5,8 +5,12 @@
     #include <win32\types.h>
 #endif
 
-#include <tightdb/query_conditions.hpp>
-#include <tightdb/column_float.hpp>
+//#include <tightdb/query.hpp>
+#include <tightdb/query_engine.hpp>
+
+class tightdb::ParentNode;
+template <class T, class F> class tightdb::BASICNODE;
+
 
 namespace {
 
@@ -288,7 +292,7 @@ R ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcou
         end = Size();
 
     // We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
-    // slower because of initial overhead).
+    // slower because of initial over).
         //    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
         //    new (node) NODE<int64_t, Column, cond>(target, 0);
     BASICNODE<T, condition> node(target, NULL);

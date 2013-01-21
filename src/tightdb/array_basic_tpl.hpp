@@ -167,14 +167,14 @@ bool ArrayBasic<T>::Compare(const ArrayBasic<T>& c) const
 
 
 template<typename T> 
-size_t ArrayBasic<T>::CalcByteLen(size_t count, size_t width) const
+size_t ArrayBasic<T>::CalcByteLen(size_t count, size_t /*width*/) const
 {
     // FIXME: This arithemtic could overflow. Consider using <tightdb/overflow.hpp>
     return 8 + (count * sizeof(T));
 }
 
 template<typename T> 
-size_t ArrayBasic<T>::CalcItemCount(size_t bytes, size_t width) const
+size_t ArrayBasic<T>::CalcItemCount(size_t bytes, size_t /*width*/) const
 {
     // ??? what about width = 0? return -1?
 

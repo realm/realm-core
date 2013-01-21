@@ -777,12 +777,13 @@ const ColumnBase& Table::GetColumnBase(size_t ndx) const
 
 void Table::validate_column_type(const ColumnBase& column, ColumnType type, size_t ndx) const
 {
-    if (type == COLUMN_TYPE_INT || type == COLUMN_TYPE_DATE || type == COLUMN_TYPE_BOOL)
+    if (type == COLUMN_TYPE_INT || type == COLUMN_TYPE_DATE || type == COLUMN_TYPE_BOOL) {
         TIGHTDB_ASSERT(column.IsIntColumn());
-    else {
-        ColumnType this_type = GetRealColumnType(ndx);
-        TIGHTDB_ASSERT(type == this_type); 
+    } else {
+        TIGHTDB_ASSERT(type == GetRealColumnType(ndx)); 
     }
+    (void)column;
+    (void)ndx;
 }
 
 template <class C, ColumnType type>
@@ -805,7 +806,7 @@ const C& Table::GetColumn(size_t ndx) const
     return static_cast<const C&>(column);
 }
 
-// TODO: get rid of the COLUMN_TYPE tempalte parameter
+// TODO: get rid of the Column* template parameter
 
 Column& Table::GetColumn(size_t ndx)             { return GetColumn<Column, COLUMN_TYPE_INT>(ndx); }
 const Column& Table::GetColumn(size_t ndx) const { return GetColumn<Column, COLUMN_TYPE_INT>(ndx); }

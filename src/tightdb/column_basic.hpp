@@ -41,7 +41,7 @@ public:
     virtual bool add() {add(0); return true;}
     bool add(T value);
     bool Set(size_t ndx, T value);
-    virtual void insert(size_t ndx) { bool ok = Insert(ndx, 0); TIGHTDB_ASSERT(ok);}
+    virtual void insert(size_t ndx) { bool ok = Insert(ndx, 0); TIGHTDB_ASSERT(ok); (void)ok;}
     bool Insert(size_t ndx, T value);
     void Delete(size_t ndx);
     void Clear();
@@ -82,24 +82,22 @@ protected:
     bool LeafInsert(size_t ndx, T value);
     void LeafDelete(size_t ndx);
 
-    template<class F>
-    size_t LeafFind(T value, size_t start, size_t end) const;
+    template<class F> size_t LeafFind(T value, size_t start, size_t end) const;
     void LeafFindAll(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
 #ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif // TIGHTDB_DEBUG
 
-//private: TODO
     template <typename R, ACTION action, class cond> R aggregate(T target, size_t start, size_t end, size_t *matchcount = (size_t*)0) const;
-
 };
 
 
 } // namespace tightdb
 
-// Templates
-#include <tightdb/column_basic_tpl.hpp>
+// template implementation
+
+//#include <tightdb/column_basic_tpl.hpp>
 
 
 #endif // TIGHTDB_COLUMN_BASIC_HPP

@@ -208,10 +208,10 @@ private:
 };
 
 
-// template implementation
-#include <tightdb/query_tpl.hpp>
-
 } // namespace tightdb
 
+
+// template implementation
+//#include <tightdb/query_tpl.hpp>
 
 #endif // TIGHTDB_QUERY_HPP
