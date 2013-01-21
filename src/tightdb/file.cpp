@@ -165,8 +165,10 @@ void File::write(const char* data, size_t size)
     }
 
     const ssize_t r = ::write(m_fd, data, size);
-    TIGHTDB_ASSERT(int_equal_to(r, size));
-    if (0 <= r) return;
+    if (0 <= r) {
+        TIGHTDB_ASSERT(int_equal_to(r, size));
+        return;
+    }
 
     const int errnum = errno; // Eliminate any risk of clobbering
     const string msg = get_sys_err_msg(errnum);
@@ -186,10 +188,23 @@ File::SizeType File::get_size() const
 
 void File::resize(SizeType size)
 {
-    // FIXME: POSIX specifies that introduced bytes read as zero. This
-    // is not required by File::resize().
+    // POSIX specifies that introduced bytes read as zero. This is not
+    // required by File::resize().
     if (TIGHTDB_LIKELY(::ftruncate(m_fd, size) == 0)) return;
     throw runtime_error("ftruncate() failed");
+}
+
+void File::alloc(SizeType offset, size_t size)
+{
+    if (TIGHTDB_LIKELY(::posix_fallocate(m_fd, offset, size) == 0)) return;
+    throw runtime_error("posix_fallocate() failed");
+
+    const int errnum = errno; // Eliminate any risk of clobbering
+    const string msg = get_sys_err_msg(errnum);
+    switch (errnum) {
+        case ENOSPC: throw ResourceAllocError(msg);
+        default:     throw runtime_error(msg);
+    }
 }
 
 void File::seek(SizeType position)

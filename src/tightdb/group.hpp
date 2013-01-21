@@ -361,6 +361,16 @@ template<class S> size_t Group::write_to_stream(S& out)
     out.seek(0);
     out.write((const char*)&topPos, 8);
 
+    // FIXME: To be 100% robust with respect to being able to detect
+    // afterwards whether the file was completely written, we would
+    // have to put a sync() here and then proceed to write the T-DB
+    // bytes into the header. Also, if it is possible that the file is
+    // left with random contents if the host looses power before our
+    // call to sync() has completed, then we must initially resize the
+    // file to header_len - 1, fill with zeroes, and call sync(). If
+    // the file is then found later with size header_len - 1, it will
+    // be considered invalid.
+
     // Clean up temporary top
     top.Set(0, 0); // reset to avoid recursive delete
     top.Set(1, 0); // reset to avoid recursive delete

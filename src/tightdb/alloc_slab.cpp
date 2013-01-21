@@ -323,23 +323,47 @@ void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, boo
     m_file.open(path.c_str(), access, create);
     File::CloseGuard fcg(m_file);
 
+    const size_t initial_size = 1024 * 1024;
+
     // The size of a database file must not exceed what can be encoded
     // in std::size_t.
     size_t size;
     if (int_cast_with_overflow_detect(m_file.get_size(), size)) goto invalid_database;
 
-    if (size == 0) {
+
+    // All good:
+    //   24 <= size
+    //   size is 64-bit aligned
+    //   validate_header returns true
+
+    // Reinitialize:
+    //   size < 24
+
+    // Else: fail
+    //   
+
+    // If (!is_shared || size >= 24) && (!validate_header): Hard fail
+
+    // size < 24 || is_64_bit_aligned_size && validate_header
+
+    // If size < 24 || size == 24 && header_is_not_default
+
+    if (size < initial_size) {
         if (read_only) goto invalid_database;
+
+        // Pre-alloc initial space except the last byte
+        m_file.alloc(0, initial_size - 1);
 
         m_file.write(default_header);
 
-        // pre-alloc initial space
-        size = 1024 * 1024;
-        m_file.resize(size);
+        // Flush to disk and then allocate the last byte to indicate
+        // that the file is correctly initialized. This provides
+        // robustness in the event of abrupt process termination or
+        // power loss.
+        m_file.sync();
+        m_file.alloc(0, size);
+        size = initial_size;
     }
-
-    // Verify that data is 64bit aligned
-    if ((size & 0x7) != 0) goto invalid_database;
 
     {
         File::Map<char> map(m_file, File::access_ReadOnly, size);
@@ -416,7 +440,7 @@ void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, boo
 bool SlabAlloc::validate_buffer(const char* data, size_t len) const
 {
     // Verify that data is 64bit aligned
-    if ((len & 0x7) != 0)
+    if (len < sizeof default_header || (len & 0x7) != 0)
         return false;
 
     // File header is 24 bytes, composed of three 64bit
@@ -440,7 +464,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t len) const
         return false; // unsupported version
 
     // Top_ref should always point within buffer
-    const uint64_t* const top_refs = (uint64_t*)data;
+    const uint64_t* const top_refs = reinterpret_cast<uint64_t*>(data);
     const size_t ref = to_ref(top_refs[valid_part]);
     if (ref >= len)
         return false; // invalid top_ref

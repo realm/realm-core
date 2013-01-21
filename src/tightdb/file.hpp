@@ -111,7 +111,7 @@ public:
 
     void write(const std::string& s) { write(s.data(), s.size()); }
 
-    template<int N> void write(const char data[N]) { write(data, N); }
+    template<std::size_t N> void write(const char (&data)[N]) { write(data, N); }
 
 #ifndef _MSC_VER // POSIX version
     typedef off_t SizeType;
@@ -124,11 +124,21 @@ public:
     SizeType get_size() const;
 
     /// If this causes the file to grow, then the new section will
-    /// have undefined contents. Calling this method on an instance
-    /// that does not refer to an open file has undefined
-    /// behavior. Calling this method on a file that is opened in
-    /// read-only mode, is an error.
+    /// have undefined contents. Setting the size with this method
+    /// does not necessarily allocate space on the target device. If
+    /// you want to ensure allocation, call alloc(). Calling this
+    /// method on an instance that does not refer to an open file has
+    /// undefined behavior. Calling this method on a file that is
+    /// opened in read-only mode, is an error.
     void resize(SizeType);
+
+    /// Allocate space on the target device for the specified region
+    /// of the file. If the region extends beyond the current end of
+    /// the file, the file is resized accordingly. Calling this method
+    /// on an instance that does not refer to an open file has
+    /// undefined behavior. Calling this method on a file that is
+    /// opened in read-only mode, is an error.
+    void alloc(SizeType offset, size_t size);
 
     /// Set the file position.
     void seek(SizeType);

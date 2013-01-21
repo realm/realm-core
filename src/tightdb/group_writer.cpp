@@ -370,11 +370,8 @@ size_t GroupWriter::extend_free_space(size_t len)
     const size_t new_filesize = rest ? (needed_size + (megabyte - rest)) : needed_size;
 
     // Extend the file
-    // FIXME: Why not use m_alloc.m_file.resize(new_filesize) here???
-    m_alloc.m_file.seek(new_filesize-1);
-    const char zero[1] = { 0 };
-    m_alloc.m_file.write(zero);
-    m_alloc.m_file.sync(); // FIXME: What does this call to  sync() achieve???
+    m_alloc.m_file.alloc(0, new_filesize);
+    m_alloc.m_file.sync(); // FIXME: What does this call to  sync() achieve? Robustness with respect to abrupt process termination?
 
     m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_filesize);
 
