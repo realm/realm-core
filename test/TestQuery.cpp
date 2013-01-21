@@ -31,7 +31,84 @@ TIGHTDB_TABLE_2(FloatTable,
                 col_float,  Float,
                 col_double, Double)
 
+TIGHTDB_TABLE_3(FloatTable3,
+                col_float,  Float,
+                col_double, Double,
+                col_int, Int)
+
 } // anonymous namespace
+
+TEST(TestQueryFloat3)
+{
+    FloatTable3 t;
+
+    t.add(float(1.1), double(2.1), 1);
+    t.add(float(1.2), double(2.2), 2);
+    t.add(float(1.3), double(2.3), 3);
+    t.add(float(1.4), double(2.4), 4); // match
+    t.add(float(1.5), double(2.5), 5); // match
+    t.add(float(1.6), double(2.6), 6); // match
+    t.add(float(1.7), double(2.7), 7);
+    t.add(float(1.8), double(2.8), 8);
+    t.add(float(1.9), double(2.9), 9);
+
+    FloatTable3::Query q1 = t.where().col_float.greater(1.35f).col_double.less(2.65);
+    int64_t a1 = q1.col_int.sum();
+    CHECK_EQUAL(15, a1);
+
+    FloatTable3::Query q2 = t.where().col_double.less(2.65).col_float.greater(1.35f);
+    int64_t a2 = q2.col_int.sum();
+    CHECK_EQUAL(15, a2);
+
+    FloatTable3::Query q3 = t.where().col_double.less(2.65).col_float.greater(1.35f);
+    double a3 = q3.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a3);
+
+    FloatTable3::Query q4 = t.where().col_float.greater(1.35f).col_double.less(2.65);
+    double a4 = q4.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a4);
+
+    FloatTable3::Query q5 = t.where().col_int.greater_equal(4).col_double.less(2.65);
+    double a5 = q5.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a5);
+
+    FloatTable3::Query q6 = t.where().col_double.less(2.65).col_int.greater_equal(4);
+    double a6 = q6.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a6);
+
+    FloatTable3::Query q7 = t.where().col_int.greater(3).col_int.less(7);
+    int64_t a7 = q7.col_int.sum();
+    CHECK_EQUAL(15, a7);
+    FloatTable3::Query q8 = t.where().col_int.greater(3).col_int.less(7);
+    int64_t a8 = q8.col_int.sum();
+    CHECK_EQUAL(15, a8);
+
+
+
+}
+
+
+TEST(TestQueryFloat4)
+{
+    FloatTable3 t;
+
+    t.add(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
+    t.add(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
+    t.add(12345.0, 12345.0, 11111);
+    
+    FloatTable3::Query q1 = t.where();
+    float a1 = q1.col_float.maximum();
+    double a2 = q1.col_double.maximum();
+    CHECK_EQUAL(std::numeric_limits<float>::infinity(), a1);
+    CHECK_EQUAL(std::numeric_limits<double>::infinity(), a2);
+
+
+    FloatTable3::Query q2 = t.where();
+    float a3 = q1.col_float.minimum();
+    double a4 = q1.col_double.minimum();
+    CHECK_EQUAL(12345.0, a3);
+    CHECK_EQUAL(12345.0, a4);
+}
 
 
 TEST(TestQueryFloat)
@@ -71,26 +148,43 @@ TEST(TestQueryFloat)
     CHECK_EQUAL(3, t.where().col_double.less(2.22).count());
     CHECK_EQUAL(4, t.where().col_double.between(2.20, 2.22).count());
 
-    // Test sum
-    double sum1 = 2.21 + 3.20;
-    FloatTable::Query q1 = t.where().col_float.between(1.13f, 1.20f).col_double.not_equal(2.22);
-    CHECK_EQUAL(sum1, q1.col_double.sum());
-    double sum2 = 1.13f + 1.20f;
-    CHECK_EQUAL(sum2, q1.col_float.sum());
+    // ------ Test sum()
 
-    // Test max, min, average
-    CHECK_EQUAL(2.21, q1.col_double.minimum());
+    // ... NO conditions
+    float sum1_f = 1.10f + 1.13f + 1.13f + 1.10f + 1.20f;
+    double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
+    CHECK_EQUAL(sum1_d, t.where().col_double.sum());
+    CHECK_EQUAL(sum1_f, t.where().col_float.sum());
 
-    CHECK_EQUAL(sum2/2.0f, q1.col_float.average());
+    // ... with conditions
+    float sum2_f = 1.13f + 1.20f;
+    double sum2_d = 2.21 + 3.20;
+    FloatTable::Query q2 = t.where().col_float.between(1.13f, 1.20f).col_double.not_equal(2.22);
+    CHECK_EQUAL(sum2_d, q2.col_double.sum());
+    CHECK_EQUAL(sum2_f, q2.col_float.sum());
+
+    // ------ Test average()
+
+    // ... NO conditions
+    CHECK_EQUAL(sum1_f/5.0f, t.where().col_float.average());
+    CHECK_EQUAL(sum1_d/5.0, t.where().col_double.average());
+    // ... with conditions
+    CHECK_EQUAL(sum2_f/2.0f, q2.col_float.average());
+    CHECK_EQUAL(sum2_d/2.0, q2.col_double.average());
+
+    // -------- Test minimum(), maximum()
+    
+    // ... NO conditions
     CHECK_EQUAL(1.20f, t.where().col_float.maximum());
     CHECK_EQUAL(1.10f, t.where().col_float.minimum());
+    CHECK_EQUAL(3.20, t.where().col_double.maximum());
+    CHECK_EQUAL(2.20, t.where().col_double.minimum());
 
-    // todo: same for double
-    CHECK_EQUAL(3.2, q1.col_double.maximum());
-    CHECK_EQUAL(sum1/2.0, q1.col_double.average());
-
-    // todo: +=, -=, in other tests
-
+    // ... with conditions
+    CHECK_EQUAL(1.20f, q2.col_float.maximum());
+    CHECK_EQUAL(1.13f, q2.col_float.minimum());
+    CHECK_EQUAL(3.20, q2.col_double.maximum());
+    CHECK_EQUAL(2.21, q2.col_double.minimum());
 }
 
 TEST(TestDateQuery)

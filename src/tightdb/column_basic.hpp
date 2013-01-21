@@ -49,7 +49,7 @@ public:
     void fill(size_t count);
 
     size_t count(T value) const;
-    double sum(size_t start = 0, size_t end = -1) const;
+    T sum(size_t start = 0, size_t end = -1) const;
     double average(size_t start = 0, size_t end = -1) const;
     T maximum(size_t start = 0, size_t end = -1) const;
     T minimum(size_t start = 0, size_t end = -1) const;

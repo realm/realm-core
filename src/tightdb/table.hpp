@@ -205,7 +205,7 @@ public:
     size_t  count_double(size_t column_ndx, double target) const;
     
     int64_t sum(size_t column_ndx) const;
-    double  sum_float(size_t column_ndx) const;
+    float   sum_float(size_t column_ndx) const;
     double  sum_double(size_t column_ndx) const;
         // FIXME: What to return for below when table empty? 0?
     int64_t maximum(size_t column_ndx) const; 
@@ -421,11 +421,11 @@ private:
     void InstantiateBeforeChange();
     void validate_column_type(const ColumnBase& column, ColumnType expected_type, size_t ndx) const;
 
-    template <class T, class C, ColumnType expect> size_t count(size_t column_ndx, T target) const;
-    template <typename T, class C, ColumnType type, typename R> R sum(size_t column_ndx) const;
-    template <typename T, class C, ColumnType type> double average(size_t column_ndx) const;
- //   template <typename T, class C, ColumnType type> T maximumT(size_t column_ndx) const;
- //   template <typename T, class C, ColumnType type> T minimumT(size_t column_ndx) const;
+    template <class T> size_t count(size_t column_ndx, T target) const;
+    template <typename T, typename R> R sum(size_t column_ndx) const;
+    template <typename T> double average(size_t column_ndx) const;
+    template <typename T> T maximum(size_t column_ndx) const;
+    template <typename T> T minimum(size_t column_ndx) const;
 
     /// Construct an empty table with independent spec and return just
     /// the reference to the underlying memory.

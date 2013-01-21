@@ -616,9 +616,7 @@ public:
         else if (action == TDB_MIN)
             state = std::numeric_limits<T>::infinity();
         else if (action == TDB_SUM)
-            state = T(0);
-        else if (action == TDB_COUNT)
-            state = 0;
+            state = 0.0;
         else
             TIGHTDB_ASSERT(false);
     }
@@ -635,10 +633,9 @@ public:
         else if (action == TDB_MIN && value < state)
             state = value;
         else if (action == TDB_SUM)
+        {
             state += value;
-        else if (action == TDB_COUNT) {
-            state++;
-            match_count = size_t(state);
+      //      std::cout << state << "+" << value << " ";
         }
 
         return true;

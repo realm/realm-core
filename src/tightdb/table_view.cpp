@@ -30,6 +30,8 @@ size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) co
 }
 
 #if 0
+// TODO: Reduce template parameters
+
 template <int function, ColumnType type, class C, typename T, typename R> 
 R TableViewBase::aggregate(size_t column_ndx) const
 {
@@ -86,7 +88,7 @@ int64_t TableViewBase::sum(size_t column_ndx) const
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
-    return aggregate<TDB_SUM, COLUMN_TYPE_FLOAT, ColumnFloat, float, double>(column_ndx);
+    return aggregate<TDB_SUM, COLUMN_TYPE_FLOAT, ColumnFloat, float, float>(column_ndx);
 }
 double TableViewBase::sum_double(size_t column_ndx) const
 {

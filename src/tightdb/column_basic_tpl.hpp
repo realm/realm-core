@@ -301,7 +301,8 @@ R ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcou
     state_state<R> st;
     st.init(action, NULL, size_t(-1));
 
-    node.template aggregate_local<action, R, T>(&st, start, end, size_t(-1), NULL, matchcount);
+    SequentialGetter<T> sg((ColumnTypeTraits<T>::column_type*)this); 
+    node.template aggregate_local<action, R, T>(&st, start, end, size_t(-1), &sg, matchcount);
 
     return st.state;
 }
@@ -313,9 +314,9 @@ size_t ColumnBasic<T>::count(T target) const
 }
 
 template<typename T>
-double ColumnBasic<T>::sum(size_t start, size_t end) const
+T ColumnBasic<T>::sum(size_t start, size_t end) const
 {
-    return aggregate<double, TDB_SUM, NONE>(0, start, end);
+    return aggregate<T, TDB_SUM, NONE>(0, start, end);
 }
 
 template<typename T>
@@ -324,8 +325,8 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = Size();
     size_t size = end - start;
-    double sum1 = aggregate<double, TDB_SUM, NONE>(0, start, end);
-    double avg = sum1 / double( size == 0 ? 1 : size );
+    T sum1 = aggregate<T, TDB_SUM, NONE>(0, start, end);
+    double avg = double(sum1) / double( size == 0 ? 1 : size ); 
     return avg;
 }
 
