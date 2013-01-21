@@ -310,9 +310,9 @@ size_t ColumnBasic<T>::count(T target) const
 }
 
 template<typename T>
-double ColumnBasic<T>::sum(size_t start, size_t end) const
+T ColumnBasic<T>::sum(size_t start, size_t end) const
 {
-    return aggregate<double, TDB_SUM, NONE>(0, start, end);
+    return aggregate<T, TDB_SUM, NONE>(0, start, end);
 }
 
 template<typename T>

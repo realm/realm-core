@@ -191,9 +191,6 @@ TEST(Table_float2)
     CHECK_EQUAL(1.1f, r.first);
     CHECK_EQUAL(2.2, r.second);
 
-//    CHECK_EQUAL(size_t(1),  table.column().second.find_first("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
-//    CHECK_EQUAL(size_t(-1), table.column().second.find_first("Foo"));
-
 #ifdef TIGHTDB_DEBUG
     table.Verify();
 #endif // TIGHTDB_DEBUG
@@ -1282,8 +1279,6 @@ TEST(Table_Spec_DeleteColumnsBug)
     table.reset();
 }
 
-#if 0 // todo fixme
-
 TEST(Table_Mixed)
 {
     Table table;
@@ -1437,7 +1432,6 @@ TEST(Table_Mixed)
 #endif // TIGHTDB_DEBUG
 }
 
-#endif
 
 namespace {
 TIGHTDB_TABLE_1(TestTableMX,
@@ -1799,6 +1793,63 @@ TEST(Table_HasSharedSpec)
     CHECK(!table4->has_shared_spec());
     CHECK(table4[0].subtab->has_shared_spec());
 }
+
+
+namespace
+{
+    TIGHTDB_TABLE_3(TableAgg,
+                    c_int,   Int,
+                    c_float, Float,
+                    c_double, Double)
+
+                    // TODO: Bool? Date
+}
+
+#if TEST_DURATION > 0
+#define TBL_SIZE MAX_LIST_SIZE*10
+#else
+#define TBL_SIZE 10
+#endif
+
+TEST(Table_Aggregates)
+{
+    TableAgg table;
+    int64_t i_sum = 0;
+    float f_sum = 0;
+    double d_sum = 0;
+
+    for (int i = 0; i < TBL_SIZE; i++) {
+        table.add(5987654, 4.0f, 3.0);
+        i_sum += 5987654;
+        f_sum += 4.0f;
+        d_sum += 3.0;
+    }
+    table.add(1, 1.1f, 1.2);
+    table.add(987654321, 11.0f, 12.0);
+    table.add(5, 4.0f, 3.0);
+    i_sum += 1 + 987654321 + 5;
+    f_sum += 1.1f + 11.0f + 4.0f;
+    d_sum += 1.2 + 12.0 + 3.0;
+    double size = TBL_SIZE + 3;
+
+    // minimum
+    CHECK_EQUAL(1, table.column().c_int.minimum());
+    CHECK_EQUAL(1.1f, table.column().c_float.minimum());
+    CHECK_EQUAL(1.2, table.column().c_double.minimum());
+    // maximum
+    CHECK_EQUAL(987654321, table.column().c_int.maximum());
+    CHECK_EQUAL(11.0f, table.column().c_float.maximum());
+    CHECK_EQUAL(12.0, table.column().c_double.maximum());
+    // sum
+    CHECK_EQUAL(i_sum, table.column().c_int.sum());
+    CHECK_EQUAL(f_sum, table.column().c_float.sum());
+    CHECK_EQUAL(d_sum, table.column().c_double.sum());
+    // average
+    CHECK_EQUAL(double(i_sum)/size, table.column().c_int.average());
+    CHECK_EQUAL(double(f_sum)/size, table.column().c_float.average());
+    CHECK_EQUAL(double(d_sum)/size, table.column().c_double.average());
+}
+
 
 #include <tightdb/lang_bind_helper.hpp>
 

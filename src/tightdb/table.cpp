@@ -40,7 +40,6 @@ using namespace std;
 
 namespace tightdb {
 
-
 struct FakeParent: Table::Parent {
     virtual void update_child_ref(size_t, size_t) {} // Ignore
     virtual void child_destroyed(size_t) {} // Ignore
@@ -1442,7 +1441,7 @@ void Table::insert_done()
 
 #ifdef TIGHTDB_DEBUG
     Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     error_code err = get_local_transact_log().row_insert_complete();
@@ -1450,30 +1449,29 @@ void Table::insert_done()
 #endif
 }
 
-template <class T, class C, ColumnType expect>
+
+// count ----------------------------------------------
+
+template <class T>
 size_t Table::count(size_t column_ndx, T target) const
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == expect);
-
-    return GetColumn<C, expect>(column_ndx).count(target);
+    // asserts are done in GetColumn
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    const ColType& column = GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
+    return column.count(target);
 }
-
 size_t Table::count_int(size_t column_ndx, int64_t target) const
 {
-    return count<int64_t, Column, COLUMN_TYPE_INT>(column_ndx, target);
+    return count<int64_t>(column_ndx, target);
 }
-
 size_t Table::count_float(size_t column_ndx, float target) const
 {
-    return count<float, ColumnFloat, COLUMN_TYPE_FLOAT>(column_ndx, target);
+    return count<float>(column_ndx, target);
 }
-
 size_t Table::count_double(size_t column_ndx, double target) const
 {
-    return count<double, ColumnDouble, COLUMN_TYPE_DOUBLE>(column_ndx, target);
+    return count<double>(column_ndx, target);
 }
-
 size_t Table::count_string(size_t column_ndx, const char* value) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
@@ -1492,73 +1490,112 @@ size_t Table::count_string(size_t column_ndx, const char* value) const
     }
 }
 
+// sum ----------------------------------------------
 
-template <typename T, class C, ColumnType type, typename R>
+template <typename T, typename R>
 R Table::sum(size_t column_ndx) const
 {
-    // asserts are done in GetColumnT
-    const C& column = GetColumn<C, type>(column_ndx);
+    // asserts are done in GetColumn
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    const ColType& column = GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
     return column.sum();
 }
-
 int64_t Table::sum(size_t column_ndx) const
 {
-    return sum<int64_t, Column, COLUMN_TYPE_INT, int64_t>(column_ndx);
+    return sum<int64_t, int64_t>(column_ndx);
 }
-
-double Table::sum_float(size_t column_ndx) const
+float Table::sum_float(size_t column_ndx) const
 {
-    return sum<float, ColumnFloat, COLUMN_TYPE_FLOAT, double>(column_ndx);
+    return sum<float, float>(column_ndx);
 }
 double Table::sum_double(size_t column_ndx) const
 {
-    return sum<double, ColumnDouble, COLUMN_TYPE_DOUBLE, double>(column_ndx);
+    return sum<double, double>(column_ndx);
 }
 
+// average ----------------------------------------------
 
-
-template <typename T, class C, ColumnType type>
+template <typename T>
 double Table::average(size_t column_ndx) const
 {
-    const C& column = GetColumn<C, type>(column_ndx);
+    // asserts are done in GetColumn
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    const ColType& column = GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
     return column.average();
 }
-
 double Table::average(size_t column_ndx) const
 {
-    return average<int64_t, Column, COLUMN_TYPE_INT>(column_ndx);
+    return average<int64_t>(column_ndx);
 }
-#if 0
+double Table::average_float(size_t column_ndx) const
+{
+    return average<float>(column_ndx);
+}
+double Table::average_double(size_t column_ndx) const
+{
+    return average<double>(column_ndx);
+}
+
+// minimum ----------------------------------------------
+
 template <typename T>
-T get()
+T Table::minimum(size_t column_ndx) const
 {
-
+    // asserts are done in GetColumnT
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    const ColType& column = GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
+    return column.minimum();
 }
-// TODO: add float, double here...
 
+#define USE_COLUMN_AGGREGATE 1
 
-template <typename T, class F>
-T Table::maximumT(size_t column_ndx) const
+int64_t Table::minimum(size_t column_ndx) const
 {
+#if USE_COLUMN_AGGREGATE
+    return minimum<int64_t>(column_ndx);
+#else
     if (is_empty()) 
         return 0;
-    T max_val = get<T>(column_ndx, 0);
-    for (size_t ndx = 1; ndx < size(); ++ndx) {
-        const T val = get<T>(column_ndx, ndx);
-        if (val > max_val) {
-            max_val = val;
+
+    int64_t mv = get_int(column_ndx, 0);
+    for (size_t i = 1; i < size(); ++i) {
+        const int64_t v = get_int(column_ndx, i);
+        if (v < mv) {
+            mv = v;
         }
     }
-    return max_val;
-}
+    return mv;
 #endif
+}
+
+
+float Table::minimum_float(size_t column_ndx) const
+{
+    return minimum<float>(column_ndx);
+}
+double Table::minimum_double(size_t column_ndx) const
+{
+    return minimum<double>(column_ndx);
+}
+
+// maximum ----------------------------------------------
+
+template <typename T>
+T Table::maximum(size_t column_ndx) const
+{
+    // asserts are done in GetColumnT
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    const ColType& column = GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
+    return column.maximum();
+}
 
 int64_t Table::maximum(size_t column_ndx) const
 {
-#if 0
-    return maximumT<int64_t, get_int>(column_ndx);
+#if USE_COLUMN_AGGREGATE
+    return maximum<int64_t>(column_ndx);
 #else
-    if (is_empty()) return 0;
+    if (is_empty()) 
+        return 0;
 
     int64_t mv = get_int(column_ndx, 0);
     for (size_t i = 1; i < size(); ++i) {
@@ -1570,20 +1607,16 @@ int64_t Table::maximum(size_t column_ndx) const
     return mv;
 #endif
 }
-
-int64_t Table::minimum(size_t column_ndx) const
+float Table::maximum_float(size_t column_ndx) const
 {
-    if (is_empty()) return 0;
-
-    int64_t mv = get_int(column_ndx, 0);
-    for (size_t i = 1; i < size(); ++i) {
-        const int64_t v = get_int(column_ndx, i);
-        if (v < mv) {
-            mv = v;
-        }
-    }
-    return mv;
+    return maximum<float>(column_ndx);
 }
+double Table::maximum_double(size_t column_ndx) const
+{
+    return maximum<double>(column_ndx);
+}
+
+
 
 size_t Table::lookup(const char* value) const
 {
@@ -1885,6 +1918,7 @@ ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t
     column.find_all_hamming(tv.get_ref_column(), value, max);
     return move(tv);
 }
+
 
 TableView Table::distinct(size_t column_ndx)
 {
