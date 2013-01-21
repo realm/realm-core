@@ -1,5 +1,4 @@
 #include <cerrno>
-#include <cstdio>
 #include <new>
 #include <algorithm>
 #include <iostream>
@@ -63,15 +62,10 @@ private:
 
 class FileOStream {
 public:
-    FileOStream(const string& path) : m_pos(0), m_file(NULL)
+    FileOStream(const string& path) : m_pos(0)
     {
-        m_file = fopen(path.c_str(), "wb");
-        if (m_file) return;
-        // Note: Microsoft Windows defines all the error codes of
-        // POSIX but uses only a small subset of them. It has been
-        // observed to produce at least EACCES.
-        if (errno == EACCES) throw PermissionDenied();
-        throw runtime_error("std::fopen() failed");
+        File file(path, File::access_ReadWrite);
+        m_file = file.open_stdio_file(File::access_ReadWrite);
     }
 
     ~FileOStream()
@@ -196,8 +190,8 @@ void Group::create_from_ref(size_t top_ref)
         create();
 
         // Everything but header is free space
-        m_freePositions.add(header_len);
-        m_freeLengths.add(m_alloc.GetFileLen() - header_len);
+        m_freePositions.add(sizeof SlabAlloc::default_header);
+        m_freeLengths.add(m_alloc.GetFileLen() - sizeof SlabAlloc::default_header);
         if (m_is_shared)
             m_freeVersions.add(0);
     }
@@ -451,25 +445,18 @@ Group::BufferSpec Group::write_to_mem()
     return BufferSpec(data, size);
 }
 
-// FIXME: Should be moved to header file and be made inlineable
-bool Group::commit()
-{
-    const size_t top_pos = commit(-1, -1, true);
-    return top_pos != size_t(-1);
-}
-
 size_t Group::commit(size_t current_version, size_t readlock_version, bool doPersist)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     TIGHTDB_ASSERT(readlock_version <= current_version);
 
-    if (!m_alloc.CanPersist()) return size_t(-1);
+    // FIXME: Under what circumstances can this even happen????
+    if (!m_alloc.CanPersist()) throw runtime_error("Cannot persist");
 
     // If we have an empty db file, we can just serialize directly
     //if (m_alloc.GetTopRef() == 0) {}
 
     GroupWriter out(*this, doPersist);
-    if (!out.IsValid()) return size_t(-1);
 
     if (m_is_shared) {
         m_readlock_version = readlock_version;
@@ -775,22 +762,13 @@ void Group::to_dot() const
     to_dot(std::cerr);
 }
 
-#if !defined(_MSC_VER)
-#include <sys/mman.h>
-#endif
-
 void Group::zero_free_space(size_t file_size, size_t readlock_version)
 {
     static_cast<void>(readlock_version); // FIXME: Why is this parameter not used?
 
     if (!m_is_shared) return;
 
-#if !defined(_MSC_VER)
-    const int fd = m_alloc.GetFileDescriptor();
-
-    // Map to memory
-    void* const p = mmap(0, file_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    if (p == (void*)-1) return;
+    File::Map<char> map(m_alloc.m_file, File::access_ReadWrite, file_size);
 
     const size_t count = m_freePositions.Size();
     for (size_t i = 0; i < count; ++i) {
@@ -800,12 +778,9 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
         const size_t pos = m_freePositions.Get(i);
         const size_t len = m_freeLengths.Get(i);
 
-        memset((char*)p+pos, 0, len);
+        char* const p = map.get_addr() + pos;
+        fill(p, p+len, 0);
     }
-
-    munmap(p, file_size);
-
-#endif
 }
 
 #endif // TIGHTDB_DEBUG

@@ -28,20 +28,26 @@
 #include <stdint.h> // unint8_t etc
 #endif
 
-#include <tightdb/exceptions.hpp>
+#include <tightdb/file.hpp>
 #include <tightdb/table_macros.hpp>
 
 namespace tightdb {
 
-// Constants
-const char* const default_header = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0T-DB\0\0\0\0";
-const size_t header_len = 24;
 
 // Pre-declarations
 class Group;
 class GroupWriter;
 
-class SlabAlloc : public Allocator {
+
+/// Thrown by Group and SharedGroup constructors if the specified file
+/// (or memory buffer) does not appear to contain a valid TightDB
+/// database.
+struct InvalidDatabase: File::OpenError {
+    InvalidDatabase(): File::OpenError("Invalid database") {}
+};
+
+
+class SlabAlloc: public Allocator {
 public:
     SlabAlloc();
     ~SlabAlloc();
@@ -76,14 +82,7 @@ public:
     bool   CanPersist() const;
     size_t GetFileLen() const {return m_baseline;}
     void   FreeAll(size_t filesize=(size_t)-1);
-    bool   ReMap(size_t filesize);
-    bool   RefreshMapping();
-
-#ifndef _MSC_VER
-    int    GetFileDescriptor() {return m_fd;}
-#else
-    void*  GetFileDescriptor() {return m_fd;}
-#endif
+    bool   ReMap(size_t filesize); // Returns false if remapping was not necessary
 
 #ifdef TIGHTDB_DEBUG
     void EnableDebug(bool enable) {m_debugOut = enable;}
@@ -92,9 +91,11 @@ public:
     void Print() const;
 #endif // TIGHTDB_DEBUG
 
-protected:
+private:
     friend class Group;
     friend class GroupWriter;
+
+    enum FreeMode { free_Noop, free_Unalloc, free_Unmap };
 
     // Define internal tables
     TIGHTDB_TABLE_2(Slabs,
@@ -104,35 +105,42 @@ protected:
                     ref,    Int,
                     size,   Int)
 
-    const FreeSpace& GetFreespace() const {return m_freeReadOnly;}
-    bool validate_buffer(const char* data, size_t len) const;
+    static const char default_header[24];
 
-    // Member variables
-    char*     m_shared;
-    bool      m_owned;
-    size_t    m_baseline;
+    File      m_file;
+    char*     m_data;
+    FreeMode  m_free_mode;
+    size_t    m_baseline; // Also size of memory mapped portion of database file
     Slabs     m_slabs;
     FreeSpace m_freeSpace;
     FreeSpace m_freeReadOnly;
 
-#ifndef _MSC_VER // POSIX
-    int       m_fd;
-#else // Windows
-    //TODO: Something in a tightdb header won't let us include windows.h, so we can't use HANDLE
-    void*     m_file;
-    void*     m_map_file;
-#endif
-
 #ifdef TIGHTDB_DEBUG
     bool      m_debugOut;
-#endif // TIGHTDB_DEBUG
+#endif
 
-private:
+    const FreeSpace& GetFreespace() const {return m_freeReadOnly;}
+    bool validate_buffer(const char* data, size_t len) const;
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     void set_replication(Replication* r) { m_replication = r; }
 #endif
 };
 
+
+
+
+// Implementation:
+
+inline SlabAlloc::SlabAlloc()
+{
+    m_data     = 0;
+    m_baseline = 8;
+
+#ifdef TIGHTDB_DEBUG
+    m_debugOut = false;
+#endif
+}
 
 } // namespace tightdb
 

@@ -1,38 +1,321 @@
 #include <cerrno>
+#include <cstdio>
 #include <cstdlib>
 
+#ifndef _MSC_VER // POSIX
+#  include <sys/stat.h>
+#  include <fcntl.h>
+#  include <unistd.h>
+#  include <sys/file.h> // Non-POSIX flock()
+#  include <sys/mman.h>
+#else // Windows
+#  include <windows.h>
+#endif
+
+#include <tightdb/assert.hpp>
+#include <tightdb/exceptions.hpp>
+#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/string_buffer.hpp>
 #include <tightdb/file.hpp>
 
 using namespace std;
+using namespace tightdb;
+
+
+namespace {
+
+
+#ifndef _MSC_VER
+
+string get_sys_err_msg(int errnum)
+{
+    StringBuffer buffer;
+    buffer.resize(1024);
+#if _GNU_SOURCE // GNU-specific version
+    const char* const m = strerror_r(errnum, buffer.data(), buffer.size());
+    if (!m) return "Unknown error";
+    return m;
+#else // POSIX version
+    if (strerror_r(errnum, buffer.data(), buffer.size()) != 0) return "Unknown error";
+    return buffer.str();
+#endif
+}
+
+inline bool lock_file(int fd, bool exclusive, bool non_blocking)
+{
+    int operation = exclusive ? LOCK_EX : LOCK_SH;
+    if (non_blocking) operation |=  LOCK_NB;
+    if (TIGHTDB_LIKELY(flock(fd, operation) == 0)) return true;
+    const int errnum = errno; // Eliminate any risk of clobbering
+    if (errnum == EWOULDBLOCK) return false;
+    const string msg = get_sys_err_msg(errnum);
+    if (errnum == ENOLCK) throw ResourceAllocError(msg);
+    throw runtime_error(msg);
+}
+
+inline void unlock_file(int fd) TIGHTDB_NOEXCEPT
+{
+    // The Linux man page for flock() does not state explicitely that
+    // unlocking is idempotent, however, we will assume it since there
+    // is no mention of the error that would be reported if a
+    // non-locked file were unlocked.
+    const int r = flock(fd, LOCK_UN);
+    TIGHTDB_ASSERT(r == 0);
+    static_cast<void>(r);
+}
+
+#endif
+
+
+} // anonymous namespace
+
 
 namespace tightdb {
 
 
-error_code create_temp_dir(StringBuffer& buffer)
+string create_temp_dir()
 {
-#if _POSIX_C_SOURCE >= 200809L
+#ifndef _MSC_VER // POSIX.1-2008 version
 
-    buffer.clear();
-    // FIXME: Can we rely on /tmp/ to always be available when _POSIX_C_SOURCE >= 200809L?
-    error_code err = buffer.append_c_str("/tmp/tightdb_XXXXXX");
-    if (err) return err;
-    if (mkdtemp(buffer.c_str()) == 0) {
-        switch (errno) {
-        case EEXIST:
-        case ENOMEM:
-        case ENOSPC: return ERROR_NO_RESOURCE;
-        default:     return ERROR_OTHER;
-        }
+    StringBuffer buffer;
+    buffer.append_c_str(P_tmpdir "tightdb_XXXXXX");
+    if (mkdtemp(buffer.c_str()) == 0) throw runtime_error("mkdtemp() failed");
+    return buffer.str();
+
+#else // Windows version
+
+    StringBuffer buffer1;
+    buffer1.resize(MAX_PATH+1);
+    if (GetTempPath(buffer1.size(), buffer1) == 0)
+        throw runtime_error("CreateDirectory() failed");
+    StringBuffer buffer2;
+    buffer2.resize(MAX_PATH);
+    for (;;) {
+        if (GetTempFileName(buffer1.c_str(), "tdb", 0, buffer2.data()) == 0)
+            throw runtime_error("GetTempFileName() failed");
+        if (DeleteFile(buffer2.c_str()) == 0)
+            throw runtime_error("DeleteFile() failed");
+        if (CreateDirectory(buffer2.c_str(), 0) != 0) break;
+        if (GetLastError() != ERROR_ALREADY_EXISTS)
+            throw runtime_error("CreateDirectory() failed");
     }
-    return ERROR_NONE;
+    return string(buffer2.c_str());
 
-#else // _POSIX_C_SOURCE < 200809L
-
-    static_cast<void>(buffer);
-    return ERROR_NOT_IMPLEMENTED;
-
-#endif // _POSIX_C_SOURCE < 200809L
+#endif
 }
+
+
+#ifndef _MSC_VER // POSIX.1-2008 version
+
+void File::open(const string& path, AccessMode a, CreateMode c)
+{
+    int flags = 0;
+    switch (a) {
+        case access_ReadWrite: flags = O_RDWR;   break;
+        case access_ReadOnly:  flags = O_RDONLY; break;
+    }
+    switch (c) {
+        case create_Auto:   flags |= O_CREAT;          break;
+        case create_Never:                             break;
+        case create_Always: flags |= O_CREAT | O_EXCL; break;
+    }
+    const int fd = ::open(path.c_str(), flags, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    if (TIGHTDB_LIKELY(0 <= fd)) {
+        m_fd = fd;
+        return;
+    }
+
+    const int errnum = errno; // Eliminate any risk of clobbering
+    const string msg = get_sys_err_msg(errnum);
+    switch (errnum) {
+        case EACCES:
+        case EROFS:
+        case ETXTBSY:       throw PermissionDenied(msg);
+        case ENOENT:        throw NotFound(msg);
+        case EEXIST:        throw Exists(msg);
+        case EISDIR:
+        case ENAMETOOLONG:
+        case ENOTDIR:
+        case ENXIO:         throw OpenError(msg);
+        case EMFILE:
+        case ENFILE:
+        case ENOSR:
+        case ENOSPC:
+        case ENOMEM:        throw ResourceAllocError(msg);
+        default:            throw runtime_error(msg);
+    }
+}
+
+void File::close() TIGHTDB_NOEXCEPT
+{
+    if (m_fd < 0) return;
+    const int r = ::close(m_fd);
+    TIGHTDB_ASSERT(r == 0);
+    static_cast<void>(r);
+    m_fd = -1;
+}
+
+void File::write(const char* data, size_t size)
+{
+    // POSIX requires than size is less than or equal to SSIZE_MAX
+    while (int_less_than(SSIZE_MAX, size)) {
+        write(data, SSIZE_MAX);
+        size -= SSIZE_MAX;
+        data += SSIZE_MAX;
+    }
+
+    const ssize_t r = ::write(m_fd, data, size);
+    TIGHTDB_ASSERT(int_equal_to(r, size));
+    if (0 <= r) return;
+
+    const int errnum = errno; // Eliminate any risk of clobbering
+    const string msg = get_sys_err_msg(errnum);
+    switch (errnum) {
+        case ENOSPC:
+        case ENOBUFS: throw ResourceAllocError(msg);
+        default:      throw runtime_error(msg);
+    }
+}
+
+File::SizeType File::get_size() const
+{
+    struct stat statbuf;
+    if (TIGHTDB_LIKELY(::fstat(m_fd, &statbuf) == 0)) return statbuf.st_size;
+    throw runtime_error("fstat() failed");
+}
+
+void File::resize(SizeType size)
+{
+    // FIXME: POSIX specifies that introduced bytes read as zero. This
+    // is not required by File::resize().
+    if (TIGHTDB_LIKELY(::ftruncate(m_fd, size) == 0)) return;
+    throw runtime_error("ftruncate() failed");
+}
+
+void File::seek(SizeType position)
+{
+    if (TIGHTDB_LIKELY(0 <= ::lseek(m_fd, position, SEEK_SET))) return;
+    throw runtime_error("lseek() failed");
+}
+
+void File::sync()
+{
+    if (TIGHTDB_LIKELY(::fsync(m_fd) == 0)) return;
+    throw runtime_error("fsync() failed");
+}
+
+FILE* File::open_stdio_file(AccessMode a)
+{
+    int errnum;
+    {
+        // First get a new independent file destriptor
+        const int new_fd = dup(m_fd);
+        if (TIGHTDB_UNLIKELY(new_fd < 0)) {
+            errnum = errno;
+            goto error;
+        }
+
+        const char* mode = 0;
+        switch (a) {
+            case access_ReadWrite: mode = "r+"; break;
+            case access_ReadOnly:  mode = "r";  break;
+        }
+        FILE* const file = fdopen(new_fd, mode);
+        if (TIGHTDB_UNLIKELY(file == 0)) {
+            errnum = errno;
+            ::close(new_fd);
+            goto error;
+        }
+        return file;
+    }
+
+  error:
+    const string msg = get_sys_err_msg(errnum);
+    switch (errnum) {
+        case EMFILE:
+        case ENOMEM: throw ResourceAllocError(msg);
+        default:     throw runtime_error(msg);
+    }
+}
+
+void File::lock_exclusive()
+{
+    lock_file(m_fd, true, false);
+}
+
+bool File::try_lock_exclusive()
+{
+    return lock_file(m_fd, true, true);
+}
+
+void File::lock_shared()
+{
+    lock_file(m_fd, false, false);
+}
+
+void File::unlock() TIGHTDB_NOEXCEPT
+{
+    unlock_file(m_fd);
+}
+
+void* File::map(AccessMode a, size_t size) const
+{
+    int prot = PROT_READ;
+    switch (a) {
+        case access_ReadWrite: prot |= PROT_WRITE; break;
+        case access_ReadOnly:                      break;
+    }
+    void* const addr = ::mmap(0, size, prot, MAP_SHARED, m_fd, 0);
+    if (TIGHTDB_LIKELY(addr != MAP_FAILED)) return addr;
+
+    const int errnum = errno; // Eliminate any risk of clobbering
+    const string msg = get_sys_err_msg(errnum);
+    switch (errnum) {
+        case EAGAIN:
+        case EMFILE:
+        case ENOMEM: throw ResourceAllocError(msg);
+        default:     throw runtime_error(msg);
+    }
+}
+
+void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size) const
+{
+    unmap(old_addr, old_size);
+    return map(a, new_size);
+}
+
+void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
+{
+    const int r = ::munmap(addr, size);
+    TIGHTDB_ASSERT(r == 0);
+    static_cast<void>(r);
+}
+
+void File::sync_map(void* addr, size_t size)
+{
+    if (TIGHTDB_LIKELY(::msync(addr, size, MS_SYNC) == 0)) return;
+    const int errnum = errno; // Eliminate any risk of clobbering
+    throw runtime_error(get_sys_err_msg(errnum));
+}
+
+#else // Windows version
+
+/* WinAPI:
+
+OVERLAPPED dummy;
+memset(&dummy, 0, sizeof dummy);
+LockFileEx(file, (excl?LOCKFILE_EXCLUSIVE_LOCK:0), 0, 1, 0, &dummy); // Success if non-zero
+
+UnlockFile(file, 0, 0, 1, 0); // Success if non-zero
+
+Under Windows a file lock must be explicitely released before the file is close. It will eventually be released by the system, but there is no guarantees on the timing.
+For this purpose we need a flag that tells us if the file has been locked.
+
+Shared/unshared memory map in Windows????
+
+*/
+
+#endif
 
 
 } // namespace tightdb

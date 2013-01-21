@@ -49,7 +49,7 @@ TEST(Group_Invalid1)
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    CHECK_THROW(Group("table_test.tightdb", Group::mode_ReadOnly), NoSuchFile);
+    CHECK_THROW(Group("table_test.tightdb", Group::mode_ReadOnly), File::NotFound);
 }
 
 TEST(Group_Invalid2)
@@ -249,6 +249,7 @@ TEST(Group_Serialize_Mem)
     // Serialize to memory (we now own the buffer)
     const Group::BufferSpec buffer = toMem.write_to_mem();
 
+{
     // Load the table
     Group fromMem(buffer);
     TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
@@ -263,6 +264,13 @@ TEST(Group_Serialize_Mem)
     toMem.Verify();
     fromMem.Verify();
 #endif //_DEBUG
+
+
+}
+
+
+
+
 }
 
 TEST(Group_Close)

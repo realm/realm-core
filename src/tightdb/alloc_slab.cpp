@@ -1,31 +1,12 @@
-// Memory Mapping includes
-#ifdef _MSC_VER
-#define NOMINMAX
-#include <windows.h>
-#include <stdio.h>
-#include <conio.h>
-#include <stdio.h>
-#else
-#include <cerrno>
-#include <unistd.h> // close()
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/mman.h>
-#include <sys/file.h>
-#endif
-
 #include <iostream>
 
+#include <tightdb/safe_int_ops.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/array.hpp>
 
-#ifdef TIGHTDB_DEBUG
-#include <cstdio>
-#endif
-
 using namespace std;
 using namespace tightdb;
+
 
 namespace {
 
@@ -72,59 +53,8 @@ size_t GetSizeFromHeader(void* p)
 }
 
 
-#ifndef _MSC_VER // POSIX version (+ Linux file locks)
 
-struct CloseGuard {
-    CloseGuard(int fd): m_fd(fd) {}
-    ~CloseGuard()
-    {
-        if (TIGHTDB_UNLIKELY(0 <= m_fd)) {
-            int r = close(m_fd);
-            TIGHTDB_ASSERT(r == 0);
-            static_cast<void>(r);
-        }
-    }
-
-    void release() { m_fd = -1; }
-
-private:
-    int m_fd;
-};
-
-struct UnmapGuard {
-    UnmapGuard(void* a, size_t s): m_addr(a), m_size(s) {}
-
-    ~UnmapGuard()
-    {
-        if (TIGHTDB_UNLIKELY(m_addr)) {
-            int r = munmap(m_addr, m_size);
-            TIGHTDB_ASSERT(r == 0);
-            static_cast<void>(r);
-        }
-    }
-
-    void release() { m_addr = 0; }
-
-private:
-    void* m_addr;
-    const size_t m_size;
-};
-
-struct FileUnlockGuard {
-    FileUnlockGuard(int fd): m_fd(fd) {}
-
-    ~FileUnlockGuard()
-    {
-        int r = flock(m_fd, LOCK_UN);
-        TIGHTDB_ASSERT(r == 0);
-        static_cast<void>(r);
-    }
-
-private:
-    const int m_fd;
-};
-
-#else // Windows version
+/*
 
 struct CloseGuard {
     CloseGuard(HANDLE file): m_file(file) {}
@@ -161,7 +91,7 @@ private:
     LPVOID m_addr;
 };
 
-#endif
+*/
 
 } // anonymous namespace
 
@@ -174,12 +104,11 @@ Allocator& GetDefaultAllocator()
     return DefaultAllocator;
 }
 
-SlabAlloc::SlabAlloc(): m_shared(NULL), m_owned(false), m_baseline(8)
-{
-#ifdef TIGHTDB_DEBUG
-    m_debugOut = false;
-#endif
-}
+const char SlabAlloc::default_header[24] = {
+        0,   0,   0,   0,   0,   0,   0,   0,
+        0,   0,   0,   0,   0,   0,   0,   0,
+        'T', '-', 'D', 'B', 0,   0,   0,   0
+};
 
 SlabAlloc::~SlabAlloc()
 {
@@ -196,20 +125,12 @@ SlabAlloc::~SlabAlloc()
         delete[] reinterpret_cast<char*>(m_slabs[i].pointer.get());
     }
 
-    // Release any shared memory
-    if (m_shared) {
-        if (m_owned) {
-            free(m_shared);
-        }
-        else {
-#ifdef _MSC_VER
-            UnmapViewOfFile(m_shared);
-            CloseHandle(m_file);
-            CloseHandle(m_map_file);
-#else
-            munmap(m_shared, m_baseline);
-            close(m_fd);
-#endif
+    // Release memory
+    if (m_data) {
+        switch (m_free_mode) {
+            case free_Noop:                                     break;
+            case free_Unalloc: free(m_data);                    break;
+            case free_Unmap:   File::unmap(m_data, m_baseline); break;
         }
     }
 }
@@ -235,7 +156,7 @@ MemRef SlabAlloc::Alloc(size_t size)
 
 #ifdef TIGHTDB_DEBUG
             if (m_debugOut) {
-                printf("Alloc ref: %lu size: %lu\n", location, size);
+                cerr << "Alloc ref: " << location << " size: " << size << "\n";
             }
 #endif // TIGHTDB_DEBUG
 
@@ -268,7 +189,7 @@ MemRef SlabAlloc::Alloc(size_t size)
 
 #ifdef TIGHTDB_DEBUG
     if (m_debugOut) {
-        printf("Alloc ref: %lu size: %lu\n", slabsBack, size);
+        cerr << "Alloc ref: " << slabsBack << " size: " << size << "\n";
     }
 #endif // TIGHTDB_DEBUG
 
@@ -288,7 +209,7 @@ void SlabAlloc::Free(size_t ref, void* p)
 
 #ifdef TIGHTDB_DEBUG
     if (m_debugOut) {
-        printf("Free ref: %lu size: %lu\n", ref, size);
+        cerr << "Free ref: " << ref << " size: " << size << "\n";
     }
 #endif // TIGHTDB_DEBUG
 
@@ -308,8 +229,6 @@ void SlabAlloc::Free(size_t ref, void* p)
         const size_t count = freeSpace.size();
         for (size_t i = 0; i < count; ++i) {
             FreeSpace::Cursor c = freeSpace[i];
-
-        //  printf("%d %d", c.ref, c.size);
 
             const size_t end = to_ref(c.ref + c.size);
             if (ref == end) {
@@ -351,7 +270,8 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
 
 #ifdef TIGHTDB_DEBUG
     if (m_debugOut) {
-        printf("ReAlloc origref: %lu oldsize: %lu newref: %lu newsize: %lu\n", ref, oldsize, space.ref, size);
+        cerr << "ReAlloc origref: " << ref << " oldsize: " << oldsize << " "
+            "newref: " << space.ref << " newsize: " << size << "\n";
     }
 #endif // TIGHTDB_DEBUG
 
@@ -360,7 +280,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
 
 void* SlabAlloc::Translate(size_t ref) const
 {
-    if (ref < m_baseline) return m_shared + ref;
+    if (ref < m_baseline) return m_data + ref;
     else {
         const size_t ndx = m_slabs.column().offset.find_pos(ref);
         TIGHTDB_ASSERT(ndx != not_found);
@@ -381,120 +301,64 @@ void SlabAlloc::set_buffer(char* data, size_t size, bool take_ownership)
     // Verify the data structures
     if (!validate_buffer(data, size)) throw InvalidDatabase();
 
-    m_shared   = data;
-    m_baseline = size;
-    m_owned    = take_ownership;
+    m_data      = data;
+    m_baseline  = size;
+    m_free_mode = take_ownership ? free_Unalloc : free_Noop;
 }
 
 
-// FIXME: There is probably no need to use a file lock below, since when concurrency is allowd this function is called in a mutex controlled manner from SharedGroup via Group.
 void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, bool no_create)
 {
     // When 'read_only' is true, this function will throw
-    // InvalidDatabaseFile if the file exists already but is
-    // empty. This can happen if another process is currently creating
-    // it. Note however, that it is only legal for multiple processes
-    // to access a database file concurrently if it is done via a
-    // SharedGroup, and in that case 'read_only' can never be true.
+    // InvalidDatabase if the file exists already but is empty. This
+    // can happen if another process is currently creating it. Note
+    // however, that it is only legal for multiple processes to access
+    // a database file concurrently if it is done via a SharedGroup,
+    // and in that case 'read_only' can never be true.
     TIGHTDB_ASSERT(!(is_shared && read_only));
     static_cast<void>(is_shared);
 
-#ifndef _MSC_VER // POSIX version (+ Linux file locks)
+    const File::AccessMode access = read_only ? File::access_ReadOnly : File::access_ReadWrite;
+    const File::CreateMode create = read_only || no_create ? File::create_Never : File::create_Auto;
+    m_file.open(path.c_str(), access, create);
+    File::CloseGuard fcg(m_file);
 
-    int errno_copy;
+    // The size of a database file must not exceed what can be encoded
+    // in std::size_t.
+    size_t size;
+    if (int_cast_with_overflow_detect(m_file.get_size(), size)) goto invalid_database;
+
+    if (size == 0) {
+        if (read_only) goto invalid_database;
+
+        m_file.write(default_header);
+
+        // pre-alloc initial space
+        size = 1024 * 1024;
+        m_file.resize(size);
+    }
+
+    // Verify that data is 64bit aligned
+    if ((size & 0x7) != 0) goto invalid_database;
+
     {
-        // Open file
-        const int open_mode = read_only ? O_RDONLY : no_create ? O_RDWR : O_RDWR|O_CREAT;
-        const int fd = open(path.c_str(), open_mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        if (fd < 0) {
-            errno_copy = errno;
-            goto open_error;
-        }
-
-        CloseGuard cg(fd);
-
-        // Get size
-        struct stat statbuf;
-        if (fstat(fd, &statbuf) < 0) goto fstat_error;
-        size_t size = statbuf.st_size;
-
-        // Handle empty files (new database)
-        if (size == 0) {
-            if (read_only) goto invalid_database;
-
-            // We don't want multiple processes creating files at the same time
-            if (flock(fd, LOCK_EX) < 0) goto flock_error;
-
-            FileUnlockGuard fug(fd);
-
-            // Verify that file has not been created by other process while
-            // we waited for lock
-            if (fstat(fd, &statbuf) < 0) goto fstat_error;
-            size = statbuf.st_size;
-
-            if (size == 0) {
-                // write file header
-                const ssize_t r = write(fd, default_header, header_len);
-                if (r < 0) goto write_error;
-
-                // pre-alloc initial space when mmapping
-                size = 1024*1024;
-                const int r2 = ftruncate(fd, size);
-                if (r2 < 0) goto ftruncate_error;
-            }
-        }
-
-        // Verify that data is 64bit aligned
-        if ((size & 0x7) != 0) goto invalid_database;
-
-        // Map to memory (read only)
-        void* const addr = mmap(0, size, PROT_READ, MAP_SHARED, fd, 0);
-        if (addr == MAP_FAILED) goto mmap_error;
-
-        UnmapGuard ug(addr, size);
+        File::Map<char> map(m_file, File::access_ReadOnly, size);
 
         // Verify the data structures
-        if (!validate_buffer(static_cast<char*>(addr), size)) goto invalid_database;
+        if (!validate_buffer(map.get_addr(), size)) goto invalid_database;
 
-        cg.release();
-        ug.release();
-
-        m_fd = fd;
-        m_shared = static_cast<char*>(addr);
-        m_baseline = size;
+        m_data      = map.release();
+        m_baseline  = size;
+        m_free_mode = free_Unmap;
     }
 
+    fcg.release(); // Do not close
     return;
-
-  open_error:
-    switch (errno_copy) {
-        case ENOENT: throw NoSuchFile();
-        case EACCES: throw PermissionDenied();
-    }
-    throw runtime_error("std::fopen() failed");
-
-  fstat_error:
-    throw runtime_error("fstat() failed");
-
-  flock_error:
-    throw runtime_error("flock() failed");
-
-  write_error:
-    throw runtime_error("write() failed");
-
-  ftruncate_error:
-    throw runtime_error("ftruncate() failed");
-
-  mmap_error:
-    throw runtime_error("mmap() failed");
 
   invalid_database:
     throw InvalidDatabase();
 
-#else // Windows version
-
-    TIGHTDB_ASSERT(read_only); // write persistence is not properly implemented for windows yet
-
+/* Windows:
     // Open file
     DWORD error_copy;
     {
@@ -533,8 +397,8 @@ void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, boo
         cg2.release();
         ug.release();
 
-        m_file = file;
-        m_shared = static_cast<char*>(addr);
+        m_file     = file;
+        m_data     = static_cast<char*>(addr);
         m_baseline = size;
     }
 
@@ -546,19 +410,7 @@ void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, boo
             // FIXME: What error codes should cause PermissionDenied to be thrown? What kind of permission violations are even possible on Windows?
     }
     throw runtime_error("CreateFile() failed");
-
-  create_map_error:
-    throw runtime_error("CreateFileMapping() failed");
-
-  map_view_error:
-    throw runtime_error("MapViewOfFile() failed");
-
-  get_size_error:
-    throw runtime_error("GetFileSizeEx() failed");
-
-  invalid_database:
-    throw InvalidDatabase();
-#endif
+*/
 }
 
 bool SlabAlloc::validate_buffer(const char* data, size_t len) const
@@ -596,47 +448,26 @@ bool SlabAlloc::validate_buffer(const char* data, size_t len) const
     return true;
 }
 
-bool SlabAlloc::RefreshMapping()
-{
-#if !defined(_MSC_VER) // write persistence
-    // We need a lock on the file so we don't get
-    // a partial size because some other process is
-    // creating it.
-    if (flock(m_fd, LOCK_EX) != 0) return false;
-
-    // Get current file size
-    struct stat statbuf;
-    if (fstat(m_fd, &statbuf) < 0) return false;
-    const size_t len = statbuf.st_size;
-
-    // Remap file if needed
-    ReMap(len);
-
-    if (flock(m_fd, LOCK_UN) != 0) return false;
-#endif
-
-    return true;
-}
-
+// FIXME: We should come up with a better name than 'CanPersist'
 bool SlabAlloc::CanPersist() const
 {
-    return m_shared != NULL;
+    return bool(m_data);
 }
 
 size_t SlabAlloc::GetTopRef() const
 {
-    TIGHTDB_ASSERT(m_shared && m_baseline > 0);
+    TIGHTDB_ASSERT(m_data && m_baseline > 0);
 
     // File header is 24 bytes, composed of three 64bit
     // blocks. The two first being top_refs (only one valid
     // at a time) and the last being the info block.
-    const char* const file_header = (const char*)m_shared;
+    const char* const file_header = m_data;
 
     // Last bit in info block indicates which top_ref block
     // is valid
     const size_t valid_ref = file_header[23] & 0x1;
 
-    const uint64_t* const top_refs = (uint64_t*)m_shared;
+    const uint64_t* const top_refs = reinterpret_cast<uint64_t*>(m_data);
     const size_t ref = to_ref(top_refs[valid_ref]);
     TIGHTDB_ASSERT(ref < m_baseline);
 
@@ -694,15 +525,10 @@ bool SlabAlloc::ReMap(size_t filesize)
     TIGHTDB_ASSERT(filesize >= m_baseline);
     TIGHTDB_ASSERT((filesize & 0x7) == 0); // 64bit alignment
 
-#if !defined(_MSC_VER) // write persistence
-    //void* const p = mremap(m_shared, m_baseline, filesize); // linux only
-    munmap(m_shared, m_baseline);
-    void* const p = mmap(0, filesize, PROT_READ, MAP_SHARED, m_fd, 0);
-    TIGHTDB_ASSERT(p);
+    void* const addr = m_file.remap(m_data, m_baseline, File::access_ReadOnly, filesize);
 
-    m_shared   = (char*)p;
+    m_data     = static_cast<char*>(addr);
     m_baseline = filesize;
-#endif
 
     // Rebase slabs and free list
     size_t new_offset = filesize;
@@ -766,7 +592,7 @@ void SlabAlloc::Print() const
         free += to_ref(m_freeSpace[i].size);
     }
 
-    cout << "Base: " << (m_shared ? m_baseline : 0) << " Allocated: " << (allocated - free) << "\n";
+    cout << "Base: " << (m_data ? m_baseline : 0) << " Allocated: " << (allocated - free) << "\n";
 }
 
 #endif // TIGHTDB_DEBUG

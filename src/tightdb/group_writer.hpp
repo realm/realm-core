@@ -27,6 +27,8 @@
 #endif
 #include <cstdlib> // size_t
 
+#include <tightdb/file.hpp>
+
 namespace tightdb {
 
 // Pre-declarations
@@ -36,15 +38,13 @@ class SlabAlloc;
 class GroupWriter {
 public:
     GroupWriter(Group& group, bool doPersist);
-    ~GroupWriter();
 
-    bool IsValid() const;
-    void SetVersions(size_t current, size_t readlock);
+    void SetVersions(std::size_t current, std::size_t readlock);
 
-    size_t Commit();
+    std::size_t Commit();
 
-    size_t write(const char* p, size_t n);
-    void WriteAt(size_t pos, const char* p, size_t n);
+    size_t write(const char* p, std::size_t n);
+    void WriteAt(std::size_t pos, const char* p, std::size_t n);
 
 #ifdef TIGHTDB_DEBUG
     void dump();
@@ -54,20 +54,18 @@ public:
 private:
     void DoCommit(uint64_t topPos);
 
-    size_t get_free_space(size_t len, size_t& filesize);
-    size_t reserve_free_space(size_t len, size_t& filesize, size_t start=0);
-    void   add_free_space(size_t pos, size_t len, size_t version=0);
-    void   merge_free_space();
-    size_t extend_free_space(size_t len, size_t& filesize);
+    std::size_t get_free_space(size_t len);
+    std::size_t reserve_free_space(size_t len, size_t start=0);
+    void        add_free_space(size_t pos, size_t len, size_t version=0);
+    void        merge_free_space();
+    std::size_t extend_free_space(size_t len);
 
-    // Member variables
-    Group&     m_group;
-    SlabAlloc& m_alloc;
-    size_t     m_current_version;
-    size_t     m_readlock_version;
-    size_t     m_len;
-    char*      m_data;
-    bool       m_doPersist;
+    Group&          m_group;
+    SlabAlloc&      m_alloc;
+    std::size_t     m_current_version;
+    std::size_t     m_readlock_version;
+    File::Map<char> m_file_map;
+    bool            m_doPersist;
 };
 
 

@@ -124,7 +124,7 @@ public:
     /// std::malloc().
     BufferSpec write_to_mem();
 
-    bool commit(); // FIXME: Should not return a bool - throw exceptions instead
+    void commit();
 
     // Conversion
     template<class S> void to_json(S& out) const;
@@ -233,6 +233,8 @@ private:
 
 
 
+
+
 // Implementation
 
 inline const Table* Group::get_table_ptr(size_t ndx) const
@@ -332,10 +334,15 @@ template<class T> inline typename T::ConstRef Group::get_table(const char* name)
     return get_table_ptr<T>(name)->get_table_ref();
 }
 
+inline void Group::commit()
+{
+    commit(-1, -1, true);
+}
+
 template<class S> size_t Group::write_to_stream(S& out)
 {
     // Space for file header
-    out.write(default_header, header_len);
+    out.write(SlabAlloc::default_header, sizeof SlabAlloc::default_header);
 
     // When serializing to disk we dont want
     // to include free space tracking as serialized
