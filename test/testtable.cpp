@@ -310,7 +310,7 @@ TEST(Table_test_to_string)
     }
     else {
         std::ifstream testFile("expect_string.txt", std::ios::in | std::ios::binary);
-        CHECK(bool(testFile) == true);
+        CHECK(testFile);
         std::string expected;
         expected.assign( std::istreambuf_iterator<char>(testFile),
                          std::istreambuf_iterator<char>() );
@@ -337,7 +337,7 @@ TEST(Table_test_json_all_data)
     else {
         std::string expected;
         std::ifstream testFile("expect_json.json", std::ios::in | std::ios::binary);
-        CHECK(bool(testFile) == true);
+        CHECK(testFile);
         std::getline(testFile,expected);
         CHECK_EQUAL(true, json == expected);
     }
