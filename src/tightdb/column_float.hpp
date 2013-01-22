@@ -20,7 +20,6 @@
 #ifndef TIGHTDB_COLUMN_FLOAT_HPP
 #define TIGHTDB_COLUMN_FLOAT_HPP
 
-#include <tightdb/column.hpp>
 #include <tightdb/column_basic.hpp>
 #include <tightdb/array_float.hpp>
 

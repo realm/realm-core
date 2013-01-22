@@ -421,12 +421,6 @@ private:
     void InstantiateBeforeChange();
     void validate_column_type(const ColumnBase& column, ColumnType expected_type, size_t ndx) const;
 
-    template <class T> size_t count(size_t column_ndx, T target) const;
-    template <typename T, typename R> R sum(size_t column_ndx) const;
-    template <typename T> double average(size_t column_ndx) const;
-    template <typename T> T maximum(size_t column_ndx) const;
-    template <typename T> T minimum(size_t column_ndx) const;
-
     /// Construct an empty table with independent spec and return just
     /// the reference to the underlying memory.
     ///
@@ -478,6 +472,27 @@ protected:
 
 
 // Implementation:
+
+template <class C, ColumnType coltype>
+C& Table::GetColumn(size_t ndx)
+{
+    ColumnBase& column = GetColumnBase(ndx);
+#ifdef TIGHTDB_DEBUG
+    validate_column_type(column, coltype, ndx);
+#endif
+    return static_cast<C&>(column);
+}
+
+template <class C, ColumnType coltype>
+const C& Table::GetColumn(size_t ndx) const
+{
+    const ColumnBase& column = GetColumnBase(ndx);
+#ifdef TIGHTDB_DEBUG
+    validate_column_type(column, coltype, ndx);
+#endif
+    return static_cast<const C&>(column);
+}
+
 
 inline bool Table::has_shared_spec() const
 {

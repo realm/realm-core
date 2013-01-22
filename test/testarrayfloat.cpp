@@ -32,18 +32,18 @@ double doubleVal[] = {0.0,
 const size_t doubleValLen = SizeOfArray(doubleVal);
 }
 
-// Add test of full range of floats.
+// TODO: Add test of full range of floats.
 
 template <class C, typename T>
 void ArrayBasic_AddGet(T val[], size_t valLen)
 {
     C f;
-    for (int i=0; i<valLen; ++i) {
+    for (size_t i=0; i<valLen; ++i) {
         f.add(val[i]);
 
         CHECK_EQUAL(i+1, f.Size());
 
-        for (int j=0; j<i; ++j) {
+        for (size_t j=0; j<i; ++j) {
             CHECK_EQUAL(val[j], f.Get(j));
         }
     }
@@ -83,7 +83,7 @@ void ArrayBasic_Set(T val[], size_t valLen)
 {
     C f;
     CHECK_EQUAL(0, f.Size());
-    for (int i=0; i<valLen; ++i)
+    for (size_t i=0; i<valLen; ++i)
         f.add(val[i]);
     CHECK_EQUAL(valLen, f.Size());
 
@@ -102,7 +102,7 @@ TEST(ArrayDouble_Set){ ArrayBasic_Set<ArrayDouble, double>(doubleVal, doubleValL
 
 
 template <class C, typename T>
-void ArrayBasic_Insert(T val[])
+void ArrayBasic_Insert()
 {
     C f;
     const T v0 = T(123.970);
@@ -136,15 +136,15 @@ void ArrayBasic_Insert(T val[])
     CHECK_EQUAL(v3, f.Get(3));
     CHECK_EQUAL(4, f.Size());
 }
-TEST(ArrayFloat_Insert) { ArrayBasic_Insert<ArrayFloat, float>(floatVal); }
-TEST(ArrayDouble_Insert){ ArrayBasic_Insert<ArrayDouble, double>(doubleVal); }
+TEST(ArrayFloat_Insert) { ArrayBasic_Insert<ArrayFloat, float>(); }
+TEST(ArrayDouble_Insert){ ArrayBasic_Insert<ArrayDouble, double>(); }
 
 
 template <class C, typename T>
 void ArrayBasic_Delete(T val[])
 {
     C f;
-    for (int i=0; i<5; ++i)
+    for (size_t i=0; i<5; ++i)
         f.add(val[i]);
 
     // Delete first
@@ -173,7 +173,7 @@ TEST(ArrayDouble_Delete){ ArrayBasic_Delete<ArrayDouble, double>(doubleVal); }
 
 
 template <class C, typename T>
-void ArrayBasic_Sum(T val[])
+void ArrayBasic_Sum()
 {
     C f;
 
@@ -196,12 +196,12 @@ void ArrayBasic_Sum(T val[])
     // single middle
     CHECK_EQUAL(double(values[2]), f.sum(2, 3));
 }
-TEST(ArrayFloat_Sum) { ArrayBasic_Sum<ArrayFloat, float>(floatVal); }
-TEST(ArrayDouble_Sum){ ArrayBasic_Sum<ArrayDouble, double>(doubleVal); }
+TEST(ArrayFloat_Sum) { ArrayBasic_Sum<ArrayFloat, float>(); }
+TEST(ArrayDouble_Sum){ ArrayBasic_Sum<ArrayDouble, double>(); }
 
 
 template <class C, typename T>
-void ArrayBasic_Minimum(T val[])
+void ArrayBasic_Minimum()
 {
     C f;
     T res;
@@ -230,12 +230,12 @@ void ArrayBasic_Minimum(T val[])
     CHECK_EQUAL(true, f.minimum(res, 3, size_t(-1)));
     CHECK_EQUAL(values[4], res);
 }
-TEST(ArrayFloat_Minimum) { ArrayBasic_Minimum<ArrayFloat, float>(floatVal); }
-TEST(ArrayDouble_Minimum){ ArrayBasic_Minimum<ArrayDouble, double>(doubleVal); }
+TEST(ArrayFloat_Minimum) { ArrayBasic_Minimum<ArrayFloat, float>(); }
+TEST(ArrayDouble_Minimum){ ArrayBasic_Minimum<ArrayDouble, double>(); }
 
 
 template <class C, typename T>
-void ArrayBasic_Maximum(T val[])
+void ArrayBasic_Maximum()
 {
     C f;
     T res;
@@ -264,7 +264,7 @@ void ArrayBasic_Maximum(T val[])
     CHECK_EQUAL(true, f.maximum(res, 3, size_t(-1)));
     CHECK_EQUAL(values[3], res);
 }
-TEST(ArrayFloat_Maximum) { ArrayBasic_Maximum<ArrayFloat, float>(floatVal); }
-TEST(ArrayDouble_Maximum){ ArrayBasic_Maximum<ArrayDouble, double>(doubleVal); }
+TEST(ArrayFloat_Maximum) { ArrayBasic_Maximum<ArrayFloat, float>(); }
+TEST(ArrayDouble_Maximum){ ArrayBasic_Maximum<ArrayDouble, double>(); }
 
 // TODO: count, find, fird_first, find_all, Compare

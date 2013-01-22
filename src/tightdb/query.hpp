@@ -130,16 +130,26 @@ public:
     ConstTableView find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
     // Aggregates
-    template<typename R, typename T>
-    R sum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    template<typename R, typename T> 
-    double average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
-    template<typename T> T maximum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    template<typename T> T minimum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     size_t count(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+
+    int64_t sum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+    int64_t maximum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t minimum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+
+    float sum_float(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double average_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+    float maximum_float(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    float minimum_float(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+
+    double sum_double(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double average_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+    double maximum_double(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double minimum_double(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+
 /*
-    time_t maximum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    time_t minimum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+  TODO:  time_t maximum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+  TODO:  time_t minimum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 */
 
     // Deletion
@@ -199,19 +209,18 @@ protected:
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
     mutable bool do_delete;
+    
 private:
     size_t m_threadcount;
 
-    template <typename T, class N>
-    Query& add_condition(size_t column_ndx, T value);
-
+    template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
+    template<ACTION action, typename R, typename T> 
+    R aggregate(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    template<typename R, typename T> 
+    double average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 };
 
 
 } // namespace tightdb
-
-
-// template implementation
-//#include <tightdb/query_tpl.hpp>
 
 #endif // TIGHTDB_QUERY_HPP

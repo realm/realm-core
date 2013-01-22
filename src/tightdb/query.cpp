@@ -1,3 +1,4 @@
+#include <tightdb/array.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/query_engine.hpp>
 
@@ -263,6 +264,110 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
     UpdatePointers(p, &p->m_child);
     return *this;
 }
+
+
+// Aggregates =================================================================================
+
+
+template <ACTION action, typename R, typename T>
+R Query::aggregate(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    if (end == size_t(-1)) 
+        end = m_table->size();
+
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    const ColType& c = m_table->GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
+
+    if (first.size() == 0 || first[0] == 0) {
+        // User created query with no criteria; aggregate range
+        if (resultcount)
+            *resultcount = end-start;
+
+        switch (action) {
+        case TDB_SUM: return c.sum(start, end);
+        case TDB_MIN: return c.minimum(start, end);
+        case TDB_MAX: return c.maximum(start, end);
+        default: TIGHTDB_ASSERT(false); return 0;
+        }
+    }
+
+    Init(*m_table);
+    size_t matchcount = 0; 
+    state_state<R> st;
+    st.init(action, NULL, limit);
+    R r = first[0]->aggregate<action, R, T>(&st, start, end, column_ndx, &matchcount);
+    if (resultcount)
+        *resultcount = matchcount;
+    return r;
+}
+
+int64_t Query::sum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<TDB_SUM, int64_t, int64_t>(column_ndx, resultcount, start, end, limit);
+}
+float Query::sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<TDB_SUM, float, float>(column_ndx, resultcount, start, end, limit);
+}
+double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<TDB_SUM, double, double>(column_ndx, resultcount, start, end, limit);
+}
+
+
+template <typename R, typename T>
+double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    Init(*m_table);
+
+    size_t resultcount2 = 0;
+    const R sum1 = aggregate<TDB_SUM, R, T>(column_ndx, &resultcount2, start, end, limit);
+    const double avg1 = (double)sum1 / (double)(resultcount2 > 0 ? resultcount2 : 1);
+
+    if (resultcount)
+        *resultcount = resultcount2;
+    return avg1;
+}
+double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return average<int64_t, int64_t>(column_ndx, resultcount, start, end, limit);
+}
+double Query::average_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return average<float, float>(column_ndx, resultcount, start, end, limit);
+}
+double Query::average_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return average<double, double>(column_ndx, resultcount, start, end, limit);
+}
+
+int64_t Query::maximum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<TDB_MAX, int64_t, int64_t>(column_ndx, resultcount, start, end, limit);
+}
+float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<TDB_MAX, float, float>(column_ndx, resultcount, start, end, limit);
+}
+double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<TDB_MAX, double, double>(column_ndx, resultcount, start, end, limit);
+}
+
+int64_t Query::minimum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<TDB_MIN, int64_t, int64_t>(column_ndx, resultcount, start, end, limit);
+}
+float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<TDB_MIN, float, float>(column_ndx, resultcount, start, end, limit);
+}
+double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<TDB_MIN, double, double>(column_ndx, resultcount, start, end, limit);
+}
+
+
 
 // Grouping
 Query& Query::group()

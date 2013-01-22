@@ -1,27 +1,14 @@
-#include <cstdlib>
-#include <cstring>
-#include <cstdio> // debug
-#ifdef _MSC_VER
-    #include <win32\types.h>
-#endif
-
-//#include <tightdb/query.hpp>
 #include <tightdb/query_engine.hpp>
-
-class tightdb::ParentNode;
-template <class T, class F> class tightdb::BASICNODE;
-
 
 namespace {
 
 using namespace tightdb;
 
-// TODO: This could be common 
+// TODO: IsNodeFromRef() could be common in column.hpp?
 bool IsNodeFromRef(size_t ref, Allocator& alloc)
 {
     const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
     const bool isNode = (header[0] & 0x80) != 0;
-
     return isNode;
 }
 
@@ -146,8 +133,6 @@ template<typename T>
 T ColumnBasic<T>::Get(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < Size());
-    // return m_array->Column???StringGet(ndx);
-    // FIXME??? why different in stringColumn?
     return TreeGet<T, ColumnBasic<T> >(ndx);
 }
 
@@ -282,7 +267,7 @@ void ColumnBasic<T>::find_all(Array &result, T value, size_t start, size_t end) 
 }
 
 
-#if 1
+#if 0
 
 // TODO: Move to ColumnBase?
 template<typename T> template <typename R, ACTION action, class condition>
@@ -291,7 +276,7 @@ R ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcou
     if (end == size_t(-1)) 
         end = Size();
 
-    // We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
+    // ???TODO We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
     // slower because of initial over).
         //    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
         //    new (node) NODE<int64_t, Column, cond>(target, 0);
@@ -301,7 +286,7 @@ R ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcou
     state_state<R> st;
     st.init(action, NULL, size_t(-1));
 
-    SequentialGetter<T> sg((ColumnTypeTraits<T>::column_type*)this); 
+    SequentialGetter<T> sg( (ColumnBasic<T>*)this ); 
     node.template aggregate_local<action, R, T>(&st, start, end, size_t(-1), &sg, matchcount);
 
     return st.state;
@@ -377,7 +362,7 @@ size_t ColumnBasic<T>::count(T target) const
 }
 
 template<typename T>
-double ColumnBasic<T>::sum(size_t start, size_t end) const
+T ColumnBasic<T>::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = Size();
@@ -415,14 +400,17 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
 template<typename T>
 T ColumnBasic<T>::minimum(size_t start, size_t end) const
 {
-    assert(0);
+    // TODO
+    (void)start;
+    (void)end;
     return 0.0;
 }
 
 template<typename T>
 T ColumnBasic<T>::maximum(size_t start, size_t end) const
 {
-    assert(0);
+    (void)start;
+    (void)end;
     return 0.0;
 }
 

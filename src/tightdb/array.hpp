@@ -605,14 +605,13 @@ public:
         return (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM);
     }
     
-    void init(ACTION action, Array* akku, size_t limit) 
+    void init(ACTION action, Array*, size_t limit) 
     {
         match_count = 0;
         m_limit = limit;
 
         if (action == TDB_MAX)
-            // TODO: FIXME
-            state = -std::numeric_limits<T>::infinity(); // verify -(inf()) is correct and there is no minusinf()
+            state = -std::numeric_limits<T>::infinity();
         else if (action == TDB_MIN)
             state = std::numeric_limits<T>::infinity();
         else if (action == TDB_SUM)

@@ -774,36 +774,17 @@ const ColumnBase& Table::GetColumnBase(size_t ndx) const
 }
 
 
-void Table::validate_column_type(const ColumnBase& column, ColumnType type, size_t ndx) const
+void Table::validate_column_type(const ColumnBase& column, ColumnType coltype, size_t ndx) const
 {
-    if (type == COLUMN_TYPE_INT || type == COLUMN_TYPE_DATE || type == COLUMN_TYPE_BOOL) {
+    if (coltype == COLUMN_TYPE_INT || coltype == COLUMN_TYPE_DATE || coltype == COLUMN_TYPE_BOOL) {
         TIGHTDB_ASSERT(column.IsIntColumn());
     } else {
-        TIGHTDB_ASSERT(type == GetRealColumnType(ndx)); 
+        TIGHTDB_ASSERT(coltype == GetRealColumnType(ndx)); 
     }
     (void)column;
     (void)ndx;
 }
 
-template <class C, ColumnType type>
-C& Table::GetColumn(size_t ndx)
-{
-    ColumnBase& column = GetColumnBase(ndx);
-#ifdef TIGHTDB_DEBUG
-    validate_column_type(column, type, ndx);
-#endif
-    return static_cast<C&>(column);
-}
-
-template <class C, ColumnType type>
-const C& Table::GetColumn(size_t ndx) const
-{
-    const ColumnBase& column = GetColumnBase(ndx);
-#ifdef TIGHTDB_DEBUG
-    validate_column_type(column, type, ndx);
-#endif
-    return static_cast<const C&>(column);
-}
 
 // TODO: get rid of the Column* template parameter
 
@@ -1453,25 +1434,20 @@ void Table::insert_done()
 
 // count ----------------------------------------------
 
-template <class T>
-size_t Table::count(size_t column_ndx, T target) const
-{
-    // asserts are done in GetColumn
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
-    const ColType& column = GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
-    return column.count(target);
-}
 size_t Table::count_int(size_t column_ndx, int64_t target) const
 {
-    return count<int64_t>(column_ndx, target);
+    const Column& column = GetColumn<Column, COLUMN_TYPE_INT>(column_ndx);
+    return column.count(target);
 }
 size_t Table::count_float(size_t column_ndx, float target) const
 {
-    return count<float>(column_ndx, target);
+    const ColumnFloat& column = GetColumn<ColumnFloat, COLUMN_TYPE_FLOAT>(column_ndx);
+    return column.count(target);
 }
 size_t Table::count_double(size_t column_ndx, double target) const
 {
-    return count<double>(column_ndx, target);
+    const ColumnDouble& column = GetColumn<ColumnDouble, COLUMN_TYPE_DOUBLE>(column_ndx);
+    return column.count(target);
 }
 size_t Table::count_string(size_t column_ndx, const char* value) const
 {
@@ -1493,67 +1469,49 @@ size_t Table::count_string(size_t column_ndx, const char* value) const
 
 // sum ----------------------------------------------
 
-template <typename T, typename R>
-R Table::sum(size_t column_ndx) const
-{
-    // asserts are done in GetColumn
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
-    const ColType& column = GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
-    return column.sum();
-}
 int64_t Table::sum(size_t column_ndx) const
 {
-    return sum<int64_t, int64_t>(column_ndx);
+    const Column& column = GetColumn<Column, COLUMN_TYPE_INT>(column_ndx);
+    return column.sum();
 }
 float Table::sum_float(size_t column_ndx) const
 {
-    return sum<float, float>(column_ndx);
+    const ColumnFloat& column = GetColumn<ColumnFloat, COLUMN_TYPE_FLOAT>(column_ndx);
+    return column.sum();
 }
 double Table::sum_double(size_t column_ndx) const
 {
-    return sum<double, double>(column_ndx);
+    const ColumnDouble& column = GetColumn<ColumnDouble, COLUMN_TYPE_DOUBLE>(column_ndx);
+    return column.sum();
 }
 
 // average ----------------------------------------------
 
-template <typename T>
 double Table::average(size_t column_ndx) const
 {
-    // asserts are done in GetColumn
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
-    const ColType& column = GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
+    const Column& column = GetColumn<Column, COLUMN_TYPE_INT>(column_ndx);
     return column.average();
-}
-double Table::average(size_t column_ndx) const
-{
-    return average<int64_t>(column_ndx);
 }
 double Table::average_float(size_t column_ndx) const
 {
-    return average<float>(column_ndx);
+    const ColumnFloat& column = GetColumn<ColumnFloat, COLUMN_TYPE_FLOAT>(column_ndx);
+    return column.average();
 }
 double Table::average_double(size_t column_ndx) const
 {
-    return average<double>(column_ndx);
+    const ColumnDouble& column = GetColumn<ColumnDouble, COLUMN_TYPE_DOUBLE>(column_ndx);
+    return column.average();
 }
 
 // minimum ----------------------------------------------
-
-template <typename T>
-T Table::minimum(size_t column_ndx) const
-{
-    // asserts are done in GetColumnT
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
-    const ColType& column = GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
-    return column.minimum();
-}
 
 #define USE_COLUMN_AGGREGATE 1
 
 int64_t Table::minimum(size_t column_ndx) const
 {
 #if USE_COLUMN_AGGREGATE
-    return minimum<int64_t>(column_ndx);
+    const Column& column = GetColumn<Column, COLUMN_TYPE_INT>(column_ndx);
+    return column.minimum();
 #else
     if (is_empty()) 
         return 0;
@@ -1569,31 +1527,24 @@ int64_t Table::minimum(size_t column_ndx) const
 #endif
 }
 
-
 float Table::minimum_float(size_t column_ndx) const
 {
-    return minimum<float>(column_ndx);
+    const ColumnFloat& column = GetColumn<ColumnFloat, COLUMN_TYPE_FLOAT>(column_ndx);
+    return column.minimum();
 }
 double Table::minimum_double(size_t column_ndx) const
 {
-    return minimum<double>(column_ndx);
+    const ColumnDouble& column = GetColumn<ColumnDouble, COLUMN_TYPE_DOUBLE>(column_ndx);
+    return column.minimum();
 }
 
 // maximum ----------------------------------------------
 
-template <typename T>
-T Table::maximum(size_t column_ndx) const
-{
-    // asserts are done in GetColumnT
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
-    const ColType& column = GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
-    return column.maximum();
-}
-
 int64_t Table::maximum(size_t column_ndx) const
 {
 #if USE_COLUMN_AGGREGATE
-    return maximum<int64_t>(column_ndx);
+    const Column& column = GetColumn<Column, COLUMN_TYPE_INT>(column_ndx);
+    return column.maximum();
 #else
     if (is_empty()) 
         return 0;
@@ -1610,11 +1561,13 @@ int64_t Table::maximum(size_t column_ndx) const
 }
 float Table::maximum_float(size_t column_ndx) const
 {
-    return maximum<float>(column_ndx);
+    const ColumnFloat& column = GetColumn<ColumnFloat, COLUMN_TYPE_FLOAT>(column_ndx);
+    return column.maximum();
 }
 double Table::maximum_double(size_t column_ndx) const
 {
-    return maximum<double>(column_ndx);
+    const ColumnDouble& column = GetColumn<ColumnDouble, COLUMN_TYPE_DOUBLE>(column_ndx);
+    return column.maximum();
 }
 
 

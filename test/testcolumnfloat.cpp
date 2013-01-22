@@ -1,7 +1,9 @@
-#include <cstdio>
+#include <iostream>
 #include <UnitTest++.h>
 #include <tightdb/column_float.hpp>
 #include <tightdb/column_double.hpp>
+
+using namespace tightdb;
 
 template <typename T, size_t N> inline
 size_t SizeOfArray( const T(&)[ N ] )
@@ -30,12 +32,10 @@ const size_t doubleValLen = SizeOfArray(doubleVal);
 
 void printCol(ColumnFloat& c)
 {
-    for (int i=0; i < c.Size(); ++i) {
-        fprintf(stderr, " Col[%d] = %f \n", i, c.Get(i));
+    for (size_t i=0; i < c.Size(); ++i) {
+        std::cerr << " Col[" << i << "] = " << c.Get(i) << " \n";
     }
 }
-
-using namespace tightdb;
 
 
 template <class C>
@@ -53,12 +53,12 @@ template <class C, typename T>
 void ColumnBasic_AddGet(T val[], size_t valLen)
 {
     C c;
-    for (int i=0; i<valLen; ++i) {
+    for (size_t i=0; i<valLen; ++i) {
         c.add(val[i]);
 
         CHECK_EQUAL(i+1, c.Size());
 
-        for (int j=0; j<i; ++j) {
+        for (size_t j=0; j<i; ++j) {
             CHECK_EQUAL(val[j], c.Get(j));
         }
     }
@@ -88,7 +88,7 @@ template <class C, typename T>
 void ColumnBasic_Set(T val[], size_t valLen)
 {
     C c;
-    for (int i=0; i<valLen; ++i)
+    for (size_t i=0; i<valLen; ++i)
         c.add(val[i]);
     CHECK_EQUAL(valLen, c.Size());
     
@@ -110,6 +110,8 @@ TEST(ColumnDouble_Set){ ColumnBasic_Set<ColumnDouble, double>(doubleVal, doubleV
 template <class C, typename T>
 void ColumnBasic_Insert(T val[], size_t valLen)
 {
+    (void)valLen;
+    
     C c;
     
     // Insert in empty column
@@ -151,25 +153,32 @@ TEST(ColumnFloat_Insert) { ColumnBasic_Insert<ColumnFloat, float>(floatVal, floa
 TEST(ColumnDouble_Insert){ ColumnBasic_Insert<ColumnDouble, double>(doubleVal, doubleValLen); }
 
 
-
 template <class C, typename T>
 void ColumnBasic_Aggregates(T val[], size_t valLen)
 {
+    (void)valLen;
+    (void)val;
+
     C c;
 
 //    double sum = c.sum();
 //    CHECK_EQUAL(0, sum);   
 
     // todo: add tests for minimum, maximum, 
+    // todo !!!
+    
+    
+    
 }
 TEST(ColumnFloat_Aggregates) { ColumnBasic_Aggregates<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_Aggregates){ ColumnBasic_Aggregates<ColumnDouble, double>(doubleVal, doubleValLen); }
+
 
 template <class C, typename T>
 void ColumnBasic_Delete(T val[], size_t valLen)
 {
     C c;
-    for (int i=0; i<valLen; ++i)
+    for (size_t i=0; i<valLen; ++i)
         c.add(val[i]);
     CHECK_EQUAL(5, c.Size());
     CHECK_EQUAL(val[0], c.Get(0));

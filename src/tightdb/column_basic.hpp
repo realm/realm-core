@@ -89,15 +89,16 @@ protected:
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif // TIGHTDB_DEBUG
 
-    template <typename R, ACTION action, class cond> R aggregate(T target, size_t start, size_t end, size_t *matchcount = (size_t*)0) const;
+    template <typename R, ACTION action, class cond> 
+    R aggregate(T target, size_t start, size_t end, size_t *matchcount = (size_t*)0) const;
 };
 
 
 } // namespace tightdb
 
-// template implementation
 
-//#include <tightdb/column_basic_tpl.hpp>
+// template implementation
+#include <tightdb/column_basic_tpl.hpp>
 
 
 #endif // TIGHTDB_COLUMN_BASIC_HPP
