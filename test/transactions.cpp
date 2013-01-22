@@ -110,7 +110,7 @@ void round(SharedGroup& db, int index)
         MySubtable::Ref subtable = table[0].eta;
         ++subtable[0].foo;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        for (int i=subsubtable->size(); i<=index; ++i) {
+        for (int i=int(subsubtable->size()); i<=index; ++i) {
             subsubtable->add();
         }
         ++table[0].alpha;
