@@ -211,14 +211,14 @@ void File::write(const char* data, size_t size)
     }
 }
 
-File::SizeType File::get_size() const
+off_t File::get_size() const
 {
     struct stat statbuf;
     if (TIGHTDB_LIKELY(::fstat(m_fd, &statbuf) == 0)) return statbuf.st_size;
     throw runtime_error("fstat() failed");
 }
 
-void File::resize(SizeType size)
+void File::resize(off_t size)
 {
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
@@ -226,7 +226,7 @@ void File::resize(SizeType size)
     throw runtime_error("ftruncate() failed");
 }
 
-void File::alloc(SizeType offset, size_t size)
+void File::alloc(off_t offset, size_t size)
 {
     if (TIGHTDB_LIKELY(::posix_fallocate(m_fd, offset, size) == 0)) return;
     throw runtime_error("posix_fallocate() failed");
@@ -239,7 +239,7 @@ void File::alloc(SizeType offset, size_t size)
     }
 }
 
-void File::seek(SizeType position)
+void File::seek(off_t position)
 {
     if (TIGHTDB_LIKELY(0 <= ::lseek(m_fd, position, SEEK_SET))) return;
     throw runtime_error("lseek() failed");

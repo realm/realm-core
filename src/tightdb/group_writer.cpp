@@ -167,7 +167,7 @@ void GroupWriter::DoCommit(uint64_t topPos)
 
     // Update top ref pointer
     uint64_t* const top_refs = reinterpret_cast<uint64_t*>(m_file_map.get_addr());
-    top_refs[new_valid_ref] = topPos;
+    top_refs[size_t(new_valid_ref)] = topPos;
     file_header[23] = new_valid_ref; // swap
 
     // Write new header to disk

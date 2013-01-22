@@ -1,5 +1,3 @@
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
 #include <utility>
 #include <ostream>
 #include <iomanip>
@@ -1480,5 +1478,3 @@ error_code Replication::apply_transact_log(InputStream& transact_log, Group& gro
 
 
 } // namespace tightdb
-
-#endif // TIGHTDB_ENABLE_REPLICATION
