@@ -1,15 +1,15 @@
 #include <cerrno>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 
-#ifndef _MSC_VER // POSIX
-#  include <sys/stat.h>
-#  include <fcntl.h>
+#ifdef _WIN32
+#else
 #  include <unistd.h>
-#  include <sys/file.h> // Non-POSIX flock()
+#  include <fcntl.h>
+#  include <sys/stat.h>
 #  include <sys/mman.h>
-#else // Windows
-#  include <windows.h>
+#  include <sys/file.h> // Non-POSIX flock()
 #endif
 
 #include <tightdb/assert.hpp>
@@ -25,24 +25,56 @@ using namespace tightdb;
 namespace {
 
 
-#ifndef _MSC_VER
-
-string get_sys_err_msg(int errnum)
+string get_sys_err_msg(const int errnum)
 {
+#if defined _BSD_SOURCE || defined _WIN32
+
+    const char* const* errlist;
+    int nerr;
+#  ifdef _BSD_SOURCE
+    errlist = sys_errlist; // BSD <stdio.h>
+    nerr    = sys_nerr;
+#  else
+    errlist = _sys_errlist; // Windows <stdlib.h>
+    nerr    = _sys_nerr;
+#  endif
+    if (0 <= errnum || errnum < nerr) return errlist[errnum];
+
+#else // POSIX <string.h>
+
     StringBuffer buffer;
     buffer.resize(1024);
-#if _GNU_SOURCE // GNU-specific version
-    const char* const m = strerror_r(errnum, buffer.data(), buffer.size());
-    if (!m) return "Unknown error";
-    return m;
-#else // POSIX version
-    if (strerror_r(errnum, buffer.data(), buffer.size()) != 0) return "Unknown error";
-    return buffer.str();
+    if (strerror_r(errnum, buffer.data(), buffer.size()) == 0) return buffer.str();
+
 #endif
+
+    return "Unknown error";
 }
 
 inline bool lock_file(int fd, bool exclusive, bool non_blocking)
 {
+#ifdef _WIN32 // Windows
+
+#else // BSD flock
+
+    // NOTE: It would probably have been more portable to use fcntl()
+    // based POSIX locks, however these locks are not recursive within
+    // a single process, and since a second attempt to acquire such a
+    // lock will always appear to succeed, one will easily suffer the
+    // 'spurious unlocking issue'. It remains to be determined whether
+    // this also applies across distinct threads inside a single
+    // process.
+    //
+    // To make matters worse, flock() may be a simple wrapper around
+    // fcntl() based locks on some systems. This is bad news, because
+    // the robustness of the TightDB API relies in part by the
+    // assumption that a single process (even a single thread) can
+    // hold multiple overlapping independent shared locks on a single
+    // file as long as they are placed via distinct file descriptors.
+    //
+    // Fortunately, on both Linux and Darwin, flock() does not suffer
+    // from this 'spurious unlocking issue'.
+
     int operation = exclusive ? LOCK_EX : LOCK_SH;
     if (non_blocking) operation |=  LOCK_NB;
     if (TIGHTDB_LIKELY(flock(fd, operation) == 0)) return true;
@@ -51,6 +83,8 @@ inline bool lock_file(int fd, bool exclusive, bool non_blocking)
     const string msg = get_sys_err_msg(errnum);
     if (errnum == ENOLCK) throw ResourceAllocError(msg);
     throw runtime_error(msg);
+
+#endif
 }
 
 inline void unlock_file(int fd) TIGHTDB_NOEXCEPT
@@ -63,8 +97,6 @@ inline void unlock_file(int fd) TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);
 }
-
-#endif
 
 
 } // anonymous namespace

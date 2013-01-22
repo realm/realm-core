@@ -376,7 +376,8 @@ TEST(Group_Serialize_All)
 
 #if !defined(_MSC_VER) // write persistence
 
-TEST(Group_Persist) {
+TEST(Group_Persist)
+{
     // Delete old file if there
     remove("testdb.tightdb");
 

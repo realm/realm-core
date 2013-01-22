@@ -20,14 +20,12 @@
 #ifndef TIGHTDB_FILE_HPP
 #define TIGHTDB_FILE_HPP
 
-#ifndef _MSC_VER // POSIX version
-#  include <sys/types.h>
-#endif
-
 #include <cstddef>
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+
+#include <sys/types.h>
 
 #include <tightdb/config.h>
 
@@ -113,15 +111,9 @@ public:
 
     template<std::size_t N> void write(const char (&data)[N]) { write(data, N); }
 
-#ifndef _MSC_VER // POSIX version
-    typedef off_t SizeType;
-#else // Windows version
-    typedef int64_t SizeType;
-#endif
-
     /// Calling this method on an instance that does not refer to an
     /// open file has undefined behavior.
-    SizeType get_size() const;
+    off_t get_size() const;
 
     /// If this causes the file to grow, then the new section will
     /// have undefined contents. Setting the size with this method
@@ -130,7 +122,7 @@ public:
     /// method on an instance that does not refer to an open file has
     /// undefined behavior. Calling this method on a file that is
     /// opened in read-only mode, is an error.
-    void resize(SizeType);
+    void resize(off_t);
 
     /// Allocate space on the target device for the specified region
     /// of the file. If the region extends beyond the current end of
@@ -138,10 +130,10 @@ public:
     /// on an instance that does not refer to an open file has
     /// undefined behavior. Calling this method on a file that is
     /// opened in read-only mode, is an error.
-    void alloc(SizeType offset, size_t size);
+    void alloc(off_t offset, std::size_t size);
 
     /// Set the file position.
-    void seek(SizeType);
+    void seek(off_t);
 
     /// Flush in-kernel buffers to disk. This blocks the caller until
     /// the synchronization operation is complete.
@@ -155,8 +147,11 @@ public:
 
     /// Place an exclusive lock on this file. This blocks the caller
     /// until all other locks have been released. Calling this method
-    /// on an instance that does not refer to an open file has
-    /// undefined behavior.
+    /// on an instance that does not refer to an open file, or on an
+    /// instance that is already locked has undefined behavior. Locks
+    /// acquired on distinct File instances have fully recursive
+    /// behavior, even if they are acquired in the same process (or
+    /// thread) and refer to the same underlying file.
     void lock_exclusive();
 
     /// Non-blocking version of lock_exclusive(). Returns true iff it
@@ -165,8 +160,11 @@ public:
 
     /// Place an shared lock on this file. This blocks the caller
     /// until all other exclusive locks have been released. Calling
-    /// this method on an instance that does not refer to an open file
-    /// has undefined behavior.
+    /// this method on an instance that does not refer to an open
+    /// file, or on an instance that is already locked has undefined
+    /// behavior. Locks acquired on distinct File instances have fully
+    /// recursive behavior, even if they are acquired in the same
+    /// process (or thread) and refer to the same underlying file.
     void lock_shared();
 
     /// Release a previously acquired lock on this file. This method
@@ -216,13 +214,7 @@ public:
     struct UnmapGuard;
 
 private:
-#ifndef _MSC_VER // POSIX version
     int m_fd;
-#else // Windows version
-    // The type should really be 'HANDLE', but we do not want to
-    // include <windows.h> in public headers.
-    void* m_file;
-#endif
 
     struct MapBase {
         void* m_addr;
@@ -340,11 +332,7 @@ inline File::File(const std::string& path, AccessMode a, CreateMode c)
 
 inline File::File() TIGHTDB_NOEXCEPT
 {
-#ifndef _MSC_VER // POSIX version
     m_fd = -1;
-#else // Windows version
-    m_file = 0;
-#endif
 }
 
 inline File::~File() TIGHTDB_NOEXCEPT
