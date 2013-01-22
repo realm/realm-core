@@ -1,3 +1,5 @@
+#if !defined(_MSC_VER)
+
 #include <cstdio>
 #include <vector>
 #include <sstream>
@@ -555,3 +557,4 @@ TEST(Transactions)
         db.end_read();
     }
 }
+#endif

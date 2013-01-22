@@ -80,7 +80,7 @@ public:
 #ifndef _MSC_VER
     int    GetFileDescriptor() {return m_fd;}
 #else
-    void*  GetFileDescriptor() {return m_fd;}
+    void*  GetFileDescriptor() {return m_file;}
 #endif
 
 #ifdef TIGHTDB_DEBUG

@@ -507,8 +507,8 @@ void SlabAlloc::set_shared(const string& path, bool read_only, bool no_create)
         CloseGuard cg(m_file);
 
         // Map to memory (read only)
-        const HANDLE m_map_file = CreateFileMapping(m_file, NULL, PAGE_WRITECOPY, 0, 0, 0);
-        if (map_file == NULL) goto create_map_error;
+        m_map_file = CreateFileMapping(m_file, NULL, PAGE_WRITECOPY, 0, 0, 0);
+        if (m_map_file == NULL) goto create_map_error;
 
         CloseGuard cg2(m_map_file);
 
@@ -536,7 +536,7 @@ void SlabAlloc::set_shared(const string& path, bool read_only, bool no_create)
 
   open_error:
     switch (error_copy) {
-        case ERROR_FILE_NOT_FOUND: throw FileNotFound();
+        case ERROR_FILE_NOT_FOUND: throw NoSuchFile();
             // FIXME: What error codes should cause PermissionDenied to be thrown? What kind of permission violations are even possible on Windows?
     }
     throw runtime_error("CreateFile() failed");
