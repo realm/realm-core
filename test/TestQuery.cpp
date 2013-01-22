@@ -1537,7 +1537,7 @@ TEST(TestQuery_Subtables_Typed) {
     employees[1].phones->add("school", "345-543-5345");
 
     // Do a query
-    EmployeeTable::Query q = employees->where().hired.eq(true);
+    EmployeeTable::Query q = employees.where().hired.eq(true);
     EmployeeTable::View view = q.find_All();
 
     // Verify result
