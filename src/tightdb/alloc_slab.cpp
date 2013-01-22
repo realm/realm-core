@@ -464,7 +464,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t len) const
         return false; // unsupported version
 
     // Top_ref should always point within buffer
-    const uint64_t* const top_refs = reinterpret_cast<uint64_t*>(data);
+    const uint64_t* const top_refs = reinterpret_cast<const uint64_t*>(data);
     const size_t ref = to_ref(top_refs[valid_part]);
     if (ref >= len)
         return false; // invalid top_ref
@@ -475,7 +475,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t len) const
 // FIXME: We should come up with a better name than 'CanPersist'
 bool SlabAlloc::CanPersist() const
 {
-    return bool(m_data);
+    return m_data != 0;
 }
 
 size_t SlabAlloc::GetTopRef() const

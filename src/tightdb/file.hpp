@@ -207,11 +207,11 @@ public:
     /// map().
     static void sync_map(void* addr, std::size_t size);
 
-    template<class> struct Map;
+    template<class> class Map;
 
-    struct CloseGuard;
-    struct UnlockGuard;
-    struct UnmapGuard;
+    class CloseGuard;
+    class UnlockGuard;
+    class UnmapGuard;
 
 private:
     int m_fd;

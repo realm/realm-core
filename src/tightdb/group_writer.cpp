@@ -163,7 +163,7 @@ void GroupWriter::DoCommit(uint64_t topPos)
     // Last byte in info block indicates which top_ref block
     // is valid
     const size_t current_valid_ref = file_header[23] & 0x1;
-    const size_t new_valid_ref = current_valid_ref == 0 ? 1 : 0;
+    const char new_valid_ref = current_valid_ref == 0 ? 1 : 0;
 
     // Update top ref pointer
     uint64_t* const top_refs = reinterpret_cast<uint64_t*>(m_file_map.get_addr());
