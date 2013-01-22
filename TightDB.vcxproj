@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -399,7 +399,6 @@
     <ClCompile Include="src\tightdb\index.cpp" />
     <ClCompile Include="src\tightdb\index_string.cpp" />
     <ClCompile Include="src\tightdb\query.cpp" />
-    <ClCompile Include="src\tightdb\replication.cpp" />
     <ClCompile Include="src\tightdb\spec.cpp" />
     <ClCompile Include="src\tightdb\string_buffer.cpp" />
     <ClCompile Include="src\tightdb\table.cpp" />
