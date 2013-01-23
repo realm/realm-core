@@ -21,7 +21,7 @@
 #define TIGHTDB_MIXED_HPP
 
 #ifndef _MSC_VER
-#include <stdint.h> // int64_t - not part of C++03, not even required by C++11 to be present (see C++11 section 18.4.1)
+#include <stdint.h> // int64_t - not part of C++03, not even required by C++11 (see C++11 section 18.4.1)
 #else
 #include <win32/stdint.h>
 #endif

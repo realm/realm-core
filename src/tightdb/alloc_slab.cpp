@@ -52,47 +52,6 @@ size_t GetSizeFromHeader(void* p)
     return bytes;
 }
 
-
-
-/*
-
-struct CloseGuard {
-    CloseGuard(HANDLE file): m_file(file) {}
-    ~CloseGuard()
-    {
-        if (TIGHTDB_UNLIKELY(m_file)) {
-            BOOL r = CloseHandle(m_file);
-            TIGHTDB_ASSERT(r);
-            static_cast<void>(r);
-        }
-    }
-
-    void release() { m_file = 0; }
-
-private:
-    HANDLE m_file;
-};
-
-struct UnmapGuard {
-    UnmapGuard(LPVOID a): m_addr(a) {}
-
-    ~UnmapGuard()
-    {
-        if (TIGHTDB_UNLIKELY(m_addr)) {
-            BOOL r = UnmapViewOfFile(m_addr);
-            TIGHTDB_ASSERT(r);
-            static_cast<void>(r);
-        }
-    }
-
-    void release() { m_addr = 0; }
-
-private:
-    LPVOID m_addr;
-};
-
-*/
-
 } // anonymous namespace
 
 
@@ -320,7 +279,7 @@ void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, boo
 
     const File::AccessMode access = read_only ? File::access_ReadOnly : File::access_ReadWrite;
     const File::CreateMode create = read_only || no_create ? File::create_Never : File::create_Auto;
-    m_file.open(path.c_str(), access, create);
+    m_file.open(path.c_str(), access, create, 0);
     File::CloseGuard fcg(m_file);
 
     const size_t initial_size = 1024 * 1024;
@@ -381,60 +340,6 @@ void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, boo
 
   invalid_database:
     throw InvalidDatabase();
-
-/* Windows:
-    // Open file
-    DWORD error_copy;
-    {
-        const DWORD desired_access = read_only ? GENERIC_READ : GENERIC_READ|GENERIC_WRITE;
-        const DWORD share_mode = FILE_SHARE_READ | FILE_SHARE_WRITE; // FIXME: Should probably be zero if we are called from a group that is not managed by a SharedGroup instance, since in this case concurrenct access is prohibited anyway.
-        const DWORD creation_disposition = read_only || no_create ? OPEN_EXISTING : OPEN_ALWAYS;
-        const HANDLE file = CreateFileA(path.c_str(), desired_access, share_mode, NULL,
-                                        creation_disposition, NULL, NULL);
-        if (file == INVALID_HANDLE_VALUE) {
-            error_copy = GetLastError();
-            goto open_error;
-        }
-
-        CloseGuard cg(file);
-
-        // Map to memory (read only)
-        const HANDLE map_file = CreateFileMapping(file, NULL, PAGE_WRITECOPY, 0, 0, 0);
-        if (map_file == NULL) goto create_map_error;
-
-        CloseGuard cg2(map_file);
-
-        const LPVOID addr = MapViewOfFile(map_file, FILE_MAP_COPY, 0, 0, 0);
-        if (!addr) goto map_view_error;
-
-        // Get Size
-        LARGE_INTEGER large_int;
-        if (!GetFileSizeEx(file, &large_int)) goto get_size_error;
-        const size_t size = to_ref(large_int.QuadPart); // FIXME: Really use to_ref() here? It looks like a misuse.
-
-        UnmapGuard ug(addr);
-
-        // Verify the data structures
-        if (!validate_buffer(static_cast<char*>(addr), size)) goto invalid_database;
-
-        cg.release();
-        cg2.release();
-        ug.release();
-
-        m_file     = file;
-        m_data     = static_cast<char*>(addr);
-        m_baseline = size;
-    }
-
-    return;
-
-  open_error:
-    switch (error_copy) {
-        case ERROR_FILE_NOT_FOUND: throw FileNotFound();
-            // FIXME: What error codes should cause PermissionDenied to be thrown? What kind of permission violations are even possible on Windows?
-    }
-    throw runtime_error("CreateFile() failed");
-*/
 }
 
 bool SlabAlloc::validate_buffer(const char* data, size_t len) const

@@ -47,42 +47,15 @@ std::string create_temp_dir();
 /// closing or unlocking prior to the File instance being detroyed.
 class File {
 public:
-    enum AccessMode {
-        access_ReadWrite,
-        access_ReadOnly
+    enum Mode {
+        mode_Read,   // access_ReadOnly,  create_Never
+        mode_Update, // access_ReadWrite, create_Auto
+        mode_Write,  // access_ReadWrite, create_Auto, flag_Trunc
+        mode_Append  // access_ReadWrite, create_Auto, flag_Append
     };
 
-    enum CreateMode {
-        create_Auto,  ///< Create the file if it does not already exist.
-        create_Never, ///< Fail if the file does not already exist.
-        create_Always ///< Fail if the file already exists.
-    };
-
-    struct OpenError: std::runtime_error {
-        OpenError(const std::string& msg): std::runtime_error(msg) {}
-    };
-
-    /// Thrown if the user does not have permission to open or create
-    /// the specified file in the specified access mode.
-    struct PermissionDenied: OpenError {
-        PermissionDenied(const std::string& msg): OpenError(msg) {}
-    };
-
-    /// Thrown if the directory part of the specified path was not
-    /// found, or create_Never was specified and the file did no
-    /// exist.
-    struct NotFound: OpenError {
-        NotFound(const std::string& msg): OpenError(msg) {}
-    };
-
-    /// Thrown if create_Always was specified and the file did already
-    /// exist.
-    struct Exists: OpenError {
-        Exists(const std::string& msg): OpenError(msg) {}
-    };
-
-    /// See open().
-    File(const std::string& path, AccessMode = access_ReadWrite, CreateMode = create_Auto);
+    /// See open(const std::string&, Mode).
+    File(const std::string& path, Mode = mode_Read);
 
     /// Create an instance that does not initially refer to an open
     /// file.
@@ -95,15 +68,38 @@ public:
     ///
     /// \throw OpenError If the file could not be opened. If the
     /// reason corresponds to one of the exception types that are
-    /// derived from OpenError, that derived exception type is thrown
+    /// derived from OpenError, the derived exception type is thrown
     /// (as long as the underlying system provides the information to
     /// unambiguously distinguish that particular reason).
-    void open(const std::string& path, AccessMode = access_ReadWrite, CreateMode = create_Auto);
+    void open(const std::string& path, Mode = mode_Read);
 
     /// This method is idempotent, that is, it is valid to call it
     /// regardless of whether this instance currently refers to an
     /// open file.
     void close() TIGHTDB_NOEXCEPT;
+
+    enum AccessMode {
+        access_ReadOnly,
+        access_ReadWrite
+    };
+
+    enum CreateMode {
+        create_Auto,  ///< Create the file if it does not already exist.
+        create_Never, ///< Fail if the file does not already exist.
+        create_Must   ///< Fail if the file already exists.
+    };
+
+    enum {
+        flag_Trunc  = 1, ///< Truncate the file if it already exists.
+        flag_Append = 2  ///< Move the end of file before each write.
+    };
+
+    /// See open(const std::string&, Mode). Specifying access_ReadOnly
+    /// together with a create mode that is not create_Never, or with
+    /// a \a flags argument that is not zero, results in undefined
+    /// behavior. Specifying flag_Trunc together with create_Must
+    /// results in undefined behavior.
+    void open(const std::string& path, AccessMode, CreateMode, int flags);
 
     void write(const char* data, std::size_t size);
 
@@ -132,7 +128,7 @@ public:
     /// opened in read-only mode, is an error.
     void alloc(off_t offset, std::size_t size);
 
-    /// Set the file position.
+    /// Reposition the read/write offset in the file.
     void seek(off_t);
 
     /// Flush in-kernel buffers to disk. This blocks the caller until
@@ -213,8 +209,35 @@ public:
     class UnlockGuard;
     class UnmapGuard;
 
+    struct OpenError: std::runtime_error {
+        OpenError(const std::string& msg): std::runtime_error(msg) {}
+    };
+
+    /// Thrown if the user does not have permission to open or create
+    /// the specified file in the specified access mode.
+    struct PermissionDenied: OpenError {
+        PermissionDenied(const std::string& msg): OpenError(msg) {}
+    };
+
+    /// Thrown if the directory part of the specified path was not
+    /// found, or create_Never was specified and the file did no
+    /// exist.
+    struct NotFound: OpenError {
+        NotFound(const std::string& msg): OpenError(msg) {}
+    };
+
+    /// Thrown if create_Always was specified and the file did already
+    /// exist.
+    struct Exists: OpenError {
+        Exists(const std::string& msg): OpenError(msg) {}
+    };
+
 private:
+#ifdef _WIN32
+    void* m_handle;
+#else
     int m_fd;
+#endif
 
     struct MapBase {
         void* m_addr;
@@ -325,19 +348,37 @@ private:
 
 // Implementation:
 
-inline File::File(const std::string& path, AccessMode a, CreateMode c)
+inline File::File(const std::string& path, Mode m)
 {
-    open(path, a, c);
+    open(path, m);
 }
 
 inline File::File() TIGHTDB_NOEXCEPT
 {
+#ifdef _WIN32
+    m_handle = 0;
+#else
     m_fd = -1;
+#endif
 }
 
 inline File::~File() TIGHTDB_NOEXCEPT
 {
     close();
+}
+
+inline void File::open(const std::string& path, Mode m)
+{
+    AccessMode a = access_ReadWrite;
+    CreateMode c = create_Auto;
+    int flags = 0;
+    switch (m) {
+        case mode_Read:   a = access_ReadOnly; c = create_Never; break;
+        case mode_Update:                                        break;
+        case mode_Write:  flags = flag_Trunc;                    break;
+        case mode_Append: flags = flag_Append;                   break;
+    }
+    open(path, a, c, flags);
 }
 
 inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size)

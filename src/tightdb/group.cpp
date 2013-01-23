@@ -64,7 +64,7 @@ class FileOStream {
 public:
     FileOStream(const string& path) : m_pos(0)
     {
-        File file(path, File::access_ReadWrite);
+        File file(path, File::mode_Write);
         m_file = file.open_stdio_file(File::access_ReadWrite);
     }
 

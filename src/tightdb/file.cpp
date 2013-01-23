@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #ifdef _WIN32
+#  include <windows.h>
 #else
 #  include <unistd.h>
 #  include <fcntl.h>
@@ -25,7 +26,23 @@ using namespace tightdb;
 namespace {
 
 
-string get_sys_err_msg(const int errnum)
+#ifdef _WIN32 // Windows - GetLastError()
+
+string get_last_error_msg(const DWORD errnum)
+{
+    StringBuffer buffer;
+    buffer.resize(1024);
+    const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+    const DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
+    const DWORD size =
+        FormatMessage(flags, 0, errnum, language_id, buffer.data(), buffer.size(), 0);
+    if (TIGHTDB_LIKELY(0 < size)) return string(buffer.data(), size);
+    return "Unknown error";
+
+#endif
+
+
+string get_errno_msg(const int errnum)
 {
 #if defined _BSD_SOURCE || defined _WIN32
 
@@ -38,25 +55,24 @@ string get_sys_err_msg(const int errnum)
     errlist = _sys_errlist; // Windows <stdlib.h>
     nerr    = _sys_nerr;
 #  endif
-    if (0 <= errnum || errnum < nerr) return errlist[errnum];
+    if (TIGHTDB_LIKELY(0 <= errnum || errnum < nerr)) return errlist[errnum];
 
 #else // POSIX <string.h>
 
     StringBuffer buffer;
     buffer.resize(1024);
-    if (strerror_r(errnum, buffer.data(), buffer.size()) == 0) return buffer.str();
+    if (TIGHTDB_LIKELY(strerror_r(errnum, buffer.data(), buffer.size()) == 0)) return buffer.str();
 
 #endif
 
     return "Unknown error";
 }
 
+
+#ifndef _WIN32 // BSD / Linux flock()
+
 inline bool lock_file(int fd, bool exclusive, bool non_blocking)
 {
-#ifdef _WIN32 // Windows
-
-#else // BSD flock
-
     // NOTE: It would probably have been more portable to use fcntl()
     // based POSIX locks, however these locks are not recursive within
     // a single process, and since a second attempt to acquire such a
@@ -80,11 +96,9 @@ inline bool lock_file(int fd, bool exclusive, bool non_blocking)
     if (TIGHTDB_LIKELY(flock(fd, operation) == 0)) return true;
     const int errnum = errno; // Eliminate any risk of clobbering
     if (errnum == EWOULDBLOCK) return false;
-    const string msg = get_sys_err_msg(errnum);
+    const string msg = get_errno_msg(errnum);
     if (errnum == ENOLCK) throw ResourceAllocError(msg);
     throw runtime_error(msg);
-
-#endif
 }
 
 inline void unlock_file(int fd) TIGHTDB_NOEXCEPT
@@ -98,6 +112,8 @@ inline void unlock_file(int fd) TIGHTDB_NOEXCEPT
     static_cast<void>(r);
 }
 
+#endif
+
 
 } // anonymous namespace
 
@@ -107,14 +123,7 @@ namespace tightdb {
 
 string create_temp_dir()
 {
-#ifndef _MSC_VER // POSIX.1-2008 version
-
-    StringBuffer buffer;
-    buffer.append_c_str(P_tmpdir "tightdb_XXXXXX");
-    if (mkdtemp(buffer.c_str()) == 0) throw runtime_error("mkdtemp() failed");
-    return buffer.str();
-
-#else // Windows version
+#ifdef _WIN32 // Windows version
 
     StringBuffer buffer1;
     buffer1.resize(MAX_PATH+1);
@@ -133,24 +142,79 @@ string create_temp_dir()
     }
     return string(buffer2.c_str());
 
+#else // POSIX.1-2008 version
+
+    StringBuffer buffer;
+    buffer.append_c_str(P_tmpdir "tightdb_XXXXXX");
+    if (mkdtemp(buffer.c_str()) == 0) throw runtime_error("mkdtemp() failed");
+    return buffer.str();
+
 #endif
 }
 
 
-#ifndef _MSC_VER // POSIX.1-2008 version
-
-void File::open(const string& path, AccessMode a, CreateMode c)
+void File::open(const string& path, AccessMode a, CreateMode c, int flags)
 {
-    int flags = 0;
+#ifdef _WIN32 // Windows version
+
+    DWORD desired_access = GENERIC_READ;
     switch (a) {
-        case access_ReadWrite: flags = O_RDWR;   break;
-        case access_ReadOnly:  flags = O_RDONLY; break;
+        case access_ReadOnly:
+            break;
+        case access_ReadWrite:
+            if (flags & flag_Append) desired_access  = FILE_APPEND_DATA;
+            else                     desired_access |= GENERIC_WRITE;
+            break;
+    }
+    // FIXME: Should probably be zero if we are called on behalf of a
+    // Group instance that is not managed by a SharedGroup instance,
+    // since in this case concurrenct access is prohibited anyway.
+    DWORD share_mode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+    DWORD creation_disposition = 0;
+    switch (c) {
+        case create_Auto:
+            creation_disposition = flags & flag_Trunc ? CREATE_ALWAYS : OPEN_ALWAYS;
+            break;
+        case create_Never:
+            creation_disposition = flags & flag_Trunc ? TRUNCATE_EXISTING : OPEN_EXISTING;
+            break;
+        case create_Must:
+            creation_disposition = CREATE_NEW;
+            break;
+    }
+    DWORD flags_and_attributes = 0;
+    const HANDLE handle = CreateFileA(path.c_str(), desired_access, share_mode, 0,
+                                      creation_disposition, flags_and_attributes, 0);
+    if (TIGHTDB_LIKELY(handle != INVALID_HANDLE_VALUE)) {
+        m_handle = handle;
+        return;
+    }
+
+    const DWORD errnum = GetLastError(); // Eliminate any risk of clobbering
+    const string msg = get_last_error_msg(errnum);
+    switch (errnum) {
+        case ERROR_SHARING_VIOLATION:
+        case ERROR_ACCESS_DENIED:       throw PermissionDenied(msg);
+        case ERROR_FILE_NOT_FOUND:      throw NotFound(msg);
+        case ERROR_FILE_EXISTS:         throw Exists(msg);
+        case ERROR_TOO_MANY_OPEN_FILES: throw ResourceAllocError(msg);
+        default:                        throw runtime_error(msg);
+    }
+
+#else // POSIX version
+
+    int flags2 = 0;
+    switch (a) {
+        case access_ReadOnly:  flags2 = O_RDONLY; break;
+        case access_ReadWrite: flags2 = O_RDWR;   break;
     }
     switch (c) {
-        case create_Auto:   flags |= O_CREAT;          break;
+        case create_Auto:  flags2 |= O_CREAT;          break;
         case create_Never:                             break;
-        case create_Always: flags |= O_CREAT | O_EXCL; break;
+        case create_Must:  flags2 |= O_CREAT | O_EXCL; break;
     }
+    if (flags & flag_Trunc)  flags2 |= O_TRUNC;
+    if (flags & flag_Append) flags2 |= O_APPEND;
     const int fd = ::open(path.c_str(), flags, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (TIGHTDB_LIKELY(0 <= fd)) {
         m_fd = fd;
@@ -158,7 +222,7 @@ void File::open(const string& path, AccessMode a, CreateMode c)
     }
 
     const int errnum = errno; // Eliminate any risk of clobbering
-    const string msg = get_sys_err_msg(errnum);
+    const string msg = get_errno_msg(errnum);
     switch (errnum) {
         case EACCES:
         case EROFS:
@@ -176,15 +240,30 @@ void File::open(const string& path, AccessMode a, CreateMode c)
         case ENOMEM:        throw ResourceAllocError(msg);
         default:            throw runtime_error(msg);
     }
+
+#endif
 }
 
 void File::close() TIGHTDB_NOEXCEPT
 {
+#ifdef _WIN32 // Windows version
+
+    if (!m_handle) return;
+
+    const BOOL r = CloseHandle(m_handle);
+    TIGHTDB_ASSERT(r);
+    static_cast<void>(r);
+    m_handle = 0;
+
+#else // POSIX version
+
     if (m_fd < 0) return;
     const int r = ::close(m_fd);
     TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);
     m_fd = -1;
+
+#endif
 }
 
 void File::write(const char* data, size_t size)
@@ -203,7 +282,7 @@ void File::write(const char* data, size_t size)
     }
 
     const int errnum = errno; // Eliminate any risk of clobbering
-    const string msg = get_sys_err_msg(errnum);
+    const string msg = get_errno_msg(errnum);
     switch (errnum) {
         case ENOSPC:
         case ENOBUFS: throw ResourceAllocError(msg);
@@ -232,7 +311,7 @@ void File::alloc(off_t offset, size_t size)
     throw runtime_error("posix_fallocate() failed");
 
     const int errnum = errno; // Eliminate any risk of clobbering
-    const string msg = get_sys_err_msg(errnum);
+    const string msg = get_errno_msg(errnum);
     switch (errnum) {
         case ENOSPC: throw ResourceAllocError(msg);
         default:     throw runtime_error(msg);
@@ -277,7 +356,7 @@ FILE* File::open_stdio_file(AccessMode a)
     }
 
   error:
-    const string msg = get_sys_err_msg(errnum);
+    const string msg = get_errno_msg(errnum);
     switch (errnum) {
         case EMFILE:
         case ENOMEM: throw ResourceAllocError(msg);
@@ -316,7 +395,7 @@ void* File::map(AccessMode a, size_t size) const
     if (TIGHTDB_LIKELY(addr != MAP_FAILED)) return addr;
 
     const int errnum = errno; // Eliminate any risk of clobbering
-    const string msg = get_sys_err_msg(errnum);
+    const string msg = get_errno_msg(errnum);
     switch (errnum) {
         case EAGAIN:
         case EMFILE:
@@ -342,10 +421,48 @@ void File::sync_map(void* addr, size_t size)
 {
     if (TIGHTDB_LIKELY(::msync(addr, size, MS_SYNC) == 0)) return;
     const int errnum = errno; // Eliminate any risk of clobbering
-    throw runtime_error(get_sys_err_msg(errnum));
+    throw runtime_error(get_errno_msg(errnum));
 }
 
-#else // Windows version
+
+
+/* Windows:
+    // Open file
+    DWORD error_copy;
+    {
+
+        CloseGuard cg(file);
+
+        // Map to memory (read only)
+        const HANDLE map_file = CreateFileMapping(file, NULL, PAGE_WRITECOPY, 0, 0, 0);
+        if (map_file == NULL) goto create_map_error;
+
+        CloseGuard cg2(map_file);
+
+        const LPVOID addr = MapViewOfFile(map_file, FILE_MAP_COPY, 0, 0, 0);
+        if (!addr) goto map_view_error;
+
+        // Get Size
+        LARGE_INTEGER large_int;
+        if (!GetFileSizeEx(file, &large_int)) goto get_size_error;
+        const size_t size = to_ref(large_int.QuadPart); // FIXME: Really use to_ref() here? It looks like a misuse.
+
+        UnmapGuard ug(addr);
+
+        // Verify the data structures
+        if (!validate_buffer(static_cast<char*>(addr), size)) goto invalid_database;
+
+        cg.release();
+        cg2.release();
+        ug.release();
+
+        m_file     = file;
+        m_data     = static_cast<char*>(addr);
+        m_baseline = size;
+    }
+
+    return;
+*/
 
 /* WinAPI:
 
@@ -362,7 +479,45 @@ Shared/unshared memory map in Windows????
 
 */
 
-#endif
 
+
+/*
+
+struct CloseGuard {
+    CloseGuard(HANDLE file): m_file(file) {}
+    ~CloseGuard()
+    {
+        if (TIGHTDB_UNLIKELY(m_file)) {
+            BOOL r = CloseHandle(m_file);
+            TIGHTDB_ASSERT(r);
+            static_cast<void>(r);
+        }
+    }
+
+    void release() { m_file = 0; }
+
+private:
+    HANDLE m_file;
+};
+
+struct UnmapGuard {
+    UnmapGuard(LPVOID a): m_addr(a) {}
+
+    ~UnmapGuard()
+    {
+        if (TIGHTDB_UNLIKELY(m_addr)) {
+            BOOL r = UnmapViewOfFile(m_addr);
+            TIGHTDB_ASSERT(r);
+            static_cast<void>(r);
+        }
+    }
+
+    void release() { m_addr = 0; }
+
+private:
+    LPVOID m_addr;
+};
+
+*/
 
 } // namespace tightdb
