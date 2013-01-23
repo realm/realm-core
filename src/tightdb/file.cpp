@@ -134,7 +134,7 @@ string create_temp_dir()
 
     StringBuffer buffer1;
     buffer1.resize(MAX_PATH+1);
-    if (GetTempPathA(buffer1.size(), buffer1.data()) == 0)
+    if (GetTempPathA(MAX_PATH+1, buffer1.data()) == 0)
         throw runtime_error("CreateDirectory() failed");
     StringBuffer buffer2;
     buffer2.resize(MAX_PATH);
@@ -432,27 +432,55 @@ void File::sync()
 
 void File::lock_exclusive()
 {
+#ifdef _WIN32 // Windows version
+
+#else // POSIX version
+
     lock_file(m_fd, true, false);
+
+#endif
 }
 
 bool File::try_lock_exclusive()
 {
+#ifdef _WIN32 // Windows version
+
+#else // POSIX version
+
     return lock_file(m_fd, true, true);
+
+#endif
 }
 
 void File::lock_shared()
 {
+#ifdef _WIN32 // Windows version
+
+#else // POSIX version
+
     lock_file(m_fd, false, false);
+
+#endif
 }
 
 void File::unlock() TIGHTDB_NOEXCEPT
 {
+#ifdef _WIN32 // Windows version
+
+#else // POSIX version
+
     unlock_file(m_fd);
+
+#endif
 }
 
 
 void* File::map(AccessMode a, size_t size) const
 {
+#ifdef _WIN32 // Windows version
+
+#else // POSIX version
+
     int prot = PROT_READ;
     switch (a) {
         case access_ReadWrite: prot |= PROT_WRITE; break;
@@ -469,6 +497,8 @@ void* File::map(AccessMode a, size_t size) const
         case ENOMEM: throw ResourceAllocError(msg);
         default:     throw runtime_error(msg);
     }
+
+#endif
 }
 
 
@@ -495,17 +525,29 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
 
 void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 {
+#ifdef _WIN32 // Windows version
+
+#else // POSIX version
+
     const int r = ::munmap(addr, size);
     TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);
+
+#endif
 }
 
 
 void File::sync_map(void* addr, size_t size)
 {
+#ifdef _WIN32 // Windows version
+
+#else // POSIX version
+
     if (TIGHTDB_LIKELY(::msync(addr, size, MS_SYNC) == 0)) return;
     const int errnum = errno; // Eliminate any risk of clobbering
     throw runtime_error(get_errno_msg(errnum));
+
+#endif
 }
 
 
