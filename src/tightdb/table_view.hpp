@@ -69,15 +69,14 @@ public:
     // FIXME: Need: size_t find_first_binary(size_t column_ndx, const char* value, size_t len) const;
 
     // Aggregate functions
-//    template <int function, ColumnType type, class C, typename T, typename R> R aggregate(size_t column_ndx) const;
-
-    template <int function>int64_t aggregate(size_t column_ndx) const;
+    template <int function, typename T, typename R> R aggregate(size_t column_ndx) const;
+    
     // TODO, FIXME: rename int versions
     // TODO: Add maximum, minimum for date
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;
-#if 0
+
     double sum_float(size_t column_ndx) const;
     float maximum_float(size_t column_ndx) const;
     float minimum_float(size_t column_ndx) const;
@@ -85,7 +84,7 @@ public:
     double sum_double(size_t column_ndx) const;
     double maximum_double(size_t column_ndx) const;
     double minimum_double(size_t column_ndx) const;
-#endif
+
     // Sort the view according to the specified column and the specified direction.
     void sort(size_t column, bool ascending = true);
 

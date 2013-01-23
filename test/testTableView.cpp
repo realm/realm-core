@@ -97,21 +97,25 @@ TEST(TableView_Floats_Find_and_Aggregations)
     CHECK_EQUAL(0, v_some.get_source_ndx(0));
     CHECK_EQUAL(3, v_some.get_source_ndx(1));
 
-#if 0
     // TODO: enable
     // Test find_first
+#if 0  
     CHECK_EQUAL(0, v_all.column().col_double.find_first(-1.2) );
     CHECK_EQUAL(5, v_all.column().col_double.find_first(0.0) );
     CHECK_EQUAL(2, v_all.column().col_double.find_first(3.2) );
-
+#endif
+#if 1
     // Test sum
     CHECK_EQUAL(sum, v_all.column().col_double.sum());
+    CHECK_EQUAL(-1.2 -1.2, v_some.column().col_double.sum());
 
     // Test max
     CHECK_EQUAL(3.2, v_all.column().col_double.maximum());
+    CHECK_EQUAL(-1.2, v_some.column().col_double.maximum());
 
     // Test min
     CHECK_EQUAL(-1.2, v_all.column().col_double.minimum());
+    CHECK_EQUAL(-1.2, v_some.column().col_double.minimum());
 #endif
     // TODO: Test +=, average, count
 }

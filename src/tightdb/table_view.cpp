@@ -18,7 +18,6 @@ size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
     return size_t(-1);
 }
 
-
 size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, COLUMN_TYPE_STRING);
@@ -29,49 +28,48 @@ size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) co
     return size_t(-1);
 }
 
-#if 0
-// TODO: Reduce template parameters
 
-template <int function, ColumnType type, class C, typename T, typename R> 
+
+template <int function, typename T, typename R> 
 R TableViewBase::aggregate(size_t column_ndx) const
 {
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type);
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
     TIGHTDB_ASSERT(function == TDB_SUM || function == TDB_MAX || function == TDB_MIN);
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
     if (m_refs.Size() == 0) 
         return 0;
 
-    const C& column = m_table->GetColumn<C, type>(column_ndx);
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    typedef typename ColumnTypeTraits<T>::array_type ArrType;
 
-    if (m_refs.Size() == column.Size()) {
+    const ColType* column = (ColType*)&m_table->GetColumnBase(column_ndx);
+
+    if (m_refs.Size() == column->Size()) {
         if (function == TDB_MAX)
-            return column.maximum();
+            return column->maximum();
         if (function == TDB_MIN)
-            return column.minimum();
+            return column->minimum();
         if (function == TDB_SUM)
-            return column.sum();
+            return column->sum();
     }
 
-    //..fix array type
-    Array m_array;
+    ArrType m_array;
     size_t m_leaf_start = 0;
     size_t m_leaf_end = 0;
-    size_t s;
+    size_t row_ndx;
 
-    //T res = get_int(column_ndx, 0); ???
-    T res = column.TreeGet(0);
+    T res = column->template TreeGet<T,ColType>(0);
 
     for (size_t ss = 1; ss < m_refs.Size(); ++ss) {
-        s = m_refs.GetAsSizeT(ss);
-        if (s >= m_leaf_end) {
-            // TODO: Verify if this works, and how expensive it is
-            (dynamic_cast<const Column&>(column)).GetBlock(s, dynamic_cast<C>(m_array), m_leaf_start);
+        row_ndx = m_refs.GetAsSizeT(ss);
+        if (row_ndx >= m_leaf_end) {
+            ((Column*)column)->GetBlock(row_ndx, m_array, m_leaf_start);
             const size_t leaf_size = m_array.Size();
             m_leaf_end = m_leaf_start + leaf_size;
         }    
 
-        T v = m_array.Get(s - m_leaf_start);
+        T v = m_array.Get(row_ndx - m_leaf_start);
 
         if (function == TDB_SUM)
             res += v;
@@ -84,112 +82,45 @@ R TableViewBase::aggregate(size_t column_ndx) const
 
 int64_t TableViewBase::sum(size_t column_ndx) const
 {
-    return aggregate<TDB_SUM, COLUMN_TYPE_INT, Column, int64_t, int64_t>(column_ndx);
+    return aggregate<TDB_SUM, int64_t, int64_t>(column_ndx);
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
-    return aggregate<TDB_SUM, COLUMN_TYPE_FLOAT, ColumnFloat, float, float>(column_ndx);
+    return aggregate<TDB_SUM, float, float>(column_ndx);
 }
 double TableViewBase::sum_double(size_t column_ndx) const
 {
-    return aggregate<TDB_SUM, COLUMN_TYPE_DOUBLE, ColumnDouble, double, double>(column_ndx);
+    return aggregate<TDB_SUM, double, double>(column_ndx);
 }
 
 
 int64_t TableViewBase::maximum(size_t column_ndx) const
 {
-    return aggregate<TDB_MAX, COLUMN_TYPE_INT, Column, int64_t, int64_t>(column_ndx);
+    return aggregate<TDB_MAX, int64_t, int64_t>(column_ndx);
 }
 float TableViewBase::maximum_float(size_t column_ndx) const
 {
-    return aggregate<TDB_MAX, COLUMN_TYPE_FLOAT, ColumnFloat, float, float>(column_ndx);
+    return aggregate<TDB_MAX, float, float>(column_ndx);
 }
 double TableViewBase::maximum_double(size_t column_ndx) const
 {
-    return aggregate<TDB_MAX, COLUMN_TYPE_DOUBLE, ColumnDouble, double, double>(column_ndx);
+    return aggregate<TDB_MAX, double, double>(column_ndx);
 }
 
 
 int64_t TableViewBase::minimum(size_t column_ndx) const
 {
-    return aggregate<TDB_MIN, COLUMN_TYPE_INT, Column, int64_t, int64_t>(column_ndx);
+    return aggregate<TDB_MIN, int64_t, int64_t>(column_ndx);
 }
 float TableViewBase::minimum_float(size_t column_ndx) const
 {
-    return aggregate<TDB_MIN, COLUMN_TYPE_FLOAT, ColumnFloat, float, float>(column_ndx);
+    return aggregate<TDB_MIN, float, float>(column_ndx);
 }
 double TableViewBase::minimum_double(size_t column_ndx) const
 {
-    return aggregate<TDB_MIN, COLUMN_TYPE_DOUBLE, ColumnDouble, double, double>(column_ndx);
+    return aggregate<TDB_MIN, double, double>(column_ndx);
 }
 
-#else
-
-
-template <int function>int64_t TableViewBase::aggregate(size_t column_ndx) const
-{
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, COLUMN_TYPE_INT);
-    TIGHTDB_ASSERT(function == TDB_SUM || function == TDB_MAX || function == TDB_MIN);
-    TIGHTDB_ASSERT(m_table);
-    TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
-    if (m_refs.Size() == 0)
-        return 0;
-
-    int64_t res = 0;
-    Column& m_column = m_table->GetColumn(column_ndx);
-
-    if (m_refs.Size() == m_column.Size()) {
-        if (function == TDB_MAX)
-            return m_column.maximum();
-        if (function == TDB_MIN)
-            return m_column.minimum();
-        if (function == TDB_SUM)
-            return m_column.sum();
-    }
-
-    Array m_array;
-    size_t m_leaf_start = 0;
-    size_t m_leaf_end = 0;
-    size_t s;
-
-    res = get_int(column_ndx, 0);
-
-    for (size_t ss = 1; ss < m_refs.Size(); ++ss) {
-        s = m_refs.GetAsSizeT(ss);
-        if (s >= m_leaf_end) {
-            m_column.GetBlock(s, m_array, m_leaf_start);
-            const size_t leaf_size = m_array.Size();
-            m_leaf_end = m_leaf_start + leaf_size;
-        }
-
-        int64_t v = m_array.Get(s - m_leaf_start);
-
-        if (function == TDB_SUM)
-            res += v;
-        else if (function == TDB_MAX ? v > res : v < res)
-            res = v;
-    }
-    
-    return res;
-}
-
-int64_t TableViewBase::sum(size_t column_ndx) const
-{
-    return aggregate<TDB_SUM>(column_ndx);
-}
-
-int64_t TableViewBase::maximum(size_t column_ndx) const
-{
-    return aggregate<TDB_MAX>(column_ndx);
-}
-
-int64_t TableViewBase::minimum(size_t column_ndx) const
-{
-    return aggregate<TDB_MIN>(column_ndx);
-}
-
-
-#endif
 
 
 void TableViewBase::sort(size_t column, bool Ascending)

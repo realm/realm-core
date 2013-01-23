@@ -81,6 +81,8 @@ public:
 
 protected:
     friend class StringIndex;
+    friend class ColumnFloat;
+    friend class ColumnDouble;
 
     struct NodeChange {
         size_t ref1;
@@ -97,7 +99,9 @@ protected:
     };
 
     // Tree functions
+public:
     template<typename T, class C> T TreeGet(size_t ndx) const;
+protected:
     template<typename T, class C> bool TreeSet(size_t ndx, T value);
     template<typename T, class C> bool TreeInsert(size_t ndx, T value);
     template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
