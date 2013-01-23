@@ -289,38 +289,28 @@ void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, boo
     size_t size;
     if (int_cast_with_overflow_detect(m_file.get_size(), size)) goto invalid_database;
 
-
-    // All good:
-    //   24 <= size
-    //   size is 64-bit aligned
-    //   validate_header returns true
-
-    // Reinitialize:
-    //   size < 24
-
-    // Else: fail
-    //   
-
-    // If (!is_shared || size >= 24) && (!validate_header): Hard fail
-
-    // size < 24 || is_64_bit_aligned_size && validate_header
-
-    // If size < 24 || size == 24 && header_is_not_default
-
-    if (size < initial_size) {
+    // FIXME: This initialization procedure does not provide
+    // sufficient robustness given that processes may be abruptly
+    // terminated at any point in time. In unshared mode, we must be
+    // able to reliably detect any invalid file as long as its
+    // invalidity is due to a terminated serialization process
+    // (e.g. due to a power failure). In shared mode we can guarantee
+    // that if the database file was ever valid, then it will remain
+    // valid, however, there is no way we can ensure that
+    // initialization of an empty database file succeeds. Thus, in
+    // shared mode we must be able to reliably distiguish between
+    // three cases when opening a database file: A) It was never
+    // properly initialized. In this case we should simply
+    // reinitialize it. B) It looks corrupt. In this case we throw an
+    // exception. C) It looks good. In this case we proceede as
+    // normal.
+    if (size == 0) {
         if (read_only) goto invalid_database;
-
-        // Pre-alloc initial space except the last byte
-        m_file.alloc(0, initial_size - 1);
 
         m_file.write(default_header);
 
-        // Flush to disk and then allocate the last byte to indicate
-        // that the file is correctly initialized. This provides
-        // robustness in the event of abrupt process termination or
-        // power loss.
-        m_file.sync();
-        m_file.alloc(0, size);
+        // Pre-alloc initial space
+        m_file.alloc(0, initial_size);
         size = initial_size;
     }
 

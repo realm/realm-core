@@ -28,7 +28,7 @@
 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-#include <tightdb/replication.hpp>
+#  include <tightdb/replication.hpp>
 #endif
 
 namespace tightdb {

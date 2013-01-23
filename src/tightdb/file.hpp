@@ -119,18 +119,22 @@ public:
     /// does not necessarily allocate space on the target device. If
     /// you want to ensure allocation, call alloc(). Calling this
     /// method will generally affect the read/write offset associated
-    /// with this File instance. Calling this method on an instance
-    /// that does not refer to an open file has undefined
-    /// behavior. Calling this method on a file that is opened in
-    /// read-only mode, is an error.
+    /// with this File instance.
+    ///
+    /// Calling this method on an instance that does not refer to an
+    /// open file has undefined behavior. Calling this method on a
+    /// file that is opened in read-only mode, is an error.
     void resize(off_t);
 
     /// Allocate space on the target device for the specified region
     /// of the file. If the region extends beyond the current end of
     /// the file, the file size is increased as necessary. Calling
-    /// this method on an instance that does not refer to an open file
-    /// has undefined behavior. Calling this method on a file that is
-    /// opened in read-only mode, is an error.
+    /// this method will generally affect the read/write offset
+    /// associated with this File instance.
+    ///
+    /// Calling this method on an instance that does not refer to an
+    /// open file has undefined behavior. Calling this method on a
+    /// file that is opened in read-only mode, is an error.
     ///
     /// This method may not have atomic behaviour on all systems, that
     /// is, two processes, or two threads should never call this
@@ -229,6 +233,9 @@ public:
     /// See open(const std::string&, Mode). The STDIO file stream is
     /// always opened in binary mode.
     static std::FILE* open_stdio_file(const std::string& path, Mode = mode_Read);
+
+    // FIXME: Can we get rid of this one please!!!
+    bool is_deleted() const;
 
     template<class> class Map;
 

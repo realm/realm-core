@@ -177,7 +177,7 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags)
     }
     if (flags & flag_Trunc)  flags2 |= O_TRUNC;
     if (flags & flag_Append) flags2 |= O_APPEND;
-    const int fd = ::open(path.c_str(), flags, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    const int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (TIGHTDB_LIKELY(0 <= fd)) {
         m_fd = fd;
         return;
@@ -610,6 +610,22 @@ FILE* File::open_stdio_file(const string& path, Mode m)
         case ENOMEM:        throw ResourceAllocError(msg);
         default:            throw runtime_error(msg);
     }
+}
+
+
+bool File::is_deleted() const
+{
+#ifdef _WIN32 // Windows version
+
+    return false; // An open file cannot be deleted on Windows
+
+#else // POSIX version
+
+    struct stat statbuf;
+    if (TIGHTDB_LIKELY(::fstat(m_fd, &statbuf) == 0)) return statbuf.st_nlink == 0;
+    throw runtime_error("fstat() failed");
+
+#endif
 }
 
 

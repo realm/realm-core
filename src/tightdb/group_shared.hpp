@@ -22,10 +22,6 @@
 
 #include <tightdb/group.hpp>
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-#include <tightdb/replication.hpp>
-#endif
-
 namespace tightdb {
 
 
@@ -109,12 +105,11 @@ private:
     struct SharedInfo;
 
     // Member variables
-    Group       m_group;
-    SharedInfo* m_info;
-    size_t      m_info_len;
-    size_t      m_version;
-    int         m_fd;
-    std::string m_lockfile_path;
+    Group                 m_group;
+    size_t                m_version;
+    File                  m_file;
+    File::Map<SharedInfo> m_file_map;
+    std::string           m_file_path;
 
     void init(const std::string& path_to_database_file, bool no_create, DurabilityLevel);
 
