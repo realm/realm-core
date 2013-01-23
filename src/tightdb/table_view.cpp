@@ -28,6 +28,22 @@ size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) co
     return size_t(-1);
 }
 
+size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
+{
+    for (size_t i = 0; i < m_refs.Size(); i++)
+        if (get_float(column_ndx, i) == value)
+            return i;
+    return size_t(-1);
+}
+
+size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
+{
+    for (size_t i = 0; i < m_refs.Size(); i++)
+        if (get_double(column_ndx, i) == value)
+            return i;
+    return size_t(-1);
+}
+
 
 
 template <int function, typename T, typename R> 
