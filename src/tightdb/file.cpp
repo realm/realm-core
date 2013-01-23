@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #ifdef _WIN32
+#  define NOMINMAX
 #  include <windows.h>
 #else
 #  include <unistd.h>
@@ -35,9 +36,11 @@ string get_last_error_msg(const DWORD errnum)
     const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
     const DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
     const DWORD size =
-        FormatMessage(flags, 0, errnum, language_id, buffer.data(), buffer.size(), 0);
+        FormatMessageA(flags, 0, errnum, language_id, buffer.data(),
+                       static_cast<DWORD>(buffer.size()), 0);
     if (TIGHTDB_LIKELY(0 < size)) return string(buffer.data(), size);
     return "Unknown error";
+}
 
 #endif
 
