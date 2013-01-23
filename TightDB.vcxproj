@@ -617,7 +617,6 @@
     <ClInclude Include="src\tightdb\query.hpp" />
     <ClInclude Include="src\tightdb\query_conditions.hpp" />
     <ClInclude Include="src\tightdb\query_engine.hpp" />
-    <ClInclude Include="src\tightdb\query_tpl.hpp" />
     <ClInclude Include="src\tightdb\replication.hpp" />
     <ClInclude Include="src\tightdb\spec.hpp" />
     <ClInclude Include="src\tightdb\static_assert.hpp" />

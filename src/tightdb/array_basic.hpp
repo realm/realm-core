@@ -60,7 +60,8 @@ private:
     static size_t create_empty_basic_array(Allocator& alloc);
 };
 
-
 #include <tightdb/array_basic_tpl.hpp>
+
+} // namespace
 
 #endif // TIGHTDB_ARRAY_BASIC_HPP

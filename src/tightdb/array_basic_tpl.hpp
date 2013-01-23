@@ -55,14 +55,6 @@ inline ArrayBasic<T>::ArrayBasic(size_t ref, ArrayParent *parent, size_t ndx_in_
     SetParent(const_cast<ArrayParent *>(parent), ndx_in_parent);
 }
 
-// Creates new array (but invalid, call UpdateRef to init)
-#if 0
-template<typename T> 
-inline ArrayBasic<T>::ArrayBasic(Allocator& alloc): Array(alloc) 
-{
-}
-#endif
-
 template<typename T> 
 inline ArrayBasic<T>::~ArrayBasic() 
 {
@@ -123,7 +115,9 @@ void ArrayBasic<T>::Insert(size_t ndx, T value)
         unsigned char* src = m_data + (ndx * m_width);
         unsigned char* dst = src + m_width;
         const size_t count = (m_len - ndx) * m_width;
-        memmove(dst, src, count); // FIXME: Use std::copy() or std::copy_backward() instead.
+        memmove(dst, src, count); 
+        // DON'T Use std::copy() or std::copy_backward() instead.
+        // NO: copy() seems 10 times slower!!!
     }
 
     // Set the value
@@ -199,7 +193,7 @@ size_t ArrayBasic<T>::Find(T target, size_t start, size_t end) const
         if (target == Get(i)) 
             return i;
     }
-    return not_found; // not found
+    return not_found;
 }
 
 template<typename T> 
@@ -287,7 +281,5 @@ bool ArrayBasic<T>::minimum(T& result, size_t start, size_t end) const
 {
     return minmax<false>(result, start, end);
 }
-
-} // namespace tightdb
 
 #endif // TIGHTDB_ARRAY_BASIC_TPL_HPP

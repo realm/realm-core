@@ -31,19 +31,15 @@
 #include <tightdb/column_binary.hpp>
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
-
+#include <tightdb/array_float.hpp>
+#include <tightdb/array_double.hpp>
 
 // Predeclarations for ColumnFloat and ColumnDouble
 namespace tightdb {
-template<class T> class ArrayBasic;
 template<class T> class ColumnBasic;
 class ColumnFloat;
 class ColumnDouble;
 }
-
-#include <tightdb/array_float.hpp>
-#include <tightdb/array_double.hpp>
-
 
 
 namespace tightdb {

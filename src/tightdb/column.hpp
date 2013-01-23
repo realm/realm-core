@@ -81,8 +81,6 @@ public:
 
 protected:
     friend class StringIndex;
-    friend class ColumnFloat;
-    friend class ColumnDouble;
 
     struct NodeChange {
         size_t ref1;
@@ -125,13 +123,13 @@ protected:
 
     static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
 
+    template <typename T, typename R, ACTION action, class condition>
+        R aggregate(T target, size_t start, size_t end, size_t *matchcount) const;
+
 #ifdef TIGHTDB_DEBUG
     void ArrayToDot(std::ostream& out, const Array& array) const;
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif // TIGHTDB_DEBUG
-
-    template <typename T, typename R, ACTION action, class condition>
-        R aggregate(T target, size_t start, size_t end, size_t *matchcount) const;
 
     // Member variables
     mutable Array* m_array;
