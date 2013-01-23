@@ -484,9 +484,9 @@ void* File::map(AccessMode a, size_t size) const
         throw runtime_error("Map size is too large");
     const HANDLE map_handle =
         CreateFileMapping(m_handle, 0, PAGE_READONLY, large_int.HighPart, large_int.LowPart, 0);
-    if (TIGHTDB_UNLIKELY(!map_file))
+    if (TIGHTDB_UNLIKELY(!map_handle))
         throw runtime_error("CreateFileMapping() failed");
-    const void* addr = MapViewOfFile(map_handle, desired_access, 0, 0, 0);
+    void* const addr = MapViewOfFile(map_handle, desired_access, 0, 0, 0);
     {
         const BOOL r = CloseHandle(map_handle);
         TIGHTDB_ASSERT(r);
