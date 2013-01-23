@@ -350,6 +350,8 @@ void File::resize(off_t size)
 {
 #ifdef _WIN32 // Windows version
 
+Problem is that file offset is affected
+
 SetFilePointer(hFile,new_size,NULL,FILE_BEGIN);
 
 SetEndOfFile(hFile);
