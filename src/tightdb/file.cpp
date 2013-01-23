@@ -2,6 +2,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 
 #ifdef _WIN32
 #  define NOMINMAX
@@ -11,7 +12,10 @@
 #  include <fcntl.h>
 #  include <sys/stat.h>
 #  include <sys/mman.h>
-#  include <sys/file.h> // Non-POSIX flock()
+#  include <sys/file.h> // BSD / Linux flock()
+#  ifdef _GNU_SOURCE
+#    include <sys/mman.h> // mremap()
+#  endif
 #endif
 
 #include <tightdb/assert.hpp>
@@ -130,16 +134,16 @@ string create_temp_dir()
 
     StringBuffer buffer1;
     buffer1.resize(MAX_PATH+1);
-    if (GetTempPath(buffer1.size(), buffer1) == 0)
+    if (GetTempPathA(buffer1.size(), buffer1.data()) == 0)
         throw runtime_error("CreateDirectory() failed");
     StringBuffer buffer2;
     buffer2.resize(MAX_PATH);
     for (;;) {
-        if (GetTempFileName(buffer1.c_str(), "tdb", 0, buffer2.data()) == 0)
+        if (GetTempFileNameA(buffer1.c_str(), "tdb", 0, buffer2.data()) == 0)
             throw runtime_error("GetTempFileName() failed");
-        if (DeleteFile(buffer2.c_str()) == 0)
+        if (DeleteFileA(buffer2.c_str()) == 0)
             throw runtime_error("DeleteFile() failed");
-        if (CreateDirectory(buffer2.c_str(), 0) != 0) break;
+        if (CreateDirectoryA(buffer2.c_str(), 0) != 0) break;
         if (GetLastError() != ERROR_ALREADY_EXISTS)
             throw runtime_error("CreateDirectory() failed");
     }
@@ -247,6 +251,7 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags)
 #endif
 }
 
+
 void File::close() TIGHTDB_NOEXCEPT
 {
 #ifdef _WIN32 // Windows version
@@ -269,8 +274,30 @@ void File::close() TIGHTDB_NOEXCEPT
 #endif
 }
 
+
 void File::write(const char* data, size_t size)
 {
+#ifdef _WIN32 // Windows version
+
+    const DWORD max_write = numeric_limits<DWORD>::max();
+    while (int_less_than(max_write, size)) {
+        write(data, max_write);
+        size -= max_write;
+        data += max_write;
+    }
+
+    DWORD n = 0;
+    if (TIGHTDB_LIKELY(WriteFile(m_handle, data, static_cast<DWORD>(size), &n, 0))) {
+        TIGHTDB_ASSERT(n == static_cast<DWORD>(size));
+        return;
+    }
+
+    const DWORD errnum = GetLastError(); // Eliminate any risk of clobbering
+    const string msg = get_last_error_msg(errnum);
+    throw runtime_error(msg);
+
+#else // POSIX version
+
     // POSIX requires than size is less than or equal to SSIZE_MAX
     while (int_less_than(SSIZE_MAX, size)) {
         write(data, SSIZE_MAX);
@@ -279,7 +306,7 @@ void File::write(const char* data, size_t size)
     }
 
     const ssize_t r = ::write(m_fd, data, size);
-    if (0 <= r) {
+    if (TIGHTDB_LIKELY(0 <= r)) {
         TIGHTDB_ASSERT(int_equal_to(r, size));
         return;
     }
@@ -291,25 +318,63 @@ void File::write(const char* data, size_t size)
         case ENOBUFS: throw ResourceAllocError(msg);
         default:      throw runtime_error(msg);
     }
+
+#endif
 }
+
 
 off_t File::get_size() const
 {
+#ifdef _WIN32 // Windows version
+
+    LARGE_INTEGER large_int;
+    if (TIGHTDB_LIKELY(GetFileSizeEx(m_handle, &large_int))) {
+        off_t size;
+        if (int_cast_with_overflow_detect(large_int.QuadPart, size))
+            throw runtime_error("File size is too large");
+        return size;
+    }
+    throw runtime_error("GetFileSizeEx() failed");
+
+#else // POSIX version
+
     struct stat statbuf;
     if (TIGHTDB_LIKELY(::fstat(m_fd, &statbuf) == 0)) return statbuf.st_size;
     throw runtime_error("fstat() failed");
+
+#endif
 }
+
 
 void File::resize(off_t size)
 {
+#ifdef _WIN32 // Windows version
+
+SetFilePointer(hFile,new_size,NULL,FILE_BEGIN);
+
+SetEndOfFile(hFile);
+
+#else // POSIX version
+
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
     if (TIGHTDB_LIKELY(::ftruncate(m_fd, size) == 0)) return;
     throw runtime_error("ftruncate() failed");
+
+#endif
 }
+
 
 void File::alloc(off_t offset, size_t size)
 {
+#ifdef _WIN32 // Windows version
+
+    if (int_add_with_overflow_detect(offset, size))
+        throw runtime_error("File size overflow");
+    File::resize(off_t size);
+
+#else // POSIX version
+
     if (TIGHTDB_LIKELY(::posix_fallocate(m_fd, offset, size) == 0)) return;
     throw runtime_error("posix_fallocate() failed");
 
@@ -319,7 +384,10 @@ void File::alloc(off_t offset, size_t size)
         case ENOSPC: throw ResourceAllocError(msg);
         default:     throw runtime_error(msg);
     }
+
+#endif
 }
+
 
 void File::seek(off_t position)
 {
@@ -327,11 +395,13 @@ void File::seek(off_t position)
     throw runtime_error("lseek() failed");
 }
 
+
 void File::sync()
 {
     if (TIGHTDB_LIKELY(::fsync(m_fd) == 0)) return;
     throw runtime_error("fsync() failed");
 }
+
 
 FILE* File::open_stdio_file(AccessMode a)
 {
@@ -367,6 +437,7 @@ FILE* File::open_stdio_file(AccessMode a)
     }
 }
 
+
 void File::lock_exclusive()
 {
     lock_file(m_fd, true, false);
@@ -386,6 +457,7 @@ void File::unlock() TIGHTDB_NOEXCEPT
 {
     unlock_file(m_fd);
 }
+
 
 void* File::map(AccessMode a, size_t size) const
 {
@@ -407,11 +479,28 @@ void* File::map(AccessMode a, size_t size) const
     }
 }
 
+
 void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size) const
 {
+#ifdef _GNU_SOURCE
+    void* const new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
+    if (TIGHTDB_LIKELY(addr != MAP_FAILED)) return addr;
+
+    unmap(old_addr, old_size);
+
+    const int errnum = errno; // Eliminate any risk of clobbering
+    const string msg = get_errno_msg(errnum);
+    switch (errnum) {
+        case EAGAIN:
+        case ENOMEM: throw ResourceAllocError(msg);
+        default:     throw runtime_error(msg);
+    }
+#else
     unmap(old_addr, old_size);
     return map(a, new_size);
+#endif
 }
+
 
 void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 {
@@ -419,6 +508,7 @@ void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);
 }
+
 
 void File::sync_map(void* addr, size_t size)
 {
@@ -444,11 +534,6 @@ void File::sync_map(void* addr, size_t size)
 
         const LPVOID addr = MapViewOfFile(map_file, FILE_MAP_COPY, 0, 0, 0);
         if (!addr) goto map_view_error;
-
-        // Get Size
-        LARGE_INTEGER large_int;
-        if (!GetFileSizeEx(file, &large_int)) goto get_size_error;
-        const size_t size = to_ref(large_int.QuadPart); // FIXME: Really use to_ref() here? It looks like a misuse.
 
         UnmapGuard ug(addr);
 
