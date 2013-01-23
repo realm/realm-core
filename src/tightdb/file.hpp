@@ -45,13 +45,16 @@ std::string create_temp_dir();
 ///
 /// You can use CloseGuard and UnlockGuard to acheive exception-safe
 /// closing or unlocking prior to the File instance being detroyed.
+///
+/// A single File instance must never be accessed concurrently by
+/// multiple threads.
 class File {
 public:
     enum Mode {
-        mode_Read,   // access_ReadOnly,  create_Never
-        mode_Update, // access_ReadWrite, create_Auto
-        mode_Write,  // access_ReadWrite, create_Auto, flag_Trunc
-        mode_Append  // access_ReadWrite, create_Auto, flag_Append
+        mode_Read,   ///< access_ReadOnly,  create_Never             (fopen: rb)
+        mode_Update, ///< access_ReadWrite, create_Never             (fopen: rb+)
+        mode_Write,  ///< access_ReadWrite, create_Auto, flag_Trunc  (fopen: wb+)
+        mode_Append  ///< access_ReadWrite, create_Auto, flag_Append (fopen: ab+)
     };
 
     /// See open(const std::string&, Mode).
@@ -115,31 +118,34 @@ public:
     /// have undefined contents. Setting the size with this method
     /// does not necessarily allocate space on the target device. If
     /// you want to ensure allocation, call alloc(). Calling this
-    /// method on an instance that does not refer to an open file has
-    /// undefined behavior. Calling this method on a file that is
-    /// opened in read-only mode, is an error.
+    /// method will generally affect the read/write offset associated
+    /// with this File instance. Calling this method on an instance
+    /// that does not refer to an open file has undefined
+    /// behavior. Calling this method on a file that is opened in
+    /// read-only mode, is an error.
     void resize(off_t);
 
     /// Allocate space on the target device for the specified region
     /// of the file. If the region extends beyond the current end of
-    /// the file, the file is resized accordingly. Calling this method
-    /// on an instance that does not refer to an open file has
-    /// undefined behavior. Calling this method on a file that is
+    /// the file, the file size is increased as necessary. Calling
+    /// this method on an instance that does not refer to an open file
+    /// has undefined behavior. Calling this method on a file that is
     /// opened in read-only mode, is an error.
+    ///
+    /// This method may not have atomic behaviour on all systems, that
+    /// is, two processes, or two threads should never call this
+    /// method concurrently for the same underlying file even though
+    /// they access the file through distinct File instances.
     void alloc(off_t offset, std::size_t size);
 
-    /// Reposition the read/write offset in the file.
+    /// Reposition the read/write offset of this File
+    /// instance. Distinct File instances have separate independent
+    /// offsets, as long as the cucrrent process is not forked.
     void seek(off_t);
 
     /// Flush in-kernel buffers to disk. This blocks the caller until
     /// the synchronization operation is complete.
     void sync();
-
-    /// The STDIO file stream is opened in binary mode. Its existence
-    /// will be independent of the existence of this File instance. It
-    /// is an error to specify an access mode that is less restrictive
-    /// than what was passed to open() or the File constructor.
-    std::FILE* open_stdio_file(AccessMode);
 
     /// Place an exclusive lock on this file. This blocks the caller
     /// until all other locks have been released. Calling this method
@@ -203,6 +209,10 @@ public:
     /// map().
     static void sync_map(void* addr, std::size_t size);
 
+    /// See open(const std::string&, Mode). The STDIO file stream is
+    /// always opened in binary mode.
+    static std::FILE* open_stdio_file(const std::string& path, Mode = mode_Read);
+
     template<class> class Map;
 
     class CloseGuard;
@@ -261,6 +271,9 @@ private:
 ///
 /// You can use UnmapGuard to acheive exception-safe unmapping prior
 /// to the Map instance being detroyed.
+///
+/// A single Map instance must never be accessed concurrently by
+/// multiple threads.
 template<class T> class File::Map: MapBase {
 public:
     /// See map().
@@ -374,7 +387,7 @@ inline void File::open(const std::string& path, Mode m)
     int flags = 0;
     switch (m) {
         case mode_Read:   a = access_ReadOnly; c = create_Never; break;
-        case mode_Update:                                        break;
+        case mode_Update:                      c = create_Never; break;
         case mode_Write:  flags = flag_Trunc;                    break;
         case mode_Append: flags = flag_Append;                   break;
     }

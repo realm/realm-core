@@ -350,11 +350,10 @@ void File::resize(off_t size)
 {
 #ifdef _WIN32 // Windows version
 
-Problem is that file offset is affected
+    seek(size);
 
-SetFilePointer(hFile,new_size,NULL,FILE_BEGIN);
-
-SetEndOfFile(hFile);
+    if (TIGHTDB_UNLIKELY(!SetEndOfFile(m_handle)))
+        throw runtime_error("SetEndOfFile() failed");
 
 #else // POSIX version
 
@@ -373,7 +372,7 @@ void File::alloc(off_t offset, size_t size)
 
     if (int_add_with_overflow_detect(offset, size))
         throw runtime_error("File size overflow");
-    File::resize(off_t size);
+    if (get_size() < offset) resize(offset);
 
 #else // POSIX version
 
@@ -393,50 +392,41 @@ void File::alloc(off_t offset, size_t size)
 
 void File::seek(off_t position)
 {
+#ifdef _WIN32 // Windows version
+
+    LARGE_INTEGER large_int;
+    if (int_cast_with_overflow_detect(size, large_int.QuadPart))
+        throw runtime_error("File size is too large");
+
+    if (TIGHTDB_UNLIKELY(!SetFilePointerEx(m_handle, large_int, 0, FILE_BEGIN)))
+        throw runtime_error("SetFilePointerEx() failed");
+
+#else // POSIX version
+
     if (TIGHTDB_LIKELY(0 <= ::lseek(m_fd, position, SEEK_SET))) return;
     throw runtime_error("lseek() failed");
+
+#endif
 }
 
 
+// FIXME: The current implementation may not guaratee that data is
+// actually written to disk. POSIX is rather vague on what fsync() has
+// to do unless _POSIX_SYNCHRONIZED_IO is defined. See also
+// http://www.humboldt.co.uk/2009/03/fsync-across-platforms.html.
 void File::sync()
 {
+#ifdef _WIN32 // Windows version
+
+    if (TIGHTDB_LIKELY(FlushFileBuffers(m_handle)) return;
+    throw runtime_error("FlushFileBuffers() failed");
+
+#else // POSIX version
+
     if (TIGHTDB_LIKELY(::fsync(m_fd) == 0)) return;
     throw runtime_error("fsync() failed");
-}
 
-
-FILE* File::open_stdio_file(AccessMode a)
-{
-    int errnum;
-    {
-        // First get a new independent file destriptor
-        const int new_fd = dup(m_fd);
-        if (TIGHTDB_UNLIKELY(new_fd < 0)) {
-            errnum = errno;
-            goto error;
-        }
-
-        const char* mode = 0;
-        switch (a) {
-            case access_ReadWrite: mode = "r+"; break;
-            case access_ReadOnly:  mode = "r";  break;
-        }
-        FILE* const file = fdopen(new_fd, mode);
-        if (TIGHTDB_UNLIKELY(file == 0)) {
-            errnum = errno;
-            ::close(new_fd);
-            goto error;
-        }
-        return file;
-    }
-
-  error:
-    const string msg = get_errno_msg(errnum);
-    switch (errnum) {
-        case EMFILE:
-        case ENOMEM: throw ResourceAllocError(msg);
-        default:     throw runtime_error(msg);
-    }
+#endif
 }
 
 
@@ -485,11 +475,10 @@ void* File::map(AccessMode a, size_t size) const
 void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size) const
 {
 #ifdef _GNU_SOURCE
+    static_cast<void>(a);
     void* const new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
-    if (TIGHTDB_LIKELY(addr != MAP_FAILED)) return addr;
-
+    if (TIGHTDB_LIKELY(new_addr != MAP_FAILED)) return new_addr;
     unmap(old_addr, old_size);
-
     const int errnum = errno; // Eliminate any risk of clobbering
     const string msg = get_errno_msg(errnum);
     switch (errnum) {
@@ -517,6 +506,42 @@ void File::sync_map(void* addr, size_t size)
     if (TIGHTDB_LIKELY(::msync(addr, size, MS_SYNC) == 0)) return;
     const int errnum = errno; // Eliminate any risk of clobbering
     throw runtime_error(get_errno_msg(errnum));
+}
+
+
+FILE* File::open_stdio_file(const string& path, Mode m)
+{
+    const char* mode = 0;
+    switch (m) {
+        case mode_Read:   mode = "rb";  break;
+        case mode_Update: mode = "rb+"; break;
+        case mode_Write:  mode = "wb+"; break;
+        case mode_Append: mode = "ab+"; break;
+    }
+    FILE* const file = fopen(path.c_str(), mode);
+    if (TIGHTDB_LIKELY(file)) return file;
+
+    const int errnum = errno; // Eliminate any risk of clobbering
+    const string msg = get_errno_msg(errnum);
+    // Note: The following error codes are defined by POSIX, and
+    // Windows follows POSIX in this respect, however, Windows
+    // probably never produce most of these.
+    switch (errnum) {
+        case EACCES:
+        case EROFS:
+        case ETXTBSY:       throw PermissionDenied(msg);
+        case ENOENT:        throw NotFound(msg);
+        case EISDIR:
+        case ENAMETOOLONG:
+        case ENOTDIR:
+        case ENXIO:         throw OpenError(msg);
+        case EMFILE:
+        case ENFILE:
+        case ENOSR:
+        case ENOSPC:
+        case ENOMEM:        throw ResourceAllocError(msg);
+        default:            throw runtime_error(msg);
+    }
 }
 
 
