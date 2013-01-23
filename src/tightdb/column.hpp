@@ -126,10 +126,12 @@ protected:
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif // TIGHTDB_DEBUG
 
+    template <typename T, typename R, ACTION action, class condition>
+        R aggregate(T target, size_t start, size_t end, size_t *matchcount) const;
+
     // Member variables
     mutable Array* m_array;
 };
-
 
 
 class Column : public ColumnBase {
@@ -234,8 +236,6 @@ protected:
     }
 
     void DoSort(size_t lo, size_t hi);
-    template <ACTION action, class cond, class T>
-        T aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;
 
     // Member variables
     Index* m_index;

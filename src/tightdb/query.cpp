@@ -1,4 +1,8 @@
 #include <tightdb/array.hpp>
+#include <tightdb/array_float.hpp>
+#include <tightdb/array_double.hpp>
+#include <tightdb/column_float.hpp>
+#include <tightdb/column_double.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/query_engine.hpp>
 

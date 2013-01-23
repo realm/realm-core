@@ -1,5 +1,6 @@
 #include <tightdb/query_engine.hpp>
 
+
 namespace {
 
 using namespace tightdb;
@@ -16,6 +17,11 @@ bool IsNodeFromRef(size_t ref, Allocator& alloc)
 
 
 namespace tightdb {
+// Predeclarations from query_engine.hpp
+class ParentNode;
+template<class T, class F> class BASICNODE;
+template<class T> class SequentialGetter;
+
 
 template<typename T>
 ColumnBasic<T>::ColumnBasic(Allocator& alloc)
@@ -267,41 +273,18 @@ void ColumnBasic<T>::find_all(Array &result, T value, size_t start, size_t end) 
 }
 
 
-#if 0
-
-// TODO: Move to ColumnBase?
-template<typename T> template <typename R, ACTION action, class condition>
-R ColumnBasic<T>::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
-{ 
-    if (end == size_t(-1)) 
-        end = Size();
-
-    // ???TODO We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
-    // slower because of initial over).
-        //    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
-        //    new (node) NODE<int64_t, Column, cond>(target, 0);
-    BASICNODE<T, condition> node(target, NULL);
-
-    node.QuickInit((ColumnBasic<T>*)this, target); 
-    state_state<R> st;
-    st.init(action, NULL, size_t(-1));
-
-    SequentialGetter<T> sg( (ColumnBasic<T>*)this ); 
-    node.template aggregate_local<action, R, T>(&st, start, end, size_t(-1), &sg, matchcount);
-
-    return st.state;
-}
+#if 1
 
 template<typename T>
 size_t ColumnBasic<T>::count(T target) const
 {
-    return size_t(aggregate<int64_t, TDB_COUNT, EQUAL>(target, 0, Size()));
+    return size_t(ColumnBase::aggregate<T, int64_t, TDB_COUNT, EQUAL>(target, 0, Size(), NULL));
 }
 
 template<typename T>
 T ColumnBasic<T>::sum(size_t start, size_t end) const
 {
-    return aggregate<T, TDB_SUM, NONE>(0, start, end);
+    return ColumnBase::aggregate<T, T, TDB_SUM, NONE>(0, start, end, NULL);
 }
 
 template<typename T>
@@ -310,7 +293,7 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = Size();
     size_t size = end - start;
-    T sum1 = aggregate<T, TDB_SUM, NONE>(0, start, end);
+    T sum1 = ColumnBase::aggregate<T, T, TDB_SUM, NONE>(0, start, end, NULL);
     double avg = double(sum1) / double( size == 0 ? 1 : size ); 
     return avg;
 }
@@ -318,13 +301,13 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
 template<typename T>
 T ColumnBasic<T>::minimum(size_t start, size_t end) const
 {
-    return aggregate<T, TDB_MIN, NONE>(0, start, end);
+    return ColumnBase::aggregate<T, T, TDB_MIN, NONE>(0, start, end, NULL);
 }
 
 template<typename T>
 T ColumnBasic<T>::maximum(size_t start, size_t end) const
 {
-    return aggregate<T, TDB_MAX, NONE>(0, start, end);
+    return ColumnBase::aggregate<T, T, TDB_MAX, NONE>(0, start, end, NULL);
 }
 
 /*
@@ -397,21 +380,60 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
     return avg;
 }
 
+#include <iostream>
+
 template<typename T>
 T ColumnBasic<T>::minimum(size_t start, size_t end) const
 {
-    // TODO
-    (void)start;
-    (void)end;
-    return 0.0;
+    if (end == size_t(-1))
+        end = Size();
+
+    T min_val = T(987.0);
+    if (m_array->IsNode()) {
+        const Array refs = NodeGetRefs();
+        const size_t n = refs.Size();
+        
+        for (size_t i = start; i < n; ++i) {
+            const size_t ref = refs.GetAsRef(i);
+            const ColumnBasic<T> col(ref, NULL, 0, m_array->GetAllocator());
+            T val = col.minimum(start, end);
+            if (val < min_val || i == start) {
+                //std::cout << "Min " << i << ": " << min_val << " new val: " << val << "\n";
+                val = min_val;
+            }
+        }
+    }
+    else {
+       // std::cout << "array-min before: " << min_val;
+        ((ArrayBasic<T>*)m_array)->minimum(min_val, start, end);
+       // std::cout << " after: " << min_val << "\n";
+    }
+    return min_val;
 }
 
 template<typename T>
 T ColumnBasic<T>::maximum(size_t start, size_t end) const
 {
-    (void)start;
-    (void)end;
-    return 0.0;
+    if (end == size_t(-1))
+        end = Size();
+
+    T max_val = T(0.0);
+    if (m_array->IsNode()) {
+        const Array refs = NodeGetRefs();
+        const size_t n = refs.Size();
+        
+        for (size_t i = start; i < n; ++i) {
+            const size_t ref = refs.GetAsRef(i);
+            const ColumnBasic<T> col(ref, NULL, 0, m_array->GetAllocator());
+            T val = col.maximum(start, end);
+            if (val > max_val || i == start)
+                val = max_val;
+        }
+    }
+    else {
+        ((ArrayBasic<T>*)m_array)->maximum(max_val, start, end);
+    }
+    return max_val;
 }
 
 #endif

@@ -29,15 +29,24 @@
 #include <tightdb/column_string.hpp>
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/column_binary.hpp>
-#include <tightdb/column_float.hpp>
-#include <tightdb/column_double.hpp>
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 
-namespace tightdb {
 
-class ArrayFloat;
-class ArrayDouble;
+// Predeclarations for ColumnFloat and ColumnDouble
+namespace tightdb {
+template<class T> class ArrayBasic;
+template<class T> class ColumnBasic;
+class ColumnFloat;
+class ColumnDouble;
+}
+
+#include <tightdb/array_float.hpp>
+#include <tightdb/array_double.hpp>
+
+
+
+namespace tightdb {
 
 // Number of matches to find in best condition loop before breaking out to probe other conditions
 const size_t findlocals = 1;   
@@ -92,11 +101,11 @@ public:
         m_array.Destroy(); 
     }
 
-    SequentialGetter(const Table& table, size_t column) 
+    SequentialGetter(const Table& table, size_t column_ndx) 
     {
         m_array.Destroy();
-        if (column != not_found)
-            m_column = (ColType *)&table.GetColumnBase(column);
+        if (column_ndx != not_found)
+            m_column = (ColType *)&table.GetColumnBase(column_ndx);
         m_leaf_end = 0;
     }
 
@@ -288,9 +297,16 @@ public:
 
     }
 
+
+#if 0
+NODE:
+    size_t aggregate_local(state_state_parent* st, size_t start, size_t end, size_t local_limit, 
+                           SequentialGetterParent* agg_col, size_t* matchcount) {
+#endif
+
     template<ACTION action, class resulttype, class T>
-    size_t aggregate_local(state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, 
-                           SequentialGetter<T>* agg_col, size_t* matchcount) 
+    size_t aggregate_local(state_state_parent* st, size_t start, size_t end, size_t local_limit, 
+                           SequentialGetterParent* agg_col, size_t* matchcount) 
     {
 		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
         // integer version, because find_first_local() is relatively slower here (because it's non-integers).
@@ -333,7 +349,7 @@ public:
                 T av = (T)0;
                 if (agg_col != NULL)
                     av = static_cast<SequentialGetter<T>*>(agg_col)->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
-                st->template state_match<action, 0>(r, 0, resulttype(av), CallbackDummy());
+                ((state_state<resulttype>*)st)->template state_match<action, 0>(r, 0, resulttype(av), CallbackDummy());
              }   
         }
     }
@@ -533,38 +549,38 @@ public:
         size_t ret;
 
         if (action == TDB_RETURN_FIRST)
-            ret = aggregate_local<TDB_RETURN_FIRST, int64_t>(st, start, end, local_limit, agg_col, matchcount);        
+            ret = aggregate_local<TDB_RETURN_FIRST, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);        
 
         else if (action == TDB_SUM && col_id == COLUMN_TYPE_INT)
-            ret = aggregate_local<TDB_SUM, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_SUM, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_SUM && col_id == COLUMN_TYPE_FLOAT)
             // todo, fixme, see if we must let sum return a double even when summing a float coltype 
-            ret = aggregate_local<TDB_SUM, float>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_SUM, float, float>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_SUM && col_id == COLUMN_TYPE_DOUBLE)
-            ret = aggregate_local<TDB_SUM, double>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_SUM, double, double>(st, start, end, local_limit, agg_col, matchcount);
 
         else if (action == TDB_MAX && col_id == COLUMN_TYPE_INT)
-            ret = aggregate_local<TDB_MAX, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_MAX, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_MAX && col_id == COLUMN_TYPE_FLOAT)
-            ret = aggregate_local<TDB_MAX, float>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_MAX, float, float>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_MAX && col_id == COLUMN_TYPE_DOUBLE)
-            ret = aggregate_local<TDB_MAX, double>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_MAX, double, double>(st, start, end, local_limit, agg_col, matchcount);
 
         else if (action == TDB_MIN && col_id == COLUMN_TYPE_INT)
-            ret = aggregate_local<TDB_MIN, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_MIN, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_MIN && col_id == COLUMN_TYPE_FLOAT)
-            ret = aggregate_local<TDB_MIN, float>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_MIN, float, float>(st, start, end, local_limit, agg_col, matchcount);
         else if (action == TDB_MIN && col_id == COLUMN_TYPE_DOUBLE)
-            ret = aggregate_local<TDB_MIN, double>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_MIN, double, double>(st, start, end, local_limit, agg_col, matchcount);
 
         else if (action == TDB_COUNT)
-            ret = aggregate_local<TDB_COUNT, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_COUNT, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
 
         else if (action == TDB_FINDALL)
-            ret = aggregate_local<TDB_FINDALL, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_FINDALL, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
 
         else if (action == TDB_CALLBACK_IDX)
-            ret = aggregate_local<TDB_CALLBACK_IDX, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_CALLBACK_IDX, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
 
         else { 
             TIGHTDB_ASSERT(false);
@@ -574,8 +590,9 @@ public:
         return ret;
     }
 
+
     // agg_col      column number in m_table which must act as source for aggreate action
-    template <ACTION action, class resulttype> 
+    template <ACTION action, class resulttype, class unused> 
     size_t aggregate_local(state_state_parent* st, size_t start, size_t end, size_t local_limit, 
                            SequentialGetterParent* agg_col, size_t* matchcount) {
         F f;
@@ -759,11 +776,11 @@ protected:
 // Can be used for simple types (currently float and double)
 template <class T, class F> class BASICNODE: public ParentNode {
 public:
-    typedef typename ColumnTypeTraits<T>::column_type C;
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
     
-    BASICNODE(T v, size_t column) : m_value(v)
+    BASICNODE(T v, size_t column_ndx) : m_value(v)
     {
-        m_column_id = column;
+        m_column_id = column_ndx;
         m_child = 0;
     }
 
@@ -771,7 +788,7 @@ public:
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
     // be merged with Init somehow to simplify
     void QuickInit(ColumnBasic<T> *column, T value) {
-        m_col.m_column = (C*)column;
+        m_col.m_column = (ColType*)column;
         m_col.m_leaf_end = 0;
         m_value = value;
         m_conds = 1;
@@ -780,7 +797,7 @@ public:
     void Init(const Table& table)
     {
         m_table = &table;
-        m_col.m_column = (C*)(&table.GetColumnBase(m_column_id));
+        m_col.m_column = (ColType*)(&table.GetColumnBase(m_column_id));
         m_col.m_leaf_end = 0;
 
         if (m_child) 

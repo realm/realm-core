@@ -447,37 +447,16 @@ void Column::fill(size_t count)
 #endif
 }
 
-template <ACTION action, class cond, class T>
-T Column::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
-{ 
-    if (end == size_t(-1)) 
-        end = Size();
-
-    // We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
-    // slower because of initial overhead).
-        //    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
-        //    new (node) NODE<int64_t, Column, cond>(target, 0);
-    NODE<T, Column, cond> node(target, 0);
-
-    node.QuickInit((Column*)this, target); 
-    state_state<T> st;
-    st.init(action, NULL, size_t(-1));
-
-    node.template aggregate_local<action, T>(&st, start, end, size_t(-1), NULL, matchcount);
-
-    return st.state;
-}
-
 // int64_t specific:
 
 size_t Column::count(int64_t target) const
 {
-    return size_t(aggregate<TDB_COUNT, EQUAL, int64_t>(target, 0, Size()));
+    return size_t(aggregate<int64_t, int64_t, TDB_COUNT, EQUAL>(target, 0, Size(), NULL));
 }
 
 int64_t Column::sum(size_t start, size_t end) const
 {
-    return aggregate<TDB_SUM, NONE, int64_t>(0, start, end);
+    return aggregate<int64_t, int64_t, TDB_SUM, NONE>(0, start, end, NULL);
 }
 
 double Column::average(size_t start, size_t end) const
@@ -485,19 +464,19 @@ double Column::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = Size();
     size_t size = end - start;
-    int64_t sum = aggregate<TDB_SUM, NONE, int64_t>(0, start, end);
+    int64_t sum = aggregate<int64_t, int64_t, TDB_SUM, NONE>(0, start, end, NULL);
     double avg = double( sum ) / double( size == 0 ? 1 : size );
     return avg;
 }
 
 int64_t Column::minimum(size_t start, size_t end) const
 {
-    return aggregate<TDB_MIN, NONE, int64_t>(0, start, end);
+    return aggregate<int64_t, int64_t, TDB_MIN, NONE>(0, start, end, NULL);
 }
 
 int64_t Column::maximum(size_t start, size_t end) const
 {
-    return aggregate<TDB_MAX, NONE, int64_t>(0, start, end);
+    return aggregate<int64_t, int64_t, TDB_MAX, NONE>(0, start, end, NULL);
 }
 
 
