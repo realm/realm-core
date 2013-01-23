@@ -395,7 +395,7 @@ void File::seek(off_t position)
 #ifdef _WIN32 // Windows version
 
     LARGE_INTEGER large_int;
-    if (int_cast_with_overflow_detect(size, large_int.QuadPart))
+    if (int_cast_with_overflow_detect(position, large_int.QuadPart))
         throw runtime_error("File size is too large");
 
     if (TIGHTDB_UNLIKELY(!SetFilePointerEx(m_handle, large_int, 0, FILE_BEGIN)))
@@ -418,7 +418,7 @@ void File::sync()
 {
 #ifdef _WIN32 // Windows version
 
-    if (TIGHTDB_LIKELY(FlushFileBuffers(m_handle)) return;
+    if (TIGHTDB_LIKELY(FlushFileBuffers(m_handle))) return;
     throw runtime_error("FlushFileBuffers() failed");
 
 #else // POSIX version
