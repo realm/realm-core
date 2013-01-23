@@ -31,24 +31,6 @@ using namespace tightdb;
 namespace {
 
 
-#ifdef _WIN32 // Windows - GetLastError()
-
-string get_last_error_msg(const DWORD errnum)
-{
-    StringBuffer buffer;
-    buffer.resize(1024);
-    const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
-    const DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
-    const DWORD size =
-        FormatMessageA(flags, 0, errnum, language_id, buffer.data(),
-                       static_cast<DWORD>(buffer.size()), 0);
-    if (TIGHTDB_LIKELY(0 < size)) return string(buffer.data(), size);
-    return "Unknown error";
-}
-
-#endif
-
-
 string get_errno_msg(const int errnum)
 {
 #if defined _BSD_SOURCE || defined _WIN32
@@ -76,47 +58,19 @@ string get_errno_msg(const int errnum)
 }
 
 
-#ifndef _WIN32 // BSD / Linux flock()
+#ifdef _WIN32 // Windows - GetLastError()
 
-inline bool lock_file(int fd, bool exclusive, bool non_blocking)
+string get_last_error_msg(const DWORD errnum)
 {
-    // NOTE: It would probably have been more portable to use fcntl()
-    // based POSIX locks, however these locks are not recursive within
-    // a single process, and since a second attempt to acquire such a
-    // lock will always appear to succeed, one will easily suffer the
-    // 'spurious unlocking issue'. It remains to be determined whether
-    // this also applies across distinct threads inside a single
-    // process.
-    //
-    // To make matters worse, flock() may be a simple wrapper around
-    // fcntl() based locks on some systems. This is bad news, because
-    // the robustness of the TightDB API relies in part by the
-    // assumption that a single process (even a single thread) can
-    // hold multiple overlapping independent shared locks on a single
-    // file as long as they are placed via distinct file descriptors.
-    //
-    // Fortunately, on both Linux and Darwin, flock() does not suffer
-    // from this 'spurious unlocking issue'.
-
-    int operation = exclusive ? LOCK_EX : LOCK_SH;
-    if (non_blocking) operation |=  LOCK_NB;
-    if (TIGHTDB_LIKELY(flock(fd, operation) == 0)) return true;
-    const int errnum = errno; // Eliminate any risk of clobbering
-    if (errnum == EWOULDBLOCK) return false;
-    const string msg = get_errno_msg(errnum);
-    if (errnum == ENOLCK) throw ResourceAllocError(msg);
-    throw runtime_error(msg);
-}
-
-inline void unlock_file(int fd) TIGHTDB_NOEXCEPT
-{
-    // The Linux man page for flock() does not state explicitely that
-    // unlocking is idempotent, however, we will assume it since there
-    // is no mention of the error that would be reported if a
-    // non-locked file were unlocked.
-    const int r = flock(fd, LOCK_UN);
-    TIGHTDB_ASSERT(r == 0);
-    static_cast<void>(r);
+    StringBuffer buffer;
+    buffer.resize(1024);
+    const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+    const DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
+    const DWORD size =
+        FormatMessageA(flags, 0, errnum, language_id, buffer.data(),
+                       static_cast<DWORD>(buffer.size()), 0);
+    if (TIGHTDB_LIKELY(0 < size)) return string(buffer.data(), size);
+    return "Unknown error";
 }
 
 #endif
@@ -193,7 +147,8 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags)
     const HANDLE handle = CreateFileA(path.c_str(), desired_access, share_mode, 0,
                                       creation_disposition, flags_and_attributes, 0);
     if (TIGHTDB_LIKELY(handle != INVALID_HANDLE_VALUE)) {
-        m_handle = handle;
+        m_handle    = handle;
+        m_have_lock = false;
         return;
     }
 
@@ -257,6 +212,7 @@ void File::close() TIGHTDB_NOEXCEPT
 #ifdef _WIN32 // Windows version
 
     if (!m_handle) return;
+    if (m_have_lock) unlock();
 
     const BOOL r = CloseHandle(m_handle);
     TIGHTDB_ASSERT(r);
@@ -410,7 +366,7 @@ void File::seek(off_t position)
 }
 
 
-// FIXME: The current implementation may not guaratee that data is
+// FIXME: The current implementation may not guarantee that data is
 // actually written to disk. POSIX is rather vague on what fsync() has
 // to do unless _POSIX_SYNCHRONIZED_IO is defined. See also
 // http://www.humboldt.co.uk/2009/03/fsync-across-platforms.html.
@@ -430,46 +386,80 @@ void File::sync()
 }
 
 
-void File::lock_exclusive()
+bool File::lock(bool exclusive, bool non_blocking)
 {
 #ifdef _WIN32 // Windows version
 
-#else // POSIX version
+    // Under Windows a file lock must be explicitely released before
+    // the file is closed. It will eventually be released by the
+    // system, but there is no guarantees on the timing.
 
-    lock_file(m_fd, true, false);
+    DWORD flags = 0;
+    if (exclusive)    flags |= LOCKFILE_EXCLUSIVE_LOCK;
+    if (non_blocking) flags |= LOCKFILE_FAIL_IMMEDIATELY;
+    OVERLAPPED overlapped;
+    memset(&overlapped, 0, sizeof overlapped);
+    if (TIGHTDB_LIKELY(LockFileEx(m_handle, flags, 0, 1, 0, &overlapped))) {
+        m_have_lock = true;
+        return true;
+    }
+    const DWORD errnum = GetLastError(); // Eliminate any risk of clobbering
+    if (errnum == ERROR_LOCK_VIOLATION) return false;
+    const string msg = get_last_error_msg(errnum);
+    throw runtime_error(msg);
+
+#else // BSD / Linux flock()
+
+    // NOTE: It would probably have been more portable to use fcntl()
+    // based POSIX locks, however these locks are not recursive within
+    // a single process, and since a second attempt to acquire such a
+    // lock will always appear to succeed, one will easily suffer the
+    // 'spurious unlocking issue'. It remains to be determined whether
+    // this also applies across distinct threads inside a single
+    // process.
+    //
+    // To make matters worse, flock() may be a simple wrapper around
+    // fcntl() based locks on some systems. This is bad news, because
+    // the robustness of the TightDB API relies in part by the
+    // assumption that a single process (even a single thread) can
+    // hold multiple overlapping independent shared locks on a single
+    // file as long as they are placed via distinct file descriptors.
+    //
+    // Fortunately, on both Linux and Darwin, flock() does not suffer
+    // from this 'spurious unlocking issue'.
+
+    int operation = exclusive ? LOCK_EX : LOCK_SH;
+    if (non_blocking) operation |=  LOCK_NB;
+    if (TIGHTDB_LIKELY(flock(m_fd, operation) == 0)) return true;
+    const int errnum = errno; // Eliminate any risk of clobbering
+    if (errnum == EWOULDBLOCK) return false;
+    const string msg = get_errno_msg(errnum);
+    if (errnum == ENOLCK) throw ResourceAllocError(msg);
+    throw runtime_error(msg);
 
 #endif
 }
 
-bool File::try_lock_exclusive()
-{
-#ifdef _WIN32 // Windows version
-
-#else // POSIX version
-
-    return lock_file(m_fd, true, true);
-
-#endif
-}
-
-void File::lock_shared()
-{
-#ifdef _WIN32 // Windows version
-
-#else // POSIX version
-
-    lock_file(m_fd, false, false);
-
-#endif
-}
 
 void File::unlock() TIGHTDB_NOEXCEPT
 {
 #ifdef _WIN32 // Windows version
 
-#else // POSIX version
+    if (!m_have_lock) return;
+    const BOOL r = UnlockFile(m_handle, 0, 0, 1, 0);
+    TIGHTDB_ASSERT(r);
+    static_cast<void>(r);
+    m_have_lock = false;
 
-    unlock_file(m_fd);
+#else // BSD / Linux flock()
+
+    // The Linux man page for flock() does not state explicitely that
+    // unlocking is idempotent, however, we will assume it since there
+    // is no mention of the error that would be reported if a
+    // non-locked file were unlocked.
+    const int r = flock(m_fd, LOCK_UN);
+    TIGHTDB_ASSERT(r == 0);
+    static_cast<void>(r);
 
 #endif
 }
@@ -478,6 +468,34 @@ void File::unlock() TIGHTDB_NOEXCEPT
 void* File::map(AccessMode a, size_t size) const
 {
 #ifdef _WIN32 // Windows version
+
+    DWORD protect        = PAGE_READONLY;
+    DWORD desired_access = FILE_MAP_READ;
+    switch (a) {
+        case access_ReadOnly:
+            break;
+        case access_ReadWrite:
+            protect        = PAGE_READWRITE;
+            desired_access = FILE_MAP_WRITE;
+            break;
+    }
+    LARGE_INTEGER large_int;
+    if (int_cast_with_overflow_detect(size, large_int.QuadPart))
+        throw runtime_error("Map size is too large");
+    const HANDLE map_handle =
+        CreateFileMapping(m_handle, 0, PAGE_READONLY, large_int.HighPart, large_int.LowPart, 0);
+    if (TIGHTDB_UNLIKELY(!map_file))
+        throw runtime_error("CreateFileMapping() failed");
+    const void* addr = MapViewOfFile(map_handle, desired_access, 0, 0, 0);
+    {
+        const BOOL r = CloseHandle(map_handle);
+        TIGHTDB_ASSERT(r);
+        static_cast<void>(r);
+    }
+    if (TIGHTDB_UNLIKELY(!addr))
+        throw runtime_error("MapViewOfFile() failed");
+
+    return addr;
 
 #else // POSIX version
 
@@ -527,6 +545,11 @@ void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 {
 #ifdef _WIN32 // Windows version
 
+    static_cast<void>(size);
+    const BOOL r = UnmapViewOfFile(addr);
+    TIGHTDB_ASSERT(r);
+    static_cast<void>(r);
+
 #else // POSIX version
 
     const int r = ::munmap(addr, size);
@@ -540,6 +563,9 @@ void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 void File::sync_map(void* addr, size_t size)
 {
 #ifdef _WIN32 // Windows version
+
+    if (TIGHTDB_LIKELY(FlushViewOfFile(addr, size))) return;
+    throw runtime_error("FlushViewOfFile() failed");
 
 #else // POSIX version
 
@@ -586,95 +612,5 @@ FILE* File::open_stdio_file(const string& path, Mode m)
     }
 }
 
-
-
-/* Windows:
-    // Open file
-    DWORD error_copy;
-    {
-
-        CloseGuard cg(file);
-
-        // Map to memory (read only)
-        const HANDLE map_file = CreateFileMapping(file, NULL, PAGE_WRITECOPY, 0, 0, 0);
-        if (map_file == NULL) goto create_map_error;
-
-        CloseGuard cg2(map_file);
-
-        const LPVOID addr = MapViewOfFile(map_file, FILE_MAP_COPY, 0, 0, 0);
-        if (!addr) goto map_view_error;
-
-        UnmapGuard ug(addr);
-
-        // Verify the data structures
-        if (!validate_buffer(static_cast<char*>(addr), size)) goto invalid_database;
-
-        cg.release();
-        cg2.release();
-        ug.release();
-
-        m_file     = file;
-        m_data     = static_cast<char*>(addr);
-        m_baseline = size;
-    }
-
-    return;
-*/
-
-/* WinAPI:
-
-OVERLAPPED dummy;
-memset(&dummy, 0, sizeof dummy);
-LockFileEx(file, (excl?LOCKFILE_EXCLUSIVE_LOCK:0), 0, 1, 0, &dummy); // Success if non-zero
-
-UnlockFile(file, 0, 0, 1, 0); // Success if non-zero
-
-Under Windows a file lock must be explicitely released before the file is close. It will eventually be released by the system, but there is no guarantees on the timing.
-For this purpose we need a flag that tells us if the file has been locked.
-
-Shared/unshared memory map in Windows????
-
-*/
-
-
-
-/*
-
-struct CloseGuard {
-    CloseGuard(HANDLE file): m_file(file) {}
-    ~CloseGuard()
-    {
-        if (TIGHTDB_UNLIKELY(m_file)) {
-            BOOL r = CloseHandle(m_file);
-            TIGHTDB_ASSERT(r);
-            static_cast<void>(r);
-        }
-    }
-
-    void release() { m_file = 0; }
-
-private:
-    HANDLE m_file;
-};
-
-struct UnmapGuard {
-    UnmapGuard(LPVOID a): m_addr(a) {}
-
-    ~UnmapGuard()
-    {
-        if (TIGHTDB_UNLIKELY(m_addr)) {
-            BOOL r = UnmapViewOfFile(m_addr);
-            TIGHTDB_ASSERT(r);
-            static_cast<void>(r);
-        }
-    }
-
-    void release() { m_addr = 0; }
-
-private:
-    LPVOID m_addr;
-};
-
-*/
 
 } // namespace tightdb

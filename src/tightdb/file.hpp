@@ -148,26 +148,36 @@ public:
     void sync();
 
     /// Place an exclusive lock on this file. This blocks the caller
-    /// until all other locks have been released. Calling this method
-    /// on an instance that does not refer to an open file, or on an
-    /// instance that is already locked has undefined behavior. Locks
-    /// acquired on distinct File instances have fully recursive
+    /// until all other locks have been released.
+    ///
+    /// Locks acquired on distinct File instances have fully recursive
     /// behavior, even if they are acquired in the same process (or
     /// thread) and refer to the same underlying file.
+    ///
+    /// Calling this method on an instance that does not refer to an
+    /// open file, or on an instance that is already locked has
+    /// undefined behavior.
     void lock_exclusive();
+
+    /// Place an shared lock on this file. This blocks the caller
+    /// until all other exclusive locks have been released.
+    ///
+    /// Locks acquired on distinct File instances have fully recursive
+    /// behavior, even if they are acquired in the same process (or
+    /// thread) and refer to the same underlying file.
+    ///
+    /// Calling this method on an instance that does not refer to an
+    /// open file, or on an instance that is already locked has
+    /// undefined behavior.
+    void lock_shared();
 
     /// Non-blocking version of lock_exclusive(). Returns true iff it
     /// succeeds.
     bool try_lock_exclusive();
 
-    /// Place an shared lock on this file. This blocks the caller
-    /// until all other exclusive locks have been released. Calling
-    /// this method on an instance that does not refer to an open
-    /// file, or on an instance that is already locked has undefined
-    /// behavior. Locks acquired on distinct File instances have fully
-    /// recursive behavior, even if they are acquired in the same
-    /// process (or thread) and refer to the same underlying file.
-    void lock_shared();
+    /// Non-blocking version of lock_shared(). Returns true iff it
+    /// succeeds.
+    bool try_lock_shared();
 
     /// Release a previously acquired lock on this file. This method
     /// is idempotent.
@@ -179,10 +189,17 @@ public:
     /// multiple threads inside a single process.
     ///
     /// This File instance does not need to remain in existence after
-    /// the mapping is established. Calling this method on an instance
-    /// that does not refer to an open file has undefined
-    /// behavior. Specifying access_ReadWrite for a file that is
-    /// opened in read-only mode, is an error.
+    /// the mapping is established.
+    ///
+    /// Specifying access_ReadWrite for a file that is opened in
+    /// read-only mode, is an error.
+    ///
+    /// Calling this method on an instance that does not refer to an
+    /// open file, or one that refers to an empty file has undefined
+    /// behavior.
+    ///
+    /// Calling this method with a size that is greater than the size
+    /// of the file has undefined behavior.
     void* map(AccessMode, std::size_t size) const;
 
     /// The same as unmap(old_addr, old_size) followed by map(a,
@@ -245,9 +262,12 @@ public:
 private:
 #ifdef _WIN32
     void* m_handle;
+    bool m_have_lock; // Only valid when m_handle is not null
 #else
     int m_fd;
 #endif
+
+    bool lock(bool exclusive, bool non_blocking);
 
     struct MapBase {
         void* m_addr;
@@ -392,6 +412,26 @@ inline void File::open(const std::string& path, Mode m)
         case mode_Append: flags = flag_Append;                   break;
     }
     open(path, a, c, flags);
+}
+
+inline void File::lock_exclusive()
+{
+    lock(true, false);
+}
+
+inline void File::lock_shared()
+{
+    lock(false, false);
+}
+
+inline bool File::try_lock_exclusive()
+{
+    return lock(true, true);
+}
+
+inline bool File::try_lock_shared()
+{
+    return lock(false, true);
 }
 
 inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size)

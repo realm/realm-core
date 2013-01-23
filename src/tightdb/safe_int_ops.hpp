@@ -215,7 +215,7 @@ template<class L, class R> inline bool int_add_with_overflow_detect(L& lval, R r
     else {
         if (int_less_than(std::numeric_limits<R>::max() - rval, lval)) return true;
     }
-    lval += rval;
+    lval = L(lval + rval);
     return false;
 }
 
@@ -227,7 +227,7 @@ template<class L, class R> inline bool int_subtract_with_overflow_detect(L& lval
     else {
         if (int_less_than(lval, std::numeric_limits<R>::min() + rval)) return true;
     }
-    lval -= rval;
+    lval = L(lval - rval);
     return false;
 }
 
@@ -240,7 +240,7 @@ template<class L, class R> inline bool int_multiply_with_overflow_detect(L& lval
     TIGHTDB_STATIC_ASSERT(lim_l::is_integer && lim_r::is_integer,
                           "Both types must be integers");
     if (int_less_than(lim_r::max() / rval, lval)) return true;
-    lval *= rval;
+    lval = L(lval * rval);
     return false;
 }
 
@@ -255,7 +255,7 @@ template<class F, class T> inline bool int_cast_with_overflow_detect(F from, T& 
 {
     typedef std::numeric_limits<T> lim_to;
     if (int_less_than(from, lim_to::min()) || int_less_than(lim_to::max(), from)) return true;
-    to = from;
+    to = T(from);
     return false;
 }
 
