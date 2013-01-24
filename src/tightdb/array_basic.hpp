@@ -29,6 +29,7 @@ class ArrayBasic : public Array {
 public:
     ArrayBasic(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
     ArrayBasic(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+    ArrayBasic(no_prealloc_tag);
     ~ArrayBasic();
 
     T Get(size_t ndx) const;

@@ -70,11 +70,10 @@ R TableViewBase::aggregate(size_t column_ndx) const
             return column->sum();
     }
 
-    // Array object instantiation must NOT allocate initial memory (capacity) with 'new' because it will lead to mem leak. 
-    // The column keeps ownership of the payload in m_array and will free it itself later, so we must not call Destroy() on m_array.
-    // Todo, create tag constructor for array instead of using 'false'. 
-    ArrType arr;
-    // TODO: why arr(false)?
+    // Array object instantiation must NOT allocate initial memory (capacity) 
+    // with 'new' because it will lead to mem leak. The column keeps ownership 
+    // of the payload in array and will free it itself later, so we must not call Destroy() on array.
+    ArrType arr((Array::no_prealloc_tag()));
 
     size_t leaf_start = 0;
     size_t leaf_end = 0;

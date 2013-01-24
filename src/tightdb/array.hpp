@@ -224,7 +224,8 @@ public:
     Array(const Array& a);
     
     // Fastest way to instantiate an array, if you just want to utilize its methods
-    Array(bool b);
+    struct no_prealloc_tag {};
+    Array(no_prealloc_tag);
 
     virtual ~Array();
 
@@ -679,8 +680,7 @@ inline Array::Array(const Array& src):
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
-inline Array::Array(bool b) : m_alloc(GetDefaultAllocator()) {
-    (void)b;
+inline Array::Array(no_prealloc_tag) : m_alloc(GetDefaultAllocator()) {
 }
 
 

@@ -24,10 +24,7 @@
 
 namespace tightdb {
 
-class ArrayDouble : public ArrayBasic<double> {
-
-};
-
+typedef ArrayBasic<double> ArrayDouble;
 
 } // namespace tightdb
 

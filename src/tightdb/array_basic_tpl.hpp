@@ -55,6 +55,10 @@ inline ArrayBasic<T>::ArrayBasic(size_t ref, ArrayParent *parent, size_t ndx_in_
     SetParent(const_cast<ArrayParent *>(parent), ndx_in_parent);
 }
 
+template<typename T>
+inline ArrayBasic<T>::ArrayBasic(no_prealloc_tag) : Array(no_prealloc_tag()) {
+}
+
 template<typename T> 
 inline ArrayBasic<T>::~ArrayBasic() 
 {

@@ -472,7 +472,7 @@ template <class T, class C, class F> class NODE: public ParentNode {
 public:
     // NOTE: Be careful to call Array(false) constructors on m_array in the initializer list, otherwise
     // their default constructors are called which are slow
-    NODE(T v, size_t column) : m_value(v), m_array(false) {
+    NODE(T v, size_t column) : m_value(v), m_array(Array::no_prealloc_tag()) {
         has_optimized_aggregate = true;
         m_column_id = column;
         m_child = 0;
