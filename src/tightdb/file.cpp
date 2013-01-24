@@ -279,13 +279,13 @@ void File::write(const char* data, size_t size)
 }
 
 
-off_t File::get_size() const
+File::SizeType File::get_size() const
 {
 #ifdef _WIN32 // Windows version
 
     LARGE_INTEGER large_int;
     if (TIGHTDB_LIKELY(GetFileSizeEx(m_handle, &large_int))) {
-        off_t size;
+        SizeType size;
         if (int_cast_with_overflow_detect(large_int.QuadPart, size))
             throw runtime_error("File size is too large");
         return size;
@@ -302,7 +302,7 @@ off_t File::get_size() const
 }
 
 
-void File::resize(off_t size)
+void File::resize(SizeType size)
 {
 #ifdef _WIN32 // Windows version
 
@@ -322,15 +322,9 @@ void File::resize(off_t size)
 }
 
 
-void File::alloc(off_t offset, size_t size)
+void File::alloc(SizeType offset, size_t size)
 {
-#ifdef _WIN32 // Windows version
-
-    if (int_add_with_overflow_detect(offset, size))
-        throw runtime_error("File size overflow");
-    if (get_size() < offset) resize(offset);
-
-#else // POSIX version
+#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     if (TIGHTDB_LIKELY(::posix_fallocate(m_fd, offset, size) == 0)) return;
     throw runtime_error("posix_fallocate() failed");
@@ -342,11 +336,20 @@ void File::alloc(off_t offset, size_t size)
         default:     throw runtime_error(msg);
     }
 
+#else // Fallback
+
+    // FIXME: OS X does not have any version of fallocate, but see
+    // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
+
+    if (int_add_with_overflow_detect(offset, size))
+        throw runtime_error("File size overflow");
+    if (get_size() < offset) resize(offset);
+
 #endif
 }
 
 
-void File::seek(off_t position)
+void File::seek(SizeType position)
 {
 #ifdef _WIN32 // Windows version
 
@@ -535,6 +538,12 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
         default:     throw runtime_error(msg);
     }
 #else
+    // FIXME: From the point of view of POSIX, it would probably be a
+    // better idea to map the new region before unmapping the old one
+    // (assuming that address overlaps are possible). This would also
+    // allows us to guarantee that a failure will leave the old region
+    // untoched. This is only possible, though, if Windows can work
+    // well with the opposite order.
     unmap(old_addr, old_size);
     return map(a, new_size);
 #endif

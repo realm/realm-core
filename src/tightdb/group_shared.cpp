@@ -132,8 +132,8 @@ open_start:
         // Handle empty files (first user)
         if (len == 0) {
             // Create new file
-            len = sizeof(SharedInfo);
-            m_file.resize(len); // FIXME: What is the size of off_t on 64-bit Windows?
+            len = sizeof (SharedInfo);
+            m_file.resize(len);
         }
         need_init = true;
     }

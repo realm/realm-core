@@ -25,7 +25,11 @@
 #include <stdexcept>
 #include <string>
 
-#include <sys/types.h>
+#ifdef _WIN32
+#  include <win32/stdint.h>
+#else // POSIX
+#  include <sys/types.h>
+#endif
 
 #include <tightdb/config.h>
 
@@ -94,7 +98,7 @@ public:
 
     enum {
         flag_Trunc  = 1, ///< Truncate the file if it already exists.
-        flag_Append = 2  ///< Move the end of file before each write.
+        flag_Append = 2  ///< Move to end of file before each write.
     };
 
     /// See open(const std::string&, Mode). Specifying access_ReadOnly
@@ -110,9 +114,15 @@ public:
 
     template<std::size_t N> void write(const char (&data)[N]) { write(data, N); }
 
+#ifdef _WIN32
+    typedef int64_t SizeType;
+#else // POSIX
+    typedef off_t SizeType;
+#endif
+
     /// Calling this method on an instance that does not refer to an
     /// open file has undefined behavior.
-    off_t get_size() const;
+    SizeType get_size() const;
 
     /// If this causes the file to grow, then the new section will
     /// have undefined contents. Setting the size with this method
@@ -124,7 +134,7 @@ public:
     /// Calling this method on an instance that does not refer to an
     /// open file has undefined behavior. Calling this method on a
     /// file that is opened in read-only mode, is an error.
-    void resize(off_t);
+    void resize(SizeType);
 
     /// Allocate space on the target device for the specified region
     /// of the file. If the region extends beyond the current end of
@@ -140,12 +150,12 @@ public:
     /// is, two processes, or two threads should never call this
     /// method concurrently for the same underlying file even though
     /// they access the file through distinct File instances.
-    void alloc(off_t offset, std::size_t size);
+    void alloc(SizeType offset, std::size_t size);
 
     /// Reposition the read/write offset of this File
     /// instance. Distinct File instances have separate independent
     /// offsets, as long as the cucrrent process is not forked.
-    void seek(off_t);
+    void seek(SizeType);
 
     /// Flush in-kernel buffers to disk. This blocks the caller until
     /// the synchronization operation is complete.
