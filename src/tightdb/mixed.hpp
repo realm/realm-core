@@ -43,8 +43,8 @@ public:
     Mixed()               {m_type = COLUMN_TYPE_INT;    m_int  = 0;}
     Mixed(bool v)         {m_type = COLUMN_TYPE_BOOL;   m_bool = v;}
     Mixed(int64_t v)      {m_type = COLUMN_TYPE_INT;    m_int  = v;}
-    Mixed(float v)       {m_type = COLUMN_TYPE_FLOAT;  m_float = v;}
-    Mixed(double v)      {m_type = COLUMN_TYPE_DOUBLE; m_double = v;}
+    Mixed(float v)        {m_type = COLUMN_TYPE_FLOAT;  m_float = v;}
+    Mixed(double v)       {m_type = COLUMN_TYPE_DOUBLE; m_double = v;}
     Mixed(const char* v)  {m_type = COLUMN_TYPE_STRING; m_str  = v;}
     Mixed(BinaryData v)   {m_type = COLUMN_TYPE_BINARY; m_str = v.pointer; m_len = v.len;}
     Mixed(Date v)         {m_type = COLUMN_TYPE_DATE;   m_date = v.get_date();}
@@ -56,14 +56,16 @@ public:
 
     bool         get_bool()   const;
     int64_t      get_int()    const;
-    float       get_float()  const;
-    double      get_double() const;
+    float        get_float()  const;
+    double       get_double() const;
     const char*  get_string() const;
     BinaryData   get_binary() const;
     std::time_t  get_date()   const;
 
     void set_bool(bool);
     void set_int(int64_t);
+    void set_float(float);
+    void set_double(double);
     void set_string(const char*);
     void set_binary(BinaryData);
     void set_binary(const char* data, std::size_t size);
@@ -199,6 +201,18 @@ inline void Mixed::set_int(int64_t v)
     m_int = v;
 }
 
+inline void Mixed::set_float(float v)
+{
+    m_type = COLUMN_TYPE_FLOAT;
+    m_float = v;
+}
+
+inline void Mixed::set_double(double v)
+{
+    m_type = COLUMN_TYPE_DOUBLE;
+    m_double = v;
+}
+
 inline void Mixed::set_string(const char* v)
 {
     m_type = COLUMN_TYPE_STRING;
@@ -241,7 +255,7 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
     }
     out << ")";
     return out;
-    
+}  
     
 
 // Compare mixed with boolean
@@ -288,6 +302,7 @@ template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b)
 {
     return Mixed(b).get_type() == COLUMN_TYPE_INT && a != Mixed(b).get_int();
 }
+
 
 // Compare mixed with float
 

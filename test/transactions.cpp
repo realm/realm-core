@@ -1,10 +1,14 @@
+#if !defined(_MSC_VER)
+
 #include <cstdio>
 #include <vector>
 #include <sstream>
 #include <fstream>
 #include <iomanip>
 
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 
 #include <UnitTest++.h>
 
@@ -555,3 +559,6 @@ TEST(Transactions)
         db.end_read();
     }
 }
+
+
+#endif // _MSC_VER

@@ -73,23 +73,24 @@ R TableViewBase::aggregate(size_t column_ndx) const
     // Array object instantiation must NOT allocate initial memory (capacity) with 'new' because it will lead to mem leak. 
     // The column keeps ownership of the payload in m_array and will free it itself later, so we must not call Destroy() on m_array.
     // Todo, create tag constructor for array instead of using 'false'. 
-    ArrType m_array(false);
+    ArrType arr;
+    // TODO: why arr(false)?
 
-    size_t m_leaf_start = 0;
-    size_t m_leaf_end = 0;
+    size_t leaf_start = 0;
+    size_t leaf_end = 0;
     size_t row_ndx;
 
     T res = column->template TreeGet<T,ColType>(0);
 
     for (size_t ss = 1; ss < m_refs.Size(); ++ss) {
         row_ndx = m_refs.GetAsSizeT(ss);
-        if (row_ndx >= m_leaf_end) {
-            ((Column*)column)->GetBlock(row_ndx, m_array, m_leaf_start);
-            const size_t leaf_size = m_array.Size();
-            m_leaf_end = m_leaf_start + leaf_size;
+        if (row_ndx >= leaf_end) {
+            ((Column*)column)->GetBlock(row_ndx, arr, leaf_start);
+            const size_t leaf_size = arr.Size();
+            leaf_end = leaf_start + leaf_size;
         }    
 
-        T v = m_array.Get(row_ndx - m_leaf_start);
+        T v = arr.Get(row_ndx - leaf_start);
 
         if (function == TDB_SUM)
             res += v;
