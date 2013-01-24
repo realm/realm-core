@@ -23,6 +23,7 @@
 
 #include <string>
 
+#include <tightdb/exceptions.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_basic_fwd.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -33,30 +34,75 @@ namespace tightdb {
 // Pre-declarations
 class SharedGroup;
 
-enum GroupMode {
-    GROUP_DEFAULT  =  0,
-    GROUP_READONLY =  1,
-
-    // Rest are internal use only
-    GROUP_SHARED   =  2,
-    GROUP_INVALID  =  4,
-    GROUP_ASYNC    =  8,
-    GROUP_SWAPONLY = 16
-};
 
 class Group: private Table::Parent {
 public:
+    /// Throws std::bad_alloc in the event of a memory allocation
+    /// error.
     Group();
-    explicit Group(std::string filename, int mode = GROUP_DEFAULT);
+
+    enum OpenMode {
+        mode_Normal,   ///< Open in read/write mode, create the file if it does not already exist.
+        mode_ReadOnly, ///< Open in read-only mode, fail if the file does not already exist.
+        mode_NoCreate  ///< Open in read/write mode, fail if the file does not already exist.
+    };
+
+    /// Construct a group from a file.
+    ///
+    /// If the specified file exists in the file system, it must
+    /// contain a valid TightDB database. If the file does not exist,
+    /// it will be created. A group constructed this way, is the
+    /// primary means of accesing and manipulating a TightDB database.
+    ///
+    /// Changes made to the database via the group are not
+    /// automatically committed to the specified file. You may,
+    /// however, at any time, explicitely commit your changes by
+    /// calling the commit() method. Alternatively you may call
+    /// write() to write the entire database to a new file.
+    ///
+    /// Throws NoSuchFile if the file did not exist and \a mode was
+    /// not mode_Normal. Throws PermissionDenied if the file could not
+    /// be opened or created due to a permission constraint. Throws
+    /// InvalidDatabase if the specified file does not appear to
+    /// contain a valid database. May also throw std::bad_alloc and
+    /// std::runtime_error.
+    explicit Group(const std::string& path, OpenMode mode = mode_Normal);
+
+    /// Specification of a memory buffer. The purpose of this class is
+    /// neither to allocate nor to deallocate memory. Its only purpose
+    /// is to specify the buffer.
+    struct BufferSpec {
+        char*       m_data;
+        std::size_t m_size;
+        BufferSpec() {}
+        BufferSpec(char* d, std::size_t s): m_data(d), m_size(s) {}
+    };
+
+    /// Construct a group from a memory buffer.
+    ///
+    /// This is similar to constructing a group from a file except
+    /// that in this case the database is assumed to be stored in the
+    /// specified memory buffer.
+    ///
+    /// If \a take_ownership is <tt>true</tt>, you pass the ownership
+    /// of the specified buffer to the group. In this case the buffer
+    /// will eventually be freed using std::free(), so the buffer you
+    /// pass, must have been allocated using std::malloc().
+    ///
+    /// On the other hand, if \a take_ownership is set to
+    /// <tt>false</tt>, it is your responsibility to keep the memory
+    /// buffer alive during the lifetime of the group, and in case the
+    /// buffer needs to be deallocated afterwards, that is your
+    /// responsibility too.
+    ///
+    /// Throws InvalidDatabase if the specified buffer does not appear
+    /// to contain a valid database. Throws std::bad_alloc in the
+    /// event of a memory allocation error.
+    Group(BufferSpec buffer, bool take_ownership = true);
+
     ~Group();
 
-    struct from_mem_tag {};
-    Group(from_mem_tag, char* buffer, size_t len, bool take_ownership = true);
-
-    // FIXME: Eliminate this. All construction errors must be reported using exceptions.
-    bool is_valid() const {return m_isValid;}
-
-    bool is_shared() const {return (m_persistMode & GROUP_SHARED) != 0;}
+    bool is_shared() const {return m_is_shared;}
     bool is_empty() const;
 
     size_t get_table_count() const;
@@ -73,8 +119,17 @@ public:
     template<class T> typename T::ConstRef get_table(const char* name) const;
 
     // Serialization
-    bool write(const char* filepath);
-    char* write_to_mem(size_t& len);
+
+    /// Throws PermissionDenied if the file could not be opened or
+    /// created due to a permission constraint. May also throw
+    /// std::bad_alloc and std::runtime_error.
+    void write(const std::string& path);
+
+    /// Ownership of the returned memory buffer is transferred to the
+    /// caller. The memory will have been allocated using
+    /// std::malloc(). Throws std::bad_alloc in the event of a memory
+    /// allocation error.
+    BufferSpec write_to_mem();
 
     bool commit();
 
@@ -106,12 +161,12 @@ protected:
     friend class GroupWriter;
     friend class SharedGroup;
 
-    bool create_from_file(std::string filename, bool do_init);
+    void create_from_file(const std::string& filename, OpenMode, bool do_init);
 
     void invalidate();
-    bool in_inital_state() const;
+    bool in_initial_state() const;
     void init_shared();
-    bool commit(size_t current_version, size_t readlock_version);
+    size_t commit(size_t current_version, size_t readlock_version, bool doPersist);
     void rollback();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -145,7 +200,8 @@ protected:
     void create(); // FIXME: Could be private
     void create_from_ref(size_t top_ref);
 
-    template<class S> size_t write(S& out);
+    // May throw WriteError
+    template<class S> size_t write_to_stream(S& out);
 
     // Member variables
     SlabAlloc m_alloc;
@@ -156,11 +212,13 @@ protected:
     Array m_freeLengths;
     Array m_freeVersions;
     mutable Array m_cachedtables;
-    uint32_t m_persistMode;
+    bool m_is_shared;
     size_t m_readlock_version;
-    bool m_isValid;
 
 private:
+    struct shared_tag {};
+    Group(shared_tag);
+
     Table* get_table_ptr(const char* name);
     Table* get_table_ptr(const char* name, bool& was_created);
     const Table* get_table_ptr(const char* name) const;
@@ -281,8 +339,7 @@ template<class T> inline typename T::ConstRef Group::get_table(const char* name)
     return get_table_ptr<T>(name)->get_table_ref();
 }
 
-template<class S>
-size_t Group::write(S& out)
+template<class S> size_t Group::write_to_stream(S& out)
 {
     // Space for file header
     out.write(default_header, header_len);
@@ -295,7 +352,7 @@ size_t Group::write(S& out)
     top.add(m_top.Get(1));
 
     // Recursively write all arrays
-    const uint64_t topPos = top.Write(out);
+    const uint64_t topPos = top.Write(out); // FIXME: Why does this not return char*?
     const size_t byte_size = out.getpos();
 
     // Write top ref

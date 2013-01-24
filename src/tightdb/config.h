@@ -88,11 +88,11 @@
  * that fully supports C++11. */
 #if defined __cplusplus && __cplusplus >= 201103 || \
     defined __GXX_EXPERIMENTAL_CXX0X__ && __GXX_EXPERIMENTAL_CXX0X__ && defined __GNUC__ && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 6)
-#  define TIGHTDB_NOTHROW nothrow
+#  define TIGHTDB_NOEXCEPT noexcept
 #elif defined TIGHTDB_DEBUG
-#  define TIGHTDB_NOTHROW throw()
+#  define TIGHTDB_NOEXCEPT throw()
 #else
-#  define TIGHTDB_NOTHROW
+#  define TIGHTDB_NOEXCEPT
 #endif
 
 

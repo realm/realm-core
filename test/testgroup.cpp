@@ -49,8 +49,7 @@ TEST(Group_Invalid1)
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    Group fromDisk("table_test.tightdb", GROUP_READONLY);
-    CHECK(!fromDisk.is_valid());
+    CHECK_THROW(Group("table_test.tightdb", Group::mode_ReadOnly), NoSuchFile);
 }
 
 TEST(Group_Invalid2)
@@ -60,8 +59,7 @@ TEST(Group_Invalid2)
     const size_t size = strlen(str);
     char* const data = new char[strlen(str)];
     copy(str, str+size, data);
-    Group fromMen(Group::from_mem_tag(), data, size);
-    CHECK(!fromMen.is_valid());
+    CHECK_THROW(Group(Group::BufferSpec(data, size)), InvalidDatabase);
     delete[] data;
 }
 
@@ -72,8 +70,7 @@ TEST(Group_Serialize0)
     toDisk.write("table_test.tightdb");
 
     // Load the group
-    Group fromDisk("table_test.tightdb", GROUP_READONLY);
-    CHECK(fromDisk.is_valid());
+    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
 
     // Create new table in group
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
@@ -94,8 +91,7 @@ TEST(Group_Read0)
 {
     // Load the group and let it clean up without loading
     // any tables
-    Group fromDisk("table_test.tightdb", GROUP_READONLY);
-    CHECK(fromDisk.is_valid());
+    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
 }
 
 TEST(Group_Serialize1)
@@ -125,8 +121,7 @@ TEST(Group_Serialize1)
     toDisk.write("table_test.tightdb");
 
     // Load the table
-    Group fromDisk("table_test.tightdb", GROUP_READONLY);
-    CHECK(fromDisk.is_valid());
+    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
@@ -157,8 +152,7 @@ TEST(Group_Read1)
 {
     // Load the group and let it clean up without loading
     // any tables
-    Group fromDisk("table_test.tightdb", GROUP_READONLY);
-    CHECK(fromDisk.is_valid());
+    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
 }
 
 TEST(Group_Serialize2)
@@ -185,8 +179,7 @@ TEST(Group_Serialize2)
     toDisk.write("table_test.tightdb");
 
     // Load the tables
-    Group fromDisk("table_test.tightdb", GROUP_READONLY);
-    CHECK(fromDisk.is_valid());
+    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
     TestTableGroup::Ref t1 = fromDisk.get_table<TestTableGroup>("test1");
     TestTableGroup::Ref t2 = fromDisk.get_table<TestTableGroup>("test2");
     (void)t2;
@@ -220,8 +213,7 @@ TEST(Group_Serialize3)
     toDisk.write("table_test.tightdb");
 
     // Load the table
-    Group fromDisk("table_test.tightdb", GROUP_READONLY);
-    CHECK(fromDisk.is_valid());
+    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
     (void)t;
 
@@ -255,12 +247,10 @@ TEST(Group_Serialize_Mem)
 #endif // TIGHTDB_DEBUG
 
     // Serialize to memory (we now own the buffer)
-    size_t len;
-    char* const buffer = toMem.write_to_mem(len);
+    const Group::BufferSpec buffer = toMem.write_to_mem();
 
     // Load the table
-    Group fromMem(Group::from_mem_tag(), buffer, len);
-    CHECK(fromMem.is_valid());
+    Group fromMem(buffer);
     TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
@@ -283,10 +273,9 @@ TEST(Group_Close)
     table->add("",  2, true, Wed);
 
     // Serialize to memory (we now own the buffer)
-    size_t len;
-    char* const buffer = toMem->write_to_mem(len);
+    const Group::BufferSpec buffer = toMem->write_to_mem();
 
-    Group *fromMem = new Group(Group::from_mem_tag(), buffer, len);
+    Group *fromMem = new Group(buffer);
     delete toMem;
     delete fromMem;
 }
@@ -312,12 +301,10 @@ TEST(Group_Serialize_Optimized)
 #endif // TIGHTDB_DEBUG
 
     // Serialize to memory (we now own the buffer)
-    size_t len;
-    char* const buffer = toMem.write_to_mem(len);
+    const Group::BufferSpec buffer = toMem.write_to_mem();
 
     // Load the table
-    Group fromMem(Group::from_mem_tag(), buffer, len);
-    CHECK(fromMem.is_valid());
+    Group fromMem(buffer);
     TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
@@ -361,12 +348,10 @@ TEST(Group_Serialize_All)
     table->insert_done();
 
     // Serialize to memory (we now own the buffer)
-    size_t len;
-    char* const buffer = toMem.write_to_mem(len);
+    const Group::BufferSpec buffer = toMem.write_to_mem();
 
     // Load the table
-    Group fromMem(Group::from_mem_tag(), buffer, len);
-    CHECK(fromMem.is_valid());
+    Group fromMem(buffer);
     TableRef t = fromMem.get_table("test");
 
     CHECK_EQUAL(6, t->get_column_count());
@@ -543,7 +528,7 @@ TEST(Group_Subtable)
     g.write("subtables.tightdb");
 
     // Read back tables
-    Group g2("subtables.tightdb", GROUP_READONLY);
+    Group g2("subtables.tightdb", Group::mode_ReadOnly);
     TableRef table2 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -634,7 +619,7 @@ TEST(Group_Subtable)
     g2.write("subtables2.tightdb");
 
     // Read back tables
-    Group g3("subtables2.tightdb", GROUP_READONLY);
+    Group g3("subtables2.tightdb", Group::mode_ReadOnly);
     TableRef table3 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -733,7 +718,7 @@ TEST(Group_MultiLevelSubtables)
 
     // Non-mixed
     {
-        Group g("subtables.tightdb", GROUP_READONLY);
+        Group g("subtables.tightdb", Group::mode_ReadOnly);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -754,7 +739,7 @@ TEST(Group_MultiLevelSubtables)
         g.write("subtables2.tightdb");
     }
     {
-        Group g("subtables2.tightdb", GROUP_READONLY);
+        Group g("subtables2.tightdb", Group::mode_ReadOnly);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -775,7 +760,7 @@ TEST(Group_MultiLevelSubtables)
 
     // Mixed
     {
-        Group g("subtables3.tightdb", GROUP_READONLY);
+        Group g("subtables3.tightdb", Group::mode_ReadOnly);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -796,7 +781,7 @@ TEST(Group_MultiLevelSubtables)
         g.write("subtables4.tightdb");
     }
     {
-        Group g("subtables4.tightdb", GROUP_READONLY);
+        Group g("subtables4.tightdb", Group::mode_ReadOnly);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -900,12 +885,10 @@ TEST(Group_Index_String)
     CHECK_EQUAL(2, c1);
     
     // Serialize to memory (we now own the buffer)
-    size_t len;
-    char* const buffer = toMem.write_to_mem(len);
+    const Group::BufferSpec buffer = toMem.write_to_mem();
     
     // Load the table
-    Group fromMem(Group::from_mem_tag(), buffer, len);
-    CHECK(fromMem.is_valid());
+    Group fromMem(buffer);
     TestTableGroup::Ref t = fromMem.get_table<TestTableGroup>("test");
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(8, t->size());

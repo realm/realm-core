@@ -13,13 +13,22 @@ Format:
 ==================
 
 
+
+2013-01-11 (Kristian Spangsege)
++ Simplified open-mode for Group constructor.
+- Group::is_valid() removed. Errors are now reported as exceptions from the constructor.
++ Now using Group::BufferSpec to pass a memory buffer to the Group constructor.
++ Group::write_to_mem() now returnis a Group::BufferSpec.
++ Addition of 'bool no_create' arguemnt to SharedGroup constructor.
+
+
+2013-01-08 (Kristian Spangsege)
++ Mixed::set_int() added (same for other value types except subtables).
++ Removed two-argument Mixed constructor for binary data since its signature is expected to be used for strings that are not zero-terminated.
+
 2013-01-08 (Brian Munkholm)
 ----------
-+ 17 New: Added a bunch of methods to support two new column types: float and double.
-
-2012-12-06 (Brian Munkholm)
-----------
-+ 16 New Table:get_string_length(col_ndx, row_ndx) added in Dynamic Table. Missing in Typed Table.
++ New: Added a bunch of methods to support two new column types: float and double.
 
 2012-12-16 (Kristian Spangsege)
 ----------
@@ -27,6 +36,11 @@ Format:
 + my_table[i].foo.set(...) added for all column types except subtables. This is for completeness.
 + When passing a file name to a Group or a SharedGroup constructor, the type is now a std::string. This is made possible by allowing exception handling. It simplifies the implementation in a few places, and in general it simplifies application code.
 + A 'tag' argument has ben added to the Group constructor that takes a memory buffer as argument. Without this change, two Group constructors were way too similar.
+
+
+2012-12-06 (Brian Munkholm)
+----------
++ 16 New Table:get_string_length(col_ndx, row_ndx) added in Dynamic Table. Missing in Typed Table.
 
 
 2012-12-06 (Kristian Spangsege)
@@ -38,13 +52,16 @@ Format:
 ----------
 + 15 Updated Group() constructor to take an optional 3'rd parameter 'take_ownership', which allows the caller to keep owenership of the provided data: Group::Group(const char* buffer, size_t len, bool take_ownership=true).
 
+
 2012-11-13 (Kristian Spangsege)
 ----------
 + 14 Renamed Table::count() to Table::count_int()
 
+
 2012-11-21
 ----------
 + Added ShareGroup::has_changed() to detect if there has been changes to the db since last transaction.
+
 
 2012-11-12 (Kristian Spangsege)
 ----------

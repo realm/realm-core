@@ -214,6 +214,80 @@ case "$MODE" in
 
 
     "dist")
+        EXTENSION_AVAILABILITY_REQUIRED="1"
+        if [ "$#" -eq 1 -a "$1" = "all" ]; then
+            INCLUDE_EXTENSIONS="$EXTENSIONS"
+        elif [ "$#" -eq 1 -a "$1" = "avail" ]; then
+            INCLUDE_EXTENSIONS="$EXTENSIONS"
+            EXTENSION_AVAILABILITY_REQUIRED=""
+        elif [ "$#" -eq 1 -a "$1" = "none" ]; then
+            INCLUDE_EXTENSIONS=""
+        elif [ $# -ge 1 -a "$1" != "not" ]; then
+            for x in "$@"; do
+                found=""
+                for y in $EXTENSIONS; do
+                    if [ "$x" = "$y" ]; then
+                        found="1"
+                        break
+                    fi
+                done
+                if [ -z "$found" ]; then
+                    echo "Bad extension name '$x'" 1>&2
+                    exit 1
+                fi
+            done
+            INCLUDE_EXTENSIONS=""
+            for x in $EXTENSIONS; do
+                for y in "$@"; do
+                    if [ "$x" = "$y" ]; then
+                        word_list_append INCLUDE_EXTENSIONS "$x" || exit 1
+                        break
+                    fi
+                done
+            done
+        elif [ "$#" -ge 1 -a "$1" = "not" ]; then
+            if [ "$#" -eq 1 ]; then
+                echo "Please specify which extensions to exclude" 1>&2
+                exit 1
+            fi
+            shift
+            for x in "$@"; do
+                found=""
+                for y in $EXTENSIONS; do
+                    if [ "$x" = "$y" ]; then
+                        found="1"
+                        break
+                    fi
+                done
+                if [ -z "$found" ]; then
+                    echo "Bad extension name '$x'" 1>&2
+                    exit 1
+                fi
+            done
+            INCLUDE_EXTENSIONS=""
+            for x in $EXTENSIONS; do
+                found=""
+                for y in "$@"; do
+                    if [ "$x" = "$y" ]; then
+                        found="1"
+                        break
+                    fi
+                done
+                if [ -z "$found" ]; then
+                    word_list_append INCLUDE_EXTENSIONS "$x" || exit 1
+                fi
+            done
+        else
+            echo "Please specify which extensions to include" 1>&2
+            echo "Specify 'all' to include all extensions." 1>&2
+            echo "Specify 'avail' to include all available extensions." 1>&2
+            echo "Specify 'none' to exclude all extensions." 1>&2
+            echo "Specify 'EXT1  [EXT2]...' to include the specified extensions." 1>&2
+            echo "Specify 'not  EXT1  [EXT2]...' to exclude the specified extensions." 1>&2
+            exit 1
+        fi
+
+
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/build.log"
         log_message()
@@ -236,16 +310,26 @@ case "$MODE" in
             message "WARNING: $msg"
         }
 
+
         message "Checking availability of extensions"
+        failed=""
         AVAIL_EXTENSIONS=""
-        for x in $EXTENSIONS; do
+        for x in $INCLUDE_EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if ! [ -r "$EXT_HOME/build.sh" ]; then
-                warning "Missing extension '$EXT_HOME'"
+                if [ "$EXTENSION_AVAILABILITY_REQUIRED" ]; then
+                    echo "Missing extension '$EXT_HOME'" 1>&2
+                    failed="1"
+                else
+                    warning "Missing extension '$EXT_HOME'"
+                fi
                 continue
             fi
             word_list_append AVAIL_EXTENSIONS "$x" || exit 1
         done
+        if [ "$failed" ]; then
+            exit 1;
+        fi
 
 
         # Checking that each extension is capable of copying
@@ -259,7 +343,12 @@ case "$MODE" in
             echo "Testing transfer of extension '$x' to package" >> "$LOG_FILE"
             mkdir "$FAKE_PKG_DIR/$EXT_DIR" || exit 1
             if ! sh "$EXT_HOME/build.sh" dist-copy "$FAKE_PKG_DIR/$EXT_DIR" >>"$LOG_FILE" 2>&1; then
-                warning "Transfer of extension '$x' to test package failed"
+                if [ "$EXTENSION_AVAILABILITY_REQUIRED" ]; then
+                    echo "Transfer of extension '$x' to test package failed" 1>&2
+                    exit 1
+                else
+                    warning "Transfer of extension '$x' to test package failed"
+                fi
                 continue
             fi
             word_list_append NEW_AVAIL_EXTENSIONS "$x" || exit 1
@@ -715,10 +804,29 @@ EOF
         ;;
 
 
+    "dist-checkout")
+        if [ "$#" -ne 1 ]; then
+            echo "Please specify what you want to checkout" 1>&2
+            exit 1
+        fi
+        WHAT="$1"
+        echo ">>>>>>>> CHECKING OUT '$WHAT' OF 'tightdb'"
+        git checkout "$WHAT"
+        for x in $EXTENSIONS; do
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+            if [ -r "$EXT_HOME/build.sh" ]; then
+                echo ">>>>>>>> CHECKING OUT '$WHAT' OF '$EXT_HOME'"
+                (cd "$EXT_HOME/"; git checkout "$WHAT")
+            fi
+        done
+        exit 0
+        ;;
+
+
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: clean build test install test-installed build-ios" 1>&2
-        echo "As well as: dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull" 1>&2
+        echo "As well as: dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull dist-checkout" 1>&2
         exit 1
         ;;
 

@@ -34,6 +34,8 @@ public:
     StringIndex(size_t ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc);
     void SetTarget(void* target_column, StringGetter get_func);
 
+    bool is_empty() const;
+
     void Insert(size_t row_ndx, const char* value, bool isLast=false);
     void Set(size_t row_ndx, const char* oldValue, const char* newValue);
     void Delete(size_t row_ndx, const char* value, bool isLast=false);
@@ -45,8 +47,6 @@ public:
     size_t find_first(const char* value) const;
     void   find_all(Array& result, const char* value) const;
     void   distinct(Array& result) const;
-
-    bool is_empty() const;
 
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream& out);

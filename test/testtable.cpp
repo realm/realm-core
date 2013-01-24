@@ -295,7 +295,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
                 table.insert_mixed(7, i, Date(123456789));
                 break;
             case 4:
-                table.insert_mixed(7, i, Mixed("binary", 7));
+                table.insert_mixed(7, i, Mixed(BinaryData("binary", 7)));
                 break;
             case 5:
             {
@@ -425,7 +425,7 @@ TEST(Table_test_json_simple)
     for (size_t i = 0; i < 1; ++i) {
         table.insert_int(0, i, i);
         table.insert_bool(1, i, (i % 2 ? true : false));
-        table.insert_date(2, i, 0xffffeeeeffffeeee);
+        table.insert_date(2, i, 0x7fffeeeeL);
         table.insert_string(3, i, "helloooooo");
         const char bin[] = "123456789012345678901234567890nopq";
         table.insert_binary(4, i, bin, sizeof(bin) );
@@ -931,7 +931,7 @@ TEST(Table_Spec)
 
     // Read back tables
     {
-        Group fromDisk("subtables.tightdb", GROUP_READONLY);
+        Group fromDisk("subtables.tightdb", Group::mode_ReadOnly);
         TableRef fromDiskTable = fromDisk.get_table("test");
 
         TableRef subtable2 = fromDiskTable->get_subtable(2, 0);
@@ -1339,7 +1339,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
 
     table.insert_int(0, 4, 43);
-    table.insert_mixed(1, 4, Mixed("binary", 7));
+    table.insert_mixed(1, 4, Mixed(BinaryData("binary", 7)));
     table.insert_done();
 
     CHECK_EQUAL(0,  table.get_int(0, 0));

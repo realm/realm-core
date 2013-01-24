@@ -18,6 +18,7 @@
 #include "../test/pthread_test.hpp"
 #endif
 
+using namespace std;
 using namespace tightdb;
 
 
@@ -27,6 +28,9 @@ struct tightdb::ReadCount {
 };
 
 struct tightdb::SharedInfo {
+    uint16_t version;
+    uint16_t flags;
+
     pthread_mutex_t readmutex;
     pthread_mutex_t writemutex;
     uint64_t filesize;
@@ -44,51 +48,75 @@ struct tightdb::SharedInfo {
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-SharedGroup::SharedGroup(string path_to_database_file):
-    m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID),
-    m_info(NULL), m_isValid(false), m_version(-1), m_replication(Replication::degenerate_tag())
+SharedGroup::SharedGroup(const string& path_to_database_file, bool no_create,
+                         DurabiltyLevel dlevel):
+    m_group(Group::shared_tag()), m_info(NULL), m_isValid(false), m_version(-1),
+    m_replication(Replication::degenerate_tag())
 {
-    init(path_to_database_file);
+    init(path_to_database_file, no_create, dlevel);
 }
 
-SharedGroup::SharedGroup(replication_tag, string path_to_database_file):
-    m_group(!path_to_database_file.empty() ? path_to_database_file :
-            Replication::get_path_to_database_file(), GROUP_SHARED|GROUP_INVALID), m_info(NULL),
-    m_isValid(false), m_version(-1), m_replication(path_to_database_file)
+SharedGroup::SharedGroup(replication_tag, const string& path_to_database_file,
+                         DurabiltyLevel dlevel):
+    m_group(Group::shared_tag()), m_info(NULL), m_isValid(false), m_version(-1),
+    m_replication(path_to_database_file)
 {
     m_group.set_replication(&m_replication);
 
     init(!path_to_database_file.empty() ? path_to_database_file :
-         Replication::get_path_to_database_file());
+         Replication::get_path_to_database_file(), false, dlevel);
 }
 
 #else // ! TIGHTDB_ENABLE_REPLICATION
 
-SharedGroup::SharedGroup(std::string path_to_database_file):
-    m_group(path_to_database_file, GROUP_SHARED|GROUP_INVALID),
-    m_info(NULL), m_isValid(false), m_version(-1)
+SharedGroup::SharedGroup(const string& path_to_database_file, bool no_create,
+                         DurabilityLevel dlevel):
+    m_group(Group::shared_tag()), m_info(NULL), m_isValid(false), m_version(-1)
 {
-    init(path_to_database_file);
+    init(path_to_database_file, no_create, dlevel);
 }
 
 #endif // ! TIGHTDB_ENABLE_REPLICATION
 
 
-void SharedGroup::init(std::string path_to_database_file)
+// NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
+//
+// According to the 'process sharing example' in the POSIX man page
+// for pthread_mutexattr_init() other processes may continue to use a
+// shared mutex after exit of the process that initialized it. Also,
+// the example does not contain any call to pthread_mutex_destroy(),
+// so apparently a shared mutex need not be destroyed at all, nor can
+// it be that a shared mutex is associated with any resources that are
+// local to the initializing process.
+//
+// While it is not explicitely stated in the man page, we shall also
+// assume that is is valid to initialize a shared mutex twice without
+// an intervending call to pthread_mutex_destroy(). We need to be able
+// to reinitialize a shared mutex if the first initializing process
+// craches and leaves the shared memory in an undefined state.
+
+// Issues with current implementation:
+//
+// - Possible reinitialization due to unlocking during downgrade of file lock
+
+void SharedGroup::init(const string& path_to_database_file, bool no_create_file,
+                       DurabilityLevel dlevel)
 {
     m_lockfile_path = path_to_database_file + ".lock";
 
 open_start:
     // Open shared coordination buffer
-    m_fd = open(m_lockfile_path.c_str(), O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    m_fd = open(m_lockfile_path.c_str(), O_RDWR|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (m_fd < 0) return;
 
-    bool needInit = false;
+    // FIXME: Handle lock file removal in case of failure below
+
+    bool need_init = false;
     size_t len    = 0;
     struct stat statbuf;
 
     // If we can get an exclusive lock we know that the file is
-    // either new (empty) or a leftover from a previous
+    // either new (empty) or a leftover from a previously
     // crashed process (needing re-initialization)
     if (flock(m_fd, LOCK_EX|LOCK_NB) == 0) {
         // There is a slight window between opening the file and getting the
@@ -110,7 +138,7 @@ open_start:
                 return;
             }
         }
-        needInit = true;
+        need_init = true;
     }
     else if (flock(m_fd, LOCK_SH) == 0) {
         // There is a slight window between opening the file and getting the
@@ -137,20 +165,20 @@ open_start:
     }
     m_info = (SharedInfo*)p;
 
-    if (needInit) {
+    const Group::OpenMode group_open_mode = no_create_file ? Group::mode_NoCreate : Group::mode_Normal;
+    if (need_init) {
         // If we are the first we may have to create the database file
         // but we invalidate the internals right after to avoid conflicting
         // with old state when starting transactions
-        if (!m_group.create_from_file(path_to_database_file, true)) {
-            close(m_fd);
-            return;
-        }
+        m_group.create_from_file(path_to_database_file, group_open_mode, true);
         m_group.invalidate();
 
         // Initialize mutexes so that they can be shared between processes
         pthread_mutexattr_t mattr;
         pthread_mutexattr_init(&mattr);
+        // FIXME: Must verify availability of optional feature: #ifdef _POSIX_THREAD_PROCESS_SHARED
         pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+        // FIXME: Should also do pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST). Check for availability with: #if _POSIX_THREADS >= 200809L
         pthread_mutex_init(&m_info->readmutex, &mattr);
         pthread_mutex_init(&m_info->writemutex, &mattr);
         pthread_mutexattr_destroy(&mattr);
@@ -158,13 +186,15 @@ open_start:
         SlabAlloc& alloc = m_group.get_allocator();
 
         // Set initial values
+        m_info->version  = 0;
+        m_info->flags    = dlevel; // durability level is fixed from creation
         m_info->filesize = alloc.GetFileLen();
         m_info->infosize = (uint32_t)len;
         m_info->current_top = alloc.GetTopRef();
         m_info->current_version = 0;
         m_info->capacity = 32-1;
-        m_info->put_pos = 0;
-        m_info->get_pos = 0;
+        m_info->put_pos  = 0;
+        m_info->get_pos  = 0;
 
         // Set initial version so we can track if other instances
         // change the db
@@ -172,14 +202,19 @@ open_start:
 
         // Downgrade lock to shared now that it is initialized,
         // so other processes can share it as well
+// FIXME: This downgrading of the lock is not guaranteed to be atomic
         flock(m_fd, LOCK_SH);
     }
     else {
-        // Setup the group, but leave it in invalid state
-        if (!m_group.create_from_file(path_to_database_file, false)) {
-            close(m_fd);
+        if (m_info->version != 0)
+            return; // unsupported version
+
+        // Durability level cannot be changed at runtime
+        if (m_info->flags != dlevel)
             return;
-        }
+
+        // Setup the group, but leave it in invalid state
+        m_group.create_from_file(path_to_database_file, group_open_mode, false);
     }
 
     m_isValid = true;
@@ -201,7 +236,16 @@ SharedGroup::~SharedGroup()
         // So that means that we have to delete it when done
         // (to avoid someone later opening a stale file
         // with uinitialized mutexes)
+// FIXME: This upgrading of the lock is not guaranteed to be atomic
         if (flock(m_fd, LOCK_EX|LOCK_NB) == 0) {
+            // If the db file is just backing for a transient
+            // data structure, we can delete it when done.
+            if (m_info->flags == durability_MemOnly) {
+                const size_t path_len = m_lockfile_path.size()-5; // remove ".lock"
+                const std::string db_path = m_lockfile_path.substr(0, path_len);
+                remove(db_path.c_str());
+            }
+
             pthread_mutex_destroy(&m_info->readmutex);
             pthread_mutex_destroy(&m_info->writemutex);
 
@@ -368,11 +412,11 @@ void SharedGroup::commit()
     }
 
     // Do the actual commit
-    m_group.commit(current_version, readlock_version);
+    const bool doPersist = (m_info->flags == durability_Full);
+    const size_t new_topref = m_group.commit(current_version, readlock_version, doPersist);
 
     // Get the new top ref
     const SlabAlloc& alloc = m_group.get_allocator();
-    const size_t new_topref   = alloc.GetTopRef();
     const size_t new_filesize = alloc.GetFileLen();
 
     // Update reader info

@@ -70,7 +70,11 @@ R TableViewBase::aggregate(size_t column_ndx) const
             return column->sum();
     }
 
-    ArrType m_array;
+    // Array object instantiation must NOT allocate initial memory (capacity) with 'new' because it will lead to mem leak. 
+    // The column keeps ownership of the payload in m_array and will free it itself later, so we must not call Destroy() on m_array.
+    // Todo, create tag constructor for array instead of using 'false'. 
+    ArrType m_array(false);
+
     size_t m_leaf_start = 0;
     size_t m_leaf_end = 0;
     size_t row_ndx;
@@ -92,7 +96,7 @@ R TableViewBase::aggregate(size_t column_ndx) const
         else if (function == TDB_MAX ? v > res : v < res)
             res = v;
     }
-    
+
     return res;
 }
 
