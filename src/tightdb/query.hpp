@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_QUERY_HPP
 #define TIGHTDB_QUERY_HPP
 
+#include <stdint.h>
 #include <cstdio>
 #include <climits>
 #include <algorithm>
