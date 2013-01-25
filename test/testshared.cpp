@@ -3,7 +3,6 @@
 #include <UnitTest++.h>
 
 #include "tightdb.hpp"
-#include "tightdb/group_shared.hpp"
 
 using namespace tightdb;
 

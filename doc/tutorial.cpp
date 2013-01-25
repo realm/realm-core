@@ -3,7 +3,6 @@ using namespace std;
 
 // @@Example: create_table @@
 #include <tightdb.hpp>
-#include <group.hpp>
 using namespace tightdb;
 
 // defining a table
@@ -17,7 +16,7 @@ int main() {
     // creating an instance of the table
     MyTable table;
     // @@EndExample@@
-    
+
     // @@Example: insert_rows @@
     table.add("Mary", 21, false);
     table.add("Lars", 21, true);
@@ -68,14 +67,14 @@ int main() {
         cout << row.name << " is " << row.age << " years old." << endl;
     }
     // @@EndExample@@
-    
+
     
     // @@Example: simple_seach @@
     size_t row_ndx;
-    row_ndx = table.cols().name.find_first("Philip");  // row = (size_t)-1
-    row_ndx = table.cols().name.find_first("Mary");    // row = 1
+    row_ndx = table.column().name.find_first("Philip");  // => not_found (-1)
+    row_ndx = table.column().name.find_first("Mary");    // => 1
     
-    TableView view = table.cols().age.find_all(21);
+    MyTable::View view = table.column().age.find_all(21);
     size_t cnt = view.size();         // cnt => 2
     // @@EndExample@@
     
@@ -83,20 +82,20 @@ int main() {
     
     // @@Example: advanced_search @@
     // Create query (current employees between 20 and 30 years old)
-    Query q = table.where().hired.equal(true)    // implicit logical-AND
-                           .age.between(20, 30);
+    MyTable::Query q = table.where().hired.equal(true)    // implicit logical-AND
+                                    .age.between(20, 30);
     
     // Get number of matching entries
-    cout << q.count(table) << endl;      // => 2
+    cout << q.count() << endl;      // => 2
     
     // Get the average age
-    cout << q.average(table, 1) << endl; // => 26
+    cout << q.age.average() << endl; // => 26
     
     // Execute the query and return a table (view)
-    TableView res = q.find_all(table);
+    MyTable::View res = q.find_all();
     for (size_t i = 0; i < res.size(); ++i) {
-        const char* name = res.get_string(0, i);
-        const int age    = res.get_int(1, i);
+        const char* name = res[i].name;
+        const int age    = res[i].age;
         
         cout << i << ": " << name << " is " << age << " years old." << endl;
     }
@@ -107,7 +106,7 @@ int main() {
     // @@Example: serialisation @@
     // Create Table in Group
     Group group;
-    BasicTableRef<MyTable> t = group.get_table<MyTable>("employees");
+    MyTable::Ref t = group.get_table<MyTable>("employees");
     
     // Add some rows
     t->add("John", 20, true);
@@ -121,8 +120,8 @@ int main() {
     
     // Load a group from disk (and print contents)
     Group fromDisk("employees.tightdb");
-    BasicTableRef<MyTable> diskTable = fromDisk.get_table<MyTable>("employees");
-    for (size_t i = 0; i < diskTable->size(); i++)
+    MyTable::Ref diskTable = fromDisk.get_table<MyTable>("employees");
+    for (size_t i = 0; i < diskTable->size(); ++i)
         cout << i << ": " << diskTable[i].name << endl;
     
     // Write same group to memory buffer
@@ -131,9 +130,40 @@ int main() {
     
     // Load a group from memory (and print contents)
     Group fromMem(buffer, len);
-    BasicTableRef<MyTable> memTable = fromMem.get_table<MyTable>("employees");
+    MyTable::Ref memTable = fromMem.get_table<MyTable>("employees");
     for (size_t i = 0; i < memTable->size(); i++)
         cout << i << ": " << memTable[i].name << endl; 
+    // @@EndExample@@
+
+    // @@Example: transaction @@
+    // Open a shared group
+    SharedGroup db("employees.tightdb");
+
+    // Read transaction
+    {
+        const Group& group = db.begin_read(); // start transaction
+        MyTable::ConstRef table = group.get_table<MyTable>("employees");
+
+        // Print table contents
+        for (size_t i = 0; i < table->size(); ++i)
+            cout << i << ": " << table[i].name << endl;
+
+        db.end_read(); // end transaction
+    }
+
+    // Write transaction
+    try {
+        Group& group = db.begin_write(); // start transaction
+        MyTable::Ref table = group.get_table<MyTable>("employees");
+
+        // Add row to table
+        t->add("Bill", 53, true);
+
+        db.commit(); // end transaction
+    }
+    catch (...) {
+        db.rollback(); // rollback on error
+    }
     // @@EndExample@@
 }
 
