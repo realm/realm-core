@@ -244,6 +244,12 @@ public:
     /// always opened in binary mode.
     static std::FILE* open_stdio_file(const std::string& path, Mode = mode_Read);
 
+    /// Check whether the specified file or directory exists. Note
+    /// that a file or directory that resides in a directory that the
+    /// calling process has no access to, will necessarily be reported
+    /// as not existing.
+    static bool exists(const std::string& path);
+
     // FIXME: Can we get rid of this one please!!!
     bool is_deleted() const;
 

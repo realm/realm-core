@@ -40,8 +40,7 @@ TEST(Shared_Initial)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_Initial_Mem)
@@ -67,10 +66,8 @@ TEST(Shared_Initial_Mem)
     }
 
     // Verify that both db and lock file was deleted after use
-    const int rc1 = access("test_shared.tightdb", F_OK);
-    const int rc2 = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc1);
-    CHECK_EQUAL(-1, rc2);
+    CHECK(!File::exists("test_shared.tightdb"));
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_Initial2)
@@ -115,8 +112,7 @@ TEST(Shared_Initial2)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_Initial2_Mem)
@@ -161,10 +157,8 @@ TEST(Shared_Initial2_Mem)
     }
 
     // Verify that both db and lock file was deleted after use
-    const int rc1 = access("test_shared.tightdb", F_OK);
-    const int rc2 = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc1);
-    CHECK_EQUAL(-1, rc2);
+    CHECK(!File::exists("test_shared.tightdb"));
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared1)
@@ -254,8 +248,7 @@ TEST(Shared1)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_rollback)
@@ -322,8 +315,7 @@ TEST(Shared_rollback)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_Writes)
@@ -362,8 +354,7 @@ TEST(Shared_Writes)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 namespace {
@@ -497,8 +488,7 @@ TEST(Shared_WriterThreads)
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 

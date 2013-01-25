@@ -7,6 +7,7 @@
 #ifdef _WIN32
 #  define NOMINMAX
 #  include <windows.h>
+#  include <io.h>
 #else
 #  include <unistd.h>
 #  include <fcntl.h>
@@ -618,6 +619,27 @@ FILE* File::open_stdio_file(const string& path, Mode m)
         case ENOSPC:
         case ENOMEM:        throw ResourceAllocError(msg);
         default:            throw runtime_error(msg);
+    }
+}
+
+
+bool File::exists(const std::string& path)
+{
+#ifdef _WIN32
+    if (_access(path.c_str(), 0) == 0) return true;
+#else // POSIX
+    if (::access(path.c_str(), F_OK) == 0) return true;
+#endif
+    const int errnum = errno; // Eliminate any risk of clobbering
+    switch (errnum) {
+        case EACCES:
+        case ENOENT:
+        case ENOTDIR: return false;
+    }
+    const string msg = get_errno_msg(errnum);
+    switch (errnum) {
+        case ENOMEM:  throw ResourceAllocError(msg);
+        default:      throw runtime_error(msg);
     }
 }
 
