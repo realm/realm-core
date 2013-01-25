@@ -197,6 +197,13 @@ public:
     /// is idempotent.
     void unlock() TIGHTDB_NOEXCEPT;
 
+    enum {
+        /// If possible, disable opportunistic flushing of dirted
+        /// pages to physical medium. On some systems this is not
+        /// possible, on other systems it is the default.
+        map_flag_NoSync = 1,
+    };
+
     /// Map this file into memory. The file is mapped as shared
     /// memory. This allows two processes to interact under exatly the
     /// same rules as applies to the interaction via regular memory of
@@ -214,21 +221,22 @@ public:
     ///
     /// Calling this method with a size that is greater than the size
     /// of the file has undefined behavior.
-    void* map(AccessMode, std::size_t size) const;
+    void* map(AccessMode, std::size_t size, int map_flags = 0) const;
 
     /// The same as unmap(old_addr, old_size) followed by map(a,
-    /// new_size), but more efficient on some systems.
+    /// new_size, map_flags), but more efficient on some systems.
     ///
     /// The old address range must have been acquired by a call to
     /// map() or remap() on this File instance, the specified access
-    /// mode must be the same as the one specified previously, and
-    /// this File instance must not have been reopend in the
-    /// meantime. Failing to adhere to these rules will result in
-    /// undefined behavior.
+    /// mode and flags must be the same as the ones specified
+    /// previously, and this File instance must not have been reopend
+    /// in the meantime. Failing to adhere to these rules will result
+    /// in undefined behavior.
     ///
     /// IMPORTANT: If this operation fails, the old address range will
     /// have been unmapped.
-    void* remap(void* old_addr, std::size_t old_size, AccessMode a, std::size_t new_size) const;
+    void* remap(void* old_addr, std::size_t old_size, AccessMode a, std::size_t new_size,
+                int map_flags = 0) const;
 
     /// Unmap the specified address range which must have been
     /// previously returned by map().
@@ -296,8 +304,8 @@ private:
         void* m_addr;
         std::size_t m_size;
 
-        void map(const File&, AccessMode, std::size_t size);
-        void remap(const File&, AccessMode, std::size_t size);
+        void map(const File&, AccessMode, std::size_t size, int map_flags);
+        void remap(const File&, AccessMode, std::size_t size, int map_flags);
         void unmap() TIGHTDB_NOEXCEPT;
         void sync();
     };
@@ -320,7 +328,8 @@ private:
 template<class T> class File::Map: MapBase {
 public:
     /// See map().
-    Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T));
+    Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+        int map_flags = 0);
 
     /// Create an instance that does not initially refer to a file
     /// mapping.
@@ -333,7 +342,8 @@ public:
     /// Calling this method on a Map instance that already refers to a
     /// file mapping has undefined behavior. The returned pointer is
     /// the same as what will subsequently be returned by get_addr().
-    T* map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T));
+    T* map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+           int map_flags = 0);
 
     /// See File::remap().
     ///
@@ -341,7 +351,8 @@ public:
     /// refer to a file mapping has undefined behavior. The returned
     /// pointer is the same as what will subsequently be returned by
     /// get_addr().
-    T* remap(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T));
+    T* remap(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+             int map_flags = 0);
 
     /// See File::unmap(). This method is idempotent, that is, it is
     /// valid to call it regardless of whether this instance refers to
@@ -462,17 +473,17 @@ inline bool File::try_lock_shared()
     return lock(false, true);
 }
 
-inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size)
+inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags)
 {
-    m_addr = f.map(a, size);
+    m_addr = f.map(a, size, map_flags);
     m_size = size;
 }
 
-inline void File::MapBase::remap(const File& f, AccessMode a, std::size_t size)
+inline void File::MapBase::remap(const File& f, AccessMode a, std::size_t size, int map_flags)
 {
     void* addr = m_addr;
     m_addr = 0; // Because if File::remap fails, the old mapping will have been destroyed
-    m_addr = f.remap(addr, m_size, a, size);
+    m_addr = f.remap(addr, m_size, a, size, map_flags);
     m_size = size;
 }
 
@@ -489,9 +500,9 @@ inline void File::MapBase::sync()
 }
 
 template<class T>
-inline File::Map<T>::Map(const File& f, AccessMode a, std::size_t size)
+inline File::Map<T>::Map(const File& f, AccessMode a, std::size_t size, int map_flags)
 {
-    map(f, a, size);
+    map(f, a, size, map_flags);
 }
 
 template<class T> inline File::Map<T>::Map() TIGHTDB_NOEXCEPT
@@ -504,15 +515,17 @@ template<class T> inline File::Map<T>::~Map() TIGHTDB_NOEXCEPT
     unmap();
 }
 
-template<class T> inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size)
+template<class T>
+inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int map_flags)
 {
-    MapBase::map(f, a, size);
+    MapBase::map(f, a, size, map_flags);
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline T* File::Map<T>::remap(const File& f, AccessMode a, std::size_t size)
+template<class T>
+inline T* File::Map<T>::remap(const File& f, AccessMode a, std::size_t size, int map_flags)
 {
-    MapBase::remap(f, a, size);
+    MapBase::remap(f, a, size, map_flags);
     return static_cast<T*>(m_addr);
 }
 

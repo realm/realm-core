@@ -473,9 +473,12 @@ void File::unlock() TIGHTDB_NOEXCEPT
 }
 
 
-void* File::map(AccessMode a, size_t size) const
+void* File::map(AccessMode a, size_t size, int map_flags) const
 {
 #ifdef _WIN32 // Windows version
+
+    // FIXME: Is there anything that we must do on Windows to honor map_flag_NoSync?
+    static_cast<void>(map_flags);
 
     DWORD protect        = PAGE_READONLY;
     DWORD desired_access = FILE_MAP_READ;
@@ -507,6 +510,11 @@ void* File::map(AccessMode a, size_t size) const
 
 #else // POSIX version
 
+    // FIXME: On FreeeBSB and other systems htat support it, we should
+    // honor map_flag_NoSync by specifying MAP_NOSYNC, but how do we
+    // reliably detect these systems?
+    static_cast<void>(map_flags);
+
     int prot = PROT_READ;
     switch (a) {
         case access_ReadWrite: prot |= PROT_WRITE; break;
@@ -528,10 +536,12 @@ void* File::map(AccessMode a, size_t size) const
 }
 
 
-void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size) const
+void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size,
+                  int map_flags) const
 {
 #ifdef _GNU_SOURCE
     static_cast<void>(a);
+    static_cast<void>(map_flags);
     void* const new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
     if (TIGHTDB_LIKELY(new_addr != MAP_FAILED)) return new_addr;
     unmap(old_addr, old_size);
@@ -550,7 +560,7 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     // untoched. This is only possible, though, if Windows can work
     // well with the opposite order.
     unmap(old_addr, old_size);
-    return map(a, new_size);
+    return map(a, new_size, map_flags);
 #endif
 }
 

@@ -81,7 +81,7 @@ void ArrayStringLong::Set(size_t ndx, const char* value, size_t len)
     const size_t current_end = (size_t)m_offsets.Get(ndx);
 
     len += 1; // include trailing null byte
-    const ssize_t diff =  (start + len) - current_end;
+    const int64_t diff =  int64_t(start + len) - int64_t(current_end);
 
     m_blob.Replace(start, current_end, value, len);
     m_offsets.Adjust(ndx, diff);

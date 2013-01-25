@@ -197,11 +197,13 @@ public:
 
     Group& get_group() const
     {
+        TIGHTDB_ASSERT(m_shared_group);
         return m_shared_group->m_group;
     }
 
     void commit()
     {
+        TIGHTDB_ASSERT(m_shared_group);
         m_shared_group->commit();
         m_shared_group = 0;
     }
