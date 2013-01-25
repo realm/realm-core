@@ -1,19 +1,24 @@
+#include <cstdarg>
 #include <cstring>
 #include <iostream>
-#include "tightdb.hpp"
-#include "tightdb/group_shared.hpp"
-#include <UnitTest++.h>
-#include <tightdb/column.hpp>
-#include <stdarg.h>
-#include <sys/stat.h>
-#include "tightdb/utilities.hpp"
-#include "testsettings.hpp"
 
-#ifdef _MSC_VER
-#include <Windows.h>
+#include <sys/stat.h>
+#include <pthread.h>
+
+#ifdef _WIN32
+#include <windows.h>
 #else
 #include <unistd.h>
 #endif
+
+#include <UnitTest++.h>
+
+#include <tightdb.hpp>
+#include <tightdb/group_shared.hpp>
+#include <tightdb/column.hpp>
+#include <tightdb/utilities.hpp>
+
+#include "testsettings.hpp"
 
 using namespace std;
 using namespace tightdb;

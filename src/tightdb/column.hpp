@@ -20,15 +20,11 @@
 #ifndef TIGHTDB_COLUMN_HPP
 #define TIGHTDB_COLUMN_HPP
 
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
 #include <stdint.h> // unint8_t etc
-#endif
-//#include <climits> // size_t
 #include <cstdlib> // size_t
-#include "query_conditions.hpp"
+
 #include <tightdb/array.hpp>
+#include <tightdb/query_conditions.hpp>
 
 namespace tightdb {
 

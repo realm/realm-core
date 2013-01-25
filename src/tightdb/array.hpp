@@ -38,16 +38,11 @@ Searching: The main finding function is:
 #ifndef TIGHTDB_ARRAY_HPP
 #define TIGHTDB_ARRAY_HPP
 
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
 #include <stdint.h> // unint8_t etc
-#endif
 #include <cstdlib> // size_t
 #include <cstring> // memmove
 #include <vector>
 #include <ostream>
-#include <assert.h>
 
 #include <tightdb/assert.hpp>
 #include <tightdb/error.hpp>

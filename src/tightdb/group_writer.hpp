@@ -20,11 +20,7 @@
 #ifndef TIGHTDB_GROUP_WRITER_HPP
 #define TIGHTDB_GROUP_WRITER_HPP
 
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
 #include <stdint.h> // unint8_t etc
-#endif
 #include <cstdlib> // size_t
 
 #include <tightdb/file.hpp>

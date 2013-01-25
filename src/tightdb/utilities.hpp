@@ -20,13 +20,15 @@
 #ifndef TIGHTDB_UTILITIES_HPP
 #define TIGHTDB_UTILITIES_HPP
 
+#include <stdint.h>
 #include <cstdlib>
-#include "assert.hpp"
+
 #ifdef _MSC_VER
-    #include <win32/types.h>
-    #include <win32/stdint.h>
-    #include <intrin.h>
+#  include <win32/types.h>
+#  include <intrin.h>
 #endif
+
+#include <tightdb/assert.hpp>
 
 #if defined(__GNUC__)
 	#define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))

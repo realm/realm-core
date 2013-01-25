@@ -21,13 +21,12 @@
 #define TIGHTDB_FILE_HPP
 
 #include <cstddef>
+#include <stdint.h>
 #include <cstdio>
 #include <stdexcept>
 #include <string>
 
-#ifdef _WIN32
-#  include <win32/stdint.h>
-#else // POSIX
+#ifndef _WIN32
 #  include <sys/types.h>
 #endif
 
@@ -101,11 +100,12 @@ public:
         flag_Append = 2  ///< Move to end of file before each write.
     };
 
-    /// See open(const std::string&, Mode). Specifying access_ReadOnly
-    /// together with a create mode that is not create_Never, or with
-    /// a \a flags argument that is not zero, results in undefined
-    /// behavior. Specifying flag_Trunc together with create_Must
-    /// results in undefined behavior.
+    /// See open(const std::string&, Mode).
+    ///
+    /// Specifying access_ReadOnly together with a create mode that is
+    /// not create_Never, or together with a non-zero \a flags
+    /// argument, results in undefined behavior. Specifying flag_Trunc
+    /// together with create_Must results in undefined behavior.
     void open(const std::string& path, AccessMode, CreateMode, int flags);
 
     void write(const char* data, std::size_t size);
@@ -322,16 +322,19 @@ public:
 
     ~Map() TIGHTDB_NOEXCEPT;
 
-    /// See File::map(). Calling this method on a Map instance that
-    /// already refers to a file mapping has undefined behavior. The
-    /// returned pointer is the same as what will subsequently be
-    /// returned by get_addr().
+    /// See File::map().
+    ///
+    /// Calling this method on a Map instance that already refers to a
+    /// file mapping has undefined behavior. The returned pointer is
+    /// the same as what will subsequently be returned by get_addr().
     T* map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T));
 
-    /// See File::remap(). Calling this method on a Map instance that
-    /// does not currently refer to a file mapping has undefined
-    /// behavior. The returned pointer is the same as what will
-    /// subsequently be returned by get_addr().
+    /// See File::remap().
+    ///
+    /// Calling this method on a Map instance that does not currently
+    /// refer to a file mapping has undefined behavior. The returned
+    /// pointer is the same as what will subsequently be returned by
+    /// get_addr().
     T* remap(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T));
 
     /// See File::unmap(). This method is idempotent, that is, it is
@@ -339,9 +342,10 @@ public:
     /// a file mapping or not.
     void unmap() TIGHTDB_NOEXCEPT;
 
-    /// See File::sync_map(). Calling this method on an instance that
-    /// does not currently refer to a file mapping, has undefined
-    /// behavior.
+    /// See File::sync_map().
+    ///
+    /// Calling this method on an instance that does not currently
+    /// refer to a file mapping, has undefined behavior.
     void sync();
 
     /// Returns a pointer to the beginning of the mapped file, or null
@@ -356,7 +360,8 @@ public:
     std::size_t get_size() const TIGHTDB_NOEXCEPT;
 
     /// Release the current mapping from this Map instance. The
-    /// mapping may then be released later by a call to File::unmap().
+    /// address range may then be unmapped later by a call to
+    /// File::unmap().
     T* release() TIGHTDB_NOEXCEPT;
 };
 

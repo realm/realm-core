@@ -1,11 +1,9 @@
+#include <pthread.h>
+
 #include <UnitTest++.h>
+
 #include "tightdb.hpp"
 #include "tightdb/group_shared.hpp"
-
-// Does not work for windows yet
-#ifndef _MSC_VER
-
-#include <unistd.h>
 
 using namespace tightdb;
 
@@ -804,6 +802,3 @@ TEST(Shared_FromSerialized)
         CHECK_EQUAL("test", (const char*)t1[0].fourth);
     }
 }
-
-
-#endif // !_MSV_VER

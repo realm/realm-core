@@ -254,7 +254,7 @@ void File::write(const char* data, size_t size)
 
 #else // POSIX version
 
-    // POSIX requires than size is less than or equal to SSIZE_MAX
+    // POSIX requires that size is less than or equal to SSIZE_MAX
     while (int_less_than(SSIZE_MAX, size)) {
         write(data, SSIZE_MAX);
         size -= SSIZE_MAX;

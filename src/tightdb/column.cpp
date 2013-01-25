@@ -1,15 +1,10 @@
+#include <stdint.h> // unint8_t etc
 #include <cstdlib>
 #include <cstring>
 #include <cstdio> // debug output
 #include <climits> // size_t
 #include <iostream>
 #include <iomanip>
-
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
-#include <stdint.h> // unint8_t etc
-#endif
 
 #include <tightdb/column.hpp>
 #include <tightdb/index.hpp>

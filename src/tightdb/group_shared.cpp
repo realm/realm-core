@@ -1,3 +1,5 @@
+#include <pthread.h>
+
 #include <tightdb/terminate.hpp>
 #include <tightdb/safe_int_ops.hpp>
 #include <tightdb/string_buffer.hpp>

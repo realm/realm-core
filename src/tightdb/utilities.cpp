@@ -1,10 +1,6 @@
-#include <string>
 #include <cstdlib> // size_t
-#ifndef _MSC_VER
+#include <string>
 #include <stdint.h>
-#else
-#include <win32/stdint.h>
-#endif
 
 #include <iostream>
 #include <tightdb/assert.hpp>

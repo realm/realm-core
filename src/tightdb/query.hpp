@@ -20,17 +20,14 @@
 #ifndef TIGHTDB_QUERY_HPP
 #define TIGHTDB_QUERY_HPP
 
-#include <string>
+#include <cstdio>
+#include <climits>
 #include <algorithm>
+#include <string>
 #include <vector>
-#include <stdio.h>
-#include <limits.h>
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-    #include <win32/pthread/pthread.h>
-    #include <win32/stdint.h>
-#else
-    #include <pthread.h>
-#endif
+
+// FIXME: If at all possible, we should hide the use of pthreads in the cpp-file
+#include <pthread.h>
 
 #include <tightdb/table_ref.hpp>
 #include <tightdb/binary_data.hpp>
@@ -45,7 +42,6 @@ class TableView;
 class ConstTableView;
 class Array;
 
-const size_t MAX_THREADS = 128;
 
 class Query {
 public:
@@ -170,7 +166,8 @@ protected:
         std::vector<size_t> results;
         std::vector<std::pair<size_t, size_t> > chunks;
     } ts;
-    pthread_t threads[MAX_THREADS];
+    static const size_t max_threads = 128;
+    pthread_t threads[max_threads];
 
     TableRef m_table;
     std::vector<ParentNode*> first;

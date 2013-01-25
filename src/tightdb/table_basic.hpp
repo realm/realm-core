@@ -20,12 +20,7 @@
 #ifndef TIGHTDB_TABLE_BASIC_HPP
 #define TIGHTDB_TABLE_BASIC_HPP
 
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
 #include <stdint.h> // unint8_t etc
-#endif
-
 #include <cstddef>
 #include <cstring> // strcmp()
 #include <ctime>

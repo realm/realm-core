@@ -20,13 +20,9 @@
 #ifndef TIGHTDB_ALLOC_HPP
 #define TIGHTDB_ALLOC_HPP
 
-#include <stdlib.h>
+#include <cstdlib>
 
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
 #include <stdint.h> // unint8_t etc
-#endif
 
 namespace tightdb {
 

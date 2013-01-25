@@ -4,6 +4,8 @@
 #include <fstream>
 #include <iomanip>
 
+#include <pthread.h>
+
 #include <UnitTest++.h>
 
 #include <tightdb/error.hpp>
