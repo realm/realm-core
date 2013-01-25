@@ -22,6 +22,8 @@
 
 namespace tightdb {
 
+// Note: tightdb_objc/Deliv/ColumnType.h must be kept in sync with his file.
+// Note: tightdb_java2/src/main/java/ColumnType.java must be kept in sync with his file.
 
 // FIXME: The namespace of all-upper-case names must be considered
 // reserved for macros. Consider renaming 'COLUMN_TYPE_INT' to
@@ -46,8 +48,8 @@ enum ColumnType {
     COLUMN_TYPE_MIXED       =  6,
     COLUMN_TYPE_DATE        =  7,
     COLUMN_TYPE_RESERVED1   =  8, // DateTime
-    COLUMN_TYPE_RESERVED2   =  9, // Float
-    COLUMN_TYPE_RESERVED3   = 10, // Double
+    COLUMN_TYPE_FLOAT       =  9, // Float
+    COLUMN_TYPE_DOUBLE      = 10, // Double
     COLUMN_TYPE_RESERVED4   = 11, // Decimal
 
     // Attributes

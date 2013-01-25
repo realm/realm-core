@@ -34,7 +34,7 @@ struct BinaryData {
 
     bool compare_payload(const BinaryData &b) const
     {
-        if(b.pointer == pointer && b.len == len)
+        if (b.pointer == pointer && b.len == len)
             return true;
         bool e = std::equal(pointer, pointer + len, b.pointer);
         return e;

@@ -17,23 +17,15 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_FWD_HPP
-#define TIGHTDB_COLUMN_FWD_HPP
+#ifndef TIGHTDB_ARRAY_FLOAT_HPP
+#define TIGHTDB_ARRAY_FLOAT_HPP
+
+#include <tightdb/array_basic.hpp>
 
 namespace tightdb {
 
-
-class ColumnBase;
-class Column;
-class ColumnFloat;
-class ColumnDouble;
-class AdaptiveStringColumn;
-class ColumnStringEnum;
-class ColumnBinary;
-class ColumnTable;
-class ColumnMixed;
-
+typedef ArrayBasic<float> ArrayFloat;
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_FWD_HPP
+#endif // TIGHTDB_ARRAY_FLOAT_HPP

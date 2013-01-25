@@ -115,9 +115,6 @@
     <ClCompile Include="src\tightdb\alloc_slab.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\array.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\tightdb\array_binary.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -157,8 +154,20 @@
     <ClCompile Include="test\transactions.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="test\testarrayfloat.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\testcolumnfloat.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
     <ClCompile Include="test\testtransactions_lasse.cpp">
       <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\experiments\fp_print.c">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\array.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -338,6 +347,30 @@
     </ClInclude>
     <ClInclude Include="test\pthread_test.hpp">
       <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array_float.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array_double.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_float.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_double.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array_basic.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_basic.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array_basic_tpl.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_basic_tpl.hpp">
+      <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

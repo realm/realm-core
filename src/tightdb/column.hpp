@@ -45,8 +45,6 @@ public:
     virtual void SetHasRefs() {};
 
     virtual bool IsIntColumn() const {return false;}
-    virtual bool IsStringColumn() const {return false;}
-    virtual bool IsBinaryColumn() const {return false;}
 
     virtual size_t Size() const = 0;
 
@@ -99,7 +97,9 @@ protected:
     };
 
     // Tree functions
+public:
     template<typename T, class C> T TreeGet(size_t ndx) const;
+protected:
     template<typename T, class C> bool TreeSet(size_t ndx, T value);
     template<typename T, class C> bool TreeInsert(size_t ndx, T value);
     template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
@@ -121,6 +121,11 @@ protected:
     template<class C> bool NodeInsertSplit(size_t ndx, size_t newRef);
     size_t GetRefSize(size_t ref) const;
 
+    static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
+
+    template <typename T, typename R, ACTION action, class condition>
+        R aggregate(T target, size_t start, size_t end, size_t *matchcount) const;
+
 #ifdef TIGHTDB_DEBUG
     void ArrayToDot(std::ostream& out, const Array& array) const;
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
@@ -128,8 +133,8 @@ protected:
 
     // Member variables
     mutable Array* m_array;
-    static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
 };
+
 
 class Column : public ColumnBase {
 public:
@@ -233,7 +238,7 @@ protected:
     }
 
     void DoSort(size_t lo, size_t hi);
-    template <ACTION action, class cond>int64_t aggregate(int64_t target, size_t start, size_t end, size_t *matchcount = 0) const;
+
     // Member variables
     Index* m_index;
 

@@ -57,7 +57,7 @@ void ColumnBinary::UpdateRef(size_t ref)
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx   = m_array->GetParentNdx();
 
-        // Replace the string array with int array for node
+        // Replace the Binary array with int array for node
         Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
         delete m_array;
         m_array = array;
@@ -154,7 +154,7 @@ bool ColumnBinary::add(BinaryData bin)
 void ColumnBinary::Insert(size_t ndx, const char* value, size_t len)
 {
     TIGHTDB_ASSERT(ndx <= Size());
-    Insert(ndx, BinaryData(value, len));
+    Insert(ndx, BinaryData(value, len));    // FIXME:Ignoring return value
 }
 
 bool ColumnBinary::Insert(size_t ndx, BinaryData bin)

@@ -28,6 +28,56 @@
 
 namespace tightdb {
 
+class ColumnFloat;
+class ColumnDouble;
+
+template <class T, class cond> class BASICNODE;
+template <class T, class C, class cond> class NODE;
+template <class T>class SequentialGetter;
+
+template<class cond, class T> struct ColumnTypeTraits2;
+
+template<class cond> struct ColumnTypeTraits2<cond, int64_t> {
+    typedef Column column_type;
+    typedef NODE<int64_t,Column,cond> node_type;
+};
+template<class cond> struct ColumnTypeTraits2<cond, bool> {
+    typedef Column column_type;
+    typedef NODE<bool,Column,cond> node_type;
+};
+template<class cond> struct ColumnTypeTraits2<cond, float> {
+    typedef ColumnFloat column_type;
+    typedef BASICNODE<float,cond> node_type;
+};
+template<class cond> struct ColumnTypeTraits2<cond, double> {
+    typedef ColumnDouble column_type;
+    typedef BASICNODE<double,cond> node_type;
+};
+
+
+template <typename T, typename R, ACTION action, class condition>
+R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
+{
+    typedef typename ColumnTypeTraits2<condition,T>::column_type ColType;
+    typedef typename ColumnTypeTraits2<condition,T>::node_type NodeType;
+
+    if (end == size_t(-1)) 
+        end = Size();
+
+    NodeType node(target, 0);
+
+    node.QuickInit((ColType*)this, target); 
+    state_state<R> st;
+    st.init(action, NULL, size_t(-1));
+
+    ColType* column = (ColType*)this;
+    SequentialGetter<T> sg( column );
+    node.template aggregate_local<action, R, T>(&st, start, end, size_t(-1), &sg, matchcount);
+
+    return st.state;
+}
+
+
 template<class T> T GetColumnFromRef(Array& parent, size_t ndx)
 {
     //TIGHTDB_ASSERT(parent.HasRefs());
@@ -76,9 +126,11 @@ template<typename T, class C> bool ColumnBase::TreeSet(size_t ndx, T value)
 
         // Set item
         C target = GetColumnFromRef<C>(refs, node_ndx);
-        if (!target.Set(local_ndx, value)) return false;
+        if (!target.Set(local_ndx, value)) 
+            return false;
     }
-    else if (!static_cast<C*>(this)->LeafSet(ndx, value)) return false;
+    else if (!static_cast<C*>(this)->LeafSet(ndx, value)) 
+        return false;
 
     // Update index
     //if (m_index) m_index->Set(ndx, oldVal, value);

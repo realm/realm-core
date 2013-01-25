@@ -2,7 +2,7 @@
 #include <iostream>
 #include <UnitTest++.h>
 #include <tightdb/utilities.hpp>
-#if defined(_MSC_VER) && defined(_DEBUG)
+#if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
     #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 

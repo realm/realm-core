@@ -22,6 +22,8 @@
 
 #include <cstdlib>
 #include "assert.hpp"
+#include <cstdlib> // size_t
+
 #ifdef _MSC_VER
     #include <win32/types.h>
     #include <win32/stdint.h>
@@ -91,9 +93,9 @@ template <int version>TIGHTDB_FORCEINLINE bool cpuid_sse()
 */
     TIGHTDB_STATIC_ASSERT(version == 30 || version == 42, "Only SSE 3 and 42 supported for detection");
 #ifdef TIGHTDB_COMPILER_SSE
-    if(version == 30)
+    if (version == 30)
         return (sse_support >= 0);
-    else if(version == 42)
+    else if (version == 42)
         return (sse_support > 0);   // faster than == 1 (0 requres no immediate operand)
 #else
     return false;
@@ -119,6 +121,9 @@ size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
 void checksum_init(checksum_t* t);
 
+// popcount
+int fast_popcount32(int32_t x);
+int fast_popcount64(int64_t x);
 }
 
 #endif // TIGHTDB_UTILITIES_HPP

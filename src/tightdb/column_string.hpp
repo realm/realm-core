@@ -38,8 +38,6 @@ public:
 
     void Destroy();
 
-    bool IsStringColumn() const {return true;}
-
     size_t Size() const;
     bool is_empty() const;
 

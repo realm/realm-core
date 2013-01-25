@@ -46,7 +46,6 @@ size_t GetSizeFromHeader(void* p)
     const size_t count = (header[1] << 16) + (header[2] << 8) + header[3];
     const size_t wt    = (header[0] & 0x18) >> 3; // Array::WidthType
 
-    // Calculate bytes used by array
     size_t bytes = 0;
     if (wt == 0) { // TDB_BITS
         const size_t bits = (count * width);
@@ -507,23 +506,27 @@ void SlabAlloc::set_shared(const string& path, bool read_only, bool no_create)
         CloseGuard cg(m_file);
 
         // Map to memory (read only)
-        const HANDLE m_map_file = CreateFileMapping(m_file, NULL, PAGE_WRITECOPY, 0, 0, 0);
-        if (map_file == NULL) goto create_map_error;
+        m_map_file = CreateFileMapping(m_file, NULL, PAGE_WRITECOPY, 0, 0, 0);
+        if (m_map_file == NULL) 
+            goto create_map_error;
 
         CloseGuard cg2(m_map_file);
 
         const LPVOID p = MapViewOfFile(m_map_file, FILE_MAP_COPY, 0, 0, 0);
-        if (!p) goto map_view_error;
+        if (!p) 
+            goto map_view_error;
 
         // Get Size
         LARGE_INTEGER size;
-        if (!GetFileSizeEx(m_file, &size)) goto get_size_error;
+        if (!GetFileSizeEx(m_file, &size)) 
+            goto get_size_error;
         m_baseline = to_ref(size.QuadPart);
 
         UnmapGuard ug(p);
 
         // Verify the data structures
-        if (!validate_buffer(static_cast<char*>(p), m_baseline)) goto invalid_database;
+        if (!validate_buffer(static_cast<char*>(p), m_baseline)) 
+            goto invalid_database;
 
         m_shared = static_cast<char*>(p);
 
@@ -536,7 +539,7 @@ void SlabAlloc::set_shared(const string& path, bool read_only, bool no_create)
 
   open_error:
     switch (error_copy) {
-        case ERROR_FILE_NOT_FOUND: throw FileNotFound();
+        case ERROR_FILE_NOT_FOUND: throw NoSuchFile();
             // FIXME: What error codes should cause PermissionDenied to be thrown? What kind of permission violations are even possible on Windows?
     }
     throw runtime_error("CreateFile() failed");

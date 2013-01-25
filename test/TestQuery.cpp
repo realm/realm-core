@@ -27,7 +27,163 @@ TIGHTDB_TABLE_5(PeopleTable,
                 hired, Date,
                 photo, Binary)
 
+TIGHTDB_TABLE_2(FloatTable,
+                col_float,  Float,
+                col_double, Double)
+
+TIGHTDB_TABLE_3(FloatTable3,
+                col_float,  Float,
+                col_double, Double,
+                col_int, Int)
 } // anonymous namespace
+
+
+TEST(TestQueryFloat3)
+{
+    FloatTable3 t;
+
+    t.add(float(1.1), double(2.1), 1);
+    t.add(float(1.2), double(2.2), 2);
+    t.add(float(1.3), double(2.3), 3);
+    t.add(float(1.4), double(2.4), 4); // match
+    t.add(float(1.5), double(2.5), 5); // match
+    t.add(float(1.6), double(2.6), 6); // match
+    t.add(float(1.7), double(2.7), 7);
+    t.add(float(1.8), double(2.8), 8);
+    t.add(float(1.9), double(2.9), 9);
+
+    FloatTable3::Query q1 = t.where().col_float.greater(1.35f).col_double.less(2.65);
+    int64_t a1 = q1.col_int.sum();
+    CHECK_EQUAL(15, a1);
+
+    FloatTable3::Query q2 = t.where().col_double.less(2.65).col_float.greater(1.35f);
+    int64_t a2 = q2.col_int.sum();
+    CHECK_EQUAL(15, a2);
+
+    FloatTable3::Query q3 = t.where().col_double.less(2.65).col_float.greater(1.35f);
+    double a3 = q3.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a3);
+
+    FloatTable3::Query q4 = t.where().col_float.greater(1.35f).col_double.less(2.65);
+    double a4 = q4.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a4);
+
+    FloatTable3::Query q5 = t.where().col_int.greater_equal(4).col_double.less(2.65);
+    double a5 = q5.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a5);
+
+    FloatTable3::Query q6 = t.where().col_double.less(2.65).col_int.greater_equal(4);
+    double a6 = q6.col_float.sum();
+    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a6);
+
+    FloatTable3::Query q7 = t.where().col_int.greater(3).col_int.less(7);
+    int64_t a7 = q7.col_int.sum();
+    CHECK_EQUAL(15, a7);
+    FloatTable3::Query q8 = t.where().col_int.greater(3).col_int.less(7);
+    int64_t a8 = q8.col_int.sum();
+    CHECK_EQUAL(15, a8);
+}
+
+
+TEST(TestQueryFloat4)
+{
+    FloatTable3 t;
+
+    t.add(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
+    t.add(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
+    t.add(12345.0, 12345.0, 11111);
+    
+    FloatTable3::Query q1 = t.where();
+    float a1 = q1.col_float.maximum();
+    double a2 = q1.col_double.maximum();
+    CHECK_EQUAL(std::numeric_limits<float>::infinity(), a1);
+    CHECK_EQUAL(std::numeric_limits<double>::infinity(), a2);
+
+
+    FloatTable3::Query q2 = t.where();
+    float a3 = q1.col_float.minimum();
+    double a4 = q1.col_double.minimum();
+    CHECK_EQUAL(12345.0, a3);
+    CHECK_EQUAL(12345.0, a4);
+}
+
+
+TEST(TestQueryFloat)
+{
+    FloatTable t;
+
+    t.add(1.10f, 2.20);
+    t.add(1.13f, 2.21);
+    t.add(1.13f, 2.22);
+    t.add(1.10f, 2.20);
+    t.add(1.20f, 3.20);
+
+    // Test find_all()
+    FloatTable::View v = t.where().col_float.equal(1.13f).find_all();
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(1.13f, v[0].col_float.get());
+    CHECK_EQUAL(1.13f, v[1].col_float.get());
+
+    FloatTable::View v2 = t.where().col_double.equal(3.2).find_all();
+    CHECK_EQUAL(1, v2.size());
+    CHECK_EQUAL(3.2, v2[0].col_double.get());
+
+    // Test operators (and count)
+    CHECK_EQUAL(2, t.where().col_float.equal(1.13f).count());
+    CHECK_EQUAL(3, t.where().col_float.not_equal(1.13f).count());
+    CHECK_EQUAL(3, t.where().col_float.greater(1.1f).count());
+    CHECK_EQUAL(3, t.where().col_float.greater_equal(1.13f).count());
+    CHECK_EQUAL(4, t.where().col_float.less_equal(1.13f).count());
+    CHECK_EQUAL(2, t.where().col_float.less(1.13f).count());
+    CHECK_EQUAL(3, t.where().col_float.between(1.13f, 1.2f).count());
+
+    CHECK_EQUAL(2, t.where().col_double.equal(2.20).count());
+    CHECK_EQUAL(3, t.where().col_double.not_equal(2.20).count());
+    CHECK_EQUAL(2, t.where().col_double.greater(2.21).count());
+    CHECK_EQUAL(3, t.where().col_double.greater_equal(2.21).count());
+    CHECK_EQUAL(4, t.where().col_double.less_equal(2.22).count());
+    CHECK_EQUAL(3, t.where().col_double.less(2.22).count());
+    CHECK_EQUAL(4, t.where().col_double.between(2.20, 2.22).count());
+
+    // ------ Test sum()
+
+    // ... NO conditions
+    float sum1_f = 1.10f + 1.13f + 1.13f + 1.10f + 1.20f;
+    double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
+    CHECK_EQUAL(sum1_d, t.where().col_double.sum());
+    CHECK_EQUAL(sum1_f, t.where().col_float.sum());
+
+    // ... with conditions
+    float sum2_f = 1.13f + 1.20f;
+    double sum2_d = 2.21 + 3.20;
+    FloatTable::Query q2 = t.where().col_float.between(1.13f, 1.20f).col_double.not_equal(2.22);
+    CHECK_EQUAL(sum2_d, q2.col_double.sum());
+    CHECK_EQUAL(sum2_f, q2.col_float.sum());
+
+    // ------ Test average()
+
+    // ... NO conditions
+    CHECK_EQUAL(sum1_f/5.0f, t.where().col_float.average());
+    CHECK_EQUAL(sum1_d/5.0, t.where().col_double.average());
+    // ... with conditions
+    CHECK_EQUAL(sum2_f/2.0f, q2.col_float.average());
+    CHECK_EQUAL(sum2_d/2.0, q2.col_double.average());
+
+    // -------- Test minimum(), maximum()
+    
+    // ... NO conditions
+    CHECK_EQUAL(1.20f, t.where().col_float.maximum());
+    CHECK_EQUAL(1.10f, t.where().col_float.minimum());
+    CHECK_EQUAL(3.20, t.where().col_double.maximum());
+    CHECK_EQUAL(2.20, t.where().col_double.minimum());
+
+    // ... with conditions
+    CHECK_EQUAL(1.20f, q2.col_float.maximum());
+    CHECK_EQUAL(1.13f, q2.col_float.minimum());
+    CHECK_EQUAL(3.20, q2.col_double.maximum());
+    CHECK_EQUAL(2.21, q2.col_double.minimum());
+}
+
 
 TEST(TestDateQuery)
 {
@@ -40,9 +196,8 @@ TEST(TestDateQuery)
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
     PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::Date(2012, 1, 1).get_date())
                                            .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all(); 
-
-    assert(view5.size() == 1 && view5[0].name == "Mary");
-
+    CHECK_EQUAL(1, view5.size());
+    CHECK_EQUAL("Mary", view5[0].name);
 }
 
 
@@ -139,7 +294,7 @@ TEST(TestQueryFindAll_Contains2_2)
     CHECK_EQUAL(5, tv2.get_source_ndx(2));
 #endif
 }
-
+/*
 TEST(TestQuery_sum_new_aggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
@@ -158,6 +313,7 @@ TEST(TestQuery_sum_new_aggregates)
     CHECK_EQUAL(2000, c);
 
 }
+*/
 
 TEST(TestQuery_sum_min_max_avg_foreign_col)
 {
@@ -464,10 +620,15 @@ TEST(TestQuerySubtable)
     subtable->insert_done();
 
 
+    int64_t val50 = 50;
+    int64_t val200 = 200;
+    int64_t val20 = 20;
+    int64_t val300 = 300;
+
     Query q1 = table->where();
-    q1.greater(0, 200);
+    q1.greater(0, val200);
     q1.subtable(2);
-    q1.less(0, 50);
+    q1.less(0, val50);
     q1.end_subtable();
     TableView t1 = q1.find_all(0, (size_t)-1);
     CHECK_EQUAL(2, t1.size());
@@ -477,9 +638,9 @@ TEST(TestQuerySubtable)
 
     Query q2 = table->where();
     q2.subtable(2);
-    q2.greater(0, 50);
+    q2.greater(0, val50);
     q2.Or();
-    q2.less(0, 20);
+    q2.less(0, val20);
     q2.end_subtable();
     TableView t2 = q2.find_all(0, (size_t)-1);
     CHECK_EQUAL(2, t2.size());
@@ -489,11 +650,11 @@ TEST(TestQuerySubtable)
 
     Query q3 = table->where();
     q3.subtable(2);
-    q3.greater(0, 50);
+    q3.greater(0, val50);
     q3.Or();
-    q3.less(0, 20);
+    q3.less(0, val20);
     q3.end_subtable();
-    q3.less(0, 300);
+    q3.less(0, val300);
     TableView t3 = q3.find_all(0, (size_t)-1);
     CHECK_EQUAL(1, t3.size());
     CHECK_EQUAL(0, t3.get_source_ndx(0));
@@ -503,11 +664,12 @@ TEST(TestQuerySubtable)
     q4.equal(0, (int64_t)333);
     q4.Or();
     q4.subtable(2);
-    q4.greater(0, 50);
+    q4.greater(0, val50);
     q4.Or();
-    q4.less(0, 20);
+    q4.less(0, val20);
     q4.end_subtable();
     TableView t4 = q4.find_all(0, (size_t)-1);
+
 
 
     CHECK_EQUAL(3, t4.size());
@@ -713,7 +875,7 @@ TEST(TestQuerySimple2)
     CHECK_EQUAL(7, tv1.get_source_ndx(2));
 }
 
-
+/*
 TEST(TestQueryLimit)
 {
     TupleTableType ttt;
@@ -759,6 +921,7 @@ TEST(TestQueryLimit)
     TupleTableType::View tv5 = q3.find_all(0, 3, 5);
     CHECK_EQUAL(3, tv5.size());
 }
+*/
 
 TEST(TestQueryFindNext)
 {
@@ -1346,24 +1509,18 @@ TEST(TestTV)
     t.add(1, "a");
     t.add(2, "a");
     t.add(3, "c");
+     
+    TupleTableType::View v = t.where().first.greater(1).find_all();
 
-    Array arr;
-    arr.add(0);
-    arr.add(2);
-    TupleTableType::Query q1 = t.where().tableview(arr);
+    TupleTableType::Query q1 = t.where().tableview(v);
     CHECK_EQUAL(2, q1.count());
 
-    TupleTableType::Query q2 = t.where().second.equal("a").tableview(arr);
-    CHECK_EQUAL(1, q2.count());
-
-    TupleTableType::Query q3 = t.where().tableview(arr).second.equal("a");
+    TupleTableType::Query q3 = t.where().tableview(v).second.equal("a");
     CHECK_EQUAL(1, q3.count());
-
-    TupleTableType::Query q4 = t.where().tableview(arr).second.equal("a");
-    TupleTableType::View v4 = q4.find_all();
-    CHECK_EQUAL(1, v4.size());
-    arr.Destroy();
 }
+ 
+ #if 0 
+ !!!
  
 TEST(TestQuery_sum_min_max_avg)
 {
@@ -1402,6 +1559,7 @@ TEST(TestQuery_sum_min_max_avg)
     CHECK_EQUAL(6, t.where().first.sum(&cnt, 0, size_t(-1)));
     CHECK_EQUAL(3, cnt);
 }
+#endif
 
 TEST(TestQuery_avg)
 {

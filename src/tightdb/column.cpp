@@ -13,7 +13,6 @@
 
 #include <tightdb/column.hpp>
 #include <tightdb/index.hpp>
-#include <tightdb/query_conditions.hpp>
 #include <tightdb/query_engine.hpp>
 
 using namespace std;
@@ -44,7 +43,7 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
 void merge_core(const Array& a0, const Array& a1, Array& res);
 Array* merge(const Array& ArrayList);
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
-
+    
 // Input:
 //     vals:   An array of values
 //     idx0:   Array of indexes pointing into vals, sorted with respect to vals
@@ -255,7 +254,8 @@ namespace tightdb {
 size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc)
 {
     Array a(ref, 0, 0, alloc);
-    if (!a.IsNode()) return a.Size();
+    if (!a.IsNode())
+        return a.Size();
     Array offsets(a.Get(0), 0, 0, alloc);
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
@@ -326,14 +326,16 @@ void Column::Destroy()
 
 bool Column::is_empty() const
 {
-    if (!IsNode()) return m_array->is_empty();
+    if (!IsNode())
+        return m_array->is_empty();
     const Array offsets = NodeGetOffsets();
     return offsets.is_empty();
 }
 
 size_t Column::Size() const
 {
-    if (!IsNode()) return m_array->Size();
+    if (!IsNode())
+        return m_array->Size();
     const Array offsets = NodeGetOffsets();
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
@@ -341,7 +343,8 @@ size_t Column::Size() const
 void Column::UpdateParentNdx(int diff)
 {
     m_array->UpdateParentNdx(diff);
-    if (m_index) m_index->UpdateParentNdx(diff);
+    if (m_index)
+        m_index->UpdateParentNdx(diff);
 }
 
 // Used by column b-tree code to ensure all leaf having same type
@@ -371,18 +374,21 @@ const Column Column::GetSubColumn(size_t ndx) const
 void Column::Clear()
 {
     m_array->Clear();
-    if (m_array->IsNode()) m_array->SetType(COLUMN_NORMAL);
+    if (m_array->IsNode())
+        m_array->SetType(COLUMN_NORMAL);
 }
 
 int64_t Column::Get(size_t ndx) const
 {
     return m_array->ColumnGet(ndx);
-    //return TreeGet<int64_t, Column>(ndx);
+    //return TreeGet<int64_t, Column>(ndx); // slower than above
 }
 
+// Will return 32-bit sized ref on 32 bit architectures. 64 bit on 64 bit architectures.
+// On 32 bit architectures it's checked that no bits above bit 31 are set.
 size_t Column::GetAsRef(size_t ndx) const
 {
-    return to_ref(TreeGet<int64_t, Column>(ndx));
+    return to_ref(Get(ndx));
 }
 
 bool Column::Set(size_t ndx, int64_t value)
@@ -390,10 +396,12 @@ bool Column::Set(size_t ndx, int64_t value)
     const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
 
     const bool res = TreeSet<int64_t, Column>(ndx, value);
-    if (!res) return false;
+    if (!res)
+        return false;
 
     // Update index
-    if (m_index) m_index->Set(ndx, oldVal, value);
+    if (m_index)
+        m_index->Set(ndx, oldVal, value);
 
     return true;
 }
@@ -408,7 +416,8 @@ bool Column::Insert(size_t ndx, int64_t value)
     TIGHTDB_ASSERT(ndx <= Size());
 
     const bool res = TreeInsert<int64_t, Column>(ndx, value);
-    if (!res) return false;
+    if (!res)
+        return false;
 
     // Update index
     if (m_index) {
@@ -440,109 +449,39 @@ void Column::fill(size_t count)
 #endif
 }
 
-template <ACTION action, class cond>int64_t Column::aggregate(int64_t target, size_t start, size_t end, size_t *matchcount) const
-{ 
-#if 1
-    if (end == size_t(-1)) 
-        end = ((Column*)this)->Size();
-    Column* m_column = (Column*)this;
-   
-    // We must allocate 'node' on stack with malloca() because malloc is slow (makes aggregate on 1000 elements around 10 times
-    // slower because of initial overhead).
-    NODE<int64_t, Column, cond>* node = (NODE<int64_t, Column, cond>*)alloca(sizeof(NODE<int64_t, Column, cond>));     
-    new (node) NODE<int64_t, Column, cond>(target, 0);
-
-//    static NODE<int64_t, Column, cond> node(target, NULL);
-
-    node->QuickInit(m_column, target);
-    // TODO: Erase matchcount
-    int64_t r = node->template aggregate<action>(0, start, end, size_t(-1), size_t(-1), matchcount);
-    node->Destroy();
-    return r;
-#else
-    // Experimental
-
-    if (end == size_t(-1)) end = ((Column*)this)->Size();
-    Column* m_column = (Column*)this;
-    // To make column aggregates fast on few number of values we need low initial overhead
-    // so we allocate Array instance from stack and use fast constructor intended for read-only use
-    // with GetDirect():
-
-//    #define ARRAYPTR
-
-//    Array *m_array = (Array*)alloca(sizeof(Array));     // Fast
-//    new (m_array) Array(false);
-
-    static Array m_array;                            // Fast but very bad practise
-    // Array m_array;                                   // Around 10 times slower for 1000 items
-    // Array *m_array = new Array(false);               // Also 10 times slower
-
-    size_t m_leaf_start = 0;
-    size_t m_leaf_end = 0;
-    size_t m_local_end = 0;
-    state_state state;
-
-#ifdef ARRAYPTR
-    m_array->state_init(action, &state, NULL);
-#else
-    m_array.state_init(action, &state, NULL);
-#endif
-
-    for (size_t s = start; s < end; ) {
-        // Cache internal leafs
-        if (s >= m_leaf_end) {
-#ifdef ARRAYPTR
-            m_column->GetBlock(s, *m_array, m_leaf_start);
-            const size_t leaf_size = m_array->Size();
-#else
-            m_column->GetBlock(s, m_array, m_leaf_start);
-            const size_t leaf_size = m_array.Size();
-#endif
-            m_leaf_end = m_leaf_start + leaf_size;
-            const size_t e = end - m_leaf_start;
-            m_local_end = leaf_size < e ? leaf_size : e;
-        }
-#ifdef ARRAYPTR
-        m_array->find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
-#else
-        m_array.find<cond, action>(target, s - m_leaf_start, m_local_end, 0, &state, &tightdb_dummy);
-#endif
-        s = m_leaf_end;
-    }
-
-    return state.state;
-#endif
-}
+// int64_t specific:
 
 size_t Column::count(int64_t target) const
 {
-    return size_t(aggregate<TDB_COUNT, EQUAL>(target, 0, ((Column*)this)->Size()));
+    return size_t(aggregate<int64_t, int64_t, TDB_COUNT, EQUAL>(target, 0, Size(), NULL));
 }
 
 int64_t Column::sum(size_t start, size_t end) const
 {
-    return aggregate<TDB_SUM, NONE>(0, start, end);
+    return aggregate<int64_t, int64_t, TDB_SUM, NONE>(0, start, end, NULL);
 }
 
 double Column::average(size_t start, size_t end) const
 {
     if (end == size_t(-1))
-        end = ((Column*)this)->Size();
+        end = Size();
     size_t size = end - start;
-    size_t sum = aggregate<TDB_SUM, NONE>(0, start, end);
+    int64_t sum = aggregate<int64_t, int64_t, TDB_SUM, NONE>(0, start, end, NULL);
     double avg = double( sum ) / double( size == 0 ? 1 : size );
     return avg;
 }
 
 int64_t Column::minimum(size_t start, size_t end) const
 {
-    return aggregate<TDB_MIN, NONE>(0, start, end);
+    return aggregate<int64_t, int64_t, TDB_MIN, NONE>(0, start, end, NULL);
 }
 
 int64_t Column::maximum(size_t start, size_t end) const
 {
-    return aggregate<TDB_MAX, NONE>(0, start, end);
+    return aggregate<int64_t, int64_t, TDB_MAX, NONE>(0, start, end, NULL);
 }
+
+
 
 void Column::sort(size_t start, size_t end)
 {
