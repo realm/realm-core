@@ -32,18 +32,18 @@ class ColumnFloat;
 class ColumnDouble;
 
 template <class T, class cond> class BASICNODE;
-template <class T, class C, class cond> class NODE;
+template <class T, class cond> class NODE;
 template <class T>class SequentialGetter;
 
 template<class cond, class T> struct ColumnTypeTraits2;
 
 template<class cond> struct ColumnTypeTraits2<cond, int64_t> {
     typedef Column column_type;
-    typedef NODE<int64_t,Column,cond> node_type;
+    typedef NODE<int64_t,cond> node_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, bool> {
     typedef Column column_type;
-    typedef NODE<bool,Column,cond> node_type;
+    typedef NODE<bool,cond> node_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, float> {
     typedef ColumnFloat column_type;
@@ -67,7 +67,7 @@ R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) 
     NodeType node(target, 0);
 
     node.QuickInit((ColType*)this, target); 
-    state_state<R> st;
+    QueryState<R> st;
     st.init(action, NULL, size_t(-1));
 
     ColType* column = (ColType*)this;

@@ -2083,7 +2083,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     if (end == (size_t)-1) end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
-    state_state<int64_t> state;
+    QueryState<int64_t> state;
     state.state = (int64_t)&result;
 
     TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
@@ -2091,7 +2091,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     return;
 }
 
-void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, state_state<int64_t> *state) const
+void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
     if (cond == COND_EQUAL) {
         if (action == TDB_SUM) {

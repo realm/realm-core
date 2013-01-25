@@ -17,6 +17,22 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
+
+/*
+
+TCondition: 
+
+TAction:     
+
+TResult
+
+TSource
+
+
+*/
+
+
+
 #ifndef TIGHTDB_QUERY_ENGINE_HPP
 #define TIGHTDB_QUERY_ENGINE_HPP
 
@@ -44,15 +60,20 @@ class ColumnDouble;
 
 namespace tightdb {
 
-// Number of matches to find in best condition loop before breaking out to probe other conditions
-const size_t findlocals = 1;   
+// Number of matches to find in best condition loop before breaking out to probe other conditions. Too low value gives too many
+// constant time overheads everywhere in the query engine. Too high value makes it adapt less rapidly to changes in match
+// frequencies.
+const size_t findlocals = 16;   
 
 // Distance between matches from which performance begins to flatten out because various initial overheads become insignificant
 const size_t bestdist = 2;    
 
-// Minimum number of matches in a certain condition before using it in statistics. Too high value can spent too much time in 
-// bad node (bad = high match frequency). Too low value gives inaccurate statistics.
+// Minimum number of matches required in a certain condition before it can be used to compute statistics. Too high value can spent 
+// too much time in a bad node (with high match frequency). Too low value gives inaccurate statistics.
 const size_t probe_matches = 2;
+
+// 
+const size_t bitwidth_time_unit = 8; 
 
 
 typedef bool (*CallbackDummy)(int64_t);
@@ -146,7 +167,7 @@ private:
 
 class ParentNode {
 public:
-    ParentNode() : cond(-1), has_optimized_aggregate(false), m_table(NULL) {}
+    ParentNode() : m_is_integer_node(false), m_table(NULL) {}
 
     std::vector<ParentNode*> gather_children(std::vector<ParentNode*> v) {
         m_children.clear();
@@ -217,18 +238,18 @@ public:
         return m_child;
     }
 
-    virtual size_t aggregate_call_specialized(ACTION /*action*/, ColumnType /*resulttype*/, 
-                                              state_state_parent* /*st*/, 
+    virtual size_t aggregate_call_specialized(ACTION /*TAction*/, ColumnType /*TResult*/, 
+                                              QueryStateParent* /*st*/, 
                                               size_t /*start*/, size_t /*end*/, size_t /*local_limit*/, 
-                                              SequentialGetterParent* /*agg_col*/, size_t* /*matchcount*/)
+                                              SequentialGetterParent* /*source_column*/, size_t* /*matchcount*/)
     {
         TIGHTDB_ASSERT(false);
         return 0;
     }
 
-    template<ACTION action, class resulttype, class T>
-    size_t aggregate_local_selector(ParentNode* node, state_state<resulttype>* st, size_t start, size_t end, size_t local_limit, 
-                                    SequentialGetter<T>* agg_col, size_t* matchcount)
+    template<ACTION TAction, class TResult, class TSource>
+    size_t aggregate_local_selector(ParentNode* node, QueryState<TResult>* st, size_t start, size_t end, size_t local_limit, 
+                                    SequentialGetter<TSource>* source_column, size_t* matchcount)
     {
         // Workaround that emulates templated vitual methods. Very very slow (dynamic_cast performs ~300 instructions, 
         // and the if..else are slow too). 
@@ -237,26 +258,26 @@ public:
         
         size_t r;
         
-        if (node->has_optimized_aggregate)
-            r = node->aggregate_call_specialized(action, ColumnTypeTraits<resulttype>::id,(state_state_parent*)st,
-                                                 start, end, local_limit, agg_col, matchcount);
+        if (node->m_is_integer_node)
+            r = node->aggregate_call_specialized(TAction, ColumnTypeTraits<TResult>::id,(QueryStateParent*)st,
+                                                 start, end, local_limit, source_column, matchcount);
         else
              // call method in parent class
-            r = aggregate_local<action, resulttype, T>(st, start, end, local_limit, agg_col, matchcount);
+            r = aggregate_local<TAction, TResult, TSource>(st, start, end, local_limit, source_column, matchcount);
         return r;
     }
 
 
-    template<ACTION action, class resulttype, class T>
-    resulttype aggregate(state_state<resulttype>* st, size_t start, size_t end, size_t agg_col2 = not_found, size_t* matchcount = 0) 
+    template<ACTION TAction, class TResult, class TSourceColumn>
+    TResult aggregate(QueryState<TResult>* st, size_t start, size_t end, size_t agg_col2 = not_found, size_t* matchcount = 0) 
     {
         if (end == size_t(-1)) 
             end = m_table->size();
 
-        SequentialGetter<T>* agg_col = NULL;
+        SequentialGetter<TSourceColumn>* source_column = NULL;
         
         if (agg_col2 != not_found)
-            agg_col = new SequentialGetter<T>(*m_table, agg_col2);
+            source_column = new SequentialGetter<TSourceColumn>(*m_table, agg_col2);
 
         size_t td;
 
@@ -266,7 +287,7 @@ public:
             // Find a large amount of local matches in best condition
             td = m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
 
-            start = aggregate_local_selector<action, resulttype, T>(m_children[best], st, start, td, findlocals, agg_col, matchcount);
+            start = aggregate_local_selector<TAction, TResult, TSourceColumn>(m_children[best], st, start, td, findlocals, source_column, matchcount);
 
             // Make remaining conditions compute their m_dD (statistics)
             for (size_t c = 0; c < m_children.size() && start < end; c++) {
@@ -280,39 +301,31 @@ public:
                     // Limit to bestdist in order not to skip too large parts of index nodes
                     size_t maxD = m_children[c]->m_dT == 0.0 ? end - start : bestdist;
                     td = m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = aggregate_local_selector<action, resulttype, T>(m_children[best], st, start, td, probe_matches, agg_col, matchcount);
+                    start = aggregate_local_selector<TAction, TResult, TSourceColumn>(m_children[best], st, start, td, probe_matches, source_column, matchcount);
                 }
             }
         }
 
         if (matchcount)
             *matchcount = st->match_count;
-        delete agg_col;
+        delete source_column;
 
         return st->state;
 
     }
 
-
-#if 0
-NODE:
-    size_t aggregate_local(state_state_parent* st, size_t start, size_t end, size_t local_limit, 
-                           SequentialGetterParent* agg_col, size_t* matchcount) {
-#endif
-
-    template<ACTION action, class resulttype, class T>
-    size_t aggregate_local(state_state_parent* st, size_t start, size_t end, size_t local_limit, 
-                           SequentialGetterParent* agg_col, size_t* matchcount) 
+    template<ACTION TAction, class TResult, class TSourceColumn>
+    size_t aggregate_local(QueryStateParent* st, size_t start, size_t end, size_t local_limit, 
+                           SequentialGetterParent* source_column, size_t* matchcount) 
     {
 		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
         // integer version, because find_first_local() is relatively slower here (because it's non-integers).
 		//
         // Todo: Two speedups are possible. Simple: Initially test if there are no sub criterias and run find_first_local()
         // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize 
-        // data type array to make array call state_match() directly on each match, like for integers.
+        // data type array to make array call match() directly on each match, like for integers.
         
         (void)matchcount;
-		(void)agg_col;
         size_t local_matches = 0;
 
         size_t r = start - 1;
@@ -342,10 +355,10 @@ NODE:
 
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
-                T av = (T)0;
-                if (agg_col != NULL)
-                    av = static_cast<SequentialGetter<T>*>(agg_col)->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
-                ((state_state<resulttype>*)st)->template state_match<action, 0>(r, 0, resulttype(av), CallbackDummy());
+                TSourceColumn av = (TSourceColumn)0;
+                if (source_column != NULL)
+                    av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
+                ((QueryState<TResult>*)st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
              }   
         }
     }
@@ -363,8 +376,10 @@ NODE:
 
     ParentNode* m_child;
     std::vector<ParentNode*>m_children;
-    int cond;
-    size_t m_column_id; // Column of search criteria
+
+    size_t m_condition_column_idx; // Column of search criteria
+    bool m_is_integer_node; // true for NODE, false for any other
+
     size_t m_conds;
     double m_dD; // Average row distance between each local match at current position
     double m_dT; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0 for index/tableview
@@ -372,7 +387,6 @@ NODE:
     size_t m_probes;
     size_t m_matches;
 
-    bool has_optimized_aggregate;
 
 protected:
     const Table* m_table;
@@ -468,18 +482,18 @@ public:
 };
 
 // NODE is for conditions for types stored as integers in a tightdb::Array (int, date, bool)
-template <class T, class C, class F> class NODE: public ParentNode {
+template <class TConditionValue, class TConditionFunction> class NODE: public ParentNode {
 public:
-    // NOTE: Be careful to call Array(false) constructors on m_array in the initializer list, otherwise
-    // their default constructors are called which are slow
-    NODE(T v, size_t column) : m_value(v), m_array(Array::no_prealloc_tag()) {
-        has_optimized_aggregate = true;
-        m_column_id = column;
-        m_child = 0;
-        F f;
-        cond = f.condition();
-        m_conds = 0;
+    typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
+    // NOTE: Be careful to call Array(no_prealloc_tag) constructors on m_array in the initializer list, otherwise
+    // their default constructors are called which are slow
+    NODE(TConditionValue v, size_t column) : m_value(v), m_array(Array::no_prealloc_tag()) {
+        m_is_integer_node = true;
+        m_condition_column_idx = column;
+        m_child = 0;
+        TConditionFunction f;
+        m_conds = 0;
         m_dT = 1.0;
         m_dD = 100.0;
         m_probes = 0;
@@ -490,7 +504,7 @@ public:
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
     // be merged with Init somehow to simplify
     void QuickInit(Column *column, int64_t value) {
-        m_column = column; 
+        m_condition_column = column; 
         m_leaf_end = 0;
         m_value = value;
         m_conds = 1;
@@ -498,21 +512,21 @@ public:
 
     void Init(const Table& table)
     {
-        m_column = (C*)&table.GetColumnBase(m_column_id);
+        m_condition_column = (ColType*)&table.GetColumnBase(m_condition_column_idx);
         m_table = &table;
         m_leaf_end = 0;
         if (m_child)
             m_child->Init(table);
     }
 
-    // This function is called from Array::find() for each search result if action == TDB_CALLBACK_IDX
+    // This function is called from Array::find() for each search result if TAction == TDB_CALLBACK_IDX
     // in the NODE::aggregate_local() call. Used if aggregate source column is different from search criteria column
-    template <ACTION action, class resulttype> bool match_callback(int64_t v) {
+    template <ACTION TAction, class TResult> bool match_callback(int64_t v) {
         size_t i = to_size_t(v);
         m_last_local_match = i;
         m_local_matches++;
-        state_state<resulttype>* state = static_cast<state_state<resulttype>*>(m_state);
-        SequentialGetter<resulttype>* column_agg = static_cast<SequentialGetter<resulttype>*>(m_column_agg);
+        QueryState<TResult>* state = static_cast<QueryState<TResult>*>(m_state);
+        SequentialGetter<TResult>* source_column = static_cast<SequentialGetter<TResult>*>(m_source_column);
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
         for (size_t c = 1; c < m_conds; c++) {
@@ -523,12 +537,12 @@ public:
         }
 
         bool b;
-        if (state->template uses_val<action>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
-            resulttype av = column_agg->GetNext(i);
-            b = state->template state_match<action, false>(i, 0, av, CallbackDummy());  
+        if (state->template uses_val<TAction>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
+            TResult av = source_column->GetNext(i);
+            b = state->template match<TAction, false>(i, 0, av, CallbackDummy());  
         }
         else {
-            b = state->template state_match<action, false>(i, 0, resulttype(0), CallbackDummy());  
+            b = state->template match<TAction, false>(i, 0, TResult(0), CallbackDummy());  
         }
 
         if (m_local_matches == m_local_limit)
@@ -538,45 +552,45 @@ public:
     }
 
 
-    size_t aggregate_call_specialized(ACTION action, ColumnType col_id, state_state_parent* st, 
+    size_t aggregate_call_specialized(ACTION TAction, ColumnType col_id, QueryStateParent* st, 
                                       size_t start, size_t end, size_t local_limit, 
-                                      SequentialGetterParent* agg_col, size_t* matchcount) 
+                                      SequentialGetterParent* source_column, size_t* matchcount) 
     {
         size_t ret;
 
-        if (action == TDB_RETURN_FIRST)
-            ret = aggregate_local<TDB_RETURN_FIRST, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);        
+        if (TAction == TDB_RETURN_FIRST)
+            ret = aggregate_local<TDB_RETURN_FIRST, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);        
 
-        else if (action == TDB_SUM && col_id == COLUMN_TYPE_INT)
-            ret = aggregate_local<TDB_SUM, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
-        else if (action == TDB_SUM && col_id == COLUMN_TYPE_FLOAT)
+        else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_INT)
+            ret = aggregate_local<TDB_SUM, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
+        else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_FLOAT)
             // todo, fixme, see if we must let sum return a double even when summing a float coltype 
-            ret = aggregate_local<TDB_SUM, float, float>(st, start, end, local_limit, agg_col, matchcount);
-        else if (action == TDB_SUM && col_id == COLUMN_TYPE_DOUBLE)
-            ret = aggregate_local<TDB_SUM, double, double>(st, start, end, local_limit, agg_col, matchcount);
+            ret = aggregate_local<TDB_SUM, float, float>(st, start, end, local_limit, source_column, matchcount);
+        else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_DOUBLE)
+            ret = aggregate_local<TDB_SUM, double, double>(st, start, end, local_limit, source_column, matchcount);
 
-        else if (action == TDB_MAX && col_id == COLUMN_TYPE_INT)
-            ret = aggregate_local<TDB_MAX, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
-        else if (action == TDB_MAX && col_id == COLUMN_TYPE_FLOAT)
-            ret = aggregate_local<TDB_MAX, float, float>(st, start, end, local_limit, agg_col, matchcount);
-        else if (action == TDB_MAX && col_id == COLUMN_TYPE_DOUBLE)
-            ret = aggregate_local<TDB_MAX, double, double>(st, start, end, local_limit, agg_col, matchcount);
+        else if (TAction == TDB_MAX && col_id == COLUMN_TYPE_INT)
+            ret = aggregate_local<TDB_MAX, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
+        else if (TAction == TDB_MAX && col_id == COLUMN_TYPE_FLOAT)
+            ret = aggregate_local<TDB_MAX, float, float>(st, start, end, local_limit, source_column, matchcount);
+        else if (TAction == TDB_MAX && col_id == COLUMN_TYPE_DOUBLE)
+            ret = aggregate_local<TDB_MAX, double, double>(st, start, end, local_limit, source_column, matchcount);
 
-        else if (action == TDB_MIN && col_id == COLUMN_TYPE_INT)
-            ret = aggregate_local<TDB_MIN, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
-        else if (action == TDB_MIN && col_id == COLUMN_TYPE_FLOAT)
-            ret = aggregate_local<TDB_MIN, float, float>(st, start, end, local_limit, agg_col, matchcount);
-        else if (action == TDB_MIN && col_id == COLUMN_TYPE_DOUBLE)
-            ret = aggregate_local<TDB_MIN, double, double>(st, start, end, local_limit, agg_col, matchcount);
+        else if (TAction == TDB_MIN && col_id == COLUMN_TYPE_INT)
+            ret = aggregate_local<TDB_MIN, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
+        else if (TAction == TDB_MIN && col_id == COLUMN_TYPE_FLOAT)
+            ret = aggregate_local<TDB_MIN, float, float>(st, start, end, local_limit, source_column, matchcount);
+        else if (TAction == TDB_MIN && col_id == COLUMN_TYPE_DOUBLE)
+            ret = aggregate_local<TDB_MIN, double, double>(st, start, end, local_limit, source_column, matchcount);
 
-        else if (action == TDB_COUNT)
-            ret = aggregate_local<TDB_COUNT, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+        else if (TAction == TDB_COUNT)
+            ret = aggregate_local<TDB_COUNT, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
 
-        else if (action == TDB_FINDALL)
-            ret = aggregate_local<TDB_FINDALL, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+        else if (TAction == TDB_FINDALL)
+            ret = aggregate_local<TDB_FINDALL, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
 
-        else if (action == TDB_CALLBACK_IDX)
-            ret = aggregate_local<TDB_CALLBACK_IDX, int64_t, int64_t>(st, start, end, local_limit, agg_col, matchcount);
+        else if (TAction == TDB_CALLBACK_IDX)
+            ret = aggregate_local<TDB_CALLBACK_IDX, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
 
         else { 
             TIGHTDB_ASSERT(false);
@@ -587,11 +601,11 @@ public:
     }
 
 
-    // agg_col      column number in m_table which must act as source for aggreate action
-    template <ACTION action, class resulttype, class unused> 
-    size_t aggregate_local(state_state_parent* st, size_t start, size_t end, size_t local_limit, 
-                           SequentialGetterParent* agg_col, size_t* matchcount) {
-        F f;
+    // source_column      column number in m_table which must act as source for aggreate TAction
+    template <ACTION TAction, class TResult, class unused> 
+    size_t aggregate_local(QueryStateParent* st, size_t start, size_t end, size_t local_limit, 
+                           SequentialGetterParent* source_column, size_t* matchcount) {
+        TConditionFunction f;
         int c = f.condition();
 
         m_local_matches = 0;
@@ -602,10 +616,10 @@ public:
         for (size_t s = start; s < end; ) {    
             // Cache internal leafs
             if (s >= m_leaf_end) {                    
-                m_column->GetBlock(s, m_array, m_leaf_start);                                       
+                m_condition_column->GetBlock(s, m_array, m_leaf_start);                                       
                 m_leaf_end = m_leaf_start + m_array.Size();
                 size_t w = m_array.GetBitWidth();
-                m_dT = (w == 0 ? 1.0 / MAX_LIST_SIZE : w / 8.0); // todo, define what width must take "1" constant-time unit. Now it's 8 bit
+                m_dT = (w == 0 ? 1.0 / MAX_LIST_SIZE : w / float(bitwidth_time_unit));
             }
 
             size_t end2;
@@ -614,13 +628,15 @@ public:
             else
                 end2 = end - m_leaf_start;
 
-            if (m_conds <= 1 && agg_col == NULL)
-                m_array.find(c, action, m_value, s - m_leaf_start, end2, m_leaf_start, (state_state<int64_t>*)st);
+            if (m_conds <= 1 && source_column == NULL) {
+                
+                m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+            }
             else {
-                state_state<int64_t> jumpstate; // todo optimize by moving outside for loop
-                m_column_agg = agg_col; 
-                m_array.find<F, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate, 
-                             std::bind1st(std::mem_fun(&NODE::match_callback<action, resulttype>), this));
+                QueryState<int64_t> jumpstate; // todo optimize by moving outside for loop
+                m_source_column = source_column; 
+                m_array.find<TConditionFunction, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate, 
+                             std::bind1st(std::mem_fun(&NODE::match_callback<TAction, TResult>), this));
             }
                     
             if (m_local_matches == m_local_limit)
@@ -630,7 +646,7 @@ public:
         }
 
         if (matchcount)
-            *matchcount = int64_t(static_cast< state_state<resulttype>* >(st)->match_count);
+            *matchcount = int64_t(static_cast< QueryState<TResult>* >(st)->match_count);
 
         if (m_local_matches == m_local_limit) {
             m_dD = (m_last_local_match + 1 - start) / (m_local_matches + 1.0);
@@ -644,14 +660,14 @@ public:
 
     size_t find_first_local(size_t start, size_t end)
     {
-        F condition;
+        TConditionFunction condition;
         TIGHTDB_ASSERT(m_table);
 
         while (start < end) {
 
             // Cache internal leafs
             if (start >= m_leaf_end) {
-                m_column->GetBlock(start, m_array, m_leaf_start);
+                m_condition_column->GetBlock(start, m_array, m_leaf_start);
                 m_leaf_end = m_leaf_start + m_array.Size();
             }
             
@@ -669,7 +685,7 @@ public:
             else
                 end2 = end - m_leaf_start;
 
-            size_t s = m_array.find_first<F>(m_value, start - m_leaf_start, end2);
+            size_t s = m_array.find_first<TConditionFunction>(m_value, start - m_leaf_start, end2);
 
             if (s == not_found) {
                 start = m_leaf_end;
@@ -682,12 +698,12 @@ public:
         return end;
     }
 
-    T m_value;
+    TConditionValue m_value;
 
 protected:
 
     size_t m_last_local_match;
-    C* m_column;                // Column on which search criteria is applied
+    ColType* m_condition_column;                // Column on which search criteria is applied
     const Array* criteria_arr;
     Array m_array;              
     size_t m_leaf_start;
@@ -697,18 +713,18 @@ protected:
     size_t m_local_matches;
     size_t m_local_limit;
  
-    state_state_parent* m_state;
-    SequentialGetterParent* m_column_agg; // Column of values used in aggregate (TDB_FINDALL, TDB_RETURN_FIRST, TDB_SUM, etc)
+    QueryStateParent* m_state;
+    SequentialGetterParent* m_source_column; // Column of values used in aggregate (TDB_FINDALL, TDB_RETURN_FIRST, TDB_SUM, etc)
 };
 
 
-template <class F> class STRINGNODE: public ParentNode {
+template <class TCondition> class STRINGNODE: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
+    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
 
     STRINGNODE(const char* v, size_t column)
     {
-        m_column_id = column;
+        m_condition_column_idx = column;
         m_child = 0;
 
         m_value = (char *)malloc(strlen(v)*6);
@@ -733,28 +749,28 @@ public:
         m_matches = 0;
 
         m_table = &table;
-        m_column = &table.GetColumnBase(m_column_id);
-        m_column_type = table.GetRealColumnType(m_column_id);
+        m_condition_column = &table.GetColumnBase(m_condition_column_idx);
+        m_column_type = table.GetRealColumnType(m_condition_column_idx);
 
         if (m_child) m_child->Init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)
     {
-        F function;
+        TCondition cond;
 
         for (size_t s = start; s < end; ++s) {
             const char* t;
 
             // todo, can be optimized by placing outside loop
             if (m_column_type == COLUMN_TYPE_STRING)
-                t = ((const AdaptiveStringColumn*)m_column)->Get(s);
+                t = ((const AdaptiveStringColumn*)m_condition_column)->Get(s);
             else {
                 //TODO: First check if string is in key list
-                t = ((const ColumnStringEnum*)m_column)->Get(s);
+                t = ((const ColumnStringEnum*)m_condition_column)->Get(s);
             }
 
-            if (function(m_value, m_ucase, m_lcase, t))
+            if (cond(m_value, m_ucase, m_lcase, t))
                 return s;
         }
         return end;
@@ -764,28 +780,28 @@ protected:
     char* m_value;
     char* m_lcase;
     char* m_ucase;
-    const ColumnBase* m_column;
+    const ColumnBase* m_condition_column;
     ColumnType m_column_type;
 };
 
 
 // Can be used for simple types (currently float and double)
-template <class T, class F> class BASICNODE: public ParentNode {
+template <class TCondition, class Condition> class BASICNODE: public ParentNode {
 public:
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    typedef typename ColumnTypeTraits<TCondition>::column_type ColType;
     
-    BASICNODE(T v, size_t column_ndx) : m_value(v)
+    BASICNODE(TCondition v, size_t column_ndx) : m_value(v)
     {
-        m_column_id = column_ndx;
+        m_condition_column_idx = column_ndx;
         m_child = 0;
     }
 
     // Only purpose of this function is to let you quickly create a NODE object and call aggregate_local() on it to aggregate
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
     // be merged with Init somehow to simplify
-    void QuickInit(ColumnBasic<T> *column, T value) {
-        m_col.m_column = (ColType*)column;
-        m_col.m_leaf_end = 0;
+    void QuickInit(ColumnBasic<TCondition> *column, TCondition value) {
+        m_condition_column.m_column = (ColType*)column;
+        m_condition_column.m_leaf_end = 0;
         m_value = value;
         m_conds = 1;
     }
@@ -793,8 +809,8 @@ public:
     void Init(const Table& table)
     {
         m_table = &table;
-        m_col.m_column = (ColType*)(&table.GetColumnBase(m_column_id));
-        m_col.m_leaf_end = 0;
+        m_condition_column.m_column = (ColType*)(&table.GetColumnBase(m_condition_column_idx));
+        m_condition_column.m_leaf_end = 0;
 
         if (m_child) 
             m_child->Init(table);
@@ -802,12 +818,12 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        F condition;
+        Condition cond;
 
         for (size_t s = start; s < end; ++s) {
-            T v = m_col.GetNext(s);
+            TCondition v = m_condition_column.GetNext(s);
 
-            if (condition(m_value, v)) {
+            if (cond(m_value, v)) {
                 if (m_child == 0)
                     return s;
                 else {
@@ -823,29 +839,29 @@ public:
     }
     
     size_t find_first_local(size_t start, size_t end) {
-        F condition;
+        Condition cond;
 
         for (size_t s = start; s < end; ++s) {            
-            T v = m_col.GetNext(s);
-            if (condition(v, m_value))
+            TCondition v = m_condition_column.GetNext(s);
+            if (cond(v, m_value))
                 return s;
         }
         return end;
     }
 
 protected:
-    T m_value;
-    SequentialGetter<T> m_col;
+    TCondition m_value;
+    SequentialGetter<TCondition> m_condition_column;
 };
 
 
 template <class F> class BINARYNODE: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*agg_col*/) {TIGHTDB_ASSERT(false); return 0;}
+    template <ACTION TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
 
     BINARYNODE(const char* v, size_t len, size_t column)
     {
-        m_column_id = column;
+        m_condition_column_idx = column;
         m_child = 0;
         m_len = len;
         m_value = (char *)malloc(len);
@@ -858,8 +874,8 @@ public:
     void Init(const Table& table)
     {
         m_table = &table;
-        m_column = &table.GetColumnBase(m_column_id);
-        m_column_type = table.GetRealColumnType(m_column_id);
+        m_condition_column = (const ColumnBinary*)&table.GetColumnBase(m_condition_column_idx);
+        m_column_type = table.GetRealColumnType(m_condition_column_idx);
 
         if (m_child) 
             m_child->Init(table);
@@ -870,8 +886,8 @@ public:
         F condition;
 
         for (size_t s = start; s < end; ++s) {
-            const char* t = ((const ColumnBinary*)m_column)->Get(s).pointer;
-            size_t len2 = ((const ColumnBinary*)m_column)->Get(s).len;
+            const char* t = m_column->Get(s).pointer;
+            size_t len2 = m_column->Get(s).len;
 
             if (condition(m_value, m_len, t, len2)) {
                 if (m_child == 0)
@@ -889,26 +905,32 @@ public:
     }
 
     size_t find_first_local(size_t start, size_t end) {
-        assert(false);
-        (void)start;
-        (void)end;
-        return 0;
+        F condition;
+
+        for (size_t s = start; s < end; ++s) {            
+            const char* value = m_condition_column->Get(s).pointer;
+            size_t len = m_condition_column->Get(s).len;
+
+            if (condition(m_value, m_len, value, len))
+                return s;
+        }
+        return end;
     }
 
 protected:
     char* m_value;
     size_t m_len;
-    const ColumnBase* m_column;
+    const ColumnBinary* m_condition_column;
     ColumnType m_column_type;
 };
 
 
 template <> class STRINGNODE<EQUAL>: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
+    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
 
     STRINGNODE(const char* v, size_t column): m_key_ndx((size_t)-1) {
-        m_column_id = column;
+        m_condition_column_idx = column;
         m_child = 0;
         m_value = (char *)malloc(strlen(v)*6);
         memcpy(m_value, v, strlen(v) + 1);
@@ -923,22 +945,22 @@ public:
         m_dD = 10.0;
         
         m_table = &table;
-        m_column = &table.GetColumnBase(m_column_id);
-        m_column_type = table.GetRealColumnType(m_column_id);
+        m_condition_column = &table.GetColumnBase(m_condition_column_idx);
+        m_column_type = table.GetRealColumnType(m_condition_column_idx);
 
         if (m_column_type == COLUMN_TYPE_STRING_ENUM) {
             m_dT = 1.0;
-            m_key_ndx = ((const ColumnStringEnum*)m_column)->GetKeyNdx(m_value);
+            m_key_ndx = ((const ColumnStringEnum*)m_condition_column)->GetKeyNdx(m_value);
         }
         else {
             m_dT = 10.0;
         }
 
-        if (m_column->HasIndex()) {
+        if (m_condition_column->HasIndex()) {
             if (m_column_type == COLUMN_TYPE_STRING_ENUM)
-                ((ColumnStringEnum*)m_column)->find_all(m_index, m_value);
+                ((ColumnStringEnum*)m_condition_column)->find_all(m_index, m_value);
             else {
-                ((AdaptiveStringColumn*)m_column)->find_all(m_index, m_value);
+                ((AdaptiveStringColumn*)m_condition_column)->find_all(m_index, m_value);
             }
             last_indexed = 0;
         }
@@ -952,7 +974,7 @@ public:
         TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
-            if (m_column->HasIndex()) {
+            if (m_condition_column->HasIndex()) {
                 size_t f = m_index.FindGTE(s, last_indexed);
                 if (f != not_found)
                     s = m_index.Get(f);
@@ -963,12 +985,12 @@ public:
             else {
                 // todo, can be optimized by placing outside loop
                 if (m_column_type == COLUMN_TYPE_STRING)
-                    s = ((const AdaptiveStringColumn*)m_column)->find_first(m_value, s, end);
+                    s = ((const AdaptiveStringColumn*)m_condition_column)->find_first(m_value, s, end);
                 else {
                     if (m_key_ndx == size_t(-1)) 
                         s = end; // not in key set
                     else {
-                        const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_column;
+                        const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_condition_column;
                         s = cse->find_first(m_key_ndx, s, end);
                     }
                 }
@@ -984,7 +1006,7 @@ protected:
     char*  m_value;
 
 private:
-    const ColumnBase* m_column;
+    const ColumnBase* m_condition_column;
     ColumnType m_column_type;
     size_t m_key_ndx;
     Array m_index;
@@ -994,7 +1016,7 @@ private:
 
 class OR_NODE: public ParentNode {
 public:
-    template <ACTION action> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t agg_col) {assert(false); return 0;}
+    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
 
     OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
 

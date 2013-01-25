@@ -100,26 +100,26 @@ Query& Query::add_condition(size_t column_ndx, T value)
 // int64
 Query& Query::equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new NODE<int64_t, Column, EQUAL>(value, column_ndx);
+    ParentNode* const p = new NODE<int64_t, EQUAL>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new NODE<int64_t, Column, NOTEQUAL>(value, column_ndx);
+    ParentNode* const p = new NODE<int64_t, NOTEQUAL>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new NODE<int64_t, Column, GREATER>(value, column_ndx);
+    ParentNode* const p = new NODE<int64_t, GREATER>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater_equal(size_t column_ndx, int64_t value)
 {
     if (value > LLONG_MIN) {
-        ParentNode* const p = new NODE<int64_t, Column, GREATER>(value - 1, column_ndx);
+        ParentNode* const p = new NODE<int64_t, GREATER>(value - 1, column_ndx);
         UpdatePointers(p, &p->m_child);
     }
     // field >= LLONG_MIN has no effect
@@ -128,7 +128,7 @@ Query& Query::greater_equal(size_t column_ndx, int64_t value)
 Query& Query::less_equal(size_t column_ndx, int64_t value)
 {
     if (value < LLONG_MAX) {
-        ParentNode* const p = new NODE<int64_t, Column, LESS>(value + 1, column_ndx);
+        ParentNode* const p = new NODE<int64_t, LESS>(value + 1, column_ndx);
         UpdatePointers(p, &p->m_child);
     }
     // field <= LLONG_MAX has no effect
@@ -136,7 +136,7 @@ Query& Query::less_equal(size_t column_ndx, int64_t value)
 }
 Query& Query::less(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new NODE<int64_t, Column, LESS>(value, column_ndx);
+    ParentNode* const p = new NODE<int64_t, LESS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -148,7 +148,7 @@ Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 }
 Query& Query::equal(size_t column_ndx, bool value)
 {
-    ParentNode* const p = new NODE<bool, Column, EQUAL>(value, column_ndx);
+    ParentNode* const p = new NODE<bool, EQUAL>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -297,7 +297,7 @@ R Query::aggregate(size_t column_ndx, size_t* resultcount, size_t start, size_t 
 
     Init(*m_table);
     size_t matchcount = 0; 
-    state_state<R> st;
+    QueryState<R> st;
     st.init(action, NULL, limit);
     R r = first[0]->aggregate<action, R, T>(&st, start, end, column_ndx, &matchcount);
     if (resultcount)
@@ -468,7 +468,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
     // Use single threading
     TableView tv(*m_table);
-    state_state<int64_t> st;
+    QueryState<int64_t> st;
     st.init(TDB_FINDALL, &tv.get_ref_column(), limit);
     first[0]->aggregate<TDB_FINDALL, int64_t, int64_t>(&st, start, end);
     return move(tv);
@@ -486,7 +486,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     }
 
     Init(*m_table);
-    state_state<int64_t> st;
+    QueryState<int64_t> st;
     st.init(TDB_COUNT, NULL, limit);
     int64_t r = first[0]->aggregate<TDB_COUNT, int64_t, int64_t>(&st, start, end);
     return size_t(r);
