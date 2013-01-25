@@ -61,17 +61,21 @@ string get_errno_msg(const int errnum)
 
 #ifdef _WIN32 // Windows - GetLastError()
 
-string get_last_error_msg(const DWORD errnum)
+string get_last_error_msg(const char* prefix, const DWORD errnum)
 {
     StringBuffer buffer;
-    buffer.resize(1024);
+	buffer.append_c_str(prefix);
+	const size_t offset = buffer.size();
+	const size_t max_msg_size = 1024;
+    buffer.resize(offset + max_msg_size);
     const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
     const DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
     const DWORD size =
-        FormatMessageA(flags, 0, errnum, language_id, buffer.data(),
-                       static_cast<DWORD>(buffer.size()), 0);
-    if (TIGHTDB_LIKELY(0 < size)) return string(buffer.data(), size);
-    return "Unknown error";
+        FormatMessageA(flags, 0, errnum, language_id, buffer.data()+offset,
+                       static_cast<DWORD>(max_msg_size), 0);
+    if (TIGHTDB_LIKELY(0 < size)) return string(buffer.data(), offset+size);
+	buffer.append_c_str("Unknown error");
+    return buffer.str();
 }
 
 #endif
@@ -154,7 +158,7 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags)
     }
 
     const DWORD errnum = GetLastError(); // Eliminate any risk of clobbering
-    const string msg = get_last_error_msg(errnum);
+    const string msg = get_last_error_msg("CreateFile() failed: ", errnum);
     switch (errnum) {
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:       throw PermissionDenied(msg);
@@ -250,7 +254,7 @@ void File::write(const char* data, size_t size)
     }
 
     const DWORD errnum = GetLastError(); // Eliminate any risk of clobbering
-    const string msg = get_last_error_msg(errnum);
+    const string msg = get_last_error_msg("WriteFile() failed: ", errnum);
     throw runtime_error(msg);
 
 #else // POSIX version
@@ -409,7 +413,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     }
     const DWORD errnum = GetLastError(); // Eliminate any risk of clobbering
     if (errnum == ERROR_LOCK_VIOLATION) return false;
-    const string msg = get_last_error_msg(errnum);
+    const string msg = get_last_error_msg("LockFileEx() failed: ", errnum);
     throw runtime_error(msg);
 
 #else // BSD / Linux flock()
@@ -487,7 +491,7 @@ void* File::map(AccessMode a, size_t size) const
     if (int_cast_with_overflow_detect(size, large_int.QuadPart))
         throw runtime_error("Map size is too large");
     const HANDLE map_handle =
-        CreateFileMapping(m_handle, 0, PAGE_READONLY, large_int.HighPart, large_int.LowPart, 0);
+        CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);
     if (TIGHTDB_UNLIKELY(!map_handle))
         throw runtime_error("CreateFileMapping() failed");
     void* const addr = MapViewOfFile(map_handle, desired_access, 0, 0, 0);
@@ -496,10 +500,10 @@ void* File::map(AccessMode a, size_t size) const
         TIGHTDB_ASSERT(r);
         static_cast<void>(r);
     }
-    if (TIGHTDB_UNLIKELY(!addr))
-        throw runtime_error("MapViewOfFile() failed");
-
-    return addr;
+    if (TIGHTDB_LIKELY(addr)) return addr;
+    const DWORD errnum = GetLastError(); // Eliminate any risk of clobbering
+    const string msg = get_last_error_msg("MapViewOfFile() failed: ", errnum);
+    throw runtime_error(msg);
 
 #else // POSIX version
 

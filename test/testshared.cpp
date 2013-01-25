@@ -16,6 +16,8 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 } // anonymous namespace
 
+#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
+
 TEST(Shared_Initial)
 {
     // Delete old files if there
@@ -791,3 +793,5 @@ TEST(Shared_FromSerialized)
         CHECK_EQUAL("test", (const char*)t1[0].fourth);
     }
 }
+
+#endif // Shared PTHREAD mutexes appear not to work on Windows
