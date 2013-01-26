@@ -25,6 +25,10 @@
 namespace tightdb {
 
 
+/// When two threads or processes want to access the same database
+/// file, they must each create their own instance of SharedGroup.
+///
+/// Processes that share a database file must reside on the same host.
 class SharedGroup {
 public:
     enum DurabilityLevel {
@@ -32,9 +36,6 @@ public:
         durability_MemOnly
     };
 
-    /// When two threads or processes want to access the same database
-    /// file, they must each create their own instance of SharedGroup.
-    ///
     /// If the database file does not already exist, it will be
     /// created unless \a no_create is set to true. When multiple
     /// threads are involved, it is safe to let the first thread, that
@@ -46,9 +47,6 @@ public:
     /// file will be placed in the same directory as the database
     /// file, and its name is derived by adding the suffix '.lock' to
     /// the name of the database file.
-    ///
-    /// Processes that share a database file must reside on the same
-    /// host.
     SharedGroup(const std::string& path_to_database_file, bool no_create = false,
                 DurabilityLevel dlevel=durability_Full);
     ~SharedGroup();
@@ -56,8 +54,27 @@ public:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct replication_tag {};
     SharedGroup(replication_tag, const std::string& path_to_database_file = "",
-                DurabiltyLevel dlevel=durability_Full);
+                DurabilityLevel dlevel=durability_Full);
+#endif
 
+    // Has db been modified since last transaction?
+    bool has_changed() const;
+
+    // Read transactions
+    const Group& begin_read();
+    void end_read();
+
+    // Write transactions
+    Group& begin_write();
+    void commit();
+    void rollback();
+
+#ifdef TIGHTDB_DEBUG
+    void test_ringbuf();
+    void zero_free_space();
+#endif
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
     /// This function may be called asynchronously to interrupt any
     /// blocking call that is part of a transaction in a replication
     /// setup. Only begin_write() and modifying functions, that are
@@ -78,23 +95,6 @@ public:
     /// in a situation where no interruption has occured. See
     /// interrupt_transact() for more.
     void clear_interrupt_transact() { m_replication.clear_interrupt(); }
-#endif
-
-    // Has db been modified since last transaction?
-    bool has_changed() const;
-
-    // Read transactions
-    const Group& begin_read();
-    void end_read();
-
-    // Write transactions
-    Group& begin_write();
-    void commit();
-    void rollback();
-
-#ifdef TIGHTDB_DEBUG
-    void test_ringbuf();
-    void zero_free_space();
 #endif
 
 private:

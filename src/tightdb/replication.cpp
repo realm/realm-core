@@ -986,8 +986,7 @@ error_code Replication::TransactLogApplier::read_string(StringBuffer& buf)
     buf.clear();
     size_t size;
     if (!read_int(size)) return ERROR_IO;
-    const error_code err = buf.resize(size);
-    if (err) return err;
+    buf.resize(size); // FIXME: Now throws
     char* str_end = buf.data();
     for (;;) {
         const size_t avail = m_input_end - m_input_begin;

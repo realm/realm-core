@@ -175,7 +175,6 @@ TEST(Transactions_Stress1)
 
     for(size_t t = 0; t < WRITERS1; t++)
         pthread_join(write_threads[t], NULL);
-
 }
 
 #endif
@@ -337,8 +336,6 @@ TEST(Transactions_Stress3)
     terminate3 = true;
     for(size_t t = 0; t < READERS3; t++)
         pthread_join(read_threads3[t], NULL);
-
-
 }
 
 
@@ -437,12 +434,8 @@ TEST(Transactions_Stress4)
     terminate4 = true;
     for(size_t t = 0; t < READERS4; t++)
         pthread_join(read_threads[t], NULL);
-
-
 }
 
 #endif
-
-
 
 #endif

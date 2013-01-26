@@ -65,13 +65,19 @@ class Group;
 /// running on the same host as the client. At most one local
 /// coordinator process may run on each host.
 struct Replication {
-    struct degenerate_tag {};
-    /// This constructor may be used to create a degenerate instance
-    /// which can be validly destroyed, but not otherwise used for
-    /// replication.
-    Replication(degenerate_tag) TIGHTDB_NOEXCEPT;
+    /// Create a Replication instance in its unattached state. To
+    /// attach it to a replication coordination buffer, call attach().
+    /// You may test whether this instance is currently in its
+    /// attached state by calling is_attach(). Calling any other
+    /// method while in the unattached state has undefined behaviour.
+    Replication() TIGHTDB_NOEXCEPT;
 
-    /// Construct a proper instance.
+    ~Replication();
+
+    static std::string get_path_to_database_file() { return "/var/lib/tightdb/replication.db"; }
+
+    /// Attach this instance to the replication coordination buffer
+    /// associated with the specified database file.
     ///
     /// \param The file system path to the database file. This is used
     /// only to derive a path for a replication specific shared memory
@@ -82,11 +88,9 @@ struct Replication {
     /// specific shared memory is mapped. When false, the transaction
     /// log buffer is not mapped. When used in conjunction with an
     /// instance of SharedGroup, this must always be true.
-    Replication(std::string path_to_database_file = "", bool map_transact_log_buf = true);
+    void attach(const std::string& path_to_database_file = "", bool map_transact_log_buf = true);
 
-    ~Replication();
-
-    static std::string get_path_to_database_file() { return "/var/lib/tightdb/replication.db"; }
+    bool is_attached() const TIGHTDB_NOEXCEPT;
 
     /// Interrupt any blocking call to a function in this class. This
     /// function may be called asyncronously from any thread, but it
@@ -275,14 +279,6 @@ private:
     struct SharedState;
     struct TransactLogApplier;
 
-public:
-    typedef SharedState* Replication::*unspecified_bool_type;
-    operator unspecified_bool_type() const
-    {
-        return m_shared_state ? &Replication::m_shared_state : 0;
-    }
-
-private:
     int m_fd; // Memory mapped file descriptor
     SharedState* m_shared_state;
     // Invariant: m_shared_state_size <= std::numeric_limits<std::ptrdiff_t>::max()
@@ -364,14 +360,21 @@ private:
 
 // Implementation:
 
-inline Replication::Replication(degenerate_tag) TIGHTDB_NOEXCEPT:
+inline Replication::Replication() TIGHTDB_NOEXCEPT:
     m_shared_state(0), m_interrupt(false), m_selected_table(0), m_selected_spec(0) {}
 
-inline Replication::Replication(std::string path_to_database_file, bool map_transact_log_buf):
-    m_shared_state(0), m_interrupt(false), m_selected_table(0), m_selected_spec(0)
+
+inline void Replication::attach(const std::string& path_to_database_file,
+                                bool map_transact_log_buf)
 {
     error_code err = init(path_to_database_file, map_transact_log_buf);
     if (err) throw_error(err);
+}
+
+
+inline bool Replication::is_attached() const TIGHTDB_NOEXCEPT
+{
+    return m_shared_state;
 }
 
 

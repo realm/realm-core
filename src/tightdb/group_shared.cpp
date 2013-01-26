@@ -45,29 +45,6 @@ struct SharedGroup::SharedInfo {
 };
 
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-SharedGroup::SharedGroup(const string& path_to_database_file, bool no_create,
-                         DurabiltyLevel dlevel):
-    m_group(Group::shared_tag()), m_version(-1),
-    m_replication(Replication::degenerate_tag())
-{
-    init(path_to_database_file, no_create, dlevel);
-}
-
-SharedGroup::SharedGroup(replication_tag, const string& path_to_database_file,
-                         DurabiltyLevel dlevel):
-    m_group(Group::shared_tag()), m_version(-1),
-    m_replication(path_to_database_file)
-{
-    m_group.set_replication(&m_replication);
-
-    init(!path_to_database_file.empty() ? path_to_database_file :
-         Replication::get_path_to_database_file(), false, dlevel);
-}
-
-#else // ! TIGHTDB_ENABLE_REPLICATION
-
 SharedGroup::SharedGroup(const string& path_to_database_file, bool no_create,
                          DurabilityLevel dlevel):
     m_group(Group::shared_tag()), m_version(-1)
@@ -75,7 +52,21 @@ SharedGroup::SharedGroup(const string& path_to_database_file, bool no_create,
     init(path_to_database_file, no_create, dlevel);
 }
 
-#endif // ! TIGHTDB_ENABLE_REPLICATION
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+SharedGroup::SharedGroup(replication_tag, const string& path_to_database_file,
+                         DurabilityLevel dlevel):
+    m_group(Group::shared_tag()), m_version(-1)
+{
+    m_replication.attach(path_to_database_file);
+    m_group.set_replication(&m_replication);
+
+    init(!path_to_database_file.empty() ? path_to_database_file :
+         Replication::get_path_to_database_file(), false, dlevel);
+}
+
+#endif
 
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
@@ -356,7 +347,7 @@ Group& SharedGroup::begin_write()
     TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication) {
+    if (m_replication.is_attached()) {
         error_code err = m_replication.begin_write_transact();
         if (err) throw_error(err);
     }
@@ -443,7 +434,7 @@ void SharedGroup::commit()
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication) {
+    if (m_replication.is_attached()) {
         if (!m_replication.commit_write_transact()) throw_error(ERROR_INTERRUPTED);
     }
 #endif
@@ -468,7 +459,7 @@ void SharedGroup::rollback()
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication) m_replication.rollback_write_transact();
+    if (m_replication.is_attached()) m_replication.rollback_write_transact();
 #endif
 }
 

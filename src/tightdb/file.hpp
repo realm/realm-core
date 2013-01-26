@@ -84,6 +84,10 @@ public:
     /// open file.
     void close() TIGHTDB_NOEXCEPT;
 
+    /// Check whether this File instance currently refers to an open
+    /// file.
+    bool is_open() const TIGHTDB_NOEXCEPT;
+
     enum AccessMode {
         access_ReadOnly,
         access_ReadWrite
@@ -362,6 +366,10 @@ public:
     /// a file mapping or not.
     void unmap() TIGHTDB_NOEXCEPT;
 
+    /// Check whether this Map instance currently refers to a file
+    /// mapping.
+    bool is_mapped() const TIGHTDB_NOEXCEPT;
+
     /// See File::sync_map().
     ///
     /// Calling this method on an instance that does not currently
@@ -456,6 +464,15 @@ inline void File::open(const std::string& path, Mode m)
     open(path, a, c, flags);
 }
 
+inline bool File::is_open() const TIGHTDB_NOEXCEPT
+{
+#ifdef _WIN32
+    return m_handle;
+#else
+    return 0 <= m_fd;
+#endif
+}
+
 inline void File::lock_exclusive()
 {
     lock(true, false);
@@ -535,6 +552,11 @@ inline T* File::Map<T>::remap(const File& f, AccessMode a, std::size_t size, int
 template<class T> inline void File::Map<T>::unmap() TIGHTDB_NOEXCEPT
 {
     MapBase::unmap();
+}
+
+template<class T> inline bool File::Map<T>::is_mapped() const TIGHTDB_NOEXCEPT
+{
+    return m_addr;
 }
 
 template<class T> inline void File::Map<T>::sync()
