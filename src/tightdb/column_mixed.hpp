@@ -159,7 +159,7 @@ public:
 
 inline ColumnMixed::ColumnMixed(): m_data(0)
 {
-    Create(GetDefaultAllocator(), 0, 0);
+    Create(Allocator::get_default(), 0, 0);
 }
 
 inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx):

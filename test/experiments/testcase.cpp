@@ -28,11 +28,9 @@ TIGHTDB_TABLE_1(TestTableShared,
 
 int main()
 {
-    // Delete old file if there
-    remove("testdb.tightdb");
-
-    // Create new database
-    Group db("testdb.tightdb");
+    Array a;
+    for (int i=0; i<16; ++i) a.add(4300000000ULL);
+    a.Destroy();
 
     return 0;
 }

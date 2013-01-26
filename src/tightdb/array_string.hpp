@@ -26,8 +26,8 @@ namespace tightdb {
 
 class ArrayString : public Array {
 public:
-    ArrayString(ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+    ArrayString(ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
+    ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=Allocator::get_default());
     ArrayString(Allocator& alloc);
     ~ArrayString();
 

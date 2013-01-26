@@ -27,8 +27,10 @@ namespace tightdb {
 
 class ArrayBlob : public Array {
 public:
-    ArrayBlob(ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+    ArrayBlob(ArrayParent *parent=NULL, size_t pndx=0,
+              Allocator& alloc = Allocator::get_default());
+    ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx,
+              Allocator& alloc = Allocator::get_default());
     ArrayBlob(Allocator& alloc);
     ~ArrayBlob();
 

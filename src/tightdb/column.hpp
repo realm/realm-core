@@ -131,8 +131,8 @@ class Column : public ColumnBase {
 public:
     explicit Column(Allocator& alloc);
     Column(ColumnDef type, Allocator& alloc);
-    Column(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    Column(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+    Column(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
+    Column(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
     Column(const Column& column);
     ~Column();
 

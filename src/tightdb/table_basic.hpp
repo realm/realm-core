@@ -79,7 +79,7 @@ public:
     using Table::add_empty_row;
     using Table::insert_empty_row;
 
-    BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc) { set_dynamic_spec(); }
+    BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc) { set_dynamic_spec(); }
 
     static int get_column_count() { return TypeCount<typename Spec::Columns>::value; }
 

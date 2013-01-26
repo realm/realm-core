@@ -57,12 +57,6 @@ size_t GetSizeFromHeader(void* p)
 
 namespace tightdb {
 
-Allocator& GetDefaultAllocator()
-{
-    static Allocator DefaultAllocator;
-    return DefaultAllocator;
-}
-
 const char SlabAlloc::default_header[24] = {
         0,   0,   0,   0,   0,   0,   0,   0,
         0,   0,   0,   0,   0,   0,   0,   0,

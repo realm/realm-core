@@ -210,18 +210,18 @@ public:
     /// Create a new array, and if \a parent and \a ndx_in_parent are
     /// specified, update the parent to point to this new array.
     Array(ColumnDef type=COLUMN_NORMAL, ArrayParent* parent=0, size_t ndx_in_parent=0,
-          Allocator& alloc=GetDefaultAllocator());
+          Allocator& alloc=Allocator::get_default());
 
     /// Initialize an array wrapper from the specified array.
     Array(size_t ref, ArrayParent* parent=0, size_t ndx_in_parent=0,
-          Allocator& alloc=GetDefaultAllocator());
+          Allocator& alloc=Allocator::get_default());
 
     /// Create an array in the invalid state (a null array).
     Array(Allocator& alloc);
 
     /// FIXME: This is a moving copy and therfore it compromises constness.
     Array(const Array& a);
-    
+
     // Fastest way to instantiate an array, if you just want to utilize its methods
     Array(bool b);
 
@@ -330,18 +330,18 @@ public:
     /// Compare two arrays for equality.
     bool Compare(const Array&) const;
 
-    // Main finding function - used for find_first, find_all, sum, max, min, etc.    
+    // Main finding function - used for find_first, find_all, sum, max, min, etc.
     void find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const;
-    
-    template <class cond, ACTION action, size_t bitwidth, class Callback> 
+
+    template <class cond, ACTION action, size_t bitwidth, class Callback>
     void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
-    
-    template <class cond, ACTION action, size_t bitwidth> 
+
+    template <class cond, ACTION action, size_t bitwidth>
     void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const;
-    
-    template <class cond, ACTION action, class Callback> 
+
+    template <class cond, ACTION action, class Callback>
     void find(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
-   
+
     // Optimized implementation for release mode
     template <class cond2, ACTION action, size_t bitwidth, class Callback>
     void find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, state_state *state, Callback callback) const;
@@ -567,7 +567,8 @@ inline Array::Array(const Array& src):
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
-inline Array::Array(bool b) : m_alloc(GetDefaultAllocator()) {
+inline Array::Array(bool b) : m_alloc(Allocator::get_default())
+{
     (void)b;
 }
 

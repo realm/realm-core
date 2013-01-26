@@ -32,8 +32,11 @@ using namespace tightdb;
 namespace {
 
 
-string get_errno_msg(const int errnum)
+string get_errno_msg(const char* prefix, const int errnum)
 {
+    StringBuffer buffer;
+    buffer.append_c_str(prefix);
+
 #if defined _BSD_SOURCE || defined _WIN32
 
     const char* const* errlist;
@@ -45,17 +48,24 @@ string get_errno_msg(const int errnum)
     errlist = _sys_errlist; // Windows <stdlib.h>
     nerr    = _sys_nerr;
 #  endif
-    if (TIGHTDB_LIKELY(0 <= errnum || errnum < nerr)) return errlist[errnum];
+    if (TIGHTDB_LIKELY(0 <= errnum || errnum < nerr)) {
+        buffer.append_c_str(errlist[errnum]);
+        return buffer.str();
+    }
 
 #else // POSIX <string.h>
 
-    StringBuffer buffer;
-    buffer.resize(1024);
-    if (TIGHTDB_LIKELY(strerror_r(errnum, buffer.data(), buffer.size()) == 0)) return buffer.str();
+    const size_t offset = buffer.size();
+    const size_t max_msg_size = 1024;
+    buffer.resize(offset + max_msg_size);
+    if (TIGHTDB_LIKELY(strerror_r(errnum, buffer.data()+offset, max_msg_size) == 0))
+        return buffer.str();
+    buffer.resize(offset);
 
 #endif
 
-    return "Unknown error";
+    buffer.append_c_str("Unknown error");
+    return buffer.str();
 }
 
 
@@ -64,9 +74,9 @@ string get_errno_msg(const int errnum)
 string get_last_error_msg(const char* prefix, const DWORD errnum)
 {
     StringBuffer buffer;
-	buffer.append_c_str(prefix);
-	const size_t offset = buffer.size();
-	const size_t max_msg_size = 1024;
+    buffer.append_c_str(prefix);
+    const size_t offset = buffer.size();
+    const size_t max_msg_size = 1024;
     buffer.resize(offset + max_msg_size);
     const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
     const DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
@@ -74,7 +84,8 @@ string get_last_error_msg(const char* prefix, const DWORD errnum)
         FormatMessageA(flags, 0, errnum, language_id, buffer.data()+offset,
                        static_cast<DWORD>(max_msg_size), 0);
     if (TIGHTDB_LIKELY(0 < size)) return string(buffer.data(), offset+size);
-	buffer.append_c_str("Unknown error");
+    buffer.resize(offset);
+    buffer.append_c_str("Unknown error");
     return buffer.str();
 }
 
@@ -189,7 +200,7 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags)
     }
 
     const int errnum = errno; // Eliminate any risk of clobbering
-    const string msg = get_errno_msg(errnum);
+    const string msg = get_errno_msg("open() failed: ", errnum);
     switch (errnum) {
         case EACCES:
         case EROFS:
@@ -273,7 +284,7 @@ void File::write(const char* data, size_t size)
     }
 
     const int errnum = errno; // Eliminate any risk of clobbering
-    const string msg = get_errno_msg(errnum);
+    const string msg = get_errno_msg("write(): failed: ", errnum);
     switch (errnum) {
         case ENOSPC:
         case ENOBUFS: throw ResourceAllocError(msg);
@@ -335,7 +346,7 @@ void File::alloc(SizeType offset, size_t size)
     throw runtime_error("posix_fallocate() failed");
 
     const int errnum = errno; // Eliminate any risk of clobbering
-    const string msg = get_errno_msg(errnum);
+    const string msg = get_errno_msg("posix_fallocate() failed: ", errnum);
     switch (errnum) {
         case ENOSPC: throw ResourceAllocError(msg);
         default:     throw runtime_error(msg);
@@ -441,7 +452,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (TIGHTDB_LIKELY(flock(m_fd, operation) == 0)) return true;
     const int errnum = errno; // Eliminate any risk of clobbering
     if (errnum == EWOULDBLOCK) return false;
-    const string msg = get_errno_msg(errnum);
+    const string msg = get_errno_msg("flock() failed: ", errnum);
     if (errnum == ENOLCK) throw ResourceAllocError(msg);
     throw runtime_error(msg);
 
@@ -477,7 +488,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
 {
 #ifdef _WIN32 // Windows version
 
-    // FIXME: Is there anything that we must do on Windows to honor map_flag_NoSync?
+    // FIXME: Is there anything that we must do on Windows to honor map_NoSync?
     static_cast<void>(map_flags);
 
     DWORD protect        = PAGE_READONLY;
@@ -511,7 +522,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
 #else // POSIX version
 
     // FIXME: On FreeeBSB and other systems htat support it, we should
-    // honor map_flag_NoSync by specifying MAP_NOSYNC, but how do we
+    // honor map_NoSync by specifying MAP_NOSYNC, but how do we
     // reliably detect these systems?
     static_cast<void>(map_flags);
 
@@ -524,7 +535,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     if (TIGHTDB_LIKELY(addr != MAP_FAILED)) return addr;
 
     const int errnum = errno; // Eliminate any risk of clobbering
-    const string msg = get_errno_msg(errnum);
+    const string msg = get_errno_msg("mmap() failed: ", errnum);
     switch (errnum) {
         case EAGAIN:
         case EMFILE:
@@ -546,7 +557,7 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     if (TIGHTDB_LIKELY(new_addr != MAP_FAILED)) return new_addr;
     unmap(old_addr, old_size);
     const int errnum = errno; // Eliminate any risk of clobbering
-    const string msg = get_errno_msg(errnum);
+    const string msg = get_errno_msg("mremap(): failed: ", errnum);
     switch (errnum) {
         case EAGAIN:
         case ENOMEM: throw ResourceAllocError(msg);
@@ -595,7 +606,7 @@ void File::sync_map(void* addr, size_t size)
 
     if (TIGHTDB_LIKELY(::msync(addr, size, MS_SYNC) == 0)) return;
     const int errnum = errno; // Eliminate any risk of clobbering
-    throw runtime_error(get_errno_msg(errnum));
+    throw runtime_error(get_errno_msg("msync() failed: ", errnum));
 
 #endif
 }
@@ -614,7 +625,7 @@ FILE* File::open_stdio_file(const string& path, Mode m)
     if (TIGHTDB_LIKELY(file)) return file;
 
     const int errnum = errno; // Eliminate any risk of clobbering
-    const string msg = get_errno_msg(errnum);
+    const string msg = get_errno_msg("fopen() failed: ", errnum);
     // Note: The following error codes are defined by POSIX, and
     // Windows follows POSIX in this respect, however, Windows
     // probably never produce most of these.
@@ -650,7 +661,7 @@ bool File::exists(const std::string& path)
         case ENOENT:
         case ENOTDIR: return false;
     }
-    const string msg = get_errno_msg(errnum);
+    const string msg = get_errno_msg("access() failed: ", errnum);
     switch (errnum) {
         case ENOMEM:  throw ResourceAllocError(msg);
         default:      throw runtime_error(msg);

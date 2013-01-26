@@ -31,9 +31,9 @@ class StringIndex;
 
 class AdaptiveStringColumn : public ColumnBase {
 public:
-    AdaptiveStringColumn(Allocator& alloc=GetDefaultAllocator());
+    AdaptiveStringColumn(Allocator& alloc=Allocator::get_default());
     AdaptiveStringColumn(size_t ref, ArrayParent* parent=NULL, size_t pndx=0,
-                         Allocator& alloc=GetDefaultAllocator());
+                         Allocator& alloc=Allocator::get_default());
     ~AdaptiveStringColumn();
 
     void Destroy();

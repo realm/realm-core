@@ -27,8 +27,10 @@ namespace tightdb {
 
 class ArrayStringLong : public Array {
 public:
-    ArrayStringLong(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+    ArrayStringLong(ArrayParent* parent=NULL, size_t pndx=0,
+                    Allocator& alloc = Allocator::get_default());
+    ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx,
+                    Allocator& alloc = Allocator::get_default());
     //ArrayStringLong(Allocator& alloc);
     ~ArrayStringLong();
 

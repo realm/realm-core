@@ -74,7 +74,7 @@ public:
     /// ConstTableRef that refer to it, or to any of its subtables,
     /// when it goes out of scope. To create a top-level table with
     /// dynamic lifetime, use Table::create() instead.
-    Table(Allocator& alloc = GetDefaultAllocator());
+    Table(Allocator& alloc = Allocator::get_default());
 
     ~Table();
 
@@ -83,7 +83,7 @@ public:
     ///
     /// \return A reference to the new table, or null if allocation
     /// failed.
-    static TableRef create(Allocator& alloc = GetDefaultAllocator());
+    static TableRef create(Allocator& alloc = Allocator::get_default());
 
     /// An invalid table must not be accessed in any way except by
     /// calling is_valid(). A table that is obtained from a Group

@@ -539,7 +539,7 @@ bool Array::Set(size_t ndx, int64_t value)
 bool Array::AddPositiveLocal(int64_t value)
 {
     TIGHTDB_ASSERT(value >= 0);
-    TIGHTDB_ASSERT(&m_alloc == &GetDefaultAllocator());
+    TIGHTDB_ASSERT(&m_alloc == &Allocator::get_default());
 
     if (value <= m_ubound) {
         if (m_len < m_capacity) {

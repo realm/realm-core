@@ -325,7 +325,7 @@ inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   const Table* table, std::size_t column_ndx):
                             Column(COLUMN_HASREFS, alloc),
                             m_table(table), m_index(column_ndx),
-                            m_subtable_map(GetDefaultAllocator()) {}
+                            m_subtable_map(Allocator::get_default()) {}
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   const Table* table, std::size_t column_ndx,
@@ -333,7 +333,7 @@ inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   std::size_t ref):
                             Column(ref, parent, ndx_in_parent, alloc),
                             m_table(table), m_index(column_ndx),
-                            m_subtable_map(GetDefaultAllocator()) {}
+                            m_subtable_map(Allocator::get_default()) {}
 
 inline void ColumnSubtableParent::update_child_ref(size_t subtable_ndx, size_t new_ref)
 {

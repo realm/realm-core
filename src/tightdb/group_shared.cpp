@@ -155,7 +155,7 @@ open_start:
     }
 
     // Map to memory
-    m_file_map.map(m_file, File::access_ReadWrite);
+    m_file_map.map(m_file, File::access_ReadWrite, File::map_NoSync);
 
     // FIXME: Need File::UnampGuard if init() becomes open()
 

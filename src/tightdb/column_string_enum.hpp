@@ -30,7 +30,7 @@ class StringIndex;
 class ColumnStringEnum : public Column {
 public:
     ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent* parent=NULL, size_t pndx=0,
-                     Allocator& alloc=GetDefaultAllocator());
+                     Allocator& alloc = Allocator::get_default());
     ~ColumnStringEnum();
     void Destroy();
 

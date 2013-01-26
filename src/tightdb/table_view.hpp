@@ -93,7 +93,7 @@ protected:
     /**
      * Construct null view (no memory allocated).
      */
-    TableViewBase(): m_table(0), m_refs(GetDefaultAllocator()) {}
+    TableViewBase(): m_table(0), m_refs(Allocator::get_default()) {}
 
     /**
      * Construct empty view, ready for addition of row indices.

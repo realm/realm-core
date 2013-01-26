@@ -378,6 +378,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\tightdb\alloc.cpp" />
     <ClCompile Include="src\tightdb\alloc_slab.cpp" />
     <ClCompile Include="src\tightdb\array.cpp" />
     <ClCompile Include="src\tightdb\array_binary.cpp" />
