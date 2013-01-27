@@ -74,7 +74,7 @@ public:
     /// currently in its attached state by calling
     /// is_attached(). Calling any other method (except the
     /// destructor) while in the unattached state has undefined
-    /// behaviour.
+    /// behavior.
     Group(unattached_tag) TIGHTDB_NOEXCEPT;
 
     ~Group();
@@ -133,7 +133,7 @@ public:
     /// A group may be created in the unattached state, and then later
     /// attached to a file with a call to open(). Calling any method
     /// other than open(), is_attached(), and ~Group() on an
-    /// unattached instance results in undefinde behavior.
+    /// unattached instance results in undefined behavior.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
@@ -153,15 +153,20 @@ public:
 
     // Serialization
 
-    /// Write this database to a file.
+    /// Write this database to a file. If the file exists already, it
+    /// will be truncated first.
     ///
     /// \param file A filesystem path.
     ///
-    /// Throws PermissionDenied if the file could not be opened or
-    /// created due to a permission constraint.
+    /// \throw File::OpenError If the file could not be opened. If the
+    /// reason corresponds to one of the exception types that are
+    /// derived from File::OpenError, the derived exception type is
+    /// thrown.
     void write(const std::string& file);
 
-    /// Ownership of the returned memory buffer is transferred to the
+    /// Write this database to a memory buffer.
+    ///
+    /// Ownership of the returned buffer is transferred to the
     /// caller. The memory will have been allocated using
     /// std::malloc().
     BufferSpec write_to_mem();
@@ -182,7 +187,7 @@ public:
     bool operator!=(const Group& g) const { return !(*this == g); }
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const; // Uncapitalized 'verify' cannot be used due to conflict with macro in Obj-C
     void print() const;
     void print_free() const;
     MemStats stats();

@@ -13,8 +13,12 @@ Format:
 ==================
 
 
-2013-01-18 (Kristian Spangsege)
+2013-01-27 (Kristian Spangsege)
++ New Group::Group(unattached_tag) added. Same for SharedGroup.
++ New Group::open(...) methods added. Same for SharedGroup.
++ New Group::is_attached() added. Same for SharedGroup.
 + Classes ReadTransaction and WriteTransaction added for handling safe scoped transaction.
++ Many methods have now been qualified with TIGHTDB_NOEXCEPT.
 
 
 2013-01-14 (Kristian Spangsege)

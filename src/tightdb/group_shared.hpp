@@ -43,13 +43,15 @@ public:
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel dlevel=durability_Full);
 
+    struct unattached_tag {};
+
     /// Create a SharedGroup instance in its unattached state. It may
     /// then be attached to a database file later by calling the
     /// open() method. You may test whether this instance is currently
     /// in its attached state by calling is_attached(). Calling any
     /// other method (except the destructor) while in the unattached
-    /// state has undefined behaviour.
-    SharedGroup() TIGHTDB_NOEXCEPT;
+    /// state has undefined behavior.
+    SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT;
 
     ~SharedGroup();
 
@@ -66,6 +68,10 @@ public:
     /// lock file will be placed in the same directory as the database
     /// file, and its name will be derived by appending ".lock" to the
     /// name of the database file.
+    ///
+    /// When multiple SharedGroup instances refer to the same file,
+    /// they must specify the same durability level, otherwise an
+    /// exception will be thrown.
     ///
     /// Calling open() on a SharedGroup instance that is already in
     /// the attached state has undefined behavior.
@@ -89,7 +95,7 @@ public:
     /// A SharedGroup may be created in the unattached state, and then
     /// later attached to a file with a call to open(). Calling any
     /// method other than open(), is_attached(), and ~SharedGroup() on
-    /// an unattached instance results in undefinde behavior.
+    /// an unattached instance results in undefined behavior.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     // Has db been modified since last transaction?
@@ -259,7 +265,7 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create, Durabil
 }
 
 
-inline SharedGroup::SharedGroup() TIGHTDB_NOEXCEPT:
+inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
     m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max()) {}
 
 

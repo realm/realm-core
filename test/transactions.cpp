@@ -55,8 +55,7 @@ const int num_threads = 23;
 const int num_rounds  = 2;
 
 // FIXME: Set to 1024 when binary size limit is fixed
-//const size_t max_bin_size = 1024;
-const size_t max_bin_size = 512;
+const size_t max_bin_size = 1024;
 
 
 void round(SharedGroup& db, int index)
