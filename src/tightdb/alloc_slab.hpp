@@ -44,9 +44,13 @@ struct InvalidDatabase: File::OpenError {
 
 class SlabAlloc: public Allocator {
 public:
+    /// Construct a slab allocator in the unattached state.
     SlabAlloc();
+
     ~SlabAlloc();
 
+    /// Attach this allocator to the specified file.
+    ///
     /// This function is used by free-standing Group instances as well
     /// as by groups that a managed by SharedGroup instances. When
     /// used by free-standing Group instances, no concurrency is
@@ -59,19 +63,23 @@ public:
     ///
     /// \param no_create Fail if the file does not already exist.
     ///
-    /// \throw InvalidDatabase
-    void map_file(const std::string& path, bool is_shared, bool read_only, bool no_create);
+    /// \throw File::OpenError
+    void attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create);
 
+    /// Attach this allocator to the specified memory buffer.
+    ///
     /// \throw InvalidDatabase
-    void set_buffer(char* data, size_t size, bool take_ownership);
+    void attach_buffer(char* data, size_t size, bool take_ownership);
+
+    bool is_attached() const TIGHTDB_NOEXCEPT;
 
     MemRef Alloc(size_t size);
     MemRef ReAlloc(size_t ref, void* p, size_t size);
     void   Free(size_t ref, void* p); // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void*  Translate(size_t ref) const;
+    void*  Translate(size_t ref) const TIGHTDB_NOEXCEPT;
 
     bool   IsReadOnly(size_t ref) const;
-    size_t GetTopRef() const;
+    size_t GetTopRef() const TIGHTDB_NOEXCEPT;
     size_t GetTotalSize() const;
 
     bool   CanPersist() const;
@@ -135,6 +143,11 @@ inline SlabAlloc::SlabAlloc()
 #ifdef TIGHTDB_DEBUG
     m_debugOut = false;
 #endif
+}
+
+inline bool SlabAlloc::is_attached() const  TIGHTDB_NOEXCEPT
+{
+    return m_data;
 }
 
 } // namespace tightdb

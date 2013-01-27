@@ -36,10 +36,10 @@ public:
 
     void Destroy();
 
-    bool IsBinaryColumn() const {return true;}
+    bool IsBinaryColumn() const TIGHTDB_NOEXCEPT {return true;}
 
-    size_t Size() const;
-    bool is_empty() const;
+    virtual size_t Size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const TIGHTDB_NOEXCEPT;
 
     BinaryData Get(size_t ndx) const;
     const char* GetData(size_t ndx) const;
@@ -81,7 +81,7 @@ protected:
 
     void UpdateRef(size_t ref);
 
-    BinaryData LeafGet(size_t ndx) const;
+    BinaryData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     bool LeafSet(size_t ndx, BinaryData value);
     bool LeafInsert(size_t ndx, BinaryData value);
     void LeafDelete(size_t ndx);

@@ -32,13 +32,12 @@ public:
     ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx,
                 Allocator& alloc = Allocator::get_default());
     //ArrayBinary(Allocator& alloc);
-    ~ArrayBinary();
 
-    bool is_empty() const;
-    size_t Size() const;
+    bool is_empty() const TIGHTDB_NOEXCEPT;
+    virtual size_t Size() const TIGHTDB_NOEXCEPT;
 
-    const char* Get(size_t ndx) const;
-    size_t GetLen(size_t ndx) const;
+    const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    size_t GetLen(size_t ndx) const TIGHTDB_NOEXCEPT;
 
     void add(const char* value, size_t len);
     void Set(size_t ndx, const char* value, size_t len);

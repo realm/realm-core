@@ -422,7 +422,6 @@ private:
 
 TEST(Transactions)
 {
-cerr << "transaction - start\n";
     const char* database_path = "transactions.tightdb";
     remove(database_path);
     remove((database_path+string(".lock")).c_str());
@@ -441,7 +440,6 @@ cerr << "transaction - start\n";
             CHECK(!threads[i].join());
         }
     }
-cerr << "transaction - mid\n";
 
     // Verify database contents
     {
@@ -553,7 +551,6 @@ cerr << "transaction - mid\n";
             // End of read transaction
         }
     }
-cerr << "transaction - end\n";
 }
 
 #endif // Shared PTHREAD mutexes appear not to work on Windows

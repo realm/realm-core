@@ -52,13 +52,13 @@ public:
     virtual MemRef ReAlloc(std::size_t ref, void* addr, std::size_t size);
     virtual void Free(std::size_t, void* addr);
 
-    virtual void* Translate(std::size_t ref) const;
+    virtual void* Translate(std::size_t ref) const TIGHTDB_NOEXCEPT;
     virtual bool IsReadOnly(std::size_t) const;
 
-    static Allocator& get_default();
+    static Allocator& get_default() TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Allocator(): m_replication(0) {}
+    Allocator() TIGHTDB_NOEXCEPT: m_replication(0) {}
 #endif
     virtual ~Allocator() {}
 

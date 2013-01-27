@@ -132,6 +132,8 @@ string create_temp_dir()
 
 void File::open(const string& path, AccessMode a, CreateMode c, int flags)
 {
+    TIGHTDB_ASSERT(!is_attached());
+
 #ifdef _WIN32 // Windows version
 
     DWORD desired_access = GENERIC_READ;
@@ -249,6 +251,8 @@ void File::close() TIGHTDB_NOEXCEPT
 
 void File::write(const char* data, size_t size)
 {
+    TIGHTDB_ASSERT(is_attached());
+
 #ifdef _WIN32 // Windows version
 
     const DWORD max_write = numeric_limits<DWORD>::max();
@@ -297,6 +301,8 @@ void File::write(const char* data, size_t size)
 
 File::SizeType File::get_size() const
 {
+    TIGHTDB_ASSERT(is_attached());
+
 #ifdef _WIN32 // Windows version
 
     LARGE_INTEGER large_int;
@@ -320,6 +326,8 @@ File::SizeType File::get_size() const
 
 void File::resize(SizeType size)
 {
+    TIGHTDB_ASSERT(is_attached());
+
 #ifdef _WIN32 // Windows version
 
     seek(size);
@@ -340,6 +348,8 @@ void File::resize(SizeType size)
 
 void File::alloc(SizeType offset, size_t size)
 {
+    TIGHTDB_ASSERT(is_attached());
+
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     if (TIGHTDB_LIKELY(::posix_fallocate(m_fd, offset, size) == 0)) return;
@@ -367,6 +377,8 @@ void File::alloc(SizeType offset, size_t size)
 
 void File::seek(SizeType position)
 {
+    TIGHTDB_ASSERT(is_attached());
+
 #ifdef _WIN32 // Windows version
 
     LARGE_INTEGER large_int;
@@ -391,6 +403,8 @@ void File::seek(SizeType position)
 // http://www.humboldt.co.uk/2009/03/fsync-across-platforms.html.
 void File::sync()
 {
+    TIGHTDB_ASSERT(is_attached());
+
 #ifdef _WIN32 // Windows version
 
     if (TIGHTDB_LIKELY(FlushFileBuffers(m_handle))) return;
@@ -407,7 +421,11 @@ void File::sync()
 
 bool File::lock(bool exclusive, bool non_blocking)
 {
+    TIGHTDB_ASSERT(is_attached());
+
 #ifdef _WIN32 // Windows version
+
+    TIGHTDB_ASSERT(!have_lock);
 
     // Under Windows a file lock must be explicitely released before
     // the file is closed. It will eventually be released by the
@@ -547,6 +565,25 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
 }
 
 
+void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
+{
+#ifdef _WIN32 // Windows version
+
+    static_cast<void>(size);
+    const BOOL r = UnmapViewOfFile(addr);
+    TIGHTDB_ASSERT(r);
+    static_cast<void>(r);
+
+#else // POSIX version
+
+    const int r = ::munmap(addr, size);
+    TIGHTDB_ASSERT(r == 0);
+    static_cast<void>(r);
+
+#endif
+}
+
+
 void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size,
                   int map_flags) const
 {
@@ -572,25 +609,6 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     // well with the opposite order.
     unmap(old_addr, old_size);
     return map(a, new_size, map_flags);
-#endif
-}
-
-
-void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
-{
-#ifdef _WIN32 // Windows version
-
-    static_cast<void>(size);
-    const BOOL r = UnmapViewOfFile(addr);
-    TIGHTDB_ASSERT(r);
-    static_cast<void>(r);
-
-#else // POSIX version
-
-    const int r = ::munmap(addr, size);
-    TIGHTDB_ASSERT(r == 0);
-    static_cast<void>(r);
-
 #endif
 }
 

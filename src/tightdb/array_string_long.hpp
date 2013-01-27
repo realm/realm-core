@@ -27,17 +27,16 @@ namespace tightdb {
 
 class ArrayStringLong : public Array {
 public:
-    ArrayStringLong(ArrayParent* parent=NULL, size_t pndx=0,
-                    Allocator& alloc = Allocator::get_default());
-    ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx,
-                    Allocator& alloc = Allocator::get_default());
+    ArrayStringLong(ArrayParent* = 0, size_t pndx = 0,
+                    Allocator& = Allocator::get_default());
+    ArrayStringLong(size_t ref, ArrayParent*, size_t pndx,
+                    Allocator& = Allocator::get_default());
     //ArrayStringLong(Allocator& alloc);
-    ~ArrayStringLong();
 
-    bool is_empty() const;
-    size_t Size() const;
+    bool is_empty() const TIGHTDB_NOEXCEPT;
+    virtual size_t Size() const TIGHTDB_NOEXCEPT;
 
-    const char* Get(size_t ndx) const;
+    const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(const char* value);
     void add(const char* value, size_t len);
     void Set(size_t ndx, const char* value);
@@ -64,6 +63,20 @@ private:
     ArrayBlob m_blob;
 };
 
+
+
+
+// Implementation:
+
+inline bool ArrayStringLong::is_empty() const TIGHTDB_NOEXCEPT
+{
+    return m_offsets.is_empty();
+}
+
+inline std::size_t ArrayStringLong::Size() const TIGHTDB_NOEXCEPT
+{
+    return m_offsets.Size();
+}
 
 } // namespace tightdb
 

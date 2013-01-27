@@ -31,6 +31,7 @@
 #endif
 
 #include <tightdb/config.h>
+#include <tightdb/assert.hpp>
 
 namespace tightdb {
 
@@ -60,17 +61,18 @@ public:
         mode_Append  ///< access_ReadWrite, create_Auto, flag_Append (fopen: ab+)
     };
 
-    /// See open(const std::string&, Mode).
-    File(const std::string& path, Mode = mode_Read);
+    /// Equivalent to calling open(const std::string&, Mode) on a
+    /// default constructed instance.
+    explicit File(const std::string& path, Mode = mode_Read);
 
-    /// Create an instance that does not initially refer to an open
+    /// Create an instance that is not initially attached to an open
     /// file.
     File() TIGHTDB_NOEXCEPT;
 
     ~File() TIGHTDB_NOEXCEPT;
 
-    /// Calling this method on an instance that already refers to an
-    /// open file has undefined behavior.
+    /// Calling this method on an instance that is already attached to
+    /// an open file has undefined behavior.
     ///
     /// \throw OpenError If the file could not be opened. If the
     /// reason corresponds to one of the exception types that are
@@ -80,13 +82,13 @@ public:
     void open(const std::string& path, Mode = mode_Read);
 
     /// This method is idempotent, that is, it is valid to call it
-    /// regardless of whether this instance currently refers to an
-    /// open file.
+    /// regardless of whether this instance currently is attached to
+    /// an open file.
     void close() TIGHTDB_NOEXCEPT;
 
-    /// Check whether this File instance currently refers to an open
+    /// Check whether this File instance currently attached to an open
     /// file.
-    bool is_open() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const TIGHTDB_NOEXCEPT;
 
     enum AccessMode {
         access_ReadOnly,
@@ -124,7 +126,7 @@ public:
     typedef off_t SizeType;
 #endif
 
-    /// Calling this method on an instance that does not refer to an
+    /// Calling this method on an instance that is not attached to an
     /// open file has undefined behavior.
     SizeType get_size() const;
 
@@ -135,7 +137,7 @@ public:
     /// method will generally affect the read/write offset associated
     /// with this File instance.
     ///
-    /// Calling this method on an instance that does not refer to an
+    /// Calling this method on an instance that is not attached to an
     /// open file has undefined behavior. Calling this method on a
     /// file that is opened in read-only mode, is an error.
     void resize(SizeType);
@@ -146,7 +148,7 @@ public:
     /// this method will generally affect the read/write offset
     /// associated with this File instance.
     ///
-    /// Calling this method on an instance that does not refer to an
+    /// Calling this method on an instance that is not attached to an
     /// open file has undefined behavior. Calling this method on a
     /// file that is opened in read-only mode, is an error.
     ///
@@ -170,9 +172,9 @@ public:
     ///
     /// Locks acquired on distinct File instances have fully recursive
     /// behavior, even if they are acquired in the same process (or
-    /// thread) and refer to the same underlying file.
+    /// thread) and are attached to the same underlying file.
     ///
-    /// Calling this method on an instance that does not refer to an
+    /// Calling this method on an instance that is not attached to an
     /// open file, or on an instance that is already locked has
     /// undefined behavior.
     void lock_exclusive();
@@ -182,9 +184,9 @@ public:
     ///
     /// Locks acquired on distinct File instances have fully recursive
     /// behavior, even if they are acquired in the same process (or
-    /// thread) and refer to the same underlying file.
+    /// thread) and are attached to the same underlying file.
     ///
-    /// Calling this method on an instance that does not refer to an
+    /// Calling this method on an instance that is not attached to an
     /// open file, or on an instance that is already locked has
     /// undefined behavior.
     void lock_shared();
@@ -222,9 +224,9 @@ public:
     /// Specifying access_ReadWrite for a file that is opened in
     /// read-only mode, is an error.
     ///
-    /// Calling this method on an instance that does not refer to an
-    /// open file, or one that refers to an empty file has undefined
-    /// behavior.
+    /// Calling this method on an instance that is not attached to an
+    /// open file, or one that is attached to an empty file has
+    /// undefined behavior.
     ///
     /// Calling this method with a size that is greater than the size
     /// of the file has undefined behavior.
@@ -311,6 +313,9 @@ private:
         void* m_addr;
         std::size_t m_size;
 
+        MapBase() TIGHTDB_NOEXCEPT;
+        ~MapBase() TIGHTDB_NOEXCEPT;
+
         void map(const File&, AccessMode, std::size_t size, int map_flags);
         void remap(const File&, AccessMode, std::size_t size, int map_flags);
         void unmap() TIGHTDB_NOEXCEPT;
@@ -323,9 +328,9 @@ private:
 /// This class provides a RAII abstraction over the concept of a
 /// memory mapped file.
 ///
-/// The Map instance makes no reference to the File instance from
-/// which it was created, and that File instance may be destroyed
-/// before the Map instance is destroyed.
+/// Once create, the Map instance makes no reference to the File
+/// instance that it was based upon, and that File instance may be
+/// destroyed before the Map instance is destroyed.
 ///
 /// You can use UnmapGuard to acheive exception-safe unmapping prior
 /// to the Map instance being detroyed.
@@ -334,63 +339,66 @@ private:
 /// multiple threads.
 template<class T> class File::Map: MapBase {
 public:
-    /// See map().
-    Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
-        int map_flags = 0);
+    /// Equivalent to calling map() on a default constructed instance.
+    explicit Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+                 int map_flags = 0);
 
-    /// Create an instance that does not initially refer to a file
-    /// mapping.
+    /// Create an instance that is not initially attached to a memory
+    /// mapped file.
     Map() TIGHTDB_NOEXCEPT;
 
     ~Map() TIGHTDB_NOEXCEPT;
 
     /// See File::map().
     ///
-    /// Calling this method on a Map instance that already refers to a
-    /// file mapping has undefined behavior. The returned pointer is
-    /// the same as what will subsequently be returned by get_addr().
+    /// Calling this method on a Map instance that is already attached
+    /// to a memory mapped file has undefined behavior. The returned
+    /// pointer is the same as what will subsequently be returned by
+    /// get_addr().
     T* map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
            int map_flags = 0);
 
+    /// See File::unmap(). This method is idempotent, that is, it is
+    /// valid to call it regardless of whether this instance is
+    /// currently attached to a memory mapped file.
+    void unmap() TIGHTDB_NOEXCEPT;
+
     /// See File::remap().
     ///
-    /// Calling this method on a Map instance that does not currently
-    /// refer to a file mapping has undefined behavior. The returned
-    /// pointer is the same as what will subsequently be returned by
-    /// get_addr().
+    /// Calling this method on a Map instance that is not currently
+    /// attached to a memory mapped file has undefined behavior. The
+    /// returned pointer is the same as what will subsequently be
+    /// returned by get_addr().
     T* remap(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
              int map_flags = 0);
 
-    /// See File::unmap(). This method is idempotent, that is, it is
-    /// valid to call it regardless of whether this instance refers to
-    /// a file mapping or not.
-    void unmap() TIGHTDB_NOEXCEPT;
-
-    /// Check whether this Map instance currently refers to a file
-    /// mapping.
-    bool is_mapped() const TIGHTDB_NOEXCEPT;
-
     /// See File::sync_map().
     ///
-    /// Calling this method on an instance that does not currently
-    /// refer to a file mapping, has undefined behavior.
+    /// Calling this method on an instance that is not currently
+    /// attached to a memory mapped file, has undefined behavior.
     void sync();
 
-    /// Returns a pointer to the beginning of the mapped file, or null
-    /// if this instance does not currently refer to a file mapping.
+    /// Check whether this Map instance is currently attached to a
+    /// memory mapped file.
+    bool is_attached() const TIGHTDB_NOEXCEPT;
+
+    /// Returns a pointer to the beginning of the memory mapped file,
+    /// or null if this instance is not currently attached.
     T* get_addr() const TIGHTDB_NOEXCEPT;
 
     /// Returns the size of the mapped region, or zero if this
-    /// instance does not currently refer to a file mapping. When this
-    /// instance refers to a file mapping, the returned value will
-    /// always be identical to the size passed to the constructor or
-    /// to map().
+    /// instance does not currently refer to a memory mapped
+    /// file. When this instance refers to a memory mapped file, the
+    /// returned value will always be identical to the size passed to
+    /// the constructor or to map().
     std::size_t get_size() const TIGHTDB_NOEXCEPT;
 
-    /// Release the current mapping from this Map instance. The
-    /// address range may then be unmapped later by a call to
-    /// File::unmap().
+    /// Release the currently attached memory mapped file from this
+    /// Map instance. The address range may then be unmapped later by
+    /// a call to File::unmap().
     T* release() TIGHTDB_NOEXCEPT;
+
+    friend class UnmapGuard;
 };
 
 
@@ -433,6 +441,12 @@ private:
 
 inline File::File(const std::string& path, Mode m)
 {
+#ifdef _WIN32
+    m_handle = 0;
+#else
+    m_fd = -1;
+#endif
+
     open(path, m);
 }
 
@@ -464,7 +478,7 @@ inline void File::open(const std::string& path, Mode m)
     open(path, a, c, flags);
 }
 
-inline bool File::is_open() const TIGHTDB_NOEXCEPT
+inline bool File::is_attached() const TIGHTDB_NOEXCEPT
 {
 #ifdef _WIN32
     return m_handle;
@@ -493,17 +507,21 @@ inline bool File::try_lock_shared()
     return lock(false, true);
 }
 
-inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline File::MapBase::MapBase() TIGHTDB_NOEXCEPT
 {
-    m_addr = f.map(a, size, map_flags);
-    m_size = size;
+    m_addr = 0;
 }
 
-inline void File::MapBase::remap(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline File::MapBase::~MapBase() TIGHTDB_NOEXCEPT
 {
-    void* addr = m_addr;
-    m_addr = 0; // Because if File::remap fails, the old mapping will have been destroyed
-    m_addr = f.remap(addr, m_size, a, size, map_flags);
+    unmap();
+}
+
+inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags)
+{
+    TIGHTDB_ASSERT(!m_addr);
+
+    m_addr = f.map(a, size, map_flags);
     m_size = size;
 }
 
@@ -514,8 +532,20 @@ inline void File::MapBase::unmap() TIGHTDB_NOEXCEPT
     m_addr = 0;
 }
 
+inline void File::MapBase::remap(const File& f, AccessMode a, std::size_t size, int map_flags)
+{
+    TIGHTDB_ASSERT(m_addr);
+
+    void* addr = m_addr;
+    m_addr = 0; // Because if File::remap fails, the old mapping will have been destroyed
+    m_addr = f.remap(addr, m_size, a, size, map_flags);
+    m_size = size;
+}
+
 inline void File::MapBase::sync()
 {
+    TIGHTDB_ASSERT(m_addr);
+
     File::sync_map(m_addr, m_size);
 }
 
@@ -525,21 +555,20 @@ inline File::Map<T>::Map(const File& f, AccessMode a, std::size_t size, int map_
     map(f, a, size, map_flags);
 }
 
-template<class T> inline File::Map<T>::Map() TIGHTDB_NOEXCEPT
-{
-    m_addr = 0;
-}
+template<class T> inline File::Map<T>::Map() TIGHTDB_NOEXCEPT {}
 
-template<class T> inline File::Map<T>::~Map() TIGHTDB_NOEXCEPT
-{
-    unmap();
-}
+template<class T> inline File::Map<T>::~Map() TIGHTDB_NOEXCEPT {}
 
 template<class T>
 inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int map_flags)
 {
     MapBase::map(f, a, size, map_flags);
     return static_cast<T*>(m_addr);
+}
+
+template<class T> inline void File::Map<T>::unmap() TIGHTDB_NOEXCEPT
+{
+    MapBase::unmap();
 }
 
 template<class T>
@@ -549,19 +578,14 @@ inline T* File::Map<T>::remap(const File& f, AccessMode a, std::size_t size, int
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline void File::Map<T>::unmap() TIGHTDB_NOEXCEPT
-{
-    MapBase::unmap();
-}
-
-template<class T> inline bool File::Map<T>::is_mapped() const TIGHTDB_NOEXCEPT
-{
-    return m_addr;
-}
-
 template<class T> inline void File::Map<T>::sync()
 {
     MapBase::sync();
+}
+
+template<class T> inline bool File::Map<T>::is_attached() const TIGHTDB_NOEXCEPT
+{
+    return m_addr;
 }
 
 template<class T> inline T* File::Map<T>::get_addr() const TIGHTDB_NOEXCEPT

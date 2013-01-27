@@ -34,32 +34,30 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
 // Creates new array (but invalid, call UpdateRef to init)
 //ArrayBinary::ArrayBinary(Allocator& alloc) : Array(alloc) {}
 
-ArrayBinary::~ArrayBinary() {}
-
-bool ArrayBinary::is_empty() const
+bool ArrayBinary::is_empty() const TIGHTDB_NOEXCEPT
 {
     return m_offsets.is_empty();
 }
 
-size_t ArrayBinary::Size() const
+size_t ArrayBinary::Size() const TIGHTDB_NOEXCEPT
 {
     return m_offsets.Size();
 }
 
-const char* ArrayBinary::Get(size_t ndx) const
+const char* ArrayBinary::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_offsets.Size());
 
-    const size_t offset = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
+    const size_t offset = ndx ? size_t(m_offsets.Get(ndx-1)) : 0;
     return m_blob.Get(offset);
 }
 
-size_t ArrayBinary::GetLen(size_t ndx) const
+size_t ArrayBinary::GetLen(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_offsets.Size());
 
-    const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
-    const size_t end = (size_t)m_offsets.Get(ndx);
+    const size_t start = ndx ? size_t(m_offsets.Get(ndx-1)) : 0;
+    const size_t end = size_t(m_offsets.Get(ndx));
 
     return end - start;
 }

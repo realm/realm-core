@@ -1,4 +1,5 @@
 #include <limits>
+#include <algorithm>
 #include <vector>
 #include <iostream>
 #include <iomanip>
@@ -162,56 +163,56 @@ void Array::set_header_capacity(size_t value)
     ::set_header_capacity(value, m_data - 8);
 }
 
-bool Array::get_header_isnode(const void* header) const
+bool Array::get_header_isnode(const void* header) const TIGHTDB_NOEXCEPT
 {
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[0] & 0x80) != 0;
 }
 
-bool Array::get_header_hasrefs(const void* header) const
+bool Array::get_header_hasrefs(const void* header) const TIGHTDB_NOEXCEPT
 {
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[0] & 0x40) != 0;
 }
 
-bool Array::get_header_indexflag(const void* header) const
+bool Array::get_header_indexflag(const void* header) const TIGHTDB_NOEXCEPT
 {
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[0] & 0x20) != 0;
 }
 
-Array::WidthType Array::get_header_wtype(const void* header) const
+Array::WidthType Array::get_header_wtype(const void* header) const TIGHTDB_NOEXCEPT
 {
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (WidthType)((header2[0] & 0x18) >> 3);
 }
 
-size_t Array::get_header_width(const void* header) const
+size_t Array::get_header_width(const void* header) const TIGHTDB_NOEXCEPT
 {
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (1 << (header2[0] & 0x07)) >> 1;
 }
 
-size_t Array::get_header_len(const void* header) const
+size_t Array::get_header_len(const void* header) const TIGHTDB_NOEXCEPT
 {
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[1] << 16) + (header2[2] << 8) + header2[3];
 }
 
-size_t Array::get_header_capacity(const void* header) const
+size_t Array::get_header_capacity(const void* header) const TIGHTDB_NOEXCEPT
 {
     const uint8_t* const header2 = header ? (const uint8_t*)header : (m_data - 8);
     return (header2[4] << 16) + (header2[5] << 8) + header2[6];
 }
 
-void Array::init_from_ref(size_t ref)
+void Array::init_from_ref(size_t ref) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ref);
-    uint8_t* const header = (uint8_t*)m_alloc.Translate(ref);
+    uint8_t* const header = static_cast<uint8_t*>(m_alloc.Translate(ref));
     CreateFromHeader(header, ref);
 }
 
-void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref)
+void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref) TIGHTDB_NOEXCEPT
 {
     // Parse header
     // We only need limited info for direct read-only use
@@ -224,7 +225,7 @@ void Array::CreateFromHeaderDirect(uint8_t* header, size_t ref)
     SetWidth(m_width);
 }
 
-void Array::CreateFromHeader(uint8_t* header, size_t ref)
+void Array::CreateFromHeader(uint8_t* header, size_t ref) TIGHTDB_NOEXCEPT
 {
     // Parse header
     m_isNode   = get_header_isnode(header);
@@ -356,25 +357,6 @@ void Array::SetParent(ArrayParent *parent, size_t pndx)
     m_parentNdx = pndx;
 }
 
-Array Array::GetSubArray(size_t ndx)
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(m_hasRefs);
-
-    const size_t ref = (size_t)Get(ndx);
-    TIGHTDB_ASSERT(ref);
-
-    return Array(ref, this, ndx, m_alloc);
-}
-
-const Array Array::GetSubArray(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(m_hasRefs);
-
-    return Array(size_t(Get(ndx)), const_cast<Array *>(this), ndx, m_alloc);
-}
-
 void Array::Destroy()
 {
     if (!m_data) return;
@@ -442,13 +424,10 @@ void Array::Delete(size_t ndx)
     }
     else if (ndx < m_len-1) {
         // when byte sized, use memmove
-// FIXME: Should be optimized as a simple division by 8.
+// FIXME: Should probably be optimized as a simple division by 8.
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        unsigned char* dst = m_data + (ndx * w);
-        unsigned char* src = dst + w;
-        const size_t count = (m_len - ndx - 1) * w;
-// FIXME: Use std::copy() or std::copy_backward() instead.
-        memmove(dst, src, count);
+        unsigned char* const dst = m_data + w*ndx;
+        copy(dst+w, m_data + w*m_len, dst);
     }
 
     // Update length (also in header)
@@ -456,7 +435,7 @@ void Array::Delete(size_t ndx)
     set_header_len(m_len);
 }
 
-int64_t Array::Get(size_t ndx) const
+int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_len);
     return (this->*m_getter)(ndx);
@@ -478,7 +457,7 @@ int64_t Array::Get(size_t ndx) const
 */
 }
 
-size_t Array::GetAsRef(size_t ndx) const
+size_t Array::GetAsRef(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_len);
     TIGHTDB_ASSERT(m_hasRefs);
@@ -486,17 +465,11 @@ size_t Array::GetAsRef(size_t ndx) const
     return to_ref(v);
 }
 
-size_t Array::GetAsSizeT(size_t ndx) const
+size_t Array::GetAsSizeT(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_len);
     const int64_t v = Get(ndx);
     return to_size_t(v);
-}
-
-int64_t Array::back() const
-{
-    TIGHTDB_ASSERT(m_len);
-    return Get(m_len-1);
 }
 
 bool Array::Set(size_t ndx, int64_t value)
@@ -686,11 +659,11 @@ void Array::Adjust(size_t start, int64_t diff)
 // Finds position of largest value SMALLER than the target (for lookups in
 // nodes)
 // Todo: rename to LastLessThan()
-template <size_t w> size_t Array::FindPos(int64_t target) const
+template <size_t w> size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 {
-    size_t low = (size_t)-1;
+    size_t low = size_t(-1);
     size_t high = m_len;
-    
+
     // Binary search based on:
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
     // Finds position of largest value SMALLER than the target (for lookups in
@@ -699,18 +672,18 @@ template <size_t w> size_t Array::FindPos(int64_t target) const
         const size_t probe = (low + high) >> 1;
         const int64_t v = Get<w>(probe);
 
-        if (v > target) 
+        if (v > target)
             high = probe;
         else
             low = probe;
     }
-    if (high == m_len) 
+    if (high == m_len)
         return not_found;
-    else 
+    else
         return high;
 }
 
-size_t Array::FindPos(int64_t target) const
+size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 {
     TEMPEX(return FindPos, m_width, (target));
 }
@@ -886,10 +859,10 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
                 m = Get<w>(start);
         }
 
-	    if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
+        if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
             __m128i *data = (__m128i *)(m_data + start * w / 8);
             __m128i state = data[0];
-            __m128i state2;
+            __m128i state2; // FIXME: gcc-4.7 says that this one is undedfined if chunks is zero - can chunks ever be zero?
 
             size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
             for (size_t t = 0; t < chunks; t++) {
@@ -1302,7 +1275,7 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
     return bytes + 8; // add room for 8 byte header
 }
 
-size_t Array::CalcItemCount(size_t bytes, size_t width) const
+size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
 {
     if (width == 0) 
         return numeric_limits<size_t>::max(); // zero width gives infinite space
@@ -1459,12 +1432,12 @@ bool Array::Alloc(size_t count, size_t width)
 }
 
 
-void Array::SetWidth(size_t width)
+void Array::SetWidth(size_t width) TIGHTDB_NOEXCEPT
 {
     TEMPEX(SetWidth, width, ());
 }
 
-template <size_t width> void Array::SetWidth(void)
+template<size_t width> void Array::SetWidth() TIGHTDB_NOEXCEPT
 {
     if (width == 0) {
         m_lbound = 0;
@@ -1524,7 +1497,7 @@ template <size_t width> void Array::SetWidth(void)
     m_finder[COND_LESS] = fl;
 }
 
-template <size_t w>int64_t Array::Get(size_t ndx) const
+template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
 	return GetUniversal<w>((const char *)m_data, ndx);
 }
@@ -1958,51 +1931,39 @@ namespace {
 
 // Direct access methods
 
-// Pre-declarations
-bool get_header_isnode_direct(const uint8_t* const header);
-bool get_header_hasrefs_direct(const uint8_t* const header);
-bool get_header_indexflag_direct(const uint8_t* const header);
-unsigned int get_header_width_direct(const uint8_t* const header);
-size_t get_header_len_direct(const uint8_t* const header);
-int64_t GetDirect(const char* const data, size_t width, const size_t ndx);
-size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target);
-template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target);
-size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, int32_t target);
-
-// FIXME: These should all be declared inline
-bool get_header_isnode_direct(const uint8_t* const header)
+inline bool get_header_isnode_direct(const uint8_t* const header) TIGHTDB_NOEXCEPT
 {
     return (header[0] & 0x80) != 0;
 }
 
-bool get_header_hasrefs_direct(const uint8_t* const header)
+inline bool get_header_hasrefs_direct(const uint8_t* const header) TIGHTDB_NOEXCEPT
 {
     return (header[0] & 0x40) != 0;
 }
 
-bool get_header_indexflag_direct(const uint8_t* const header)
+inline bool get_header_indexflag_direct(const uint8_t* const header) TIGHTDB_NOEXCEPT
 {
     return (header[0] & 0x20) != 0;
 }
 
-unsigned int get_header_width_direct(const uint8_t* const header)
+inline unsigned int get_header_width_direct(const uint8_t* const header) TIGHTDB_NOEXCEPT
 {
     return (1 << (header[0] & 0x07)) >> 1;
 }
 
-size_t get_header_len_direct(const uint8_t* const header)
+inline size_t get_header_len_direct(const uint8_t* const header) TIGHTDB_NOEXCEPT
 {
     return (header[1] << 16) + (header[2] << 8) + header[3];
 }
 
-template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx);
+template<size_t> int64_t GetDirect(const char* const data, const size_t ndx) TIGHTDB_NOEXCEPT;
 
-int64_t GetDirect(const char* const data, size_t width, const size_t ndx)
+int64_t GetDirect(const char* const data, size_t width, const size_t ndx) TIGHTDB_NOEXCEPT
 {
     TEMPEX(return GetDirect, width, (data, ndx));
 }
 
-template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx)
+template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx) TIGHTDB_NOEXCEPT
 {
     if (w == 0) {
         return 0;
@@ -2040,16 +2001,21 @@ template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx)
     }
 }
 
-size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target)
+template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data,
+                                               const int64_t target) TIGHTDB_NOEXCEPT;
+
+size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width,
+                     const int64_t target) TIGHTDB_NOEXCEPT
 {
     TEMPEX(return FindPosDirectImp, width, (header, data, target));
 }
 
-template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target)
+template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data,
+                                               const int64_t target) TIGHTDB_NOEXCEPT
 {
     const size_t len = get_header_len_direct(header);
 
-    size_t low = (size_t)-1;
+    size_t low = size_t(-1);
     size_t high = len;
 
     // Binary search based on:
@@ -2063,7 +2029,7 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
         if (v > target) high = probe;
         else            low = probe;
     }
-    if (high == len) return (size_t)-1;
+    if (high == len) return size_t(-1);
     else return high;
 }
 
@@ -2294,110 +2260,101 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retva
 
 
 // Get value direct through column b-tree without instatiating any Arrays.
-int64_t Array::ColumnGet(size_t ndx) const
+int64_t Array::ColumnGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    const char* data   = (const char*)m_data;
+    const char* data = reinterpret_cast<char*>(m_data);
     const uint8_t* header;
     size_t width = m_width;
     bool isNode = m_isNode;
+    while (isNode) {
+        // Get subnode table
+        const size_t ref_offsets = to_ref(GetDirect(data, width, 0));
+        const size_t ref_refs    = to_ref(GetDirect(data, width, 1));
 
-    while (1) {
-        if (isNode) {
-            // Get subnode table
-            const size_t ref_offsets = to_ref(GetDirect(data, width, 0));
-            const size_t ref_refs    = to_ref(GetDirect(data, width, 1));
+        // Find the subnode containing the item
+        const uint8_t* const offsets_header = static_cast<uint8_t*>(m_alloc.Translate(ref_offsets));
+        const char* const offsets_data = reinterpret_cast<const char*>(offsets_header) + 8;
+        const size_t offsets_width  = get_header_width_direct(offsets_header);
+        const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
 
-            // Find the subnode containing the item
-            const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
-            const char* const offsets_data = (const char*)offsets_header + 8;
-            const size_t offsets_width  = get_header_width_direct(offsets_header);
-            const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
+        // Calc index in subnode
+        const size_t offset = node_ndx ? to_ref(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
+        ndx = ndx - offset; // local index
 
-            // Calc index in subnode
-            const size_t offset = node_ndx ? to_ref(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
-            ndx = ndx - offset; // local index
+        // Get ref to array
+        const uint8_t* const refs_header = static_cast<uint8_t*>(m_alloc.Translate(ref_refs));
+        const char* const refs_data = reinterpret_cast<const char*>(refs_header) + 8;
+        const size_t refs_width  = get_header_width_direct(refs_header);
+        const size_t ref = to_size_t(GetDirect(refs_data, refs_width, node_ndx));
 
-            // Get ref to array
-            const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
-            const char* const refs_data = (const char*)refs_header + 8;
-            const size_t refs_width  = get_header_width_direct(refs_header);
-            const size_t ref = to_size_t(GetDirect(refs_data, refs_width, node_ndx));
-
-            // Set vars for next iteration
-            header = (const uint8_t*)m_alloc.Translate(ref);
-            data   = (const char*)header + 8;
-            width  = get_header_width_direct(header);
-            isNode = get_header_isnode_direct(header);
-        }
-        else {
-            return GetDirect(data, width, ndx);
-        }
+        // Set vars for next iteration
+        header = static_cast<uint8_t*>(m_alloc.Translate(ref));
+        data   = reinterpret_cast<const char*>(header) + 8;
+        width  = get_header_width_direct(header);
+        isNode = get_header_isnode_direct(header);
     }
+    return GetDirect(data, width, ndx);
 }
 
-const char* Array::ColumnStringGet(size_t ndx) const
+const char* Array::ColumnStringGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    const char* data   = (const char*)m_data;
+    const char* data   = reinterpret_cast<char*>(m_data);
     const uint8_t* header = m_data - 8;
     size_t width = m_width;
     bool isNode = m_isNode;
 
-    while (1) {
-        if (isNode) {
-            // Get subnode table
-            const size_t ref_offsets = to_size_t(GetDirect(data, width, 0));
-            const size_t ref_refs    = to_size_t(GetDirect(data, width, 1));
+    while (isNode) {
+        // Get subnode table
+        const size_t ref_offsets = to_size_t(GetDirect(data, width, 0));
+        const size_t ref_refs    = to_size_t(GetDirect(data, width, 1));
 
-            // Find the subnode containing the item
-            const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
-            const char* const offsets_data = (const char*)offsets_header + 8;
-            const size_t offsets_width  = get_header_width_direct(offsets_header);
-            const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
+        // Find the subnode containing the item
+        const uint8_t* const offsets_header = static_cast<uint8_t*>(m_alloc.Translate(ref_offsets));
+        const char* const offsets_data = reinterpret_cast<const char*>(offsets_header) + 8;
+        const size_t offsets_width  = get_header_width_direct(offsets_header);
+        const size_t node_ndx = FindPosDirect(offsets_header, offsets_data, offsets_width, ndx);
 
-            // Calc index in subnode
-            const size_t offset = node_ndx ? to_ref(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
-            ndx = ndx - offset; // local index
+        // Calc index in subnode
+        const size_t offset = node_ndx ? to_ref(GetDirect(offsets_data, offsets_width, node_ndx-1)) : 0;
+        ndx = ndx - offset; // local index
 
-            // Get ref to array
-            const uint8_t* const refs_header = (const uint8_t*)m_alloc.Translate(ref_refs);
-            const char* const refs_data = (const char*)refs_header + 8;
-            const size_t refs_width  = get_header_width_direct(refs_header);
-            const size_t ref = to_ref(GetDirect(refs_data, refs_width, node_ndx));
+        // Get ref to array
+        const uint8_t* const refs_header = static_cast<uint8_t*>(m_alloc.Translate(ref_refs));
+        const char* const refs_data = reinterpret_cast<const char*>(refs_header) + 8;
+        const size_t refs_width  = get_header_width_direct(refs_header);
+        const size_t ref = to_ref(GetDirect(refs_data, refs_width, node_ndx));
 
-            // Set vars for next iteration
-            header = (const uint8_t*)m_alloc.Translate(ref);
-            data   = (const char*)header + 8;
-            width  = get_header_width_direct(header);
-            isNode = get_header_isnode_direct(header);
-        }
-        else {
-            const bool hasRefs = get_header_hasrefs_direct(header);
-            if (hasRefs) {
-                // long strings
-                const size_t ref_offsets = to_size_t(GetDirect(data, width, 0));
-                const size_t ref_blob    = to_size_t(GetDirect(data, width, 1));
-
-                size_t offset = 0;
-                if (ndx) {
-                    const uint8_t* const offsets_header = (const uint8_t*)m_alloc.Translate(ref_offsets);
-                    const char* const offsets_data = (const char*)offsets_header + 8;
-                    const size_t offsets_width  = get_header_width_direct(offsets_header);
-
-                    offset = to_size_t(GetDirect(offsets_data, offsets_width, ndx-1));
-                }
-
-                const uint8_t* const blob_header = (const uint8_t*)m_alloc.Translate(ref_blob);
-                const char* const blob_data = (const char*)blob_header + 8;
-
-                return (const char*)blob_data + offset;
-            }
-            else {
-                // short strings
-                if (width == 0) return "";
-                else return (const char*)(data + (ndx * width));
-            }
-        }
+        // Set vars for next iteration
+        header = static_cast<uint8_t*>(m_alloc.Translate(ref));
+        data   = reinterpret_cast<const char*>(header + 8);
+        width  = get_header_width_direct(header);
+        isNode = get_header_isnode_direct(header);
     }
+
+    const bool hasRefs = get_header_hasrefs_direct(header);
+    if (hasRefs) {
+        // long strings
+        const size_t ref_offsets = to_size_t(GetDirect(data, width, 0));
+        const size_t ref_blob    = to_size_t(GetDirect(data, width, 1));
+
+        size_t offset = 0;
+        if (ndx) {
+            const uint8_t* const offsets_header = static_cast<uint8_t*>(m_alloc.Translate(ref_offsets));
+            const char* const offsets_data = reinterpret_cast<const char*>(offsets_header) + 8;
+            const size_t offsets_width  = get_header_width_direct(offsets_header);
+
+            offset = to_size_t(GetDirect(offsets_data, offsets_width, ndx-1));
+        }
+
+        const uint8_t* const blob_header = static_cast<uint8_t*>(m_alloc.Translate(ref_blob));
+        const char* const blob_data = reinterpret_cast<const char*>(blob_header) + 8;
+
+        return blob_data + offset;
+    }
+
+    // short strings
+    if (width == 0) return "";
+    return data + (ndx * width);
 }
 
 // Find value direct through column b-tree without instatiating any Arrays.

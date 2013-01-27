@@ -66,10 +66,11 @@ class Group;
 /// coordinator process may run on each host.
 struct Replication {
     /// Create a Replication instance in its unattached state. To
-    /// attach it to a replication coordination buffer, call attach().
+    /// attach it to a replication coordination buffer, call open().
     /// You may test whether this instance is currently in its
-    /// attached state by calling is_attach(). Calling any other
-    /// method while in the unattached state has undefined behaviour.
+    /// attached state by calling is_attached(). Calling any other
+    /// method (except the destructor) while in the unattached state
+    /// has undefined behaviour.
     Replication() TIGHTDB_NOEXCEPT;
 
     ~Replication();
@@ -88,7 +89,7 @@ struct Replication {
     /// specific shared memory is mapped. When false, the transaction
     /// log buffer is not mapped. When used in conjunction with an
     /// instance of SharedGroup, this must always be true.
-    void attach(const std::string& path_to_database_file = "", bool map_transact_log_buf = true);
+    void open(const std::string& path_to_database_file = "", bool map_transact_log_buf = true);
 
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
@@ -364,8 +365,8 @@ inline Replication::Replication() TIGHTDB_NOEXCEPT:
     m_shared_state(0), m_interrupt(false), m_selected_table(0), m_selected_spec(0) {}
 
 
-inline void Replication::attach(const std::string& path_to_database_file,
-                                bool map_transact_log_buf)
+inline void Replication::open(const std::string& path_to_database_file,
+                              bool map_transact_log_buf)
 {
     error_code err = init(path_to_database_file, map_transact_log_buf);
     if (err) throw_error(err);

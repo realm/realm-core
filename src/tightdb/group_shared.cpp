@@ -45,30 +45,6 @@ struct SharedGroup::SharedInfo {
 };
 
 
-SharedGroup::SharedGroup(const string& path_to_database_file, bool no_create,
-                         DurabilityLevel dlevel):
-    m_group(Group::shared_tag()), m_version(-1)
-{
-    init(path_to_database_file, no_create, dlevel);
-}
-
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-SharedGroup::SharedGroup(replication_tag, const string& path_to_database_file,
-                         DurabilityLevel dlevel):
-    m_group(Group::shared_tag()), m_version(-1)
-{
-    m_replication.attach(path_to_database_file);
-    m_group.set_replication(&m_replication);
-
-    init(!path_to_database_file.empty() ? path_to_database_file :
-         Replication::get_path_to_database_file(), false, dlevel);
-}
-
-#endif
-
-
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
 // According to the 'process sharing example' in the POSIX man page
@@ -85,139 +61,137 @@ SharedGroup::SharedGroup(replication_tag, const string& path_to_database_file,
 // to reinitialize a shared mutex if the first initializing process
 // craches and leaves the shared memory in an undefined state.
 
-// Issues with current implementation:
+// FIXME: Issues with current implementation:
 //
 // - Possible reinitialization due to temporary unlocking during downgrade of file lock
 
-void SharedGroup::init(const string& path_to_database_file, bool no_create_file,
+void SharedGroup::open(const string& file, bool no_create_file,
                        DurabilityLevel dlevel)
 {
-    m_file_path = path_to_database_file + ".lock";
+    TIGHTDB_ASSERT(!is_attached());
 
-    bool need_init;
-    size_t len;
+    m_file_path = file + ".lock";
 
-open_start:
-    // Open shared coordination buffer
-    m_file.open(m_file_path, File::access_ReadWrite, File::create_Auto, 0);
+retry:
+    {
+        // Open shared coordination buffer
+        m_file.open(m_file_path, File::access_ReadWrite, File::create_Auto, 0);
+        File::CloseGuard fcg(m_file);
 
-    // FIXME: Need File::CloseGuard if init() becomes open()
+        // FIXME: Handle lock file removal in case of failure below
 
-    // FIXME: Handle lock file removal in case of failure below
+        bool need_init = false;
+        size_t len     = 0;
 
-    need_init = false;
-    len       = 0;
+        // If we can get an exclusive lock we know that the file is
+        // either new (empty) or a leftover from a previously
+        // crashed process (needing re-initialization)
+        if (m_file.try_lock_exclusive()) {
+            // There is a slight window between opening the file and getting the
+            // lock where another process could have deleted the file
+            if (m_file.is_deleted()) {
+                goto retry;
+            }
+            // Get size
+            if (int_cast_with_overflow_detect(m_file.get_size(), len))
+                throw runtime_error("Lock file too large");
 
-    // If we can get an exclusive lock we know that the file is
-    // either new (empty) or a leftover from a previously
-    // crashed process (needing re-initialization)
-    if (m_file.try_lock_exclusive()) {
-        // There is a slight window between opening the file and getting the
-        // lock where another process could have deleted the file
-        if (m_file.is_deleted()) {
-            m_file.close();
-            goto open_start; // retry
+            // Handle empty files (first user)
+            if (len == 0) {
+                // Create new file
+                len = sizeof (SharedInfo);
+                m_file.resize(len);
+            }
+            need_init = true;
         }
-        // Get size
-        if (int_cast_with_overflow_detect(m_file.get_size(), len))
-            throw runtime_error("Lock file too large");
+        else {
+            m_file.lock_shared();
 
-        // Handle empty files (first user)
-        if (len == 0) {
-            // Create new file
-            len = sizeof (SharedInfo);
-            m_file.resize(len);
+            // Get size
+            if (int_cast_with_overflow_detect(m_file.get_size(), len))
+                throw runtime_error("Lock file too large");
+
+            // There is a slight window between opening the file and getting the
+            // lock where another process could have deleted the file
+            if (len == 0 || m_file.is_deleted()) {
+                goto retry;
+            }
         }
-        need_init = true;
-    }
-    else {
-        m_file.lock_shared();
 
-        // Get size
-        if (int_cast_with_overflow_detect(m_file.get_size(), len))
-            throw runtime_error("Lock file too large");
+        // Map to memory
+        m_file_map.map(m_file, File::access_ReadWrite, File::map_NoSync);
+        File::UnmapGuard fug(m_file_map);
 
-        // There is a slight window between opening the file and getting the
-        // lock where another process could have deleted the file
-        if (len == 0 || m_file.is_deleted()) {
-            m_file.close();
-            goto open_start; // retry
+        SharedInfo* const info = m_file_map.get_addr();
+
+        if (need_init) {
+            // If we are the first we may have to create the database file
+            // but we invalidate the internals right after to avoid conflicting
+            // with old state when starting transactions
+            const Group::OpenMode group_open_mode =
+                no_create_file ? Group::mode_NoCreate : Group::mode_Normal;
+            m_group.create_from_file(file, group_open_mode, true);
+            m_group.invalidate();
+
+            // Initialize mutexes so that they can be shared between processes
+            pthread_mutexattr_t mattr;
+            pthread_mutexattr_init(&mattr);
+            // FIXME: Must verify availability of optional feature: #ifdef _POSIX_THREAD_PROCESS_SHARED
+            pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+            // FIXME: Should also do pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST). Check for availability with: #if _POSIX_THREADS >= 200809L
+            pthread_mutex_init(&info->readmutex, &mattr);
+            pthread_mutex_init(&info->writemutex, &mattr);
+            pthread_mutexattr_destroy(&mattr);
+
+            SlabAlloc& alloc = m_group.get_allocator();
+
+            // Set initial values
+            info->version  = 0;
+            info->flags    = dlevel; // durability level is fixed from creation
+            info->filesize = alloc.GetFileLen();
+            info->infosize = (uint32_t)len;
+            info->current_top = alloc.GetTopRef();
+            info->current_version = 0;
+            info->capacity = 32-1;
+            info->put_pos  = 0;
+            info->get_pos  = 0;
+
+            // Set initial version so we can track if other instances
+            // change the db
+            m_version = 0;
+
+            // FIXME: This downgrading of the lock is not guaranteed to be atomic
+
+            // Downgrade lock to shared now that it is initialized,
+            // so other processes can share it as well
+            m_file.unlock();
+            m_file.lock_shared();
         }
+        else {
+            if (info->version != 0)
+                throw runtime_error("Unsupported version");
+
+            // Durability level cannot be changed at runtime
+            if (info->flags != dlevel)
+                throw runtime_error("Inconsistent durability level");
+
+            // Setup the group, but leave it in invalid state
+            m_group.create_from_file(file, Group::mode_NoCreate, false);
+        }
+
+        fug.release(); // Do not unmap
+        fcg.release(); // Do not close
     }
-
-    // Map to memory
-    m_file_map.map(m_file, File::access_ReadWrite, File::map_NoSync);
-
-    // FIXME: Need File::UnampGuard if init() becomes open()
-
-    SharedInfo* const info = m_file_map.get_addr();
-
-    if (need_init) {
-        // If we are the first we may have to create the database file
-        // but we invalidate the internals right after to avoid conflicting
-        // with old state when starting transactions
-        const Group::OpenMode group_open_mode =
-            no_create_file ? Group::mode_NoCreate : Group::mode_Normal;
-        m_group.create_from_file(path_to_database_file, group_open_mode, true);
-        m_group.invalidate();
-
-        // Initialize mutexes so that they can be shared between processes
-        pthread_mutexattr_t mattr;
-        pthread_mutexattr_init(&mattr);
-        // FIXME: Must verify availability of optional feature: #ifdef _POSIX_THREAD_PROCESS_SHARED
-        pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
-        // FIXME: Should also do pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST). Check for availability with: #if _POSIX_THREADS >= 200809L
-        pthread_mutex_init(&info->readmutex, &mattr);
-        pthread_mutex_init(&info->writemutex, &mattr);
-        pthread_mutexattr_destroy(&mattr);
-
-        SlabAlloc& alloc = m_group.get_allocator();
-
-        // Set initial values
-        info->version  = 0;
-        info->flags    = dlevel; // durability level is fixed from creation
-        info->filesize = alloc.GetFileLen();
-        info->infosize = (uint32_t)len;
-        info->current_top = alloc.GetTopRef();
-        info->current_version = 0;
-        info->capacity = 32-1;
-        info->put_pos  = 0;
-        info->get_pos  = 0;
-
-        // Set initial version so we can track if other instances
-        // change the db
-        m_version = 0;
-
-        // FIXME: This downgrading of the lock is not guaranteed to be atomic
-
-        // Downgrade lock to shared now that it is initialized,
-        // so other processes can share it as well
-        m_file.unlock();
-        m_file.lock_shared();
-    }
-    else {
-        if (info->version != 0)
-            return; // unsupported version
-
-        // Durability level cannot be changed at runtime
-        if (info->flags != dlevel)
-            return;
-
-        // Setup the group, but leave it in invalid state
-        m_group.create_from_file(path_to_database_file, Group::mode_NoCreate, false);
-    }
-
-//    m_isValid = true;
 
 #ifdef TIGHTDB_DEBUG
-    m_state = SHARED_STATE_READY;
+    m_transact_stage = transact_Ready;
 #endif
 }
 
 
 SharedGroup::~SharedGroup()
 {
-    TIGHTDB_ASSERT(m_state == SHARED_STATE_READY);
+    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
     // If we can get an exclusive lock on the file we know that we are
     // the only user (since all users take at least shared locks on
@@ -261,7 +235,7 @@ bool SharedGroup::has_changed() const
 
 const Group& SharedGroup::begin_read()
 {
-    TIGHTDB_ASSERT(m_state == SHARED_STATE_READY);
+    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
     TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
 
     size_t new_topref = 0;
@@ -298,7 +272,7 @@ const Group& SharedGroup::begin_read()
     m_group.update_from_shared(new_topref, new_filesize);
 
 #ifdef TIGHTDB_DEBUG
-    m_state = SHARED_STATE_READING;
+    m_transact_stage = transact_Reading;
     m_group.Verify();
 #endif
 
@@ -307,16 +281,22 @@ const Group& SharedGroup::begin_read()
 
 void SharedGroup::end_read()
 {
-    TIGHTDB_ASSERT(m_state == SHARED_STATE_READING);
-    TIGHTDB_ASSERT(m_version != (uint32_t)-1);
+    TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
+    TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
     SharedInfo* const info = m_file_map.get_addr();
 
     pthread_mutex_lock(&info->readmutex);
     {
+        // FIXME: m_version may well be a 64-bit integer so this cast
+        // to uint32_t seems quite dangerous. Should the type of
+        // m_version be changed to uint32_t? The problem with uint32_t
+        // is that it is not part of C++03. It was introduced in C++11
+        // though.
+
         // Find entry for current version
-        const size_t ndx = ringbuf_find((uint32_t)m_version);
-        TIGHTDB_ASSERT(ndx != (size_t)-1);
+        const size_t ndx = ringbuf_find(uint32_t(m_version));
+        TIGHTDB_ASSERT(ndx != size_t(-1));
         ReadCount& r = ringbuf_get(ndx);
 
         // Decrement count and remove as many entries as possible
@@ -337,13 +317,13 @@ void SharedGroup::end_read()
     m_group.invalidate();
 
 #ifdef TIGHTDB_DEBUG
-    m_state = SHARED_STATE_READY;
+    m_transact_stage = transact_Ready;
 #endif
 }
 
 Group& SharedGroup::begin_write()
 {
-    TIGHTDB_ASSERT(m_state == SHARED_STATE_READY);
+    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
     TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -369,7 +349,7 @@ Group& SharedGroup::begin_write()
     m_group.update_from_shared(new_topref, new_filesize);
 
 #ifdef TIGHTDB_DEBUG
-    m_state = SHARED_STATE_WRITING;
+    m_transact_stage = transact_Writing;
     m_group.Verify();
 #endif
 
@@ -378,7 +358,7 @@ Group& SharedGroup::begin_write()
 
 void SharedGroup::commit()
 {
-    TIGHTDB_ASSERT(m_state == SHARED_STATE_WRITING);
+    TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
     SharedInfo* const info = m_file_map.get_addr();
 
@@ -430,7 +410,7 @@ void SharedGroup::commit()
     m_group.invalidate();
 
 #ifdef TIGHTDB_DEBUG
-    m_state = SHARED_STATE_READY;
+    m_transact_stage = transact_Ready;
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -442,7 +422,7 @@ void SharedGroup::commit()
 
 void SharedGroup::rollback()
 {
-    TIGHTDB_ASSERT(m_state == SHARED_STATE_WRITING);
+    TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
     // Clear all changes made during transaction
     m_group.rollback();
@@ -455,7 +435,7 @@ void SharedGroup::rollback()
     m_group.invalidate();
 
 #ifdef TIGHTDB_DEBUG
-    m_state = SHARED_STATE_READY;
+    m_transact_stage = transact_Ready;
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

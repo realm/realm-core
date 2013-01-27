@@ -34,23 +34,12 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
 // Creates new array (but invalid, call UpdateRef to init)
 //ArrayStringLong::ArrayStringLong(Allocator& alloc) : Array(alloc) {}
 
-ArrayStringLong::~ArrayStringLong() {}
-
-bool ArrayStringLong::is_empty() const
-{
-    return m_offsets.is_empty();
-}
-size_t ArrayStringLong::Size() const
-{
-    return m_offsets.Size();
-}
-
-const char* ArrayStringLong::Get(size_t ndx) const
+const char* ArrayStringLong::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_offsets.Size());
 
-    const size_t offset = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
-    return (const char*)m_blob.Get(offset);
+    const size_t offset = ndx ? size_t(m_offsets.Get(ndx-1)) : 0;
+    return m_blob.Get(offset);
 }
 
 void ArrayStringLong::add(const char* value)

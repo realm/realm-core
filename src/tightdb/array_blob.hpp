@@ -32,9 +32,8 @@ public:
     ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx,
               Allocator& alloc = Allocator::get_default());
     ArrayBlob(Allocator& alloc);
-    ~ArrayBlob();
 
-    const char* Get(size_t pos) const;
+    const char* Get(size_t pos) const TIGHTDB_NOEXCEPT;
 
     void add(const char* data, size_t len);
     void Insert(size_t pos, const char* data, size_t len);
@@ -49,9 +48,75 @@ public:
 
 private:
     virtual size_t CalcByteLen(size_t count, size_t width) const;
-    virtual size_t CalcItemCount(size_t bytes, size_t width) const;
+    virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const {return TDB_IGNORE;}
 };
+
+
+
+
+// Implementation:
+
+inline ArrayBlob::ArrayBlob(ArrayParent *parent, std::size_t pndx, Allocator& alloc):
+    Array(COLUMN_NORMAL, parent, pndx, alloc)
+{
+    // Manually set wtype as array constructor in initiatializer list
+    // will not be able to call correct virtual function
+    set_header_wtype(TDB_IGNORE);
+}
+
+inline ArrayBlob::ArrayBlob(std::size_t ref, const ArrayParent *parent, std::size_t pndx,
+                            Allocator& alloc): Array(alloc)
+{
+    // Manually create array as doing it in initializer list
+    // will not be able to call correct virtual functions
+    init_from_ref(ref);
+    SetParent(const_cast<ArrayParent *>(parent), pndx);
+}
+
+// Creates new array (but invalid, call UpdateRef to init)
+inline ArrayBlob::ArrayBlob(Allocator& alloc) : Array(alloc) {}
+
+inline const char* ArrayBlob::Get(std::size_t pos) const TIGHTDB_NOEXCEPT
+{
+    return reinterpret_cast<const char*>(m_data) + pos;
+}
+
+inline void ArrayBlob::add(const char* data, std::size_t len)
+{
+    Replace(m_len, m_len, data, len);
+}
+
+inline void ArrayBlob::Insert(std::size_t pos, const char* data, std::size_t len)
+{
+    Replace(pos, pos, data, len);
+}
+
+inline void ArrayBlob::Delete(std::size_t start, std::size_t end)
+{
+    Replace(start, end, 0, 0);
+}
+
+inline void ArrayBlob::Resize(std::size_t len)
+{
+    TIGHTDB_ASSERT(len <= m_len);
+    Replace(len, m_len, 0, 0);
+}
+
+inline void ArrayBlob::Clear()
+{
+    Replace(0, m_len, 0, 0);
+}
+
+inline std::size_t ArrayBlob::CalcByteLen(std::size_t count, std::size_t) const
+{
+    return 8 + count; // include room for header
+}
+
+inline std::size_t ArrayBlob::CalcItemCount(std::size_t bytes, std::size_t) const TIGHTDB_NOEXCEPT
+{
+    return bytes - 8;
+}
 
 
 } // namespace tightdb

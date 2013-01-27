@@ -68,9 +68,9 @@ public:
     void SetParent(ArrayParent* parent, size_t pndx);
     void UpdateFromParent();
 
-    ColumnType GetType(size_t ndx) const;
-    size_t Size() const {return m_types->Size();}
-    bool is_empty() const {return m_types->is_empty();}
+    ColumnType GetType(size_t ndx) const TIGHTDB_NOEXCEPT;
+    virtual size_t Size() const TIGHTDB_NOEXCEPT {return m_types->Size();}
+    bool is_empty() const TIGHTDB_NOEXCEPT {return m_types->is_empty();}
 
     int64_t GetInt(size_t ndx) const;
     bool get_bool(size_t ndx) const;
@@ -80,7 +80,7 @@ public:
 
     /// The returned size is zero if the specified row does not
     /// contain a subtable.
-    size_t get_subtable_size(std::size_t row_idx) const;
+    size_t get_subtable_size(std::size_t row_idx) const TIGHTDB_NOEXCEPT;
 
     /// Returns null if the specified row does not contain a subtable,
     /// otherwise the returned table pointer must end up being wrapped
@@ -175,7 +175,7 @@ inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_
     Create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
 }
 
-inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const
+inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXCEPT
 {
     // FIXME: If the table object is cached, it is possible to get the
     // size from it. Maybe it is faster in general to check for the
@@ -183,8 +183,8 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const
     TIGHTDB_ASSERT(row_idx < m_types->Size());
     if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
     const size_t top_ref = m_refs->GetAsRef(row_idx);
-    const size_t columns_ref = Array(top_ref, NULL, 0, m_refs->GetAllocator()).GetAsRef(1);
-    const Array columns(columns_ref, NULL, 0, m_refs->GetAllocator());
+    const size_t columns_ref = Array(top_ref, 0, 0, m_refs->GetAllocator()).GetAsRef(1);
+    const Array columns(columns_ref, 0, 0, m_refs->GetAllocator());
     if (columns.is_empty()) return 0;
     const size_t first_col_ref = columns.GetAsRef(0);
     return get_size_from_ref(first_col_ref, m_refs->GetAllocator());

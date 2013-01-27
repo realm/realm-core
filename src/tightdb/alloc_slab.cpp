@@ -132,7 +132,7 @@ MemRef SlabAlloc::Alloc(size_t size)
     // Add to slab table
     Slabs::Cursor s = m_slabs.add(); // FIXME: Use the immediate form add()
     s.offset = slabsBack + newsize;
-    s.pointer = (intptr_t)slab;
+    s.pointer = reinterpret_cast<int64_t>(slab);
 
     // Update free list
     const size_t rest = newsize - size;
@@ -149,6 +149,9 @@ MemRef SlabAlloc::Alloc(size_t size)
     return MemRef(slab, slabsBack);
 }
 
+// FIXME: We need to come up with a way to make Free() a method that
+// never throws. This is essential for exception safety in large parts
+// of the TightDB API.
 void SlabAlloc::Free(size_t ref, void* p)
 {
     // Free space in read only segment is tracked separately
@@ -231,7 +234,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
     return space;
 }
 
-void* SlabAlloc::Translate(size_t ref) const
+void* SlabAlloc::Translate(size_t ref) const TIGHTDB_NOEXCEPT
 {
     if (ref < m_baseline) return m_data + ref;
     else {
@@ -239,7 +242,7 @@ void* SlabAlloc::Translate(size_t ref) const
         TIGHTDB_ASSERT(ndx != not_found);
 
         const size_t offset = ndx ? size_t(m_slabs[ndx-1].offset) : m_baseline;
-        return (char*)(intptr_t)m_slabs[ndx].pointer + (ref - offset);
+        return reinterpret_cast<char*>(m_slabs[ndx].pointer.get()) + (ref - offset);
     }
 }
 
@@ -249,18 +252,7 @@ bool SlabAlloc::IsReadOnly(size_t ref) const
 }
 
 
-void SlabAlloc::set_buffer(char* data, size_t size, bool take_ownership)
-{
-    // Verify the data structures
-    if (!validate_buffer(data, size)) throw InvalidDatabase();
-
-    m_data      = data;
-    m_baseline  = size;
-    m_free_mode = take_ownership ? free_Unalloc : free_Noop;
-}
-
-
-void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, bool no_create)
+void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create)
 {
     // When 'read_only' is true, this function will throw
     // InvalidDatabase if the file exists already but is empty. This
@@ -326,6 +318,18 @@ void SlabAlloc::map_file(const string& path, bool is_shared, bool read_only, boo
     throw InvalidDatabase();
 }
 
+
+void SlabAlloc::attach_buffer(char* data, size_t size, bool take_ownership)
+{
+    // Verify the data structures
+    if (!validate_buffer(data, size)) throw InvalidDatabase();
+
+    m_data      = data;
+    m_baseline  = size;
+    m_free_mode = take_ownership ? free_Unalloc : free_Noop;
+}
+
+
 bool SlabAlloc::validate_buffer(const char* data, size_t len) const
 {
     // Verify that data is 64bit aligned
@@ -367,7 +371,7 @@ bool SlabAlloc::CanPersist() const
     return m_data != 0;
 }
 
-size_t SlabAlloc::GetTopRef() const
+size_t SlabAlloc::GetTopRef() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_data && m_baseline > 0);
 

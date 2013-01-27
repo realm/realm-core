@@ -110,8 +110,8 @@ typedef struct {
     unsigned long long result;
 } checksum_t;
 
-size_t to_ref(int64_t v);
-size_t to_size_t(int64_t v);
+std::size_t to_ref(int64_t) TIGHTDB_NOEXCEPT;
+std::size_t to_size_t(int64_t) TIGHTDB_NOEXCEPT;
 void cpuid_init();
 unsigned long long checksum(unsigned char* data, size_t len);
 void checksum_rolling(unsigned char* data, size_t len, checksum_t* t);
@@ -121,7 +121,38 @@ size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
 void checksum_init(checksum_t* t);
 
+
+
+
+// Implementation:
+
+inline std::size_t to_ref(int64_t v) TIGHTDB_NOEXCEPT
+{
+#ifdef TIGHTDB_DEBUG
+    uint64_t m = std::size_t(-1);
+    TIGHTDB_ASSERT(uint64_t(v) <= m);
+    // FIXME: This misbehaves for negative v when size_t is 64-bits.
+    // FIXME: This misbehaves on architectures that do not use 2's complement represenation of negative numbers.
+    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
+    // FIXME: Must also check that v is divisible by 8 (64-bit aligned).
+#endif
+    return std::size_t(v);
 }
+
+// Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
+inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
+{
+#ifdef TIGHTDB_DEBUG
+    uint64_t m = std::size_t(-1);
+    TIGHTDB_ASSERT(uint64_t(v) <= m);
+    // FIXME: This misbehaves for negative v when size_t is 64-bits.
+    // FIXME: This misbehaves on architectures that do not use 2's complement represenation of negative numbers.
+    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
+#endif
+    return std::size_t(v);
+}
+
+} // namespace tightdb
 
 #endif // TIGHTDB_UTILITIES_HPP
 

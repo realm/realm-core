@@ -29,7 +29,7 @@ void Allocator::Free(size_t, void* addr)
     free(addr);
 }
 
-void* Allocator::Translate(size_t ref) const
+void* Allocator::Translate(size_t ref) const TIGHTDB_NOEXCEPT
 {
     return reinterpret_cast<void*>(ref);
 }
@@ -39,7 +39,7 @@ bool Allocator::IsReadOnly(size_t) const
     return false;
 }
 
-Allocator& Allocator::get_default()
+Allocator& Allocator::get_default() TIGHTDB_NOEXCEPT
 {
     static Allocator default_alloc;
     return default_alloc;

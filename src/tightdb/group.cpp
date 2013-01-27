@@ -101,44 +101,11 @@ private:
 
 namespace tightdb {
 
-Group::Group():
-    m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
-    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc),
-    m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc),
-    m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_is_shared(false)
-{
-    create();
-}
-
-Group::Group(const string& filename, OpenMode mode):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
-    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
-{
-    create_from_file(filename, mode, true);
-}
-
-Group::Group(BufferSpec buffer, bool take_ownership):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
-    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
-{
-    TIGHTDB_ASSERT(buffer.m_data);
-
-    // Memory map file
-    m_alloc.set_buffer(buffer.m_data, buffer.m_size, take_ownership);
-
-    const size_t top_ref = m_alloc.GetTopRef();
-    create_from_ref(top_ref);
-}
-
-Group::Group(shared_tag):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
-    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(true) {}
-
 void Group::create_from_file(const string& filename, OpenMode mode, bool do_init)
 {
     // Memory map file
     // This leaves the group ready, but in invalid state
-    m_alloc.map_file(filename, m_is_shared, mode == mode_ReadOnly, mode == mode_NoCreate);
+    m_alloc.attach_file(filename, m_is_shared, mode == mode_ReadOnly, mode == mode_NoCreate);
 
     if (!do_init)  return;
 
@@ -147,7 +114,7 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
     if (m_is_shared && m_alloc.GetTopRef() == 0) return;
 
     const size_t top_ref = m_alloc.GetTopRef();
-    create_from_ref(top_ref);
+    create_from_ref(top_ref); // FIXME: Throws and leaves the Group in peril
 }
 
 // Create a new memory structure and attach this group instance to it.
@@ -337,37 +304,6 @@ void Group::invalidate()
     // to clean up
     // TODO: This is also done in commit(), fix to do it only once
     m_alloc.FreeAll();
-}
-
-// FIXME: Should be moved to header file and be made inlineable
-bool Group::is_empty() const
-{
-    if (!m_top.IsValid()) return true;
-
-    return m_tableNames.is_empty();
-}
-
-// FIXME: Should be moved to header file and be made inlineable
-bool Group::in_initial_state() const
-{
-    return !m_top.IsValid();
-}
-
-// FIXME: Should be moved to header file and be made inlineable
-size_t Group::get_table_count() const
-{
-    if (!m_top.IsValid()) return 0;
-
-    return m_tableNames.Size();
-}
-
-// FIXME: Should be moved to header file and be made inlineable
-const char* Group::get_table_name(size_t table_ndx) const
-{
-    TIGHTDB_ASSERT(m_top.IsValid());
-    TIGHTDB_ASSERT(table_ndx < m_tableNames.Size());
-
-    return m_tableNames.Get(table_ndx);
 }
 
 Table* Group::get_table_ptr(size_t ndx)

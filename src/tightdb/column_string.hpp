@@ -38,12 +38,12 @@ public:
 
     void Destroy();
 
-    bool IsStringColumn() const {return true;}
+    bool IsStringColumn() const TIGHTDB_NOEXCEPT {return true;}
 
-    size_t Size() const;
-    bool is_empty() const;
+    virtual size_t Size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const TIGHTDB_NOEXCEPT;
 
-    const char* Get(size_t ndx) const;
+    const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
     virtual bool add() {return add("");}
     bool add(const char* value);
     bool Set(size_t ndx, const char* value);
@@ -84,7 +84,7 @@ protected:
     friend class ColumnBase;
     void UpdateRef(size_t ref);
 
-    const char* LeafGet(size_t ndx) const;
+    const char* LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     bool LeafSet(size_t ndx, const char* value);
     bool LeafInsert(size_t ndx, const char* value);
     template<class F> size_t LeafFind(const char* value, size_t start, size_t end) const;
@@ -92,7 +92,7 @@ protected:
 
     void LeafDelete(size_t ndx);
 
-    bool IsLongStrings() const {return m_array->HasRefs();} // HasRefs indicates long string array
+    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();} // HasRefs indicates long string array
 
     bool FindKeyPos(const char* target, size_t& pos) const;
 
