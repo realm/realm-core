@@ -28,17 +28,17 @@ namespace tightdb {
 
 class Date {
 public:
-    Date(): m_time(0) {}
+    Date() TIGHTDB_NOEXCEPT: m_time(0) {}
 
     /// Construct from the number of seconds since Jan 1 00:00:00 UTC
     /// 1970.
-    Date(std::time_t d): m_time(d) {}
+    Date(std::time_t d) TIGHTDB_NOEXCEPT: m_time(d) {}
 
     /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.
-    std::time_t get_date() const { return m_time; }
+    std::time_t get_date() const TIGHTDB_NOEXCEPT { return m_time; }
 
-    bool operator==(const Date& d) const { return m_time == d.m_time; }
-    bool operator!=(const Date& d) const { return m_time != d.m_time; }
+    bool operator==(const Date& d) const TIGHTDB_NOEXCEPT { return m_time == d.m_time; }
+    bool operator!=(const Date& d) const TIGHTDB_NOEXCEPT { return m_time != d.m_time; }
 
     /// Construct from broken down local time.
     ///

@@ -69,7 +69,7 @@ public:
 
 inline Table* LangBindHelper::new_table()
 {
-    Allocator& alloc = GetDefaultAllocator();
+    Allocator& alloc = Allocator::get_default();
     const size_t ref = Table::create_empty_table(alloc);
     if (!ref) return 0;
     Table* const table = new (std::nothrow) Table(Table::RefCountTag(), alloc, ref, 0, 0);

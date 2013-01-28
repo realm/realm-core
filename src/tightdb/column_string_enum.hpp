@@ -30,14 +30,11 @@ class StringIndex;
 class ColumnStringEnum : public Column {
 public:
     ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent* parent=NULL, size_t pndx=0,
-                     Allocator& alloc=GetDefaultAllocator());
+                     Allocator& alloc = Allocator::get_default());
     ~ColumnStringEnum();
     void Destroy();
 
-    size_t Size() const;
-    bool is_empty() const;
-
-    const char* Get(size_t ndx) const;
+    const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
     bool add(const char* value);
     bool Set(size_t ndx, const char* value);
     bool Insert(size_t ndx, const char* value);

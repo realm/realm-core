@@ -28,11 +28,11 @@
 
 namespace tightdb {
 
-template<class T> T GetColumnFromRef(Array& parent, size_t ndx)
+template<class T> T GetColumnFromRef(Array& parent, size_t ndx) // Throws
 {
     //TIGHTDB_ASSERT(parent.HasRefs());
     //TIGHTDB_ASSERT(ndx < parent.Size());
-    return T(size_t(parent.Get(ndx)), &parent, ndx, parent.GetAllocator());
+    return T(size_t(parent.Get(ndx)), &parent, ndx, parent.GetAllocator()); // Throws
 }
 
 template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const
@@ -50,7 +50,7 @@ template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const
         const size_t local_ndx = ndx - offset;
 
         // Get item
-        const C target = GetColumnFromRef<C>(refs, node_ndx);
+        const C target = GetColumnFromRef<C>(refs, node_ndx); // Throws
         return target.template TreeGet<T,C>(local_ndx);
     }
     else {

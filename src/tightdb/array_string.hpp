@@ -20,18 +20,21 @@
 #ifndef TIGHTDB_ARRAY_STRING_HPP
 #define TIGHTDB_ARRAY_STRING_HPP
 
+#include <cstring>
+
 #include <tightdb/array.hpp>
 
 namespace tightdb {
 
 class ArrayString : public Array {
 public:
-    ArrayString(ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    ArrayString(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
+    ArrayString(ArrayParent *parent=NULL, size_t pndx=0,
+                Allocator& alloc = Allocator::get_default());
+    ArrayString(size_t ref, const ArrayParent *parent, size_t pndx,
+                Allocator& alloc = Allocator::get_default());
     ArrayString(Allocator& alloc);
-    ~ArrayString();
 
-    const char* Get(size_t ndx) const;
+    const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
     bool add();
     bool add(const char* value);
     bool Set(size_t ndx, const char* c_str);
@@ -63,7 +66,7 @@ public:
 private:
     size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
     virtual size_t CalcByteLen(size_t count, size_t width) const;
-    virtual size_t CalcItemCount(size_t bytes, size_t width) const;
+    virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const {return TDB_MULTIPLY;}
 };
 
@@ -100,7 +103,21 @@ inline ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t nd
 // Creates new array (but invalid, call UpdateRef to init)
 inline ArrayString::ArrayString(Allocator& alloc): Array(alloc) {}
 
-inline ArrayString::~ArrayString() {}
+inline const char* ArrayString::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < m_len);
+
+    if (m_width == 0) return "";
+    else return reinterpret_cast<char*>(m_data + (ndx * m_width));
+}
+
+inline bool ArrayString::Set(std::size_t ndx, const char* value)
+{
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(value);
+
+    return Set(ndx, value, std::strlen(value));
+}
 
 
 } // namespace tightdb

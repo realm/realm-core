@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iomanip>
 
-#include <unistd.h>
+#include <pthread.h>
 
 #include <UnitTest++.h>
 
@@ -16,10 +16,6 @@ using namespace std;
 using namespace tightdb;
 
 namespace {
-
-// Todo, fixme, set to 1024 when binary size limit is fixed
-//const size_t MAX_BIN_SIZE = 1024;
-const size_t MAX_BIN_SIZE = 512;
 
 template<class T> struct mem_buf {
     mem_buf(std::size_t size): m_ptr(new T[size]) {}
@@ -58,13 +54,16 @@ TIGHTDB_TABLE_8(MyTable,
 const int num_threads = 23;
 const int num_rounds  = 2;
 
+// FIXME: Set to 1024 when binary size limit is fixed
+const size_t max_bin_size = 1024;
 
-void round(SharedGroup* db, int index)
+
+void round(SharedGroup& db, int index)
 {
     // Testing all value types
     {
-        Group& group = db->begin_write(); // Write transaction #1
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #1
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         if (table->is_empty()) {
             table->add();
             table->add(0, false, moja, time_t(), "", BinaryData(0,0), 0, Mixed(int64_t()));
@@ -72,29 +71,28 @@ void round(SharedGroup* db, int index)
             table->add(749321, true, kumi_na_tatu, time_t(99992), "click",
                        BinaryData(binary_data, sizeof(binary_data)), 0, Mixed("fido"));
         }
+        wt.commit();
     }
-    db->commit();
 
     // Add more rows
     {
-        Group& group = db->begin_write(); // Write transaction #2
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #2
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         if (table->size() < 100) for (int i=0; i<10; ++i) table->add();
         ++table[0].alpha;
+        wt.commit();
     }
-    db->commit();
 
     // Testing empty transaction
     {
-        Group& group = db->begin_write(); // Write transaction #3
-        static_cast<void>(group);
+        WriteTransaction wt(db); // Write transaction #3
+        wt.commit();
     }
-    db->commit();
 
     // Testing subtables
     {
-        Group& group = db->begin_write(); // Write transaction #4
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #4
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
         if (subtable->is_empty()) {
             subtable->add(0, 0);
@@ -102,50 +100,49 @@ void round(SharedGroup* db, int index)
             subtable->add(0, 0);
         }
         ++table[0].alpha;
+        wt.commit();
     }
-    db->commit();
 
     // Testing subtables within subtables
     {
-        Group& group = db->begin_write(); // Write transaction #5
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #5
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         ++table[0].alpha;
         MySubtable::Ref subtable = table[0].eta;
         ++subtable[0].foo;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        for (int i=subsubtable->size(); i<=index; ++i) {
+        for (int i=int(subsubtable->size()); i<=index; ++i) {
             subsubtable->add();
         }
         ++table[0].alpha;
+        wt.commit();
     }
-    db->commit();
 
     // Testing remove row
     {
-        Group& group = db->begin_write(); // Write transaction #6
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #6
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         if (3 <= table->size()) {
             if (table[2].alpha == 749321) table->remove(1);
             else table->remove(2);
         }
         MySubtable::Ref subtable = table[0].eta;
         ++subtable[0].foo;
+        wt.commit();
     }
-    db->commit();
 
     // Testing read transaction
     {
-        const Group& group = db->begin_read();
-        MyTable::ConstRef table = group.get_table<MyTable>("my_table");
+        ReadTransaction rt(db);
+        MyTable::ConstRef table = rt.get_table<MyTable>("my_table");
         CHECK_EQUAL(749321, table[1].alpha);
         MySubtable::ConstRef subtable = table[0].eta;
         CHECK_EQUAL(100, subtable[1].foo);
     }
-    db->end_read();
 
     {
-        Group& group = db->begin_write(); // Write transaction #7
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #7
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
         subsubtable[index].value = index;
@@ -153,58 +150,58 @@ void round(SharedGroup* db, int index)
         subsubtable[index].value += 2;
         ++subtable[0].foo;
         subsubtable[index].value += 2;
+        wt.commit();
     }
-    db->commit();
 
     // Testing rollback
     {
-        Group& group = db->begin_write(); // Write transaction #8
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #8
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
         ++table[0].alpha;
         subsubtable[index].value += 2;
         ++subtable[0].foo;
         subsubtable[index].value += 2;
+        // Note: Implicit rollback
     }
-    db->rollback();
 
     // Testing large chunks of data
     {
-        Group& group = db->begin_write(); // Write transaction #9
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #9
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        const size_t size = (512 + index%1024) * MAX_BIN_SIZE;
+        const size_t size = (512 + index%1024) * max_bin_size;
         mem_buf<char> data(size);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index) * 677 % 256);
         subsubtable[index].binary = BinaryData(data.get(), size);
+        wt.commit();
     }
-    db->commit();
 
     {
-        Group& group = db->begin_write(); // Write transaction #10
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #10
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
         subtable[2].foo = index*677;
+        wt.commit();
     }
-    db->commit();
 
     {
-        Group& group = db->begin_write(); // Write transaction #11
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
-        const size_t size = (512 + (333 + 677*index) % 1024) * MAX_BIN_SIZE;
+        WriteTransaction wt(db); // Write transaction #11
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
+        const size_t size = (512 + (333 + 677*index) % 1024) * max_bin_size;
         mem_buf<char> data(size);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
         table[index%2].zeta = BinaryData(data.get(), size);
+        wt.commit();
     }
-    db->commit();
 
     {
-        Group& group = db->begin_write(); // Write transaction #12
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #12
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
         subsubtable[index].value += 1000;
@@ -212,24 +209,24 @@ void round(SharedGroup* db, int index)
         subsubtable[index].value -= 2;
         --subtable[0].foo;
         subsubtable[index].value -= 2;
+        wt.commit();
     }
-    db->commit();
 
     {
-        Group& group = db->begin_write(); // Write transaction #13
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #13
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         const size_t size = (512 + (333 + 677*index) % 1024) * 327;
         mem_buf<char> data(size);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
         table[(index+1)%2].zeta = BinaryData(data.get(), size);
+        wt.commit();
     }
-    db->commit();
 
     // Testing subtables in mixed column
     {
-        Group& group = db->begin_write(); // Write transaction #14
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #14
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable;
         if (table[1].theta.get_type() == COLUMN_TYPE_TABLE) {
             subtable = table[1].theta.get_subtable<MyTable>();
@@ -252,23 +249,23 @@ void round(SharedGroup* db, int index)
             subtable->add(6, false, saba,  time_t(), "eta",     bin, 0, mix);
             subtable->add(7, false, nane,  time_t(), "theta",   bin, 0, mix);
         }
+        wt.commit();
     }
-    db->commit();
 
     // Testing table optimization (unique strings enumeration)
     {
-        Group& group = db->begin_write(); // Write transaction #15
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #15
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         table->optimize();
         MyTable::Ref subtable = table[1].theta.get_subtable<MyTable>();
         subtable->optimize();
+        wt.commit();
     }
-    db->commit();
 
     // Testing all mixed types
     {
-        Group& group = db->begin_write(); // Write transaction #16
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #16
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable = table[1].theta.get_subtable<MyTable>();
         MyTable::Ref subsubtable;
         if (subtable[0].theta.get_type() == COLUMN_TYPE_TABLE) {
@@ -287,13 +284,13 @@ void round(SharedGroup* db, int index)
         subsubtable->add(2, false, sita, 0, "", bin, 0, Mixed(Date(index*13)));
         subsubtable->add(3, false, saba, 0, "", bin, 0, Mixed("click"));
         subsubtable->add(4, false, nane, 0, "", bin, 0, Mixed(bin));
+        wt.commit();
     }
-    db->commit();
 
     // Testing clearing of table with multiple subtables
     {
-        Group& group = db->begin_write(); // Write transaction #17
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #17
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable = table[1].theta.get_subtable<MyTable>();
         MySubtable::Ref subsubtable;
         if (subtable[1].theta.get_type() == COLUMN_TYPE_TABLE) {
@@ -316,22 +313,22 @@ void round(SharedGroup* db, int index)
                 subsubsubtables[j]->add((i-j)*index-19, bin);
             }
         }
+        wt.commit();
     }
-    db->commit();
 
     {
-        Group& group = db->begin_write(); // Write transaction #18
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #18
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable = table[1].theta.get_subtable<MyTable>();
         MySubtable::Ref subsubtable = subtable[1].theta.get_subtable<MySubtable>();
         subsubtable->clear();
+        wt.commit();
     }
-    db->commit();
 
     // Testing addition of an integer to all values in a column
     {
-        Group& group = db->begin_write(); // Write transaction #19
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #19
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable = table[1].theta.get_subtable<MyTable>();
         MySubsubtable::Ref subsubtable;
         if (subtable[2].theta.get_type() == COLUMN_TYPE_TABLE) {
@@ -345,13 +342,13 @@ void round(SharedGroup* db, int index)
             subsubtable->add(i, BinaryData(0,0));
         }
         subsubtable->column().value += 31;
+        wt.commit();
     }
-    db->commit();
 
     // Testing addition of an index to a column
     {
-        Group& group = db->begin_write(); // Write transaction #20
-        MyTable::Ref table = group.get_table<MyTable>("my_table");
+        WriteTransaction wt(db); // Write transaction #20
+        MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable = table[1].theta.get_subtable<MyTable>();
         MySubsubtable::Ref subsubtable;
         if (subtable[3].theta.get_type() == COLUMN_TYPE_TABLE) {
@@ -366,8 +363,8 @@ void round(SharedGroup* db, int index)
         for (int i=0; i<num; ++i) {
             subsubtable->add(i, BinaryData(0,0));
         }
+        wt.commit();
     }
-    db->commit();
 }
 
 
@@ -375,8 +372,7 @@ void thread(int index, const char* database_path)
 {
     for (int i=0; i<num_rounds; ++i) {
         SharedGroup db(database_path);
-        if (!db.is_valid()) throw_error(ERROR_OTHER);
-        round(&db, index);
+        round(db, index);
     }
 }
 
@@ -421,6 +417,7 @@ private:
 } // anonymous namespace
 
 
+#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
 
 TEST(Transactions)
 {
@@ -451,10 +448,9 @@ TEST(Transactions)
         table1_theta_size += 2;
 
         SharedGroup db(database_path);
-        CHECK(db.is_valid());
         {
-            const Group& group = db.begin_read();
-            MyTable::ConstRef table = group.get_table<MyTable>("my_table");
+            ReadTransaction rt(db);
+            MyTable::ConstRef table = rt.get_table<MyTable>("my_table");
             CHECK(2 <= table->size());
 
             CHECK_EQUAL(num_threads*num_rounds*4, table[0].alpha);
@@ -485,7 +481,7 @@ TEST(Transactions)
                 MySubsubtable::ConstRef subsubtable = subtable[0].bar;
                 for (int i=0; i<num_threads; ++i) {
                     CHECK_EQUAL(1000+i, subsubtable[i].value);
-                    const size_t size = (512 + i%1024) * MAX_BIN_SIZE;
+                    const size_t size = (512 + i%1024) * max_bin_size;
                     mem_buf<char> data(size);
                     for (size_t j=0; j<size; ++j)
                         data[j] = static_cast<unsigned char>((j+i) * 677 % 256);
@@ -551,7 +547,9 @@ TEST(Transactions)
                     CHECK_EQUAL("click", subsubtable[5*i+3].theta);
                 }
             }
+            // End of read transaction
         }
-        db.end_read();
     }
 }
+
+#endif // Shared PTHREAD mutexes appear not to work on Windows

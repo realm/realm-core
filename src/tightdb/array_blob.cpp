@@ -2,43 +2,6 @@
 
 namespace tightdb {
 
-ArrayBlob::ArrayBlob(ArrayParent *parent, size_t pndx, Allocator& alloc):
-    Array(COLUMN_NORMAL, parent, pndx, alloc)
-{
-    // Manually set wtype as array constructor in initiatializer list
-    // will not be able to call correct virtual function
-    set_header_wtype(TDB_IGNORE);
-}
-
-ArrayBlob::ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx, Allocator& alloc):
-    Array(alloc)
-{
-    // Manually create array as doing it in initializer list
-    // will not be able to call correct virtual functions
-    init_from_ref(ref);
-    SetParent(const_cast<ArrayParent *>(parent), pndx);
-}
-
-// Creates new array (but invalid, call UpdateRef to init)
-ArrayBlob::ArrayBlob(Allocator& alloc) : Array(alloc) {}
-
-ArrayBlob::~ArrayBlob() {}
-
-const char* ArrayBlob::Get(size_t pos) const
-{
-    return reinterpret_cast<const char*>(m_data) + pos;
-}
-
-void ArrayBlob::add(const char* data, size_t len)
-{
-    Replace(m_len, m_len, data, len);
-}
-
-void ArrayBlob::Insert(size_t pos, const char* data, size_t len)
-{
-    Replace(pos, pos, data, len);
-}
-
 void ArrayBlob::Replace(size_t start, size_t end, const char* data, size_t len)
 {
     TIGHTDB_ASSERT(start <= end);
@@ -64,32 +27,6 @@ void ArrayBlob::Replace(size_t start, size_t end, const char* data, size_t len)
     memcpy(m_data + start, data, len); // FIXME: Use std::copy() instead!
 
     m_len = newsize;
-}
-
-void ArrayBlob::Delete(size_t start, size_t end)
-{
-    Replace(start, end, NULL, 0);
-}
-
-void ArrayBlob::Resize(size_t len)
-{
-    TIGHTDB_ASSERT(len <= m_len);
-    Replace(len, m_len, NULL, 0);
-}
-
-void ArrayBlob::Clear()
-{
-    Replace(0, m_len, NULL, 0);
-}
-
-size_t ArrayBlob::CalcByteLen(size_t count, size_t) const
-{
-    return 8 + count; // include room for header
-}
-
-size_t ArrayBlob::CalcItemCount(size_t bytes, size_t) const
-{
-    return bytes - 8;
 }
 
 #ifdef TIGHTDB_DEBUG

@@ -274,12 +274,12 @@ ColumnType Spec::get_type_attr(size_t ndx) const
     return (ColumnType)m_spec.Get(ndx);
 }
 
-size_t Spec::get_column_count() const
+size_t Spec::get_column_count() const TIGHTDB_NOEXCEPT
 {
     return m_names.Size();
 }
 
-size_t Spec::get_column_type_pos(size_t column_ndx) const
+size_t Spec::get_column_type_pos(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
 
@@ -289,21 +289,21 @@ size_t Spec::get_column_type_pos(size_t column_ndx) const
     size_t i = 0;
     size_t type_ndx = 0;
     for (; type_ndx < column_ndx; ++i) {
-        const ColumnType type = (ColumnType)m_spec.Get(i);
+        const ColumnType type = ColumnType(m_spec.Get(i));
         if (type >= COLUMN_ATTR_INDEXED) continue; // ignore attributes
         ++type_ndx;
     }
     return i;
 }
 
-ColumnType Spec::get_real_column_type(size_t ndx) const
+ColumnType Spec::get_real_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
 
     ColumnType type;
     size_t column_ndx = 0;
     for (size_t i = 0; column_ndx <= ndx; ++i) {
-        type = (ColumnType)m_spec.Get(i);
+        type = ColumnType(m_spec.Get(i));
         if (type >= COLUMN_ATTR_INDEXED) continue; // ignore attributes
         ++column_ndx;
     }
@@ -311,7 +311,7 @@ ColumnType Spec::get_real_column_type(size_t ndx) const
     return type;
 }
 
-ColumnType Spec::get_column_type(size_t ndx) const
+ColumnType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
 
@@ -390,7 +390,7 @@ void Spec::set_column_attr(size_t ndx, ColumnType attr)
     }
 }
 
-const char* Spec::get_column_name(size_t ndx) const
+const char* Spec::get_column_name(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
     return m_names.Get(ndx);

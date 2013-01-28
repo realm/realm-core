@@ -20,13 +20,7 @@
 #ifndef TIGHTDB_ALLOC_HPP
 #define TIGHTDB_ALLOC_HPP
 
-#include <stdlib.h>
-
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
-#include <stdint.h> // unint8_t etc
-#endif
+#include <cstddef>
 
 namespace tightdb {
 
@@ -35,23 +29,36 @@ struct Replication;
 #endif
 
 struct MemRef {
-    MemRef(): pointer(NULL), ref(0) {}
-    MemRef(void* p, size_t r): pointer(p), ref(r) {}
+    MemRef(): pointer(0), ref(0) {}
+    MemRef(void* p, std::size_t r): pointer(p), ref(r) {}
     void* pointer;
-    size_t ref;
+    std::size_t ref;
 };
+
+// FIXME: Casting a pointer to std::size_t is inherently nonportable
+// (see the default definition of Allocator::Alloc()). For example,
+// systems exist where pointers are 64 bits and std::size_t is 32. One
+// idea would be to use a different type for refs such as
+// std::uintptr_t, the problem with this one is that while it is
+// described by the C++11 standard it is not required to be
+// present. C++03 does not even mention it. A real working solution
+// will be to introduce a new name for the type of refs. The typedef
+// can then be made as complex as required to pick out an appropriate
+// type on any supported platform.
 
 class Allocator {
 public:
-    virtual MemRef Alloc(size_t size) {void* p = new char[size]; return MemRef(p,(size_t)p);}
-    virtual MemRef ReAlloc(size_t /*ref*/, void* p, size_t size) {void* p2 = realloc(p, size); return MemRef(p2,(size_t)p2);}
-    virtual void Free(size_t, void* p) {return delete[] static_cast<char*>(p);}
+    virtual MemRef Alloc(std::size_t size);
+    virtual MemRef ReAlloc(std::size_t ref, void* addr, std::size_t size);
+    virtual void Free(std::size_t, void* addr);
 
-    virtual void* Translate(size_t ref) const {return (void*)ref;}
-    virtual bool IsReadOnly(size_t) const {return false;}
+    virtual void* Translate(std::size_t ref) const TIGHTDB_NOEXCEPT;
+    virtual bool IsReadOnly(std::size_t) const;
+
+    static Allocator& get_default() TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Allocator(): m_replication(0) {}
+    Allocator() TIGHTDB_NOEXCEPT: m_replication(0) {}
 #endif
     virtual ~Allocator() {}
 
@@ -60,7 +67,7 @@ public:
 #endif
 
 #ifdef TIGHTDB_DEBUG
-    virtual void Verify() const {};
+    virtual void Verify() const {}
 #endif // TIGHTDB_DEBUG
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -68,8 +75,6 @@ protected:
     Replication* m_replication;
 #endif
 };
-
-Allocator& GetDefaultAllocator();
 
 
 } // namespace tightdb
