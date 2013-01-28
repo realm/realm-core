@@ -153,7 +153,7 @@ private:
         MIXED_COL_FLOAT       =  9, // Float
         MIXED_COL_DOUBLE      = 10, // Positive Double
         MIXED_COL_DOUBLE_NEG  = 11, // Negative Double
-        MIXED_COL_INT_NEG     = 12, // Negative Integers
+        MIXED_COL_INT_NEG     = 12 // Negative Integers
         // Preserve values above for backward compability
     };
 
