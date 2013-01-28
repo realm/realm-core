@@ -203,7 +203,8 @@ float ColumnMixed::get_float(size_t ndx) const
     TIGHTDB_ASSERT(m_types->Get(ndx) == MIXED_COL_FLOAT);
 
     const int64_t intval = get_value(ndx);
-    const float value = * reinterpret_cast<const float *>(&intval);
+    const void* vptr = reinterpret_cast<const void*>(&intval);
+    const float value = * reinterpret_cast<const float *>(vptr);
     return value;
 }
 
@@ -221,7 +222,8 @@ double ColumnMixed::get_double(size_t ndx) const
     else {
         TIGHTDB_ASSERT(coltype == MIXED_COL_DOUBLE);
     }
-    double value = * reinterpret_cast<double *>(&intval);
+    const void* vptr = reinterpret_cast<const void*>(&intval);
+    const double value = * reinterpret_cast<const double *>(vptr);
     return value;
 }
 
@@ -258,7 +260,8 @@ void ColumnMixed::insert_int64(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= m_types->Size());
 
-    int64_t val64 = * reinterpret_cast<int64_t*>(&value);
+    void* vptr = reinterpret_cast<void*>(&value);
+    int64_t val64 = * reinterpret_cast<int64_t*>(vptr);
 
     // 'store' the sign-bit in the integer-type
     if ((val64 & BIT63) == 0)
@@ -286,9 +289,10 @@ void ColumnMixed::insert_float(size_t ndx, float value)
 {
     TIGHTDB_ASSERT(ndx <= m_types->Size());
 
-    int32_t val32 = * reinterpret_cast<int32_t*>(&value);
+    const void* vptr = reinterpret_cast<const void*>(&value);
+    const int32_t val32 = * reinterpret_cast<const int32_t*>(vptr);
     // Shift value one bit and set lowest bit to indicate that this is not a ref
-    int64_t val64 = (static_cast<int64_t>(val32) << 1) + 1;
+    const int64_t val64 = (static_cast<int64_t>(val32) << 1) + 1;
     m_refs->Insert(ndx, val64);
     m_types->Insert(ndx, MIXED_COL_FLOAT);
 }
@@ -377,7 +381,8 @@ void ColumnMixed::set_int64(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
 
-    int64_t val64 = *(reinterpret_cast<int64_t*>(&value));
+    void* vptr = reinterpret_cast<void*>(&value);
+    int64_t val64 = *(reinterpret_cast<int64_t*>(vptr));
     
     // If sign-bit is set in value, 'store' it in the column-type
     const MixedColType coltype = ((val64 & BIT63) == 0) ? pos_type : neg_type;
@@ -415,8 +420,9 @@ void ColumnMixed::set_value(size_t ndx, int64_t value)
 
 void ColumnMixed::set_float(size_t ndx, float value)
 {
-    int32_t val32 = * reinterpret_cast<int32_t*>(&value);
-    set_value<MIXED_COL_FLOAT>(ndx, static_cast<int64_t>(val32));
+    const void* vptr = reinterpret_cast<const void*>(&value);
+    const int32_t val32 = * reinterpret_cast<const int32_t*>(vptr);
+    set_value<MIXED_COL_FLOAT>(ndx, static_cast<const int64_t>(val32));
 }
 
 void ColumnMixed::set_bool(size_t ndx, bool value)
@@ -426,7 +432,7 @@ void ColumnMixed::set_bool(size_t ndx, bool value)
 
 void ColumnMixed::set_date(size_t ndx, time_t value)
 {
-    set_value<MIXED_COL_DATE>(ndx, static_cast<int64_t>(value));
+    set_value<MIXED_COL_DATE>(ndx, static_cast<const int64_t>(value));
 }
 
 void ColumnMixed::set_string(size_t ndx, const char* value)
