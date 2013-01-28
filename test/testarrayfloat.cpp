@@ -77,6 +77,45 @@ void ArrayBasic_AddManyValues()
 TEST(ArrayFloat_AddManyValues) { ArrayBasic_AddManyValues<ArrayFloat, float>(); }
 TEST(ArrayDouble_AddManyValues){ ArrayBasic_AddManyValues<ArrayDouble, double>(); }
 
+template <class C, typename T>
+void ArrayBasic_Delete()
+{
+    C f;
+    for (size_t i=0; i<5; ++i)
+        f.add( T(i) );
+
+    // Delete first
+    f.Delete(0);
+    CHECK_EQUAL(4, f.Size());
+    CHECK_EQUAL(1, f.Get(0));
+    CHECK_EQUAL(2, f.Get(1));
+    CHECK_EQUAL(3, f.Get(2));
+    CHECK_EQUAL(4, f.Get(3));
+
+    // Delete last
+    f.Delete(3);
+    CHECK_EQUAL(3, f.Size());
+    CHECK_EQUAL(1, f.Get(0));
+    CHECK_EQUAL(2, f.Get(1));
+    CHECK_EQUAL(3, f.Get(2));
+        
+    // Delete middle
+    f.Delete(1);
+    CHECK_EQUAL(2, f.Size());
+    CHECK_EQUAL(1, f.Get(0));
+    CHECK_EQUAL(3, f.Get(1));
+
+    // Delete all
+    f.Delete(0);
+    CHECK_EQUAL(1, f.Size());
+    CHECK_EQUAL(3, f.Get(0));
+    f.Delete(0);
+    CHECK_EQUAL(0, f.Size());
+    CHECK(f.is_empty());
+}
+TEST(ArrayFloat_Delete) { ArrayBasic_Delete<ArrayFloat, float>(); }
+TEST(ArrayDouble_Delete){ ArrayBasic_Delete<ArrayDouble, double>(); }
+
 
 template <class C, typename T>
 void ArrayBasic_Set(T val[], size_t valLen)
@@ -138,38 +177,6 @@ void ArrayBasic_Insert()
 }
 TEST(ArrayFloat_Insert) { ArrayBasic_Insert<ArrayFloat, float>(); }
 TEST(ArrayDouble_Insert){ ArrayBasic_Insert<ArrayDouble, double>(); }
-
-
-template <class C, typename T>
-void ArrayBasic_Delete(T val[])
-{
-    C f;
-    for (size_t i=0; i<5; ++i)
-        f.add(val[i]);
-
-    // Delete first
-    f.Delete(0);
-    CHECK_EQUAL(4, f.Size());
-    CHECK_EQUAL(val[1], f.Get(0));
-    CHECK_EQUAL(val[2], f.Get(1));
-    CHECK_EQUAL(val[3], f.Get(2));
-    CHECK_EQUAL(val[4], f.Get(3));
-
-    // Delete middle
-    f.Delete(2);
-    CHECK_EQUAL(3, f.Size());
-    CHECK_EQUAL(val[1], f.Get(0));
-    CHECK_EQUAL(val[2], f.Get(1));
-    CHECK_EQUAL(val[4], f.Get(2));
-
-    // Delete buttom
-    f.Delete(2);
-    CHECK_EQUAL(2, f.Size());
-    CHECK_EQUAL(val[1], f.Get(0));
-    CHECK_EQUAL(val[2], f.Get(1));
-}
-TEST(ArrayFloat_Delete) { ArrayBasic_Delete<ArrayFloat, float>(floatVal); }
-TEST(ArrayDouble_Delete){ ArrayBasic_Delete<ArrayDouble, double>(doubleVal); }
 
 
 template <class C, typename T>
@@ -267,4 +274,111 @@ void ArrayBasic_Maximum()
 TEST(ArrayFloat_Maximum) { ArrayBasic_Maximum<ArrayFloat, float>(); }
 TEST(ArrayDouble_Maximum){ ArrayBasic_Maximum<ArrayDouble, double>(); }
 
-// TODO: count, find, fird_first, find_all, Compare
+
+template <class C, typename T>
+void ArrayBasic_Find()
+{
+    C f;
+
+    // Empty list
+    CHECK_EQUAL(-1, f.find_first(0));
+    
+    // Add some values
+    T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
+    for (size_t i=0; i<6; ++i) {
+        f.add(values[i]);
+    }
+
+    // Find (full range: start=0, end=-1)
+    CHECK_EQUAL(0, f.find_first(T(1.1)));
+    CHECK_EQUAL(5, f.find_first(T(4.4)));
+    CHECK_EQUAL(2, f.find_first(T(-1.0)));
+
+    // non-existing
+    CHECK_EQUAL(-1, f.find_first(T(0)));
+   
+    // various range limitations
+    CHECK_EQUAL( 1, f.find_first(T(2.2), 1, 2));    // ok
+    CHECK_EQUAL( 1, f.find_first(T(2.2), 1, 3));    
+    CHECK_EQUAL( 5, f.find_first(T(4.4), 1));       // defaul end=all
+    CHECK_EQUAL(-1, f.find_first(T(2.2), 1, 1));    // start=end
+    CHECK_EQUAL(-1, f.find_first(T(1.1), 1, 4));    // no match .end 1 too little
+    CHECK_EQUAL( 4, f.find_first(T(1.1), 1, 5));    // skip first match, end at last match
+
+    // Find all
+    Array resArr;
+    f.find_all(resArr, T(1.1), 0);
+    CHECK_EQUAL(2, resArr.Size());
+    CHECK_EQUAL(0, resArr.Get(0));
+    CHECK_EQUAL(4, resArr.Get(1));
+    // Find all, range limited -> no match
+    resArr.Clear();
+    f.find_all(resArr, T(1.1), 0, 1, 4);
+    CHECK_EQUAL(0, resArr.Size());
+
+}
+TEST(ArrayFloat_Find) { ArrayBasic_Find<ArrayFloat, float>(); }
+TEST(ArrayDouble_Find){ ArrayBasic_Find<ArrayDouble, double>(); }
+
+
+template <class C, typename T>
+void ArrayBasic_Count()
+{
+    C f;
+
+    // Empty list
+    CHECK_EQUAL(0, f.count(0));
+    
+    // Add some values
+    //                0       1        2       3       4       5
+    T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
+    for (size_t i=0; i<6; ++i) {
+        f.add(values[i]);
+    }
+    // count full range
+    CHECK_EQUAL(0, f.count(T(0.0)));
+    CHECK_EQUAL(1, f.count(T(4.4)));
+    CHECK_EQUAL(1, f.count(T(-1.0)));
+    CHECK_EQUAL(2, f.count(T(1.1)));
+
+    // limited range
+    CHECK_EQUAL(0, f.count(T(4.4), 0, 5));
+    CHECK_EQUAL(1, f.count(T(4.4), 0, 6));
+    CHECK_EQUAL(1, f.count(T(4.4), 5, 6));
+
+    CHECK_EQUAL(0, f.count(T(-1.0), 1, 2));
+    CHECK_EQUAL(0, f.count(T(-1.0), 3, 4));
+    CHECK_EQUAL(1, f.count(T(-1.0), 2, 4));
+    CHECK_EQUAL(1, f.count(T(-1.0), 1));
+
+}
+TEST(ArrayFloat_Count) { ArrayBasic_Count<ArrayFloat, float>(); }
+TEST(ArrayDouble_Count){ ArrayBasic_Count<ArrayDouble, double>(); }
+
+
+template <class C, typename T>
+void ArrayBasic_Compare()
+{
+    C f1, f2;
+
+    // Empty list
+    CHECK_EQUAL(true, f1.Compare(f2));
+    CHECK_EQUAL(true, f2.Compare(f1));
+    
+    // Add some values
+    T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
+    for (size_t i=0; i<6; ++i) {
+        f1.add(values[i]);
+        f2.add(values[i]);
+        CHECK_EQUAL(true, f1.Compare(f2));
+    }
+
+    f1.Delete(0);
+    CHECK_EQUAL(false, f1.Compare(f2));
+
+    f2.Delete(0);
+    CHECK_EQUAL(true, f1.Compare(f2));
+}
+TEST(ArrayFloat_Compare) { ArrayBasic_Compare<ArrayFloat, float>(); }
+TEST(ArrayDouble_Compare){ ArrayBasic_Compare<ArrayDouble, double>(); }
+
