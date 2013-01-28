@@ -381,12 +381,14 @@ void Column::Clear()
 int64_t Column::Get(size_t ndx) const
 {
     return m_array->ColumnGet(ndx);
-    //return TreeGet<int64_t, Column>(ndx);
+    //return TreeGet<int64_t, Column>(ndx); // slower than above
 }
 
+// Will return 32-bit sized ref on 32 bit architectures. 64 bit on 64 bit architectures.
+// On 32 bit architectures it's checked that no bits above bit 31 are set.
 size_t Column::GetAsRef(size_t ndx) const
 {
-    return to_ref(TreeGet<int64_t, Column>(ndx));
+    return to_ref(Get(ndx));
 }
 
 bool Column::Set(size_t ndx, int64_t value)

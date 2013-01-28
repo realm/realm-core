@@ -263,7 +263,6 @@ void Table::CacheColumns()
                 new_col = c;
             }
             break;
-
         case COLUMN_TYPE_STRING:
             {
                 AdaptiveStringColumn* c =
@@ -1292,7 +1291,7 @@ Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const
 
     switch (type) {
         case COLUMN_TYPE_INT:
-            return Mixed(column.GetInt(ndx));
+            return Mixed(column.get_int(ndx));
         case COLUMN_TYPE_BOOL:
             return Mixed(column.get_bool(ndx));
         case COLUMN_TYPE_DATE:
@@ -1332,7 +1331,7 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
 
     switch (type) {
         case COLUMN_TYPE_INT:
-            column.SetInt(ndx, value.get_int());
+            column.set_int(ndx, value.get_int());
             break;
         case COLUMN_TYPE_BOOL:
             column.set_bool(ndx, value.get_bool());

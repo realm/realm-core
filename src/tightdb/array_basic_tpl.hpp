@@ -183,12 +183,10 @@ size_t ArrayBasic<T>::CalcItemCount(size_t bytes, size_t /*width*/) const
 template<typename T> 
 size_t ArrayBasic<T>::Find(T target, size_t start, size_t end) const
 {
-    TIGHTDB_ASSERT(target);
-
     if (end == (size_t)-1) 
         end = m_len;
-    if (start == end) 
-        return (size_t)-1;
+    if (start >= end) 
+        return not_found;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
     if (m_len == 0)
         return not_found; // empty list
@@ -203,15 +201,12 @@ size_t ArrayBasic<T>::Find(T target, size_t start, size_t end) const
 template<typename T> 
 size_t ArrayBasic<T>::find_first(T value, size_t start, size_t end) const
 {
-    TIGHTDB_ASSERT(value);
     return Find(value, start, end);
 }
 
 template<typename T> 
 void ArrayBasic<T>::find_all(Array& result, T value, size_t add_offset, size_t start, size_t end)
 {
-    TIGHTDB_ASSERT(value);
-
     size_t first = start - 1;
     for (;;) {
         first = Find(value, first + 1, end);
@@ -233,8 +228,7 @@ size_t ArrayBasic<T>::count(T value, size_t start, size_t end) const
             ++count;
         else 
             break;
-    }
-    
+    } 
     return count;
 }
 

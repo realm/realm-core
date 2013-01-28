@@ -72,7 +72,7 @@ public:
     size_t Size() const {return m_types->Size();}
     bool is_empty() const {return m_types->is_empty();}
 
-    int64_t GetInt(size_t ndx) const;
+    int64_t get_int(size_t ndx) const;
     bool get_bool(size_t ndx) const;
     time_t get_date(size_t ndx) const;
     float get_float(size_t ndx) const;
@@ -89,7 +89,7 @@ public:
     /// by an instance of BasicTableRef.
     Table* get_subtable_ptr(std::size_t row_idx) const;
 
-    void SetInt(size_t ndx, int64_t value);
+    void set_int(size_t ndx, int64_t value);
     void set_bool(size_t ndx, bool value);
     void set_date(size_t ndx, time_t value);
     void set_float(size_t ndx, float value);
@@ -139,13 +139,47 @@ private:
                 ArrayParent* parent, size_t ndx_in_parent, size_t ref);
     void InitDataColumn();
 
-    void ClearValue(size_t ndx, ColumnType newtype);
+    enum MixedColType {
+        // Column types used in Mixed
+        MIXED_COL_INT         =  0,
+        MIXED_COL_BOOL        =  1,
+        MIXED_COL_STRING      =  2,
+        MIXED_COL_STRING_ENUM =  3, // double refs
+        MIXED_COL_BINARY      =  4,
+        MIXED_COL_TABLE       =  5,
+        MIXED_COL_MIXED       =  6,
+        MIXED_COL_DATE        =  7,
+        MIXED_COL_RESERVED1   =  8, // DateTime
+        MIXED_COL_FLOAT       =  9, // Float
+        MIXED_COL_DOUBLE      = 10, // Positive Double
+        MIXED_COL_DOUBLE_NEG  = 11, // Negative Double
+        MIXED_COL_INT_NEG     = 12 // Negative Integers
+        // Preserve values above for backward compability
+    };
+
+    void clear_value(size_t ndx, MixedColType newtype);
+    
+    // Get/set/insert 64-bit values in m_refs/m_types
+    inline int64_t get_value(size_t ndx) const;
+    template<MixedColType coltype> void set_value(size_t ndx, int64_t value);
+    template<MixedColType pos_type, MixedColType neg_type, typename T> void insert_int64(size_t ndx, T value);
+    template<MixedColType pos_type, MixedColType neg_type, typename T> void set_int64(size_t ndx, T value);
+
 
     class RefsColumn;
 
-    // Member variables
+    // Member variables:
+
+    // 'm_types' stores the ColumnType of each value at the given index.
+    // For values that uses all 64 bit's the datatype also stores this bit.
+    // (By having a type for both positive numbers, and another type for negative numbers)
     Column*       m_types;
-    RefsColumn*   m_refs;
+
+    // Bit 0 is used to indicate if it's a reference. 
+    // If not, the data value is stored (shifted 1 bit left). And the sign bit is stored in m_types.
+    RefsColumn*   m_refs;       
+    
+    // m_data holds any Binary/String data - if needed.
     ColumnBinary* m_data;
 };
 
@@ -181,6 +215,7 @@ inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_
     Create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
 }
 
+
 inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const
 {
     // FIXME: If the table object is cached, it is possible to get the
@@ -199,7 +234,8 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const
 inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
 {
     TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
+    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) 
+        return 0;
     return m_refs->get_subtable_ptr(row_idx);
 }
 

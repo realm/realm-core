@@ -1416,16 +1416,16 @@ TEST(Table_Mixed)
     CHECK_EQUAL(COLUMN_TYPE_DATE,   table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(COLUMN_TYPE_BINARY, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(COLUMN_TYPE_TABLE,  table.get_mixed(1, 5).get_type());
-//TODO    CHECK_EQUAL(COLUMN_TYPE_FLOAT,  table.get_mixed(1, 6).get_type());
-//TODO    CHECK_EQUAL(COLUMN_TYPE_DOUBLE, table.get_mixed(1, 7).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_FLOAT,  table.get_mixed(1, 6).get_type());
+    CHECK_EQUAL(COLUMN_TYPE_DOUBLE, table.get_mixed(1, 7).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
     CHECK_EQUAL("binary", (const char*)table.get_mixed(1, 4).get_binary().pointer);
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
-//FIXME:    CHECK_EQUAL(float(1.123),  table.get_mixed(1, 6).get_float());
-//FIXME:    CHECK_EQUAL(double(2.234), table.get_mixed(1, 7).get_double());
+    CHECK_EQUAL(float(1.123),  table.get_mixed(1, 6).get_float());
+    CHECK_EQUAL(double(2.234), table.get_mixed(1, 7).get_double());
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
