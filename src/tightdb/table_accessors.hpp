@@ -1218,20 +1218,19 @@ public:
 
 
 /// QueryColumn specialization for subtables.
-template<class Taboid, int col_idx, class Subspec>
-class QueryColumn<Taboid, col_idx, BasicTable<Subspec> >:
-    public QueryColumnBase<Taboid, col_idx, BasicTable<Subspec> > {
+template<class Taboid, int col_idx, class Subtab>
+class QueryColumn<Taboid, col_idx, SpecBase::Subtable<Subtab> > {
 private:
-    typedef QueryColumnBase<Taboid, col_idx, const char*> Base;
     typedef typename Taboid::Query Query;
+    Query* const m_query;
 
 public:
-    explicit QueryColumn(Query* q): Base(q) {}
+    explicit QueryColumn(Query* q): m_query(q) {}
 
     Query& subtable()
     {
-        Base::m_query->m_impl.subtable(col_idx);
-        return *Base::m_query;
+        m_query->m_impl.subtable(col_idx);
+        return *m_query;
     }
 };
 
