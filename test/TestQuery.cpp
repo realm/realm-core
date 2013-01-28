@@ -1512,19 +1512,22 @@ TEST(TestQuery_Const)
     const_table.where().second.equal("a").remove();
 }
 
-namespace{
-    TIGHTDB_TABLE_2(PhoneTable,
-                    type,   String,
-                    number, String)
+namespace {
 
-    TIGHTDB_TABLE_4(EmployeeTable,
-                    name,   String,
-                    age,    Int,
-                    hired,  Bool,
-                    phones, Subtable<PhoneTable>)
-}
+TIGHTDB_TABLE_2(PhoneTable,
+                type,   String,
+                number, String)
 
-TEST(TestQuery_Subtables_Typed) {
+TIGHTDB_TABLE_4(EmployeeTable,
+                name,   String,
+                age,    Int,
+                hired,  Bool,
+                phones, Subtable<PhoneTable>)
+
+} // anonymous namespace
+
+TEST(TestQuery_Subtables_Typed)
+{
     // Create table
     EmployeeTable employees;
 
@@ -1542,5 +1545,5 @@ TEST(TestQuery_Subtables_Typed) {
     EmployeeTable::View view = q.find_all();
 
     // Verify result
-    assert(view.size() == 1 && view[0].name == "jessica");
+    CHECK(view.size() == 1 && view[0].name == "jessica");
 }
