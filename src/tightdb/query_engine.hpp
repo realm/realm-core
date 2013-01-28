@@ -20,15 +20,20 @@
 
 /*
 
-TCondition: 
-
-TAction:     
-
-TResult
-
-TSource
 
 
+
+TConditionFunction: Each node has a condition from query_conditions.c such as EQUAL, GREATER_EQUAL, etc
+
+TConditionValue:    Type of values in condition column. That is, int64_t, float, int, bool, etc
+
+TAction:            What to do with each search result, from the enums TDB_RETURN_FIRST, TDB_COUNT, TDB_SUM, etc
+
+TResult:            Type of result of actions - float, double, int64_t, etc. Special notes: For TDB_COUNT it's 
+                    int64_t, for TDB_FIND_ALL it's int64_t which points at destination array.
+
+TSourceColumn:      Type of source column used in actions, or *ignored* if no source column is used (like for 
+                    TDB_COUNT, TDB_RETURN_FIRST)
 */
 
 
@@ -238,6 +243,7 @@ public:
         return m_child;
     }
 
+    // Only purpose is to make all NODE classes have this function (overloaded only in NODE)
     virtual size_t aggregate_call_specialized(ACTION /*TAction*/, ColumnType /*TResult*/, 
                                               QueryStateParent* /*st*/, 
                                               size_t /*start*/, size_t /*end*/, size_t /*local_limit*/, 
@@ -247,37 +253,33 @@ public:
         return 0;
     }
 
-    template<ACTION TAction, class TResult, class TSource>
+    template<ACTION TAction, class TResult, class TSourceColumn>
     size_t aggregate_local_selector(ParentNode* node, QueryState<TResult>* st, size_t start, size_t end, size_t local_limit, 
-                                    SequentialGetter<TSource>* source_column, size_t* matchcount)
+                                    SequentialGetter<TSourceColumn>* source_column, size_t* matchcount)
     {
-        // Workaround that emulates templated vitual methods. Very very slow (dynamic_cast performs ~300 instructions, 
-        // and the if..else are slow too). 
-        // Real fix: Make ParentNode a templated class according to type of aggregate result (size_t for Find, 
-        // Array for FindAll, int64_t for sum of integers, float for sum of floats, size_t for count, etc).
-        
         size_t r;
         
         if (node->m_is_integer_node)
+            // call method in NODE
             r = node->aggregate_call_specialized(TAction, ColumnTypeTraits<TResult>::id,(QueryStateParent*)st,
                                                  start, end, local_limit, source_column, matchcount);
         else
-             // call method in parent class
-            r = aggregate_local<TAction, TResult, TSource>(st, start, end, local_limit, source_column, matchcount);
+             // call method in ParentNode
+            r = aggregate_local<TAction, TResult, TSourceColumn>(st, start, end, local_limit, source_column, matchcount);
         return r;
     }
 
 
     template<ACTION TAction, class TResult, class TSourceColumn>
-    TResult aggregate(QueryState<TResult>* st, size_t start, size_t end, size_t agg_col2 = not_found, size_t* matchcount = 0) 
+    TResult aggregate(QueryState<TResult>* st, size_t start, size_t end, size_t agg_col, size_t* matchcount) 
     {
         if (end == size_t(-1)) 
             end = m_table->size();
 
         SequentialGetter<TSourceColumn>* source_column = NULL;
         
-        if (agg_col2 != not_found)
-            source_column = new SequentialGetter<TSourceColumn>(*m_table, agg_col2);
+        if (agg_col != not_found)
+            source_column = new SequentialGetter<TSourceColumn>(*m_table, agg_col);
 
         size_t td;
 
@@ -718,7 +720,7 @@ protected:
 };
 
 
-template <class TCondition> class STRINGNODE: public ParentNode {
+template <class TConditionFunction> class STRINGNODE: public ParentNode {
 public:
     template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
 
@@ -757,7 +759,7 @@ public:
 
     size_t find_first_local(size_t start, size_t end)
     {
-        TCondition cond;
+        TConditionFunction cond;
 
         for (size_t s = start; s < end; ++s) {
             const char* t;
@@ -786,11 +788,11 @@ protected:
 
 
 // Can be used for simple types (currently float and double)
-template <class TCondition, class Condition> class BASICNODE: public ParentNode {
+template <class TConditionValue, class TConditionFunction> class BASICNODE: public ParentNode {
 public:
-    typedef typename ColumnTypeTraits<TCondition>::column_type ColType;
+    typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
     
-    BASICNODE(TCondition v, size_t column_ndx) : m_value(v)
+    BASICNODE(TConditionValue v, size_t column_ndx) : m_value(v)
     {
         m_condition_column_idx = column_ndx;
         m_child = 0;
@@ -799,7 +801,7 @@ public:
     // Only purpose of this function is to let you quickly create a NODE object and call aggregate_local() on it to aggregate
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
     // be merged with Init somehow to simplify
-    void QuickInit(ColumnBasic<TCondition> *column, TCondition value) {
+    void QuickInit(ColumnBasic<TConditionValue> *column, TConditionValue value) {
         m_condition_column.m_column = (ColType*)column;
         m_condition_column.m_leaf_end = 0;
         m_value = value;
@@ -815,34 +817,12 @@ public:
         if (m_child) 
             m_child->Init(table);
     }
-
-    size_t find_first(size_t start, size_t end)
-    {
-        Condition cond;
-
-        for (size_t s = start; s < end; ++s) {
-            TCondition v = m_condition_column.GetNext(s);
-
-            if (cond(m_value, v)) {
-                if (m_child == 0)
-                    return s;
-                else {
-                    const size_t a = m_child->find_first(s, end);
-                    if (s == a)
-                        return s;
-                    else
-                        s = a - 1;
-                }
-            }
-        }
-        return end;
-    }
     
     size_t find_first_local(size_t start, size_t end) {
-        Condition cond;
+        TConditionFunction cond;
 
         for (size_t s = start; s < end; ++s) {            
-            TCondition v = m_condition_column.GetNext(s);
+            TConditionValue v = m_condition_column.GetNext(s);
             if (cond(v, m_value))
                 return s;
         }
@@ -850,12 +830,12 @@ public:
     }
 
 protected:
-    TCondition m_value;
-    SequentialGetter<TCondition> m_condition_column;
+    TConditionValue m_value;
+    SequentialGetter<TConditionValue> m_condition_column;
 };
 
 
-template <class F> class BINARYNODE: public ParentNode {
+template <class TConditionFunction> class BINARYNODE: public ParentNode {
 public:
     template <ACTION TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
 
@@ -883,7 +863,7 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        F condition;
+        TConditionFunction condition;
 
         for (size_t s = start; s < end; ++s) {
             const char* t = m_column->Get(s).pointer;
@@ -905,7 +885,7 @@ public:
     }
 
     size_t find_first_local(size_t start, size_t end) {
-        F condition;
+        TConditionFunction condition;
 
         for (size_t s = start; s < end; ++s) {            
             const char* value = m_condition_column->Get(s).pointer;

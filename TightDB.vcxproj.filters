@@ -163,12 +163,10 @@
     <ClCompile Include="test\testtransactions_lasse.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\experiments\fp_print.c">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="src\tightdb\array.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="test\performance\timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">

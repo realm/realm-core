@@ -470,7 +470,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     TableView tv(*m_table);
     QueryState<int64_t> st;
     st.init(TDB_FINDALL, &tv.get_ref_column(), limit);
-    first[0]->aggregate<TDB_FINDALL, int64_t, int64_t>(&st, start, end);
+    first[0]->aggregate<TDB_FINDALL, int64_t, int64_t>(&st, start, end, not_found, NULL);
     return move(tv);
 }
 
@@ -488,7 +488,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     Init(*m_table);
     QueryState<int64_t> st;
     st.init(TDB_COUNT, NULL, limit);
-    int64_t r = first[0]->aggregate<TDB_COUNT, int64_t, int64_t>(&st, start, end);
+    int64_t r = first[0]->aggregate<TDB_COUNT, int64_t, int64_t>(&st, start, end, not_found, NULL);
     return size_t(r);
 }
 
