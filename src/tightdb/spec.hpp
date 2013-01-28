@@ -59,10 +59,10 @@ public:
     ColumnType get_type_attr(size_t column_ndx) const;
 
     // Column info
-    size_t get_column_count() const;
-    ColumnType get_column_type(size_t column_ndx) const;
-    ColumnType get_real_column_type(size_t column_ndx) const;
-    const char* get_column_name(size_t column_ndx) const;
+    size_t get_column_count() const TIGHTDB_NOEXCEPT;
+    ColumnType get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnType get_real_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    const char* get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     /// Returns std::size_t(-1) if the specified column is not found.
     size_t get_column_index(const char* name) const;
@@ -109,7 +109,7 @@ private:
     // Serialization
     template<class S> size_t write(S& out, size_t& pos) const;
 
-    size_t get_column_type_pos(size_t column_ndx) const;
+    size_t get_column_type_pos(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     size_t get_subspec_ndx(size_t column_ndx) const;
     size_t get_subspec_ref(size_t subspec_ndx) const;
     size_t get_num_subspecs() const { return m_subSpecs.IsValid() ? m_subSpecs.Size() : 0; }

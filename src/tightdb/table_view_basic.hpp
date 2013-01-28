@@ -35,11 +35,14 @@ public:
     typedef typename Tab::spec_type spec_type;
     typedef Tab table_type;
 
-    bool is_empty() const { return m_impl.is_empty(); }
-    size_t size() const { return m_impl.size(); }
+    bool is_empty() const TIGHTDB_NOEXCEPT { return m_impl.is_empty(); }
+    size_t size() const TIGHTDB_NOEXCEPT { return m_impl.size(); }
 
     // Get row index in the source table this view is "looking" at.
-    size_t get_source_ndx(size_t row_ndx) const { return m_impl.get_source_ndx(row_ndx); }
+    size_t get_source_ndx(size_t row_ndx) const TIGHTDB_NOEXCEPT
+    {
+        return m_impl.get_source_ndx(row_ndx);
+    }
 
 private:
     typedef typename Tab::spec_type Spec;
@@ -57,9 +60,9 @@ private:
     typedef typename Spec::template ColNames<ConstCol, const View*> ConstColsAccessor;
 
 public:
-    ColsAccessor column() { return ColsAccessor(static_cast<View*>(this)); }
+    ColsAccessor column() TIGHTDB_NOEXCEPT { return ColsAccessor(static_cast<View*>(this)); }
 
-    ConstColsAccessor column() const { return ConstColsAccessor(static_cast<const View*>(this)); }
+    ConstColsAccessor column() const TIGHTDB_NOEXCEPT { return ConstColsAccessor(static_cast<const View*>(this)); }
 
 private:
     template<int col_idx> struct Field {
@@ -77,12 +80,12 @@ private:
     typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
 public:
-    RowAccessor operator[](std::size_t row_idx)
+    RowAccessor operator[](std::size_t row_idx) TIGHTDB_NOEXCEPT
     {
         return RowAccessor(std::make_pair(static_cast<View*>(this), row_idx));
     }
 
-    ConstRowAccessor operator[](std::size_t row_idx) const
+    ConstRowAccessor operator[](std::size_t row_idx) const TIGHTDB_NOEXCEPT
     {
         return ConstRowAccessor(std::make_pair(static_cast<const View*>(this), row_idx));
     }
@@ -96,8 +99,8 @@ protected:
     BasicTableViewBase() {}
     BasicTableViewBase(Impl i): m_impl(move(i)) {}
 
-    Impl* get_impl() { return &m_impl; }
-    const Impl* get_impl() const { return &m_impl; }
+    Impl* get_impl() TIGHTDB_NOEXCEPT { return &m_impl; }
+    const Impl* get_impl() const TIGHTDB_NOEXCEPT { return &m_impl; }
 };
 
 
@@ -146,8 +149,15 @@ public:
     void remove(size_t ndx) { Base::m_impl.remove(ndx); }
     void remove_last() { Base::m_impl.remove_last(); }
 
-    Tab& get_parent() { return static_cast<Tab&>(Base::m_impl.get_parent()); }
-    const Tab& get_parent() const { return static_cast<const Tab&>(Base::m_impl.get_parent()); }
+    Tab& get_parent() TIGHTDB_NOEXCEPT
+    {
+        return static_cast<Tab&>(Base::m_impl.get_parent());
+    }
+
+    const Tab& get_parent() const TIGHTDB_NOEXCEPT
+    {
+        return static_cast<const Tab&>(Base::m_impl.get_parent());
+    }
 
 private:
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
@@ -200,7 +210,10 @@ public:
         return *this;
     }
 
-    const Tab& get_parent() const { return static_cast<const Tab&>(Base::m_impl.get_parent()); }
+    const Tab& get_parent() const TIGHTDB_NOEXCEPT
+    {
+        return static_cast<const Tab&>(Base::m_impl.get_parent());
+    }
 
 private:
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}

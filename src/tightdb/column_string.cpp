@@ -112,36 +112,36 @@ StringIndex& AdaptiveStringColumn::CreateIndex()
 
 void AdaptiveStringColumn::SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx)
 {
-    TIGHTDB_ASSERT(m_index == NULL);
+    TIGHTDB_ASSERT(!m_index);
     m_index = new StringIndex(ref, parent, pndx, this, &GetString, m_array->GetAllocator());
 }
 
-bool AdaptiveStringColumn::is_empty() const
+bool AdaptiveStringColumn::is_empty() const TIGHTDB_NOEXCEPT
 {
     if (IsNode()) {
         const Array offsets = NodeGetOffsets();
         return offsets.is_empty();
     }
     else if (IsLongStrings()) {
-        return ((ArrayStringLong*)m_array)->is_empty();
+        return (static_cast<ArrayStringLong*>(m_array))->is_empty();
     }
     else {
-        return ((ArrayString*)m_array)->is_empty();
+        return (static_cast<ArrayString*>(m_array))->is_empty();
     }
 }
 
-size_t AdaptiveStringColumn::Size() const
+size_t AdaptiveStringColumn::Size() const TIGHTDB_NOEXCEPT
 {
     if (IsNode())  {
         const Array offsets = NodeGetOffsets();
-        const size_t size = offsets.is_empty() ? 0 : (size_t)offsets.back();
+        const size_t size = offsets.is_empty() ? 0 : size_t(offsets.back());
         return size;
     }
     else if (IsLongStrings()) {
-        return ((ArrayStringLong*)m_array)->Size();
+        return (static_cast<ArrayStringLong*>(m_array))->Size();
     }
     else {
-        return ((ArrayString*)m_array)->Size();
+        return (static_cast<ArrayString*>(m_array))->Size();
     }
 }
 
@@ -155,9 +155,9 @@ void AdaptiveStringColumn::Clear()
         m_array = array;
     }
     else if (IsLongStrings()) {
-        ((ArrayStringLong*)m_array)->Clear();
+        (static_cast<ArrayStringLong*>(m_array))->Clear();
     }
-    else ((ArrayString*)m_array)->Clear();
+    else (static_cast<ArrayString*>(m_array))->Clear();
 
     if (m_index)
         m_index->Clear();
@@ -168,13 +168,13 @@ void AdaptiveStringColumn::Resize(size_t ndx)
     TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
 
     if (IsLongStrings()) {
-        ((ArrayStringLong*)m_array)->Resize(ndx);
+        (static_cast<ArrayStringLong*>(m_array))->Resize(ndx);
     }
-    else ((ArrayString*)m_array)->Resize(ndx);
+    else (static_cast<ArrayString*>(m_array))->Resize(ndx);
 
 }
 
-const char* AdaptiveStringColumn::Get(size_t ndx) const
+const char* AdaptiveStringColumn::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Size());
     return m_array->ColumnStringGet(ndx);
@@ -301,13 +301,13 @@ void AdaptiveStringColumn::find_all(Array &result, const char* value, size_t sta
     TreeFindAll<const char*, AdaptiveStringColumn>(result, value, 0, start, end);
 }
 
-const char* AdaptiveStringColumn::LeafGet(size_t ndx) const
+const char* AdaptiveStringColumn::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     if (IsLongStrings()) {
-        return ((ArrayStringLong*)m_array)->Get(ndx);
+        return (static_cast<ArrayStringLong*>(m_array))->Get(ndx);
     }
     else {
-        return ((ArrayString*)m_array)->Get(ndx);
+        return (static_cast<ArrayString*>(m_array))->Get(ndx);
     }
 }
 

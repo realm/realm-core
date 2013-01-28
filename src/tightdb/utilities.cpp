@@ -1,10 +1,6 @@
-#include <string>
 #include <cstdlib> // size_t
-#ifndef _MSC_VER
+#include <string>
 #include <stdint.h>
-#else
-#include <win32/stdint.h>
-#endif
 
 #include <iostream>
 #include <tightdb/assert.hpp>
@@ -45,32 +41,6 @@ void cpuid_init()
     else
         sse_support = -2;
 #endif
-}
-
-size_t to_ref(int64_t v)
-{
-#ifdef TIGHTDB_DEBUG
-    uint64_t m = size_t(-1);
-    TIGHTDB_ASSERT(uint64_t(v) <= m);
-    // FIXME: This misbehaves for negative v when size_t is 64-bits.
-    // FIXME: This misbehaves on architectures that do not use 2's complement represenation of negative numbers.
-    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
-    // FIXME: Must also check that v is divisible by 8 (64-bit aligned).
-#endif
-    return size_t(v);
-}
-
-// Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
-size_t to_size_t(int64_t v)
-{
-#ifdef TIGHTDB_DEBUG
-    uint64_t m = size_t(-1);
-    TIGHTDB_ASSERT(uint64_t(v) <= m);
-    // FIXME: This misbehaves for negative v when size_t is 64-bits.
-    // FIXME: This misbehaves on architectures that do not use 2's complement represenation of negative numbers.
-    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
-#endif
-    return size_t(v);
 }
 
 

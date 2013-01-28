@@ -1,5 +1,4 @@
 #include <cstdlib>
-#include <cstring>
 #include <cstdio> // debug
 #include <iostream>
 
@@ -31,22 +30,6 @@ size_t round_up(size_t len)
 
 namespace tightdb {
 
-
-const char* ArrayString::Get(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-
-    if (m_width == 0) return "";
-    else return (const char*)(m_data + (ndx * m_width));
-}
-
-bool ArrayString::Set(size_t ndx, const char* value)
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(value);
-
-    return Set(ndx, value, strlen(value));
-}
 
 bool ArrayString::Set(size_t ndx, const char* value, size_t len)
 {
@@ -209,9 +192,9 @@ size_t ArrayString::CalcByteLen(size_t count, size_t width) const
     return 8 + (count * width);
 }
 
-size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const
+size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
 {
-    if (width == 0) return (size_t)-1; // zero-width gives infinite space
+    if (width == 0) return size_t(-1); // zero-width gives infinite space
 
     const size_t bytes_without_header = bytes - 8;
     return bytes_without_header / width;
@@ -221,7 +204,7 @@ size_t ArrayString::count(const char* value, size_t start, size_t end) const
 {
     const size_t len = strlen(value);
     size_t count = 0;
-    
+
     size_t lastmatch = start - 1;
     for (;;) {
         lastmatch = FindWithLen(value, len, lastmatch+1, end);
@@ -229,7 +212,7 @@ size_t ArrayString::count(const char* value, size_t start, size_t end) const
             ++count;
         else break;
     }
-    
+
     return count;
 }
 

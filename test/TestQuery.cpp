@@ -1,4 +1,5 @@
 #include <UnitTest++.h>
+
 #include <tightdb.hpp>
 
 using namespace tightdb;
@@ -41,7 +42,7 @@ TEST(TestDateQuery)
     PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::Date(2012, 1, 1).get_date())
                                            .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all(); 
 
-    assert(view5.size() == 1 && view5[0].name == "Mary");
+    CHECK(view5.size() == 1 && view5[0].name == "Mary");
 
 }
 
@@ -120,8 +121,8 @@ TEST(TestQueryFindAll_Contains2_2)
     ttt.add(7, "fobar");
     ttt.add(8, "oobar");
 
-// utf8 case handling is only implemented on msw for now
-#if defined(_MSC_VER)
+// FIXME: UTF-8 case handling is only implemented on msw for now
+#ifdef _WIN32
     TupleTableType::Query q1 = ttt.where().second.contains("foO", false);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(6, tv1.size());

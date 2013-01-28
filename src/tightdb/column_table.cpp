@@ -20,7 +20,7 @@ bool ColumnTable::has_subtable(size_t ndx) const
     return (ref_columns != 0);
 }
 
-size_t ColumnTable::get_subtable_size(size_t ndx) const
+size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     // FIXME: If the table object is cached, it is possible to get the
     // size from it. Maybe it is faster in general to check for the
@@ -30,7 +30,7 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const
     const size_t ref_columns = GetAsRef(ndx);
     if (ref_columns == 0) return 0;
 
-    const size_t ref_first_col = Array(ref_columns, NULL, 0, GetAllocator()).GetAsRef(0);
+    const size_t ref_first_col = Array(ref_columns, 0, 0, GetAllocator()).GetAsRef(0);
     return get_size_from_ref(ref_first_col, GetAllocator());
 }
 

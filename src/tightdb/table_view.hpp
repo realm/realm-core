@@ -36,26 +36,26 @@ using std::time_t;
  */
 class TableViewBase {
 public:
-    bool is_empty() const { return m_refs.is_empty(); }
-    size_t size() const { return m_refs.Size(); }
+    bool is_empty() const TIGHTDB_NOEXCEPT { return m_refs.is_empty(); }
+    size_t size() const TIGHTDB_NOEXCEPT { return m_refs.Size(); }
 
     // Column information
-    size_t      get_column_count() const;
-    const char* get_column_name(size_t column_ndx) const;
+    size_t      get_column_count() const TIGHTDB_NOEXCEPT;
+    const char* get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     size_t      get_column_index(const char* name) const;
-    ColumnType  get_column_type(size_t column_ndx) const;
+    ColumnType  get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     // Getting values
-    int64_t     get_int(size_t column_ndx, size_t row_ndx) const;
-    bool        get_bool(size_t column_ndx, size_t row_ndx) const;
-    time_t      get_date(size_t column_ndx, size_t row_ndx) const;
-    const char* get_string(size_t column_ndx, size_t row_ndx) const;
-    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const;
-    Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const;
-    ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
+    int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    bool        get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    time_t      get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    const char* get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Subtables
-    size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const;
+    size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Searching (Int and String)
     size_t find_first_int(size_t column_ndx, int64_t value) const;
@@ -74,7 +74,10 @@ public:
     void sort(size_t column, bool ascending = true);
 
     // Get row index in the source table this view is "looking" at.
-    size_t get_source_ndx(size_t row_ndx) const { return size_t(m_refs.Get(row_ndx)); }
+    size_t get_source_ndx(size_t row_ndx) const TIGHTDB_NOEXCEPT
+    {
+        return size_t(m_refs.Get(row_ndx));
+    }
 
     // Conversion
     void to_json(std::ostream& out);
@@ -93,7 +96,7 @@ protected:
     /**
      * Construct null view (no memory allocated).
      */
-    TableViewBase(): m_table(0), m_refs(GetDefaultAllocator()) {}
+    TableViewBase(): m_table(0), m_refs(Allocator::get_default()) {}
 
     /**
      * Construct empty view, ready for addition of row indices.
@@ -198,8 +201,8 @@ public:
     // FIXME: Need: TableView find_all_binary(size_t column_ndx, const char* value, size_t len);
     // FIXME: Need: ConstTableView find_all_binary(size_t column_ndx, const char* value, size_t len) const;
 
-    Table& get_parent() { return *m_table; }
-    const Table& get_parent() const { return *m_table; }
+    Table& get_parent() TIGHTDB_NOEXCEPT { return *m_table; }
+    const Table& get_parent() const TIGHTDB_NOEXCEPT { return *m_table; }
 
 private:
     friend class ConstTableView;
@@ -247,7 +250,7 @@ public:
     ConstTableView find_all_date(size_t column_ndx, time_t value) const;
     ConstTableView find_all_string(size_t column_ndx, const char *value) const;
 
-   const Table& get_parent() const { return *m_table; }
+   const Table& get_parent() const TIGHTDB_NOEXCEPT { return *m_table; }
 
 private:
     friend class TableView;
@@ -300,13 +303,13 @@ inline void TableViewBase::move_assign(TableViewBase* tv)
 // Column information
 
 
-inline size_t TableViewBase::get_column_count() const
+inline size_t TableViewBase::get_column_count() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_table);
     return m_table->get_column_count();
 }
 
-inline const char* TableViewBase::get_column_name(size_t column_ndx) const
+inline const char* TableViewBase::get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_table);
     return m_table->get_column_name(column_ndx);
@@ -318,7 +321,7 @@ inline size_t TableViewBase::get_column_index(const char* name) const
     return m_table->get_column_index(name);
 }
 
-inline ColumnType TableViewBase::get_column_type(size_t column_ndx) const
+inline ColumnType TableViewBase::get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_table);
     return m_table->get_column_type(column_ndx);
@@ -328,7 +331,7 @@ inline ColumnType TableViewBase::get_column_type(size_t column_ndx) const
 // Getters
 
 
-inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const
+inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx);
 
@@ -336,7 +339,7 @@ inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const
     return m_table->get_int(column_ndx, real_ndx);
 }
 
-inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const
+inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, COLUMN_TYPE_BOOL);
 
@@ -344,7 +347,7 @@ inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const
     return m_table->get_bool(column_ndx, real_ndx);
 }
 
-inline time_t TableViewBase::get_date(size_t column_ndx, size_t row_ndx) const
+inline time_t TableViewBase::get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, COLUMN_TYPE_DATE);
 
@@ -352,7 +355,7 @@ inline time_t TableViewBase::get_date(size_t column_ndx, size_t row_ndx) const
     return m_table->get_date(column_ndx, real_ndx);
 }
 
-inline const char* TableViewBase::get_string(size_t column_ndx, size_t row_ndx) const
+inline const char* TableViewBase::get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, COLUMN_TYPE_STRING);
 
@@ -365,7 +368,7 @@ inline BinaryData TableViewBase::get_binary(size_t column_ndx, size_t row_ndx) c
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, COLUMN_TYPE_BINARY);
 
     const size_t real_ndx = size_t(m_refs.Get(row_ndx));
-    return m_table->get_binary(column_ndx, real_ndx);
+    return m_table->get_binary(column_ndx, real_ndx); // Throws
 }
 
 inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const
@@ -373,10 +376,10 @@ inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, COLUMN_TYPE_MIXED);
 
     const size_t real_ndx = size_t(m_refs.Get(row_ndx));
-    return m_table->get_mixed(column_ndx, real_ndx);
+    return m_table->get_mixed(column_ndx, real_ndx); // Throws
 }
 
-inline ColumnType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx) const
+inline ColumnType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, COLUMN_TYPE_MIXED);
 
@@ -384,7 +387,7 @@ inline ColumnType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_nd
     return m_table->get_mixed_type(column_ndx, real_ndx);
 }
 
-inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx) const
+inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, COLUMN_TYPE_TABLE);
 

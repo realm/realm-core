@@ -105,3 +105,59 @@ void destroy()
   }
   close(m_fd); // FIXME: Failures here?
 }
+
+
+
+
+struct SharedData {
+  pthread_mutex_t mutex;
+  bool is_initialized; // Protected by the mutex
+  // Other members protected by the mutex
+};
+
+
+
+void SharedGroup::open()
+{
+    if (m_file) throw runtime_error("Cannot open a SharedGroup that is open already");
+    m_file.open(...); // Create it with zero size if it does not exist
+    file::close_guard fcg(m_file);
+
+    // First initialize just the mutex
+    if (m_file.try_lock_exclusive()) {
+        if (m_file.get_size() < sizeof ShareData) {
+            m_file.resize(sizeof pthread_mutex_t);
+            {
+                file::map<SharedData> map(m_file, for_read_write, sizeof pthread_mutex_t); // FIXME: Shared or not shared?
+                SharedData* const shared_data = map.get_addr();
+
+                // Initialize mutex
+
+                // FIXME: Must also initialize m_is_initialized if the resizing operation does not guarantee zero-fill.
+
+                map.sync();
+            }
+            m_file.resize(sizeof ShareData);
+        }
+        m_file.unlock();
+    }
+
+    m_file.lock_shared();
+
+    m_file_map.map(m_file, for_read_write); // FIXME: Must request shared map
+    file::map::unmap_guard fmug(m_file_map);
+    SharedData* const shared_data = m_file_map.get_addr();
+
+    if (file_has_been_deleted(fd))   ; // FIXME: Could this be based simply on a flag in SharedData?
+
+    // Initialize the rest of the file if we have to
+    pthread_mutex_lock(&shared_data->mutex);
+    if (!shared_data->m_is_initialized) {
+        // Initialize other members
+        shared_data->m_is_initialized = true;
+    }
+    pthread_mutex_lock(&shared_data->mutex);
+
+    fmug.release(); // Don't unmap
+    fcg.release(); // Don't unlock and don't close
+}

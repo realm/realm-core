@@ -1,10 +1,8 @@
+#include <pthread.h>
+
 #include <UnitTest++.h>
+
 #include "tightdb.hpp"
-
-// Does not work for windows yet
-#ifndef _MSC_VER
-
-#include <unistd.h>
 
 using namespace tightdb;
 
@@ -18,6 +16,8 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 } // anonymous namespace
 
+#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
+
 TEST(Shared_Initial)
 {
     // Delete old files if there
@@ -26,25 +26,22 @@ TEST(Shared_Initial)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
+        SharedGroup sg("test_shared.tightdb");
 
         // Verify that new group is empty
         {
-            const Group& g1 = shared.begin_read();
-            CHECK(g1.is_empty());
-            shared.end_read();
+            ReadTransaction rt(sg);
+            CHECK(rt.get_group().is_empty());
         }
 
 #ifdef TIGHTDB_DEBUG
         // Also do a basic ringbuffer test
-        shared.test_ringbuf();
+        sg.test_ringbuf();
 #endif
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_Initial_Mem)
@@ -55,27 +52,23 @@ TEST(Shared_Initial_Mem)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
-        CHECK(shared.is_valid());
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
 
         // Verify that new group is empty
         {
-            const Group& g1 = shared.begin_read();
-            CHECK(g1.is_empty());
-            shared.end_read();
+            ReadTransaction rt(sg);
+            CHECK(rt.get_group().is_empty());
         }
 
 #ifdef TIGHTDB_DEBUG
         // Also do a basic ringbuffer test
-        shared.test_ringbuf();
+        sg.test_ringbuf();
 #endif
     }
 
     // Verify that both db and lock file was deleted after use
-    const int rc1 = access("test_shared.tightdb", F_OK);
-    const int rc2 = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc1);
-    CHECK_EQUAL(-1, rc2);
+    CHECK(!File::exists("test_shared.tightdb"));
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_Initial2)
@@ -86,46 +79,41 @@ TEST(Shared_Initial2)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
+        SharedGroup sg("test_shared.tightdb");
 
         {
             // Open the same db again (in empty state)
-            SharedGroup shared2("test_shared.tightdb");
-            CHECK(shared2.is_valid());
+            SharedGroup sg2("test_shared.tightdb");
 
             // Verify that new group is empty
             {
-                const Group& g1 = shared2.begin_read();
-                CHECK(g1.is_empty());
-                shared2.end_read();
+                ReadTransaction rt(sg2);
+                CHECK(rt.get_group().is_empty());
             }
 
             // Add a new table
             {
-                Group& g1 = shared2.begin_write();
-                TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+                WriteTransaction wt(sg2);
+                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1->add(1, 2, false, "test");
-                shared2.commit();
+                wt.commit();
             }
         }
 
         // Verify that the new table has been added
         {
-            const Group& g1 = shared.begin_read();
-            TestTableShared::ConstRef t1 = g1.get_table<TestTableShared>("test");
+            ReadTransaction rt(sg);
+            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
             CHECK_EQUAL(1, t1->size());
             CHECK_EQUAL(1, t1[0].first);
             CHECK_EQUAL(2, t1[0].second);
             CHECK_EQUAL(false, t1[0].third);
             CHECK_EQUAL("test", (const char*)t1[0].fourth);
-            shared.end_read();
         }
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_Initial2_Mem)
@@ -136,48 +124,42 @@ TEST(Shared_Initial2_Mem)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
-        CHECK(shared.is_valid());
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
 
         {
             // Open the same db again (in empty state)
-            SharedGroup shared2("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
-            CHECK(shared2.is_valid());
+            SharedGroup sg2("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
 
             // Verify that new group is empty
             {
-                const Group& g1 = shared2.begin_read();
-                CHECK(g1.is_empty());
-                shared2.end_read();
+                ReadTransaction rt(sg2);
+                CHECK(rt.get_group().is_empty());
             }
 
             // Add a new table
             {
-                Group& g1 = shared2.begin_write();
-                TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+                WriteTransaction wt(sg2);
+                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1->add(1, 2, false, "test");
-                shared2.commit();
+                wt.commit();
             }
         }
 
         // Verify that the new table has been added
         {
-            const Group& g1 = shared.begin_read();
-            TestTableShared::ConstRef t1 = g1.get_table<TestTableShared>("test");
+            ReadTransaction rt(sg);
+            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
             CHECK_EQUAL(1, t1->size());
             CHECK_EQUAL(1, t1[0].first);
             CHECK_EQUAL(2, t1[0].second);
             CHECK_EQUAL(false, t1[0].third);
             CHECK_EQUAL("test", (const char*)t1[0].fourth);
-            shared.end_read();
         }
     }
 
     // Verify that both db and lock file was deleted after use
-    const int rc1 = access("test_shared.tightdb", F_OK);
-    const int rc2 = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc1);
-    CHECK_EQUAL(-1, rc2);
+    CHECK(!File::exists("test_shared.tightdb"));
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared1)
@@ -188,38 +170,35 @@ TEST(Shared1)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
+        SharedGroup sg("test_shared.tightdb");
 
         // Create first table in group
         {
-            Group& g1 = shared.begin_write();
-            TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
-            shared.commit();
+            wt.commit();
         }
 
         // Open same db again
-        SharedGroup shared2("test_shared.tightdb");
-        CHECK(shared2.is_valid());
+        SharedGroup sg2("test_shared.tightdb");
         {
-            const Group& g2 = shared2.begin_read();
+            ReadTransaction rt(sg2);
 
             // Verify that last set of changes are commited
-            TestTableShared::ConstRef t2 = g2.get_table<TestTableShared>("test");
+            TestTableShared::ConstRef t2 = rt.get_table<TestTableShared>("test");
             CHECK(t2->size() == 1);
             CHECK_EQUAL(1, t2[0].first);
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
             CHECK_EQUAL("test", (const char*)t2[0].fourth);
-            // don't end_read yet
 
             // Do a new change while stil having current read transaction open
             {
-                Group& g1 = shared.begin_write();
-                TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+                WriteTransaction wt(sg);
+                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1->add(2, 3, true, "more test");
-                shared.commit();
+                wt.commit();
             }
 
             // Verify that that the read transaction does not see
@@ -233,10 +212,10 @@ TEST(Shared1)
             // Do one more new change while stil having current read transaction open
             // so we know that it does not overwrite data held by
             {
-                Group& g1 = shared.begin_write();
-                TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+                WriteTransaction wt(sg);
+                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1->add(0, 1, false, "even more test");
-                shared.commit();
+                wt.commit();
             }
 
             // Verify that that the read transaction does still not see
@@ -246,15 +225,12 @@ TEST(Shared1)
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
             CHECK_EQUAL("test", (const char*)t2[0].fourth);
-
-            // Close read transaction
-            shared2.end_read();
         }
 
         // Start a new read transaction and verify that it can now see the changes
         {
-            const Group& g3 = shared2.begin_read();
-            TestTableShared::ConstRef t3 = g3.get_table<TestTableShared>("test");
+            ReadTransaction rt(sg2);
+            TestTableShared::ConstRef t3 = rt.get_table<TestTableShared>("test");
 
             CHECK(t3->size() == 3);
             CHECK_EQUAL(1, t3[0].first);
@@ -269,14 +245,11 @@ TEST(Shared1)
             CHECK_EQUAL(1, t3[2].second);
             CHECK_EQUAL(false, t3[2].third);
             CHECK_EQUAL("even more test", (const char*)t3[2].fourth);
-
-            shared2.end_read();
         }
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_rollback)
@@ -287,68 +260,63 @@ TEST(Shared_rollback)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
+        SharedGroup sg("test_shared.tightdb");
 
         // Create first table in group (but rollback)
         {
-            Group& g1 = shared.begin_write();
-            TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
-            shared.rollback();
+            // Note: Implicit rollback
         }
 
         // Verify that no changes were made
         {
-            const Group& g1 = shared.begin_read();
-            CHECK_EQUAL(false, g1.has_table("test"));
-            shared.end_read();
+            ReadTransaction rt(sg);
+            CHECK_EQUAL(false, rt.get_group().has_table("test"));
         }
 
         // Really create first table in group
         {
-            Group& g1 = shared.begin_write();
-            TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
-            shared.commit();
+            wt.commit();
         }
 
         // Verify that the changes were made
         {
-            const Group& g1 = shared.begin_read();
-            TestTableShared::ConstRef t = g1.get_table<TestTableShared>("test");
+            ReadTransaction rt(sg);
+            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
             CHECK(t->size() == 1);
             CHECK_EQUAL(1, t[0].first);
             CHECK_EQUAL(2, t[0].second);
             CHECK_EQUAL(false, t[0].third);
             CHECK_EQUAL("test", (const char*)t[0].fourth);
-            shared.end_read();
         }
 
         // Greate more changes (but rollback)
         {
-            Group& g1 = shared.begin_write();
-            TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(0, 0, true, "more test");
-            shared.rollback();
+            // Note: Implicit rollback
         }
 
         // Verify that no changes were made
         {
-            const Group& g1 = shared.begin_read();
-            TestTableShared::ConstRef t = g1.get_table<TestTableShared>("test");
+            ReadTransaction rt(sg);
+            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
             CHECK(t->size() == 1);
             CHECK_EQUAL(1, t[0].first);
             CHECK_EQUAL(2, t[0].second);
             CHECK_EQUAL(false, t[0].third);
             CHECK_EQUAL("test", (const char*)t[0].fourth);
-            shared.end_read();
         }
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_Writes)
@@ -359,38 +327,35 @@ TEST(Shared_Writes)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
+        SharedGroup sg("test_shared.tightdb");
 
         // Create first table in group
         {
-            Group& g1 = shared.begin_write();
-            TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(0, 2, false, "test");
-            shared.commit();
+            wt.commit();
         }
 
         // Do a lot of repeated write transactions
         for (size_t i = 0; i < 100; ++i) {
-            Group& g1 = shared.begin_write();
-            TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1[0].first += 1;
-            shared.commit();
+            wt.commit();
         }
 
         // Verify that the changes were made
         {
-            const Group& g1 = shared.begin_read();
-            TestTableShared::ConstRef t = g1.get_table<TestTableShared>("test");
+            ReadTransaction rt(sg);
+            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
             const int64_t v = t[0].first;
             CHECK_EQUAL(100, v);
-            shared.end_read();
         }
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 namespace {
@@ -404,41 +369,39 @@ TEST(Shared_Writes_SpecialOrder)
     remove("test.tightdb");
     remove("test.tightdb.lock");
 
-    SharedGroup db("test.tightdb");
-    CHECK(db.is_valid());
+    SharedGroup sg("test.tightdb");
 
     const int num_rows = 5; // FIXME: Should be strictly greater than MAX_LIST_SIZE, but that takes a loooooong time!
     const int num_reps = 25;
 
     {
-        Group& group = db.begin_write();
-        MyTable_SpecialOrder::Ref table = group.get_table<MyTable_SpecialOrder>("test");
+        WriteTransaction wt(sg);
+        MyTable_SpecialOrder::Ref table = wt.get_table<MyTable_SpecialOrder>("test");
         for (int i=0; i<num_rows; ++i) {
             table->add(0);
         }
+        wt.commit();
     }
-    db.commit();
 
     for (int i=0; i<num_rows; ++i) {
         for (int j=0; j<num_reps; ++j) {
             {
-                Group& group = db.begin_write();
-                MyTable_SpecialOrder::Ref table = group.get_table<MyTable_SpecialOrder>("test");
+                WriteTransaction wt(sg);
+                MyTable_SpecialOrder::Ref table = wt.get_table<MyTable_SpecialOrder>("test");
                 CHECK_EQUAL(j, table[i].first);
                 ++table[i].first;
+                wt.commit();
             }
-            db.commit();
         }
     }
 
     {
-        const Group& group = db.begin_read();
-        MyTable_SpecialOrder::ConstRef table = group.get_table<MyTable_SpecialOrder>("test");
+        ReadTransaction rt(sg);
+        MyTable_SpecialOrder::ConstRef table = rt.get_table<MyTable_SpecialOrder>("test");
         for (int i=0; i<num_rows; ++i) {
             CHECK_EQUAL(num_reps, table[i].first);
         }
     }
-    db.end_read();
 }
 
 namespace  {
@@ -450,29 +413,26 @@ void* IncrementEntry(void* arg )
     const size_t row_id = (size_t)arg;
 
     // Open shared db
-    SharedGroup shared("test_shared.tightdb");
-    CHECK(shared.is_valid());
+    SharedGroup sg("test_shared.tightdb");
 
     for (size_t i = 0; i < 100; ++i) {
         // Increment cell
         {
-            Group& g1 = shared.begin_write();
-            TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1[row_id].first += 1;
-            shared.commit();
+            wt.commit();
         }
 
         // Verify in new transaction so that we interleave
         // read and write transactions
         {
-            const Group& g1 = shared.begin_read();
-            TestTableShared::ConstRef t = g1.get_table<TestTableShared>("test");
+            ReadTransaction rt(sg);
+            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
             const int64_t v = t[row_id].first;
             const int64_t expected = i+1;
             CHECK_EQUAL(expected, v);
-
-            shared.end_read();
         }
     }
     return NULL;
@@ -488,19 +448,18 @@ TEST(Shared_WriterThreads)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
+        SharedGroup sg("test_shared.tightdb");
 
         const size_t thread_count = 10;
 
         // Create first table in group
         {
-            Group& g1 = shared.begin_write();
-            TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             for (size_t i = 0; i < thread_count; ++i) {
                 t1->add(0, 2, false, "test");
             }
-            shared.commit();
+            wt.commit();
         }
 
         pthread_t threads[thread_count];
@@ -519,20 +478,18 @@ TEST(Shared_WriterThreads)
 
         // Verify that the changes were made
         {
-            const Group& g1 = shared.begin_read();
-            TestTableShared::ConstRef t = g1.get_table<TestTableShared>("test");
+            ReadTransaction rt(sg);
+            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
             for (size_t i = 0; i < thread_count; ++i) {
                 const int64_t v = t[i].first;
                 CHECK_EQUAL(100, v);
             }
-            shared.end_read();
         }
     }
 
     // Verify that lock file was deleted after use
-    const int rc = access("test_shared.tightdb.lock", F_OK);
-    CHECK_EQUAL(-1, rc);
+    CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
 
@@ -540,11 +497,10 @@ TEST(Shared_FormerErrorCase1)
 {
     remove("test_shared.tightdb");
     remove("test_shared.tightdb.lock");
-    SharedGroup db("test_shared.tightdb");
-    CHECK(db.is_valid());
+    SharedGroup sg("test_shared.tightdb");
     {
-        Group& group = db.begin_write();
-        TableRef table = group.get_table("my_table");
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("my_table");
         {
             Spec& spec = table->get_spec();
             spec.add_column(COLUMN_TYPE_INT, "alpha");
@@ -565,113 +521,112 @@ TEST(Shared_FormerErrorCase1)
         }
         table->update_from_spec();
         table->insert_empty_row(0, 1);
+        wt.commit();
     }
-    db.commit();
 
     {
-        Group& group = db.begin_write();
-        static_cast<void>(group);
+        WriteTransaction wt(sg);
+        wt.commit();
     }
-    db.commit();
 
     {
-        Group& group = db.begin_write();
+        WriteTransaction wt(sg);
         {
-            TableRef table = group.get_table("my_table");
+            TableRef table = wt.get_table("my_table");
             table->set_int(0, 0, 1);
         }
+        wt.commit();
     }
-    db.commit();
 
     {
-        Group& group = db.begin_write();
+        WriteTransaction wt(sg);
         {
-            TableRef table = group.get_table("my_table");
+            TableRef table = wt.get_table("my_table");
             table->set_int(0, 0, 2);
         }
+        wt.commit();
     }
-    db.commit();
 
     {
-        Group& group = db.begin_write();
+        WriteTransaction wt(sg);
         {
-            TableRef table = group.get_table("my_table");
+            TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
             table2->insert_int(0, 0, 0);
             table2->insert_subtable(1, 0);
             table2->insert_done();
         }
         {
-            TableRef table = group.get_table("my_table");
+            TableRef table = wt.get_table("my_table");
             table->set_int(0, 0, 3);
         }
+        wt.commit();
     }
-    db.commit();
 
     {
-        Group& group = db.begin_write();
+        WriteTransaction wt(sg);
         {
-            TableRef table = group.get_table("my_table");
+            TableRef table = wt.get_table("my_table");
             table->set_int(0, 0, 4);
         }
+        wt.commit();
     }
-    db.commit();
 
     {
-        Group& group = db.begin_write();
+        WriteTransaction wt(sg);
         {
-            TableRef table = group.get_table("my_table");
+            TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
             TableRef table3 = table2->get_subtable(1, 0);
             table3->insert_empty_row(0, 1);
         }
+        wt.commit();
     }
-    db.commit();
 
     {
-        Group& group = db.begin_write();
+        WriteTransaction wt(sg);
         {
-            TableRef table = group.get_table("my_table");
+            TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
             TableRef table3 = table2->get_subtable(1, 0);
             table3->insert_empty_row(1, 1);
         }
+        wt.commit();
     }
-    db.commit();
 
     {
-        Group& group = db.begin_write();
+        WriteTransaction wt(sg);
         {
-            TableRef table = group.get_table("my_table");
+            TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
             TableRef table3 = table2->get_subtable(1, 0);
             table3->set_int(0, 0, 0);
         }
         {
-            TableRef table = group.get_table("my_table");
+            TableRef table = wt.get_table("my_table");
             table->set_int(0, 0, 5);
         }
         {
-            TableRef table = group.get_table("my_table");
+            TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
             table2->set_int(0, 0, 1);
         }
+        wt.commit();
     }
-    db.commit();
 
     {
-        Group& group = db.begin_write();
-        TableRef table = group.get_table("my_table");
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("my_table");
         table = table->get_subtable(6, 0);
         table = table->get_subtable(1, 0);
         table->set_int(0, 1, 1);
-        table = group.get_table("my_table");
+        table = wt.get_table("my_table");
         table->set_int(0, 0, 6);
-        table = group.get_table("my_table");
+        table = wt.get_table("my_table");
         table = table->get_subtable(6, 0);
         table->set_int(0, 0, 2);
+        wt.commit();
     }
-    db.commit();
 }
 
 
@@ -692,11 +647,10 @@ TEST(Shared_FormerErrorCase2)
     remove("test_shared.tightdb.lock");
 
     for (int i=0; i<10; ++i) {
-        SharedGroup db("test_shared.tightdb");
-        CHECK(db.is_valid());
+        SharedGroup sg("test_shared.tightdb");
         {
-            Group& group = db.begin_write();
-            FormerErrorCase2_Table::Ref table = group.get_table<FormerErrorCase2_Table>("table");
+            WriteTransaction wt(sg);
+            FormerErrorCase2_Table::Ref table = wt.get_table<FormerErrorCase2_Table>("table");
             table->add();
             table->add();
             table->add();
@@ -705,8 +659,8 @@ TEST(Shared_FormerErrorCase2)
             table->clear();
             table->add();
             table[0].bar->add();
+            wt.commit();
         }
-        db.commit();
     }
 }
 
@@ -726,25 +680,22 @@ TEST(Shared_SpaceOveruse)
     {
         remove("over_alloc_1.tightdb");
         remove("over_alloc_1.tightdb.lock");
-        SharedGroup db("over_alloc_1.tightdb");
-        CHECK(db.is_valid());
+        SharedGroup sg("over_alloc_1.tightdb");
 
         // Do a lot of sequential transactions
         for (int i = 0; i < n_outer; ++i) {
-            {
-                Group& group = db.begin_write();
-                OverAllocTable::Ref table = group.get_table<OverAllocTable>("my_table");
-                for (int j = 0; j < n_inner; ++j) {
-                    table->add("x");
-                }
+            WriteTransaction wt(sg);
+            OverAllocTable::Ref table = wt.get_table<OverAllocTable>("my_table");
+            for (int j = 0; j < n_inner; ++j) {
+                table->add("x");
             }
-            db.commit();
+            wt.commit();
         }
 
         // Verify that all was added correctly
         {
-            const Group& group = db.begin_read();
-            OverAllocTable::ConstRef table = group.get_table<OverAllocTable>("my_table");
+            ReadTransaction rt(sg);
+            OverAllocTable::ConstRef table = rt.get_table<OverAllocTable>("my_table");
 
             const size_t count = table->size();
             CHECK_EQUAL(n_outer * n_inner, count);
@@ -756,8 +707,6 @@ TEST(Shared_SpaceOveruse)
 #ifdef TIGHTDB_DEBUG
             table->Verify();
 #endif
-
-            db.end_read();
         }
     }
 }
@@ -770,54 +719,49 @@ TEST(Shared_Notifications)
 
     {
         // Create a new shared db
-        SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
+        SharedGroup sg("test_shared.tightdb");
 
         // No other instance have changed db since last transaction
-        CHECK(!shared.has_changed());
+        CHECK(!sg.has_changed());
 
         {
             // Open the same db again (in empty state)
-            SharedGroup shared2("test_shared.tightdb");
-            CHECK(shared2.is_valid());
+            SharedGroup sg2("test_shared.tightdb");
 
             // Verify that new group is empty
             {
-                const Group& g1 = shared2.begin_read();
-                CHECK(g1.is_empty());
-                shared2.end_read();
+                ReadTransaction rt(sg2);
+                CHECK(rt.get_group().is_empty());
             }
 
             // No other instance have changed db since last transaction
-            CHECK(!shared2.has_changed());
+            CHECK(!sg2.has_changed());
 
             // Add a new table
             {
-                Group& g1 = shared2.begin_write();
-                TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+                WriteTransaction wt(sg2);
+                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1->add(1, 2, false, "test");
-                shared2.commit();
+                wt.commit();
             }
         }
 
         // Db has been changed by other instance
-        CHECK(shared.has_changed());
+        CHECK(sg.has_changed());
 
         // Verify that the new table has been added
         {
-            const Group& g1 = shared.begin_read();
-
-            TestTableShared::ConstRef t1 = g1.get_table<TestTableShared>("test");
+            ReadTransaction rt(sg);
+            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
             CHECK_EQUAL(1, t1->size());
             CHECK_EQUAL(1, t1[0].first);
             CHECK_EQUAL(2, t1[0].second);
             CHECK_EQUAL(false, t1[0].third);
             CHECK_EQUAL("test", (const char*)t1[0].fourth);
-            shared.end_read();
         }
 
         // No other instance have changed db since last transaction
-        CHECK(!shared.has_changed());
+        CHECK(!sg.has_changed());
     }
 }
 
@@ -836,22 +780,18 @@ TEST(Shared_FromSerialized)
     }
 
     // Open same file as shared group
-    SharedGroup shared("test_shared.tightdb");
-    CHECK(shared.is_valid());
+    SharedGroup sg("test_shared.tightdb");
 
     // Verify that contents is there when shared
     {
-        const Group& g1 = shared.begin_read();
-
-        TestTableShared::ConstRef t1 = g1.get_table<TestTableShared>("test");
+        ReadTransaction rt(sg);
+        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
         CHECK_EQUAL(1, t1->size());
         CHECK_EQUAL(1, t1[0].first);
         CHECK_EQUAL(2, t1[0].second);
         CHECK_EQUAL(false, t1[0].third);
         CHECK_EQUAL("test", (const char*)t1[0].fourth);
-        shared.end_read();
     }
 }
 
-
-#endif // !_MSV_VER
+#endif // Shared PTHREAD mutexes appear not to work on Windows

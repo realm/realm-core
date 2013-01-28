@@ -2,9 +2,16 @@
 #include <iostream>
 #include <UnitTest++.h>
 #include <tightdb/utilities.hpp>
+
+// FIXME: I suggest we enable this only if
+// TIGHTDB_VISUAL_LEAK_DETECTOR is defined. It is problematic that we
+// cannot run the unit tests witout installing this (and indeed
+// installing it in that particular location)
+/*
 #if defined(_MSC_VER) && defined(_DEBUG)
-    #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
+#  include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
+*/
 
 using namespace std;
 

@@ -120,10 +120,10 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype)
     if (type != newtype) m_types->Set(ndx, newtype);
 }
 
-ColumnType ColumnMixed::GetType(size_t ndx) const
+ColumnType ColumnMixed::GetType(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
-    return (ColumnType)m_types->Get(ndx);
+    return ColumnType(m_types->Get(ndx));
 }
 
 int64_t ColumnMixed::GetInt(size_t ndx) const
