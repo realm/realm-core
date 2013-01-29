@@ -34,17 +34,7 @@ void ColumnStringEnum::UpdateFromParent()
     m_keys.UpdateFromParent();
 }
 
-size_t ColumnStringEnum::Size() const
-{
-    return Column::Size();
-}
-
-bool ColumnStringEnum::is_empty() const
-{
-    return Column::is_empty();
-}
-
-const char* ColumnStringEnum::Get(size_t ndx) const
+const char* ColumnStringEnum::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Column::Size());
     const size_t key_ndx = Column::GetAsRef(ndx);

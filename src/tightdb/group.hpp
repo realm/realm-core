@@ -37,8 +37,9 @@ class SharedGroup;
 
 class Group: private Table::Parent {
 public:
-    /// Throws std::bad_alloc in the event of a memory allocation
-    /// error.
+    /// Construct a free-standing group. This group instance will be
+    /// in the attached state, but neither associated with a file, nor
+    /// with an external memory buffer.
     Group();
 
     enum OpenMode {
@@ -47,26 +48,9 @@ public:
         mode_NoCreate  ///< Open in read/write mode, fail if the file does not already exist.
     };
 
-    /// Construct a group from a file.
-    ///
-    /// If the specified file exists in the file system, it must
-    /// contain a valid TightDB database. If the file does not exist,
-    /// it will be created. A group constructed this way, is the
-    /// primary means of accesing and manipulating a TightDB database.
-    ///
-    /// Changes made to the database via the group are not
-    /// automatically committed to the specified file. You may,
-    /// however, at any time, explicitely commit your changes by
-    /// calling the commit() method. Alternatively you may call
-    /// write() to write the entire database to a new file.
-    ///
-    /// Throws NoSuchFile if the file did not exist and \a mode was
-    /// not mode_Normal. Throws PermissionDenied if the file could not
-    /// be opened or created due to a permission constraint. Throws
-    /// InvalidDatabase if the specified file does not appear to
-    /// contain a valid database. May also throw std::bad_alloc and
-    /// std::runtime_error.
-    explicit Group(const std::string& path, OpenMode mode = mode_Normal);
+    /// Equivalent to calling open(const std::string&, OpenMode) on a
+    /// default constructed instance.
+    explicit Group(const std::string& file, OpenMode = mode_Normal);
 
     /// Specification of a memory buffer. The purpose of this class is
     /// neither to allocate nor to deallocate memory. Its only purpose
@@ -78,7 +62,51 @@ public:
         BufferSpec(char* d, std::size_t s): m_data(d), m_size(s) {}
     };
 
-    /// Construct a group from a memory buffer.
+    /// Equivalent to calling open(BufferSpec, bool) on a default
+    /// constructed instance.
+    explicit Group(BufferSpec, bool take_ownership = true);
+
+    struct unattached_tag {};
+
+    /// Create a Group instance in its unattached state. It may then
+    /// be attached to a database file later by calling one of the
+    /// open() methods. You may test whether this instance is
+    /// currently in its attached state by calling
+    /// is_attached(). Calling any other method (except the
+    /// destructor) while in the unattached state has undefined
+    /// behavior.
+    Group(unattached_tag) TIGHTDB_NOEXCEPT;
+
+    ~Group();
+
+    /// Attach this Group instance to the specified database file.
+    ///
+    /// If the specified file exists in the file system, it must
+    /// contain a valid TightDB database. If the file does not exist,
+    /// it will be created (unless mode_NoCreate is specified). While
+    /// a group constructed this way, can be used to access and
+    /// manipulate a TightDB database, it is generally better to use a
+    /// SharedGroup instance along with proper transactions.
+    ///
+    /// Changes made to the database via a Group instance are not
+    /// automatically committed to the specified file. You may,
+    /// however, at any time, explicitely commit your changes by
+    /// calling the commit() method. Alternatively you may call
+    /// write() to write the entire database to a new file.
+    ///
+    /// Calling open() on a Group instance that is already in the
+    /// attached state has undefined behavior.
+    ///
+    /// \param file Filesystem path to a TightDB database file.
+    ///
+    /// \throw File::OpenError If the file could not be opened. If the
+    /// reason corresponds to one of the exception types that are
+    /// derived from File::OpenError, the derived exception type is
+    /// thrown. Note that InvalidDatabase is among these derived
+    /// exception types.
+    void open(const std::string& file, OpenMode = mode_Normal);
+
+    /// Attach this Group instance to the specified memory buffer.
     ///
     /// This is similar to constructing a group from a file except
     /// that in this case the database is assumed to be stored in the
@@ -95,15 +123,20 @@ public:
     /// buffer needs to be deallocated afterwards, that is your
     /// responsibility too.
     ///
-    /// Throws InvalidDatabase if the specified buffer does not appear
-    /// to contain a valid database. Throws std::bad_alloc in the
-    /// event of a memory allocation error.
-    Group(BufferSpec buffer, bool take_ownership = true);
+    /// Calling open() on a Group instance that is already in the
+    /// attached state has undefined behavior.
+    ///
+    /// \throw InvalidDatabase If the specified buffer does not appear
+    /// to contain a valid database.
+    void open(BufferSpec, bool take_ownership = true);
 
-    ~Group();
+    /// A group may be created in the unattached state, and then later
+    /// attached to a file with a call to open(). Calling any method
+    /// other than open(), is_attached(), and ~Group() on an
+    /// unattached instance results in undefined behavior.
+    bool is_attached() const TIGHTDB_NOEXCEPT;
 
-    bool is_shared() const {return m_is_shared;}
-    bool is_empty() const;
+    bool is_empty() const TIGHTDB_NOEXCEPT;
 
     size_t get_table_count() const;
     const char* get_table_name(size_t table_ndx) const;
@@ -120,18 +153,25 @@ public:
 
     // Serialization
 
-    /// Throws PermissionDenied if the file could not be opened or
-    /// created due to a permission constraint. May also throw
-    /// std::bad_alloc and std::runtime_error.
-    void write(const std::string& path);
+    /// Write this database to a file. If the file exists already, it
+    /// will be truncated first.
+    ///
+    /// \param file A filesystem path.
+    ///
+    /// \throw File::OpenError If the file could not be opened. If the
+    /// reason corresponds to one of the exception types that are
+    /// derived from File::OpenError, the derived exception type is
+    /// thrown.
+    void write(const std::string& file);
 
-    /// Ownership of the returned memory buffer is transferred to the
+    /// Write this database to a memory buffer.
+    ///
+    /// Ownership of the returned buffer is transferred to the
     /// caller. The memory will have been allocated using
-    /// std::malloc(). Throws std::bad_alloc in the event of a memory
-    /// allocation error.
+    /// std::malloc().
     BufferSpec write_to_mem();
 
-    bool commit();
+    void commit();
 
     // Conversion
     template<class S> void to_json(S& out) const;
@@ -147,7 +187,7 @@ public:
     bool operator!=(const Group& g) const { return !(*this == g); }
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const; // Uncapitalized 'verify' cannot be used due to conflict with macro in Obj-C
     void print() const;
     void print_free() const;
     MemStats stats();
@@ -212,12 +252,12 @@ protected:
     Array m_freeLengths;
     Array m_freeVersions;
     mutable Array m_cachedtables;
-    bool m_is_shared;
+    const bool m_is_shared;
     size_t m_readlock_version;
 
 private:
     struct shared_tag {};
-    Group(shared_tag);
+    Group(shared_tag) TIGHTDB_NOEXCEPT;
 
     Table* get_table_ptr(const char* name);
     Table* get_table_ptr(const char* name, bool& was_created);
@@ -240,9 +280,85 @@ private:
 
 
 
+
+
 // Implementation
 
-inline const Table* Group::get_table_ptr(size_t ndx) const
+inline Group::Group():
+    m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
+    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc),
+    m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc),
+    m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_is_shared(false)
+{
+    create();
+}
+
+inline Group::Group(const std::string& file, OpenMode mode):
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
+{
+    open(file, mode);
+}
+
+inline Group::Group(BufferSpec buffer, bool take_ownership):
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
+{
+    open(buffer, take_ownership);
+}
+
+inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false) {}
+
+inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:
+    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
+    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(true) {}
+
+inline void Group::open(const std::string& file, OpenMode mode)
+{
+    TIGHTDB_ASSERT(!is_attached());
+    create_from_file(file, mode, true);
+}
+
+inline void Group::open(BufferSpec buffer, bool take_ownership)
+{
+    TIGHTDB_ASSERT(!is_attached());
+    TIGHTDB_ASSERT(buffer.m_data);
+    m_alloc.attach_buffer(buffer.m_data, buffer.m_size, take_ownership);
+    create_from_ref(m_alloc.GetTopRef()); // FIXME: Throws and leaves the Group in peril
+}
+
+inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
+{
+    return m_alloc.is_attached();
+}
+
+inline bool Group::is_empty() const TIGHTDB_NOEXCEPT
+{
+    if (!m_top.IsValid()) return true;
+    return m_tableNames.is_empty();
+}
+
+inline bool Group::in_initial_state() const
+{
+    return !m_top.IsValid();
+}
+
+inline std::size_t Group::get_table_count() const
+{
+    if (!m_top.IsValid()) return 0;
+    return m_tableNames.Size();
+}
+
+inline const char* Group::get_table_name(std::size_t table_ndx) const
+{
+    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(table_ndx < m_tableNames.Size());
+    return m_tableNames.Get(table_ndx);
+}
+
+inline const Table* Group::get_table_ptr(std::size_t ndx) const
 {
     return const_cast<Group*>(this)->get_table_ptr(ndx);
 }
@@ -250,7 +366,6 @@ inline const Table* Group::get_table_ptr(size_t ndx) const
 inline bool Group::has_table(const char* name) const
 {
     if (!m_top.IsValid()) return false;
-
     const size_t i = m_tableNames.find_first(name);
     return i != size_t(-1);
 }
@@ -339,10 +454,15 @@ template<class T> inline typename T::ConstRef Group::get_table(const char* name)
     return get_table_ptr<T>(name)->get_table_ref();
 }
 
+inline void Group::commit()
+{
+    commit(-1, -1, true);
+}
+
 template<class S> size_t Group::write_to_stream(S& out)
 {
     // Space for file header
-    out.write(default_header, header_len);
+    out.write(SlabAlloc::default_header, sizeof SlabAlloc::default_header);
 
     // When serializing to disk we dont want
     // to include free space tracking as serialized
@@ -360,6 +480,16 @@ template<class S> size_t Group::write_to_stream(S& out)
     //  zero, it is the first ref block that is valid)
     out.seek(0);
     out.write((const char*)&topPos, 8);
+
+    // FIXME: To be 100% robust with respect to being able to detect
+    // afterwards whether the file was completely written, we would
+    // have to put a sync() here and then proceed to write the T-DB
+    // bytes into the header. Also, if it is possible that the file is
+    // left with random contents if the host looses power before our
+    // call to sync() has completed, then we must initially resize the
+    // file to header_len - 1, fill with zeroes, and call sync(). If
+    // the file is then found later with size header_len - 1, it will
+    // be considered invalid.
 
     // Clean up temporary top
     top.Set(0, 0); // reset to avoid recursive delete

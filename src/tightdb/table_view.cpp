@@ -1,6 +1,5 @@
 #include <tightdb/table_view.hpp>
 #include <tightdb/column.hpp>
-#include <assert.h>
 
 namespace tightdb {
 

@@ -57,7 +57,7 @@ ${j+1}%slurp
 %for $j in range($num_cols)
         typename Col<$j>::type name${j+1}; \\
 %end for
-        ColNames(Init i): %slurp
+        ColNames(Init i) TIGHTDB_NOEXCEPT: %slurp
 %for $j in range($num_cols)
 %if 0 < $j
 , %slurp

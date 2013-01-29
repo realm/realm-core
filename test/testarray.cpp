@@ -2,13 +2,18 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+
 #include <UnitTest++.h>
+
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 #include "testsettings.hpp"
 
+using namespace std;
 using namespace tightdb;
+
+namespace {
 
 struct db_setup_array {
     static Array c;
@@ -16,12 +21,31 @@ struct db_setup_array {
 
 Array db_setup_array::c;
 
-// Pre-declare local functions
-uint64_t rand2(void);
-template<class T, class U> bool vector_eq_array(const std::vector<T>& v, const U& a);
-template<class T, class U> bool findall_test(std::vector<T>& v, U& a, T val);
-template<class T> std::vector<size_t> findall_vector(std::vector<T>& v, T val);
-void hasZeroByte(int64_t value, size_t reps);
+void hasZeroByte(int64_t value, size_t reps)
+{
+    Array a;
+    Array r;
+
+    for (size_t i = 0; i < reps - 1; i++){
+        a.add(value);
+    }
+
+    a.add(0);
+
+    size_t t = a.find_first(0);
+    CHECK_EQUAL(a.Size() - 1, t);
+
+    r.Clear();
+    a.find_all(r, 0);
+    CHECK_EQUAL(int64_t(a.Size() - 1), r.Get(0));
+
+    // Cleanup
+    a.Destroy();
+    r.Destroy();
+}
+
+} // anonymous namespace
+
 
 TEST_FIXTURE(db_setup_array, Array_Add0)
 {
@@ -716,29 +740,6 @@ TEST(findallint7)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
-
-    // Cleanup
-    a.Destroy();
-    r.Destroy();
-}
-
-void hasZeroByte(int64_t value, size_t reps)
-{
-    Array a;
-    Array r;
-
-    for (size_t i = 0; i < reps - 1; i++){
-        a.add(value);
-    }
-
-    a.add(0);
-
-    size_t t = a.find_first(0);
-    CHECK_EQUAL(a.Size() - 1, t);
-
-    r.Clear();
-    a.find_all(r, 0);
-    CHECK_EQUAL(int64_t(a.Size() - 1), r.Get(0));
 
     // Cleanup
     a.Destroy();

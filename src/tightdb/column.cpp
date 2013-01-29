@@ -1,15 +1,10 @@
+#include <stdint.h> // unint8_t etc
 #include <cstdlib>
 #include <cstring>
 #include <cstdio> // debug output
 #include <climits> // size_t
 #include <iostream>
 #include <iomanip>
-
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
-#include <stdint.h> // unint8_t etc
-#endif
 
 #include <tightdb/column.hpp>
 #include <tightdb/index.hpp>
@@ -252,7 +247,7 @@ bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, voi
 
 namespace tightdb {
 
-size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc)
+size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     Array a(ref, 0, 0, alloc);
     if (!a.IsNode()) return a.Size();
@@ -286,6 +281,7 @@ Column::Column(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc): 
 Column::Column(const Column& column): ColumnBase(), m_index(0)
 {
     m_array = column.m_array; // we now own array
+    // FIXME: Unfortunate hidden constness violation here
     column.m_array = 0;       // so invalidate source
 }
 
@@ -324,14 +320,14 @@ void Column::Destroy()
 }
 
 
-bool Column::is_empty() const
+bool Column::is_empty() const TIGHTDB_NOEXCEPT
 {
     if (!IsNode()) return m_array->is_empty();
     const Array offsets = NodeGetOffsets();
     return offsets.is_empty();
 }
 
-size_t Column::Size() const
+size_t Column::Size() const TIGHTDB_NOEXCEPT
 {
     if (!IsNode()) return m_array->Size();
     const Array offsets = NodeGetOffsets();
@@ -372,17 +368,6 @@ void Column::Clear()
 {
     m_array->Clear();
     if (m_array->IsNode()) m_array->SetType(COLUMN_NORMAL);
-}
-
-int64_t Column::Get(size_t ndx) const
-{
-    return m_array->ColumnGet(ndx);
-    //return TreeGet<int64_t, Column>(ndx);
-}
-
-size_t Column::GetAsRef(size_t ndx) const
-{
-    return to_ref(TreeGet<int64_t, Column>(ndx));
 }
 
 bool Column::Set(size_t ndx, int64_t value)
@@ -608,28 +593,16 @@ size_t ColumnBase::GetRefSize(size_t ref) const
     return (header[1] << 16) + (header[2] << 8) + header[3];
 }
 
-Array ColumnBase::NodeGetOffsets()
+Array ColumnBase::NodeGetOffsets() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(IsNode());
-    return m_array->GetSubArray(0);
+    return m_array->GetSubArray(0); // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
 }
 
-const Array ColumnBase::NodeGetOffsets() const
+Array ColumnBase::NodeGetRefs() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(IsNode());
-    return m_array->GetSubArray(0);
-}
-
-Array ColumnBase::NodeGetRefs()
-{
-    TIGHTDB_ASSERT(IsNode());
-    return m_array->GetSubArray(1);
-}
-
-const Array ColumnBase::NodeGetRefs() const
-{
-    TIGHTDB_ASSERT(IsNode());
-    return m_array->GetSubArray(1);
+    return m_array->GetSubArray(1); // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
 }
 
 bool ColumnBase::NodeUpdateOffsets(size_t ndx)
@@ -768,7 +741,7 @@ void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, siz
     }
 }
 
-size_t Column::find_pos(int64_t target) const
+size_t Column::find_pos(int64_t target) const TIGHTDB_NOEXCEPT
 {
     // NOTE: Binary search only works if the column is sorted
 
@@ -776,7 +749,7 @@ size_t Column::find_pos(int64_t target) const
         return m_array->FindPos(target);
     }
 
-    const int len = (int)Size();
+    const int len = int(Size());
     int low = -1;
     int high = len;
 
@@ -784,11 +757,11 @@ size_t Column::find_pos(int64_t target) const
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
     // Finds position of largest value SMALLER than the target
     while (high - low > 1) {
-        const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+        const size_t probe = (unsigned(low) + unsigned(high)) >> 1;
         const int64_t v = Get(probe);
 
-        if (v > target) high = (int)probe;
-        else            low = (int)probe;
+        if (v > target) high = int(probe);
+        else            low  = int(probe);
     }
     if (high == len) return not_found;
     else return high;
@@ -802,7 +775,7 @@ size_t Column::find_pos2(int64_t target) const
         return m_array->FindPos2(target);
     }
 
-    const int len = (int)Size();
+    const int len = int(Size());
     int low = -1;
     int high = len;
 
@@ -813,8 +786,8 @@ size_t Column::find_pos2(int64_t target) const
         const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
         const int64_t v = Get(probe);
 
-        if (v < target) low  = (int)probe;
-        else            high = (int)probe;
+        if (v < target) low  = int(probe);
+        else            high = int(probe);
     }
     if (high == len) return not_found;
     else return high;

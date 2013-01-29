@@ -28,28 +28,9 @@ TIGHTDB_TABLE_1(TestTableShared,
 
 int main()
 {
-    // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
-
-    {
-        // Create a new shared db
-        SharedGroup shared("test_shared.tightdb");
-        CHECK(shared.is_valid());
-
-        {
-            // Open the same db again (in empty state)
-            SharedGroup shared2("test_shared.tightdb");
-            CHECK(shared2.is_valid());
-
-            // Add a new table
-            {
-                Group& g = shared2.begin_write();
-                TestTableShared::Ref t = g.get_table<TestTableShared>("test");
-            }
-            shared2.commit();
-        }
-    }
+    Array a;
+    for (int i=0; i<16; ++i) a.add(4300000000ULL);
+    a.Destroy();
 
     return 0;
 }
