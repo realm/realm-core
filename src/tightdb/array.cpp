@@ -369,10 +369,10 @@ int64_t Array::Get(size_t ndx) const
 
 // Two ideas that are not efficient but may be worth looking into again:
 /*
-    // Assume correct width is found early in TEMPEX, which is the case for B tree offsets that 
+    // Assume correct width is found early in TDB_TEMPEX, which is the case for B tree offsets that 
     // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
     // if found later
-    TEMPEX(return Get, (ndx));              
+    TDB_TEMPEX(return Get, (ndx));              
 */
 /*
     // Slightly slower in both of the if-cases. Also needs an matchcount m_len check too, to avoid
@@ -618,7 +618,7 @@ template <size_t w> size_t Array::FindPos(int64_t target) const
 
 size_t Array::FindPos(int64_t target) const
 {
-    TEMPEX(return FindPos, m_width, (target));
+    TDB_TEMPEX(return FindPos, m_width, (target));
 }
 
 // BM FIXME: Rename to something better... // FirstGTE()
@@ -909,17 +909,17 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
 
 bool Array::maximum(int64_t& result, size_t start, size_t end) const
 {
-    TEMPEX2(return minmax, true, m_width, (result, start, end));
+    TDB_TEMPEX2(return minmax, true, m_width, (result, start, end));
 }
 
 bool Array::minimum(int64_t& result, size_t start, size_t end) const
 {
-    TEMPEX2(return minmax, false, m_width, (result, start, end));
+    TDB_TEMPEX2(return minmax, false, m_width, (result, start, end));
 }
 
 int64_t Array::sum(size_t start, size_t end) const
 {
-    TEMPEX(return sum, m_width, (start, end));
+    TDB_TEMPEX(return sum, m_width, (start, end));
 }
 
 template <size_t w> int64_t Array::sum(size_t start, size_t end) const
@@ -1445,7 +1445,7 @@ bool Array::Alloc(size_t count, size_t width)
 
 void Array::SetWidth(size_t width)
 {
-    TEMPEX(SetWidth, width, ());
+    TDB_TEMPEX(SetWidth, width, ());
 }
 
 template <size_t width> void Array::SetWidth(void)
@@ -1563,7 +1563,7 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
 // Sort array.
 void Array::sort()
 {
-    TEMPEX(sort, m_width, ());
+    TDB_TEMPEX(sort, m_width, ());
 }
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
@@ -1608,7 +1608,7 @@ template <size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, 
 // is allowed to contain fewer elements than m_array.
 void Array::ReferenceSort(Array& ref)
 {
-    TEMPEX(ReferenceSort, m_width, (ref));
+    TDB_TEMPEX(ReferenceSort, m_width, (ref));
 }
 
 template <size_t w>void Array::ReferenceSort(Array& ref)
@@ -1729,7 +1729,7 @@ template <size_t w> void Array::sort()
 
 void Array::ReferenceQuickSort(Array& ref)
 {
-    TEMPEX(ReferenceQuickSort, m_width, (0, m_len - 1, ref));
+    TDB_TEMPEX(ReferenceQuickSort, m_width, (0, m_len - 1, ref));
 }
 
 template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref)
@@ -1788,7 +1788,7 @@ template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& r
 
 void Array::QuickSort(size_t lo, size_t hi)
 {
-    TEMPEX(QuickSort, m_width, (lo, hi);)
+    TDB_TEMPEX(QuickSort, m_width, (lo, hi);)
 }
 
 template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
@@ -1983,7 +1983,7 @@ template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx);
 
 int64_t GetDirect(const char* const data, size_t width, const size_t ndx)
 {
-    TEMPEX(return GetDirect, width, (data, ndx));
+    TDB_TEMPEX(return GetDirect, width, (data, ndx));
 }
 
 template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx)
@@ -2026,7 +2026,7 @@ template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx)
 
 size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width, const int64_t target)
 {
-    TEMPEX(return FindPosDirectImp, width, (header, data, target));
+    TDB_TEMPEX(return FindPosDirectImp, width, (header, data, target));
 }
 
 template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data, const int64_t target)
@@ -2086,7 +2086,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     QueryState<int64_t> state;
     state.state = (int64_t)&result;
 
-    TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
+    TDB_TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
 
     return;
 }
@@ -2095,102 +2095,102 @@ void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t en
 {
     if (cond == COND_EQUAL) {
         if (action == TDB_SUM) {
-            TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MIN) {
-            TEMPEX3(find, EQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, EQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MAX) {
-            TEMPEX3(find, EQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, EQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_COUNT) {
-            TEMPEX3(find, EQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, EQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_FINDALL) {
-            TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_CALLBACK_IDX) {
-            TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
     if (cond == COND_NOTEQUAL) {
         if (action == TDB_SUM) {
-            TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MIN) {
-            TEMPEX3(find, NOTEQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MAX) {
-            TEMPEX3(find, NOTEQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_COUNT) {
-            TEMPEX3(find, NOTEQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_FINDALL) {
-            TEMPEX3(find, NOTEQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_CALLBACK_IDX) {
-            TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
     if (cond == COND_GREATER) {
         if (action == TDB_SUM) {
-            TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MIN) {
-            TEMPEX3(find, GREATER, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, GREATER, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MAX) {
-            TEMPEX3(find, GREATER, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, GREATER, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_COUNT) {
-            TEMPEX3(find, GREATER, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, GREATER, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_FINDALL) {
-            TEMPEX3(find, GREATER, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, GREATER, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_CALLBACK_IDX) {
-            TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
     if (cond == COND_LESS) {
         if (action == TDB_SUM) {
-            TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MIN) {
-            TEMPEX3(find, LESS, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, LESS, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MAX) {
-            TEMPEX3(find, LESS, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, LESS, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_COUNT) {
-            TEMPEX3(find, LESS, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, LESS, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_FINDALL) {
-            TEMPEX3(find, LESS, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, LESS, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_CALLBACK_IDX) {
-            TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
     if (cond == COND_NONE) {
         if (action == TDB_SUM) {
-            TEMPEX3(find, NONE, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NONE, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MIN) {
-            TEMPEX3(find, NONE, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NONE, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MAX) {
-            TEMPEX3(find, NONE, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NONE, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_COUNT) {
-            TEMPEX3(find, NONE, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NONE, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_FINDALL) {
-            TEMPEX3(find, NONE, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NONE, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_CALLBACK_IDX) {
-            TEMPEX3(find, NONE, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TDB_TEMPEX3(find, NONE, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
 }

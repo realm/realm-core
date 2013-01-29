@@ -82,17 +82,17 @@ Searching: The main finding function is:
 // is too high. In short, the all-uppercase name space is reserved for
 // macros.
 //
-// todo, move
-enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
 
 namespace tightdb {
+
+enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
 
 #define NO0(v) ((v) == 0 ? 1 : (v))
 
 const size_t not_found = size_t(-1);
 
  /* wid == 16/32 likely when accessing offsets in B tree */
-#define TEMPEX(fun, wid, arg) \
+#define TDB_TEMPEX(fun, wid, arg) \
     if (wid == 16) {fun<16> arg;} \
     else if (wid == 32) {fun<32> arg;} \
     else if (wid == 0) {fun<0> arg;} \
@@ -103,7 +103,7 @@ const size_t not_found = size_t(-1);
     else if (wid == 64) {fun<64> arg;} \
     else {TIGHTDB_ASSERT(false); fun<0> arg;}
 
-#define TEMPEX2(fun, targ, wid, arg) \
+#define TDB_TEMPEX2(fun, targ, wid, arg) \
     if (wid == 16) {fun<targ, 16> arg;} \
     else if (wid == 32) {fun<targ, 32> arg;} \
     else if (wid == 0) {fun<targ, 0> arg;} \
@@ -114,7 +114,7 @@ const size_t not_found = size_t(-1);
     else if (wid == 64) {fun<targ, 64> arg;} \
     else {TIGHTDB_ASSERT(false); fun<targ, 0> arg;}
 
-#define TEMPEX3(fun, targ1, targ2, wid, arg) \
+#define TDB_TEMPEX3(fun, targ1, targ2, wid, arg) \
     if (wid == 16) {fun<targ1, targ2, 16> arg;} \
     else if (wid == 32) {fun<targ1, targ2, 32> arg;} \
     else if (wid == 0) {fun<targ1, targ2, 0> arg;} \
@@ -125,7 +125,7 @@ const size_t not_found = size_t(-1);
     else if (wid == 64) {fun<targ1, targ2, 64> arg;} \
     else {TIGHTDB_ASSERT(false); fun<targ1, targ2, 0> arg;}
 
-#define TEMPEX4(fun, targ1, targ2, wid, targ3, arg) \
+#define TDB_TEMPEX4(fun, targ1, targ2, wid, targ3, arg) \
     if (wid == 16) {fun<targ1, targ2, 16, targ3> arg;} \
     else if (wid == 32) {fun<targ1, targ2, 32, targ3> arg;} \
     else if (wid == 0) {fun<targ1, targ2, 0, targ3> arg;} \
@@ -1532,7 +1532,7 @@ template <class cond, ACTION action, size_t bitwidth> void Array::find(int64_t v
 
 template <class cond, ACTION action, class Callback> void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    TEMPEX4(find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
+    TDB_TEMPEX4(find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
 }
 
 template <class cond, ACTION action, size_t bitwidth, class Callback> void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const

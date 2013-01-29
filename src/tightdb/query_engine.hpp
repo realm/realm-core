@@ -20,9 +20,6 @@
 
 /*
 
-
-
-
 TConditionFunction: Each node has a condition from query_conditions.c such as EQUAL, GREATER_EQUAL, etc
 
 TConditionValue:    Type of values in condition column. That is, int64_t, float, int, bool, etc
@@ -34,9 +31,13 @@ TResult:            Type of result of actions - float, double, int64_t, etc. Spe
 
 TSourceColumn:      Type of source column used in actions, or *ignored* if no source column is used (like for 
                     TDB_COUNT, TDB_RETURN_FIRST)
-*/
 
 
+Each node has some functions:
+size_t find_first_local(start, end): Finds first match 
+
+
+                    */
 
 #ifndef TIGHTDB_QUERY_ENGINE_HPP
 #define TIGHTDB_QUERY_ENGINE_HPP
@@ -493,7 +494,6 @@ public:
         m_is_integer_node = true;
         m_condition_column_idx = column;
         m_child = 0;
-        TConditionFunction f;
         m_conds = 0;
         m_dT = 1.0;
         m_dD = 100.0;
@@ -861,29 +861,6 @@ public:
             m_child->Init(table);
     }
 
-    size_t find_first(size_t start, size_t end)
-    {
-        TConditionFunction condition;
-
-        for (size_t s = start; s < end; ++s) {
-            const char* t = m_condition_column->Get(s).pointer;
-            size_t len2 = m_condition_column->Get(s).len;
-
-            if (condition(m_value, m_len, t, len2)) {
-                if (m_child == 0)
-                    return s;
-                else {
-                    const size_t a = m_child->find_first(s, end);
-                    if (s == a)
-                        return s;
-                    else
-                        s = a - 1;
-                }
-            }
-        }
-        return end;
-    }
-
     size_t find_first_local(size_t start, size_t end) {
         TConditionFunction condition;
 
@@ -999,7 +976,6 @@ public:
     template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
 
     OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
-
 
     void Init(const Table& table)
     {
