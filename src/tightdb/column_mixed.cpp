@@ -131,7 +131,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
         m_types->Set(ndx, newtype);
 }
 
-ColumnType ColumnMixed::GetType(size_t ndx) const
+ColumnType ColumnMixed::GetType(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
     MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));

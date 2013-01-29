@@ -2,7 +2,6 @@
 #include <tightdb/column.hpp>
 #include <tightdb/column_float.hpp>
 #include <tightdb/column_double.hpp>
-#include <assert.h>
 
 namespace tightdb {
 

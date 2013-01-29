@@ -103,7 +103,7 @@ void ColumnBasic<T>::UpdateRef(size_t ref)
 }
 
 template<typename T>
-bool ColumnBasic<T>::is_empty() const
+bool ColumnBasic<T>::is_empty() const TIGHTDB_NOEXCEPT
 {
     if (IsNode()) {
         const Array offsets = NodeGetOffsets();
@@ -115,7 +115,7 @@ bool ColumnBasic<T>::is_empty() const
 }
 
 template<typename T>
-size_t ColumnBasic<T>::Size() const
+size_t ColumnBasic<T>::Size() const TIGHTDB_NOEXCEPT
 {
     if (IsNode())  {
         const Array offsets = NodeGetOffsets();
@@ -161,7 +161,7 @@ template<typename T>
 T ColumnBasic<T>::Get(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < Size());
-    return TreeGet<T, ColumnBasic<T> >(ndx);
+    return TreeGet<T, ColumnBasic<T> >(ndx); // Throws
 }
 
 template<typename T>
@@ -225,7 +225,7 @@ void ColumnBasic<T>::Delete(size_t ndx)
 }
 
 template<typename T>
-T ColumnBasic<T>::LeafGet(size_t ndx) const
+T ColumnBasic<T>::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return ((ArrayBasic<T>*)m_array)->Get(ndx);
 }

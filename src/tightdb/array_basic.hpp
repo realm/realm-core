@@ -27,12 +27,11 @@ namespace tightdb {
 template<typename T> 
 class ArrayBasic : public Array {
 public:
-    ArrayBasic(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    ArrayBasic(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=GetDefaultAllocator());
-    ArrayBasic(no_prealloc_tag);
-    ~ArrayBasic();
+    explicit ArrayBasic(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
+    ArrayBasic(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    explicit ArrayBasic(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
-    T Get(size_t ndx) const;
+    T Get(size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(T value);
     void Set(size_t ndx, T value);
     void Insert(size_t ndx, T value);
@@ -54,7 +53,7 @@ public:
 
 private:
     virtual size_t CalcByteLen(size_t count, size_t width) const;
-    virtual size_t CalcItemCount(size_t bytes, size_t width) const;
+    virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const {return TDB_MULTIPLY;}
 
     template <bool find_max> bool minmax(T& result, size_t start, size_t end) const;

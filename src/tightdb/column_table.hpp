@@ -119,7 +119,7 @@ private:
     struct SubtableMap {
         SubtableMap(Allocator& alloc): m_indices(alloc), m_wrappers(alloc) {}
         ~SubtableMap();
-        bool empty() const { return !m_indices.IsValid() || m_indices.is_empty(); }
+        bool empty() const TIGHTDB_NOEXCEPT { return !m_indices.IsValid() || m_indices.is_empty(); }
         Table* find(std::size_t subtable_ndx) const;
         void insert(std::size_t subtable_ndx, Table* wrapper);
         void remove(std::size_t subtable_ndx);
@@ -163,7 +163,7 @@ public:
                 std::size_t spec_ref, std::size_t column_ref);
 
     bool   has_subtable(size_t ndx) const;
-    size_t get_subtable_size(size_t ndx) const;
+    size_t get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT;
 
     /// The returned table pointer must always end up being wrapped in
     /// an instance of BasicTableRef.
@@ -292,6 +292,9 @@ inline void ColumnSubtableParent::SubtableMap::remove(size_t subtable_ndx)
     TIGHTDB_ASSERT(m_indices.IsValid());
     const size_t pos = m_indices.find_first(subtable_ndx);
     TIGHTDB_ASSERT(pos != size_t(-1));
+    // FIXME: It is a problem that Array as our most low-level array
+    // construct has too many features to deliver a Delete() method
+    // that cannot be guaranteed to never throw.
     m_indices.Delete(pos);
     m_wrappers.Delete(pos);
 }
@@ -325,7 +328,7 @@ inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   const Table* table, std::size_t column_ndx):
                             Column(COLUMN_HASREFS, alloc),
                             m_table(table), m_index(column_ndx),
-                            m_subtable_map(GetDefaultAllocator()) {}
+                            m_subtable_map(Allocator::get_default()) {}
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   const Table* table, std::size_t column_ndx,
@@ -333,7 +336,7 @@ inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   std::size_t ref):
                             Column(ref, parent, ndx_in_parent, alloc),
                             m_table(table), m_index(column_ndx),
-                            m_subtable_map(GetDefaultAllocator()) {}
+                            m_subtable_map(Allocator::get_default()) {}
 
 inline void ColumnSubtableParent::update_child_ref(size_t subtable_ndx, size_t new_ref)
 {

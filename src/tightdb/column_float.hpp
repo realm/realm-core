@@ -27,9 +27,9 @@ namespace tightdb {
     
 class ColumnFloat : public ColumnBasic<float> {
 public:
-    ColumnFloat(Allocator& alloc=GetDefaultAllocator()) : 
+    ColumnFloat(Allocator& alloc=Allocator::get_default()) : 
         ColumnBasic<float>(alloc) {};
-    ColumnFloat(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator()) :
+    ColumnFloat(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default()) :
         ColumnBasic<float>(ref, parent, pndx, alloc) {};
 };
 

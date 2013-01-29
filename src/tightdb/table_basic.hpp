@@ -20,12 +20,7 @@
 #ifndef TIGHTDB_TABLE_BASIC_HPP
 #define TIGHTDB_TABLE_BASIC_HPP
 
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
 #include <stdint.h> // unint8_t etc
-#endif
-
 #include <cstddef>
 #include <cstring> // strcmp()
 #include <ctime>
@@ -84,7 +79,7 @@ public:
     using Table::add_empty_row;
     using Table::insert_empty_row;
 
-    BasicTable(Allocator& alloc = GetDefaultAllocator()): Table(alloc) { set_dynamic_spec(); }
+    BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc) { set_dynamic_spec(); }
 
     static int get_column_count() { return TypeCount<typename Spec::Columns>::value; }
 
@@ -112,8 +107,8 @@ private:
     typedef typename Spec::template ColNames<ConstCol, const BasicTable*> ConstColsAccessor;
 
 public:
-    ColsAccessor column() { return ColsAccessor(this); }
-    ConstColsAccessor column() const { return ConstColsAccessor(this); }
+    ColsAccessor column() TIGHTDB_NOEXCEPT { return ColsAccessor(this); }
+    ConstColsAccessor column() const TIGHTDB_NOEXCEPT { return ConstColsAccessor(this); }
 
 private:
     template<int col_idx> struct Field {
@@ -131,18 +126,25 @@ private:
     typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
 public:
-    RowAccessor operator[](std::size_t row_idx)
+    RowAccessor operator[](std::size_t row_idx) TIGHTDB_NOEXCEPT
     {
         return RowAccessor(std::make_pair(this, row_idx));
     }
 
-    ConstRowAccessor operator[](std::size_t row_idx) const
+    ConstRowAccessor operator[](std::size_t row_idx) const TIGHTDB_NOEXCEPT
     {
         return ConstRowAccessor(std::make_pair(this, row_idx));
     }
 
-    RowAccessor front() { return RowAccessor(std::make_pair(this, 0)); }
-    ConstRowAccessor front() const { return ConstRowAccessor(std::make_pair(this, 0)); }
+    RowAccessor front() TIGHTDB_NOEXCEPT
+    {
+        return RowAccessor(std::make_pair(this, 0));
+    }
+
+    ConstRowAccessor front() const TIGHTDB_NOEXCEPT
+    {
+        return ConstRowAccessor(std::make_pair(this, 0));
+    }
 
     /// Access the last row, or one of its predecessors.
     ///
@@ -150,12 +152,12 @@ public:
     /// to the end. Thus, <tt>table.back(rel_idx)</tt> is the same as
     /// <tt>table[table.size() + rel_idx]</tt>.
     ///
-    RowAccessor back(int rel_idx = -1)
+    RowAccessor back(int rel_idx = -1) TIGHTDB_NOEXCEPT
     {
         return RowAccessor(std::make_pair(this, m_size+rel_idx));
     }
 
-    ConstRowAccessor back(int rel_idx = -1) const
+    ConstRowAccessor back(int rel_idx = -1) const TIGHTDB_NOEXCEPT
     {
         return ConstRowAccessor(std::make_pair(this, m_size+rel_idx));
     }
@@ -247,8 +249,8 @@ private:
     };
 
     // These are intende to be used only by accessor classes
-    Table* get_impl() { return this; }
-    const Table* get_impl() const { return this; }
+    Table* get_impl() TIGHTDB_NOEXCEPT { return this; }
+    const Table* get_impl() const TIGHTDB_NOEXCEPT { return this; }
 
     template<class Subtab> Subtab* get_subtable_ptr(size_t col_idx, std::size_t row_idx)
     {

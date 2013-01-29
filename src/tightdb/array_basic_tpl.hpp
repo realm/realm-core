@@ -47,7 +47,7 @@ inline ArrayBasic<T>::ArrayBasic(ArrayParent *parent, size_t ndx_in_parent, Allo
 
 template<typename T>
 inline ArrayBasic<T>::ArrayBasic(size_t ref, ArrayParent *parent, size_t ndx_in_parent,
-                               Allocator& alloc): Array(alloc)
+                               Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
@@ -56,11 +56,7 @@ inline ArrayBasic<T>::ArrayBasic(size_t ref, ArrayParent *parent, size_t ndx_in_
 }
 
 template<typename T>
-inline ArrayBasic<T>::ArrayBasic(no_prealloc_tag) : Array(no_prealloc_tag()) {
-}
-
-template<typename T> 
-inline ArrayBasic<T>::~ArrayBasic() 
+inline ArrayBasic<T>::ArrayBasic(no_prealloc_tag) TIGHTDB_NOEXCEPT : Array(no_prealloc_tag())
 {
 }
 
@@ -82,7 +78,7 @@ inline void ArrayBasic<T>::add(T value)
 }
 
 template<typename T> 
-inline T ArrayBasic<T>::Get(size_t ndx) const
+inline T ArrayBasic<T>::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     T* dataPtr = (T *)m_data + ndx;
     return *dataPtr;
@@ -172,7 +168,7 @@ size_t ArrayBasic<T>::CalcByteLen(size_t count, size_t /*width*/) const
 }
 
 template<typename T> 
-size_t ArrayBasic<T>::CalcItemCount(size_t bytes, size_t /*width*/) const
+size_t ArrayBasic<T>::CalcItemCount(size_t bytes, size_t /*width*/) const TIGHTDB_NOEXCEPT
 {
     // ??? what about width = 0? return -1?
 

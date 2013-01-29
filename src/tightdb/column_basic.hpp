@@ -28,14 +28,14 @@ namespace tightdb {
 template<typename T>
 class ColumnBasic : public ColumnBase {
 public:
-    ColumnBasic(Allocator& alloc=GetDefaultAllocator());
-    ColumnBasic(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
+    ColumnBasic(Allocator& alloc=Allocator::get_default());
+    ColumnBasic(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
     ~ColumnBasic();
 
     void Destroy();
 
-    size_t Size() const;
-    bool is_empty() const;
+    virtual size_t Size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const TIGHTDB_NOEXCEPT;
 
     T Get(size_t ndx) const;
     virtual bool add() {add(0); return true;}
@@ -77,7 +77,7 @@ protected:
 
     void UpdateRef(size_t ref);
 
-    T LeafGet(size_t ndx) const;
+    T LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     bool LeafSet(size_t ndx, T value);
     bool LeafInsert(size_t ndx, T value);
     void LeafDelete(size_t ndx);

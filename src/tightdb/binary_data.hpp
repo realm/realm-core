@@ -26,13 +26,15 @@
 
 namespace tightdb {
 
-struct BinaryData {
+class BinaryData {
+public:
     const char* pointer;
     std::size_t len;
-    BinaryData(): pointer(0), len(0) {}
-    BinaryData(const char* data, std::size_t size): pointer(data), len(size) {}
 
-    bool compare_payload(const BinaryData &b) const
+    BinaryData() TIGHTDB_NOEXCEPT: pointer(0), len(0) {}
+    BinaryData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT: pointer(data), len(size) {}
+
+    bool compare_payload(const BinaryData &b) const TIGHTDB_NOEXCEPT
     {
         if (b.pointer == pointer && b.len == len)
             return true;
@@ -44,7 +46,9 @@ struct BinaryData {
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const BinaryData&);
 };
 
+
 // Implementation:
+
 template<class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const BinaryData& d)
 {

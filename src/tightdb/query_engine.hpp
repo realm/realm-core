@@ -494,7 +494,6 @@ public:
         m_is_integer_node = true;
         m_condition_column_idx = column;
         m_child = 0;
-        TConditionFunction f;
         m_conds = 0;
         m_dT = 1.0;
         m_dD = 100.0;
@@ -723,7 +722,12 @@ protected:
 
 template <class TConditionFunction> class STRINGNODE: public ParentNode {
 public:
-    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
+    template <ACTION TAction>
+    int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column)
+    {
+        TIGHTDB_ASSERT(false);
+        return 0;
+    }
 
     STRINGNODE(const char* v, size_t column)
     {
@@ -867,8 +871,8 @@ public:
         TConditionFunction condition;
 
         for (size_t s = start; s < end; ++s) {
-            const char* t = m_column->Get(s).pointer;
-            size_t len2 = m_column->Get(s).len;
+            const char* t = m_condition_column->Get(s).pointer;
+            size_t len2 = m_condition_column->Get(s).len;
 
             if (condition(m_value, m_len, t, len2)) {
                 if (m_child == 0)
@@ -908,7 +912,12 @@ protected:
 
 template <> class STRINGNODE<EQUAL>: public ParentNode {
 public:
-    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
+    template <ACTION TAction> 
+    int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) 
+    {
+        TIGHTDB_ASSERT(false); 
+        return 0;
+    }
 
     STRINGNODE(const char* v, size_t column): m_key_ndx((size_t)-1) {
         m_condition_column_idx = column;
@@ -997,7 +1006,11 @@ private:
 
 class OR_NODE: public ParentNode {
 public:
-    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
+    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column)
+    {
+        TIGHTDB_ASSERT(false);
+        return 0;
+    }
 
     OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
 

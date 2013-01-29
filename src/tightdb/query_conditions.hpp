@@ -20,11 +20,9 @@
 #ifndef TIGHTDB_QUERY_CONDITIONS_HPP
 #define TIGHTDB_QUERY_CONDITIONS_HPP
 
+#include <stdint.h>
 #include <cstring>
 #include <string>
-#ifdef _MSC_VER
-    #include <win32/stdint.h>
-#endif
 
 #include <tightdb/utf8.hpp>
 

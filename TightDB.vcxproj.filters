@@ -109,6 +109,9 @@
     <ClCompile Include="src\tightdb\utf8.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\tightdb\alloc.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="src\tightdb\alloc_slab.cpp">
       <Filter>src</Filter>
     </ClCompile>
