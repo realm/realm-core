@@ -19,6 +19,8 @@
  **************************************************************************/
 
 /*
+Template arguments:
+----------------------------------------------------------------------------------------------------
 
 TConditionFunction: Each node has a condition from query_conditions.c such as EQUAL, GREATER_EQUAL, etc
 
@@ -34,10 +36,23 @@ TSourceColumn:      Type of source column used in actions, or *ignored* if no so
 
 
 Each node has some functions:
-size_t find_first_local(start, end): Finds first match 
+----------------------------------------------------------------------------------------------------
+TResult aggregate(QueryState<TResult>*, start, end, agg_col, size_t* matchcount) 
+    Main aggregate function. Call this on any node of your query, except nodes nested in OR or SUBTABLE node.
 
+size_t aggregate_local(QueryStateParent, start, end, local_limit, source_column):
+    Execute aggregate from start...end by first searching in node's own condition, and then for each match test
+    all sub conditions. But break aggreation if/when local_limit matches in called node's condition has been found.
+    Returns last match position + 1 so you can call the function repeatedly with start = aggregate_local() on the
+    node that currently has lowest cost (match density and linear search vs index, etc).
 
-                    */
+size_t find_first_local(start, end): 
+    Find first match of that node's own condition only - not entire database row match with all conditions
+
+size_t find_first(start, end): 
+    Find first match of node plus all sub conditions of that node. Called only on OR and SUBTABLE nodes
+
+*/
 
 #ifndef TIGHTDB_QUERY_ENGINE_HPP
 #define TIGHTDB_QUERY_ENGINE_HPP

@@ -602,6 +602,7 @@ public:
 
 };
 
+// Please create only a float or double instance of this class
 template <class T> class QueryState : public QueryStateParent {
 public:
 
@@ -616,6 +617,7 @@ public:
     
     void init(ACTION action, Array*, size_t limit) 
     {
+        TIGHTDB_STATIC_ASSERT((SameType<T, float>::value || SameType<T, double>::value), "");
         match_count = 0;
         m_limit = limit;
 
