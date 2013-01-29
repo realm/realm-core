@@ -109,9 +109,6 @@
     <ClCompile Include="src\tightdb\utf8.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\utilities.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\tightdb\alloc_slab.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -167,6 +164,9 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="test\performance\timer.cpp" />
+    <ClCompile Include="src\tightdb\utilities.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">

@@ -509,7 +509,7 @@ public:
         m_condition_column = column; 
         m_leaf_end = 0;
         m_value = value;
-        m_conds = 1;
+        m_conds = 0;
     }
 
     void Init(const Table& table)
@@ -607,6 +607,8 @@ public:
     template <ACTION TAction, class TResult, class unused> 
     size_t aggregate_local(QueryStateParent* st, size_t start, size_t end, size_t local_limit, 
                            SequentialGetterParent* source_column, size_t* matchcount) {
+        
+                               
         TConditionFunction f;
         int c = f.condition();
 
@@ -630,8 +632,7 @@ public:
             else
                 end2 = end - m_leaf_start;
 
-            if (m_conds <= 1 && source_column == NULL) {
-                
+            if (m_conds <= 1 && source_column != NULL && SameType<TResult, int64_t>::value && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)    {
                 m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
             }
             else {
@@ -805,7 +806,7 @@ public:
         m_condition_column.m_column = (ColType*)column;
         m_condition_column.m_leaf_end = 0;
         m_value = value;
-        m_conds = 1;
+        m_conds = 0;
     }
 
     void Init(const Table& table)
