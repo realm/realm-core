@@ -68,18 +68,17 @@ namespace tightdb {
 // Number of matches to find in best condition loop before breaking out to probe other conditions. Too low value gives too many
 // constant time overheads everywhere in the query engine. Too high value makes it adapt less rapidly to changes in match
 // frequencies.
-const size_t findlocals = 16;   
+const size_t findlocals = 32;   
 
-// Distance between matches from which performance begins to flatten out because various initial overheads become insignificant
-const size_t bestdist = 2;    
+// Average match distance in linear searches where further increase in distance no longer increases query speed (because time
+// spent on handling each match becomes insignificant compared to time spent on the search).
+const size_t bestdist = 16;
 
 // Minimum number of matches required in a certain condition before it can be used to compute statistics. Too high value can spent 
 // too much time in a bad node (with high match frequency). Too low value gives inaccurate statistics.
 const size_t probe_matches = 2;
 
-// 
 const size_t bitwidth_time_unit = 8; 
-
 
 typedef bool (*CallbackDummy)(int64_t);
 
@@ -303,7 +302,7 @@ public:
                     // Limit to bestdist in order not to skip too large parts of index nodes
                     size_t maxD = m_children[c]->m_dT == 0.0 ? end - start : bestdist;
                     td = m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = aggregate_local_selector<TAction, TResult, TSourceColumn>(m_children[best], st, start, td, probe_matches, source_column, matchcount);
+                    start = aggregate_local_selector<TAction, TResult, TSourceColumn>(m_children[c], st, start, td, probe_matches, source_column, matchcount);
                 }
             }
         }
@@ -563,6 +562,9 @@ public:
         if (TAction == TDB_RETURN_FIRST)
             ret = aggregate_local<TDB_RETURN_FIRST, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);        
 
+        else if (TAction == TDB_COUNT)
+            ret = aggregate_local<TDB_COUNT, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
+
         else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_INT)
             ret = aggregate_local<TDB_SUM, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_FLOAT)
@@ -584,9 +586,6 @@ public:
             ret = aggregate_local<TDB_MIN, float, float>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == TDB_MIN && col_id == COLUMN_TYPE_DOUBLE)
             ret = aggregate_local<TDB_MIN, double, double>(st, start, end, local_limit, source_column, matchcount);
-
-        else if (TAction == TDB_COUNT)
-            ret = aggregate_local<TDB_COUNT, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == TDB_FINDALL)
             ret = aggregate_local<TDB_FINDALL, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
@@ -632,7 +631,7 @@ public:
             else
                 end2 = end - m_leaf_start;
 
-            if (m_conds <= 1 && source_column != NULL && SameType<TResult, int64_t>::value && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)    {
+            if (m_conds <= 1 && (source_column == NULL || SameType<TResult, int64_t>::value && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))    {
                 m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
             }
             else {
@@ -867,8 +866,8 @@ public:
         TConditionFunction condition;
 
         for (size_t s = start; s < end; ++s) {
-            const char* t = m_column->Get(s).pointer;
-            size_t len2 = m_column->Get(s).len;
+            const char* t = m_condition_column->Get(s).pointer;
+            size_t len2 = m_condition_column->Get(s).len;
 
             if (condition(m_value, m_len, t, len2)) {
                 if (m_child == 0)
