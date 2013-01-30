@@ -221,7 +221,7 @@ public:
 
     // Fastest way to instantiate an array, if you just want to utilize its methods
     struct no_prealloc_tag {};
-    explicit Array(no_prealloc_tag);
+    explicit Array(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
     virtual ~Array() TIGHTDB_NOEXCEPT {}
 
@@ -688,7 +688,7 @@ inline Array::Array(const Array& src) TIGHTDB_NOEXCEPT:
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
-inline Array::Array(no_prealloc_tag) : m_alloc(Allocator::get_default()) {}
+inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(Allocator::get_default()) {}
 
 
 inline int64_t Array::back() const TIGHTDB_NOEXCEPT
@@ -1225,7 +1225,8 @@ template <size_t width> inline int64_t Array::LowerBits(void) const
 }
 
 // Tests if any chunk in 'value' is 0
-template <size_t width> inline bool Array::TestZero(uint64_t value) const {
+template <size_t width> inline bool Array::TestZero(uint64_t value) const
+{
     uint64_t hasZeroByte;
     uint64_t lower = LowerBits<width>();
     uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
@@ -1469,7 +1470,8 @@ template <bool gt, ACTION action, size_t width, class Callback> bool Array::Find
 }
 
 
-template <bool eq, ACTION action, size_t width, class Callback> inline bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const {
+template <bool eq, ACTION action, size_t width, class Callback> inline bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+{
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
     TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);

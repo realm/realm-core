@@ -167,7 +167,7 @@ class ParentNode {
 public:
     ParentNode() : m_is_integer_node(false), m_table(NULL) {}
 
-    std::vector<ParentNode*> gather_children(std::vector<ParentNode*> v) {
+    void gather_children(std::vector<ParentNode*>& v) {
         m_children.clear();
         ParentNode* p = this;
         size_t i = v.size();
@@ -175,7 +175,7 @@ public:
         p = p->child_criteria();
 
         if (p != NULL)
-            v = p->gather_children(v);
+            p->gather_children(v);
 
         m_children = v;
         m_children.erase(m_children.begin() + i);
@@ -442,7 +442,7 @@ public:
         
         if (m_child) {
             m_child->Init(table);
-            std::vector<ParentNode*>v;
+            std::vector<ParentNode*> v;
             m_child->gather_children(v);
         }
 
@@ -1013,10 +1013,11 @@ public:
         m_dT = 50.0;
         m_dD = 10.0;
 
-        std::vector<ParentNode*>v;
+        std::vector<ParentNode*> v;
 
         for (size_t c = 0; c < 2; ++c) {
             m_cond[c]->Init(table);
+            v.clear();
             m_cond[c]->gather_children(v);
             m_last[c] = 0;
             m_was_match[c] = false;

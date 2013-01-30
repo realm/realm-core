@@ -289,7 +289,7 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
 };
 
 
@@ -330,7 +330,7 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i): Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
 };
 
 
@@ -897,7 +897,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, float> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t): Base(t) {}
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
 
     std::size_t find_first(float value) const
     {
@@ -928,7 +928,7 @@ public:
     {
         return Base::m_table->get_impl()->minimum_float(col_idx);
     }
-    
+
     double average() const
     {
         return Base::m_table->get_impl()->average_float(col_idx);
@@ -950,7 +950,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, double> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t): Base(t) {}
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
 
     std::size_t find_first(double value) const
     {
@@ -981,7 +981,7 @@ public:
     {
         return Base::m_table->get_impl()->minimum_double(col_idx);
     }
-    
+
     double average() const
     {
         return Base::m_table->get_impl()->average_double(col_idx);
@@ -1232,7 +1232,7 @@ public:
     double average(std::size_t* resultcount=NULL, std::size_t start=0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);    
+        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
     }
 };
 
@@ -1246,7 +1246,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q): Base(q) {}
+    explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
     using Base::equal;
     using Base::not_equal;
 
@@ -1315,7 +1315,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q): Base(q) {}
+    explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
     using Base::equal;
     using Base::not_equal;
 
