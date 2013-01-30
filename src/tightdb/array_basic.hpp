@@ -60,8 +60,13 @@ private:
     static size_t create_empty_basic_array(Allocator& alloc);
 };
 
-#include <tightdb/array_basic_tpl.hpp>
 
-} // namespace
+// Class typedefs for BasicArray's: ArrayFloat and ArrayDouble
+typedef BasicArray<float> ArrayFloat;
+typedef BasicArray<double> ArrayDouble;
+
+} // namespace tightdb
+
+#include <tightdb/array_basic_tpl.hpp>
 
 #endif // TIGHTDB_ARRAY_BASIC_HPP

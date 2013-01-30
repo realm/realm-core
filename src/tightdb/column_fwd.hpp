@@ -25,8 +25,9 @@ namespace tightdb {
 
 class ColumnBase;
 class Column;
-class ColumnFloat;
-class ColumnDouble;
+template<class T> class BasicColumn;
+typedef BasicColumn<double> ColumnDouble;
+typedef BasicColumn<float> ColumnFloat;
 class AdaptiveStringColumn;
 class ColumnStringEnum;
 class ColumnBinary;

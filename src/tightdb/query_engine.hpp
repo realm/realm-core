@@ -47,20 +47,13 @@ TSourceColumn:      Type of source column used in actions, or *ignored* if no so
 
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
+#include <tightdb/column_fwd.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/column_binary.hpp>
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
-#include <tightdb/array_float.hpp>
-#include <tightdb/array_double.hpp>
-
-// Predeclarations for ColumnFloat and ColumnDouble
-namespace tightdb {
-template<class T> class BasicColumn;
-class ColumnFloat;
-class ColumnDouble;
-}
+#include <tightdb/array_basic.hpp>
 
 
 namespace tightdb {

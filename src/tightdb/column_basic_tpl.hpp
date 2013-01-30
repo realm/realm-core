@@ -39,6 +39,7 @@ bool IsNodeFromRef(size_t ref, Allocator& alloc)
 
 
 namespace tightdb {
+
 // Predeclarations from query_engine.hpp
 class ParentNode;
 template<class T, class F> class BASICNODE;
@@ -343,7 +344,7 @@ void BasicColumn<T>::sort(size_t start, size_t end)
 
 #else
 
-// Alternative 'naive' implementation:
+// Alternative 'naive' reference implementation - useful for reference performance testing.
 // TODO: test performance of column aggregates
 
 template<typename T>
@@ -404,7 +405,7 @@ double BasicColumn<T>::average(size_t start, size_t end) const
     return avg;
 }
 
-#include <iostream>
+// #include <iostream>
 
 template<typename T>
 T BasicColumn<T>::minimum(size_t start, size_t end) const
@@ -460,7 +461,7 @@ T BasicColumn<T>::maximum(size_t start, size_t end) const
     return max_val;
 }
 
-#endif
+#endif // reference implementation of aggregates
 
 } // namespace tightdb
 

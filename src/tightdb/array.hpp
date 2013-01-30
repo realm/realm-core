@@ -62,7 +62,6 @@ Searching: The main finding function is:
     SSE4.1: smmintrin.h
     SSE4.2: nmmintrin.h
 */
-
 #ifdef TIGHTDB_COMPILER_SSE
     #include <emmintrin.h> // SSE2
     #include <tightdb/tightdb_nmmintrin.h> // SSE42
@@ -139,6 +138,7 @@ class GroupWriter;
 class Column;
 template <class T> class QueryState;
 
+
 #ifdef TIGHTDB_DEBUG
 class MemStats {
 public:
@@ -170,6 +170,7 @@ enum ColumnDef {
 };
 
 bool IsArrayIndexNode(size_t ref, const Allocator& alloc);
+
 
 class ArrayParent
 {

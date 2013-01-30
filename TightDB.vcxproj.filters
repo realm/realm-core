@@ -142,9 +142,6 @@
     <ClCompile Include="src\tightdb\string_buffer.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\replication.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="test\testindexstring.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -217,9 +214,6 @@
     <ClInclude Include="src\tightdb\table_view_basic.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\tightdb-c.h">
-      <Filter>src\include</Filter>
-    </ClInclude>
     <ClInclude Include="src\tightdb\tuple.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
@@ -289,12 +283,6 @@
     <ClInclude Include="src\tightdb\config.h">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\c-table.h">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tightdb\c-tightdb.h">
-      <Filter>src\include</Filter>
-    </ClInclude>
     <ClInclude Include="src\tightdb\date.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
@@ -349,18 +337,6 @@
     <ClInclude Include="test\pthread_test.hpp">
       <Filter>test</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\array_float.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tightdb\array_double.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tightdb\column_float.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tightdb\column_double.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
     <ClInclude Include="src\tightdb\array_basic.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
@@ -371,6 +347,9 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\column_basic_tpl.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\column_mixed_tpl.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>

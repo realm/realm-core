@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -575,8 +575,6 @@
     <ClInclude Include="src\tightdb\array.hpp" />
     <ClInclude Include="src\tightdb\array_binary.hpp" />
     <ClInclude Include="src\tightdb\array_blob.hpp" />
-    <ClInclude Include="src\tightdb\array_double.hpp" />
-    <ClInclude Include="src\tightdb\array_float.hpp" />
     <ClInclude Include="src\tightdb\array_basic.hpp" />
     <ClInclude Include="src\tightdb\array_basic_tpl.hpp">
       <FileType>CppHeader</FileType>
@@ -587,12 +585,11 @@
     <ClInclude Include="src\tightdb\bind_ptr.hpp" />
     <ClInclude Include="src\tightdb\column.hpp" />
     <ClInclude Include="src\tightdb\column_binary.hpp" />
-    <ClInclude Include="src\tightdb\column_double.hpp" />
-    <ClInclude Include="src\tightdb\column_float.hpp" />
     <ClInclude Include="src\tightdb\column_fwd.hpp" />
     <ClInclude Include="src\tightdb\column_basic.hpp" />
     <ClInclude Include="src\tightdb\column_basic_tpl.hpp" />
     <ClInclude Include="src\tightdb\column_mixed.hpp" />
+    <ClInclude Include="src\tightdb\column_mixed_tpl.hpp" />
     <ClInclude Include="src\tightdb\column_string.hpp" />
     <ClInclude Include="src\tightdb\column_string_enum.hpp" />
     <ClInclude Include="src\tightdb\column_table.hpp" />

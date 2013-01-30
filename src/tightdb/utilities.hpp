@@ -156,6 +156,19 @@ inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
     return std::size_t(v);
 }
 
+
+template<typename ReturnType, typename OriginalType>
+ReturnType TypePunning( OriginalType variable )
+{
+    union
+    {
+        OriginalType    in;
+        ReturnType      out;
+    };
+    in = variable;
+    return out;
+}
+
 } // namespace tightdb
 
 #endif // TIGHTDB_UTILITIES_HPP

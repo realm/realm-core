@@ -1,6 +1,5 @@
 #include <UnitTest++.h>
-#include <tightdb/array_float.hpp>
-#include <tightdb/array_double.hpp>
+#include <tightdb/array_basic.hpp>
 #include <tightdb/column.hpp>
 
 template <typename T, size_t N> inline

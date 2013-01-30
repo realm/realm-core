@@ -20,6 +20,8 @@
 #ifndef TIGHTDB_ARRAY_BASIC_TPL_HPP
 #define TIGHTDB_ARRAY_BASIC_TPL_HPP
 
+namespace tightdb {
+
 template<typename T>
 inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc) 
 {
@@ -278,5 +280,8 @@ bool BasicArray<T>::minimum(T& result, size_t start, size_t end) const
 {
     return minmax<false>(result, start, end);
 }
+
+
+} // namespace tightdb
 
 #endif // TIGHTDB_ARRAY_BASIC_TPL_HPP

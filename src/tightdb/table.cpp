@@ -27,8 +27,8 @@
 #include <tightdb/index.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/column.hpp>
-#include <tightdb/column_float.hpp>
-#include <tightdb/column_double.hpp>
+#include <tightdb/column_basic.hpp>
+
 #include <tightdb/column_string.hpp>
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/column_binary.hpp>

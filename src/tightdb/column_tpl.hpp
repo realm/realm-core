@@ -25,11 +25,9 @@
 #include <tightdb/config.h>
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
+#include <tightdb/column_fwd.hpp>
 
 namespace tightdb {
-
-class ColumnFloat;
-class ColumnDouble;
 
 template <class T, class cond> class BASICNODE;
 template <class T, class cond> class NODE;

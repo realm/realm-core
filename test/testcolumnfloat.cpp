@@ -1,7 +1,6 @@
 #include <iostream>
 #include <UnitTest++.h>
-#include <tightdb/column_float.hpp>
-#include <tightdb/column_double.hpp>
+#include <tightdb/column_basic.hpp>
 
 using namespace tightdb;
 

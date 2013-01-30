@@ -23,8 +23,12 @@
 #include <tightdb/column.hpp>
 #include <tightdb/column_type.hpp>
 #include <tightdb/column_table.hpp>
+#include <tightdb/column_binary.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/index.hpp>
+#include <tightdb/utilities.hpp>
+#include <limits>
+
 
 namespace tightdb {
 
@@ -160,11 +164,10 @@ private:
     void clear_value(size_t ndx, MixedColType newtype);
     
     // Get/set/insert 64-bit values in m_refs/m_types
-    inline int64_t get_value(size_t ndx) const;
-    template<MixedColType coltype> void set_value(size_t ndx, int64_t value);
-    template<MixedColType pos_type, MixedColType neg_type, typename T> void insert_int64(size_t ndx, T value);
-    template<MixedColType pos_type, MixedColType neg_type, typename T> void set_int64(size_t ndx, T value);
-
+    int64_t get_value(size_t ndx) const;
+    void set_value(size_t ndx, int64_t value, MixedColType coltype);
+    void insert_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
+    void set_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
 
     class RefsColumn;
 
@@ -197,58 +200,11 @@ public:
 };
 
 
-inline ColumnMixed::ColumnMixed(): m_data(0)
-{
-    Create(Allocator::get_default(), 0, 0);
-}
-
-inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx):
-    m_data(0)
-{
-    Create(alloc, table, column_ndx);
-}
-
-inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx,
-                                ArrayParent* parent, std::size_t ndx_in_parent, std::size_t ref):
-    m_data(0)
-{
-    Create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
-}
-
-inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXCEPT
-{
-    // FIXME: If the table object is cached, it is possible to get the
-    // size from it. Maybe it is faster in general to check for the
-    // the presence of the cached object and use it when available.
-    TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
-    const size_t top_ref = m_refs->GetAsRef(row_idx);
-    const size_t columns_ref = Array(top_ref, 0, 0, m_refs->GetAllocator()).GetAsRef(1);
-    const Array columns(columns_ref, 0, 0, m_refs->GetAllocator());
-    if (columns.is_empty()) return 0;
-    const size_t first_col_ref = columns.GetAsRef(0);
-    return get_size_from_ref(first_col_ref, m_refs->GetAllocator());
-}
-
-inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
-{
-    TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) 
-        return 0;
-    return m_refs->get_subtable_ptr(row_idx);
-}
-
-inline void ColumnMixed::invalidate_subtables()
-{
-    m_refs->invalidate_subtables();
-}
-
-inline void ColumnMixed::invalidate_subtables_virtual()
-{
-    invalidate_subtables();
-}
-
-
 } // namespace tightdb
+
+
+// Implementation
+#include <tightdb/column_mixed_tpl.hpp>
+
 
 #endif // TIGHTDB_COLUMN_MIXED_HPP
