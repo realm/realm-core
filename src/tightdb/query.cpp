@@ -74,7 +74,7 @@ Query& Query::tableview(const TableView& tv)
 // Makes query search only in rows contained in tv
 Query& Query::tableview(const Array &arr)
 {
-    ParentNode* const p = new ARRAYNODE(arr);
+    ParentNode* const p = new ArrayNode(arr);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -83,7 +83,7 @@ Query& Query::tableview(const Array &arr)
 // Binary
 Query& Query::equal(size_t column_ndx, BinaryData b)
 {
-    ParentNode* const p = new BINARYNODE<EQUAL>(b.pointer, b.len, column_ndx);
+    ParentNode* const p = new BinaryNode<EQUAL>(b.pointer, b.len, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -100,26 +100,26 @@ Query& Query::add_condition(size_t column_ndx, T value)
 // int64
 Query& Query::equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new NODE<int64_t, EQUAL>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, EQUAL>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new NODE<int64_t, NOTEQUAL>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, NOTEQUAL>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new NODE<int64_t, GREATER>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, GREATER>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater_equal(size_t column_ndx, int64_t value)
 {
     if (value > LLONG_MIN) {
-        ParentNode* const p = new NODE<int64_t, GREATER>(value - 1, column_ndx);
+        ParentNode* const p = new IntegerNode<int64_t, GREATER>(value - 1, column_ndx);
         UpdatePointers(p, &p->m_child);
     }
     // field >= LLONG_MIN has no effect
@@ -128,7 +128,7 @@ Query& Query::greater_equal(size_t column_ndx, int64_t value)
 Query& Query::less_equal(size_t column_ndx, int64_t value)
 {
     if (value < LLONG_MAX) {
-        ParentNode* const p = new NODE<int64_t, LESS>(value + 1, column_ndx);
+        ParentNode* const p = new IntegerNode<int64_t, LESS>(value + 1, column_ndx);
         UpdatePointers(p, &p->m_child);
     }
     // field <= LLONG_MAX has no effect
@@ -136,7 +136,7 @@ Query& Query::less_equal(size_t column_ndx, int64_t value)
 }
 Query& Query::less(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new NODE<int64_t, LESS>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, LESS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -148,7 +148,7 @@ Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 }
 Query& Query::equal(size_t column_ndx, bool value)
 {
-    ParentNode* const p = new NODE<bool, EQUAL>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<bool, EQUAL>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -222,9 +222,9 @@ Query& Query::equal(size_t column_ndx, const char* value, bool caseSensitive)
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new STRINGNODE<EQUAL>(value, column_ndx);
+        p = new StringNode<EQUAL>(value, column_ndx);
     else
-        p = new STRINGNODE<EQUAL_INS>(value, column_ndx);
+        p = new StringNode<EQUAL_INS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -232,9 +232,9 @@ Query& Query::begins_with(size_t column_ndx, const char* value, bool caseSensiti
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new STRINGNODE<BEGINSWITH>(value, column_ndx);
+        p = new StringNode<BEGINSWITH>(value, column_ndx);
     else
-        p = new STRINGNODE<BEGINSWITH_INS>(value, column_ndx);
+        p = new StringNode<BEGINSWITH_INS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -242,9 +242,9 @@ Query& Query::ends_with(size_t column_ndx, const char* value, bool caseSensitive
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new STRINGNODE<ENDSWITH>(value, column_ndx);
+        p = new StringNode<ENDSWITH>(value, column_ndx);
     else
-        p = new STRINGNODE<ENDSWITH_INS>(value, column_ndx);
+        p = new StringNode<ENDSWITH_INS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -252,9 +252,9 @@ Query& Query::contains(size_t column_ndx, const char* value, bool caseSensitive)
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new STRINGNODE<CONTAINS>(value, column_ndx);
+        p = new StringNode<CONTAINS>(value, column_ndx);
     else
-        p = new STRINGNODE<CONTAINS_INS>(value, column_ndx);
+        p = new StringNode<CONTAINS_INS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -262,9 +262,9 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new STRINGNODE<NOTEQUAL>(value, column_ndx);
+        p = new StringNode<NOTEQUAL>(value, column_ndx);
     else
-        p = new STRINGNODE<NOTEQUAL_INS>(value, column_ndx);
+        p = new StringNode<NOTEQUAL_INS>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -418,10 +418,10 @@ Query& Query::Or()
 
 void Query::subtable(size_t column)
 {
-    ParentNode* const p = new SUBTABLE(column);
+    ParentNode* const p = new SubtableNode(column);
     UpdatePointers(p, &p->m_child);
     // once subtable conditions have been evaluated, resume evaluation from m_child2
-    subtables.push_back(&((SUBTABLE*)p)->m_child2);
+    subtables.push_back(&((SubtableNode*)p)->m_child2);
     group();
 }
 

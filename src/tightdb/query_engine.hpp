@@ -19,7 +19,42 @@
  **************************************************************************/
 
 /*
-Template arguments:
+A query consists of node objects, one for each query condition. Each node contains pointers to all other nodes:
+
+node1        node2         node3
+------       -----         -----
+node2*       node1*        node1*
+node3*       node3*        node2*
+
+The construction of all this takes part in query.cpp. Each node has two important functions:
+
+    aggregate(start, end)
+    aggregate_local(start, end)
+
+The aggregate() function executes the aggregate of a query. You can call the method on any of the nodes
+(except children nodes of OrNode and SubtableNode) - it has the same behaviour. The function contains 
+scheduling that calls aggregate_local(start, end) on different nodes with different start/end ranges,
+depending on what it finds is most optimal.
+
+The aggregate_local() function contains a tight loop that tests the condition of its own node, and upon match
+it tests all other conditions at that index to report a full match or not. It will remain in the tight loop
+after a full match.
+
+So a call stack with 2 and 9 being local matches of a node could look like this:
+
+aggregate(0, 10)
+    node1->aggregate_local(0, 3)
+        node2->find_first_local(2)
+        node3->find_first_local(2)
+    node3->aggregate_local(3, 10)
+        node1->find_first_local(9)
+        node2->find_first_local(9)
+
+Note that this is very simplified. There are other statistical arguments to the methods, and also, 
+find_first_local() can be called from a callback function called by an integer Array.
+
+
+Template arguments in methods:
 ----------------------------------------------------------------------------------------------------
 
 TConditionFunction: Each node has a condition from query_conditions.c such as EQUAL, GREATER_EQUAL, etc
@@ -35,22 +70,13 @@ TSourceColumn:      Type of source column used in actions, or *ignored* if no so
                     TDB_COUNT, TDB_RETURN_FIRST)
 
 
-Each node has some functions:
+There are two important classes used in queries:
 ----------------------------------------------------------------------------------------------------
-TResult aggregate(QueryState<TResult>*, start, end, agg_col, size_t* matchcount) 
-    Main aggregate function. Call this on any node of your query, except nodes nested in OR or SUBTABLE node.
+SequentialGetter    Column iterator used to get successive values with leaf caching. Used both for condition columns
+                    and aggregate source column
 
-size_t aggregate_local(QueryStateParent, start, end, local_limit, source_column):
-    Execute aggregate from start...end by first searching in node's own condition, and then for each match test
-    all sub conditions. But break aggreation if/when local_limit matches in called node's condition has been found.
-    Returns last match position + 1 so you can call the function repeatedly with start = aggregate_local() on the
-    node that currently has lowest cost (match density and linear search vs index, etc).
-
-size_t find_first_local(start, end): 
-    Find first match of that node's own condition only - not entire database row match with all conditions
-
-size_t find_first(start, end): 
-    Find first match of node plus all sub conditions of that node. Called only on OR and SUBTABLE nodes
+AggregateState      State of the aggregate - contains a state variable that stores intermediate sum, max, min, 
+                    etc, etc.
 
 */
 
@@ -124,9 +150,9 @@ template<> struct ColumnTypeTraits<double> {
 
 
 // Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
-class SequentialGetterParent {};
+class SequentialGetterBase {};
 
-template<class T>class SequentialGetter : public SequentialGetterParent {
+template<class T>class SequentialGetter : public SequentialGetterBase {
 public:
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::array_type ArrayType;
@@ -189,7 +215,8 @@ class ParentNode {
 public:
     ParentNode() : m_is_integer_node(false), m_table(NULL) {}
 
-    std::vector<ParentNode*> gather_children(std::vector<ParentNode*> v) {
+    std::vector<ParentNode*> gather_children(std::vector<ParentNode*> v) 
+    {
         m_children.clear();
         ParentNode* p = this;
         size_t i = v.size();
@@ -207,7 +234,8 @@ public:
         return v;                              
     }
 
-    struct score_compare {
+    struct score_compare 
+    {
         bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->cost() < b->cost()); }
     };
 
@@ -216,7 +244,8 @@ public:
         return 16.0 / m_dD + m_dT;
     }
 
-    size_t find_first(size_t start, size_t end) {
+    size_t find_first(size_t start, size_t end)
+    {
         
         size_t m = 0;
         size_t next_cond = 0;
@@ -246,7 +275,8 @@ public:
 
     virtual ~ParentNode() {}
     
-    virtual void Init(const Table& table) {
+    virtual void Init(const Table& table) 
+    {
         m_table = &table; 
         if (m_child) 
             m_child->Init(table);
@@ -254,15 +284,16 @@ public:
     
     virtual size_t find_first_local(size_t start, size_t end) = 0;
     
-    virtual ParentNode* child_criteria(void) {
+    virtual ParentNode* child_criteria(void)
+    {
         return m_child;
     }
 
-    // Only purpose is to make all NODE classes have this function (overloaded only in NODE)
+    // Only purpose is to make all IntegerNode classes have this function (overloaded only in IntegerNode)
     virtual size_t aggregate_call_specialized(ACTION /*TAction*/, ColumnType /*TResult*/, 
                                               QueryStateParent* /*st*/, 
                                               size_t /*start*/, size_t /*end*/, size_t /*local_limit*/, 
-                                              SequentialGetterParent* /*source_column*/, size_t* /*matchcount*/)
+                                              SequentialGetterBase* /*source_column*/, size_t* /*matchcount*/)
     {
         TIGHTDB_ASSERT(false);
         return 0;
@@ -275,7 +306,7 @@ public:
         size_t r;
         
         if (node->m_is_integer_node)
-            // call method in NODE
+            // call method in IntegerNode
             r = node->aggregate_call_specialized(TAction, ColumnTypeTraits<TResult>::id,(QueryStateParent*)st,
                                                  start, end, local_limit, source_column, matchcount);
         else
@@ -333,7 +364,7 @@ public:
 
     template<ACTION TAction, class TResult, class TSourceColumn>
     size_t aggregate_local(QueryStateParent* st, size_t start, size_t end, size_t local_limit, 
-                           SequentialGetterParent* source_column, size_t* matchcount) 
+                           SequentialGetterBase* source_column, size_t* matchcount) 
     {
 		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
         // integer version, because find_first_local() is relatively slower here (because it's non-integers).
@@ -395,7 +426,7 @@ public:
     std::vector<ParentNode*>m_children;
 
     size_t m_condition_column_idx; // Column of search criteria
-    bool m_is_integer_node; // true for NODE, false for any other
+    bool m_is_integer_node; // true for IntegerNode, false for any other
 
     size_t m_conds;
     double m_dD; // Average row distance between each local match at current position
@@ -412,9 +443,9 @@ protected:
 };
 
 
-class ARRAYNODE: public ParentNode {
+class ArrayNode: public ParentNode {
 public:
-    ARRAYNODE(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.Size()) {m_child = 0;}
+    ArrayNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.Size()) {m_child = 0;}
 
     void Init(const Table& table)
     {
@@ -449,10 +480,10 @@ protected:
 };
 
 
-class SUBTABLE: public ParentNode {
+class SubtableNode: public ParentNode {
 public:
-    SUBTABLE(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
-    SUBTABLE() {};
+    SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
+    SubtableNode() {};
     void Init(const Table& table)
     {
         m_dT = 100.0;
@@ -498,14 +529,14 @@ public:
     size_t m_column;
 };
 
-// NODE is for conditions for types stored as integers in a tightdb::Array (int, date, bool)
-template <class TConditionValue, class TConditionFunction> class NODE: public ParentNode {
+// IntegerNode is for conditions for types stored as integers in a tightdb::Array (int, date, bool)
+template <class TConditionValue, class TConditionFunction> class IntegerNode: public ParentNode {
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
     // NOTE: Be careful to call Array(no_prealloc_tag) constructors on m_array in the initializer list, otherwise
     // their default constructors are called which are slow
-    NODE(TConditionValue v, size_t column) : m_value(v), m_array(Array::no_prealloc_tag()) {
+    IntegerNode(TConditionValue v, size_t column) : m_value(v), m_array(Array::no_prealloc_tag()) {
         m_is_integer_node = true;
         m_condition_column_idx = column;
         m_child = 0;
@@ -516,7 +547,7 @@ public:
         m_matches = 0;
     }
 
-    // Only purpose of this function is to let you quickly create a NODE object and call aggregate_local() on it to aggregate
+    // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
     // be merged with Init somehow to simplify
     void QuickInit(Column *column, int64_t value) {
@@ -536,7 +567,7 @@ public:
     }
 
     // This function is called from Array::find() for each search result if TAction == TDB_CALLBACK_IDX
-    // in the NODE::aggregate_local() call. Used if aggregate source column is different from search criteria column
+    // in the IntegerNode::aggregate_local() call. Used if aggregate source column is different from search criteria column
     template <ACTION TAction, class TResult> bool match_callback(int64_t v) {
         size_t i = to_size_t(v);
         m_last_local_match = i;
@@ -570,7 +601,7 @@ public:
 
     size_t aggregate_call_specialized(ACTION TAction, ColumnType col_id, QueryStateParent* st, 
                                       size_t start, size_t end, size_t local_limit, 
-                                      SequentialGetterParent* source_column, size_t* matchcount) 
+                                      SequentialGetterBase* source_column, size_t* matchcount) 
     {
         size_t ret;
 
@@ -620,7 +651,7 @@ public:
     // source_column      column number in m_table which must act as source for aggreate TAction
     template <ACTION TAction, class TResult, class unused> 
     size_t aggregate_local(QueryStateParent* st, size_t start, size_t end, size_t local_limit, 
-                           SequentialGetterParent* source_column, size_t* matchcount) {
+                           SequentialGetterBase* source_column, size_t* matchcount) {
         
                                
         TConditionFunction f;
@@ -653,7 +684,7 @@ public:
                 QueryState<int64_t> jumpstate; // todo optimize by moving outside for loop
                 m_source_column = source_column; 
                 m_array.find<TConditionFunction, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate, 
-                             std::bind1st(std::mem_fun(&NODE::match_callback<TAction, TResult>), this));
+                             std::bind1st(std::mem_fun(&IntegerNode::match_callback<TAction, TResult>), this));
             }
                     
             if (m_local_matches == m_local_limit)
@@ -731,31 +762,32 @@ protected:
     size_t m_local_limit;
  
     QueryStateParent* m_state;
-    SequentialGetterParent* m_source_column; // Column of values used in aggregate (TDB_FINDALL, TDB_RETURN_FIRST, TDB_SUM, etc)
+    SequentialGetterBase* m_source_column; // Column of values used in aggregate (TDB_FINDALL, TDB_RETURN_FIRST, TDB_SUM, etc)
 };
 
 
-template <class TConditionFunction> class STRINGNODE: public ParentNode {
+template <class TConditionFunction> class StringNode: public ParentNode {
 public:
     template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
 
-    STRINGNODE(const char* v, size_t column)
+    StringNode(const char* v, size_t column)
     {
         m_condition_column_idx = column;
         m_child = 0;
 
-        m_value = (char *)malloc(strlen(v)*6);
+        // todo, see if we can store in std::string instead
+        m_value = new char[strlen(v)*6];
         memcpy(m_value, v, strlen(v) + 1);
-        m_ucase = (char *)malloc(strlen(v)*6);
-        m_lcase = (char *)malloc(strlen(v)*6);
+        m_ucase = new char[strlen(v)*6];
+        m_lcase = new char[strlen(v)*6];
 
         const bool b1 = utf8case(v, m_lcase, false);
         const bool b2 = utf8case(v, m_ucase, true);
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(m_value);
     }
-    ~STRINGNODE() {
-        free((void*)m_value); free((void*)m_ucase); free((void*)m_lcase);
+    ~StringNode() {
+        delete m_value; delete m_ucase; delete m_lcase;
     }
 
     void Init(const Table& table)
@@ -813,7 +845,7 @@ public:
         m_child = 0;
     }
 
-    // Only purpose of this function is to let you quickly create a NODE object and call aggregate_local() on it to aggregate
+    // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
     // be merged with Init somehow to simplify
     void QuickInit(ColumnBasic<TConditionValue> *column, TConditionValue value) {
@@ -850,11 +882,11 @@ protected:
 };
 
 
-template <class TConditionFunction> class BINARYNODE: public ParentNode {
+template <class TConditionFunction> class BinaryNode: public ParentNode {
 public:
     template <ACTION TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
 
-    BINARYNODE(const char* v, size_t len, size_t column)
+    BinaryNode(const char* v, size_t len, size_t column)
     {
         m_condition_column_idx = column;
         m_child = 0;
@@ -862,7 +894,7 @@ public:
         m_value = (char *)malloc(len);
         memcpy(m_value, v, len);
     }
-    ~BINARYNODE() {
+    ~BinaryNode() {
         free((void*)m_value);
     }
 
@@ -897,17 +929,17 @@ protected:
 };
 
 
-template <> class STRINGNODE<EQUAL>: public ParentNode {
+template <> class StringNode<EQUAL>: public ParentNode {
 public:
     template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
 
-    STRINGNODE(const char* v, size_t column): m_key_ndx((size_t)-1) {
+    StringNode(const char* v, size_t column): m_key_ndx((size_t)-1) {
         m_condition_column_idx = column;
         m_child = 0;
         m_value = (char *)malloc(strlen(v)*6);
         memcpy(m_value, v, strlen(v) + 1);
     }
-    ~STRINGNODE() {
+    ~StringNode() {
         free((void*)m_value);
         m_index.Destroy();
     }
