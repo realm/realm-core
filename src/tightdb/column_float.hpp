@@ -25,12 +25,12 @@
 
 namespace tightdb {
     
-class ColumnFloat : public ColumnBasic<float> {
+class ColumnFloat : public BasicColumn<float> {
 public:
     ColumnFloat(Allocator& alloc=Allocator::get_default()) : 
-        ColumnBasic<float>(alloc) {};
+        BasicColumn<float>(alloc) {};
     ColumnFloat(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default()) :
-        ColumnBasic<float>(ref, parent, pndx, alloc) {};
+        BasicColumn<float>(ref, parent, pndx, alloc) {};
 };
 
 } // namespace tightdb

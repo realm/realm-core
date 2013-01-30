@@ -25,11 +25,11 @@
 namespace tightdb {
 
 template<typename T> 
-class ArrayBasic : public Array {
+class BasicArray : public Array {
 public:
-    explicit ArrayBasic(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
-    ArrayBasic(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=Allocator::get_default()) TIGHTDB_NOEXCEPT;
-    explicit ArrayBasic(no_prealloc_tag) TIGHTDB_NOEXCEPT;
+    explicit BasicArray(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
+    BasicArray(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
     T Get(size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(T value);
@@ -43,12 +43,12 @@ public:
     void find_all(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1);
 
     size_t count(T value, size_t start=0, size_t end=-1) const;
-    double sum(size_t start=0, size_t end=-1) const;
+    // Unused: double sum(size_t start=0, size_t end=-1) const;
     bool maximum(T& result, size_t start=0, size_t end=-1) const;
     bool minimum(T& result, size_t start=0, size_t end=-1) const;
 
     /// Compare two arrays for equality.
-    bool Compare(const ArrayBasic<T>&) const;
+    bool Compare(const BasicArray<T>&) const;
 
 
 private:

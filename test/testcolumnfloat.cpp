@@ -39,18 +39,18 @@ void printCol(ColumnFloat& c)
 
 
 template <class C>
-void ColumnBasic_IsEmpty()
+void BasicColumn_IsEmpty()
 {
     C c;
     CHECK(c.is_empty());
     CHECK_EQUAL(c.Size(), (size_t)0);
 }
-TEST(ColumnFloat_IsEmpty) { ColumnBasic_IsEmpty<ColumnFloat>(); }
-TEST(ColumnDouble_IsEmpty){ ColumnBasic_IsEmpty<ColumnDouble>(); }
+TEST(ColumnFloat_IsEmpty) { BasicColumn_IsEmpty<ColumnFloat>(); }
+TEST(ColumnDouble_IsEmpty){ BasicColumn_IsEmpty<ColumnDouble>(); }
 
 
 template <class C, typename T>
-void ColumnBasic_AddGet(T val[], size_t valLen)
+void BasicColumn_AddGet(T val[], size_t valLen)
 {
     C c;
     for (size_t i=0; i<valLen; ++i) {
@@ -63,12 +63,12 @@ void ColumnBasic_AddGet(T val[], size_t valLen)
         }
     }
 }
-TEST(ColumnFloat_AddGet) { ColumnBasic_AddGet<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_AddGet){ ColumnBasic_AddGet<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_AddGet) { BasicColumn_AddGet<ColumnFloat, float>(floatVal, floatValLen); }
+TEST(ColumnDouble_AddGet){ BasicColumn_AddGet<ColumnDouble, double>(doubleVal, doubleValLen); }
 
 
 template <class C, typename T>
-void ColumnBasic_Clear()
+void BasicColumn_Clear()
 {
     C c;
     CHECK(c.is_empty());
@@ -80,12 +80,12 @@ void ColumnBasic_Clear()
     c.Clear();
     CHECK(c.is_empty());
 }
-TEST(ColumnFloat_Clear) { ColumnBasic_Clear<ColumnFloat, float>(); }
-TEST(ColumnDouble_Clear){ ColumnBasic_Clear<ColumnDouble, double>(); }
+TEST(ColumnFloat_Clear) { BasicColumn_Clear<ColumnFloat, float>(); }
+TEST(ColumnDouble_Clear){ BasicColumn_Clear<ColumnDouble, double>(); }
 
 
 template <class C, typename T>
-void ColumnBasic_Set(T val[], size_t valLen)
+void BasicColumn_Set(T val[], size_t valLen)
 {
     C c;
     for (size_t i=0; i<valLen; ++i)
@@ -103,12 +103,12 @@ void ColumnBasic_Set(T val[], size_t valLen)
     CHECK_EQUAL(val[2], c.Get(2));
     CHECK_EQUAL(val[4], c.Get(4));
 }
-TEST(ColumnFloat_Set) { ColumnBasic_Set<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Set){ ColumnBasic_Set<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Set) { BasicColumn_Set<ColumnFloat, float>(floatVal, floatValLen); }
+TEST(ColumnDouble_Set){ BasicColumn_Set<ColumnDouble, double>(doubleVal, doubleValLen); }
 
 
 template <class C, typename T>
-void ColumnBasic_Insert(T val[], size_t valLen)
+void BasicColumn_Insert(T val[], size_t valLen)
 {
     (void)valLen;
     
@@ -149,12 +149,12 @@ void ColumnBasic_Insert(T val[], size_t valLen)
     CHECK_EQUAL(val[3], c.Get(4));
     CHECK_EQUAL(5, c.Size());   
 }
-TEST(ColumnFloat_Insert) { ColumnBasic_Insert<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Insert){ ColumnBasic_Insert<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Insert) { BasicColumn_Insert<ColumnFloat, float>(floatVal, floatValLen); }
+TEST(ColumnDouble_Insert){ BasicColumn_Insert<ColumnDouble, double>(doubleVal, doubleValLen); }
 
 
 template <class C, typename T>
-void ColumnBasic_Aggregates(T val[], size_t valLen)
+void BasicColumn_Aggregates(T val[], size_t valLen)
 {
     (void)valLen;
     (void)val;
@@ -170,12 +170,12 @@ void ColumnBasic_Aggregates(T val[], size_t valLen)
     
     
 }
-TEST(ColumnFloat_Aggregates) { ColumnBasic_Aggregates<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Aggregates){ ColumnBasic_Aggregates<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Aggregates) { BasicColumn_Aggregates<ColumnFloat, float>(floatVal, floatValLen); }
+TEST(ColumnDouble_Aggregates){ BasicColumn_Aggregates<ColumnDouble, double>(doubleVal, doubleValLen); }
 
 
 template <class C, typename T>
-void ColumnBasic_Delete(T val[], size_t valLen)
+void BasicColumn_Delete(T val[], size_t valLen)
 {
     C c;
     for (size_t i=0; i<valLen; ++i)
@@ -217,6 +217,6 @@ void ColumnBasic_Delete(T val[], size_t valLen)
     c.Delete(0);
     CHECK_EQUAL(0, c.Size());
 }
-TEST(ColumnFloat_Delete) { ColumnBasic_Delete<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Delete){ ColumnBasic_Delete<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Delete) { BasicColumn_Delete<ColumnFloat, float>(floatVal, floatValLen); }
+TEST(ColumnDouble_Delete){ BasicColumn_Delete<ColumnDouble, double>(doubleVal, doubleValLen); }
 

@@ -57,7 +57,7 @@ TSourceColumn:      Type of source column used in actions, or *ignored* if no so
 
 // Predeclarations for ColumnFloat and ColumnDouble
 namespace tightdb {
-template<class T> class ColumnBasic;
+template<class T> class BasicColumn;
 class ColumnFloat;
 class ColumnDouble;
 }
@@ -806,7 +806,7 @@ public:
     // Only purpose of this function is to let you quickly create a NODE object and call aggregate_local() on it to aggregate
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
     // be merged with Init somehow to simplify
-    void QuickInit(ColumnBasic<TConditionValue> *column, TConditionValue value) {
+    void QuickInit(BasicColumn<TConditionValue> *column, TConditionValue value) {
         m_condition_column.m_column = (ColType*)column;
         m_condition_column.m_leaf_end = 0;
         m_value = value;

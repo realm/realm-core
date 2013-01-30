@@ -46,42 +46,42 @@ template<class T> class SequentialGetter;
 
 
 template<typename T>
-ColumnBasic<T>::ColumnBasic(Allocator& alloc)
+BasicColumn<T>::BasicColumn(Allocator& alloc)
 {
-    m_array = new ArrayBasic<T>(NULL, 0, alloc);
+    m_array = new BasicArray<T>(NULL, 0, alloc);
 }
 
 template<typename T>
-ColumnBasic<T>::ColumnBasic(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
+BasicColumn<T>::BasicColumn(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
 {
     const bool isNode = IsNodeFromRef(ref, alloc);
     if (isNode)
         m_array = new Array(ref, parent, pndx, alloc);
     else
-        m_array = new ArrayBasic<T>(ref, parent, pndx, alloc);
+        m_array = new BasicArray<T>(ref, parent, pndx, alloc);
 }
 
 template<typename T>
-ColumnBasic<T>::~ColumnBasic()
+BasicColumn<T>::~BasicColumn()
 {
     if (IsNode()) 
         delete m_array;
     else 
-        delete (ArrayBasic<T>*)m_array;
+        delete (BasicArray<T>*)m_array;
 }
 
 template<typename T>
-void ColumnBasic<T>::Destroy()
+void BasicColumn<T>::Destroy()
 {
     if (IsNode()) 
         m_array->Destroy();
     else 
-        ((ArrayBasic<T>*)m_array)->Destroy();
+        ((BasicArray<T>*)m_array)->Destroy();
 }
 
 
 template<typename T>
-void ColumnBasic<T>::UpdateRef(size_t ref)
+void BasicColumn<T>::UpdateRef(size_t ref)
 {
     TIGHTDB_ASSERT(IsNodeFromRef(ref, m_array->GetAllocator())); // Can only be called when creating node
 
@@ -103,19 +103,19 @@ void ColumnBasic<T>::UpdateRef(size_t ref)
 }
 
 template<typename T>
-bool ColumnBasic<T>::is_empty() const TIGHTDB_NOEXCEPT
+bool BasicColumn<T>::is_empty() const TIGHTDB_NOEXCEPT
 {
     if (IsNode()) {
         const Array offsets = NodeGetOffsets();
         return offsets.is_empty();
     }
     else {
-        return ((ArrayBasic<T>*)m_array)->is_empty();
+        return ((BasicArray<T>*)m_array)->is_empty();
     }
 }
 
 template<typename T>
-size_t ColumnBasic<T>::Size() const TIGHTDB_NOEXCEPT
+size_t BasicColumn<T>::Size() const TIGHTDB_NOEXCEPT
 {
     if (IsNode())  {
         const Array offsets = NodeGetOffsets();
@@ -123,19 +123,19 @@ size_t ColumnBasic<T>::Size() const TIGHTDB_NOEXCEPT
         return size;
     }
     else {
-        return ((ArrayBasic<T>*)m_array)->Size();
+        return ((BasicArray<T>*)m_array)->Size();
     }
 }
 
 template<typename T>
-void ColumnBasic<T>::Clear()
+void BasicColumn<T>::Clear()
 {
     if (m_array->IsNode()) {
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx = m_array->GetParentNdx();
 
         // Revert to generic array
-        ArrayBasic<T>* array = new ArrayBasic<T>(parent, pndx, m_array->GetAllocator());
+        BasicArray<T>* array = new BasicArray<T>(parent, pndx, m_array->GetAllocator());
         if (parent) 
             parent->update_child_ref(pndx, array->GetRef());
 
@@ -146,46 +146,46 @@ void ColumnBasic<T>::Clear()
         m_array = array;
     }
     else 
-        ((ArrayBasic<T>*)m_array)->Clear();
+        ((BasicArray<T>*)m_array)->Clear();
 }
 
 template<typename T>
-void ColumnBasic<T>::Resize(size_t ndx)
+void BasicColumn<T>::Resize(size_t ndx)
 {
     TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
     TIGHTDB_ASSERT(ndx < Size());
-    ((ArrayBasic<T>*)m_array)->Resize(ndx);
+    ((BasicArray<T>*)m_array)->Resize(ndx);
 }
 
 template<typename T>
-T ColumnBasic<T>::Get(size_t ndx) const
+T BasicColumn<T>::Get(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < Size());
-    return TreeGet<T, ColumnBasic<T> >(ndx); // Throws
+    return TreeGet<T, BasicColumn<T> >(ndx); // Throws
 }
 
 template<typename T>
-bool ColumnBasic<T>::Set(size_t ndx, T value)
+bool BasicColumn<T>::Set(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < Size());
-    return TreeSet<T,ColumnBasic<T> >(ndx, value);
+    return TreeSet<T,BasicColumn<T> >(ndx, value);
 }
 
 template<typename T>
-bool ColumnBasic<T>::add(T value)
+bool BasicColumn<T>::add(T value)
 {
     return Insert(Size(), value);
 }
 
 template<typename T>
-bool ColumnBasic<T>::Insert(size_t ndx, T value)
+bool BasicColumn<T>::Insert(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= Size());
-    return TreeInsert<T, ColumnBasic<T> >(ndx, value);
+    return TreeInsert<T, BasicColumn<T> >(ndx, value);
 }
 
 template<typename T>
-void ColumnBasic<T>::fill(size_t count)
+void BasicColumn<T>::fill(size_t count)
 {
     TIGHTDB_ASSERT(is_empty());
 
@@ -193,7 +193,7 @@ void ColumnBasic<T>::fill(size_t count)
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
     for (size_t i = 0; i < count; ++i) {
-        TreeInsert<T, ColumnBasic<T> >(i, 0);
+        TreeInsert<T, BasicColumn<T> >(i, 0);
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -202,7 +202,7 @@ void ColumnBasic<T>::fill(size_t count)
 }
 
 template<typename T>
-bool ColumnBasic<T>::Compare(const ColumnBasic& c) const
+bool BasicColumn<T>::Compare(const BasicColumn& c) const
 {
     const size_t n = Size();
     if (c.Size() != n) 
@@ -218,47 +218,47 @@ bool ColumnBasic<T>::Compare(const ColumnBasic& c) const
 
 
 template<typename T>
-void ColumnBasic<T>::Delete(size_t ndx)
+void BasicColumn<T>::Delete(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
-    TreeDelete<T, ColumnBasic<T> >(ndx);
+    TreeDelete<T, BasicColumn<T> >(ndx);
 }
 
 template<typename T>
-T ColumnBasic<T>::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
+T BasicColumn<T>::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return ((ArrayBasic<T>*)m_array)->Get(ndx);
+    return ((BasicArray<T>*)m_array)->Get(ndx);
 }
 
 template<typename T>
-bool ColumnBasic<T>::LeafSet(size_t ndx, T value)
+bool BasicColumn<T>::LeafSet(size_t ndx, T value)
 {
-    ((ArrayBasic<T>*)m_array)->Set(ndx, value);
+    ((BasicArray<T>*)m_array)->Set(ndx, value);
     return true;
 }
 
 template<typename T>
-bool ColumnBasic<T>::LeafInsert(size_t ndx, T value)
+bool BasicColumn<T>::LeafInsert(size_t ndx, T value)
 {
-    ((ArrayBasic<T>*)m_array)->Insert(ndx, value);
+    ((BasicArray<T>*)m_array)->Insert(ndx, value);
     return true;
 }
 
 template<typename T>
-void ColumnBasic<T>::LeafDelete(size_t ndx)
+void BasicColumn<T>::LeafDelete(size_t ndx)
 {
-    ((ArrayBasic<T>*)m_array)->Delete(ndx);
+    ((BasicArray<T>*)m_array)->Delete(ndx);
 }
 
 
 #ifdef TIGHTDB_DEBUG
 
 template<typename T>
-void ColumnBasic<T>::LeafToDot(std::ostream& out, const Array& array) const
+void BasicColumn<T>::LeafToDot(std::ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
     const size_t ref = array.GetRef();
-    const ArrayBasic<T> newArray(ref, NULL, 0, array.GetAllocator());
+    const BasicArray<T> newArray(ref, NULL, 0, array.GetAllocator());
 
     newArray.ToDot(out);
 }
@@ -267,50 +267,50 @@ void ColumnBasic<T>::LeafToDot(std::ostream& out, const Array& array) const
 
 
 template<typename T> template<class F>
-size_t ColumnBasic<T>::LeafFind(T value, size_t start, size_t end) const
+size_t BasicColumn<T>::LeafFind(T value, size_t start, size_t end) const
 {
-    return ((ArrayBasic<T>*)m_array)->find_first(value, start, end);
+    return ((BasicArray<T>*)m_array)->find_first(value, start, end);
 }
 
 template<typename T>
-void ColumnBasic<T>::LeafFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const
+void BasicColumn<T>::LeafFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const
 {
-    return ((ArrayBasic<T>*)m_array)->find_all(result, value, add_offset, start, end);
+    return ((BasicArray<T>*)m_array)->find_all(result, value, add_offset, start, end);
 }
 
 template<typename T>
-size_t ColumnBasic<T>::find_first(T value, size_t start, size_t end) const
+size_t BasicColumn<T>::find_first(T value, size_t start, size_t end) const
 {
     TIGHTDB_ASSERT(value);
 
-    return TreeFind<T, ColumnBasic<T>, EQUAL>(value, start, end);
+    return TreeFind<T, BasicColumn<T>, EQUAL>(value, start, end);
 }
 
 template<typename T>
-void ColumnBasic<T>::find_all(Array &result, T value, size_t start, size_t end) const
+void BasicColumn<T>::find_all(Array &result, T value, size_t start, size_t end) const
 {
     TIGHTDB_ASSERT(value);
 
-    TreeFindAll<T, ColumnBasic<T> >(result, value, 0, start, end);
+    TreeFindAll<T, BasicColumn<T> >(result, value, 0, start, end);
 }
 
 
 #if 1
 
 template<typename T>
-size_t ColumnBasic<T>::count(T target) const
+size_t BasicColumn<T>::count(T target) const
 {
     return size_t(ColumnBase::aggregate<T, int64_t, TDB_COUNT, EQUAL>(target, 0, Size(), NULL));
 }
 
 template<typename T>
-T ColumnBasic<T>::sum(size_t start, size_t end) const
+T BasicColumn<T>::sum(size_t start, size_t end) const
 {
     return ColumnBase::aggregate<T, T, TDB_SUM, NONE>(0, start, end, NULL);
 }
 
 template<typename T>
-double ColumnBasic<T>::average(size_t start, size_t end) const
+double BasicColumn<T>::average(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = Size();
@@ -321,20 +321,20 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
 }
 
 template<typename T>
-T ColumnBasic<T>::minimum(size_t start, size_t end) const
+T BasicColumn<T>::minimum(size_t start, size_t end) const
 {
     return ColumnBase::aggregate<T, T, TDB_MIN, NONE>(0, start, end, NULL);
 }
 
 template<typename T>
-T ColumnBasic<T>::maximum(size_t start, size_t end) const
+T BasicColumn<T>::maximum(size_t start, size_t end) const
 {
     return ColumnBase::aggregate<T, T, TDB_MAX, NONE>(0, start, end, NULL);
 }
 
 /*
 template<typename T>
-void ColumnBasic<T>::sort(size_t start, size_t end)
+void BasicColumn<T>::sort(size_t start, size_t end)
 {
     // TODO
     assert(0);
@@ -347,7 +347,7 @@ void ColumnBasic<T>::sort(size_t start, size_t end)
 // TODO: test performance of column aggregates
 
 template<typename T>
-size_t ColumnBasic<T>::count(T target) const
+size_t BasicColumn<T>::count(T target) const
 {
     size_t count = 0;
     
@@ -357,19 +357,19 @@ size_t ColumnBasic<T>::count(T target) const
         
         for (size_t i = 0; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
-            const ColumnBasic<T> col(ref, NULL, 0, m_array->GetAllocator());
+            const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
             
             count += col.count(target);
         }
     }
     else {
-        count += ((ArrayBasic<T>*)m_array)->count(target);
+        count += ((BasicArray<T>*)m_array)->count(target);
     }
     return count;
 }
 
 template<typename T>
-T ColumnBasic<T>::sum(size_t start, size_t end) const
+T BasicColumn<T>::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = Size();
@@ -382,19 +382,19 @@ T ColumnBasic<T>::sum(size_t start, size_t end) const
         
         for (size_t i = start; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
-            const ColumnBasic<T> col(ref, NULL, 0, m_array->GetAllocator());
+            const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
             
             sum += col.sum(start, end);
         }
     }
     else {
-        sum += ((ArrayBasic<T>*)m_array)->sum(start, end);
+        sum += ((BasicArray<T>*)m_array)->sum(start, end);
     }
     return sum;
 }
 
 template<typename T>
-double ColumnBasic<T>::average(size_t start, size_t end) const
+double BasicColumn<T>::average(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = Size();
@@ -407,7 +407,7 @@ double ColumnBasic<T>::average(size_t start, size_t end) const
 #include <iostream>
 
 template<typename T>
-T ColumnBasic<T>::minimum(size_t start, size_t end) const
+T BasicColumn<T>::minimum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = Size();
@@ -419,7 +419,7 @@ T ColumnBasic<T>::minimum(size_t start, size_t end) const
         
         for (size_t i = start; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
-            const ColumnBasic<T> col(ref, NULL, 0, m_array->GetAllocator());
+            const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
             T val = col.minimum(start, end);
             if (val < min_val || i == start) {
                 //std::cout << "Min " << i << ": " << min_val << " new val: " << val << "\n";
@@ -429,14 +429,14 @@ T ColumnBasic<T>::minimum(size_t start, size_t end) const
     }
     else {
        // std::cout << "array-min before: " << min_val;
-        ((ArrayBasic<T>*)m_array)->minimum(min_val, start, end);
+        ((BasicArray<T>*)m_array)->minimum(min_val, start, end);
        // std::cout << " after: " << min_val << "\n";
     }
     return min_val;
 }
 
 template<typename T>
-T ColumnBasic<T>::maximum(size_t start, size_t end) const
+T BasicColumn<T>::maximum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = Size();
@@ -448,14 +448,14 @@ T ColumnBasic<T>::maximum(size_t start, size_t end) const
         
         for (size_t i = start; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
-            const ColumnBasic<T> col(ref, NULL, 0, m_array->GetAllocator());
+            const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
             T val = col.maximum(start, end);
             if (val > max_val || i == start)
                 val = max_val;
         }
     }
     else {
-        ((ArrayBasic<T>*)m_array)->maximum(max_val, start, end);
+        ((BasicArray<T>*)m_array)->maximum(max_val, start, end);
     }
     return max_val;
 }

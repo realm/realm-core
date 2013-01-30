@@ -26,12 +26,12 @@
 
 namespace tightdb {
     
-class ColumnDouble : public ColumnBasic<double> {
+class ColumnDouble : public BasicColumn<double> {
 public:
     ColumnDouble(Allocator& alloc=Allocator::get_default()) : 
-        ColumnBasic<double>(alloc) {};
+        BasicColumn<double>(alloc) {};
     ColumnDouble(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default()) :
-        ColumnBasic<double>(ref, parent, pndx, alloc) {};
+        BasicColumn<double>(ref, parent, pndx, alloc) {};
 };
 
 } // namespace tightdb
