@@ -118,8 +118,7 @@ void BasicArray<T>::Insert(size_t ndx, T value)
         unsigned char* dst = src + m_width;
         const size_t count = (m_len - ndx) * m_width;
         memmove(dst, src, count); 
-        // DON'T Use std::copy() or std::copy_backward() instead.
-        // NO: copy() seems 10 times slower!!!
+        // fixme: Consider std::copy() or std::copy_backward() instead.
     }
 
     // Set the value
@@ -172,7 +171,7 @@ size_t BasicArray<T>::CalcByteLen(size_t count, size_t /*width*/) const
 template<typename T> 
 size_t BasicArray<T>::CalcItemCount(size_t bytes, size_t /*width*/) const TIGHTDB_NOEXCEPT
 {
-    // ??? what about width = 0? return -1?
+    // fixme: ??? what about width = 0? return -1?
 
     const size_t bytes_without_header = bytes - 8;
     return bytes_without_header / sizeof(T);
