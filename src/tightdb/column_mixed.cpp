@@ -222,7 +222,7 @@ double ColumnMixed::get_double(size_t ndx) const
     else {
         TIGHTDB_ASSERT(coltype == MIXED_COL_DOUBLE);
     }
-    const void* vptr = reinterpret_cast<const void*>(&intval);
+    const void* vptr = &intval;
     const double value = * reinterpret_cast<const double *>(vptr);
     return value;
 }

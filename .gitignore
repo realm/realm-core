@@ -44,5 +44,3 @@ Static library*/
 *.opensdf
 *.sdf
 /tightdb.xcodeproj
-
-/src/tightdb/array_generic_tpl.hpp

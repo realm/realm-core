@@ -5,12 +5,6 @@
 #include <sys/stat.h>
 #include <pthread.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
@@ -19,6 +13,13 @@
 #include <tightdb/utilities.hpp>
 
 #include "testsettings.hpp"
+
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 using namespace std;
 using namespace tightdb;
@@ -337,7 +338,7 @@ TEST(Transactions_Stress3)
     for(size_t t = 0; t < READERS3; t++)
         pthread_join(read_threads3[t], NULL);
 }
-
+#endif
 
 #ifdef STRESSTEST4
 
@@ -438,4 +439,4 @@ TEST(Transactions_Stress4)
 
 #endif
 
-#endif
+
