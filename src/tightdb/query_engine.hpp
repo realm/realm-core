@@ -167,6 +167,7 @@ class ParentNode {
 public:
     ParentNode() : m_is_integer_node(false), m_table(NULL) {}
 
+    // Note: Changed to avoid a lot of copying of the vector. Lasse, plese review.
     void gather_children(std::vector<ParentNode*>& v) {
         m_children.clear();
         ParentNode* p = this;
@@ -182,7 +183,6 @@ public:
         m_children.insert(m_children.begin(), this);
 
         m_conds = m_children.size();        
-        return v;                              
     }
 
     struct score_compare {
