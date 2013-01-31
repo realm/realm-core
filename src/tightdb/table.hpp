@@ -28,7 +28,7 @@
 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-#include <tightdb/replication.hpp>
+#  include <tightdb/replication.hpp>
 #endif
 
 namespace tightdb {
@@ -74,7 +74,7 @@ public:
     /// ConstTableRef that refer to it, or to any of its subtables,
     /// when it goes out of scope. To create a top-level table with
     /// dynamic lifetime, use Table::create() instead.
-    Table(Allocator& alloc = GetDefaultAllocator());
+    Table(Allocator& alloc = Allocator::get_default());
 
     ~Table();
 
@@ -83,7 +83,7 @@ public:
     ///
     /// \return A reference to the new table, or null if allocation
     /// failed.
-    static TableRef create(Allocator& alloc = GetDefaultAllocator());
+    static TableRef create(Allocator& alloc = Allocator::get_default());
 
     /// An invalid table must not be accessed in any way except by
     /// calling is_valid(). A table that is obtained from a Group
@@ -110,7 +110,7 @@ public:
     /// table (except ~Table()) has undefined behaviour and is
     /// considered an error on behalf of the application. Note that
     /// even Table::is_valid() is disallowed in this case.
-    bool is_valid() const { return m_columns.HasParent(); }
+    bool is_valid() const TIGHTDB_NOEXCEPT { return m_columns.HasParent(); }
 
     /// A shared spec is a column specification that in general
     /// applies to many tables. A table is not allowed to directly
@@ -131,15 +131,15 @@ public:
     void        rename_column(const vector<size_t>& column_path, const char* name);
 
     // Table size and deletion
-    bool        is_empty() const {return m_size == 0;}
-    size_t      size() const {return m_size;}
+    bool        is_empty() const TIGHTDB_NOEXCEPT {return m_size == 0;}
+    size_t      size() const TIGHTDB_NOEXCEPT {return m_size;}
     void        clear();
 
     // Column information
-    size_t      get_column_count() const;
-    const char* get_column_name(size_t column_ndx) const;
+    size_t      get_column_count() const TIGHTDB_NOEXCEPT;
+    const char* get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     size_t      get_column_index(const char* name) const;
-    ColumnType  get_column_type(size_t column_ndx) const;
+    ColumnType  get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     // Row handling
     size_t      add_empty_row(size_t num_rows = 1);
@@ -162,16 +162,16 @@ public:
     void insert_done();
 
     // Get cell values
-    int64_t     get_int(size_t column_ndx, size_t row_ndx) const;
-    bool        get_bool(size_t column_ndx, size_t row_ndx) const;
-    time_t      get_date(size_t column_ndx, size_t row_ndx) const;
-    float       get_float(size_t column_ndx, size_t row_ndx) const;
-    double      get_double(size_t column_ndx, size_t row_ndx) const;
-    const char* get_string(size_t column_ndx, size_t row_ndx) const;
-    size_t      get_string_length(size_t column_ndx, size_t row_ndx) const;
-    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const;
-    Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const;
-    ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
+    int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    bool        get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    time_t      get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    float       get_float(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    double      get_double(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    const char* get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    size_t      get_string_length(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Set cell values
     void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
@@ -189,10 +189,10 @@ public:
     // 'mixed', for a value in a mixed column that is not a subtable,
     // get_subtable() returns null, get_subtable_size() returns zero,
     // and clear_subtable() replaces the value with an empty table.)
-    TableRef        get_subtable(size_t column_ndx, size_t row_ndx);
-    ConstTableRef   get_subtable(size_t column_ndx, size_t row_ndx) const;
-    size_t          get_subtable_size(size_t column_ndx, size_t row_ndx) const;
-    void            clear_subtable(size_t column_ndx, size_t row_ndx);
+    TableRef       get_subtable(size_t column_ndx, size_t row_ndx);
+    ConstTableRef  get_subtable(size_t column_ndx, size_t row_ndx) const;
+    size_t         get_subtable_size(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    void           clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Indexing
     bool has_index(size_t column_ndx) const;
@@ -285,34 +285,34 @@ public:
 #endif // TIGHTDB_DEBUG
 
     // todo, note, these three functions have been protected
-    const ColumnBase& GetColumnBase(size_t column_ndx) const;
-    ColumnType GetRealColumnType(size_t column_ndx) const;
+    const ColumnBase& GetColumnBase(size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Move this to private section next to the non-const version
+    ColumnType GetRealColumnType(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     class Parent;
 
 protected:
-    size_t find_pos_int(size_t column_ndx, int64_t value) const;
+    size_t find_pos_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
 
     // FIXME: Most of the things that are protected here, could instead be private
     // Direct Column access
     template <class T, ColumnType COL_TYPE> T& GetColumn(size_t ndx);
-    template <class T, ColumnType COL_TYPE> const T& GetColumn(size_t ndx) const;
+    template <class T, ColumnType COL_TYPE> const T& GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT;
     Column& GetColumn(size_t column_ndx);
-    const Column& GetColumn(size_t column_ndx) const;
+    const Column& GetColumn(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnFloat& GetColumnFloat(size_t column_ndx);
-    const ColumnFloat& GetColumnFloat(size_t column_ndx) const;
+    const ColumnFloat& GetColumnFloat(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnDouble& GetColumnDouble(size_t column_ndx);
-    const ColumnDouble& GetColumnDouble(size_t column_ndx) const;
+    const ColumnDouble& GetColumnDouble(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     AdaptiveStringColumn& GetColumnString(size_t column_ndx);
-    const AdaptiveStringColumn& GetColumnString(size_t column_ndx) const;
+    const AdaptiveStringColumn& GetColumnString(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnBinary& GetColumnBinary(size_t column_ndx);
-    const ColumnBinary& GetColumnBinary(size_t column_ndx) const;
+    const ColumnBinary& GetColumnBinary(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnStringEnum& GetColumnStringEnum(size_t column_ndx);
-    const ColumnStringEnum& GetColumnStringEnum(size_t column_ndx) const;
+    const ColumnStringEnum& GetColumnStringEnum(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnTable& GetColumnTable(size_t column_ndx);
-    const ColumnTable& GetColumnTable(size_t column_ndx) const;
+    const ColumnTable& GetColumnTable(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnMixed& GetColumnMixed(size_t column_ndx);
-    const ColumnMixed& GetColumnMixed(size_t column_ndx) const;
+    const ColumnMixed& GetColumnMixed(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     /// Used when the lifetime of a table is managed by reference
     /// counting. The lifetime of free-standing tables allocated on
@@ -484,7 +484,7 @@ C& Table::GetColumn(size_t ndx)
 }
 
 template <class C, ColumnType coltype>
-const C& Table::GetColumn(size_t ndx) const
+const C& Table::GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     const ColumnBase& column = GetColumnBase(ndx);
 #ifdef TIGHTDB_DEBUG

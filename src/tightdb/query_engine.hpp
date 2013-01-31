@@ -92,20 +92,13 @@ AggregateState      State of the aggregate - contains a state variable that stor
 
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
+#include <tightdb/column_fwd.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/column_binary.hpp>
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
-#include <tightdb/array_float.hpp>
-#include <tightdb/array_double.hpp>
-
-// Predeclarations for ColumnFloat and ColumnDouble
-namespace tightdb {
-template<class T> class ColumnBasic;
-class ColumnFloat;
-class ColumnDouble;
-}
+#include <tightdb/array_basic.hpp>
 
 
 namespace tightdb {
@@ -218,6 +211,7 @@ class ParentNode {
 public:
     ParentNode() : m_is_integer_node(false), m_table(NULL) {}
 
+    // Note: Changed to avoid a lot of copying of the vector. Lasse, plese review.
     void gather_children(std::vector<ParentNode*>& v) {
         m_children.clear();
         ParentNode* p = this;
@@ -496,7 +490,7 @@ public:
         
         if (m_child) {
             m_child->Init(table);
-            std::vector<ParentNode*>v;
+            std::vector<ParentNode*> v;
             m_child->gather_children(v);
         }
 
@@ -769,7 +763,12 @@ protected:
 
 template <class TConditionFunction> class StringNode: public ParentNode {
 public:
-    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
+    template <ACTION TAction>
+    int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column)
+    {
+        TIGHTDB_ASSERT(false);
+        return 0;
+    }
 
     StringNode(const char* v, size_t column)
     {
@@ -849,7 +848,7 @@ public:
     // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
     // be merged with Init somehow to simplify
-    void QuickInit(ColumnBasic<TConditionValue> *column, TConditionValue value) {
+    void QuickInit(BasicColumn<TConditionValue> *column, TConditionValue value) {
         m_condition_column.m_column = (ColType*)column;
         m_condition_column.m_leaf_end = 0;
         m_value = value;
@@ -932,7 +931,12 @@ protected:
 
 template <> class StringNode<EQUAL>: public ParentNode {
 public:
-    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
+    template <ACTION TAction> 
+    int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) 
+    {
+        TIGHTDB_ASSERT(false); 
+        return 0;
+    }
 
     StringNode(const char* v, size_t column): m_key_ndx((size_t)-1) {
         m_condition_column_idx = column;
@@ -1021,7 +1025,11 @@ private:
 
 class OR_NODE: public ParentNode {
 public:
-    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) {assert(false); return 0;}
+    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column)
+    {
+        TIGHTDB_ASSERT(false);
+        return 0;
+    }
 
     OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
 
@@ -1030,10 +1038,11 @@ public:
         m_dT = 50.0;
         m_dD = 10.0;
 
-        std::vector<ParentNode*>v;
+        std::vector<ParentNode*> v;
 
         for (size_t c = 0; c < 2; ++c) {
             m_cond[c]->Init(table);
+            v.clear();
             m_cond[c]->gather_children(v);
             m_last[c] = 0;
             m_was_match[c] = false;

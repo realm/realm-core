@@ -53,7 +53,7 @@ CATEGORIES:
                  Open a shared group (will be created if it does not already exist).
 
                  By default the shared group will be fully durable, so that each commit writes its changes
-                 to disk in an atomic manner that quarantees that the file is always consistent.
+                 to disk in an atomic manner that guarantees that the file is always consistent.
 
                  If your data is transient, and does not need to persist to disk (like for caching or
                  shared state between processes). You can open the shared group in mem-only mode. Then the
@@ -61,36 +61,105 @@ CATEGORIES:
                  are no more processes using it.
 
                  Note that a shared group can only be opened in the mode it was created in.
+
+                 A SharedGroup may also be constructed in an unattached
+                 state (2). See open() and is_attached() for more on
+                 this.
       SIGNATURE: >
-                 SharedGroup(const std::string& path_to_database_file, DurabilityLevel dlevel);
-      PARAMS:                 
-      - NAME   : path_to_database_file
+                 SharedGroup(const std::string& file, bool no_create = false, DurabilityLevel dlevel);
+                 SharedGroup(unattached_tag);
+      PARAMS:
+      - NAME   : file
         TYPES  : const std::string&
-        DESCR  : Path to a TightDB data file.
+        DESCR  : Filesystem path of the TightDB database file to be opened.
+      - NAME   : no_create
+        TYPES  : bool
+        DESCR  : If set to <tt>true</tt>, File::NotFound will be thrown
+                 if the file does not already exist.
       - NAME   : dlevel
         TYPES  : DurabilityLevel
         DESCR  : Durability Level (durability_Full or durability_MemOnly)
-      RETURN:                 
+      RETURN:
         TYPES  : SharedGroup
         DESCR  : A shared group.
-      EXAMPLES:                  
+      THROWS:
+      - EXCEPT : File::OpenError
+        DESCR  : If the file could not be opened. If the reason
+                 corresponds to one of the exception types that are
+                 derived from File::OpenError, the derived exception
+                 type is thrown. Note that InvalidDatabase is among
+                 these derived exception types.
+      EXAMPLES:
       - CODE   : ex_cpp_shared_group_constructor
-        DESCR  : 
+        DESCR  :
 - Utilities:
   METHODS:
-  - g_shared_group_is_valid:
-      NAMES    : is_valid
-      SUMMARY  : &g_shared_group_is_valid_summary
-                 Is shared group valid?
-      DESCR    : &g_shared_group_is_valid_descr
-                 >
-                 This method tests the consistency/validity of a shared group.
+  - g_shared_group_open:
+      NAMES    : open
+      SUMMARY  : &g_shared_group_open_summary
+                 Is this SharedGroup instance in its attached state?
+      DESCR    : &g_shared_group_open_descr
+                 Attach this SharedGroup instance to the specified
+                 database file.
+
+                 If the database file does not already exist, it will
+                 be created (unless <tt>no_create</tt> is set to
+                 true.) When multiple threads are involved, it is safe
+                 to let the first thread, that gets to it, create the
+                 file.
+
+                 While at least one instance of SharedGroup exists for
+                 a specific database file, a "lock" file will be
+                 present too. The lock file will be placed in the same
+                 directory as the database file, and its name will be
+                 derived by appending ".lock" to the name of the
+                 database file.
+
+                 When multiple SharedGroup instances refer to the same
+                 file, they must specify the same durability level,
+                 otherwise an exception will be thrown.
+
+                 Calling open() on a SharedGroup instance that is
+                 already in the attached state has undefined behavior.
+      PARAMS:
+      - NAME   : file
+        TYPES  : const std::string&
+        DESCR  : Filesystem path of the TightDB database file to be opened.
+      - NAME   : no_create
+        TYPES  : bool
+        DESCR  : If set to <tt>true</tt>, File::NotFound will be thrown
+                 if the file does not already exist.
+      - NAME   : dlevel
+        TYPES  : DurabilityLevel
+        DESCR  : Durability Level (durability_Full or durability_MemOnly)
+      THROWS:
+      - EXCEPT : File::OpenError
+        DESCR  : If the file could not be opened. If the reason
+                 corresponds to one of the exception types that are
+                 derived from File::OpenError, the derived exception
+                 type is thrown. Note that InvalidDatabase is among
+                 these derived exception types.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_shared_group_open
+  - g_shared_group_is_attached:
+      NAMES    : is_attached
+      SUMMARY  : &g_shared_group_is_attached_summary
+                 Is this SharedGroup instance in its attached state?
+      DESCR    : &g_shared_group_is_attached_descr
+                 A shared group may be created in the unattached
+                 state, and then later attached to a file with a call
+                 to one of the open() methods. Calling any method
+                 other than open(), is_attached(), and ~SharedGroup()
+                 on an unattached instance results in undefined
+                 behavior.
+      CONST    : true
       RETURN:
         TYPES  : bool
-        DESCR  : <code>true</code> is consistent/valid, <code>false</code> otherwise.
+        DESCR  : <code>true</code> if attached, <code>false</code> otherwise.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_is_valid
-        DESCR  :
+      - DESCR  :
+        CODE   : ex_cpp_shared_group_is_attached
   - g_shared_group_has_changed:
       NAMES    : has_changed
       SUMMARY  : &g_shared_group_has_changed_summary

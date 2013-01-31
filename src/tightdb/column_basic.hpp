@@ -26,16 +26,16 @@
 namespace tightdb {
 
 template<typename T>
-class ColumnBasic : public ColumnBase {
+class BasicColumn : public ColumnBase {
 public:
-    ColumnBasic(Allocator& alloc=GetDefaultAllocator());
-    ColumnBasic(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    ~ColumnBasic();
+    BasicColumn(Allocator& alloc=Allocator::get_default());
+    BasicColumn(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
+    ~BasicColumn();
 
     void Destroy();
 
-    size_t Size() const;
-    bool is_empty() const;
+    virtual size_t Size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const TIGHTDB_NOEXCEPT;
 
     T Get(size_t ndx) const;
     virtual bool add() {add(0); return true;}
@@ -66,7 +66,7 @@ public:
     void SetParent(ArrayParent* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 
     /// Compare two columns for equality.
-    bool Compare(const ColumnBasic&) const;
+    bool Compare(const BasicColumn&) const;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
@@ -77,7 +77,7 @@ protected:
 
     void UpdateRef(size_t ref);
 
-    T LeafGet(size_t ndx) const;
+    T LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     bool LeafSet(size_t ndx, T value);
     bool LeafInsert(size_t ndx, T value);
     void LeafDelete(size_t ndx);

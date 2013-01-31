@@ -26,25 +26,11 @@
 namespace tightdb {
 
 
-struct FileOpenError: std::runtime_error {
-    FileOpenError(const std::string& msg): std::runtime_error(msg) {}
-};
-
-/// A specified file system path (or the directory prefix of a
-/// specified file system path) was not found in the file system.
-struct NoSuchFile: FileOpenError {
-    NoSuchFile(): FileOpenError("No such file") {}
-};
-
-/// Lacking permissions or insufficient privileges.
-struct PermissionDenied: FileOpenError {
-    PermissionDenied(): FileOpenError("Permission denied") {}
-};
-
-/// Thrown by Group constructors if the specified file or memory
-/// buffer does not appear to contain a valid TightDB database.
-struct InvalidDatabase: std::runtime_error {
-    InvalidDatabase(): std::runtime_error("Invalid database") {}
+/// Thrown by various TightDb functions and methods if necessary
+/// system resources could not be allocated. Memory allocation errors,
+/// specifically, are generally reported by throwing std::bad_alloc.
+struct ResourceAllocError: std::runtime_error {
+    ResourceAllocError(const std::string& msg): std::runtime_error(msg) {}
 };
 
 

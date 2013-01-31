@@ -67,26 +67,26 @@ void ColumnBinary::UpdateRef(size_t ref)
     }
 }
 
-bool ColumnBinary::is_empty() const
+bool ColumnBinary::is_empty() const TIGHTDB_NOEXCEPT
 {
     if (IsNode()) {
         const Array offsets = NodeGetOffsets();
         return offsets.is_empty();
     }
     else {
-        return ((ArrayBinary*)m_array)->is_empty();
+        return (static_cast<ArrayBinary*>(m_array))->is_empty();
     }
 }
 
-size_t ColumnBinary::Size() const
+size_t ColumnBinary::Size() const  TIGHTDB_NOEXCEPT
 {
     if (IsNode())  {
         const Array offsets = NodeGetOffsets();
-        const size_t size = offsets.is_empty() ? 0 : (size_t)offsets.back();
+        const size_t size = offsets.is_empty() ? 0 : size_t(offsets.back());
         return size;
     }
     else {
-        return ((ArrayBinary*)m_array)->Size();
+        return (static_cast<ArrayBinary*>(m_array))->Size();
     }
 }
 
@@ -106,7 +106,7 @@ void ColumnBinary::Clear()
 
         m_array = array;
     }
-    else ((ArrayBinary*)m_array)->Clear();
+    else (static_cast<ArrayBinary*>(m_array))->Clear();
 }
 
 BinaryData ColumnBinary::Get(size_t ndx) const
@@ -207,7 +207,7 @@ bool ColumnBinary::Compare(const ColumnBinary& c) const
     return true;
 }
 
-BinaryData ColumnBinary::LeafGet(size_t ndx) const
+BinaryData ColumnBinary::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     const ArrayBinary* const array = static_cast<ArrayBinary*>(m_array);
     return BinaryData(array->Get(ndx), array->GetLen(ndx));

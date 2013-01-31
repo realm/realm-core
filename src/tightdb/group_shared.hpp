@@ -20,18 +20,17 @@
 #ifndef TIGHTDB_GROUP_SHARED_HPP
 #define TIGHTDB_GROUP_SHARED_HPP
 
-#include <tightdb/group.hpp>
+#include <limits>
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-#include <tightdb/replication.hpp>
-#endif
+#include <tightdb/group.hpp>
 
 namespace tightdb {
 
-// Pre-declarations
-struct ReadCount;
-struct SharedInfo;
 
+/// When two threads or processes want to access the same database
+/// file, they must each create their own instance of SharedGroup.
+///
+/// Processes that share a database file must reside on the same host.
 class SharedGroup {
 public:
     enum DurabilityLevel {
@@ -39,32 +38,84 @@ public:
         durability_MemOnly
     };
 
-    /// When two threads or processes want to access the same database
-    /// file, they must each create their own instance of SharedGroup.
+    /// Equivalent to calling open(const std::string&, bool,
+    /// DurabilityLevel) on a default constructed instance.
+    explicit SharedGroup(const std::string& file, bool no_create = false,
+                         DurabilityLevel dlevel=durability_Full);
+
+    struct unattached_tag {};
+
+    /// Create a SharedGroup instance in its unattached state. It may
+    /// then be attached to a database file later by calling the
+    /// open() method. You may test whether this instance is currently
+    /// in its attached state by calling is_attached(). Calling any
+    /// other method (except the destructor) while in the unattached
+    /// state has undefined behavior.
+    SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT;
+
+    ~SharedGroup();
+
+    /// Attach this SharedGroup instance to the specified database
+    /// file.
     ///
     /// If the database file does not already exist, it will be
-    /// created unless \a no_create is set to true. When multiple
+    /// created (unless \a no_create is set to true.) When multiple
     /// threads are involved, it is safe to let the first thread, that
-    /// gets to it, create the file. If \a no_create is set to false,
-    /// and the file does not already exist, NoSuchFile is thrown.
+    /// gets to it, create the file.
     ///
     /// While at least one instance of SharedGroup exists for a
-    /// specific database file, a lock file will exist too. The lock
-    /// file will be placed in the same directory as the database
-    /// file, and its name is derived by adding the suffix '.lock' to
-    /// the name of the database file.
+    /// specific database file, a "lock" file will be present too. The
+    /// lock file will be placed in the same directory as the database
+    /// file, and its name will be derived by appending ".lock" to the
+    /// name of the database file.
     ///
-    /// Processes that share a database file must reside on the same
-    /// host.
-    SharedGroup(const std::string& path_to_database_file, bool no_create = false,
-                DurabilityLevel dlevel=durability_Full);
-    ~SharedGroup();
+    /// When multiple SharedGroup instances refer to the same file,
+    /// they must specify the same durability level, otherwise an
+    /// exception will be thrown.
+    ///
+    /// Calling open() on a SharedGroup instance that is already in
+    /// the attached state has undefined behavior.
+    ///
+    /// \param file Filesystem path to a TightDB database file.
+    ///
+    /// \throw File::OpenError If the file could not be opened. If the
+    /// reason corresponds to one of the exception types that are
+    /// derived from File::OpenError, the derived exception type is
+    /// thrown. Note that InvalidDatabase is among these derived
+    /// exception types.
+    void open(const std::string& file, bool no_create = false,
+              DurabilityLevel dlevel=durability_Full);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct replication_tag {};
-    SharedGroup(replication_tag, const std::string& path_to_database_file = "",
-                DurabiltyLevel dlevel=durability_Full);
+    void open(replication_tag, const std::string& file = "",
+              DurabilityLevel dlevel=durability_Full);
+#endif
 
+    /// A SharedGroup may be created in the unattached state, and then
+    /// later attached to a file with a call to open(). Calling any
+    /// method other than open(), is_attached(), and ~SharedGroup() on
+    /// an unattached instance results in undefined behavior.
+    bool is_attached() const TIGHTDB_NOEXCEPT;
+
+    // Has db been modified since last transaction?
+    bool has_changed() const;
+
+    // Read transactions
+    const Group& begin_read();
+    void end_read();
+
+    // Write transactions
+    Group& begin_write();
+    void commit();
+    void rollback();
+
+#ifdef TIGHTDB_DEBUG
+    void test_ringbuf();
+    void zero_free_space();
+#endif
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
     /// This function may be called asynchronously to interrupt any
     /// blocking call that is part of a transaction in a replication
     /// setup. Only begin_write() and modifying functions, that are
@@ -87,27 +138,32 @@ public:
     void clear_interrupt_transact() { m_replication.clear_interrupt(); }
 #endif
 
-    // FIXME: Eliminate this. All construction errors must be reported using exceptions.
-    bool is_valid() const { return m_isValid; }
+private:
+    struct SharedInfo;
 
-    // Has db been modified since last transaction?
-    bool has_changed() const;
-
-    // Read transactions
-    const Group& begin_read();
-    void end_read();
-
-    // Write transactions
-    Group& begin_write();
-    void commit();
-    void rollback();
+    // Member variables
+    Group                 m_group;
+    size_t                m_version;
+    File                  m_file;
+    File::Map<SharedInfo> m_file_map;
+    std::string           m_file_path;
 
 #ifdef TIGHTDB_DEBUG
-    void test_ringbuf();
-    void zero_free_space();
+    // In debug mode we want to track transaction stages
+    enum TransactStage {
+        transact_Ready,
+        transact_Reading,
+        transact_Writing
+    };
+    TransactStage m_transact_stage;
 #endif
 
-private:
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    Replication m_replication;
+#endif
+
+    struct ReadCount;
+
     // Ring buffer managment
     bool       ringbuf_is_empty() const;
     size_t     ringbuf_size() const;
@@ -120,31 +176,119 @@ private:
     ReadCount& ringbuf_get_first();
     ReadCount& ringbuf_get_last();
 
-    // Member variables
-    Group       m_group;
-    SharedInfo* m_info;
-    size_t      m_info_len;
-    bool        m_isValid;
-    size_t      m_version;
-    int         m_fd;
-    std::string m_lockfile_path;
+    friend class ReadTransaction;
+    friend class WriteTransaction;
+};
 
-    void init(const std::string& path_to_database_file, bool no_create, DurabilityLevel);
 
-#ifdef TIGHTDB_DEBUG
-    // In debug mode we want to track state
-    enum SharedState {
-        SHARED_STATE_READY,
-        SHARED_STATE_READING,
-        SHARED_STATE_WRITING
-    };
-    SharedState m_state;
-#endif
+class ReadTransaction {
+public:
+    ReadTransaction(SharedGroup& sg): m_shared_group(sg)
+    {
+        m_shared_group.begin_read();
+    }
+
+    ~ReadTransaction()
+    {
+        m_shared_group.end_read();
+    }
+
+    ConstTableRef get_table(const char* name) const
+    {
+        return get_group().get_table(name);
+    }
+
+    template<class T> typename T::ConstRef get_table(const char* name) const
+    {
+        return get_group().get_table<T>(name);
+    }
+
+    const Group& get_group() const
+    {
+        return m_shared_group.m_group;
+    }
+
+private:
+    SharedGroup& m_shared_group;
+};
+
+
+class WriteTransaction {
+public:
+    WriteTransaction(SharedGroup& sg): m_shared_group(&sg)
+    {
+        m_shared_group->begin_write();
+    }
+
+    ~WriteTransaction()
+    {
+        if (m_shared_group) m_shared_group->rollback();
+    }
+
+    TableRef get_table(const char* name) const
+    {
+        return get_group().get_table(name);
+    }
+
+    template<class T> typename T::Ref get_table(const char* name) const
+    {
+        return get_group().get_table<T>(name);
+    }
+
+    Group& get_group() const
+    {
+        TIGHTDB_ASSERT(m_shared_group);
+        return m_shared_group->m_group;
+    }
+
+    void commit()
+    {
+        TIGHTDB_ASSERT(m_shared_group);
+        m_shared_group->commit();
+        m_shared_group = 0;
+    }
+
+private:
+    SharedGroup* m_shared_group;
+};
+
+
+
+
+
+// Implementation:
+
+inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max())
+{
+    open(file, no_create, dlevel);
+}
+
+
+inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max()) {}
+
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication m_replication;
+
+inline void SharedGroup::open(replication_tag, const string& file, DurabilityLevel dlevel)
+{
+    TIGHTDB_ASSERT(!is_attached());
+
+    m_replication.attach(file);
+    m_group.set_replication(&m_replication);
+
+    open(!file.empty() ? file : Replication::get_path_to_database_file(), false, dlevel);
+}
+
 #endif
-};
+
+
+inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
+{
+    return m_file_map.is_attached();
+}
+
 
 } // namespace tightdb
 

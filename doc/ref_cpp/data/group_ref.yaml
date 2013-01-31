@@ -39,36 +39,49 @@ CATEGORIES:
       NAMES    : Group
       DESCR    : &g_group_constructor_descr
                  >
-                 Group objects can be created in various ways depending on use pattern.
+                 Group objects can be created in various ways
+                 depending on use pattern.
 
                  You can either just create a new (empty) group, or load an
                  existing group either from a file or memory buffer.
+
+                 A group may also be constructed in an unattached
+                 state (4). See open() and is_attached() for more on
+                 this.
 
       SUMMARY  : &g_group_constructor_summary
                  Creates a table group.
       SIGNATURE: |
                  Group();
-                 Group(const std::string& path, OpenMode mode = mode_Normal);
+                 Group(const std::string& file, OpenMode mode = mode_Normal);
                  Group(BufferSpec buffer, bool take_ownership = true);
+                 Group(unattached_tag) noexcept;
       PARAMS:
-      - NAME   : path
+      - NAME   : file
         TYPES  : const std::string&
-        DESCR  : The name of the file.
-      - NAME   : buffer
-        TYPES  : Group::BufferSpec
-        DESCR  : In-memory binary encoded representation of a group.
+        DESCR  : Filesystem path of the TightDB database file to be opened.
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : |
                  Group::mode_Normal:   Open in read/write mode, create the file if it does not already exist.
                  Group::mode_ReadOnly: Open in read-only mode, fail if the file does not already exist.
                  Group::mode_NoCreate: Open in read/write mode, fail if the file does not already exist.
+      - NAME   : buffer
+        TYPES  : Group::BufferSpec
+        DESCR  : In-memory binary encoded representation of a group.
       - NAME   : len
-        TYPES  : size_t
-        DESCR  : Length of buffer.
+        TYPES  : std::size_t
+        DESCR  : Size of the representation.
       RETURN:
         TYPES  : Group
         DESCR  : A - possibly empty - group.
+      THROWS:
+      - EXCEPT : File::OpenError
+        DESCR  : If the file (or buffer) could not be opened. If the reason
+                 corresponds to one of the exception types that are
+                 derived from File::OpenError, the derived exception
+                 type is thrown. Note that InvalidDatabase is among
+                 these derived exception types.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_constructor_plain
@@ -228,12 +241,15 @@ CATEGORIES:
                  This method will write the group to persistent storage (disk). Metadata and tables
                  will be stored, and can be retrieved at later times.
       PARAMS:
-      - NAME   : filepath
+      - NAME   : file
         TYPES  : const std::string&
-        DESCR  : File name, possibly a full path.
+        DESCR  : A filesystem path.
       THROWS:
-      - EXCEPT : PermissionDenied
-        DESCR  : If the file could not be opened due to a permission issue.
+      - EXCEPT : File::OpenError
+        DESCR  : If the file could not be opened. If the reason
+                 corresponds to one of the exception types that are
+                 derived from File::OpenError, the derived exception
+                 type is thrown.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_write_to_file
@@ -253,19 +269,6 @@ CATEGORIES:
         CODE   : ex_cpp_group_write_to_mem
 - Group:
   METHODS:
-  - g_group_is_shared:
-      NAMES    : is_shared
-      SUMMARY  : &g_group_is_shared_summary
-                 Is group shared?
-      DESCR    : &g_group_is_shared_descr
-                 The method checks if group is shared.
-      CONST    : true
-      RETURN:
-        TYPES  : bool
-        DESCR  : <code>true</code> if group is shared, <code>false</code> otherwise.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_is_shared
   - g_group_is_empty:
       NAMES    : is_empty
       SUMMARY  : &g_group_is_empty_summary
@@ -294,3 +297,95 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_tostring
+  - g_group_open_file:
+  - g_group_open_memory:
+      NAMES    : open
+      DESCR    : &g_group_open_descr
+                 >
+                 Attach this Group instance to a file or an externally
+                 supplied memory buffer.
+
+                 If the specified file exists in the file system, it
+                 must contain a valid TightDB database. If the file
+                 does not exist, it will be created (unless
+                 mode_NoCreate is specified). While a group
+                 constructed this way, can be used to access and
+                 manipulate a TightDB database, it is generally better
+                 to use a SharedGroup instance along with proper
+                 transactions.
+
+                 Changes made to the database via a Group instance are
+                 not automatically committed to the specified
+                 file. You may, however, at any time, explicitely
+                 commit your changes by calling the commit()
+                 method. Alternatively you may call write() to write
+                 the entire database to a new file.
+
+                 Specifying a memory buffer is equivalent to
+                 specifying a file except that in this case the
+                 database is assumed to be stored in that buffer.
+
+                 If <tt>take_ownership</tt> is <tt>true</tt>, you will
+                 pass the ownership of the specified buffer to the
+                 Group instance. In this case the buffer will
+                 eventually be freed using std::free(), so the buffer
+                 you pass, must have been allocated using
+                 std::malloc().
+
+                 On the other hand, if <tt>take_ownership</tt> is set
+                 to <tt>false</tt>, it is your responsibility to keep
+                 the memory buffer alive during the lifetime of the
+                 group, and in case the buffer needs to be deallocated
+                 afterwards, that is your responsibility too.
+
+                 Calling open() on a Group instance that is already in
+                 the attached state has undefined behavior.
+
+      SUMMARY  : &g_group_open_summary
+                 Attach to a file or a memory buffer.
+      SIGNATURE: |
+                 void open(const std::string& file, OpenMode mode = mode_Normal);
+                 void open(BufferSpec buffer, bool take_ownership = true);
+      PARAMS:
+      - NAME   : file
+        TYPES  : const std::string&
+        DESCR  : Filesytem path of the TightDB database file to be opened.
+      - NAME   : mode
+        TYPES  : Group::OpenMode
+        DESCR  : See Group().
+      - NAME   : buffer
+        TYPES  : Group::BufferSpec
+        DESCR  : In-memory binary encoded representation of a group.
+      - NAME   : len
+        TYPES  : std::size_t
+        DESCR  : Size of the representation.
+      THROWS:
+      - EXCEPT : File::OpenError
+        DESCR  : If the file (or buffer) could not be opened. If the reason
+                 corresponds to one of the exception types that are
+                 derived from File::OpenError, the derived exception
+                 type is thrown. Note that InvalidDatabase is among
+                 these derived exception types.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_open_file
+      - DESCR  :
+        CODE   : ex_cpp_group_open_memory
+  - g_group_is_attached:
+      NAMES    : is_attached
+      SUMMARY  : &g_group_is_attached_summary
+                 Is this Group instance in its attached state?
+      DESCR    : &g_group_is_attached_descr
+                 A group may be created in the unattached state, and
+                 then later attached to a file or a memory buffer with
+                 a call to one of the open() methods. Calling any
+                 method other than open(), is_attached(), and ~Group()
+                 on an unattached instance results in undefined
+                 behavior.
+      CONST    : true
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if attached, <code>false</code> otherwise.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_is_attached

@@ -1,4 +1,5 @@
 #include <UnitTest++.h>
+
 #include <tightdb.hpp>
 
 using namespace tightdb;
@@ -275,8 +276,8 @@ TEST(TestQueryFindAll_Contains2_2)
     ttt.add(7, "fobar");
     ttt.add(8, "oobar");
 
-// utf8 case handling is only implemented on msw for now
-#if defined(_MSC_VER)
+// FIXME: UTF-8 case handling is only implemented on msw for now
+#ifdef _WIN32
     TupleTableType::Query q1 = ttt.where().second.contains("foO", false);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(6, tv1.size());
@@ -1667,4 +1668,40 @@ TEST(TestQuery_Const)
 
     //TODO: Should not be possible
     const_table.where().second.equal("a").remove();
+}
+
+namespace {
+
+TIGHTDB_TABLE_2(PhoneTable,
+                type,   String,
+                number, String)
+
+TIGHTDB_TABLE_4(EmployeeTable,
+                name,   String,
+                age,    Int,
+                hired,  Bool,
+                phones, Subtable<PhoneTable>)
+
+} // anonymous namespace
+
+TEST(TestQuery_Subtables_Typed)
+{
+    // Create table
+    EmployeeTable employees;
+
+    // Add initial rows
+    employees.add("joe", 42, false, NULL);
+    employees[0].phones->add("home", "324-323-3214");
+    employees[0].phones->add("work", "321-564-8678");
+
+    employees.add("jessica", 22, true, NULL);
+    employees[1].phones->add("mobile", "434-426-4646");
+    employees[1].phones->add("school", "345-543-5345");
+
+    // Do a query
+    EmployeeTable::Query q = employees.where().hired.equal(true);
+    EmployeeTable::View view = q.find_all();
+
+    // Verify result
+    CHECK(view.size() == 1 && view[0].name == "jessica");
 }

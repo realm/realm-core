@@ -1,8 +1,6 @@
 #include <tightdb/table_view.hpp>
 #include <tightdb/column.hpp>
-#include <tightdb/column_float.hpp>
-#include <tightdb/column_double.hpp>
-#include <assert.h>
+#include <tightdb/column_basic.hpp>
 
 namespace tightdb {
 

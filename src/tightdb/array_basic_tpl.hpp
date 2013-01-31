@@ -20,8 +20,10 @@
 #ifndef TIGHTDB_ARRAY_BASIC_TPL_HPP
 #define TIGHTDB_ARRAY_BASIC_TPL_HPP
 
+namespace tightdb {
+
 template<typename T>
-inline size_t ArrayBasic<T>::create_empty_basic_array(Allocator& alloc) 
+inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc) 
 {
     const size_t capacity = Array::initial_capacity;
     const MemRef mem_ref = alloc.Alloc(capacity);
@@ -34,7 +36,7 @@ inline size_t ArrayBasic<T>::create_empty_basic_array(Allocator& alloc)
 }
 
 template<typename T> 
-inline ArrayBasic<T>::ArrayBasic(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc)
+inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc)
                                :Array(alloc)
 {
     const size_t ref = create_empty_basic_array(alloc);
@@ -46,8 +48,8 @@ inline ArrayBasic<T>::ArrayBasic(ArrayParent *parent, size_t ndx_in_parent, Allo
 }
 
 template<typename T>
-inline ArrayBasic<T>::ArrayBasic(size_t ref, ArrayParent *parent, size_t ndx_in_parent,
-                               Allocator& alloc): Array(alloc)
+inline BasicArray<T>::BasicArray(size_t ref, ArrayParent *parent, size_t ndx_in_parent,
+                               Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
@@ -56,17 +58,13 @@ inline ArrayBasic<T>::ArrayBasic(size_t ref, ArrayParent *parent, size_t ndx_in_
 }
 
 template<typename T>
-inline ArrayBasic<T>::ArrayBasic(no_prealloc_tag) : Array(no_prealloc_tag()) {
-}
-
-template<typename T> 
-inline ArrayBasic<T>::~ArrayBasic() 
+inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT : Array(no_prealloc_tag())
 {
 }
 
 
 template<typename T> 
-inline void ArrayBasic<T>::Clear()
+inline void BasicArray<T>::Clear()
 {
     CopyOnWrite();
 
@@ -76,20 +74,20 @@ inline void ArrayBasic<T>::Clear()
 }
 
 template<typename T> 
-inline void ArrayBasic<T>::add(T value)
+inline void BasicArray<T>::add(T value)
 {
     Insert(m_len, value);
 }
 
 template<typename T> 
-inline T ArrayBasic<T>::Get(size_t ndx) const
+inline T BasicArray<T>::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     T* dataPtr = (T *)m_data + ndx;
     return *dataPtr;
 }
 
 template<typename T> 
-inline void ArrayBasic<T>::Set(size_t ndx, T value)
+inline void BasicArray<T>::Set(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
@@ -103,7 +101,7 @@ inline void ArrayBasic<T>::Set(size_t ndx, T value)
 }
 
 template<typename T> 
-void ArrayBasic<T>::Insert(size_t ndx, T value)
+void BasicArray<T>::Insert(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
 
@@ -120,8 +118,7 @@ void ArrayBasic<T>::Insert(size_t ndx, T value)
         unsigned char* dst = src + m_width;
         const size_t count = (m_len - ndx) * m_width;
         memmove(dst, src, count); 
-        // DON'T Use std::copy() or std::copy_backward() instead.
-        // NO: copy() seems 10 times slower!!!
+        // fixme: Consider std::copy() or std::copy_backward() instead.
     }
 
     // Set the value
@@ -132,7 +129,7 @@ void ArrayBasic<T>::Insert(size_t ndx, T value)
 }
 
 template<typename T> 
-void ArrayBasic<T>::Delete(size_t ndx)
+void BasicArray<T>::Delete(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
@@ -154,7 +151,7 @@ void ArrayBasic<T>::Delete(size_t ndx)
 }
 
 template<typename T>
-bool ArrayBasic<T>::Compare(const ArrayBasic<T>& c) const
+bool BasicArray<T>::Compare(const BasicArray<T>& c) const
 {
     for (size_t i = 0; i < Size(); ++i) {
         if (Get(i) != c.Get(i)) 
@@ -165,23 +162,23 @@ bool ArrayBasic<T>::Compare(const ArrayBasic<T>& c) const
 
 
 template<typename T> 
-size_t ArrayBasic<T>::CalcByteLen(size_t count, size_t /*width*/) const
+size_t BasicArray<T>::CalcByteLen(size_t count, size_t /*width*/) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/overflow.hpp>
+    // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
     return 8 + (count * sizeof(T));
 }
 
 template<typename T> 
-size_t ArrayBasic<T>::CalcItemCount(size_t bytes, size_t /*width*/) const
+size_t BasicArray<T>::CalcItemCount(size_t bytes, size_t /*width*/) const TIGHTDB_NOEXCEPT
 {
-    // ??? what about width = 0? return -1?
+    // fixme: ??? what about width = 0? return -1?
 
     const size_t bytes_without_header = bytes - 8;
     return bytes_without_header / sizeof(T);
 }
 
 template<typename T> 
-size_t ArrayBasic<T>::Find(T target, size_t start, size_t end) const
+size_t BasicArray<T>::Find(T target, size_t start, size_t end) const
 {
     if (end == (size_t)-1) 
         end = m_len;
@@ -199,13 +196,13 @@ size_t ArrayBasic<T>::Find(T target, size_t start, size_t end) const
 }
 
 template<typename T> 
-size_t ArrayBasic<T>::find_first(T value, size_t start, size_t end) const
+size_t BasicArray<T>::find_first(T value, size_t start, size_t end) const
 {
     return Find(value, start, end);
 }
 
 template<typename T> 
-void ArrayBasic<T>::find_all(Array& result, T value, size_t add_offset, size_t start, size_t end)
+void BasicArray<T>::find_all(Array& result, T value, size_t add_offset, size_t start, size_t end)
 {
     size_t first = start - 1;
     for (;;) {
@@ -218,7 +215,7 @@ void ArrayBasic<T>::find_all(Array& result, T value, size_t add_offset, size_t s
 }
 
 template<typename T> 
-size_t ArrayBasic<T>::count(T value, size_t start, size_t end) const
+size_t BasicArray<T>::count(T value, size_t start, size_t end) const
 {
     size_t count = 0;
     size_t lastmatch = start - 1;
@@ -232,8 +229,10 @@ size_t ArrayBasic<T>::count(T value, size_t start, size_t end) const
     return count;
 }
 
-template<typename T> 
-double ArrayBasic<T>::sum(size_t start, size_t end) const
+#if 0
+// currently unused
+template<typename T>
+double BasicArray<T>::sum(size_t start, size_t end) const
 {
     if (end == (size_t)-1)
         end = m_len;
@@ -241,15 +240,16 @@ double ArrayBasic<T>::sum(size_t start, size_t end) const
         return 0;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
-    double sum = 0;
+    R sum = 0;
     for (size_t i = start; i < end; ++i) {
         sum += Get(i);
     }
     return sum;
 }
+#endif
 
 template <typename T> template<bool find_max>
-bool ArrayBasic<T>::minmax(T& result, size_t start, size_t end) const
+bool BasicArray<T>::minmax(T& result, size_t start, size_t end) const
 {
     if (end == (size_t)-1)
         end = m_len;
@@ -269,15 +269,18 @@ bool ArrayBasic<T>::minmax(T& result, size_t start, size_t end) const
 }
 
 template <typename T>
-bool ArrayBasic<T>::maximum(T& result, size_t start, size_t end) const
+bool BasicArray<T>::maximum(T& result, size_t start, size_t end) const
 {
     return minmax<true>(result, start, end);
 }
 
 template <typename T>
-bool ArrayBasic<T>::minimum(T& result, size_t start, size_t end) const
+bool BasicArray<T>::minimum(T& result, size_t start, size_t end) const
 {
     return minmax<false>(result, start, end);
 }
+
+
+} // namespace tightdb
 
 #endif // TIGHTDB_ARRAY_BASIC_TPL_HPP

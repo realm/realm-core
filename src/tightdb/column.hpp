@@ -20,15 +20,11 @@
 #ifndef TIGHTDB_COLUMN_HPP
 #define TIGHTDB_COLUMN_HPP
 
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
 #include <stdint.h> // unint8_t etc
-#endif
-//#include <climits> // size_t
 #include <cstdlib> // size_t
-#include "query_conditions.hpp"
+
 #include <tightdb/array.hpp>
+#include <tightdb/query_conditions.hpp>
 
 namespace tightdb {
 
@@ -44,9 +40,9 @@ public:
 
     virtual void SetHasRefs() {};
 
-    virtual bool IsIntColumn() const {return false;}
+    virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT {return false;}
 
-    virtual size_t Size() const = 0;
+    virtual size_t Size() const TIGHTDB_NOEXCEPT = 0;
 
     virtual bool add() = 0;
     virtual void insert(size_t ndx) = 0;
@@ -98,7 +94,7 @@ protected:
 
     // Tree functions
 public:
-    template<typename T, class C> T TreeGet(size_t ndx) const;
+    template<typename T, class C> T TreeGet(size_t ndx) const; // FIXME: This one should probably be eliminated because it throws due to dynamic memory allocation
 protected:
     template<typename T, class C> bool TreeSet(size_t ndx, T value);
     template<typename T, class C> bool TreeInsert(size_t ndx, T value);
@@ -109,11 +105,9 @@ protected:
     template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 
     // Node functions
-    bool IsNode() const {return m_array->IsNode();}
-    const Array NodeGetOffsets() const;
-    const Array NodeGetRefs() const;
-    Array NodeGetOffsets();
-    Array NodeGetRefs();
+    bool IsNode() const TIGHTDB_NOEXCEPT {return m_array->IsNode();}
+    Array NodeGetOffsets() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
+    Array NodeGetRefs() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     template<class C> bool NodeInsert(size_t ndx, size_t ref);
     template<class C> bool NodeAdd(size_t ref);
     bool NodeAddKey(size_t ref);
@@ -121,7 +115,7 @@ protected:
     template<class C> bool NodeInsertSplit(size_t ndx, size_t newRef);
     size_t GetRefSize(size_t ref) const;
 
-    static std::size_t get_size_from_ref(std::size_t ref, Allocator&);
+    static std::size_t get_size_from_ref(std::size_t ref, Allocator&) TIGHTDB_NOEXCEPT;
 
     template <typename T, typename R, ACTION action, class condition>
         R aggregate(T target, size_t start, size_t end, size_t *matchcount) const;
@@ -132,35 +126,37 @@ protected:
 #endif // TIGHTDB_DEBUG
 
     // Member variables
-    mutable Array* m_array;
+    mutable Array* m_array; // FIXME: This should not be mutable
 };
 
 
 class Column : public ColumnBase {
 public:
-    explicit Column(Allocator& alloc);
-    Column(ColumnDef type, Allocator& alloc);
-    Column(ColumnDef type=COLUMN_NORMAL, ArrayParent *parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    Column(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=GetDefaultAllocator());
-    Column(const Column& column);
+    explicit Column(Allocator&);
+    Column(ColumnDef type, Allocator&);
+    Column(ColumnDef type=COLUMN_NORMAL, ArrayParent* = 0, size_t pndx = 0,
+           Allocator& = Allocator::get_default());
+    Column(size_t ref, ArrayParent* = 0, size_t pndx = 0,
+           Allocator& = Allocator::get_default()); // Throws
+    Column(const Column&); // FIXME: Constness violation
     ~Column();
 
     void Destroy();
 
-    bool IsIntColumn() const {return true;}
+    bool IsIntColumn() const TIGHTDB_NOEXCEPT {return true;}
 
     bool operator==(const Column& column) const;
 
     void UpdateParentNdx(int diff);
     void SetHasRefs();
 
-    size_t Size() const;
-    bool is_empty() const;
+    virtual size_t Size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const TIGHTDB_NOEXCEPT;
 
     // Getting and setting values
-    int64_t Get(size_t ndx) const;
-    size_t GetAsRef(size_t ndx) const;
-    int64_t Back() const {return Get(Size()-1);}
+    int64_t Get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    size_t GetAsRef(size_t ndx) const TIGHTDB_NOEXCEPT;
+    int64_t Back() const TIGHTDB_NOEXCEPT {return Get(Size()-1);}
     bool Set(size_t ndx, int64_t value);
     void insert(size_t ndx) { Insert(ndx, 0); } // FIXME: Ignoring boolean return value here!
     bool Insert(size_t ndx, int64_t value);
@@ -190,7 +186,7 @@ public:
 
     void find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
     void find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
-    size_t find_pos(int64_t value) const;
+    size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT;
     size_t find_pos2(int64_t value) const;
 
     // Query support methods
@@ -207,7 +203,7 @@ public:
     size_t FindWithIndex(int64_t value) const;
 
     size_t GetRef() const {return m_array->GetRef();}
-    Allocator& GetAllocator() const {return m_array->GetAllocator();}
+    Allocator& GetAllocator() const TIGHTDB_NOEXCEPT {return m_array->GetAllocator();}
     Array* GetArray(void) {return m_array;}
 
     void sort();
@@ -228,7 +224,7 @@ protected:
     void UpdateRef(size_t ref);
 
     // Node functions
-    int64_t LeafGet(size_t ndx) const {return m_array->Get(ndx);}
+    int64_t LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT {return m_array->Get(ndx);}
     bool LeafSet(size_t ndx, int64_t value) {return m_array->Set(ndx, value);}
     bool LeafInsert(size_t ndx, int64_t value) {return m_array->Insert(ndx, value);}
     void LeafDelete(size_t ndx) {m_array->Delete(ndx);}
@@ -246,6 +242,19 @@ private:
     Column &operator=(Column const &); // not allowed
 };
 
+
+
+// Implementation:
+
+inline int64_t Column::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return m_array->ColumnGet(ndx);
+}
+
+inline std::size_t Column::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return to_ref(Get(ndx));
+}
 
 } // namespace tightdb
 

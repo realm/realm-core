@@ -38,16 +38,11 @@ Searching: The main finding function is:
 #ifndef TIGHTDB_ARRAY_HPP
 #define TIGHTDB_ARRAY_HPP
 
-#ifdef _MSC_VER
-#include <win32/stdint.h>
-#else
 #include <stdint.h> // unint8_t etc
-#endif
 #include <cstdlib> // size_t
 #include <cstring> // memmove
 #include <vector>
 #include <ostream>
-#include <assert.h>
 
 #include <tightdb/assert.hpp>
 #include <tightdb/error.hpp>
@@ -67,7 +62,6 @@ Searching: The main finding function is:
     SSE4.1: smmintrin.h
     SSE4.2: nmmintrin.h
 */
-
 #ifdef TIGHTDB_COMPILER_SSE
     #include <emmintrin.h> // SSE2
     #include <tightdb/tightdb_nmmintrin.h> // SSE42
@@ -144,6 +138,7 @@ class GroupWriter;
 class Column;
 template <class T> class QueryState;
 
+
 #ifdef TIGHTDB_DEBUG
 class MemStats {
 public:
@@ -175,6 +170,7 @@ enum ColumnDef {
 };
 
 bool IsArrayIndexNode(size_t ref, const Allocator& alloc);
+
 
 class ArrayParent
 {
@@ -210,24 +206,24 @@ public:
 
     /// Create a new array, and if \a parent and \a ndx_in_parent are
     /// specified, update the parent to point to this new array.
-    Array(ColumnDef type=COLUMN_NORMAL, ArrayParent* parent=0, size_t ndx_in_parent=0,
-          Allocator& alloc=GetDefaultAllocator());
+    explicit Array(ColumnDef type=COLUMN_NORMAL, ArrayParent* parent=0, size_t ndx_in_parent=0,
+                   Allocator& = Allocator::get_default());
 
     /// Initialize an array wrapper from the specified array.
-    Array(size_t ref, ArrayParent* parent=0, size_t ndx_in_parent=0,
-          Allocator& alloc=GetDefaultAllocator());
+    explicit Array(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
+                   Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 
     /// Create an array in the invalid state (a null array).
-    Array(Allocator& alloc);
+    explicit Array(Allocator&) TIGHTDB_NOEXCEPT;
 
-    /// FIXME: This is a moving copy and therfore it compromises constness.
-    Array(const Array& a);
-    
+    /// FIXME: This is an attempt at a moving constructor - but it violates constness in an onfortunate way.
+    Array(const Array&) TIGHTDB_NOEXCEPT;
+
     // Fastest way to instantiate an array, if you just want to utilize its methods
     struct no_prealloc_tag {};
-    Array(no_prealloc_tag);
+    explicit Array(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
-    virtual ~Array();
+    virtual ~Array() TIGHTDB_NOEXCEPT {}
 
     // FIXME: This operator does not compare the arrays, it compares
     // just the data pointers. This is hugely counterintuitive. If
@@ -252,39 +248,39 @@ public:
     static size_t create_empty_array(ColumnDef, Allocator&);
 
     // Parent tracking
-    bool HasParent() const {return m_parent != NULL;}
-    void SetParent(ArrayParent *parent, size_t ndx_in_parent);
+    bool HasParent() const TIGHTDB_NOEXCEPT {return m_parent != NULL;}
+    void SetParent(ArrayParent *parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
     void UpdateParentNdx(int diff) {m_parentNdx += diff;}
-    ArrayParent *GetParent() const {return m_parent;}
+    ArrayParent *GetParent() const TIGHTDB_NOEXCEPT {return m_parent;}
     size_t GetParentNdx() const {return m_parentNdx;}
     bool UpdateFromParent();
 
-    bool IsValid() const {return m_data != NULL;}
-    void Invalidate() const {m_data = NULL;}
+    bool IsValid() const TIGHTDB_NOEXCEPT {return m_data != NULL;}
+    void Invalidate() const TIGHTDB_NOEXCEPT {m_data = NULL;}
 
-    virtual size_t Size() const {return m_len;}
-    bool is_empty() const {return m_len == 0;}
+    virtual size_t Size() const TIGHTDB_NOEXCEPT {return m_len;}
+    bool is_empty() const TIGHTDB_NOEXCEPT {return m_len == 0;}
 
     bool Insert(size_t ndx, int64_t value);
     bool add(int64_t value);
     bool Set(size_t ndx, int64_t value);
     template<size_t w> void Set(size_t ndx, int64_t value);
 
-    int64_t Get(size_t ndx) const;
-    template<size_t w> int64_t Get(size_t ndx) const;
+    int64_t Get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    template<size_t w> int64_t Get(size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    size_t GetAsRef(size_t ndx) const;
-    size_t GetAsSizeT(size_t ndx) const;
+    size_t GetAsRef(size_t ndx) const TIGHTDB_NOEXCEPT;
+    size_t GetAsSizeT(size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    int64_t operator[](size_t ndx) const {return Get(ndx);}
-    int64_t back() const;
+    int64_t operator[](size_t ndx) const TIGHTDB_NOEXCEPT {return Get(ndx);}
+    int64_t back() const TIGHTDB_NOEXCEPT;
     void Delete(size_t ndx);
     void Clear();
 
     // Direct access methods
     const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const;
-    int64_t ColumnGet(size_t ndx) const;
-    const char* ColumnStringGet(size_t ndx) const;
+    int64_t ColumnGet(size_t ndx) const TIGHTDB_NOEXCEPT;
+    const char* ColumnStringGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
     typedef const char*(*StringGetter)(void*, size_t); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const;
@@ -298,7 +294,7 @@ public:
     void Adjust(size_t start, int64_t diff);
     template <size_t w> bool Increment(int64_t value, size_t start, size_t end);
 
-    size_t FindPos(int64_t value) const;
+    size_t FindPos(int64_t value) const TIGHTDB_NOEXCEPT;
     size_t FindPos2(int64_t value) const;
     size_t FindGTE(int64_t target, size_t start) const;
     void Preset(int64_t min, int64_t max, size_t count);
@@ -313,22 +309,21 @@ public:
     void ReferenceSort(Array &ref);
     void Resize(size_t count);
 
-    bool IsNode() const {return m_isNode;}
-    bool HasRefs() const {return m_hasRefs;}
+    bool IsNode() const TIGHTDB_NOEXCEPT {return m_isNode;}
+    bool HasRefs() const TIGHTDB_NOEXCEPT {return m_hasRefs;}
     bool IsIndexNode() const {return get_header_indexflag();}
     void SetIsIndexNode(bool value) {set_header_indexflag(value);}
-    Array GetSubArray(size_t ndx);
-    const Array GetSubArray(size_t ndx) const;
-    size_t GetRef() const {return m_ref;};
+    Array GetSubArray(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array may cause the parent to be modified too.
+    size_t GetRef() const TIGHTDB_NOEXCEPT {return m_ref;};
     void Destroy();
 
-    Allocator& GetAllocator() const {return m_alloc;}
+    Allocator& GetAllocator() const TIGHTDB_NOEXCEPT {return m_alloc;}
 
     // Serialization
     template<class S> size_t Write(S& target, bool recurse=true, bool persist=false) const;
     template<class S> void WriteAt(size_t pos, S& out) const;
     size_t GetByteSize(bool align=false) const;
-    std::vector<int64_t> ToVector(void) const; // FIXME: We cannot use std::vector (or any other STL data structure) if we choose to support disabling of exceptions.
+    std::vector<int64_t> ToVector(void) const;
 
     /// Compare two arrays for equality.
     bool Compare(const Array&) const;
@@ -412,27 +407,27 @@ private:
 
     typedef bool (*CallbackDummy)(int64_t);
 
-    template <size_t w> bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max);
+    template<size_t w> bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t* min, int64_t* max);
     Array& operator=(const Array&) {return *this;} // not allowed
     template<size_t w> void QuickSort(size_t lo, size_t hi);
     void QuickSort(size_t lo, size_t hi);
-    void ReferenceQuickSort(Array &ref);
-    template<size_t w> void ReferenceQuickSort(size_t lo, size_t hi, Array &ref);
+    void ReferenceQuickSort(Array& ref);
+    template<size_t w> void ReferenceQuickSort(size_t lo, size_t hi, Array& ref);
 
-    template <size_t w> void sort();
-    template <size_t w>void ReferenceSort(Array &ref);
+    template<size_t w> void sort();
+    template<size_t w> void ReferenceSort(Array& ref);
 
-    template <size_t w> int64_t sum(size_t start, size_t end) const;
-    template <size_t w> size_t FindPos(int64_t target) const;
-   
+    template<size_t w> int64_t sum(size_t start, size_t end) const;
+    template<size_t w> size_t FindPos(int64_t target) const TIGHTDB_NOEXCEPT;
+
 protected:
     friend class GroupWriter;
 
     bool AddPositiveLocal(int64_t value);
 
-    void init_from_ref(size_t ref);
-    void CreateFromHeader(uint8_t* header, size_t ref=0);
-    void CreateFromHeaderDirect(uint8_t* header, size_t ref=0);
+    void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
+    void CreateFromHeader(uint8_t* header, size_t ref=0) TIGHTDB_NOEXCEPT;
+    void CreateFromHeaderDirect(uint8_t* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void update_ref_in_parent();
 
     enum WidthType {
@@ -442,7 +437,7 @@ protected:
     };
 
     virtual size_t CalcByteLen(size_t count, size_t width) const;
-    virtual size_t CalcItemCount(size_t bytes, size_t width) const;
+    virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const {return TDB_BITS;}
 
     void set_header_isnode(bool value);
@@ -452,13 +447,14 @@ protected:
     void set_header_width(size_t value);
     void set_header_len(size_t value);
     void set_header_capacity(size_t value);
-    bool get_header_isnode(const void* header=NULL) const;
-    bool get_header_hasrefs(const void* header=NULL) const;
-    bool get_header_indexflag(const void* header=NULL) const;
-    WidthType get_header_wtype(const void* header=NULL) const;
-    size_t get_header_width(const void* header=NULL) const;
-    size_t get_header_len(const void* header=NULL) const;
-    size_t get_header_capacity(const void* header=NULL) const;
+
+    bool get_header_isnode(const void* header=NULL) const TIGHTDB_NOEXCEPT;
+    bool get_header_hasrefs(const void* header=NULL) const TIGHTDB_NOEXCEPT;
+    bool get_header_indexflag(const void* header=NULL) const TIGHTDB_NOEXCEPT;
+    WidthType get_header_wtype(const void* header=NULL) const TIGHTDB_NOEXCEPT;
+    size_t get_header_width(const void* header=NULL) const TIGHTDB_NOEXCEPT;
+    size_t get_header_len(const void* header=NULL) const TIGHTDB_NOEXCEPT;
+    size_t get_header_capacity(const void* header=NULL) const TIGHTDB_NOEXCEPT;
 
     static void set_header_isnode(bool value, void* header);
     static void set_header_hasrefs(bool value, void* header);
@@ -470,8 +466,8 @@ protected:
     static void init_header(void* header, bool is_node, bool has_refs, int width_type,
                      size_t width, size_t length, size_t capacity);
 
-    template <size_t width> void SetWidth(void);
-    void SetWidth(size_t width);
+    template <size_t width> void SetWidth(void) TIGHTDB_NOEXCEPT;
+    void SetWidth(size_t width) TIGHTDB_NOEXCEPT;
     bool Alloc(size_t count, size_t width);
     bool CopyOnWrite();
 
@@ -504,7 +500,7 @@ protected:
 // FIXME: below should be moved to a specific ArrayNumber class
 protected:
     // Getters and Setters for adaptive-packed arrays
-    typedef int64_t(Array::*Getter)(size_t) const;
+    typedef int64_t(Array::*Getter)(size_t) const; // Note: getters must not throw
     typedef void(Array::*Setter)(size_t, int64_t);
     typedef void (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryState<int64_t>*) const;
 
@@ -658,7 +654,7 @@ public:
 
 
 
-inline Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
+inline Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
     m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
@@ -676,14 +672,14 @@ inline Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator&
 }
 
 // Creates new array (but invalid, call UpdateRef or SetType to init)
-inline Array::Array(Allocator& alloc):
+inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
     m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
 
 // Copy-constructor
 // Note that this array now own the ref. Should only be used when
 // the source array goes away right after (like return values from functions)
-inline Array::Array(const Array& src):
+inline Array::Array(const Array& src) TIGHTDB_NOEXCEPT:
     ArrayParent(), m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
 {
     const size_t ref = src.GetRef();
@@ -694,11 +690,27 @@ inline Array::Array(const Array& src):
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
-inline Array::Array(no_prealloc_tag) : m_alloc(GetDefaultAllocator()) {
+inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(Allocator::get_default()) {}
+
+
+inline int64_t Array::back() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(m_len);
+    return Get(m_len-1);
 }
 
 
-inline Array::~Array() {}
+inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(m_hasRefs);
+
+    const size_t ref = std::size_t(Get(ndx));
+    TIGHTDB_ASSERT(ref);
+
+    return Array(ref, const_cast<Array*>(this), ndx, m_alloc); // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
+}
+
 
 
 //-------------------------------------------------
@@ -1215,7 +1227,8 @@ template <size_t width> inline int64_t Array::LowerBits(void) const
 }
 
 // Tests if any chunk in 'value' is 0
-template <size_t width> inline bool Array::TestZero(uint64_t value) const {
+template <size_t width> inline bool Array::TestZero(uint64_t value) const
+{
     uint64_t hasZeroByte;
     uint64_t lower = LowerBits<width>();
     uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
@@ -1459,7 +1472,8 @@ template <bool gt, ACTION action, size_t width, class Callback> bool Array::Find
 }
 
 
-template <bool eq, ACTION action, size_t width, class Callback> inline bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const {
+template <bool eq, ACTION action, size_t width, class Callback> inline bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+{
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
     TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);

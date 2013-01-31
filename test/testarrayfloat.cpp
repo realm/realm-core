@@ -1,6 +1,5 @@
 #include <UnitTest++.h>
-#include <tightdb/array_float.hpp>
-#include <tightdb/array_double.hpp>
+#include <tightdb/array_basic.hpp>
 #include <tightdb/column.hpp>
 
 template <typename T, size_t N> inline
@@ -35,7 +34,7 @@ const size_t doubleValLen = SizeOfArray(doubleVal);
 // TODO: Add test of full range of floats.
 
 template <class C, typename T>
-void ArrayBasic_AddGet(T val[], size_t valLen)
+void BasicArray_AddGet(T val[], size_t valLen)
 {
     C f;
     for (size_t i=0; i<valLen; ++i) {
@@ -51,12 +50,12 @@ void ArrayBasic_AddGet(T val[], size_t valLen)
     f.Clear();
     CHECK_EQUAL(0, f.Size());
 }
-TEST(ArrayFloat_AddGet) { ArrayBasic_AddGet<ArrayFloat, float>(floatVal, floatValLen); }
-TEST(ArrayDouble_AddGet){ ArrayBasic_AddGet<ArrayDouble, double>(doubleVal, doubleValLen); }
+TEST(ArrayFloat_AddGet) { BasicArray_AddGet<ArrayFloat, float>(floatVal, floatValLen); }
+TEST(ArrayDouble_AddGet){ BasicArray_AddGet<ArrayDouble, double>(doubleVal, doubleValLen); }
 
 
 template <class C, typename T>
-void ArrayBasic_AddManyValues()
+void BasicArray_AddManyValues()
 {
     C f;
     const size_t repeats = 1100;
@@ -74,11 +73,11 @@ void ArrayBasic_AddManyValues()
     f.Clear();
     CHECK_EQUAL(0, f.Size());
 }
-TEST(ArrayFloat_AddManyValues) { ArrayBasic_AddManyValues<ArrayFloat, float>(); }
-TEST(ArrayDouble_AddManyValues){ ArrayBasic_AddManyValues<ArrayDouble, double>(); }
+TEST(ArrayFloat_AddManyValues) { BasicArray_AddManyValues<ArrayFloat, float>(); }
+TEST(ArrayDouble_AddManyValues){ BasicArray_AddManyValues<ArrayDouble, double>(); }
 
 template <class C, typename T>
-void ArrayBasic_Delete()
+void BasicArray_Delete()
 {
     C f;
     for (size_t i=0; i<5; ++i)
@@ -113,12 +112,12 @@ void ArrayBasic_Delete()
     CHECK_EQUAL(0, f.Size());
     CHECK(f.is_empty());
 }
-TEST(ArrayFloat_Delete) { ArrayBasic_Delete<ArrayFloat, float>(); }
-TEST(ArrayDouble_Delete){ ArrayBasic_Delete<ArrayDouble, double>(); }
+TEST(ArrayFloat_Delete) { BasicArray_Delete<ArrayFloat, float>(); }
+TEST(ArrayDouble_Delete){ BasicArray_Delete<ArrayDouble, double>(); }
 
 
 template <class C, typename T>
-void ArrayBasic_Set(T val[], size_t valLen)
+void BasicArray_Set(T val[], size_t valLen)
 {
     C f;
     CHECK_EQUAL(0, f.Size());
@@ -136,12 +135,12 @@ void ArrayBasic_Set(T val[], size_t valLen)
     CHECK_EQUAL(val[4], f.Get(4));
     CHECK_EQUAL(valLen, f.Size());
 }
-TEST(ArrayFloat_Set) { ArrayBasic_Set<ArrayFloat, float>(floatVal, floatValLen); }
-TEST(ArrayDouble_Set){ ArrayBasic_Set<ArrayDouble, double>(doubleVal, doubleValLen); }
+TEST(ArrayFloat_Set) { BasicArray_Set<ArrayFloat, float>(floatVal, floatValLen); }
+TEST(ArrayDouble_Set){ BasicArray_Set<ArrayDouble, double>(doubleVal, doubleValLen); }
 
 
 template <class C, typename T>
-void ArrayBasic_Insert()
+void BasicArray_Insert()
 {
     C f;
     const T v0 = T(123.970);
@@ -175,12 +174,13 @@ void ArrayBasic_Insert()
     CHECK_EQUAL(v3, f.Get(3));
     CHECK_EQUAL(4, f.Size());
 }
-TEST(ArrayFloat_Insert) { ArrayBasic_Insert<ArrayFloat, float>(); }
-TEST(ArrayDouble_Insert){ ArrayBasic_Insert<ArrayDouble, double>(); }
+TEST(ArrayFloat_Insert) { BasicArray_Insert<ArrayFloat, float>(); }
+TEST(ArrayDouble_Insert){ BasicArray_Insert<ArrayDouble, double>(); }
 
-
+#if 0
+// sum() is unused by other classes
 template <class C, typename T>
-void ArrayBasic_Sum()
+void BasicArray_Sum()
 {
     C f;
 
@@ -203,12 +203,12 @@ void ArrayBasic_Sum()
     // single middle
     CHECK_EQUAL(double(values[2]), f.sum(2, 3));
 }
-TEST(ArrayFloat_Sum) { ArrayBasic_Sum<ArrayFloat, float>(); }
-TEST(ArrayDouble_Sum){ ArrayBasic_Sum<ArrayDouble, double>(); }
-
+TEST(ArrayFloat_Sum) { BasicArray_Sum<ArrayFloat, float>(); }
+TEST(ArrayDouble_Sum){ BasicArray_Sum<ArrayDouble, double>(); }
+#endif
 
 template <class C, typename T>
-void ArrayBasic_Minimum()
+void BasicArray_Minimum()
 {
     C f;
     T res;
@@ -237,12 +237,12 @@ void ArrayBasic_Minimum()
     CHECK_EQUAL(true, f.minimum(res, 3, size_t(-1)));
     CHECK_EQUAL(values[4], res);
 }
-TEST(ArrayFloat_Minimum) { ArrayBasic_Minimum<ArrayFloat, float>(); }
-TEST(ArrayDouble_Minimum){ ArrayBasic_Minimum<ArrayDouble, double>(); }
+TEST(ArrayFloat_Minimum) { BasicArray_Minimum<ArrayFloat, float>(); }
+TEST(ArrayDouble_Minimum){ BasicArray_Minimum<ArrayDouble, double>(); }
 
 
 template <class C, typename T>
-void ArrayBasic_Maximum()
+void BasicArray_Maximum()
 {
     C f;
     T res;
@@ -271,12 +271,12 @@ void ArrayBasic_Maximum()
     CHECK_EQUAL(true, f.maximum(res, 3, size_t(-1)));
     CHECK_EQUAL(values[3], res);
 }
-TEST(ArrayFloat_Maximum) { ArrayBasic_Maximum<ArrayFloat, float>(); }
-TEST(ArrayDouble_Maximum){ ArrayBasic_Maximum<ArrayDouble, double>(); }
+TEST(ArrayFloat_Maximum) { BasicArray_Maximum<ArrayFloat, float>(); }
+TEST(ArrayDouble_Maximum){ BasicArray_Maximum<ArrayDouble, double>(); }
 
 
 template <class C, typename T>
-void ArrayBasic_Find()
+void BasicArray_Find()
 {
     C f;
 
@@ -317,12 +317,12 @@ void ArrayBasic_Find()
     CHECK_EQUAL(0, resArr.Size());
 
 }
-TEST(ArrayFloat_Find) { ArrayBasic_Find<ArrayFloat, float>(); }
-TEST(ArrayDouble_Find){ ArrayBasic_Find<ArrayDouble, double>(); }
+TEST(ArrayFloat_Find) { BasicArray_Find<ArrayFloat, float>(); }
+TEST(ArrayDouble_Find){ BasicArray_Find<ArrayDouble, double>(); }
 
 
 template <class C, typename T>
-void ArrayBasic_Count()
+void BasicArray_Count()
 {
     C f;
 
@@ -352,12 +352,12 @@ void ArrayBasic_Count()
     CHECK_EQUAL(1, f.count(T(-1.0), 1));
 
 }
-TEST(ArrayFloat_Count) { ArrayBasic_Count<ArrayFloat, float>(); }
-TEST(ArrayDouble_Count){ ArrayBasic_Count<ArrayDouble, double>(); }
+TEST(ArrayFloat_Count) { BasicArray_Count<ArrayFloat, float>(); }
+TEST(ArrayDouble_Count){ BasicArray_Count<ArrayDouble, double>(); }
 
 
 template <class C, typename T>
-void ArrayBasic_Compare()
+void BasicArray_Compare()
 {
     C f1, f2;
 
@@ -379,6 +379,6 @@ void ArrayBasic_Compare()
     f2.Delete(0);
     CHECK_EQUAL(true, f1.Compare(f2));
 }
-TEST(ArrayFloat_Compare) { ArrayBasic_Compare<ArrayFloat, float>(); }
-TEST(ArrayDouble_Compare){ ArrayBasic_Compare<ArrayDouble, double>(); }
+TEST(ArrayFloat_Compare) { BasicArray_Compare<ArrayFloat, float>(); }
+TEST(ArrayDouble_Compare){ BasicArray_Compare<ArrayDouble, double>(); }
 

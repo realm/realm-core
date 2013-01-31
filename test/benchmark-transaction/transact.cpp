@@ -1,6 +1,6 @@
 /*
  * Transaction benchmark for SQLite 3 and TightDB
- * 
+ *
  * (C) Copyright 2012 by TightDB, Inc. <http://www.tightdb.com/>
  *
  */
@@ -63,7 +63,8 @@ static pthread_mutex_t mtx_writers = PTHREAD_MUTEX_INITIALIZER;
 
 double wall_time;
 
-void usage(const char *msg) {
+void usage(const char *msg)
+{
     if (strlen(msg) > 0)
         cout << "Error: " << msg << endl << endl;
     cout << "Usage:" << endl;
@@ -81,7 +82,8 @@ void usage(const char *msg) {
 
 
 // minimal version: no error checks!
-void copy(const char *src, const char *dst) {
+void copy(const char *src, const char *dst)
+{
     int fd_to, fd_from;
     char buf[4096];
     ssize_t nread;
@@ -105,7 +107,8 @@ void copy(const char *src, const char *dst) {
 }
 
 // copy table in mysql
-void copy_db(const char *src, const char *dst) {
+void copy_db(const char *src, const char *dst)
+{
     MYSQL    *db;
     char sql[128];
 
@@ -120,11 +123,13 @@ void copy_db(const char *src, const char *dst) {
     mysql_close(db);
 }
 
-double delta_time(struct timespec ts_1, struct timespec ts_2) {
+double delta_time(struct timespec ts_1, struct timespec ts_2)
+{
     return (double)ts_2.tv_sec+1e-9*(double)ts_2.tv_nsec - ((double)ts_1.tv_sec+1e-9*(double)ts_1.tv_nsec);
 }
 
-void update_reader(struct timespec ts_1, struct timespec ts_2) {
+void update_reader(struct timespec ts_1, struct timespec ts_2)
+{
     double dt = delta_time(ts_1, ts_2);
     pthread_mutex_lock(&mtx_readers);
     dt_readers += dt;
@@ -133,7 +138,8 @@ void update_reader(struct timespec ts_1, struct timespec ts_2) {
 }
 
 
-void update_writer(struct timespec ts_1, struct timespec ts_2) {
+void update_writer(struct timespec ts_1, struct timespec ts_2)
+{
     double dt = delta_time(ts_1, ts_2);
     pthread_mutex_lock(&mtx_writers);
     dt_writers += dt;
@@ -143,11 +149,13 @@ void update_writer(struct timespec ts_1, struct timespec ts_2) {
 
 
 // keep retrying
-int db_retry(void *data, int i) {
+int db_retry(void *data, int i)
+{
     return 1;
 }
 
-static void *sqlite_reader(void *arg) {
+static void *sqlite_reader(void *arg)
+{
     struct timespec ts_1, ts_2;
     sqlite3 *db;
     long int randy;
@@ -189,7 +197,7 @@ static void *sqlite_reader(void *arg) {
         // update statistics
         clock_gettime(CLOCK_REALTIME, &ts_2);
         update_reader(ts_1, ts_2);
-    }        
+    }
     sqlite3_close(db);
     if (verbose) {
         cout << "Reader threads " << tinfo->thread_num << ":" << c << endl;
@@ -197,23 +205,24 @@ static void *sqlite_reader(void *arg) {
     return NULL;
 }
 
-static void *mysql_reader(void *arg) {
+static void *mysql_reader(void *arg)
+{
     struct timespec ts_1, ts_2;
     long int randy;
     char sql[128];
     MYSQL *db;
     long int c = 0;
-    
+
     struct thread_info *tinfo = (struct thread_info *)arg;
     srandom(tinfo->thread_num);
-    
+
     // open mysql
     db = mysql_init(NULL);
     if (mysql_real_connect(db, DB_HOST, DB_USER, DB_PASS, DB_NAME, 0, NULL, 0) == NULL) {
         cout << "Cannot connect to MySQL" << endl;
     }
     mysql_autocommit(db, 0);
-    
+
     while (true) {
         pthread_mutex_lock(&mtx_runnable);
         bool local_runnable = runnable;
@@ -222,7 +231,7 @@ static void *mysql_reader(void *arg) {
             break;
         }
         clock_gettime(CLOCK_REALTIME, &ts_1);
-        
+
         // execute transaction
         if (mysql_query(db, "START TRANSACTION;")) {
             cout << "MySQL error: " << mysql_errno(db) << endl;
@@ -239,10 +248,10 @@ static void *mysql_reader(void *arg) {
         if (mysql_query(db, "COMMIT;")) {
             cout << "Cannot commit" << endl;
         }
-        
+
         // update statistics
         clock_gettime(CLOCK_REALTIME, &ts_2);
-        update_reader(ts_1, ts_2);        
+        update_reader(ts_1, ts_2);
     }
     if (verbose) {
         cout << "Reader threads " << tinfo->thread_num << ":" << c << endl;
@@ -250,13 +259,14 @@ static void *mysql_reader(void *arg) {
     mysql_close(db);
 }
 
-static void *tdb_reader(void *arg) {
+static void *tdb_reader(void *arg)
+{
     struct timespec ts_1, ts_2;
     struct thread_info *tinfo = (struct thread_info *)arg;
     size_t c = 0;
     srandom(tinfo->thread_num);
     clock_gettime(CLOCK_REALTIME, &ts_1);
-    SharedGroup shared(tinfo->datfile);
+    SharedGroup sg(tinfo->datfile);
     while (true) {
         pthread_mutex_lock(&mtx_runnable);
         bool local_runnable = runnable;
@@ -267,11 +277,12 @@ static void *tdb_reader(void *arg) {
         clock_gettime(CLOCK_REALTIME, &ts_1);
 
         // execute transaction
-        const Group& g = shared.begin_read();
-        TestTable::ConstRef t = g.get_table<TestTable>("test");
-        long randy = random() % 1000;
-        c += t->where().y.equal(randy).count();
-        shared.end_read();
+        {
+            ReadTransaction rt(sg);
+            TestTable::ConstRef t = rt.get_table<TestTable>("test");
+            long randy = random() % 1000;
+            c += t->where().y.equal(randy).count();
+        }
 
         // update statistics
         clock_gettime(CLOCK_REALTIME, &ts_2);
@@ -283,7 +294,8 @@ static void *tdb_reader(void *arg) {
     return NULL;
 }
 
-static void *sqlite_writer(void *arg) {
+static void *sqlite_writer(void *arg)
+{
     sqlite3 *db;
     long int randx, randy;
     char *errmsg;
@@ -308,7 +320,7 @@ static void *sqlite_writer(void *arg) {
         }
         clock_gettime(CLOCK_REALTIME, &ts_1);
 
-        // execute transaction        
+        // execute transaction
         sqlite3_exec(db, "BEGIN EXCLUSIVE TRANSACTION", NULL, NULL, &errmsg);
         randx = random() % 1000;
         randy = random() % 1000;
@@ -322,23 +334,24 @@ static void *sqlite_writer(void *arg) {
         sqlite3_clear_bindings(s);
         sqlite3_reset(s);
 
-        // update statistics    
+        // update statistics
         clock_gettime(CLOCK_REALTIME, &ts_2);
         update_writer(ts_1, ts_2);
-    }        
+    }
     sqlite3_close(db);
     return NULL;
 }
 
-static void *mysql_writer(void *arg) {
+static void *mysql_writer(void *arg)
+{
     struct timespec ts_1, ts_2;
     long int randx, randy;
     char sql[128];
     MYSQL *db;
-    
+
     struct thread_info *tinfo = (struct thread_info *)arg;
     srandom(tinfo->thread_num);
-    
+
     // open mysql
     db = mysql_init(NULL);
     mysql_real_connect(db, DB_HOST, DB_USER, DB_PASS, DB_NAME, 0, NULL, 0);
@@ -365,20 +378,21 @@ static void *mysql_writer(void *arg) {
         if (mysql_query(db, "COMMIT;")) {
             cout << "Cannot commit" << endl;
         }
-        
-        // update statistics    
+
+        // update statistics
         clock_gettime(CLOCK_REALTIME, &ts_2);
         update_writer(ts_1, ts_2);
-    }        
+    }
     mysql_close(db);
     return NULL;
 }
 
-static void *tdb_writer(void *arg) {
+static void *tdb_writer(void *arg)
+{
     struct timespec ts_1, ts_2;
     struct thread_info *tinfo = (struct thread_info *)arg;
     srandom(tinfo->thread_num);
-    SharedGroup shared(tinfo->datfile);
+    SharedGroup sg(tinfo->datfile);
     while (true) {
         pthread_mutex_lock(&mtx_runnable);
         bool local_runnable = runnable;
@@ -389,15 +403,17 @@ static void *tdb_writer(void *arg) {
         clock_gettime(CLOCK_REALTIME, &ts_1);
 
         // execute transaction
-        Group& g = shared.begin_write();
-        BasicTableRef<TestTable> t = g.get_table<TestTable>("test");
-        long randx = random() % 1000;
-        long randy = random() % 1000;
-        TestTable::View tv = t->where().y.equal(randy).find_all();
-        for(size_t j=0; j<tv.size(); ++j) {
-            tv[j].x = randx;
+        {
+            WriteTransaction wt(sg);
+            BasicTableRef<TestTable> t = wt.get_table<TestTable>("test");
+            long randx = random() % 1000;
+            long randy = random() % 1000;
+            TestTable::View tv = t->where().y.equal(randy).find_all();
+            for(size_t j=0; j<tv.size(); ++j) {
+                tv[j].x = randx;
+            }
+            wt.commit();
         }
-        shared.commit();
 
         // update statistics
         clock_gettime(CLOCK_REALTIME, &ts_2);
@@ -406,7 +422,8 @@ static void *tdb_writer(void *arg) {
     return NULL;
 }
 
-void sqlite_create(const char *f, long n, bool wal) {
+void sqlite_create(const char *f, long n, bool wal)
+{
     int      i;
     long     randx, randy;
     char     sql[128];
@@ -438,7 +455,8 @@ void sqlite_create(const char *f, long n, bool wal) {
     sqlite3_close(db);
 }
 
-void mysql_create(const char *f, long n) {
+void mysql_create(const char *f, long n)
+{
     int      i;
     long     randx, randy;
     char     sql[128];
@@ -453,7 +471,7 @@ void mysql_create(const char *f, long n) {
     mysql_query(db, sql);
     if (mysql_query(db, "START TRANSACTION;")) {
         cout << "MySQL error: " << mysql_errno(db) << endl;
-    }    
+    }
     for(i=0; i<n; ++i) {
         randx = random() % 1000;
         randy = random() % 1000;
@@ -466,24 +484,28 @@ void mysql_create(const char *f, long n) {
     mysql_close(db);
 }
 
-void tdb_create(const char *f, long n) {
+void tdb_create(const char *f, long n)
+{
     remove(f);
     remove((string(f)+".lock").c_str());
-    SharedGroup shared(f);
-    Group& g = shared.begin_write();
-    BasicTableRef<TestTable> t = g.get_table<TestTable>("test");
+    SharedGroup sg(f);
+    {
+        WriteTransaction wt(sg);
+        BasicTableRef<TestTable> t = wt.get_table<TestTable>("test");
 
-    srandom(1);
-    for(int i=0; i<n; ++i) {
-        long randx = random() % 1000;
-        long randy = random() % 1000;
-        t->add(randx, randy);
+        srandom(1);
+        for(int i=0; i<n; ++i) {
+            long randx = random() % 1000;
+            long randy = random() % 1000;
+            t->add(randx, randy);
+        }
+        wt.commit();
     }
-    shared.commit();
 }
 
 
-void benchmark(bool single, int database, const char *datfile, long n_readers, long n_writers, unsigned int duration) { 
+void benchmark(bool single, int database, const char *datfile, long n_readers, long n_writers, unsigned int duration)
+{
     pthread_attr_t attr;
     struct thread_info *tinfo;
     void *res;
@@ -508,10 +530,10 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
         unlink(("tmp"+string(datfile)).c_str());
         unlink(("tmp"+string(datfile)+".lock").c_str());
     }
-    
+
     assert(pthread_attr_init(&attr) == 0);
     assert((tinfo = (struct thread_info *)calloc(sizeof(struct thread_info), n_readers+n_writers)) != NULL);
-   
+
     for(int i=0; i<(n_readers+n_writers); ++i) {
         tinfo[i].thread_num = i+1;
         if (single) {
@@ -563,7 +585,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     pthread_mutex_lock(&mtx_runnable);
     runnable = false;
     pthread_mutex_unlock(&mtx_runnable);
- 
+
     if (verbose)
         cout << "Waiting for threads" << endl;
     for(int i=0; i<n_readers; ++i) {
@@ -582,10 +604,11 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
         unlink(("tmp"+string(datfile)).c_str());
         unlink(("tmp"+string(datfile)+".lock").c_str());
     }
-    free((void *)tinfo); 
+    free((void *)tinfo);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     int c;
     long n_readers = -1, n_writers = -1, n_records = -1;
     unsigned int duration = 0;
@@ -639,9 +662,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (n_writers == -1) 
+    if (n_writers == -1)
         n_writers = 2;
-    if (n_readers == -1) 
+    if (n_readers == -1)
         n_readers = 2;
     if (n_records == -1)
         n_records = 10000;
@@ -655,10 +678,10 @@ int main(int argc, char *argv[]) {
     if (database == DB_SQLITE) {
         sqlite3_config(SQLITE_CONFIG_SERIALIZED);
     }
-    
+
     if (verbose) cout << "Creating test data for " << database << endl;
     switch (database) {
-    case DB_TIGHTDB: 
+    case DB_TIGHTDB:
         tdb_create(datfile, n_records);
         break;
     case DB_SQLITE:
@@ -669,12 +692,12 @@ int main(int argc, char *argv[]) {
         mysql_create(datfile, n_records);
         break;
     }
-    
+
     // SQLite WAL is used
     if (database == DB_SQLITE_WAL) {
         database = DB_SQLITE;
     }
-    
+
     if (single) {
         benchmark(true, database, datfile, n_readers, n_writers, duration);
         cout << wall_time << " " << iteration_readers << " " << dt_readers
@@ -693,10 +716,10 @@ int main(int argc, char *argv[]) {
             for(int j=0; j<=n_writers; ++j) {
                 benchmark(false, database, "test_db", i, j, duration);
                 cout << i << " " << j << " ";
-                cout << wall_time << " " << iteration_readers 
-                     << " " << dt_readers << " " << iteration_writers 
+                cout << wall_time << " " << iteration_readers
+                     << " " << dt_readers << " " << iteration_writers
                      << " " << dt_writers << endl;
             }
         }
-    }       
+    }
 }
