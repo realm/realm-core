@@ -425,7 +425,7 @@ bool File::lock(bool exclusive, bool non_blocking)
 
 #ifdef _WIN32 // Windows version
 
-    TIGHTDB_ASSERT(!have_lock);
+    TIGHTDB_ASSERT(!m_have_lock);
 
     // Under Windows a file lock must be explicitely released before
     // the file is closed. It will eventually be released by the

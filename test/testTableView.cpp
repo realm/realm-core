@@ -3,9 +3,10 @@
 
 using namespace tightdb;
 
+namespace {
 TIGHTDB_TABLE_1(TestTableInt,
                 first, Int)
-
+}
 
 TEST(GetSetInteger)
 {
@@ -31,6 +32,104 @@ TEST(GetSetInteger)
     CHECK_EQUAL(123, v[0].first);
 }
 
+
+
+namespace {
+TIGHTDB_TABLE_3(TableFloats,
+                col_float, Float,
+                col_double, Double,
+                col_int, Int)
+}
+
+TEST(TableView_Floats_GetSet)
+{
+    TableFloats table;
+
+    float  f_val[] = { 1.1f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f };
+    double d_val[] = { 1.2 , 2.2 , 3.2 , -1.2 , 2.3, 0.0  };
+
+    CHECK_EQUAL(1, table.is_empty());
+
+    // Test add(?,?) with parameters
+    for (size_t i=0; i<5; ++i)
+        table.add(f_val[i], d_val[i], i);
+    table.add();
+    CHECK_EQUAL(6, table.size());
+    for (size_t i=0; i<6; ++i) {
+        CHECK_EQUAL(f_val[i], table.column().col_float[i]);
+        CHECK_EQUAL(d_val[i], table.column().col_double[i]);
+    }
+
+    TableFloats::View v; // Test empty construction
+    v = table.column().col_float.find_all(2.1f); // Test assignment
+    CHECK_EQUAL(2, v.size());
+
+    // Test of Get
+    CHECK_EQUAL(2.1f, v[0].col_float);
+    CHECK_EQUAL(2.1f, v[1].col_float);
+    CHECK_EQUAL(2.2, v[0].col_double);
+    CHECK_EQUAL(2.3, v[1].col_double);
+
+    // Test of Set
+    v[0].col_float = 123.321f;
+    CHECK_EQUAL(123.321f, v[0].col_float);
+    v[0].col_double = 123.3219;
+    CHECK_EQUAL(123.3219, v[0].col_double);
+}
+
+TEST(TableView_Floats_Find_and_Aggregations)
+{
+    TableFloats table;
+    float  f_val[] = { 1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f };
+    double d_val[] = { -1.2, 2.2 , 3.2 ,-1.2 , 2.3 , 0.0  };
+    float sum_f = 0.0f;
+    double sum_d = 0.0;
+    for (size_t i=0; i<6; ++i) {
+        table.add(f_val[i], d_val[i], 1);
+        sum_d += d_val[i];
+        sum_f += f_val[i];
+    }
+
+    // Test find_all()
+    TableFloats::View v_all = table.column().col_int.find_all(1);
+    CHECK_EQUAL(6, v_all.size());
+
+    TableFloats::View v_some = table.column().col_double.find_all(-1.2);
+    CHECK_EQUAL(2, v_some.size());
+    CHECK_EQUAL(0, v_some.get_source_ndx(0));
+    CHECK_EQUAL(3, v_some.get_source_ndx(1));
+
+    // Test find_first
+    CHECK_EQUAL(0, v_all.column().col_double.find_first(-1.2) );
+    CHECK_EQUAL(5, v_all.column().col_double.find_first(0.0) );
+    CHECK_EQUAL(2, v_all.column().col_double.find_first(3.2) );
+    
+    CHECK_EQUAL(1, v_all.column().col_float.find_first(2.1f) );
+    CHECK_EQUAL(5, v_all.column().col_float.find_first(0.0f) );
+    CHECK_EQUAL(2, v_all.column().col_float.find_first(3.1f) );
+
+    // TODO: add for float as well
+
+    // Test sum
+    CHECK_EQUAL(sum_d, v_all.column().col_double.sum());
+    CHECK_EQUAL(sum_f, v_all.column().col_float.sum());
+    CHECK_EQUAL(-1.2 -1.2, v_some.column().col_double.sum());
+    CHECK_EQUAL(1.2f -1.1f, v_some.column().col_float.sum());
+
+    // Test max
+    CHECK_EQUAL(3.2, v_all.column().col_double.maximum());
+    CHECK_EQUAL(-1.2, v_some.column().col_double.maximum());
+    CHECK_EQUAL(3.1f, v_all.column().col_float.maximum());
+    CHECK_EQUAL(1.2f, v_some.column().col_float.maximum());
+
+    // Test min
+    CHECK_EQUAL(-1.2, v_all.column().col_double.minimum());
+    CHECK_EQUAL(-1.2, v_some.column().col_double.minimum());
+    CHECK_EQUAL(-1.1f, v_all.column().col_float.minimum());
+    CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
+
+    // TODO: Test +=, average, count
+}
 
 TEST(TableViewSum)
 {
@@ -82,8 +181,6 @@ TEST(TableViewMax)
     CHECK_EQUAL(2, max);
 }
 
-
-
 TEST(TableViewMax2)
 {
     TestTableInt table;
@@ -119,7 +216,6 @@ TEST(TableViewMin)
     CHECK_EQUAL(-1, min);
 }
 
-
 TEST(TableViewMin2)
 {
     TestTableInt table;
@@ -136,7 +232,6 @@ TEST(TableViewMin2)
     int64_t min = v.column().first.minimum();
     CHECK_EQUAL(-3, min);
 }
-
 
 
 TEST(TableViewFind)
@@ -176,8 +271,10 @@ TEST(TableViewFindAll)
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
 
+namespace {
 TIGHTDB_TABLE_1(TestTableString,
                 first, String)
+}
 
 TEST(TableViewFindAllString)
 {

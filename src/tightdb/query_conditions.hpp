@@ -28,7 +28,7 @@
 
 namespace tightdb {
 
-enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_LESS, COND_NONE, COND_COUNT};
+enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_GREATER_EQUAL, COND_LESS, COND_LESS_EQUAL, COND_NONE, COND_COUNT};
 
 
 // FIXME: We cannot use all-uppercase names like 'CONTAINS' for
@@ -71,6 +71,11 @@ struct ENDSWITH {
 };
 
 struct EQUAL {
+    bool operator()(const bool v1, const bool v2) const
+    {
+        return v1 == v2;
+    }
+
     bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
         (void)v1_lower;
@@ -79,15 +84,16 @@ struct EQUAL {
     }
     bool operator()(const char *v1, size_t len1, const char* v2, size_t len2) const
     {
-        if(len1 != len2)
+        if (len1 != len2)
             return false;
-        if(len1 == 0)
+        if (len1 == 0)
             return true;
-        if(v1[len1 - 1] != v2[len1 - 1])
+        if (v1[len1 - 1] != v2[len1 - 1])
             return false;
         int i = memcmp(v1, v2, len1);
         return (i == 0);
     }
+
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
     int condition(void) {return COND_EQUAL;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (v >= lbound && v <= ubound); }
@@ -178,22 +184,25 @@ struct NONE {
 
 struct LESS {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 < v2;}
-    int condition(void) {return  COND_LESS;}
+    int condition(void) {return COND_LESS;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { (void)ubound; return (lbound < v); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { (void)lbound; return (ubound < v); }
 };
 
-struct LESSEQUAL {
+struct LESS_EQUAL {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 <= v2;}
-    int condition(void) {return -1;}
+    int condition(void) {return COND_LESS_EQUAL;}
 };
 
-struct GREATEREQUAL {
+struct GREATER_EQUAL {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
-    int condition(void) {return -1;}
+    int condition(void) {return COND_GREATER_EQUAL;}
 };
 
 
 } // namespace tightdb
 
 #endif // TIGHTDB_QUERY_CONDITIONS_HPP
+
+
+

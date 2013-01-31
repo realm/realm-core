@@ -23,8 +23,12 @@
 #include <tightdb/column.hpp>
 #include <tightdb/column_type.hpp>
 #include <tightdb/column_table.hpp>
+#include <tightdb/column_binary.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/index.hpp>
+#include <tightdb/utilities.hpp>
+#include <limits>
+
 
 namespace tightdb {
 
@@ -72,9 +76,11 @@ public:
     virtual size_t Size() const TIGHTDB_NOEXCEPT {return m_types->Size();}
     bool is_empty() const TIGHTDB_NOEXCEPT {return m_types->is_empty();}
 
-    int64_t GetInt(size_t ndx) const;
+    int64_t get_int(size_t ndx) const;
     bool get_bool(size_t ndx) const;
     time_t get_date(size_t ndx) const;
+    float get_float(size_t ndx) const;
+    double get_double(size_t ndx) const;
     const char* get_string(size_t ndx) const;
     BinaryData get_binary(size_t ndx) const;
 
@@ -87,9 +93,11 @@ public:
     /// by an instance of BasicTableRef.
     Table* get_subtable_ptr(std::size_t row_idx) const;
 
-    void SetInt(size_t ndx, int64_t value);
+    void set_int(size_t ndx, int64_t value);
     void set_bool(size_t ndx, bool value);
     void set_date(size_t ndx, time_t value);
+    void set_float(size_t ndx, float value);
+    void set_double(size_t ndx, double value);
     void set_string(size_t ndx, const char* value);
     void set_binary(size_t ndx, const char* value, size_t len);
     bool set_subtable(size_t ndx);
@@ -97,6 +105,8 @@ public:
     void insert_int(size_t ndx, int64_t value);
     void insert_bool(size_t ndx, bool value);
     void insert_date(size_t ndx, time_t value);
+    void insert_float(size_t ndx, float value);
+    void insert_double(size_t ndx, double value);
     void insert_string(size_t ndx, const char* value);
     void insert_binary(size_t ndx, const char* value, size_t len);
     bool insert_subtable(size_t ndx);
@@ -133,13 +143,46 @@ private:
                 ArrayParent* parent, size_t ndx_in_parent, size_t ref);
     void InitDataColumn();
 
-    void ClearValue(size_t ndx, ColumnType newtype);
+    enum MixedColType {
+        // Column types used in Mixed
+        MIXED_COL_INT         =  0,
+        MIXED_COL_BOOL        =  1,
+        MIXED_COL_STRING      =  2,
+        MIXED_COL_STRING_ENUM =  3, // double refs
+        MIXED_COL_BINARY      =  4,
+        MIXED_COL_TABLE       =  5,
+        MIXED_COL_MIXED       =  6,
+        MIXED_COL_DATE        =  7,
+        MIXED_COL_RESERVED1   =  8, // DateTime
+        MIXED_COL_FLOAT       =  9, // Float
+        MIXED_COL_DOUBLE      = 10, // Positive Double
+        MIXED_COL_DOUBLE_NEG  = 11, // Negative Double
+        MIXED_COL_INT_NEG     = 12 // Negative Integers
+        // Preserve values above for backward compability
+    };
+
+    void clear_value(size_t ndx, MixedColType newtype);
+    
+    // Get/set/insert 64-bit values in m_refs/m_types
+    int64_t get_value(size_t ndx) const;
+    void set_value(size_t ndx, int64_t value, MixedColType coltype);
+    void insert_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
+    void set_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
 
     class RefsColumn;
 
-    // Member variables
+    // Member variables:
+
+    // 'm_types' stores the ColumnType of each value at the given index.
+    // For values that uses all 64 bit's the datatype also stores this bit.
+    // (By having a type for both positive numbers, and another type for negative numbers)
     Column*       m_types;
-    RefsColumn*   m_refs;
+
+    // Bit 0 is used to indicate if it's a reference. 
+    // If not, the data value is stored (shifted 1 bit left). And the sign bit is stored in m_types.
+    RefsColumn*   m_refs;       
+    
+    // m_data holds any Binary/String data - if needed.
     ColumnBinary* m_data;
 };
 
@@ -157,57 +200,11 @@ public:
 };
 
 
-inline ColumnMixed::ColumnMixed(): m_data(0)
-{
-    Create(Allocator::get_default(), 0, 0);
-}
-
-inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx):
-    m_data(0)
-{
-    Create(alloc, table, column_ndx);
-}
-
-inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx,
-                                ArrayParent* parent, std::size_t ndx_in_parent, std::size_t ref):
-    m_data(0)
-{
-    Create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
-}
-
-inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXCEPT
-{
-    // FIXME: If the table object is cached, it is possible to get the
-    // size from it. Maybe it is faster in general to check for the
-    // the presence of the cached object and use it when available.
-    TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
-    const size_t top_ref = m_refs->GetAsRef(row_idx);
-    const size_t columns_ref = Array(top_ref, 0, 0, m_refs->GetAllocator()).GetAsRef(1);
-    const Array columns(columns_ref, 0, 0, m_refs->GetAllocator());
-    if (columns.is_empty()) return 0;
-    const size_t first_col_ref = columns.GetAsRef(0);
-    return get_size_from_ref(first_col_ref, m_refs->GetAllocator());
-}
-
-inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
-{
-    TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
-    return m_refs->get_subtable_ptr(row_idx);
-}
-
-inline void ColumnMixed::invalidate_subtables()
-{
-    m_refs->invalidate_subtables();
-}
-
-inline void ColumnMixed::invalidate_subtables_virtual()
-{
-    invalidate_subtables();
-}
-
-
 } // namespace tightdb
+
+
+// Implementation
+#include <tightdb/column_mixed_tpl.hpp>
+
 
 #endif // TIGHTDB_COLUMN_MIXED_HPP
