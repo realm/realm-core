@@ -44,14 +44,17 @@ So a call stack with 2 and 9 being local matches of a node could look like this:
 
 aggregate(0, 10)
     node1->aggregate_local(0, 3)
-        node2->find_first_local(2)
-        node3->find_first_local(2)
+        node2->find_first_local(2, 3)
+        node3->find_first_local(2, 3)
     node3->aggregate_local(3, 10)
-        node1->find_first_local(9)
-        node2->find_first_local(9)
+        node1->find_first_local(4, 5)
+        node2->find_first_local(4, 5)
+        node1->find_first_local(7, 8)
+        node2->find_first_local(7, 8)
 
-Note that this is very simplified. There are other statistical arguments to the methods, and also, 
-find_first_local() can be called from a callback function called by an integer Array.
+find_first_local(n, n + 1) is a function that can be used to test a single row of another condition. Note that 
+this is very simplified. There are other statistical arguments to the methods, and also, find_first_local() can be 
+called from a callback function called by an integer Array.
 
 
 Template arguments in methods:
@@ -215,8 +218,7 @@ class ParentNode {
 public:
     ParentNode() : m_is_integer_node(false), m_table(NULL) {}
 
-    std::vector<ParentNode*> gather_children(std::vector<ParentNode*> v) 
-    {
+    void gather_children(std::vector<ParentNode*>& v) {
         m_children.clear();
         ParentNode* p = this;
         size_t i = v.size();
@@ -224,14 +226,13 @@ public:
         p = p->child_criteria();
 
         if (p != NULL)
-            v = p->gather_children(v);
+            p->gather_children(v);
 
         m_children = v;
         m_children.erase(m_children.begin() + i);
         m_children.insert(m_children.begin(), this);
 
         m_conds = m_children.size();        
-        return v;                              
     }
 
     struct score_compare 

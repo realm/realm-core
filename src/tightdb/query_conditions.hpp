@@ -78,6 +78,7 @@ struct EQUAL {
         return v1 == v2;
     }
 
+    // To avoid a "performance warning" in VC++
     bool operator()(const int64_t v1, const bool v2) const
     {
         return (v1 != 0) == v2;
