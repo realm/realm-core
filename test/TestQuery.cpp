@@ -39,6 +39,20 @@ TIGHTDB_TABLE_3(FloatTable3,
 } // anonymous namespace
 
 
+TEST(TestQueryJavaMinimumCrash)
+{
+    // Test that triggers a bug that was discovered through Java intnerface and has been fixed
+    PHPMinimumCrash ttt;
+
+    ttt.add("Joe", "John", 1);
+    ttt.add("Jane", "Doe", 2);
+    ttt.add("Bob", "Hanson", 3);
+
+    PHPMinimumCrash::Query q1 = ttt.where().firstname.equal("Joe").Or().firstname.equal("Bob");
+    int64_t m = q1.salary.minimum();
+    CHECK_EQUAL(1, m);
+}
+
 TEST(TestQueryFloat3)
 {
     FloatTable3 t;
