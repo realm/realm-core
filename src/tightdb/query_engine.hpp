@@ -1031,6 +1031,7 @@ public:
         return 0;
     }
 
+    OR_NODE(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
     OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
 
     void Init(const Table& table)
@@ -1106,7 +1107,6 @@ public:
 private:
     size_t m_last[2];
     bool m_was_match[2];
-    const Table* m_table;
 };
 
 
