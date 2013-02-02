@@ -43,9 +43,11 @@ size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
 }
 
 
+// Aggregates ----------------------------------------------------
 
-template <int function, typename T, typename R> 
-R TableViewBase::aggregate(size_t column_ndx) const
+
+template <int function, typename T, typename R, class ColType> 
+R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
     TIGHTDB_ASSERT(function == TDB_SUM || function == TDB_MAX || function == TDB_MIN);
@@ -54,30 +56,23 @@ R TableViewBase::aggregate(size_t column_ndx) const
     if (m_refs.Size() == 0) 
         return 0;
 
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::array_type ArrType;
-
     const ColType* column = (ColType*)&m_table->GetColumnBase(column_ndx);
 
     if (m_refs.Size() == column->Size()) {
-        if (function == TDB_MAX)
-            return column->maximum();
-        if (function == TDB_MIN)
-            return column->minimum();
-        if (function == TDB_SUM)
-            return column->sum();
+        // direct aggregate on the column
+        return (column->*aggregateMethod)(0, size_t(-1));
     }
 
     // Array object instantiation must NOT allocate initial memory (capacity) 
     // with 'new' because it will lead to mem leak. The column keeps ownership 
     // of the payload in array and will free it itself later, so we must not call Destroy() on array.
     ArrType arr((Array::no_prealloc_tag()));
-
     size_t leaf_start = 0;
     size_t leaf_end = 0;
     size_t row_ndx;
 
-    T res = column->template TreeGet<T,ColType>(0);
+    R res = static_cast<R>(column->template TreeGet<T,ColType>(0));
 
     for (size_t ss = 1; ss < m_refs.Size(); ++ss) {
         row_ndx = m_refs.GetAsSizeT(ss);
@@ -98,48 +93,52 @@ R TableViewBase::aggregate(size_t column_ndx) const
     return res;
 }
 
+// sum
+
 int64_t TableViewBase::sum(size_t column_ndx) const
 {
-    return aggregate<TDB_SUM, int64_t, int64_t>(column_ndx);
+    return aggregate<TDB_SUM, int64_t>(&Column::sum, column_ndx);
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
-    return aggregate<TDB_SUM, float, float>(column_ndx);
+    return aggregate<TDB_SUM, float>(&ColumnFloat::sum, column_ndx);
 }
 double TableViewBase::sum_double(size_t column_ndx) const
 {
-    return aggregate<TDB_SUM, double, double>(column_ndx);
+    return aggregate<TDB_SUM, double>(&ColumnDouble::sum, column_ndx);
 }
 
+// Maximum
 
 int64_t TableViewBase::maximum(size_t column_ndx) const
 {
-    return aggregate<TDB_MAX, int64_t, int64_t>(column_ndx);
+    return aggregate<TDB_MAX, int64_t>(&Column::maximum, column_ndx);
 }
 float TableViewBase::maximum_float(size_t column_ndx) const
 {
-    return aggregate<TDB_MAX, float, float>(column_ndx);
+    return aggregate<TDB_MAX, float>(&ColumnFloat::maximum, column_ndx);
 }
 double TableViewBase::maximum_double(size_t column_ndx) const
 {
-    return aggregate<TDB_MAX, double, double>(column_ndx);
+    return aggregate<TDB_MAX, double>(&ColumnDouble::maximum, column_ndx);
 }
 
+// Minimum
 
 int64_t TableViewBase::minimum(size_t column_ndx) const
 {
-    return aggregate<TDB_MIN, int64_t, int64_t>(column_ndx);
+    return aggregate<TDB_MIN, int64_t>(&Column::minimum, column_ndx);
 }
 float TableViewBase::minimum_float(size_t column_ndx) const
 {
-    return aggregate<TDB_MIN, float, float>(column_ndx);
+    return aggregate<TDB_MIN, float>(&ColumnFloat::minimum, column_ndx);
 }
 double TableViewBase::minimum_double(size_t column_ndx) const
 {
-    return aggregate<TDB_MIN, double, double>(column_ndx);
+    return aggregate<TDB_MIN, double>(&ColumnDouble::minimum, column_ndx);
 }
 
-
+//
 
 void TableViewBase::sort(size_t column, bool Ascending)
 {

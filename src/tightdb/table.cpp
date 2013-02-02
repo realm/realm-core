@@ -1473,7 +1473,7 @@ int64_t Table::sum(size_t column_ndx) const
     const Column& column = GetColumn<Column, COLUMN_TYPE_INT>(column_ndx);
     return column.sum();
 }
-float Table::sum_float(size_t column_ndx) const
+double Table::sum_float(size_t column_ndx) const
 {
     const ColumnFloat& column = GetColumn<ColumnFloat, COLUMN_TYPE_FLOAT>(column_ndx);
     return column.sum();

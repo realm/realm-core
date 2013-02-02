@@ -69,8 +69,10 @@ public:
     // FIXME: Need: size_t find_first_binary(size_t column_ndx, const char* value, size_t len) const;
 
     // Aggregate functions
-    template <int function, typename T, typename R> R aggregate(size_t column_ndx) const;
-    
+    template <int function, typename T, typename R, class ColType>
+        R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx) const;
+
+
     // TODO, FIXME: rename int versions
     // TODO: Add maximum, minimum for date
     int64_t sum(size_t column_ndx) const;

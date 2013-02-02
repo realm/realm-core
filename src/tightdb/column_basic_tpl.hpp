@@ -305,9 +305,9 @@ size_t BasicColumn<T>::count(T target) const
 }
 
 template<typename T>
-T BasicColumn<T>::sum(size_t start, size_t end) const
+typename BasicColumn<T>::SumType BasicColumn<T>::sum(size_t start, size_t end) const
 {
-    return ColumnBase::aggregate<T, T, TDB_SUM, NONE>(0, start, end, NULL);
+    return ColumnBase::aggregate<T, SumType, TDB_SUM, NONE>(0, start, end, NULL);
 }
 
 template<typename T>
@@ -316,8 +316,8 @@ double BasicColumn<T>::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = Size();
     size_t size = end - start;
-    T sum1 = ColumnBase::aggregate<T, T, TDB_SUM, NONE>(0, start, end, NULL);
-    double avg = double(sum1) / double( size == 0 ? 1 : size ); 
+    double sum1 = ColumnBase::aggregate<T, SumType, TDB_SUM, NONE>(0, start, end, NULL);
+    double avg = sum1 / ( size == 0 ? 1 : size ); 
     return avg;
 }
 

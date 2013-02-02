@@ -81,21 +81,25 @@ template<class T> struct ColumnTypeTraits;
 template<> struct ColumnTypeTraits<int64_t> {
     typedef Column column_type;
     typedef Array array_type;
+    typedef int64_t sum_type;
     static const ColumnType id = COLUMN_TYPE_INT;
 };
 template<> struct ColumnTypeTraits<bool> {
     typedef Column column_type;
     typedef Array array_type;
+    typedef int64_t sum_type;
     static const ColumnType id = COLUMN_TYPE_BOOL;
 };
 template<> struct ColumnTypeTraits<float> {
     typedef ColumnFloat column_type;
     typedef ArrayFloat array_type;
+    typedef double sum_type;
     static const ColumnType id = COLUMN_TYPE_FLOAT;
 };
 template<> struct ColumnTypeTraits<double> {
     typedef ColumnDouble column_type;
     typedef ArrayDouble array_type;
+    typedef double sum_type;
     static const ColumnType id = COLUMN_TYPE_DOUBLE;
 };
 
@@ -238,7 +242,7 @@ public:
 
     // Only purpose is to make all NODE classes have this function (overloaded only in NODE)
     virtual size_t aggregate_call_specialized(ACTION /*TAction*/, ColumnType /*TResult*/, 
-                                              QueryStateParent* /*st*/, 
+                                              QueryStateBase* /*st*/, 
                                               size_t /*start*/, size_t /*end*/, size_t /*local_limit*/, 
                                               SequentialGetterParent* /*source_column*/, size_t* /*matchcount*/)
     {
@@ -254,7 +258,7 @@ public:
         
         if (node->m_is_integer_node)
             // call method in NODE
-            r = node->aggregate_call_specialized(TAction, ColumnTypeTraits<TResult>::id,(QueryStateParent*)st,
+            r = node->aggregate_call_specialized(TAction, ColumnTypeTraits<TResult>::id,(QueryStateBase*)st,
                                                  start, end, local_limit, source_column, matchcount);
         else
              // call method in ParentNode
@@ -302,15 +306,15 @@ public:
         }
 
         if (matchcount)
-            *matchcount = st->match_count;
+            *matchcount = st->m_match_count;
         delete source_column;
 
-        return st->state;
+        return st->m_state;
 
     }
 
     template<ACTION TAction, class TResult, class TSourceColumn>
-    size_t aggregate_local(QueryStateParent* st, size_t start, size_t end, size_t local_limit, 
+    size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit, 
                            SequentialGetterParent* source_column, size_t* matchcount) 
     {
 		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
@@ -545,8 +549,7 @@ public:
             return b;
     }
 
-
-    size_t aggregate_call_specialized(ACTION TAction, ColumnType col_id, QueryStateParent* st, 
+    size_t aggregate_call_specialized(ACTION TAction, ColumnType col_id, QueryStateBase* st, 
                                       size_t start, size_t end, size_t local_limit, 
                                       SequentialGetterParent* source_column, size_t* matchcount) 
     {
@@ -590,25 +593,22 @@ public:
             TIGHTDB_ASSERT(false);
             return 0;
         }
-
         return ret;
     }
 
 
-    // source_column      column number in m_table which must act as source for aggreate TAction
+    // source_column: column number in m_table which must act as source for aggreate TAction
     template <ACTION TAction, class TResult, class unused> 
-    size_t aggregate_local(QueryStateParent* st, size_t start, size_t end, size_t local_limit, 
-                           SequentialGetterParent* source_column, size_t* matchcount) {
-        
-                               
+    size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit, 
+                           SequentialGetterParent* source_column, size_t* matchcount) 
+    {
         TConditionFunction f;
         int c = f.condition();
-
         m_local_matches = 0;
         m_local_limit = local_limit;
         m_last_local_match = start - 1;
-
         m_state = st;
+
         for (size_t s = start; s < end; ) {    
             // Cache internal leafs
             if (s >= m_leaf_end) {                    
@@ -624,8 +624,9 @@ public:
             else
                 end2 = end - m_leaf_start;
 
-            if (m_conds <= 1 && source_column != NULL && SameType<TResult, int64_t>::value && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)    {
-                m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+            if (m_conds <= 1 && source_column != NULL && SameType<TResult, int64_t>::value && 
+                static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)    {
+                    m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
             }
             else {
                 QueryState<int64_t> jumpstate; // todo optimize by moving outside for loop
@@ -641,7 +642,7 @@ public:
         }
 
         if (matchcount)
-            *matchcount = int64_t(static_cast< QueryState<TResult>* >(st)->match_count);
+            *matchcount = int64_t(static_cast< QueryState<TResult>* >(st)->m_match_count);
 
         if (m_local_matches == m_local_limit) {
             m_dD = (m_last_local_match + 1 - start) / (m_local_matches + 1.0);
@@ -699,7 +700,7 @@ protected:
 
     size_t m_last_local_match;
     ColType* m_condition_column;                // Column on which search criteria is applied
-    const Array* criteria_arr;
+//    const Array* m_criteria_arr;
     Array m_array;              
     size_t m_leaf_start;
     size_t m_leaf_end;
@@ -708,7 +709,7 @@ protected:
     size_t m_local_matches;
     size_t m_local_limit;
  
-    QueryStateParent* m_state;
+    QueryStateBase* m_state;
     SequentialGetterParent* m_source_column; // Column of values used in aggregate (TDB_FINDALL, TDB_RETURN_FIRST, TDB_SUM, etc)
 };
 

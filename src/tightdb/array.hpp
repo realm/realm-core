@@ -516,13 +516,13 @@ protected:
 
 // Implementation:
 
-class QueryStateParent {};
+class QueryStateBase {};
 
-template <> class QueryState<int64_t> : public QueryStateParent {
+template <> class QueryState<int64_t> : public QueryStateBase {
 public:
 
-    int64_t state;
-    size_t match_count;
+    int64_t m_state;
+    size_t m_match_count;
     size_t m_limit;
 
     template <ACTION action> bool uses_val(void) 
@@ -535,21 +535,21 @@ public:
     
     void init(ACTION action, Array* akku, size_t limit) 
     {
-        match_count = 0;
+        m_match_count = 0;
         m_limit = limit;
 
         if (action == TDB_MAX)
-            state = -0x7fffffffffffffffLL - 1LL;
+            m_state = -0x7fffffffffffffffLL - 1LL;
         else if (action == TDB_MIN)
-            state = 0x7fffffffffffffffLL;
+            m_state = 0x7fffffffffffffffLL;
         else if (action == TDB_RETURN_FIRST)
-            state = not_found;
+            m_state = not_found;
         else if (action == TDB_SUM)
-            state = 0;
+            m_state = 0;
         else if (action == TDB_COUNT)
-            state = 0;
+            m_state = 0;
         else if (action == TDB_FINDALL)
-            state = (int64_t)akku;
+            m_state = (int64_t)akku;
         else
             TIGHTDB_ASSERT(false);
     }
@@ -559,36 +559,36 @@ public:
     {
         if (pattern) {
             if (action == TDB_COUNT) {
-                state += fast_popcount64(indexpattern);
-                match_count = size_t(state);
+                m_state += fast_popcount64(indexpattern);
+                m_match_count = size_t(m_state);
                 return true;
             }
             // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
             return false;
         }
 
-        ++match_count;
+        ++m_match_count;
 
         if (action == TDB_CALLBACK_IDX)
             return callback(index);
         else if (action == TDB_MAX) {
-            if(value > state)
-                state = value;
+            if(value > m_state)
+                m_state = value;
         }
         else if (action == TDB_MIN) {
-            if(value < state)
-                state = value;
+            if(value < m_state)
+                m_state = value;
         }
         else if (action == TDB_SUM)
-            state += value;
+            m_state += value;
         else if (action == TDB_COUNT) {
-            state++;
-            match_count = size_t(state);
+            m_state++;
+            m_match_count = size_t(m_state);
         }
         else if (action == TDB_FINDALL)
-            ((Array*)state)->add(index);
+            ((Array*)m_state)->add(index);
         else if (action == TDB_RETURN_FIRST) {
-            state = index;
+            m_state = index;
             return false;
         }
         else
@@ -598,11 +598,10 @@ public:
 
 };
 
-template <class T> class QueryState : public QueryStateParent {
+template <class R> class QueryState : public QueryStateBase {
 public:
-
-    T state;
-    size_t match_count;
+    R m_state;
+    size_t m_match_count;
     size_t m_limit;
 
     template <ACTION action> bool uses_val(void) 
@@ -612,15 +611,15 @@ public:
     
     void init(ACTION action, Array*, size_t limit) 
     {
-        match_count = 0;
+        m_match_count = 0;
         m_limit = limit;
 
         if (action == TDB_MAX)
-            state = -std::numeric_limits<T>::infinity();
+            m_state = -std::numeric_limits<R>::infinity();
         else if (action == TDB_MIN)
-            state = std::numeric_limits<T>::infinity();
+            m_state = std::numeric_limits<R>::infinity();
         else if (action == TDB_SUM)
-            state = 0.0;
+            m_state = 0.0;
         else
             TIGHTDB_ASSERT(false);
     }
@@ -628,22 +627,22 @@ public:
     template <ACTION action, bool pattern, class Callback, typename resulttype> 
     inline bool match(size_t /*index*/, uint64_t /*indexpattern*/, resulttype value, Callback /*callback*/)
     {
-        if(pattern)
+        if (pattern)
             return false;
 
         TIGHTDB_STATIC_ASSERT(action == TDB_SUM || action == TDB_MAX || action == TDB_MIN, "");
-        ++match_count;
+        ++m_match_count;
 
         if (action == TDB_MAX) {
-            if(value > state)
-                state = value;
+            if (value > m_state)
+                m_state = value;
         }
         else if (action == TDB_MIN) {
-            if(value < state)
-                state = value;
+            if (value < m_state)
+                m_state = value;
         }
         else if (action == TDB_SUM)
-            state += value;
+            m_state += value;
         else
             TIGHTDB_ASSERT(false);
         return true;
@@ -1149,7 +1148,7 @@ template <class cond2, ACTION action, size_t bitwidth, class Callback> void Arra
             FIND_ACTION<action, Callback>(start + baseindex, res, state, callback);
         }
         else if (action == TDB_COUNT) {
-            state->state += end - start;                
+            state->m_state += end - start;                
         }
         else {
             for (; start < end; start++)
@@ -1552,15 +1551,15 @@ template <class cond, ACTION action, size_t bitwidth, class Callback> void Array
 #ifdef TIGHTDB_DEBUG
     Array r_arr;
     QueryState<int64_t> r_state;
-    Array *akku = (Array*)state->state;
-    r_state.state = (int64_t)&r_arr;
+    Array *akku = (Array*)state->m_state;
+    r_state.m_state = (int64_t)&r_arr;
 
     if (action == TDB_FINDALL) {
         for (size_t t = 0; t < akku->Size(); t++)
             r_arr.add(akku->Get(t));
     }
     else {
-        r_state.state = state->state;
+        r_state.m_state = state->m_state;
     }
 #endif
     find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
@@ -1572,7 +1571,7 @@ template <class cond, ACTION action, size_t bitwidth, class Callback> void Array
         if (action == TDB_FINDALL)
             TIGHTDB_ASSERT(akku->Compare(r_arr));
         else
-            TIGHTDB_ASSERT(state->state == r_state.state);
+            TIGHTDB_ASSERT(state->m_state == r_state.m_state);
     }
     r_arr.Destroy();
 #endif
@@ -1592,19 +1591,19 @@ template <class cond2, ACTION action, size_t bitwidth, class Callback> int64_t A
 
         if (SameType<cond2, NONE>::value || (SameType<cond2, EQUAL>::value && v == value) || (SameType<cond2, NOTEQUAL>::value && v != value) || (SameType<cond2, GREATER>::value && v > value) || (SameType<cond2, LESS>::value && v < value)) {
             if (action == TDB_RETURN_FIRST) {
-                state->state = t;
+                state->m_state = t;
                 return false;
             }
             else if (action == TDB_SUM)
-                state->state += v;
-            else if (action == TDB_MAX && v > state->state)
-                    state->state = v;
-            else if (action == TDB_MIN && v < state->state)
-                    state->state = v;
+                state->m_state += v;
+            else if (action == TDB_MAX && v > state->m_state)
+                    state->m_state = v;
+            else if (action == TDB_MIN && v < state->m_state)
+                    state->m_state = v;
             else if (action == TDB_COUNT)
-                state->state++;
+                state->m_state++;
             else if (action == TDB_FINDALL)
-                ((Array*)state->state)->add(t + baseindex);
+                ((Array*)state->m_state)->add(t + baseindex);
         }
 
     }
@@ -1814,11 +1813,11 @@ template <class cond> size_t Array::find_first(int64_t value, size_t start, size
     cond C;        
     TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
     QueryState<int64_t> state;
-    state.state = not_found;
+    state.m_state = not_found;
     Finder finder = m_finder[C.condition()];
     (this->*finder)(value, start, end, 0, &state);
 
-    return size_t(state.state);
+    return size_t(state.m_state);
 }
 
 //*************************************************************************************

@@ -82,12 +82,12 @@ TEST(TableView_Floats_Find_and_Aggregations)
     TableFloats table;
     float  f_val[] = { 1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f };
     double d_val[] = { -1.2, 2.2 , 3.2 ,-1.2 , 2.3 , 0.0  };
-    float sum_f = 0.0f;
+    double sum_f = 0.0;
     double sum_d = 0.0;
     for (size_t i=0; i<6; ++i) {
         table.add(f_val[i], d_val[i], 1);
         sum_d += d_val[i];
-        sum_f += f_val[i];
+        sum_f += double(f_val[i]);
     }
 
     // Test find_all()

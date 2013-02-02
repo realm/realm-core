@@ -25,6 +25,14 @@
 
 namespace tightdb {
 
+template<class T> struct AggReturnType {
+    typedef T sum_type;
+};
+template<> struct AggReturnType<float> {
+    typedef double sum_type;
+};
+
+
 template<typename T>
 class BasicColumn : public ColumnBase {
 public:
@@ -49,7 +57,9 @@ public:
     void fill(size_t count);
 
     size_t count(T value) const;
-    T sum(size_t start = 0, size_t end = -1) const;
+
+    typedef typename AggReturnType<T>::sum_type SumType;
+    SumType sum(size_t start = 0, size_t end = -1) const;
     double average(size_t start = 0, size_t end = -1) const;
     T maximum(size_t start = 0, size_t end = -1) const;
     T minimum(size_t start = 0, size_t end = -1) const;

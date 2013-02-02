@@ -65,14 +65,14 @@ R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) 
     NodeType node(target, 0);
 
     node.QuickInit((ColType*)this, target); 
-    QueryState<R> st;
-    st.init(action, NULL, size_t(-1));
+    QueryState<R> state;
+    state.init(action, NULL, size_t(-1));
 
     ColType* column = (ColType*)this;
     SequentialGetter<T> sg( column );
-    node.template aggregate_local<action, R, T>(&st, start, end, size_t(-1), &sg, matchcount);
+    node.template aggregate_local<action, R, T>(&state, start, end, size_t(-1), &sg, matchcount);
 
-    return st.state;
+    return state.m_state;
 }
 
 

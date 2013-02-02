@@ -108,7 +108,6 @@ TEST(TestQueryFloat4)
     CHECK_EQUAL(12345.0, a4);
 }
 
-
 TEST(TestQueryFloat)
 {
     FloatTable t;
@@ -147,15 +146,18 @@ TEST(TestQueryFloat)
     CHECK_EQUAL(4, t.where().col_double.between(2.20, 2.22).count());
 
     // ------ Test sum()
-
     // ... NO conditions
-    float sum1_f = 1.10f + 1.13f + 1.13f + 1.10f + 1.20f;
     double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
     CHECK_EQUAL(sum1_d, t.where().col_double.sum());
-    CHECK_EQUAL(sum1_f, t.where().col_float.sum());
+
+    // Note: sum of float is calculated by having a double aggregate to where each float is added 
+    // (thereby getting casted to double).
+    double sum1_f = double(1.10f) + double(1.13f) + double(1.13f) + double(1.10f) + double(1.20f);
+    double res = t.where().col_float.sum();
+    CHECK_EQUAL(sum1_f, res);
 
     // ... with conditions
-    float sum2_f = 1.13f + 1.20f;
+    double sum2_f = double(1.13f) + double(1.20f);
     double sum2_d = 2.21 + 3.20;
     FloatTable::Query q2 = t.where().col_float.between(1.13f, 1.20f).col_double.not_equal(2.22);
     CHECK_EQUAL(sum2_d, q2.col_double.sum());

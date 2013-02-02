@@ -1815,20 +1815,20 @@ TEST(Table_Aggregates)
 {
     TableAgg table;
     int64_t i_sum = 0;
-    float f_sum = 0;
+    double f_sum = 0;
     double d_sum = 0;
 
     for (int i = 0; i < TBL_SIZE; i++) {
         table.add(5987654, 4.0f, 3.0);
         i_sum += 5987654;
-        f_sum += 4.0f;
+        f_sum += double(4.0f);
         d_sum += 3.0;
     }
     table.add(1, 1.1f, 1.2);
     table.add(987654321, 11.0f, 12.0);
     table.add(5, 4.0f, 3.0);
     i_sum += 1 + 987654321 + 5;
-    f_sum += 1.1f + 11.0f + 4.0f;
+    f_sum += double(1.1f) + double(11.0f) + double(4.0f);
     d_sum += 1.2 + 12.0 + 3.0;
     double size = TBL_SIZE + 3;
 

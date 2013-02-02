@@ -2050,7 +2050,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     QueryState<int64_t> state;
-    state.state = (int64_t)&result;
+    state.m_state = (int64_t)&result;
 
     TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
 

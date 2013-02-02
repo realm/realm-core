@@ -28,7 +28,8 @@
 #include <vector>
 
 // FIXME: If at all possible, we should hide the use of pthreads in the cpp-file
-#include <pthread.h>
+//#include <pthread.h>
+#include "win32/pthread/pthread.h"
 
 #include <tightdb/table_ref.hpp>
 #include <tightdb/binary_data.hpp>
@@ -134,7 +135,7 @@ public:
     int64_t maximum(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     int64_t minimum(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 
-    float sum_float(      size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double sum_float(     size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     double average_float( size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     float maximum_float(  size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     float minimum_float  (size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
@@ -212,10 +213,12 @@ private:
     size_t m_threadcount;
 
     template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
-    template<ACTION action, typename R, typename T> 
-    R aggregate(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    template<typename R, typename T> 
-    double average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+    template<typename T> 
+        double average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+    template <ACTION action, typename T, typename R, class ColClass>
+        R aggregate(R (ColClass::*method)(size_t, size_t) const, 
+                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+
 };
 
 

@@ -205,7 +205,7 @@ public:
     size_t  count_double(size_t column_ndx, double target) const;
     
     int64_t sum(size_t column_ndx) const;
-    float   sum_float(size_t column_ndx) const;
+    double  sum_float(size_t column_ndx) const;
     double  sum_double(size_t column_ndx) const;
         // FIXME: What to return for below when table empty? 0?
     int64_t maximum(size_t column_ndx) const; 
