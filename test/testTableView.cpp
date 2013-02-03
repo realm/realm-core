@@ -48,7 +48,7 @@ TEST(TableView_Floats_GetSet)
     float  f_val[] = { 1.1f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f };
     double d_val[] = { 1.2 , 2.2 , 3.2 , -1.2 , 2.3, 0.0  };
 
-    CHECK_EQUAL(1, table.is_empty());
+    CHECK_EQUAL(true, table.is_empty());
 
     // Test add(?,?) with parameters
     for (size_t i=0; i<5; ++i)

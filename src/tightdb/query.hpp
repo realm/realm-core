@@ -28,8 +28,7 @@
 #include <vector>
 
 // FIXME: If at all possible, we should hide the use of pthreads in the cpp-file
-//#include <pthread.h>
-#include "win32/pthread/pthread.h"
+#include <pthread.h>
 
 #include <tightdb/table_ref.hpp>
 #include <tightdb/binary_data.hpp>
