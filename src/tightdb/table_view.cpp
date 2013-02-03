@@ -72,7 +72,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
     size_t leaf_end = 0;
     size_t row_ndx;
 
-    R res = static_cast<R>(column->template TreeGet<T,ColType>(0));
+    R res = static_cast<R>( column->template TreeGet<T,ColType>(m_refs.GetAsSizeT(0)) );
 
     for (size_t ss = 1; ss < m_refs.Size(); ++ss) {
         row_ndx = m_refs.GetAsSizeT(ss);

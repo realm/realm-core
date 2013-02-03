@@ -672,8 +672,9 @@ public:
             else
                 end2 = end - m_leaf_start;
 
-            if (m_conds <= 1 && (source_column == NULL || SameType<TResult, int64_t>::value
-                && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)) {
+            if (m_conds <= 1 && (source_column == NULL || 
+                (SameType<TResult, int64_t>::value 
+                 && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
                 m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
             }
             else {
@@ -1032,7 +1033,7 @@ public:
         return 0;
     }
 
-    OR_NODE(ParentNode* p1) : m_table(NULL) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
+    OR_NODE(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
 
     void Init(const Table& table)
     {
@@ -1107,7 +1108,6 @@ public:
 private:
     size_t m_last[2];
     bool m_was_match[2];
-    const Table* m_table;
 };
 
 
