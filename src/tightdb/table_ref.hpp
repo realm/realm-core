@@ -32,52 +32,51 @@ class Table;
 template<class> class BasicTable;
 
 
-/**
- * A "smart" reference to a table.
- *
- * This kind of table reference is often needed when working with
- * subtables. For example:
- *
- * \code{.cpp}
- *
- *   void func(Table& table)
- *   {
- *     Table& sub1 = *table.get_subtable(0,0); // INVALID! (sub1 becomes 'dangeling')
- *     TableRef sub2 = table.get_subtable(0,0); // Safe!
- *   }
- *
- * \endcode
- *
- * \note This class provides a lesser form of move semantics when the
- * compiler does not support C++11 rvalue references. See
- * MoveSemantics for details about how this works. In any case you may
- * use an unqualifed move() to move a value of this class.
- *
- * \note A top-level table (explicitely created or obtained from a
- * group) may not be destroyed until all "smart" table references
- * obtained from it, or from any of its subtables, are destroyed.
- */
+/// A "smart" reference to a table.
+///
+/// This kind of table reference is often needed when working with
+/// subtables. For example:
+///
+/// \code{.cpp}
+///
+///   void func(Table& table)
+///   {
+///     Table& sub1 = *table.get_subtable(0,0); // INVALID! (sub1 becomes 'dangeling')
+///     TableRef sub2 = table.get_subtable(0,0); // Safe!
+///   }
+///
+/// \endcode
+///
+/// A restricted notion of move semantics (as defined by C++11) is
+/// provided. Instead of calling <tt>std::move()</tt> one must call
+/// <tt>move()</tt> without the <tt>std</tt> qualifier. The
+/// effectiveness of this 'emulation' relies on 'return value
+/// optimization' being enabled in the compiler.
+///
+/// \note A top-level table (explicitely created or obtained from a
+/// group) may not be destroyed until all "smart" table references
+/// obtained from it, or from any of its subtables, are destroyed.
 template<class T> class BasicTableRef: private bind_ptr<T> {
 public:
 #ifdef TIGHTDB_HAVE_CXX11_CONSTEXPR
-    constexpr BasicTableRef() {}
+    constexpr BasicTableRef() TIGHTDB_NOEXCEPT {}
 #else
-    BasicTableRef() {}
+    BasicTableRef() TIGHTDB_NOEXCEPT {}
 #endif
 
 #ifdef TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
 
     // Copy construct
-    BasicTableRef(const BasicTableRef& r): bind_ptr<T>(r) {}
-    template<class U> BasicTableRef(const BasicTableRef<U>& r): bind_ptr<T>(r) {}
+    BasicTableRef(const BasicTableRef& r) TIGHTDB_NOEXCEPT: bind_ptr<T>(r) {}
+    template<class U> BasicTableRef(const BasicTableRef<U>& r) TIGHTDB_NOEXCEPT: bind_ptr<T>(r) {}
 
     // Copy assign
     BasicTableRef& operator=(const BasicTableRef&);
     template<class U> BasicTableRef& operator=(const BasicTableRef<U>&);
 
     // Move construct
-    BasicTableRef(BasicTableRef&& r): bind_ptr<T>(std::move(r)) {}
-    template<class U> BasicTableRef(BasicTableRef<U>&& r): bind_ptr<T>(std::move(r)) {}
+    BasicTableRef(BasicTableRef&& r) TIGHTDB_NOEXCEPT: bind_ptr<T>(std::move(r)) {}
+    template<class U> BasicTableRef(BasicTableRef<U>&& r) TIGHTDB_NOEXCEPT: bind_ptr<T>(std::move(r)) {}
 
     // Move assign
     BasicTableRef& operator=(BasicTableRef&&);
@@ -86,8 +85,8 @@ public:
 #else // !TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
 
     // Copy construct
-    BasicTableRef(const BasicTableRef& r): bind_ptr<T>(r) {}
-    template<class U> BasicTableRef(BasicTableRef<U> r): bind_ptr<T>(move(r)) {}
+    BasicTableRef(const BasicTableRef& r) TIGHTDB_NOEXCEPT: bind_ptr<T>(r) {}
+    template<class U> BasicTableRef(BasicTableRef<U> r) TIGHTDB_NOEXCEPT: bind_ptr<T>(move(r)) {}
 
     // Copy assign
     BasicTableRef& operator=(BasicTableRef);
@@ -96,12 +95,12 @@ public:
 #endif // !TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
 
     // Replacement for std::move() in C++03
-    friend BasicTableRef move(BasicTableRef& r) { return BasicTableRef(&r, move_tag()); }
+    friend BasicTableRef move(BasicTableRef& r) TIGHTDB_NOEXCEPT { return BasicTableRef(&r, move_tag()); }
 
     // Comparison
-    template<class U> bool operator==(const BasicTableRef<U>&) const;
-    template<class U> bool operator!=(const BasicTableRef<U>&) const;
-    template<class U> bool operator<(const BasicTableRef<U>&) const;
+    template<class U> bool operator==(const BasicTableRef<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator!=(const BasicTableRef<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator<(const BasicTableRef<U>&) const TIGHTDB_NOEXCEPT;
 
     // Dereference
     using bind_ptr<T>::operator*;
@@ -115,11 +114,11 @@ public:
 
     void reset() { bind_ptr<T>::reset(); }
 
-    void swap(BasicTableRef& r) { this->bind_ptr<T>::swap(r); }
-    friend void swap(BasicTableRef& a, BasicTableRef& b) { a.swap(b); }
+    void swap(BasicTableRef& r) TIGHTDB_NOEXCEPT { this->bind_ptr<T>::swap(r); }
+    friend void swap(BasicTableRef& a, BasicTableRef& b) TIGHTDB_NOEXCEPT { a.swap(b); }
 
-    template<class U> friend BasicTableRef<U> unchecked_cast(BasicTableRef<Table>);
-    template<class U> friend BasicTableRef<const U> unchecked_cast(BasicTableRef<const Table>);
+    template<class U> friend BasicTableRef<U> unchecked_cast(BasicTableRef<Table>) TIGHTDB_NOEXCEPT;
+    template<class U> friend BasicTableRef<const U> unchecked_cast(BasicTableRef<const Table>) TIGHTDB_NOEXCEPT;
 
 private:
     template<class> struct GetRowAccType { typedef void type; };
@@ -133,7 +132,7 @@ private:
 
 public:
     /// Same as 'table[i]' where 'table' is the referenced table.
-    RowAccessor operator[](std::size_t i) const { return (*this->get())[i]; }
+    RowAccessor operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return (*this->get())[i]; }
 
 private:
     friend class ColumnSubtableParent;
@@ -141,13 +140,13 @@ private:
     template<class> friend class BasicTable;
     template<class> friend class BasicTableRef;
 
-    explicit BasicTableRef(T* t): bind_ptr<T>(t) {}
+    explicit BasicTableRef(T* t) TIGHTDB_NOEXCEPT: bind_ptr<T>(t) {}
 
     typedef typename bind_ptr<T>::move_tag move_tag;
-    BasicTableRef(BasicTableRef* r, move_tag): bind_ptr<T>(r, move_tag()) {}
+    BasicTableRef(BasicTableRef* r, move_tag) TIGHTDB_NOEXCEPT: bind_ptr<T>(r, move_tag()) {}
 
     typedef typename bind_ptr<T>::casting_move_tag casting_move_tag;
-    template<class U> BasicTableRef(BasicTableRef<U>* r, casting_move_tag):
+    template<class U> BasicTableRef(BasicTableRef<U>* r, casting_move_tag) TIGHTDB_NOEXCEPT:
         bind_ptr<T>(r, casting_move_tag()) {}
 };
 
@@ -163,12 +162,12 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const B
     return out;
 }
 
-template<class T> inline BasicTableRef<T> unchecked_cast(TableRef t)
+template<class T> inline BasicTableRef<T> unchecked_cast(TableRef t) TIGHTDB_NOEXCEPT
 {
     return BasicTableRef<T>(&t, typename BasicTableRef<T>::casting_move_tag());
 }
 
-template<class T> inline BasicTableRef<const T> unchecked_cast(ConstTableRef t)
+template<class T> inline BasicTableRef<const T> unchecked_cast(ConstTableRef t) TIGHTDB_NOEXCEPT
 {
     return BasicTableRef<const T>(&t, typename BasicTableRef<T>::casting_move_tag());
 }
@@ -225,19 +224,19 @@ inline BasicTableRef<T>& BasicTableRef<T>::operator=(BasicTableRef<U> r)
 #endif // !TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
 
 template<class T> template<class U>
-inline bool BasicTableRef<T>::operator==(const BasicTableRef<U>& r) const
+inline bool BasicTableRef<T>::operator==(const BasicTableRef<U>& r) const TIGHTDB_NOEXCEPT
 {
     return this->bind_ptr<T>::operator==(r);
 }
 
 template<class T> template<class U>
-inline bool BasicTableRef<T>::operator!=(const BasicTableRef<U>& r) const
+inline bool BasicTableRef<T>::operator!=(const BasicTableRef<U>& r) const TIGHTDB_NOEXCEPT
 {
     return this->bind_ptr<T>::operator!=(r);
 }
 
 template<class T> template<class U>
-inline bool BasicTableRef<T>::operator<(const BasicTableRef<U>& r) const
+inline bool BasicTableRef<T>::operator<(const BasicTableRef<U>& r) const TIGHTDB_NOEXCEPT
 {
     return this->bind_ptr<T>::operator<(r);
 }

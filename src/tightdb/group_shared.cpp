@@ -272,8 +272,8 @@ const Group& SharedGroup::begin_read()
     m_group.update_from_shared(new_topref, new_filesize);
 
 #ifdef TIGHTDB_DEBUG
-    m_transact_stage = transact_Reading;
     m_group.Verify();
+    m_transact_stage = transact_Reading;
 #endif
 
     return m_group;
@@ -327,10 +327,7 @@ Group& SharedGroup::begin_write()
     TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication.is_attached()) {
-        error_code err = m_replication.begin_write_transact();
-        if (err) throw_error(err);
-    }
+    if (m_replication.is_attached()) m_replication.begin_write_transact(); // Throws
 #endif
 
     SharedInfo* const info = m_file_map.get_addr();
@@ -349,8 +346,8 @@ Group& SharedGroup::begin_write()
     m_group.update_from_shared(new_topref, new_filesize);
 
 #ifdef TIGHTDB_DEBUG
-    m_transact_stage = transact_Writing;
     m_group.Verify();
+    m_transact_stage = transact_Writing;
 #endif
 
     return m_group;
@@ -409,14 +406,16 @@ void SharedGroup::commit()
 
     m_group.invalidate();
 
-#ifdef TIGHTDB_DEBUG
-    m_transact_stage = transact_Ready;
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    // FIXME: It is essential that if
+    // Replicatin::commit_write_transact() fails, then the transaction
+    // is not completed. A following call to rollback() must roll it
+    // back.
+    if (m_replication.is_attached()) m_replication.commit_write_transact(); // Throws
 #endif
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication.is_attached()) {
-        if (!m_replication.commit_write_transact()) throw_error(ERROR_INTERRUPTED);
-    }
+#ifdef TIGHTDB_DEBUG
+    m_transact_stage = transact_Ready;
 #endif
 }
 
@@ -434,12 +433,12 @@ void SharedGroup::rollback()
 
     m_group.invalidate();
 
-#ifdef TIGHTDB_DEBUG
-    m_transact_stage = transact_Ready;
-#endif
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (m_replication.is_attached()) m_replication.rollback_write_transact();
+#endif
+
+#ifdef TIGHTDB_DEBUG
+    m_transact_stage = transact_Ready;
 #endif
 }
 

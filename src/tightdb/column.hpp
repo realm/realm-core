@@ -46,7 +46,7 @@ public:
 
     virtual size_t Size() const TIGHTDB_NOEXCEPT = 0;
 
-    virtual bool add() = 0;
+    virtual void add() = 0;
     virtual void insert(size_t ndx) = 0;
     virtual void Clear() = 0;
     virtual void Delete(size_t ndx) = 0;
@@ -83,21 +83,15 @@ protected:
     struct NodeChange {
         size_t ref1;
         size_t ref2;
-        enum ChangeType {
-            CT_ERROR,
-            CT_NONE,
-            CT_INSERT_BEFORE,
-            CT_INSERT_AFTER,
-            CT_SPLIT
-        } type;
+        enum ChangeType { none, insert_before, insert_after, split } type;
         NodeChange(ChangeType t, size_t r1=0, size_t r2=0) : ref1(r1), ref2(r2), type(t) {}
-        NodeChange(bool success) : ref1(0), ref2(0), type(success ? CT_NONE : CT_ERROR) {}
+        NodeChange() : ref1(0), ref2(0), type(none) {}
     };
 
     // Tree functions
-    template<typename T, class C> T TreeGet(size_t ndx) const; // FIXME: This one should probably be eliminated because it throws due to dynamic memory allocation
-    template<typename T, class C> bool TreeSet(size_t ndx, T value);
-    template<typename T, class C> bool TreeInsert(size_t ndx, T value);
+    template<typename T, class C> T TreeGet(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
+    template<typename T, class C> void TreeSet(size_t ndx, T value);
+    template<typename T, class C> void TreeInsert(size_t ndx, T value);
     template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
     template<typename T, class C> void TreeDelete(size_t ndx);
     template<typename T, class C> void TreeFindAll(Array &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
@@ -108,11 +102,11 @@ protected:
     bool IsNode() const TIGHTDB_NOEXCEPT {return m_array->IsNode();}
     Array NodeGetOffsets() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     Array NodeGetRefs() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
-    template<class C> bool NodeInsert(size_t ndx, size_t ref);
-    template<class C> bool NodeAdd(size_t ref);
-    bool NodeAddKey(size_t ref);
-    bool NodeUpdateOffsets(size_t ndx);
-    template<class C> bool NodeInsertSplit(size_t ndx, size_t newRef);
+    template<class C> void NodeInsert(size_t ndx, size_t ref);
+    template<class C> void NodeAdd(size_t ref);
+    void NodeAddKey(size_t ref);
+    void NodeUpdateOffsets(size_t ndx);
+    template<class C> void NodeInsertSplit(size_t ndx, size_t newRef);
     size_t GetRefSize(size_t ref) const;
 
 #ifdef TIGHTDB_DEBUG
@@ -146,18 +140,18 @@ public:
     void UpdateParentNdx(int diff);
     void SetHasRefs();
 
-    virtual size_t Size() const TIGHTDB_NOEXCEPT;
+    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     // Getting and setting values
     int64_t Get(size_t ndx) const TIGHTDB_NOEXCEPT;
     size_t GetAsRef(size_t ndx) const TIGHTDB_NOEXCEPT;
     int64_t Back() const TIGHTDB_NOEXCEPT {return Get(Size()-1);}
-    bool Set(size_t ndx, int64_t value);
-    void insert(size_t ndx) { Insert(ndx, 0); } // FIXME: Ignoring boolean return value here!
-    bool Insert(size_t ndx, int64_t value);
-    bool add() {return add(0);}
-    bool add(int64_t value);
+    void Set(size_t ndx, int64_t value);
+    void insert(size_t ndx) TIGHTDB_OVERRIDE { Insert(ndx, 0); }
+    void Insert(size_t ndx, int64_t value);
+    void add() TIGHTDB_OVERRIDE { add(0); }
+    void add(int64_t value);
     void fill(size_t count);
 
     size_t  count(int64_t target) const;
@@ -171,12 +165,11 @@ public:
 
     intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
 
-    void Clear();
-    void Delete(size_t ndx);
+    void Clear() TIGHTDB_OVERRIDE;
+    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
     //void Resize(size_t len);
-    bool Reserve(size_t len, size_t width=8);
 
-    bool Increment64(int64_t value, size_t start=0, size_t end=-1);
+    void Increment64(int64_t value, size_t start=0, size_t end=-1);
     void IncrementIf(int64_t limit, int64_t value);
     size_t find_first(int64_t value, size_t start=0, size_t end=-1) const;
 
@@ -220,10 +213,10 @@ protected:
     void UpdateRef(size_t ref);
 
     // Node functions
-    int64_t LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT {return m_array->Get(ndx);}
-    bool LeafSet(size_t ndx, int64_t value) {return m_array->Set(ndx, value);}
-    bool LeafInsert(size_t ndx, int64_t value) {return m_array->Insert(ndx, value);}
-    void LeafDelete(size_t ndx) {m_array->Delete(ndx);}
+    int64_t LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT { return m_array->Get(ndx); }
+    void LeafSet(size_t ndx, int64_t value) { m_array->Set(ndx, value); }
+    void LeafInsert(size_t ndx, int64_t value) { m_array->Insert(ndx, value); }
+    void LeafDelete(size_t ndx) { m_array->Delete(ndx); }
     template<class F> size_t LeafFind(int64_t value, size_t start, size_t end) const
     {
         return m_array->find_first<F>(value, start, end);

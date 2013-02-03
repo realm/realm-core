@@ -58,7 +58,7 @@ template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const
     }
 }
 
-template<typename T, class C> bool ColumnBase::TreeSet(size_t ndx, T value)
+template<typename T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
 {
     //const T oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
 
@@ -76,55 +76,45 @@ template<typename T, class C> bool ColumnBase::TreeSet(size_t ndx, T value)
 
         // Set item
         C target = GetColumnFromRef<C>(refs, node_ndx);
-        if (!target.Set(local_ndx, value)) return false;
+        target.Set(local_ndx, value);
     }
-    else if (!static_cast<C*>(this)->LeafSet(ndx, value)) return false;
+    else {
+        static_cast<C*>(this)->LeafSet(ndx, value);
+    }
 
     // Update index
     //if (m_index) m_index->Set(ndx, oldVal, value);
-
-    return true;
 }
 
-template<typename T, class C> bool ColumnBase::TreeInsert(size_t ndx, T value)
+template<typename T, class C> void ColumnBase::TreeInsert(size_t ndx, T value)
 {
     const NodeChange nc = DoInsert<T,C>(ndx, value);
-
     switch (nc.type) {
-    case NodeChange::CT_ERROR:
-        return false; // allocation error
-    case NodeChange::CT_NONE:
-        break;
-    case NodeChange::CT_INSERT_BEFORE:
-    {
-        Column newNode(COLUMN_NODE, m_array->GetAllocator());
-        newNode.NodeAdd<C>(nc.ref1);
-        newNode.NodeAdd<C>(GetRef());
-        static_cast<C*>(this)->UpdateRef(newNode.GetRef());
-        break;
+        case NodeChange::none:
+            return;
+        case NodeChange::insert_before: {
+            Column newNode(COLUMN_NODE, m_array->GetAllocator());
+            newNode.NodeAdd<C>(nc.ref1);
+            newNode.NodeAdd<C>(GetRef());
+            static_cast<C*>(this)->UpdateRef(newNode.GetRef());
+            return;
+        }
+        case NodeChange::insert_after: {
+            Column newNode(COLUMN_NODE, m_array->GetAllocator());
+            newNode.NodeAdd<C>(GetRef());
+            newNode.NodeAdd<C>(nc.ref1);
+            static_cast<C*>(this)->UpdateRef(newNode.GetRef());
+            return;
+        }
+        case NodeChange::split: {
+            Column newNode(COLUMN_NODE, m_array->GetAllocator());
+            newNode.NodeAdd<C>(nc.ref1);
+            newNode.NodeAdd<C>(nc.ref2);
+            static_cast<C*>(this)->UpdateRef(newNode.GetRef());
+            return;
+        }
     }
-    case NodeChange::CT_INSERT_AFTER:
-    {
-        Column newNode(COLUMN_NODE, m_array->GetAllocator());
-        newNode.NodeAdd<C>(GetRef());
-        newNode.NodeAdd<C>(nc.ref1);
-        static_cast<C*>(this)->UpdateRef(newNode.GetRef());
-        break;
-    }
-    case NodeChange::CT_SPLIT:
-    {
-        Column newNode(COLUMN_NODE, m_array->GetAllocator());
-        newNode.NodeAdd<C>(nc.ref1);
-        newNode.NodeAdd<C>(nc.ref2);
-        static_cast<C*>(this)->UpdateRef(newNode.GetRef());
-        break;
-    }
-    default:
-        TIGHTDB_ASSERT(false);
-        return false;
-    }
-
-    return true;
+    TIGHTDB_ASSERT(false);
 }
 
 template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx, T value)
@@ -150,23 +140,23 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 
         // Insert item
         const NodeChange nc = target.template DoInsert<T, C>(local_ndx, value);
-        if (nc.type ==  NodeChange::CT_ERROR) return NodeChange(NodeChange::CT_ERROR); // allocation error
-        else if (nc.type ==  NodeChange::CT_NONE) {
+        if (nc.type ==  NodeChange::none) {
             offsets.Increment(1, node_ndx);  // update offsets
-            return NodeChange(NodeChange::CT_NONE); // no new nodes
+            return NodeChange::none; // no new nodes
         }
 
-        if (nc.type == NodeChange::CT_INSERT_AFTER) ++node_ndx;
+        if (nc.type == NodeChange::insert_after) ++node_ndx;
 
         // If there is room, just update node directly
         if (offsets.Size() < MAX_LIST_SIZE) {
-            if (nc.type == NodeChange::CT_SPLIT) return NodeInsertSplit<C>(node_ndx, nc.ref2);
-            else return NodeInsert<C>(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+            if (nc.type == NodeChange::split) NodeInsertSplit<C>(node_ndx, nc.ref2);
+            else NodeInsert<C>(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+            return NodeChange::none;
         }
 
         // Else create new node
         Column newNode(COLUMN_NODE, m_array->GetAllocator());
-        if (nc.type == NodeChange::CT_SPLIT) {
+        if (nc.type == NodeChange::split) {
             // update offset for left node
             const size_t newsize = target.Size();
             const size_t preoffset = node_ndx ? to_ref(offsets.Get(node_ndx-1)) : 0;
@@ -179,11 +169,11 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 
         switch (node_ndx) {
         case 0:             // insert before
-            return NodeChange(NodeChange::CT_INSERT_BEFORE, newNode.GetRef());
+            return NodeChange(NodeChange::insert_before, newNode.GetRef());
         case MAX_LIST_SIZE: // insert after
-            if (nc.type == NodeChange::CT_SPLIT)
-                return NodeChange(NodeChange::CT_SPLIT, GetRef(), newNode.GetRef());
-            else return NodeChange(NodeChange::CT_INSERT_AFTER, newNode.GetRef());
+            if (nc.type == NodeChange::split)
+                return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
+            else return NodeChange(NodeChange::insert_after, newNode.GetRef());
         default:            // split
             // Move items after split to new node
             const size_t len = refs.Size();
@@ -193,27 +183,28 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
             }
             offsets.Resize(node_ndx);
             refs.Resize(node_ndx);
-            return NodeChange(NodeChange::CT_SPLIT, GetRef(), newNode.GetRef());
+            return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
         }
     }
     else {
         // Is there room in the list?
         const size_t count = static_cast<C*>(this)->Size();
         if (count < MAX_LIST_SIZE) {
-            return static_cast<C*>(this)->LeafInsert(ndx, value);
+            static_cast<C*>(this)->LeafInsert(ndx, value);
+            return NodeChange::none;
         }
 
         // Create new list for item
         C newList(m_array->GetAllocator());
         if (m_array->HasRefs()) newList.SetHasRefs(); // all leafs should have same type
 
-        if (!newList.add(value)) return NodeChange(NodeChange::CT_ERROR);
+        newList.add(value);
 
         switch (ndx) {
         case 0:             // insert before
-            return NodeChange(NodeChange::CT_INSERT_BEFORE, newList.GetRef());
+            return NodeChange(NodeChange::insert_before, newList.GetRef());
         case MAX_LIST_SIZE: // insert below
-            return NodeChange(NodeChange::CT_INSERT_AFTER, newList.GetRef());
+            return NodeChange(NodeChange::insert_after, newList.GetRef());
         default:            // split
             // Move items after split to new list
             for (size_t i = ndx; i < count; ++i) {
@@ -221,12 +212,12 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
             }
             static_cast<C*>(this)->Resize(ndx);
 
-            return NodeChange(NodeChange::CT_SPLIT, GetRef(), newList.GetRef());
+            return NodeChange(NodeChange::split, GetRef(), newList.GetRef());
         }
     }
 }
 
-template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
+template<class C> void ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
 {
     TIGHTDB_ASSERT(IsNode());
     TIGHTDB_ASSERT(new_ref);
@@ -262,11 +253,9 @@ template<class C> bool ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
     // Update following offsets
     if (offsets.Size() > ndx+2)
         offsets.Increment(1, ndx+2);
-
-    return true;
 }
 
-template<class C> bool ColumnBase::NodeInsert(size_t ndx, size_t ref)
+template<class C> void ColumnBase::NodeInsert(size_t ndx, size_t ref)
 {
     TIGHTDB_ASSERT(ref);
     TIGHTDB_ASSERT(IsNode());
@@ -281,14 +270,14 @@ template<class C> bool ColumnBase::NodeInsert(size_t ndx, size_t ref)
     const size_t refSize = col.Size();
     const int64_t newOffset = (ndx ? offsets.Get(ndx-1) : 0) + refSize;
 
-    if (!offsets.Insert(ndx, newOffset)) return false;
+    offsets.Insert(ndx, newOffset);
     if (ndx+1 < offsets.Size()) {
-        if (!offsets.Increment(refSize, ndx+1)) return false;
+        offsets.Increment(refSize, ndx+1);
     }
-    return refs.Insert(ndx, ref);
+    refs.Insert(ndx, ref);
 }
 
-template<class C> bool ColumnBase::NodeAdd(size_t ref)
+template<class C> void ColumnBase::NodeAdd(size_t ref)
 {
     TIGHTDB_ASSERT(ref);
     TIGHTDB_ASSERT(IsNode());
@@ -300,8 +289,8 @@ template<class C> bool ColumnBase::NodeAdd(size_t ref)
     TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
 
     const int64_t newOffset = (offsets.is_empty() ? 0 : offsets.back()) + col.Size();
-    if (!offsets.add(newOffset)) return false;
-    return refs.add(ref);
+    offsets.add(newOffset);
+    refs.add(ref);
 }
 
 template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
@@ -493,7 +482,6 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
             }
         }
     }
-    return;
 }
 
 

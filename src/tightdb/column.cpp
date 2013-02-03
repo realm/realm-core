@@ -370,30 +370,26 @@ void Column::Clear()
     if (m_array->IsNode()) m_array->SetType(COLUMN_NORMAL);
 }
 
-bool Column::Set(size_t ndx, int64_t value)
+void Column::Set(size_t ndx, int64_t value)
 {
     const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
 
-    const bool res = TreeSet<int64_t, Column>(ndx, value);
-    if (!res) return false;
+    TreeSet<int64_t, Column>(ndx, value);
 
     // Update index
     if (m_index) m_index->Set(ndx, oldVal, value);
-
-    return true;
 }
 
-bool Column::add(int64_t value)
+void Column::add(int64_t value)
 {
-    return Insert(Size(), value);
+    Insert(Size(), value);
 }
 
-bool Column::Insert(size_t ndx, int64_t value)
+void Column::Insert(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx <= Size());
 
-    const bool res = TreeInsert<int64_t, Column>(ndx, value);
-    if (!res) return false;
+    TreeInsert<int64_t, Column>(ndx, value);
 
     // Update index
     if (m_index) {
@@ -404,8 +400,6 @@ bool Column::Insert(size_t ndx, int64_t value)
 #ifdef TIGHTDB_DEBUG
     Verify();
 #endif
-
-    return true;
 }
 
 void Column::fill(size_t count)
@@ -605,7 +599,7 @@ Array ColumnBase::NodeGetRefs() const TIGHTDB_NOEXCEPT
     return m_array->GetSubArray(1); // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
 }
 
-bool ColumnBase::NodeUpdateOffsets(size_t ndx)
+void ColumnBase::NodeUpdateOffsets(size_t ndx)
 {
     TIGHTDB_ASSERT(IsNode());
 
@@ -617,10 +611,10 @@ bool ColumnBase::NodeUpdateOffsets(size_t ndx)
     const int64_t oldSize = offsets.Get(ndx) - (ndx ? offsets.Get(ndx-1) : 0);
     const int64_t diff = newSize - oldSize;
 
-    return offsets.Increment(diff, ndx);
+    offsets.Increment(diff, ndx);
 }
 
-bool ColumnBase::NodeAddKey(size_t ref)
+void ColumnBase::NodeAddKey(size_t ref)
 {
     TIGHTDB_ASSERT(ref);
     TIGHTDB_ASSERT(IsNode());
@@ -634,8 +628,8 @@ bool ColumnBase::NodeAddKey(size_t ref)
     TIGHTDB_ASSERT(!new_offsets.is_empty());
 
     const int64_t key = new_offsets.back();
-    if (!offsets.add(key)) return false;
-    return refs.add(ref);
+    offsets.add(key);
+    refs.add(ref);
 }
 
 void Column::Delete(size_t ndx)
@@ -664,18 +658,19 @@ void Column::Delete(size_t ndx)
     }
 }
 
-bool Column::Increment64(int64_t value, size_t start, size_t end)
+void Column::Increment64(int64_t value, size_t start, size_t end)
 {
-    if (!IsNode()) return m_array->Increment(value, start, end);
-    else {
-        //TODO: partial incr
-        Array refs = NodeGetRefs();
-        const size_t count = refs.Size();
-        for (size_t i = 0; i < count; ++i) {
-            Column col = ::GetColumnFromRef(refs, i);
-            if (!col.Increment64(value)) return false;
-        }
-        return true;
+    if (!IsNode()) {
+        m_array->Increment(value, start, end);
+        return;
+    }
+
+    //TODO: partial incr
+    Array refs = NodeGetRefs();
+    const size_t count = refs.Size();
+    for (size_t i = 0; i < count; ++i) {
+        Column col = ::GetColumnFromRef(refs, i);
+        col.Increment64(value);
     }
 }
 

@@ -87,9 +87,19 @@ public:
               DurabilityLevel dlevel=durability_Full);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
+
     struct replication_tag {};
+
+    /// Equivalent to calling open(replication_tag, const
+    /// std::string&, bool, DurabilityLevel) on a default constructed
+    /// instance.
+    explicit SharedGroup(replication_tag, const std::string& file = "",
+                         DurabilityLevel dlevel=durability_Full);
+
+    /// Open this group in replication mode.
     void open(replication_tag, const std::string& file = "",
               DurabilityLevel dlevel=durability_Full);
+
 #endif
 
     /// A SharedGroup may be created in the unattached state, and then
@@ -271,11 +281,17 @@ inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-inline void SharedGroup::open(replication_tag, const string& file, DurabilityLevel dlevel)
+inline SharedGroup::SharedGroup(replication_tag, const std::string& file, DurabilityLevel dlevel):
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max())
+{
+    open(replication_tag(), file, dlevel);
+}
+
+inline void SharedGroup::open(replication_tag, const std::string& file, DurabilityLevel dlevel)
 {
     TIGHTDB_ASSERT(!is_attached());
 
-    m_replication.attach(file);
+    m_replication.open(file);
     m_group.set_replication(&m_replication);
 
     open(!file.empty() ? file : Replication::get_path_to_database_file(), false, dlevel);

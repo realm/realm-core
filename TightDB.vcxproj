@@ -391,8 +391,8 @@
     <ClCompile Include="src\tightdb\column_string.cpp" />
     <ClCompile Include="src\tightdb\column_string_enum.cpp" />
     <ClCompile Include="src\tightdb\column_table.cpp" />
-    <ClCompile Include="src\tightdb\error.cpp" />
     <ClCompile Include="src\tightdb\file.cpp" />
+    <ClCompile Include="src\tightdb\pthread_helpers.cpp" />
     <ClCompile Include="src\tightdb\group.cpp" />
     <ClCompile Include="src\tightdb\group_shared.cpp" />
     <ClCompile Include="src\tightdb\group_writer.cpp" />
@@ -554,6 +554,7 @@
     <ClInclude Include="src\tightdb\array_string.hpp" />
     <ClInclude Include="src\tightdb\array_string_long.hpp" />
     <ClInclude Include="src\tightdb\binary_data.hpp" />
+    <ClInclude Include="src\tightdb\unique_ptr.hpp" />
     <ClInclude Include="src\tightdb\bind_ptr.hpp" />
     <ClInclude Include="src\tightdb\column.hpp" />
     <ClInclude Include="src\tightdb\column_binary.hpp" />
@@ -566,7 +567,6 @@
     <ClInclude Include="src\tightdb\column_type.hpp" />
     <ClInclude Include="src\tightdb\config.h" />
     <ClInclude Include="src\tightdb\date.hpp" />
-    <ClInclude Include="src\tightdb\error.hpp" />
     <ClInclude Include="src\tightdb\group.hpp" />
     <ClInclude Include="src\tightdb\group_shared.hpp" />
     <ClInclude Include="src\tightdb\group_writer.hpp" />

@@ -135,10 +135,10 @@ void ColumnBinary::Set(size_t ndx, const char* value, size_t len)
     Set(ndx, BinaryData(value, len));
 }
 
-bool ColumnBinary::Set(size_t ndx, BinaryData bin)
+void ColumnBinary::Set(size_t ndx, BinaryData bin)
 {
     TIGHTDB_ASSERT(ndx < Size());
-    return TreeSet<BinaryData,ColumnBinary>(ndx, bin);
+    TreeSet<BinaryData,ColumnBinary>(ndx, bin);
 }
 
 void ColumnBinary::add(const char* value, size_t len)
@@ -146,9 +146,9 @@ void ColumnBinary::add(const char* value, size_t len)
     Insert(Size(), value, len);
 }
 
-bool ColumnBinary::add(BinaryData bin)
+void ColumnBinary::add(BinaryData bin)
 {
-    return Insert(Size(), bin);
+    Insert(Size(), bin);
 }
 
 void ColumnBinary::Insert(size_t ndx, const char* value, size_t len)
@@ -157,10 +157,10 @@ void ColumnBinary::Insert(size_t ndx, const char* value, size_t len)
     Insert(ndx, BinaryData(value, len));
 }
 
-bool ColumnBinary::Insert(size_t ndx, BinaryData bin)
+void ColumnBinary::Insert(size_t ndx, BinaryData bin)
 {
     TIGHTDB_ASSERT(ndx <= Size());
-    return TreeInsert<BinaryData,ColumnBinary>(ndx, bin);
+    TreeInsert<BinaryData,ColumnBinary>(ndx, bin);
 }
 
 void ColumnBinary::fill(size_t count)
@@ -213,16 +213,14 @@ BinaryData ColumnBinary::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
     return BinaryData(array->Get(ndx), array->GetLen(ndx));
 }
 
-bool ColumnBinary::LeafSet(size_t ndx, BinaryData value)
+void ColumnBinary::LeafSet(size_t ndx, BinaryData value)
 {
     ((ArrayBinary*)m_array)->Set(ndx, value.pointer, value.len);
-    return true;
 }
 
-bool ColumnBinary::LeafInsert(size_t ndx, BinaryData value)
+void ColumnBinary::LeafInsert(size_t ndx, BinaryData value)
 {
     ((ArrayBinary*)m_array)->Insert(ndx, value.pointer, value.len);
-    return true;
 }
 
 void ColumnBinary::LeafDelete(size_t ndx)

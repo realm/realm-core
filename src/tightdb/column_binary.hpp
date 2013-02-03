@@ -38,21 +38,21 @@ public:
 
     bool IsBinaryColumn() const TIGHTDB_NOEXCEPT {return true;}
 
-    virtual size_t Size() const TIGHTDB_NOEXCEPT;
+    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     BinaryData Get(size_t ndx) const;
     const char* GetData(size_t ndx) const;
     size_t GetLen(size_t ndx) const;
 
-    virtual bool add() { add(NULL, 0); return true; }
+    void add() TIGHTDB_OVERRIDE { add(NULL, 0); }
     void add(const char* value, size_t len);
     void Set(size_t ndx, const char* value, size_t len);
-    virtual void insert(size_t ndx) { Insert(ndx, 0, 0); }
+    void insert(size_t ndx) TIGHTDB_OVERRIDE { Insert(ndx, 0, 0); }
     void Insert(size_t ndx, const char* value, size_t len);
-    void Delete(size_t ndx);
+    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
     void Resize(size_t ndx);
-    void Clear();
+    void Clear() TIGHTDB_OVERRIDE;
     void fill(size_t count);
 
     // Index
@@ -75,15 +75,15 @@ public:
 protected:
     friend class ColumnBase;
 
-    bool add(BinaryData bin);
-    bool Set(size_t ndx, BinaryData bin);
-    bool Insert(size_t ndx, BinaryData bin);
+    void add(BinaryData bin);
+    void Set(size_t ndx, BinaryData bin);
+    void Insert(size_t ndx, BinaryData bin);
 
     void UpdateRef(size_t ref);
 
     BinaryData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
-    bool LeafSet(size_t ndx, BinaryData value);
-    bool LeafInsert(size_t ndx, BinaryData value);
+    void LeafSet(size_t ndx, BinaryData value);
+    void LeafInsert(size_t ndx, BinaryData value);
     void LeafDelete(size_t ndx);
 
 #ifdef TIGHTDB_DEBUG

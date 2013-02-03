@@ -89,16 +89,16 @@ void StringIndex::Insert(size_t row_ndx, const char* value, bool isLast)
     InsertWithOffset(row_ndx, 0, value);
 }
 
-bool StringIndex::InsertWithOffset(size_t row_ndx, size_t offset, const char* value)
+void StringIndex::InsertWithOffset(size_t row_ndx, size_t offset, const char* value)
 {
     // Create 4 byte index key
     const char* const v = value + offset;
     const int32_t key = CreateKey(v);
 
-    return TreeInsert(row_ndx, key, offset, value);
+    TreeInsert(row_ndx, key, offset, value);
 }
 
-bool StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
+void StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
 {
     TIGHTDB_ASSERT(!m_array->IsNode()); // only works in leafs
 
@@ -116,7 +116,7 @@ bool StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
         // When key is outside current range, we can just add it
         values.add(key);
         refs.add(ref);
-        return true;
+        return;
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -129,48 +129,37 @@ bool StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
     // If key is not present we add it at the correct location
     values.Insert(ins_pos, key);
     refs.Insert(ins_pos, ref);
-    return true;
 }
 
-bool StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, const char* value)
+void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, const char* value)
 {
     const NodeChange nc = DoInsert(row_ndx, key, offset, value);
-
     switch (nc.type) {
-        case NodeChange::CT_ERROR:
-            return false; // allocation error
-        case NodeChange::CT_NONE:
-            break;
-        case NodeChange::CT_INSERT_BEFORE:
-        {
+        case NodeChange::none:
+            return;
+        case NodeChange::insert_before: {
             StringIndex newNode(COLUMN_NODE, m_array->GetAllocator());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(GetRef());
             UpdateRef(newNode.GetRef());
-            break;
+            return;
         }
-        case NodeChange::CT_INSERT_AFTER:
-        {
+        case NodeChange::insert_after: {
             StringIndex newNode(COLUMN_NODE, m_array->GetAllocator());
             newNode.NodeAddKey(GetRef());
             newNode.NodeAddKey(nc.ref1);
             UpdateRef(newNode.GetRef());
-            break;
+            return;
         }
-        case NodeChange::CT_SPLIT:
-        {
+        case NodeChange::split: {
             StringIndex newNode(COLUMN_NODE, m_array->GetAllocator());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(nc.ref2);
             UpdateRef(newNode.GetRef());
-            break;
+            return;
         }
-        default:
-            TIGHTDB_ASSERT(false);
-            return false;
     }
-
-    return true;
+    TIGHTDB_ASSERT(false);
 }
 
 Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t offset, const char* value)
@@ -193,25 +182,25 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
 
         // Insert item
         const NodeChange nc = target.DoInsert(row_ndx, key, offset, value);
-        if (nc.type ==  NodeChange::CT_ERROR) return NodeChange(NodeChange::CT_ERROR); // allocation error
-        else if (nc.type ==  NodeChange::CT_NONE) {
+        if (nc.type ==  NodeChange::none) {
             // update keys
             const int64_t lastKey = target.GetLastKey();
             offsets.Set(node_ndx, lastKey);
-            return NodeChange(NodeChange::CT_NONE); // no new nodes
+            return NodeChange::none; // no new nodes
         }
 
-        if (nc.type == NodeChange::CT_INSERT_AFTER) ++node_ndx;
+        if (nc.type == NodeChange::insert_after) ++node_ndx;
 
         // If there is room, just update node directly
         if (offsets.Size() < MAX_LIST_SIZE) {
-            if (nc.type == NodeChange::CT_SPLIT) return NodeInsertSplit(node_ndx, nc.ref2);
-            else return NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+            if (nc.type == NodeChange::split) NodeInsertSplit(node_ndx, nc.ref2);
+            else NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+            return NodeChange::none;
         }
 
         // Else create new node
         StringIndex newNode(COLUMN_NODE, m_array->GetAllocator());
-        if (nc.type == NodeChange::CT_SPLIT) {
+        if (nc.type == NodeChange::split) {
             // update offset for left node
             const int32_t lastKey = target.GetLastKey();
             offsets.Set(node_ndx, lastKey);
@@ -223,11 +212,11 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
 
         switch (node_ndx) {
             case 0:             // insert before
-                return NodeChange(NodeChange::CT_INSERT_BEFORE, newNode.GetRef());
+                return NodeChange(NodeChange::insert_before, newNode.GetRef());
             case MAX_LIST_SIZE: // insert after
-                if (nc.type == NodeChange::CT_SPLIT)
-                    return NodeChange(NodeChange::CT_SPLIT, GetRef(), newNode.GetRef());
-                else return NodeChange(NodeChange::CT_INSERT_AFTER, newNode.GetRef());
+                if (nc.type == NodeChange::split)
+                    return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
+                else return NodeChange(NodeChange::insert_after, newNode.GetRef());
             default:            // split
                 // Move items after split to new node
                 const size_t len = refs.Size();
@@ -237,7 +226,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
                 }
                 offsets.Resize(node_ndx);
                 refs.Resize(node_ndx);
-                return NodeChange(NodeChange::CT_SPLIT, GetRef(), newNode.GetRef());
+                return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
         }
     }
     else {
@@ -249,21 +238,20 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
         if (LeafInsert(row_ndx, key, offset, value, noextend))
-            return true;
+            return NodeChange::none;
 
         // Create new list for item
         StringIndex newList(m_target_column, m_get_func, m_array->GetAllocator());
 
-        if (!newList.LeafInsert(row_ndx, key, offset, value))
-            return NodeChange(NodeChange::CT_ERROR);
+        newList.LeafInsert(row_ndx, key, offset, value);
 
         const size_t ndx = old_offsets.FindPos2(key);
 
         switch (ndx) {
             case 0:             // insert before
-                return NodeChange(NodeChange::CT_INSERT_BEFORE, newList.GetRef());
+                return NodeChange(NodeChange::insert_before, newList.GetRef());
             case -1: // insert after
-                return NodeChange(NodeChange::CT_INSERT_AFTER, newList.GetRef());
+                return NodeChange(NodeChange::insert_after, newList.GetRef());
             default: // split
             {
                 Array old_refs = m_array->GetSubArray(1);
@@ -280,16 +268,16 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
                 old_offsets.Resize(ndx);
                 old_refs.Resize(ndx);
 
-                return NodeChange(NodeChange::CT_SPLIT, GetRef(), newList.GetRef());
+                return NodeChange(NodeChange::split, GetRef(), newList.GetRef());
             }
         }
     }
 
     TIGHTDB_ASSERT(false); // never reach here
-    return NodeChange(NodeChange::CT_NONE);
+    return NodeChange::none;
 }
 
-bool StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
+void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
 {
     TIGHTDB_ASSERT(IsNode());
     TIGHTDB_ASSERT(new_ref);
@@ -313,11 +301,9 @@ bool StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
     const size_t newKey = new_col.GetLastKey();
     offsets.Insert(ndx+1, newKey);
     refs.Insert(ndx+1, new_ref);
-
-    return true;
 }
 
-bool StringIndex::NodeInsert(size_t ndx, size_t ref)
+void StringIndex::NodeInsert(size_t ndx, size_t ref)
 {
     TIGHTDB_ASSERT(ref);
     TIGHTDB_ASSERT(IsNode());
@@ -331,8 +317,8 @@ bool StringIndex::NodeInsert(size_t ndx, size_t ref)
     const StringIndex col(ref, (Array*)NULL, 0, m_target_column, m_get_func, m_array->GetAllocator());
     const int64_t lastKey = col.GetLastKey();
 
-    if (!offsets.Insert(ndx, lastKey)) return false;
-    return refs.Insert(ndx, ref);
+    offsets.Insert(ndx, lastKey);
+    refs.Insert(ndx, ref);
 }
 
 bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const char* value, bool noextend)

@@ -122,8 +122,8 @@ string create_temp_dir()
 #else // POSIX.1-2008 version
 
     StringBuffer buffer;
-    buffer.append_c_str(P_tmpdir "tightdb_XXXXXX");
-    if (mkdtemp(buffer.c_str()) == 0) throw runtime_error("mkdtemp() failed");
+    buffer.append_c_str(P_tmpdir "/tightdb_XXXXXX");
+    if (TIGHTDB_UNLIKELY(mkdtemp(buffer.c_str()) == 0)) throw runtime_error("mkdtemp() failed");
     return buffer.str();
 
 #endif
@@ -367,6 +367,11 @@ void File::alloc(SizeType offset, size_t size)
     // FIXME: OS X does not have any version of fallocate, but see
     // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
 
+    // FIXME: On Windows one could use a call to CreateFileMapping()
+    // since it will grow the file if necessary, but never shrink it,
+    // just like posix_fallocate(). The advantage would be that it
+    // then becomes an atomic operation (probably).
+
     if (int_add_with_overflow_detect(offset, size))
         throw runtime_error("File size overflow");
     if (get_size() < offset) resize(offset);
@@ -592,7 +597,6 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     static_cast<void>(map_flags);
     void* const new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
     if (TIGHTDB_LIKELY(new_addr != MAP_FAILED)) return new_addr;
-    unmap(old_addr, old_size);
     const int errnum = errno; // Eliminate any risk of clobbering
     const string msg = get_errno_msg("mremap(): failed: ", errnum);
     switch (errnum) {
@@ -601,14 +605,9 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
         default:     throw runtime_error(msg);
     }
 #else
-    // FIXME: From the point of view of POSIX, it would probably be a
-    // better idea to map the new region before unmapping the old one
-    // (assuming that address overlaps are possible). This would also
-    // allows us to guarantee that a failure will leave the old region
-    // untoched. This is only possible, though, if Windows can work
-    // well with the opposite order.
+    void* const new_addr = map(a, new_size, map_flags);
     unmap(old_addr, old_size);
-    return map(a, new_size, map_flags);
+    return new_addr;
 #endif
 }
 

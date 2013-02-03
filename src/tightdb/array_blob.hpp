@@ -35,11 +35,11 @@ public:
 
     const char* Get(size_t pos) const TIGHTDB_NOEXCEPT;
 
-    void add(const char* data, size_t len);
-    void Insert(size_t pos, const char* data, size_t len);
-    void Replace(size_t start, size_t end, const char* data, size_t len);
-    void Delete(size_t start, size_t end);
-    void Resize(size_t len);
+    void add(const char* data, size_t size);
+    void Insert(size_t pos, const char* data, size_t size);
+    void Replace(size_t begin, size_t end, const char* data, size_t size);
+    void Delete(size_t begin, size_t end);
+    void Resize(size_t size);
     void Clear();
 
 #ifdef TIGHTDB_DEBUG
@@ -47,9 +47,9 @@ public:
 #endif // TIGHTDB_DEBUG
 
 private:
-    virtual size_t CalcByteLen(size_t count, size_t width) const;
-    virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
-    virtual WidthType GetWidthType() const {return TDB_IGNORE;}
+    size_t CalcByteLen(size_t count, size_t width) const TIGHTDB_OVERRIDE;
+    size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    WidthType GetWidthType() const TIGHTDB_OVERRIDE {return TDB_IGNORE;}
 };
 
 

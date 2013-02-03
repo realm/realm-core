@@ -8,7 +8,6 @@
 
 #include <UnitTest++.h>
 
-#include <tightdb/error.hpp>
 #include <tightdb/file.hpp>
 #include <tightdb/group_shared.hpp>
 
@@ -54,7 +53,6 @@ TIGHTDB_TABLE_8(MyTable,
 const int num_threads = 23;
 const int num_rounds  = 2;
 
-// FIXME: Set to 1024 when binary size limit is fixed
 const size_t max_bin_size = 1024;
 
 
@@ -384,14 +382,14 @@ struct ThreadWrapper {
         m_database_path = database_path;
         m_error         = false;
         const int rc = pthread_create(&m_pthread, 0, &ThreadWrapper::run, this);
-        if (rc != 0) throw_error(ERROR_OTHER);
+        if (rc != 0) throw runtime_error("pthread_create() failed");
     }
 
     // Returns 'true' on error
     bool join()
     {
         const int rc = pthread_join(m_pthread, 0);
-        if (rc != 0) throw_error(ERROR_OTHER);
+        if (rc != 0) throw runtime_error("pthread_join() failed");
         return m_error;
     }
 

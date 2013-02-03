@@ -136,10 +136,10 @@
     <ClCompile Include="test\testshared.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\error.cpp">
+    <ClCompile Include="src\tightdb\file.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\file.cpp">
+    <ClCompile Include="src\tightdb\pthread_helpers.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\index_string.cpp">
@@ -249,6 +249,9 @@
     <ClInclude Include="src\tightdb\binary_data.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
+    <ClInclude Include="src\tightdb\unique_ptr.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
     <ClInclude Include="src\tightdb\bind_ptr.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
@@ -316,9 +319,6 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tightdb\error.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\index_string.hpp">

@@ -375,28 +375,20 @@ void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
     }
 }
 
-// FIXME: Check that callers test the return value
-bool ColumnMixed::insert_subtable(size_t ndx)
+void ColumnMixed::insert_subtable(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx <= m_types->Size());
-    const size_t ref = Table::create_empty_table(m_array->GetAllocator());
-    if (!ref) return false;
-    // FIXME: These inserts can also fail on allocation
+    const size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
     m_types->Insert(ndx, COLUMN_TYPE_TABLE);
     m_refs->Insert(ndx, ref);
-    return true;
 }
 
-// FIXME: Check that callers test the return value
-bool ColumnMixed::set_subtable(size_t ndx)
+void ColumnMixed::set_subtable(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
-    const size_t ref = Table::create_empty_table(m_array->GetAllocator());
-    if (!ref) return false;
-    // FIXME: Could the following operations also fail on allocation?
+    const size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
     ClearValue(ndx, COLUMN_TYPE_TABLE); // Remove any previous refs or binary data
     m_refs->Set(ndx, ref);
-    return true;
 }
 
 void ColumnMixed::Delete(size_t ndx)
