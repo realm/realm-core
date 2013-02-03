@@ -110,19 +110,20 @@ TEST(TestQueryFloat3)
 
     FloatTable3::Query q3 = t.where().col_double.less(2.65).col_float.greater(1.35f);
     double a3 = q3.col_float.sum();
-    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a3);
+    double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
+    CHECK_EQUAL(sum3, a3);
 
     FloatTable3::Query q4 = t.where().col_float.greater(1.35f).col_double.less(2.65);
     double a4 = q4.col_float.sum();
-    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a4);
+    CHECK_EQUAL(sum3, a4);
 
     FloatTable3::Query q5 = t.where().col_int.greater_equal(4).col_double.less(2.65);
     double a5 = q5.col_float.sum();
-    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a5);
+    CHECK_EQUAL(sum3, a5);
 
     FloatTable3::Query q6 = t.where().col_double.less(2.65).col_int.greater_equal(4);
     double a6 = q6.col_float.sum();
-    CHECK_EQUAL(1.4f + 1.5f + 1.6f, a6);
+    CHECK_EQUAL(sum3, a6);
 
     FloatTable3::Query q7 = t.where().col_int.greater(3).col_int.less(7);
     int64_t a7 = q7.col_int.sum();
