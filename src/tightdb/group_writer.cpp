@@ -68,7 +68,7 @@ size_t GroupWriter::Commit()
     // Reserve space for each block. We explicitly ask for a bigger space than
     // the blocks can occupy, so that later when we know the real size, we can
     // adjust the segment size, without changing the width.
-    const size_t res_ndx = reserve_free_space(total_reserve, m_file_map.get_size());
+    const size_t res_ndx = reserve_free_space(total_reserve);
     const size_t res_pos = fpositions.GetAsSizeT(res_ndx); // top of reserved segments
 
     // Get final sizes of free lists
