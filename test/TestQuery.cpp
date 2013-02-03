@@ -166,11 +166,11 @@ TEST(TestQueryFloat)
     // ------ Test average()
 
     // ... NO conditions
-    CHECK_EQUAL(sum1_f/5.0f, t.where().col_float.average());
-    CHECK_EQUAL(sum1_d/5.0, t.where().col_double.average());
+    CHECK_EQUAL(sum1_f/5, t.where().col_float.average());
+    CHECK_EQUAL(sum1_d/5, t.where().col_double.average());
     // ... with conditions
-    CHECK_EQUAL(sum2_f/2.0f, q2.col_float.average());
-    CHECK_EQUAL(sum2_d/2.0, q2.col_double.average());
+    CHECK_EQUAL(sum2_f/2, q2.col_float.average());
+    CHECK_EQUAL(sum2_d/2, q2.col_double.average());
 
     // -------- Test minimum(), maximum()
     

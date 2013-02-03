@@ -76,17 +76,17 @@ Searching: The main finding function is:
 // is too high. In short, the all-uppercase name space is reserved for
 // macros.
 //
-// todo, move
-enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
 
 namespace tightdb {
+
+enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
 
 #define NO0(v) ((v) == 0 ? 1 : (v))
 
 const size_t not_found = size_t(-1);
 
  /* wid == 16/32 likely when accessing offsets in B tree */
-#define TEMPEX(fun, wid, arg) \
+#define TDB_TEMPEX(fun, wid, arg) \
     if (wid == 16) {fun<16> arg;} \
     else if (wid == 32) {fun<32> arg;} \
     else if (wid == 0) {fun<0> arg;} \
@@ -97,7 +97,7 @@ const size_t not_found = size_t(-1);
     else if (wid == 64) {fun<64> arg;} \
     else {TIGHTDB_ASSERT(false); fun<0> arg;}
 
-#define TEMPEX2(fun, targ, wid, arg) \
+#define TDB_TEMPEX2(fun, targ, wid, arg) \
     if (wid == 16) {fun<targ, 16> arg;} \
     else if (wid == 32) {fun<targ, 32> arg;} \
     else if (wid == 0) {fun<targ, 0> arg;} \
@@ -108,7 +108,7 @@ const size_t not_found = size_t(-1);
     else if (wid == 64) {fun<targ, 64> arg;} \
     else {TIGHTDB_ASSERT(false); fun<targ, 0> arg;}
 
-#define TEMPEX3(fun, targ1, targ2, wid, arg) \
+#define TDB_TEMPEX3(fun, targ1, targ2, wid, arg) \
     if (wid == 16) {fun<targ1, targ2, 16> arg;} \
     else if (wid == 32) {fun<targ1, targ2, 32> arg;} \
     else if (wid == 0) {fun<targ1, targ2, 0> arg;} \
@@ -119,7 +119,7 @@ const size_t not_found = size_t(-1);
     else if (wid == 64) {fun<targ1, targ2, 64> arg;} \
     else {TIGHTDB_ASSERT(false); fun<targ1, targ2, 0> arg;}
 
-#define TEMPEX4(fun, targ1, targ2, wid, targ3, arg) \
+#define TDB_TEMPEX4(fun, targ1, targ2, wid, targ3, arg) \
     if (wid == 16) {fun<targ1, targ2, 16, targ3> arg;} \
     else if (wid == 32) {fun<targ1, targ2, 32, targ3> arg;} \
     else if (wid == 0) {fun<targ1, targ2, 0, targ3> arg;} \
@@ -221,7 +221,7 @@ public:
 
     // Fastest way to instantiate an array, if you just want to utilize its methods
     struct no_prealloc_tag {};
-    explicit Array(no_prealloc_tag);
+    explicit Array(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
     virtual ~Array() TIGHTDB_NOEXCEPT {}
 
@@ -520,7 +520,6 @@ class QueryStateBase {};
 
 template <> class QueryState<int64_t> : public QueryStateBase {
 public:
-
     int64_t m_state;
     size_t m_match_count;
     size_t m_limit;
@@ -595,9 +594,9 @@ public:
             TIGHTDB_ASSERT(false);
         return true;
     }
-
 };
 
+// Used only for Basic-types: currently float and double
 template <class R> class QueryState : public QueryStateBase {
 public:
     R m_state;
@@ -611,6 +610,7 @@ public:
     
     void init(ACTION action, Array*, size_t limit) 
     {
+        TIGHTDB_STATIC_ASSERT((SameType<R, float>::value || SameType<R, double>::value), "");
         m_match_count = 0;
         m_limit = limit;
 
@@ -687,7 +687,7 @@ inline Array::Array(const Array& src) TIGHTDB_NOEXCEPT:
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
-inline Array::Array(no_prealloc_tag) : m_alloc(Allocator::get_default()) {}
+inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(Allocator::get_default()) {}
 
 
 inline int64_t Array::back() const TIGHTDB_NOEXCEPT
@@ -1224,7 +1224,8 @@ template <size_t width> inline int64_t Array::LowerBits(void) const
 }
 
 // Tests if any chunk in 'value' is 0
-template <size_t width> inline bool Array::TestZero(uint64_t value) const {
+template <size_t width> inline bool Array::TestZero(uint64_t value) const
+{
     uint64_t hasZeroByte;
     uint64_t lower = LowerBits<width>();
     uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
@@ -1468,7 +1469,8 @@ template <bool gt, ACTION action, size_t width, class Callback> bool Array::Find
 }
 
 
-template <bool eq, ACTION action, size_t width, class Callback> inline bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const {
+template <bool eq, ACTION action, size_t width, class Callback> inline bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+{
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
     TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
@@ -1543,7 +1545,7 @@ template <class cond, ACTION action, size_t bitwidth> void Array::find(int64_t v
 
 template <class cond, ACTION action, class Callback> void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    TEMPEX4(find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
+    TDB_TEMPEX4(find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
 }
 
 template <class cond, ACTION action, size_t bitwidth, class Callback> void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
