@@ -439,115 +439,111 @@ TEST(Transactions)
     }
 
     // Verify database contents
+    size_t table1_theta_size = 0;
+    for (int i=0; i<num_threads; ++i) table1_theta_size += 13 / (1+i) * 8;
+    table1_theta_size *= num_rounds;
+    table1_theta_size += 2;
+
+    SharedGroup db(database_path);
+    ReadTransaction rt(db);
+    MyTable::ConstRef table = rt.get_table<MyTable>("my_table");
+    CHECK(2 <= table->size());
+
+    CHECK_EQUAL(num_threads*num_rounds*4, table[0].alpha);
+    CHECK_EQUAL(false,             table[0].beta);
+    CHECK_EQUAL(moja,              table[0].gamma);
+    CHECK_EQUAL(time_t(0),         table[0].delta);
+    CHECK_EQUAL("",                table[0].epsilon);
+    CHECK_EQUAL(3u,                table[0].eta->size());
+    CHECK_EQUAL(0,                 table[0].theta);
+
+    CHECK_EQUAL(749321,            table[1].alpha);
+    CHECK_EQUAL(true,              table[1].beta);
+    CHECK_EQUAL(kumi_na_tatu,      table[1].gamma);
+    CHECK_EQUAL(time_t(99992),     table[1].delta);
+    CHECK_EQUAL("click",           table[1].epsilon);
+    CHECK_EQUAL(0u,                table[1].eta->size());
+    CHECK_EQUAL(table1_theta_size, table[1].theta.get_subtable_size());
+    CHECK(table[1].theta.is_subtable<MyTable>());
+
     {
-        size_t table1_theta_size = 0;
-        for (int i=0; i<num_threads; ++i) table1_theta_size += 13 / (1+i) * 8;
-        table1_theta_size *= num_rounds;
-        table1_theta_size += 2;
+        MySubtable::ConstRef subtable = table[0].eta;
+        CHECK_EQUAL(num_threads*num_rounds*2, subtable[0].foo);
+        CHECK_EQUAL(size_t(num_threads), subtable[0].bar->size());
+        CHECK_EQUAL(100, subtable[1].foo);
+        CHECK_EQUAL(0u,  subtable[1].bar->size());
+        CHECK_EQUAL(0u,  subtable[2].bar->size());
 
-        SharedGroup db(database_path);
-        {
-            ReadTransaction rt(db);
-            MyTable::ConstRef table = rt.get_table<MyTable>("my_table");
-            CHECK(2 <= table->size());
-
-            CHECK_EQUAL(num_threads*num_rounds*4, table[0].alpha);
-            CHECK_EQUAL(false,             table[0].beta);
-            CHECK_EQUAL(moja,              table[0].gamma);
-            CHECK_EQUAL(time_t(0),         table[0].delta);
-            CHECK_EQUAL("",                table[0].epsilon);
-            CHECK_EQUAL(3u,                table[0].eta->size());
-            CHECK_EQUAL(0,                 table[0].theta);
-
-            CHECK_EQUAL(749321,            table[1].alpha);
-            CHECK_EQUAL(true,              table[1].beta);
-            CHECK_EQUAL(kumi_na_tatu,      table[1].gamma);
-            CHECK_EQUAL(time_t(99992),     table[1].delta);
-            CHECK_EQUAL("click",           table[1].epsilon);
-            CHECK_EQUAL(0u,                table[1].eta->size());
-            CHECK_EQUAL(table1_theta_size, table[1].theta.get_subtable_size());
-            CHECK(table[1].theta.is_subtable<MyTable>());
-
-            {
-                MySubtable::ConstRef subtable = table[0].eta;
-                CHECK_EQUAL(num_threads*num_rounds*2, subtable[0].foo);
-                CHECK_EQUAL(size_t(num_threads), subtable[0].bar->size());
-                CHECK_EQUAL(100, subtable[1].foo);
-                CHECK_EQUAL(0u,  subtable[1].bar->size());
-                CHECK_EQUAL(0u,  subtable[2].bar->size());
-
-                MySubsubtable::ConstRef subsubtable = subtable[0].bar;
-                for (int i=0; i<num_threads; ++i) {
-                    CHECK_EQUAL(1000+i, subsubtable[i].value);
-                    const size_t size = (512 + i%1024) * max_bin_size;
-                    mem_buf<char> data(size);
-                    for (size_t j=0; j<size; ++j)
-                        data[j] = static_cast<unsigned char>((j+i) * 677 % 256);
-                    CHECK_EQUAL(BinaryData(data.get(), size), subsubtable[i].binary);
-                }
-            }
-
-            {
-                MyTable::ConstRef subtable = table[1].theta.get_subtable<MyTable>();
-                for (size_t i=0; i<table1_theta_size; ++i) {
-                    CHECK_EQUAL(false,           subtable[i].beta);
-                    CHECK_EQUAL(0,               subtable[i].delta);
-                    CHECK_EQUAL(BinaryData(0,0), subtable[i].zeta);
-                    CHECK_EQUAL(0u,              subtable[i].eta->size());
-                    if (4 <= i) {
-                        CHECK_EQUAL(COLUMN_TYPE_INT, subtable[i].theta.get_type());
-                    }
-                }
-                CHECK_EQUAL(size_t(num_threads*num_rounds*5),
-                            subtable[0].theta.get_subtable_size());
-                CHECK(subtable[0].theta.is_subtable<MyTable>());
-                CHECK_EQUAL(0u, subtable[1].theta.get_subtable_size());
-                CHECK(subtable[1].theta.is_subtable<MySubtable>());
-                CHECK_EQUAL(size_t(num_threads*num_rounds*9),
-                            subtable[2].theta.get_subtable_size());
-                CHECK(subtable[2].theta.is_subtable<MySubsubtable>());
-                CHECK_EQUAL(size_t(num_threads*num_rounds*9),
-                            subtable[3].theta.get_subtable_size());
-                CHECK(subtable[3].theta.is_subtable<MySubsubtable>());
-
-                MyTable::ConstRef subsubtable = subtable[0].theta.get_subtable<MyTable>();
-                for (int i=0; i<num_threads*num_rounds; ++i) {
-                    CHECK_EQUAL(0,       subsubtable[5*i+0].alpha);
-                    CHECK_EQUAL(1,       subsubtable[5*i+1].alpha);
-                    CHECK_EQUAL(2,       subsubtable[5*i+2].alpha);
-                    CHECK_EQUAL(3,       subsubtable[5*i+3].alpha);
-                    CHECK_EQUAL(4,       subsubtable[5*i+4].alpha);
-                    CHECK_EQUAL(false,   subsubtable[5*i+0].beta);
-                    CHECK_EQUAL(false,   subsubtable[5*i+1].beta);
-                    CHECK_EQUAL(false,   subsubtable[5*i+2].beta);
-                    CHECK_EQUAL(false,   subsubtable[5*i+3].beta);
-                    CHECK_EQUAL(false,   subsubtable[5*i+4].beta);
-                    CHECK_EQUAL(nne,     subsubtable[5*i+0].gamma);
-                    CHECK_EQUAL(tano,    subsubtable[5*i+1].gamma);
-                    CHECK_EQUAL(sita,    subsubtable[5*i+2].gamma);
-                    CHECK_EQUAL(saba,    subsubtable[5*i+3].gamma);
-                    CHECK_EQUAL(nane,    subsubtable[5*i+4].gamma);
-                    CHECK_EQUAL(0,       subsubtable[5*i+0].delta);
-                    CHECK_EQUAL(0,       subsubtable[5*i+1].delta);
-                    CHECK_EQUAL(0,       subsubtable[5*i+2].delta);
-                    CHECK_EQUAL(0,       subsubtable[5*i+3].delta);
-                    CHECK_EQUAL(0,       subsubtable[5*i+4].delta);
-                    CHECK_EQUAL("",      subsubtable[5*i+0].epsilon);
-                    CHECK_EQUAL("",      subsubtable[5*i+1].epsilon);
-                    CHECK_EQUAL("",      subsubtable[5*i+2].epsilon);
-                    CHECK_EQUAL("",      subsubtable[5*i+3].epsilon);
-                    CHECK_EQUAL("",      subsubtable[5*i+4].epsilon);
-                    CHECK_EQUAL(0u,      subsubtable[5*i+0].eta->size());
-                    CHECK_EQUAL(0u,      subsubtable[5*i+1].eta->size());
-                    CHECK_EQUAL(0u,      subsubtable[5*i+2].eta->size());
-                    CHECK_EQUAL(0u,      subsubtable[5*i+3].eta->size());
-                    CHECK_EQUAL(0u,      subsubtable[5*i+4].eta->size());
-                    CHECK_EQUAL("click", subsubtable[5*i+3].theta);
-                }
-            }
-            // End of read transaction
+        MySubsubtable::ConstRef subsubtable = subtable[0].bar;
+        for (int i=0; i<num_threads; ++i) {
+            CHECK_EQUAL(1000+i, subsubtable[i].value);
+            const size_t size = (512 + i%1024) * max_bin_size;
+            mem_buf<char> data(size);
+            for (size_t j=0; j<size; ++j)
+                data[j] = static_cast<unsigned char>((j+i) * 677 % 256);
+            CHECK_EQUAL(BinaryData(data.get(), size), subsubtable[i].binary);
         }
     }
+
+    {
+        MyTable::ConstRef subtable = table[1].theta.get_subtable<MyTable>();
+        for (size_t i=0; i<table1_theta_size; ++i) {
+            CHECK_EQUAL(false,           subtable[i].beta);
+            CHECK_EQUAL(0,               subtable[i].delta);
+            CHECK_EQUAL(BinaryData(0,0), subtable[i].zeta);
+            CHECK_EQUAL(0u,              subtable[i].eta->size());
+            if (4 <= i) {
+                CHECK_EQUAL(COLUMN_TYPE_INT, subtable[i].theta.get_type());
+            }
+        }
+        CHECK_EQUAL(size_t(num_threads*num_rounds*5),
+                    subtable[0].theta.get_subtable_size());
+        CHECK(subtable[0].theta.is_subtable<MyTable>());
+        CHECK_EQUAL(0u, subtable[1].theta.get_subtable_size());
+        CHECK(subtable[1].theta.is_subtable<MySubtable>());
+        CHECK_EQUAL(size_t(num_threads*num_rounds*9),
+                    subtable[2].theta.get_subtable_size());
+        CHECK(subtable[2].theta.is_subtable<MySubsubtable>());
+        CHECK_EQUAL(size_t(num_threads*num_rounds*9),
+                    subtable[3].theta.get_subtable_size());
+        CHECK(subtable[3].theta.is_subtable<MySubsubtable>());
+
+        MyTable::ConstRef subsubtable = subtable[0].theta.get_subtable<MyTable>();
+        for (int i=0; i<num_threads*num_rounds; ++i) {
+            CHECK_EQUAL(0,       subsubtable[5*i+0].alpha);
+            CHECK_EQUAL(1,       subsubtable[5*i+1].alpha);
+            CHECK_EQUAL(2,       subsubtable[5*i+2].alpha);
+            CHECK_EQUAL(3,       subsubtable[5*i+3].alpha);
+            CHECK_EQUAL(4,       subsubtable[5*i+4].alpha);
+            CHECK_EQUAL(false,   subsubtable[5*i+0].beta);
+            CHECK_EQUAL(false,   subsubtable[5*i+1].beta);
+            CHECK_EQUAL(false,   subsubtable[5*i+2].beta);
+            CHECK_EQUAL(false,   subsubtable[5*i+3].beta);
+            CHECK_EQUAL(false,   subsubtable[5*i+4].beta);
+            CHECK_EQUAL(nne,     subsubtable[5*i+0].gamma);
+            CHECK_EQUAL(tano,    subsubtable[5*i+1].gamma);
+            CHECK_EQUAL(sita,    subsubtable[5*i+2].gamma);
+            CHECK_EQUAL(saba,    subsubtable[5*i+3].gamma);
+            CHECK_EQUAL(nane,    subsubtable[5*i+4].gamma);
+            CHECK_EQUAL(0,       subsubtable[5*i+0].delta);
+            CHECK_EQUAL(0,       subsubtable[5*i+1].delta);
+            CHECK_EQUAL(0,       subsubtable[5*i+2].delta);
+            CHECK_EQUAL(0,       subsubtable[5*i+3].delta);
+            CHECK_EQUAL(0,       subsubtable[5*i+4].delta);
+            CHECK_EQUAL("",      subsubtable[5*i+0].epsilon);
+            CHECK_EQUAL("",      subsubtable[5*i+1].epsilon);
+            CHECK_EQUAL("",      subsubtable[5*i+2].epsilon);
+            CHECK_EQUAL("",      subsubtable[5*i+3].epsilon);
+            CHECK_EQUAL("",      subsubtable[5*i+4].epsilon);
+            CHECK_EQUAL(0u,      subsubtable[5*i+0].eta->size());
+            CHECK_EQUAL(0u,      subsubtable[5*i+1].eta->size());
+            CHECK_EQUAL(0u,      subsubtable[5*i+2].eta->size());
+            CHECK_EQUAL(0u,      subsubtable[5*i+3].eta->size());
+            CHECK_EQUAL(0u,      subsubtable[5*i+4].eta->size());
+            CHECK_EQUAL("click", subsubtable[5*i+3].theta);
+        }
+    }
+    // End of read transaction
 }
 
 #endif // Shared PTHREAD mutexes appear not to work on Windows
