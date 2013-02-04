@@ -6,9 +6,10 @@
 #include <pthread.h>
 
 #ifdef _WIN32
-#include <windows.h>
+#  define NOMINMAX
+#  include <windows.h>
 #else
-#include <unistd.h>
+#  include <unistd.h>
 #endif
 
 #include <UnitTest++.h>
