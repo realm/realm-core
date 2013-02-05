@@ -234,7 +234,7 @@ void round(SharedGroup& db, int index)
             subtable->add();
             subtable->add();
         }
-        const int n = 13 / (1+index);
+        const int n = 1 + 13 / (1+index);
         for (int i=0; i<n; ++i) {
             const BinaryData bin(0,0);
             const Mixed mix = int64_t(i);
@@ -440,7 +440,7 @@ TEST(Transactions)
 
     // Verify database contents
     size_t table1_theta_size = 0;
-    for (int i=0; i<num_threads; ++i) table1_theta_size += 13 / (1+i) * 8;
+    for (int i=0; i<num_threads; ++i) table1_theta_size += (1 + 13 / (1+i)) * 8;
     table1_theta_size *= num_rounds;
     table1_theta_size += 2;
 
