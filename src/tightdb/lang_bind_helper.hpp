@@ -23,7 +23,6 @@
 #include <cstddef>
 
 #include <tightdb/table.hpp>
-#include <tightdb/column_table.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/group.hpp>
 
@@ -51,7 +50,7 @@ public:
     static const Table* get_subtable_ptr(const Table*, std::size_t column_ndx,
                                          std::size_t row_ndx);
 
-    // FIXME: He who added this one, please provide a comment that explains why it is necessary!
+    // FIXME: This is an oddball, do we really need it? If we do, please provide a comment that explains why it is needed!
     static Table* get_subtable_ptr_during_insert(Table*, std::size_t col_ndx,
                                                  std::size_t row_ndx);
 
@@ -93,17 +92,6 @@ inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, std::size_t
                                                      std::size_t row_ndx)
 {
     const Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx);
-    subtab->bind_ref();
-    return subtab;
-}
-
-inline Table* LangBindHelper::get_subtable_ptr_during_insert(Table* t, std::size_t col_ndx,
-                                                             std::size_t row_ndx)
-{
-    TIGHTDB_ASSERT(col_ndx < t->get_column_count());
-    ColumnTable& subtables =  t->GetColumnTable(col_ndx);
-    TIGHTDB_ASSERT(row_ndx < subtables.Size());
-    Table* subtab = subtables.get_subtable_ptr(row_ndx);
     subtab->bind_ref();
     return subtab;
 }
