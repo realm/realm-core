@@ -18,102 +18,8 @@
 
 using namespace std;
 
-namespace {
-
-const size_t initial_capacity = 128;
-
-inline void set_header_isnode(bool value, void* header)
-{
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x80) | uint8_t(value << 7);
-}
-
-inline void set_header_hasrefs(bool value, void* header)
-{
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x40) | uint8_t(value << 6);
-}
-
-inline void set_header_indexflag(bool value, void* header)
-{
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x20) | uint8_t(value << 5);
-}
-
-inline void set_header_wtype(int value, void* header)
-{
-    // Indicates how to calculate size in bytes based on width
-    // 0: bits      (width/8) * length
-    // 1: multiply  width * length
-    // 2: ignore    1 * length
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x18) | uint8_t(value << 3);
-}
-
-inline void set_header_width(size_t value, void* header)
-{
-    // Pack width in 3 bits (log2)
-    size_t w = 0;
-    size_t b = size_t(value);
-    while (b) {++w; b >>= 1;}
-    TIGHTDB_ASSERT(w < 8);
-
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x7) | uint8_t(w);
-}
-
-inline void set_header_len(size_t value, void* header)
-{
-    TIGHTDB_ASSERT(value <= 0xFFFFFF);
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[1] = (value >> 16) & 0x000000FF;
-    header2[2] = (value >>  8) & 0x000000FF;
-    header2[3] =  value        & 0x000000FF;
-}
-
-inline void set_header_capacity(size_t value, void* header)
-{
-    TIGHTDB_ASSERT(value <= 0xFFFFFF);
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[4] = (value >> 16) & 0x000000FF;
-    header2[5] = (value >>  8) & 0x000000FF;
-    header2[6] =  value        & 0x000000FF;
-}
-
-
-inline void init_header(void* header, bool is_node, bool has_refs, int width_type,
-                        size_t width, size_t length, size_t capacity)
-{
-    // Note: Since the header layout contains unallocated
-    // bit and/or bytes, it is important that we put the
-    // entire 8 byte header into a well defined state
-    // initially. Note also: The C++ standard does not
-    // guarantee that int64_t is extactly 8 bytes wide. It
-    // may be more, and it may be less. That is why we
-    // need the static assert.
-    TIGHTDB_STATIC_ASSERT(sizeof(int64_t) == 8,
-                          "Trouble if int64_t is not 8 bytes wide");
-    *reinterpret_cast<int64_t*>(header) = 0;
-    set_header_isnode(is_node, header);
-    set_header_hasrefs(has_refs, header);
-    set_header_wtype(width_type, header);
-    set_header_width(width, header);
-    set_header_len(length, header);
-    set_header_capacity(capacity, header);
-}
-
-
-} // anonymous namespace
-
-
 
 namespace tightdb {
-
-bool tightdb_dummy (int64_t t)
-{ 
-	(void)t;
-    return true; 
-}
 
 // Header format (8 bytes):
 // |--------|--------|--------|--------|--------|--------|--------|--------|
@@ -130,37 +36,37 @@ bool IsArrayIndexNode(size_t ref, const Allocator& alloc)
 
 void Array::set_header_isnode(bool value)
 {
-    ::set_header_isnode(value, m_data - 8);
+    set_header_isnode(value, m_data - 8);
 }
 
 void Array::set_header_hasrefs(bool value)
 {
-    ::set_header_hasrefs(value, m_data - 8);
+    set_header_hasrefs(value, m_data - 8);
 }
 
 void Array::set_header_indexflag(bool value)
 {
-    ::set_header_indexflag(value, m_data - 8);
+    set_header_indexflag(value, m_data - 8);
 }
 
 void Array::set_header_wtype(WidthType value)
 {
-    ::set_header_wtype(value, m_data - 8);
+    set_header_wtype(value, m_data - 8);
 }
 
 void Array::set_header_width(size_t value)
 {
-    ::set_header_width(value, m_data - 8);
+    set_header_width(value, m_data - 8);
 }
 
 void Array::set_header_len(size_t value)
 {
-    ::set_header_len(value, m_data - 8);
+    set_header_len(value, m_data - 8);
 }
 
 void Array::set_header_capacity(size_t value)
 {
-    ::set_header_capacity(value, m_data - 8);
+    set_header_capacity(value, m_data - 8);
 }
 
 bool Array::get_header_isnode(const void* header) const TIGHTDB_NOEXCEPT
@@ -255,7 +161,7 @@ void Array::SetType(ColumnDef type)
         m_width = size_t(-1);
     }
 
-    if (m_ref) CopyOnWrite();
+    if (m_ref) CopyOnWrite(); // Throws
 
     bool is_node = false, has_refs = false;
     if (type == COLUMN_NODE) is_node = has_refs = true;
@@ -351,7 +257,7 @@ void Array::Preset(int64_t min, int64_t max, size_t count)
     Preset(w, count);
 }
 
-void Array::SetParent(ArrayParent *parent, size_t pndx)
+void Array::SetParent(ArrayParent *parent, size_t pndx) TIGHTDB_NOEXCEPT
 {
     m_parent = parent;
     m_parentNdx = pndx;
@@ -385,7 +291,7 @@ void Array::Destroy()
 
 void Array::Clear()
 {
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Make sure we don't have any dangling references
     if (m_hasRefs) {
@@ -413,7 +319,7 @@ void Array::Delete(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Move values below deletion up
     if (m_width < 8) {
@@ -426,8 +332,11 @@ void Array::Delete(size_t ndx)
         // when byte sized, use memmove
 // FIXME: Should probably be optimized as a simple division by 8.
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        unsigned char* const dst = m_data + w*ndx;
-        copy(dst+w, m_data + w*m_len, dst);
+        char* const base = reinterpret_cast<char*>(m_data);
+        char* const dst_begin = base + ndx*w;
+        const char* const src_begin = dst_begin + w;
+        const char* const src_end   = base + m_len*w;
+        copy(src_begin, src_end, dst_begin);
     }
 
     // Update length (also in header)
@@ -442,10 +351,10 @@ int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 
 // Two ideas that are not efficient but may be worth looking into again:
 /*
-    // Assume correct width is found early in TEMPEX, which is the case for B tree offsets that 
+    // Assume correct width is found early in TDB_TEMPEX, which is the case for B tree offsets that 
     // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
     // if found later
-    TEMPEX(return Get, (ndx));              
+    TDB_TEMPEX(return Get, (ndx));              
 */
 /*
     // Slightly slower in both of the if-cases. Also needs an matchcount m_len check too, to avoid
@@ -550,8 +459,8 @@ void Array::Insert(size_t ndx, int64_t value)
 
     // Move values below insertion (may expand)
     if (doExpand || m_width < 8) {
-        int k = (int)m_len;
-        while (--k >= (int)ndx) {
+        int k = int(m_len);
+        while (--k >= int(ndx)) {
             const int64_t v = (this->*oldGetter)(k);
             (this->*m_setter)(k+1, v);
         }
@@ -560,9 +469,10 @@ void Array::Insert(size_t ndx, int64_t value)
         // when byte sized and no expansion, use memmove
 // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        unsigned char* const src_begin = m_data + ndx*w;
-        unsigned char* const src_end   = m_data + m_len*w;
-        unsigned char* const dst_end   = src_end + w;
+        char* const base = reinterpret_cast<char*>(m_data);
+        char* const src_begin = base + ndx*w;
+        char* const src_end   = base + m_len*w;
+        char* const dst_end   = src_end + w;
         copy_backward(src_begin, src_end, dst_end);
     }
 
@@ -571,7 +481,7 @@ void Array::Insert(size_t ndx, int64_t value)
 
     // Expand values above insertion
     if (doExpand) {
-        int k = (int)ndx;
+        int k = int(ndx);
         while (--k >= 0) {
             const int64_t v = (this->*oldGetter)(k);
             (this->*m_setter)(k, v);
@@ -593,7 +503,7 @@ void Array::Resize(size_t count)
 {
     TIGHTDB_ASSERT(count <= m_len);
 
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Update length (also in header)
     m_len = count;
@@ -602,7 +512,7 @@ void Array::Resize(size_t count)
 
 void Array::SetAllToZero()
 {
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     m_capacity = CalcItemCount(get_header_capacity(), 0);
     SetWidth(0);
@@ -675,7 +585,7 @@ template <size_t w> size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 
 size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 {
-    TEMPEX(return FindPos, m_width, (target));
+    TDB_TEMPEX(return FindPos, m_width, (target));
 }
 
 // BM FIXME: Rename to something better... // FirstGTE()
@@ -703,6 +613,81 @@ size_t Array::FindPos2(int64_t target) const
         return high;
 }
 
+// return first element E for which E >= target or return -1 if none. Array must be sorted
+size_t Array::FindGTE(int64_t target, size_t start) const
+{
+#if TIGHTDB_DEBUG
+    // Reference implementation to illustrate and test behaviour
+    size_t ref = 0;
+    size_t idx;
+    for (idx = start; idx < m_len; ++idx) {
+        if (Get(idx) >= target) {
+            ref = idx;
+            break;
+        }
+    }
+    if (idx == m_len)
+        ref = not_found;
+#endif
+
+    size_t ret;
+
+    if (start >= m_len) {ret = not_found; goto exit;}
+
+    if (start + 2 < m_len) {
+        if (Get(start) >= target) {ret = start; goto exit;} else ++start;
+        if (Get(start) >= target) {ret = start; goto exit;} else ++start;
+    }
+
+    // Todo, use templated Get<width> from this point for performance
+    if (target > Get(m_len - 1)) {ret = not_found; goto exit;}
+
+    size_t add;
+    add = 1;
+
+    for(;;) {
+        if (start + add < m_len && Get(start + add) < target)
+            start += add;
+        else
+            break;
+       add *= 2;
+    }
+
+    size_t high;
+    high = start + add + 1;
+
+    if (high > m_len)
+        high = m_len;
+
+   // if (start > 0)
+        start--;
+
+    //start og high
+
+    size_t orig_high;
+    orig_high = high;
+
+    while (high - start > 1) {
+        const size_t probe = (start + high) / 2;
+        const int64_t v = Get(probe);
+        if (v < target) 
+            start = probe;
+        else           
+            high = probe;
+    }
+    if (high == orig_high)         
+        ret = not_found;
+    else
+        ret = high;
+
+exit:
+
+#if TIGHTDB_DEBUG
+    TIGHTDB_ASSERT(ref == ret);
+#endif
+
+    return ret;
+}
 
 size_t Array::FirstSetBit(unsigned int v) const
 {
@@ -842,7 +827,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
     ++start;
 
 #ifdef TIGHTDB_COMPILER_SSE
-    if(cpuid_sse<42>()) {
+    if (cpuid_sse<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && ((((size_t)m_data & 0xf) * 8 + start * w) % (128) != 0); start++) {
             if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
@@ -852,7 +837,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
         if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
             __m128i *data = (__m128i *)(m_data + start * w / 8);
             __m128i state = data[0];
-            __m128i state2; // FIXME: gcc-4.7 says that this one is undedfined if chunks is zero - can chunks ever be zero?
+            __m128i state2;
 
             size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
             for (size_t t = 0; t < chunks; t++) {
@@ -867,7 +852,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
             }
 
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
-            state2 = state; 
+            state2 = state;
             for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
                 const int64_t v = GetUniversal<w>(((const char *)&state2), t);
                 if (find_max ? v > m : v < m) {
@@ -891,17 +876,17 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
 
 bool Array::maximum(int64_t& result, size_t start, size_t end) const
 {
-    TEMPEX2(return minmax, true, m_width, (result, start, end));
+    TDB_TEMPEX2(return minmax, true, m_width, (result, start, end));
 }
 
 bool Array::minimum(int64_t& result, size_t start, size_t end) const
 {
-    TEMPEX2(return minmax, false, m_width, (result, start, end));
+    TDB_TEMPEX2(return minmax, false, m_width, (result, start, end));
 }
 
 int64_t Array::sum(size_t start, size_t end) const
 {
-    TEMPEX(return sum, m_width, (start, end));
+    TDB_TEMPEX(return sum, m_width, (start, end));
 }
 
 template <size_t w> int64_t Array::sum(size_t start, size_t end) const
@@ -975,7 +960,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
     }
 
 #ifdef TIGHTDB_COMPILER_SSE
-    if(cpuid_sse<42>()) {
+    if (cpuid_sse<42>()) {
 
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds: 
         // Naive, templated Get<>: 391 371 374
@@ -1076,7 +1061,7 @@ size_t Array::count(int64_t value) const
     const size_t end = m_len;
     size_t i = 0;
 
-    // staiic values needed for fast population count
+    // static values needed for fast population count
     const uint64_t m1  = 0x5555555555555555ULL;
     const uint64_t m2  = 0x3333333333333333ULL;
     const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
@@ -1259,7 +1244,7 @@ size_t Array::GetByteSize(bool align) const
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/overflow.hpp>
+    // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
     const size_t bits = count * width;
     const size_t bytes = (bits+7) / 8; // round up
     return bytes + 8; // add room for 8 byte header
@@ -1356,11 +1341,13 @@ void Array::CopyOnWrite()
 size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator& alloc)
 {
     bool is_node = false, has_refs = false;
-    if (type == COLUMN_NODE) is_node = has_refs = true;
-    else if (type == COLUMN_HASREFS) has_refs = true;
+    if (type == COLUMN_NODE) 
+        is_node = has_refs = true;
+    else if (type == COLUMN_HASREFS) 
+        has_refs = true;
 
     const size_t capacity = initial_capacity;
-    MemRef mem_ref = alloc.Alloc(capacity); // Throws
+    const MemRef mem_ref = alloc.Alloc(capacity); // Throws
 
     init_header(mem_ref.pointer, is_node, has_refs, width_type, 0, 0, capacity);
 
@@ -1394,9 +1381,9 @@ void Array::Alloc(size_t count, size_t width)
             }
             else {
                 mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, capacity_bytes); // Throws
-                ::set_header_width(width, mem_ref.pointer);
-                ::set_header_len(count, mem_ref.pointer);
-                ::set_header_capacity(capacity_bytes, mem_ref.pointer);
+                set_header_width(width, mem_ref.pointer);
+                set_header_len(count, mem_ref.pointer);
+                set_header_capacity(capacity_bytes, mem_ref.pointer);
             }
 
             // Update wrapper objects
@@ -1418,7 +1405,7 @@ void Array::Alloc(size_t count, size_t width)
 
 void Array::SetWidth(size_t width) TIGHTDB_NOEXCEPT
 {
-    TEMPEX(SetWidth, width, ());
+    TDB_TEMPEX(SetWidth, width, ());
 }
 
 template<size_t width> void Array::SetWidth() TIGHTDB_NOEXCEPT
@@ -1536,7 +1523,7 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
 // Sort array.
 void Array::sort()
 {
-    TEMPEX(sort, m_width, ());
+    TDB_TEMPEX(sort, m_width, ());
 }
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
@@ -1581,7 +1568,7 @@ template <size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, 
 // is allowed to contain fewer elements than m_array.
 void Array::ReferenceSort(Array& ref)
 {
-    TEMPEX(ReferenceSort, m_width, (ref));
+    TDB_TEMPEX(ReferenceSort, m_width, (ref));
 }
 
 template <size_t w>void Array::ReferenceSort(Array& ref)
@@ -1702,7 +1689,7 @@ template <size_t w> void Array::sort()
 
 void Array::ReferenceQuickSort(Array& ref)
 {
-    TEMPEX(ReferenceQuickSort, m_width, (0, m_len - 1, ref));
+    TDB_TEMPEX(ReferenceQuickSort, m_width, (0, m_len - 1, ref));
 }
 
 template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref)
@@ -1761,7 +1748,7 @@ template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& r
 
 void Array::QuickSort(size_t lo, size_t hi)
 {
-    TEMPEX(QuickSort, m_width, (lo, hi);)
+    TDB_TEMPEX(QuickSort, m_width, (lo, hi);)
 }
 
 template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
@@ -1944,7 +1931,7 @@ template<size_t> int64_t GetDirect(const char* const data, const size_t ndx) TIG
 
 int64_t GetDirect(const char* const data, size_t width, const size_t ndx) TIGHTDB_NOEXCEPT
 {
-    TEMPEX(return GetDirect, width, (data, ndx));
+    TDB_TEMPEX(return GetDirect, width, (data, ndx));
 }
 
 template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx) TIGHTDB_NOEXCEPT
@@ -1991,7 +1978,7 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width,
                      const int64_t target) TIGHTDB_NOEXCEPT
 {
-    TEMPEX(return FindPosDirectImp, width, (header, data, target));
+    TDB_TEMPEX(return FindPosDirectImp, width, (header, data, target));
 }
 
 template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data,
@@ -2044,141 +2031,119 @@ size_t FindPos2Direct_32(const uint8_t* const header, const char* const data, in
 
 namespace tightdb {
 
-void Array::state_init(ACTION action, state_state *state, Array* akku) 
-{
-    if (action == TDB_MAX) {
-        state->state = -0x7fffffffffffffffLL - 1LL;
-        state->match_count = 0;
-    }
-    if (action == TDB_MIN) {
-        state->state = 0x7fffffffffffffffLL;
-        state->match_count = 0;
-    }
-    if (action == TDB_RETURN_FIRST)
-        state->state = not_found;
-    if (action == TDB_SUM) {
-        state->state = 0;
-        state->match_count = 0;
-    }
-    if (action == TDB_COUNT)
-        state->state = 0;
-    if (action == TDB_FINDALL)
-        state->state = (int64_t)akku;
-}
-
 void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
 {
     if (end == (size_t)-1) end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
-    state_state state;
-    state.state = (int64_t)&result;
+    QueryState<int64_t> state;
+    state.m_state = (int64_t)&result;
 
-    TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, &tightdb_dummy));
+    TDB_TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
 
     return;
 }
 
-void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, state_state *state) const
+void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
     if (cond == COND_EQUAL) {
         if (action == TDB_SUM) {
-            TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MIN) {
-            TEMPEX3(find, EQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, EQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MAX) {
-            TEMPEX3(find, EQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, EQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_COUNT) {
-            TEMPEX3(find, EQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, EQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_FINDALL) {
-            TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_CALLBACK_IDX) {
-            TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
     if (cond == COND_NOTEQUAL) {
         if (action == TDB_SUM) {
-            TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MIN) {
-            TEMPEX3(find, NOTEQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MAX) {
-            TEMPEX3(find, NOTEQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_COUNT) {
-            TEMPEX3(find, NOTEQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_FINDALL) {
-            TEMPEX3(find, NOTEQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_CALLBACK_IDX) {
-            TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
     if (cond == COND_GREATER) {
         if (action == TDB_SUM) {
-            TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MIN) {
-            TEMPEX3(find, GREATER, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, GREATER, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MAX) {
-            TEMPEX3(find, GREATER, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, GREATER, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_COUNT) {
-            TEMPEX3(find, GREATER, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, GREATER, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_FINDALL) {
-            TEMPEX3(find, GREATER, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, GREATER, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_CALLBACK_IDX) {
-            TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
     if (cond == COND_LESS) {
         if (action == TDB_SUM) {
-            TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MIN) {
-            TEMPEX3(find, LESS, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, LESS, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MAX) {
-            TEMPEX3(find, LESS, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, LESS, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_COUNT) {
-            TEMPEX3(find, LESS, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, LESS, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_FINDALL) {
-            TEMPEX3(find, LESS, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, LESS, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_CALLBACK_IDX) {
-            TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
     if (cond == COND_NONE) {
         if (action == TDB_SUM) {
-            TEMPEX3(find, NONE, TDB_SUM, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NONE, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MIN) {
-            TEMPEX3(find, NONE, TDB_MIN, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NONE, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_MAX) {
-            TEMPEX3(find, NONE, TDB_MAX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NONE, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_COUNT) {
-            TEMPEX3(find, NONE, TDB_COUNT, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NONE, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_FINDALL) {
-            TEMPEX3(find, NONE, TDB_FINDALL, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NONE, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
         else if (action == TDB_CALLBACK_IDX) {
-            TEMPEX3(find, NONE, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, &tightdb_dummy))
+            TDB_TEMPEX3(find, NONE, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
 }
@@ -2280,6 +2245,7 @@ int64_t Array::ColumnGet(size_t ndx) const TIGHTDB_NOEXCEPT
     return GetDirect(data, width, ndx);
 }
 
+// FIXME: Shouldn't ColumnStringGet() be locaterd in ColumnString?
 const char* Array::ColumnStringGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     const char* data   = reinterpret_cast<char*>(m_data);

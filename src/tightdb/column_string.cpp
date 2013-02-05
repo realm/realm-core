@@ -384,15 +384,15 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
     delete oldarray;
 }
 
-template<class F>size_t AdaptiveStringColumn::LeafFind(const char* value,
-                                                       size_t start, size_t end) const
+template<class F>
+size_t AdaptiveStringColumn::LeafFind(const char* value, size_t start, size_t end) const
 {
-        if (IsLongStrings()) {
-            return ((ArrayStringLong*)m_array)->find_first(value, start, end);
-        }
-        else {
-            return ((ArrayString*)m_array)->find_first(value, start, end);
-        }
+    if (IsLongStrings()) {
+        return ((ArrayStringLong*)m_array)->find_first(value, start, end);
+    }
+    else {
+        return ((ArrayString*)m_array)->find_first(value, start, end);
+    }
 }
 
 void AdaptiveStringColumn::LeafFindAll(Array &result, const char* value, size_t add_offset, size_t start, size_t end) const

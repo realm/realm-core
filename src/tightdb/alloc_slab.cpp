@@ -27,7 +27,6 @@ size_t GetSizeFromHeader(void* p)
     const size_t count = (header[1] << 16) + (header[2] << 8) + header[3];
     const size_t wt    = (header[0] & 0x18) >> 3; // Array::WidthType
 
-    // Calculate bytes used by array
     size_t bytes = 0;
     if (wt == 0) { // TDB_BITS
         const size_t bits = (count * width);

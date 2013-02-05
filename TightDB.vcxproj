@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -222,7 +222,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG /DMAX_LIST_SIZE=1000 %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -277,6 +277,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <BrowseInformation>true</BrowseInformation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -287,6 +288,9 @@
       <TargetMachine>MachineX86</TargetMachine>
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <Bscmake>
+      <PreserveSBR>true</PreserveSBR>
+    </Bscmake>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">
     <ClCompile>
@@ -439,6 +443,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/DUSE_SSE42 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
+    <ClCompile Include="test\performance\timer.cpp" />
     <ClCompile Include="test\testalloc.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
@@ -456,6 +461,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testarrayfloat.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="test\testarraystring.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
@@ -480,6 +491,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\testcolumnfloat.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="test\testcolumnmixed.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
@@ -541,8 +558,18 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="test\testtransactions_lasse.cpp" />
-    <ClCompile Include="test\transactions.cpp" />
+    <ClCompile Include="test\testtransactions_lasse.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\transactions.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\tightdb.hpp" />
@@ -551,6 +578,10 @@
     <ClInclude Include="src\tightdb\array.hpp" />
     <ClInclude Include="src\tightdb\array_binary.hpp" />
     <ClInclude Include="src\tightdb\array_blob.hpp" />
+    <ClInclude Include="src\tightdb\array_basic.hpp" />
+    <ClInclude Include="src\tightdb\array_basic_tpl.hpp">
+      <FileType>CppHeader</FileType>
+    </ClInclude>
     <ClInclude Include="src\tightdb\array_string.hpp" />
     <ClInclude Include="src\tightdb\array_string_long.hpp" />
     <ClInclude Include="src\tightdb\binary_data.hpp" />
@@ -559,7 +590,10 @@
     <ClInclude Include="src\tightdb\column.hpp" />
     <ClInclude Include="src\tightdb\column_binary.hpp" />
     <ClInclude Include="src\tightdb\column_fwd.hpp" />
+    <ClInclude Include="src\tightdb\column_basic.hpp" />
+    <ClInclude Include="src\tightdb\column_basic_tpl.hpp" />
     <ClInclude Include="src\tightdb\column_mixed.hpp" />
+    <ClInclude Include="src\tightdb\column_mixed_tpl.hpp" />
     <ClInclude Include="src\tightdb\column_string.hpp" />
     <ClInclude Include="src\tightdb\column_string_enum.hpp" />
     <ClInclude Include="src\tightdb\column_table.hpp" />
@@ -581,6 +615,7 @@
     <ClInclude Include="src\tightdb\query_conditions.hpp" />
     <ClInclude Include="src\tightdb\query_engine.hpp" />
     <ClInclude Include="src\tightdb\replication.hpp" />
+    <ClInclude Include="src\tightdb\safe_int_ops.hpp" />
     <ClInclude Include="src\tightdb\spec.hpp" />
     <ClInclude Include="src\tightdb\static_assert.hpp" />
     <ClInclude Include="src\tightdb\string_buffer.hpp" />
