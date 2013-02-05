@@ -1,6 +1,7 @@
 #ifndef _MSC_VER
 #  include <time.h>
 #else
+#  define NOMINMAX
 #  include <windows.h>
 #endif
 

@@ -91,17 +91,13 @@ public:
     Query& not_equal(size_t column_ndx, const char* value, bool caseSensitive=true);
 
     // Conditions: date
-    // FIXME: Maybe we can just use 'int' versions for date, but why then do we have a special 'date' column type?
-    // FIXME: The '_date' suffix is needed because 'time_t' may not be distinguishable from 'int64_t' on all platforms.
-/*
-    Query& equal_date(size_t column_ndx, time_t value);
-    Query& not_equal_date(size_t column_ndx, time_t value);
-    Query& greater_date(size_t column_ndx, time_t value);
-    Query& greater_equal_date(size_t column_ndx, time_t value);
-    Query& less_date(size_t column_ndx, time_t value);
-    Query& less_equal_date(size_t column_ndx, time_t value);
-    Query& between_date(size_t column_ndx, time_t from, time_t to);
-*/
+    Query& equal_date(size_t column_ndx, time_t value) { return equal(column_ndx, int64_t(value)); }
+    Query& not_equal_date(size_t column_ndx, time_t value) { return not_equal(column_ndx, int64_t(value)); }
+    Query& greater_date(size_t column_ndx, time_t value) { return greater(column_ndx, int64_t(value)); }
+    Query& greater_equal_date(size_t column_ndx, time_t value) { return greater_equal(column_ndx, int64_t(value)); }
+    Query& less_date(size_t column_ndx, time_t value) { return less(column_ndx, int64_t(value)); }
+    Query& less_equal_date(size_t column_ndx, time_t value) { return less_equal(column_ndx, int64_t(value)); }
+    Query& between_date(size_t column_ndx, time_t from, time_t to) { return between(column_ndx, int64_t(from), int64_t(to)); }
 
     // Conditions: binary data
     // Only BinaryData prototype can exist, else it would conflict with equal() for strings 
