@@ -47,7 +47,7 @@ public:
     Mixed(Date) TIGHTDB_NOEXCEPT;
 
     struct subtable_tag {};
-    Mixed(subtable_tag) TIGHTDB_NOEXCEPT: m_type(COLUMN_TYPE_TABLE) {}
+    Mixed(subtable_tag) TIGHTDB_NOEXCEPT: m_type(type_Table) {}
 
     ColumnType get_type() const TIGHTDB_NOEXCEPT { return m_type; }
 
@@ -85,7 +85,7 @@ private:
 };
 
 // Note: We cannot compare two mixed values, since when the type of
-// both is COLUMN_TYPE_TABLE, we would have to compare the two tables,
+// both is type_Table, we would have to compare the two tables,
 // but the mixed values do not provide access to those tables.
 
 // Note: The mixed values are specified as Wrap<Mixed>. If they were
@@ -146,122 +146,122 @@ bool operator!=(Date, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
 
 inline Mixed::Mixed() TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_INT;
+    m_type = type_Int;
     m_int  = 0;
 }
 
 inline Mixed::Mixed(bool v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_BOOL;
+    m_type = type_Bool;
     m_bool = v;
 }
 
 inline Mixed::Mixed(int64_t v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_INT;
+    m_type = type_Int;
     m_int  = v;
 }
 
 inline Mixed::Mixed(float v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_FLOAT;
+    m_type = type_Float;
     m_float = v;
 }
 
 inline Mixed::Mixed(double v) TIGHTDB_NOEXCEPT
 {
-   m_type = COLUMN_TYPE_DOUBLE;
+   m_type = type_Double;
    m_double = v;
 }
 
 inline Mixed::Mixed(const char* v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_STRING;
+    m_type = type_String;
     m_str  = v;
 }
 
 inline Mixed::Mixed(BinaryData v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_BINARY;
+    m_type = type_Binary;
     m_str  = v.pointer;
     m_len  = v.len;
 }
 
 inline Mixed::Mixed(Date v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_DATE;
+    m_type = type_Date;
     m_date = v.get_date();
 }
 
 inline bool Mixed::get_bool() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_BOOL);
+    TIGHTDB_ASSERT(m_type == type_Bool);
     return m_bool;
 }
 
 inline int64_t Mixed::get_int() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_INT);
+    TIGHTDB_ASSERT(m_type == type_Int);
     return m_int;
 }
 
 inline float Mixed::get_float() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_FLOAT);
+    TIGHTDB_ASSERT(m_type == type_Float);
     return m_float;
 }
 
 inline double Mixed::get_double() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_DOUBLE);
+    TIGHTDB_ASSERT(m_type == type_Double);
     return m_double;
 }
 
 inline const char* Mixed::get_string() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_STRING);
+    TIGHTDB_ASSERT(m_type == type_String);
     return m_str;
 }
 
 inline BinaryData Mixed::get_binary() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_BINARY);
+    TIGHTDB_ASSERT(m_type == type_Binary);
     return BinaryData(m_str, m_len);
 }
 
 inline std::time_t Mixed::get_date() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_type == COLUMN_TYPE_DATE);
+    TIGHTDB_ASSERT(m_type == type_Date);
     return m_date;
 }
 
 inline void Mixed::set_bool(bool v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_BOOL;
+    m_type = type_Bool;
     m_bool = v;
 }
 
 inline void Mixed::set_int(int64_t v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_INT;
+    m_type = type_Int;
     m_int = v;
 }
 
 inline void Mixed::set_float(float v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_FLOAT;
+    m_type = type_Float;
     m_float = v;
 }
 
 inline void Mixed::set_double(double v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_DOUBLE;
+    m_type = type_Double;
     m_double = v;
 }
 
 inline void Mixed::set_string(const char* v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_STRING;
+    m_type = type_String;
     m_str = v;
 }
 
@@ -272,14 +272,14 @@ inline void Mixed::set_binary(BinaryData v) TIGHTDB_NOEXCEPT
 
 inline void Mixed::set_binary(const char* data, std::size_t size) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_BINARY;
+    m_type = type_Binary;
     m_str = data;
     m_len = size;
 }
 
 inline void Mixed::set_date(std::time_t v) TIGHTDB_NOEXCEPT
 {
-    m_type = COLUMN_TYPE_DATE;
+    m_type = type_Date;
     m_date = v;
 }
 
@@ -289,14 +289,14 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 {
     out << "Mixed(";
     switch (m.m_type) {
-    case COLUMN_TYPE_BOOL: out << m.m_bool; break;
-    case COLUMN_TYPE_INT: out << m.m_int; break;
-    case COLUMN_TYPE_STRING: out << m.m_str; break;   
-    case COLUMN_TYPE_FLOAT:  out << m.m_float; break;
-    case COLUMN_TYPE_DOUBLE: out << m.m_double; break;
-    case COLUMN_TYPE_BINARY: out << BinaryData(m.m_str, m.m_len); break;
-    case COLUMN_TYPE_DATE: out << Date(m.m_date); break;
-    case COLUMN_TYPE_TABLE: out << "subtable"; break;
+    case type_Bool: out << m.m_bool; break;
+    case type_Int: out << m.m_int; break;
+    case type_String: out << m.m_str; break;   
+    case type_Float:  out << m.m_float; break;
+    case type_Double: out << m.m_double; break;
+    case type_Binary: out << BinaryData(m.m_str, m.m_len); break;
+    case type_Date: out << Date(m.m_date); break;
+    case type_Table: out << "subtable"; break;
     default: TIGHTDB_ASSERT(false); break;
     }
     out << ")";
@@ -308,22 +308,22 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 
 inline bool operator==(Wrap<Mixed> a, bool b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_BOOL && Mixed(a).get_bool() == b;
+    return Mixed(a).get_type() == type_Bool && Mixed(a).get_bool() == b;
 }
 
 inline bool operator!=(Wrap<Mixed> a, bool b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_BOOL && Mixed(a).get_bool() != b;
+    return Mixed(a).get_type() == type_Bool && Mixed(a).get_bool() != b;
 }
 
 inline bool operator==(bool a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_BOOL && a == Mixed(b).get_bool();
+    return Mixed(b).get_type() == type_Bool && a == Mixed(b).get_bool();
 }
 
 inline bool operator!=(bool a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_BOOL && a != Mixed(b).get_bool();
+    return Mixed(b).get_type() == type_Bool && a != Mixed(b).get_bool();
 }
 
 
@@ -331,22 +331,22 @@ inline bool operator!=(bool a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 
 template<class T> inline bool operator==(Wrap<Mixed> a, const T& b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_INT && Mixed(a).get_int() == b;
+    return Mixed(a).get_type() == type_Int && Mixed(a).get_int() == b;
 }
 
 template<class T> inline bool operator!=(Wrap<Mixed> a, const T& b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_INT && Mixed(a).get_int() != b;
+    return Mixed(a).get_type() == type_Int && Mixed(a).get_int() != b;
 }
 
 template<class T> inline bool operator==(const T& a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_INT && a == Mixed(b).get_int();
+    return Mixed(b).get_type() == type_Int && a == Mixed(b).get_int();
 }
 
 template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_INT && a != Mixed(b).get_int();
+    return Mixed(b).get_type() == type_Int && a != Mixed(b).get_int();
 }
 
 
@@ -354,22 +354,22 @@ template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b) TIGHTDB_NOEX
 
 inline bool operator==(Wrap<Mixed> a, float b)
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_FLOAT && Mixed(a).get_float() == b;
+    return Mixed(a).get_type() == type_Float && Mixed(a).get_float() == b;
 }
 
 inline bool operator!=(Wrap<Mixed> a, float b)
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_FLOAT && Mixed(a).get_float() != b;
+    return Mixed(a).get_type() == type_Float && Mixed(a).get_float() != b;
 }
 
 inline bool operator==(float a, Wrap<Mixed> b)
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_FLOAT && a == Mixed(b).get_float();
+    return Mixed(b).get_type() == type_Float && a == Mixed(b).get_float();
 }
 
 inline bool operator!=(float a, Wrap<Mixed> b)
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_FLOAT && a != Mixed(b).get_float();
+    return Mixed(b).get_type() == type_Float && a != Mixed(b).get_float();
 }
 
 
@@ -377,22 +377,22 @@ inline bool operator!=(float a, Wrap<Mixed> b)
 
 inline bool operator==(Wrap<Mixed> a, double b)
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_DOUBLE && Mixed(a).get_double() == b;
+    return Mixed(a).get_type() == type_Double && Mixed(a).get_double() == b;
 }
 
 inline bool operator!=(Wrap<Mixed> a, double b)
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_DOUBLE && Mixed(a).get_double() != b;
+    return Mixed(a).get_type() == type_Double && Mixed(a).get_double() != b;
 }
 
 inline bool operator==(double a, Wrap<Mixed> b)
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_DOUBLE && a == Mixed(b).get_double();
+    return Mixed(b).get_type() == type_Double && a == Mixed(b).get_double();
 }
 
 inline bool operator!=(double a, Wrap<Mixed> b)
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_DOUBLE && a != Mixed(b).get_double();
+    return Mixed(b).get_type() == type_Double && a != Mixed(b).get_double();
 }
 
 
@@ -400,42 +400,42 @@ inline bool operator!=(double a, Wrap<Mixed> b)
 
 inline bool operator==(Wrap<Mixed> a, const char* b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_STRING && std::strcmp(Mixed(a).get_string(), b) == 0;
+    return Mixed(a).get_type() == type_String && std::strcmp(Mixed(a).get_string(), b) == 0;
 }
 
 inline bool operator!=(Wrap<Mixed> a, const char* b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_STRING && std::strcmp(Mixed(a).get_string(), b) != 0;
+    return Mixed(a).get_type() == type_String && std::strcmp(Mixed(a).get_string(), b) != 0;
 }
 
 inline bool operator==(const char* a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_STRING && std::strcmp(a, Mixed(b).get_string()) == 0;
+    return Mixed(b).get_type() == type_String && std::strcmp(a, Mixed(b).get_string()) == 0;
 }
 
 inline bool operator!=(const char* a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_STRING && std::strcmp(a, Mixed(b).get_string()) != 0;
+    return Mixed(b).get_type() == type_String && std::strcmp(a, Mixed(b).get_string()) != 0;
 }
 
 inline bool operator==(Wrap<Mixed> a, char* b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_STRING && std::strcmp(Mixed(a).get_string(), b) == 0;
+    return Mixed(a).get_type() == type_String && std::strcmp(Mixed(a).get_string(), b) == 0;
 }
 
 inline bool operator!=(Wrap<Mixed> a, char* b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_STRING && std::strcmp(Mixed(a).get_string(), b) != 0;
+    return Mixed(a).get_type() == type_String && std::strcmp(Mixed(a).get_string(), b) != 0;
 }
 
 inline bool operator==(char* a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_STRING && std::strcmp(a, Mixed(b).get_string()) == 0;
+    return Mixed(b).get_type() == type_String && std::strcmp(a, Mixed(b).get_string()) == 0;
 }
 
 inline bool operator!=(char* a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_STRING && std::strcmp(a, Mixed(b).get_string()) != 0;
+    return Mixed(b).get_type() == type_String && std::strcmp(a, Mixed(b).get_string()) != 0;
 }
 
 
@@ -443,22 +443,22 @@ inline bool operator!=(char* a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 
 inline bool operator==(Wrap<Mixed> a, BinaryData b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_BINARY && Mixed(a).get_binary().compare_payload(b);
+    return Mixed(a).get_type() == type_Binary && Mixed(a).get_binary().compare_payload(b);
 }
 
 inline bool operator!=(Wrap<Mixed> a, BinaryData b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_BINARY && !Mixed(a).get_binary().compare_payload(b);
+    return Mixed(a).get_type() == type_Binary && !Mixed(a).get_binary().compare_payload(b);
 }
 
 inline bool operator==(BinaryData a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_BINARY && a.compare_payload(Mixed(b).get_binary());
+    return Mixed(b).get_type() == type_Binary && a.compare_payload(Mixed(b).get_binary());
 }
 
 inline bool operator!=(BinaryData a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_BINARY && !a.compare_payload(Mixed(b).get_binary());
+    return Mixed(b).get_type() == type_Binary && !a.compare_payload(Mixed(b).get_binary());
 }
 
 
@@ -466,22 +466,22 @@ inline bool operator!=(BinaryData a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 
 inline bool operator==(Wrap<Mixed> a, Date b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_DATE && Date(Mixed(a).get_date()) == b;
+    return Mixed(a).get_type() == type_Date && Date(Mixed(a).get_date()) == b;
 }
 
 inline bool operator!=(Wrap<Mixed> a, Date b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == COLUMN_TYPE_DATE && Date(Mixed(a).get_date()) != b;
+    return Mixed(a).get_type() == type_Date && Date(Mixed(a).get_date()) != b;
 }
 
 inline bool operator==(Date a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_DATE && a == Date(Mixed(b).get_date());
+    return Mixed(b).get_type() == type_Date && a == Date(Mixed(b).get_date());
 }
 
 inline bool operator!=(Date a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(b).get_type() == COLUMN_TYPE_DATE && a != Date(Mixed(b).get_date());
+    return Mixed(b).get_type() == type_Date && a != Date(Mixed(b).get_date());
 }
 
 

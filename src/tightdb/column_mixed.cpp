@@ -151,19 +151,19 @@ ColumnType ColumnMixed::GetType(size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(ndx < m_types->Size());
     MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));
     switch (coltype) {
-    case MIXED_COL_INT:         return COLUMN_TYPE_INT;
-    case MIXED_COL_INT_NEG:     return COLUMN_TYPE_INT;
-    case MIXED_COL_BOOL:        return COLUMN_TYPE_BOOL;
-    case MIXED_COL_STRING:      return COLUMN_TYPE_STRING;
-    case MIXED_COL_BINARY:      return COLUMN_TYPE_BINARY;
-    case MIXED_COL_TABLE:       return COLUMN_TYPE_TABLE;
-    case MIXED_COL_DATE:        return COLUMN_TYPE_DATE;
-    case MIXED_COL_FLOAT:       return COLUMN_TYPE_FLOAT;
-    case MIXED_COL_DOUBLE:      return COLUMN_TYPE_DOUBLE;
-    case MIXED_COL_DOUBLE_NEG:  return COLUMN_TYPE_DOUBLE;
+    case MIXED_COL_INT:         return type_Int;
+    case MIXED_COL_INT_NEG:     return type_Int;
+    case MIXED_COL_BOOL:        return type_Bool;
+    case MIXED_COL_STRING:      return type_String;
+    case MIXED_COL_BINARY:      return type_Binary;
+    case MIXED_COL_TABLE:       return type_Table;
+    case MIXED_COL_DATE:        return type_Date;
+    case MIXED_COL_FLOAT:       return type_Float;
+    case MIXED_COL_DOUBLE:      return type_Double;
+    case MIXED_COL_DOUBLE_NEG:  return type_Double;
     default:
         TIGHTDB_ASSERT(false); 
-        return (COLUMN_TYPE_INT);
+        return (type_Int);
     }
 }
 
@@ -265,25 +265,25 @@ bool ColumnMixed::Compare(const ColumnMixed& c) const
         if (c.GetType(i) != type)
             return false;
         switch (type) {
-        case COLUMN_TYPE_INT:
+        case type_Int:
             if (get_int(i) != c.get_int(i)) return false;
             break;
-        case COLUMN_TYPE_BOOL:
+        case type_Bool:
             if (get_bool(i) != c.get_bool(i)) return false;
             break;
-        case COLUMN_TYPE_DATE:
+        case type_Date:
             if (get_date(i) != c.get_date(i)) return false;
             break;
-        case COLUMN_TYPE_FLOAT:
+        case type_Float:
             if (get_float(i) != c.get_float(i)) return false;
             break;
-        case COLUMN_TYPE_DOUBLE:
+        case type_Double:
             if (get_double(i) != c.get_double(i)) return false;
             break;
-        case COLUMN_TYPE_STRING:
+        case type_String:
             if (strcmp(get_string(i), c.get_string(i)) != 0) return false;
             break;
-        case COLUMN_TYPE_BINARY:
+        case type_Binary:
             {
                 const BinaryData d1 = get_binary(i);
                 const BinaryData d2 = c.get_binary(i);
@@ -291,7 +291,7 @@ bool ColumnMixed::Compare(const ColumnMixed& c) const
                     return false;
             }
             break;
-        case COLUMN_TYPE_TABLE:
+        case type_Table:
             {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
                 ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();

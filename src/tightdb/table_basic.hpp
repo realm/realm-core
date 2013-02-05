@@ -394,31 +394,31 @@ namespace _impl
     template<class T> struct GetColumnTypeId;
 
     template<> struct GetColumnTypeId<int64_t> {
-        static const ColumnType id = COLUMN_TYPE_INT;
+        static const ColumnType id = type_Int;
     };
     template<> struct GetColumnTypeId<bool> {
-        static const ColumnType id = COLUMN_TYPE_BOOL;
+        static const ColumnType id = type_Bool;
     };
     template<> struct GetColumnTypeId<float> {
-        static const ColumnType id = COLUMN_TYPE_FLOAT;
+        static const ColumnType id = type_Float;
     };
     template<> struct GetColumnTypeId<double> {
-        static const ColumnType id = COLUMN_TYPE_DOUBLE;
+        static const ColumnType id = type_Double;
     };
     template<> struct GetColumnTypeId<const char*> {
-        static const ColumnType id = COLUMN_TYPE_STRING;
+        static const ColumnType id = type_String;
     };
     template<class E> struct GetColumnTypeId<SpecBase::Enum<E> > {
-        static const ColumnType id = COLUMN_TYPE_INT;
+        static const ColumnType id = type_Int;
     };
     template<> struct GetColumnTypeId<Date> {
-        static const ColumnType id = COLUMN_TYPE_DATE;
+        static const ColumnType id = type_Date;
     };
     template<> struct GetColumnTypeId<BinaryData> {
-        static const ColumnType id = COLUMN_TYPE_BINARY;
+        static const ColumnType id = type_Binary;
     };
     template<> struct GetColumnTypeId<Mixed> {
-        static const ColumnType id = COLUMN_TYPE_MIXED;
+        static const ColumnType id = type_Mixed;
     };
 
 
@@ -456,7 +456,7 @@ namespace _impl
     template<class Subtab, int col_idx> struct DiffColType<SpecBase::Subtable<Subtab>, col_idx> {
         static bool exec(const Spec* spec, const char* const* col_names)
         {
-            if (spec->get_column_type(col_idx) != COLUMN_TYPE_TABLE ||
+            if (spec->get_column_type(col_idx) != type_Table ||
                 std::strcmp(col_names[col_idx], spec->get_column_name(col_idx)) != 0) return true;
             Spec subspec = spec->get_subtable_spec(col_idx);
             return !Subtab::matches_dynamic_spec(&subspec);

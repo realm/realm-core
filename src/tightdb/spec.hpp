@@ -36,7 +36,7 @@ public:
     Spec(const Spec& s);
     ~Spec();
 
-    size_t add_column(ColumnType type, const char* name, ColumnType attr=COLUMN_ATTR_NONE);
+    size_t add_column(ColumnType type, const char* name, ColumnType attr=col_attr_None);
     size_t add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name);
     Spec add_subtable_column(const char* name);
 

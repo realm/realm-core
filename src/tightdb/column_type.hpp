@@ -24,39 +24,31 @@ namespace tightdb {
 
 // Note: tightdb_objc/Deliv/ColumnType.h must be kept in sync with his file.
 // Note: tightdb_java2/src/main/java/ColumnType.java must be kept in sync with his file.
-
-// FIXME: The namespace of all-upper-case names must be considered
-// reserved for macros. Consider renaming 'COLUMN_TYPE_INT' to
-// 'type_Int', COLUMN_TYPE_STRING_ENUM to 'type_StringEnum', and so
-// forth. That is, a qualifying prefix followed by the enumeration
-// name in CamelCase. This is a reasonably common naming scheme for
-// enumeration values. Note that I am also suggesting that we drop
-// 'column' from the names, since these types a used much more
-// generally than as just 'column types'.
 //
 // Note: <tightdb/c/column_type.h> must be kept in sync with his file.
 // Note: <tightdb/objc/column_type.h> must be kept in sync with his file.
 // Note: "com/tightdb/ColumnType.java" must be kept in sync with his file.
 enum ColumnType {
     // Column types
-    COLUMN_TYPE_INT         =  0,
-    COLUMN_TYPE_BOOL        =  1,
-    COLUMN_TYPE_STRING      =  2,
-    COLUMN_TYPE_STRING_ENUM =  3, // double refs
-    COLUMN_TYPE_BINARY      =  4,
-    COLUMN_TYPE_TABLE       =  5,
-    COLUMN_TYPE_MIXED       =  6,
-    COLUMN_TYPE_DATE        =  7,
-    COLUMN_TYPE_RESERVED1   =  8, // DateTime
-    COLUMN_TYPE_FLOAT       =  9, // Float
-    COLUMN_TYPE_DOUBLE      = 10, // Double
-    COLUMN_TYPE_RESERVED4   = 11, // Decimal
+    type_Int         =  0,
+    type_Bool        =  1,
+    type_String      =  2,
+    type_Binary      =  4,
+    type_Table       =  5,
+    type_Mixed       =  6,
+    type_Date        =  7,
+    type_Float       =  9,
+    type_Double      = 10,
+
+    col_type_StringEnum  =  3, // double refs
+    col_type_Reserved1   =  8, // DateTime
+    col_type_Reserved4   = 11, // Decimal
 
     // Attributes
-    COLUMN_ATTR_INDEXED     = 100,
-    COLUMN_ATTR_UNIQUE      = 101,
-    COLUMN_ATTR_SORTED      = 102,
-    COLUMN_ATTR_NONE        = 103
+    col_attr_Indexed     = 100,
+    col_attr_Unique      = 101,
+    col_attr_Sorted      = 102,
+    col_attr_None        = 103
 };
 
 

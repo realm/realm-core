@@ -11,11 +11,11 @@ int main()
     TableRef table = group.get_table("test");
 
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_STRING, "name");
-    s.add_column(COLUMN_TYPE_INT,    "age");
-    s.add_column(COLUMN_TYPE_BOOL,   "male");
-    s.add_column(COLUMN_TYPE_DATE,   "hired");
-    s.add_column(COLUMN_TYPE_BINARY, "photo");
+    s.add_column(type_String, "name");
+    s.add_column(type_Int,    "age");
+    s.add_column(type_Bool,   "male");
+    s.add_column(type_Date,   "hired");
+    s.add_column(type_Binary, "photo");
     table->update_from_spec();
 
 // @@EndFold@@

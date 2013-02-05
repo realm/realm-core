@@ -127,25 +127,25 @@ template<> struct ColumnTypeTraits<int64_t> {
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
-    static const ColumnType id = COLUMN_TYPE_INT;
+    static const ColumnType id = type_Int;
 };
 template<> struct ColumnTypeTraits<bool> {
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
-    static const ColumnType id = COLUMN_TYPE_BOOL;
+    static const ColumnType id = type_Bool;
 };
 template<> struct ColumnTypeTraits<float> {
     typedef ColumnFloat column_type;
     typedef ArrayFloat array_type;
     typedef double sum_type;
-    static const ColumnType id = COLUMN_TYPE_FLOAT;
+    static const ColumnType id = type_Float;
 };
 template<> struct ColumnTypeTraits<double> {
     typedef ColumnDouble column_type;
     typedef ArrayDouble array_type;
     typedef double sum_type;
-    static const ColumnType id = COLUMN_TYPE_DOUBLE;
+    static const ColumnType id = type_Double;
 };
 
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
@@ -622,26 +622,26 @@ public:
         else if (TAction == TDB_COUNT)
             ret = aggregate_local<TDB_COUNT, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
 
-        else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_INT)
+        else if (TAction == TDB_SUM && col_id == type_Int)
             ret = aggregate_local<TDB_SUM, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
-        else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_FLOAT)
+        else if (TAction == TDB_SUM && col_id == type_Float)
             // todo, fixme, see if we must let sum return a double even when summing a float coltype 
             ret = aggregate_local<TDB_SUM, float, void>(st, start, end, local_limit, source_column, matchcount);
-        else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_DOUBLE)
+        else if (TAction == TDB_SUM && col_id == type_Double)
             ret = aggregate_local<TDB_SUM, float, void>(st, start, end, local_limit, source_column, matchcount);
 
-        else if (TAction == TDB_MAX && col_id == COLUMN_TYPE_INT)
+        else if (TAction == TDB_MAX && col_id == type_Int)
             ret = aggregate_local<TDB_MAX, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
-        else if (TAction == TDB_MAX && col_id == COLUMN_TYPE_FLOAT)
+        else if (TAction == TDB_MAX && col_id == type_Float)
             ret = aggregate_local<TDB_MAX, float, void>(st, start, end, local_limit, source_column, matchcount);
-        else if (TAction == TDB_MAX && col_id == COLUMN_TYPE_DOUBLE)
+        else if (TAction == TDB_MAX && col_id == type_Double)
             ret = aggregate_local<TDB_MAX, double, void>(st, start, end, local_limit, source_column, matchcount);
 
-        else if (TAction == TDB_MIN && col_id == COLUMN_TYPE_INT)
+        else if (TAction == TDB_MIN && col_id == type_Int)
             ret = aggregate_local<TDB_MIN, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
-        else if (TAction == TDB_MIN && col_id == COLUMN_TYPE_FLOAT)
+        else if (TAction == TDB_MIN && col_id == type_Float)
             ret = aggregate_local<TDB_MIN, float, void>(st, start, end, local_limit, source_column, matchcount);
-        else if (TAction == TDB_MIN && col_id == COLUMN_TYPE_DOUBLE)
+        else if (TAction == TDB_MIN && col_id == type_Double)
             ret = aggregate_local<TDB_MIN, double, void>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == TDB_FINDALL)
@@ -833,7 +833,7 @@ public:
             const char* t;
 
             // todo, can be optimized by placing outside loop
-            if (m_column_type == COLUMN_TYPE_STRING)
+            if (m_column_type == type_String)
                 t = ((const AdaptiveStringColumn*)m_condition_column)->Get(s);
             else {
                 //TODO: First check if string is in key list
@@ -978,7 +978,7 @@ public:
         m_condition_column = &table.GetColumnBase(m_condition_column_idx);
         m_column_type = table.GetRealColumnType(m_condition_column_idx);
 
-        if (m_column_type == COLUMN_TYPE_STRING_ENUM) {
+        if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
             m_key_ndx = ((const ColumnStringEnum*)m_condition_column)->GetKeyNdx(m_value);
         }
@@ -987,7 +987,7 @@ public:
         }
 
         if (m_condition_column->HasIndex()) {
-            if (m_column_type == COLUMN_TYPE_STRING_ENUM)
+            if (m_column_type == col_type_StringEnum)
                 ((ColumnStringEnum*)m_condition_column)->find_all(m_index, m_value);
             else {
                 ((AdaptiveStringColumn*)m_condition_column)->find_all(m_index, m_value);
@@ -1014,7 +1014,7 @@ public:
             }
             else {
                 // todo, can be optimized by placing outside loop
-                if (m_column_type == COLUMN_TYPE_STRING)
+                if (m_column_type == type_String)
                     s = ((const AdaptiveStringColumn*)m_condition_column)->find_first(m_value, s, end);
                 else {
                     if (m_key_ndx == size_t(-1)) 
