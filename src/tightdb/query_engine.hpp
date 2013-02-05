@@ -458,13 +458,12 @@ protected:
 
 class ArrayNode: public ParentNode {
 public:
-    ArrayNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.Size()) {m_child = 0;}
+    ArrayNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.Size()) {m_child = 0; m_dT = 0.0;}
 
     void Init(const Table& table)
     {
         m_table = &table;
 
-        m_dT = 0.0;
         m_dD =  m_table->size() / (m_arr.Size() + 1.0);
         m_probes = 0;
         m_matches = 0;
@@ -495,11 +494,10 @@ protected:
 
 class SubtableNode: public ParentNode {
 public:
-    SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0;}
+    SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0; m_dT = 100.0;}
     SubtableNode() {};
     void Init(const Table& table)
     {
-        m_dT = 100.0;
         m_dD = 10.0;
         m_probes = 0;
         m_matches = 0;
@@ -555,7 +553,6 @@ public:
         m_child = 0;
         m_conds = 0;
         m_dT = 1.0;
-        m_dD = 100.0;
         m_probes = 0;
         m_matches = 0;
     }
@@ -572,6 +569,7 @@ public:
 
     void Init(const Table& table)
     {
+        m_dD = 100.0;
         m_condition_column = (ColType*)&table.GetColumnBase(m_condition_column_idx);
         m_table = &table;
         m_leaf_end = 0;
@@ -798,6 +796,7 @@ public:
     {
         m_condition_column_idx = column;
         m_child = 0;
+        m_dT = 10.0;
 
         // todo, see if we can store in std::string instead
         m_value = new char[strlen(v)*6];
@@ -816,8 +815,7 @@ public:
 
     void Init(const Table& table)
     {
-        m_dT = 10.0;
-        m_dD = 10.0;
+        m_dD = 100.0;
         m_probes = 0;
         m_matches = 0;
 
@@ -867,6 +865,7 @@ public:
     {
         m_condition_column_idx = column_ndx;
         m_child = 0;
+        m_dT = 8.0;
     }
 
     // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
@@ -881,6 +880,7 @@ public:
 
     void Init(const Table& table)
     {
+        m_dD = 100.0;
         m_table = &table;
         m_condition_column.m_column = (ColType*)(&table.GetColumnBase(m_condition_column_idx));
         m_condition_column.m_leaf_end = 0;
@@ -912,6 +912,7 @@ public:
 
     BinaryNode(const char* v, size_t len, size_t column)
     {
+        m_dT = 100.0;
         m_condition_column_idx = column;
         m_child = 0;
         m_len = len;
@@ -924,6 +925,7 @@ public:
 
     void Init(const Table& table)
     {
+        m_dD = 100.0;
         m_table = &table;
         m_condition_column = (const ColumnBinary*)&table.GetColumnBase(m_condition_column_idx);
         m_column_type = table.GetRealColumnType(m_condition_column_idx);
@@ -1055,11 +1057,10 @@ public:
         return 0;
     }
 
-    OR_NODE(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
+    OR_NODE(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL; m_dT = 50.0;};
 
     void Init(const Table& table)
     {
-        m_dT = 50.0;
         m_dD = 10.0;
 
         std::vector<ParentNode*> v;
