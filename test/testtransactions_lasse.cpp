@@ -5,6 +5,13 @@
 #include <sys/stat.h>
 #include <pthread.h>
 
+#ifdef _WIN32
+#  define NOMINMAX
+#  include <windows.h>
+#else
+#  include <unistd.h>
+#endif
+
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
@@ -13,13 +20,6 @@
 #include <tightdb/utilities.hpp>
 
 #include "testsettings.hpp"
-
-#ifdef _WIN32
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 using namespace std;
 using namespace tightdb;
