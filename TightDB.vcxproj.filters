@@ -352,6 +352,9 @@
     <ClInclude Include="src\tightdb\column_mixed_tpl.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
+    <ClInclude Include="src\tightdb\safe_int_ops.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">

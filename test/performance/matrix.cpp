@@ -6,7 +6,14 @@
 
 #include <tightdb.hpp>
 
-#include "timer.hpp"
+#include "performance/timer.hpp"
+
+#define ONLY_CN_TESTS
+const size_t row_count = 250112; // should be dividable with 128
+const size_t rounds = 1000;
+
+//const size_t row_count = 128*10; // should be dividable with 128
+//const size_t rounds = 1;
 
 using namespace std;
 using namespace tightdb;
@@ -183,9 +190,6 @@ public:
 
 int main()
 {
-    const size_t row_count = 250112; // should be dividable with 128
-    const size_t rounds = 1000;
-
 #ifdef TIGHTDB_DEBUG
     printf("Running Debug Build\n");
 #else
@@ -195,6 +199,8 @@ int main()
     printf("  Rounds:    %d\n", (int)rounds);
     printf("\n");
 
+
+#ifndef ONLY_CN_TESTS        
     // TightDB tests
     {
         TestTable table;
@@ -220,7 +226,6 @@ int main()
         
         table.optimize(); // auto-enumerate last string column
 
-        
         // Search over integer columns
         for (size_t i = 0; i < 8; ++i) {
             // Do a search over entire column (sparse, only last value matches)
@@ -241,7 +246,7 @@ int main()
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
-                        const size_t res = q.count(table);
+                        const size_t res = q.count();
                         if (res != expected) {
                             printf("error");
                         }
@@ -292,7 +297,7 @@ int main()
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
-                        const size_t res = q.count(table);
+                        const size_t res = q.count();
                         if (res != expected) {
                             printf("error");
                         }
@@ -341,14 +346,14 @@ int main()
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
-                        if      (i == 0) res = q.bits_0.sum(table);
-                        else if (i == 1) res = q.bits_1.sum(table);
-                        else if (i == 2) res = q.bits_2.sum(table);
-                        else if (i == 3) res = q.bits_4.sum(table);
-                        else if (i == 4) res = q.bits_8.sum(table);
-                        else if (i == 5) res = q.bits_16.sum(table);
-                        else if (i == 6) res = q.bits_32.sum(table);
-                        else if (i == 7) res = q.bits_64.sum(table);
+                        if      (i == 0) res = q.bits_0.sum();
+                        else if (i == 1) res = q.bits_1.sum();
+                        else if (i == 2) res = q.bits_2.sum();
+                        else if (i == 3) res = q.bits_4.sum();
+                        else if (i == 4) res = q.bits_8.sum();
+                        else if (i == 5) res = q.bits_16.sum();
+                        else if (i == 6) res = q.bits_32.sum();
+                        else if (i == 7) res = q.bits_64.sum();
                         
                         if (res != expected) {
                             printf("error");
@@ -407,7 +412,7 @@ int main()
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
-                        const size_t res = q.count(table);
+                        const size_t res = q.count();
                         if (res != expected) {
                             printf("error");
                         }
@@ -429,7 +434,7 @@ int main()
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
-                        const size_t res = q.count(table);
+                        const size_t res = q.count();
                         if (res != expected) {
                             printf("error");
                         }
@@ -440,8 +445,9 @@ int main()
             }
         }
     }
-    
-    
+#endif    
+
+#ifndef ONLY_CN_TESTS        
     // STL tests
     {
         vector<TestStruct> table;
@@ -526,6 +532,7 @@ int main()
             
             // Do a sum over entire column (all matches)
             {
+                timer.start();
                 for (size_t n = 0; n < rounds; ++n) {
                     int64_t expected;
                     if      (i == 0) expected = 0;
@@ -535,9 +542,7 @@ int main()
                     else if (i == 4) expected = row_count * 0x7FLL;
                     else if (i == 5) expected = row_count * 0x7FFFLL;
                     else if (i == 6) expected = row_count * 0x7FFFFFFFLL;
-                    else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;
-                    
-                    timer.start();
+                    else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;                    
                     {
                         int64_t res = 0;
                         if (i == 0) {
@@ -636,7 +641,9 @@ int main()
         }
         
     }
-    
+
+#endif
+
     // TightDB Multi-column tests
     {
         TestTable table;
@@ -678,7 +685,7 @@ int main()
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
-                    const size_t res = q.count(table);
+                    const size_t res = q.count();
                     if (res != expected) {
                         printf("error");
                     }
@@ -696,7 +703,7 @@ int main()
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
-                    const size_t res = q.count(table);
+                    const size_t res = q.count();
                     if (res != expected) {
                         printf("error");
                     }
@@ -717,7 +724,7 @@ int main()
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
-                    const size_t res = q.count(table);
+                    const size_t res = q.count();
                     if (res != expected) {
                         printf("error");
                     }
@@ -739,7 +746,7 @@ int main()
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
-                    const size_t res = q.count(table);
+                    const size_t res = q.count();
                     if (res != expected) {
                         printf("error %d %d", (int)expected, (int)res);
                     }
@@ -762,7 +769,7 @@ int main()
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
-                    const size_t res = q.count(table);
+                    const size_t res = q.count();
                     if (res != expected) {
                         printf("error");
                     }
@@ -786,7 +793,7 @@ int main()
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
-                    const size_t res = q.count(table);
+                    const size_t res = q.count();
                     if (res != expected) {
                         printf("error");
                     }
