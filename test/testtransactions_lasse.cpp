@@ -338,7 +338,7 @@ TEST(Transactions_Stress3)
     for(size_t t = 0; t < READERS3; t++)
         pthread_join(read_threads3[t], NULL);
 }
-#endif
+
 
 #ifdef STRESSTEST4
 
@@ -439,4 +439,4 @@ TEST(Transactions_Stress4)
 
 #endif
 
-
+#endif
