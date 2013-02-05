@@ -516,7 +516,7 @@ protected:
 
 // Implementation:
 
-class QueryStateBase {};
+class QueryStateBase {virtual void dyncast(){}};
 
 template <> class QueryState<int64_t> : public QueryStateBase {
 public:

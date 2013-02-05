@@ -50,42 +50,6 @@ TIGHTDB_TABLE_3(TableViewSum,
 } // anonymous namespace
 
 
-TEST(TestTableViewSum)
-{
-    TableViewSum ttt;
-
-    ttt.add(1.0, 1.0, 1);
-    ttt.add(2.0, 2.0, 2);
-    ttt.add(3.0, 3.0, 3);
-    ttt.add(4.0, 4.0, 4);
-    ttt.add(5.0, 5.0, 5);
-    ttt.add(6.0, 6.0, 6);
-    ttt.add(7.0, 7.0, 7);
-    ttt.add(8.0, 8.0, 8);
-    ttt.add(9.0, 9.0, 9);
-    ttt.add(10.0, 10.0, 10);
-
-    TableViewSum::Query q1 = ttt.where().col_int.between(5, 9);
-    TableViewSum::View tv1 = q1.find_all();
-    int64_t s = tv1.column().col_int.sum();
-    CHECK_EQUAL(5 + 6 + 7 + 8 + 9, s);
-}
-
-
-TEST(TestQueryJavaMinimumCrash)
-{
-    // Test that triggers a bug that was discovered through Java intnerface and has been fixed
-    PHPMinimumCrash ttt;
-
-    ttt.add("Joe", "John", 1);
-    ttt.add("Jane", "Doe", 2);
-    ttt.add("Bob", "Hanson", 3);
-
-    PHPMinimumCrash::Query q1 = ttt.where().firstname.equal("Joe").Or().firstname.equal("Bob");
-    int64_t m = q1.salary.minimum();
-    CHECK_EQUAL(1, m);
-}
-
 TEST(TestQueryFloat3)
 {
     FloatTable3 t;
@@ -132,6 +96,44 @@ TEST(TestQueryFloat3)
     int64_t a8 = q8.col_int.sum();
     CHECK_EQUAL(15, a8);
 }
+
+TEST(TestTableViewSum)
+{
+    TableViewSum ttt;
+
+    ttt.add(1.0, 1.0, 1);
+    ttt.add(2.0, 2.0, 2);
+    ttt.add(3.0, 3.0, 3);
+    ttt.add(4.0, 4.0, 4);
+    ttt.add(5.0, 5.0, 5);
+    ttt.add(6.0, 6.0, 6);
+    ttt.add(7.0, 7.0, 7);
+    ttt.add(8.0, 8.0, 8);
+    ttt.add(9.0, 9.0, 9);
+    ttt.add(10.0, 10.0, 10);
+
+    TableViewSum::Query q1 = ttt.where().col_int.between(5, 9);
+    TableViewSum::View tv1 = q1.find_all();
+    int64_t s = tv1.column().col_int.sum();
+    CHECK_EQUAL(5 + 6 + 7 + 8 + 9, s);
+}
+
+
+TEST(TestQueryJavaMinimumCrash)
+{
+    // Test that triggers a bug that was discovered through Java intnerface and has been fixed
+    PHPMinimumCrash ttt;
+
+    ttt.add("Joe", "John", 1);
+    ttt.add("Jane", "Doe", 2);
+    ttt.add("Bob", "Hanson", 3);
+
+    PHPMinimumCrash::Query q1 = ttt.where().firstname.equal("Joe").Or().firstname.equal("Bob");
+    int64_t m = q1.salary.minimum();
+    CHECK_EQUAL(1, m);
+}
+
+
 
 
 TEST(TestQueryFloat4)

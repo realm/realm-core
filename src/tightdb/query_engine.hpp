@@ -96,6 +96,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/column_string.hpp>
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/column_binary.hpp>
+#include <tightdb/column_basic.hpp>
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
@@ -147,10 +148,20 @@ template<> struct ColumnTypeTraits<double> {
     static const ColumnType id = COLUMN_TYPE_DOUBLE;
 };
 
+// Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
+template<class T, ACTION A> struct ColumnTypeTraitsSum {
+    typedef T sum_type;
+};
+
+template<> struct ColumnTypeTraitsSum<float, TDB_SUM> {
+    typedef double sum_type;
+};
+
+
 
 
 // Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
-class SequentialGetterBase {};
+class SequentialGetterBase { virtual void dummy(){}};
 
 template<class T>class SequentialGetter : public SequentialGetterBase {
 public:
@@ -186,6 +197,7 @@ public:
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
             m_array_ptr = (ArrayType*) (((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
+//            m_array_ptr = m_column->GetBlock(index, m_array, m_leaf_start, true);
             const size_t leaf_size = m_array_ptr->Size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
@@ -400,6 +412,8 @@ public:
                 }
             }
 
+            TIGHTDB_STATIC_ASSERT( !(TAction == TDB_SUM && (SameType<TSourceColumn, float>::value && !SameType<TResult, double>::value)), "");
+
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
                 TSourceColumn av = (TSourceColumn)0;
@@ -567,12 +581,14 @@ public:
 
     // This function is called from Array::find() for each search result if TAction == TDB_CALLBACK_IDX
     // in the IntegerNode::aggregate_local() call. Used if aggregate source column is different from search criteria column
-    template <ACTION TAction, class TResult> bool match_callback(int64_t v) {
+    template <ACTION TAction, class TSourceColumn> bool match_callback(int64_t v) {
         size_t i = to_size_t(v);
         m_last_local_match = i;
         m_local_matches++;
-        QueryState<TResult>* state = static_cast<QueryState<TResult>*>(m_state);
-        SequentialGetter<TResult>* source_column = static_cast<SequentialGetter<TResult>*>(m_source_column);
+
+        typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type QueryStateType;
+        QueryState<QueryStateType>* state = static_cast<QueryState<QueryStateType>*>(m_state);
+        SequentialGetter<TSourceColumn>* source_column = static_cast<SequentialGetter<TSourceColumn>*>(m_source_column);
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
         for (size_t c = 1; c < m_conds; c++) {
@@ -584,11 +600,11 @@ public:
 
         bool b;
         if (state->template uses_val<TAction>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded         
-            TResult av = source_column->GetNext(i);
+            TSourceColumn av = source_column->GetNext(i);
             b = state->template match<TAction, false>(i, 0, av, CallbackDummy());  
         }
         else {
-            b = state->template match<TAction, false>(i, 0, TResult(0), CallbackDummy());  
+            b = state->template match<TAction, false>(i, 0, TSourceColumn(0), CallbackDummy());  
         }
 
         if (m_local_matches == m_local_limit)
@@ -604,38 +620,38 @@ public:
         size_t ret;
 
         if (TAction == TDB_RETURN_FIRST)
-            ret = aggregate_local<TDB_RETURN_FIRST, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);        
+            ret = aggregate_local<TDB_RETURN_FIRST, int64_t, void>(st, start, end, local_limit, source_column, matchcount);        
 
         else if (TAction == TDB_COUNT)
-            ret = aggregate_local<TDB_COUNT, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_COUNT, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_INT)
-            ret = aggregate_local<TDB_SUM, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_SUM, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_FLOAT)
             // todo, fixme, see if we must let sum return a double even when summing a float coltype 
-            ret = aggregate_local<TDB_SUM, float, float>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_SUM, float, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == TDB_SUM && col_id == COLUMN_TYPE_DOUBLE)
-            ret = aggregate_local<TDB_SUM, double, double>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_SUM, float, void>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == TDB_MAX && col_id == COLUMN_TYPE_INT)
-            ret = aggregate_local<TDB_MAX, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_MAX, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == TDB_MAX && col_id == COLUMN_TYPE_FLOAT)
-            ret = aggregate_local<TDB_MAX, float, float>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_MAX, float, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == TDB_MAX && col_id == COLUMN_TYPE_DOUBLE)
-            ret = aggregate_local<TDB_MAX, double, double>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_MAX, double, void>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == TDB_MIN && col_id == COLUMN_TYPE_INT)
-            ret = aggregate_local<TDB_MIN, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_MIN, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == TDB_MIN && col_id == COLUMN_TYPE_FLOAT)
-            ret = aggregate_local<TDB_MIN, float, float>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_MIN, float, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == TDB_MIN && col_id == COLUMN_TYPE_DOUBLE)
-            ret = aggregate_local<TDB_MIN, double, double>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_MIN, double, void>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == TDB_FINDALL)
-            ret = aggregate_local<TDB_FINDALL, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_FINDALL, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == TDB_CALLBACK_IDX)
-            ret = aggregate_local<TDB_CALLBACK_IDX, int64_t, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<TDB_CALLBACK_IDX, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
 
         else { 
             TIGHTDB_ASSERT(false);
@@ -646,10 +662,14 @@ public:
 
 
     // source_column: column number in m_table which must act as source for aggreate TAction
-    template <ACTION TAction, class TResult, class unused> 
+    template <ACTION TAction, class TSourceColumn, class unused> 
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit, 
                            SequentialGetterBase* source_column, size_t* matchcount)
     {
+        typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type QueryStateType;
+        TIGHTDB_ASSERT(source_column == NULL || dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != NULL);
+        TIGHTDB_ASSERT(dynamic_cast<QueryState<QueryStateType>*>(st) != NULL);
+
         TConditionFunction f;
         int c = f.condition();
         m_local_matches = 0;
@@ -673,15 +693,15 @@ public:
                 end2 = end - m_leaf_start;
 
             if (m_conds <= 1 && (source_column == NULL || 
-                (SameType<TResult, int64_t>::value 
-                 && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
+                (SameType<TSourceColumn, int64_t>::value 
+                 && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) { 
                 m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
             }
             else {
                 QueryState<int64_t> jumpstate; // todo optimize by moving outside for loop
                 m_source_column = source_column; 
                 m_array.find<TConditionFunction, TDB_CALLBACK_IDX>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate, 
-                             std::bind1st(std::mem_fun(&IntegerNode::match_callback<TAction, TResult>), this));
+                             std::bind1st(std::mem_fun(&IntegerNode::match_callback<TAction, TSourceColumn>), this));
             }
                     
             if (m_local_matches == m_local_limit)
@@ -690,8 +710,10 @@ public:
             s = end2 + m_leaf_start;
         }
 
+
+
         if (matchcount)
-            *matchcount = int64_t(static_cast< QueryState<TResult>* >(st)->m_match_count);
+            *matchcount = int64_t(static_cast< QueryState<QueryStateType>* >(st)->m_match_count);
 
         if (m_local_matches == m_local_limit) {
             m_dD = (m_last_local_match + 1 - start) / (m_local_matches + 1.0);
