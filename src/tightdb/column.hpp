@@ -115,10 +115,12 @@ protected:
     template<class C> bool NodeInsertSplit(size_t ndx, size_t newRef);
     size_t GetRefSize(size_t ref) const;
 
-    static std::size_t get_size_from_ref(std::size_t ref, Allocator&) TIGHTDB_NOEXCEPT;
+    static size_t get_size_from_ref(size_t ref, Allocator&) TIGHTDB_NOEXCEPT;
+    static bool is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT;
 
     template <typename T, typename R, ACTION action, class condition>
         R aggregate(T target, size_t start, size_t end, size_t *matchcount) const;
+
 
 #ifdef TIGHTDB_DEBUG
     void ArrayToDot(std::ostream& out, const Array& array) const;

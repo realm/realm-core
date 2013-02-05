@@ -255,6 +255,13 @@ size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXC
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
 
+bool ColumnBase::is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
+    const bool isNode = (header[0] & 0x80) != 0;
+    return isNode;
+}
+
 Column::Column(Allocator& alloc): m_index(0)
 {
     m_array = new Array(COLUMN_NORMAL, 0, 0, alloc);

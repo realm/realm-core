@@ -5,18 +5,6 @@
 using namespace std;
 using namespace tightdb;
 
-namespace {
-
-bool IsNodeFromRef(size_t ref, Allocator& alloc)
-{
-    const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
-    const bool isNode = (header[0] & 0x80) != 0;
-
-    return isNode;
-}
-
-} // anonymous namespace
-
 
 namespace tightdb {
 
@@ -27,7 +15,7 @@ ColumnBinary::ColumnBinary(Allocator& alloc)
 
 ColumnBinary::ColumnBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
 {
-    const bool isNode = IsNodeFromRef(ref, alloc);
+    const bool isNode = is_node_from_ref(ref, alloc);
     if (isNode) {
         m_array = new Array(ref, parent, pndx, alloc);
     }
@@ -50,7 +38,7 @@ void ColumnBinary::Destroy()
 
 void ColumnBinary::UpdateRef(size_t ref)
 {
-    TIGHTDB_ASSERT(IsNodeFromRef(ref, m_array->GetAllocator())); // Can only be called when creating node
+    TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->GetAllocator())); // Can only be called when creating node
 
     if (IsNode()) m_array->UpdateRef(ref);
     else {
