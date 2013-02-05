@@ -788,7 +788,7 @@ protected:
 template <class TConditionFunction> class StringNode: public ParentNode {
 public:
     template <ACTION TAction>
-    int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column)
+    int64_t find_all(Array*, size_t, size_t, size_t, size_t)
     {
         TIGHTDB_ASSERT(false);
         return 0;
@@ -956,7 +956,7 @@ protected:
 template <> class StringNode<EQUAL>: public ParentNode {
 public:
     template <ACTION TAction> 
-    int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column) 
+    int64_t find_all(Array*, size_t, size_t, size_t, size_t) 
     {
         TIGHTDB_ASSERT(false); 
         return 0;
@@ -1049,7 +1049,7 @@ private:
 
 class OR_NODE: public ParentNode {
 public:
-    template <ACTION TAction> int64_t find_all(Array* res, size_t start, size_t end, size_t limit, size_t source_column)
+    template <ACTION TAction> int64_t find_all(Array*, size_t, size_t, size_t, size_t)
     {
         TIGHTDB_ASSERT(false);
         return 0;
