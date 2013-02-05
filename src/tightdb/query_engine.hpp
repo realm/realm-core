@@ -245,13 +245,11 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        
         size_t m = 0;
         size_t next_cond = 0;
         size_t first_cond = 0;
 
         while (start < end) {
-            
             m = m_children[next_cond]->find_first_local(start, end);
 
             next_cond++;
@@ -267,7 +265,6 @@ public:
                 start = m;
             }
         }
-
         return end;
     }
 
