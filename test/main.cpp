@@ -55,7 +55,7 @@ struct CustomTestReporter: TestReporter {
 
 int main(int argc, char* argv[])
 {
-    bool const no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exit-staus") == 0;
+    bool const no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
 #ifdef TIGHTDB_DEBUG
     cerr << "Running Debug unit tests\n";
