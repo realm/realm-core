@@ -142,6 +142,9 @@
     <ClCompile Include="src\tightdb\string_buffer.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\tightdb\lang_bind_helper.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="test\testindexstring.cpp">
       <Filter>test</Filter>
     </ClCompile>

@@ -23,6 +23,10 @@
 #include <tightdb/column.hpp>
 #include <tightdb/array_basic.hpp>
 
+// 
+// A BasicColumn can currently only be used for simple unstructured types like float, double.
+//
+
 namespace tightdb {
 
 template<class T> struct AggReturnType {

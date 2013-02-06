@@ -22,6 +22,10 @@
 
 #include <tightdb/array.hpp>
 
+// 
+// A BasicArray can currently only be used for simple unstructured types like float, double.
+//
+
 namespace tightdb {
 
 template<typename T> 
