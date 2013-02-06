@@ -264,7 +264,7 @@ bool ColumnBase::is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 
 Column::Column(Allocator& alloc): m_index(0)
 {
-    m_array = new Array(COLUMN_NORMAL, 0, 0, alloc);
+    m_array = new Array(coldef_Normal, 0, 0, alloc);
     Create();
 }
 
@@ -296,8 +296,8 @@ void Column::Create()
 {
     // Add subcolumns for nodes
     if (IsNode()) {
-        const Array offsets(COLUMN_NORMAL, 0, 0, m_array->GetAllocator());
-        const Array refs(COLUMN_HASREFS, 0, 0, m_array->GetAllocator());
+        const Array offsets(coldef_Normal, 0, 0, m_array->GetAllocator());
+        const Array refs(coldef_HasRefs, 0, 0, m_array->GetAllocator());
         m_array->add(offsets.GetRef());
         m_array->add(refs.GetRef());
     }
@@ -353,7 +353,7 @@ void Column::UpdateParentNdx(int diff)
 // Used by column b-tree code to ensure all leaf having same type
 void Column::SetHasRefs()
 {
-    m_array->SetType(COLUMN_HASREFS);
+    m_array->SetType(coldef_HasRefs);
 }
 
 /*
@@ -378,7 +378,7 @@ void Column::Clear()
 {
     m_array->Clear();
     if (m_array->IsNode())
-        m_array->SetType(COLUMN_NORMAL);
+        m_array->SetType(coldef_Normal);
 }
 
 void Column::Set(size_t ndx, int64_t value)

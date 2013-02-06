@@ -164,8 +164,8 @@ void Array::SetType(ColumnDef type)
     if (m_ref) CopyOnWrite(); // Throws
 
     bool is_node = false, has_refs = false;
-    if (type == COLUMN_NODE) is_node = has_refs = true;
-    else if (type == COLUMN_HASREFS) has_refs = true;
+    if (type == coldef_Node) is_node = has_refs = true;
+    else if (type == coldef_HasRefs) has_refs = true;
     m_isNode  = is_node;
     m_hasRefs = has_refs;
 
@@ -1340,9 +1340,9 @@ void Array::CopyOnWrite()
 size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator& alloc)
 {
     bool is_node = false, has_refs = false;
-    if (type == COLUMN_NODE)
+    if (type == coldef_Node)
         is_node = has_refs = true;
-    else if (type == COLUMN_HASREFS)
+    else if (type == coldef_HasRefs)
         has_refs = true;
 
     const size_t capacity = initial_capacity;

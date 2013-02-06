@@ -157,9 +157,9 @@ public:
 #endif
 
 enum ColumnDef {
-    COLUMN_NORMAL,
-    COLUMN_NODE,
-    COLUMN_HASREFS
+    coldef_Normal,
+    coldef_Node,
+    coldef_HasRefs
 };
 
 bool IsArrayIndexNode(size_t ref, const Allocator& alloc);
@@ -199,7 +199,7 @@ public:
 
     /// Create a new array, and if \a parent and \a ndx_in_parent are
     /// specified, update the parent to point to this new array.
-    explicit Array(ColumnDef type=COLUMN_NORMAL, ArrayParent* parent=0, size_t ndx_in_parent=0,
+    explicit Array(ColumnDef type=coldef_Normal, ArrayParent* parent=0, size_t ndx_in_parent=0,
                    Allocator& = Allocator::get_default());
 
     /// Initialize an array wrapper from the specified array.
@@ -793,7 +793,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 
     if (recurse && m_hasRefs) {
         // Temp array for updated refs
-        Array newRefs(m_isNode ? COLUMN_NODE : COLUMN_HASREFS);
+        Array newRefs(m_isNode ? coldef_Node : coldef_HasRefs);
 
         // Make sure that all flags are retained
         if (IsIndexNode())
@@ -824,7 +824,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
         const size_t refs_pos = newRefs.Write(out, false, persist);
 
         // Clean-up
-        newRefs.SetType(COLUMN_NORMAL); // avoid recursive del
+        newRefs.SetType(coldef_Normal); // avoid recursive del
         newRefs.Destroy();
 
         return refs_pos; // Return position

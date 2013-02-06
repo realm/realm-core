@@ -291,8 +291,8 @@ protected:
 
     // FIXME: Most of the things that are protected here, could instead be private
     // Direct Column access
-    template <class T, ColumnType COL_TYPE> T& GetColumn(size_t ndx);
-    template <class T, ColumnType COL_TYPE> const T& GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT;
+    template <class T, ColumnType col_type> T& GetColumn(size_t ndx);
+    template <class T, ColumnType col_type> const T& GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT;
     Column& GetColumn(size_t column_ndx);
     const Column& GetColumn(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnFloat& GetColumnFloat(size_t column_ndx);
@@ -537,9 +537,9 @@ inline bool Table::has_shared_spec() const
 
 inline size_t Table::create_empty_table(Allocator& alloc)
 {
-    Array top(COLUMN_HASREFS, 0, 0, alloc);
+    Array top(coldef_HasRefs, 0, 0, alloc);
     top.add(Spec::create_empty_spec(alloc));
-    top.add(Array::create_empty_array(COLUMN_HASREFS, alloc)); // Columns
+    top.add(Array::create_empty_array(coldef_HasRefs, alloc)); // Columns
     return top.GetRef();
 }
 

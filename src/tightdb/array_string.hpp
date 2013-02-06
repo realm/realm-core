@@ -75,7 +75,7 @@ private:
 
 inline size_t ArrayString::create_empty_string_array(Allocator& alloc)
 {
-    return create_empty_array(COLUMN_NORMAL, TDB_MULTIPLY, alloc); // Throws
+    return create_empty_array(coldef_Normal, TDB_MULTIPLY, alloc); // Throws
 }
 
 inline ArrayString::ArrayString(ArrayParent *parent, size_t ndx_in_parent,

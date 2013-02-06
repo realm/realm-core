@@ -1348,7 +1348,7 @@ TEST(ArrayCopy)
     CHECK_EQUAL(4, b.Get(4));
 
     // With sub-arrays
-    Array c(COLUMN_HASREFS);
+    Array c(coldef_HasRefs);
     c.add(a.GetRef());
 
     Array d;

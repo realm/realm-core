@@ -66,7 +66,7 @@ void Table::CreateColumns()
 
     // Instantiate first if we have an empty table (from zero-ref)
     if (!m_columns.IsValid()) {
-        m_columns.SetType(COLUMN_HASREFS);
+        m_columns.SetType(coldef_HasRefs);
     }
 
     size_t subtable_count = 0;
@@ -85,7 +85,7 @@ void Table::CreateColumns()
         case type_Bool:
         case type_Date:
             {
-                Column* c = new Column(COLUMN_NORMAL, alloc);
+                Column* c = new Column(coldef_Normal, alloc);
                 m_columns.add(c->GetRef());
                 c->SetParent(&m_columns, ref_pos);
                 new_col = c;
@@ -494,7 +494,7 @@ size_t Table::do_add_column(DataType type)
     case type_Bool:
     case type_Date:
         {
-            Column* c = new Column(COLUMN_NORMAL, alloc);
+            Column* c = new Column(coldef_Normal, alloc);
             m_columns.add(c->GetRef());
             c->SetParent(&m_columns, m_columns.Size()-1);
             new_col = c;

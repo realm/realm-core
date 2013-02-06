@@ -84,7 +84,7 @@ size_t Spec::add_column(DataType type, const char* name, ColumnType attr)
     if (type == type_Table) {
         // SubSpecs array is only there when there are subtables
         if (m_specSet.Size() == 2) {
-            m_subSpecs.SetType(COLUMN_HASREFS);
+            m_subSpecs.SetType(coldef_HasRefs);
             //m_subSpecs.SetType((ColumnDef)4);
             //return;
             m_specSet.add(m_subSpecs.GetRef());
@@ -94,9 +94,9 @@ size_t Spec::add_column(DataType type, const char* name, ColumnType attr)
         Allocator& alloc = m_specSet.GetAllocator();
 
         // Create spec for new subtable
-        Array spec(COLUMN_NORMAL, NULL, 0, alloc);
+        Array spec(coldef_Normal, NULL, 0, alloc);
         ArrayString names(NULL, 0, alloc);
-        Array specSet(COLUMN_HASREFS, NULL, 0, alloc);
+        Array specSet(coldef_HasRefs, NULL, 0, alloc);
         specSet.add(spec.GetRef());
         specSet.add(names.GetRef());
 
