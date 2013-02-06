@@ -100,9 +100,8 @@ public:
     Query& between_date(size_t column_ndx, time_t from, time_t to) { return between(column_ndx, int64_t(from), int64_t(to)); }
 
     // Conditions: binary data
-    // Only BinaryData prototype can exist, else it would conflict with equal() for strings 
-
-    Query& equal(size_t column_ndx, BinaryData b);
+    // Only BinaryData prototype can exist, else it would conflict with equal() for strings
+    Query& equal(size_t column_ndx, BinaryData value);
 /*
     Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& begins_with_binary(size_t column_ndx, const char* ptr, size_t len);
