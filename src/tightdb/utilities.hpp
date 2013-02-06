@@ -32,15 +32,15 @@
 #include <tightdb/assert.hpp>
 
 #if defined(__GNUC__)
-	#define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
+    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
 #elif defined(_MSC_VER)
-	#define TIGHTDB_FORCEINLINE __forceinline
+    #define TIGHTDB_FORCEINLINE __forceinline
 #elif defined(__HP_aCC)
-	#define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
+    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
 #elif defined(__xlC__ )
-	#define TIGHTDB_FORCEINLINE inline
+    #define TIGHTDB_FORCEINLINE inline
 #else
-	#error TEXT("Compiler version not detectable")
+    #error TEXT("Compiler version not detectable")
 #endif
 
 /* GCC defines __i386__ and __x86_64__ */

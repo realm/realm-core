@@ -374,9 +374,9 @@ public:
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                            SequentialGetterBase* source_column, size_t* matchcount)
     {
-		// aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
+        // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
         // integer version, because find_first_local() is relatively slower here (because it's non-integers).
-		//
+        //
         // Todo: Two speedups are possible. Simple: Initially test if there are no sub criterias and run find_first_local()
         // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize
         // data type array to make array call match() directly on each match, like for integers.

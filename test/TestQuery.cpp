@@ -592,17 +592,17 @@ TEST(TestQuerySimple)
 
 TEST(TestQuerySimpleBUGdetect)
 {
-	TupleTableType ttt;
-	ttt.add(1, "a");
-	ttt.add(2, "a");
+    TupleTableType ttt;
+    ttt.add(1, "a");
+    ttt.add(2, "a");
 
-	TupleTableType::Query q1 = ttt.where();
+    TupleTableType::Query q1 = ttt.where();
 
-	TupleTableType::View tv1 = q1.find_all();
-	CHECK_EQUAL(2, tv1.size());
-	CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(2, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
 
-	TupleTableType::View resView = tv1.column().second.find_all("Foo");
+    TupleTableType::View resView = tv1.column().second.find_all("Foo");
 
     // This previously crashed:
     // TableView resView = TableView(tv1);

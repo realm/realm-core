@@ -58,24 +58,24 @@ void ptf_randsleep(void)
 
 int ptf_pthread_mutex_trylock(pthread_mutex_t * mutex)
 {
-	ptf_randsleep();
-	int i = pthread_mutex_trylock(mutex);
-	ptf_randsleep();
-	return i;
+    ptf_randsleep();
+    int i = pthread_mutex_trylock(mutex);
+    ptf_randsleep();
+    return i;
 }
 
 int ptf_pthread_barrier_wait(pthread_barrier_t *barrier)
 {
-	ptf_randsleep();
-	int i = pthread_barrier_wait(barrier);
-	ptf_randsleep();
-	return i;
+    ptf_randsleep();
+    int i = pthread_barrier_wait(barrier);
+    ptf_randsleep();
+    return i;
 }
 
 #define ptf_surround(arg) \
-	ptf_randsleep(); \
-	arg; \
-	ptf_randsleep();
+    ptf_randsleep(); \
+    arg; \
+    ptf_randsleep();
 
 #define pthread_mutex_lock(mutex) ptf_surround(pthread_mutex_lock(mutex))
 #define pthread_mutex_unlock(mutex) ptf_surround(pthread_mutex_unlock(mutex))
