@@ -270,7 +270,7 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
 
 // Aggregates =================================================================================
 
-template <ACTION action, typename T, typename R, class ColType>
+template <Action action, typename T, typename R, class ColType>
 R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {

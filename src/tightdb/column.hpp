@@ -112,7 +112,7 @@ protected:
     static size_t get_size_from_ref(size_t ref, Allocator&) TIGHTDB_NOEXCEPT;
     static bool is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT;
 
-    template <typename T, typename R, ACTION action, class condition>
+    template <typename T, typename R, Action action, class condition>
         R aggregate(T target, size_t start, size_t end, size_t *matchcount) const;
 
 

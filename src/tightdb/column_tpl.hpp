@@ -53,7 +53,7 @@ template<class cond> struct ColumnTypeTraits2<cond, double> {
 };
 
 
-template <typename T, typename R, ACTION action, class condition>
+template <typename T, typename R, Action action, class condition>
 R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
 {
     typedef typename ColumnTypeTraits2<condition,T>::column_type ColType;

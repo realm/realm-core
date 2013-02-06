@@ -149,7 +149,7 @@ template<> struct ColumnTypeTraits<double> {
 };
 
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
-template<class T, ACTION A> struct ColumnTypeTraitsSum {
+template<class T, Action A> struct ColumnTypeTraitsSum {
     typedef T sum_type;
 };
 
@@ -298,7 +298,7 @@ public:
     }
 
     // Only purpose is to make all IntegerNode classes have this function (overloaded only in IntegerNode)
-    virtual size_t aggregate_call_specialized(ACTION /*TAction*/, DataType /*TResult*/,
+    virtual size_t aggregate_call_specialized(Action /*TAction*/, DataType /*TResult*/,
                                               QueryStateBase* /*st*/,
                                               size_t /*start*/, size_t /*end*/, size_t /*local_limit*/,
                                               SequentialGetterBase* /*source_column*/, size_t* /*matchcount*/)
@@ -307,7 +307,7 @@ public:
         return 0;
     }
 
-    template<ACTION TAction, class TResult, class TSourceColumn>
+    template<Action TAction, class TResult, class TSourceColumn>
     size_t aggregate_local_selector(ParentNode* node, QueryState<TResult>* st, size_t start, size_t end, size_t local_limit,
                                     SequentialGetter<TSourceColumn>* source_column, size_t* matchcount)
     {
@@ -324,7 +324,7 @@ public:
     }
 
 
-    template<ACTION TAction, class TResult, class TSourceColumn>
+    template<Action TAction, class TResult, class TSourceColumn>
     TResult aggregate(QueryState<TResult>* st, size_t start, size_t end, size_t agg_col, size_t* matchcount)
     {
         if (end == size_t(-1))
@@ -370,7 +370,7 @@ public:
 
     }
 
-    template<ACTION TAction, class TResult, class TSourceColumn>
+    template<Action TAction, class TResult, class TSourceColumn>
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                            SequentialGetterBase* source_column, size_t* matchcount)
     {
@@ -581,7 +581,7 @@ public:
 
     // This function is called from Array::find() for each search result if TAction == TDB_CALLBACK_IDX
     // in the IntegerNode::aggregate_local() call. Used if aggregate source column is different from search criteria column
-    template <ACTION TAction, class TSourceColumn> bool match_callback(int64_t v)
+    template <Action TAction, class TSourceColumn> bool match_callback(int64_t v)
     {
         size_t i = to_size_t(v);
         m_last_local_match = i;
@@ -614,7 +614,7 @@ public:
             return b;
     }
 
-    size_t aggregate_call_specialized(ACTION TAction, DataType col_id, QueryStateBase* st,
+    size_t aggregate_call_specialized(Action TAction, DataType col_id, QueryStateBase* st,
                                       size_t start, size_t end, size_t local_limit,
                                       SequentialGetterBase* source_column, size_t* matchcount)
     {
@@ -663,7 +663,7 @@ public:
 
 
     // source_column: column number in m_table which must act as source for aggreate TAction
-    template <ACTION TAction, class TSourceColumn, class unused>
+    template <Action TAction, class TSourceColumn, class unused>
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                            SequentialGetterBase* source_column, size_t* matchcount)
     {
@@ -788,7 +788,7 @@ protected:
 
 template <class TConditionFunction> class StringNode: public ParentNode {
 public:
-    template <ACTION TAction>
+    template <Action TAction>
     int64_t find_all(Array*, size_t, size_t, size_t, size_t)
     {
         TIGHTDB_ASSERT(false);
@@ -913,7 +913,7 @@ protected:
 
 template <class TConditionFunction> class BinaryNode: public ParentNode {
 public:
-    template <ACTION TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
+    template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
 
     BinaryNode(const char* v, size_t len, size_t column)
     {
@@ -963,7 +963,7 @@ protected:
 
 template <> class StringNode<EQUAL>: public ParentNode {
 public:
-    template <ACTION TAction>
+    template <Action TAction>
     int64_t find_all(Array*, size_t, size_t, size_t, size_t)
     {
         TIGHTDB_ASSERT(false);
@@ -1057,7 +1057,7 @@ private:
 
 class OR_NODE: public ParentNode {
 public:
-    template <ACTION TAction> int64_t find_all(Array*, size_t, size_t, size_t, size_t)
+    template <Action TAction> int64_t find_all(Array*, size_t, size_t, size_t, size_t)
     {
         TIGHTDB_ASSERT(false);
         return 0;

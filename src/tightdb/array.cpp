@@ -2043,7 +2043,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     return;
 }
 
-void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
+void Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
     if (cond == COND_EQUAL) {
         if (action == TDB_SUM) {
