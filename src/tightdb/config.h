@@ -22,14 +22,13 @@
 
 
 /* This one is needed to allow tightdb-config to know whether a
- * nondefault value is in effect. It MUST always be equal to the
- * fallback value of MAX_LIST_SIZE as pecified above. */
+ * nondefault value is in effect. */
 #define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
 
-/* the maximum number of elements in a B-tree node. Allow this value
+/* The maximum number of elements in a B-tree node. Allow this value
  * to be overridden on the command-line. */
-#ifndef MAX_LIST_SIZE
-#  define MAX_LIST_SIZE TIGHTDB_DEFAULT_MAX_LIST_SIZE
+#ifndef TIGHTDB_MAX_LIST_SIZE
+#  define TIGHTDB_MAX_LIST_SIZE TIGHTDB_DEFAULT_MAX_LIST_SIZE
 #endif
 
 

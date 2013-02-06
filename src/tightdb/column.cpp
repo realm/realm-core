@@ -562,7 +562,7 @@ void ColumnBase::NodeAddKey(size_t ref)
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
-    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.Size() < TIGHTDB_MAX_LIST_SIZE);
 
     const Array new_top(ref, NULL, 0,m_array->GetAllocator());
     const Array new_offsets(new_top.GetAsRef(0), NULL, 0,m_array->GetAllocator());

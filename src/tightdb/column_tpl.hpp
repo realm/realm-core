@@ -196,7 +196,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         if (nc.type == NodeChange::insert_after) ++node_ndx;
 
         // If there is room, just update node directly
-        if (offsets.Size() < MAX_LIST_SIZE) {
+        if (offsets.Size() < TIGHTDB_MAX_LIST_SIZE) {
             if (nc.type == NodeChange::split) NodeInsertSplit<C>(node_ndx, nc.ref2);
             else NodeInsert<C>(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
             return NodeChange::none;
@@ -218,7 +218,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         switch (node_ndx) {
         case 0:             // insert before
             return NodeChange(NodeChange::insert_before, newNode.GetRef());
-        case MAX_LIST_SIZE: // insert after
+        case TIGHTDB_MAX_LIST_SIZE: // insert after
             if (nc.type == NodeChange::split)
                 return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
             else return NodeChange(NodeChange::insert_after, newNode.GetRef());
@@ -237,7 +237,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
     else {
         // Is there room in the list?
         const size_t count = static_cast<C*>(this)->Size();
-        if (count < MAX_LIST_SIZE) {
+        if (count < TIGHTDB_MAX_LIST_SIZE) {
             static_cast<C*>(this)->LeafInsert(ndx, value);
             return NodeChange::none;
         }
@@ -251,7 +251,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         switch (ndx) {
         case 0:             // insert before
             return NodeChange(NodeChange::insert_before, newList.GetRef());
-        case MAX_LIST_SIZE: // insert below
+        case TIGHTDB_MAX_LIST_SIZE: // insert below
             return NodeChange(NodeChange::insert_after, newList.GetRef());
         default:            // split
             // Move items after split to new list
@@ -274,7 +274,7 @@ template<class C> void ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
     Array refs = NodeGetRefs();
 
     TIGHTDB_ASSERT(ndx < offsets.Size());
-    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.Size() < TIGHTDB_MAX_LIST_SIZE);
 
     // Get sublists
     const C orig_col = GetColumnFromRef<C>(refs, ndx);
@@ -312,7 +312,7 @@ template<class C> void ColumnBase::NodeInsert(size_t ndx, size_t ref)
     Array refs = NodeGetRefs();
 
     TIGHTDB_ASSERT(ndx <= offsets.Size());
-    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.Size() < TIGHTDB_MAX_LIST_SIZE);
 
     const C col(ref, (Array*)NULL, 0, m_array->GetAllocator());
     const size_t refSize = col.Size();
@@ -334,7 +334,7 @@ template<class C> void ColumnBase::NodeAdd(size_t ref)
     Array refs = NodeGetRefs();
     const C col(ref, (Array*)NULL, 0, m_array->GetAllocator());
 
-    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.Size() < TIGHTDB_MAX_LIST_SIZE);
 
     const int64_t newOffset = (offsets.is_empty() ? 0 : offsets.back()) + col.Size();
     offsets.add(newOffset);

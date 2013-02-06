@@ -244,7 +244,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         if (nc.type == NodeChange::insert_after) ++node_ndx;
 
         // If there is room, just update node directly
-        if (offsets.Size() < MAX_LIST_SIZE) {
+        if (offsets.Size() < TIGHTDB_MAX_LIST_SIZE) {
             if (nc.type == NodeChange::split) NodeInsertSplit<Column>(node_ndx, nc.ref2);
             else NodeInsert<Column>(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
             return NodeChange::none;
@@ -257,7 +257,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         switch (node_ndx) {
         case 0:             // insert before
             return NodeChange(NodeChange::insert_before, newNode.GetRef());
-        case MAX_LIST_SIZE: // insert below
+        case TIGHTDB_MAX_LIST_SIZE: // insert below
             return NodeChange(NodeChange::insert_after, newNode.GetRef());
         default:            // split
             // Move items below split to new node
@@ -272,7 +272,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
     }
     else {
         // Is there room in the list?
-        if (Size() < MAX_LIST_SIZE) {
+        if (Size() < TIGHTDB_MAX_LIST_SIZE) {
             LeafInsert(ndx, value);
             return NodeChange::none;
         }
@@ -284,7 +284,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         switch (ndx) {
         case 0:             // insert before
             return NodeChange(NodeChange::insert_before, newList.GetRef());
-        case MAX_LIST_SIZE: // insert below
+        case TIGHTDB_MAX_LIST_SIZE: // insert below
             return NodeChange(NodeChange::insert_after, newList.GetRef());
         default:            // split
             // Move items below split to new list

@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
     cerr << "Running Release unit tests\n";
 #endif
 
-    cerr << "MAX_LIST_SIZE = " << MAX_LIST_SIZE << "\n";
+    cerr << "TIGHTDB_MAX_LIST_SIZE = " << TIGHTDB_MAX_LIST_SIZE << "\n";
 
 #ifdef TIGHTDB_COMPILER_SSE
     cerr << "Compiler supported SSE (auto detect): Yes\n";

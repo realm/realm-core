@@ -193,7 +193,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         if (nc.type == NodeChange::insert_after) ++node_ndx;
 
         // If there is room, just update node directly
-        if (offsets.Size() < MAX_LIST_SIZE) {
+        if (offsets.Size() < TIGHTDB_MAX_LIST_SIZE) {
             if (nc.type == NodeChange::split) NodeInsertSplit(node_ndx, nc.ref2);
             else NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
             return NodeChange::none;
@@ -214,7 +214,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         switch (node_ndx) {
             case 0:             // insert before
                 return NodeChange(NodeChange::insert_before, newNode.GetRef());
-            case MAX_LIST_SIZE: // insert after
+            case TIGHTDB_MAX_LIST_SIZE: // insert after
                 if (nc.type == NodeChange::split)
                     return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
                 else return NodeChange(NodeChange::insert_after, newNode.GetRef());
@@ -234,7 +234,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         // Is there room in the list?
         Array old_offsets = m_array->GetSubArray(0);
         const size_t count = old_offsets.Size();
-        const bool noextend = count >= MAX_LIST_SIZE;
+        const bool noextend = count >= TIGHTDB_MAX_LIST_SIZE;
 
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
@@ -287,7 +287,7 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
     Array refs = NodeGetRefs();
 
     TIGHTDB_ASSERT(ndx < offsets.Size());
-    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.Size() < TIGHTDB_MAX_LIST_SIZE);
 
     // Get sublists
     const size_t orig_ref = refs.Get(ndx);
@@ -313,7 +313,7 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
     Array refs = NodeGetRefs();
 
     TIGHTDB_ASSERT(ndx <= offsets.Size());
-    TIGHTDB_ASSERT(offsets.Size() < MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.Size() < TIGHTDB_MAX_LIST_SIZE);
 
     const StringIndex col(ref, (Array*)NULL, 0, m_target_column, m_get_func, m_array->GetAllocator());
     const int64_t lastKey = col.GetLastKey();
