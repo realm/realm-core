@@ -410,6 +410,7 @@
     <ClCompile Include="src\tightdb\terminate.cpp" />
     <ClCompile Include="src\tightdb\utf8.cpp" />
     <ClCompile Include="src\tightdb\utilities.cpp" />
+    <ClCompile Include="src\tightdb\lang_bind_helper.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c" />
     <ClCompile Include="test\large_tests\test_column.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
