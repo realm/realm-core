@@ -22,7 +22,7 @@
 Searching: The main finding function is:
     template <class cond, Action action, size_t bitwidth, class Callback> void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState *state, Callback callback) const
 
-    cond:       One of EQUAL, NOTEQUAL, GREATER, etc. classes
+    cond:       One of Equal, NotEqual, Greater, etc. classes
     Action:     One of TDB_RETURN_FIRST, TDB_FINDALL, TDB_MAX, TDB_CALLBACK_IDX, etc, constants
     Callback:   Optional function to call for each search result. Will be called if action == TDB_CALLBACK_IDX
 
@@ -347,19 +347,19 @@ public:
     void find_all(Array& result, int64_t value, size_t colOffset = 0, size_t start = 0, size_t end = (size_t)-1) const;
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const;
 
-    // Non-SSE find for the four functions EQUAL/NOTEQUAL/LESS/GREATER
+    // Non-SSE find for the four functions Equal/NotEqual/Less/Greater
     template <class cond2, Action action, size_t bitwidth, class Callback>
     bool Compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const;
 
-    // Non-SSE find for EQUAL/NOTEQUAL
+    // Non-SSE find for Equal/NotEqual
     template <bool eq, Action action, size_t width, class Callback>
     inline bool CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const;
 
-    // Non-SSE find for LESS/GREATER
+    // Non-SSE find for Less/Greater
     template <bool gt, Action action, size_t bitwidth, class Callback>
     bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const;
 
-    // SSE find for the four functions EQUAL/NOTEQUAL/LESS/GREATER
+    // SSE find for the four functions Equal/NotEqual/Less/Greater
 #ifdef TIGHTDB_COMPILER_SSE
     template <class cond2, Action action, size_t width, class Callback>
     size_t FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
@@ -1099,7 +1099,7 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
 }
 
 // This is the main finding function for Array. Other finding functions are just wrappers around this one.
-// Search for 'value' using condition cond2 (EQUAL, NOTEQUAL, LESS, etc) and call find_action() or find_action_pattern() for each match. Break and return if find_action() returns false or 'end' is reached.
+// Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern() for each match. Break and return if find_action() returns false or 'end' is reached.
 template <class cond2, Action action, size_t bitwidth, class Callback> void Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     cond2 C;
@@ -1118,11 +1118,11 @@ template <class cond2, Action action, size_t bitwidth, class Callback> void Arra
 
     if (end == (size_t)-1) end = m_len;
 
-    // Return immediately if no items in array can match (such as if cond2 == GREATER and value == 100 and m_ubound == 15).
+    // Return immediately if no items in array can match (such as if cond2 == Greater and value == 100 and m_ubound == 15).
     if (!C.can_match(value, m_lbound, m_ubound))
         return;
 
-    // call find_action() on all items in array if all items are guaranteed to match (such as cond2 == NOTEQUAL and value == 100 and m_ubound == 15)
+    // call find_action() on all items in array if all items are guaranteed to match (such as cond2 == NotEqual and value == 100 and m_ubound == 15)
     if (C.will_match(value, m_lbound, m_ubound)) {
         if (action == TDB_SUM || action == TDB_MAX || action == TDB_MIN) {
             int64_t res;
@@ -1151,7 +1151,7 @@ template <class cond2, Action action, size_t bitwidth, class Callback> void Arra
 
 #if defined(TIGHTDB_COMPILER_SSE)
     if ((cpuid_sse<42>() &&                                  (end - start >= sizeof(__m128i) && m_width >= 8))
-    ||  (cpuid_sse<30>() && (SameType<cond2, EQUAL>::value && end - start >= sizeof(__m128i) && m_width >= 8 && m_width < 64))) {
+    ||  (cpuid_sse<30>() && (SameType<cond2, Equal>::value && end - start >= sizeof(__m128i) && m_width >= 8 && m_width < 64))) {
 
         // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
         __m128i* const a = (__m128i *)round_up(m_data + start * bitwidth / 8, sizeof(__m128i));
@@ -1168,7 +1168,7 @@ template <class cond2, Action action, size_t bitwidth, class Callback> void Arra
                 }
                 else if (cpuid_sse<30>()) {
 
-                if (!FindSSE<EQUAL, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / no0(bitwidth)), callback))
+                if (!FindSSE<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / no0(bitwidth)), callback))
                     return;
                 }
         }
@@ -1578,7 +1578,7 @@ template <class cond2, Action action, size_t bitwidth, class Callback> int64_t A
     for (size_t t = start; t < end; t++) {
         int64_t v = Get(t);
 
-        if (SameType<cond2, NONE>::value || (SameType<cond2, EQUAL>::value && v == value) || (SameType<cond2, NOTEQUAL>::value && v != value) || (SameType<cond2, GREATER>::value && v > value) || (SameType<cond2, LESS>::value && v < value)) {
+        if (SameType<cond2, None>::value || (SameType<cond2, Equal>::value && v == value) || (SameType<cond2, NotEqual>::value && v != value) || (SameType<cond2, Greater>::value && v > value) || (SameType<cond2, Less>::value && v < value)) {
             if (action == TDB_RETURN_FIRST) {
                 state->m_state = t;
                 return false;

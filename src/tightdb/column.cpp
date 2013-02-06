@@ -38,7 +38,7 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
 void merge_core(const Array& a0, const Array& a1, Array& res);
 Array* merge(const Array& ArrayList);
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult);
-    
+
 // Input:
 //     vals:   An array of values
 //     idx0:   Array of indexes pointing into vals, sorted with respect to vals
@@ -148,7 +148,7 @@ Array* merge(const Array& arrayList)
 {
     const size_t size = arrayList.Size();
 
-    if (size == 1) 
+    if (size == 1)
         return NULL; // already sorted
 
     Array leftHalf, rightHalf;
@@ -180,9 +180,9 @@ Array* merge(const Array& arrayList)
     // Clean-up
     leftHalf.Destroy();
     rightHalf.Destroy();
-    if (left) 
+    if (left)
         left->Destroy();
-    if (right) 
+    if (right)
         right->Destroy();
     delete left;
     delete right;
@@ -434,12 +434,12 @@ void Column::fill(size_t count)
 
 size_t Column::count(int64_t target) const
 {
-    return size_t(aggregate<int64_t, int64_t, TDB_COUNT, EQUAL>(target, 0, Size(), NULL));
+    return size_t(aggregate<int64_t, int64_t, TDB_COUNT, Equal>(target, 0, Size(), NULL));
 }
 
 int64_t Column::sum(size_t start, size_t end) const
 {
-    return aggregate<int64_t, int64_t, TDB_SUM, NONE>(0, start, end, NULL);
+    return aggregate<int64_t, int64_t, TDB_SUM, None>(0, start, end, NULL);
 }
 
 double Column::average(size_t start, size_t end) const
@@ -447,19 +447,19 @@ double Column::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = Size();
     size_t size = end - start;
-    int64_t sum = aggregate<int64_t, int64_t, TDB_SUM, NONE>(0, start, end, NULL);
+    int64_t sum = aggregate<int64_t, int64_t, TDB_SUM, None>(0, start, end, NULL);
     double avg = double( sum ) / double( size == 0 ? 1 : size );
     return avg;
 }
 
 int64_t Column::minimum(size_t start, size_t end) const
 {
-    return aggregate<int64_t, int64_t, TDB_MIN, NONE>(0, start, end, NULL);
+    return aggregate<int64_t, int64_t, TDB_MIN, None>(0, start, end, NULL);
 }
 
 int64_t Column::maximum(size_t start, size_t end) const
 {
-    return aggregate<int64_t, int64_t, TDB_MAX, NONE>(0, start, end, NULL);
+    return aggregate<int64_t, int64_t, TDB_MAX, None>(0, start, end, NULL);
 }
 
 
@@ -640,7 +640,7 @@ size_t Column::find_first(int64_t value, size_t start, size_t end) const
         return m_array->ColumnFind(value, ref, cache);
     }
     else {
-        return TreeFind<int64_t, Column, EQUAL>(value, start, end);
+        return TreeFind<int64_t, Column, Equal>(value, start, end);
     }
 }
 

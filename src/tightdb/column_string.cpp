@@ -285,7 +285,7 @@ size_t AdaptiveStringColumn::find_first(const char* value, size_t start, size_t 
     if (m_index && start == 0 && end == (size_t)-1)
         return m_index->find_first(value);
 
-    return TreeFind<const char*, AdaptiveStringColumn, EQUAL>(value, start, end);
+    return TreeFind<const char*, AdaptiveStringColumn, Equal>(value, start, end);
 }
 
 

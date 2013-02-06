@@ -60,7 +60,7 @@ called from a callback function called by an integer Array.
 Template arguments in methods:
 ----------------------------------------------------------------------------------------------------
 
-TConditionFunction: Each node has a condition from query_conditions.c such as EQUAL, GREATER_EQUAL, etc
+TConditionFunction: Each node has a condition from query_conditions.c such as Equal, GreaterEqual, etc
 
 TConditionValue:    Type of values in condition column. That is, int64_t, float, int, bool, etc
 
@@ -862,11 +862,11 @@ protected:
 
 
 // Can be used for simple types (currently float and double)
-template <class TConditionValue, class TConditionFunction> class BASICNODE: public ParentNode {
+template <class TConditionValue, class TConditionFunction> class BasicNode: public ParentNode {
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
-    BASICNODE(TConditionValue v, size_t column_ndx) : m_value(v)
+    BasicNode(TConditionValue v, size_t column_ndx) : m_value(v)
     {
         m_condition_column_idx = column_ndx;
         m_child = 0;
@@ -961,7 +961,7 @@ protected:
 };
 
 
-template <> class StringNode<EQUAL>: public ParentNode {
+template <> class StringNode<Equal>: public ParentNode {
 public:
     template <Action TAction>
     int64_t find_all(Array*, size_t, size_t, size_t, size_t)
@@ -1055,7 +1055,7 @@ private:
 };
 
 
-class OR_NODE: public ParentNode {
+class OrNode: public ParentNode {
 public:
     template <Action TAction> int64_t find_all(Array*, size_t, size_t, size_t, size_t)
     {
@@ -1063,7 +1063,7 @@ public:
         return 0;
     }
 
-    OR_NODE(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
+    OrNode(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL;};
 
     void Init(const Table& table)
     {

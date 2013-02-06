@@ -81,7 +81,7 @@ Query& Query::tableview(const Array &arr)
 // Binary
 Query& Query::equal(size_t column_ndx, BinaryData b)
 {
-    ParentNode* const p = new BinaryNode<EQUAL>(b.pointer, b.len, column_ndx);
+    ParentNode* const p = new BinaryNode<Equal>(b.pointer, b.len, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -98,26 +98,26 @@ Query& Query::add_condition(size_t column_ndx, T value)
 // int64
 Query& Query::equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, EQUAL>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, NOTEQUAL>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, NotEqual>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, GREATER>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Greater>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater_equal(size_t column_ndx, int64_t value)
 {
     if (value > LLONG_MIN) {
-        ParentNode* const p = new IntegerNode<int64_t, GREATER>(value - 1, column_ndx);
+        ParentNode* const p = new IntegerNode<int64_t, Greater>(value - 1, column_ndx);
         UpdatePointers(p, &p->m_child);
     }
     // field >= LLONG_MIN has no effect
@@ -126,7 +126,7 @@ Query& Query::greater_equal(size_t column_ndx, int64_t value)
 Query& Query::less_equal(size_t column_ndx, int64_t value)
 {
     if (value < LLONG_MAX) {
-        ParentNode* const p = new IntegerNode<int64_t, LESS>(value + 1, column_ndx);
+        ParentNode* const p = new IntegerNode<int64_t, Less>(value + 1, column_ndx);
         UpdatePointers(p, &p->m_child);
     }
     // field <= LLONG_MAX has no effect
@@ -134,7 +134,7 @@ Query& Query::less_equal(size_t column_ndx, int64_t value)
 }
 Query& Query::less(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, LESS>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Less>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -146,7 +146,7 @@ Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 }
 Query& Query::equal(size_t column_ndx, bool value)
 {
-    ParentNode* const p = new IntegerNode<bool, EQUAL>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<bool, Equal>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -154,27 +154,27 @@ Query& Query::equal(size_t column_ndx, bool value)
 // ------------- float
 Query& Query::equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, EQUAL> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, Equal> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, NOTEQUAL> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, NotEqual> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, GREATER> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, Greater> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, GREATER_EQUAL> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, GreaterEqual> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, LESS_EQUAL> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, LessEqual> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, LESS> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, Less> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
@@ -186,27 +186,27 @@ Query& Query::between(size_t column_ndx, float from, float to)
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, EQUAL> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, Equal> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, NOTEQUAL> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, NotEqual> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, GREATER> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, Greater> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, GREATER_EQUAL> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, GreaterEqual> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, LESS_EQUAL> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, LessEqual> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, LESS> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, Less> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
@@ -220,9 +220,9 @@ Query& Query::equal(size_t column_ndx, const char* value, bool caseSensitive)
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new StringNode<EQUAL>(value, column_ndx);
+        p = new StringNode<Equal>(value, column_ndx);
     else
-        p = new StringNode<EQUAL_INS>(value, column_ndx);
+        p = new StringNode<EqualIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -230,9 +230,9 @@ Query& Query::begins_with(size_t column_ndx, const char* value, bool caseSensiti
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new StringNode<BEGINSWITH>(value, column_ndx);
+        p = new StringNode<BeginsWith>(value, column_ndx);
     else
-        p = new StringNode<BEGINSWITH_INS>(value, column_ndx);
+        p = new StringNode<BeginsWithIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -240,9 +240,9 @@ Query& Query::ends_with(size_t column_ndx, const char* value, bool caseSensitive
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new StringNode<ENDSWITH>(value, column_ndx);
+        p = new StringNode<EndsWith>(value, column_ndx);
     else
-        p = new StringNode<ENDSWITH_INS>(value, column_ndx);
+        p = new StringNode<EndsWithIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -250,9 +250,9 @@ Query& Query::contains(size_t column_ndx, const char* value, bool caseSensitive)
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new StringNode<CONTAINS>(value, column_ndx);
+        p = new StringNode<Contains>(value, column_ndx);
     else
-        p = new StringNode<CONTAINS_INS>(value, column_ndx);
+        p = new StringNode<ContainsIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -260,9 +260,9 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new StringNode<NOTEQUAL>(value, column_ndx);
+        p = new StringNode<NotEqual>(value, column_ndx);
     else
-        p = new StringNode<NOTEQUAL_INS>(value, column_ndx);
+        p = new StringNode<NotEqualIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -409,12 +409,12 @@ Query& Query::end_group()
 
 Query& Query::Or()
 {
-    ParentNode* const o = new OR_NODE(first[first.size()-1]);
+    ParentNode* const o = new OrNode(first[first.size()-1]);
     all_nodes.push_back(o);
 
     first[first.size()-1] = o;
-    update[update.size()-1] = &((OR_NODE*)o)->m_cond[1];
-    update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
+    update[update.size()-1] = &((OrNode*)o)->m_cond[1];
+    update_override[update_override.size()-1] = &((OrNode*)o)->m_child;
     return *this;
 }
 

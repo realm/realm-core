@@ -29,7 +29,7 @@
 
 namespace tightdb {
 
-template <class T, class cond> class BASICNODE;
+template <class T, class cond> class BasicNode;
 template <class T, class cond> class IntegerNode;
 template <class T>class SequentialGetter;
 
@@ -45,11 +45,11 @@ template<class cond> struct ColumnTypeTraits2<cond, bool> {
 };
 template<class cond> struct ColumnTypeTraits2<cond, float> {
     typedef ColumnFloat column_type;
-    typedef BASICNODE<float,cond> node_type;
+    typedef BasicNode<float,cond> node_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, double> {
     typedef ColumnDouble column_type;
-    typedef BASICNODE<double,cond> node_type;
+    typedef BasicNode<double,cond> node_type;
 };
 
 
