@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -271,6 +271,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <BrowseInformation>true</BrowseInformation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>tightdb32.lib;Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -282,6 +283,9 @@
       <AdditionalLibraryDirectories>..\..\lib</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>libcpmt.lib;LIBCMT.lib</IgnoreSpecificDefaultLibraries>
     </Link>
+    <Bscmake>
+      <PreserveSBR>true</PreserveSBR>
+    </Bscmake>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">
     <ClCompile>
