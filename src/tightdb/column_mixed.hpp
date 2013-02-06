@@ -119,7 +119,7 @@ public:
 
     // Indexing
     bool HasIndex() const {return false;}
-    void BuildIndex(Index& index) {(void)index;}
+    void BuildIndex(Index& index) { static_cast<void>(index); }
     void ClearIndex() {}
 
     size_t GetRef() const {return m_array->GetRef();}
@@ -162,7 +162,7 @@ private:
     };
 
     void clear_value(size_t ndx, MixedColType newtype);
-    
+
     // Get/set/insert 64-bit values in m_refs/m_types
     int64_t get_value(size_t ndx) const;
     void set_value(size_t ndx, int64_t value, MixedColType coltype);
@@ -178,10 +178,10 @@ private:
     // (By having a type for both positive numbers, and another type for negative numbers)
     Column*       m_types;
 
-    // Bit 0 is used to indicate if it's a reference. 
+    // Bit 0 is used to indicate if it's a reference.
     // If not, the data value is stored (shifted 1 bit left). And the sign bit is stored in m_types.
-    RefsColumn*   m_refs;       
-    
+    RefsColumn*   m_refs;
+
     // m_data holds any Binary/String data - if needed.
     ColumnBinary* m_data;
 };
