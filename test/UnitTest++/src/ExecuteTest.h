@@ -35,7 +35,7 @@ void ExecuteTest(T& testObject, TestDetails const& details)
 		stream << "Unhandled exception: " << e.what();
 		CurrentTest::Results()->OnTestFailure(details, stream.GetText());
 	}
-	catch (...)
+ 	catch (...)
 	{
 		CurrentTest::Results()->OnTestFailure(details, "Unhandled exception: Crash!");
 	}

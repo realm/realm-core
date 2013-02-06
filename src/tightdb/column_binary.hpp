@@ -36,8 +36,6 @@ public:
 
     void Destroy();
 
-    bool IsBinaryColumn() const TIGHTDB_NOEXCEPT {return true;}
-
     virtual size_t Size() const TIGHTDB_NOEXCEPT;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 

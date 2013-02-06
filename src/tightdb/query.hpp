@@ -62,6 +62,24 @@ public:
     Query& less_equal(size_t column_ndx, int64_t value);
     Query& between(size_t column_ndx, int64_t from, int64_t to);
 
+    // Conditions: float
+    Query& equal(size_t column_ndx, float value);
+    Query& not_equal(size_t column_ndx, float value);
+    Query& greater(size_t column_ndx, float value);
+    Query& greater_equal(size_t column_ndx, float value);
+    Query& less(size_t column_ndx, float value);
+    Query& less_equal(size_t column_ndx, float value);
+    Query& between(size_t column_ndx, float from, float to);
+
+     // Conditions: double
+    Query& equal(size_t column_ndx, double value);
+    Query& not_equal(size_t column_ndx, double value);
+    Query& greater(size_t column_ndx, double value);
+    Query& greater_equal(size_t column_ndx, double value);
+    Query& less(size_t column_ndx, double value);
+    Query& less_equal(size_t column_ndx, double value);
+    Query& between(size_t column_ndx, double from, double to);
+
     // Conditions: bool
     Query& equal(size_t column_ndx, bool value);
 
@@ -73,22 +91,17 @@ public:
     Query& not_equal(size_t column_ndx, const char* value, bool caseSensitive=true);
 
     // Conditions: date
-    // FIXME: Maybe we can just use 'int' versions for date, but why then do we have a special 'date' column type?
-    // FIXME: The '_date' suffix is needed because 'time_t' may not be distinguishable from 'int64_t' on all platforms.
-/*
-    Query& equal_date(size_t column_ndx, time_t value);
-    Query& not_equal_date(size_t column_ndx, time_t value);
-    Query& greater_date(size_t column_ndx, time_t value);
-    Query& greater_equal_date(size_t column_ndx, time_t value);
-    Query& less_date(size_t column_ndx, time_t value);
-    Query& less_equal_date(size_t column_ndx, time_t value);
-    Query& between_date(size_t column_ndx, time_t from, time_t to);
-*/
+    Query& equal_date(size_t column_ndx, time_t value) { return equal(column_ndx, int64_t(value)); }
+    Query& not_equal_date(size_t column_ndx, time_t value) { return not_equal(column_ndx, int64_t(value)); }
+    Query& greater_date(size_t column_ndx, time_t value) { return greater(column_ndx, int64_t(value)); }
+    Query& greater_equal_date(size_t column_ndx, time_t value) { return greater_equal(column_ndx, int64_t(value)); }
+    Query& less_date(size_t column_ndx, time_t value) { return less(column_ndx, int64_t(value)); }
+    Query& less_equal_date(size_t column_ndx, time_t value) { return less_equal(column_ndx, int64_t(value)); }
+    Query& between_date(size_t column_ndx, time_t from, time_t to) { return between(column_ndx, int64_t(from), int64_t(to)); }
 
     // Conditions: binary data
-    // Only BinaryData prototype can exist, else it would conflict with equal() for strings 
-
-    Query& equal(size_t column_ndx, BinaryData b);
+    // Only BinaryData prototype can exist, else it would conflict with equal() for strings
+    Query& equal(size_t column_ndx, BinaryData value);
 /*
     Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& begins_with_binary(size_t column_ndx, const char* ptr, size_t len);
@@ -104,19 +117,31 @@ public:
     Query& Or();
 
     // Searching
-    size_t         find_next(size_t lastmatch=-1);
+    size_t         find_next(size_t lastmatch=size_t(-1));
     TableView      find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
     ConstTableView find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
     // Aggregates
-    int64_t sum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    int64_t maximum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    int64_t minimum(size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    double  average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
-    size_t  count(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+    size_t count(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+
+    int64_t sum(    size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double average( size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t maximum(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t minimum(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+
+    double sum_float(     size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double average_float( size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    float maximum_float(  size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    float minimum_float  (size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+
+    double sum_double(    size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double average_double(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double maximum_double(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double minimum_double(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+
 /*
-    time_t maximum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    time_t minimum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+  TODO:  time_t maximum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+  TODO:  time_t minimum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 */
 
     // Deletion
@@ -177,8 +202,17 @@ protected:
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
     mutable bool do_delete;
+    
 private:
     size_t m_threadcount;
+
+    template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
+    template<typename T> 
+        double average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+    template <ACTION action, typename T, typename R, class ColClass>
+        R aggregate(R (ColClass::*method)(size_t, size_t) const, 
+                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+
 };
 
 

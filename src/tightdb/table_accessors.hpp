@@ -41,6 +41,8 @@ struct SpecBase {
     typedef int64_t             Int;
     typedef bool                Bool;
     typedef tightdb::Date       Date;
+    typedef float               Float;
+    typedef double              Double;
     typedef const char*         String;
     typedef tightdb::BinaryData Binary;
     typedef tightdb::Mixed      Mixed;
@@ -243,6 +245,88 @@ public:
         const int64_t value = get();
         set(value - 1);
         return value;
+    }
+
+
+    explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
+};
+
+
+/// Field accessor specialization for floats.
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, float, const_tab>: public FieldAccessorBase<Taboid> {
+private:
+    typedef FieldAccessorBase<Taboid> Base;
+
+public:
+    float get() const
+    {
+        return Base::m_table->get_impl()->get_float(col_idx, Base::m_row_idx);
+    }
+
+    void set(float value) const
+    {
+        Base::m_table->get_impl()->set_float(col_idx, Base::m_row_idx, value);
+    }
+
+    operator float() const { return get(); }
+    const FieldAccessor& operator=(float value) const { set(value); return *this; }
+
+    const FieldAccessor& operator+=(float value) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        set(get() + value);
+        return *this;
+    }
+
+    const FieldAccessor& operator-=(float value) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        set(get() - value);
+        return *this;
+    }
+
+
+    explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
+};
+
+
+/// Field accessor specialization for doubles.
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, double, const_tab>: public FieldAccessorBase<Taboid> {
+private:
+    typedef FieldAccessorBase<Taboid> Base;
+
+public:
+    double get() const
+    {
+        return Base::m_table->get_impl()->get_double(col_idx, Base::m_row_idx);
+    }
+
+    void set(double value) const
+    {
+        Base::m_table->get_impl()->set_double(col_idx, Base::m_row_idx, value);
+    }
+
+    operator double() const { return get(); }
+    const FieldAccessor& operator=(double value) const { set(value); return *this; }
+
+    const FieldAccessor& operator+=(double value) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        set(get() + value);
+        return *this;
+    }
+
+    const FieldAccessor& operator-=(double value) const
+    {
+        // FIXME: Should be optimized (can be both optimized and
+        // generalized by using a form of expression templates).
+        set(get() - value);
+        return *this;
     }
 
 
@@ -551,6 +635,10 @@ public:
 
     std::time_t get_date() const { return get().get_date(); } // FIXME: Should be modified so it never throws
 
+    float get_float() const { return get().get_float(); } // FIXME: Should be modified so it never throws
+
+    double get_double() const { return get().get_double(); } // FIXME: Should be modified so it never throws
+
     const char* get_string() const { return get().get_string(); } // FIXME: Should be modified so it never throws
 
     BinaryData get_binary() const { return get().get_binary(); } // FIXME: Should be modified so it never throws
@@ -788,9 +876,120 @@ public:
         return Base::m_table->get_impl()->minimum(col_idx);
     }
 
+    double average() const
+    {
+        return Base::m_table->get_impl()->average(col_idx);
+    }
+
     const ColumnAccessor& operator+=(int64_t value) const
     {
         Base::m_table->get_impl()->add_int(col_idx, value);
+        return *this;
+    }
+};
+
+
+/// Column accessor specialization for float
+template<class Taboid, int col_idx>
+class ColumnAccessor<Taboid, col_idx, float>:
+    public ColumnAccessorBase<Taboid, col_idx, float> {
+private:
+    typedef ColumnAccessorBase<Taboid, col_idx, float> Base;
+
+public:
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+
+    std::size_t find_first(float value) const
+    {
+        return Base::m_table->get_impl()->find_first_float(col_idx, value);
+    }
+
+    BasicTableView<typename Base::RealTable> find_all(float value) const
+    {
+        return Base::m_table->get_impl()->find_all_float(col_idx, value);
+    }
+
+    size_t count(float target) const
+    {
+        return Base::m_table->get_impl()->count_float(col_idx, target);
+    }
+
+    double sum() const
+    {
+        return Base::m_table->get_impl()->sum_float(col_idx);
+    }
+
+    float maximum() const
+    {
+        return Base::m_table->get_impl()->maximum_float(col_idx);
+    }
+
+    float minimum() const
+    {
+        return Base::m_table->get_impl()->minimum_float(col_idx);
+    }
+
+    double average() const
+    {
+        return Base::m_table->get_impl()->average_float(col_idx);
+    }
+
+    const ColumnAccessor& operator+=(float value) const
+    {
+        Base::m_table->get_impl()->add_float(col_idx, value);
+        return *this;
+    }
+};
+
+
+/// Column accessor specialization for double
+template<class Taboid, int col_idx>
+class ColumnAccessor<Taboid, col_idx, double>:
+    public ColumnAccessorBase<Taboid, col_idx, double> {
+private:
+    typedef ColumnAccessorBase<Taboid, col_idx, double> Base;
+
+public:
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+
+    std::size_t find_first(double value) const
+    {
+        return Base::m_table->get_impl()->find_first_double(col_idx, value);
+    }
+
+    BasicTableView<typename Base::RealTable> find_all(double value) const
+    {
+        return Base::m_table->get_impl()->find_all_double(col_idx, value);
+    }
+
+    size_t count(double target) const
+    {
+        return Base::m_table->get_impl()->count_double(col_idx, target);
+    }
+
+    double sum() const
+    {
+        return Base::m_table->get_impl()->sum_double(col_idx);
+    }
+
+    double maximum() const
+    {
+        return Base::m_table->get_impl()->maximum_double(col_idx);
+    }
+
+    double minimum() const
+    {
+        return Base::m_table->get_impl()->minimum_double(col_idx);
+    }
+
+    double average() const
+    {
+        return Base::m_table->get_impl()->average_double(col_idx);
+    }
+
+    const ColumnAccessor& operator+=(double value) const
+    {
+        Base::m_table->get_impl()->add_double(col_idx, value);
         return *this;
     }
 };
@@ -938,12 +1137,13 @@ public:
 
 
 
-
+/// ***********************************************************************************************
 /// This class implements a column of a table as used in a table query.
 ///
 /// \tparam Taboid Matches either 'BasicTable<Spec>' or
 /// 'BasicTableView<Tab>'. Neither may be const-qualified.
 ///
+
 /// FIXME: These do not belong in this file!
 template<class Taboid, int col_idx, class Type> class QueryColumn;
 
@@ -1037,6 +1237,145 @@ public:
 };
 
 
+
+/// QueryColumn specialization for floats.
+template<class Taboid, int col_idx>
+class QueryColumn<Taboid, col_idx, float>: public QueryColumnBase<Taboid, col_idx, float> {
+private:
+    typedef QueryColumnBase<Taboid, col_idx, float> Base;
+    typedef typename Taboid::Query Query;
+
+public:
+    explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
+    using Base::equal;
+    using Base::not_equal;
+
+    Query& greater(float value) const
+    {
+        Base::m_query->m_impl.greater(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& greater_equal(float value) const
+    {
+        Base::m_query->m_impl.greater_equal(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& less(float value) const
+    {
+        Base::m_query->m_impl.less(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& less_equal(float value) const
+    {
+        Base::m_query->m_impl.less_equal(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& between(float from, float to) const
+    {
+        Base::m_query->m_impl.between(col_idx, from, to);
+        return *Base::m_query;
+    };
+
+    double sum(std::size_t* resultcount=NULL, std::size_t start=0,
+               std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.sum_float(col_idx, resultcount, start, end, limit);
+    }
+
+    float maximum(std::size_t* resultcount=NULL, std::size_t start=0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.maximum_float(col_idx, resultcount, start, end, limit);
+    }
+
+    float minimum(std::size_t* resultcount=NULL, std::size_t start=0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.minimum_float(col_idx, resultcount, start, end, limit);
+    }
+
+    double average(std::size_t* resultcount=NULL, std::size_t start=0,
+                   std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.average_float(col_idx, resultcount, start, end, limit);
+    }
+};
+
+
+
+/// QueryColumn specialization for doubles.
+template<class Taboid, int col_idx>
+class QueryColumn<Taboid, col_idx, double>: public QueryColumnBase<Taboid, col_idx, double> {
+private:
+    typedef QueryColumnBase<Taboid, col_idx, double> Base;
+    typedef typename Taboid::Query Query;
+
+public:
+    explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
+    using Base::equal;
+    using Base::not_equal;
+
+    Query& greater(double value) const
+    {
+        Base::m_query->m_impl.greater(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& greater_equal(double value) const
+    {
+        Base::m_query->m_impl.greater_equal(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& less(double value) const
+    {
+        Base::m_query->m_impl.less(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& less_equal(double value) const
+    {
+        Base::m_query->m_impl.less_equal(col_idx, value);
+        return *Base::m_query;
+    }
+
+    Query& between(double from, double to) const
+    {
+        Base::m_query->m_impl.between(col_idx, from, to);
+        return *Base::m_query;
+    };
+
+    double sum(std::size_t* resultcount=NULL, std::size_t start=0,
+               std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.sum_double(col_idx, resultcount, start, end, limit);
+    }
+
+    double maximum(std::size_t* resultcount=NULL, std::size_t start=0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.maximum_double(col_idx, resultcount, start, end, limit);
+    }
+
+    double minimum(std::size_t* resultcount=NULL, std::size_t start=0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.minimum_double(col_idx, resultcount, start, end, limit);
+    }
+
+    double average(std::size_t* resultcount=NULL, std::size_t start=0,
+                   std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    {
+        return Base::m_query->m_impl.average_double(col_idx, resultcount, start, end, limit);
+    }
+};
+
+
+
 /// QueryColumn specialization for booleans.
 template<class Taboid, int col_idx>
 class QueryColumn<Taboid, col_idx, bool>: public QueryColumnBase<Taboid, col_idx, bool> {
@@ -1078,43 +1417,43 @@ public:
 
     Query& equal(std::time_t value) const
     {
-        Base::m_query->m_impl.equal(col_idx, value); // fixme, missing equal_date
+        Base::m_query->m_impl.equal_date(col_idx, value);
         return *Base::m_query;
     }
 
     Query& not_equal(std::time_t value) const
     {
-        Base::m_query->m_impl.not_equal(col_idx, value); // fixme, missing not_equal_date
+        Base::m_query->m_impl.not_equal_date(col_idx, value);
         return *Base::m_query;
     }
 
     Query& greater(std::time_t value) const
     {
-        Base::m_query->m_impl.greater(col_idx, value); // fixme, missing greater_date
+        Base::m_query->m_impl.greater_date(col_idx, value);
         return *Base::m_query;
     }
 
     Query& greater_equal(std::time_t value) const
     {
-        Base::m_query->m_impl.greater_equal(col_idx, value); // fixme, todo, missing greater_equal_date
+        Base::m_query->m_impl.greater_equal_date(col_idx, value);
         return *Base::m_query;
     }
 
     Query& less(std::time_t value) const
     {
-        Base::m_query->m_impl.less(col_idx, value); // fixme, todo, missing less_date
+        Base::m_query->m_impl.less_date(col_idx, value);
         return *Base::m_query;
     }
 
     Query& less_equal(std::time_t value) const
     {
-        Base::m_query->m_impl.less_equal(col_idx, value);
+        Base::m_query->m_impl.less_equal_date(col_idx, value);
         return *Base::m_query;
     }
 
     Query& between(std::time_t from, std::time_t to) const
     {
-        Base::m_query->m_impl.between(col_idx, from, to);
+        Base::m_query->m_impl.between_date(col_idx, from, to);
         return *Base::m_query;
     };
 

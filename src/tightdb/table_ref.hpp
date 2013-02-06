@@ -57,7 +57,7 @@ template<class> class BasicTable;
  * group) may not be destroyed until all "smart" table references
  * obtained from it, or from any of its subtables, are destroyed.
  */
-template<class T> class BasicTableRef: private bind_ptr<T> {
+template<class T> class BasicTableRef: bind_ptr<T> {
 public:
 #ifdef TIGHTDB_HAVE_CXX11_CONSTEXPR
     constexpr BasicTableRef() {}
@@ -104,7 +104,12 @@ public:
     template<class U> bool operator<(const BasicTableRef<U>&) const;
 
     // Dereference
+#ifdef __clang__
+    // Clang has a bug that causes it to effectively ignore the 'using' declaration.
+    T& operator*() const { return bind_ptr<T>::operator*(); }
+#else
     using bind_ptr<T>::operator*;
+#endif
     using bind_ptr<T>::operator->;
 
 #ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
