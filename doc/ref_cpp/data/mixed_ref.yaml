@@ -8,19 +8,19 @@ SUMMARY    : &g_mixed_summary
              Flexible data type.
 DESCR      : &g_mixed_descr
              The Mixed class is a light-weight implementation of a flexible type system. Once
-             a variable is given a value via a constructor, it is not possible to modify the 
+             a variable is given a value via a constructor, it is not possible to modify the
              value. Any supported type of TightDB can be used with the Mixed class. The current
-             supported types are boolean, integer, timestamps, strings, binary data and 
+             supported types are boolean, integer, timestamps, strings, binary data and
              {@link class_dyn_table}.
 
              Using the Mixed class resembles using a dynamic typed language. The flexibility
              of mixing types has a cost as compacting data is harder and queries will generally
              be slower.
-SEE        : 
-EXAMPLES: 
-- DESCR    : 
+SEE        :
+EXAMPLES:
+- DESCR    :
   CODE     : ex_cpp_group_intro
-IGNORE     : []                   # List of method-ids to ignore   
+IGNORE     : []                   # List of method-ids to ignore
 CATEGORIES:
 - Constructors:
   METHODS:
@@ -33,19 +33,19 @@ CATEGORIES:
                  Mixed typed variables are instances of the Mixed class. Mixed typed values add a high
                  degree of flexibility to schemas.
       SIGNATURE: |
-                 Mixed(bool v)       
-                 Mixed(int64_t v)    
-                 Mixed(Date v)       
+                 Mixed(bool v)
+                 Mixed(int64_t v)
+                 Mixed(Date v)
                  Mixed(const char* v)
                  Mixed(BinaryData v)
                  Mixed(subtable_tag)
-      PARAMS:                 
+      PARAMS:
       - NAME   : v
         TYPES  : [bool, int64_t, Date, const char*, BinaryData]
         DESCR  : The value.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_mixed_constructor
-        DESCR  : 
+        DESCR  :
 - Getters:
   METHODS:
   - g_mixed_get_type:
@@ -54,13 +54,13 @@ CATEGORIES:
                  Get the type.
       DESCR    : &g_mixed_get_type_descr
                  This method retrieves the real type of a Mixed variable.
-      CONST    : True             
-      RETURN:                 
+      CONST    : True
+      RETURN:
         TYPES  : DataType
         DESCR  : The type.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_mixed_get_type
-        DESCR  : 
+        DESCR  :
   - g_mixed_get_bool:
   - g_mixed_get_int:
   - g_mixed_get_date:
@@ -77,10 +77,10 @@ CATEGORIES:
                  std::time_t get_date()   const;
                  const char* get_string() const;
                  BinaryData  get_binary() const;
-      CONST    : True             
-      RETURN:                 
+      CONST    : True
+      RETURN:
         TYPES  : [bool, int64_t, time_t, const char*, BinaryData]
         DESCR  : The value.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_mixed_get_value
-        DESCR  : 
+        DESCR  :

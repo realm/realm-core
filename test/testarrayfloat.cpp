@@ -99,7 +99,7 @@ void BasicArray_Delete()
     CHECK_EQUAL(1, f.Get(0));
     CHECK_EQUAL(2, f.Get(1));
     CHECK_EQUAL(3, f.Get(2));
-        
+
     // Delete middle
     f.Delete(1);
     CHECK_EQUAL(2, f.Size());
@@ -290,7 +290,7 @@ void BasicArray_Find()
 
     // Empty list
     CHECK_EQUAL(-1, f.find_first(0));
-    
+
     // Add some values
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
     for (size_t i=0; i<6; ++i) {
@@ -304,10 +304,10 @@ void BasicArray_Find()
 
     // non-existing
     CHECK_EQUAL(-1, f.find_first(T(0)));
-   
+
     // various range limitations
     CHECK_EQUAL( 1, f.find_first(T(2.2), 1, 2));    // ok
-    CHECK_EQUAL( 1, f.find_first(T(2.2), 1, 3));    
+    CHECK_EQUAL( 1, f.find_first(T(2.2), 1, 3));
     CHECK_EQUAL( 5, f.find_first(T(4.4), 1));       // defaul end=all
     CHECK_EQUAL(-1, f.find_first(T(2.2), 1, 1));    // start=end
     CHECK_EQUAL(-1, f.find_first(T(1.1), 1, 4));    // no match .end 1 too little
@@ -336,7 +336,7 @@ void BasicArray_Count()
 
     // Empty list
     CHECK_EQUAL(0, f.count(0));
-    
+
     // Add some values
     //                0       1        2       3       4       5
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
@@ -372,7 +372,7 @@ void BasicArray_Compare()
     // Empty list
     CHECK_EQUAL(true, f1.Compare(f2));
     CHECK_EQUAL(true, f2.Compare(f1));
-    
+
     // Add some values
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
     for (size_t i=0; i<6; ++i) {

@@ -103,7 +103,7 @@ TEST(TableView_Floats_Find_and_Aggregations)
     CHECK_EQUAL(0, v_all.column().col_double.find_first(-1.2) );
     CHECK_EQUAL(5, v_all.column().col_double.find_first(0.0) );
     CHECK_EQUAL(2, v_all.column().col_double.find_first(3.2) );
-    
+
     CHECK_EQUAL(1, v_all.column().col_float.find_first(2.1f) );
     CHECK_EQUAL(5, v_all.column().col_float.find_first(0.0f) );
     CHECK_EQUAL(2, v_all.column().col_float.find_first(3.1f) );

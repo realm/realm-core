@@ -13,7 +13,7 @@ int main()
 
 // @@EndFold@@
     table.add("Joe",  17, 50);
-    table.add("Jack", 22, 60); 
+    table.add("Jack", 22, 60);
     table.add("Mary", 14, 70);
     table.add("Jill", 21, 80);
 

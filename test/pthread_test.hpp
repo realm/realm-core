@@ -12,7 +12,7 @@ Use by #including this file in the file(s) that call pthreads functions. If you 
 #ifndef TIGHTDB_PTHREAD_TEST_HPP
 #define TIGHTDB_PTHREAD_TEST_HPP
 
-unsigned int ptf_fastrand() 
+unsigned int ptf_fastrand()
 {
     // Must be fast because important edge case is 0 delay. Not thread safe, but that just adds randomnes.
     static unsigned int u = 1;

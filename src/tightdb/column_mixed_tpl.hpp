@@ -56,7 +56,7 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXC
 inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
 {
     TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != type_Table) 
+    if (m_types->Get(row_idx) != type_Table)
         return 0;
     return m_refs->get_subtable_ptr(row_idx);
 }
@@ -76,7 +76,7 @@ inline void ColumnMixed::invalidate_subtables_virtual()
 // Getters
 //
 
-#define TIGHTDB_BIT63 0x8000000000000000    
+#define TIGHTDB_BIT63 0x8000000000000000
 
 inline int64_t ColumnMixed::get_value(size_t ndx) const
 {
@@ -168,7 +168,7 @@ inline BinaryData ColumnMixed::get_binary(size_t ndx) const
 // Setters
 //
 
-// Set a int64 value. 
+// Set a int64 value.
 // Store 63 bit of the value in m_refs. Store sign bit in m_types.
 
 inline void ColumnMixed::set_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type)
@@ -177,7 +177,7 @@ inline void ColumnMixed::set_int64(size_t ndx, int64_t value, MixedColType pos_t
 
     // If sign-bit is set in value, 'store' it in the column-type
     const MixedColType coltype = ((value & TIGHTDB_BIT63) == 0) ? pos_type : neg_type;
-    
+
     // Remove refs or binary data (sets type to double)
     clear_value(ndx, coltype);
 
@@ -238,7 +238,7 @@ inline void ColumnMixed::set_subtable(std::size_t ndx)
 // Inserts
 //
 
-// Insert a int64 value. 
+// Insert a int64 value.
 // Store 63 bit of the value in m_refs. Store sign bit in m_types.
 
 inline void ColumnMixed::insert_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type)
@@ -272,7 +272,7 @@ inline void ColumnMixed::insert_float(size_t ndx, float value)
     TIGHTDB_ASSERT(ndx <= m_types->Size());
 
     // Convert to int32_t first, to ensure we only access 32 bits from the float.
-    const int32_t val32 = TypePunning<int32_t>( value );    
+    const int32_t val32 = TypePunning<int32_t>( value );
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     const int64_t val64 = (static_cast<int64_t>(val32) << 1) + 1;

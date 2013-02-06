@@ -1467,7 +1467,7 @@ int64_t Table::maximum(size_t column_ndx) const
     const Column& column = GetColumn<Column, col_type_Int>(column_ndx);
     return column.maximum();
 #else
-    if (is_empty()) 
+    if (is_empty())
         return 0;
 
     int64_t mv = get_int(column_ndx, 0);

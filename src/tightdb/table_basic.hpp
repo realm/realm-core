@@ -321,9 +321,9 @@ public:
 // Query& Query::tableview(const TableView& tv)
 // Query& Query::tableview(const Array &arr)
 
-    Query& tableview(const typename BasicTable<Spec>::View& v) { 
+    Query& tableview(const typename BasicTable<Spec>::View& v) {
         m_impl.tableview(*v.get_impl());
-        return *this; 
+        return *this;
     }
 
 

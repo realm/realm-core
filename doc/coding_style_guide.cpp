@@ -15,10 +15,10 @@ class tightdb {                             // "{" on same line
 }
 
 void tightdb::my_func(int a,
-                      int b)      
+                      int b)
 // IF multiple parameters are made on multiple lines, align identation
 // Function "{" on seperate line. Yes - it's inconsistent...but we like it
-{  
+{
     // Indentation is 4 spaces - not TAB
     char* ptr;                              // Pointer "*" belongs to the type
     const char* const ptr;                  // Const placement
@@ -34,7 +34,7 @@ void tightdb::my_func(int a,
     }
 
     // space between expressions and operators
-    if (a && b)                             
+    if (a && b)
         do();
 
     const size_t count = t.size();          // seperate var for function call "size"

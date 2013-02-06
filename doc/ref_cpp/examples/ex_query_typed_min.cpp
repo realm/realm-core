@@ -14,7 +14,7 @@ void main()
 // @@EndFold@@
     table.add("Mary", 14, 35);  // match
     table.add("Joe",  17, 40);  // match
-    table.add("Jack", 22, 41); 
+    table.add("Jack", 22, 41);
     table.add("Jill", 21, 37);
 
     // Calculate sum of weight where age >= 13 && age <= 19

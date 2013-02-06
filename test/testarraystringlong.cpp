@@ -206,14 +206,14 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind)
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongCount)
 {
     c.Clear();
-    
+
     // first, middle and end
     c.add("foobar");
     c.add("bar abc");
     c.add("foobar");
     c.add("baz");
     c.add("foobar");
-    
+
     const size_t count = c.count("foobar");
     CHECK_EQUAL(3, count);
 }

@@ -558,7 +558,7 @@ TEST(Table_Sorted_Int)
 TEST(Table_Index_String)
 {
     TestTableEnum table;
-    
+
     table.add(Mon, "jeff");
     table.add(Tue, "jim");
     table.add(Wed, "jennifer");
@@ -567,13 +567,13 @@ TEST(Table_Index_String)
     table.add(Sat, "jimbo");
     table.add(Sun, "johnny");
     table.add(Mon, "jennifer"); //duplicate
-    
+
     table.column().second.set_index();
     CHECK(table.column().second.has_index());
-    
+
     const size_t r1 = table.column().second.find_first("jimmi");
     CHECK_EQUAL(not_found, r1);
-    
+
     const size_t r2 = table.column().second.find_first("jeff");
     const size_t r3 = table.column().second.find_first("jim");
     const size_t r4 = table.column().second.find_first("jimbo");
@@ -582,7 +582,7 @@ TEST(Table_Index_String)
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);
     CHECK_EQUAL(6, r5);
-    
+
     const size_t c1 = table.column().second.count("jennifer");
     CHECK_EQUAL(2, c1);
 }

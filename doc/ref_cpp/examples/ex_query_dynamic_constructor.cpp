@@ -5,7 +5,7 @@ using namespace tightdb;
 
 int main()
 {
-// @@Show@@ 
+// @@Show@@
     Group group;
     TableRef table = group.get_table("test");
 

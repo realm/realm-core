@@ -18,7 +18,7 @@ void main()
     table.add("Jill", 21, 80);  // match
 
     PeopleTable::View view = table.where().age.greater(15).find_all();
-    
+
     int64_t heaviest = view.column().weight.maximum();
 // @@Fold@@
     assert(heaviest == 80);

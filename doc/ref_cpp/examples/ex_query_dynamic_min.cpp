@@ -40,7 +40,7 @@ int main()
     int64_t min = table->where().minimum(1);
     assert(min == 27);
 
-    // Find the minimum Age (column 1) where Name (column 0) contains "e" 
+    // Find the minimum Age (column 1) where Name (column 0) contains "e"
     Query q = table->where().contains(0, "e");
     min = q.minimum(1);
     assert(min == 44);

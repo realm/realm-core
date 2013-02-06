@@ -25,7 +25,7 @@
 namespace tightdb {
 
 template<typename T>
-inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc) 
+inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc)
 {
     const size_t capacity = Array::initial_capacity;
     const MemRef mem_ref = alloc.Alloc(capacity); // Throws
@@ -35,7 +35,7 @@ inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc)
     return mem_ref.ref;
 }
 
-template<typename T> 
+template<typename T>
 inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc)
                                :Array(alloc)
 {
@@ -61,7 +61,7 @@ inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT : Array(no_pr
 }
 
 
-template<typename T> 
+template<typename T>
 inline void BasicArray<T>::Clear()
 {
     CopyOnWrite(); // Throws
@@ -71,20 +71,20 @@ inline void BasicArray<T>::Clear()
     set_header_len(0);
 }
 
-template<typename T> 
+template<typename T>
 inline void BasicArray<T>::add(T value)
 {
     Insert(m_len, value);
 }
 
-template<typename T> 
+template<typename T>
 inline T BasicArray<T>::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     T* dataPtr = reinterpret_cast<T*>(m_data) + ndx;
     return *dataPtr;
 }
 
-template<typename T> 
+template<typename T>
 inline void BasicArray<T>::Set(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < m_len);
@@ -97,7 +97,7 @@ inline void BasicArray<T>::Set(size_t ndx, T value)
     *data = value;
 }
 
-template<typename T> 
+template<typename T>
 void BasicArray<T>::Insert(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
@@ -124,7 +124,7 @@ void BasicArray<T>::Insert(size_t ndx, T value)
      ++m_len;
 }
 
-template<typename T> 
+template<typename T>
 void BasicArray<T>::Delete(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_len);
@@ -150,21 +150,21 @@ template<typename T>
 bool BasicArray<T>::Compare(const BasicArray<T>& c) const
 {
     for (size_t i = 0; i < Size(); ++i) {
-        if (Get(i) != c.Get(i)) 
+        if (Get(i) != c.Get(i))
             return false;
     }
     return true;
 }
 
 
-template<typename T> 
+template<typename T>
 size_t BasicArray<T>::CalcByteLen(size_t count, size_t /*width*/) const
 {
     // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
     return 8 + (count * sizeof(T));
 }
 
-template<typename T> 
+template<typename T>
 size_t BasicArray<T>::CalcItemCount(size_t bytes, size_t /*width*/) const TIGHTDB_NOEXCEPT
 {
     // fixme: ??? what about width = 0? return -1?
@@ -173,31 +173,31 @@ size_t BasicArray<T>::CalcItemCount(size_t bytes, size_t /*width*/) const TIGHTD
     return bytes_without_header / sizeof(T);
 }
 
-template<typename T> 
+template<typename T>
 size_t BasicArray<T>::Find(T target, size_t start, size_t end) const
 {
-    if (end == (size_t)-1) 
+    if (end == (size_t)-1)
         end = m_len;
-    if (start >= end) 
+    if (start >= end)
         return not_found;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
     if (m_len == 0)
         return not_found; // empty list
 
     for (size_t i = start; i < end; ++i) {
-        if (target == Get(i)) 
+        if (target == Get(i))
             return i;
     }
     return not_found;
 }
 
-template<typename T> 
+template<typename T>
 size_t BasicArray<T>::find_first(T value, size_t start, size_t end) const
 {
     return Find(value, start, end);
 }
 
-template<typename T> 
+template<typename T>
 void BasicArray<T>::find_all(Array& result, T value, size_t add_offset, size_t start, size_t end)
 {
     size_t first = start - 1;
@@ -205,12 +205,12 @@ void BasicArray<T>::find_all(Array& result, T value, size_t add_offset, size_t s
         first = Find(value, first + 1, end);
         if (first != not_found)
             result.add(first + add_offset);
-        else 
+        else
             break;
     }
 }
 
-template<typename T> 
+template<typename T>
 size_t BasicArray<T>::count(T value, size_t start, size_t end) const
 {
     size_t count = 0;
@@ -219,9 +219,9 @@ size_t BasicArray<T>::count(T value, size_t start, size_t end) const
         lastmatch = Find(value, lastmatch+1, end);
         if (lastmatch != not_found)
             ++count;
-        else 
+        else
             break;
-    } 
+    }
     return count;
 }
 

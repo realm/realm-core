@@ -12,7 +12,7 @@ int main()
     table.add("Joe",   57);
     table.add("Mary",  14);
     table.add("Alice", 42);
-    table.add("Jack",  32); 
+    table.add("Jack",  32);
 
     // Select rows where age > 18
     PeopleTable::View view = table.where().age.greater(18).find_all();
