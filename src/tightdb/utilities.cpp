@@ -34,9 +34,9 @@ void cpuid_init()
 #endif
 
 // Byte is atomic. Race can/will occur but that's fine
-    if(cret & 0x100000) // test for 4.2
+    if (cret & 0x100000) // test for 4.2
         sse_support = 1;
-    else if(cret & 0x1) // Test for 3
+    else if (cret & 0x1) // Test for 3
         sse_support = 0;
     else
         sse_support = -2;
@@ -139,4 +139,51 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     return;
 }
 
+// popcount
+#if defined(_MSC_VER) && _MSC_VER >= 1500
+    #include <intrin.h>
+    int fast_popcount32(int32_t x)
+    {
+        return __popcnt(x);
+    }
+    #if defined(_M_X64)
+        int fast_popcount64(int64_t x)
+        {
+            return (int)__popcnt64(x);
+        }
+    #else
+        int fast_popcount64(int64_t x)
+        {
+            return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
+        }
+    #endif
+#elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
+    #define fast_popcount32 __builtin_popcount
+    #if ULONG_MAX == 0xffffffff
+        int fast_popcount64(int64_t x)
+        {
+            return __builtin_popcount((unsigned)(x)) + __builtin_popcount((unsigned)(x >> 32));
+        }
+    #else
+        int fast_popcount64(int64_t x)
+        {
+            return __builtin_popcountll(x);
+        }
+    #endif
+#else
+    static const char a_popcount_bits[256] = {
+        0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+    };
+
+    // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
+    inline int fast_popcount32(uint32_t x)
+    {
+        return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
+    }
+    inline int fast_popcount64(uint64_t x)
+    {
+        return fast_popcount32(x) + fast_popcount32(x >> 32);
+    }
+
+#endif // select best popcount implementations
 }

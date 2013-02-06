@@ -480,6 +480,16 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
         buf = encode_int(buf, int(value.get_bool()));
         transact_log_advance(buf);
         break;
+    case COLUMN_TYPE_FLOAT:
+        TIGHTDB_ASSERT(false);  // FIXME: IMPLEMENT
+        //buf = encode_float(buf, value.get_float()));
+        transact_log_advance(buf);
+        break;
+    case COLUMN_TYPE_DOUBLE:
+        TIGHTDB_ASSERT(false);  // FIXME: IMPLEMENT
+        //buf = encode_double(buf, value.get_double()));
+        transact_log_advance(buf);
+        break;
     case COLUMN_TYPE_DATE:
         buf = encode_int(buf, value.get_date());
         transact_log_advance(buf);

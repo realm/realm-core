@@ -1,10 +1,6 @@
 #include <tightdb/column_mixed.hpp>
-#include <tightdb/column_binary.hpp>
-
-using namespace std;
 
 namespace tightdb {
-
 
 ColumnMixed::~ColumnMixed()
 {
@@ -27,11 +23,13 @@ void ColumnMixed::SetParent(ArrayParent *parent, size_t pndx)
 
 void ColumnMixed::UpdateFromParent()
 {
-    if (!m_array->UpdateFromParent()) return;
+    if (!m_array->UpdateFromParent())
+        return;
 
     m_types->UpdateFromParent();
     m_refs->UpdateFromParent();
-    if (m_data) m_data->UpdateFromParent();
+    if (m_data)
+        m_data->UpdateFromParent();
 }
 
 
@@ -72,7 +70,8 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
 
 void ColumnMixed::InitDataColumn()
 {
-    if (m_data) return;
+    if (m_data)
+        return;
 
     TIGHTDB_ASSERT(m_array->Size() == 2);
 
@@ -84,27 +83,33 @@ void ColumnMixed::InitDataColumn()
     m_data->SetParent(m_array, 2);
 }
 
-void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype)
+void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
 
-    const ColumnType type = (ColumnType)m_types->Get(ndx);
-    if (type != COLUMN_TYPE_INT) {
+    const MixedColType type = (MixedColType)m_types->Get(ndx);
+    if (type != MIXED_COL_INT) {
         switch (type) {
-            case COLUMN_TYPE_BOOL:
-            case COLUMN_TYPE_DATE:
+            case MIXED_COL_INT_NEG:
+            case MIXED_COL_BOOL:
+            case MIXED_COL_DATE:
+            case MIXED_COL_FLOAT:
+            case MIXED_COL_DOUBLE:
+            case MIXED_COL_DOUBLE_NEG:
                 break;
-            case COLUMN_TYPE_STRING:
-            case COLUMN_TYPE_BINARY:
+            case MIXED_COL_STRING:
+            case MIXED_COL_BINARY:
             {
                 // If item is in middle of the column, we just clear
                 // it to avoid having to adjust refs to following items
                 const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-                if (ref == m_data->Size()-1) m_data->Delete(ref);
-                else m_data->Set(ref, "", 0);
+                if (ref == m_data->Size()-1) 
+                    m_data->Delete(ref);
+                else 
+                    m_data->Set(ref, "", 0);
                 break;
             }
-            case COLUMN_TYPE_TABLE:
+            case MIXED_COL_TABLE:
             {
                 // Delete entire table
                 const size_t ref = m_refs->GetAsRef(ndx);
@@ -116,279 +121,8 @@ void ColumnMixed::ClearValue(size_t ndx, ColumnType newtype)
                 TIGHTDB_ASSERT(false);
         }
     }
-
-    if (type != newtype) m_types->Set(ndx, newtype);
-}
-
-ColumnType ColumnMixed::GetType(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-    return ColumnType(m_types->Get(ndx));
-}
-
-int64_t ColumnMixed::GetInt(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_INT);
-
-    const int64_t value = m_refs->Get(ndx) >> 1;
-    return value;
-}
-
-bool ColumnMixed::get_bool(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_BOOL);
-
-    const bool value = (m_refs->Get(ndx) >> 1) == 1;
-    return value;
-}
-
-time_t ColumnMixed::get_date(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_DATE);
-
-    const time_t value = m_refs->Get(ndx) >> 1;
-    return value;
-}
-
-const char* ColumnMixed::get_string(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_STRING);
-    TIGHTDB_ASSERT(m_data);
-
-    const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-    const char* value = (const char*)m_data->GetData(ref);
-
-    return value;
-}
-
-BinaryData ColumnMixed::get_binary(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-    TIGHTDB_ASSERT(m_types->Get(ndx) == COLUMN_TYPE_BINARY);
-    TIGHTDB_ASSERT(m_data);
-
-    const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-
-    return m_data->Get(ref);
-}
-
-void ColumnMixed::fill(size_t count)
-{
-    TIGHTDB_ASSERT(is_empty());
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (size_t i = 0; i < count; ++i) {
-        m_types->Insert(i, COLUMN_TYPE_INT);
-    }
-    for (size_t i = 0; i < count; ++i) {
-        m_refs->Insert(i, 1); // 1 is zero shifted one and low bit set; 
-    }
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
-}
-
-void ColumnMixed::insert_int(size_t ndx, int64_t value)
-{
-    TIGHTDB_ASSERT(ndx <= m_types->Size());
-
-    // Shift value one bit and set lowest bit to indicate
-    // that this is not a ref
-    const int64_t v = (value << 1) + 1;
-
-    m_types->Insert(ndx, COLUMN_TYPE_INT);
-    m_refs->Insert(ndx, v);
-}
-
-void ColumnMixed::insert_bool(size_t ndx, bool value)
-{
-    TIGHTDB_ASSERT(ndx <= m_types->Size());
-
-    // Shift value one bit and set lowest bit to indicate
-    // that this is not a ref
-    const int64_t v = ((value ? 1 : 0) << 1) + 1;
-
-    m_types->Insert(ndx, COLUMN_TYPE_BOOL);
-    m_refs->Insert(ndx, v);
-}
-
-void ColumnMixed::insert_date(size_t ndx, time_t value)
-{
-    TIGHTDB_ASSERT(ndx <= m_types->Size());
-
-    // Shift value one bit and set lowest bit to indicate
-    // that this is not a ref
-    const int64_t v = (value << 1) + 1;
-
-    m_types->Insert(ndx, COLUMN_TYPE_DATE);
-    m_refs->Insert(ndx, v);
-}
-
-void ColumnMixed::insert_string(size_t ndx, const char* value)
-{
-    TIGHTDB_ASSERT(ndx <= m_types->Size());
-    InitDataColumn();
-
-    const size_t len = strlen(value)+1;
-    const size_t ref = m_data->Size();
-    m_data->add(value, len);
-
-    // Shift value one bit and set lowest bit to indicate
-    // that this is not a ref
-    const int64_t v = (ref << 1) + 1;
-
-    m_types->Insert(ndx, COLUMN_TYPE_STRING);
-    m_refs->Insert(ndx, v);
-}
-
-void ColumnMixed::insert_binary(size_t ndx, const char* value, size_t len)
-{
-    TIGHTDB_ASSERT(ndx <= m_types->Size());
-    InitDataColumn();
-
-    const size_t ref = m_data->Size();
-    m_data->add(value, len);
-
-    // Shift value one bit and set lowest bit to indicate
-    // that this is not a ref
-    const int64_t v = (ref << 1) + 1;
-
-    m_types->Insert(ndx, COLUMN_TYPE_BINARY);
-    m_refs->Insert(ndx, v);
-}
-
-void ColumnMixed::SetInt(size_t ndx, int64_t value)
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-
-    // Remove refs or binary data (sets type to int)
-    ClearValue(ndx, COLUMN_TYPE_INT);
-
-    // Shift value one bit and set lowest bit to indicate
-    // that this is not a ref
-    const int64_t v = (value << 1) + 1;
-
-    m_refs->Set(ndx, v);
-}
-
-void ColumnMixed::set_bool(size_t ndx, bool value)
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-
-    // Remove refs or binary data (sets type to int)
-    ClearValue(ndx, COLUMN_TYPE_BOOL);
-
-    // Shift value one bit and set lowest bit to indicate
-    // that this is not a ref
-    const int64_t v = ((value ? 1 : 0) << 1) + 1;
-
-    m_refs->Set(ndx, v);
-}
-
-void ColumnMixed::set_date(size_t ndx, time_t value)
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-
-    // Remove refs or binary data (sets type to int)
-    ClearValue(ndx, COLUMN_TYPE_DATE);
-
-    // Shift value one bit and set lowest bit to indicate
-    // that this is not a ref
-    const int64_t v = (int64_t(value) << 1) + 1;
-
-    m_refs->Set(ndx, v);
-}
-
-void ColumnMixed::set_string(size_t ndx, const char* value)
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-    InitDataColumn();
-
-    const ColumnType type = (ColumnType)m_types->Get(ndx);
-    const size_t len = strlen(value)+1;
-
-    // See if we can reuse data position
-    if (type == COLUMN_TYPE_STRING) {
-        const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-        m_data->Set(ref, value, len);
-    }
-    else if (type == COLUMN_TYPE_BINARY) {
-        const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-        m_data->Set(ref, value, len);
-        m_types->Set(ndx, COLUMN_TYPE_STRING);
-    }
-    else {
-        // Remove refs or binary data
-        ClearValue(ndx, COLUMN_TYPE_STRING);
-
-        // Add value to data column
-        const size_t ref = m_data->Size();
-        m_data->add(value, len);
-
-        // Shift value one bit and set lowest bit to indicate
-        // that this is not a ref
-        const int64_t v = (ref << 1) + 1;
-
-        m_types->Set(ndx, COLUMN_TYPE_STRING);
-        m_refs->Set(ndx, v);
-    }
-}
-
-void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-    InitDataColumn();
-
-    const ColumnType type = (ColumnType)m_types->Get(ndx);
-
-    // See if we can reuse data position
-    if (type == COLUMN_TYPE_STRING) {
-        const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-        m_data->Set(ref, value, len);
-        m_types->Set(ndx, COLUMN_TYPE_BINARY);
-    }
-    else if (type == COLUMN_TYPE_BINARY) {
-        const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-        m_data->Set(ref, value, len);
-    }
-    else {
-        // Remove refs or binary data
-        ClearValue(ndx, COLUMN_TYPE_BINARY);
-
-        // Add value to data column
-        const size_t ref = m_data->Size();
-        m_data->add(value, len);
-
-        // Shift value one bit and set lowest bit to indicate
-        // that this is not a ref
-        const int64_t v = (ref << 1) + 1;
-
-        m_types->Set(ndx, COLUMN_TYPE_BINARY);
-        m_refs->Set(ndx, v);
-    }
-}
-
-void ColumnMixed::insert_subtable(size_t ndx)
-{
-    TIGHTDB_ASSERT(ndx <= m_types->Size());
-    const size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
-    m_types->Insert(ndx, COLUMN_TYPE_TABLE);
-    m_refs->Insert(ndx, ref);
-}
-
-void ColumnMixed::set_subtable(size_t ndx)
-{
-    TIGHTDB_ASSERT(ndx < m_types->Size());
-    const size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
-    ClearValue(ndx, COLUMN_TYPE_TABLE); // Remove any previous refs or binary data
-    m_refs->Set(ndx, ref);
+    if (type != newtype) 
+        m_types->Set(ndx, newtype);
 }
 
 void ColumnMixed::Delete(size_t ndx)
@@ -396,7 +130,7 @@ void ColumnMixed::Delete(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_types->Size());
 
     // Remove refs or binary data
-    ClearValue(ndx, COLUMN_TYPE_INT);
+    clear_value(ndx, MIXED_COL_INT);
 
     m_types->Delete(ndx);
     m_refs->Delete(ndx);
@@ -408,25 +142,143 @@ void ColumnMixed::Clear()
 {
     m_types->Clear();
     m_refs->Clear();
-    if (m_data) m_data->Clear();
+    if (m_data) 
+        m_data->Clear();
+}
+
+ColumnType ColumnMixed::GetType(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+    MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));
+    switch (coltype) {
+    case MIXED_COL_INT:         return COLUMN_TYPE_INT;
+    case MIXED_COL_INT_NEG:     return COLUMN_TYPE_INT;
+    case MIXED_COL_BOOL:        return COLUMN_TYPE_BOOL;
+    case MIXED_COL_STRING:      return COLUMN_TYPE_STRING;
+    case MIXED_COL_BINARY:      return COLUMN_TYPE_BINARY;
+    case MIXED_COL_TABLE:       return COLUMN_TYPE_TABLE;
+    case MIXED_COL_DATE:        return COLUMN_TYPE_DATE;
+    case MIXED_COL_FLOAT:       return COLUMN_TYPE_FLOAT;
+    case MIXED_COL_DOUBLE:      return COLUMN_TYPE_DOUBLE;
+    case MIXED_COL_DOUBLE_NEG:  return COLUMN_TYPE_DOUBLE;
+    default:
+        TIGHTDB_ASSERT(false); 
+        return (COLUMN_TYPE_INT);
+    }
+}
+
+void ColumnMixed::fill(size_t count)
+{
+    TIGHTDB_ASSERT(is_empty());
+
+    // Fill column with default values
+    // TODO: this is a very naive approach
+    // we could speedup by creating full nodes directly
+    for (size_t i = 0; i < count; ++i) {
+        m_types->Insert(i, MIXED_COL_INT);
+    }
+    for (size_t i = 0; i < count; ++i) {
+        m_refs->Insert(i, 1); // 1 is zero shifted one and low bit set; 
+    }
+
+#ifdef TIGHTDB_DEBUG
+    Verify();
+#endif
+}
+
+
+void ColumnMixed::set_string(size_t ndx, const char* value)
+{
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+    InitDataColumn();
+
+    const MixedColType type = (MixedColType)m_types->Get(ndx);
+    const size_t len = strlen(value)+1;
+
+    // See if we can reuse data position
+    if (type == MIXED_COL_STRING) {
+        const size_t ref = m_refs->GetAsRef(ndx) >> 1;
+        m_data->Set(ref, value, len);
+    }
+    else if (type == MIXED_COL_BINARY) {
+        const size_t ref = m_refs->GetAsRef(ndx) >> 1;
+        m_data->Set(ref, value, len);
+        m_types->Set(ndx, MIXED_COL_STRING);
+    }
+    else {
+        // Remove refs or binary data
+        clear_value(ndx, MIXED_COL_STRING);
+
+        // Add value to data column
+        const size_t ref = m_data->Size();
+        m_data->add(value, len);
+
+        // Shift value one bit and set lowest bit to indicate that this is not a ref
+        const int64_t v = (ref << 1) + 1;
+
+        m_types->Set(ndx, MIXED_COL_STRING);
+        m_refs->Set(ndx, v);
+    }
+}
+
+void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
+{
+    TIGHTDB_ASSERT(ndx < m_types->Size());
+    InitDataColumn();
+
+    const MixedColType type = (MixedColType)m_types->Get(ndx);
+
+    // See if we can reuse data position
+    if (type == MIXED_COL_STRING) {
+        const size_t ref = m_refs->GetAsRef(ndx) >> 1;
+        m_data->Set(ref, value, len);
+        m_types->Set(ndx, MIXED_COL_BINARY);
+    }
+    else if (type == MIXED_COL_BINARY) {
+        const size_t ref = m_refs->GetAsRef(ndx) >> 1;
+        m_data->Set(ref, value, len);
+    }
+    else {
+        // Remove refs or binary data
+        clear_value(ndx, MIXED_COL_BINARY);
+
+        // Add value to data column
+        const size_t ref = m_data->Size();
+        m_data->add(value, len);
+
+        // Shift value one bit and set lowest bit to indicate that this is not a ref
+        const int64_t v = (ref << 1) + 1;
+
+        m_types->Set(ndx, MIXED_COL_BINARY);
+        m_refs->Set(ndx, v);
+    }
 }
 
 bool ColumnMixed::Compare(const ColumnMixed& c) const
 {
     const size_t n = Size();
-    if (c.Size() != n) return false;
+    if (c.Size() != n) 
+        return false;
+    
     for (size_t i=0; i<n; ++i) {
         const ColumnType type = GetType(i);
-        if (c.GetType(i) != type) return false;
+        if (c.GetType(i) != type)
+            return false;
         switch (type) {
         case COLUMN_TYPE_INT:
-            if (GetInt(i) != c.GetInt(i)) return false;
+            if (get_int(i) != c.get_int(i)) return false;
             break;
         case COLUMN_TYPE_BOOL:
             if (get_bool(i) != c.get_bool(i)) return false;
             break;
         case COLUMN_TYPE_DATE:
             if (get_date(i) != c.get_date(i)) return false;
+            break;
+        case COLUMN_TYPE_FLOAT:
+            if (get_float(i) != c.get_float(i)) return false;
+            break;
+        case COLUMN_TYPE_DOUBLE:
+            if (get_double(i) != c.get_double(i)) return false;
             break;
         case COLUMN_TYPE_STRING:
             if (strcmp(get_string(i), c.get_string(i)) != 0) return false;
@@ -435,15 +287,16 @@ bool ColumnMixed::Compare(const ColumnMixed& c) const
             {
                 const BinaryData d1 = get_binary(i);
                 const BinaryData d2 = c.get_binary(i);
-                if (d1.len != d2.len ||
-                    !equal(d1.pointer, d1.pointer+d1.len, d2.pointer)) return false;
+                if (d1.len != d2.len || !std::equal(d1.pointer, d1.pointer+d1.len, d2.pointer)) 
+                    return false;
             }
             break;
         case COLUMN_TYPE_TABLE:
             {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
                 ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
-                if (*t1 != *t2) return false;
+                if (*t1 != *t2) 
+                    return false;
             }
             break;
         default:
@@ -492,8 +345,8 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const
     // Write sub-tables
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
-        const ColumnType type = (ColumnType)m_types->Get(i);
-        if (type != COLUMN_TYPE_TABLE) continue;
+        const MixedColType type = (MixedColType)m_types->Get(i);
+        if (type != MIXED_COL_TABLE) continue;
         ConstTableRef subtable = m_refs->get_subtable(i);
         subtable->to_dot(out);
     }

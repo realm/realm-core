@@ -318,6 +318,15 @@ public:
 
     Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
 
+// Query& Query::tableview(const TableView& tv)
+// Query& Query::tableview(const Array &arr)
+
+    Query& tableview(const typename BasicTable<Spec>::View& v) { 
+        m_impl.tableview(*v.get_impl());
+        return *this; 
+    }
+
+
     Query& group() { m_impl.group(); return *this; }
 
     Query& end_group() { m_impl.end_group(); return *this; }
@@ -383,11 +392,18 @@ private:
 namespace _impl
 {
     template<class T> struct GetColumnTypeId;
+
     template<> struct GetColumnTypeId<int64_t> {
         static const ColumnType id = COLUMN_TYPE_INT;
     };
     template<> struct GetColumnTypeId<bool> {
         static const ColumnType id = COLUMN_TYPE_BOOL;
+    };
+    template<> struct GetColumnTypeId<float> {
+        static const ColumnType id = COLUMN_TYPE_FLOAT;
+    };
+    template<> struct GetColumnTypeId<double> {
+        static const ColumnType id = COLUMN_TYPE_DOUBLE;
     };
     template<> struct GetColumnTypeId<const char*> {
         static const ColumnType id = COLUMN_TYPE_STRING;
@@ -454,6 +470,22 @@ namespace _impl
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
             t->insert_int(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for float
+    template<int col_idx> struct InsertIntoCol<float, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_float(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // InsertIntoCol specialization for double
+    template<int col_idx> struct InsertIntoCol<double, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->insert_double(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 
@@ -524,6 +556,22 @@ namespace _impl
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
             t->set_int(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // AssignIntoCol specialization for floats
+    template<int col_idx> struct AssignIntoCol<float, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->set_float(col_idx, row_idx, at<col_idx>(tuple));
+        }
+    };
+
+    // AssignIntoCol specialization for doubles
+    template<int col_idx> struct AssignIntoCol<double, col_idx> {
+        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        {
+            t->set_double(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 

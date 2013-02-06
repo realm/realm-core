@@ -41,8 +41,6 @@ public:
     virtual void SetHasRefs() {};
 
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT {return false;}
-    virtual bool IsStringColumn() const TIGHTDB_NOEXCEPT {return false;}
-    virtual bool IsBinaryColumn() const TIGHTDB_NOEXCEPT {return false;}
 
     virtual size_t Size() const TIGHTDB_NOEXCEPT = 0;
 
@@ -89,7 +87,9 @@ protected:
     };
 
     // Tree functions
+public:
     template<typename T, class C> T TreeGet(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
+protected:
     template<typename T, class C> void TreeSet(size_t ndx, T value);
     template<typename T, class C> void TreeInsert(size_t ndx, T value);
     template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
@@ -109,6 +109,13 @@ protected:
     template<class C> void NodeInsertSplit(size_t ndx, size_t newRef);
     size_t GetRefSize(size_t ref) const;
 
+    static size_t get_size_from_ref(size_t ref, Allocator&) TIGHTDB_NOEXCEPT;
+    static bool is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT;
+
+    template <typename T, typename R, ACTION action, class condition>
+        R aggregate(T target, size_t start, size_t end, size_t *matchcount) const;
+
+
 #ifdef TIGHTDB_DEBUG
     void ArrayToDot(std::ostream& out, const Array& array) const;
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
@@ -116,11 +123,10 @@ protected:
 
     // Member variables
     mutable Array* m_array; // FIXME: This should not be mutable
-
-    static std::size_t get_size_from_ref(std::size_t ref, Allocator&) TIGHTDB_NOEXCEPT;
 };
 
-class Column: public ColumnBase {
+
+class Column : public ColumnBase {
 public:
     explicit Column(Allocator&);
     Column(ColumnDef type, Allocator&);
@@ -223,7 +229,7 @@ protected:
     }
 
     void DoSort(size_t lo, size_t hi);
-    template <ACTION action, class cond>int64_t aggregate(int64_t target, size_t start, size_t end, size_t *matchcount = 0) const;
+
     // Member variables
     Index* m_index;
 
@@ -242,7 +248,7 @@ inline int64_t Column::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
 inline std::size_t Column::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return to_ref(m_array->ColumnGet(ndx));
+    return to_ref(Get(ndx));
 }
 
 } // namespace tightdb

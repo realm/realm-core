@@ -150,6 +150,8 @@ public:
     void insert_bool(size_t column_ndx, size_t row_ndx, bool value);
     void insert_date(size_t column_ndx, size_t row_ndx, time_t value);
     template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
+    void insert_float(size_t column_ndx, size_t row_ndx, float value);
+    void insert_double(size_t column_ndx, size_t row_ndx, double value);
     void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
     void insert_binary(size_t column_ndx, size_t row_ndx, const char* data, size_t size);
     void insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
@@ -160,6 +162,8 @@ public:
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     time_t      get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    float       get_float(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    double      get_double(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
     const char* get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     size_t      get_string_length(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
@@ -171,6 +175,8 @@ public:
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_date(size_t column_ndx, size_t row_ndx, time_t value);
     template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
+    void set_float(size_t column_ndx, size_t row_ndx, float value);
+    void set_double(size_t column_ndx, size_t row_ndx, double value);
     void set_string(size_t column_ndx, size_t row_ndx, const char* value);
     void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
@@ -192,16 +198,30 @@ public:
     // Aggregate functions
     size_t  count_int(size_t column_ndx, int64_t target) const;
     size_t  count_string(size_t column_ndx, const char* target) const;
+    size_t  count_float(size_t column_ndx, float target) const;
+    size_t  count_double(size_t column_ndx, double target) const;
+    
     int64_t sum(size_t column_ndx) const;
-    int64_t maximum(size_t column_ndx) const; // FIXME: When table is empty?
-    int64_t minimum(size_t column_ndx) const; // FIXME: When table is empty?
-    double  average(size_t column_ndx) const; // FIXME: When table is empty?
+    double  sum_float(size_t column_ndx) const;
+    double  sum_double(size_t column_ndx) const;
+        // FIXME: What to return for below when table empty? 0?
+    int64_t maximum(size_t column_ndx) const; 
+    float   maximum_float(size_t column_ndx) const;
+    double  maximum_double(size_t column_ndx) const;
+    int64_t minimum(size_t column_ndx) const;
+    float   minimum_float(size_t column_ndx) const;
+    double  minimum_double(size_t column_ndx) const;
+    double  average(size_t column_ndx) const;
+    double  average_float(size_t column_ndx) const;
+    double  average_double(size_t column_ndx) const;
 
     // Searching
     size_t         lookup(const char* value) const;
     size_t         find_first_int(size_t column_ndx, int64_t value) const;
     size_t         find_first_bool(size_t column_ndx, bool value) const;
     size_t         find_first_date(size_t column_ndx, time_t value) const;
+    size_t         find_first_float(size_t column_ndx, float value) const;
+    size_t         find_first_double(size_t column_ndx, double value) const;
     size_t         find_first_string(size_t column_ndx, const char* value) const;
     size_t         find_first_binary(size_t column_ndx, const char* value, size_t len) const;
 
@@ -211,6 +231,10 @@ public:
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
     TableView      find_all_date(size_t column_ndx, time_t value);
     ConstTableView find_all_date(size_t column_ndx, time_t value) const;
+    TableView      find_all_float(size_t column_ndx, float value);
+    ConstTableView find_all_float(size_t column_ndx, float value) const;
+    TableView      find_all_double(size_t column_ndx, double value);
+    ConstTableView find_all_double(size_t column_ndx, double value) const;
     TableView      find_all_string(size_t column_ndx, const char* value);
     ConstTableView find_all_string(size_t column_ndx, const char* value) const;
     TableView      find_all_binary(size_t column_ndx, const char* value, size_t len);
@@ -268,8 +292,14 @@ protected:
 
     // FIXME: Most of the things that are protected here, could instead be private
     // Direct Column access
+    template <class T, ColumnType COL_TYPE> T& GetColumn(size_t ndx);
+    template <class T, ColumnType COL_TYPE> const T& GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT;
     Column& GetColumn(size_t column_ndx);
     const Column& GetColumn(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnFloat& GetColumnFloat(size_t column_ndx);
+    const ColumnFloat& GetColumnFloat(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnDouble& GetColumnDouble(size_t column_ndx);
+    const ColumnDouble& GetColumnDouble(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     AdaptiveStringColumn& GetColumnString(size_t column_ndx);
     const AdaptiveStringColumn& GetColumnString(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnBinary& GetColumnBinary(size_t column_ndx);
@@ -280,7 +310,6 @@ protected:
     const ColumnTable& GetColumnTable(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnMixed& GetColumnMixed(size_t column_ndx);
     const ColumnMixed& GetColumnMixed(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-
 
     /// Used when the lifetime of a table is managed by reference
     /// counting. The lifetime of free-standing tables allocated on
@@ -397,6 +426,7 @@ private:
 
     ColumnBase& GetColumnBase(size_t column_ndx);
     void InstantiateBeforeChange();
+    void validate_column_type(const ColumnBase& column, ColumnType expected_type, size_t ndx) const;
 
     /// Construct an empty table with independent spec and return just
     /// the reference to the underlying memory.
@@ -447,6 +477,27 @@ protected:
 
 
 // Implementation:
+
+template <class C, ColumnType coltype>
+C& Table::GetColumn(size_t ndx)
+{
+    ColumnBase& column = GetColumnBase(ndx);
+#ifdef TIGHTDB_DEBUG
+    validate_column_type(column, coltype, ndx);
+#endif
+    return static_cast<C&>(column);
+}
+
+template <class C, ColumnType coltype>
+const C& Table::GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    const ColumnBase& column = GetColumnBase(ndx);
+#ifdef TIGHTDB_DEBUG
+    validate_column_type(column, coltype, ndx);
+#endif
+    return static_cast<const C&>(column);
+}
+
 
 inline bool Table::has_shared_spec() const
 {

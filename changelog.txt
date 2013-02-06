@@ -25,7 +25,6 @@ Format:
 - Group::set_shared() removed.
 - SharedGroup::is_valid() removed. Errors are now reported as exceptions from the constructor.
 
-
 2013-01-11 (Kristian Spangsege)
 + Simplified open-mode for Group constructor.
 - Group::is_valid() removed. Errors are now reported as exceptions from the constructor.
@@ -38,6 +37,9 @@ Format:
 + Mixed::set_int() added (same for other value types except subtables).
 + Removed two-argument Mixed constructor for binary data since its signature is expected to be used for strings that are not zero-terminated.
 
+2013-01-08 (Brian Munkholm)
+----------
++ New: Added a bunch of methods to support two new column types: float and double.
 
 2012-12-16 (Kristian Spangsege)
 ----------

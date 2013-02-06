@@ -25,8 +25,56 @@
 #include <tightdb/config.h>
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
+#include <tightdb/column_fwd.hpp>
 
 namespace tightdb {
+
+template <class T, class cond> class BASICNODE;
+template <class T, class cond> class IntegerNode;
+template <class T>class SequentialGetter;
+
+template<class cond, class T> struct ColumnTypeTraits2;
+
+template<class cond> struct ColumnTypeTraits2<cond, int64_t> {
+    typedef Column column_type;
+    typedef IntegerNode<int64_t,cond> node_type;
+};
+template<class cond> struct ColumnTypeTraits2<cond, bool> {
+    typedef Column column_type;
+    typedef IntegerNode<bool,cond> node_type;
+};
+template<class cond> struct ColumnTypeTraits2<cond, float> {
+    typedef ColumnFloat column_type;
+    typedef BASICNODE<float,cond> node_type;
+};
+template<class cond> struct ColumnTypeTraits2<cond, double> {
+    typedef ColumnDouble column_type;
+    typedef BASICNODE<double,cond> node_type;
+};
+
+
+template <typename T, typename R, ACTION action, class condition>
+R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
+{
+    typedef typename ColumnTypeTraits2<condition,T>::column_type ColType;
+    typedef typename ColumnTypeTraits2<condition,T>::node_type NodeType;
+
+    if (end == size_t(-1)) 
+        end = Size();
+
+    NodeType node(target, 0);
+
+    node.QuickInit((ColType*)this, target); 
+    QueryState<R> state;
+    state.init(action, NULL, size_t(-1));
+
+    ColType* column = (ColType*)this;
+    SequentialGetter<T> sg( column );
+    node.template aggregate_local<action, R, T>(&state, start, end, size_t(-1), &sg, matchcount);
+
+    return state.m_state;
+}
+
 
 template<class T> T GetColumnFromRef(Array& parent, size_t ndx) // Throws
 {

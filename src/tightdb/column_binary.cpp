@@ -5,18 +5,6 @@
 using namespace std;
 using namespace tightdb;
 
-namespace {
-
-bool IsNodeFromRef(size_t ref, Allocator& alloc)
-{
-    const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
-    const bool isNode = (header[0] & 0x80) != 0;
-
-    return isNode;
-}
-
-} // anonymous namespace
-
 
 namespace tightdb {
 
@@ -27,7 +15,7 @@ ColumnBinary::ColumnBinary(Allocator& alloc)
 
 ColumnBinary::ColumnBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
 {
-    const bool isNode = IsNodeFromRef(ref, alloc);
+    const bool isNode = is_node_from_ref(ref, alloc);
     if (isNode) {
         m_array = new Array(ref, parent, pndx, alloc);
     }
@@ -50,14 +38,14 @@ void ColumnBinary::Destroy()
 
 void ColumnBinary::UpdateRef(size_t ref)
 {
-    TIGHTDB_ASSERT(IsNodeFromRef(ref, m_array->GetAllocator())); // Can only be called when creating node
+    TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->GetAllocator())); // Can only be called when creating node
 
     if (IsNode()) m_array->UpdateRef(ref);
     else {
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx   = m_array->GetParentNdx();
 
-        // Replace the string array with int array for node
+        // Replace the Binary array with int array for node
         Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
         delete m_array;
         m_array = array;
@@ -154,7 +142,7 @@ void ColumnBinary::add(BinaryData bin)
 void ColumnBinary::Insert(size_t ndx, const char* value, size_t len)
 {
     TIGHTDB_ASSERT(ndx <= Size());
-    Insert(ndx, BinaryData(value, len));
+    Insert(ndx, BinaryData(value, len));    // FIXME:Ignoring return value
 }
 
 void ColumnBinary::Insert(size_t ndx, BinaryData bin)

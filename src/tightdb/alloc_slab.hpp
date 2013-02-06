@@ -147,7 +147,7 @@ inline SlabAlloc::SlabAlloc()
 
 inline bool SlabAlloc::is_attached() const  TIGHTDB_NOEXCEPT
 {
-    return m_data;
+    return (m_data != NULL);
 }
 
 } // namespace tightdb
