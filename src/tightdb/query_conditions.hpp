@@ -28,13 +28,9 @@
 
 namespace tightdb {
 
-enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_GREATER_EQUAL, COND_LESS, COND_LESS_EQUAL, COND_NONE, COND_COUNT};
+enum {cond_Equal, cond_NotEqual, cond_Greater, cond_GreaterEqual, cond_Less, cond_LessEqual, cond_None, cond_Count};
 
 
-// FIXME: We cannot use all-uppercase names like 'CONTAINS' for
-// classes since the risk of colliding with one of the customers macro
-// names is too high. In short, the all-uppercase name space is
-// reserved for macros.
 struct CONTAINS {
     CONTAINS() {};
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
@@ -101,7 +97,7 @@ struct EQUAL {
     }
 
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
-    int condition(void) {return COND_EQUAL;}
+    int condition(void) {return cond_Equal;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (v >= lbound && v <= ubound); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v == 0 && ubound == 0 && lbound == 0); }
 };
@@ -114,7 +110,7 @@ struct NOTEQUAL {
         return std::strcmp(v1, v2) != 0;
     }
     template<class T> bool operator()(const T& v1, const T& v2) const { return v1 != v2; }
-    int condition(void) {return COND_NOTEQUAL;}
+    int condition(void) {return cond_NotEqual;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return !(v == 0 && ubound == 0 && lbound == 0); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v > ubound || v < lbound); }
 };
@@ -175,14 +171,14 @@ struct NOTEQUAL_INS {
 
 struct GREATER {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 > v2;}
-    int condition(void) {return COND_GREATER;}
+    int condition(void) {return cond_Greater;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { (void)lbound; return (ubound > v); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { (void)ubound; return (lbound > v); }
 };
 
 struct NONE {
     template<class T> bool operator()(const T& v1, const T& v2) const {(void)v1; (void)v2; return true;}
-    int condition(void) {return COND_NONE;}
+    int condition(void) {return cond_None;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) {(void)lbound; (void)ubound; (void)v; return true; }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) {(void)lbound; (void)ubound; (void)v; return true; }
 
@@ -190,19 +186,19 @@ struct NONE {
 
 struct LESS {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 < v2;}
-    int condition(void) {return COND_LESS;}
+    int condition(void) {return cond_Less;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { (void)ubound; return (lbound < v); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { (void)lbound; return (ubound < v); }
 };
 
 struct LESS_EQUAL {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 <= v2;}
-    int condition(void) {return COND_LESS_EQUAL;}
+    int condition(void) {return cond_LessEqual;}
 };
 
 struct GREATER_EQUAL {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
-    int condition(void) {return COND_GREATER_EQUAL;}
+    int condition(void) {return cond_GreaterEqual;}
 };
 
 

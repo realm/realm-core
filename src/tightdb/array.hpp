@@ -495,7 +495,7 @@ protected:
 
     Getter m_getter;
     Setter m_setter;
-    Finder m_finder[COND_COUNT]; // one for each COND_XXX enum
+    Finder m_finder[cond_Count]; // one for each COND_XXX enum
 
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
@@ -1631,7 +1631,7 @@ template <class cond2, Action action, size_t width, class Callback> size_t Array
     // Search loop. Unrolling it has been tested to NOT increase performance (apparently mem bound)
     for (i = 0; i < items; ++i) {
         // equal / not-equal
-        if (cond == COND_EQUAL || cond == COND_NOTEQUAL) {
+        if (cond == cond_Equal || cond == cond_NotEqual) {
             if (width == 8)
                 compare = _mm_cmpeq_epi8(data[i], search);
             if (width == 16)
@@ -1644,7 +1644,7 @@ template <class cond2, Action action, size_t width, class Callback> size_t Array
         }
 
         // greater
-        else if (cond == COND_GREATER) {
+        else if (cond == cond_Greater) {
             if (width == 8)
                 compare = _mm_cmpgt_epi8(data[i], search);
             if (width == 16)
@@ -1655,7 +1655,7 @@ template <class cond2, Action action, size_t width, class Callback> size_t Array
                 compare = _mm_cmpgt_epi64(data[i], search);
         }
         // less
-        else if (cond == COND_LESS) {
+        else if (cond == cond_Less) {
             if (width == 8)
                 compare = _mm_cmplt_epi8(data[i], search);
             if (width == 16)
@@ -1671,7 +1671,7 @@ template <class cond2, Action action, size_t width, class Callback> size_t Array
 
         resmask = _mm_movemask_epi8(compare);
 
-        if (cond == COND_NOTEQUAL)
+        if (cond == cond_NotEqual)
             resmask = ~resmask & 0x0000ffff;
 
         size_t s = i * sizeof(__m128i) * 8 / no0(width);
@@ -1704,13 +1704,13 @@ template <class cond2, Action action, size_t bitwidth, class Callback> bool Arra
     int cond = C.condition();
     bool ret = false;
 
-    if (cond == COND_EQUAL)
+    if (cond == cond_Equal)
         ret = CompareEquality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-    else if (cond == COND_NOTEQUAL)
+    else if (cond == cond_NotEqual)
         ret = CompareEquality<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-    else if (cond == COND_GREATER)
+    else if (cond == cond_Greater)
         ret = CompareRelation<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-    else if (cond == COND_LESS)
+    else if (cond == cond_Less)
         ret = CompareRelation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else
         TIGHTDB_ASSERT(false);

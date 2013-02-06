@@ -1455,16 +1455,16 @@ template<size_t width> void Array::SetWidth() TIGHTDB_NOEXCEPT
     m_setter = temp_setter;
 
     Finder feq = &Array::find<EQUAL, TDB_RETURN_FIRST, width>;
-    m_finder[COND_EQUAL] = feq;
+    m_finder[cond_Equal] = feq;
 
     Finder fne = &Array::find<NOTEQUAL, TDB_RETURN_FIRST, width>;
-    m_finder[COND_NOTEQUAL]  = fne;
+    m_finder[cond_NotEqual]  = fne;
 
     Finder fg = &Array::find<GREATER, TDB_RETURN_FIRST, width>;
-    m_finder[COND_GREATER] = fg;
+    m_finder[cond_Greater] = fg;
 
     Finder fl =  &Array::find<LESS, TDB_RETURN_FIRST, width>;
-    m_finder[COND_LESS] = fl;
+    m_finder[cond_Less] = fl;
 }
 
 template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
@@ -2045,7 +2045,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
 
 void Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
-    if (cond == COND_EQUAL) {
+    if (cond == cond_Equal) {
         if (action == TDB_SUM) {
             TDB_TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
@@ -2065,7 +2065,7 @@ void Array::find(int cond, Action action, int64_t value, size_t start, size_t en
             TDB_TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
-    if (cond == COND_NOTEQUAL) {
+    if (cond == cond_NotEqual) {
         if (action == TDB_SUM) {
             TDB_TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
@@ -2085,7 +2085,7 @@ void Array::find(int cond, Action action, int64_t value, size_t start, size_t en
             TDB_TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
-    if (cond == COND_GREATER) {
+    if (cond == cond_Greater) {
         if (action == TDB_SUM) {
             TDB_TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
@@ -2105,7 +2105,7 @@ void Array::find(int cond, Action action, int64_t value, size_t start, size_t en
             TDB_TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
-    if (cond == COND_LESS) {
+    if (cond == cond_Less) {
         if (action == TDB_SUM) {
             TDB_TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
@@ -2125,7 +2125,7 @@ void Array::find(int cond, Action action, int64_t value, size_t start, size_t en
             TDB_TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
-    if (cond == COND_NONE) {
+    if (cond == cond_None) {
         if (action == TDB_SUM) {
             TDB_TEMPEX3(find, NONE, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
