@@ -2058,6 +2058,7 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
                         case type_Binary:
                             out << "\""; out_binary(out, m.get_binary()); out << "\"";
                             break;
+                        case type_Table:
                         case type_Mixed:
                             TIGHTDB_ASSERT(false);
                             break;
