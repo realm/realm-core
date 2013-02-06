@@ -144,21 +144,21 @@ private:
     void InitDataColumn();
 
     enum MixedColType {
+        // NOTE: below numbers must be kept in sync with ColumnType
         // Column types used in Mixed
         mixcol_Int         =  0,
         mixcol_Bool        =  1,
         mixcol_String      =  2,
-        mixcol_StringEnum  =  3, // double refs
+                           // 3, used for STRING_ENUM in ColumnType
         mixcol_Binary      =  4,
         mixcol_Table       =  5,
         mixcol_Mixed       =  6,
         mixcol_Date        =  7,
-        mixcol_Reserved1   =  8, // DateTime
-        mixcol_Float       =  9, // Float
+                           // 8, used for RESERVED1 in ColumnType
+        mixcol_Float       =  9,
         mixcol_Double      = 10, // Positive Double
         mixcol_DoubleNeg   = 11, // Negative Double
         mixcol_IntNeg      = 12  // Negative Integers
-        // Preserve values above for backward compability
     };
 
     void clear_value(size_t ndx, MixedColType newtype);

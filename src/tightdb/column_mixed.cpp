@@ -151,19 +151,9 @@ DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(ndx < m_types->Size());
     MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));
     switch (coltype) {
-        case mixcol_Int:         return type_Int;
-        case mixcol_IntNeg:      return type_Int;
-        case mixcol_Bool:        return type_Bool;
-        case mixcol_String:      return type_String;
-        case mixcol_Binary:      return type_Binary;
-        case mixcol_Table:       return type_Table;
-        case mixcol_Date:        return type_Date;
-        case mixcol_Float:       return type_Float;
-        case mixcol_Double:      return type_Double;
-        case mixcol_DoubleNeg:   return type_Double;
-        default:
-            TIGHTDB_ASSERT(false);
-            return (type_Int);
+        case mixcol_IntNeg:    return type_Int;
+        case mixcol_DoubleNeg: return type_Double;
+        default: return static_cast<DataType>(coltype);   // all others must be in sync with ColumnType
     }
 }
 
