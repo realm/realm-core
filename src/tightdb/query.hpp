@@ -101,8 +101,7 @@ public:
 
     // Conditions: binary data
     // Only BinaryData prototype can exist, else it would conflict with equal() for strings
-
-    Query& equal(size_t column_ndx, BinaryData b);
+    Query& equal(size_t column_ndx, BinaryData);
 /*
     Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& begins_with_binary(size_t column_ndx, const char* ptr, size_t len);
