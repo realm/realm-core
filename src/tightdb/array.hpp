@@ -80,7 +80,7 @@ namespace tightdb {
 
 enum ACTION {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
 
-#define NO0(v) ((v) == 0 ? 1 : (v))
+template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 
 const size_t not_found = size_t(-1);
 
@@ -1163,24 +1163,24 @@ template <class cond2, ACTION action, size_t bitwidth, class Callback> void Arra
         __m128i* const a = (__m128i *)round_up(m_data + start * bitwidth / 8, sizeof(__m128i));
         __m128i* const b = (__m128i *)round_down(m_data + end * bitwidth / 8, sizeof(__m128i));
 
-        if (!Compare<cond2, action, bitwidth, Callback>(value, start, ((unsigned char *)a - m_data) * 8 / NO0(bitwidth), baseindex, state, callback))
+        if (!Compare<cond2, action, bitwidth, Callback>(value, start, ((unsigned char *)a - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
             return;
    
         // Search aligned area with SSE
         if (b > a) {
             if (cpuid_sse<42>()) {
-                if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth)), callback))
+                if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / no0(bitwidth)), callback))
                     return;
                 }
                 else if (cpuid_sse<30>()) {
 
-                if (!FindSSE<EQUAL, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / NO0(bitwidth)), callback))
+                if (!FindSSE<EQUAL, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / no0(bitwidth)), callback))
                     return;
                 }
         }
 
         // Search remainder with CompareEquality()
-        if (!Compare<cond2, action, bitwidth, Callback>(value, ((unsigned char *)b - m_data) * 8 / NO0(bitwidth), end, baseindex, state, callback))
+        if (!Compare<cond2, action, bitwidth, Callback>(value, ((unsigned char *)b - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
             return;
 
         return;
@@ -1246,12 +1246,12 @@ template <bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
         hasZeroByte = TestZero<width>(v | 0xffffffff00000000ULL);
         if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
             // 00?? -> increasing
-            start += 64 / NO0(width) / 2;
+            start += 64 / no0(width) / 2;
             if (width <= 4) {
                 hasZeroByte = TestZero<width>(v | 0xffff000000000000ULL);
                 if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
                     // 000?
-                    start += 64 / NO0(width) / 4;
+                    start += 64 / no0(width) / 4;
                 }
             }
         }
@@ -1261,7 +1261,7 @@ template <bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
                 hasZeroByte = TestZero<width>(v | 0xffffffffffff0000ULL);
                 if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
                     // 0?00
-                    start += 64 / NO0(width) / 4;
+                    start += 64 / no0(width) / 4;
                 }
             }
         }
@@ -1280,7 +1280,7 @@ template <bool gt, size_t width>int64_t Array::FindGTLT_Magic(int64_t v) const
 {
     uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     uint64_t mask2 = mask1 >> 1;
-    uint64_t magic = gt ? (~0ULL / NO0(mask1) * (mask2 - v)) : (~0ULL / NO0(mask1) * v);
+    uint64_t magic = gt ? (~0ULL / no0(mask1) * (mask2 - v)) : (~0ULL / no0(mask1) * v);
     return magic;
 }
 
@@ -1291,13 +1291,13 @@ template <bool gt, ACTION action, size_t width, class Callback> bool Array::Find
         
     uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     uint64_t mask2 = mask1 >> 1;
-    uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / NO0(mask1) * (mask2 + 1)) : ((chunk - magic) & ~chunk&~0ULL/NO0(mask1)*(mask2+1));
+    uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / no0(mask1) * (mask2 + 1)) : ((chunk - magic) & ~chunk&~0ULL/no0(mask1)*(mask2+1));
     size_t p = 0;
     while(m) {
-        if (FIND_ACTION_PATTERN<action, Callback>(baseindex, m >> (NO0(width) - 1), state, callback))
+        if (FIND_ACTION_PATTERN<action, Callback>(baseindex, m >> (no0(width) - 1), state, callback))
             break; // consumed, so do not call FIND_ACTION()
 
-        size_t t = FirstSetBit64(m) / NO0(width);
+        size_t t = FirstSetBit64(m) / no0(width);
         p += t;
         if (!FIND_ACTION<action, Callback>(p + baseindex, (chunk >> (p * width)) & mask1, state, callback))
             return false;
@@ -1469,7 +1469,7 @@ template <bool eq, ACTION action, size_t width, class Callback> inline bool Arra
 
     TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
 
-    size_t ee = round_up(start, 64 / NO0(width));
+    size_t ee = round_up(start, 64 / no0(width));
     ee = ee > end ? end : ee;
     for (; start < ee; ++start)
         if (eq ? (Get<width>(start) == value) : (Get<width>(start) != value)) {
@@ -1484,12 +1484,12 @@ template <bool eq, ACTION action, size_t width, class Callback> inline bool Arra
         const int64_t* p = (const int64_t*)(m_data + (start * width / 8));
         const int64_t* const e = (int64_t*)(m_data + (end * width / 8)) - 1;
         const uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
-        const uint64_t valuemask = ~0ULL / NO0(mask) * (value & mask); // the "== ? :" is to avoid division by 0 compiler error
+        const uint64_t valuemask = ~0ULL / no0(mask) * (value & mask); // the "== ? :" is to avoid division by 0 compiler error
  
         while (p < e) {
             uint64_t chunk = *p;
             uint64_t v2 = chunk ^ valuemask;
-            start = (p - (int64_t *)m_data) * 8 * 8 / NO0(width);
+            start = (p - (int64_t *)m_data) * 8 * 8 / no0(width);
             size_t a = 0;
 
             while (eq ? TestZero<width>(v2) : v2) {
@@ -1500,7 +1500,7 @@ template <bool eq, ACTION action, size_t width, class Callback> inline bool Arra
                 size_t t = FindZero<eq, width>(v2);
                 a += t;
 
-                if (a >= 64 / NO0(width))
+                if (a >= 64 / no0(width))
                     break;
 
                 if (!FIND_ACTION<action, Callback>(a + start + baseindex, Get<width>(start + t), state, callback))
@@ -1515,7 +1515,7 @@ template <bool eq, ACTION action, size_t width, class Callback> inline bool Arra
 
         // Loop ended because we are near end or end of array. No need to optimize search in remainder in this case because end of array means that
         // lots of search work has taken place prior to ending here. So time spent searching remainder is relatively tiny
-        start = (p - (int64_t *)m_data) * 8 * 8 / NO0(width);
+        start = (p - (int64_t *)m_data) * 8 * 8 / no0(width);
     }
 
     while (start < end) {
@@ -1681,20 +1681,20 @@ template <class cond2, ACTION action, size_t width, class Callback> size_t Array
         if (cond == COND_NOTEQUAL)
             resmask = ~resmask & 0x0000ffff;
 
-        size_t s = i * sizeof(__m128i) * 8 / NO0(width);
+        size_t s = i * sizeof(__m128i) * 8 / no0(width);
 
         while (resmask != 0) {
 
-            uint64_t upper = LowerBits<width / 8>() << (NO0(width / 8) - 1);
+            uint64_t upper = LowerBits<width / 8>() << (no0(width / 8) - 1);
             uint64_t pattern = resmask & upper; // fixme, bits at wrong offsets. Only OK because we only use them in 'count' aggregate
             if (FIND_ACTION_PATTERN<action, Callback>(s + baseindex, pattern, state, callback))
                 break;
 
-            size_t idx = FirstSetBit(resmask) * 8 / NO0(width);
+            size_t idx = FirstSetBit(resmask) * 8 / no0(width);
             s += idx;
             if (!FIND_ACTION<action, Callback>( s + baseindex, GetUniversal<width>((const char *)data, s), state, callback))
                 return false;
-            resmask >>= (idx + 1) * NO0(width) / 8;
+            resmask >>= (idx + 1) * no0(width) / 8;
             ++s;
         }
     }
@@ -1732,7 +1732,7 @@ template <bool gt, ACTION action, size_t bitwidth, class Callback> bool Array::C
     TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
     uint64_t mask = (bitwidth == 64 ? ~0ULL : ((1ULL << (bitwidth == 64 ? 0 : bitwidth)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
 
-    size_t ee = round_up(start, 64 / NO0(bitwidth));
+    size_t ee = round_up(start, 64 / no0(bitwidth));
     ee = ee > end ? end : ee;
     for (; start < ee; start++) {
         if (gt ? (Get<bitwidth>(start) > value) : (Get<bitwidth>(start) < value)) {
@@ -1757,7 +1757,7 @@ template <bool gt, ACTION action, size_t bitwidth, class Callback> bool Array::C
         if (value != int64_t((magic & mask)) && value >= 0 && bitwidth >= 2 && value <= (int64_t)((mask >> 1) - (gt ? 1 : 0))) {
             // 15 ms
             while (p < e) {
-                uint64_t upper = LowerBits<bitwidth>() << (NO0(bitwidth) - 1);
+                uint64_t upper = LowerBits<bitwidth>() << (no0(bitwidth) - 1);
 
                 const int64_t v = *p;
                 size_t idx;
@@ -1767,11 +1767,11 @@ template <bool gt, ACTION action, size_t bitwidth, class Callback> bool Array::C
 
                 if ((bitwidth > 4 ? !upper : true)) {
                     // Assert that all values in chunk are positive.
-                    TIGHTDB_ASSERT(bitwidth <= 4 || ((LowerBits<bitwidth>() << (NO0(bitwidth) - 1)) & value) == 0);
-                    idx = FindGTLT_Fast<gt, action, bitwidth, Callback>(v, magic, state, (p - (int64_t *)m_data) * 8 * 8 / NO0(bitwidth) + baseindex, callback); 
+                    TIGHTDB_ASSERT(bitwidth <= 4 || ((LowerBits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
+                    idx = FindGTLT_Fast<gt, action, bitwidth, Callback>(v, magic, state, (p - (int64_t *)m_data) * 8 * 8 / no0(bitwidth) + baseindex, callback); 
                 }
                 else
-                    idx = FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - (int64_t *)m_data) * 8 * 8 / NO0(bitwidth) + baseindex, callback);
+                    idx = FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - (int64_t *)m_data) * 8 * 8 / no0(bitwidth) + baseindex, callback);
 
                 if (!idx)
                     return false;
@@ -1782,12 +1782,12 @@ template <bool gt, ACTION action, size_t bitwidth, class Callback> bool Array::C
             // 24 ms
             while (p < e) {
                 int64_t v = *p;
-                if (!FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - (int64_t *)m_data) * 8 * 8 / NO0(bitwidth) + baseindex, callback))
+                if (!FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - (int64_t *)m_data) * 8 * 8 / no0(bitwidth) + baseindex, callback))
                     return false;
                 ++p;
             }
         }
-        start = (p - (int64_t *)m_data) * 8 * 8 / NO0(bitwidth);
+        start = (p - (int64_t *)m_data) * 8 * 8 / no0(bitwidth);
     }
 
     // matchcount logic in SIMD no longer pays off for 32/64 bit ints because we have just 4/2 elements

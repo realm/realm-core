@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include <tightdb/array.hpp>
 #include <tightdb/column_basic.hpp>
 #include <tightdb/column_fwd.hpp>
@@ -7,19 +9,17 @@
 
 #define MULTITHREAD 0
 
+using namespace std;
 using namespace tightdb;
 
-const size_t THREAD_CHUNK_SIZE = 1000;
-
-#define MIN(a, b)  (((a) < (b)) ? (a) : (b))
-#define MAX(a, b)  (((a) > (b)) ? (a) : (b))
+const size_t thread_chunk_size = 1000;
 
 Query::Query(Table& table) : m_table(table.get_table_ref())
 {
     Create();
 }
 
-Query::Query(const Table& table) : m_table(((Table&)table).get_table_ref())
+Query::Query(const Table& table) : m_table((const_cast<Table&>(table)).get_table_ref())
 {
     Create();
 }
@@ -658,9 +658,9 @@ bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, siz
 
 void* Query::query_thread(void* arg)
 {
-    (void)arg;
+    static_cast<void>(arg);
 #if MULTITHREAD
-    thread_state* ts = (thread_state*)arg;
+    thread_state* ts = static_cast<thread_state*>(arg);
 
     std::vector<size_t> res;
     std::vector<std::pair<size_t, size_t> > chunks;
@@ -677,7 +677,7 @@ void* Query::query_thread(void* arg)
             pthread_mutex_lock(&ts->jobs_mutex);
             if (ts->next_job == ts->end_job)
                 break;
-            const size_t chunk = MIN(ts->end_job - ts->next_job, THREAD_CHUNK_SIZE);
+            const size_t chunk = min(ts->end_job - ts->next_job, thread_chunk_size);
             const size_t mine = ts->next_job;
             ts->next_job += chunk;
             size_t r = mine - 1;

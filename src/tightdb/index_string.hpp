@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef __TDB_INDEX_STRING__
-#define __TDB_INDEX_STRING__
+#ifndef TIGHTDB_INDEX_STRING_HPP
+#define TIGHTDB_INDEX_STRING_HPP
 
 #include <tightdb/column.hpp>
 #include <tightdb/column_string.hpp>
@@ -84,4 +84,4 @@ protected:
 
 } //namespace tightdb
 
-#endif //__TDB_INDEX_STRING__
+#endif // TIGHTDB_INDEX_STRING_HPP

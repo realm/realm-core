@@ -1,6 +1,6 @@
 #include <cstring>
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-#include <Windows.h>
+#ifdef _WIN32
+#  include <windows.h>
 #endif
 
 #include <tightdb/utf8.hpp>
@@ -74,7 +74,8 @@ bool case_cmp(const char* constant_upper, const char* constant_lower, const char
             matchlen++;
         else
             return false;
-    } while (constant_lower[matchlen] != 0 && source[matchlen] != 0);
+    }
+    while (constant_lower[matchlen] != 0 && source[matchlen] != 0);
     if (constant_lower[matchlen] != 0 || source[matchlen] != 0)
         return false;
 
@@ -99,7 +100,7 @@ bool case_strstr(const char *constant_upper, const char *constant_lower, const c
 // Converts a single utf8 character to upper or lower case. Operating system specific function.
 bool utf8case_single(const char* source, char* destination, int upper)
 {
-#if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
+#ifdef _WIN32
     wchar_t tmp[2];
 
     int i = MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)source, (int)sequence_length(source), &tmp[0], 1);
@@ -120,7 +121,7 @@ bool utf8case_single(const char* source, char* destination, int upper)
     return true;
 #else
     memcpy(destination, source, sequence_length(source));
-    (void)upper;
+    static_cast<void>(upper);
     return true;
 #endif
 }
