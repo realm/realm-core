@@ -107,17 +107,17 @@ namespace tightdb {
 // Number of matches to find in best condition loop before breaking out to probe other conditions. Too low value gives too many
 // constant time overheads everywhere in the query engine. Too high value makes it adapt less rapidly to changes in match
 // frequencies.
-const size_t findlocals = 32;   
+const size_t findlocals = 64;   
 
 // Average match distance in linear searches where further increase in distance no longer increases query speed (because time
 // spent on handling each match becomes insignificant compared to time spent on the search).
-const size_t bestdist = 16;
+const size_t bestdist = 512;
 
 // Minimum number of matches required in a certain condition before it can be used to compute statistics. Too high value can spent 
 // too much time in a bad node (with high match frequency). Too low value gives inaccurate statistics.
-const size_t probe_matches = 2;
+const size_t probe_matches = 4;
 
-const size_t bitwidth_time_unit = 8; 
+const size_t bitwidth_time_unit = 64; 
 
 typedef bool (*CallbackDummy)(int64_t);
 
@@ -252,7 +252,7 @@ public:
 
     double cost(void) const
     {
-        return 16.0 / m_dD + m_dT;
+        return 8 * bitwidth_time_unit / m_dD + m_dT; // dt = 1/64 to 1. Match dist is 8 times more important than bitwidth
     }
 
     size_t find_first(size_t start, size_t end)
@@ -552,7 +552,7 @@ public:
         m_condition_column_idx = column;
         m_child = 0;
         m_conds = 0;
-        m_dT = 1.0;
+        m_dT = 1.0 / 4.0;
         m_probes = 0;
         m_matches = 0;
     }
@@ -865,7 +865,7 @@ public:
     {
         m_condition_column_idx = column_ndx;
         m_child = 0;
-        m_dT = 8.0;
+        m_dT = 1.0;
     }
 
     // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
