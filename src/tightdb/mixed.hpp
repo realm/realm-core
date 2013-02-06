@@ -27,7 +27,7 @@
 
 #include <tightdb/assert.hpp>
 #include <tightdb/meta.hpp>
-#include <tightdb/column_type.hpp>
+#include <tightdb/data_type.hpp>
 #include <tightdb/date.hpp>
 #include <tightdb/binary_data.hpp>
 
@@ -49,7 +49,7 @@ public:
     struct subtable_tag {};
     Mixed(subtable_tag) TIGHTDB_NOEXCEPT: m_type(type_Table) {}
 
-    ColumnType get_type() const TIGHTDB_NOEXCEPT { return m_type; }
+    DataType get_type() const TIGHTDB_NOEXCEPT { return m_type; }
 
     bool         get_bool()   const TIGHTDB_NOEXCEPT;
     int64_t      get_int()    const TIGHTDB_NOEXCEPT;
@@ -72,7 +72,7 @@ public:
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
 
 private:
-    ColumnType m_type;
+    DataType m_type;
     union {
         int64_t      m_int;
         bool         m_bool;
@@ -289,20 +289,20 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 {
     out << "Mixed(";
     switch (m.m_type) {
-    case type_Bool: out << m.m_bool; break;
-    case type_Int: out << m.m_int; break;
-    case type_String: out << m.m_str; break;   
-    case type_Float:  out << m.m_float; break;
-    case type_Double: out << m.m_double; break;
-    case type_Binary: out << BinaryData(m.m_str, m.m_len); break;
-    case type_Date: out << Date(m.m_date); break;
-    case type_Table: out << "subtable"; break;
-    default: TIGHTDB_ASSERT(false); break;
+        case type_Bool:   out << m.m_bool;                     break;
+        case type_Int:    out << m.m_int;                      break;
+        case type_String: out << m.m_str;                      break;
+        case type_Float:  out << m.m_float;                    break;
+        case type_Double: out << m.m_double;                   break;
+        case type_Binary: out << BinaryData(m.m_str, m.m_len); break;
+        case type_Date:   out << Date(m.m_date);               break;
+        case type_Table:  out << "subtable";                   break;
+        default: TIGHTDB_ASSERT(false); break; // FIXME: Remove
     }
     out << ")";
     return out;
-}  
-    
+}
+
 
 // Compare mixed with boolean
 

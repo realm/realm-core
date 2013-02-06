@@ -216,7 +216,7 @@ public:
     /// must have the same columns, and in the same order. Two columns
     /// are considered equal if, and only if they have the same name
     /// and the same type. The type is understood as the value encoded
-    /// by the ColumnType enumeration. This check proceeds recursively
+    /// by the DataType enumeration. This check proceeds recursively
     /// for subtable columns.
     ///
     /// \tparam T The static table type. It makes no difference
@@ -394,31 +394,31 @@ namespace _impl
     template<class T> struct GetColumnTypeId;
 
     template<> struct GetColumnTypeId<int64_t> {
-        static const ColumnType id = type_Int;
+        static const DataType id = type_Int;
     };
     template<> struct GetColumnTypeId<bool> {
-        static const ColumnType id = type_Bool;
+        static const DataType id = type_Bool;
     };
     template<> struct GetColumnTypeId<float> {
-        static const ColumnType id = type_Float;
+        static const DataType id = type_Float;
     };
     template<> struct GetColumnTypeId<double> {
-        static const ColumnType id = type_Double;
+        static const DataType id = type_Double;
     };
     template<> struct GetColumnTypeId<const char*> {
-        static const ColumnType id = type_String;
+        static const DataType id = type_String;
     };
     template<class E> struct GetColumnTypeId<SpecBase::Enum<E> > {
-        static const ColumnType id = type_Int;
+        static const DataType id = type_Int;
     };
     template<> struct GetColumnTypeId<Date> {
-        static const ColumnType id = type_Date;
+        static const DataType id = type_Date;
     };
     template<> struct GetColumnTypeId<BinaryData> {
-        static const ColumnType id = type_Binary;
+        static const DataType id = type_Binary;
     };
     template<> struct GetColumnTypeId<Mixed> {
-        static const ColumnType id = type_Mixed;
+        static const DataType id = type_Mixed;
     };
 
 

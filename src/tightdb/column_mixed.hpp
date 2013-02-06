@@ -72,7 +72,7 @@ public:
     void SetParent(ArrayParent* parent, size_t pndx);
     void UpdateFromParent();
 
-    ColumnType GetType(size_t ndx) const TIGHTDB_NOEXCEPT;
+    DataType get_type(size_t ndx) const TIGHTDB_NOEXCEPT;
     size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->Size(); }
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_types->is_empty(); }
 

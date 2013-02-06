@@ -22,6 +22,7 @@
 
 #include <tightdb/array.hpp>
 #include <tightdb/array_string.hpp>
+#include <tightdb/data_type.hpp>
 #include <tightdb/column_type.hpp>
 
 namespace tightdb {
@@ -36,8 +37,8 @@ public:
     Spec(const Spec& s);
     ~Spec();
 
-    size_t add_column(ColumnType type, const char* name, ColumnType attr=col_attr_None);
-    size_t add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name);
+    size_t add_column(DataType type, const char* name, ColumnType attr=col_attr_None);
+    size_t add_subcolumn(const vector<size_t>& column_path, DataType type, const char* name);
     Spec add_subtable_column(const char* name);
 
     void rename_column(size_t column_ndx, const char* newname);
@@ -60,7 +61,7 @@ public:
 
     // Column info
     size_t get_column_count() const TIGHTDB_NOEXCEPT;
-    ColumnType get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    DataType get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnType get_real_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     const char* get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
@@ -97,12 +98,6 @@ private:
     bool update_from_parent();
     void set_parent(ArrayParent* parent, size_t pndx);
 
-    // FIXME: This one was made private because it is called
-    // internally from Table::optimize(), and it is not called from
-    // any test case. If it must be public, it must also be made to
-    // emit a transaction log instruction, but the internal call must
-    // then call a different version that does not emit such an
-    // instruction.
     void set_column_type(size_t column_ndx, ColumnType type);
     void set_column_attr(size_t column_ndx, ColumnType attr);
 
@@ -119,7 +114,7 @@ private:
     /// underlying memory.
     static size_t create_empty_spec(Allocator&);
 
-    size_t do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, ColumnType type, const char* name);
+    size_t do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, const char* name);
     void do_remove_column(const vector<size_t>& column_ids, size_t pos);
     void do_rename_column(const vector<size_t>& column_ids, size_t pos, const char* name);
 

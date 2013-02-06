@@ -43,7 +43,7 @@ public:
     size_t      get_column_count() const TIGHTDB_NOEXCEPT;
     const char* get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     size_t      get_column_index(const char* name) const;
-    ColumnType  get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    DataType    get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     // Getting values
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -54,7 +54,7 @@ public:
     const char* get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
-    ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Subtables
     size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -348,7 +348,7 @@ inline size_t TableViewBase::get_column_index(const char* name) const
     return m_table->get_column_index(name);
 }
 
-inline ColumnType TableViewBase::get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT
+inline DataType TableViewBase::get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_table);
     return m_table->get_column_type(column_ndx);
@@ -398,7 +398,8 @@ inline double TableViewBase::get_double(size_t column_ndx, size_t row_ndx) const
     return m_table->get_double(column_ndx, real_ndx);
 }
 
-inline const char* TableViewBase::get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline const char* TableViewBase::get_string(size_t column_ndx, size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_String);
 
@@ -422,7 +423,8 @@ inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const
     return m_table->get_mixed(column_ndx, real_ndx); // Throws
 }
 
-inline ColumnType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline DataType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
@@ -430,7 +432,8 @@ inline ColumnType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_nd
     return m_table->get_mixed_type(column_ndx, real_ndx);
 }
 
-inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
 

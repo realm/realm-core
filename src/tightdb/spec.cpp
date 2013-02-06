@@ -67,7 +67,7 @@ bool Spec::update_from_parent()
     else return false;
 }
 
-size_t Spec::add_column(ColumnType type, const char* name, ColumnType attr)
+size_t Spec::add_column(DataType type, const char* name, ColumnType attr)
 {
     TIGHTDB_ASSERT(name);
 
@@ -113,13 +113,13 @@ size_t Spec::add_column(ColumnType type, const char* name, ColumnType attr)
     return (m_names.Size()-1); // column_ndx
 }
 
-size_t Spec::add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name)
+size_t Spec::add_subcolumn(const vector<size_t>& column_path, DataType type, const char* name)
 {
     TIGHTDB_ASSERT(!column_path.empty());
     return do_add_subcolumn(column_path, 0, type, name);
 }
 
-size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, ColumnType type, const char* name)
+size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, const char* name)
 {
     const size_t column_ndx = column_ids[pos];
     Spec subspec = get_subtable_spec(column_ndx);
@@ -174,8 +174,8 @@ void Spec::remove_column(size_t column_ndx)
 
     // If the column is a subtable column, we have to delete
     // the subspec(s) as well
-    const ColumnType type = (ColumnType)m_spec.Get(type_ndx);
-    if (type == type_Table) {
+    const ColumnType type = ColumnType(m_spec.Get(type_ndx));
+    if (type == col_type_Table) {
         const size_t subspec_ndx = get_subspec_ndx(column_ndx);
         const size_t subspec_ref = m_subSpecs.GetAsRef(subspec_ndx);
 
@@ -190,7 +190,7 @@ void Spec::remove_column(size_t column_ndx)
 
     // If there are an attribute, we have to delete that as well
     if (type_ndx > 0) {
-        const ColumnType type_prefix = (ColumnType)m_spec.Get(type_ndx-1);
+        const ColumnType type_prefix = ColumnType(m_spec.Get(type_ndx-1));
         if (type_prefix >= col_attr_Indexed)
             m_spec.Delete(type_ndx-1);
     }
@@ -247,7 +247,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const
     // so we need to count up to it's position
     size_t pos = 0;
     for (size_t i = 0; i < type_ndx; ++i) {
-        if ((ColumnType)m_spec.Get(i) == type_Table) ++pos;
+        if (ColumnType(m_spec.Get(i)) == col_type_Table) ++pos;
     }
     return pos;
 }
@@ -308,7 +308,7 @@ ColumnType Spec::get_real_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
     return type;
 }
 
-ColumnType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
+DataType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
 
@@ -316,7 +316,8 @@ ColumnType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 
     // Hide internal types
     if (type == col_type_StringEnum) return type_String;
-    else return type;
+
+    return DataType(type);
 }
 
 void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
@@ -328,14 +329,14 @@ void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
     const size_t count = m_spec.Size();
 
     for (;type_ndx < count; ++type_ndx) {
-        const size_t t = (ColumnType)m_spec.Get(type_ndx);
+        const ColumnType t = ColumnType(m_spec.Get(type_ndx));
         if (t >= col_attr_Indexed) continue; // ignore attributes
         if (column_count == column_ndx) break;
         ++column_count;
     }
 
     // At this point we only support upgrading to string enum
-    TIGHTDB_ASSERT((ColumnType)m_spec.Get(type_ndx) == type_String);
+    TIGHTDB_ASSERT(ColumnType(m_spec.Get(type_ndx)) == col_type_String);
     TIGHTDB_ASSERT(type == col_type_StringEnum);
 
     m_spec.Set(type_ndx, type);

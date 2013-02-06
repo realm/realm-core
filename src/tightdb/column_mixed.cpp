@@ -142,11 +142,11 @@ void ColumnMixed::Clear()
 {
     m_types->Clear();
     m_refs->Clear();
-    if (m_data) 
+    if (m_data)
         m_data->Clear();
 }
 
-ColumnType ColumnMixed::GetType(size_t ndx) const TIGHTDB_NOEXCEPT
+DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
     MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));
@@ -162,7 +162,7 @@ ColumnType ColumnMixed::GetType(size_t ndx) const TIGHTDB_NOEXCEPT
     case MIXED_COL_DOUBLE:      return type_Double;
     case MIXED_COL_DOUBLE_NEG:  return type_Double;
     default:
-        TIGHTDB_ASSERT(false); 
+        TIGHTDB_ASSERT(false);
         return (type_Int);
     }
 }
@@ -178,7 +178,7 @@ void ColumnMixed::fill(size_t count)
         m_types->Insert(i, MIXED_COL_INT);
     }
     for (size_t i = 0; i < count; ++i) {
-        m_refs->Insert(i, 1); // 1 is zero shifted one and low bit set; 
+        m_refs->Insert(i, 1); // 1 is zero shifted one and low bit set;
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -257,12 +257,12 @@ void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
 bool ColumnMixed::Compare(const ColumnMixed& c) const
 {
     const size_t n = Size();
-    if (c.Size() != n) 
+    if (c.Size() != n)
         return false;
-    
+
     for (size_t i=0; i<n; ++i) {
-        const ColumnType type = GetType(i);
-        if (c.GetType(i) != type)
+        const DataType type = get_type(i);
+        if (c.get_type(i) != type)
             return false;
         switch (type) {
         case type_Int:
@@ -287,7 +287,7 @@ bool ColumnMixed::Compare(const ColumnMixed& c) const
             {
                 const BinaryData d1 = get_binary(i);
                 const BinaryData d2 = c.get_binary(i);
-                if (d1.len != d2.len || !std::equal(d1.pointer, d1.pointer+d1.len, d2.pointer)) 
+                if (d1.len != d2.len || !std::equal(d1.pointer, d1.pointer+d1.len, d2.pointer))
                     return false;
             }
             break;
@@ -295,12 +295,13 @@ bool ColumnMixed::Compare(const ColumnMixed& c) const
             {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
                 ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
-                if (*t1 != *t2) 
+                if (*t1 != *t2)
                     return false;
             }
             break;
-        default:
+        case type_Mixed:
             TIGHTDB_ASSERT(false);
+            break;
         }
     }
     return true;

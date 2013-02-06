@@ -624,7 +624,7 @@ public:
         return static_cast<FieldAccessor&>(*this);
     }
 
-    ColumnType get_type() const TIGHTDB_NOEXCEPT
+    DataType get_type() const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->get_impl()->get_mixed_type(col_idx, Base::m_row_idx);
     }

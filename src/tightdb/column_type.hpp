@@ -22,26 +22,20 @@
 
 namespace tightdb {
 
-// Note: tightdb_objc/Deliv/ColumnType.h must be kept in sync with his file.
-// Note: tightdb_java2/src/main/java/ColumnType.java must be kept in sync with his file.
-//
-// Note: <tightdb/c/column_type.h> must be kept in sync with his file.
-// Note: <tightdb/objc/column_type.h> must be kept in sync with his file.
-// Note: "com/tightdb/ColumnType.java" must be kept in sync with his file.
+// Note: Value assignments must be kept in sync with <tightdb/data_type.hpp>
 enum ColumnType {
     // Column types
-    type_Int         =  0,
-    type_Bool        =  1,
-    type_String      =  2,
-    type_Binary      =  4,
-    type_Table       =  5,
-    type_Mixed       =  6,
-    type_Date        =  7,
-    type_Float       =  9,
-    type_Double      = 10,
-
+    col_type_Int         =  0,
+    col_type_Bool        =  1,
+    col_type_String      =  2,
     col_type_StringEnum  =  3, // double refs
+    col_type_Binary      =  4,
+    col_type_Table       =  5,
+    col_type_Mixed       =  6,
+    col_type_Date        =  7,
     col_type_Reserved1   =  8, // DateTime
+    col_type_Float       =  9,
+    col_type_Double      = 10,
     col_type_Reserved4   = 11, // Decimal
 
     // Attributes
