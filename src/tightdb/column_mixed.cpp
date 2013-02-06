@@ -153,7 +153,7 @@ DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
     switch (coltype) {
         case MIXED_COL_INT_NEG:     return type_Int;
         case MIXED_COL_DOUBLE_NEG:  return type_Double;
-        default: return static_cast<ColumnType>(coltype);   // all others must be in sync with ColumnType
+        default: return static_cast<DataType>(coltype);   // all others must be in sync with ColumnType
     }
 }
 
