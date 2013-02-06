@@ -303,45 +303,45 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const
 
 int64_t Query::sum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_SUM, int64_t>(&Column::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, resultcount, start, end, limit);
 }
 double Query::sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_SUM, float>(&ColumnFloat::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, resultcount, start, end, limit);
 }
 double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_SUM, double>(&ColumnDouble::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, resultcount, start, end, limit);
 }
 
 // Maximum
 
 int64_t Query::maximum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MAX, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit);
 }
 float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MAX, float>(&ColumnFloat::maximum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, resultcount, start, end, limit);
 }
 double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MAX, double>(&ColumnDouble::maximum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, resultcount, start, end, limit);
 }
 
 // Minimum
 
 int64_t Query::minimum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MIN, int64_t>(&Column::minimum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, resultcount, start, end, limit);
 }
 float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MIN, float>(&ColumnFloat::minimum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx, resultcount, start, end, limit);
 }
 double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MIN, double>(&ColumnDouble::minimum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, resultcount, start, end, limit);
 }
 
 // Average
@@ -352,7 +352,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     size_t resultcount2 = 0;
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::sum_type SumType;
-    const SumType sum1 = aggregate<TDB_SUM, T>(&ColType::sum, column_ndx, &resultcount2, start, end, limit);
+    const SumType sum1 = aggregate<act_Sum, T>(&ColType::sum, column_ndx, &resultcount2, start, end, limit);
     double avg1 = 0;
     if (resultcount2 != 0)
         avg1 = static_cast<double>(sum1) / resultcount2;
@@ -471,8 +471,8 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     // Use single threading
     TableView tv(*m_table);
     QueryState<int64_t> st;
-    st.init(TDB_FINDALL, &tv.get_ref_column(), limit);
-    first[0]->aggregate<TDB_FINDALL, int64_t, int64_t>(&st, start, end, not_found, NULL);
+    st.init(act_FindAll, &tv.get_ref_column(), limit);
+    first[0]->aggregate<act_FindAll, int64_t, int64_t>(&st, start, end, not_found, NULL);
     return move(tv);
 }
 
@@ -489,8 +489,8 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 
     Init(*m_table);
     QueryState<int64_t> st;
-    st.init(TDB_COUNT, NULL, limit);
-    int64_t r = first[0]->aggregate<TDB_COUNT, int64_t, int64_t>(&st, start, end, not_found, NULL);
+    st.init(act_Count, NULL, limit);
+    int64_t r = first[0]->aggregate<act_Count, int64_t, int64_t>(&st, start, end, not_found, NULL);
     return size_t(r);
 }
 

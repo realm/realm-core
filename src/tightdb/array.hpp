@@ -23,8 +23,8 @@ Searching: The main finding function is:
     template <class cond, Action action, size_t bitwidth, class Callback> void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState *state, Callback callback) const
 
     cond:       One of Equal, NotEqual, Greater, etc. classes
-    Action:     One of TDB_RETURN_FIRST, TDB_FINDALL, TDB_MAX, TDB_CALLBACK_IDX, etc, constants
-    Callback:   Optional function to call for each search result. Will be called if action == TDB_CALLBACK_IDX
+    Action:     One of act_ReturnFirst, act_FindAll, act_Max, act_CallbackIdx, etc, constants
+    Callback:   Optional function to call for each search result. Will be called if action == act_CallbackIdx
 
     find() will call find_action_pattern() or find_action() that again calls match() for each search result which optionally calls callback():
 
@@ -72,7 +72,7 @@ Searching: The main finding function is:
 
 namespace tightdb {
 
-enum Action {TDB_RETURN_FIRST, TDB_SUM, TDB_MAX, TDB_MIN, TDB_COUNT, TDB_FINDALL, TDB_CALL_IDX, TDB_CALLBACK_IDX, TDB_CALLBACK_VAL, TDB_CALLBACK_NONE, TDB_CALLBACK_BOTH};
+enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_CallIdx, act_CallbackIdx, act_CallbackVal, act_CallbackNone, act_CallbackBoth};
 
 template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 
@@ -515,7 +515,7 @@ public:
 
     template <Action action> bool uses_val(void)
     {
-        if (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM)
+        if (action == act_Max || action == act_Min || action == act_Sum)
             return true;
         else
             return false;
@@ -526,17 +526,17 @@ public:
         m_match_count = 0;
         m_limit = limit;
 
-        if (action == TDB_MAX)
+        if (action == act_Max)
             m_state = -0x7fffffffffffffffLL - 1LL;
-        else if (action == TDB_MIN)
+        else if (action == act_Min)
             m_state = 0x7fffffffffffffffLL;
-        else if (action == TDB_RETURN_FIRST)
+        else if (action == act_ReturnFirst)
             m_state = not_found;
-        else if (action == TDB_SUM)
+        else if (action == act_Sum)
             m_state = 0;
-        else if (action == TDB_COUNT)
+        else if (action == act_Count)
             m_state = 0;
-        else if (action == TDB_FINDALL)
+        else if (action == act_FindAll)
             m_state = (int64_t)akku;
         else
             TIGHTDB_ASSERT(false);
@@ -546,7 +546,7 @@ public:
     inline bool match(size_t index, uint64_t indexpattern, int64_t value, Callback callback)
     {
         if (pattern) {
-            if (action == TDB_COUNT) {
+            if (action == act_Count) {
                 m_state += fast_popcount64(indexpattern);
                 m_match_count = size_t(m_state);
                 return true;
@@ -557,25 +557,25 @@ public:
 
         ++m_match_count;
 
-        if (action == TDB_CALLBACK_IDX)
+        if (action == act_CallbackIdx)
             return callback(index);
-        else if (action == TDB_MAX) {
+        else if (action == act_Max) {
             if(value > m_state)
                 m_state = value;
         }
-        else if (action == TDB_MIN) {
+        else if (action == act_Min) {
             if(value < m_state)
                 m_state = value;
         }
-        else if (action == TDB_SUM)
+        else if (action == act_Sum)
             m_state += value;
-        else if (action == TDB_COUNT) {
+        else if (action == act_Count) {
             m_state++;
             m_match_count = size_t(m_state);
         }
-        else if (action == TDB_FINDALL)
+        else if (action == act_FindAll)
             ((Array*)m_state)->add(index);
-        else if (action == TDB_RETURN_FIRST) {
+        else if (action == act_ReturnFirst) {
             m_state = index;
             return false;
         }
@@ -594,7 +594,7 @@ public:
 
     template <Action action> bool uses_val()
     {
-        return (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM);
+        return (action == act_Max || action == act_Min || action == act_Sum);
     }
 
     void init(Action action, Array*, size_t limit)
@@ -603,11 +603,11 @@ public:
         m_match_count = 0;
         m_limit = limit;
 
-        if (action == TDB_MAX)
+        if (action == act_Max)
             m_state = -std::numeric_limits<R>::infinity();
-        else if (action == TDB_MIN)
+        else if (action == act_Min)
             m_state = std::numeric_limits<R>::infinity();
-        else if (action == TDB_SUM)
+        else if (action == act_Sum)
             m_state = 0.0;
         else
             TIGHTDB_ASSERT(false);
@@ -619,18 +619,18 @@ public:
         if (pattern)
             return false;
 
-        TIGHTDB_STATIC_ASSERT(action == TDB_SUM || action == TDB_MAX || action == TDB_MIN, "");
+        TIGHTDB_STATIC_ASSERT(action == act_Sum || action == act_Max || action == act_Min, "");
         ++m_match_count;
 
-        if (action == TDB_MAX) {
+        if (action == act_Max) {
             if (value > m_state)
                 m_state = value;
         }
-        else if (action == TDB_MIN) {
+        else if (action == act_Min) {
             if (value < m_state)
                 m_state = value;
         }
-        else if (action == TDB_SUM)
+        else if (action == act_Sum)
             m_state += value;
         else
             TIGHTDB_ASSERT(false);
@@ -1124,18 +1124,18 @@ template <class cond2, Action action, size_t bitwidth, class Callback> void Arra
 
     // call find_action() on all items in array if all items are guaranteed to match (such as cond2 == NotEqual and value == 100 and m_ubound == 15)
     if (C.will_match(value, m_lbound, m_ubound)) {
-        if (action == TDB_SUM || action == TDB_MAX || action == TDB_MIN) {
+        if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
-            if (action == TDB_SUM)
+            if (action == act_Sum)
                 res = Array::sum(start, end);
-            if (action == TDB_MAX)
+            if (action == act_Max)
                 Array::maximum(res, start, end);
-            if (action == TDB_MIN)
+            if (action == act_Min)
                 Array::minimum(res, start, end);
 
             find_action<action, Callback>(start + baseindex, res, state, callback);
         }
-        else if (action == TDB_COUNT) {
+        else if (action == act_Count) {
             state->m_state += end - start;
         }
         else {
@@ -1543,7 +1543,7 @@ template <class cond, Action action, size_t bitwidth, class Callback> void Array
     Array *akku = (Array*)state->m_state;
     r_state.m_state = (int64_t)&r_arr;
 
-    if (action == TDB_FINDALL) {
+    if (action == act_FindAll) {
         for (size_t t = 0; t < akku->Size(); t++)
             r_arr.add(akku->Get(t));
     }
@@ -1555,9 +1555,9 @@ template <class cond, Action action, size_t bitwidth, class Callback> void Array
 
 #ifdef TIGHTDB_DEBUG
 
-    if (action == TDB_MAX || action == TDB_MIN || action == TDB_SUM || action == TDB_COUNT || action == TDB_RETURN_FIRST || action == TDB_COUNT) {
+    if (action == act_Max || action == act_Min || action == act_Sum || action == act_Count || action == act_ReturnFirst || action == act_Count) {
         find_reference<cond, action, bitwidth, Callback>(value, start, end, baseindex, &r_state, callback);
-        if (action == TDB_FINDALL)
+        if (action == act_FindAll)
             TIGHTDB_ASSERT(akku->Compare(r_arr));
         else
             TIGHTDB_ASSERT(state->m_state == r_state.m_state);
@@ -1579,25 +1579,25 @@ template <class cond2, Action action, size_t bitwidth, class Callback> int64_t A
         int64_t v = Get(t);
 
         if (SameType<cond2, None>::value || (SameType<cond2, Equal>::value && v == value) || (SameType<cond2, NotEqual>::value && v != value) || (SameType<cond2, Greater>::value && v > value) || (SameType<cond2, Less>::value && v < value)) {
-            if (action == TDB_RETURN_FIRST) {
+            if (action == act_ReturnFirst) {
                 state->m_state = t;
                 return false;
             }
-            else if (action == TDB_SUM)
+            else if (action == act_Sum)
                 state->m_state += v;
-            else if (action == TDB_MAX && v > state->m_state)
+            else if (action == act_Max && v > state->m_state)
                     state->m_state = v;
-            else if (action == TDB_MIN && v < state->m_state)
+            else if (action == act_Min && v < state->m_state)
                     state->m_state = v;
-            else if (action == TDB_COUNT)
+            else if (action == act_Count)
                 state->m_state++;
-            else if (action == TDB_FINDALL)
+            else if (action == act_FindAll)
                 ((Array*)state->m_state)->add(t + baseindex);
         }
 
     }
 
-    if (action == TDB_RETURN_FIRST)
+    if (action == act_ReturnFirst)
         return false;
     else
         return true;

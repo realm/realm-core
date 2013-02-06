@@ -284,13 +284,13 @@ void BasicColumn<T>::find_all(Array &result, T value, size_t start, size_t end) 
 template<typename T>
 size_t BasicColumn<T>::count(T target) const
 {
-    return size_t(ColumnBase::aggregate<T, int64_t, TDB_COUNT, Equal>(target, 0, Size(), NULL));
+    return size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, Size(), NULL));
 }
 
 template<typename T>
 typename BasicColumn<T>::SumType BasicColumn<T>::sum(size_t start, size_t end) const
 {
-    return ColumnBase::aggregate<T, SumType, TDB_SUM, None>(0, start, end, NULL);
+    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, NULL);
 }
 
 template<typename T>
@@ -299,7 +299,7 @@ double BasicColumn<T>::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = Size();
     size_t size = end - start;
-    double sum1 = ColumnBase::aggregate<T, SumType, TDB_SUM, None>(0, start, end, NULL);
+    double sum1 = ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, NULL);
     double avg = sum1 / ( size == 0 ? 1 : size );
     return avg;
 }
@@ -307,13 +307,13 @@ double BasicColumn<T>::average(size_t start, size_t end) const
 template<typename T>
 T BasicColumn<T>::minimum(size_t start, size_t end) const
 {
-    return ColumnBase::aggregate<T, T, TDB_MIN, None>(0, start, end, NULL);
+    return ColumnBase::aggregate<T, T, act_Min, None>(0, start, end, NULL);
 }
 
 template<typename T>
 T BasicColumn<T>::maximum(size_t start, size_t end) const
 {
-    return ColumnBase::aggregate<T, T, TDB_MAX, None>(0, start, end, NULL);
+    return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, NULL);
 }
 
 /*
