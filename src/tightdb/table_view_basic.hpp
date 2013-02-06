@@ -30,6 +30,7 @@ namespace tightdb {
 /// Common base class for BasicTableView<Tab> and BasicTableView<const
 /// Tab>.
 ///
+/// \tparam Impl Is either TableView or ConstTableView.
 template<class Tab, class View, class Impl> class BasicTableViewBase {
 public:
     typedef typename Tab::spec_type spec_type;

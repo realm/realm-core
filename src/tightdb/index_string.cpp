@@ -1,4 +1,5 @@
 #include <tightdb/index_string.hpp>
+#include <cstdio>
 
 using namespace tightdb;
 

@@ -353,8 +353,6 @@ void File::alloc(SizeType offset, size_t size)
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     if (TIGHTDB_LIKELY(::posix_fallocate(m_fd, offset, size) == 0)) return;
-    throw runtime_error("posix_fallocate() failed");
-
     const int errnum = errno; // Eliminate any risk of clobbering
     const string msg = get_errno_msg("posix_fallocate() failed: ", errnum);
     switch (errnum) {
@@ -425,7 +423,7 @@ bool File::lock(bool exclusive, bool non_blocking)
 
 #ifdef _WIN32 // Windows version
 
-    TIGHTDB_ASSERT(!have_lock);
+    TIGHTDB_ASSERT(!m_have_lock);
 
     // Under Windows a file lock must be explicitely released before
     // the file is closed. It will eventually be released by the
@@ -469,7 +467,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (non_blocking) operation |=  LOCK_NB;
     if (TIGHTDB_LIKELY(flock(m_fd, operation) == 0)) return true;
     const int errnum = errno; // Eliminate any risk of clobbering
-    if (errnum == EWOULDBLOCK) return false;
+    if (TIGHTDB_LIKELY(errnum == EWOULDBLOCK)) return false;
     const string msg = get_errno_msg("flock() failed: ", errnum);
     if (errnum == ENOLCK) throw ResourceAllocError(msg);
     throw runtime_error(msg);

@@ -481,7 +481,7 @@ inline void File::open(const std::string& path, Mode m)
 inline bool File::is_attached() const TIGHTDB_NOEXCEPT
 {
 #ifdef _WIN32
-    return m_handle;
+    return (m_handle != NULL);
 #else
     return 0 <= m_fd;
 #endif
@@ -585,7 +585,7 @@ template<class T> inline void File::Map<T>::sync()
 
 template<class T> inline bool File::Map<T>::is_attached() const TIGHTDB_NOEXCEPT
 {
-    return m_addr;
+    return (m_addr != NULL);
 }
 
 template<class T> inline T* File::Map<T>::get_addr() const TIGHTDB_NOEXCEPT

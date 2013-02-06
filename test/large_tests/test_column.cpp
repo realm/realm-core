@@ -59,7 +59,7 @@ TEST(LESS)
         size_t LEN2 = 64 * 8 / (a.GetBitWidth() == 0 ? 1 : a.GetBitWidth());
 
         Array akku;
-        state_state state;
+        QueryState state;
         state.state = int64_t(&akku);
 
         for (size_t from = 0; from < LEN2; from++) {
