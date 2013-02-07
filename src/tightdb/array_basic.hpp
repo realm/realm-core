@@ -60,7 +60,7 @@ private:
     virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const {return TDB_MULTIPLY;}
 
-    template <bool find_max> bool minmax(T& result, size_t start, size_t end) const;
+    template<bool find_max> bool minmax(T& result, size_t start, size_t end) const;
     static size_t create_empty_basic_array(Allocator& alloc);
 };
 

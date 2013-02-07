@@ -45,7 +45,6 @@ Searching: The main finding function is:
 #include <ostream>
 
 #include <tightdb/assert.hpp>
-#include <tightdb/error.hpp>
 #include <tightdb/alloc.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/query_conditions.hpp>
@@ -183,7 +182,7 @@ public:
 protected:
     friend class Array;
 
-    virtual size_t get_child_ref(size_t child_ndx) const = 0;
+    virtual size_t get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT = 0;
 };
 
 
@@ -237,14 +236,11 @@ public:
 
     void SetType(ColumnDef type);
     void UpdateRef(size_t ref);
-    bool Copy(const Array&); // Copy semantics for assignment
+    void Copy(const Array&); // Copy semantics for assignment
     void move_assign(Array&); // Move semantics for assignment
 
     /// Construct an empty array of the specified type and return just
     /// the reference to the underlying memory.
-    ///
-    /// \return Zero if allocation fails.
-    ///
     static size_t create_empty_array(ColumnDef, Allocator&);
 
     // Parent tracking
@@ -252,8 +248,8 @@ public:
     void SetParent(ArrayParent *parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
     void UpdateParentNdx(int diff) {m_parentNdx += diff;}
     ArrayParent *GetParent() const TIGHTDB_NOEXCEPT {return m_parent;}
-    size_t GetParentNdx() const {return m_parentNdx;}
-    bool UpdateFromParent();
+    size_t GetParentNdx() const TIGHTDB_NOEXCEPT {return m_parentNdx;}
+    bool UpdateFromParent() TIGHTDB_NOEXCEPT;
 
     bool IsValid() const TIGHTDB_NOEXCEPT {return m_data != NULL;}
     void Invalidate() const TIGHTDB_NOEXCEPT {m_data = NULL;}
@@ -261,9 +257,9 @@ public:
     virtual size_t Size() const TIGHTDB_NOEXCEPT {return m_len;}
     bool is_empty() const TIGHTDB_NOEXCEPT {return m_len == 0;}
 
-    bool Insert(size_t ndx, int64_t value);
-    bool add(int64_t value);
-    bool Set(size_t ndx, int64_t value);
+    void Insert(size_t ndx, int64_t value);
+    void add(int64_t value);
+    void Set(size_t ndx, int64_t value);
     template<size_t w> void Set(size_t ndx, int64_t value);
 
     int64_t Get(size_t ndx) const TIGHTDB_NOEXCEPT;
@@ -288,8 +284,8 @@ public:
     size_t IndexStringCount(const char* value, void* column, StringGetter get_func) const;
 
     void SetAllToZero();
-    bool Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
-    bool IncrementIf(int64_t limit, int64_t value);
+    void Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
+    void IncrementIf(int64_t limit, int64_t value);
     template <size_t w> void Adjust(size_t start, int64_t diff);
     void Adjust(size_t start, int64_t diff);
     template <size_t w> bool Increment(int64_t value, size_t start, size_t end);
@@ -423,7 +419,7 @@ private:
 protected:
     friend class GroupWriter;
 
-    bool AddPositiveLocal(int64_t value);
+//    void AddPositiveLocal(int64_t value);
 
     void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
     void CreateFromHeader(uint8_t* header, size_t ref=0) TIGHTDB_NOEXCEPT;
@@ -448,13 +444,13 @@ protected:
     void set_header_len(size_t value);
     void set_header_capacity(size_t value);
 
-    bool get_header_isnode(const void* header=NULL) const TIGHTDB_NOEXCEPT;
-    bool get_header_hasrefs(const void* header=NULL) const TIGHTDB_NOEXCEPT;
-    bool get_header_indexflag(const void* header=NULL) const TIGHTDB_NOEXCEPT;
-    WidthType get_header_wtype(const void* header=NULL) const TIGHTDB_NOEXCEPT;
-    size_t get_header_width(const void* header=NULL) const TIGHTDB_NOEXCEPT;
-    size_t get_header_len(const void* header=NULL) const TIGHTDB_NOEXCEPT;
-    size_t get_header_capacity(const void* header=NULL) const TIGHTDB_NOEXCEPT;
+    bool get_header_isnode(const void* header=0) const TIGHTDB_NOEXCEPT;
+    bool get_header_hasrefs(const void* header=0) const TIGHTDB_NOEXCEPT;
+    bool get_header_indexflag(const void* header=0) const TIGHTDB_NOEXCEPT;
+    WidthType get_header_wtype(const void* header=0) const TIGHTDB_NOEXCEPT;
+    size_t get_header_width(const void* header=0) const TIGHTDB_NOEXCEPT;
+    size_t get_header_len(const void* header=0) const TIGHTDB_NOEXCEPT;
+    size_t get_header_capacity(const void* header=0) const TIGHTDB_NOEXCEPT;
 
     static void set_header_isnode(bool value, void* header);
     static void set_header_hasrefs(bool value, void* header);
@@ -464,12 +460,12 @@ protected:
     static void set_header_len(size_t value, void* header);
     static void set_header_capacity(size_t value, void* header);
     static void init_header(void* header, bool is_node, bool has_refs, int width_type,
-                     size_t width, size_t length, size_t capacity);
+                            size_t width, size_t length, size_t capacity);
 
-    template <size_t width> void SetWidth(void) TIGHTDB_NOEXCEPT;
-    void SetWidth(size_t width) TIGHTDB_NOEXCEPT;
-    bool Alloc(size_t count, size_t width);
-    bool CopyOnWrite();
+    template<size_t width> void SetWidth() TIGHTDB_NOEXCEPT;
+    void SetWidth(size_t) TIGHTDB_NOEXCEPT;
+    void Alloc(size_t count, size_t width);
+    void CopyOnWrite();
 
 private:
     size_t m_ref;
@@ -493,9 +489,8 @@ protected:
     static const size_t initial_capacity = 128;
     static size_t create_empty_array(ColumnDef, WidthType, Allocator&);
 
-    // Overriding methods in ArrayParent
-    virtual void update_child_ref(size_t child_ndx, size_t new_ref);
-    virtual size_t get_child_ref(size_t child_ndx) const;
+    void update_child_ref(size_t child_ndx, size_t new_ref) TIGHTDB_OVERRIDE;
+    size_t get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 // FIXME: below should be moved to a specific ArrayNumber class
 protected:
@@ -662,8 +657,7 @@ inline Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator&
     m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
     m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
-    const size_t ref = create_empty_array(type, alloc);
-    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    const size_t ref = create_empty_array(type, alloc); // Throws
     init_from_ref(ref);
     update_ref_in_parent();
 }
@@ -917,7 +911,7 @@ inline void Array::move_assign(Array& a)
 
 inline size_t Array::create_empty_array(ColumnDef type, Allocator& alloc)
 {
-    return create_empty_array(type, TDB_BITS, alloc);
+    return create_empty_array(type, TDB_BITS, alloc); // Throws
 }
 
 inline void Array::update_ref_in_parent()
@@ -932,7 +926,7 @@ inline void Array::update_child_ref(size_t child_ndx, size_t new_ref)
     Set(child_ndx, new_ref);
 }
 
-inline size_t Array::get_child_ref(size_t child_ndx) const
+inline size_t Array::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
     return GetAsRef(child_ndx);
 }

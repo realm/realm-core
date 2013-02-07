@@ -23,6 +23,8 @@
 #include <cstdlib>
 #include <string>
 
+#include <tightdb/config.h>
+
 #ifdef TIGHTDB_DEBUG
 #  define TIGHTDB_TERMINATE(msg) tightdb::terminate((msg), __FILE__, __LINE__)
 #else
@@ -32,7 +34,7 @@
 namespace tightdb {
 
 
-void terminate(std::string message, const char* file, long line);
+TIGHTDB_NORETURN void terminate(std::string message, const char* file, long line) TIGHTDB_NOEXCEPT;
 
 
 } // namespace tightdb

@@ -73,8 +73,8 @@ public:
     void UpdateFromParent();
 
     ColumnType GetType(size_t ndx) const TIGHTDB_NOEXCEPT;
-    virtual size_t Size() const TIGHTDB_NOEXCEPT {return m_types->Size();}
-    bool is_empty() const TIGHTDB_NOEXCEPT {return m_types->is_empty();}
+    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->Size(); }
+    bool is_empty() const TIGHTDB_NOEXCEPT { return m_types->is_empty(); }
 
     int64_t get_int(size_t ndx) const;
     bool get_bool(size_t ndx) const;
@@ -100,7 +100,7 @@ public:
     void set_double(size_t ndx, double value);
     void set_string(size_t ndx, const char* value);
     void set_binary(size_t ndx, const char* value, size_t len);
-    bool set_subtable(size_t ndx);
+    void set_subtable(size_t ndx);
 
     void insert_int(size_t ndx, int64_t value);
     void insert_bool(size_t ndx, bool value);
@@ -109,12 +109,12 @@ public:
     void insert_double(size_t ndx, double value);
     void insert_string(size_t ndx, const char* value);
     void insert_binary(size_t ndx, const char* value, size_t len);
-    bool insert_subtable(size_t ndx);
+    void insert_subtable(size_t ndx);
 
-    bool add() { insert_int(Size(), 0); return true; }
-    void insert(size_t ndx) { insert_int(ndx, 0); invalidate_subtables(); }
-    void Clear(); // Overriding virtual method.
-    void Delete(size_t ndx);
+    void add() TIGHTDB_OVERRIDE { insert_int(Size(), 0); }
+    void insert(size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
+    void Clear() TIGHTDB_OVERRIDE;
+    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
     void fill(size_t count);
 
     // Indexing

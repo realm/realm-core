@@ -117,9 +117,6 @@ private:
 
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
-    ///
-    /// \return Zero if allocation fails.
-    ///
     static size_t create_empty_spec(Allocator&);
 
     size_t do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, ColumnType type, const char* name);
@@ -128,7 +125,8 @@ private:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Precondition: 1 <= end - begin
-    size_t* record_subspec_path(const Array* root_subspecs, size_t* begin, size_t* end) const;
+    size_t* record_subspec_path(const Array* root_subspecs, size_t* begin,
+                                size_t* end) const TIGHTDB_NOEXCEPT;
     friend class Replication;
 #endif
 
@@ -164,8 +162,7 @@ inline Spec::Spec(const Table* table, Allocator& alloc):
 inline Spec::Spec(const Table* table, Allocator& alloc, ArrayParent* parent, size_t ndx_in_parent):
     m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
 {
-    const size_t ref = create_empty_spec(alloc);
-    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    const size_t ref = create_empty_spec(alloc); // Throws
     init_from_ref(ref, parent, ndx_in_parent);
 }
 

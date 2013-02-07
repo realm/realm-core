@@ -107,10 +107,7 @@ size_t Spec::add_column(ColumnType type, const char* name, ColumnType attr)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* repl = m_specSet.GetAllocator().get_replication();
-    if (repl) {
-        error_code err = repl->add_column(m_table, this, type, name);
-        if (err) throw_error(err);
-    }
+    if (repl) repl->add_column(m_table, this, type, name); // Throws
 #endif
 
     return (m_names.Size()-1); // column_ndx
@@ -402,7 +399,8 @@ size_t Spec::get_column_index(const char* name) const
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-size_t* Spec::record_subspec_path(const Array* root_subspecs, size_t* begin, size_t* end) const
+size_t* Spec::record_subspec_path(const Array* root_subspecs, size_t* begin,
+                                  size_t* end) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(begin < end);
     const Array* spec_set = &m_specSet;

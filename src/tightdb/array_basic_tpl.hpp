@@ -20,15 +20,15 @@
 #ifndef TIGHTDB_ARRAY_BASIC_TPL_HPP
 #define TIGHTDB_ARRAY_BASIC_TPL_HPP
 
+#include <algorithm>
+
 namespace tightdb {
 
 template<typename T>
 inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc) 
 {
     const size_t capacity = Array::initial_capacity;
-    const MemRef mem_ref = alloc.Alloc(capacity);
-    if (!mem_ref.pointer) 
-        return 0;
+    const MemRef mem_ref = alloc.Alloc(capacity); // Throws
 
     init_header(mem_ref.pointer, false, false, TDB_MULTIPLY, sizeof(T), 0, capacity);
 
@@ -39,9 +39,7 @@ template<typename T>
 inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc)
                                :Array(alloc)
 {
-    const size_t ref = create_empty_basic_array(alloc);
-    if (!ref) 
-        throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    const size_t ref = create_empty_basic_array(alloc); // Throws
     init_from_ref(ref);
     SetParent(parent, ndx_in_parent);
     update_ref_in_parent();
@@ -66,7 +64,7 @@ inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT : Array(no_pr
 template<typename T> 
 inline void BasicArray<T>::Clear()
 {
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Truncate size to zero (but keep capacity and width)
     m_len = 0;
@@ -82,7 +80,7 @@ inline void BasicArray<T>::add(T value)
 template<typename T> 
 inline T BasicArray<T>::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    T* dataPtr = (T *)m_data + ndx;
+    T* dataPtr = reinterpret_cast<T*>(m_data) + ndx;
     return *dataPtr;
 }
 
@@ -92,11 +90,10 @@ inline void BasicArray<T>::Set(size_t ndx, T value)
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) 
-        return;
+    CopyOnWrite(); // Throws
 
     // Set the value
-    T* data = (T *)m_data + ndx;
+    T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
 }
 
@@ -106,23 +103,22 @@ void BasicArray<T>::Insert(size_t ndx, T value)
     TIGHTDB_ASSERT(ndx <= m_len);
 
     // Check if we need to copy before modifying
-    (void)CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Make room for the new value
-    if (!Alloc(m_len+1, m_width))
-        return;
+    Alloc(m_len+1, m_width); // Throws
 
     // Move values below insertion
     if (ndx != m_len) {
-        unsigned char* src = m_data + (ndx * m_width);
-        unsigned char* dst = src + m_width;
-        const size_t count = (m_len - ndx) * m_width;
-        memmove(dst, src, count); 
-        // fixme: Consider std::copy() or std::copy_backward() instead.
+        char* const base = reinterpret_cast<char*>(m_data);
+        char* const src_begin = base + ndx*m_width;
+        char* const src_end   = base + m_len*m_width;
+        char* const dst_end   = src_end + m_width;
+        std::copy_backward(src_begin, src_end, dst_end);
     }
 
     // Set the value
-    T* data = (T *)m_data + ndx;
+    T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
 
      ++m_len;
@@ -134,19 +130,19 @@ void BasicArray<T>::Delete(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    CopyOnWrite();
-
-    --m_len;
+    CopyOnWrite(); // Throws
 
     // move data under deletion up
-    if (ndx < m_len) {
-        unsigned char* src = m_data + ((ndx+1) * m_width);
-        unsigned char* dst = m_data + (ndx * m_width);
-        const size_t len = (m_len - ndx) * m_width;
-        memmove(dst, src, len); // FIXME: Use std::copy() or std::copy_backward() instead.
+    if (ndx < m_len-1) {
+        char* const base = reinterpret_cast<char*>(m_data);
+        char* const dst_begin = base + ndx*m_width;
+        const char* const src_begin = dst_begin + m_width;
+        const char* const src_end   = base + m_len*m_width;
+        std::copy(src_begin, src_end, dst_begin);
     }
 
-    // Update length in header
+    // Update length (also in header)
+    --m_len;
     set_header_len(m_len);
 }
 

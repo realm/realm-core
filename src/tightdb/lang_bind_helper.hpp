@@ -20,10 +20,9 @@
 #ifndef TIGHTDB_LANG_BIND_HELPER_HPP
 #define TIGHTDB_LANG_BIND_HELPER_HPP
 
-#include <new>
+#include <cstddef>
 
 #include <tightdb/table.hpp>
-#include <tightdb/column_table.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/group.hpp>
 
@@ -35,26 +34,31 @@ namespace tightdb {
 ///
 /// \note An application must never call these functions directly.
 ///
-/// All the get_*_ptr() functions and new_table in this class will return a Table
-/// pointer where the reference count has already been incremented.
+/// All the get_*_ptr() functions as well as new_table() in this class
+/// will return a Table pointer where the reference count has already been
+/// incremented.
 ///
 /// The application must make sure that the unbind_table_ref() function is
 /// called to decrement the reference count when it no longer needs
 /// access to that table.
 class LangBindHelper {
 public:
-    /// Construct a freestanding table. Returns null on memory
-    /// allocation failure.
-    static Table* new_table(); // FIXME: Verify that the caller checks for null!
+    /// Construct a freestanding table.
+    static Table* new_table();
 
-    static Table* get_subtable_ptr(Table*, size_t column_ndx, size_t row_ndx);
-    static const Table* get_subtable_ptr(const Table*, size_t column_ndx, size_t row_ndx);
+    static Table* get_subtable_ptr(Table*, std::size_t column_ndx, std::size_t row_ndx);
+    static const Table* get_subtable_ptr(const Table*, std::size_t column_ndx,
+                                         std::size_t row_ndx);
 
-    static Table* get_subtable_ptr_during_insert(Table*, size_t col_ndx, size_t row_ndx);
+    // FIXME: This is an oddball, do we really need it? If we do, please provide a comment that explains why it is needed!
+    static Table* get_subtable_ptr_during_insert(Table*, std::size_t col_ndx,
+                                                 std::size_t row_ndx);
 
-    static Table* get_subtable_ptr(TableView*, size_t column_ndx, size_t row_ndx);
-    static const Table* get_subtable_ptr(const TableView*, size_t column_ndx, size_t row_ndx);
-    static const Table* get_subtable_ptr(const ConstTableView*, size_t column_ndx, size_t row_ndx);
+    static Table* get_subtable_ptr(TableView*, std::size_t column_ndx, std::size_t row_ndx);
+    static const Table* get_subtable_ptr(const TableView*, std::size_t column_ndx,
+                                         std::size_t row_ndx);
+    static const Table* get_subtable_ptr(const ConstTableView*, std::size_t column_ndx,
+                                         std::size_t row_ndx);
 
     static Table* get_table_ptr(Group* grp, const char* name);
     static Table* get_table_ptr(Group* grp, const char* name, bool& was_created);
@@ -70,48 +74,42 @@ public:
 inline Table* LangBindHelper::new_table()
 {
     Allocator& alloc = Allocator::get_default();
-    const size_t ref = Table::create_empty_table(alloc);
-    if (!ref) return 0;
-    Table* const table = new (std::nothrow) Table(Table::RefCountTag(), alloc, ref, 0, 0);
-    if (!table) return 0;
+    const std::size_t ref = Table::create_empty_table(alloc); // Throws
+    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
     table->bind_ref();
     return table;
 }
 
-inline Table* LangBindHelper::get_subtable_ptr(Table* t, size_t column_ndx, size_t row_ndx)
+inline Table* LangBindHelper::get_subtable_ptr(Table* t, std::size_t column_ndx,
+                                               std::size_t row_ndx)
 {
     Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx);
     subtab->bind_ref();
     return subtab;
 }
 
-inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, size_t column_ndx, size_t row_ndx)
+inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, std::size_t column_ndx,
+                                                     std::size_t row_ndx)
 {
     const Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx);
     subtab->bind_ref();
     return subtab;
 }
 
-inline Table* LangBindHelper::get_subtable_ptr_during_insert(Table* t, size_t col_ndx, size_t row_ndx) {
-    TIGHTDB_ASSERT(col_ndx < t->get_column_count());
-    ColumnTable& subtables =  t->GetColumnTable(col_ndx);
-    TIGHTDB_ASSERT(row_ndx < subtables.Size());
-    Table* subtab = subtables.get_subtable_ptr(row_ndx);
-    subtab->bind_ref();
-    return subtab;
-}
-
-inline Table* LangBindHelper::get_subtable_ptr(TableView* tv, size_t column_ndx, size_t row_ndx)
+inline Table* LangBindHelper::get_subtable_ptr(TableView* tv, std::size_t column_ndx,
+                                               std::size_t row_ndx)
 {
     return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
 }
 
-inline const Table* LangBindHelper::get_subtable_ptr(const TableView* tv, size_t column_ndx, size_t row_ndx)
+inline const Table* LangBindHelper::get_subtable_ptr(const TableView* tv, std::size_t column_ndx,
+                                                     std::size_t row_ndx)
 {
     return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
 }
 
-inline const Table* LangBindHelper::get_subtable_ptr(const ConstTableView* tv, size_t column_ndx, size_t row_ndx)
+inline const Table* LangBindHelper::get_subtable_ptr(const ConstTableView* tv,
+                                                     std::size_t column_ndx, std::size_t row_ndx)
 {
     return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
 }

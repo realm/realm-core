@@ -4,6 +4,7 @@
 
 #include "tightdb.hpp"
 
+using namespace std;
 using namespace tightdb;
 
 namespace {
@@ -406,11 +407,9 @@ TEST(Shared_Writes_SpecialOrder)
 
 namespace  {
 
-void* IncrementEntry(void* arg);
-
-void* IncrementEntry(void* arg )
+void* IncrementEntry(void* arg)
 {
-    const size_t row_id = (size_t)arg;
+    const size_t row_ndx = (size_t)arg;
 
     // Open shared db
     SharedGroup sg("test_shared.tightdb");
@@ -420,7 +419,13 @@ void* IncrementEntry(void* arg )
         {
             WriteTransaction wt(sg);
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1[row_id].first += 1;
+            t1[row_ndx].first += 1;
+            // FIXME: For some reason this takes ages when running
+            // inside valgrind, it is probably due to the "extreme
+            // overallocation" bug. The 1000 transactions performed
+            // here can produce a final database file size of more
+            // than 1 GiB. Really! And that is a table with only 10
+            // rows. It is about 1 MiB per transaction.
             wt.commit();
         }
 
@@ -430,12 +435,12 @@ void* IncrementEntry(void* arg )
             ReadTransaction rt(sg);
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
-            const int64_t v = t[row_id].first;
+            const int64_t v = t[row_ndx].first;
             const int64_t expected = i+1;
             CHECK_EQUAL(expected, v);
         }
     }
-    return NULL;
+    return 0;
 }
 
 } // anonymous namespace
