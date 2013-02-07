@@ -372,7 +372,7 @@ TEST(Shared_Writes_SpecialOrder)
 
     SharedGroup sg("test.tightdb");
 
-    const int num_rows = 5; // FIXME: Should be strictly greater than MAX_LIST_SIZE, but that takes a loooooong time!
+    const int num_rows = 5; // FIXME: Should be strictly greater than TIGHTDB_MAX_LIST_SIZE, but that takes a loooooong time!
     const int num_reps = 25;
 
     {

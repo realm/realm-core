@@ -27,7 +27,7 @@ uint64_t rand2(int bitwidth = 64)
 
 std::string randstring(void)
 {
-    // If there are in the order of MAX_LIST_SIZE different strings, then we'll get a good
+    // If there are in the order of TIGHTDB_MAX_LIST_SIZE different strings, then we'll get a good
     // distribution btw. arrays with no matches and arrays with multiple matches, when
     // testing Find/FindAll
     int64_t t = (rand() % 100) * 100;

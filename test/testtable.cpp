@@ -1806,7 +1806,7 @@ namespace
 }
 
 #if TEST_DURATION > 0
-#define TBL_SIZE MAX_LIST_SIZE*10
+#define TBL_SIZE TIGHTDB_MAX_LIST_SIZE*10
 #else
 #define TBL_SIZE 10
 #endif
