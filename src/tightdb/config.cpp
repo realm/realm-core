@@ -92,8 +92,8 @@ int main(int argc, char* argv[])
         emit_flags("-DTIGHTDB_ENABLE_REPLICATION");
 #endif
 
-        if (MAX_LIST_SIZE != TIGHTDB_DEFAULT_MAX_LIST_SIZE) {
-            emit_flags("-DMAX_LIST_SIZE=" TO_STR(MAX_LIST_SIZE));
+        if (TIGHTDB_MAX_LIST_SIZE != TIGHTDB_DEFAULT_MAX_LIST_SIZE) {
+            emit_flags("-DTIGHTDB_MAX_LIST_SIZE=" TO_STR(TIGHTDB_MAX_LIST_SIZE));
         }
 
 #ifdef TIGHTDB_DEBUG

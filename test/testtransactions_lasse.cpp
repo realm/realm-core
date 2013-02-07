@@ -245,7 +245,7 @@ TEST(Transactions_Stress2)
 const size_t ITER3 =     20;
 const size_t WRITERS3 =   4;
 const size_t READERS3 =   4;
-const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if MAX_LIST_SIZE = 1000
+const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if TIGHTDB_MAX_LIST_SIZE = 1000
 bool terminate3 = false;
 
 void* write_thread3(void* arg)

@@ -611,7 +611,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
     AdaptiveStringColumn asc;
     Array c;
 
-    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+    // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
     asc.add("HEJSA");
@@ -665,7 +665,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
     AdaptiveStringColumn asc;
     Array c;
 
-    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+    // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -717,7 +717,7 @@ TEST(AdaptiveStringColumnCount)
 {
     AdaptiveStringColumn asc;
 
-    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+    // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -759,7 +759,7 @@ TEST(AdaptiveStringColumnIndex)
 {
     AdaptiveStringColumn asc;
 
-    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+    // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
