@@ -17,35 +17,28 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_TYPE_HPP
-#define TIGHTDB_COLUMN_TYPE_HPP
+#ifndef TIGHTDB_DATA_TYPE_HPP
+#define TIGHTDB_DATA_TYPE_HPP
 
 namespace tightdb {
 
-// Note: Value assignments must be kept in sync with <tightdb/data_type.hpp>
-enum ColumnType {
-    // Column types
-    col_type_Int         =  0,
-    col_type_Bool        =  1,
-    col_type_String      =  2,
-    col_type_StringEnum  =  3, // double refs
-    col_type_Binary      =  4,
-    col_type_Table       =  5,
-    col_type_Mixed       =  6,
-    col_type_Date        =  7,
-    col_type_Reserved1   =  8, // DateTime
-    col_type_Float       =  9,
-    col_type_Double      = 10,
-    col_type_Reserved4   = 11, // Decimal
-
-    // Attributes
-    col_attr_Indexed     = 100,
-    col_attr_Unique      = 101,
-    col_attr_Sorted      = 102,
-    col_attr_None        = 103
+// Note: Value assignments must be kept in sync with <tightdb/column_type.h>
+// Note: Value assignments must be kept in sync with <tightdb/c/column_type.h>
+// Note: Value assignments must be kept in sync with <tightdb/objc/column_type.h>
+// Note: Value assignments must be kept in sync with "com/tightdb/ColumnType.java"
+enum DataType {
+    type_Int    =  0,
+    type_Bool   =  1,
+    type_Date   =  7,
+    type_Float  =  9,
+    type_Double = 10,
+    type_String =  2,
+    type_Binary =  4,
+    type_Table  =  5,
+    type_Mixed  =  6
 };
 
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_TYPE_HPP
+#endif // TIGHTDB_DATA_TYPE_HPP

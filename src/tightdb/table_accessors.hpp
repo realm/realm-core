@@ -624,7 +624,7 @@ public:
         return static_cast<FieldAccessor&>(*this);
     }
 
-    ColumnType get_type() const TIGHTDB_NOEXCEPT
+    DataType get_type() const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->get_impl()->get_mixed_type(col_idx, Base::m_row_idx);
     }
@@ -643,7 +643,7 @@ public:
 
     BinaryData get_binary() const { return get().get_binary(); } // FIXME: Should be modified so it never throws
 
-    bool is_subtable() const TIGHTDB_NOEXCEPT { return get_type() == COLUMN_TYPE_TABLE; }
+    bool is_subtable() const TIGHTDB_NOEXCEPT { return get_type() == type_Table; }
 
     /// Checks whether this value is a subtable of the specified type.
     ///

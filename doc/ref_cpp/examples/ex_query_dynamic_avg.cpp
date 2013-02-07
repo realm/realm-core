@@ -19,8 +19,8 @@ int main()
     TableRef table = group.get_table("test");
 
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_STRING, "Name");
-    s.add_column(COLUMN_TYPE_INT,    "Age");
+    s.add_column(type_String, "Name");
+    s.add_column(type_Int,    "Age");
     table->update_from_spec();
 
     table->add_empty_row(3);

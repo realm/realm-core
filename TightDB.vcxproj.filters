@@ -283,6 +283,9 @@
     <ClInclude Include="src\tightdb\column_tpl.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
+    <ClInclude Include="src\tightdb\data_type.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
     <ClInclude Include="src\tightdb\column_type.hpp">
       <Filter>src\include</Filter>
     </ClInclude>

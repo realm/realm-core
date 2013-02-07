@@ -19,7 +19,7 @@ TEST(ColumnMixed_Int)
     CHECK_EQUAL(4, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_INT, c.GetType(i));
+        CHECK_EQUAL(type_Int, c.get_type(i));
     }
 
     CHECK_EQUAL(     2, c.get_int(0));
@@ -33,7 +33,7 @@ TEST(ColumnMixed_Int)
     c.set_int(3,      1);
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_INT, c.GetType(i));
+        CHECK_EQUAL(type_Int, c.get_type(i));
     }
 
     CHECK_EQUAL(   400, c.get_int(0));
@@ -54,14 +54,14 @@ TEST(ColumnMixed_Float)
     const float f = static_cast<float>(v);
     float fval1[] = {0.0f, 100.123f, -111.222f, f};
     float fval2[] = {-0.0f, -100.123f, std::numeric_limits<float>::max(), std::numeric_limits<float>::min()};
-    
+
     // Test insert
     for (size_t i=0; i<4; ++i)
         c.insert_float(i, fval1[i]);
     CHECK_EQUAL(4, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_FLOAT, c.GetType(i));
+        CHECK_EQUAL(type_Float, c.get_type(i));
         CHECK_EQUAL( fval1[i], c.get_float(i));
     }
 
@@ -70,7 +70,7 @@ TEST(ColumnMixed_Float)
         c.set_float(i, fval2[i]);
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_FLOAT, c.GetType(i));
+        CHECK_EQUAL(type_Float, c.get_type(i));
         CHECK_EQUAL( fval2[i], c.get_float(i));
     }
     CHECK_EQUAL(4, c.Size());
@@ -87,7 +87,7 @@ TEST(ColumnMixed_Double)
     const double d = static_cast<double>(v);
     double fval1[] = {1.0, 200.123, -111.222, d};
     double fval2[] = {-1.0, -100.123, std::numeric_limits<double>::max(), std::numeric_limits<double>::min()};
-    
+
     // Test insert
     for (size_t i=0; i<4; ++i) {
         c.insert_double(i, fval1[i]);
@@ -95,7 +95,7 @@ TEST(ColumnMixed_Double)
     CHECK_EQUAL(4, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_DOUBLE, c.GetType(i));
+        CHECK_EQUAL(type_Double, c.get_type(i));
         double v = c.get_double(i);
         CHECK_EQUAL( fval1[i], v);
     }
@@ -106,7 +106,7 @@ TEST(ColumnMixed_Double)
 
     CHECK_EQUAL(4, c.Size());
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_DOUBLE, c.GetType(i));
+        CHECK_EQUAL(type_Double, c.get_type(i));
         CHECK_EQUAL( fval2[i], c.get_double(i));
     }
 
@@ -123,7 +123,7 @@ TEST(ColumnMixed_Bool)
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_BOOL, c.GetType(i));
+        CHECK_EQUAL(type_Bool, c.get_type(i));
     }
 
     CHECK_EQUAL(true,  c.get_bool(0));
@@ -136,7 +136,7 @@ TEST(ColumnMixed_Bool)
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_BOOL, c.GetType(i));
+        CHECK_EQUAL(type_Bool, c.get_type(i));
     }
 
     CHECK_EQUAL(false, c.get_bool(0));
@@ -156,7 +156,7 @@ TEST(ColumnMixed_Date)
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_DATE, c.GetType(i));
+        CHECK_EQUAL(type_Date, c.get_type(i));
     }
 
     CHECK_EQUAL(    2, c.get_date(0));
@@ -168,7 +168,7 @@ TEST(ColumnMixed_Date)
     c.set_date(2, 99999);
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_DATE, c.GetType(i));
+        CHECK_EQUAL(type_Date, c.get_type(i));
     }
 
     CHECK_EQUAL(  400, c.get_date(0));
@@ -189,7 +189,7 @@ TEST(ColumnMixed_String)
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_STRING, c.GetType(i));
+        CHECK_EQUAL(type_String, c.get_type(i));
     }
 
     CHECK_EQUAL("aaa",     c.get_string(0));
@@ -202,7 +202,7 @@ TEST(ColumnMixed_String)
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_STRING, c.GetType(i));
+        CHECK_EQUAL(type_String, c.get_type(i));
     }
 
     CHECK_EQUAL("dd",        c.get_string(0));
@@ -222,7 +222,7 @@ TEST(ColumnMixed_Binary)
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_BINARY, c.GetType(i));
+        CHECK_EQUAL(type_Binary, c.get_type(i));
     }
 
     CHECK_EQUAL("aaa",     (const char*)c.get_binary(0).pointer);
@@ -235,7 +235,7 @@ TEST(ColumnMixed_Binary)
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_BINARY, c.GetType(i));
+        CHECK_EQUAL(type_Binary, c.get_type(i));
     }
 
     CHECK_EQUAL("dd",        (const char*)c.get_binary(0).pointer);
@@ -254,7 +254,7 @@ TEST(ColumnMixed_Table)
     CHECK_EQUAL(2, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
-        CHECK_EQUAL(COLUMN_TYPE_TABLE, c.GetType(i));
+        CHECK_EQUAL(type_Table, c.get_type(i));
     }
 
     Table* const t1 = c.get_subtable_ptr(0);
@@ -282,14 +282,14 @@ TEST(ColumnMixed_Mixed)
     c.insert_double(0, 1234.124);
     CHECK_EQUAL(8, c.Size());
 
-    CHECK_EQUAL(COLUMN_TYPE_DOUBLE, c.GetType(0));
-    CHECK_EQUAL(COLUMN_TYPE_FLOAT,  c.GetType(1));
-    CHECK_EQUAL(COLUMN_TYPE_TABLE,  c.GetType(2));
-    CHECK_EQUAL(COLUMN_TYPE_BINARY, c.GetType(3));
-    CHECK_EQUAL(COLUMN_TYPE_STRING, c.GetType(4));
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   c.GetType(5));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   c.GetType(6));
-    CHECK_EQUAL(COLUMN_TYPE_INT,    c.GetType(7));
+    CHECK_EQUAL(type_Double, c.get_type(0));
+    CHECK_EQUAL(type_Float,  c.get_type(1));
+    CHECK_EQUAL(type_Table,  c.get_type(2));
+    CHECK_EQUAL(type_Binary, c.get_type(3));
+    CHECK_EQUAL(type_String, c.get_type(4));
+    CHECK_EQUAL(type_Date,   c.get_type(5));
+    CHECK_EQUAL(type_Bool,   c.get_type(6));
+    CHECK_EQUAL(type_Int,    c.get_type(7));
 
     // Change all entries to new types
     c.set_int(0, 23);
@@ -302,14 +302,14 @@ TEST(ColumnMixed_Mixed)
     c.set_double(7, 1234.124);
     CHECK_EQUAL(8, c.Size());
 
-    CHECK_EQUAL(COLUMN_TYPE_DOUBLE, c.GetType(7));
-    CHECK_EQUAL(COLUMN_TYPE_FLOAT,  c.GetType(6));
-    CHECK_EQUAL(COLUMN_TYPE_TABLE,  c.GetType(5));
-    CHECK_EQUAL(COLUMN_TYPE_BINARY, c.GetType(4));
-    CHECK_EQUAL(COLUMN_TYPE_STRING, c.GetType(3));
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   c.GetType(2));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   c.GetType(1));
-    CHECK_EQUAL(COLUMN_TYPE_INT,    c.GetType(0));
+    CHECK_EQUAL(type_Double, c.get_type(7));
+    CHECK_EQUAL(type_Float,  c.get_type(6));
+    CHECK_EQUAL(type_Table,  c.get_type(5));
+    CHECK_EQUAL(type_Binary, c.get_type(4));
+    CHECK_EQUAL(type_String, c.get_type(3));
+    CHECK_EQUAL(type_Date,   c.get_type(2));
+    CHECK_EQUAL(type_Bool,   c.get_type(1));
+    CHECK_EQUAL(type_Int,    c.get_type(0));
 
     c.Destroy();
 }

@@ -142,18 +142,18 @@ void ColumnMixed::Clear()
 {
     m_types->Clear();
     m_refs->Clear();
-    if (m_data) 
+    if (m_data)
         m_data->Clear();
 }
 
-ColumnType ColumnMixed::GetType(size_t ndx) const TIGHTDB_NOEXCEPT
+DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
     MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));
     switch (coltype) {
-    case MIXED_COL_INT_NEG:     return COLUMN_TYPE_INT;
-    case MIXED_COL_DOUBLE_NEG:  return COLUMN_TYPE_DOUBLE;
-    default: return static_cast<ColumnType>(coltype);   // all others must be in sync with ColumnType
+        case MIXED_COL_INT_NEG:     return type_Int;
+        case MIXED_COL_DOUBLE_NEG:  return type_Double;
+        default: return static_cast<DataType>(coltype);   // all others must be in sync with ColumnType
     }
 }
 
@@ -168,7 +168,7 @@ void ColumnMixed::fill(size_t count)
         m_types->Insert(i, MIXED_COL_INT);
     }
     for (size_t i = 0; i < count; ++i) {
-        m_refs->Insert(i, 1); // 1 is zero shifted one and low bit set; 
+        m_refs->Insert(i, 1); // 1 is zero shifted one and low bit set;
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -247,50 +247,51 @@ void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
 bool ColumnMixed::Compare(const ColumnMixed& c) const
 {
     const size_t n = Size();
-    if (c.Size() != n) 
+    if (c.Size() != n)
         return false;
-    
+
     for (size_t i=0; i<n; ++i) {
-        const ColumnType type = GetType(i);
-        if (c.GetType(i) != type)
+        const DataType type = get_type(i);
+        if (c.get_type(i) != type)
             return false;
         switch (type) {
-        case COLUMN_TYPE_INT:
+        case type_Int:
             if (get_int(i) != c.get_int(i)) return false;
             break;
-        case COLUMN_TYPE_BOOL:
+        case type_Bool:
             if (get_bool(i) != c.get_bool(i)) return false;
             break;
-        case COLUMN_TYPE_DATE:
+        case type_Date:
             if (get_date(i) != c.get_date(i)) return false;
             break;
-        case COLUMN_TYPE_FLOAT:
+        case type_Float:
             if (get_float(i) != c.get_float(i)) return false;
             break;
-        case COLUMN_TYPE_DOUBLE:
+        case type_Double:
             if (get_double(i) != c.get_double(i)) return false;
             break;
-        case COLUMN_TYPE_STRING:
+        case type_String:
             if (strcmp(get_string(i), c.get_string(i)) != 0) return false;
             break;
-        case COLUMN_TYPE_BINARY:
+        case type_Binary:
             {
                 const BinaryData d1 = get_binary(i);
                 const BinaryData d2 = c.get_binary(i);
-                if (d1.len != d2.len || !std::equal(d1.pointer, d1.pointer+d1.len, d2.pointer)) 
+                if (d1.len != d2.len || !std::equal(d1.pointer, d1.pointer+d1.len, d2.pointer))
                     return false;
             }
             break;
-        case COLUMN_TYPE_TABLE:
+        case type_Table:
             {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
                 ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
-                if (*t1 != *t2) 
+                if (*t1 != *t2)
                     return false;
             }
             break;
-        default:
+        case type_Mixed:
             TIGHTDB_ASSERT(false);
+            break;
         }
     }
     return true;

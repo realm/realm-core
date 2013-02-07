@@ -56,7 +56,7 @@ CATEGORIES:
                  This method retrieves the real type of a Mixed variable.
       CONST    : True             
       RETURN:                 
-        TYPES  : ColumnType
+        TYPES  : DataType
         DESCR  : The type.
       EXAMPLES:                  
       - CODE   : ex_cpp_mixed_get_type

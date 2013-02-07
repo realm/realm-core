@@ -599,6 +599,7 @@
     <ClInclude Include="src\tightdb\column_string_enum.hpp" />
     <ClInclude Include="src\tightdb\column_table.hpp" />
     <ClInclude Include="src\tightdb\column_tpl.hpp" />
+    <ClInclude Include="src\tightdb\data_type.hpp" />
     <ClInclude Include="src\tightdb\column_type.hpp" />
     <ClInclude Include="src\tightdb\config.h" />
     <ClInclude Include="src\tightdb\date.hpp" />

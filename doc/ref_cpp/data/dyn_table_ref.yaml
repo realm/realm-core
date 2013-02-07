@@ -225,7 +225,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : The column index.     
       RETURN:                 
-        TYPES  : ColumnType
+        TYPES  : DataType
         DESCR  : The column type.
       EXAMPLES:                  
       - CODE   : ex_cpp_dyn_table_get_column_type
@@ -354,7 +354,7 @@ CATEGORIES :
                  const char*   get_string(size_t column_ndx, size_t row_ndx) const;
                  BinaryData    get_binary(size_t column_ndx, size_t row_ndx) const;
                  Mixed         get_mixed(size_t column_ndx, size_t row_ndx) const;
-                 ColumnType    get_mixed_type(size_t column_ndx, size_t row_ndx) const
+                 DataType      get_mixed_type(size_t column_ndx, size_t row_ndx) const
                  
                  TableRef      get_subtable(size_t column_ndx, size_t row_ndx);
                  ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
@@ -367,7 +367,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : The row index.
       RETURN:
-        TYPES  : [bool, int64_t, time_t, const char*, BinaryData, Mixed, ColumnType]
+        TYPES  : [bool, int64_t, time_t, const char*, BinaryData, Mixed, DataType]
         DESCR  : The value.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_xxx

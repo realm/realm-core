@@ -18,7 +18,7 @@ size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 
 size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) const
 {
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, COLUMN_TYPE_STRING);
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
 
     for (size_t i = 0; i < m_refs.Size(); i++)
         if (strcmp(get_string(column_ndx, i), value) == 0)
@@ -143,9 +143,9 @@ double TableViewBase::minimum_double(size_t column_ndx) const
 void TableViewBase::sort(size_t column, bool Ascending)
 {
     TIGHTDB_ASSERT(m_table);
-    TIGHTDB_ASSERT(m_table->get_column_type(column) == COLUMN_TYPE_INT  ||
-                   m_table->get_column_type(column) == COLUMN_TYPE_DATE ||
-                   m_table->get_column_type(column) == COLUMN_TYPE_BOOL);
+    TIGHTDB_ASSERT(m_table->get_column_type(column) == type_Int  ||
+                   m_table->get_column_type(column) == type_Date ||
+                   m_table->get_column_type(column) == type_Bool);
 
     if (m_refs.Size() == 0)
         return;
@@ -160,20 +160,20 @@ void TableViewBase::sort(size_t column, bool Ascending)
 
     // Extract all values from the Column and put them in an Array because Array is much faster to operate on
     // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
-    if (m_table->get_column_type(column) == COLUMN_TYPE_INT) {
+    if (m_table->get_column_type(column) == type_Int) {
         for (size_t t = 0; t < m_refs.Size(); t++) {
             const int64_t v = m_table->get_int(column, size_t(m_refs.Get(t)));
             vals.add(v);
         }
     }
-    else if (m_table->get_column_type(column) == COLUMN_TYPE_DATE) {
+    else if (m_table->get_column_type(column) == type_Date) {
         for (size_t t = 0; t < m_refs.Size(); t++) {
             const size_t idx = size_t(m_refs.Get(t));
             const int64_t v = int64_t(m_table->get_date(column, idx));
             vals.add(v);
         }
     }
-    else if (m_table->get_column_type(column) == COLUMN_TYPE_BOOL) {
+    else if (m_table->get_column_type(column) == type_Bool) {
         for (size_t t = 0; t < m_refs.Size(); t++) {
             const size_t idx = size_t(m_refs.Get(t));
             const int64_t v = int64_t(m_table->get_bool(column, idx));

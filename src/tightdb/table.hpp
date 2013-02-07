@@ -120,8 +120,8 @@ public:
     Spec&       get_spec();
     const Spec& get_spec() const;
     void        update_from_spec(); // Must not be called for a table with shared spec
-    size_t      add_column(ColumnType type, const char* name); // Add a column dynamically
-    size_t      add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name);
+    size_t      add_column(DataType type, const char* name); // Add a column dynamically
+    size_t      add_subcolumn(const vector<size_t>& column_path, DataType type, const char* name);
     void        remove_column(size_t column_ndx);
     void        remove_column(const vector<size_t>& column_path);
     void        rename_column(size_t column_ndx, const char* name);
@@ -136,7 +136,7 @@ public:
     size_t      get_column_count() const TIGHTDB_NOEXCEPT;
     const char* get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     size_t      get_column_index(const char* name) const;
-    ColumnType  get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    DataType    get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     // Row handling
     size_t      add_empty_row(size_t num_rows = 1);
@@ -168,7 +168,7 @@ public:
     size_t      get_string_length(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
-    ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Set cell values
     void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
@@ -200,12 +200,12 @@ public:
     size_t  count_string(size_t column_ndx, const char* target) const;
     size_t  count_float(size_t column_ndx, float target) const;
     size_t  count_double(size_t column_ndx, double target) const;
-    
+
     int64_t sum(size_t column_ndx) const;
     double  sum_float(size_t column_ndx) const;
     double  sum_double(size_t column_ndx) const;
         // FIXME: What to return for below when table empty? 0?
-    int64_t maximum(size_t column_ndx) const; 
+    int64_t maximum(size_t column_ndx) const;
     float   maximum_float(size_t column_ndx) const;
     double  maximum_double(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;
@@ -281,9 +281,8 @@ public:
     MemStats stats() const;
 #endif // TIGHTDB_DEBUG
 
-    // todo, note, these three functions have been protected
     const ColumnBase& GetColumnBase(size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Move this to private section next to the non-const version
-    ColumnType GetRealColumnType(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnType get_real_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Used by various node types in <tightdb/query_engine.hpp>
 
     class Parent;
 
@@ -345,8 +344,8 @@ protected:
     void   UpdateFromParent();
     void   do_remove_column(const vector<size_t>& column_ids, size_t pos);
     void   do_remove_column(size_t column_ndx);
-    size_t do_add_column(ColumnType type);
-    void   do_add_subcolumn(const vector<size_t>& column_path, size_t pos, ColumnType type);
+    size_t do_add_column(DataType type);
+    void   do_add_subcolumn(const vector<size_t>& column_path, size_t pos, DataType type);
 
     void   set_index(size_t column_ndx, bool update_spec);
 
@@ -477,6 +476,34 @@ protected:
 
 
 // Implementation:
+
+inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT
+{
+    return m_spec_set.get_column_count();
+}
+
+inline const char* Table::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < get_column_count());
+    return m_spec_set.get_column_name(ndx);
+}
+
+inline std::size_t Table::get_column_index(const char* name) const
+{
+    return m_spec_set.get_column_index(name);
+}
+
+inline ColumnType Table::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < get_column_count());
+    return m_spec_set.get_real_column_type(ndx);
+}
+
+inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < get_column_count());
+    return m_spec_set.get_column_type(ndx);
+}
 
 template <class C, ColumnType coltype>
 C& Table::GetColumn(size_t ndx)
@@ -634,7 +661,7 @@ struct Table::LocalTransactLog {
         if (m_repl) m_repl->optimize_table(m_table); // Throws
     }
 
-    void add_column(ColumnType type, const char* name)
+    void add_column(DataType type, const char* name)
     {
         if (m_repl) m_repl->add_column(m_table, &m_table->m_spec_set, type, name); // Throws
     }

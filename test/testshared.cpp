@@ -508,21 +508,21 @@ TEST(Shared_FormerErrorCase1)
         TableRef table = wt.get_table("my_table");
         {
             Spec& spec = table->get_spec();
-            spec.add_column(COLUMN_TYPE_INT, "alpha");
-            spec.add_column(COLUMN_TYPE_BOOL, "beta");
-            spec.add_column(COLUMN_TYPE_INT, "gamma");
-            spec.add_column(COLUMN_TYPE_DATE, "delta");
-            spec.add_column(COLUMN_TYPE_STRING, "epsilon");
-            spec.add_column(COLUMN_TYPE_BINARY, "zeta");
+            spec.add_column(type_Int, "alpha");
+            spec.add_column(type_Bool, "beta");
+            spec.add_column(type_Int, "gamma");
+            spec.add_column(type_Date, "delta");
+            spec.add_column(type_String, "epsilon");
+            spec.add_column(type_Binary, "zeta");
             {
                 Spec subspec = spec.add_subtable_column("eta");
-                subspec.add_column(COLUMN_TYPE_INT, "foo");
+                subspec.add_column(type_Int, "foo");
                 {
                     Spec subsubspec = subspec.add_subtable_column("bar");
-                    subsubspec.add_column(COLUMN_TYPE_INT, "value");
+                    subsubspec.add_column(type_Int, "value");
                 }
             }
-            spec.add_column(COLUMN_TYPE_MIXED, "theta");
+            spec.add_column(type_Mixed, "theta");
         }
         table->update_from_spec();
         table->insert_empty_row(0, 1);

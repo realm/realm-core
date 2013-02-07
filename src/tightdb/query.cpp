@@ -271,13 +271,14 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
 // Aggregates =================================================================================
 
 template <ACTION action, typename T, typename R, class ColType>
-R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const, 
+R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (end == size_t(-1))
         end = m_table->size();
 
-    const ColType& column = m_table->GetColumn<ColType, ColumnTypeTraits<T>::id>(column_ndx);
+    const ColType& column =
+        m_table->GetColumn<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
 
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; aggregate range
