@@ -813,7 +813,7 @@ public:
 
     ~StringNode()
     {
-        delete m_value; delete m_ucase; delete m_lcase;
+        delete[] m_value; delete[] m_ucase; delete[] m_lcase;
     }
 
     void Init(const Table& table)
