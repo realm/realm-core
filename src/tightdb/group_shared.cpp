@@ -10,7 +10,7 @@
 // TIGHTDB_PTHREADS_TEST to <config.h> and move <pthread_test.hpp>
 // into the "src/tightdb" directory.
 
-// Wrap pthread function calls with the pthread bug finding tool (program execution will be slower). 
+// Wrap pthread function calls with the pthread bug finding tool (program execution will be slower).
 // Works both in debug and release mode. Define the flag in testsettings.h
 #include "../test/testsettings.hpp"
 #ifdef TIGHTDB_PTHREADS_TEST

@@ -716,7 +716,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
 TEST(AdaptiveStringColumnCount)
 {
     AdaptiveStringColumn asc;
-    
+
     // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
@@ -735,21 +735,21 @@ TEST(AdaptiveStringColumnCount)
     asc.add("HEJSA");
     asc.add("15");
     asc.add("HEJSA"); // 16
-    
+
     const size_t count = asc.count("HEJSA");
     CHECK_EQUAL(9, count);
-    
+
     // Create StringEnum
     size_t keys;
     size_t values;
     const bool res = asc.AutoEnumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
-    
+
     // Check that enumerated column return same result
     const size_t ecount = e.count("HEJSA");
     CHECK_EQUAL(9, ecount);
-    
+
     // Clean-up
     asc.Destroy();
     e.Destroy();
@@ -758,7 +758,7 @@ TEST(AdaptiveStringColumnCount)
 TEST(AdaptiveStringColumnIndex)
 {
     AdaptiveStringColumn asc;
-    
+
     // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
@@ -777,10 +777,10 @@ TEST(AdaptiveStringColumnIndex)
     asc.add("HEJSA");
     asc.add("15");
     asc.add("HEJSA"); // 16
-    
+
     asc.CreateIndex();
     CHECK(asc.HasIndex());
-    
+
     const size_t count0 = asc.count("HEJ");
     const size_t count1 = asc.count("HEJSA");
     const size_t count2 = asc.count("1");
@@ -789,7 +789,7 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(9, count1);
     CHECK_EQUAL(1, count2);
     CHECK_EQUAL(1, count3);
-    
+
     const size_t ndx0 = asc.find_first("HEJS");
     const size_t ndx1 = asc.find_first("HEJSA");
     const size_t ndx2 = asc.find_first("1");
@@ -798,7 +798,7 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(0, ndx1);
     CHECK_EQUAL(1, ndx2);
     CHECK_EQUAL(15, ndx3);
-    
+
     // Set some values
     asc.Set(1, "one");
     asc.Set(15, "fifteen");
@@ -810,7 +810,7 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(not_found, set2);
     CHECK_EQUAL(1, set3);
     CHECK_EQUAL(15, set4);
-    
+
     // Insert some values
     asc.Insert(0, "top");
     asc.Insert(8, "middle");
@@ -821,7 +821,7 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(0, ins1);
     CHECK_EQUAL(8, ins2);
     CHECK_EQUAL(19, ins3);
-    
+
     // Delete some values
     asc.Delete(0);  // top
     asc.Delete(7);  // middle
@@ -836,14 +836,14 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(not_found, del3);
     CHECK_EQUAL(0, del4);
     CHECK_EQUAL(15, del5);
-    
+
     // Remove all
     asc.Clear();
     const size_t c1 = asc.find_first("HEJSA");
     const size_t c2 = asc.find_first("fifteen");
     CHECK_EQUAL(not_found, c1);
     CHECK_EQUAL(not_found, c2);
-    
+
     // Clean-up
     asc.Destroy();
 }

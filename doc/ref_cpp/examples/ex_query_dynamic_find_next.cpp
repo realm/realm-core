@@ -39,7 +39,7 @@ int main()
 // @@Show@@
     // Find rows where age (column 1) < 50
     Query query = table->where().less(1, 50);
-    
+
     // Find first match
     size_t match = query.find_next(size_t(-1));
     assert(match == 0); // Alice

@@ -4,7 +4,7 @@
 using namespace tightdb;
 using namespace std;
 
-TIGHTDB_TABLE_2(Phones, 
+TIGHTDB_TABLE_2(Phones,
                 desc, String,
                 number, String)
 
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
     t[2].name  = "Bill";
     t[2].age   = 34;
     t[2].hired = false;
-    
+
     // Number of rows
     cout << "Rows:    " << t.size() << endl;
 }

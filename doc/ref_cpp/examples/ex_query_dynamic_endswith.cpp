@@ -15,11 +15,11 @@ int main()
 
     table->add_empty_row(5);
 // @@Show@@
-    table->set_string(0, 0, "Mary"); 
-    table->set_string(0, 1, "Joe"); 
-    table->set_string(0, 2, "Jack"); 
-    table->set_string(0, 3, "Jill"); 
-    table->set_string(0, 4, "oe"); 
+    table->set_string(0, 0, "Mary");
+    table->set_string(0, 1, "Joe");
+    table->set_string(0, 2, "Jack");
+    table->set_string(0, 3, "Jill");
+    table->set_string(0, 4, "oe");
 
     // Find names (column 0) ending with "oe", case sensitive
     TableView view1 = table->where().ends_with(0, "oe").find_all();

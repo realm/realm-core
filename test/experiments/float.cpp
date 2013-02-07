@@ -8,7 +8,7 @@ union Float_t
     bool Negative() const { return (i >> 31) != 0; }
     int32_t RawMantissa() const { return i & ((1 << 23) - 1); }
     int32_t RawExponent() const { return (i >> 23) & 0xFF; }
- 
+
     int32_t i;
     float f;
 #ifdef _DEBUG

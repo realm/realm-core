@@ -49,7 +49,7 @@ int main()
 // @@Show@@
     // Find rows where (age > 12 && age < 20) || name == "Alice"
     Query query = table->where().group().greater(1, 12).less(1, 20).end_group().Or().equal(0, "Alice");
- 
+
     TableView view = query.find_all();
     assert(view.size() == 3);
     assert(!strcmp(view.get_string(0, 0), "Mary"));

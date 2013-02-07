@@ -924,10 +924,10 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
 #if defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
                     s += __popcnt64(data[t]);
 #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
-					s += __builtin_popcountll(data[t]);
+                    s += __builtin_popcountll(data[t]);
 #else
                     uint64_t a = data[t];
-					const uint64_t m1  = 0x5555555555555555ULL;
+                    const uint64_t m1  = 0x5555555555555555ULL;
                     a -= (a >> 1) & m1;
                     a = (a & m2) + ((a >> 2) & m2);
                     a = (a + (a >> 4)) & m4;
@@ -1469,7 +1469,7 @@ template<size_t width> void Array::SetWidth() TIGHTDB_NOEXCEPT
 
 template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-	return GetUniversal<w>((const char *)m_data, ndx);
+    return GetUniversal<w>((const char *)m_data, ndx);
 }
 
 #ifdef _MSC_VER
@@ -2048,102 +2048,102 @@ void Array::find(int cond, Action action, int64_t value, size_t start, size_t en
     if (cond == cond_Equal) {
         if (action == act_Sum) {
             TDB_TEMPEX3(find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Min) {
             TDB_TEMPEX3(find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Max) {
             TDB_TEMPEX3(find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Count) {
             TDB_TEMPEX3(find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_FindAll) {
             TDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_CallbackIdx) {
             TDB_TEMPEX3(find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
     }
     if (cond == cond_NotEqual) {
         if (action == act_Sum) {
             TDB_TEMPEX3(find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Min) {
             TDB_TEMPEX3(find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Max) {
             TDB_TEMPEX3(find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Count) {
             TDB_TEMPEX3(find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_FindAll) {
             TDB_TEMPEX3(find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_CallbackIdx) {
             TDB_TEMPEX3(find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
     }
     if (cond == cond_Greater) {
         if (action == act_Sum) {
             TDB_TEMPEX3(find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Min) {
             TDB_TEMPEX3(find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Max) {
             TDB_TEMPEX3(find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Count) {
             TDB_TEMPEX3(find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_FindAll) {
             TDB_TEMPEX3(find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_CallbackIdx) {
             TDB_TEMPEX3(find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
     }
     if (cond == cond_Less) {
         if (action == act_Sum) {
             TDB_TEMPEX3(find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Min) {
             TDB_TEMPEX3(find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Max) {
             TDB_TEMPEX3(find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Count) {
             TDB_TEMPEX3(find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_FindAll) {
             TDB_TEMPEX3(find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_CallbackIdx) {
             TDB_TEMPEX3(find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
     }
     if (cond == cond_None) {
         if (action == act_Sum) {
             TDB_TEMPEX3(find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Min) {
             TDB_TEMPEX3(find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Max) {
             TDB_TEMPEX3(find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_Count) {
             TDB_TEMPEX3(find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_FindAll) {
             TDB_TEMPEX3(find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
         else if (action == act_CallbackIdx) {
             TDB_TEMPEX3(find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+        }
     }
 }
 

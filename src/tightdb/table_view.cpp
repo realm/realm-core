@@ -46,14 +46,14 @@ size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
 // Aggregates ----------------------------------------------------
 
 
-template <int function, typename T, typename R, class ColType> 
+template <int function, typename T, typename R, class ColType>
 R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
     TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min);
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
-    if (m_refs.Size() == 0) 
+    if (m_refs.Size() == 0)
         return 0;
 
     typedef typename ColumnTypeTraits<T>::array_type ArrType;
@@ -64,8 +64,8 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
         return (column->*aggregateMethod)(0, size_t(-1));
     }
 
-    // Array object instantiation must NOT allocate initial memory (capacity) 
-    // with 'new' because it will lead to mem leak. The column keeps ownership 
+    // Array object instantiation must NOT allocate initial memory (capacity)
+    // with 'new' because it will lead to mem leak. The column keeps ownership
     // of the payload in array and will free it itself later, so we must not call Destroy() on array.
     ArrType arr((Array::no_prealloc_tag()));
     size_t leaf_start = 0;
@@ -80,7 +80,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
             ((Column*)column)->GetBlock(row_ndx, arr, leaf_start);
             const size_t leaf_size = arr.Size();
             leaf_end = leaf_start + leaf_size;
-        }    
+        }
 
         T v = arr.Get(row_ndx - leaf_start);
 
@@ -216,7 +216,7 @@ void TableViewBase::to_json(std::ostream& out)
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        if (r > 0) 
+        if (r > 0)
             out << ",";
         const size_t real_row_index = get_source_ndx(r);
         m_table->to_json_row(real_row_index, out);

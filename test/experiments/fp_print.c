@@ -197,7 +197,7 @@ void one_shift_left(int y, Bignum *z) {
 void short_shift_left(Bigit x, int y, Bignum *z) {
    int n, m, i, zl;
    Bigit *zp;
-   
+
    n = y / 64;
    m = y % 64;
    zl = n;
@@ -217,7 +217,7 @@ void short_shift_left(Bigit x, int y, Bignum *z) {
 void big_shift_left(Bignum *x, int y, Bignum *z) {
    int n, m, i, xl, zl;
    Bigit *xp, *zp, k;
-   
+
    n = y / 64;
    m = y % 64;
    xl = x->l;
@@ -267,7 +267,7 @@ int sub_big(Bignum *x, Bignum *y, Bignum *z) {
   xp = &x->d[0];
   yp = &y->d[0];
   zp = &z->d[0];
-  
+
   for (i = yl, b = 0; i >= 0; i--)
     SUB(*xp++, *yp++, *zp++, b);
   for (i = xl-yl; b && i > 0; i--) {
@@ -300,7 +300,7 @@ void add_big(Bignum *x, Bignum *y, Bignum *z) {
   xp = &x->d[0];
   yp = &y->d[0];
   zp = &z->d[0];
-  
+
   for (i = yl, k = 0; i >= 0; i--)
     ADD(*xp++, *yp++, *zp++, k);
   for (i = xl-yl; k && i > 0; i--) {
@@ -323,7 +323,7 @@ int add_cmp() {
    rl = R.l;
    ml = (use_mp ? MP.l : MM.l);
    sl = S.l;
-   
+
    suml = rl >= ml ? rl : ml;
    if ((sl > suml+1) || ((sl == suml+1) && (S.d[sl] > 1))) return -1;
    if (sl < suml) return 1;
@@ -387,7 +387,7 @@ int dragon(char *buf, double v) {
    /* decompose float into sign, mantissa & exponent */
    x = (struct dblflt *)&v;
    sign = x->s;
-   e = x->e; 
+   e = x->e;
    f = (Bigit)(x->m1 << 16 | x->m2) << 32 | (U32)(x->m3 << 16 | x->m4);
    if (e != 0) {
       e = e - bias - bitstoright;
@@ -403,7 +403,7 @@ int dragon(char *buf, double v) {
      *buf = 0;
      return 0;
    }
-   
+
    ruf = !(f & 1); /* ruf = (even? f) */
 
    /* Compute the scaling factor estimate, k */
@@ -412,7 +412,7 @@ int dragon(char *buf, double v) {
    else {
       int n;
       Bigit y;
-      
+
       for (n = e+52, y = (Bigit)1 << 52; f < y; n--) y >>= 1;
       k = estimate(n);
    }
@@ -427,7 +427,7 @@ int dragon(char *buf, double v) {
          use_mp = 0, f_n = 1, s_n = 1-e, m_n = 0;
       else
          use_mp = 1, f_n = 2, s_n = 2-e, m_n = 0;
-   
+
    /* Scale it! */
    if (k == 0) {
       short_shift_left(f, f_n, &R);
@@ -440,7 +440,7 @@ int dragon(char *buf, double v) {
       s_n += k;
       if (m_n >= s_n)
          f_n -= s_n, m_n -= s_n, s_n = 0;
-      else 
+      else
          f_n -= m_n, s_n -= m_n, m_n = 0;
       short_shift_left(f, f_n, &R);
       big_shift_left(&five[k-1], s_n, &S);
@@ -477,7 +477,7 @@ int dragon(char *buf, double v) {
    putchar('\n');
    fflush(0);
    */
-   
+
    if (qr_shift) {
      sl = s_n / 64;
      slr = s_n % 64;
@@ -508,7 +508,7 @@ again:
          }
       else {
          Bigit *p;
-         
+
          p = &R.d[sl+1];
          d = *p << (64 - slr) | *(p-1) >> slr;
          p--;
@@ -574,7 +574,7 @@ void free_init() {
 
 void test_fp(double f)
 {
-    char buf[30];    
+    char buf[30];
     printf("Float printf: %f.\n", f);
     dragon(buf, f);
     printf("Dragon: %s\n", buf);

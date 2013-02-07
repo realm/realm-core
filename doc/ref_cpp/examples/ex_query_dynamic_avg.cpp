@@ -38,7 +38,7 @@ int main()
     double avg = table->where().average(1);
     assert(avg == (27 + 50 + 44) / 3.0);
 
-    // Find the average Age (column 1) where Name (column 0) contains "e" 
+    // Find the average Age (column 1) where Name (column 0) contains "e"
     Query q = table->where().contains(0, "e");
     avg = q.average(1);
     assert(avg == (27 + 44) / 2.0);

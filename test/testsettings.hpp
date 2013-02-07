@@ -8,7 +8,7 @@
     //#define TEST_DURATION 3
 #endif
 
-// Wrap pthread function calls with the pthread bug finding tool (program execution will be slower) by 
+// Wrap pthread function calls with the pthread bug finding tool (program execution will be slower) by
 // #including pthread_test.h. Works both in debug and release mode.
 //#define TIGHTDB_PTHREADS_TEST
 

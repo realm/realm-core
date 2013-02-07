@@ -42,7 +42,7 @@ int main()
 // @@Show@@
     // Find rows where age < 15 || name == "Jack"
     Query query = table->where().less(1, 15).Or().equal(0, "Jack");
- 
+
     TableView view = query.find_all();
     assert(view.size() == 2);
     assert(!strcmp(view.get_string(0, 0), "Mary"));

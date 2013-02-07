@@ -59,12 +59,12 @@ R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) 
     typedef typename ColumnTypeTraits2<condition,T>::column_type ColType;
     typedef typename ColumnTypeTraits2<condition,T>::node_type NodeType;
 
-    if (end == size_t(-1)) 
+    if (end == size_t(-1))
         end = Size();
 
     NodeType node(target, 0);
 
-    node.QuickInit((ColType*)this, target); 
+    node.QuickInit((ColType*)this, target);
     QueryState<R> state;
     state.init(action, NULL, size_t(-1));
 

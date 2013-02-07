@@ -40,7 +40,7 @@ int main()
     int64_t max = table->where().maximum(1);
     assert(max == 50);
 
-    // Find the maximum Age (column 1) where Name (column 0) contains "e" 
+    // Find the maximum Age (column 1) where Name (column 0) contains "e"
     Query q = table->where().contains(0, "e");
     max = q.maximum(1);
     assert(max == 44);
