@@ -24,7 +24,7 @@ int32_t CreateKey(const char* v)
 } // namespace
 
 StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc)
-: Column(COLUMN_HASREFS, NULL, 0, alloc), m_target_column(target_column), m_get_func(get_func)
+: Column(coldef_HasRefs, NULL, 0, alloc), m_target_column(target_column), m_get_func(get_func)
 {
     Create();
 }
@@ -32,7 +32,7 @@ StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& 
 StringIndex::StringIndex(ColumnDef type, Allocator& alloc)
 : Column(type, NULL, 0, alloc), m_target_column(NULL), m_get_func(NULL)
 {
-    TIGHTDB_ASSERT(type == COLUMN_NODE); // only used for node creation at this point
+    TIGHTDB_ASSERT(type == coldef_Node); // only used for node creation at this point
 
     // Mark that this is part of index
     // (as opposed to columns under leafs)
@@ -55,8 +55,8 @@ void StringIndex::Create()
 
     // Add subcolumns for leafs
     Allocator& alloc = m_array->GetAllocator();
-    Array values(COLUMN_NORMAL, NULL, 0, alloc);
-    Array refs(COLUMN_HASREFS, NULL, 1, alloc);
+    Array values(coldef_Normal, NULL, 0, alloc);
+    Array refs(coldef_HasRefs, NULL, 1, alloc);
     m_array->add(values.GetRef());
     m_array->add(refs.GetRef());
     values.SetParent((ArrayParent*)m_array, 0);
@@ -139,21 +139,21 @@ void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, const c
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            StringIndex newNode(COLUMN_NODE, m_array->GetAllocator());
+            StringIndex newNode(coldef_Node, m_array->GetAllocator());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(GetRef());
             UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::insert_after: {
-            StringIndex newNode(COLUMN_NODE, m_array->GetAllocator());
+            StringIndex newNode(coldef_Node, m_array->GetAllocator());
             newNode.NodeAddKey(GetRef());
             newNode.NodeAddKey(nc.ref1);
             UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::split: {
-            StringIndex newNode(COLUMN_NODE, m_array->GetAllocator());
+            StringIndex newNode(coldef_Node, m_array->GetAllocator());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(nc.ref2);
             UpdateRef(newNode.GetRef());
@@ -200,7 +200,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         }
 
         // Else create new node
-        StringIndex newNode(COLUMN_NODE, m_array->GetAllocator());
+        StringIndex newNode(coldef_Node, m_array->GetAllocator());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             const int32_t lastKey = target.GetLastKey();
@@ -364,7 +364,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
         const char* const v2 = Get(row_ndx2);
         if (strcmp(v2, value) == 0) {
             // convert to list (in sorted order)
-            Array row_list(COLUMN_NORMAL, NULL, 0, alloc);
+            Array row_list(coldef_Normal, NULL, 0, alloc);
             row_list.add(row_ndx < row_ndx2 ? row_ndx : row_ndx2);
             row_list.add(row_ndx < row_ndx2 ? row_ndx2 : row_ndx);
             refs.Set(ins_pos, row_list.GetRef());

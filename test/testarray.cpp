@@ -883,7 +883,7 @@ TEST(Greater)
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
-        size_t t = a.find_first<GREATER>(0, 0, (size_t)-1);
+        size_t t = a.find_first<Greater>(0, 0, (size_t)-1);
         CHECK_EQUAL(-1, t);
 
 
@@ -894,7 +894,7 @@ TEST(Greater)
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1);
 
-			size_t t = a.find_first<GREATER>(0, 0, (size_t)-1);
+			size_t t = a.find_first<Greater>(0, 0, (size_t)-1);
             TIGHTDB_ASSERT(i == t);
 
             CHECK_EQUAL(i, t);
@@ -907,7 +907,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 3);
-            size_t t = a.find_first<GREATER>(2, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(2, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 2);
         }
@@ -918,7 +918,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 11);
-            size_t t = a.find_first<GREATER>(10, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(10, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 10);
         }
@@ -929,7 +929,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 110);
-            size_t t = a.find_first<GREATER>(100, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(100, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 100);
         }
@@ -939,7 +939,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 210);
-            size_t t = a.find_first<GREATER>(200, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(200, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 200);
         }
@@ -950,7 +950,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 11000);
-            size_t t = a.find_first<GREATER>(10000, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(10000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 10000);
         }
@@ -961,7 +961,7 @@ TEST(Greater)
 
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 41000);
-            size_t t = a.find_first<GREATER>(40000, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(40000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 40000);
         }
@@ -972,7 +972,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1100000);
-            size_t t = a.find_first<GREATER>(1000000, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(1000000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1000000);
         }
@@ -983,7 +983,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
-            size_t t = a.find_first<GREATER>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
         }
@@ -1008,7 +1008,7 @@ TEST(Less)
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
-        size_t t = a.find_first<LESS>(0, 0, (size_t)-1);
+        size_t t = a.find_first<Less>(0, 0, (size_t)-1);
         CHECK_EQUAL(-1, t);
 
 
@@ -1018,7 +1018,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 0);
-            size_t t = a.find_first<LESS>(1, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(1, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1);
         }
@@ -1029,7 +1029,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 2);
-            size_t t = a.find_first<LESS>(3, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(3, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 3);
         }
@@ -1040,7 +1040,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 10);
-            size_t t = a.find_first<LESS>(11, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(11, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 11);
         }
@@ -1051,7 +1051,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 100);
-            size_t t = a.find_first<LESS>(110, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(110, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 110);
         }
@@ -1061,7 +1061,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 200);
-            size_t t = a.find_first<LESS>(210, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(210, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 210);
         }
@@ -1072,7 +1072,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 10000);
-            size_t t = a.find_first<LESS>(11000, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(11000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 11000);
         }
@@ -1083,7 +1083,7 @@ TEST(Less)
 
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 40000);
-            size_t t = a.find_first<LESS>(41000, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(41000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 41000);
         }
@@ -1094,7 +1094,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000000);
-            size_t t = a.find_first<LESS>(1100000, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(1100000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1100000);
         }
@@ -1105,7 +1105,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL - 1ULL);
-            size_t t = a.find_first<LESS>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
         }
@@ -1118,13 +1118,13 @@ TEST(Less)
 TEST(NotEqual1)
 {
     Array a;
-    
+
     a.Clear();
     for (size_t i = 0; i < 100; i++) {
         a.add(0x33);
     }
     a.Set(50, 0x44);
-    size_t t = a.find_first<NOTEQUAL>(0x33, 0, (size_t)-1);
+    size_t t = a.find_first<NotEqual>(0x33, 0, (size_t)-1);
     CHECK_EQUAL(50, t);
     a.Destroy();
 }
@@ -1141,7 +1141,7 @@ TEST(NotEqual)
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
-        size_t t = a.find_first<NOTEQUAL>(0, 0, (size_t)-1);
+        size_t t = a.find_first<NotEqual>(0, 0, (size_t)-1);
         CHECK_EQUAL(-1, t);
 
 
@@ -1151,7 +1151,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1);
-            size_t t = a.find_first<NOTEQUAL>(0, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(0, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 0);
         }
@@ -1162,7 +1162,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 3);
-            size_t t = a.find_first<NOTEQUAL>(2, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(2, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 2);
         }
@@ -1173,7 +1173,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 11);
-            size_t t = a.find_first<NOTEQUAL>(10, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(10, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 10);
         }
@@ -1184,7 +1184,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 110);
-            size_t t = a.find_first<NOTEQUAL>(100, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(100, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 100);
         }
@@ -1194,7 +1194,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 210);
-            size_t t = a.find_first<NOTEQUAL>(200, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(200, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 200);
         }
@@ -1205,7 +1205,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 11000);
-            size_t t = a.find_first<NOTEQUAL>(10000, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(10000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 10000);
         }
@@ -1216,7 +1216,7 @@ TEST(NotEqual)
 
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 41000);
-            size_t t = a.find_first<NOTEQUAL>(40000, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(40000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 40000);
         }
@@ -1227,7 +1227,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1100000);
-            size_t t = a.find_first<NOTEQUAL>(1000000, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(1000000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1000000);
         }
@@ -1238,7 +1238,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
-            size_t t = a.find_first<NOTEQUAL>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
         }
@@ -1348,7 +1348,7 @@ TEST(ArrayCopy)
     CHECK_EQUAL(4, b.Get(4));
 
     // With sub-arrays
-    Array c(COLUMN_HASREFS);
+    Array c(coldef_HasRefs);
     c.add(a.GetRef());
 
     Array d;

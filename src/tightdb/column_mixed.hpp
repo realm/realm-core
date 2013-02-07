@@ -146,20 +146,19 @@ private:
     enum MixedColType {
         // NOTE: below numbers must be kept in sync with ColumnType
         // Column types used in Mixed
-        MIXED_COL_INT         =  0,
-        MIXED_COL_BOOL        =  1,
-        MIXED_COL_STRING      =  2,
-                              // 3, used for STRING_ENUM in ColumnType
-        MIXED_COL_BINARY      =  4,
-        MIXED_COL_TABLE       =  5,
-        MIXED_COL_MIXED       =  6,
-        MIXED_COL_DATE        =  7,
-                              // 8, used for RESERVED1 in ColumnType
-        MIXED_COL_FLOAT       =  9, // Float
-        MIXED_COL_DOUBLE      = 10, // Positive Double
-        MIXED_COL_DOUBLE_NEG  = 11, // Negative Double
-        MIXED_COL_INT_NEG     = 12  // Negative Integers
-
+        mixcol_Int         =  0,
+        mixcol_Bool        =  1,
+        mixcol_String      =  2,
+                           // 3, used for STRING_ENUM in ColumnType
+        mixcol_Binary      =  4,
+        mixcol_Table       =  5,
+        mixcol_Mixed       =  6,
+        mixcol_Date        =  7,
+                           // 8, used for RESERVED1 in ColumnType
+        mixcol_Float       =  9,
+        mixcol_Double      = 10, // Positive Double
+        mixcol_DoubleNeg   = 11, // Negative Double
+        mixcol_IntNeg      = 12  // Negative Integers
     };
 
     void clear_value(size_t ndx, MixedColType newtype);

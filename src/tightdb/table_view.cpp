@@ -50,7 +50,7 @@ template <int function, typename T, typename R, class ColType>
 R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
-    TIGHTDB_ASSERT(function == TDB_SUM || function == TDB_MAX || function == TDB_MIN);
+    TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min);
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
     if (m_refs.Size() == 0) 
@@ -84,9 +84,9 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
 
         T v = arr.Get(row_ndx - leaf_start);
 
-        if (function == TDB_SUM)
+        if (function == act_Sum)
             res += v;
-        else if (function == TDB_MAX ? v > res : v < res)
+        else if (function == act_Max ? v > res : v < res)
             res = v;
     }
 
@@ -97,45 +97,45 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
 
 int64_t TableViewBase::sum(size_t column_ndx) const
 {
-    return aggregate<TDB_SUM, int64_t>(&Column::sum, column_ndx);
+    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx);
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
-    return aggregate<TDB_SUM, float>(&ColumnFloat::sum, column_ndx);
+    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx);
 }
 double TableViewBase::sum_double(size_t column_ndx) const
 {
-    return aggregate<TDB_SUM, double>(&ColumnDouble::sum, column_ndx);
+    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx);
 }
 
 // Maximum
 
 int64_t TableViewBase::maximum(size_t column_ndx) const
 {
-    return aggregate<TDB_MAX, int64_t>(&Column::maximum, column_ndx);
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx);
 }
 float TableViewBase::maximum_float(size_t column_ndx) const
 {
-    return aggregate<TDB_MAX, float>(&ColumnFloat::maximum, column_ndx);
+    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx);
 }
 double TableViewBase::maximum_double(size_t column_ndx) const
 {
-    return aggregate<TDB_MAX, double>(&ColumnDouble::maximum, column_ndx);
+    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx);
 }
 
 // Minimum
 
 int64_t TableViewBase::minimum(size_t column_ndx) const
 {
-    return aggregate<TDB_MIN, int64_t>(&Column::minimum, column_ndx);
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx);
 }
 float TableViewBase::minimum_float(size_t column_ndx) const
 {
-    return aggregate<TDB_MIN, float>(&ColumnFloat::minimum, column_ndx);
+    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx);
 }
 double TableViewBase::minimum_double(size_t column_ndx) const
 {
-    return aggregate<TDB_MIN, double>(&ColumnDouble::minimum, column_ndx);
+    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx);
 }
 
 //

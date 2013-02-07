@@ -28,39 +28,34 @@
 
 namespace tightdb {
 
-enum {COND_EQUAL, COND_NOTEQUAL, COND_GREATER, COND_GREATER_EQUAL, COND_LESS, COND_LESS_EQUAL, COND_NONE, COND_COUNT};
+enum {cond_Equal, cond_NotEqual, cond_Greater, cond_GreaterEqual, cond_Less, cond_LessEqual, cond_None, cond_Count};
 
 
-// FIXME: We cannot use all-uppercase names like 'CONTAINS' for
-// classes since the risk of colliding with one of the customers macro
-// names is too high. In short, the all-uppercase name space is
-// reserved for macros.
-struct CONTAINS {
-    CONTAINS() {};
+struct Contains {
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
-        (void)v1_lower;
-        (void)v1_upper;
+        static_cast<void>(v1_lower);
+        static_cast<void>(v1_upper);
         return std::strstr(v2, v1) != 0;
     }
 };
 
 // is v2 a prefix of v1?
-struct BEGINSWITH {
+struct BeginsWith {
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
-        (void)v1_lower;
-        (void)v1_upper;
+        static_cast<void>(v1_lower);
+        static_cast<void>(v1_upper);
         return std::strstr(v2, v1) == v2; // FIXME: Not the most efficient way to do this
     }
 };
 
 // does v1 end with s2?
-struct ENDSWITH {
+struct EndsWith {
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
-        (void)v1_lower;
-        (void)v1_upper;
+        static_cast<void>(v1_lower);
+        static_cast<void>(v1_upper);
         const size_t l1 = std::strlen(v1);
         const size_t l2 = std::strlen(v2);
         if (l1 > l2)
@@ -70,7 +65,7 @@ struct ENDSWITH {
     }
 };
 
-struct EQUAL {
+struct Equal {
     bool operator()(const bool v1, const bool v2) const
     {
         return v1 == v2;
@@ -84,8 +79,8 @@ struct EQUAL {
 
     bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
-        (void)v1_lower;
-        (void)v1_upper;
+        static_cast<void>(v1_lower);
+        static_cast<void>(v1_upper);
         return std::strcmp(v1, v2) == 0;
     }
     bool operator()(const char *v1, size_t len1, const char* v2, size_t len2) const
@@ -101,46 +96,46 @@ struct EQUAL {
     }
 
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
-    int condition(void) {return COND_EQUAL;}
+    int condition() {return cond_Equal;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (v >= lbound && v <= ubound); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v == 0 && ubound == 0 && lbound == 0); }
 };
 
-struct NOTEQUAL {
+struct NotEqual {
     bool operator()(const char *v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
-        (void)v1_lower;
-        (void)v1_upper;
+        static_cast<void>(v1_lower);
+        static_cast<void>(v1_upper);
         return std::strcmp(v1, v2) != 0;
     }
     template<class T> bool operator()(const T& v1, const T& v2) const { return v1 != v2; }
-    int condition(void) {return COND_NOTEQUAL;}
+    int condition() {return cond_NotEqual;}
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return !(v == 0 && ubound == 0 && lbound == 0); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v > ubound || v < lbound); }
 };
 
 // does v1 contain v2?
-struct CONTAINS_INS {
+struct ContainsIns {
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
-        (void)v1;
+        static_cast<void>(v1);
         return case_strstr(v1_upper, v1_lower, v2);
     }
-    int condition(void) {return -1;}
+    int condition() {return -1;}
 };
 
 // is v2 a prefix of v1?
-struct BEGINSWITH_INS {
+struct BeginsWithIns {
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
-        (void)v1;
+        static_cast<void>(v1);
         return case_prefix(v1_upper, v1_lower, v2) != (size_t)-1;
     }
-    int condition(void) {return -1;}
+    int condition() {return -1;}
 };
 
 // does v1 end with s2?
-struct ENDSWITH_INS {
+struct EndsWithIns {
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
         const size_t l1 = std::strlen(v1);
@@ -151,58 +146,58 @@ struct ENDSWITH_INS {
         bool r = case_cmp(v1_upper, v1_lower, v2 + l2 - l1);
         return r;
     }
-    int condition(void) {return -1;}
+    int condition() {return -1;}
 };
 
-struct EQUAL_INS {
+struct EqualIns {
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
-        (void)v1;
+        static_cast<void>(v1);
         return case_cmp(v1_upper, v1_lower, v2);
     }
-    int condition(void) {return -1;}
+    int condition() {return -1;}
 };
 
-struct NOTEQUAL_INS {
+struct NotEqualIns {
     bool operator()(const char* v1, const char* v1_upper, const char* v1_lower, const char* v2) const
     {
-        (void)v1_lower;
-        (void)v1;
+        static_cast<void>(v1_lower);
+        static_cast<void>(v1);
         return !case_cmp(v1_upper, v1_lower, v2);
     }
-    int condition(void) {return -1;}
+    int condition() {return -1;}
 };
 
-struct GREATER {
+struct Greater {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 > v2;}
-    int condition(void) {return COND_GREATER;}
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { (void)lbound; return (ubound > v); }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { (void)ubound; return (lbound > v); }
+    int condition() {return cond_Greater;}
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(lbound); return ubound > v; }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(ubound); return lbound > v; }
 };
 
-struct NONE {
-    template<class T> bool operator()(const T& v1, const T& v2) const {(void)v1; (void)v2; return true;}
-    int condition(void) {return COND_NONE;}
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound) {(void)lbound; (void)ubound; (void)v; return true; }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound) {(void)lbound; (void)ubound; (void)v; return true; }
+struct None {
+    template<class T> bool operator()(const T& v1, const T& v2) const {static_cast<void>(v1); static_cast<void>(v2); return true;}
+    int condition() {return cond_None;}
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) {static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) {static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
 
 };
 
-struct LESS {
+struct Less {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 < v2;}
-    int condition(void) {return COND_LESS;}
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { (void)ubound; return (lbound < v); }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { (void)lbound; return (ubound < v); }
+    int condition() {return cond_Less;}
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(ubound); return lbound < v; }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(lbound); return ubound < v; }
 };
 
-struct LESS_EQUAL {
+struct LessEqual {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 <= v2;}
-    int condition(void) {return COND_LESS_EQUAL;}
+    int condition() {return cond_LessEqual;}
 };
 
-struct GREATER_EQUAL {
+struct GreaterEqual {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
-    int condition(void) {return COND_GREATER_EQUAL;}
+    int condition() {return cond_GreaterEqual;}
 };
 
 

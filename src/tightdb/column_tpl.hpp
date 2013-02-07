@@ -29,7 +29,7 @@
 
 namespace tightdb {
 
-template <class T, class cond> class BASICNODE;
+template <class T, class cond> class BasicNode;
 template <class T, class cond> class IntegerNode;
 template <class T>class SequentialGetter;
 
@@ -45,15 +45,15 @@ template<class cond> struct ColumnTypeTraits2<cond, bool> {
 };
 template<class cond> struct ColumnTypeTraits2<cond, float> {
     typedef ColumnFloat column_type;
-    typedef BASICNODE<float,cond> node_type;
+    typedef BasicNode<float,cond> node_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, double> {
     typedef ColumnDouble column_type;
-    typedef BASICNODE<double,cond> node_type;
+    typedef BasicNode<double,cond> node_type;
 };
 
 
-template <typename T, typename R, ACTION action, class condition>
+template <typename T, typename R, Action action, class condition>
 R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
 {
     typedef typename ColumnTypeTraits2<condition,T>::column_type ColType;
@@ -141,21 +141,21 @@ template<typename T, class C> void ColumnBase::TreeInsert(size_t ndx, T value)
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            Column newNode(COLUMN_NODE, m_array->GetAllocator());
+            Column newNode(coldef_Node, m_array->GetAllocator());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(GetRef());
             static_cast<C*>(this)->UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::insert_after: {
-            Column newNode(COLUMN_NODE, m_array->GetAllocator());
+            Column newNode(coldef_Node, m_array->GetAllocator());
             newNode.NodeAdd<C>(GetRef());
             newNode.NodeAdd<C>(nc.ref1);
             static_cast<C*>(this)->UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::split: {
-            Column newNode(COLUMN_NODE, m_array->GetAllocator());
+            Column newNode(coldef_Node, m_array->GetAllocator());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(nc.ref2);
             static_cast<C*>(this)->UpdateRef(newNode.GetRef());
@@ -203,7 +203,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         }
 
         // Else create new node
-        Column newNode(COLUMN_NODE, m_array->GetAllocator());
+        Column newNode(coldef_Node, m_array->GetAllocator());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             const size_t newsize = target.Size();

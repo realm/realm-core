@@ -164,8 +164,8 @@ void Array::SetType(ColumnDef type)
     if (m_ref) CopyOnWrite(); // Throws
 
     bool is_node = false, has_refs = false;
-    if (type == COLUMN_NODE) is_node = has_refs = true;
-    else if (type == COLUMN_HASREFS) has_refs = true;
+    if (type == coldef_Node) is_node = has_refs = true;
+    else if (type == coldef_HasRefs) has_refs = true;
     m_isNode  = is_node;
     m_hasRefs = has_refs;
 
@@ -351,17 +351,17 @@ int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 
 // Two ideas that are not efficient but may be worth looking into again:
 /*
-    // Assume correct width is found early in TDB_TEMPEX, which is the case for B tree offsets that 
+    // Assume correct width is found early in TDB_TEMPEX, which is the case for B tree offsets that
     // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
     // if found later
-    TDB_TEMPEX(return Get, (ndx));              
+    TDB_TEMPEX(return Get, (ndx));
 */
 /*
     // Slightly slower in both of the if-cases. Also needs an matchcount m_len check too, to avoid
     // reading beyond array.
-    if (m_width >= 8 && m_len > ndx + 7)     
+    if (m_width >= 8 && m_len > ndx + 7)
         return Get<64>(ndx >> m_shift) & m_widthmask;
-    else 
+    else
         return (this->*m_getter)(ndx);
 */
 }
@@ -413,7 +413,7 @@ void Array::Set(size_t ndx, int64_t value)
 }
 
 /*
-// Optimization for the common case of adding positive values to a local array 
+// Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)
 void Array::AddPositiveLocal(int64_t value)
 {
@@ -602,14 +602,14 @@ size_t Array::FindPos2(int64_t target) const
         const size_t probe = (low + high) >> 1;
         const int64_t v = Get(probe);
 
-        if (v < target) 
+        if (v < target)
             low = probe;
         else
             high = probe;
     }
-    if (high == m_len) 
+    if (high == m_len)
         return not_found;
-    else 
+    else
         return high;
 }
 
@@ -670,12 +670,12 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     while (high - start > 1) {
         const size_t probe = (start + high) / 2;
         const int64_t v = Get(probe);
-        if (v < target) 
+        if (v < target)
             start = probe;
-        else           
+        else
             high = probe;
     }
-    if (high == orig_high)         
+    if (high == orig_high)
         ret = not_found;
     else
         ret = high;
@@ -700,9 +700,9 @@ size_t Array::FirstSetBit(unsigned int v) const
     return __builtin_clz(v);
 #else
     int r;
-    static const int MultiplyDeBruijnBitPosition[32] = 
+    static const int MultiplyDeBruijnBitPosition[32] =
     {
-        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
         31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
     };
 
@@ -773,19 +773,19 @@ template <bool eq, size_t width> size_t FindZero(uint64_t v)
     size_t start = 0;
     uint64_t hasZeroByte;
 
-    // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay off because 
-    // the work done by TestZero() is wasted for the cases where the value exists in first half, but useful if it exists in last 
+    // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay off because
+    // the work done by TestZero() is wasted for the cases where the value exists in first half, but useful if it exists in last
     // half. Sweet spot turns out to be the widths and partitions below.
     if (width <= 8) {
         hasZeroByte = has_zero_element<width>(v | 0xffffffff00000000ULL);
         if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
             // 00?? -> increasing
-            start += 64 / NO0(width) / 2;
+            start += 64 / no0(width) / 2;
             if (width <= 4) {
                 hasZeroByte = has_zero_element<width>(v | 0xffff000000000000ULL);
                 if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
                     // 000?
-                    start += 64 / NO0(width) / 4;
+                    start += 64 / no0(width) / 4;
                 }
             }
         }
@@ -795,7 +795,7 @@ template <bool eq, size_t width> size_t FindZero(uint64_t v)
                 hasZeroByte = has_zero_element<width>(v | 0xffffffffffff0000ULL);
                 if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
                     // 0?00
-                    start += 64 / NO0(width) / 4;
+                    start += 64 / no0(width) / 4;
                 }
             }
         }
@@ -811,7 +811,7 @@ template <bool eq, size_t width> size_t FindZero(uint64_t v)
 
 template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
 {
-    if (end == (size_t)-1) 
+    if (end == (size_t)-1)
         end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
@@ -834,7 +834,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
                 m = Get<w>(start);
         }
 
-        if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
+        if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / no0(w)) {
             __m128i *data = (__m128i *)(m_data + start * w / 8);
             __m128i state = data[0];
             __m128i state2;
@@ -848,17 +848,17 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
                 else if (w == 32)
                     state = find_max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
 
-                start += sizeof(__m128i) * 8 / NO0(w);
+                start += sizeof(__m128i) * 8 / no0(w);
             }
 
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
             state2 = state;
-            for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
+            for (size_t t = 0; t < sizeof(__m128i) * 8 / no0(w); ++t) {
                 const int64_t v = GetUniversal<w>(((const char *)&state2), t);
                 if (find_max ? v > m : v < m) {
                     m = v;
                 }
-            }        
+            }
         }
     }
 #endif
@@ -890,7 +890,7 @@ int64_t Array::sum(size_t start, size_t end) const
 }
 
 template <size_t w> int64_t Array::sum(size_t start, size_t end) const
-{ 
+{
     if (end == (size_t)-1) end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
@@ -927,13 +927,13 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
 					s += __builtin_popcountll(data[t]);
 #else
                     uint64_t a = data[t];
-					const uint64_t m1  = 0x5555555555555555ULL; 
+					const uint64_t m1  = 0x5555555555555555ULL;
                     a -= (a >> 1) & m1;
                     a = (a & m2) + ((a >> 2) & m2);
                     a = (a + (a >> 4)) & m4;
                     a = (a * h01) >> 56;
                     s += a;
-#endif         
+#endif
 */
 
                 s += fast_popcount64(data[t]);
@@ -947,7 +947,6 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                 a = (a * h01) >> 56;
 
                 s += a;
-                
             }
             else if (w == 4) {
                 uint64_t a = data[t];
@@ -956,17 +955,17 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                 s += a;
             }
         }
-        start += sizeof(int64_t) * 8 / NO0(w) * chunks;
+        start += sizeof(int64_t) * 8 / no0(w) * chunks;
     }
 
 #ifdef TIGHTDB_COMPILER_SSE
     if (cpuid_sse<42>()) {
 
-        // 2000 items summed 500000 times, 8/16/32 bits, miliseconds: 
+        // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
         // Naive, templated Get<>: 391 371 374
         // SSE:                     97 148 282
 
-        if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / NO0(w)) {
+        if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
             __m128i *data = (__m128i *)(m_data + start * w / 8);
             __m128i sum = {0};
             __m128i sum2;
@@ -975,24 +974,24 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
 
             for (size_t t = 0; t < chunks; t++) {
                 if (w == 8) {
-                    /* 
+                    /*
                     // 469 ms AND disadvantage of handling max 64k elements before overflow
                     __m128i vl = _mm_cvtepi8_epi16(data[t]);
                     __m128i vh = data[t];
                     vh.m128i_i64[0] = vh.m128i_i64[1];
                     vh = _mm_cvtepi8_epi16(vh);
                     sum = _mm_add_epi16(sum, vl);
-                    sum = _mm_add_epi16(sum, vh); 
+                    sum = _mm_add_epi16(sum, vh);
                     */
-                
+
                     /*
                     // 424 ms
-                    __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0)); 
+                    __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0));
                     __m128i vh = _mm_unpackhi_epi8(data[t], _mm_set1_epi8(0));
                     sum = _mm_add_epi32(sum, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
                     sum = _mm_add_epi32(sum, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
                     */
-                
+
                     __m128i vl = _mm_cvtepi8_epi16(data[t]);        // sign extend lower words 8->16
                     __m128i vh = data[t];
                     vh = _mm_srli_si128(vh, 8);                     // v >>= 64
@@ -1005,7 +1004,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                     sum = _mm_add_epi32(sum, sumH);
                 }
                 else if (w == 16) {
-                    // todo, can overflow for array size > 2^32 
+                    // todo, can overflow for array size > 2^32
                     __m128i vl = _mm_cvtepi16_epi32(data[t]);       // sign extend lower words 16->32
                     __m128i vh = data[t];
                     vh = _mm_srli_si128(vh, 8);                     // v >>= 64
@@ -1029,12 +1028,12 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                     */
                 }
             }
-            start += sizeof(__m128i) * 8 / NO0(w) * chunks;
+            start += sizeof(__m128i) * 8 / no0(w) * chunks;
 
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
             sum2 = sum;
 
-            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by GetUniversal 
+            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by GetUniversal
             char sum3[sizeof(sum2)];
             memcpy(&sum3, &sum2, sizeof(sum2));
 
@@ -1046,7 +1045,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
         }
     }
 #endif
-    
+
     // Sum remaining elements
     for (; start < end; ++start)
         s += Get<w>(start);
@@ -1252,7 +1251,7 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
 
 size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
 {
-    if (width == 0) 
+    if (width == 0)
         return numeric_limits<size_t>::max(); // zero width gives infinite space
 
     const size_t bytes_data = bytes - 8; // ignore 8 byte header
@@ -1341,9 +1340,9 @@ void Array::CopyOnWrite()
 size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator& alloc)
 {
     bool is_node = false, has_refs = false;
-    if (type == COLUMN_NODE) 
+    if (type == coldef_Node)
         is_node = has_refs = true;
-    else if (type == COLUMN_HASREFS) 
+    else if (type == coldef_HasRefs)
         has_refs = true;
 
     const size_t capacity = initial_capacity;
@@ -1449,23 +1448,23 @@ template<size_t width> void Array::SetWidth() TIGHTDB_NOEXCEPT
     m_width = width;
     // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of Get() instead of Get<n>
     // if the declaration and association of the getter are on two different source lines
-    Getter temp_getter = &Array::Get<width>; 
+    Getter temp_getter = &Array::Get<width>;
     m_getter = temp_getter;
 
-    Setter temp_setter = &Array::Set<width>; 
+    Setter temp_setter = &Array::Set<width>;
     m_setter = temp_setter;
 
-    Finder feq = &Array::find<EQUAL, TDB_RETURN_FIRST, width>;
-    m_finder[COND_EQUAL] = feq;
+    Finder feq = &Array::find<Equal, act_ReturnFirst, width>;
+    m_finder[cond_Equal] = feq;
 
-    Finder fne = &Array::find<NOTEQUAL, TDB_RETURN_FIRST, width>;
-    m_finder[COND_NOTEQUAL]  = fne;
+    Finder fne = &Array::find<NotEqual, act_ReturnFirst, width>;
+    m_finder[cond_NotEqual]  = fne;
 
-    Finder fg = &Array::find<GREATER, TDB_RETURN_FIRST, width>;
-    m_finder[COND_GREATER] = fg;
+    Finder fg = &Array::find<Greater, act_ReturnFirst, width>;
+    m_finder[cond_Greater] = fg;
 
-    Finder fl =  &Array::find<LESS, TDB_RETURN_FIRST, width>;
-    m_finder[COND_LESS] = fl;
+    Finder fl =  &Array::find<Less, act_ReturnFirst, width>;
+    m_finder[cond_Less] = fl;
 }
 
 template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
@@ -1480,7 +1479,7 @@ template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 template <size_t w> void Array::Set(size_t ndx, int64_t value)
 {
     if (w == 0) {
-        return;   
+        return;
     }
     else if (w == 1) {
         const size_t offset = ndx >> 3;
@@ -1492,7 +1491,7 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
         const size_t offset = ndx >> 2;
         const uint8_t n = (uint8_t)((ndx & 3) << 1);
         uint8_t* p = &m_data[offset];
-        *p = (*p &~ (0x03 << n)) | (uint8_t)((value & 0x03) << n);        
+        *p = (*p &~ (0x03 << n)) | (uint8_t)((value & 0x03) << n);
     }
     else if (w == 4) {
         const size_t offset = ndx >> 1;
@@ -1501,7 +1500,7 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
         *p = (*p &~ (0x0F << n)) | (uint8_t)((value & 0x0F) << n);
     }
     else if (w == 8) {
-        *((char*)m_data + ndx) = (char)value;        
+        *((char*)m_data + ndx) = (char)value;
     }
     else if (w == 16) {
         const size_t offset = ndx * 2;
@@ -1509,11 +1508,11 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
     }
     else if (w == 32) {
         const size_t offset = ndx * 4;
-        *(int32_t*)(m_data + offset) = (int32_t)value;        
+        *(int32_t*)(m_data + offset) = (int32_t)value;
     }
     else if (w == 64) {
         const size_t offset = ndx * 8;
-        *(int64_t*)(m_data + offset) = value;   
+        *(int64_t*)(m_data + offset) = value;
     }
 }
 #ifdef _MSC_VER
@@ -2039,111 +2038,111 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     QueryState<int64_t> state;
     state.m_state = (int64_t)&result;
 
-    TDB_TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
+    TDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
 
     return;
 }
 
-void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
+void Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
-    if (cond == COND_EQUAL) {
-        if (action == TDB_SUM) {
-            TDB_TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+    if (cond == cond_Equal) {
+        if (action == act_Sum) {
+            TDB_TEMPEX3(find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_MIN) {
-            TDB_TEMPEX3(find, EQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_Min) {
+            TDB_TEMPEX3(find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_MAX) {
-            TDB_TEMPEX3(find, EQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_Max) {
+            TDB_TEMPEX3(find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_COUNT) {
-            TDB_TEMPEX3(find, EQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_Count) {
+            TDB_TEMPEX3(find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_FINDALL) {
-            TDB_TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_FindAll) {
+            TDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_CALLBACK_IDX) {
-            TDB_TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-    }
-    if (cond == COND_NOTEQUAL) {
-        if (action == TDB_SUM) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MIN) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MAX) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_COUNT) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_FINDALL) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_CALLBACK_IDX) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_CallbackIdx) {
+            TDB_TEMPEX3(find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
-    if (cond == COND_GREATER) {
-        if (action == TDB_SUM) {
-            TDB_TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+    if (cond == cond_NotEqual) {
+        if (action == act_Sum) {
+            TDB_TEMPEX3(find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_MIN) {
-            TDB_TEMPEX3(find, GREATER, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_Min) {
+            TDB_TEMPEX3(find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_MAX) {
-            TDB_TEMPEX3(find, GREATER, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_Max) {
+            TDB_TEMPEX3(find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_COUNT) {
-            TDB_TEMPEX3(find, GREATER, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_Count) {
+            TDB_TEMPEX3(find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_FINDALL) {
-            TDB_TEMPEX3(find, GREATER, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_FindAll) {
+            TDB_TEMPEX3(find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_CALLBACK_IDX) {
-            TDB_TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-    }
-    if (cond == COND_LESS) {
-        if (action == TDB_SUM) {
-            TDB_TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MIN) {
-            TDB_TEMPEX3(find, LESS, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MAX) {
-            TDB_TEMPEX3(find, LESS, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_COUNT) {
-            TDB_TEMPEX3(find, LESS, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_FINDALL) {
-            TDB_TEMPEX3(find, LESS, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_CALLBACK_IDX) {
-            TDB_TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_CallbackIdx) {
+            TDB_TEMPEX3(find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
-    if (cond == COND_NONE) {
-        if (action == TDB_SUM) {
-            TDB_TEMPEX3(find, NONE, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+    if (cond == cond_Greater) {
+        if (action == act_Sum) {
+            TDB_TEMPEX3(find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_MIN) {
-            TDB_TEMPEX3(find, NONE, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_Min) {
+            TDB_TEMPEX3(find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_MAX) {
-            TDB_TEMPEX3(find, NONE, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_Max) {
+            TDB_TEMPEX3(find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_COUNT) {
-            TDB_TEMPEX3(find, NONE, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_Count) {
+            TDB_TEMPEX3(find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_FINDALL) {
-            TDB_TEMPEX3(find, NONE, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_FindAll) {
+            TDB_TEMPEX3(find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
-        else if (action == TDB_CALLBACK_IDX) {
-            TDB_TEMPEX3(find, NONE, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        else if (action == act_CallbackIdx) {
+            TDB_TEMPEX3(find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+    }
+    if (cond == cond_Less) {
+        if (action == act_Sum) {
+            TDB_TEMPEX3(find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+        else if (action == act_Min) {
+            TDB_TEMPEX3(find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+        else if (action == act_Max) {
+            TDB_TEMPEX3(find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+        else if (action == act_Count) {
+            TDB_TEMPEX3(find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+        else if (action == act_FindAll) {
+            TDB_TEMPEX3(find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+        else if (action == act_CallbackIdx) {
+            TDB_TEMPEX3(find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+    }
+    if (cond == cond_None) {
+        if (action == act_Sum) {
+            TDB_TEMPEX3(find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+        else if (action == act_Min) {
+            TDB_TEMPEX3(find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+        else if (action == act_Max) {
+            TDB_TEMPEX3(find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+        else if (action == act_Count) {
+            TDB_TEMPEX3(find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+        else if (action == act_FindAll) {
+            TDB_TEMPEX3(find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+		}
+        else if (action == act_CallbackIdx) {
+            TDB_TEMPEX3(find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
 		}
     }
 }
@@ -2151,11 +2150,11 @@ void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t en
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    return find_first<EQUAL>(value, start, end);
+    return find_first<Equal>(value, start, end);
 }
 
-// Get containing array block direct through column b-tree without instatiating any Arrays. Calling with 
-// use_retval = true will return itself if leaf and avoid unneccesary header initialization. 
+// Get containing array block direct through column b-tree without instatiating any Arrays. Calling with
+// use_retval = true will return itself if leaf and avoid unneccesary header initialization.
 const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval) const
 {
     // Reduce time overhead for cols with few entries

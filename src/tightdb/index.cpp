@@ -25,11 +25,11 @@ const Index GetIndexFromRef(const Array& parent, size_t ndx)
 
 namespace tightdb {
 
-Index::Index(): Column(COLUMN_HASREFS)
+Index::Index(): Column(coldef_HasRefs)
 {
     // Add subcolumns for leafs
-    const Array values(COLUMN_NORMAL);
-    const Array refs(COLUMN_NORMAL); // we do not own these refs (to column positions), so no COLUMN_HASREF
+    const Array values(coldef_Normal);
+    const Array refs(coldef_Normal); // we do not own these refs (to column positions), so no COLUMN_HASREF
     m_array->add((intptr_t)values.GetRef());
     m_array->add((intptr_t)refs.GetRef());
 }
@@ -139,21 +139,21 @@ void Index::Insert(size_t ndx, int64_t value, bool isLast)
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            Index newNode(COLUMN_NODE);
+            Index newNode(coldef_Node);
             newNode.NodeAdd(nc.ref1);
             newNode.NodeAdd(GetRef());
             m_array->UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::insert_after: {
-            Index newNode(COLUMN_NODE);
+            Index newNode(coldef_Node);
             newNode.NodeAdd(GetRef());
             newNode.NodeAdd(nc.ref1);
             m_array->UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::split: {
-            Index newNode(COLUMN_NODE);
+            Index newNode(coldef_Node);
             newNode.NodeAdd(nc.ref1);
             newNode.NodeAdd(nc.ref2);
             m_array->UpdateRef(newNode.GetRef());
@@ -251,7 +251,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         }
 
         // Else create new node
-        Index newNode(COLUMN_NODE);
+        Index newNode(coldef_Node);
         newNode.NodeAdd(nc.ref1);
 
         switch (node_ndx) {
