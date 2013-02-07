@@ -894,7 +894,7 @@ TEST(Greater)
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1);
 
-			size_t t = a.find_first<Greater>(0, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(0, 0, (size_t)-1);
             TIGHTDB_ASSERT(i == t);
 
             CHECK_EQUAL(i, t);

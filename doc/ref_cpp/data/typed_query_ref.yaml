@@ -12,8 +12,8 @@ DESCR      : &g_typed_query_intro_descr
              {@link class_typed_table}. The typed query class is used in conjunction with
              {@link class_typed_table}.
 
-             Conditions is added to a query through a 
-             <a href="http://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a>. 
+             Conditions is added to a query through a
+             <a href="http://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a>.
              This means that the methods representing the conditions will return the
              query object.
 
@@ -28,9 +28,9 @@ DESCR      : &g_typed_query_intro_descr
 
              Alternatively, a query can result in a {@link class_typed_tableview} which can be further
              queried.
-SEE        : 
-EXAMPLES   : 
-- DESCR: 
+SEE        :
+EXAMPLES   :
+- DESCR:
   CODE: ex_cpp_typed_query_intro
 IGNORE     : []
 CATEGORIES :
@@ -303,8 +303,8 @@ CATEGORIES :
       NAMES    : group
       DESCR    : &g_typed_query_group_descr
                  >
-                 Group conditions ("left" parenthesis). Group of conditions can be nested and they are 
-                 conceptually a parenthesis. 
+                 Group conditions ("left" parenthesis). Group of conditions can be nested and they are
+                 conceptually a parenthesis.
       SUMMARY  : &g_typed_query_group_summary
                  Start group ("left parenthesis").
       RETURN:
@@ -355,7 +355,7 @@ CATEGORIES :
                  End of subtable query.
       SUMMARY  : &g_typed_query_endSubtable_summary
                  End of subtable query.
-      RETURN:  
+      RETURN:
         TYPES  : Query
         DESCR  : The query object.
       EXAMPLES:
@@ -367,7 +367,7 @@ CATEGORIES :
   - g_typed_query_find_all:
       NAMES    : find_all
       DESCR    : &g_typed_query_find_all_descr
-                 Execute a query. See the {@link class_dyn_tableview} class for further details. 
+                 Execute a query. See the {@link class_dyn_tableview} class for further details.
       SUMMARY  : &g_typed_query_find_all_summary
                  Execute query.
       SIGNATURE: |
@@ -572,7 +572,7 @@ CATEGORIES :
   - g_typed_query_find_all_const_multi:
       NAMES    : find_all_multi
       DESCR    : &g_typed_query_find_all_multi_descr
-                 Execute a query using (POSIX) threads. See the {@link class_dyn_tableview} class for further details. 
+                 Execute a query using (POSIX) threads. See the {@link class_dyn_tableview} class for further details.
       SUMMARY  : &g_typed_query_find_all_multi_summary
                  Execute query.
       SIGNATURE: |

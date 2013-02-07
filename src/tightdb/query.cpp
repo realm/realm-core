@@ -479,7 +479,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
 size_t Query::count(size_t start, size_t end, size_t limit) const
 {
-    if (end == size_t(-1)) 
+    if (end == size_t(-1))
         end = m_table->size();
 
     if (first.size() == 0 || first[0] == 0) {
@@ -621,9 +621,9 @@ void Query::Init(const Table& table) const
 
 size_t Query::FindInternal(size_t start, size_t end) const
 {
-    if (end == size_t(-1)) 
+    if (end == size_t(-1))
         end = m_table->size();
-    if (start == end) 
+    if (start == end)
         return not_found;
 
     size_t r;

@@ -23,7 +23,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/array_basic.hpp>
 
-// 
+//
 // A BasicColumn can currently only be used for simple unstructured types like float, double.
 //
 
@@ -103,7 +103,7 @@ protected:
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif // TIGHTDB_DEBUG
 
-    template <typename R, Action action, class cond> 
+    template <typename R, Action action, class cond>
     R aggregate(T target, size_t start, size_t end, size_t *matchcount = (size_t*)0) const;
 };
 

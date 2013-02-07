@@ -15,11 +15,11 @@ int main()
 
     table->add_empty_row(5);
 // @@Show@@
-    table->set_string(0, 0, "Mary"); 
-    table->set_string(0, 1, "Joe"); 
-    table->set_string(0, 2, "Jack"); 
-    table->set_string(0, 3, "Jill"); 
-    table->set_string(0, 4, "Jo"); 
+    table->set_string(0, 0, "Mary");
+    table->set_string(0, 1, "Joe");
+    table->set_string(0, 2, "Jack");
+    table->set_string(0, 3, "Jill");
+    table->set_string(0, 4, "Jo");
 
     // Find names (column 0) containing "ac", case sensitive
     TableView view1 = table->where().contains(0, "ac").find_all();

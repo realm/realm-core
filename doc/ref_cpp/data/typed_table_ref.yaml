@@ -8,31 +8,31 @@ SUMMARY    : &g_typed_table_summary
              Typed table.
 DESCR      : &g_typed_table_descr
              >
-             The Table class is the core class of the TightDB framework. It allows you 
+             The Table class is the core class of the TightDB framework. It allows you
              to efficiently work with data in terms of rows and columns. The value of
              a cell (specific column, specific row) is compacted in order to keep the
              overall memory consumption as little as possible. The internal data structure
-             is optimized so retrieving a particular row in a table is as fast as possible 
+             is optimized so retrieving a particular row in a table is as fast as possible
              (often faster than native data structures).
-                          
+
              When the number and types of columns are known a priori, you can use a set of macros
-             to define type safe and efficient table classes. The compiler can take avantage of 
+             to define type safe and efficient table classes. The compiler can take avantage of
              a typed table and enforce type checking of the methods parameters at compile time.
 
-             The table supports the most common types including integers, timestamps and strings. 
-             It is possible to use a TightDB table class as column type. This means that you can 
+             The table supports the most common types including integers, timestamps and strings.
+             It is possible to use a TightDB table class as column type. This means that you can
              have tables of tables structure.
 
-             Moreover, TightDB introduces a column type called {@link class_mixed}. A value of the 
-             Mixed type can be any supported value of TightDB. This implies - as the name 
-             indicates - that you can mix the type of values in the the column. In one row the 
+             Moreover, TightDB introduces a column type called {@link class_mixed}. A value of the
+             Mixed type can be any supported value of TightDB. This implies - as the name
+             indicates - that you can mix the type of values in the the column. In one row the
              value could be an integer, in another row the value could be a string or even a table.
 
              The aim of the TightDB table class is that it feels as close to the native data
              structures (in particular arrays) as possible.
-SEE        : 
-EXAMPLES: 
-- DESCR    : 
+SEE        :
+EXAMPLES:
+- DESCR    :
   CODE     : ex_cpp_typed_table_intro
 IGNORE     : []                   # List of method-ids to ignore
 
@@ -42,7 +42,7 @@ CATEGORIES:
   - g_typed_table_macros:
       NAMES    : TIGHTDB_TABLE_*
       DESCR    : >
-                 This set of predefined macros is used to declare type safe table classes. 
+                 This set of predefined macros is used to declare type safe table classes.
                  It is possible to declare table classes with 1 to 15 columns.
       SIGNATURE: |
                  TIGHTDB_TABLE_*(ClassName,
@@ -77,9 +77,9 @@ CATEGORIES:
                  <tr><td>Mixed</td>             <td>Dynamic</td>      <td>(contains any of the above)</td></tr>
                  </tbody>
                  </table>
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_macros
-        DESCR  : 
+        DESCR  :
 
 - State:
   METHODS:
@@ -94,9 +94,9 @@ CATEGORIES:
         TYPES  : bool
         DESCR  : &g_typed_table_true_false
                  <code>true</code> if table is empty, <code>false</code> otherwise.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   :  ex_cpp_type_table_is_empty
-        DESCR  : 
+        DESCR  :
   - g_typed_table_size:
       NAMES    : size
       DESCR    : &g_typed_table_size_descr
@@ -107,9 +107,9 @@ CATEGORIES:
       RETURN:
         TYPES  : size_t
         DESCR  : Number of rows in table.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   :  ex_cpp_type_table_size
-        DESCR  : 
+        DESCR  :
 
 - Table:
   METHODS:
@@ -129,7 +129,7 @@ CATEGORIES:
       DESCR    : &g_typed_table_optimize_descr
                  >
                  This method will optimize the internal data structures of a table.
-                 The result is that the table will consume less memory and queries might 
+                 The result is that the table will consume less memory and queries might
                  be faster.
 
                  This should be called as soon as there is an representative amount of
@@ -140,7 +140,7 @@ CATEGORIES:
                  so you only need to call optimize once.
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_optimize
-        DESCR  : 
+        DESCR  :
   - g_typed_table_columns:
       NAMES    : columns
       SIGNATURE: |
@@ -163,17 +163,17 @@ CATEGORIES:
                  and row index R in one of the tables, there is a value of type
                  T at column index C and row index R in the other table that
                  is equal to V. This method returns true if two tables are identical.
-      CONST    : True             
-      PARAMS:                 
+      CONST    : True
+      PARAMS:
       - NAME   : table
         TYPES  : const Table&
         DESCR  : The other table.
-      RETURN:                 
+      RETURN:
         TYPES  : bool
         DESCR  : <code>true</code> if the two tables are equal, <code>false</code> otherwise.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_table_operator==
-        DESCR  : 
+        DESCR  :
   - g_dyn_table_operator!=:
       NAMES    : operator!=
       SUMMARY  : &g_typed_table_operator_neq_summary
@@ -186,15 +186,15 @@ CATEGORIES:
                  and row index R in one of the tables, there is a value of type
                  T at column index C and row index R in the other table that
                  is equal to V. This method returns true if two tables are not identical.
-      CONST    : True             
-      PARAMS:                 
+      CONST    : True
+      PARAMS:
       - NAME   : table
         TYPES  : const Table&
         DESCR  : The other table.
-      RETURN:                 
+      RETURN:
         TYPES  : bool
         DESCR  : <code>true</code> if the two tables are not equal, <code>false</code> otherwise.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_operator!=
         DESCR  :
 - Rows:
@@ -206,14 +206,14 @@ CATEGORIES:
                  ConstRowAccessor operator[](size_t row_ndx) const
       SUMMARY  : Access rows.
       DESCR    : Access rows.
-      PARAMS:                 
+      PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : Row index.
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_operator_brackets
         DESCR  :
   - g_typed_table_front:
@@ -226,7 +226,7 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_front
         DESCR  :
   - g_typed_table_back:
@@ -239,7 +239,7 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_back
         DESCR  :
   - g_typed_table_add:
@@ -258,7 +258,7 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_add
         DESCR  :
   - g_typed_table_add_empty_row:
@@ -270,7 +270,7 @@ CATEGORIES:
       - NAME   : num_rows
         TYPES  : size_t
         DESCR  : "Number of rows to add (default: 1)."
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_add_empty_row
         DESCR  :
   - g_typed_table_insert:
@@ -291,7 +291,7 @@ CATEGORIES:
       RETURN:
         TYPES  : RowAccesor
         DESCR  : Cursor that lets you access row values as members.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_insert
         DESCR  :
   - g_typed_table_insert_empty_row:
@@ -306,7 +306,7 @@ CATEGORIES:
       - NAME   : num_rows
         TYPES  : size_t
         DESCR  : "Number of rows to insert (default: 1)."
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_insert_empty_row
         DESCR  :
   - g_typed_table_remove_row:
@@ -333,7 +333,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_remove_last_row
         DESCR  :
-      
+
 - Searching:
   METHODS:
   - g_typed_table_lookup:
@@ -393,14 +393,14 @@ CATEGORIES:
       SUMMARY  : &g_find_all_xxx_summary
                  Find all matching rows.
       DESCR    : &g_find_all_xxx_descr
-                 The method finds all occurences of a given value in a specific column. 
+                 The method finds all occurences of a given value in a specific column.
                  The rows are returned as a {@link class_typed_tableview} object.
       SIGNATURE: |
                  TableView      find_all_int(int64_t value);
                  TableView      find_all_bool(bool value);
                  TableView      find_all_date(time_t value);
                  TableView      find_all_string(const char* value);
-                 
+
                  ConstTableView find_all_int(int64_t value) const;
                  ConstTableView find_all_bool(bool value) const;
                  ConstTableView find_all_date(time_t value) const;
@@ -434,7 +434,7 @@ CATEGORIES:
       RETURN:
         TYPES  : TableView
         DESCR  : A view.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_get_sorted_view
         DESCR  :
   - g_typed_table_distinct:
@@ -453,14 +453,14 @@ CATEGORIES:
       RETURN:
         TYPES  : TableView
         DESCR  : A view.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_typed_table_distinct
         DESCR  :
   - g_typed_table_where:
   - g_typed_table_where_const:
       NAMES    : [where, where]
       SIGNATURE: |
-                 Query       where()                 
+                 Query       where()
                  const Query where() const
       SUMMARY  : Query table.
       DESCR    : This method initiates a query. See {@link class_typed_query}.
@@ -470,4 +470,4 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_table_where
-        
+

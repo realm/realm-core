@@ -179,7 +179,7 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
         offset = end;
     }
 
-    return not_found; 
+    return not_found;
 }
 
 #ifdef TIGHTDB_DEBUG

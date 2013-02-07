@@ -143,7 +143,7 @@ TEST(TestQueryFloat4)
     t.add(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
     t.add(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
     t.add(12345.0, 12345.0, 11111);
-    
+
     FloatTable3::Query q1 = t.where();
     float a1 = q1.col_float.maximum();
     double a2 = q1.col_double.maximum();
@@ -200,7 +200,7 @@ TEST(TestQueryFloat)
     double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
     CHECK_EQUAL(sum1_d, t.where().col_double.sum());
 
-    // Note: sum of float is calculated by having a double aggregate to where each float is added 
+    // Note: sum of float is calculated by having a double aggregate to where each float is added
     // (thereby getting casted to double).
     double sum1_f = double(1.10f) + double(1.13f) + double(1.13f) + double(1.10f) + double(1.20f);
     double res = t.where().col_float.sum();
@@ -223,7 +223,7 @@ TEST(TestQueryFloat)
     CHECK_EQUAL(sum2_d/2, q2.col_double.average());
 
     // -------- Test minimum(), maximum()
-    
+
     // ... NO conditions
     CHECK_EQUAL(1.20f, t.where().col_float.maximum());
     CHECK_EQUAL(1.10f, t.where().col_float.minimum());
@@ -248,7 +248,7 @@ TEST(TestDateQuery)
 
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
     PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::Date(2012, 1, 1).get_date())
-                                           .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all(); 
+                                           .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all();
     CHECK_EQUAL(1, view5.size());
     CHECK_EQUAL("Mary", view5[0].name);
 }
@@ -518,7 +518,7 @@ TEST(TestQueryDelete)
     CHECK_EQUAL(2, ttt.size());
     CHECK_EQUAL(2, ttt[0].first);
     CHECK_EQUAL(4, ttt[1].first);
-    
+
     // test remove of all
     ttt.clear();
     ttt.add(1, "X");
@@ -592,17 +592,17 @@ TEST(TestQuerySimple)
 
 TEST(TestQuerySimpleBUGdetect)
 {
-	TupleTableType ttt;
-	ttt.add(1, "a");
-	ttt.add(2, "a");
+    TupleTableType ttt;
+    ttt.add(1, "a");
+    ttt.add(2, "a");
 
-	TupleTableType::Query q1 = ttt.where();
+    TupleTableType::Query q1 = ttt.where();
 
-	TupleTableType::View tv1 = q1.find_all();
-	CHECK_EQUAL(2, tv1.size());
-	CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(2, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
 
-	TupleTableType::View resView = tv1.column().second.find_all("Foo");
+    TupleTableType::View resView = tv1.column().second.find_all("Foo");
 
     // This previously crashed:
     // TableView resView = TableView(tv1);
@@ -1562,7 +1562,7 @@ TEST(TestTV)
     t.add(1, "a");
     t.add(2, "a");
     t.add(3, "c");
-     
+
     TupleTableType::View v = t.where().first.greater(1).find_all();
 
     TupleTableType::Query q1 = t.where().tableview(v);
@@ -1571,10 +1571,10 @@ TEST(TestTV)
     TupleTableType::Query q3 = t.where().tableview(v).second.equal("a");
     CHECK_EQUAL(1, q3.count());
 }
- 
- #if 0 
+
+ #if 0
  !!!
- 
+
 TEST(TestQuery_sum_min_max_avg)
 {
     TupleTableType t;
@@ -1629,7 +1629,7 @@ TEST(TestQuery_avg)
     CHECK_EQUAL(20,t.where().first.average(NULL, 0, -1));     // both
 
     CHECK_EQUAL(10,t.where().first.average(&cnt, 0, 1));     // first
-    
+
     CHECK_EQUAL(30,t.where().first.sum(NULL, 1, 2));     // second
     CHECK_EQUAL(30,t.where().first.average(NULL, 1, 2));     // second
 }

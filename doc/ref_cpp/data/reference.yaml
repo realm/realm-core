@@ -6,7 +6,7 @@ TITLE     : 'C++'
 DESCR     : &g_introduction_descr
             >
             The goal of TightDB is to provide a high performance
-            data storage for your applications. 
+            data storage for your applications.
 
             TightDB integrates seamless in your programming language, making it
             fast to learn and easy to use.  You can replace your traditional data
@@ -17,19 +17,19 @@ DESCR     : &g_introduction_descr
             possibilities in an intuitive language and the ability to share your data
             across all supported languages and platforms.
 
-            The core of the framework is the classes {@link class_typed_table} and 
+            The core of the framework is the classes {@link class_typed_table} and
             {@link class_dyn_table}. Both classes are a representation of the
             fundamental concept <strong>Table</strong>. {@link class_typed_table}
             is used if you know the table structure a priori while {@link class_dyn_table}
-            provides the flexibility for situation where data model changes 
-            dynamically. 
+            provides the flexibility for situation where data model changes
+            dynamically.
 
             Tables organize data in columns and rows and data is compacted for
             low memory usage. The interface to the data resembles the native
             data structures. Moreover, tables can have tables as data. Using subtables
             you can build complex data structures.
 
-            It is possible to query data using the {@link class_typed_query} and 
+            It is possible to query data using the {@link class_typed_query} and
             {@link class_dyn_query} classes. Queries can be complex - involving
             any columns and values. You can either apply aggregate functions to you
             resulting data set or use the data set in your application as a
@@ -57,8 +57,8 @@ CATEGORIES:                       # list global class-id in order of appearence
   - mixed
 #  - cursor
 
-EXAMPLES  : 
-- DESCR   : 
+EXAMPLES  :
+- DESCR   :
   CODE    : ex_cpp_intro           # id to example code
 
 #
@@ -68,16 +68,16 @@ EXAMPLES  :
 # TODO!!!
 
 # Text quotation
-# -------------- 
+# --------------
 # Examples:
 # plain: unqouted text can't contain colon character
 # single-quoted: 'quoted text can contain :'
 # double-quoted: "double quoted can contain special characters - apparently"
-# literal: |   
-#    multiple lines, 
+# literal: |
+#    multiple lines,
 #    each with newline at end
 # folded: >
-#    only 1 newline at 
+#    only 1 newline at
 #    end of last line.
 #
 
@@ -85,7 +85,7 @@ EXAMPLES  :
 
 # Text tags
 # ----------
-# @link global-id 
+# @link global-id
 
 # Aliases:
 # --------

@@ -62,7 +62,7 @@ void BasicColumn_AddGet(T val[], size_t valLen)
             CHECK_EQUAL(val[j], c.Get(j));
         }
     }
-    
+
     c.Destroy();
 }
 TEST(ColumnFloat_AddGet) { BasicColumn_AddGet<ColumnFloat, float>(floatVal, floatValLen); }
@@ -81,7 +81,7 @@ void BasicColumn_Clear()
 
     c.Clear();
     CHECK(c.is_empty());
-    
+
     c.Destroy();
 }
 TEST(ColumnFloat_Clear) { BasicColumn_Clear<ColumnFloat, float>(); }
@@ -95,7 +95,7 @@ void BasicColumn_Set(T val[], size_t valLen)
     for (size_t i=0; i<valLen; ++i)
         c.add(val[i]);
     CHECK_EQUAL(valLen, c.Size());
-    
+
     T v0 = T(1.6);
     T v3 = T(-987.23);
     c.Set(0, v0);
@@ -117,9 +117,9 @@ template <class C, typename T>
 void BasicColumn_Insert(T val[], size_t valLen)
 {
     (void)valLen;
-    
+
     C c;
-    
+
     // Insert in empty column
     c.Insert(0, val[0]);
     CHECK_EQUAL(val[0], c.Get(0));
@@ -144,7 +144,7 @@ void BasicColumn_Insert(T val[], size_t valLen)
     CHECK_EQUAL(val[2], c.Get(1));
     CHECK_EQUAL(val[0], c.Get(2));
     CHECK_EQUAL(val[3], c.Get(3));
-    CHECK_EQUAL(4, c.Size());   
+    CHECK_EQUAL(4, c.Size());
 
     // Insert at top
     c.Insert(0, val[4]);
@@ -153,7 +153,7 @@ void BasicColumn_Insert(T val[], size_t valLen)
     CHECK_EQUAL(val[2], c.Get(2));
     CHECK_EQUAL(val[0], c.Get(3));
     CHECK_EQUAL(val[3], c.Get(4));
-    CHECK_EQUAL(5, c.Size());   
+    CHECK_EQUAL(5, c.Size());
 
     c.Destroy();
 }
@@ -170,12 +170,12 @@ void BasicColumn_Aggregates(T val[], size_t valLen)
     C c;
 
 //    double sum = c.sum();
-//    CHECK_EQUAL(0, sum);   
+//    CHECK_EQUAL(0, sum);
 
-    // todo: add tests for minimum, maximum, 
+    // todo: add tests for minimum, maximum,
     // todo !!!
-    
-   c.Destroy();    
+
+   c.Destroy();
 }
 TEST(ColumnFloat_Aggregates) { BasicColumn_Aggregates<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_Aggregates){ BasicColumn_Aggregates<ColumnDouble, double>(doubleVal, doubleValLen); }

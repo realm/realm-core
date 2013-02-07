@@ -655,7 +655,7 @@ void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t
 
 void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const
 {
-	m_array->find_all(result, value, add_offset, start, end);
+    m_array->find_all(result, value, add_offset, start, end);
 }
 
 void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const

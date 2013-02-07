@@ -22,11 +22,11 @@ var App = {};
 
 
 		<style type="text/css">
-        
+
         strong, b {
         font-weight: bolder;
         }
-        
+
         dl {
         display: block;
         -webkit-margin-before: 1em;
@@ -34,21 +34,21 @@ var App = {};
         -webkit-margin-start: 0px;
         -webkit-margin-end: 0px;
         }
-        
+
         dd {
         display: block;
         -webkit-margin-start: 40px;
         }
-        
+
         dt {
         display: block;
         }
-        
+
         pre, xmp, plaintext, listing {
         font-family: monospace;
         white-space: pre;
         }
-        
+
         p {
         display: block;
         -webkit-margin-before: 1em;
@@ -103,7 +103,7 @@ var App = {};
 		margin-bottom: 25px;
 		color: #0067AB;
 		}
-		
+
 	.eks {
 	    border: 1px solid #CBE3F3;
 	    border-radius: 5px 5px 5px 5px;
@@ -210,10 +210,10 @@ var App = {};
 				</div>
 			</div>
 			<div class="left_col">
-				
+
 				<h1>TightDB C++ Reference</h1>
      <p>
-     This reference manual documents the high-level C++ interface to 
+     This reference manual documents the high-level C++ interface to
      <a href="http://www.tightdb.com">TightDB</a>. The low-level interface is documented elsewhere.
      The TightDB classes have a common namespace: <pre>tightdb</pre>.
      </p>
@@ -272,7 +272,7 @@ var App = {};
 				<br>
 				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get last row as object</td>
 				</tr>
-				
+
 				<tr bgcolor="white" class="TableRowColor">
 				<td align="right" valign="top" width="1%"><font size="-1">
 				<code>&nbsp;int</code></font></td>
@@ -289,7 +289,7 @@ var App = {};
 				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Update an entire row</td>
 				</tr>
 
-				
+
 				<tr bgcolor="white" class="TableRowColor">
 				<td align="right" valign="top" width="1%"><font size="-1">
 				<code>&nbsp;void</code></font></td>
@@ -297,7 +297,7 @@ var App = {};
 				<br>
 				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Delete all rows</td>
 				</tr>
-				
+
                 <tr bgcolor="white" class="TableRowColor">
 				<td align="right" valign="top" width="1%"><font size="-1">
 				<code>&nbsp;size_t</code></font></td>
@@ -305,7 +305,7 @@ var App = {};
 				<br>
 				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Find values in a specific column</td>
 				</tr>
-				
+
 				<tr bgcolor="white" class="TableRowColor">
 				<td align="right" valign="top" width="1%"><font size="-1">
 				<code>&nbsp;<a href="#tableview">TableView</a></code></font></td>
@@ -313,7 +313,7 @@ var App = {};
 				<br>
 				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Find all matching values in a specific column</td>
 				</tr>
-				
+
 				<tr bgcolor="white" class="TableRowColor">
 				<td align="right" valign="top" width="1%"><font size="-1">
 				<code>&nbsp;int64_t</code></font></td>
@@ -321,7 +321,7 @@ var App = {};
 				<br>
 				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Sum the values in an integer column</td>
 				</tr>
-				
+
 				<tr bgcolor="white" class="TableRowColor">
 				<td align="right" valign="top" width="1%"><font size="-1">
 				<code>&nbsp;int64_t</code> or <code>time_t</code></font></td>
@@ -329,7 +329,7 @@ var App = {};
 				<br>
 				    Get the lowest value in an integer column</td>
 				</tr>
-				
+
 				<tr bgcolor="white" class="TableRowColor">
 				<td align="right" valign="top" width="1%"><font size="-1">
 				<code>&nbsp;int64_t</code> or <code>&nbsp;time_t</code></font></td>
@@ -356,7 +356,7 @@ var App = {};
 
 				</tbody></table>
                 <br>
-                
+
                 <h3>Constructor Detail</h3>
 
                 <a href="#" name="table-constructor" id="table-constructor"></a>
@@ -372,7 +372,7 @@ var App = {};
 	                Note: Only tables which are part of a <a href="#group">group</a> can be serialized to memory or disk.
                 	</p>
                     <p>
-                      Note: Tables should be allocated and instantiated using the 
+                      Note: Tables should be allocated and instantiated using the
                       <code>TDB_TABLE_<i>x</i></code> macros (<code><i>x</i></code> = 1 .. 15).
                     </p>
                 	<dl>
@@ -442,7 +442,7 @@ table[5].age = 43;
 				                     </dd>
 				            	</dl>
 				            	 <h5>Getting a row</h5>
-				            	 <p>The backets syntax can also be used to fetch a row which is wrapped as a 
+				            	 <p>The backets syntax can also be used to fetch a row which is wrapped as a
 				            	 cursor object.
 				            	 </p>
 				            	 <dl>
@@ -547,7 +547,7 @@ people::Cursor second_last = people.back(-2);
                 	</dl>
                 </dd></dl>
 
-                
+
 				<a href="#" name="table-setAtIndex" id="table-setAtIndex"></a>
 				<a href="#" class="section section_major" name="table-setAtIndex_anchor" id="table-setAtIndex_anchor"></a>
 				<h4>set</h4>
@@ -604,7 +604,7 @@ table.clear();
                 </dd></dl>
 
                 <a href="#" name="table-deleteRow" id="table-deleteRow"></a>
-				<a href="#" class="section section_major" name="table-deleteRow_anchor" id="table-deleteRow_anchor"></a>	
+				<a href="#" class="section section_major" name="table-deleteRow_anchor" id="table-deleteRow_anchor"></a>
    			<h4>remove</h4>
                 <p><div class="eks">
                 <pre class="prettyprint" lang-cpp style="font-size: 16px">void <b>remove</b>(size_t index)</pre>
@@ -630,7 +630,7 @@ table.remove(42);
 
 
                 <a href="#" name="table-Add" id="table-Add"></a>
-				<a href="#" class="section section_major" name="table-Add_anchor" id="table-Add_anchor"></a>	
+				<a href="#" class="section section_major" name="table-Add_anchor" id="table-Add_anchor"></a>
 
 				<h4>add</h4>
                 <p><div class="eks">
@@ -699,7 +699,7 @@ row = table.cols().name.find_first("Mary");
                 </p>
                 <dl><dd>
                 	<p>
-                	Find all matching values in a specific column. 
+                	Find all matching values in a specific column.
                 	</p>
                 	<dl>
                 		<dt><b>Parameters:</b></dt>
@@ -780,7 +780,7 @@ int64_t youngest = table.cols().age.min();
 	                         </dd>
 	                	</dl>
 	                </dd></dl>
-	
+
 	            	<a href="#" name="table-max" id="table-max"></a>
 						<a href="#" class="section section_major" name="table-max_anchor" id="table-max_anchor"></a>
 						<h4>max</h4>
@@ -899,7 +899,7 @@ table.optimize();
 people::Cursor pc = people.back(); // pc is a cursor object
 pc.name = "Hans"; // the name is updated
                 </pre>
-                	
+
 
 
                 <a href="#" name="tablequery" id="tablequery"></a>
@@ -1115,7 +1115,7 @@ TableView view = table.where().group()
                       </dd>
                     </dl>
                 </dd></dl>
-                
+
                 <a href="#" name="tablequery-do" id="table-do"></a>
                 <a href="#" class="section section_major" name="tablequery-do_anchor" id="tablequery-do_anchor"></a>
                 <h4>find_all</h4>
@@ -1337,7 +1337,7 @@ int64_t lite = table.where().group()
                 <th align="left" colspan="2"><font size="+2">
                 <b>Method Summary</b></font></th>
                 </tr>
-                
+
                 <tr bgcolor="white" class="TableRowColor">
                 <td align="right" valign="top" width="1%"><font size="-1">
                 <code>&nbsp;void</code></font></td>
@@ -1528,7 +1528,7 @@ size_t cnt = view.size();
                 <th align="left" colspan="2"><font size="+2">
                 <b>Method Summary</b></font></th>
                 </tr>
-                
+
                 <tr bgcolor="white" class="TableRowColor">
                 <td align="right" valign="top" width="1%"><font size="-1">
                 <code>&nbsp;void</code></font></td>
@@ -1544,8 +1544,8 @@ size_t cnt = view.size();
                 <br>
                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Check if group has a specific named table</td>
                 </tr>
-                
-                
+
+
                 <tr bgcolor="white" class="TableRowColor">
                 <td align="right" valign="top" width="1%"><font size="-1">
                 <code>&nbsp;void</code></font></td>
@@ -1553,7 +1553,7 @@ size_t cnt = view.size();
                 <br>
                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Write table group to disk</td>
                 </tr>
-                
+
                 <tr bgcolor="white" class="TableRowColor">
                 <td align="right" valign="top" width="1%"><font size="-1">
                 <code>&nbsp;string</code></font></td>
@@ -1563,7 +1563,7 @@ size_t cnt = view.size();
                 </tr>
                 </tbody></table>
                 <br>
-                
+
                 <h3>Constructor Detail</h3>
 
                 <a href="#" name="group-constructor" id="group-constructor"></a>
@@ -1581,7 +1581,7 @@ size_t cnt = view.size();
                 		<dt><b>Parameters:</b></dt>
                 		<dd>
 	                    <p>No arguments: Creates a new group.</p>
-	                
+
 	                    <p><code>file</code>: named file on disk</p>
                         <p><code>buffer</code>, <code>len</code>: volatile buffer</p>
 	                    </dd>
@@ -1598,7 +1598,7 @@ TDB_TABLE_3(PeopleTable,
             name,  String,
             age,   Int,
             hired, Bool)
- 
+
 // Create Table in Group
 Group group;
 PeopleTable& table = group.get_table<PeopleTable>("My great table");
@@ -1639,7 +1639,7 @@ if (group.has_table("my great table")) {
 	                         </dd>
 	                	</dl>
 	                </dd></dl>
-		
+
 
 				<a href="#" name="group-get_table" id="group-get_table"></a>
 				<a href="#" class="section section_minor" name="group-get_table_anchor" id="group-get_table_anchor"></a>
@@ -1669,7 +1669,7 @@ TDB_TABLE_3(PeopleTable,
             name,  String,
             age,   Int,
             hired, Bool)
- 
+
 // Create Table in Group
 Group group;
 PeopleTable& table = group.get_table<PeopleTable>("My great table");
@@ -1740,8 +1740,8 @@ const char* const buffer = group.write_to_mem(len);
                 	</dl>
                </dd></dl>
 			</div>
-			
-			
+
+
 			<script type="text/javascript">
 			$(document).ready(function() {
 			new App.Views.Docs({ el: $("body"), accordian: true });

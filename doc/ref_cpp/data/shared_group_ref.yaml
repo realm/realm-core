@@ -36,9 +36,9 @@ DESCR      : &g_shared_group_descr
              transactions do. This division is important to remember
              as derived objects (tables, views, etc.) are either
              writable or not.
-SEE        : 
-EXAMPLES: 
-- DESCR    : 
+SEE        :
+EXAMPLES:
+- DESCR    :
   CODE     : ex_cpp_shared_group_intro
 IGNORE     : []
 CATEGORIES:
@@ -168,7 +168,7 @@ CATEGORIES:
                  >
                  This method tests if the shared group has been modified (by another process),
                  since the last transaction.
-                 
+
                  It has very little overhead and does not affect other processes, so it is
                  ok to call it at regular intervals (like in the idle handler of an application).
       RETURN:
@@ -185,30 +185,30 @@ CATEGORIES:
                  Initiate a transaction.
       DESCR    : &g_shared_group_begin_write_descr
                  Begin writing to a shared group.
-      RETURN:                 
+      RETURN:
         TYPES  : Group&
         DESCR  : A group.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_shared_group_begin_write
-        DESCR  : 
+        DESCR  :
   - g_shared_group_begin_commit:
       NAMES    : commit
       SUMMARY  : &g_shared_group_commit_summary
                  Commit a transaction.
       DESCR    : &g_shared_group_commit_descr
                  This method closes a transaction and changes are written to the group.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_shared_group_commit
-        DESCR  : 
+        DESCR  :
   - g_shared_group_rollback:
       NAMES    : rollback
       SUMMARY  : &g_shared_group_rollback_summary
                  Rollback a transaction.
       DESCR    : &g_shared_group_rollback_descr
                  This method descards all changes.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_shared_group_rollback
-        DESCR  : 
+        DESCR  :
   - g_shared_group_interrupt_transact:
       NAMES    : interrupt_transact
       SUMMARY  : &g_shared_group_interrupt_transact_summary
@@ -217,7 +217,7 @@ CATEGORIES:
                  >
                  This function may be called asynchronously to interrupt any
                  blocking call that is part of a transaction in a replication
-                 setup. Only {@link g_shared_group_begin_write} and 
+                 setup. Only {@link g_shared_group_begin_write} and
                  modifying function that are part
                  of a write transaction can block. The transaction is
                  interrupted only if such a call is blocked or would
@@ -225,15 +225,15 @@ CATEGORIES:
                  may not be called directly from a system signal handler. When
                  a transaction is interrupted, the only valid member function
                  to call is {@link g_shared_group_rollback}. If a client calls
-                 {@link g_shared_group_clear_interrupt_transact} after having 
+                 {@link g_shared_group_clear_interrupt_transact} after having
                  called {@link g_shared_group_rollback}, it
-                 may then resume normal operation on this database/shared group. 
+                 may then resume normal operation on this database/shared group.
                  Currently,
                  transaction interruption works by throwing an exception from
                  one of the mentioned member functions that may block.
-      EXAMPLES:                  
-      - CODE   : ex_cpp_shared_group_interrupt_transact 
-        DESCR  : 
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_interrupt_transact
+        DESCR  :
   - g_shared_group_clear_interrupt_transact:
       NAMES    : clear_interrupt_transact
       SUMMARY  : &g_shared_group_clear_interrupt_transact_summary
@@ -242,11 +242,11 @@ CATEGORIES:
                  >
                  This method clears the interrupted state of the shared group after rolling
                  back a transaction. It is not an error to call this function
-                 in a situation where no interruption has occured. 
+                 in a situation where no interruption has occured.
       SEE      : g_shared_group_interrupt_transact
-      EXAMPLES:                  
-      - CODE   : ex_cpp_shared_group_clear_interrupt_transact 
-        DESCR  : 
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_clear_interrupt_transact
+        DESCR  :
 - Read transactions:
   METHODS:
   - g_shared_group_begin_read:
@@ -255,20 +255,20 @@ CATEGORIES:
                  Initiate reading.
       DESCR    : &g_shared_group_begin_read_descr
                  Begin reading from a shared group.
-      CONST    : True             
-      RETURN:                 
+      CONST    : True
+      RETURN:
         TYPES  : Group&
         DESCR  : A group.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_shared_group_begin_read
-        DESCR  : 
+        DESCR  :
   - g_shared_group_end_read:
       NAMES    : end_read
       SUMMARY  : &g_shared_group_end_read_summary
                  Stop reading from a group.
       DESCR    : &g_shared_group_end_read_descr
                  This method stops reading from a shared group.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_shared_group_end_read
-        DESCR  : 
+        DESCR  :
 

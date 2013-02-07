@@ -580,7 +580,7 @@ TEST(Column_Average)
     Column c;
     c.add(10);
     CHECK_EQUAL(10, c.average());
-    
+
     c.add(30);
     CHECK_EQUAL(0, c.average(0,0));     // None
     CHECK_EQUAL(10, c.average(0,1));    // first

@@ -12,8 +12,8 @@ DESCR      : &g_dyn_query_intro_descr
              {@link class_dyn_table}. The dynamic query class is used in conjunction with the
              dynamic table class.
 
-             Conditions is added to a query through a 
-             <a href="http://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a>. 
+             Conditions is added to a query through a
+             <a href="http://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a>.
              This means that the methods representing the conditions will return the
              query object. In general, the predicate functions require a column index
              as parameter. The compiler cannot infer the correct types as tables are
@@ -27,11 +27,11 @@ DESCR      : &g_dyn_query_intro_descr
 
              Alternatively, a query can result in a {@link class_dyn_tableview} which can be further
              queried.
-SEE        : 
-EXAMPLES   : 
-- DESCR: 
+SEE        :
+EXAMPLES   :
+- DESCR:
   CODE: ex_cpp_dyn_query_intro
-IGNORE     : []                   # List of method-ids to ignore   
+IGNORE     : []                   # List of method-ids to ignore
 CATEGORIES :
 - Conditions:
   METHODS:
@@ -332,8 +332,8 @@ CATEGORIES :
       NAMES    : group
       DESCR    : &g_dyn_query_group_descr
                  >
-                 Group conditions ("left" parenthesis). Group of conditions can be nested and they are 
-                 conceptually a parenthesis. 
+                 Group conditions ("left" parenthesis). Group of conditions can be nested and they are
+                 conceptually a parenthesis.
       SUMMARY  : &g_dyn_query_group_summary
                  Start group ("left parenthesis").
       RETURN:
@@ -388,7 +388,7 @@ CATEGORIES :
                  End of subtable query.
       SUMMARY  : &g_dyn_query_endSubtable_summary
                  End of subtable query.
-      RETURN:  
+      RETURN:
         TYPES  : Query
         DESCR  : The query object.
       EXAMPLES:
@@ -400,7 +400,7 @@ CATEGORIES :
   - g_dyn_query_find_all:
       NAMES    : find_all
       DESCR    : &g_dyn_query_find_all_descr
-                 This method executes the query. See the {@link class_dyn_tableview} class for further details. 
+                 This method executes the query. See the {@link class_dyn_tableview} class for further details.
       SUMMARY  : &g_dyn_query_find_all_summary
                  Execute query.
       SIGNATURE: |
@@ -624,9 +624,9 @@ CATEGORIES :
       NAMES    : find_all_multi
       DESCR    : &g_dyn_query_find_all_multi_descr
                  >
-                 This method execute a query using (POSIX) threads that is, the query is parallellized and 
-                 can lower the search time on a multi-core computer. See the {@link class_dyn_tableview} class 
-                 for further details. 
+                 This method execute a query using (POSIX) threads that is, the query is parallellized and
+                 can lower the search time on a multi-core computer. See the {@link class_dyn_tableview} class
+                 for further details.
       SUMMARY  : &g_dyn_query_find_all_multi_summary
                  Execute query.
       SIGNATURE: |

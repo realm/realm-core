@@ -14,7 +14,7 @@ int main()
     table.add("Mary",  34);
     table.add("Joe",   37);
     table.add("Alice", 12);
-    table.add("Jack",  75); 
+    table.add("Jack",  75);
     table.add("Bob",   10);
     table.add("Peter", 40);
 
@@ -24,7 +24,7 @@ int main()
     // Find all matching rows of entire table
     PeopleTable::View view1 = query.find_all();
 // @@Fold@@
-    
+
     assert(view1.size() == 4);
     assert(view1[0].name == "Mary");
     assert(view1[1].name == "Joe");
@@ -54,7 +54,7 @@ int main()
     // Find next 2 matches of table
     start = view3.get_source_ndx(view3.size() - 1) + 1; // start = 1 + 1 = 2
     PeopleTable::View view4 = query.find_all(start, size_t(-1), 2);
-    
+
 // @@Fold@@
     assert(view4.size() == 2);
     assert(view4[0].name == "Jack");

@@ -36,14 +36,14 @@ int main()
 // @@EndFold@@
 
     // Find people hired 2012-Jan-24, 00:00:00
-    PeopleTable::View view4 = table.where().hired.equal(tightdb::Date(2012, 1, 24).get_date()).find_all(); 
+    PeopleTable::View view4 = table.where().hired.equal(tightdb::Date(2012, 1, 24).get_date()).find_all();
 // @@Fold@@
     assert(view4.size() == 1 && view4[0].name == "Mary");
 
 // @@EndFold@@
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
     PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::Date(2012, 1, 1).get_date())
-                                           .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all(); 
+                                           .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all();
 // @@Fold@@
     assert(view5.size() == 1 && view5[0].name == "Mary");
 // @@EndFold@@

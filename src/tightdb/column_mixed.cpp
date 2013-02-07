@@ -103,9 +103,9 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
                 // If item is in middle of the column, we just clear
                 // it to avoid having to adjust refs to following items
                 const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-                if (ref == m_data->Size()-1) 
+                if (ref == m_data->Size()-1)
                     m_data->Delete(ref);
-                else 
+                else
                     m_data->Set(ref, "", 0);
                 break;
             }
@@ -121,7 +121,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
                 TIGHTDB_ASSERT(false);
         }
     }
-    if (type != newtype) 
+    if (type != newtype)
         m_types->Set(ndx, newtype);
 }
 
