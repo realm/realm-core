@@ -289,10 +289,10 @@ private:
 // ownership of the underlying memory, causes lots of problems with
 // robustness both here and in other places.
 inline Group::Group():
-    m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
-    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc),
-    m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc),
-    m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_is_shared(false)
+    m_top(coldef_HasRefs, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
+    m_freePositions(coldef_Normal, NULL, 0, m_alloc),
+    m_freeLengths(coldef_Normal, NULL, 0, m_alloc),
+    m_freeVersions(coldef_Normal, NULL, 0, m_alloc), m_is_shared(false)
 {
     // FIXME: Arrays are leaked when create() throws
     create();
@@ -490,7 +490,7 @@ template<class S> size_t Group::write_to_stream(S& out)
     // When serializing to disk we dont want
     // to include free space tracking as serialized
     // files are written without any free space.
-    Array top(COLUMN_HASREFS, NULL, 0, m_alloc);
+    Array top(coldef_HasRefs, NULL, 0, m_alloc);
     top.add(m_top.Get(0));
     top.add(m_top.Get(1));
 

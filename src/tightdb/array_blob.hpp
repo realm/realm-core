@@ -58,7 +58,7 @@ private:
 // Implementation:
 
 inline ArrayBlob::ArrayBlob(ArrayParent *parent, std::size_t pndx, Allocator& alloc):
-    Array(COLUMN_NORMAL, parent, pndx, alloc)
+    Array(coldef_Normal, parent, pndx, alloc)
 {
     // Manually set wtype as array constructor in initiatializer list
     // will not be able to call correct virtual function

@@ -112,7 +112,7 @@ protected:
     static size_t get_size_from_ref(size_t ref, Allocator&) TIGHTDB_NOEXCEPT;
     static bool is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT;
 
-    template <typename T, typename R, ACTION action, class condition>
+    template <typename T, typename R, Action action, class condition>
         R aggregate(T target, size_t start, size_t end, size_t *matchcount) const;
 
 
@@ -130,7 +130,7 @@ class Column : public ColumnBase {
 public:
     explicit Column(Allocator&);
     Column(ColumnDef type, Allocator&);
-    Column(ColumnDef type=COLUMN_NORMAL, ArrayParent* = 0, size_t pndx = 0,
+    Column(ColumnDef type=coldef_Normal, ArrayParent* = 0, size_t pndx = 0,
            Allocator& = Allocator::get_default());
     Column(size_t ref, ArrayParent* = 0, size_t pndx = 0,
            Allocator& = Allocator::get_default()); // Throws

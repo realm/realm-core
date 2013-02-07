@@ -19,9 +19,9 @@ ColumnDef GetTypeFromArray(size_t ref, Allocator& alloc)
     const bool isNode = (header[0] & 0x80) != 0;
     const bool hasRefs  = (header[0] & 0x40) != 0;
 
-    if (isNode) return COLUMN_NODE;
-    else if (hasRefs) return COLUMN_HASREFS;
-    else return COLUMN_NORMAL;
+    if (isNode) return coldef_Node;
+    else if (hasRefs) return coldef_HasRefs;
+    else return coldef_Normal;
 }
 
 }
@@ -37,10 +37,10 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) : m_index(NULL)
 AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc) : m_index(NULL)
 {
     const ColumnDef type = GetTypeFromArray(ref, alloc);
-    if (type == COLUMN_NODE) {
+    if (type == coldef_Node) {
         m_array = new Array(ref, parent, pndx, alloc);
     }
-    else if (type == COLUMN_HASREFS) {
+    else if (type == coldef_HasRefs) {
         m_array = new ArrayStringLong(ref, parent, pndx, alloc);
     }
     else {
@@ -70,7 +70,7 @@ void AdaptiveStringColumn::Destroy()
 
 void AdaptiveStringColumn::UpdateRef(size_t ref)
 {
-    TIGHTDB_ASSERT(GetTypeFromArray(ref, m_array->GetAllocator()) == COLUMN_NODE); // Can only be called when creating node
+    TIGHTDB_ASSERT(GetTypeFromArray(ref, m_array->GetAllocator()) == coldef_Node); // Can only be called when creating node
 
     if (IsNode()) m_array->UpdateRef(ref);
     else {
@@ -285,7 +285,7 @@ size_t AdaptiveStringColumn::find_first(const char* value, size_t start, size_t 
     if (m_index && start == 0 && end == (size_t)-1)
         return m_index->find_first(value);
 
-    return TreeFind<const char*, AdaptiveStringColumn, EQUAL>(value, start, end);
+    return TreeFind<const char*, AdaptiveStringColumn, Equal>(value, start, end);
 }
 
 

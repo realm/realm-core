@@ -151,7 +151,7 @@ TEST(LESS)
                             a.Set(match + off, v[w] - 1);
 
                             akku.Clear();
-                            a.find(COND_LESS, TDB_FINDALL, v[w], from, to, 0, &state);
+                            a.find(cond_Less, act_FindAll, v[w], from, to, 0, &state);
 
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
@@ -178,7 +178,7 @@ TEST(LESS)
                             a.Set(match + off, v[w] + 1);
 
                             akku.Clear();
-                            a.find(COND_GREATER, TDB_FINDALL, v[w], from, to, 0, &state);
+                            a.find(cond_Greater, act_FindAll, v[w], from, to, 0, &state);
 
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
@@ -203,7 +203,7 @@ TEST(LESS)
                             a.Set(match + off, v[w] + 1);
 
                             akku.Clear();
-                            a.find(COND_EQUAL, TDB_FINDALL, v[w] + 1, from, to, 0, &state);
+                            a.find(cond_Equal, act_FindAll, v[w] + 1, from, to, 0, &state);
 
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);

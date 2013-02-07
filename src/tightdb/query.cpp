@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include <tightdb/array.hpp>
 #include <tightdb/column_basic.hpp>
 #include <tightdb/column_fwd.hpp>
@@ -7,19 +9,17 @@
 
 #define MULTITHREAD 0
 
+using namespace std;
 using namespace tightdb;
 
-const size_t THREAD_CHUNK_SIZE = 1000;
-
-#define MIN(a, b)  (((a) < (b)) ? (a) : (b))
-#define MAX(a, b)  (((a) > (b)) ? (a) : (b))
+const size_t thread_chunk_size = 1000;
 
 Query::Query(Table& table) : m_table(table.get_table_ref())
 {
     Create();
 }
 
-Query::Query(const Table& table) : m_table(((Table&)table).get_table_ref())
+Query::Query(const Table& table) : m_table((const_cast<Table&>(table)).get_table_ref())
 {
     Create();
 }
@@ -81,7 +81,7 @@ Query& Query::tableview(const Array &arr)
 // Binary
 Query& Query::equal(size_t column_ndx, BinaryData b)
 {
-    ParentNode* const p = new BinaryNode<EQUAL>(b.pointer, b.len, column_ndx);
+    ParentNode* const p = new BinaryNode<Equal>(b.pointer, b.len, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -98,26 +98,26 @@ Query& Query::add_condition(size_t column_ndx, T value)
 // int64
 Query& Query::equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, EQUAL>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, NOTEQUAL>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, NotEqual>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, GREATER>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Greater>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater_equal(size_t column_ndx, int64_t value)
 {
     if (value > LLONG_MIN) {
-        ParentNode* const p = new IntegerNode<int64_t, GREATER>(value - 1, column_ndx);
+        ParentNode* const p = new IntegerNode<int64_t, Greater>(value - 1, column_ndx);
         UpdatePointers(p, &p->m_child);
     }
     // field >= LLONG_MIN has no effect
@@ -126,7 +126,7 @@ Query& Query::greater_equal(size_t column_ndx, int64_t value)
 Query& Query::less_equal(size_t column_ndx, int64_t value)
 {
     if (value < LLONG_MAX) {
-        ParentNode* const p = new IntegerNode<int64_t, LESS>(value + 1, column_ndx);
+        ParentNode* const p = new IntegerNode<int64_t, Less>(value + 1, column_ndx);
         UpdatePointers(p, &p->m_child);
     }
     // field <= LLONG_MAX has no effect
@@ -134,7 +134,7 @@ Query& Query::less_equal(size_t column_ndx, int64_t value)
 }
 Query& Query::less(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, LESS>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Less>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -146,7 +146,7 @@ Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 }
 Query& Query::equal(size_t column_ndx, bool value)
 {
-    ParentNode* const p = new IntegerNode<bool, EQUAL>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<bool, Equal>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -154,27 +154,27 @@ Query& Query::equal(size_t column_ndx, bool value)
 // ------------- float
 Query& Query::equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, EQUAL> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, Equal> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, NOTEQUAL> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, NotEqual> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, GREATER> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, Greater> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, GREATER_EQUAL> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, GreaterEqual> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, LESS_EQUAL> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, LessEqual> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
-    return add_condition<float, BASICNODE<float, LESS> >(column_ndx, value);
+    return add_condition<float, BasicNode<float, Less> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
@@ -186,27 +186,27 @@ Query& Query::between(size_t column_ndx, float from, float to)
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, EQUAL> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, Equal> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, NOTEQUAL> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, NotEqual> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, GREATER> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, Greater> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, GREATER_EQUAL> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, GreaterEqual> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, LESS_EQUAL> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, LessEqual> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, double value)
 {
-    return add_condition<double, BASICNODE<double, LESS> >(column_ndx, value);
+    return add_condition<double, BasicNode<double, Less> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
@@ -220,9 +220,9 @@ Query& Query::equal(size_t column_ndx, const char* value, bool caseSensitive)
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new StringNode<EQUAL>(value, column_ndx);
+        p = new StringNode<Equal>(value, column_ndx);
     else
-        p = new StringNode<EQUAL_INS>(value, column_ndx);
+        p = new StringNode<EqualIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -230,9 +230,9 @@ Query& Query::begins_with(size_t column_ndx, const char* value, bool caseSensiti
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new StringNode<BEGINSWITH>(value, column_ndx);
+        p = new StringNode<BeginsWith>(value, column_ndx);
     else
-        p = new StringNode<BEGINSWITH_INS>(value, column_ndx);
+        p = new StringNode<BeginsWithIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -240,9 +240,9 @@ Query& Query::ends_with(size_t column_ndx, const char* value, bool caseSensitive
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new StringNode<ENDSWITH>(value, column_ndx);
+        p = new StringNode<EndsWith>(value, column_ndx);
     else
-        p = new StringNode<ENDSWITH_INS>(value, column_ndx);
+        p = new StringNode<EndsWithIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -250,9 +250,9 @@ Query& Query::contains(size_t column_ndx, const char* value, bool caseSensitive)
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new StringNode<CONTAINS>(value, column_ndx);
+        p = new StringNode<Contains>(value, column_ndx);
     else
-        p = new StringNode<CONTAINS_INS>(value, column_ndx);
+        p = new StringNode<ContainsIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -260,9 +260,9 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
 {
     ParentNode* p;
     if (caseSensitive)
-        p = new StringNode<NOTEQUAL>(value, column_ndx);
+        p = new StringNode<NotEqual>(value, column_ndx);
     else
-        p = new StringNode<NOTEQUAL_INS>(value, column_ndx);
+        p = new StringNode<NotEqualIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -270,7 +270,7 @@ Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive
 
 // Aggregates =================================================================================
 
-template <ACTION action, typename T, typename R, class ColType>
+template <Action action, typename T, typename R, class ColType>
 R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
@@ -303,45 +303,45 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const
 
 int64_t Query::sum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_SUM, int64_t>(&Column::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, resultcount, start, end, limit);
 }
 double Query::sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_SUM, float>(&ColumnFloat::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, resultcount, start, end, limit);
 }
 double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_SUM, double>(&ColumnDouble::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, resultcount, start, end, limit);
 }
 
 // Maximum
 
 int64_t Query::maximum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MAX, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit);
 }
 float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MAX, float>(&ColumnFloat::maximum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, resultcount, start, end, limit);
 }
 double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MAX, double>(&ColumnDouble::maximum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, resultcount, start, end, limit);
 }
 
 // Minimum
 
 int64_t Query::minimum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MIN, int64_t>(&Column::minimum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, resultcount, start, end, limit);
 }
 float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MIN, float>(&ColumnFloat::minimum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx, resultcount, start, end, limit);
 }
 double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<TDB_MIN, double>(&ColumnDouble::minimum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, resultcount, start, end, limit);
 }
 
 // Average
@@ -352,7 +352,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     size_t resultcount2 = 0;
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::sum_type SumType;
-    const SumType sum1 = aggregate<TDB_SUM, T>(&ColType::sum, column_ndx, &resultcount2, start, end, limit);
+    const SumType sum1 = aggregate<act_Sum, T>(&ColType::sum, column_ndx, &resultcount2, start, end, limit);
     double avg1 = 0;
     if (resultcount2 != 0)
         avg1 = static_cast<double>(sum1) / resultcount2;
@@ -409,12 +409,12 @@ Query& Query::end_group()
 
 Query& Query::Or()
 {
-    ParentNode* const o = new OR_NODE(first[first.size()-1]);
+    ParentNode* const o = new OrNode(first[first.size()-1]);
     all_nodes.push_back(o);
 
     first[first.size()-1] = o;
-    update[update.size()-1] = &((OR_NODE*)o)->m_cond[1];
-    update_override[update_override.size()-1] = &((OR_NODE*)o)->m_child;
+    update[update.size()-1] = &((OrNode*)o)->m_cond[1];
+    update_override[update_override.size()-1] = &((OrNode*)o)->m_child;
     return *this;
 }
 
@@ -471,8 +471,8 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     // Use single threading
     TableView tv(*m_table);
     QueryState<int64_t> st;
-    st.init(TDB_FINDALL, &tv.get_ref_column(), limit);
-    first[0]->aggregate<TDB_FINDALL, int64_t, int64_t>(&st, start, end, not_found, NULL);
+    st.init(act_FindAll, &tv.get_ref_column(), limit);
+    first[0]->aggregate<act_FindAll, int64_t, int64_t>(&st, start, end, not_found, NULL);
     return move(tv);
 }
 
@@ -489,8 +489,8 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 
     Init(*m_table);
     QueryState<int64_t> st;
-    st.init(TDB_COUNT, NULL, limit);
-    int64_t r = first[0]->aggregate<TDB_COUNT, int64_t, int64_t>(&st, start, end, not_found, NULL);
+    st.init(act_Count, NULL, limit);
+    int64_t r = first[0]->aggregate<act_Count, int64_t, int64_t>(&st, start, end, not_found, NULL);
     return size_t(r);
 }
 
@@ -658,9 +658,9 @@ bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, siz
 
 void* Query::query_thread(void* arg)
 {
-    (void)arg;
+    static_cast<void>(arg);
 #if MULTITHREAD
-    thread_state* ts = (thread_state*)arg;
+    thread_state* ts = static_cast<thread_state*>(arg);
 
     std::vector<size_t> res;
     std::vector<std::pair<size_t, size_t> > chunks;
@@ -677,7 +677,7 @@ void* Query::query_thread(void* arg)
             pthread_mutex_lock(&ts->jobs_mutex);
             if (ts->next_job == ts->end_job)
                 break;
-            const size_t chunk = MIN(ts->end_job - ts->next_job, THREAD_CHUNK_SIZE);
+            const size_t chunk = min(ts->end_job - ts->next_job, thread_chunk_size);
             const size_t mine = ts->next_job;
             ts->next_job += chunk;
             size_t r = mine - 1;

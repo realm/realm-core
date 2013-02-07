@@ -9,8 +9,8 @@
 namespace tightdb {
 
 ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(COLUMN_HASREFS, parent, pndx, alloc),
-    m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc)
+    Array(coldef_HasRefs, parent, pndx, alloc),
+    m_offsets(coldef_Normal, NULL, 0, alloc), m_blob(NULL, 0, alloc)
 {
     // Add subarrays for long string
     Array::add(m_offsets.GetRef());

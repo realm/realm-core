@@ -142,8 +142,8 @@ inline size_t Spec::create_empty_spec(Allocator& alloc)
 {
     // The 'spec_set' contains the specification (types and names) of
     // all columns and sub-tables
-    Array spec_set(COLUMN_HASREFS, 0, 0, alloc);
-    spec_set.add(Array::create_empty_array(COLUMN_NORMAL, alloc)); // One type for each column
+    Array spec_set(coldef_HasRefs, 0, 0, alloc);
+    spec_set.add(Array::create_empty_array(coldef_Normal, alloc)); // One type for each column
     spec_set.add(ArrayString::create_empty_string_array(alloc)); // One name for each column
     return spec_set.GetRef();
 }

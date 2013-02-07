@@ -101,7 +101,7 @@ public:
 
     // Conditions: binary data
     // Only BinaryData prototype can exist, else it would conflict with equal() for strings
-    Query& equal(size_t column_ndx, BinaryData value);
+    Query& equal(size_t column_ndx, BinaryData);
 /*
     Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
     Query& begins_with_binary(size_t column_ndx, const char* ptr, size_t len);
@@ -202,15 +202,15 @@ protected:
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
     mutable bool do_delete;
-    
+
 private:
     size_t m_threadcount;
 
     template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
-    template<typename T> 
+    template<typename T>
         double average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
-    template <ACTION action, typename T, typename R, class ColClass>
-        R aggregate(R (ColClass::*method)(size_t, size_t) const, 
+    template <Action action, typename T, typename R, class ColClass>
+        R aggregate(R (ColClass::*method)(size_t, size_t) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
 
 };

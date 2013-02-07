@@ -27,7 +27,7 @@ namespace tightdb {
 
 // Predeclarations from query_engine.hpp
 class ParentNode;
-template<class T, class F> class BASICNODE;
+template<class T, class F> class BasicNode;
 template<class T> class SequentialGetter;
 
 
@@ -50,18 +50,18 @@ BasicColumn<T>::BasicColumn(size_t ref, ArrayParent* parent, size_t pndx, Alloca
 template<typename T>
 BasicColumn<T>::~BasicColumn()
 {
-    if (IsNode()) 
+    if (IsNode())
         delete m_array;
-    else 
+    else
         delete static_cast<BasicArray<T>*>(m_array);
 }
 
 template<typename T>
 void BasicColumn<T>::Destroy()
 {
-    if (IsNode()) 
+    if (IsNode())
         m_array->Destroy();
-    else 
+    else
         static_cast<BasicArray<T>*>(m_array)->Destroy();
 }
 
@@ -71,7 +71,7 @@ void BasicColumn<T>::UpdateRef(size_t ref)
 {
     TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->GetAllocator())); // Can only be called when creating node
 
-    if (IsNode()) 
+    if (IsNode())
         m_array->UpdateRef(ref);
     else {
         ArrayParent* const parent = m_array->GetParent();
@@ -83,7 +83,7 @@ void BasicColumn<T>::UpdateRef(size_t ref)
         m_array = array;
 
         // Update ref in parent
-        if (parent) 
+        if (parent)
             parent->update_child_ref(pndx, ref);
     }
 }
@@ -122,7 +122,7 @@ void BasicColumn<T>::Clear()
 
         // Revert to generic array
         BasicArray<T>* array = new BasicArray<T>(parent, pndx, m_array->GetAllocator());
-        if (parent) 
+        if (parent)
             parent->update_child_ref(pndx, array->GetRef());
 
         // Remove original node
@@ -131,7 +131,7 @@ void BasicColumn<T>::Clear()
 
         m_array = array;
     }
-    else 
+    else
         static_cast<BasicArray<T>*>(m_array)->Clear();
 }
 
@@ -191,12 +191,12 @@ template<typename T>
 bool BasicColumn<T>::Compare(const BasicColumn& c) const
 {
     const size_t n = Size();
-    if (c.Size() != n) 
+    if (c.Size() != n)
         return false;
     for (size_t i=0; i<n; ++i) {
         const T v1 = Get(i);
         const T v2 = c.Get(i);
-        if (v1 == v2) 
+        if (v1 == v2)
             return false;
     }
     return true;
@@ -267,7 +267,7 @@ size_t BasicColumn<T>::find_first(T value, size_t start, size_t end) const
 {
     TIGHTDB_ASSERT(value);
 
-    return TreeFind<T, BasicColumn<T>, EQUAL>(value, start, end);
+    return TreeFind<T, BasicColumn<T>, Equal>(value, start, end);
 }
 
 template<typename T>
@@ -284,13 +284,13 @@ void BasicColumn<T>::find_all(Array &result, T value, size_t start, size_t end) 
 template<typename T>
 size_t BasicColumn<T>::count(T target) const
 {
-    return size_t(ColumnBase::aggregate<T, int64_t, TDB_COUNT, EQUAL>(target, 0, Size(), NULL));
+    return size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, Size(), NULL));
 }
 
 template<typename T>
 typename BasicColumn<T>::SumType BasicColumn<T>::sum(size_t start, size_t end) const
 {
-    return ColumnBase::aggregate<T, SumType, TDB_SUM, NONE>(0, start, end, NULL);
+    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, NULL);
 }
 
 template<typename T>
@@ -299,21 +299,21 @@ double BasicColumn<T>::average(size_t start, size_t end) const
     if (end == size_t(-1))
         end = Size();
     size_t size = end - start;
-    double sum1 = ColumnBase::aggregate<T, SumType, TDB_SUM, NONE>(0, start, end, NULL);
-    double avg = sum1 / ( size == 0 ? 1 : size ); 
+    double sum1 = ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, NULL);
+    double avg = sum1 / ( size == 0 ? 1 : size );
     return avg;
 }
 
 template<typename T>
 T BasicColumn<T>::minimum(size_t start, size_t end) const
 {
-    return ColumnBase::aggregate<T, T, TDB_MIN, NONE>(0, start, end, NULL);
+    return ColumnBase::aggregate<T, T, act_Min, None>(0, start, end, NULL);
 }
 
 template<typename T>
 T BasicColumn<T>::maximum(size_t start, size_t end) const
 {
-    return ColumnBase::aggregate<T, T, TDB_MAX, NONE>(0, start, end, NULL);
+    return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, NULL);
 }
 
 /*
@@ -334,15 +334,15 @@ template<typename T>
 size_t BasicColumn<T>::count(T target) const
 {
     size_t count = 0;
-    
+
     if (m_array->IsNode()) {
         const Array refs = NodeGetRefs();
         const size_t n = refs.Size();
-        
+
         for (size_t i = 0; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
             const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
-            
+
             count += col.count(target);
         }
     }
@@ -359,15 +359,15 @@ T BasicColumn<T>::sum(size_t start, size_t end) const
         end = Size();
 
     double sum = 0;
-    
+
     if (m_array->IsNode()) {
         const Array refs = NodeGetRefs();
         const size_t n = refs.Size();
-        
+
         for (size_t i = start; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
             const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
-            
+
             sum += col.sum(start, end);
         }
     }
@@ -400,7 +400,7 @@ T BasicColumn<T>::minimum(size_t start, size_t end) const
     if (m_array->IsNode()) {
         const Array refs = NodeGetRefs();
         const size_t n = refs.Size();
-        
+
         for (size_t i = start; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
             const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
@@ -429,7 +429,7 @@ T BasicColumn<T>::maximum(size_t start, size_t end) const
     if (m_array->IsNode()) {
         const Array refs = NodeGetRefs();
         const size_t n = refs.Size();
-        
+
         for (size_t i = start; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
             const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());

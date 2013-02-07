@@ -120,7 +120,7 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 // Create a new memory structure and attach this group instance to it.
 void Group::create()
 {
-    m_tables.SetType(COLUMN_HASREFS); // FIXME: Why is this not done in Group() like the rest of the arrays?
+    m_tables.SetType(coldef_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
 
     m_top.add(m_tableNames.GetRef());
     m_top.add(m_tables.GetRef());
@@ -144,13 +144,13 @@ void Group::create_from_ref(size_t top_ref)
 {
     // Instantiate top arrays
     if (top_ref == 0) {
-        m_top.SetType(COLUMN_HASREFS);
-        m_tables.SetType(COLUMN_HASREFS);
-        m_tableNames.SetType(COLUMN_NORMAL);
-        m_freePositions.SetType(COLUMN_NORMAL);
-        m_freeLengths.SetType(COLUMN_NORMAL);
+        m_top.SetType(coldef_HasRefs);
+        m_tables.SetType(coldef_HasRefs);
+        m_tableNames.SetType(coldef_Normal);
+        m_freePositions.SetType(coldef_Normal);
+        m_freeLengths.SetType(coldef_Normal);
         if (m_is_shared) {
-            m_freeVersions.SetType(COLUMN_NORMAL);
+            m_freeVersions.SetType(coldef_Normal);
         }
 
         create();
@@ -208,8 +208,8 @@ void Group::init_shared()
         // Serialized files have no free space tracking
         // at all so we have to add the basic free lists
         if (m_top.Size() == 2) {
-            m_freePositions.SetType(COLUMN_NORMAL);
-            m_freeLengths.SetType(COLUMN_NORMAL);
+            m_freePositions.SetType(coldef_Normal);
+            m_freeLengths.SetType(coldef_Normal);
             m_top.add(m_freePositions.GetRef());
             m_top.add(m_freeLengths.GetRef());
             m_freePositions.SetParent(&m_top, 2);
@@ -220,7 +220,7 @@ void Group::init_shared()
         // mode do not have version tracking for the free lists
         if (m_top.Size() == 4) {
             const size_t count = m_freePositions.Size();
-            m_freeVersions.SetType(COLUMN_NORMAL);
+            m_freeVersions.SetType(coldef_Normal);
             for (size_t i = 0; i < count; ++i) {
                 m_freeVersions.add(0);
             }
