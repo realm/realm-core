@@ -44,7 +44,7 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXC
     // size from it. Maybe it is faster in general to check for the
     // the presence of the cached object and use it when available.
     TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
+    if (m_types->Get(row_idx) != type_Table) return 0;
     const size_t top_ref = m_refs->GetAsRef(row_idx);
     const size_t columns_ref = Array(top_ref, 0, 0, m_refs->GetAllocator()).GetAsRef(1);
     const Array columns(columns_ref, 0, 0, m_refs->GetAllocator());
@@ -56,7 +56,7 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXC
 inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
 {
     TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) 
+    if (m_types->Get(row_idx) != type_Table) 
         return 0;
     return m_refs->get_subtable_ptr(row_idx);
 }

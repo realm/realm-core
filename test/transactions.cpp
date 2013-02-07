@@ -226,7 +226,7 @@ void round(SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #14
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable;
-        if (table[1].theta.get_type() == COLUMN_TYPE_TABLE) {
+        if (table[1].theta.get_type() == type_Table) {
             subtable = table[1].theta.get_subtable<MyTable>();
         }
         else {
@@ -266,7 +266,7 @@ void round(SharedGroup& db, int index)
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable = table[1].theta.get_subtable<MyTable>();
         MyTable::Ref subsubtable;
-        if (subtable[0].theta.get_type() == COLUMN_TYPE_TABLE) {
+        if (subtable[0].theta.get_type() == type_Table) {
             subsubtable = subtable[0].theta.get_subtable<MyTable>();
         }
         else {
@@ -291,7 +291,7 @@ void round(SharedGroup& db, int index)
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable = table[1].theta.get_subtable<MyTable>();
         MySubtable::Ref subsubtable;
-        if (subtable[1].theta.get_type() == COLUMN_TYPE_TABLE) {
+        if (subtable[1].theta.get_type() == type_Table) {
             subsubtable = subtable[1].theta.get_subtable<MySubtable>();
         }
         else {
@@ -329,7 +329,7 @@ void round(SharedGroup& db, int index)
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable = table[1].theta.get_subtable<MyTable>();
         MySubsubtable::Ref subsubtable;
-        if (subtable[2].theta.get_type() == COLUMN_TYPE_TABLE) {
+        if (subtable[2].theta.get_type() == type_Table) {
             subsubtable = subtable[2].theta.get_subtable<MySubsubtable>();
         }
         else {
@@ -349,7 +349,7 @@ void round(SharedGroup& db, int index)
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MyTable::Ref subtable = table[1].theta.get_subtable<MyTable>();
         MySubsubtable::Ref subsubtable;
-        if (subtable[3].theta.get_type() == COLUMN_TYPE_TABLE) {
+        if (subtable[3].theta.get_type() == type_Table) {
             subsubtable = subtable[3].theta.get_subtable<MySubsubtable>();
         }
         else {
@@ -493,7 +493,7 @@ TEST(Transactions)
             CHECK_EQUAL(BinaryData(0,0), subtable[i].zeta);
             CHECK_EQUAL(0u,              subtable[i].eta->size());
             if (4 <= i) {
-                CHECK_EQUAL(COLUMN_TYPE_INT, subtable[i].theta.get_type());
+                CHECK_EQUAL(type_Int, subtable[i].theta.get_type());
             }
         }
         CHECK_EQUAL(size_t(num_threads*num_rounds*5),

@@ -617,11 +617,11 @@ TEST(TestQuerySubtable)
 
     // Create specification with sub-table
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_INT,    "first");
-    s.add_column(COLUMN_TYPE_STRING, "second");
+    s.add_column(type_Int,    "first");
+    s.add_column(type_String, "second");
     Spec sub = s.add_subtable_column("third");
-        sub.add_column(COLUMN_TYPE_INT,    "sub_first");
-        sub.add_column(COLUMN_TYPE_STRING, "sub_second");
+        sub.add_column(type_Int,    "sub_first");
+        sub.add_column(type_String, "sub_second");
     table->update_from_spec();
 
     CHECK_EQUAL(3, table->get_column_count());
@@ -826,7 +826,7 @@ TEST(TestQuerySort_Descending)
 TEST(TestQuerySort_Dates)
 {
     Table table;
-    table.add_column(COLUMN_TYPE_DATE, "first");
+    table.add_column(type_Date, "first");
 
     table.insert_date(0, 0, 1000);
     table.insert_done();
@@ -853,7 +853,7 @@ TEST(TestQuerySort_Dates)
 TEST(TestQuerySort_Bools)
 {
     Table table;
-    table.add_column(COLUMN_TYPE_BOOL, "first");
+    table.add_column(type_Bool, "first");
 
     table.insert_bool(0, 0, true);
     table.insert_done();

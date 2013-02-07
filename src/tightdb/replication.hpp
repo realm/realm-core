@@ -472,29 +472,29 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
     buf = encode_int(buf, ndx);
     buf = encode_int(buf, int(value.get_type()));
     switch (value.get_type()) {
-    case COLUMN_TYPE_INT:
+    case type_Int:
         buf = encode_int(buf, value.get_int());
         transact_log_advance(buf);
         break;
-    case COLUMN_TYPE_BOOL:
+    case type_Bool:
         buf = encode_int(buf, int(value.get_bool()));
         transact_log_advance(buf);
         break;
-    case COLUMN_TYPE_FLOAT:
+    case type_Float:
         TIGHTDB_ASSERT(false);  // FIXME: IMPLEMENT
         //buf = encode_float(buf, value.get_float()));
         transact_log_advance(buf);
         break;
-    case COLUMN_TYPE_DOUBLE:
+    case type_Double:
         TIGHTDB_ASSERT(false);  // FIXME: IMPLEMENT
         //buf = encode_double(buf, value.get_double()));
         transact_log_advance(buf);
         break;
-    case COLUMN_TYPE_DATE:
+    case type_Date:
         buf = encode_int(buf, value.get_date());
         transact_log_advance(buf);
         break;
-    case COLUMN_TYPE_STRING:
+    case type_String:
         {
             const char* data = value.get_string();
             std::size_t size = std::strlen(data);
@@ -503,7 +503,7 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
             transact_log_append(data, size); // Throws
         }
         break;
-    case COLUMN_TYPE_BINARY:
+    case type_Binary:
         {
             BinaryData data = value.get_binary();
             buf = encode_int(buf, data.len);
@@ -511,7 +511,7 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
             transact_log_append(data.pointer, data.len); // Throws
         }
         break;
-    case COLUMN_TYPE_TABLE:
+    case type_Table:
         transact_log_advance(buf);
         break;
     default:

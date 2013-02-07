@@ -154,7 +154,7 @@ TEST(Transactions_Stress1)
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
         Spec& spec = table->get_spec();
-        spec.add_column(COLUMN_TYPE_INT, "row");
+        spec.add_column(type_Int, "row");
         table->update_from_spec();
         table->insert_empty_row(0, 1);
         table->set_int(0, 0, 0);
@@ -315,7 +315,7 @@ TEST(Transactions_Stress3)
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
         Spec& spec = table->get_spec();
-        spec.add_column(COLUMN_TYPE_INT, "row");
+        spec.add_column(type_Int, "row");
         table->update_from_spec();
         wt.commit();
     }
@@ -412,7 +412,7 @@ TEST(Transactions_Stress4)
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
         Spec& spec = table->get_spec();
-        spec.add_column(COLUMN_TYPE_INT, "row");
+        spec.add_column(type_Int, "row");
         table->update_from_spec();
         table->insert_empty_row(0, 1);
         table->set_int(0, 0, 0);
