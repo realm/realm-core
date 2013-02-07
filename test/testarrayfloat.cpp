@@ -49,6 +49,7 @@ void BasicArray_AddGet(T val[], size_t valLen)
 
     f.Clear();
     CHECK_EQUAL(0, f.Size());
+
     f.Destroy();    // cleanup
 }
 TEST(ArrayFloat_AddGet) { BasicArray_AddGet<ArrayFloat, float>(floatVal, floatValLen); }
@@ -73,6 +74,7 @@ void BasicArray_AddManyValues()
 
     f.Clear();
     CHECK_EQUAL(0, f.Size());
+
     f.Destroy();    // cleanup
 }
 TEST(ArrayFloat_AddManyValues) { BasicArray_AddManyValues<ArrayFloat, float>(); }
@@ -113,6 +115,7 @@ void BasicArray_Delete()
     f.Delete(0);
     CHECK_EQUAL(0, f.Size());
     CHECK(f.is_empty());
+
     f.Destroy();    // cleanup
 }
 TEST(ArrayFloat_Delete) { BasicArray_Delete<ArrayFloat, float>(); }
@@ -137,6 +140,7 @@ void BasicArray_Set(T val[], size_t valLen)
     CHECK_EQUAL(val[2], f.Get(2));
     CHECK_EQUAL(val[4], f.Get(4));
     CHECK_EQUAL(valLen, f.Size());
+
     f.Destroy();    // cleanup
 }
 TEST(ArrayFloat_Set) { BasicArray_Set<ArrayFloat, float>(floatVal, floatValLen); }
@@ -177,6 +181,7 @@ void BasicArray_Insert()
     CHECK_EQUAL(v0, f.Get(2));
     CHECK_EQUAL(v3, f.Get(3));
     CHECK_EQUAL(4, f.Size());
+
     f.Destroy();    // cleanup
 }
 TEST(ArrayFloat_Insert) { BasicArray_Insert<ArrayFloat, float>(); }
@@ -242,6 +247,7 @@ void BasicArray_Minimum()
     // first match in range
     CHECK_EQUAL(true, f.minimum(res, 3, size_t(-1)));
     CHECK_EQUAL(values[4], res);
+
     f.Destroy();    // cleanup
 }
 TEST(ArrayFloat_Minimum) { BasicArray_Minimum<ArrayFloat, float>(); }
@@ -277,6 +283,7 @@ void BasicArray_Maximum()
     // first match in range
     CHECK_EQUAL(true, f.maximum(res, 3, size_t(-1)));
     CHECK_EQUAL(values[3], res);
+
     f.Destroy();    // cleanup
 }
 TEST(ArrayFloat_Maximum) { BasicArray_Maximum<ArrayFloat, float>(); }
@@ -323,6 +330,8 @@ void BasicArray_Find()
     resArr.Clear();
     f.find_all(resArr, T(1.1), 0, 1, 4);
     CHECK_EQUAL(0, resArr.Size());
+    resArr.Destroy();
+
     f.Destroy();    // cleanup
 }
 TEST(ArrayFloat_Find) { BasicArray_Find<ArrayFloat, float>(); }
@@ -358,6 +367,7 @@ void BasicArray_Count()
     CHECK_EQUAL(0, f.count(T(-1.0), 3, 4));
     CHECK_EQUAL(1, f.count(T(-1.0), 2, 4));
     CHECK_EQUAL(1, f.count(T(-1.0), 1));
+
     f.Destroy();    // cleanup
 }
 TEST(ArrayFloat_Count) { BasicArray_Count<ArrayFloat, float>(); }
@@ -386,8 +396,9 @@ void BasicArray_Compare()
 
     f2.Delete(0);
     CHECK_EQUAL(true, f1.Compare(f2));
+
     f1.Destroy();    // cleanup
-    f2.Destroy();    // cleanup
+    f2.Destroy();
 }
 TEST(ArrayFloat_Compare) { BasicArray_Compare<ArrayFloat, float>(); }
 TEST(ArrayDouble_Compare){ BasicArray_Compare<ArrayDouble, double>(); }
