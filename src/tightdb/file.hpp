@@ -242,8 +242,8 @@ public:
     /// in the meantime. Failing to adhere to these rules will result
     /// in undefined behavior.
     ///
-    /// IMPORTANT: If this operation fails, the old address range will
-    /// have been unmapped.
+    /// If this method throws, the old address range will remain
+    /// mapped.
     void* remap(void* old_addr, std::size_t old_size, AccessMode a, std::size_t new_size,
                 int map_flags = 0) const;
 
@@ -269,6 +269,9 @@ public:
 
     // FIXME: Can we get rid of this one please!!!
     bool is_deleted() const;
+
+    class ExclusiveLock;
+    class SharedLock;
 
     template<class> class Map;
 
@@ -321,6 +324,24 @@ private:
         void unmap() TIGHTDB_NOEXCEPT;
         void sync();
     };
+};
+
+
+
+class File::ExclusiveLock {
+public:
+    ExclusiveLock(File& f): m_file(f) { f.lock_exclusive(); }
+    ~ExclusiveLock() TIGHTDB_NOEXCEPT { m_file.unlock(); }
+private:
+    File& m_file;
+};
+
+class File::SharedLock {
+public:
+    SharedLock(File& f): m_file(f) { f.lock_shared(); }
+    ~SharedLock() TIGHTDB_NOEXCEPT { m_file.unlock(); }
+private:
+    File& m_file;
 };
 
 
@@ -536,9 +557,7 @@ inline void File::MapBase::remap(const File& f, AccessMode a, std::size_t size, 
 {
     TIGHTDB_ASSERT(m_addr);
 
-    void* addr = m_addr;
-    m_addr = 0; // Because if File::remap fails, the old mapping will have been destroyed
-    m_addr = f.remap(addr, m_size, a, size, map_flags);
+    m_addr = f.remap(m_addr, m_size, a, size, map_flags);
     m_size = size;
 }
 

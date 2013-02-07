@@ -222,17 +222,14 @@ protected:
     void update_from_shared(size_t top_ref, size_t len);
     void reset_to_new();
 
-    // Overriding virtual method in ArrayParent
-    void update_child_ref(size_t subtable_ndx, size_t new_ref)
+    void update_child_ref(size_t subtable_ndx, size_t new_ref) TIGHTDB_OVERRIDE
     {
         m_tables.Set(subtable_ndx, new_ref);
     }
 
-    // Overriding virtual method in Table::Parent
-    void child_destroyed(std::size_t) {} // Ignore
+    void child_destroyed(std::size_t) TIGHTDB_OVERRIDE {} // Ignore
 
-    // Overriding virtual method in ArrayParent
-    size_t get_child_ref(size_t subtable_ndx) const
+    size_t get_child_ref(size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         return m_tables.GetAsRef(subtable_ndx);
     }
@@ -265,9 +262,9 @@ private:
     template<class T> T* get_table_ptr(const char* name);
     template<class T> const T* get_table_ptr(const char* name) const;
 
-    Table* get_table_ptr(size_t ndx); // Throws
-    const Table* get_table_ptr(size_t ndx) const; // Throws
-    Table* create_new_table(const char* name); // Throws
+    Table* get_table_ptr(size_t ndx);
+    const Table* get_table_ptr(size_t ndx) const;
+    Table* create_new_table(const char* name);
 
     void clear_cache();
 
@@ -284,12 +281,20 @@ private:
 
 // Implementation
 
+// FIXME: Successfully constructed arrays are leaked if one array
+// constructor fails. The core problem here and in many other places
+// is that ~Array() does not deallocate memory. More generally, the
+// fact that the Array class violates the RAII idiom in multiple ways,
+// coupled with the fact that we still use it in ways that involves
+// ownership of the underlying memory, causes lots of problems with
+// robustness both here and in other places.
 inline Group::Group():
     m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
     m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc),
     m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc),
     m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_is_shared(false)
 {
+    // FIXME: Arrays are leaked when create() throws
     create();
 }
 
@@ -297,14 +302,32 @@ inline Group::Group(const std::string& file, OpenMode mode):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
 {
-    open(file, mode);
+    // FIXME: The try-cache is required because of the unfortunate
+    // fact that Array violates the RAII idiom while still being used
+    // to own memory. We must find a way to improve Array.
+    try {
+        open(file, mode); // Throws
+    }
+    catch (...) {
+        m_cachedtables.Destroy();
+        throw;
+    }
 }
 
 inline Group::Group(BufferSpec buffer, bool take_ownership):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
 {
-    open(buffer, take_ownership);
+    // FIXME: The try-cache is required because of the unfortunate
+    // fact that Array violates the RAII idiom while still being used
+    // to own memory. We must find a way to improve Array.
+    try {
+        open(buffer, take_ownership); // Throws
+    }
+    catch (...) {
+        m_cachedtables.Destroy();
+        throw;
+    }
 }
 
 inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:

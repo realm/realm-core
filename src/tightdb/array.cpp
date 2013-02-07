@@ -161,7 +161,7 @@ void Array::SetType(ColumnDef type)
         m_width = size_t(-1);
     }
 
-    if (m_ref) CopyOnWrite();
+    if (m_ref) CopyOnWrite(); // Throws
 
     bool is_node = false, has_refs = false;
     if (type == COLUMN_NODE) is_node = has_refs = true;
@@ -192,7 +192,7 @@ void Array::UpdateRef(size_t ref)
     update_ref_in_parent();
 }
 
-bool Array::UpdateFromParent()
+bool Array::UpdateFromParent() TIGHTDB_NOEXCEPT
 {
     if (!m_parent) return false;
 
@@ -245,7 +245,7 @@ void Array::Preset(size_t bitwidth, size_t count)
 {
     Clear();
     SetWidth(bitwidth);
-    TIGHTDB_ASSERT(Alloc(count, bitwidth));
+    Alloc(count, bitwidth); // Throws
     m_len = count;
     for (size_t n = 0; n < count; n++)
         Set(n, 0);
@@ -291,7 +291,7 @@ void Array::Destroy()
 
 void Array::Clear()
 {
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Make sure we don't have any dangling references
     if (m_hasRefs) {
@@ -319,7 +319,7 @@ void Array::Delete(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Move values below deletion up
     if (m_width < 8) {
@@ -332,8 +332,11 @@ void Array::Delete(size_t ndx)
         // when byte sized, use memmove
 // FIXME: Should probably be optimized as a simple division by 8.
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        unsigned char* const dst = m_data + w*ndx;
-        copy(dst+w, m_data + w*m_len, dst);
+        char* const base = reinterpret_cast<char*>(m_data);
+        char* const dst_begin = base + ndx*w;
+        const char* const src_begin = dst_begin + w;
+        const char* const src_end   = base + m_len*w;
+        copy(src_begin, src_end, dst_begin);
     }
 
     // Update length (also in header)
@@ -378,13 +381,12 @@ size_t Array::GetAsSizeT(size_t ndx) const TIGHTDB_NOEXCEPT
     return to_size_t(v);
 }
 
-bool Array::Set(size_t ndx, int64_t value)
+void Array::Set(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) 
-        return false;
+    CopyOnWrite(); // Throws
 
     // Make room for the new value
     size_t width = m_width;
@@ -395,8 +397,7 @@ bool Array::Set(size_t ndx, int64_t value)
     const bool doExpand = (width > m_width);
     if (doExpand) {
         Getter oldGetter = m_getter;    // Save old getter before width expansion
-        if (!Alloc(m_len, width)) 
-            return false;
+        Alloc(m_len, width); // Throws
         SetWidth(width);
 
         // Expand the old values
@@ -409,13 +410,12 @@ bool Array::Set(size_t ndx, int64_t value)
 
     // Set the value
     (this->*m_setter)(ndx, value);
-
-    return true;
 }
 
+/*
 // Optimization for the common case of adding positive values to a local array 
 // (happens a lot when returning results to TableViews)
-bool Array::AddPositiveLocal(int64_t value)
+void Array::AddPositiveLocal(int64_t value)
 {
     TIGHTDB_ASSERT(value >= 0);
     TIGHTDB_ASSERT(&m_alloc == &Allocator::get_default());
@@ -425,20 +425,20 @@ bool Array::AddPositiveLocal(int64_t value)
             (this->*m_setter)(m_len, value);
             ++m_len;
             set_header_len(m_len);
-            return true;
+            return;
         }
     }
 
-    return Insert(m_len, value);
+    Insert(m_len, value);
 }
+*/
 
-bool Array::Insert(size_t ndx, int64_t value)
+void Array::Insert(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) 
-        return false;
+    CopyOnWrite(); // Throws
 
     // Make room for the new value
     size_t width = m_width;
@@ -450,19 +450,17 @@ bool Array::Insert(size_t ndx, int64_t value)
 
     const bool doExpand = (width > m_width);
     if (doExpand) {
-        if (!Alloc(m_len+1, width)) 
-            return false;
+        Alloc(m_len+1, width); // Throws
         SetWidth(width);
     }
     else {
-        if (!Alloc(m_len+1, m_width)) 
-            return false;
+        Alloc(m_len+1, m_width); // Throws
     }
 
     // Move values below insertion (may expand)
     if (doExpand || m_width < 8) {
-        int k = (int)m_len;
-        while (--k >= (int)ndx) {
+        int k = int(m_len);
+        while (--k >= int(ndx)) {
             const int64_t v = (this->*oldGetter)(k);
             (this->*m_setter)(k+1, v);
         }
@@ -471,11 +469,11 @@ bool Array::Insert(size_t ndx, int64_t value)
         // when byte sized and no expansion, use memmove
 // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        unsigned char* src = m_data + (ndx * w);
-        unsigned char* dst = src + w;
-        const size_t count = (m_len - ndx) * w;
-// FIXME: Use std::copy() or std::copy_backward() instead.
-        memmove(dst, src, count);
+        char* const base = reinterpret_cast<char*>(m_data);
+        char* const src_begin = base + ndx*w;
+        char* const src_end   = base + m_len*w;
+        char* const dst_end   = src_end + w;
+        copy_backward(src_begin, src_end, dst_end);
     }
 
     // Insert the new value
@@ -483,7 +481,7 @@ bool Array::Insert(size_t ndx, int64_t value)
 
     // Expand values above insertion
     if (doExpand) {
-        int k = (int)ndx;
+        int k = int(ndx);
         while (--k >= 0) {
             const int64_t v = (this->*oldGetter)(k);
             (this->*m_setter)(k, v);
@@ -493,21 +491,19 @@ bool Array::Insert(size_t ndx, int64_t value)
     // Update length
     // (no need to do it in header as it has been done by Alloc)
     ++m_len;
-
-    return true;
 }
 
 
-bool Array::add(int64_t value)
+void Array::add(int64_t value)
 {
-    return Insert(m_len, value);
+    Insert(m_len, value);
 }
 
 void Array::Resize(size_t count)
 {
     TIGHTDB_ASSERT(count <= m_len);
 
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Update length (also in header)
     m_len = count;
@@ -516,7 +512,7 @@ void Array::Resize(size_t count)
 
 void Array::SetAllToZero()
 {
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     m_capacity = CalcItemCount(get_header_capacity(), 0);
     SetWidth(0);
@@ -525,7 +521,7 @@ void Array::SetAllToZero()
     set_header_width(0);
 }
 
-bool Array::Increment(int64_t value, size_t start, size_t end)
+void Array::Increment(int64_t value, size_t start, size_t end)
 {
     if (end == (size_t)-1) end = m_len;
     TIGHTDB_ASSERT(start < m_len);
@@ -535,18 +531,16 @@ bool Array::Increment(int64_t value, size_t start, size_t end)
     for (size_t i = start; i < end; ++i) {
         Set(i, Get(i) + value);
     }
-    return true;
 }
 
-bool Array::IncrementIf(int64_t limit, int64_t value)
+void Array::IncrementIf(int64_t limit, int64_t value)
 {
     // Update (incr or decrement) values bigger or equal to the limit
     for (size_t i = 0; i < m_len; ++i) {
         const int64_t v = Get(i);
-        if (v >= limit) 
+        if (v >= limit)
             Set(i, v + value);
     }
-    return true;
 }
 
 void Array::Adjust(size_t start, int64_t diff)
@@ -1266,7 +1260,7 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
     return total_bits / width;
 }
 
-bool Array::Copy(const Array& a)
+void Array::Copy(const Array& a)
 {
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t len = CalcByteLen(a.m_len, a.m_width);
@@ -1275,9 +1269,11 @@ bool Array::Copy(const Array& a)
     const size_t new_len = len + 64;
 
     // Create new copy of array
-    const MemRef mref = m_alloc.Alloc(new_len);
-    if (!mref.pointer) return false;
-    memcpy(mref.pointer, a.m_data-8, len);
+    const MemRef mref = m_alloc.Alloc(new_len); // Throws
+    const unsigned char* const src_begin = a.m_data - 8;
+    const unsigned char* const src_end   = src_begin + len;
+    unsigned char*       const dst_begin = static_cast<unsigned char*>(mref.pointer);
+    copy(src_begin, src_end, dst_begin);
 
     // Clear old contents
     Destroy();
@@ -1305,13 +1301,11 @@ bool Array::Copy(const Array& a)
             cp.Copy(sub);
         }
     }
-
-    return true;
 }
 
-bool Array::CopyOnWrite()
+void Array::CopyOnWrite()
 {
-    if (!m_alloc.IsReadOnly(m_ref)) return true;
+    if (!m_alloc.IsReadOnly(m_ref)) return;
 
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t len = CalcByteLen(m_len, m_width);
@@ -1320,16 +1314,17 @@ bool Array::CopyOnWrite()
     const size_t new_len = len + 64;
 
     // Create new copy of array
-    const MemRef mref = m_alloc.Alloc(new_len);
-    if (!mref.pointer) return false;
-    memcpy(mref.pointer, m_data-8, len);
+    const MemRef mref = m_alloc.Alloc(new_len); // Throws
+    char* const old_begin = reinterpret_cast<char*>(m_data) - 8;
+    char* const old_end   = old_begin + len;
+    char* const new_begin = static_cast<char*>(mref.pointer);
+    copy(old_begin, old_end, new_begin);
 
     const size_t old_ref = m_ref;
-    void* const  old_ptr = m_data - 8;
 
     // Update internal data
     m_ref = mref.ref;
-    m_data = (unsigned char*)mref.pointer + 8;
+    m_data = static_cast<unsigned char*>(mref.pointer) + 8;
     m_capacity = CalcItemCount(new_len, m_width);
 
     // Update capacity in header
@@ -1339,9 +1334,7 @@ bool Array::CopyOnWrite()
 
     // Mark original as deleted, so that the space can be reclaimed in
     // future commits, when no versions are using it anymore
-    m_alloc.Free(old_ref, old_ptr);
-
-    return true;
+    m_alloc.Free(old_ref, old_begin);
 }
 
 
@@ -1354,9 +1347,7 @@ size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator
         has_refs = true;
 
     const size_t capacity = initial_capacity;
-    const MemRef mem_ref = alloc.Alloc(capacity);
-    if (!mem_ref.pointer) 
-        return 0;
+    const MemRef mem_ref = alloc.Alloc(capacity); // Throws
 
     init_header(mem_ref.pointer, is_node, has_refs, width_type, 0, 0, capacity);
 
@@ -1364,10 +1355,10 @@ size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator
 }
 
 
-bool Array::Alloc(size_t count, size_t width)
+void Array::Alloc(size_t count, size_t width)
 {
     if (count > m_capacity || width != m_width) {
-        const size_t needed_bytes = CalcByteLen(count, width);              
+        const size_t needed_bytes = CalcByteLen(count, width);
         size_t capacity_bytes     = m_capacity ? get_header_capacity() : 0; // space currently available in bytes
 
         if (needed_bytes > capacity_bytes) {
@@ -1384,14 +1375,12 @@ bool Array::Alloc(size_t count, size_t width)
             // Allocate and initialize header
             MemRef mem_ref;
             if (!m_data) {
-                mem_ref = m_alloc.Alloc(capacity_bytes);
-                if (!mem_ref.pointer) return false;
+                mem_ref = m_alloc.Alloc(capacity_bytes); // Throws
                 init_header(mem_ref.pointer, m_isNode, m_hasRefs, GetWidthType(),
                             width, count, capacity_bytes);
             }
             else {
-                mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, capacity_bytes);
-                if (!mem_ref.pointer) return false;
+                mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, capacity_bytes); // Throws
                 set_header_width(width, mem_ref.pointer);
                 set_header_len(count, mem_ref.pointer);
                 set_header_capacity(capacity_bytes, mem_ref.pointer);
@@ -1401,8 +1390,8 @@ bool Array::Alloc(size_t count, size_t width)
             m_ref      = mem_ref.ref;
             m_data     = reinterpret_cast<unsigned char*>(mem_ref.pointer) + 8;
             m_capacity = CalcItemCount(capacity_bytes, width);
-            update_ref_in_parent();
-            return true;
+            update_ref_in_parent(); // FIXME: Trouble when this one throws. We will then leave this array instance in a corrupt state
+            return;
         }
 
         m_capacity = CalcItemCount(capacity_bytes, width);
@@ -1411,8 +1400,6 @@ bool Array::Alloc(size_t count, size_t width)
 
     // Update header
     set_header_len(count);
-
-    return true;
 }
 
 

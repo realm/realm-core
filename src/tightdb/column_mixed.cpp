@@ -244,7 +244,6 @@ void ColumnMixed::set_binary(size_t ndx, const char* value, size_t len)
     }
 }
 
-
 bool ColumnMixed::Compare(const ColumnMixed& c) const
 {
     const size_t n = Size();

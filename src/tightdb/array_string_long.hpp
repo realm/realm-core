@@ -34,7 +34,7 @@ public:
     //ArrayStringLong(Allocator& alloc);
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
-    virtual size_t Size() const TIGHTDB_NOEXCEPT;
+    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(const char* value);

@@ -46,17 +46,17 @@ public:
 
     void Destroy();
 
-    virtual size_t Size() const TIGHTDB_NOEXCEPT;
+    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     T Get(size_t ndx) const;
-    virtual bool add() {add(0); return true;}
-    bool add(T value);
-    bool Set(size_t ndx, T value);
-    virtual void insert(size_t ndx) { bool ok = Insert(ndx, 0); TIGHTDB_ASSERT(ok); (void)ok;}
-    bool Insert(size_t ndx, T value);
-    void Delete(size_t ndx);
-    void Clear();
+    void add() TIGHTDB_OVERRIDE { add(0); }
+    void add(T value);
+    void Set(size_t ndx, T value);
+    void insert(size_t ndx) TIGHTDB_OVERRIDE { Insert(ndx, 0); }
+    void Insert(size_t ndx, T value);
+    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
+    void Clear() TIGHTDB_OVERRIDE;
     void Resize(size_t ndx);
     void fill(size_t count);
 
@@ -71,13 +71,13 @@ public:
     void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
 
     // Index
-    bool HasIndex() const {return false;}
+    bool HasIndex() const TIGHTDB_OVERRIDE {return false;}
     void BuildIndex(Index&) {}
     void ClearIndex() {}
     size_t FindWithIndex(int64_t) const {return (size_t)-1;}
 
-    size_t GetRef() const {return m_array->GetRef();}
-    void SetParent(ArrayParent* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
+    size_t GetRef() const TIGHTDB_OVERRIDE {return m_array->GetRef();}
+    void SetParent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE {m_array->SetParent(parent, pndx);}
 
     /// Compare two columns for equality.
     bool Compare(const BasicColumn&) const;
@@ -92,8 +92,8 @@ protected:
     void UpdateRef(size_t ref);
 
     T LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
-    bool LeafSet(size_t ndx, T value);
-    bool LeafInsert(size_t ndx, T value);
+    void LeafSet(size_t ndx, T value);
+    void LeafInsert(size_t ndx, T value);
     void LeafDelete(size_t ndx);
 
     template<class F> size_t LeafFind(T value, size_t start, size_t end) const;

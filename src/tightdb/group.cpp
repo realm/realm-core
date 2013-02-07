@@ -315,46 +315,34 @@ Table* Group::get_table_ptr(size_t ndx)
     Table* table = reinterpret_cast<Table*>(m_cachedtables.Get(ndx));
     if (!table) {
         const size_t ref = m_tables.GetAsRef(ndx);
-        table = new (nothrow) Table(Table::RefCountTag(), m_alloc, ref, this, ndx);
-        if (!table) {
-        error:
-            throw_error(ERROR_OUT_OF_MEMORY);
-        }
-        table->bind_ref(); // The group has shared ownership
-        if (!m_cachedtables.Set(ndx, intptr_t(table))) { // FIXME: intptr_t is not guaranteed to exists, even in C++11
-            table->unbind_ref();
-            goto error;
-        }
+        Table::UnbindGuard t(new Table(Table::RefCountTag(), m_alloc, ref, this, ndx)); // Throws
+        t->bind_ref(); // Increase reference count to 1
+        m_cachedtables.Set(ndx, intptr_t(t.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
+        // This group shares ownership of the table, so leave
+        // reference count at 1.
+        table = t.release();
     }
     return table;
 }
 
 Table* Group::create_new_table(const char* name)
 {
-    const size_t ref = Table::create_empty_table(m_alloc);
-    if (!ref) {
-    error:
-        throw_error(ERROR_OUT_OF_MEMORY);
-    }
-    if (!m_tables.add(ref)) goto error;
-    if (!m_tableNames.add(name)) goto error;
-    Table* const table =
-        new (nothrow) Table(Table::RefCountTag(), m_alloc, ref, this, m_tables.Size()-1);
-    if (!table) goto error;
-    table->bind_ref(); // The group has shared ownership
-    if (!m_cachedtables.add(intptr_t(table))) { // FIXME: intptr_t is not guaranteed to exists, even in C++11
-        table->unbind_ref();
-        goto error;
-    }
+    const size_t ref = Table::create_empty_table(m_alloc); // Throws
+    m_tables.add(ref);
+    m_tableNames.add(name);
+    Table::UnbindGuard table(new Table(Table::RefCountTag(), m_alloc,
+                                       ref, this, m_tables.Size()-1)); // Throws
+    table->bind_ref(); // Increase reference count to 1
+    m_cachedtables.add(intptr_t(table.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* repl = m_alloc.get_replication();
-    if (repl) {
-        error_code err = repl->new_top_level_table(name);
-        if (err) throw_error(err);
-    }
+    if (repl) repl->new_top_level_table(name); // Throws
 #endif
-    return table;
+
+    // This group shares ownership of the table, so leave reference
+    // count at 1.
+    return table.release();
 }
 
 

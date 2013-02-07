@@ -129,50 +129,41 @@ bool Index::DoDelete(size_t ndx, int64_t value)
     return false;
 }
 
-bool Index::Insert(size_t ndx, int64_t value, bool isLast)
+void Index::Insert(size_t ndx, int64_t value, bool isLast)
 {
     // If it is last item in column, we don't have to update refs
     if (!isLast) UpdateRefs(ndx, 1);
 
     const NodeChange nc = DoInsert(ndx, value);
     switch (nc.type) {
-    case NodeChange::CT_ERROR:
-        return false; // allocation error
-    case NodeChange::CT_NONE:
-        break;
-    case NodeChange::CT_INSERT_BEFORE:
-        {
+        case NodeChange::none:
+            return;
+        case NodeChange::insert_before: {
             Index newNode(COLUMN_NODE);
             newNode.NodeAdd(nc.ref1);
             newNode.NodeAdd(GetRef());
             m_array->UpdateRef(newNode.GetRef());
-            break;
+            return;
         }
-    case NodeChange::CT_INSERT_AFTER:
-        {
+        case NodeChange::insert_after: {
             Index newNode(COLUMN_NODE);
             newNode.NodeAdd(GetRef());
             newNode.NodeAdd(nc.ref1);
             m_array->UpdateRef(newNode.GetRef());
-            break;
+            return;
         }
-    case NodeChange::CT_SPLIT:
-        {
+        case NodeChange::split: {
             Index newNode(COLUMN_NODE);
             newNode.NodeAdd(nc.ref1);
             newNode.NodeAdd(nc.ref2);
             m_array->UpdateRef(newNode.GetRef());
-            break;
+            return;
         }
-    default:
-        TIGHTDB_ASSERT(false);
-        return false;
     }
-
-    return true;
+    TIGHTDB_ASSERT(false);
 }
 
-bool Index::LeafInsert(size_t ref, int64_t value)
+void Index::LeafInsert(size_t ref, int64_t value)
 {
     TIGHTDB_ASSERT(!IsNode());
 
@@ -190,11 +181,9 @@ bool Index::LeafInsert(size_t ref, int64_t value)
         values.Insert(ins_pos, value);
         refs.Insert(ins_pos, ref);
     }
-
-    return true;
 }
 
-bool Index::NodeAdd(size_t ref)
+void Index::NodeAdd(size_t ref)
 {
     TIGHTDB_ASSERT(ref);
     TIGHTDB_ASSERT(IsNode());
@@ -216,8 +205,6 @@ bool Index::NodeAdd(size_t ref)
         offsets.Insert(ins_pos, maxval);
         refs.Insert(ins_pos, ref);
     }
-
-    return true;
 }
 
 int64_t Index::MaxValue() const
@@ -249,18 +236,18 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
 
         // Insert item
         const NodeChange nc = target.DoInsert(local_ndx, value);
-        if (nc.type ==  NodeChange::CT_ERROR) return NodeChange(NodeChange::CT_ERROR); // allocation error
-        else if (nc.type ==  NodeChange::CT_NONE) {
+        if (nc.type ==  NodeChange::none) {
             offsets.Increment(1, node_ndx);  // update offsets
-            return NodeChange(NodeChange::CT_NONE); // no new nodes
+            return NodeChange::none; // no new nodes
         }
 
-        if (nc.type == NodeChange::CT_INSERT_AFTER) ++node_ndx;
+        if (nc.type == NodeChange::insert_after) ++node_ndx;
 
         // If there is room, just update node directly
         if (offsets.Size() < MAX_LIST_SIZE) {
-            if (nc.type == NodeChange::CT_SPLIT) return NodeInsertSplit<Column>(node_ndx, nc.ref2);
-            else return NodeInsert<Column>(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+            if (nc.type == NodeChange::split) NodeInsertSplit<Column>(node_ndx, nc.ref2);
+            else NodeInsert<Column>(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+            return NodeChange::none;
         }
 
         // Else create new node
@@ -269,9 +256,9 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
 
         switch (node_ndx) {
         case 0:             // insert before
-            return NodeChange(NodeChange::CT_INSERT_BEFORE, newNode.GetRef());
+            return NodeChange(NodeChange::insert_before, newNode.GetRef());
         case MAX_LIST_SIZE: // insert below
-            return NodeChange(NodeChange::CT_INSERT_AFTER, newNode.GetRef());
+            return NodeChange(NodeChange::insert_after, newNode.GetRef());
         default:            // split
             // Move items below split to new node
             const size_t len = refs.Size();
@@ -280,24 +267,25 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
             }
             offsets.Resize(node_ndx);
             refs.Resize(node_ndx);
-            return NodeChange(NodeChange::CT_SPLIT, GetRef(), newNode.GetRef());
+            return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
         }
     }
     else {
         // Is there room in the list?
         if (Size() < MAX_LIST_SIZE) {
-            return LeafInsert(ndx, value);
+            LeafInsert(ndx, value);
+            return NodeChange::none;
         }
 
         // Create new list for item
         Index newList;
-        if (!newList.LeafInsert(ndx, value)) return NodeChange(NodeChange::CT_ERROR);
+        LeafInsert(ndx, value);
 
         switch (ndx) {
         case 0:             // insert before
-            return NodeChange(NodeChange::CT_INSERT_BEFORE, newList.GetRef());
+            return NodeChange(NodeChange::insert_before, newList.GetRef());
         case MAX_LIST_SIZE: // insert below
-            return NodeChange(NodeChange::CT_INSERT_AFTER, newList.GetRef());
+            return NodeChange(NodeChange::insert_after, newList.GetRef());
         default:            // split
             // Move items below split to new list
             for (size_t i = ndx; i < m_array->Size(); ++i) {
@@ -305,7 +293,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
             }
             m_array->Resize(ndx);
 
-            return NodeChange(NodeChange::CT_SPLIT, GetRef(), newList.GetRef());
+            return NodeChange(NodeChange::split, GetRef(), newList.GetRef());
         }
     }
 }

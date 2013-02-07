@@ -10,15 +10,7 @@ using namespace tightdb;
 
 namespace {
 
-enum Days {
-    Mon,
-    Tue,
-    Wed,
-    Thu,
-    Fri,
-    Sat,
-    Sun
-};
+enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 TIGHTDB_TABLE_4(TestTableGroup,
                 first,  String,

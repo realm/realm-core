@@ -125,8 +125,8 @@ MemRef SlabAlloc::Alloc(size_t size)
     const size_t newsize = multible > doubleLast ? multible : doubleLast;
 
     // Allocate memory
-    void* const slab = newsize ? new char[newsize]: 0;
-    if (!slab) return MemRef(NULL, 0);
+    TIGHTDB_ASSERT(0 < newsize);
+    void* const slab = new char[newsize]; // Throws
 
     // Add to slab table
     Slabs::Cursor s = m_slabs.add(); // FIXME: Use the immediate form add()
@@ -209,8 +209,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
     //TODO: Check if we can extend current space
 
     // Allocate new space
-    const MemRef space = Alloc(size);
-    if (!space.pointer) return space;
+    const MemRef space = Alloc(size); // Throws
 
     /*if (doCopy) {*/  //TODO: allow realloc without copying
         // Get size of old segment
@@ -220,7 +219,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
         memcpy(space.pointer, p, oldsize);
 
         // Add old segment to freelist
-        Free(ref, p);
+        Free(ref, p); // FIXME: Unfortunately, this one can throw
     //}
 
 #ifdef TIGHTDB_DEBUG
@@ -245,7 +244,7 @@ void* SlabAlloc::Translate(size_t ref) const TIGHTDB_NOEXCEPT
     }
 }
 
-bool SlabAlloc::IsReadOnly(size_t ref) const
+bool SlabAlloc::IsReadOnly(size_t ref) const TIGHTDB_NOEXCEPT
 {
     return ref < m_baseline;
 }

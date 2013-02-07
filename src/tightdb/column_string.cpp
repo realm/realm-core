@@ -181,7 +181,7 @@ const char* AdaptiveStringColumn::Get(size_t ndx) const TIGHTDB_NOEXCEPT
     //return TreeGet<const char*, AdaptiveStringColumn>(ndx);
 }
 
-bool AdaptiveStringColumn::Set(size_t ndx, const char* value)
+void AdaptiveStringColumn::Set(size_t ndx, const char* value)
 {
     TIGHTDB_ASSERT(ndx < Size());
 
@@ -194,26 +194,24 @@ bool AdaptiveStringColumn::Set(size_t ndx, const char* value)
         m_index->Set(ndx, oldVal, value);
     }
 
-    return TreeSet<const char*, AdaptiveStringColumn>(ndx, value);
+    TreeSet<const char*, AdaptiveStringColumn>(ndx, value);
 }
 
-bool AdaptiveStringColumn::add(const char* value)
+void AdaptiveStringColumn::add(const char* value)
 {
-    return Insert(Size(), value);
+    Insert(Size(), value);
 }
 
-bool AdaptiveStringColumn::Insert(size_t ndx, const char* value)
+void AdaptiveStringColumn::Insert(size_t ndx, const char* value)
 {
     TIGHTDB_ASSERT(ndx <= Size());
 
-    const bool res = TreeInsert<const char*, AdaptiveStringColumn>(ndx, value);
-    if (!res) return false;
+    TreeInsert<const char*, AdaptiveStringColumn>(ndx, value);
 
     if (m_index) {
         const bool isLast = (ndx+1 == Size());
         m_index->Insert(ndx, value, isLast);
     }
-    return true;
 }
 
 void AdaptiveStringColumn::fill(size_t count)
@@ -258,15 +256,15 @@ size_t AdaptiveStringColumn::count(const char* target) const
         return m_index->count(target);
 
     size_t count = 0;
-    
+
     if (m_array->IsNode()) {
         const Array refs = NodeGetRefs();
         const size_t n = refs.Size();
-        
+
         for (size_t i = 0; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
             const AdaptiveStringColumn col(ref, NULL, 0, m_array->GetAllocator());
-            
+
             count += col.count(target);
         }
     }
@@ -276,7 +274,7 @@ size_t AdaptiveStringColumn::count(const char* target) const
         else
             count +=((ArrayString*)m_array)->count(target);
     }
-    
+
     return count;
 }
 
@@ -311,16 +309,17 @@ const char* AdaptiveStringColumn::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
     }
 }
 
-bool AdaptiveStringColumn::LeafSet(size_t ndx, const char* value)
+void AdaptiveStringColumn::LeafSet(size_t ndx, const char* value)
 {
     // Easy to set if the strings fit
     const size_t len = strlen(value);
     if (IsLongStrings()) {
         ((ArrayStringLong*)m_array)->Set(ndx, value, len);
-        return true;
+        return;
     }
     else if (len < 16) {
-        return ((ArrayString*)m_array)->Set(ndx, value);
+        ((ArrayString*)m_array)->Set(ndx, value);
+        return;
     }
 
     // Replace string array with long string array
@@ -345,19 +344,19 @@ bool AdaptiveStringColumn::LeafSet(size_t ndx, const char* value)
     m_array = newarray;
     oldarray->Destroy();
     delete oldarray;
+}
 
-    return true;}
-
-bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
+void AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
 {
     // Easy to insert if the strings fit
     const size_t len = strlen(value);
     if (IsLongStrings()) {
         ((ArrayStringLong*)m_array)->Insert(ndx, value, len);
-        return true;
+        return;
     }
     else if (len < 16) {
-        return ((ArrayString*)m_array)->Insert(ndx, value);
+        ((ArrayString*)m_array)->Insert(ndx, value);
+        return;
     }
 
     // Replace string array with long string array
@@ -383,8 +382,6 @@ bool AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
     m_array = newarray;
     oldarray->Destroy();
     delete oldarray;
-
-    return true;
 }
 
 template<class F>
@@ -520,4 +517,4 @@ void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) cons
 
 #endif // TIGHTDB_DEBUG
 
-}
+} // namespace tightdb

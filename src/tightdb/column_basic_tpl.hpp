@@ -53,7 +53,7 @@ BasicColumn<T>::~BasicColumn()
     if (IsNode()) 
         delete m_array;
     else 
-        delete (BasicArray<T>*)m_array;
+        delete static_cast<BasicArray<T>*>(m_array);
 }
 
 template<typename T>
@@ -62,7 +62,7 @@ void BasicColumn<T>::Destroy()
     if (IsNode()) 
         m_array->Destroy();
     else 
-        ((BasicArray<T>*)m_array)->Destroy();
+        static_cast<BasicArray<T>*>(m_array)->Destroy();
 }
 
 
@@ -74,7 +74,7 @@ void BasicColumn<T>::UpdateRef(size_t ref)
     if (IsNode()) 
         m_array->UpdateRef(ref);
     else {
-        ArrayParent *const parent = m_array->GetParent();
+        ArrayParent* const parent = m_array->GetParent();
         const size_t pndx = m_array->GetParentNdx();
 
         // Replace the generic array with int array for node
@@ -96,7 +96,7 @@ bool BasicColumn<T>::is_empty() const TIGHTDB_NOEXCEPT
         return offsets.is_empty();
     }
     else {
-        return ((BasicArray<T>*)m_array)->is_empty();
+        return static_cast<BasicArray<T>*>(m_array)->is_empty();
     }
 }
 
@@ -105,11 +105,11 @@ size_t BasicColumn<T>::Size() const TIGHTDB_NOEXCEPT
 {
     if (IsNode())  {
         const Array offsets = NodeGetOffsets();
-        const size_t size = offsets.is_empty() ? 0 : (size_t)offsets.back();
+        const size_t size = offsets.is_empty() ? 0 : size_t(offsets.back());
         return size;
     }
     else {
-        return ((BasicArray<T>*)m_array)->Size();
+        return m_array->Size();
     }
 }
 
@@ -132,7 +132,7 @@ void BasicColumn<T>::Clear()
         m_array = array;
     }
     else 
-        ((BasicArray<T>*)m_array)->Clear();
+        static_cast<BasicArray<T>*>(m_array)->Clear();
 }
 
 template<typename T>
@@ -140,7 +140,7 @@ void BasicColumn<T>::Resize(size_t ndx)
 {
     TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
     TIGHTDB_ASSERT(ndx < Size());
-    ((BasicArray<T>*)m_array)->Resize(ndx);
+    static_cast<BasicArray<T>*>(m_array)->Resize(ndx);
 }
 
 template<typename T>
@@ -151,23 +151,23 @@ T BasicColumn<T>::Get(size_t ndx) const
 }
 
 template<typename T>
-bool BasicColumn<T>::Set(size_t ndx, T value)
+void BasicColumn<T>::Set(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < Size());
-    return TreeSet<T,BasicColumn<T> >(ndx, value);
+    TreeSet<T,BasicColumn<T> >(ndx, value);
 }
 
 template<typename T>
-bool BasicColumn<T>::add(T value)
+void BasicColumn<T>::add(T value)
 {
-    return Insert(Size(), value);
+    Insert(Size(), value);
 }
 
 template<typename T>
-bool BasicColumn<T>::Insert(size_t ndx, T value)
+void BasicColumn<T>::Insert(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= Size());
-    return TreeInsert<T, BasicColumn<T> >(ndx, value);
+    TreeInsert<T, BasicColumn<T> >(ndx, value);
 }
 
 template<typename T>
@@ -213,27 +213,25 @@ void BasicColumn<T>::Delete(size_t ndx)
 template<typename T>
 T BasicColumn<T>::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return ((BasicArray<T>*)m_array)->Get(ndx);
+    return static_cast<BasicArray<T>*>(m_array)->Get(ndx);
 }
 
 template<typename T>
-bool BasicColumn<T>::LeafSet(size_t ndx, T value)
+void BasicColumn<T>::LeafSet(size_t ndx, T value)
 {
-    ((BasicArray<T>*)m_array)->Set(ndx, value);
-    return true;
+    static_cast<BasicArray<T>*>(m_array)->Set(ndx, value);
 }
 
 template<typename T>
-bool BasicColumn<T>::LeafInsert(size_t ndx, T value)
+void BasicColumn<T>::LeafInsert(size_t ndx, T value)
 {
-    ((BasicArray<T>*)m_array)->Insert(ndx, value);
-    return true;
+    static_cast<BasicArray<T>*>(m_array)->Insert(ndx, value);
 }
 
 template<typename T>
 void BasicColumn<T>::LeafDelete(size_t ndx)
 {
-    ((BasicArray<T>*)m_array)->Delete(ndx);
+    static_cast<BasicArray<T>*>(m_array)->Delete(ndx);
 }
 
 
@@ -255,13 +253,13 @@ void BasicColumn<T>::LeafToDot(std::ostream& out, const Array& array) const
 template<typename T> template<class F>
 size_t BasicColumn<T>::LeafFind(T value, size_t start, size_t end) const
 {
-    return ((BasicArray<T>*)m_array)->find_first(value, start, end);
+    return static_cast<BasicArray<T>*>(m_array)->find_first(value, start, end);
 }
 
 template<typename T>
 void BasicColumn<T>::LeafFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const
 {
-    return ((BasicArray<T>*)m_array)->find_all(result, value, add_offset, start, end);
+    return static_cast<BasicArray<T>*>(m_array)->find_all(result, value, add_offset, start, end);
 }
 
 template<typename T>

@@ -1,28 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
+#include <stdexcept>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
 #include <sstream>
 
-
 #include <tightdb/config.h>
-
-#ifndef TIGHTDB_HAVE_RTTI
-#  ifdef __GNUC__
-#    warning RTTI appears to be disabled
-#  else
-#    pragma message("RTTI appears to be disabled")
-#  endif
-#endif
-
-#ifndef TIGHTDB_HAVE_EXCEPTIONS
-#  ifdef __GNUC__
-#    warning Exceptions appear to be disabled
-#  else
-#    pragma message("Exceptions appear to be disabled")
-#  endif
-#endif
-
 #include <tightdb/table.hpp>
 #include <tightdb/index.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -41,9 +24,9 @@ using namespace std;
 namespace tightdb {
 
 struct FakeParent: Table::Parent {
-    virtual void update_child_ref(size_t, size_t) {} // Ignore
-    virtual void child_destroyed(size_t) {} // Ignore
-    virtual size_t get_child_ref(size_t) const { return 0; }
+    void update_child_ref(size_t, size_t) TIGHTDB_OVERRIDE {} // Ignore
+    void child_destroyed(size_t) TIGHTDB_OVERRIDE {} // Ignore
+    size_t get_child_ref(size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return 0; }
 };
 
 
@@ -361,7 +344,7 @@ void Table::ClearCachedColumns()
 Table::~Table()
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    get_local_transact_log().on_table_destroyed();
+    transact_log().on_table_destroyed();
 #endif
 
     if (!is_valid()) {
@@ -377,9 +360,7 @@ Table::~Table()
         ArrayParent* parent = m_columns.GetParent();
         TIGHTDB_ASSERT(parent);
         TIGHTDB_ASSERT(m_ref_count == 0);
-#ifdef TIGHTDB_HAVE_RTTI
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-#endif
         static_cast<Parent*>(parent)->child_destroyed(m_columns.GetParentNdx());
         ClearCachedColumns();
         return;
@@ -390,9 +371,7 @@ Table::~Table()
         // This is a table whose lifetime is managed by reference
         // counting, so we must let our parent know about our demise.
         TIGHTDB_ASSERT(m_ref_count == 0);
-#ifdef TIGHTDB_HAVE_RTTI
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-#endif
         static_cast<Parent*>(parent)->child_destroyed(m_top.GetParentNdx());
         ClearCachedColumns();
         return;
@@ -480,8 +459,7 @@ size_t Table::add_subcolumn(const vector<size_t>& column_path, ColumnType type, 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // TODO:
-    //error_code err = get_local_transact_log().add_column(type, name);
-    //if (err) throw_error(err);
+    //transact_log().add_column(type, name); // Throws
 #endif
 
     return column_ndx;
@@ -527,8 +505,7 @@ size_t Table::add_column(ColumnType type, const char* name)
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().add_column(type, name);
-    if (err) throw_error(err);
+    transact_log().add_column(type, name); // Throws
 #endif
 
     return column_ndx;
@@ -750,8 +727,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
         m_spec_set.set_column_attr(column_ndx, COLUMN_ATTR_INDEXED);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().add_index_to_column(column_ndx);
-    if (err) throw_error(err);
+    transact_log().add_index_to_column(column_ndx); // Throws
 #endif
 }
 
@@ -828,8 +804,7 @@ size_t Table::add_empty_row(size_t num_rows)
     m_size += num_rows;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().insert_empty_rows(new_ndx, 1);
-    if (err) throw_error(err);
+    transact_log().insert_empty_rows(new_ndx, 1); // Throws
 #endif
 
     return new_ndx;
@@ -850,8 +825,7 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
     m_size += num_rows;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().insert_empty_rows(ndx, num_rows);
-    if (err) throw_error(err);
+    transact_log().insert_empty_rows(ndx, num_rows); // Throws
 #endif
 }
 
@@ -865,8 +839,7 @@ void Table::clear()
     m_size = 0;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().clear_table();
-    if (err) throw_error(err);
+    transact_log().clear_table(); // Throws
 #endif
 }
 
@@ -882,8 +855,7 @@ void Table::remove(size_t ndx)
     --m_size;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().remove_row(ndx);
-    if (err) throw_error(err);
+    transact_log().remove_row(ndx); // Throws
 #endif
 }
 
@@ -899,9 +871,7 @@ void Table::insert_subtable(size_t column_ndx, size_t ndx)
     subtables.Insert(ndx); // FIXME: Consider calling virtual method insert(size_t) instead.
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err =
-        get_local_transact_log().insert_value(column_ndx, ndx, Replication::subtable_tag());
-    if (err) throw_error(err);
+    transact_log().insert_value(column_ndx, ndx, Replication::subtable_tag()); // Throws
 #endif
 }
 
@@ -971,9 +941,7 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
         subtables.invalidate_subtables();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err =
-        get_local_transact_log().set_value(col_idx, row_idx, Replication::subtable_tag());
-    if (err) throw_error(err);
+        transact_log().set_value(col_idx, row_idx, Replication::subtable_tag()); // Throws
 #endif
     }
     else if (type == COLUMN_TYPE_MIXED) {
@@ -982,9 +950,7 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
         subtables.invalidate_subtables();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err =
-        get_local_transact_log().set_value(col_idx, row_idx, Mixed(Mixed::subtable_tag()));
-    if (err) throw_error(err);
+        transact_log().set_value(col_idx, row_idx, Mixed(Mixed::subtable_tag())); // Throws
 #endif
     }
     else {
@@ -1011,8 +977,7 @@ void Table::set_int(size_t column_ndx, size_t ndx, int64_t value)
     column.Set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().set_value(column_ndx, ndx, value);
-    if (err) throw_error(err);
+    transact_log().set_value(column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1023,8 +988,7 @@ void Table::add_int(size_t column_ndx, int64_t value)
     GetColumn(column_ndx).Increment64(value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().add_int_to_column(column_ndx, value);
-    if (err) throw_error(err);
+    transact_log().add_int_to_column(column_ndx, value); // Throws
 #endif
 }
 
@@ -1049,8 +1013,7 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
     column.Set(ndx, value ? 1 : 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().set_value(column_ndx, ndx, int(value));
-    if (err) throw_error(err);
+    transact_log().set_value(column_ndx, ndx, int(value)); // Throws
 #endif
 }
 
@@ -1074,8 +1037,7 @@ void Table::set_date(size_t column_ndx, size_t ndx, time_t value)
     column.Set(ndx, (int64_t)value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().set_value(column_ndx, ndx, value);
-    if (err) throw_error(err);
+    transact_log().set_value(column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1088,8 +1050,7 @@ void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
     column.Insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().insert_value(column_ndx, ndx, value);
-    if (err) throw_error(err);
+    transact_log().insert_value(column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1212,9 +1173,7 @@ void Table::set_string(size_t column_ndx, size_t ndx, const char* value)
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().set_value(column_ndx, ndx,
-                                                        BinaryData(value, std::strlen(value)));
-    if (err) throw_error(err);
+    transact_log().set_value(column_ndx, ndx, BinaryData(value, std::strlen(value))); // Throws
 #endif
 }
 
@@ -1236,9 +1195,7 @@ void Table::insert_string(size_t column_ndx, size_t ndx, const char* value)
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().insert_value(column_ndx, ndx,
-                                                           BinaryData(value, std::strlen(value)));
-    if (err) throw_error(err);
+    transact_log().insert_value(column_ndx, ndx, BinaryData(value, std::strlen(value))); // Throws
 #endif
 }
 
@@ -1261,8 +1218,7 @@ void Table::set_binary(size_t column_ndx, size_t ndx, const char* data, size_t s
     column.Set(ndx, data, size);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().set_value(column_ndx, ndx, BinaryData(data, size));
-    if (err) throw_error(err);
+    transact_log().set_value(column_ndx, ndx, BinaryData(data, size)); // Throws
 #endif
 }
 
@@ -1275,8 +1231,7 @@ void Table::insert_binary(size_t column_ndx, size_t ndx, const char* data, size_
     column.Insert(ndx, data, size);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().insert_value(column_ndx, ndx, BinaryData(data, size));
-    if (err) throw_error(err);
+    transact_log().insert_value(column_ndx, ndx, BinaryData(data, size)); // Throws
 #endif
 }
 
@@ -1364,8 +1319,7 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
     column.invalidate_subtables();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().set_value(column_ndx, ndx, value);
-    if (err) throw_error(err);
+    transact_log().set_value(column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1411,8 +1365,7 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
     column.invalidate_subtables();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().insert_value(column_ndx, ndx, value);
-    if (err) throw_error(err);
+    transact_log().insert_value(column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1425,8 +1378,7 @@ void Table::insert_done()
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().row_insert_complete();
-    if (err) throw_error(err);
+    transact_log().row_insert_complete(); // Throws
 #endif
 }
 
@@ -1452,9 +1404,9 @@ size_t Table::count_string(size_t column_ndx, const char* value) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(value);
-    
+
     const ColumnType type = GetRealColumnType(column_ndx);
-    
+
     if (type == COLUMN_TYPE_STRING) {
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
         return column.count(value);
@@ -1671,8 +1623,7 @@ size_t Table::find_first_binary(size_t column_ndx, const char* value, size_t len
     static_cast<void>(column_ndx);
     static_cast<void>(value);
     static_cast<void>(len);
-    throw_error(ERROR_NOT_IMPLEMENTED);
-    return 0;
+    throw runtime_error("Not implemented");
 }
 
 size_t Table::find_pos_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
@@ -1835,8 +1786,7 @@ TableView Table::find_all_binary(size_t column_ndx, const char* value, size_t le
     static_cast<void>(column_ndx);
     static_cast<void>(value);
     static_cast<void>(len);
-    throw_error(ERROR_NOT_IMPLEMENTED);
-    return TableView(*this);
+    throw runtime_error("Not implemented");
 }
 
 ConstTableView Table::find_all_binary(size_t column_ndx, const char* value, size_t len) const
@@ -1845,8 +1795,7 @@ ConstTableView Table::find_all_binary(size_t column_ndx, const char* value, size
     static_cast<void>(column_ndx);
     static_cast<void>(value);
     static_cast<void>(len);
-    throw_error(ERROR_NOT_IMPLEMENTED);
-    return ConstTableView(*this);
+    throw runtime_error("Not implemented");
 }
 
 
@@ -1985,7 +1934,7 @@ void Table::optimize()
             UpdateColumnRefs(i+1, 1);
 
             // Replace cached column
-            ColumnStringEnum* const e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc); // FIXME: We may have to use 'new (nothrow)' here. It depends on whether we choose to allow exceptions.
+            ColumnStringEnum* const e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc);
             m_cols.Set(i, (intptr_t)e);
 
             // Inherit any existing index
@@ -2001,8 +1950,7 @@ void Table::optimize()
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().optimize_table();
-    if (err) throw_error(err);
+    transact_log().optimize_table(); // Throws
 #endif
 }
 

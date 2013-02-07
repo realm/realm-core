@@ -226,17 +226,12 @@ inline void ColumnMixed::set_date(size_t ndx, time_t value)
     set_value(ndx, static_cast<const int64_t>(value), MIXED_COL_DATE);
 }
 
-// FIXME: Check that callers test the return value
-inline bool ColumnMixed::set_subtable(size_t ndx)
+inline void ColumnMixed::set_subtable(std::size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
-    const size_t ref = Table::create_empty_table(m_array->GetAllocator());
-    if (!ref) 
-        return false;
-    // FIXME: Could the following operations also fail on allocation?
+    const std::size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
     clear_value(ndx, MIXED_COL_TABLE); // Remove any previous refs or binary data
     m_refs->Set(ndx, ref);
-    return true;
 }
 
 //
@@ -338,16 +333,12 @@ inline void ColumnMixed::insert_binary(size_t ndx, const char* value, size_t len
     m_refs->Insert(ndx, v);
 }
 
-// FIXME: Check that callers test the return value
-inline bool ColumnMixed::insert_subtable(size_t ndx)
+inline void ColumnMixed::insert_subtable(std::size_t ndx)
 {
     TIGHTDB_ASSERT(ndx <= m_types->Size());
-    const size_t ref = Table::create_empty_table(m_array->GetAllocator());
-    if (!ref) return false;
-    // FIXME: These inserts can also fail on allocation
+    const std::size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
     m_types->Insert(ndx, MIXED_COL_TABLE);
     m_refs->Insert(ndx, ref);
-    return true;
 }
 
 } // namespace tightdb

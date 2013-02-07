@@ -80,9 +80,6 @@ public:
 
     /// Construct a new freestanding top-level table with dynamic
     /// lifetime.
-    ///
-    /// \return A reference to the new table, or null if allocation
-    /// failed.
     static TableRef create(Allocator& alloc = Allocator::get_default());
 
     /// An invalid table must not be accessed in any way except by
@@ -414,8 +411,18 @@ private:
     mutable size_t m_ref_count;
     mutable const StringIndex* m_lookup_index;
 
-    void bind_ref() const { ++m_ref_count; }
-    void unbind_ref() const { if (--m_ref_count == 0) delete this; }
+    void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
+    void unbind_ref() const { if (--m_ref_count == 0) delete this; } // FIXME: Cannot be noexcept since ~Table() may throw
+
+    struct UnbindGuard {
+        UnbindGuard(Table* t) TIGHTDB_NOEXCEPT: m_table(t) {}
+        ~UnbindGuard() { if(m_table) m_table->unbind_ref(); } // FIXME: Cannot be noexcept since ~Table() may throw
+        Table* operator->() const { return m_table; }
+        Table* get() const { return m_table; }
+        Table* release() TIGHTDB_NOEXCEPT { Table* t = m_table; m_table = 0; return t; }
+    private:
+        Table* m_table;
+    };
 
     ColumnBase& GetColumnBase(size_t column_ndx);
     void InstantiateBeforeChange();
@@ -423,8 +430,6 @@ private:
 
     /// Construct an empty table with independent spec and return just
     /// the reference to the underlying memory.
-    ///
-    /// \return Zero if allocation fails.
     static size_t create_empty_table(Allocator&);
 
     // Experimental
@@ -433,11 +438,11 @@ private:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct LocalTransactLog;
-    LocalTransactLog get_local_transact_log();
+    LocalTransactLog transact_log() TIGHTDB_NOEXCEPT;
     // Condition: 1 <= end - begin
-    size_t* record_subspec_path(const Spec*, size_t* begin, size_t* end) const;
+    size_t* record_subspec_path(const Spec*, size_t* begin, size_t* end) const TIGHTDB_NOEXCEPT;
     // Condition: 1 <= end - begin
-    size_t* record_subtable_path(size_t* begin, size_t* end) const;
+    size_t* record_subtable_path(size_t* begin, size_t* end) const TIGHTDB_NOEXCEPT;
     friend class Replication;
 #endif
 
@@ -463,7 +468,7 @@ protected:
     virtual void child_destroyed(size_t child_ndx) = 0;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    virtual size_t* record_subtable_path(size_t* begin, size_t* end);
+    virtual size_t* record_subtable_path(size_t* begin, size_t* end) TIGHTDB_NOEXCEPT;
 #endif
 };
 
@@ -499,9 +504,7 @@ inline bool Table::has_shared_spec() const
     const Array& top_array = m_top.IsValid() ? m_top : m_columns;
     ArrayParent* parent = top_array.GetParent();
     if (!parent) return false;
-#ifdef TIGHTDB_HAVE_RTTI
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-#endif
     return static_cast<Parent*>(parent)->subtables_have_shared_spec();
 }
 
@@ -516,8 +519,7 @@ inline size_t Table::create_empty_table(Allocator& alloc)
 inline Table::Table(Allocator& alloc):
     m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1), m_lookup_index(NULL)
 {
-    const size_t ref = create_empty_table(alloc);
-    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    const size_t ref = create_empty_table(alloc); // Throws
     init_from_ref(ref, 0, 0);
 }
 
@@ -537,10 +539,8 @@ inline Table::Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t colum
 
 inline TableRef Table::create(Allocator& alloc)
 {
-    const size_t ref = Table::create_empty_table(alloc);
-    if (!ref) return TableRef();
-    Table* const table = new (std::nothrow) Table(Table::RefCountTag(), alloc, ref, 0, 0);
-    if (!table) return TableRef();
+    const size_t ref = Table::create_empty_table(alloc); // Throws
+    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }
 
@@ -589,85 +589,75 @@ inline bool Table::operator!=(const Table& t) const
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 struct Table::LocalTransactLog {
-    template<class T> error_code set_value(size_t column_ndx, size_t row_ndx, const T& value)
+    template<class T> void set_value(size_t column_ndx, size_t row_ndx, const T& value)
     {
-        if (!m_repl) return ERROR_NONE;
-        return m_repl->set_value(m_table, column_ndx, row_ndx, value);
+        if (m_repl) m_repl->set_value(m_table, column_ndx, row_ndx, value); // Throws
     }
 
-    template<class T> error_code insert_value(size_t column_ndx, size_t row_ndx, const T& value)
+    template<class T> void insert_value(size_t column_ndx, size_t row_ndx, const T& value)
     {
-        if (!m_repl) return ERROR_NONE;
-        return m_repl->insert_value(m_table, column_ndx, row_ndx, value);
+        if (m_repl) m_repl->insert_value(m_table, column_ndx, row_ndx, value); // Throws
     }
 
-    error_code row_insert_complete()
+    void row_insert_complete()
     {
-        if (!m_repl) return ERROR_NONE;
-        return m_repl->row_insert_complete(m_table);
+        if (m_repl) m_repl->row_insert_complete(m_table); // Throws
     }
 
-    error_code insert_empty_rows(std::size_t row_ndx, std::size_t num_rows)
+    void insert_empty_rows(std::size_t row_ndx, std::size_t num_rows)
     {
-        if (!m_repl) return ERROR_NONE;
-        return m_repl->insert_empty_rows(m_table, row_ndx, num_rows);
+        if (m_repl) m_repl->insert_empty_rows(m_table, row_ndx, num_rows); // Throws
     }
 
-    error_code remove_row(std::size_t row_ndx)
+    void remove_row(std::size_t row_ndx)
     {
-        if (!m_repl) return ERROR_NONE;
-        return m_repl->remove_row(m_table, row_ndx);
+        if (m_repl) m_repl->remove_row(m_table, row_ndx); // Throws
     }
 
-    error_code add_int_to_column(std::size_t column_ndx, int64_t value)
+    void add_int_to_column(std::size_t column_ndx, int64_t value)
     {
-        if (!m_repl) return ERROR_NONE;
-        return m_repl->add_int_to_column(m_table, column_ndx, value);
+        if (m_repl) m_repl->add_int_to_column(m_table, column_ndx, value); // Throws
     }
 
-    error_code add_index_to_column(std::size_t column_ndx)
+    void add_index_to_column(std::size_t column_ndx)
     {
-        if (!m_repl) return ERROR_NONE;
-        return m_repl->add_index_to_column(m_table, column_ndx);
+        if (m_repl) m_repl->add_index_to_column(m_table, column_ndx); // Throws
     }
 
-    error_code clear_table()
+    void clear_table()
     {
-        if (!m_repl) return ERROR_NONE;
-        return m_repl->clear_table(m_table);
+        if (m_repl) m_repl->clear_table(m_table); // Throws
     }
 
-    error_code optimize_table()
+    void optimize_table()
     {
-        if (!m_repl) return ERROR_NONE;
-        return m_repl->optimize_table(m_table);
+        if (m_repl) m_repl->optimize_table(m_table); // Throws
     }
 
-    error_code add_column(ColumnType type, const char* name)
+    void add_column(ColumnType type, const char* name)
     {
-        if (!m_repl) return ERROR_NONE;
-        return m_repl->add_column(m_table, &m_table->m_spec_set, type, name);
+        if (m_repl) m_repl->add_column(m_table, &m_table->m_spec_set, type, name); // Throws
     }
 
-    void on_table_destroyed()
+    void on_table_destroyed() TIGHTDB_NOEXCEPT
     {
-        if (!m_repl) return;
-        m_repl->on_table_destroyed(m_table);
+        if (m_repl) m_repl->on_table_destroyed(m_table);
     }
 
 private:
     Replication* const m_repl;
     Table* const m_table;
-    LocalTransactLog(Replication* r, Table* t): m_repl(r), m_table(t) {}
+    LocalTransactLog(Replication* r, Table* t) TIGHTDB_NOEXCEPT: m_repl(r), m_table(t) {}
     friend class Table;
 };
 
-inline Table::LocalTransactLog Table::get_local_transact_log()
+inline Table::LocalTransactLog Table::transact_log() TIGHTDB_NOEXCEPT
 {
     return LocalTransactLog(m_top.GetAllocator().get_replication(), this);
 }
 
-inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin, size_t* end) const
+inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin,
+                                          size_t* end) const TIGHTDB_NOEXCEPT
 {
     if (spec != &m_spec_set) {
         TIGHTDB_ASSERT(m_spec_set.m_subSpecs.IsValid());
@@ -676,7 +666,7 @@ inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin, size_
     return begin;
 }
 
-inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const
+inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const TIGHTDB_NOEXCEPT
 {
     const Array& real_top = m_top.IsValid() ? m_top : m_columns;
     const size_t index_in_parent = real_top.GetParentNdx();
@@ -684,13 +674,11 @@ inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const
     *begin++ = index_in_parent;
     ArrayParent* parent = real_top.GetParent();
     TIGHTDB_ASSERT(parent);
-#ifdef TIGHTDB_HAVE_RTTI
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-#endif
     return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
 }
 
-inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*)
+inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*) TIGHTDB_NOEXCEPT
 {
     return begin;
 }

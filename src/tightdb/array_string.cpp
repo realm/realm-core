@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <cstdio> // debug
+#include <algorithm>
 #include <iostream>
 
 #include <tightdb/utilities.hpp>
@@ -10,159 +11,161 @@ using namespace std;
 
 namespace {
 
+// When len = 0 returns 0
+// When len = 1 returns 4
+// When 2 <= len < 256 returns 2**ceil(log2(len+1)).
+// Thus, 0 < len < 256 implies that len < round_up(len).
 size_t round_up(size_t len)
 {
-    size_t width = 0;
-    if (len == 0)     width = 0;
-    else if (len < 3) width = 4;
-    else {
-        width = len;
-        width |= width >> 1;
-        width |= width >> 2;
-        width |= width >> 4;
-        ++width;
-    }
-    return width;
+    if (len < 2) return len << 2;
+    len |= len >> 1;
+    len |= len >> 2;
+    len |= len >> 4;
+    ++len;
+    return len;
 }
 
-}
+} // anonymous namespace
 
 
 namespace tightdb {
 
 
-bool ArrayString::Set(size_t ndx, const char* value, size_t len)
+void ArrayString::Set(size_t ndx, const char* data, size_t size)
 {
     TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(value);
-    TIGHTDB_ASSERT(len < 64); // otherwise we have to use another column type
+    TIGHTDB_ASSERT(data);
+    TIGHTDB_ASSERT(size < 64); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) return false;
+    CopyOnWrite(); // Throws
 
     // Calc min column width (incl trailing zero-byte)
-    size_t width = ::round_up(len);
+    size_t min_width = ::round_up(size);
 
     // Make room for the new value
-    if (width > m_width) {
-        const size_t oldwidth = m_width;
-        if (!Alloc(m_len, width)) return false;
-        m_width = width;
+    if (m_width < min_width) {
+        // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
+        Alloc(m_len, min_width); // Throws
 
-        // Expand the old values
-        int k = (int)m_len;
-        while (--k >= 0) {
-            const char* v = (const char*)m_data + (k * oldwidth);
-
-            // Move the value
-            char* data = (char*)m_data + (k * m_width);
-            char* const end = data + m_width;
-            memmove(data, v, oldwidth); // FIXME: Use std::copy() or std::copy_backward() instead.
-            for (data += oldwidth; data < end; ++data) {
-                *data = '\0'; // pad with zeroes
+        // Expand the old values in reverse order
+        char* const base = reinterpret_cast<char*>(m_data);
+        const char* old_end = base + m_len*m_width;
+        char*       new_end = base + m_len*min_width;
+        while (new_end != base) {
+            {
+              char* const new_begin = new_end - (min_width-m_width);
+              fill(new_begin, new_end, 0); // Extra zero-padding is needed
+              new_end = new_begin;
+            }
+            {
+              const char* const old_begin = old_end - m_width;
+              new_end = copy_backward(old_begin, old_end, new_end);
+              old_end = old_begin;
             }
         }
+        m_width = min_width;
     }
 
     // Set the value
-    char* data = (char*)m_data + (ndx * m_width);
-    char* const end = data + m_width;
-    memmove(data, value, len); // FIXME: Use std::copy() or std::copy_backward() instead.
-    for (data += len; data < end; ++data) {
-        *data = '\0'; // pad with zeroes
-    }
-
-    return true;
+    char*       begin = reinterpret_cast<char*>(m_data) + (ndx * m_width);
+    char* const end   = begin + m_width;
+    begin = copy(data, data+size, begin);
+    fill(begin, end, 0); // Pad with zeroes
 }
 
-bool ArrayString::add()
+// FIXME: Should be moved to header
+void ArrayString::add()
 {
-    return Insert(m_len, "", 0);
+    Insert(m_len, "", 0); // Throws
 }
 
-bool ArrayString::add(const char* value)
+// FIXME: Should be moved to header
+void ArrayString::add(const char* value)
 {
-    return Insert(m_len, value, strlen(value));
+    Insert(m_len, value, strlen(value)); // Throws
 }
 
-bool ArrayString::Insert(size_t ndx, const char* value)
+// FIXME: Should be moved to header
+void ArrayString::Insert(size_t ndx, const char* value)
 {
-    return Insert(ndx, value, strlen(value));
+    Insert(ndx, value, strlen(value)); // Throws
 }
 
 
 
-bool ArrayString::Insert(size_t ndx, const char* value, size_t len)
+void ArrayString::Insert(size_t ndx, const char* data, size_t size)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
-    TIGHTDB_ASSERT(value);
-    TIGHTDB_ASSERT(len < 64); // otherwise we have to use another column type
+    TIGHTDB_ASSERT(data);
+    TIGHTDB_ASSERT(size < 64); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) return false;
+    CopyOnWrite(); // Throws
 
     // Calc min column width (incl trailing zero-byte)
-    size_t width = ::round_up(len);
-
-    const bool doExpand = width > m_width;
+    size_t new_width = max(m_width, ::round_up(size));
 
     // Make room for the new value
-    const size_t oldwidth = m_width;
-    if (!Alloc(m_len+1, doExpand ? width : m_width)) return false;
-    if (doExpand) m_width = width;
+    Alloc(m_len+1, new_width); // Throws
 
-    // Move values below insertion (may expand)
-    if (doExpand) {
-        // Expand the old values
-        int k = (int)m_len;
-        while (--k >= (int)ndx) {
-            const char* v = (const char*)m_data + (k * oldwidth);
+    char* const base = reinterpret_cast<char*>(m_data);
+    const char* old_end = base + m_len*m_width;
+    char*       new_end = base + m_len*new_width + new_width;
 
-            // Move the value
-            char* data = (char*)m_data + ((k+1) * m_width);
-            char* const end = data + m_width;
-            memmove(data, v, oldwidth); // FIXME: Use std::copy() or std::copy_backward() instead.
-            for (data += oldwidth; data < end; ++data) {
-                *data = '\0'; // pad with zeroes
+    // Move values beyond insertion point (may expand)
+    if (ndx != m_len) {
+        if (TIGHTDB_UNLIKELY(m_width < new_width)) {
+            // Expand the old values
+            char* const new_begin = base + ndx*new_width + new_width;
+            do {
+                {
+                    char* const new_begin2 = new_end - (new_width-m_width);
+                    fill(new_begin2, new_end, 0); // Extra zero-padding is needed
+                    new_end = new_begin2;
+                }
+                {
+                    const char* const old_begin = old_end - m_width;
+                    new_end = copy_backward(old_begin, old_end, new_end);
+                    old_end = old_begin;
+                }
             }
+            while (new_end != new_begin);
         }
-    }
-    else if (ndx != m_len) {
-        // when no expansion, use memmove
-        unsigned char* src = m_data + (ndx * m_width);
-        unsigned char* dst = src + m_width;
-        const size_t count = (m_len - ndx) * m_width;
-        memmove(dst, src, count); // FIXME: Use std::copy() or std::copy_backward() instead.
+        else {
+            // when no expansion just move the following entries forward
+            const char* const old_begin = base + ndx*m_width;
+            new_end = copy_backward(old_begin, old_end, new_end);
+            old_end = old_begin;
+        }
     }
 
     // Set the value
-    char* data = (char*)m_data + (ndx * m_width);
-    memcpy(data, value, len);
-
-    // Pad with zeroes
-    char* const end = data + m_width;
-    for (data += len; data < end; ++data) {
-        *data = '\0';
+    {
+        char* const new_begin = new_end - new_width;
+        char* const pad_begin = copy(data, data+size, new_begin);
+        fill(pad_begin, new_end, 0); // Pad with zeroes
+        new_end = new_begin;
     }
 
-    // Expand values above insertion
-    if (doExpand) {
-        int k = (int)ndx;
-        while (--k >= 0) {
-            const char* v = (const char*)m_data + (k * oldwidth);
-
-            // Move the value
-            char* data = (char*)m_data + (k * m_width);
-            char* const end = data + m_width;
-            memmove(data, v, oldwidth); // FIXME: Use std::copy() or std::copy_backward() instead.
-            for (data += oldwidth; data < end; ++data) {
-                *data = '\0'; // pad with zeroes
+    // Expand values before insertion point
+    if (TIGHTDB_UNLIKELY(m_width < new_width)) {
+        while (new_end != base) {
+            {
+              char* const new_begin = new_end - (new_width-m_width);
+              fill(new_begin, new_end, 0); // Extra zero-padding is needed
+              new_end = new_begin;
+            }
+            {
+              const char* const old_begin = old_end - m_width;
+              new_end = copy_backward(old_begin, old_end, new_end);
+              old_end = old_begin;
             }
         }
     }
 
+    m_width = new_width;
     ++m_len;
-    return true;
 }
 
 void ArrayString::Delete(size_t ndx)
@@ -170,17 +173,17 @@ void ArrayString::Delete(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
+
+    // move data backwards after deletion
+    if (ndx < m_len-1) {
+        char* const new_begin = reinterpret_cast<char*>(m_data) + ndx*m_width;
+        char* const old_begin = new_begin + m_width;
+        char* const old_end   = reinterpret_cast<char*>(m_data) + m_len*m_width;
+        copy(old_begin, old_end, new_begin);
+    }
 
     --m_len;
-
-    // move data under deletion up
-    if (ndx < m_len) {
-        char* src = (char*)m_data + ((ndx+1) * m_width);
-        char* dst = (char*)m_data + (ndx * m_width);
-        const size_t len = (m_len - ndx) * m_width;
-        memmove(dst, src, len); // FIXME: Use std::copy() or std::copy_backward() instead.
-    }
 
     // Update length in header
     set_header_len(m_len);

@@ -39,7 +39,7 @@ public:
     void Insert(size_t row_ndx, const char* value, bool isLast=false);
     void Set(size_t row_ndx, const char* oldValue, const char* newValue);
     void Delete(size_t row_ndx, const char* value, bool isLast=false);
-    void Clear();
+    void Clear() TIGHTDB_OVERRIDE;
 
     using Column::Delete;
 
@@ -55,17 +55,18 @@ public:
 protected:
     void Create();
 
-    bool InsertWithOffset(size_t row_ndx, size_t offset, const char* value);
-    bool InsertRowList(size_t ref, size_t offset, const char* value);
+    void InsertWithOffset(size_t row_ndx, size_t offset, const char* value);
+    void InsertRowList(size_t ref, size_t offset, const char* value);
     int32_t GetLastKey() const;
     void UpdateRefs(size_t pos, int diff);
 
     // B-Tree functions
-    bool TreeInsert(size_t row_ndx, int32_t key, size_t offset, const char* value);
+    void TreeInsert(size_t row_ndx, int32_t key, size_t offset, const char* value);
     NodeChange DoInsert(size_t ndx, int32_t key, size_t offset, const char* value);
+    /// Returns true if there is room or it can join existing entries
     bool LeafInsert(size_t row_ndx, int32_t key, size_t offset, const char* value, bool noextend=false);
-    bool NodeInsertSplit(size_t ndx, size_t new_ref);
-    bool NodeInsert(size_t ndx, size_t ref);
+    void NodeInsertSplit(size_t ndx, size_t new_ref);
+    void NodeInsert(size_t ndx, size_t ref);
     void DoDelete(size_t ndx, const char* value, size_t offset);
 
     const char* Get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
