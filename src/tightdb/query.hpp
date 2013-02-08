@@ -154,11 +154,10 @@ public:
 
     TableRef& get_table() {return m_table;}
 
+
 #ifdef TIGHTDB_DEBUG
     std::string Verify(); // Must be upper case to avoid conflict with macro in ObjC
 #endif
-
-    std::string error_code;
 
 protected:
     friend class Table;
@@ -204,6 +203,7 @@ protected:
     mutable bool do_delete;
 
 private:
+    std::string error_code;
     size_t m_threadcount;
 
     template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
