@@ -29,7 +29,6 @@
 #include <tightdb/meta.hpp>
 #include <tightdb/tuple.hpp>
 #include <tightdb/table.hpp>
-#include <tightdb/column.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/table_accessors.hpp>
 #include <tightdb/table_view_basic.hpp>

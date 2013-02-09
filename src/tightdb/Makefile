@@ -5,9 +5,9 @@ GENERATED_SOURCES = $(TABLE_MACROS_HPP)
 INST_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp terminate.hpp type_list.hpp tuple.hpp \
 safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp string_buffer.hpp file.hpp pthread_helpers.hpp \
 utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp \
-column_type.hpp column_fwd.hpp column.hpp column_tpl.hpp spec.hpp date.hpp binary_data.hpp \
-mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp \
-table_view.hpp table_view_basic.hpp $(TABLE_MACROS_HPP) group.hpp group_shared.hpp query.hpp \
+column_type.hpp column_fwd.hpp spec.hpp date.hpp binary_data.hpp mixed.hpp table.hpp \
+table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp table_view.hpp \
+table_view_basic.hpp $(TABLE_MACROS_HPP) group.hpp group_shared.hpp query.hpp \
 query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
 
 lib_LIBRARIES = libtightdb.a
