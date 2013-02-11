@@ -126,7 +126,7 @@ void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const
 {
     array.ToDot(out);
 
-    const size_t count = array.Size();
+    const size_t count = array.size();
     for (size_t i = 0; i < count; ++i) {
         if (array.GetAsRef(i) == 0) continue;
         const ConstTableRef subtable = get_subtable(i, m_ref_specSet);

@@ -8,14 +8,14 @@ using namespace tightdb;
 Index GetIndexFromRef(Array& parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.HasRefs());
-    TIGHTDB_ASSERT(ndx < parent.Size());
+    TIGHTDB_ASSERT(ndx < parent.size());
     return Index((size_t)parent.Get(ndx), &parent, ndx);
 }
 
 const Index GetIndexFromRef(const Array& parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.HasRefs());
-    TIGHTDB_ASSERT(ndx < parent.Size());
+    TIGHTDB_ASSERT(ndx < parent.size());
     return Index((size_t)parent.Get(ndx));
 }
 
@@ -74,8 +74,8 @@ void Index::Delete(size_t ndx, int64_t value, bool isLast)
     // Collapse top nodes with single item
     while (IsNode()) {
         Array refs = m_array->GetSubArray(1);
-        TIGHTDB_ASSERT(refs.Size() != 0); // node cannot be empty
-        if (refs.Size() > 1) break;
+        TIGHTDB_ASSERT(refs.size() != 0); // node cannot be empty
+        if (refs.size() > 1) break;
 
         const size_t ref = (size_t)refs.Get(0);
         refs.Delete(0); // avoid deleting subtree
@@ -113,7 +113,7 @@ bool Index::DoDelete(size_t ndx, int64_t value)
                 return true;
             }
             else ++pos;
-        } while (pos < refs.Size());
+        } while (pos < refs.size());
         TIGHTDB_ASSERT(false); // we should never reach here
     }
     else {
@@ -124,7 +124,7 @@ bool Index::DoDelete(size_t ndx, int64_t value)
                 return true;
             }
             else ++pos;
-        } while (pos < refs.Size());
+        } while (pos < refs.size());
     }
     return false;
 }
@@ -224,7 +224,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         size_t node_ndx = offsets.FindPos2(ndx);
         if (node_ndx == (size_t)-1) {
             // node can never be empty, so try to fit in last item
-            node_ndx = offsets.Size()-1;
+            node_ndx = offsets.size()-1;
         }
 
         // Calc index in subnode
@@ -244,7 +244,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         if (nc.type == NodeChange::insert_after) ++node_ndx;
 
         // If there is room, just update node directly
-        if (offsets.Size() < TIGHTDB_MAX_LIST_SIZE) {
+        if (offsets.size() < TIGHTDB_MAX_LIST_SIZE) {
             if (nc.type == NodeChange::split) NodeInsertSplit<Column>(node_ndx, nc.ref2);
             else NodeInsert<Column>(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
             return NodeChange::none;
@@ -261,7 +261,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
             return NodeChange(NodeChange::insert_after, newNode.GetRef());
         default:            // split
             // Move items below split to new node
-            const size_t len = refs.Size();
+            const size_t len = refs.size();
             for (size_t i = node_ndx; i < len; ++i) {
                 newNode.NodeAdd((size_t)refs.Get(i));
             }
@@ -288,7 +288,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
             return NodeChange(NodeChange::insert_after, newList.GetRef());
         default:            // split
             // Move items below split to new list
-            for (size_t i = ndx; i < m_array->Size(); ++i) {
+            for (size_t i = ndx; i < m_array->size(); ++i) {
                 newList.add(m_array->Get(i));
             }
             m_array->Resize(ndx);
@@ -332,7 +332,7 @@ bool Index::find_all(Column& result, int64_t value) const
             const Index node = GetIndexFromRef(refs, pos);
             if (!node.find_all(result, value)) return false;
             ++pos;
-        } while (pos < refs.Size());
+        } while (pos < refs.size());
     }
     else {
         do {
@@ -341,7 +341,7 @@ bool Index::find_all(Column& result, int64_t value) const
                 ++pos;
             }
             else return false; // no more matches
-        } while (pos < refs.Size());
+        } while (pos < refs.size());
     }
 
     return true; // may be more matches in next node
@@ -361,7 +361,7 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const
             const Index node = GetIndexFromRef(refs, pos);
             if (!node.FindAllRange(result, start, end)) return false;
             ++pos;
-        } while (pos < refs.Size());
+        } while (pos < refs.size());
     }
     else {
         do {
@@ -371,7 +371,7 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const
                 ++pos;
             }
             else return false; // no more matches
-        } while (pos < refs.Size());
+        } while (pos < refs.size());
     }
 
     return true; // may be more matches in next node
@@ -384,7 +384,7 @@ void Index::UpdateRefs(size_t pos, int diff)
     Array refs = m_array->GetSubArray(1);
 
     if (m_array->IsNode()) {
-        for (size_t i = 0; i < refs.Size(); ++i) {
+        for (size_t i = 0; i < refs.size(); ++i) {
             const size_t ref = (size_t)refs.Get(i);
             Index ndx(ref);
             ndx.UpdateRefs(pos, diff);
@@ -399,20 +399,20 @@ void Index::UpdateRefs(size_t pos, int diff)
 
 void Index::Verify() const
 {
-    TIGHTDB_ASSERT(m_array->Size() == 2);
+    TIGHTDB_ASSERT(m_array->size() == 2);
     TIGHTDB_ASSERT(m_array->HasRefs());
 
     const Array offsets = m_array->GetSubArray(0);
     const Array refs = m_array->GetSubArray(1);
     offsets.Verify();
     refs.Verify();
-    TIGHTDB_ASSERT(offsets.Size() == refs.Size());
+    TIGHTDB_ASSERT(offsets.size() == refs.size());
 
     if (m_array->IsNode()) {
         TIGHTDB_ASSERT(refs.HasRefs());
 
         // Make sure that all offsets matches biggest value in ref
-        for (size_t i = 0; i < refs.Size(); ++i) {
+        for (size_t i = 0; i < refs.size(); ++i) {
             const size_t ref = (size_t)refs.Get(i);
             TIGHTDB_ASSERT(ref);
 

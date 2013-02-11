@@ -294,7 +294,7 @@ inline void ColumnSubtableParent::SubtableMap::update_from_parents()
 {
     if (!m_indices.IsValid()) return;
 
-    const size_t count = m_wrappers.Size();
+    const size_t count = m_wrappers.size();
     for (size_t i = 0; i < count; ++i) {
         Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));
         t->UpdateFromParent();
@@ -305,7 +305,7 @@ inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
 {
     if (!m_indices.IsValid()) return;
 
-    const size_t n = m_wrappers.Size();
+    const size_t n = m_wrappers.size();
     for (size_t i=0; i<n; ++i) {
         Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));
         t->invalidate();

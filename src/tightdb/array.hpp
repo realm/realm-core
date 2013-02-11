@@ -248,7 +248,7 @@ public:
     bool IsValid() const TIGHTDB_NOEXCEPT {return m_data != NULL;}
     void Invalidate() const TIGHTDB_NOEXCEPT {m_data = NULL;}
 
-    virtual size_t Size() const TIGHTDB_NOEXCEPT {return m_len;}
+    virtual size_t size() const TIGHTDB_NOEXCEPT {return m_len;}
     bool is_empty() const TIGHTDB_NOEXCEPT {return m_len == 0;}
 
     void Insert(size_t ndx, int64_t value);
@@ -800,7 +800,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
             newRefs.SetIsIndexNode(true);
 
         // First write out all sub-arrays
-        const size_t count = Size();
+        const size_t count = size();
         for (size_t i = 0; i < count; ++i) {
             const size_t ref = GetAsRef(i);
             if (ref == 0 || ref & 0x1) {
@@ -1544,7 +1544,7 @@ template <class cond, Action action, size_t bitwidth, class Callback> void Array
     r_state.m_state = (int64_t)&r_arr;
 
     if (action == act_FindAll) {
-        for (size_t t = 0; t < akku->Size(); t++)
+        for (size_t t = 0; t < akku->size(); t++)
             r_arr.add(akku->Get(t));
     }
     else {
@@ -1572,8 +1572,8 @@ template <class cond2, Action action, size_t bitwidth, class Callback> int64_t A
     // Reference implementation of find_optimized for bug testing
     (void)callback;
 
-    if (end > Size())
-        end = Size();
+    if (end > size())
+        end = size();
 
     for (size_t t = start; t < end; t++) {
         int64_t v = Get(t);

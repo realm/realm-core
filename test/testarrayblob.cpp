@@ -52,7 +52,7 @@ TEST(ArrayBlob)
 
     CHECK_EQUAL(t1, blob.Get(0));
     CHECK_EQUAL(t3, blob.Get(l1));
-    CHECK_EQUAL(l1 + l3, blob.Size());
+    CHECK_EQUAL(l1 + l3, blob.size());
 
     // Delete all
     blob.Delete(0, l1 + l3);

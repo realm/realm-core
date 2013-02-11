@@ -174,7 +174,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         size_t node_ndx = offsets.FindPos2(key);
         if (node_ndx == (size_t)-1) {
             // node can never be empty, so try to fit in last item
-            node_ndx = offsets.Size()-1;
+            node_ndx = offsets.size()-1;
         }
 
         // Get sublist
@@ -193,7 +193,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         if (nc.type == NodeChange::insert_after) ++node_ndx;
 
         // If there is room, just update node directly
-        if (offsets.Size() < TIGHTDB_MAX_LIST_SIZE) {
+        if (offsets.size() < TIGHTDB_MAX_LIST_SIZE) {
             if (nc.type == NodeChange::split) NodeInsertSplit(node_ndx, nc.ref2);
             else NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
             return NodeChange::none;
@@ -220,7 +220,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
                 else return NodeChange(NodeChange::insert_after, newNode.GetRef());
             default:            // split
                 // Move items after split to new node
-                const size_t len = refs.Size();
+                const size_t len = refs.size();
                 for (size_t i = node_ndx; i < len; ++i) {
                     const size_t ref = refs.GetAsRef(i);
                     newNode.NodeAddKey(ref);
@@ -233,7 +233,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
     else {
         // Is there room in the list?
         Array old_offsets = m_array->GetSubArray(0);
-        const size_t count = old_offsets.Size();
+        const size_t count = old_offsets.size();
         const bool noextend = count >= TIGHTDB_MAX_LIST_SIZE;
 
         // See if we can fit entry into current leaf
@@ -286,8 +286,8 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
 
-    TIGHTDB_ASSERT(ndx < offsets.Size());
-    TIGHTDB_ASSERT(offsets.Size() < TIGHTDB_MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(ndx < offsets.size());
+    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
     // Get sublists
     const size_t orig_ref = refs.Get(ndx);
@@ -312,8 +312,8 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
 
-    TIGHTDB_ASSERT(ndx <= offsets.Size());
-    TIGHTDB_ASSERT(offsets.Size() < TIGHTDB_MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(ndx <= offsets.size());
+    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
     const StringIndex col(ref, (Array*)NULL, 0, m_target_column, m_get_func, m_array->GetAllocator());
     const int64_t lastKey = col.GetLastKey();
@@ -438,7 +438,7 @@ size_t StringIndex::count(const char* value) const
 void StringIndex::distinct(Array& result) const
 {
     Array refs = m_array->GetSubArray(1);
-    const size_t count = refs.Size();
+    const size_t count = refs.size();
     Allocator& alloc = m_array->GetAllocator();
 
     // Get first matching row for every key
@@ -479,7 +479,7 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
     TIGHTDB_ASSERT(diff == 1 || diff == -1); // only used by insert and delete
 
     Array refs = m_array->GetSubArray(1);
-    const size_t count = refs.Size();
+    const size_t count = refs.size();
     Allocator& alloc = m_array->GetAllocator();
 
     if (m_array->IsNode()) {
@@ -531,8 +531,8 @@ void StringIndex::Delete(size_t row_ndx, const char* value, bool isLast)
     // Collapse top nodes with single item
     while (IsNode()) {
         Array refs = m_array->GetSubArray(1);
-        TIGHTDB_ASSERT(refs.Size() != 0); // node cannot be empty
-        if (refs.Size() > 1) break;
+        TIGHTDB_ASSERT(refs.size() != 0); // node cannot be empty
+        if (refs.size() > 1) break;
 
         const size_t ref = (size_t)refs.Get(0);
         refs.Delete(0); // avoid deleting subtree
@@ -664,7 +664,7 @@ void StringIndex::ArrayToDot(std::ostream& out, const Array& array) const
 
         refs.ToDot(out, "refs");
 
-        const size_t count = refs.Size();
+        const size_t count = refs.size();
         for (size_t i = 0; i < count; ++i) {
             const size_t ref = refs.GetAsRef(i);
             if (ref & 1) continue; // ignore literals
@@ -699,7 +699,7 @@ void StringIndex::KeysToDot(std::ostream& out, const Array& array, const char* t
     out << "</FONT></TD>" << std::endl;
 
     // Values
-    const size_t count = array.Size();
+    const size_t count = array.size();
     for (size_t i = 0; i < count; ++i) {
         const int64_t v =  array.Get(i);
 

@@ -371,13 +371,13 @@ inline bool Group::in_initial_state() const
 inline std::size_t Group::get_table_count() const
 {
     if (!m_top.IsValid()) return 0;
-    return m_tableNames.Size();
+    return m_tableNames.size();
 }
 
 inline const char* Group::get_table_name(std::size_t table_ndx) const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
-    TIGHTDB_ASSERT(table_ndx < m_tableNames.Size());
+    TIGHTDB_ASSERT(table_ndx < m_tableNames.size());
     return m_tableNames.Get(table_ndx);
 }
 
@@ -533,7 +533,7 @@ void Group::to_json(S& out) const
 
     out << "{";
 
-    for (size_t i = 0; i < m_tables.Size(); ++i) {
+    for (size_t i = 0; i < m_tables.size(); ++i) {
         const char* const name = m_tableNames.Get(i);
         const Table* const table = get_table_ptr(i);
 
@@ -549,7 +549,7 @@ void Group::to_json(S& out) const
 
 inline void Group::clear_cache()
 {
-    const size_t count = m_cachedtables.Size();
+    const size_t count = m_cachedtables.size();
     for (size_t i = 0; i < count; ++i) {
         if (Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i))) {
             t->invalidate();

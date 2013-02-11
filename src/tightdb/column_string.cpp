@@ -138,10 +138,10 @@ size_t AdaptiveStringColumn::Size() const TIGHTDB_NOEXCEPT
         return size;
     }
     else if (IsLongStrings()) {
-        return (static_cast<ArrayStringLong*>(m_array))->Size();
+        return (static_cast<ArrayStringLong*>(m_array))->size();
     }
     else {
-        return (static_cast<ArrayString*>(m_array))->Size();
+        return (static_cast<ArrayString*>(m_array))->size();
     }
 }
 
@@ -259,7 +259,7 @@ size_t AdaptiveStringColumn::count(const char* target) const
 
     if (m_array->IsNode()) {
         const Array refs = NodeGetRefs();
-        const size_t n = refs.Size();
+        const size_t n = refs.size();
 
         for (size_t i = 0; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
@@ -327,7 +327,7 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, const char* value)
 
     // Copy strings to new array
     ArrayString* const oldarray = (ArrayString*)m_array;
-    for (size_t i = 0; i < oldarray->Size(); ++i) {
+    for (size_t i = 0; i < oldarray->size(); ++i) {
         newarray->add(oldarray->Get(i));
     }
     newarray->Set(ndx, value, len);
@@ -364,7 +364,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
 
     // Copy strings to new array
     ArrayString* const oldarray = (ArrayString*)m_array;
-    const size_t n = oldarray->Size();
+    const size_t n = oldarray->size();
     for (size_t i=0; i<n; ++i) {
         newarray->add(oldarray->Get(i));
     }
