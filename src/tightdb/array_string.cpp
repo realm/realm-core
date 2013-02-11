@@ -264,9 +264,9 @@ size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, siz
 
 bool ArrayString::Compare(const ArrayString& c) const
 {
-    if (c.Size() != Size()) return false;
+    if (c.size() != size()) return false;
 
-    for (size_t i = 0; i < Size(); ++i) {
+    for (size_t i = 0; i < size(); ++i) {
         if (strcmp(Get(i), c.Get(i)) != 0) return false;
     }
 

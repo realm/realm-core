@@ -507,7 +507,7 @@ TEST(Column_FindAll_IntMin)
     }
 
     c.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
@@ -539,7 +539,7 @@ TEST(Column_FindAll_IntMax)
     }
 
     c.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
@@ -566,7 +566,7 @@ TEST(Column_FindHamming)
     Array res;
     col.find_all_hamming(res, 0x3333333333333332LL, 2);
 
-    CHECK_EQUAL(10, res.Size()); // Half should match
+    CHECK_EQUAL(10, res.size()); // Half should match
 
     // Clean up
     col.Destroy();

@@ -149,7 +149,7 @@ void BasicArray<T>::Delete(size_t ndx)
 template<typename T>
 bool BasicArray<T>::Compare(const BasicArray<T>& c) const
 {
-    for (size_t i = 0; i < Size(); ++i) {
+    for (size_t i = 0; i < size(); ++i) {
         if (Get(i) != c.Get(i))
             return false;
     }

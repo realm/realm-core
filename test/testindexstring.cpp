@@ -306,7 +306,7 @@ TEST(StringIndex_Distinct)
     Array result;
     ndx.distinct(result);
 
-    CHECK_EQUAL(4, result.Size());
+    CHECK_EQUAL(4, result.size());
     CHECK_EQUAL(1, result[0]); // s2 = Brian
     CHECK_EQUAL(0, result[1]); // s1 = John
     CHECK_EQUAL(3, result[2]); // s3 = Samantha

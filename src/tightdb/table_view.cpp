@@ -10,7 +10,7 @@ namespace tightdb {
 
 size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 {
-    for (size_t i = 0; i < m_refs.Size(); i++)
+    for (size_t i = 0; i < m_refs.size(); i++)
         if (get_int(column_ndx, i) == value)
             return i;
     return size_t(-1);
@@ -20,7 +20,7 @@ size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) co
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
 
-    for (size_t i = 0; i < m_refs.Size(); i++)
+    for (size_t i = 0; i < m_refs.size(); i++)
         if (strcmp(get_string(column_ndx, i), value) == 0)
             return i;
     return size_t(-1);
@@ -28,7 +28,7 @@ size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) co
 
 size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
 {
-    for (size_t i = 0; i < m_refs.Size(); i++)
+    for (size_t i = 0; i < m_refs.size(); i++)
         if (get_float(column_ndx, i) == value)
             return i;
     return size_t(-1);
@@ -36,7 +36,7 @@ size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
 
 size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
 {
-    for (size_t i = 0; i < m_refs.Size(); i++)
+    for (size_t i = 0; i < m_refs.size(); i++)
         if (get_double(column_ndx, i) == value)
             return i;
     return size_t(-1);
@@ -53,13 +53,13 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
     TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min);
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
-    if (m_refs.Size() == 0)
+    if (m_refs.size() == 0)
         return 0;
 
     typedef typename ColumnTypeTraits<T>::array_type ArrType;
     const ColType* column = (ColType*)&m_table->GetColumnBase(column_ndx);
 
-    if (m_refs.Size() == column->Size()) {
+    if (m_refs.size() == column->Size()) {
         // direct aggregate on the column
         return (column->*aggregateMethod)(0, size_t(-1));
     }
@@ -74,11 +74,11 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
 
     R res = static_cast<R>( column->template TreeGet<T,ColType>(m_refs.GetAsSizeT(0)) );
 
-    for (size_t ss = 1; ss < m_refs.Size(); ++ss) {
+    for (size_t ss = 1; ss < m_refs.size(); ++ss) {
         row_ndx = m_refs.GetAsSizeT(ss);
         if (row_ndx >= leaf_end) {
             ((Column*)column)->GetBlock(row_ndx, arr, leaf_start);
-            const size_t leaf_size = arr.Size();
+            const size_t leaf_size = arr.size();
             leaf_end = leaf_start + leaf_size;
         }
 
@@ -147,34 +147,34 @@ void TableViewBase::sort(size_t column, bool Ascending)
                    m_table->get_column_type(column) == type_Date ||
                    m_table->get_column_type(column) == type_Bool);
 
-    if (m_refs.Size() == 0)
+    if (m_refs.size() == 0)
         return;
 
     Array vals;
     Array ref;
     Array result;
 
-    //ref.Preset(0, m_refs.Size() - 1, m_refs.Size());
-    for (size_t t = 0; t < m_refs.Size(); t++)
+    //ref.Preset(0, m_refs.size() - 1, m_refs.size());
+    for (size_t t = 0; t < m_refs.size(); t++)
         ref.add(t);
 
     // Extract all values from the Column and put them in an Array because Array is much faster to operate on
     // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
     if (m_table->get_column_type(column) == type_Int) {
-        for (size_t t = 0; t < m_refs.Size(); t++) {
+        for (size_t t = 0; t < m_refs.size(); t++) {
             const int64_t v = m_table->get_int(column, size_t(m_refs.Get(t)));
             vals.add(v);
         }
     }
     else if (m_table->get_column_type(column) == type_Date) {
-        for (size_t t = 0; t < m_refs.Size(); t++) {
+        for (size_t t = 0; t < m_refs.size(); t++) {
             const size_t idx = size_t(m_refs.Get(t));
             const int64_t v = int64_t(m_table->get_date(column, idx));
             vals.add(v);
         }
     }
     else if (m_table->get_column_type(column) == type_Bool) {
-        for (size_t t = 0; t < m_refs.Size(); t++) {
+        for (size_t t = 0; t < m_refs.size(); t++) {
             const size_t idx = size_t(m_refs.Get(t));
             const int64_t v = int64_t(m_table->get_bool(column, idx));
             vals.add(v);
@@ -184,7 +184,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
     vals.ReferenceSort(ref);
     vals.Destroy();
 
-    for (size_t t = 0; t < m_refs.Size(); t++) {
+    for (size_t t = 0; t < m_refs.size(); t++) {
         const size_t r  = (size_t)ref.Get(t);
         const size_t rr = (size_t)m_refs.Get(r);
         result.add(rr);
@@ -195,14 +195,14 @@ void TableViewBase::sort(size_t column, bool Ascending)
     // Copy result to m_refs (todo, there might be a shortcut)
     m_refs.Clear();
     if (Ascending) {
-        for (size_t t = 0; t < ref.Size(); t++) {
+        for (size_t t = 0; t < ref.size(); t++) {
             const size_t v = (size_t)result.Get(t);
             m_refs.add(v);
         }
     }
     else {
-        for (size_t t = 0; t < ref.Size(); t++) {
-            const size_t v = (size_t)result.Get(ref.Size() - t - 1);
+        for (size_t t = 0; t < ref.size(); t++) {
+            const size_t v = (size_t)result.Get(ref.size() - t - 1);
             m_refs.add(v);
         }
     }
@@ -251,7 +251,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
 void TableView::remove(size_t ndx)
 {
     TIGHTDB_ASSERT(m_table);
-    TIGHTDB_ASSERT(ndx < m_refs.Size());
+    TIGHTDB_ASSERT(ndx < m_refs.size());
 
     // Delete row in source table
     const size_t real_ndx = size_t(m_refs.Get(ndx));
@@ -270,7 +270,7 @@ void TableView::clear()
 
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)
-    const size_t count = m_refs.Size();
+    const size_t count = m_refs.size();
     for (size_t i = count; i; --i) {
         const size_t ndx = size_t(m_refs.Get(i-1));
         m_table->remove(ndx);

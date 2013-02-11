@@ -74,7 +74,7 @@ size_t ColumnBinary::Size() const  TIGHTDB_NOEXCEPT
         return size;
     }
     else {
-        return (static_cast<ArrayBinary*>(m_array))->Size();
+        return (static_cast<ArrayBinary*>(m_array))->size();
     }
 }
 
