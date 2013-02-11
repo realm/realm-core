@@ -248,7 +248,7 @@ public:
     bool IsValid() const TIGHTDB_NOEXCEPT {return m_data != NULL;}
     void Invalidate() const TIGHTDB_NOEXCEPT {m_data = NULL;}
 
-    virtual size_t size() const TIGHTDB_NOEXCEPT {return m_len;}
+    size_t size() const TIGHTDB_NOEXCEPT {return m_len;}
     bool is_empty() const TIGHTDB_NOEXCEPT {return m_len == 0;}
 
     void Insert(size_t ndx, int64_t value);
