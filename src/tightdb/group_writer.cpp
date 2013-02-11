@@ -30,8 +30,8 @@ size_t GroupWriter::Commit()
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
     const bool isShared = m_group.m_is_shared;
-    TIGHTDB_ASSERT(fpositions.Size() == flengths.Size());
-    TIGHTDB_ASSERT(!isShared || fversions.Size() == flengths.Size());
+    TIGHTDB_ASSERT(fpositions.size() == flengths.size());
+    TIGHTDB_ASSERT(!isShared || fversions.size() == flengths.size());
 
     // Ensure that the freelist arrays are are themselves added to
     // (the allocator) free list
@@ -60,7 +60,7 @@ size_t GroupWriter::Commit()
     // To make sure we have room for top and free list we calculate the absolute
     // largest size they can get:
     // (64bit width + one possible ekstra entry per alloc and header)
-    const size_t free_count = fpositions.Size() + 5;
+    const size_t free_count = fpositions.size() + 5;
     const size_t top_max_size = (5 + 1) * 8;
     const size_t flist_max_size = (free_count) * 8;
     const size_t total_reserve = top_max_size + (flist_max_size * (isShared ? 3 : 2));
@@ -87,7 +87,7 @@ size_t GroupWriter::Commit()
     top.Set(2, res_pos);
     top.Set(3, fl_pos);
     if (isShared) top.Set(4, fv_pos);
-    else if (top.Size() == 5) top.Delete(4); // versions
+    else if (top.size() == 5) top.Delete(4); // versions
 
     // Get final sizes
     const size_t top_size = top.GetByteSize(true);
@@ -184,7 +184,7 @@ void GroupWriter::merge_free_space()
     if (flengths.is_empty())
         return;
 
-    size_t count = flengths.Size()-1;
+    size_t count = flengths.size()-1;
     for (size_t i = 0; i < count; ++i) {
         const size_t i2 = i+1;
         const size_t pos1 = fpositions.GetAsSizeT(i);
@@ -249,7 +249,7 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t start)
     const bool isShared = m_group.m_is_shared;
 
     // Do we have a free space we can reuse?
-    const size_t count = flengths.Size();
+    const size_t count = flengths.size();
     size_t ndx = not_found;
     for (size_t i = start; i < count; ++i) {
         const size_t free_len = flengths.GetAsSizeT(i);
@@ -297,7 +297,7 @@ size_t GroupWriter::get_free_space(size_t len)
     Array& fversions    = m_group.m_freeVersions;
     const bool isShared = m_group.m_is_shared;
 
-    const size_t count = flengths.Size();
+    const size_t count = flengths.size();
 
     // Since we do a 'first fit' search, the top pieces are likely
     // to get smaller and smaller. So if we are looking for a bigger piece
@@ -379,7 +379,7 @@ size_t GroupWriter::extend_free_space(size_t len)
 
     // See if we can merge in new space
     if (!fpositions.is_empty()) {
-        const size_t last_ndx = fpositions.Size()-1;
+        const size_t last_ndx = fpositions.size()-1;
         const size_t last_len = flengths[last_ndx];
         const size_t end  = fpositions[last_ndx] + last_len;
         const size_t ver  = isShared ? fversions[last_ndx] : 0;
@@ -394,7 +394,7 @@ size_t GroupWriter::extend_free_space(size_t len)
     flengths.add(ext_len);
     if (isShared) fversions.add(0); // new space is always free for writing
 
-    return fpositions.Size()-1;
+    return fpositions.size()-1;
 }
 
 
@@ -407,7 +407,7 @@ void GroupWriter::dump()
     Array& fversions    = m_group.m_freeVersions;
     const bool isShared = m_group.m_is_shared;
 
-    const size_t count = flengths.Size();
+    const size_t count = flengths.size();
     cout << "count: " << count << ", m_len = " << m_file_map.get_size() << ", version >= " << m_readlock_version << "\n";
     if (!isShared) {
         for (size_t i = 0; i < count; ++i) {

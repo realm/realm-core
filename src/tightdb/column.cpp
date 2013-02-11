@@ -19,7 +19,7 @@ using namespace tightdb;
 Column GetColumnFromRef(Array &parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.HasRefs());
-    TIGHTDB_ASSERT(ndx < parent.Size());
+    TIGHTDB_ASSERT(ndx < parent.size());
     return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
 }
 
@@ -52,8 +52,8 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
     int64_t v0, v1;
     size_t i0, i1;
     size_t p0 = 0, p1 = 0;
-    size_t s0 = idx0->Size();
-    size_t s1 = idx1->Size();
+    size_t s0 = idx0->size();
+    size_t s1 = idx1->size();
 
     i0 = idx0->GetAsRef(p0++);
     i1 = idx1->GetAsRef(p1++);
@@ -92,7 +92,7 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
         idxres->add(i1);
     }
 
-    TIGHTDB_ASSERT(idxres->Size() == idx0->Size() + idx1->Size());
+    TIGHTDB_ASSERT(idxres->size() == idx0->size() + idx1->size());
 }
 
 // Merge two sorted arrays into a single sorted array
@@ -102,8 +102,8 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
 
     size_t p0 = 0;
     size_t p1 = 0;
-    const size_t s0 = a0.Size();
-    const size_t s1 = a1.Size();
+    const size_t s0 = a0.size();
+    const size_t s1 = a1.size();
 
     int64_t v0 = a0.Get(p0++);
     int64_t v1 = a1.Get(p1++);
@@ -137,7 +137,7 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
         res.add(v1);
     }
 
-    TIGHTDB_ASSERT(res.Size() == a0.Size() + a1.Size());
+    TIGHTDB_ASSERT(res.size() == a0.size() + a1.size());
 }
 
 // Input:
@@ -146,7 +146,7 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
 //     Merge-sorted array of all values
 Array* merge(const Array& arrayList)
 {
-    const size_t size = arrayList.Size();
+    const size_t size = arrayList.size();
 
     if (size == 1)
         return NULL; // already sorted
@@ -198,7 +198,7 @@ Array* merge(const Array& arrayList)
 // TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 {
-    if (indexlists->Size() == 1) {
+    if (indexlists->size() == 1) {
 //      size_t ref = valuelist->Get(0);
         *indexresult = (Array *)indexlists->Get(0);
         return;
@@ -206,12 +206,12 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 
     Array leftV, rightV;
     Array leftI, rightI;
-    size_t leftSize = indexlists->Size() / 2;
+    size_t leftSize = indexlists->size() / 2;
     for (size_t t = 0; t < leftSize; t++) {
         leftV.add(indexlists->Get(t));
         leftI.add(indexlists->Get(t));
     }
-    for (size_t t = leftSize; t < indexlists->Size(); t++) {
+    for (size_t t = leftSize; t < indexlists->size(); t++) {
         rightV.add(indexlists->Get(t));
         rightI.add(indexlists->Get(t));
     }
@@ -250,7 +250,7 @@ size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXC
 {
     Array a(ref, 0, 0, alloc);
     if (!a.IsNode())
-        return a.Size();
+        return a.size();
     Array offsets(a.Get(0), 0, 0, alloc);
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
@@ -338,7 +338,7 @@ bool Column::is_empty() const TIGHTDB_NOEXCEPT
 size_t Column::Size() const TIGHTDB_NOEXCEPT
 {
     if (!IsNode())
-        return m_array->Size();
+        return m_array->size();
     const Array offsets = NodeGetOffsets();
     return offsets.is_empty() ? 0 : size_t(offsets.back());
 }
@@ -468,7 +468,7 @@ void Column::sort(size_t start, size_t end)
 {
     Array arr;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
-    for (size_t t = 0; t < arr.Size(); t++) {
+    for (size_t t = 0; t < arr.size(); t++) {
         const size_t ref = to_ref(arr.Get(t));
         Array a(ref);
         a.sort();
@@ -477,7 +477,7 @@ void Column::sort(size_t start, size_t end)
     Array* sorted = merge(arr);
     if (sorted) {
         // Todo, this is a bit slow. Add bulk insert or the like to Column
-        const size_t count = sorted->Size();
+        const size_t count = sorted->size();
         for (size_t t = 0; t < count; ++t) {
             Set(t, sorted->Get(t));
         }
@@ -500,16 +500,16 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&values);
 
     size_t offset = 0;
-    for (size_t t = 0; t < values.Size(); t++) {
+    for (size_t t = 0; t < values.size(); t++) {
         Array *i = new Array();
         size_t ref = values.GetAsRef(t);
         Array v(ref);
-        for (size_t j = 0; j < v.Size(); j++)
+        for (size_t j = 0; j < v.size(); j++)
             all_values.add(v.Get(j));
         v.ReferenceSort(*i);
-        for (size_t n = 0; n < v.Size(); n++)
+        for (size_t n = 0; n < v.size(); n++)
             i->Set(n, i->Get(n) + offset);
-        offset += v.Size();
+        offset += v.size();
         indexes.add((int64_t)i);
     }
 
@@ -517,7 +517,7 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
 
     merge_references(&all_values, &indexes, &ResI);
 
-    for (size_t t = 0; t < ResI->Size(); t++)
+    for (size_t t = 0; t < ResI->size(); t++)
         ref.add(ResI->Get(t));
 }
 
@@ -546,7 +546,7 @@ void ColumnBase::NodeUpdateOffsets(size_t ndx)
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
-    TIGHTDB_ASSERT(ndx < offsets.Size());
+    TIGHTDB_ASSERT(ndx < offsets.size());
 
     const int64_t newSize = GetRefSize((size_t)refs.Get(ndx));
     const int64_t oldSize = offsets.Get(ndx) - (ndx ? offsets.Get(ndx-1) : 0);
@@ -562,7 +562,7 @@ void ColumnBase::NodeAddKey(size_t ref)
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
-    TIGHTDB_ASSERT(offsets.Size() < TIGHTDB_MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
     const Array new_top(ref, NULL, 0,m_array->GetAllocator());
     const Array new_offsets(new_top.GetAsRef(0), NULL, 0,m_array->GetAllocator());
@@ -584,7 +584,7 @@ void Column::Delete(size_t ndx)
     // Flatten tree if possible
     while (IsNode()) {
         Array refs = NodeGetRefs();
-        if (refs.Size() != 1) break;
+        if (refs.size() != 1) break;
 
         const size_t ref = refs.GetAsRef(0);
         refs.Delete(0); // avoid destroying subtree
@@ -608,7 +608,7 @@ void Column::Increment64(int64_t value, size_t start, size_t end)
 
     //TODO: partial incr
     Array refs = NodeGetRefs();
-    const size_t count = refs.Size();
+    const size_t count = refs.size();
     for (size_t i = 0; i < count; ++i) {
         Column col = ::GetColumnFromRef(refs, i);
         col.Increment64(value);
@@ -620,7 +620,7 @@ void Column::IncrementIf(int64_t limit, int64_t value)
     if (!IsNode()) m_array->IncrementIf(limit, value);
     else {
         Array refs = NodeGetRefs();
-        const size_t count = refs.Size();
+        const size_t count = refs.size();
         for (size_t i = 0; i < count; ++i) {
             Column col = ::GetColumnFromRef(refs, i);
             col.IncrementIf(limit, value);
@@ -667,7 +667,7 @@ void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, siz
         // Get subnode table
         const Array offsets = NodeGetOffsets();
         const Array refs = NodeGetRefs();
-        const size_t count = refs.Size();
+        const size_t count = refs.size();
 
         for (size_t i = 0; i < count; ++i) {
             const Column col((size_t)refs.Get(i));
@@ -785,10 +785,10 @@ void Column::Print() const
         const Array offsets = NodeGetOffsets();
         const Array refs = NodeGetRefs();
 
-        for (size_t i = 0; i < refs.Size(); ++i) {
+        for (size_t i = 0; i < refs.size(); ++i) {
             cout << " " << i << ": " << offsets.Get(i) << " " << hex << refs.Get(i) << dec <<"\n";
         }
-        for (size_t i = 0; i < refs.Size(); ++i) {
+        for (size_t i = 0; i < refs.size(); ++i) {
             const Column col((size_t)refs.Get(i));
             col.Print();
         }
@@ -801,7 +801,7 @@ void Column::Print() const
 void Column::Verify() const
 {
     if (IsNode()) {
-        TIGHTDB_ASSERT(m_array->Size() == 2);
+        TIGHTDB_ASSERT(m_array->size() == 2);
         //TIGHTDB_ASSERT(m_hasRefs);
 
         const Array offsets = NodeGetOffsets();
@@ -809,10 +809,10 @@ void Column::Verify() const
         offsets.Verify();
         refs.Verify();
         TIGHTDB_ASSERT(refs.HasRefs());
-        TIGHTDB_ASSERT(offsets.Size() == refs.Size());
+        TIGHTDB_ASSERT(offsets.size() == refs.size());
 
         size_t off = 0;
-        for (size_t i = 0; i < refs.Size(); ++i) {
+        for (size_t i = 0; i < refs.size(); ++i) {
             const size_t ref = size_t(refs.Get(i));
             TIGHTDB_ASSERT(ref);
 
@@ -860,7 +860,7 @@ void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const
 
         refs.ToDot(out, "refs");
 
-        const size_t count = refs.Size();
+        const size_t count = refs.size();
         for (size_t i = 0; i < count; ++i) {
             const Array r = refs.GetSubArray(i);
             ArrayToDot(out, r);

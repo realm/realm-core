@@ -295,7 +295,7 @@ void Array::Clear()
 
     // Make sure we don't have any dangling references
     if (m_hasRefs) {
-        for (size_t i = 0; i < Size(); ++i) {
+        for (size_t i = 0; i < size(); ++i) {
             const size_t ref = GetAsRef(i);
             if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
@@ -1606,7 +1606,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
         }
 
         // Accumulate occurences
-        for (size_t t = 1; t < count.Size(); t++) {
+        for (size_t t = 1; t < count.size(); t++) {
             count.Set(t, count.Get(t) + count.Get(t - 1));
         }
 
@@ -1621,7 +1621,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
         }
 
         // Copy result into ref
-        for (size_t t = 0; t < res.Size(); t++)
+        for (size_t t = 0; t < res.size(); t++)
             ref.Set(t, res.Get(t));
 
         res.Destroy();
@@ -1781,7 +1781,7 @@ template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
 std::vector<int64_t> Array::ToVector(void) const
 {
     std::vector<int64_t> v;
-    const size_t count = Size();
+    const size_t count = size();
     for (size_t t = 0; t < count; ++t)
         v.push_back(Get(t));
     return v;
@@ -1789,9 +1789,9 @@ std::vector<int64_t> Array::ToVector(void) const
 
 bool Array::Compare(const Array& c) const
 {
-    if (c.Size() != Size()) return false;
+    if (c.size() != size()) return false;
 
-    for (size_t i = 0; i < Size(); ++i) {
+    for (size_t i = 0; i < size(); ++i) {
         if (Get(i) != c.Get(i)) return false;
     }
 
@@ -1803,8 +1803,8 @@ bool Array::Compare(const Array& c) const
 
 void Array::Print() const
 {
-    std::cout << std::hex << GetRef() << std::dec << ": (" << Size() << ") ";
-    for (size_t i = 0; i < Size(); ++i) {
+    std::cout << std::hex << GetRef() << std::dec << ": (" << size() << ") ";
+    for (size_t i = 0; i < size(); ++i) {
         if (i) std::cout << ", ";
         std::cout << Get(i);
     }

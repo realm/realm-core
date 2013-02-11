@@ -161,7 +161,7 @@ void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end
     c.Clear();
 
     u.find_all(c, value);
-    if (c.Size() != result.size())
+    if (c.size() != result.size())
         TIGHTDB_ASSERT(false);
     for (size_t t = 0; t < result.size(); ++t) {
         if (result[t] != (size_t)c.Get(t))

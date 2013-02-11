@@ -66,7 +66,7 @@ void ArrayBlob::ToDot(std::ostream& out, const char* title) const
 
     // Values
     out << "<TD>";
-    out << Size() << " bytes"; //TODO: write content
+    out << size() << " bytes"; //TODO: write content
     out << "</TD>" << std::endl;
 
     out << "</TR></TABLE>>];" << std::endl;

@@ -37,7 +37,7 @@ using std::time_t;
 class TableViewBase {
 public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_refs.is_empty(); }
-    size_t size() const TIGHTDB_NOEXCEPT { return m_refs.Size(); }
+    size_t size() const TIGHTDB_NOEXCEPT { return m_refs.size(); }
 
     // Column information
     size_t      get_column_count() const TIGHTDB_NOEXCEPT;
@@ -305,11 +305,11 @@ private:
 
 #define TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx)                           \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
-    TIGHTDB_ASSERT(row_ndx < m_refs.Size());
+    TIGHTDB_ASSERT(row_ndx < m_refs.size());
 
 #define TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, column_type)     \
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)                 \
-    TIGHTDB_ASSERT(row_ndx < m_refs.Size());
+    TIGHTDB_ASSERT(row_ndx < m_refs.size());
 
 
 inline TableViewBase::TableViewBase(TableViewBase* tv):
@@ -468,7 +468,7 @@ template <class R, class V>
 R TableViewBase::find_all_integer(V* view, size_t column_ndx, int64_t value)
 {
     R tv(*view->m_table);
-    for (size_t i = 0; i < view->m_refs.Size(); i++)
+    for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_int(column_ndx, i) == value)
             tv.get_ref_column().add(i);
     return move(tv);
@@ -478,7 +478,7 @@ template <class R, class V>
 R TableViewBase::find_all_float(V* view, size_t column_ndx, float value)
 {
     R tv(*view->m_table);
-    for (size_t i = 0; i < view->m_refs.Size(); i++)
+    for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_float(column_ndx, i) == value)
             tv.get_ref_column().add(i);
     return move(tv);
@@ -488,7 +488,7 @@ template <class R, class V>
 R TableViewBase::find_all_double(V* view, size_t column_ndx, double value)
 {
     R tv(*view->m_table);
-    for (size_t i = 0; i < view->m_refs.Size(); i++)
+    for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_double(column_ndx, i) == value)
             tv.get_ref_column().add(i);
     return move(tv);
@@ -502,7 +502,7 @@ R TableViewBase::find_all_string(V* view, size_t column_ndx, const char* value)
     TIGHTDB_ASSERT(view->m_table->get_column_type(column_ndx) == type_String);
 
     R tv(*view->m_table);
-    for (size_t i = 0; i < view->m_refs.Size(); i++)
+    for (size_t i = 0; i < view->m_refs.size(); i++)
         if (strcmp(view->get_string(column_ndx, i), value) == 0)
             tv.get_ref_column().add(i);
     return move(tv);

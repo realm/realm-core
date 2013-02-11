@@ -37,7 +37,7 @@ void Table::init_from_ref(size_t top_ref, ArrayParent* parent, size_t ndx_in_par
     // Load from allocated memory
     m_top.UpdateRef(top_ref);
     m_top.SetParent(parent, ndx_in_parent);
-    TIGHTDB_ASSERT(m_top.Size() == 2);
+    TIGHTDB_ASSERT(m_top.size() == 2);
 
     const size_t spec_ref    = m_top.GetAsRef(0);
     const size_t columns_ref = m_top.GetAsRef(1);
@@ -77,7 +77,7 @@ void Table::CreateColumns()
     // Add the newly defined columns
     for (size_t i=0; i<count; ++i) {
         const ColumnType type = m_spec_set.get_type_attr(i);
-        const size_t ref_pos =  m_columns.Size();
+        const size_t ref_pos =  m_columns.size();
         ColumnBase* new_col = 0;
 
         switch (type) {
@@ -125,7 +125,7 @@ void Table::CreateColumns()
             break;
         case type_Table:
             {
-                const size_t column_ndx = m_cols.Size();
+                const size_t column_ndx = m_cols.size();
                 const size_t subspec_ref = m_spec_set.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, subspec_ref);
                 m_columns.add(c->GetRef());
@@ -136,7 +136,7 @@ void Table::CreateColumns()
             break;
         case type_Mixed:
             {
-                const size_t column_ndx = m_cols.Size();
+                const size_t column_ndx = m_cols.size();
                 ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
                 m_columns.add(c->GetRef());
                 c->SetParent(&m_columns, ref_pos);
@@ -159,7 +159,7 @@ void Table::CreateColumns()
 
         // Atributes on columns may define that they come with an index
         if (attr != col_attr_None) {
-            const size_t column_ndx = m_cols.Size()-1;
+            const size_t column_ndx = m_cols.size()-1;
             set_index(column_ndx, false);
 
             attr = col_attr_None;
@@ -187,7 +187,7 @@ void Table::invalidate()
     m_columns.SetParent(0,0);
 
     // Invalidate all subtables
-    const size_t n = m_cols.Size();
+    const size_t n = m_cols.size();
     for (size_t i=0; i<n; ++i) {
         ColumnBase* const c = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
         c->invalidate_subtables_virtual();
@@ -273,7 +273,7 @@ void Table::CacheColumns()
             break;
         case type_Table:
             {
-                const size_t column_ndx = m_cols.Size();
+                const size_t column_ndx = m_cols.size();
                 const size_t spec_ref = m_spec_set.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, &m_columns, ndx_in_parent,
                                                  spec_ref, ref);
@@ -284,7 +284,7 @@ void Table::CacheColumns()
             break;
         case type_Mixed:
             {
-                const size_t column_ndx = m_cols.Size();
+                const size_t column_ndx = m_cols.size();
                 ColumnMixed* c =
                     new ColumnMixed(alloc, this, column_ndx, &m_columns, ndx_in_parent, ref);
                 colsize = c->Size();
@@ -333,7 +333,7 @@ void Table::ClearCachedColumns()
 {
     TIGHTDB_ASSERT(m_cols.IsValid());
 
-    const size_t count = m_cols.Size();
+    const size_t count = m_cols.size();
     for (size_t i = 0; i < count; ++i) {
         ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
         delete column;
@@ -484,7 +484,7 @@ size_t Table::add_column(DataType type, const char* name)
 size_t Table::do_add_column(DataType type)
 {
     const size_t count      = size();
-    const size_t column_ndx = m_cols.Size();
+    const size_t column_ndx = m_cols.size();
 
     ColumnBase* new_col = NULL;
     Allocator& alloc = m_columns.GetAllocator();
@@ -496,7 +496,7 @@ size_t Table::do_add_column(DataType type)
         {
             Column* c = new Column(coldef_Normal, alloc);
             m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.Size()-1);
+            c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -505,7 +505,7 @@ size_t Table::do_add_column(DataType type)
         {
             ColumnFloat* c = new ColumnFloat(alloc);
             m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.Size()-1);
+            c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -514,7 +514,7 @@ size_t Table::do_add_column(DataType type)
         {
             ColumnDouble* c = new ColumnDouble(alloc);
             m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.Size()-1);
+            c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -523,7 +523,7 @@ size_t Table::do_add_column(DataType type)
         {
             AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
             m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.Size()-1);
+            c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -532,7 +532,7 @@ size_t Table::do_add_column(DataType type)
         {
             ColumnBinary* c = new ColumnBinary(alloc);
             m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.Size()-1);
+            c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -542,7 +542,7 @@ size_t Table::do_add_column(DataType type)
         {
             ColumnTable* c = new ColumnTable(alloc, this, column_ndx, -1); // subspec ref will be filled in later
             m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.Size()-1);
+            c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -552,7 +552,7 @@ size_t Table::do_add_column(DataType type)
         {
             ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
             m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.Size()-1);
+            c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -705,14 +705,14 @@ ColumnBase& Table::GetColumnBase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
     InstantiateBeforeChange();
-    TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
+    TIGHTDB_ASSERT(m_cols.size() == get_column_count());
     return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
 }
 
 const ColumnBase& Table::GetColumnBase(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    TIGHTDB_ASSERT(m_cols.Size() == get_column_count());
+    TIGHTDB_ASSERT(m_cols.size() == get_column_count());
     return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
 }
 
@@ -1102,7 +1102,7 @@ void Table::insert_double(size_t column_ndx, size_t ndx, double value)
 
 const char* Table::get_string(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
 
     const ColumnType type = get_real_column_type(column_ndx);
@@ -1171,7 +1171,7 @@ void Table::insert_string(size_t column_ndx, size_t ndx, const char* value)
 
 BinaryData Table::get_binary(size_t column_ndx, size_t ndx) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
 
     const ColumnBinary& column = GetColumnBinary(column_ndx);
@@ -1207,7 +1207,7 @@ void Table::insert_binary(size_t column_ndx, size_t ndx, const char* data, size_
 
 Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
 
     const ColumnMixed& column = GetColumnMixed(column_ndx);
@@ -1239,7 +1239,7 @@ Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const
 
 DataType Table::get_mixed_type(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
 
     const ColumnMixed& column = GetColumnMixed(column_ndx);
@@ -1527,7 +1527,7 @@ size_t Table::lookup(const char* value) const
 
 size_t Table::find_first_int(size_t column_ndx, int64_t value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Int);
     const Column& column = GetColumn(column_ndx);
 
@@ -1536,7 +1536,7 @@ size_t Table::find_first_int(size_t column_ndx, int64_t value) const
 
 size_t Table::find_first_bool(size_t column_ndx, bool value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Bool);
     const Column& column = GetColumn(column_ndx);
 
@@ -1545,7 +1545,7 @@ size_t Table::find_first_bool(size_t column_ndx, bool value) const
 
 size_t Table::find_first_date(size_t column_ndx, time_t value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
     const Column& column = GetColumn(column_ndx);
 
@@ -1554,7 +1554,7 @@ size_t Table::find_first_date(size_t column_ndx, time_t value) const
 
 size_t Table::find_first_float(size_t column_ndx, float value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Float);
     const ColumnFloat& column = GetColumnFloat(column_ndx);
 
@@ -1563,7 +1563,7 @@ size_t Table::find_first_float(size_t column_ndx, float value) const
 
 size_t Table::find_first_double(size_t column_ndx, double value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Double);
     const ColumnDouble& column = GetColumnDouble(column_ndx);
 
@@ -1572,7 +1572,7 @@ size_t Table::find_first_double(size_t column_ndx, double value) const
 
 size_t Table::find_first_string(size_t column_ndx, const char* value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const ColumnType type = get_real_column_type(column_ndx);
 
@@ -1603,7 +1603,7 @@ size_t Table::find_pos_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXC
 
 TableView Table::find_all_int(size_t column_ndx, int64_t value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = GetColumn(column_ndx);
 
@@ -1614,7 +1614,7 @@ TableView Table::find_all_int(size_t column_ndx, int64_t value)
 
 ConstTableView Table::find_all_int(size_t column_ndx, int64_t value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = GetColumn(column_ndx);
 
@@ -1625,7 +1625,7 @@ ConstTableView Table::find_all_int(size_t column_ndx, int64_t value) const
 
 TableView Table::find_all_bool(size_t column_ndx, bool value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = GetColumn(column_ndx);
 
@@ -1636,7 +1636,7 @@ TableView Table::find_all_bool(size_t column_ndx, bool value)
 
 ConstTableView Table::find_all_bool(size_t column_ndx, bool value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = GetColumn(column_ndx);
 
@@ -1648,7 +1648,7 @@ ConstTableView Table::find_all_bool(size_t column_ndx, bool value) const
 
 TableView Table::find_all_float(size_t column_ndx, float value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const ColumnFloat& column = GetColumnFloat(column_ndx);
 
@@ -1659,7 +1659,7 @@ TableView Table::find_all_float(size_t column_ndx, float value)
 
 ConstTableView Table::find_all_float(size_t column_ndx, float value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const ColumnFloat& column = GetColumnFloat(column_ndx);
 
@@ -1670,7 +1670,7 @@ ConstTableView Table::find_all_float(size_t column_ndx, float value) const
 
 TableView Table::find_all_double(size_t column_ndx, double value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const ColumnDouble& column = GetColumnDouble(column_ndx);
 
@@ -1681,7 +1681,7 @@ TableView Table::find_all_double(size_t column_ndx, double value)
 
 ConstTableView Table::find_all_double(size_t column_ndx, double value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const ColumnDouble& column = GetColumnDouble(column_ndx);
 
@@ -1692,7 +1692,7 @@ ConstTableView Table::find_all_double(size_t column_ndx, double value) const
 
 TableView Table::find_all_date(size_t column_ndx, time_t value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = GetColumn(column_ndx);
 
@@ -1703,7 +1703,7 @@ TableView Table::find_all_date(size_t column_ndx, time_t value)
 
 ConstTableView Table::find_all_date(size_t column_ndx, time_t value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = GetColumn(column_ndx);
 
@@ -1714,7 +1714,7 @@ ConstTableView Table::find_all_date(size_t column_ndx, time_t value) const
 
 TableView Table::find_all_string(size_t column_ndx, const char *value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const ColumnType type = get_real_column_type(column_ndx);
 
@@ -1733,7 +1733,7 @@ TableView Table::find_all_string(size_t column_ndx, const char *value)
 
 ConstTableView Table::find_all_string(size_t column_ndx, const char *value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const ColumnType type = get_real_column_type(column_ndx);
 
@@ -1771,7 +1771,7 @@ ConstTableView Table::find_all_binary(size_t column_ndx, const char* value, size
 
 TableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = GetColumn(column_ndx);
 
@@ -1782,7 +1782,7 @@ TableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max)
 
 ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = GetColumn(column_ndx);
 
@@ -1794,7 +1794,7 @@ ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t
 
 TableView Table::distinct(size_t column_ndx)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));
 
     TableView tv(*this);
@@ -1817,7 +1817,7 @@ TableView Table::distinct(size_t column_ndx)
 
 ConstTableView Table::distinct(size_t column_ndx) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));
 
     ConstTableView tv(*this);
@@ -1840,7 +1840,7 @@ ConstTableView Table::distinct(size_t column_ndx) const
 
 TableView Table::get_sorted_view(size_t column_ndx, bool ascending)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     TableView tv(*this);
 
@@ -1859,7 +1859,7 @@ TableView Table::get_sorted_view(size_t column_ndx, bool ascending)
 
 ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.Size());
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     ConstTableView tv(*this);
 
@@ -1926,7 +1926,7 @@ void Table::optimize()
 
 void Table::UpdateColumnRefs(size_t column_ndx, int diff)
 {
-    for (size_t i = column_ndx; i < m_cols.Size(); ++i) {
+    for (size_t i = column_ndx; i < m_cols.size(); ++i) {
         ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
         column->UpdateParentNdx(diff);
     }
@@ -2411,7 +2411,7 @@ void Table::Verify() const
     m_columns.Verify();
     if (m_columns.IsValid()) {
         const size_t column_count = get_column_count();
-        TIGHTDB_ASSERT(column_count == m_cols.Size());
+        TIGHTDB_ASSERT(column_count == m_cols.size());
 
         for (size_t i = 0; i < column_count; ++i) {
             const ColumnType type = get_real_column_type(i);

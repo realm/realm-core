@@ -435,7 +435,7 @@ TEST(ColumnStringAutoEnumerateIndex)
     CHECK_EQUAL(4, res2);
 
     e.find_all(results, "klmop");
-    CHECK_EQUAL(5, results.Size());
+    CHECK_EQUAL(5, results.size());
     CHECK_EQUAL(4, results.Get(0));
     CHECK_EQUAL(9, results.Get(1));
     CHECK_EQUAL(14, results.Get(2));
@@ -453,7 +453,7 @@ TEST(ColumnStringAutoEnumerateIndex)
 
     results.Clear();
     e.find_all(results, "newval");
-    CHECK_EQUAL(1, results.Size());
+    CHECK_EQUAL(1, results.size());
     CHECK_EQUAL(1, results.Get(0));
 
     // Insert a value
@@ -556,7 +556,7 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
 
     c.find_all(col, "baz");
 
-    CHECK_EQUAL(2, col.Size());
+    CHECK_EQUAL(2, col.size());
 
     // Cleanup
     col.Destroy();
@@ -576,7 +576,7 @@ TEST(AdaptiveStringColumnFindAllExpand)
     asc.find_all(c, "HEJ");
 
     CHECK_EQUAL(5, asc.Size());
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
     CHECK_EQUAL(0, c.Get(0));
     CHECK_EQUAL(2, c.Get(1));
     CHECK_EQUAL(4, c.Get(2));
@@ -593,7 +593,7 @@ TEST(AdaptiveStringColumnFindAllExpand)
     asc.find_all(c, "HEJ");
 
     CHECK_EQUAL(10, asc.Size());
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
     CHECK_EQUAL(0, c.Get(0));
     CHECK_EQUAL(2, c.Get(1));
     CHECK_EQUAL(4, c.Get(2));
@@ -632,7 +632,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
 
     c.Clear();
     asc.find_all(c, "HEJSA", 0, 17);
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
     CHECK_EQUAL(0, c.Get(0));
     CHECK_EQUAL(2, c.Get(1));
     CHECK_EQUAL(4, c.Get(2));
@@ -645,7 +645,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
 
     c.Clear();
     asc.find_all(c, "HEJSA", 1, 16);
-    CHECK_EQUAL(7, c.Size());
+    CHECK_EQUAL(7, c.size());
     CHECK_EQUAL(2, c.Get(0));
     CHECK_EQUAL(4, c.Get(1));
     CHECK_EQUAL(6, c.Get(2));
@@ -686,7 +686,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
 
     c.Clear();
     asc.find_all(c, "HEJSA", 0, 17);
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
     CHECK_EQUAL(0, c.Get(0));
     CHECK_EQUAL(2, c.Get(1));
     CHECK_EQUAL(4, c.Get(2));
@@ -699,7 +699,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
 
     c.Clear();
     asc.find_all(c, "HEJSA", 1, 16);
-    CHECK_EQUAL(7, c.Size());
+    CHECK_EQUAL(7, c.size());
     CHECK_EQUAL(2, c.Get(0));
     CHECK_EQUAL(4, c.Get(1));
     CHECK_EQUAL(6, c.Get(2));

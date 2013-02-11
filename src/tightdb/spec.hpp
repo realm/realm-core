@@ -107,7 +107,7 @@ private:
     size_t get_column_type_pos(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     size_t get_subspec_ndx(size_t column_ndx) const;
     size_t get_subspec_ref(size_t subspec_ndx) const;
-    size_t get_num_subspecs() const { return m_subSpecs.IsValid() ? m_subSpecs.Size() : 0; }
+    size_t get_num_subspecs() const { return m_subSpecs.IsValid() ? m_subSpecs.size() : 0; }
     Spec get_subspec_by_ndx(size_t subspec_ndx);
 
     /// Construct an empty spec and return just the reference to the
