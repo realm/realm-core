@@ -811,14 +811,14 @@ TEST(StringIndex_Bug)
 {
     remove("indexbug.tightdb");
     remove("indexbug.tightdb.lock");
-	SharedGroup db("indexbug.tightdb");
+    SharedGroup db("indexbug.tightdb");
 
     {
         Group& group = db.begin_write();
         TableRef table = group.get_table("users");
-		table->add_column(type_String, "username");
+        table->add_column(type_String, "username");
         table->set_index(0);  // Disabling index makes it work
-		db.commit();
+        db.commit();
     }
 
     size_t transactions = 0;
