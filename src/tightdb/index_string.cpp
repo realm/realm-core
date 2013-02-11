@@ -14,10 +14,10 @@ int32_t CreateKey(const char* v)
     // (encoded like this to allow literal comparisons
     // independently of endianness)
     int32_t key = 0;
-    if (*v) key  = ((int32_t)(*v++) << 24);
-    if (*v) key |= ((int32_t)(*v++) << 16);
-    if (*v) key |= ((int32_t)(*v++) << 8);
-    if (*v) key |=  (int32_t)(*v++);
+    if (*v) key  = (int32_t(*v++) << 24);
+    if (*v) key |= (int32_t(*v++) << 16);
+    if (*v) key |= (int32_t(*v++) << 8);
+    if (*v) key |=  int32_t(*v++);
     return key;
 }
 
@@ -32,7 +32,7 @@ StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& 
 StringIndex::StringIndex(ColumnDef type, Allocator& alloc)
 : Column(type, NULL, 0, alloc), m_target_column(NULL), m_get_func(NULL)
 {
-    TIGHTDB_ASSERT(type == coldef_Node); // only used for node creation at this point
+    TIGHTDB_ASSERT(type == coldef_InnerNode); // only used for node creation at this point
 
     // Mark that this is part of index
     // (as opposed to columns under leafs)
@@ -139,21 +139,21 @@ void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, const c
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            StringIndex newNode(coldef_Node, m_array->GetAllocator());
+            StringIndex newNode(coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(GetRef());
             UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::insert_after: {
-            StringIndex newNode(coldef_Node, m_array->GetAllocator());
+            StringIndex newNode(coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAddKey(GetRef());
             newNode.NodeAddKey(nc.ref1);
             UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::split: {
-            StringIndex newNode(coldef_Node, m_array->GetAllocator());
+            StringIndex newNode(coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(nc.ref2);
             UpdateRef(newNode.GetRef());
@@ -200,7 +200,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         }
 
         // Else create new node
-        StringIndex newNode(coldef_Node, m_array->GetAllocator());
+        StringIndex newNode(coldef_InnerNode, m_array->GetAllocator());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             const int32_t lastKey = target.GetLastKey();
@@ -704,10 +704,10 @@ void StringIndex::KeysToDot(std::ostream& out, const Array& array, const char* t
         const int64_t v =  array.Get(i);
 
         char str[5] = "\0\0\0\0";
-        str[3] = (char)(v & 0xFF);
-        str[2] = (char)((v >> 8) & 0xFF);
-        str[1] = (char)((v >> 16) & 0xFF);
-        str[0] = (char)((v >> 24) & 0xFF);
+        str[3] = char(v & 0xFF);
+        str[2] = char((v >> 8) & 0xFF);
+        str[1] = char((v >> 16) & 0xFF);
+        str[0] = char((v >> 24) & 0xFF);
         const char* s = str;
 
         out << "<TD>" << s << "</TD>" << std::endl;

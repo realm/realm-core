@@ -161,7 +161,7 @@ template<> struct ColumnTypeTraitsSum<float, act_Sum> {
 
 
 // Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
-class SequentialGetterBase { virtual void dummy(){}};
+struct SequentialGetterBase { virtual ~SequentialGetterBase() {} };
 
 template<class T>class SequentialGetter : public SequentialGetterBase {
 public:
@@ -172,12 +172,12 @@ public:
     // wait until a SequentialGetter destructor because GetBlock() maps it to data that we don't have ownership of.
     SequentialGetter()
     {
-        m_array.Destroy();
+        m_array.Destroy(); // FIXME: Instead of first allocating memory and the release it immediately, why not just call the constructor that does not allocate any memory?
     }
 
     SequentialGetter(const Table& table, size_t column_ndx)
     {
-        m_array.Destroy();
+        m_array.Destroy(); // FIXME: Instead of first allocating memory and the release it immediately, why not just call the constructor that does not allocate any memory?
         if (column_ndx != not_found)
             m_column = (ColType *)&table.GetColumnBase(column_ndx);
         m_leaf_end = 0;
@@ -185,7 +185,7 @@ public:
 
     SequentialGetter(ColType* column)
     {
-        m_array.Destroy();
+        m_array.Destroy(); // FIXME: Instead of first allocating memory and the release it immediately, why not just call the constructor that does not allocate any memory?
         m_column = column;
         m_leaf_end = 0;
     }
@@ -681,7 +681,7 @@ public:
             if (s >= m_leaf_end) {
                 m_condition_column->GetBlock(s, m_array, m_leaf_start);
                 m_leaf_end = m_leaf_start + m_array.size();
-                size_t w = m_array.GetBitWidth();
+                size_t w = m_array.get_width();
                 m_dT = (w == 0 ? 1.0 / TIGHTDB_MAX_LIST_SIZE : w / float(bitwidth_time_unit));
             }
 

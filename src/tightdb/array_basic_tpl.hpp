@@ -36,8 +36,8 @@ inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc)
 }
 
 template<typename T>
-inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc)
-                               :Array(alloc)
+inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc):
+    Array(alloc)
 {
     const size_t ref = create_empty_basic_array(alloc); // Throws
     init_from_ref(ref);

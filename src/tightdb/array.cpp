@@ -12,7 +12,6 @@
 
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
-#include <tightdb/utilities.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 
@@ -164,8 +163,11 @@ void Array::SetType(ColumnDef type)
     if (m_ref) CopyOnWrite(); // Throws
 
     bool is_node = false, has_refs = false;
-    if (type == coldef_Node) is_node = has_refs = true;
-    else if (type == coldef_HasRefs) has_refs = true;
+    switch (type) {
+        case coldef_Normal:                               break;
+        case coldef_InnerNode: has_refs = is_node = true; break;
+        case coldef_HasRefs:   has_refs = true;           break;
+    }
     m_isNode  = is_node;
     m_hasRefs = has_refs;
 
@@ -342,43 +344,6 @@ void Array::Delete(size_t ndx)
     // Update length (also in header)
     --m_len;
     set_header_len(m_len);
-}
-
-int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    return (this->*m_getter)(ndx);
-
-// Two ideas that are not efficient but may be worth looking into again:
-/*
-    // Assume correct width is found early in TIGHTDB_TEMPEX, which is the case for B tree offsets that
-    // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
-    // if found later
-    TIGHTDB_TEMPEX(return Get, (ndx));
-*/
-/*
-    // Slightly slower in both of the if-cases. Also needs an matchcount m_len check too, to avoid
-    // reading beyond array.
-    if (m_width >= 8 && m_len > ndx + 7)
-        return Get<64>(ndx >> m_shift) & m_widthmask;
-    else
-        return (this->*m_getter)(ndx);
-*/
-}
-
-size_t Array::GetAsRef(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(m_hasRefs);
-    const int64_t v = Get(ndx);
-    return to_ref(v);
-}
-
-size_t Array::GetAsSizeT(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    const int64_t v = Get(ndx);
-    return to_size_t(v);
 }
 
 void Array::Set(size_t ndx, int64_t value)
@@ -1340,10 +1305,11 @@ void Array::CopyOnWrite()
 size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator& alloc)
 {
     bool is_node = false, has_refs = false;
-    if (type == coldef_Node)
-        is_node = has_refs = true;
-    else if (type == coldef_HasRefs)
-        has_refs = true;
+    switch (type) {
+        case coldef_Normal:                               break;
+        case coldef_InnerNode: has_refs = is_node = true; break;
+        case coldef_HasRefs:   has_refs = true;           break;
+    }
 
     const size_t capacity = initial_capacity;
     const MemRef mem_ref = alloc.Alloc(capacity); // Throws
@@ -1778,7 +1744,7 @@ template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
     if (i < (int)hi) QuickSort(i, hi);
 }
 
-std::vector<int64_t> Array::ToVector(void) const
+std::vector<int64_t> Array::ToVector() const
 {
     std::vector<int64_t> v;
     const size_t count = size();
@@ -2247,7 +2213,7 @@ int64_t Array::ColumnGet(size_t ndx) const TIGHTDB_NOEXCEPT
 // FIXME: Shouldn't ColumnStringGet() be locaterd in ColumnString?
 const char* Array::ColumnStringGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    const char* data   = reinterpret_cast<char*>(m_data);
+    const char* data = reinterpret_cast<char*>(m_data);
     const uint8_t* header = m_data - 8;
     size_t width = m_width;
     bool isNode = m_isNode;
@@ -2687,5 +2653,6 @@ top:
         else return 0;
     }
 }
+
 
 } //namespace tightdb

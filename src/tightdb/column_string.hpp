@@ -90,7 +90,10 @@ protected:
 
     void LeafDelete(size_t ndx);
 
-    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();} // HasRefs indicates long string array
+    // Assumes that this column has only a single leaf node, no
+    // internal nodes. In this case HasRefs indicates a long string
+    // array.
+    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();}
 
     bool FindKeyPos(const char* target, size_t& pos) const;
 
@@ -101,6 +104,18 @@ protected:
 private:
     StringIndex* m_index;
 };
+
+
+
+
+
+// Implementation:
+
+inline const char* AdaptiveStringColumn::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < Size());
+    return m_array->ColumnStringGet(ndx);
+}
 
 
 } // namespace tightdb

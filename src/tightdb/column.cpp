@@ -20,7 +20,7 @@ Column GetColumnFromRef(Array &parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.HasRefs());
     TIGHTDB_ASSERT(ndx < parent.size());
-    return Column((size_t)parent.Get(ndx), &parent, ndx, parent.GetAllocator());
+    return Column(parent.GetAsRef(ndx), &parent, ndx, parent.GetAllocator());
 }
 
 /*
@@ -232,12 +232,12 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 
 bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state)
 {
-    (void)end;
-    (void)start;
-    (void)caller_offset;
-    Array* p = (Array*)state;
+    static_cast<void>(end);
+    static_cast<void>(start);
+    static_cast<void>(caller_offset);
+    Array* p = static_cast<Array*>(state);
     const size_t ref = a->GetRef();
-    p->add((int64_t)ref); // todo, check cast
+    p->add(int64_t(ref)); // todo, check cast
     return true;
 }
 
@@ -257,7 +257,7 @@ size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXC
 
 bool ColumnBase::is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
+    const uint8_t* const header = reinterpret_cast<uint8_t*>(alloc.Translate(ref));
     const bool isNode = (header[0] & 0x80) != 0;
     return isNode;
 }
@@ -789,7 +789,7 @@ void Column::Print() const
             cout << " " << i << ": " << offsets.Get(i) << " " << hex << refs.Get(i) << dec <<"\n";
         }
         for (size_t i = 0; i < refs.size(); ++i) {
-            const Column col((size_t)refs.Get(i));
+            const Column col(refs.GetAsRef(i));
             col.Print();
         }
     }
@@ -820,7 +820,7 @@ void Column::Verify() const
             col.Verify();
 
             off += col.Size();
-            const size_t node_off = (size_t)offsets.Get(i);
+            const size_t node_off = size_t(offsets.Get(i));
             if (node_off != off) {
                 TIGHTDB_ASSERT(false);
             }
