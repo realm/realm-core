@@ -799,4 +799,61 @@ TEST(Shared_FromSerialized)
     }
 }
 
+namespace {
+void randstr(char* res, size_t len) {
+    for(size_t i = 0; i < len; ++i) {
+        res[i] = 'a' + rand() % 10;
+    }
+}
+}
+
+TEST(StringIndex_Bug)
+{
+    remove("indexbug.tightdb");
+    remove("indexbug.tightdb.lock");
+    SharedGroup db("indexbug.tightdb");
+
+    {
+        Group& group = db.begin_write();
+        TableRef table = group.get_table("users");
+        table->add_column(type_String, "username");
+        table->set_index(0);  // Disabling index makes it work
+        db.commit();
+    }
+
+    size_t transactions = 0;
+
+    for (size_t n = 0; n < 100; ++n) {
+        const uint64_t action = rand() % 1000;
+
+        transactions++;
+
+        if (action <= 500) {
+            // delete random user
+            Group& group = db.begin_write();
+            TableRef table = group.get_table("users");
+            if (table->size() > 0) {
+                size_t del = rand() % table->size();
+                //cerr << "-" << del << ": " << table->get_string(0, del) << endl;
+                table->remove(del);
+                table->Verify();
+            }
+            db.commit();
+        }
+        else {
+            // add new user
+            Group& group = db.begin_write();
+            TableRef table = group.get_table("users");
+            table->add_empty_row();
+            char txt[100];
+            randstr(txt, 8);
+            txt[8] = 0;
+            //cerr << "+" << txt << endl;
+            table->set_string(0, table->size() - 1, txt);
+            table->Verify();
+            db.commit();
+        }
+    }
+}
+
 #endif // Shared PTHREAD mutexes appear not to work on Windows

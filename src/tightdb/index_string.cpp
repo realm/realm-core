@@ -113,7 +113,7 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
 
     const size_t ins_pos = values.FindPos2(key);
 
-    if (ins_pos == (size_t)-1) {
+    if (ins_pos == not_found) {
         // When key is outside current range, we can just add it
         values.add(key);
         refs.add(ref);
@@ -485,7 +485,7 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
     if (m_array->IsNode()) {
         for (size_t i = 0; i < count; ++i) {
             const size_t ref = (size_t)refs.Get(i);
-            StringIndex ndx(ref, NULL, 0, m_target_column, m_get_func, alloc);
+            StringIndex ndx(ref, &refs, i, m_target_column, m_get_func, alloc);
             ndx.UpdateRefs(pos, diff);
         }
     }
@@ -551,7 +551,7 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
     Allocator& alloc = m_array->GetAllocator();
 
     // Create 4 byte index key
-    const char* v = value + offset;
+    const char* const v = value + offset;
     const int32_t key = CreateKey(v);
 
     const size_t pos = values.FindPos2(key);
@@ -617,7 +617,26 @@ bool StringIndex::is_empty() const
 
 #ifdef TIGHTDB_DEBUG
 
-void StringIndex::to_dot(std::ostream& out)
+void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
+{
+    Array results;
+
+    const size_t count = column.Size();
+    for (size_t i = 0; i < count; ++i) {
+        const char* const value = column.Get(i);
+
+        find_all(results, value);
+
+        const size_t has_match = results.find_first(i);
+        if (has_match == not_found) {
+            TIGHTDB_ASSERT(false);
+        }
+        results.Clear();
+    }
+    results.Destroy(); // clean-up
+}
+
+void StringIndex::to_dot(std::ostream& out) const
 {
     out << "digraph G {" << std::endl;
 
