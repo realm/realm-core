@@ -22,6 +22,7 @@
 
 #include <tightdb/column.hpp>
 #include <tightdb/column_string.hpp>
+#include <iostream>
 
 namespace tightdb {
 
@@ -49,7 +50,9 @@ public:
     void   distinct(Array& result) const;
 
 #ifdef TIGHTDB_DEBUG
-    void to_dot(std::ostream& out);
+    void verify_entries(const AdaptiveStringColumn& column) const;
+    void to_dot() const {to_dot(std::cerr);}
+    void to_dot(std::ostream& out) const;
 #endif
 
 protected:
