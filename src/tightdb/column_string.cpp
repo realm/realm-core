@@ -493,6 +493,13 @@ bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const
 
 #ifdef TIGHTDB_DEBUG
 
+void AdaptiveStringColumn::Verify() const
+{
+    if (m_index) {
+        m_index->verify_entries(*this);
+    }
+}
+
 void AdaptiveStringColumn::LeafToDot(ostream& out, const Array& array) const
 {
     const bool isLongStrings = array.HasRefs(); // HasRefs indicates long string array

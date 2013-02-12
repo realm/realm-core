@@ -75,7 +75,7 @@ public:
     bool Compare(const AdaptiveStringColumn&) const;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
 #endif // TIGHTDB_DEBUG
 
 protected:
