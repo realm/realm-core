@@ -6,6 +6,8 @@
 #include <tightdb/array_blob.hpp>
 #include <tightdb/column.hpp>
 
+using namespace std;
+
 namespace tightdb {
 
 ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& alloc):
@@ -33,14 +35,6 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
 
 // Creates new array (but invalid, call UpdateRef to init)
 //ArrayStringLong::ArrayStringLong(Allocator& alloc) : Array(alloc) {}
-
-const char* ArrayStringLong::Get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_offsets.size());
-
-    const size_t offset = ndx ? size_t(m_offsets.Get(ndx-1)) : 0;
-    return m_blob.Get(offset);
-}
 
 void ArrayStringLong::add(const char* value)
 {
@@ -182,22 +176,23 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
     return not_found;
 }
 
+
 #ifdef TIGHTDB_DEBUG
 
-void ArrayStringLong::ToDot(std::ostream& out, const char* title) const
+void ArrayStringLong::ToDot(ostream& out, const char* title) const
 {
     const size_t ref = GetRef();
 
-    out << "subgraph cluster_arraystringlong" << ref << " {" << std::endl;
+    out << "subgraph cluster_arraystringlong" << ref << " {" << endl;
     out << " label = \"ArrayStringLong";
     if (title) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    out << "\";" << endl;
 
     Array::ToDot(out, "stringlong_top");
     m_offsets.ToDot(out, "offsets");
     m_blob.ToDot(out, "blob");
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
 #endif // TIGHTDB_DEBUG

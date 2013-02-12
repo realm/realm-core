@@ -158,7 +158,7 @@ public:
 
 enum ColumnDef {
     coldef_Normal,
-    coldef_Node,
+    coldef_InnerNode, ///< Inner node of B-tree
     coldef_HasRefs
 };
 
@@ -299,8 +299,15 @@ public:
     void ReferenceSort(Array &ref);
     void Resize(size_t count);
 
-    bool IsNode() const TIGHTDB_NOEXCEPT {return m_isNode;}
+    /// Returns true if type is not coldef_InnerNode
+    bool is_leaf() const TIGHTDB_NOEXCEPT {return !m_isNode;}
+
+    /// Returns true if type is either coldef_HasRefs or coldef_InnerNode
     bool HasRefs() const TIGHTDB_NOEXCEPT {return m_hasRefs;}
+
+    // FIXME: Remove this, wrong terminology
+    bool IsNode() const TIGHTDB_NOEXCEPT {return m_isNode;}
+
     bool IsIndexNode() const {return get_header_indexflag();}
     void SetIsIndexNode(bool value) {set_header_indexflag(value);}
     Array GetSubArray(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array may cause the parent to be modified too.
@@ -382,8 +389,9 @@ public:
     template <bool gt, Action action, size_t width, class Callback>
     bool FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
 
-    // Debug
-    size_t GetBitWidth() const {return m_width;}
+    /// The meaning of 'width' depends on the context in which this
+    /// array is used.
+    std::size_t get_width() const TIGHTDB_NOEXCEPT { return m_width; }
 
 #ifdef TIGHTDB_DEBUG
     void Print() const;
@@ -391,7 +399,10 @@ public:
     void ToDot(std::ostream& out, const char* title=NULL) const;
     void Stats(MemStats& stats) const;
 #endif // TIGHTDB_DEBUG
-    mutable unsigned char* m_data; // FIXME: Should be 'char' not 'unsigned char'
+
+    // FIXME: Should be 'char' not 'unsigned char'
+    // FIXME: Should not be public
+    mutable unsigned char* m_data;
 
 private:
 
@@ -489,8 +500,8 @@ protected:
 // FIXME: below should be moved to a specific ArrayNumber class
 protected:
     // Getters and Setters for adaptive-packed arrays
-    typedef int64_t(Array::*Getter)(size_t) const; // Note: getters must not throw
-    typedef void(Array::*Setter)(size_t, int64_t);
+    typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
+    typedef void (Array::*Setter)(size_t, int64_t);
     typedef void (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryState<int64_t>*) const;
 
     Getter m_getter;
@@ -684,13 +695,50 @@ inline int64_t Array::back() const TIGHTDB_NOEXCEPT
     return Get(m_len-1);
 }
 
+inline int64_t Array::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < m_len);
+    return (this->*m_getter)(ndx);
+
+// Two ideas that are not efficient but may be worth looking into again:
+/*
+    // Assume correct width is found early in TIGHTDB_TEMPEX, which is the case for B tree offsets that
+    // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
+    // if found later
+    TIGHTDB_TEMPEX(return Get, (ndx));
+*/
+/*
+    // Slightly slower in both of the if-cases. Also needs an matchcount m_len check too, to avoid
+    // reading beyond array.
+    if (m_width >= 8 && m_len > ndx + 7)
+        return Get<64>(ndx >> m_shift) & m_widthmask;
+    else
+        return (this->*m_getter)(ndx);
+*/
+}
+
+inline std::size_t Array::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(m_hasRefs);
+    const int64_t v = Get(ndx);
+    return to_ref(v);
+}
+
+inline std::size_t Array::GetAsSizeT(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < m_len);
+    const int64_t v = Get(ndx);
+    return to_size_t(v);
+}
+
 
 inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_len);
     TIGHTDB_ASSERT(m_hasRefs);
 
-    const size_t ref = std::size_t(Get(ndx));
+    const std::size_t ref = std::size_t(Get(ndx));
     TIGHTDB_ASSERT(ref);
 
     return Array(ref, const_cast<Array*>(this), ndx, m_alloc); // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
@@ -783,7 +831,6 @@ inline void Array::init_header(void* header, bool is_node, bool has_refs, int wi
 
 //-------------------------------------------------
 
-
 template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 {
     TIGHTDB_ASSERT(IsValid());
@@ -793,7 +840,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 
     if (recurse && m_hasRefs) {
         // Temp array for updated refs
-        Array newRefs(m_isNode ? coldef_Node : coldef_HasRefs);
+        Array newRefs(m_isNode ? coldef_InnerNode : coldef_HasRefs);
 
         // Make sure that all flags are retained
         if (IsIndexNode())
@@ -1540,12 +1587,12 @@ template <class cond, Action action, size_t bitwidth, class Callback> void Array
 #ifdef TIGHTDB_DEBUG
     Array r_arr;
     QueryState<int64_t> r_state;
-    Array *akku = (Array*)state->m_state;
+    Array *accu = (Array*)state->m_state;
     r_state.m_state = (int64_t)&r_arr;
 
     if (action == act_FindAll) {
-        for (size_t t = 0; t < akku->size(); t++)
-            r_arr.add(akku->Get(t));
+        for (size_t t = 0; t < accu->size(); t++)
+            r_arr.add(accu->Get(t));
     }
     else {
         r_state.m_state = state->m_state;
@@ -1558,7 +1605,7 @@ template <class cond, Action action, size_t bitwidth, class Callback> void Array
     if (action == act_Max || action == act_Min || action == act_Sum || action == act_Count || action == act_ReturnFirst || action == act_Count) {
         find_reference<cond, action, bitwidth, Callback>(value, start, end, baseindex, &r_state, callback);
         if (action == act_FindAll)
-            TIGHTDB_ASSERT(akku->Compare(r_arr));
+            TIGHTDB_ASSERT(accu->Compare(r_arr));
         else
             TIGHTDB_ASSERT(state->m_state == r_state.m_state);
     }

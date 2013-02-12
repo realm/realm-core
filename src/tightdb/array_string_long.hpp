@@ -56,11 +56,11 @@ public:
 #endif // TIGHTDB_DEBUG
 
 private:
-    size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
-
     // Member variables
     Array m_offsets;
     ArrayBlob m_blob;
+
+    size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
 };
 
 
@@ -77,6 +77,14 @@ inline std::size_t ArrayStringLong::size() const TIGHTDB_NOEXCEPT
 {
     return m_offsets.size();
 }
+
+inline const char* ArrayStringLong::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < m_offsets.size());
+    const std::size_t offset = 0 < ndx ? std::size_t(m_offsets.Get(ndx-1)) : 0;
+    return m_blob.Get(offset);
+}
+
 
 } // namespace tightdb
 

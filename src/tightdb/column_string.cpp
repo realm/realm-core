@@ -11,15 +11,16 @@
 
 namespace {
 
+using namespace std;
 using namespace tightdb;
 
 ColumnDef GetTypeFromArray(size_t ref, Allocator& alloc)
 {
-    const uint8_t* const header = (uint8_t*)alloc.Translate(ref);
+    const uint8_t* const header = reinterpret_cast<uint8_t*>(alloc.Translate(ref));
     const bool isNode = (header[0] & 0x80) != 0;
     const bool hasRefs  = (header[0] & 0x40) != 0;
 
-    if (isNode) return coldef_Node;
+    if (isNode) return coldef_InnerNode;
     else if (hasRefs) return coldef_HasRefs;
     else return coldef_Normal;
 }
@@ -37,7 +38,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) : m_index(NULL)
 AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc) : m_index(NULL)
 {
     const ColumnDef type = GetTypeFromArray(ref, alloc);
-    if (type == coldef_Node) {
+    if (type == coldef_InnerNode) {
         m_array = new Array(ref, parent, pndx, alloc);
     }
     else if (type == coldef_HasRefs) {
@@ -70,7 +71,7 @@ void AdaptiveStringColumn::Destroy()
 
 void AdaptiveStringColumn::UpdateRef(size_t ref)
 {
-    TIGHTDB_ASSERT(GetTypeFromArray(ref, m_array->GetAllocator()) == coldef_Node); // Can only be called when creating node
+    TIGHTDB_ASSERT(GetTypeFromArray(ref, m_array->GetAllocator()) == coldef_InnerNode); // Can only be called when creating node
 
     if (IsNode()) m_array->UpdateRef(ref);
     else {
@@ -172,13 +173,6 @@ void AdaptiveStringColumn::Resize(size_t ndx)
     }
     else (static_cast<ArrayString*>(m_array))->Resize(ndx);
 
-}
-
-const char* AdaptiveStringColumn::Get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < Size());
-    return m_array->ColumnStringGet(ndx);
-    //return TreeGet<const char*, AdaptiveStringColumn>(ndx);
 }
 
 void AdaptiveStringColumn::Set(size_t ndx, const char* value)
@@ -302,10 +296,10 @@ void AdaptiveStringColumn::find_all(Array &result, const char* value, size_t sta
 const char* AdaptiveStringColumn::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     if (IsLongStrings()) {
-        return (static_cast<ArrayStringLong*>(m_array))->Get(ndx);
+        return static_cast<ArrayStringLong*>(m_array)->Get(ndx);
     }
     else {
-        return (static_cast<ArrayString*>(m_array))->Get(ndx);
+        return static_cast<ArrayString*>(m_array)->Get(ndx);
     }
 }
 
@@ -506,7 +500,7 @@ void AdaptiveStringColumn::Verify() const
     }
 }
 
-void AdaptiveStringColumn::LeafToDot(std::ostream& out, const Array& array) const
+void AdaptiveStringColumn::LeafToDot(ostream& out, const Array& array) const
 {
     const bool isLongStrings = array.HasRefs(); // HasRefs indicates long string array
 

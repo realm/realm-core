@@ -204,7 +204,7 @@ public:
     int64_t sum(size_t column_ndx) const;
     double  sum_float(size_t column_ndx) const;
     double  sum_double(size_t column_ndx) const;
-        // FIXME: What to return for below when table empty? 0?
+    // FIXME: What to return for below when table empty? 0?
     int64_t maximum(size_t column_ndx) const;
     float   maximum_float(size_t column_ndx) const;
     double  maximum_double(size_t column_ndx) const;
@@ -413,15 +413,7 @@ private:
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
     void unbind_ref() const { if (--m_ref_count == 0) delete this; } // FIXME: Cannot be noexcept since ~Table() may throw
 
-    struct UnbindGuard {
-        UnbindGuard(Table* t) TIGHTDB_NOEXCEPT: m_table(t) {}
-        ~UnbindGuard() { if(m_table) m_table->unbind_ref(); } // FIXME: Cannot be noexcept since ~Table() may throw
-        Table* operator->() const { return m_table; }
-        Table* get() const { return m_table; }
-        Table* release() TIGHTDB_NOEXCEPT { Table* t = m_table; m_table = 0; return t; }
-    private:
-        Table* m_table;
-    };
+    struct UnbindGuard;
 
     ColumnBase& GetColumnBase(size_t column_ndx);
     void InstantiateBeforeChange();
@@ -534,6 +526,16 @@ inline bool Table::has_shared_spec() const
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->subtables_have_shared_spec();
 }
+
+struct Table::UnbindGuard {
+    UnbindGuard(Table* t) TIGHTDB_NOEXCEPT: m_table(t) {}
+    ~UnbindGuard() { if(m_table) m_table->unbind_ref(); } // FIXME: Cannot be noexcept since ~Table() may throw
+    Table* operator->() const { return m_table; }
+    Table* get() const { return m_table; }
+    Table* release() TIGHTDB_NOEXCEPT { Table* t = m_table; m_table = 0; return t; }
+private:
+    Table* m_table;
+};
 
 inline size_t Table::create_empty_table(Allocator& alloc)
 {

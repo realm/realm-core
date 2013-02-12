@@ -99,7 +99,7 @@ protected:
     template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 
     // Node functions
-    bool IsNode() const TIGHTDB_NOEXCEPT {return m_array->IsNode();}
+    bool IsNode() const TIGHTDB_NOEXCEPT {return m_array->IsNode();} // FIXME: This one should go away. It does not make any sense to think of a column being a node or not a node.
     Array NodeGetOffsets() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     Array NodeGetRefs() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     template<class C> void NodeInsert(size_t ndx, size_t ref);
@@ -124,6 +124,7 @@ protected:
     // Member variables
     mutable Array* m_array; // FIXME: This should not be mutable
 };
+
 
 
 class Column : public ColumnBase {
@@ -239,6 +240,7 @@ private:
 
 
 
+
 // Implementation:
 
 inline int64_t Column::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -250,6 +252,7 @@ inline std::size_t Column::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return to_ref(Get(ndx));
 }
+
 
 } // namespace tightdb
 

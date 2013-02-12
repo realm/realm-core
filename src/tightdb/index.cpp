@@ -9,14 +9,14 @@ Index GetIndexFromRef(Array& parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.HasRefs());
     TIGHTDB_ASSERT(ndx < parent.size());
-    return Index((size_t)parent.Get(ndx), &parent, ndx);
+    return Index(parent.GetAsRef(ndx), &parent, ndx);
 }
 
 const Index GetIndexFromRef(const Array& parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.HasRefs());
     TIGHTDB_ASSERT(ndx < parent.size());
-    return Index((size_t)parent.Get(ndx));
+    return Index(parent.GetAsRef(ndx));
 }
 
 }
@@ -30,8 +30,8 @@ Index::Index(): Column(coldef_HasRefs)
     // Add subcolumns for leafs
     const Array values(coldef_Normal);
     const Array refs(coldef_Normal); // we do not own these refs (to column positions), so no COLUMN_HASREF
-    m_array->add((intptr_t)values.GetRef());
-    m_array->add((intptr_t)refs.GetRef());
+    m_array->add(intptr_t(values.GetRef()));
+    m_array->add(intptr_t(refs.GetRef()));
 }
 
 Index::Index(ColumnDef type, Array* parent, size_t pndx): Column(type, parent, pndx) {}
@@ -77,7 +77,7 @@ void Index::Delete(size_t ndx, int64_t value, bool isLast)
         TIGHTDB_ASSERT(refs.size() != 0); // node cannot be empty
         if (refs.size() > 1) break;
 
-        const size_t ref = (size_t)refs.Get(0);
+        const size_t ref = refs.GetAsRef(0);
         refs.Delete(0); // avoid deleting subtree
         m_array->Destroy();
         m_array->UpdateRef(ref);
@@ -93,7 +93,7 @@ bool Index::DoDelete(size_t ndx, int64_t value)
     Array refs = m_array->GetSubArray(1);
 
     size_t pos = values.FindPos2(value);
-    TIGHTDB_ASSERT(pos != (size_t)-1);
+    TIGHTDB_ASSERT(pos != size_t(-1));
 
     // There may be several nodes with the same values,
     // so we have to find the one with the matching ref
@@ -139,21 +139,21 @@ void Index::Insert(size_t ndx, int64_t value, bool isLast)
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            Index newNode(coldef_Node);
+            Index newNode(coldef_InnerNode);
             newNode.NodeAdd(nc.ref1);
             newNode.NodeAdd(GetRef());
             m_array->UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::insert_after: {
-            Index newNode(coldef_Node);
+            Index newNode(coldef_InnerNode);
             newNode.NodeAdd(GetRef());
             newNode.NodeAdd(nc.ref1);
             m_array->UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::split: {
-            Index newNode(coldef_Node);
+            Index newNode(coldef_InnerNode);
             newNode.NodeAdd(nc.ref1);
             newNode.NodeAdd(nc.ref2);
             m_array->UpdateRef(newNode.GetRef());
@@ -251,7 +251,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         }
 
         // Else create new node
-        Index newNode(coldef_Node);
+        Index newNode(coldef_InnerNode);
         newNode.NodeAdd(nc.ref1);
 
         switch (node_ndx) {
@@ -385,7 +385,7 @@ void Index::UpdateRefs(size_t pos, int diff)
 
     if (m_array->IsNode()) {
         for (size_t i = 0; i < refs.size(); ++i) {
-            const size_t ref = (size_t)refs.Get(i);
+            const size_t ref = size_t(refs.Get(i));
             Index ndx(ref);
             ndx.UpdateRefs(pos, diff);
         }

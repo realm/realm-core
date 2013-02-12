@@ -104,7 +104,7 @@ inline const char* ArrayString::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(ndx < m_len);
 
     if (m_width == 0) return "";
-    else return reinterpret_cast<char*>(m_data + (ndx * m_width));
+    else return reinterpret_cast<char*>(m_data) + (ndx * m_width);
 }
 
 inline void ArrayString::Set(std::size_t ndx, const char* value)
