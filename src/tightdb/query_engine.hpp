@@ -198,7 +198,7 @@ public:
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
             m_array_ptr = (ArrayType*) (((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
 //            m_array_ptr = m_column->GetBlock(index, m_array, m_leaf_start, true);
-            const size_t leaf_size = m_array_ptr->Size();
+            const size_t leaf_size = m_array_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
         }
@@ -455,13 +455,13 @@ protected:
 
 class ArrayNode: public ParentNode {
 public:
-    ArrayNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.Size()) {m_child = 0; m_dT = 0.0;}
+    ArrayNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
 
     void Init(const Table& table)
     {
         m_table = &table;
 
-        m_dD =  m_table->size() / (m_arr.Size() + 1.0);
+        m_dD =  m_table->size() / (m_arr.size() + 1.0);
         m_probes = 0;
         m_matches = 0;
 
@@ -680,7 +680,7 @@ public:
             // Cache internal leafs
             if (s >= m_leaf_end) {
                 m_condition_column->GetBlock(s, m_array, m_leaf_start);
-                m_leaf_end = m_leaf_start + m_array.Size();
+                m_leaf_end = m_leaf_start + m_array.size();
                 size_t w = m_array.GetBitWidth();
                 m_dT = (w == 0 ? 1.0 / TIGHTDB_MAX_LIST_SIZE : w / float(bitwidth_time_unit));
             }
@@ -734,7 +734,7 @@ public:
             // Cache internal leafs
             if (start >= m_leaf_end) {
                 m_condition_column->GetBlock(start, m_array, m_leaf_start);
-                m_leaf_end = m_leaf_start + m_array.Size();
+                m_leaf_end = m_leaf_start + m_array.size();
             }
 
             // Do search directly on cached leaf array

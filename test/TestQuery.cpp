@@ -458,11 +458,11 @@ TEST(TestQueryFindAll_range_or_monkey2)
                 a.add(t);
             }
         }
-        size_t s1 = a.Size();
+        size_t s1 = a.size();
         size_t s2 = tv1.size();
 
         CHECK_EQUAL(s1, s2);
-        for (size_t t = 0; t < a.Size(); t++) {
+        for (size_t t = 0; t < a.size(); t++) {
             size_t i1 = a.GetAsSizeT(t);
             size_t i2 = tv1.get_source_ndx(t);
             CHECK_EQUAL(i1, i2);

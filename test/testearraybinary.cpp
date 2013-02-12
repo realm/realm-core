@@ -18,7 +18,7 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryMultiEmpty)
     c.add(NULL, 0);
     c.add(NULL, 0);
 
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 
     CHECK_EQUAL(0, c.GetLen(0));
     CHECK_EQUAL(0, c.GetLen(1));
@@ -32,7 +32,7 @@ TEST_FIXTURE(db_setup_binary, ArrayBinarySet)
 {
     c.Set(0, "hey", 4);
 
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 
     CHECK_EQUAL("hey", c.Get(0));
     CHECK_EQUAL(4, c.GetLen(0));
@@ -46,19 +46,19 @@ TEST_FIXTURE(db_setup_binary, ArrayBinarySet)
 TEST_FIXTURE(db_setup_binary, ArrayBinaryAdd)
 {
     c.Clear();
-    CHECK_EQUAL(0, c.Size());
+    CHECK_EQUAL(0, c.size());
 
     c.add("abc", 4);
     CHECK_EQUAL("abc", c.Get(0)); // single
     CHECK_EQUAL(4, c.GetLen(0));
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
 
     c.add("defg", 5); //non-empty
     CHECK_EQUAL("abc", c.Get(0));
     CHECK_EQUAL("defg", c.Get(1));
     CHECK_EQUAL(4, c.GetLen(0));
     CHECK_EQUAL(5, c.GetLen(1));
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
 }
 
 TEST_FIXTURE(db_setup_binary, ArrayBinarySet2)
@@ -69,51 +69,51 @@ TEST_FIXTURE(db_setup_binary, ArrayBinarySet2)
     c.add("abc", 4);
     c.Set(0, "de", 3); // shrink single
     CHECK_EQUAL("de", c.Get(0));
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
 
     c.Set(0, "abcd", 5); // grow single
     CHECK_EQUAL("abcd", c.Get(0));
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
 
     c.add("efg", 4);
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL("efg", c.Get(1));
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
 
     c.Set(1, "hi", 3); // shrink last
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL("hi", c.Get(1));
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
 
     c.Set(1, "jklmno", 7); // grow last
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL("jklmno", c.Get(1));
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
 
     c.add("pq", 3);
     c.Set(1, "efghijkl", 9); // grow middle
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL("efghijkl", c.Get(1));
     CHECK_EQUAL("pq", c.Get(2));
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
 
     c.Set(1, "x", 2); // shrink middle
     CHECK_EQUAL("abcd", c.Get(0));
     CHECK_EQUAL("x", c.Get(1));
     CHECK_EQUAL("pq", c.Get(2));
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
 
     c.Set(0, "qwertyuio", 10); // grow first
     CHECK_EQUAL("qwertyuio", c.Get(0));
     CHECK_EQUAL("x", c.Get(1));
     CHECK_EQUAL("pq", c.Get(2));
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
 
     c.Set(0, "mno", 4); // shrink first
     CHECK_EQUAL("mno", c.Get(0));
     CHECK_EQUAL("x", c.Get(1));
     CHECK_EQUAL("pq", c.Get(2));
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
 }
 
 TEST_FIXTURE(db_setup_binary, ArrayBinaryInsert)
@@ -122,25 +122,25 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryInsert)
 
     c.Insert(0, "abc", 4); // single
     CHECK_EQUAL("abc", c.Get(0));
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
 
     c.Insert(1, "d", 2); // end
     CHECK_EQUAL("abc", c.Get(0));
     CHECK_EQUAL("d", c.Get(1));
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
 
     c.Insert(2, "ef", 3); // end
     CHECK_EQUAL("abc", c.Get(0));
     CHECK_EQUAL("d", c.Get(1));
     CHECK_EQUAL("ef", c.Get(2));
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
 
     c.Insert(1, "ghij", 5); // middle
     CHECK_EQUAL("abc", c.Get(0));
     CHECK_EQUAL("ghij", c.Get(1));
     CHECK_EQUAL("d", c.Get(2));
     CHECK_EQUAL("ef", c.Get(3));
-    CHECK_EQUAL(4, c.Size());
+    CHECK_EQUAL(4, c.size());
 
     c.Insert(0, "klmno", 6); // first
     CHECK_EQUAL("klmno", c.Get(0));
@@ -148,7 +148,7 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryInsert)
     CHECK_EQUAL("ghij", c.Get(2));
     CHECK_EQUAL("d", c.Get(3));
     CHECK_EQUAL("ef", c.Get(4));
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_binary, ArrayBinaryDelete)
@@ -166,25 +166,25 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryDelete)
     CHECK_EQUAL("def", c.Get(1));
     CHECK_EQUAL("ghij", c.Get(2));
     CHECK_EQUAL("klmno", c.Get(3));
-    CHECK_EQUAL(4, c.Size());
+    CHECK_EQUAL(4, c.size());
 
     c.Delete(3); // last
     CHECK_EQUAL("bc", c.Get(0));
     CHECK_EQUAL("def", c.Get(1));
     CHECK_EQUAL("ghij", c.Get(2));
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
 
     c.Delete(1); // middle
     CHECK_EQUAL("bc", c.Get(0));
     CHECK_EQUAL("ghij", c.Get(1));
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
 
     c.Delete(0); // single
     CHECK_EQUAL("ghij", c.Get(0));
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
 
     c.Delete(0); // all
-    CHECK_EQUAL(0, c.Size());
+    CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
 }
 

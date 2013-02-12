@@ -51,7 +51,7 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
                          ArrayParent* parent, size_t ndx_in_parent, size_t ref)
 {
     m_array = new Array(ref, parent, ndx_in_parent, alloc);
-    TIGHTDB_ASSERT(m_array->Size() == 2 || m_array->Size() == 3);
+    TIGHTDB_ASSERT(m_array->size() == 2 || m_array->size() == 3);
 
     const size_t types_ref = m_array->GetAsRef(0);
     const size_t refs_ref  = m_array->GetAsRef(1);
@@ -62,7 +62,7 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
 
     // Binary column with values that does not fit in refs
     // is only there if needed
-    if (m_array->Size() == 3) {
+    if (m_array->size() == 3) {
         const size_t data_ref = m_array->GetAsRef(2);
         m_data = new ColumnBinary(data_ref, m_array, 2, alloc);
     }
@@ -73,7 +73,7 @@ void ColumnMixed::InitDataColumn()
     if (m_data)
         return;
 
-    TIGHTDB_ASSERT(m_array->Size() == 2);
+    TIGHTDB_ASSERT(m_array->size() == 2);
 
     // Create new data column for items that do not fit in refs
     m_data = new ColumnBinary(m_array->GetAllocator());
@@ -345,7 +345,7 @@ void ColumnMixed::ToDot(std::ostream& out, const char* title) const
     m_types->ToDot(out, "types");
     m_refs->ToDot(out, "refs");
 
-    if (m_array->Size() > 2) {
+    if (m_array->size() > 2) {
         m_data->ToDot(out, "data");
     }
 

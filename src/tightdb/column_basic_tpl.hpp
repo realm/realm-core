@@ -109,7 +109,7 @@ size_t BasicColumn<T>::Size() const TIGHTDB_NOEXCEPT
         return size;
     }
     else {
-        return m_array->Size();
+        return m_array->size();
     }
 }
 
@@ -337,7 +337,7 @@ size_t BasicColumn<T>::count(T target) const
 
     if (m_array->IsNode()) {
         const Array refs = NodeGetRefs();
-        const size_t n = refs.Size();
+        const size_t n = refs.size();
 
         for (size_t i = 0; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
@@ -362,7 +362,7 @@ T BasicColumn<T>::sum(size_t start, size_t end) const
 
     if (m_array->IsNode()) {
         const Array refs = NodeGetRefs();
-        const size_t n = refs.Size();
+        const size_t n = refs.size();
 
         for (size_t i = start; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
@@ -399,7 +399,7 @@ T BasicColumn<T>::minimum(size_t start, size_t end) const
     T min_val = T(987.0);
     if (m_array->IsNode()) {
         const Array refs = NodeGetRefs();
-        const size_t n = refs.Size();
+        const size_t n = refs.size();
 
         for (size_t i = start; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);
@@ -428,7 +428,7 @@ T BasicColumn<T>::maximum(size_t start, size_t end) const
     T max_val = T(0.0);
     if (m_array->IsNode()) {
         const Array refs = NodeGetRefs();
-        const size_t n = refs.Size();
+        const size_t n = refs.size();
 
         for (size_t i = start; i < n; ++i) {
             const size_t ref = refs.GetAsRef(i);

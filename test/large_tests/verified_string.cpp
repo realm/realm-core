@@ -108,7 +108,7 @@ void VerifiedString::find_all(Array &c, const char *value, size_t start, size_t 
     c.Clear();
 
     u.find_all(c, value);
-    size_t cs = c.Size();
+    size_t cs = c.size();
     if (cs != result.size())
         TIGHTDB_ASSERT(false);
     for (size_t t = 0; t < result.size(); ++t) {
