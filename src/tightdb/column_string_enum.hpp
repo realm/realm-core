@@ -74,7 +74,6 @@ public:
     size_t GetKeyNdxOrAdd(const char* value);
 
 private:
-
     // Member variables
     AdaptiveStringColumn m_keys;
     StringIndex* m_index;

@@ -1106,16 +1106,14 @@ const char* Table::get_string(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXC
     TIGHTDB_ASSERT(ndx < m_size);
 
     const ColumnType type = get_real_column_type(column_ndx);
-
     if (type == col_type_String) {
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
         return column.Get(ndx);
     }
-    else {
-        TIGHTDB_ASSERT(type == col_type_StringEnum);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        return column.Get(ndx);
-    }
+
+    TIGHTDB_ASSERT(type == col_type_StringEnum);
+    const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+    return column.Get(ndx);
 }
 
 size_t Table::get_string_length(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT

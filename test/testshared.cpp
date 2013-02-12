@@ -836,7 +836,9 @@ TEST(StringIndex_Bug)
                 size_t del = rand() % table->size();
                 //cerr << "-" << del << ": " << table->get_string(0, del) << endl;
                 table->remove(del);
+#ifdef TIGHTDB_DEBUG
                 table->Verify();
+#endif
             }
             db.commit();
         }
@@ -850,7 +852,9 @@ TEST(StringIndex_Bug)
             txt[8] = 0;
             //cerr << "+" << txt << endl;
             table->set_string(0, table->size() - 1, txt);
+#ifdef TIGHTDB_DEBUG
             table->Verify();
+#endif
             db.commit();
         }
     }

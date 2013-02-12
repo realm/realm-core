@@ -40,8 +40,9 @@ template<> struct AggReturnType<float> {
 template<typename T>
 class BasicColumn : public ColumnBase {
 public:
-    BasicColumn(Allocator& alloc=Allocator::get_default());
-    BasicColumn(size_t ref, ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
+    BasicColumn(Allocator& alloc = Allocator::get_default());
+    BasicColumn(size_t ref, ArrayParent* parent = 0, size_t pndx = 0,
+                Allocator& alloc = Allocator::get_default());
     ~BasicColumn();
 
     void Destroy();
@@ -74,7 +75,7 @@ public:
     bool HasIndex() const TIGHTDB_OVERRIDE {return false;}
     void BuildIndex(Index&) {}
     void ClearIndex() {}
-    size_t FindWithIndex(int64_t) const {return (size_t)-1;}
+    size_t FindWithIndex(int64_t) const {return size_t(-1);}
 
     size_t GetRef() const TIGHTDB_OVERRIDE {return m_array->GetRef();}
     void SetParent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE {m_array->SetParent(parent, pndx);}
@@ -86,7 +87,7 @@ public:
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif // TIGHTDB_DEBUG
 
-protected:
+private:
     friend class ColumnBase;
 
     void UpdateRef(size_t ref);
@@ -104,7 +105,7 @@ protected:
 #endif // TIGHTDB_DEBUG
 
     template <typename R, Action action, class cond>
-    R aggregate(T target, size_t start, size_t end, size_t *matchcount = (size_t*)0) const;
+    R aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;
 };
 
 

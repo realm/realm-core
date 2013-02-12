@@ -187,11 +187,13 @@ bool ColumnStringEnum::Compare(const ColumnStringEnum& c) const
     return true;
 }
 
+
 // Getter function for string index
 static const char* GetString(void* column, size_t ndx)
 {
-    return ((ColumnStringEnum*)column)->Get(ndx);
+    return static_cast<ColumnStringEnum*>(column)->Get(ndx);
 }
+
 
 StringIndex& ColumnStringEnum::CreateIndex()
 {

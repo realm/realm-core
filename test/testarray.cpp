@@ -51,8 +51,8 @@ TEST_FIXTURE(db_setup_array, Array_Add0)
 {
     c.add(0);
     CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.size(), (size_t)1);
-    CHECK_EQUAL(0, c.GetBitWidth());
+    CHECK_EQUAL(c.size(), 1);
+    CHECK_EQUAL(0, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add1)
@@ -61,7 +61,7 @@ TEST_FIXTURE(db_setup_array, Array_Add1)
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.size(), 2);
-    CHECK_EQUAL(1, c.GetBitWidth());
+    CHECK_EQUAL(1, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add2)
@@ -71,7 +71,7 @@ TEST_FIXTURE(db_setup_array, Array_Add2)
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
     CHECK_EQUAL(c.size(), 3);
-    CHECK_EQUAL(2, c.GetBitWidth());
+    CHECK_EQUAL(2, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add3)
@@ -82,7 +82,7 @@ TEST_FIXTURE(db_setup_array, Array_Add3)
     CHECK_EQUAL(c.Get(2), 2);
     CHECK_EQUAL(c.Get(3), 3);
     CHECK_EQUAL(c.size(), 4);
-    CHECK_EQUAL(2, c.GetBitWidth());
+    CHECK_EQUAL(2, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add4)
@@ -94,7 +94,7 @@ TEST_FIXTURE(db_setup_array, Array_Add4)
     CHECK_EQUAL(c.Get(3), 3);
     CHECK_EQUAL(c.Get(4), 4);
     CHECK_EQUAL(c.size(), 5);
-    CHECK_EQUAL(4, c.GetBitWidth());
+    CHECK_EQUAL(4, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add5)
@@ -107,7 +107,7 @@ TEST_FIXTURE(db_setup_array, Array_Add5)
     CHECK_EQUAL(c.Get(4), 4);
     CHECK_EQUAL(c.Get(5), 16);
     CHECK_EQUAL(c.size(), 6);
-    CHECK_EQUAL(8, c.GetBitWidth());
+    CHECK_EQUAL(8, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add6)
@@ -121,7 +121,7 @@ TEST_FIXTURE(db_setup_array, Array_Add6)
     CHECK_EQUAL(c.Get(5), 16);
     CHECK_EQUAL(c.Get(6), 256);
     CHECK_EQUAL(c.size(), 7);
-    CHECK_EQUAL(16, c.GetBitWidth());
+    CHECK_EQUAL(16, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add7)
@@ -136,7 +136,7 @@ TEST_FIXTURE(db_setup_array, Array_Add7)
     CHECK_EQUAL(c.Get(6), 256);
     CHECK_EQUAL(c.Get(7), 65536);
     CHECK_EQUAL(c.size(), 8);
-    CHECK_EQUAL(32, c.GetBitWidth());
+    CHECK_EQUAL(32, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add8)
@@ -152,7 +152,7 @@ TEST_FIXTURE(db_setup_array, Array_Add8)
     CHECK_EQUAL(c.Get(7), 65536);
     CHECK_EQUAL(c.Get(8), 4294967296LL);
     CHECK_EQUAL(c.size(), 9);
-    CHECK_EQUAL(64, c.GetBitWidth());
+    CHECK_EQUAL(64, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg1)
@@ -162,7 +162,7 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg1)
 
     CHECK_EQUAL(c.size(), 1);
     CHECK_EQUAL(c.Get(0), -1);
-    CHECK_EQUAL(8, c.GetBitWidth());
+    CHECK_EQUAL(8, c.get_width());
 }
 
 TEST(Array_AddNeg1_1)
@@ -179,7 +179,7 @@ TEST(Array_AddNeg1_1)
     CHECK_EQUAL(c.Get(1), 2);
     CHECK_EQUAL(c.Get(2), 3);
     CHECK_EQUAL(c.Get(3), -128);
-    CHECK_EQUAL(8, c.GetBitWidth());
+    CHECK_EQUAL(8, c.get_width());
 
     // Cleanup
     c.Destroy();
@@ -192,7 +192,7 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg2)
     CHECK_EQUAL(c.size(), 2);
     CHECK_EQUAL(c.Get(0), -1);
     CHECK_EQUAL(c.Get(1), -256);
-    CHECK_EQUAL(16, c.GetBitWidth());
+    CHECK_EQUAL(16, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg3)
@@ -203,7 +203,7 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg3)
     CHECK_EQUAL(c.Get(0), -1);
     CHECK_EQUAL(c.Get(1), -256);
     CHECK_EQUAL(c.Get(2), -65536);
-    CHECK_EQUAL(32, c.GetBitWidth());
+    CHECK_EQUAL(32, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg4)
@@ -215,7 +215,7 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg4)
     CHECK_EQUAL(c.Get(1), -256);
     CHECK_EQUAL(c.Get(2), -65536);
     CHECK_EQUAL(c.Get(3), -4294967296LL);
-    CHECK_EQUAL(64, c.GetBitWidth());
+    CHECK_EQUAL(64, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Set)
