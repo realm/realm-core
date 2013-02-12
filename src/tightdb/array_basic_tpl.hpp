@@ -157,6 +157,21 @@ bool BasicArray<T>::Compare(const BasicArray<T>& c) const
 }
 
 
+template<class T>
+inline void BasicArray<T>::foreach(ForEachOp<T>* op) const TIGHTDB_NOEXCEPT
+{
+    foreach(this, op);
+}
+
+
+template<class T>
+inline void BasicArray<T>::foreach(const Array* a, ForEachOp<T>* op) TIGHTDB_NOEXCEPT
+{
+    const T* begin = reinterpret_cast<T*>(a->m_data);
+    op->handle_chunk(begin, begin + a->size());
+}
+
+
 template<typename T>
 size_t BasicArray<T>::CalcByteLen(size_t count, size_t /*width*/) const
 {

@@ -188,6 +188,24 @@ bool ColumnStringEnum::Compare(const ColumnStringEnum& c) const
 }
 
 
+void ColumnStringEnum::ForEachIndexOp::handle_chunk(const int64_t* begin, const int64_t* end)
+    TIGHTDB_NOEXCEPT
+{
+    const int buf_size = 16;
+    const char* buf[buf_size];
+    while (buf_size < end - begin) {
+        for (int i=0; i<buf_size; ++i) {
+            buf[i] = m_keys.Get(*(begin++));
+        }
+        m_op->handle_chunk(buf, buf + buf_size);
+    }
+    for (int i = 0; i < int(end - begin); ++i) {
+        buf[i] = m_keys.Get(*(begin+i));
+    }
+    m_op->handle_chunk(buf, buf + (end - begin));
+}
+
+
 // Getter function for string index
 static const char* GetString(void* column, size_t ndx)
 {

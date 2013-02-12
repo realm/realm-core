@@ -74,6 +74,8 @@ public:
     /// Compare two string columns for equality.
     bool Compare(const AdaptiveStringColumn&) const;
 
+    void foreach(Array::ForEachOp<const char*>*) const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif // TIGHTDB_DEBUG
@@ -103,6 +105,8 @@ protected:
 
 private:
     StringIndex* m_index;
+
+    static void foreach(const Array* parent, Array::ForEachOp<const char*>*) TIGHTDB_NOEXCEPT;
 };
 
 
@@ -115,6 +119,21 @@ inline const char* AdaptiveStringColumn::Get(std::size_t ndx) const TIGHTDB_NOEX
 {
     TIGHTDB_ASSERT(ndx < Size());
     return m_array->ColumnStringGet(ndx);
+}
+
+inline void AdaptiveStringColumn::foreach(Array::ForEachOp<const char*>* op) const TIGHTDB_NOEXCEPT
+{
+    if (TIGHTDB_LIKELY(m_array->is_leaf())) {
+        if (m_array->HasRefs()) {
+            static_cast<const ArrayStringLong*>(m_array)->foreach(op);
+        }
+        else {
+            static_cast<const ArrayString*>(m_array)->foreach(op);
+        }
+        return;
+    }
+
+    foreach(m_array, op);
 }
 
 

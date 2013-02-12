@@ -51,6 +51,9 @@ public:
     size_t find_first(const char* value, size_t start=0 , size_t end=-1) const;
     void find_all(Array &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
+    void foreach(ForEachOp<const char*>*) const TIGHTDB_NOEXCEPT;
+    static void foreach(const Array*, ForEachOp<const char*>*) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif // TIGHTDB_DEBUG
@@ -60,6 +63,7 @@ private:
     Array m_offsets;
     ArrayBlob m_blob;
 
+    struct ForEachOffsetOp;
     size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
 };
 
@@ -83,6 +87,31 @@ inline const char* ArrayStringLong::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(ndx < m_offsets.size());
     const std::size_t offset = 0 < ndx ? std::size_t(m_offsets.Get(ndx-1)) : 0;
     return m_blob.Get(offset);
+}
+
+struct ArrayStringLong::ForEachOffsetOp: ForEachOp<int64_t> {
+    void handle_chunk(const int64_t* begin, const int64_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ForEachOffsetOp(const ArrayBlob& b, ForEachOp<const char*>* o) TIGHTDB_NOEXCEPT:
+        m_blob(b), m_op(o), m_prev_offset(0) {}
+private:
+    const ArrayBlob& m_blob;
+    ForEachOp<const char*>* const m_op;
+    std::size_t m_prev_offset;
+};
+
+inline void ArrayStringLong::foreach(ForEachOp<const char*>* op) const TIGHTDB_NOEXCEPT
+{
+    ForEachOffsetOp op2(m_blob, op);
+    m_offsets.foreach(&op2);
+}
+
+inline void ArrayStringLong::foreach(const Array* a, ForEachOp<const char*>* op) TIGHTDB_NOEXCEPT
+{
+    Allocator& alloc = a->GetAllocator();
+    Array offsets(a->GetAsRef(0), 0, 0, alloc);
+    ArrayBlob blob(a->GetAsRef(1), 0, 0, alloc);
+    ForEachOffsetOp op2(blob, op);
+    offsets.foreach(&op2);
 }
 
 

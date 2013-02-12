@@ -54,6 +54,9 @@ public:
     /// Compare two string arrays for equality.
     bool Compare(const ArrayString&) const;
 
+    void foreach(ForEachOp<const char*>*) const TIGHTDB_NOEXCEPT;
+    static void foreach(const Array*, ForEachOp<const char*>*) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void StringStats() const;
     //void ToDot(FILE* f) const;
@@ -113,6 +116,11 @@ inline void ArrayString::Set(std::size_t ndx, const char* value)
     TIGHTDB_ASSERT(value);
 
     Set(ndx, value, std::strlen(value)); // Throws
+}
+
+inline void ArrayString::foreach(ForEachOp<const char*>* op) const TIGHTDB_NOEXCEPT
+{
+    foreach(this, op);
 }
 
 

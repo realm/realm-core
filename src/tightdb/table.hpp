@@ -273,6 +273,42 @@ public:
     /// Compare two tables for inequality. See operator==().
     bool operator!=(const Table& t) const;
 
+    //@{
+    /// Higher-order functions on single columns.
+
+    template<class Op>
+    void foreach_int(std::size_t column_ndx, Op operation) const TIGHTDB_NOEXCEPT;
+
+    template<class Op>
+    void foreach_float(std::size_t column_ndx, Op operation) const TIGHTDB_NOEXCEPT;
+
+    template<class Op>
+    void foreach_double(std::size_t column_ndx, Op operation) const TIGHTDB_NOEXCEPT;
+
+    template<class Op>
+    void foreach_string(std::size_t column_ndx, Op operation) const TIGHTDB_NOEXCEPT;
+
+    template<class T, class Binop>
+    T foldl_int(std::size_t column_ndx, Binop operation, T init) const TIGHTDB_NOEXCEPT;
+
+    template<class T, class Binop>
+    T foldl_float(std::size_t column_ndx, Binop operation, T init) const TIGHTDB_NOEXCEPT;
+
+    /// Perform a 'fold left' operation on the specified column which
+    /// must be of type 'double'. The specified binary operation
+    /// should have signature (T, double) -> T.
+    ///
+    /// For example, foldl_double(i, std::plus<double>(), 0.0) is
+    /// equivalent to sum_double(i), although the latter will
+    /// generally be more efficient.
+    template<class T, class Binop>
+    T foldl_double(std::size_t column_ndx, Binop operation, T init) const TIGHTDB_NOEXCEPT;
+
+    template<class T, class Binop>
+    T foldl_string(std::size_t column_ndx, Binop operation, T init) const TIGHTDB_NOEXCEPT;
+
+    //@}
+
     // Debug
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
@@ -414,6 +450,14 @@ private:
     void unbind_ref() const { if (--m_ref_count == 0) delete this; } // FIXME: Cannot be noexcept since ~Table() may throw
 
     struct UnbindGuard;
+
+    template<class, class>        struct ForEachOpX;
+    template<class, class, class> struct FoldLeftOp;
+
+    void foreach_int_p(std::size_t col, Array::ForEachOp<int64_t>*) const TIGHTDB_NOEXCEPT;
+    void foreach_float_p(std::size_t col, Array::ForEachOp<float>*) const TIGHTDB_NOEXCEPT;
+    void foreach_double_p(std::size_t col, Array::ForEachOp<double>*) const TIGHTDB_NOEXCEPT;
+    void foreach_string_p(std::size_t col, Array::ForEachOp<const char*>*) const TIGHTDB_NOEXCEPT;
 
     ColumnBase& GetColumnBase(size_t column_ndx);
     void InstantiateBeforeChange();
@@ -612,6 +656,95 @@ inline bool Table::operator==(const Table& t) const
 inline bool Table::operator!=(const Table& t) const
 {
     return m_spec_set != t.m_spec_set || !compare_rows(t);
+}
+
+template<class Elem, class Op> struct Table::ForEachOpX: Array::ForEachOp<Elem> {
+    const Op m_op;
+
+    void handle_chunk(const Elem* begin, const Elem* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+        const Op op = m_op;
+        for (const Elem* i = begin; i != end; ++i)
+            op(*i);
+    }
+
+    ForEachOpX(Op op) TIGHTDB_NOEXCEPT: m_op(op) {}
+};
+
+template<class Op>
+inline void Table::foreach_int(std::size_t column_ndx, Op operation) const TIGHTDB_NOEXCEPT
+{
+    ForEachOpX<int64_t, Op> op(operation);
+    foreach_int_p(column_ndx, &op);
+}
+
+template<class Op>
+inline void Table::foreach_float(std::size_t column_ndx, Op operation) const TIGHTDB_NOEXCEPT
+{
+    ForEachOpX<float, Op> op(operation);
+    foreach_float_p(column_ndx, &op);
+}
+
+template<class Op>
+inline void Table::foreach_double(std::size_t column_ndx, Op operation) const TIGHTDB_NOEXCEPT
+{
+    ForEachOpX<double, Op> op(operation);
+    foreach_double_p(column_ndx, &op);
+}
+
+template<class Op>
+inline void Table::foreach_string(std::size_t column_ndx, Op operation) const TIGHTDB_NOEXCEPT
+{
+    ForEachOpX<const char*, Op> op(operation);
+    foreach_string_p(column_ndx, &op);
+}
+
+template<class Elem, class Accum, class Binop> struct Table::FoldLeftOp: Array::ForEachOp<Elem> {
+    const Binop m_op;
+    Accum m_accum;
+
+    void handle_chunk(const Elem* begin, const Elem* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+        const Binop op = m_op;
+        Accum a = m_accum;
+        for (const Elem* i = begin; i != end; ++i)
+            a = op(a, *i);
+        m_accum = a;
+    }
+
+    FoldLeftOp(Binop op, Accum init) TIGHTDB_NOEXCEPT: m_op(op), m_accum(init) {}
+};
+
+template<class T, class Binop>
+inline T Table::foldl_int(std::size_t column_ndx, Binop operation, T init) const TIGHTDB_NOEXCEPT
+{
+    FoldLeftOp<int64_t, T, Binop> op(operation, init);
+    foreach_int_p(column_ndx, &op);
+    return op.m_accum;
+}
+
+template<class T, class Binop>
+inline T Table::foldl_float(std::size_t column_ndx, Binop operation, T init) const TIGHTDB_NOEXCEPT
+{
+    FoldLeftOp<float, T, Binop> op(operation, init);
+    foreach_float_p(column_ndx, &op);
+    return op.m_accum;
+}
+
+template<class T, class Binop>
+inline T Table::foldl_double(std::size_t column_ndx, Binop operation, T init) const TIGHTDB_NOEXCEPT
+{
+    FoldLeftOp<double, T, Binop> op(operation, init);
+    foreach_double_p(column_ndx, &op);
+    return op.m_accum;
+}
+
+template<class T, class Binop>
+inline T Table::foldl_string(std::size_t column_ndx, Binop operation, T init) const TIGHTDB_NOEXCEPT
+{
+    FoldLeftOp<const char*, T, Binop> op(operation, init);
+    foreach_string_p(column_ndx, &op);
+    return op.m_accum;
 }
 
 

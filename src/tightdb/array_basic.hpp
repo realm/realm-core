@@ -54,6 +54,9 @@ public:
     /// Compare two arrays for equality.
     bool Compare(const BasicArray<T>&) const;
 
+    void foreach(ForEachOp<T>*) const TIGHTDB_NOEXCEPT;
+    static void foreach(const Array*, ForEachOp<T>*) TIGHTDB_NOEXCEPT;
+
 private:
     virtual size_t CalcByteLen(size_t count, size_t width) const;
     virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;

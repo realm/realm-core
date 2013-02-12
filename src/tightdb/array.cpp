@@ -2655,4 +2655,24 @@ top:
 }
 
 
+void Array::foreach(ForEachOp<int64_t>* op) const TIGHTDB_NOEXCEPT
+{
+    const int buf_size = 16;
+    int64_t buf[buf_size];
+    // FIXME: Consider whether it would be worth introducing a bulk-getter rather than getting each element individually
+    const size_t n = m_len;
+    size_t ndx = 0;
+    while (size_t(buf_size) < n - ndx) {
+        for (int i=0; i<buf_size; ++i) {
+            buf[i] = Get(ndx++);
+        }
+        op->handle_chunk(buf, buf + buf_size);
+    }
+    for (int i=0; i<int(n - ndx); ++i) {
+        buf[i] = Get(ndx+i);
+    }
+    op->handle_chunk(buf, buf + (n - ndx));
+}
+
+
 } //namespace tightdb

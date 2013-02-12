@@ -207,6 +207,8 @@ public:
     /// Compare two columns for equality.
     bool Compare(const Column&) const;
 
+    void foreach(Array::ForEachOp<int64_t>*) const TIGHTDB_NOEXCEPT;
+
     // Debug
 #ifdef TIGHTDB_DEBUG
     void Print() const;
@@ -236,6 +238,8 @@ protected:
 
 private:
     Column &operator=(Column const &); // not allowed
+
+    static void foreach(const Array* parent, Array::ForEachOp<int64_t>*) TIGHTDB_NOEXCEPT;
 };
 
 
@@ -251,6 +255,16 @@ inline int64_t Column::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 inline std::size_t Column::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return to_ref(Get(ndx));
+}
+
+inline void Column::foreach(Array::ForEachOp<int64_t>* op) const TIGHTDB_NOEXCEPT
+{
+    if (TIGHTDB_LIKELY(m_array->is_leaf())) {
+        m_array->foreach(op);
+        return;
+    }
+
+    foreach(m_array, op);
 }
 
 

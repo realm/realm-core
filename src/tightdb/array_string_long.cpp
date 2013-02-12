@@ -177,6 +177,28 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
 }
 
 
+void ArrayStringLong::ForEachOffsetOp::handle_chunk(const int64_t* begin, const int64_t* end)
+    TIGHTDB_NOEXCEPT
+{
+    const int buf_size = 16;
+    const char* buf[buf_size];
+    size_t prev_offset = m_prev_offset;
+    while (buf_size < end - begin) {
+        for (int i=0; i<buf_size; ++i) {
+            buf[i] = m_blob.Get(prev_offset);
+            prev_offset = *(begin++);
+        }
+        m_op->handle_chunk(buf, buf + buf_size);
+    }
+    for (int i = 0; i < int(end - begin); ++i) {
+        buf[i] = m_blob.Get(prev_offset);
+        prev_offset = *(begin+i);
+    }
+    m_op->handle_chunk(buf, buf + (end - begin));
+    m_prev_offset = prev_offset;
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void ArrayStringLong::ToDot(ostream& out, const char* title) const

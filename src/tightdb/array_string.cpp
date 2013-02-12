@@ -273,6 +273,28 @@ bool ArrayString::Compare(const ArrayString& c) const
     return true;
 }
 
+void ArrayString::foreach(const Array* a, ForEachOp<const char*>* op) TIGHTDB_NOEXCEPT
+{
+    const char* str = reinterpret_cast<char*>(a->m_data);
+    const int buf_size = 16;
+    const char* buf[buf_size];
+    const size_t stride = a->get_width();
+    size_t n = a->size();
+    while (size_t(buf_size) < n) {
+        for (int i=0; i<buf_size; ++i) {
+            buf[i] = str;
+            str += stride;
+        }
+        op->handle_chunk(buf, buf + buf_size);
+        n -= buf_size;
+    }
+    for (int i=0; i<int(n); ++i) {
+        buf[i] = str;
+        str += stride;
+    }
+    op->handle_chunk(buf, buf + n);
+}
+
 
 #ifdef TIGHTDB_DEBUG
 

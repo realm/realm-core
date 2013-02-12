@@ -404,6 +404,12 @@ public:
     // FIXME: Should not be public
     mutable unsigned char* m_data;
 
+    template<class T> struct ForEachOp {
+        virtual void handle_chunk(const T* begin, const T* end) TIGHTDB_NOEXCEPT = 0;
+    };
+
+    void foreach(ForEachOp<int64_t>*) const TIGHTDB_NOEXCEPT;
+
 private:
 
     typedef bool (*CallbackDummy)(int64_t);

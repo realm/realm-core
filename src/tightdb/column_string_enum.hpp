@@ -65,6 +65,8 @@ public:
     /// Compare two string enumeration columns for equality
     bool Compare(const ColumnStringEnum&) const;
 
+    void foreach(Array::ForEachOp<const char*>*) const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void ToDot(std::ostream& out, const char* title) const;
@@ -77,7 +79,29 @@ private:
     // Member variables
     AdaptiveStringColumn m_keys;
     StringIndex* m_index;
+
+    struct ForEachIndexOp;
 };
+
+
+
+
+// Implementation:
+
+struct ColumnStringEnum::ForEachIndexOp: Array::ForEachOp<int64_t> {
+    void handle_chunk(const int64_t* begin, const int64_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ForEachIndexOp(const AdaptiveStringColumn& k,
+                   Array::ForEachOp<const char*>* o) TIGHTDB_NOEXCEPT: m_keys(k), m_op(o) {}
+private:
+    const AdaptiveStringColumn& m_keys;
+    Array::ForEachOp<const char*>* const m_op;
+};
+
+inline void ColumnStringEnum::foreach(Array::ForEachOp<const char*>* op) const TIGHTDB_NOEXCEPT
+{
+    ForEachIndexOp op2(m_keys, op);
+    Column::foreach(&op2);
+}
 
 
 } // namespace tightdb

@@ -775,6 +775,24 @@ bool Column::Compare(const Column& c) const
 }
 
 
+void Column::foreach(const Array* parent, Array::ForEachOp<int64_t>* op) TIGHTDB_NOEXCEPT
+{
+    Allocator& alloc = parent->GetAllocator();
+    Array children(parent->GetAsRef(1), 0, 0, alloc);
+    const std::size_t n = children.size();
+    for (std::size_t i=0; i<n; ++i) {
+        const std::size_t ref = children.GetAsRef(i);
+        Array child(ref, 0, 0, alloc);
+        if (TIGHTDB_LIKELY(child.is_leaf())) {
+            child.foreach(op);
+        }
+        else {
+            foreach(&child, op);
+        }
+    }
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void Column::Print() const

@@ -83,6 +83,8 @@ public:
     /// Compare two columns for equality.
     bool Compare(const BasicColumn&) const;
 
+    void foreach(Array::ForEachOp<T>*) const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif // TIGHTDB_DEBUG
@@ -106,6 +108,8 @@ private:
 
     template <typename R, Action action, class cond>
     R aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;
+
+    static void foreach(const Array* parent, Array::ForEachOp<T>*) TIGHTDB_NOEXCEPT;
 };
 
 
