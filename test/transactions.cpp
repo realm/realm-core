@@ -10,6 +10,7 @@
 
 #include <tightdb/file.hpp>
 #include <tightdb/group_shared.hpp>
+#include "testsettings.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -53,8 +54,11 @@ TIGHTDB_TABLE_8(MyTable,
 const int num_threads = 23;
 const int num_rounds  = 2;
 
-const size_t max_bin_size = 1024;
-
+#ifdef TIGHTDB_BYPASS_BINARYDATA_BUG
+    const size_t max_bin_size = 512;
+#else
+    const size_t max_bin_size = 1024;
+#endif
 
 void round(SharedGroup& db, int index)
 {
