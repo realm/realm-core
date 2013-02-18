@@ -6,11 +6,13 @@
 #include <tightdb/array_blob.hpp>
 #include <tightdb/column.hpp>
 
+using namespace std;
+
 namespace tightdb {
 
 ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(COLUMN_HASREFS, parent, pndx, alloc),
-    m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc)
+    Array(coldef_HasRefs, parent, pndx, alloc),
+    m_offsets(coldef_Normal, NULL, 0, alloc), m_blob(NULL, 0, alloc)
 {
     // Add subarrays for long string
     Array::add(m_offsets.GetRef());
@@ -24,8 +26,8 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
     m_blob(Array::GetAsRef(1), NULL, 0, alloc)
 {
     TIGHTDB_ASSERT(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
-    TIGHTDB_ASSERT(Array::Size() == 2);
-    TIGHTDB_ASSERT(m_blob.Size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.back()));
+    TIGHTDB_ASSERT(Array::size() == 2);
+    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.back()));
 
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
@@ -33,14 +35,6 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
 
 // Creates new array (but invalid, call UpdateRef to init)
 //ArrayStringLong::ArrayStringLong(Allocator& alloc) : Array(alloc) {}
-
-const char* ArrayStringLong::Get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_offsets.Size());
-
-    const size_t offset = ndx ? size_t(m_offsets.Get(ndx-1)) : 0;
-    return m_blob.Get(offset);
-}
 
 void ArrayStringLong::add(const char* value)
 {
@@ -63,7 +57,7 @@ void ArrayStringLong::Set(size_t ndx, const char* value)
 
 void ArrayStringLong::Set(size_t ndx, const char* value, size_t len)
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.size());
     TIGHTDB_ASSERT(value);
 
     const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
@@ -83,7 +77,7 @@ void ArrayStringLong::Insert(size_t ndx, const char* value)
 
 void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len)
 {
-    TIGHTDB_ASSERT(ndx <= m_offsets.Size());
+    TIGHTDB_ASSERT(ndx <= m_offsets.size());
     TIGHTDB_ASSERT(value);
 
     const size_t pos = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
@@ -96,7 +90,7 @@ void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len)
 
 void ArrayStringLong::Delete(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.size());
 
     const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     const size_t end = (size_t)m_offsets.Get(ndx);
@@ -108,7 +102,7 @@ void ArrayStringLong::Delete(size_t ndx)
 
 void ArrayStringLong::Resize(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.size());
 
     const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
 
@@ -165,7 +159,7 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
     TIGHTDB_ASSERT(value);
 
     len += 1; // include trailing null byte
-    const size_t count = m_offsets.Size();
+    const size_t count = m_offsets.size();
     size_t offset = (start == 0 ? 0 : (size_t)m_offsets.Get(start - 1)); // todo, verify
     for (size_t i = start; i < count && i < end; ++i) {
         const size_t end = (size_t)m_offsets.Get(i);
@@ -179,25 +173,26 @@ size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start,
         offset = end;
     }
 
-    return not_found; 
+    return not_found;
 }
+
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayStringLong::ToDot(std::ostream& out, const char* title) const
+void ArrayStringLong::ToDot(ostream& out, const char* title) const
 {
     const size_t ref = GetRef();
 
-    out << "subgraph cluster_arraystringlong" << ref << " {" << std::endl;
+    out << "subgraph cluster_arraystringlong" << ref << " {" << endl;
     out << " label = \"ArrayStringLong";
     if (title) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    out << "\";" << endl;
 
     Array::ToDot(out, "stringlong_top");
     m_offsets.ToDot(out, "offsets");
     m_blob.ToDot(out, "blob");
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
 #endif // TIGHTDB_DEBUG

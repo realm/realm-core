@@ -48,12 +48,17 @@ struct MemRef {
 
 class Allocator {
 public:
+    /// \throw std::bad_alloc If insufficient memory was available.
     virtual MemRef Alloc(std::size_t size);
+
+    /// \throw std::bad_alloc If insufficient memory was available.
     virtual MemRef ReAlloc(std::size_t ref, void* addr, std::size_t size);
+
+    // FIXME: SlabAlloc::Free() should be modified such than this method never throws.
     virtual void Free(std::size_t, void* addr);
 
     virtual void* Translate(std::size_t ref) const TIGHTDB_NOEXCEPT;
-    virtual bool IsReadOnly(std::size_t) const;
+    virtual bool IsReadOnly(std::size_t) const TIGHTDB_NOEXCEPT;
 
     static Allocator& get_default() TIGHTDB_NOEXCEPT;
 
@@ -63,7 +68,7 @@ public:
     virtual ~Allocator() {}
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* get_replication() { return m_replication; }
+    Replication* get_replication() TIGHTDB_NOEXCEPT { return m_replication; }
 #endif
 
 #ifdef TIGHTDB_DEBUG

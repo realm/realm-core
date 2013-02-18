@@ -41,12 +41,12 @@ const char* ColumnStringEnum::Get(size_t ndx) const TIGHTDB_NOEXCEPT
     return m_keys.Get(key_ndx);
 }
 
-bool ColumnStringEnum::add(const char* value)
+void ColumnStringEnum::add(const char* value)
 {
-    return Insert(Column::Size(), value);
+    Insert(Column::Size(), value);
 }
 
-bool ColumnStringEnum::Set(size_t ndx, const char* value)
+void ColumnStringEnum::Set(size_t ndx, const char* value)
 {
     TIGHTDB_ASSERT(ndx < Column::Size());
     TIGHTDB_ASSERT(value);
@@ -61,24 +61,21 @@ bool ColumnStringEnum::Set(size_t ndx, const char* value)
     }
 
     const size_t key_ndx = GetKeyNdxOrAdd(value);
-    return Column::Set(ndx, key_ndx);
+    Column::Set(ndx, key_ndx);
 }
 
-bool ColumnStringEnum::Insert(size_t ndx, const char* value)
+void ColumnStringEnum::Insert(size_t ndx, const char* value)
 {
     TIGHTDB_ASSERT(ndx <= Column::Size());
     TIGHTDB_ASSERT(value);
 
     const size_t key_ndx = GetKeyNdxOrAdd(value);
-    const bool res = Column::Insert(ndx, key_ndx);
-    if (!res) return false;
+    Column::Insert(ndx, key_ndx);
 
     if (m_index) {
         const bool isLast = (ndx+1 == Size());
         m_index->Insert(ndx, value, isLast);
     }
-
-    return true;
 }
 
 void ColumnStringEnum::Delete(size_t ndx)
@@ -190,11 +187,13 @@ bool ColumnStringEnum::Compare(const ColumnStringEnum& c) const
     return true;
 }
 
+
 // Getter function for string index
 static const char* GetString(void* column, size_t ndx)
 {
-    return ((ColumnStringEnum*)column)->Get(ndx);
+    return static_cast<ColumnStringEnum*>(column)->Get(ndx);
 }
+
 
 StringIndex& ColumnStringEnum::CreateIndex()
 {

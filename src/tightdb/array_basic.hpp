@@ -22,13 +22,13 @@
 
 #include <tightdb/array.hpp>
 
-// 
+//
 // A BasicArray can currently only be used for simple unstructured types like float, double.
 //
 
 namespace tightdb {
 
-template<typename T> 
+template<typename T>
 class BasicArray : public Array {
 public:
     explicit BasicArray(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
@@ -54,13 +54,12 @@ public:
     /// Compare two arrays for equality.
     bool Compare(const BasicArray<T>&) const;
 
-
 private:
     virtual size_t CalcByteLen(size_t count, size_t width) const;
     virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const {return TDB_MULTIPLY;}
 
-    template <bool find_max> bool minmax(T& result, size_t start, size_t end) const;
+    template<bool find_max> bool minmax(T& result, size_t start, size_t end) const;
     static size_t create_empty_basic_array(Allocator& alloc);
 };
 

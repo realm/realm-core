@@ -4,6 +4,7 @@
 
 #include "tightdb.hpp"
 
+using namespace std;
 using namespace tightdb;
 
 namespace {
@@ -371,7 +372,7 @@ TEST(Shared_Writes_SpecialOrder)
 
     SharedGroup sg("test.tightdb");
 
-    const int num_rows = 5; // FIXME: Should be strictly greater than MAX_LIST_SIZE, but that takes a loooooong time!
+    const int num_rows = 5; // FIXME: Should be strictly greater than TIGHTDB_MAX_LIST_SIZE, but that takes a loooooong time!
     const int num_reps = 25;
 
     {
@@ -406,11 +407,9 @@ TEST(Shared_Writes_SpecialOrder)
 
 namespace  {
 
-void* IncrementEntry(void* arg);
-
-void* IncrementEntry(void* arg )
+void* IncrementEntry(void* arg)
 {
-    const size_t row_id = (size_t)arg;
+    const size_t row_ndx = (size_t)arg;
 
     // Open shared db
     SharedGroup sg("test_shared.tightdb");
@@ -420,7 +419,13 @@ void* IncrementEntry(void* arg )
         {
             WriteTransaction wt(sg);
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1[row_id].first += 1;
+            t1[row_ndx].first += 1;
+            // FIXME: For some reason this takes ages when running
+            // inside valgrind, it is probably due to the "extreme
+            // overallocation" bug. The 1000 transactions performed
+            // here can produce a final database file size of more
+            // than 1 GiB. Really! And that is a table with only 10
+            // rows. It is about 1 MiB per transaction.
             wt.commit();
         }
 
@@ -430,12 +435,12 @@ void* IncrementEntry(void* arg )
             ReadTransaction rt(sg);
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
-            const int64_t v = t[row_id].first;
+            const int64_t v = t[row_ndx].first;
             const int64_t expected = i+1;
             CHECK_EQUAL(expected, v);
         }
     }
-    return NULL;
+    return 0;
 }
 
 } // anonymous namespace
@@ -503,21 +508,21 @@ TEST(Shared_FormerErrorCase1)
         TableRef table = wt.get_table("my_table");
         {
             Spec& spec = table->get_spec();
-            spec.add_column(COLUMN_TYPE_INT, "alpha");
-            spec.add_column(COLUMN_TYPE_BOOL, "beta");
-            spec.add_column(COLUMN_TYPE_INT, "gamma");
-            spec.add_column(COLUMN_TYPE_DATE, "delta");
-            spec.add_column(COLUMN_TYPE_STRING, "epsilon");
-            spec.add_column(COLUMN_TYPE_BINARY, "zeta");
+            spec.add_column(type_Int, "alpha");
+            spec.add_column(type_Bool, "beta");
+            spec.add_column(type_Int, "gamma");
+            spec.add_column(type_Date, "delta");
+            spec.add_column(type_String, "epsilon");
+            spec.add_column(type_Binary, "zeta");
             {
                 Spec subspec = spec.add_subtable_column("eta");
-                subspec.add_column(COLUMN_TYPE_INT, "foo");
+                subspec.add_column(type_Int, "foo");
                 {
                     Spec subsubspec = subspec.add_subtable_column("bar");
-                    subsubspec.add_column(COLUMN_TYPE_INT, "value");
+                    subsubspec.add_column(type_Int, "value");
                 }
             }
-            spec.add_column(COLUMN_TYPE_MIXED, "theta");
+            spec.add_column(type_Mixed, "theta");
         }
         table->update_from_spec();
         table->insert_empty_row(0, 1);
@@ -791,6 +796,67 @@ TEST(Shared_FromSerialized)
         CHECK_EQUAL(2, t1[0].second);
         CHECK_EQUAL(false, t1[0].third);
         CHECK_EQUAL("test", (const char*)t1[0].fourth);
+    }
+}
+
+namespace {
+void randstr(char* res, size_t len) {
+    for(size_t i = 0; i < len; ++i) {
+        res[i] = 'a' + rand() % 10;
+    }
+}
+}
+
+TEST(StringIndex_Bug)
+{
+    remove("indexbug.tightdb");
+    remove("indexbug.tightdb.lock");
+    SharedGroup db("indexbug.tightdb");
+
+    {
+        Group& group = db.begin_write();
+        TableRef table = group.get_table("users");
+        table->add_column(type_String, "username");
+        table->set_index(0);  // Disabling index makes it work
+        db.commit();
+    }
+
+    size_t transactions = 0;
+
+    for (size_t n = 0; n < 100; ++n) {
+        const uint64_t action = rand() % 1000;
+
+        transactions++;
+
+        if (action <= 500) {
+            // delete random user
+            Group& group = db.begin_write();
+            TableRef table = group.get_table("users");
+            if (table->size() > 0) {
+                size_t del = rand() % table->size();
+                //cerr << "-" << del << ": " << table->get_string(0, del) << endl;
+                table->remove(del);
+#ifdef TIGHTDB_DEBUG
+                table->Verify();
+#endif
+            }
+            db.commit();
+        }
+        else {
+            // add new user
+            Group& group = db.begin_write();
+            TableRef table = group.get_table("users");
+            table->add_empty_row();
+            char txt[100];
+            randstr(txt, 8);
+            txt[8] = 0;
+            //cerr << "+" << txt << endl;
+            table->set_string(0, table->size() - 1, txt);
+#ifdef TIGHTDB_DEBUG
+            table->Verify();
+#endif
+            db.commit();
+        }
     }
 }
 

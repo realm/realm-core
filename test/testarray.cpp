@@ -33,11 +33,11 @@ void hasZeroByte(int64_t value, size_t reps)
     a.add(0);
 
     size_t t = a.find_first(0);
-    CHECK_EQUAL(a.Size() - 1, t);
+    CHECK_EQUAL(a.size() - 1, t);
 
     r.Clear();
     a.find_all(r, 0);
-    CHECK_EQUAL(int64_t(a.Size() - 1), r.Get(0));
+    CHECK_EQUAL(int64_t(a.size() - 1), r.Get(0));
 
     // Cleanup
     a.Destroy();
@@ -51,8 +51,8 @@ TEST_FIXTURE(db_setup_array, Array_Add0)
 {
     c.add(0);
     CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Size(), (size_t)1);
-    CHECK_EQUAL(0, c.GetBitWidth());
+    CHECK_EQUAL(c.size(), 1);
+    CHECK_EQUAL(0, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add1)
@@ -60,8 +60,8 @@ TEST_FIXTURE(db_setup_array, Array_Add1)
     c.add(1);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Size(), 2);
-    CHECK_EQUAL(1, c.GetBitWidth());
+    CHECK_EQUAL(c.size(), 2);
+    CHECK_EQUAL(1, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add2)
@@ -70,8 +70,8 @@ TEST_FIXTURE(db_setup_array, Array_Add2)
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
-    CHECK_EQUAL(c.Size(), 3);
-    CHECK_EQUAL(2, c.GetBitWidth());
+    CHECK_EQUAL(c.size(), 3);
+    CHECK_EQUAL(2, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add3)
@@ -81,8 +81,8 @@ TEST_FIXTURE(db_setup_array, Array_Add3)
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
     CHECK_EQUAL(c.Get(3), 3);
-    CHECK_EQUAL(c.Size(), 4);
-    CHECK_EQUAL(2, c.GetBitWidth());
+    CHECK_EQUAL(c.size(), 4);
+    CHECK_EQUAL(2, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add4)
@@ -93,8 +93,8 @@ TEST_FIXTURE(db_setup_array, Array_Add4)
     CHECK_EQUAL(c.Get(2), 2);
     CHECK_EQUAL(c.Get(3), 3);
     CHECK_EQUAL(c.Get(4), 4);
-    CHECK_EQUAL(c.Size(), 5);
-    CHECK_EQUAL(4, c.GetBitWidth());
+    CHECK_EQUAL(c.size(), 5);
+    CHECK_EQUAL(4, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add5)
@@ -106,8 +106,8 @@ TEST_FIXTURE(db_setup_array, Array_Add5)
     CHECK_EQUAL(c.Get(3), 3);
     CHECK_EQUAL(c.Get(4), 4);
     CHECK_EQUAL(c.Get(5), 16);
-    CHECK_EQUAL(c.Size(), 6);
-    CHECK_EQUAL(8, c.GetBitWidth());
+    CHECK_EQUAL(c.size(), 6);
+    CHECK_EQUAL(8, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add6)
@@ -120,8 +120,8 @@ TEST_FIXTURE(db_setup_array, Array_Add6)
     CHECK_EQUAL(c.Get(4), 4);
     CHECK_EQUAL(c.Get(5), 16);
     CHECK_EQUAL(c.Get(6), 256);
-    CHECK_EQUAL(c.Size(), 7);
-    CHECK_EQUAL(16, c.GetBitWidth());
+    CHECK_EQUAL(c.size(), 7);
+    CHECK_EQUAL(16, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add7)
@@ -135,8 +135,8 @@ TEST_FIXTURE(db_setup_array, Array_Add7)
     CHECK_EQUAL(c.Get(5), 16);
     CHECK_EQUAL(c.Get(6), 256);
     CHECK_EQUAL(c.Get(7), 65536);
-    CHECK_EQUAL(c.Size(), 8);
-    CHECK_EQUAL(32, c.GetBitWidth());
+    CHECK_EQUAL(c.size(), 8);
+    CHECK_EQUAL(32, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Add8)
@@ -151,8 +151,8 @@ TEST_FIXTURE(db_setup_array, Array_Add8)
     CHECK_EQUAL(c.Get(6), 256);
     CHECK_EQUAL(c.Get(7), 65536);
     CHECK_EQUAL(c.Get(8), 4294967296LL);
-    CHECK_EQUAL(c.Size(), 9);
-    CHECK_EQUAL(64, c.GetBitWidth());
+    CHECK_EQUAL(c.size(), 9);
+    CHECK_EQUAL(64, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg1)
@@ -160,9 +160,9 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg1)
     c.Clear();
     c.add(-1);
 
-    CHECK_EQUAL(c.Size(), 1);
+    CHECK_EQUAL(c.size(), 1);
     CHECK_EQUAL(c.Get(0), -1);
-    CHECK_EQUAL(8, c.GetBitWidth());
+    CHECK_EQUAL(8, c.get_width());
 }
 
 TEST(Array_AddNeg1_1)
@@ -174,12 +174,12 @@ TEST(Array_AddNeg1_1)
     c.add(3);
     c.add(-128);
 
-    CHECK_EQUAL(c.Size(), 4);
+    CHECK_EQUAL(c.size(), 4);
     CHECK_EQUAL(c.Get(0), 1);
     CHECK_EQUAL(c.Get(1), 2);
     CHECK_EQUAL(c.Get(2), 3);
     CHECK_EQUAL(c.Get(3), -128);
-    CHECK_EQUAL(8, c.GetBitWidth());
+    CHECK_EQUAL(8, c.get_width());
 
     // Cleanup
     c.Destroy();
@@ -189,33 +189,33 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg2)
 {
     c.add(-256);
 
-    CHECK_EQUAL(c.Size(), 2);
+    CHECK_EQUAL(c.size(), 2);
     CHECK_EQUAL(c.Get(0), -1);
     CHECK_EQUAL(c.Get(1), -256);
-    CHECK_EQUAL(16, c.GetBitWidth());
+    CHECK_EQUAL(16, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg3)
 {
     c.add(-65536);
 
-    CHECK_EQUAL(c.Size(), 3);
+    CHECK_EQUAL(c.size(), 3);
     CHECK_EQUAL(c.Get(0), -1);
     CHECK_EQUAL(c.Get(1), -256);
     CHECK_EQUAL(c.Get(2), -65536);
-    CHECK_EQUAL(32, c.GetBitWidth());
+    CHECK_EQUAL(32, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg4)
 {
     c.add(-4294967296LL);
 
-    CHECK_EQUAL(c.Size(), 4);
+    CHECK_EQUAL(c.size(), 4);
     CHECK_EQUAL(c.Get(0), -1);
     CHECK_EQUAL(c.Get(1), -256);
     CHECK_EQUAL(c.Get(2), -65536);
     CHECK_EQUAL(c.Get(3), -4294967296LL);
-    CHECK_EQUAL(64, c.GetBitWidth());
+    CHECK_EQUAL(64, c.get_width());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Set)
@@ -225,7 +225,7 @@ TEST_FIXTURE(db_setup_array, Array_Set)
     c.Set(2, 1);
     c.Set(3, 0);
 
-    CHECK_EQUAL(c.Size(), 4);
+    CHECK_EQUAL(c.size(), 4);
     CHECK_EQUAL(c.Get(0), 3);
     CHECK_EQUAL(c.Get(1), 2);
     CHECK_EQUAL(c.Get(2), 1);
@@ -244,7 +244,7 @@ TEST_FIXTURE(db_setup_array, Array_Insert1)
     // Insert in middle
     c.Insert(2, 16);
 
-    CHECK_EQUAL(c.Size(), 5);
+    CHECK_EQUAL(c.size(), 5);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 16);
@@ -257,7 +257,7 @@ TEST_FIXTURE(db_setup_array, Array_Insert2)
     // Insert at top
     c.Insert(0, 256);
 
-    CHECK_EQUAL(c.Size(), 6);
+    CHECK_EQUAL(c.size(), 6);
     CHECK_EQUAL(c.Get(0), 256);
     CHECK_EQUAL(c.Get(1), 0);
     CHECK_EQUAL(c.Get(2), 1);
@@ -271,7 +271,7 @@ TEST_FIXTURE(db_setup_array, Array_Insert3)
     // Insert at bottom
     c.Insert(6, 65536);
 
-    CHECK_EQUAL(c.Size(), 7);
+    CHECK_EQUAL(c.size(), 7);
     CHECK_EQUAL(c.Get(0), 256);
     CHECK_EQUAL(c.Get(1), 0);
     CHECK_EQUAL(c.Get(2), 1);
@@ -305,7 +305,7 @@ TEST_FIXTURE(db_setup_array, Array_Delete1)
     // Delete from middle
     c.Delete(3);
 
-    CHECK_EQUAL(c.Size(), 6);
+    CHECK_EQUAL(c.size(), 6);
     CHECK_EQUAL(c.Get(0), 256);
     CHECK_EQUAL(c.Get(1), 0);
     CHECK_EQUAL(c.Get(2), 1);
@@ -319,7 +319,7 @@ TEST_FIXTURE(db_setup_array, Array_Delete2)
     // Delete from top
     c.Delete(0);
 
-    CHECK_EQUAL(c.Size(), 5);
+    CHECK_EQUAL(c.size(), 5);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
@@ -332,7 +332,7 @@ TEST_FIXTURE(db_setup_array, Array_Delete3)
     // Delete from bottom
     c.Delete(4);
 
-    CHECK_EQUAL(c.Size(), 4);
+    CHECK_EQUAL(c.size(), 4);
     CHECK_EQUAL(c.Get(0), 0);
     CHECK_EQUAL(c.Get(1), 1);
     CHECK_EQUAL(c.Get(2), 2);
@@ -348,7 +348,7 @@ TEST_FIXTURE(db_setup_array, Array_DeleteAll)
     c.Delete(0);
 
     CHECK(c.is_empty());
-    CHECK_EQUAL(0, c.Size());
+    CHECK_EQUAL(0, c.size());
 }
 
 TEST_FIXTURE(db_setup_array, Array_Find1)
@@ -510,11 +510,11 @@ TEST(findallint0)
     }
 
     a.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.Size()){
+    while (i < a.size()){
         if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
@@ -541,11 +541,11 @@ TEST(findallint1)
     }
 
     a.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.Size()){
+    while (i < a.size()){
         if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
@@ -572,11 +572,11 @@ TEST(findallint2)
     }
 
     a.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.Size()){
+    while (i < a.size()){
         if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
@@ -603,11 +603,11 @@ TEST(findallint3)
     }
 
     a.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.Size()){
+    while (i < a.size()){
         if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
@@ -635,11 +635,11 @@ TEST(findallint4)
     }
 
     a.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.Size()){
+    while (i < a.size()){
         if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
@@ -667,11 +667,11 @@ TEST(findallint5)
     }
 
     a.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.Size()){
+    while (i < a.size()){
         if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
@@ -699,11 +699,11 @@ TEST(findallint6)
     }
 
     a.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.Size()){
+    while (i < a.size()){
         if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
@@ -731,11 +731,11 @@ TEST(findallint7)
     }
 
     a.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.Size()){
+    while (i < a.size()){
         if (a.Get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
@@ -785,7 +785,7 @@ TEST(Sum0)
     for (int i = 0; i < 64 + 7; i++) {
         a.add(0);
     }
-    CHECK_EQUAL(0, a.sum(0, a.Size()));
+    CHECK_EQUAL(0, a.sum(0, a.size()));
     a.Destroy();
 }
 
@@ -799,7 +799,7 @@ TEST(Sum1)
     s1 = 0;
     for (int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.Size()));
+    CHECK_EQUAL(s1, a.sum(0, a.size()));
 
     s1 = 0;
     for (int i = 3; i < 100; i++)
@@ -819,7 +819,7 @@ TEST(Sum2)
     s1 = 0;
     for (int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.Size()));
+    CHECK_EQUAL(s1, a.sum(0, a.size()));
 
     s1 = 0;
     for (int i = 3; i < 100; i++)
@@ -840,7 +840,7 @@ TEST(Sum4)
     s1 = 0;
     for (int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.Size()));
+    CHECK_EQUAL(s1, a.sum(0, a.size()));
 
     s1 = 0;
     for (int i = 3; i < 100; i++)
@@ -860,7 +860,7 @@ TEST(Sum16)
     s1 = 0;
     for (int i = 0; i < 256 + 7; i++)
         s1 += a.Get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.Size()));
+    CHECK_EQUAL(s1, a.sum(0, a.size()));
 
     s1 = 0;
     for (int i = 3; i < 100; i++)
@@ -883,7 +883,7 @@ TEST(Greater)
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
-        size_t t = a.find_first<GREATER>(0, 0, (size_t)-1);
+        size_t t = a.find_first<Greater>(0, 0, (size_t)-1);
         CHECK_EQUAL(-1, t);
 
 
@@ -894,7 +894,7 @@ TEST(Greater)
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1);
 
-			size_t t = a.find_first<GREATER>(0, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(0, 0, (size_t)-1);
             TIGHTDB_ASSERT(i == t);
 
             CHECK_EQUAL(i, t);
@@ -907,7 +907,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 3);
-            size_t t = a.find_first<GREATER>(2, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(2, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 2);
         }
@@ -918,7 +918,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 11);
-            size_t t = a.find_first<GREATER>(10, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(10, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 10);
         }
@@ -929,7 +929,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 110);
-            size_t t = a.find_first<GREATER>(100, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(100, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 100);
         }
@@ -939,7 +939,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 210);
-            size_t t = a.find_first<GREATER>(200, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(200, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 200);
         }
@@ -950,7 +950,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 11000);
-            size_t t = a.find_first<GREATER>(10000, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(10000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 10000);
         }
@@ -961,7 +961,7 @@ TEST(Greater)
 
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 41000);
-            size_t t = a.find_first<GREATER>(40000, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(40000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 40000);
         }
@@ -972,7 +972,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1100000);
-            size_t t = a.find_first<GREATER>(1000000, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(1000000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1000000);
         }
@@ -983,7 +983,7 @@ TEST(Greater)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
-            size_t t = a.find_first<GREATER>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
+            size_t t = a.find_first<Greater>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
         }
@@ -1008,7 +1008,7 @@ TEST(Less)
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
-        size_t t = a.find_first<LESS>(0, 0, (size_t)-1);
+        size_t t = a.find_first<Less>(0, 0, (size_t)-1);
         CHECK_EQUAL(-1, t);
 
 
@@ -1018,7 +1018,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 0);
-            size_t t = a.find_first<LESS>(1, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(1, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1);
         }
@@ -1029,7 +1029,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 2);
-            size_t t = a.find_first<LESS>(3, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(3, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 3);
         }
@@ -1040,7 +1040,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 10);
-            size_t t = a.find_first<LESS>(11, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(11, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 11);
         }
@@ -1051,7 +1051,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 100);
-            size_t t = a.find_first<LESS>(110, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(110, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 110);
         }
@@ -1061,7 +1061,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 200);
-            size_t t = a.find_first<LESS>(210, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(210, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 210);
         }
@@ -1072,7 +1072,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 10000);
-            size_t t = a.find_first<LESS>(11000, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(11000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 11000);
         }
@@ -1083,7 +1083,7 @@ TEST(Less)
 
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 40000);
-            size_t t = a.find_first<LESS>(41000, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(41000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 41000);
         }
@@ -1094,7 +1094,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000000);
-            size_t t = a.find_first<LESS>(1100000, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(1100000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1100000);
         }
@@ -1105,7 +1105,7 @@ TEST(Less)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL - 1ULL);
-            size_t t = a.find_first<LESS>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
+            size_t t = a.find_first<Less>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
         }
@@ -1118,13 +1118,13 @@ TEST(Less)
 TEST(NotEqual1)
 {
     Array a;
-    
+
     a.Clear();
     for (size_t i = 0; i < 100; i++) {
         a.add(0x33);
     }
     a.Set(50, 0x44);
-    size_t t = a.find_first<NOTEQUAL>(0x33, 0, (size_t)-1);
+    size_t t = a.find_first<NotEqual>(0x33, 0, (size_t)-1);
     CHECK_EQUAL(50, t);
     a.Destroy();
 }
@@ -1141,7 +1141,7 @@ TEST(NotEqual)
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
-        size_t t = a.find_first<NOTEQUAL>(0, 0, (size_t)-1);
+        size_t t = a.find_first<NotEqual>(0, 0, (size_t)-1);
         CHECK_EQUAL(-1, t);
 
 
@@ -1151,7 +1151,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1);
-            size_t t = a.find_first<NOTEQUAL>(0, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(0, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 0);
         }
@@ -1162,7 +1162,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 3);
-            size_t t = a.find_first<NOTEQUAL>(2, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(2, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 2);
         }
@@ -1173,7 +1173,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 11);
-            size_t t = a.find_first<NOTEQUAL>(10, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(10, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 10);
         }
@@ -1184,7 +1184,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 110);
-            size_t t = a.find_first<NOTEQUAL>(100, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(100, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 100);
         }
@@ -1194,7 +1194,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 210);
-            size_t t = a.find_first<NOTEQUAL>(200, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(200, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 200);
         }
@@ -1205,7 +1205,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 11000);
-            size_t t = a.find_first<NOTEQUAL>(10000, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(10000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 10000);
         }
@@ -1216,7 +1216,7 @@ TEST(NotEqual)
 
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 41000);
-            size_t t = a.find_first<NOTEQUAL>(40000, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(40000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 40000);
         }
@@ -1227,7 +1227,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1100000);
-            size_t t = a.find_first<NOTEQUAL>(1000000, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(1000000, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1000000);
         }
@@ -1238,7 +1238,7 @@ TEST(NotEqual)
         }
         for (size_t i = 0; i < items; i++) {
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
-            size_t t = a.find_first<NOTEQUAL>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
+            size_t t = a.find_first<NotEqual>(1000ULL*1000ULL*1000ULL*1000ULL, 0, (size_t)-1);
             CHECK_EQUAL(i, t);
             a.Set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
         }
@@ -1258,11 +1258,11 @@ TEST(ArraySort)
     for (size_t t = 0; t < 400; t++)
         a.add(rand() % 300 - 100);
 
-    size_t orig_size = a.Size();
+    size_t orig_size = a.size();
     a.sort();
 
-    CHECK(a.Size() == orig_size);
-    for (size_t t = 1; t < a.Size(); t++)
+    CHECK(a.size() == orig_size);
+    for (size_t t = 1; t < a.size(); t++)
         CHECK(a.Get(t) >= a.Get(t - 1));
 
     a.Destroy();
@@ -1277,11 +1277,11 @@ TEST(ArraySort2)
     for (size_t t = 0; t < 400; t++)
         a.add((int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand());
 
-    size_t orig_size = a.Size();
+    size_t orig_size = a.size();
     a.sort();
 
-    CHECK(a.Size() == orig_size);
-    for (size_t t = 1; t < a.Size(); t++)
+    CHECK(a.size() == orig_size);
+    for (size_t t = 1; t < a.size(); t++)
         CHECK(a.Get(t) >= a.Get(t - 1));
 
     a.Destroy();
@@ -1295,11 +1295,11 @@ TEST(ArraySort3)
     for (size_t t = 0; t < 1000000ULL; t++)
         a.add(rand());
 
-    size_t orig_size = a.Size();
+    size_t orig_size = a.size();
     a.sort();
 
-    CHECK(a.Size() == orig_size);
-    for (size_t t = 1; t < a.Size(); t++)
+    CHECK(a.size() == orig_size);
+    for (size_t t = 1; t < a.size(); t++)
         CHECK(a.Get(t) >= a.Get(t - 1));
 
     a.Destroy();
@@ -1314,11 +1314,11 @@ TEST(ArraySort4)
     for (size_t t = 0; t < 1000; t++)
         a.add(0);
 
-    size_t orig_size = a.Size();
+    size_t orig_size = a.size();
     a.sort();
 
-    CHECK(a.Size() == orig_size);
-    for (size_t t = 1; t < a.Size(); t++)
+    CHECK(a.size() == orig_size);
+    for (size_t t = 1; t < a.size(); t++)
         CHECK(a.Get(t) == 0);
 
     a.Destroy();
@@ -1340,7 +1340,7 @@ TEST(ArrayCopy)
     b.Verify();
 #endif
 
-    CHECK_EQUAL(5, b.Size());
+    CHECK_EQUAL(5, b.size());
     CHECK_EQUAL(0, b.Get(0));
     CHECK_EQUAL(1, b.Get(1));
     CHECK_EQUAL(2, b.Get(2));
@@ -1348,7 +1348,7 @@ TEST(ArrayCopy)
     CHECK_EQUAL(4, b.Get(4));
 
     // With sub-arrays
-    Array c(COLUMN_HASREFS);
+    Array c(coldef_HasRefs);
     c.add(a.GetRef());
 
     Array d;
@@ -1359,10 +1359,10 @@ TEST(ArrayCopy)
 #endif
 
     CHECK(d.HasRefs());
-    CHECK_EQUAL(1, d.Size());
+    CHECK_EQUAL(1, d.size());
 
     const Array e = d.GetSubArray(0);
-    CHECK_EQUAL(5, e.Size());
+    CHECK_EQUAL(5, e.size());
     CHECK_EQUAL(0, e.Get(0));
     CHECK_EQUAL(1, e.Get(1));
     CHECK_EQUAL(2, e.Get(2));

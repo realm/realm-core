@@ -200,7 +200,7 @@ int main()
     printf("\n");
 
 
-#ifndef ONLY_CN_TESTS        
+#ifndef ONLY_CN_TESTS
     // TightDB tests
     {
         TestTable table;
@@ -208,22 +208,22 @@ int main()
         // Build large table
         for (size_t i = 0; i < row_count; ++i) {
             std::stringstream ss;
-            
+
             // Create short unique string
             ss << "s" << i;
             const string short_str = ss.str();
-            
+
             // Create long unique string
             ss << " very long string...............";
             const string long_str = ss.str();
-            
+
             // Create strings that can be auto-enumerated
             const string enum_str = (i % 2) ? "monday" : "tuesday";
 
             table.add(0, 1, 3, 15, 0x7FLL, 0x7FFFLL, 0x7FFFFFFFLL, 0x7FFFFFFFFFFFFFFFLL, short_str.c_str(), long_str.c_str(), enum_str.c_str());
         }
         table.add(0, 0, 0, 0, 0, 0, 0, 0, "bottom", "long bottom", "saturday");
-        
+
         table.optimize(); // auto-enumerate last string column
 
         // Search over integer columns
@@ -240,9 +240,9 @@ int main()
                 else if (i == 5) q.bits_16.equal(0);
                 else if (i == 6) q.bits_32.equal(0);
                 else if (i == 7) q.bits_64.equal(0);
-                
+
                 const size_t expected = (i == 0) ? 0 : 1;
-                
+
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
@@ -254,7 +254,7 @@ int main()
                 }
                 const double search_time = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Sparse: %fs\n", (int)i, search_time);
-                
+
                 // Search with column intrinsic functions
                 timer.start();
                 {
@@ -268,7 +268,7 @@ int main()
                         else if (i == 5) res = table.column().bits_16.count(0);
                         else if (i == 6) res = table.column().bits_32.count(0);
                         else if (i == 7) res = table.column().bits_64.count(0);
-                        
+
                         if (res != expected) {
                             printf("error");
                         }
@@ -277,7 +277,7 @@ int main()
                 const double search_time2 = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Sparse2: %fs\n", (int)i, search_time2);
             }
-            
+
             // Do a search over entire column (all matches)
             {
                 // Search with query engine
@@ -290,10 +290,10 @@ int main()
                 else if (i == 5) q.bits_16.equal(0x7FFFLL);
                 else if (i == 6) q.bits_32.equal(0x7FFFFFFFLL);
                 else if (i == 7) q.bits_64.equal(0x7FFFFFFFFFFFFFFFLL);
-                
+
                 size_t expected = row_count;
                 if (i == 0) ++expected;
-                
+
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
@@ -305,7 +305,7 @@ int main()
                 }
                 const double search_time = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Many:   %fs\n", (int)i, search_time);
-                
+
                 // Search with column intrinsic functions
                 timer.start();
                 {
@@ -319,7 +319,7 @@ int main()
                         else if (i == 5) res = table.column().bits_16.count(0x7FFFLL);
                         else if (i == 6) res = table.column().bits_32.count(0x7FFFFFFFLL);
                         else if (i == 7) res = table.column().bits_64.count(0x7FFFFFFFFFFFFFFFLL);
-                        
+
                         if (res != expected) {
                             printf("error");
                         }
@@ -328,7 +328,7 @@ int main()
                 const double search_time2 = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Many2: %fs\n", (int)i, search_time2);
             }
-            
+
             // Do a sum over entire column (all matches)
             {
                 TestTable::Query q = table.where();
@@ -341,7 +341,7 @@ int main()
                 else if (i == 5) expected = row_count * 0x7FFFLL;
                 else if (i == 6) expected = row_count * 0x7FFFFFFFLL;
                 else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;
-                
+
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
@@ -354,7 +354,7 @@ int main()
                         else if (i == 5) res = q.bits_16.sum();
                         else if (i == 6) res = q.bits_32.sum();
                         else if (i == 7) res = q.bits_64.sum();
-                        
+
                         if (res != expected) {
                             printf("error");
                         }
@@ -363,7 +363,7 @@ int main()
                 const double search_time = timer.get_elapsed_millis();
                 printf("TightDB: Column %d: Sum:    %fs\n", (int)i, search_time);
             }
-            
+
             // Do a sum over entire column (all matches)
             {
                 int64_t expected;
@@ -375,7 +375,7 @@ int main()
                 else if (i == 5) expected = row_count * 0x7FFFLL;
                 else if (i == 6) expected = row_count * 0x7FFFFFFFLL;
                 else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;
-                
+
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
@@ -388,7 +388,7 @@ int main()
                         else if (i == 5) res = table.column().bits_16.sum();
                         else if (i == 6) res = table.column().bits_32.sum();
                         else if (i == 7) res = table.column().bits_64.sum();
-                        
+
                         if (res != expected) {
                             printf("error");
                         }
@@ -398,7 +398,7 @@ int main()
                 printf("TightDB: Column %d: Sum2:   %fs\n", (int)i, search_time);
             }
         }
-        
+
         for (size_t i = 0; i < 3; ++i) {
             // Do a search over entire column (sparse, only last value matches)
             {
@@ -406,9 +406,9 @@ int main()
                 if      (i == 0) q.short_str.equal("bottom");
                 else if (i == 1) q.long_str.equal("long bottom");
                 else if (i == 2) q.enum_str.equal("saturday");
-                
+
                 const size_t expected = 1;
-                
+
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
@@ -421,16 +421,16 @@ int main()
                 const double search_time = timer.get_elapsed_millis();
                 printf("TightDB: StringColumn %d: Sparse: %fs\n", (int)i, search_time);
             }
-            
+
             // Do a search over entire column (all but last value matches)
             {
                 TestTable::Query q = table.where();
                 if      (i == 0) q.short_str.not_equal("bottom");
                 else if (i == 1) q.long_str.not_equal("long bottom");
                 else if (i == 2) q.enum_str.not_equal("saturday");
-                
+
                 const size_t expected = row_count;
-                
+
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
@@ -445,42 +445,42 @@ int main()
             }
         }
     }
-#endif    
+#endif
 
-#ifndef ONLY_CN_TESTS        
+#ifndef ONLY_CN_TESTS
     // STL tests
     {
         vector<TestStruct> table;
-        
-        
-                
+
+
+
         // Build large table
         for (size_t i = 0; i < row_count; ++i) {
             std::stringstream ss;
-            
+
             // Create short unique string
             ss << "s" << i;
             const string short_str = ss.str();
-            
+
             // Create long unique string
             ss << " very long string...............";
             const string long_str = ss.str();
-            
+
             // Create strings that can be auto-enumerated
             const string enum_str = (i % 2) ? "monday" : "tuesday";
-            
+
             const TestStruct ts = {0, 1, 3, 15, 0x7FLL, 0x7FFFLL, 0x7FFFFFFFLL, 0x7FFFFFFFFFFFFFFFLL, short_str, long_str, enum_str};
             table.push_back(ts);
         }
         const TestStruct ts2 = {0, 0, 0, 0, 0, 0, 0, 0, "bottom", "long bottom", "saturday"};
         table.push_back(ts2);
-        
+
         // Search over integer columns
         for (size_t i = 0; i < 8; ++i) {
             // Do a search over entire column (sparse, only last value matches)
             {
                 const size_t expected = (i == 0) ? 0 : 1;
-                
+
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
@@ -493,7 +493,7 @@ int main()
                         else if (i == 5) res = count_if(table.begin(), table.end(), match6(0));
                         else if (i == 6) res = count_if(table.begin(), table.end(), match7(0));
                         else if (i == 7) res = count_if(table.begin(), table.end(), match8(0));
-                        
+
                         if (res != expected) {
                             printf("error");
                         }
@@ -502,12 +502,12 @@ int main()
                 const double search_time = timer.get_elapsed_millis();
                 printf("STL: Column %d: Sparse: %fs\n", (int)i, search_time);
             }
-            
+
             // Do a search over entire column (all matches)
             {
                 size_t expected = row_count;
                 if (i == 0) ++expected;
-                
+
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
@@ -520,7 +520,7 @@ int main()
                         else if (i == 5) res = count_if(table.begin(), table.end(), match6(0x7FFFLL));
                         else if (i == 6) res = count_if(table.begin(), table.end(), match7(0x7FFFFFFFLL));
                         else if (i == 7) res = count_if(table.begin(), table.end(), match8(0x7FFFFFFFFFFFFFFFLL));
-                        
+
                         if (res != expected) {
                             printf("error");
                         }
@@ -529,7 +529,7 @@ int main()
                 const double search_time = timer.get_elapsed_millis();
                 printf("STL: Column %d: Many:   %fs\n", (int)i, search_time);
             }
-            
+
             // Do a sum over entire column (all matches)
             {
                 timer.start();
@@ -542,7 +542,7 @@ int main()
                     else if (i == 4) expected = row_count * 0x7FLL;
                     else if (i == 5) expected = row_count * 0x7FFFLL;
                     else if (i == 6) expected = row_count * 0x7FFFFFFFLL;
-                    else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;                    
+                    else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;
                     {
                         int64_t res = 0;
                         if (i == 0) {
@@ -585,7 +585,7 @@ int main()
                                 res += p->field8;
                             }
                         }
-                        
+
                         if (res != expected) {
                             printf("error");
                         }
@@ -595,12 +595,12 @@ int main()
                 printf("STL: Column %d: Sum:    %fs\n", (int)i, search_time);
             }
         }
-        
+
         for (size_t i = 0; i < 3; ++i) {
             // Do a search over entire column (sparse, only last value matches)
             {
                 const size_t expected = 1;
-                
+
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
@@ -608,7 +608,7 @@ int main()
                         if      (i == 0) res = count_if(table.begin(), table.end(), match9("bottom"));
                         else if (i == 1) res = count_if(table.begin(), table.end(), match10("long bottom"));
                         else if (i == 2) res = count_if(table.begin(), table.end(), match11("saturday"));
-                        
+
                         if (res != expected) {
                             printf("error");
                         }
@@ -617,11 +617,11 @@ int main()
                 const double search_time = timer.get_elapsed_millis();
                 printf("STL: StringColumn %d: Sparse: %fs\n", (int)i, search_time);
             }
-            
+
             // Do a search over entire column (all but last value matches)
             {
                 const size_t expected = row_count;
-                
+
                 timer.start();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
@@ -629,7 +629,7 @@ int main()
                         if      (i == 0) res = count_if(table.begin(), table.end(), match9n("bottom"));
                         else if (i == 1) res = count_if(table.begin(), table.end(), match10n("long bottom"));
                         else if (i == 2) res = count_if(table.begin(), table.end(), match11n("saturday"));
-                        
+
                         if (res != expected) {
                             printf("error");
                         }
@@ -639,7 +639,7 @@ int main()
                 printf("STL: StringColumn %d: Many: %fs\n", (int)i, search_time);
             }
         }
-        
+
     }
 
 #endif
@@ -647,22 +647,22 @@ int main()
     // TightDB Multi-column tests
     {
         TestTable table;
-        
+
         // Build large table
         for (size_t i = 0; i < row_count; ++i) {
             std::stringstream ss;
-            
+
             // Create short unique string
             ss << "s" << i;
             const string short_str = ss.str();
-            
+
             // Create long unique string
             ss << " very long string...............";
             const string long_str = ss.str();
-            
+
             // Create strings that can be auto-enumerated
             const string enum_str = (i % 2) ? "monday" : "tuesday";
-            
+
             const int64_t v1 = (i % 2) ? 0 : 1;
             const int64_t v2 = (i % 4) ? 0 : 3;
             const int64_t v3 = (i % 8) ? 0 : 15;
@@ -670,18 +670,18 @@ int main()
             const int64_t v5 = (i % 32) ? 0 : 0x7FFFLL;
             const int64_t v6 = (i % 64) ? 0 : 0x7FFFFFFFLL;
             const int64_t v7 = (i % 128) ? 0 : 0x7FFFFFFFFFFFFFFFLL;
-            
+
             table.add(0, v1, v2, v3, v4, v5, v6, v7, short_str.c_str(), long_str.c_str(), enum_str.c_str());
         }
         //table.add(0, 0, 0, 0, 0, 0, 0, 0, "bottom", "long bottom", "saturday");
-        
+
         table.optimize(); // auto-enumerate last string column
-        
+
         // Search over two columns
         {
             TestTable::Query q = table.where().bits_1.equal(1).bits_2.equal(3);
             const size_t expected = row_count / 4;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -694,12 +694,12 @@ int main()
             const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c2: %fs\n", search_time);
         }
-        
+
         // Search over three columns
         {
             TestTable::Query q = table.where().bits_1.equal(1).bits_2.equal(3).bits_4.equal(15);
             const size_t expected = row_count / 8;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -712,7 +712,7 @@ int main()
             const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c3: %fs\n", search_time);
         }
-        
+
         // Search over four columns
         {
             TestTable::Query q = table.where().bits_1.equal(1)
@@ -720,7 +720,7 @@ int main()
                                               .bits_4.equal(15)
                                               .bits_8.equal(0x7FLL);
             const size_t expected = row_count / 16;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -733,7 +733,7 @@ int main()
             const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c4: %fs\n", search_time);
         }
-        
+
         // Search over five columns
         {
             TestTable::Query q = table.where().bits_1.equal(1)
@@ -742,7 +742,7 @@ int main()
                                               .bits_8.equal(0x7FLL)
                                               .bits_16.equal(0x7FFFLL);
             const size_t expected = row_count / 32;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -755,7 +755,7 @@ int main()
             const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c5: %fs\n", search_time);
         }
-        
+
         // Search over six columns
         {
             TestTable::Query q = table.where().bits_1.equal(1)
@@ -765,7 +765,7 @@ int main()
                                               .bits_16.equal(0x7FFFLL)
                                               .bits_32.equal(0x7FFFFFFFLL);
             const size_t expected = row_count / 64;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -778,7 +778,7 @@ int main()
             const double search_time = timer.get_elapsed_millis();
             printf("TightDB: c6: %fs\n", search_time);
         }
-        
+
         // Search over six columns
         {
             TestTable::Query q = table.where().bits_1.equal(1)
@@ -789,7 +789,7 @@ int main()
                                               .bits_32.equal(0x7FFFFFFFLL)
                                               .bits_64.equal(0x7FFFFFFFFFFFFFFFLL);
             const size_t expected = row_count / 128;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -803,28 +803,28 @@ int main()
             printf("TightDB: c7: %fs\n", search_time);
         }
     }
-    
+
     // STL Multi-column tests
     {
         vector<TestStruct> table;
-        
 
-        
+
+
         // Build large table
         for (size_t i = 0; i < row_count; ++i) {
             std::stringstream ss;
-            
+
             // Create short unique string
             ss << "s" << i;
             const string short_str = ss.str();
-            
+
             // Create long unique string
             ss << " very long string...............";
             const string long_str = ss.str();
-            
+
             // Create strings that can be auto-enumerated
             const string enum_str = (i % 2) ? "monday" : "tuesday";
-            
+
             const int64_t v1 = (i % 2) ? 0 : 1;
             const int64_t v2 = (i % 4) ? 0 : 3;
             const int64_t v3 = (i % 8) ? 0 : 15;
@@ -832,17 +832,17 @@ int main()
             const int64_t v5 = (i % 32) ? 0 : 0x7FFFLL;
             const int64_t v6 = (i % 64) ? 0 : 0x7FFFFFFFLL;
             const int64_t v7 = (i % 128) ? 0 : 0x7FFFFFFFFFFFFFFFLL;
-            
+
             const TestStruct ts = {0, v1, v2, v3, v4, v5, v6, v7, short_str, long_str, enum_str};
             table.push_back(ts);
         }
         const TestStruct ts2 = {0, 0, 0, 0, 0, 0, 0, 0, "bottom", "long bottom", "saturday"};
         table.push_back(ts2);
-        
+
         // Search over two columns
         {
             const size_t expected = row_count / 4;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -855,11 +855,11 @@ int main()
             const double search_time = timer.get_elapsed_millis();
             printf("STL: c2: %fs\n", search_time);
         }
-        
+
         // Search over three columns
         {
             const size_t expected = row_count / 8;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -872,11 +872,11 @@ int main()
             const double search_time = timer.get_elapsed_millis();
             printf("STL: c3: %fs\n", search_time);
         }
-        
+
         // Search over four columns
         {
             const size_t expected = row_count / 16;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -889,11 +889,11 @@ int main()
             const double search_time = timer.get_elapsed_millis();
             printf("STL: c4: %fs\n", search_time);
         }
-        
+
         // Search over five columns
         {
             const size_t expected = row_count / 32;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -906,11 +906,11 @@ int main()
             const double search_time = timer.get_elapsed_millis();
             printf("STL: c5: %fs\n", search_time);
         }
-        
+
         // Search over six columns
         {
             const size_t expected = row_count / 64;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {
@@ -923,11 +923,11 @@ int main()
             const double search_time = timer.get_elapsed_millis();
             printf("STL: c6: %fs\n", search_time);
         }
-        
+
         // Search over seven columns
         {
             const size_t expected = row_count / 128;
-            
+
             timer.start();
             {
                 for (size_t n = 0; n < rounds; ++n) {

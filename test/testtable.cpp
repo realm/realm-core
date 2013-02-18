@@ -11,11 +11,11 @@ using namespace tightdb;
 TEST(Table1)
 {
     Table table;
-    table.add_column(COLUMN_TYPE_INT, "first");
-    table.add_column(COLUMN_TYPE_INT, "second");
+    table.add_column(type_Int, "first");
+    table.add_column(type_Int, "second");
 
-    CHECK_EQUAL(COLUMN_TYPE_INT, table.get_column_type(0));
-    CHECK_EQUAL(COLUMN_TYPE_INT, table.get_column_type(1));
+    CHECK_EQUAL(type_Int, table.get_column_type(0));
+    CHECK_EQUAL(type_Int, table.get_column_type(1));
     CHECK_EQUAL("first", table.get_column_name(0));
     CHECK_EQUAL("second", table.get_column_name(1));
 
@@ -50,11 +50,11 @@ TEST(Table1)
 TEST(Table_floats)
 {
     Table table;
-    table.add_column(COLUMN_TYPE_FLOAT, "first");
-    table.add_column(COLUMN_TYPE_DOUBLE, "second");
+    table.add_column(type_Float, "first");
+    table.add_column(type_Double, "second");
 
-    CHECK_EQUAL(COLUMN_TYPE_FLOAT, table.get_column_type(0));
-    CHECK_EQUAL(COLUMN_TYPE_DOUBLE, table.get_column_type(1));
+    CHECK_EQUAL(type_Float, table.get_column_type(0));
+    CHECK_EQUAL(type_Double, table.get_column_type(1));
     CHECK_EQUAL("first", table.get_column_name(0));
     CHECK_EQUAL("second", table.get_column_name(1));
 
@@ -241,17 +241,17 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 {
     // Create table with all column types
     Spec& s = table.get_spec();
-    s.add_column(COLUMN_TYPE_INT,    "int");
-    s.add_column(COLUMN_TYPE_BOOL,   "bool");
-    s.add_column(COLUMN_TYPE_DATE,   "date");
-    s.add_column(COLUMN_TYPE_STRING, "string");
-    s.add_column(COLUMN_TYPE_STRING, "string_long");
-    s.add_column(COLUMN_TYPE_STRING, "string_enum"); // becomes ColumnStringEnum
-    s.add_column(COLUMN_TYPE_BINARY, "binary");
-    s.add_column(COLUMN_TYPE_MIXED,  "mixed");
+    s.add_column(type_Int,    "int");
+    s.add_column(type_Bool,   "bool");
+    s.add_column(type_Date,   "date");
+    s.add_column(type_String, "string");
+    s.add_column(type_String, "string_long");
+    s.add_column(type_String, "string_enum"); // becomes ColumnStringEnum
+    s.add_column(type_Binary, "binary");
+    s.add_column(type_Mixed,  "mixed");
     Spec sub = s.add_subtable_column("tables");
-    sub.add_column(COLUMN_TYPE_INT,    "sub_first");
-    sub.add_column(COLUMN_TYPE_STRING, "sub_second");
+    sub.add_column(type_Int,    "sub_first");
+    sub.add_column(type_String, "sub_second");
     table.update_from_spec();
 
     // Add some rows
@@ -313,8 +313,8 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
         // Add subtable to mixed column
         if (i % 6 == 5) {
             TableRef subtable = table.get_subtable(7, i);
-            subtable->add_column(COLUMN_TYPE_INT,    "first");
-            subtable->add_column(COLUMN_TYPE_STRING, "second");
+            subtable->add_column(type_Int,    "first");
+            subtable->add_column(type_String, "second");
             for (size_t j=0; j<2; j++) {
                 subtable->insert_int(0, j, i*i*j);
                 subtable->insert_string(1, j, "mixed sub");
@@ -413,12 +413,12 @@ TEST(Table_test_json_simple)
     // Create table with all column types
     Table table;
     Spec& s = table.get_spec();
-    s.add_column(COLUMN_TYPE_INT,    "int");
-    s.add_column(COLUMN_TYPE_BOOL,   "bool");
-    s.add_column(COLUMN_TYPE_DATE,   "date");
+    s.add_column(type_Int,    "int");
+    s.add_column(type_Bool,   "bool");
+    s.add_column(type_Date,   "date");
     // FIXME: Add float, double
-    s.add_column(COLUMN_TYPE_STRING, "string");
-    s.add_column(COLUMN_TYPE_BINARY, "binary");
+    s.add_column(type_String, "string");
+    s.add_column(type_Binary, "binary");
     table.update_from_spec();
 
     // Add some rows
@@ -558,7 +558,7 @@ TEST(Table_Sorted_Int)
 TEST(Table_Index_String)
 {
     TestTableEnum table;
-    
+
     table.add(Mon, "jeff");
     table.add(Tue, "jim");
     table.add(Wed, "jennifer");
@@ -567,13 +567,13 @@ TEST(Table_Index_String)
     table.add(Sat, "jimbo");
     table.add(Sun, "johnny");
     table.add(Mon, "jennifer"); //duplicate
-    
+
     table.column().second.set_index();
     CHECK(table.column().second.has_index());
-    
+
     const size_t r1 = table.column().second.find_first("jimmi");
     CHECK_EQUAL(not_found, r1);
-    
+
     const size_t r2 = table.column().second.find_first("jeff");
     const size_t r3 = table.column().second.find_first("jim");
     const size_t r4 = table.column().second.find_first("jimbo");
@@ -582,7 +582,7 @@ TEST(Table_Index_String)
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);
     CHECK_EQUAL(6, r5);
-    
+
     const size_t c1 = table.column().second.count("jennifer");
     CHECK_EQUAL(2, c1);
 }
@@ -884,11 +884,11 @@ TEST(Table_Spec)
 
     // Create specification with sub-table
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_INT,    "first");
-    s.add_column(COLUMN_TYPE_STRING, "second");
+    s.add_column(type_Int,    "first");
+    s.add_column(type_String, "second");
     Spec sub = s.add_subtable_column("third");
-        sub.add_column(COLUMN_TYPE_INT,    "sub_first");
-        sub.add_column(COLUMN_TYPE_STRING, "sub_second");
+        sub.add_column(type_Int,    "sub_first");
+        sub.add_column(type_String, "sub_second");
     table->update_from_spec();
 
     CHECK_EQUAL(3, table->get_column_count());
@@ -948,16 +948,16 @@ TEST(Table_Spec_RenameColumns)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    table->add_column(COLUMN_TYPE_INT,    "first");
-    table->add_column(COLUMN_TYPE_STRING, "second");
-    table->add_column(COLUMN_TYPE_TABLE,  "third");
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
     vector<size_t> column_path;
     column_path.push_back(2); // third
 
-    table->add_subcolumn(column_path, COLUMN_TYPE_INT,    "sub_first");
-    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "sub_second");
+    table->add_subcolumn(column_path, type_Int,    "sub_first");
+    table->add_subcolumn(column_path, type_String, "sub_second");
 
     // Add a row
     table->insert_int(0, 0, 4);
@@ -999,16 +999,16 @@ TEST(Table_Spec_DeleteColumns)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    table->add_column(COLUMN_TYPE_INT,    "first");
-    table->add_column(COLUMN_TYPE_STRING, "second");
-    table->add_column(COLUMN_TYPE_TABLE,  "third");
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
     vector<size_t> column_path;
     column_path.push_back(2); // third
 
-    table->add_subcolumn(column_path, COLUMN_TYPE_INT,    "sub_first");
-    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "sub_second");
+    table->add_subcolumn(column_path, type_Int,    "sub_first");
+    table->add_subcolumn(column_path, type_String, "sub_second");
 
     // Put in an index as well
     table->set_index(1);
@@ -1092,16 +1092,16 @@ TEST(Table_Spec_AddColumns)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    table->add_column(COLUMN_TYPE_INT,    "first");
-    table->add_column(COLUMN_TYPE_STRING, "second");
-    table->add_column(COLUMN_TYPE_TABLE,  "third");
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
     vector<size_t> column_path;
     column_path.push_back(2); // third
 
-    table->add_subcolumn(column_path, COLUMN_TYPE_INT,    "sub_first");
-    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "sub_second");
+    table->add_subcolumn(column_path, type_Int,    "sub_first");
+    table->add_subcolumn(column_path, type_String, "sub_second");
 
     // Put in an index as well
     table->set_index(1);
@@ -1132,22 +1132,22 @@ TEST(Table_Spec_AddColumns)
     CHECK_EQUAL(1, table->get_subtable_size(2, 0));
 
     // Add a new bool column
-    table->add_column(COLUMN_TYPE_BOOL, "fourth");
+    table->add_column(type_Bool, "fourth");
     CHECK_EQUAL(4, table->get_column_count());
     CHECK_EQUAL(false, table->get_bool(3, 0));
 
     // Add a new string column
-    table->add_column(COLUMN_TYPE_STRING, "fifth");
+    table->add_column(type_String, "fifth");
     CHECK_EQUAL(5, table->get_column_count());
     CHECK_EQUAL("", table->get_string(4, 0));
 
     // Add a new table column
-    table->add_column(COLUMN_TYPE_TABLE, "sixth");
+    table->add_column(type_Table, "sixth");
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(0, table->get_subtable_size(5, 0));
 
     // Add a new mixed column
-    table->add_column(COLUMN_TYPE_MIXED, "seventh");
+    table->add_column(type_Mixed, "seventh");
     CHECK_EQUAL(7, table->get_column_count());
     CHECK_EQUAL(0, table->get_mixed(6, 0).get_int());
 
@@ -1156,7 +1156,7 @@ TEST(Table_Spec_AddColumns)
     column_path.push_back(2); // third
 
     // Add new int column to sub-table
-    table->add_subcolumn(column_path, COLUMN_TYPE_INT, "sub_third");
+    table->add_subcolumn(column_path, type_Int, "sub_third");
 
     // Get the sub-table again and see if the values
     // still match.
@@ -1171,7 +1171,7 @@ TEST(Table_Spec_AddColumns)
     }
 
     // Add new table column to sub-table
-    table->add_subcolumn(column_path, COLUMN_TYPE_TABLE, "sub_fourth");
+    table->add_subcolumn(column_path, type_Table, "sub_fourth");
 
     // Get the sub-table again and see if the values
     // still match.
@@ -1188,7 +1188,7 @@ TEST(Table_Spec_AddColumns)
 
     // Add new column to new sub-table
     column_path.push_back(3); // sub_forth
-    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "first");
+    table->add_subcolumn(column_path, type_String, "first");
 
     // Get the sub-table again and see if the values
     // still match.
@@ -1212,18 +1212,18 @@ TEST(Table_Spec_DeleteColumnsBug)
     table = Table::create();
 
     // Create specification with sub-table
-    table->add_column(COLUMN_TYPE_STRING, "name");
+    table->add_column(type_String, "name");
     table->set_index(0);
-    table->add_column(COLUMN_TYPE_INT,    "age");
-    table->add_column(COLUMN_TYPE_BOOL,   "hired");
-    table->add_column(COLUMN_TYPE_TABLE,  "phones");
+    table->add_column(type_Int,    "age");
+    table->add_column(type_Bool,   "hired");
+    table->add_column(type_Table,  "phones");
 
     // Create path to sub-table column
     vector<size_t> column_path;
     column_path.push_back(3); // phones
 
-    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "type");
-    table->add_subcolumn(column_path, COLUMN_TYPE_STRING, "number");
+    table->add_subcolumn(column_path, type_String, "type");
+    table->add_subcolumn(column_path, type_String, "number");
 
     // Add rows
     table->add_empty_row();
@@ -1264,7 +1264,7 @@ TEST(Table_Spec_DeleteColumnsBug)
     }
 
     // Add new column
-    table->add_column(COLUMN_TYPE_MIXED, "extra");
+    table->add_column(type_Mixed, "extra");
     table->set_mixed(4, 0, true);
     table->set_mixed(4, 2, "Random string!");
 
@@ -1282,11 +1282,11 @@ TEST(Table_Spec_DeleteColumnsBug)
 TEST(Table_Mixed)
 {
     Table table;
-    table.add_column(COLUMN_TYPE_INT, "first");
-    table.add_column(COLUMN_TYPE_MIXED, "second");
+    table.add_column(type_Int, "first");
+    table.add_column(type_Mixed, "second");
 
-    CHECK_EQUAL(COLUMN_TYPE_INT, table.get_column_type(0));
-    CHECK_EQUAL(COLUMN_TYPE_MIXED, table.get_column_type(1));
+    CHECK_EQUAL(type_Int, table.get_column_type(0));
+    CHECK_EQUAL(type_Mixed, table.get_column_type(1));
     CHECK_EQUAL("first", table.get_column_name(0));
     CHECK_EQUAL("second", table.get_column_name(1));
 
@@ -1295,7 +1295,7 @@ TEST(Table_Mixed)
     table.set_mixed(1, ndx, true);
 
     CHECK_EQUAL(0, table.get_int(0, 0));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL, table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
 
     table.insert_int(0, 1, 43);
@@ -1304,8 +1304,8 @@ TEST(Table_Mixed)
 
     CHECK_EQUAL(0,  table.get_int(0, ndx));
     CHECK_EQUAL(43, table.get_int(0, 1));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL, table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_INT,  table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,  table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,   table.get_mixed(1, 1).get_int());
 
@@ -1315,9 +1315,9 @@ TEST(Table_Mixed)
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
     CHECK_EQUAL(43, table.get_int(0, 1));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
@@ -1329,10 +1329,10 @@ TEST(Table_Mixed)
     CHECK_EQUAL(0,  table.get_int(0, 0));
     CHECK_EQUAL(43, table.get_int(0, 1));
     CHECK_EQUAL(0,  table.get_int(0, 3));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
@@ -1346,11 +1346,11 @@ TEST(Table_Mixed)
     CHECK_EQUAL(43, table.get_int(0, 1));
     CHECK_EQUAL(0,  table.get_int(0, 3));
     CHECK_EQUAL(43, table.get_int(0, 4));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.get_mixed(1, 3).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_BINARY, table.get_mixed(1, 4).get_type());
+    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
@@ -1367,12 +1367,12 @@ TEST(Table_Mixed)
     CHECK_EQUAL(0,  table.get_int(0, 3));
     CHECK_EQUAL(43, table.get_int(0, 4));
     CHECK_EQUAL(0,  table.get_int(0, 5));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.get_mixed(1, 3).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_BINARY, table.get_mixed(1, 4).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_TABLE,  table.get_mixed(1, 5).get_type());
+    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
+    CHECK_EQUAL(type_Table,  table.get_mixed(1, 5).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
@@ -1382,8 +1382,8 @@ TEST(Table_Mixed)
 
     // Get table from mixed column and add schema and some values
     TableRef subtable = table.get_subtable(1, 5);
-    subtable->add_column(COLUMN_TYPE_STRING, "name");
-    subtable->add_column(COLUMN_TYPE_INT,    "age");
+    subtable->add_column(type_String, "name");
+    subtable->add_column(type_Int,    "age");
 
     subtable->insert_string(0, 0, "John");
     subtable->insert_int(1, 0, 40);
@@ -1410,14 +1410,14 @@ TEST(Table_Mixed)
     CHECK_EQUAL(0,  table.get_int(0, 5));
     CHECK_EQUAL(31, table.get_int(0, 6));
     CHECK_EQUAL(0,  table.get_int(0, 7));
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   table.get_mixed(1, 3).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_BINARY, table.get_mixed(1, 4).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_TABLE,  table.get_mixed(1, 5).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_FLOAT,  table.get_mixed(1, 6).get_type());
-    CHECK_EQUAL(COLUMN_TYPE_DOUBLE, table.get_mixed(1, 7).get_type());
+    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
+    CHECK_EQUAL(type_Table,  table.get_mixed(1, 5).get_type());
+    CHECK_EQUAL(type_Float,  table.get_mixed(1, 6).get_type());
+    CHECK_EQUAL(type_Double, table.get_mixed(1, 7).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
@@ -1447,10 +1447,10 @@ TEST(Table_Mixed2)
     table.add(Date(1234));
     table.add("test");
 
-    CHECK_EQUAL(COLUMN_TYPE_INT,    table[0].first.get_type());
-    CHECK_EQUAL(COLUMN_TYPE_BOOL,   table[1].first.get_type());
-    CHECK_EQUAL(COLUMN_TYPE_DATE,   table[2].first.get_type());
-    CHECK_EQUAL(COLUMN_TYPE_STRING, table[3].first.get_type());
+    CHECK_EQUAL(type_Int,    table[0].first.get_type());
+    CHECK_EQUAL(type_Bool,   table[1].first.get_type());
+    CHECK_EQUAL(type_Date,   table[2].first.get_type());
+    CHECK_EQUAL(type_String, table[3].first.get_type());
 
     CHECK_EQUAL(1,            table[0].first.get_int());
     CHECK_EQUAL(true,         table[1].first.get_bool());
@@ -1465,9 +1465,9 @@ TEST(Table_SubtableSizeAndClear)
     Spec& spec = table.get_spec();
     {
         Spec subspec = spec.add_subtable_column("subtab");
-        subspec.add_column(COLUMN_TYPE_INT, "int");
+        subspec.add_column(type_Int, "int");
     }
-    spec.add_column(COLUMN_TYPE_MIXED, "mixed");
+    spec.add_column(type_Mixed, "mixed");
     table.update_from_spec();
 
     table.insert_subtable(0, 0);
@@ -1495,7 +1495,7 @@ TEST(Table_SubtableSizeAndClear)
     TableRef subtab2 = table.get_subtable(1, 0);
     {
         Spec& subspec = subtab2->get_spec();
-        subspec.add_column(COLUMN_TYPE_INT, "int");
+        subspec.add_column(type_Int, "int");
         subtab2->update_from_spec();
     }
 
@@ -1707,9 +1707,9 @@ TEST(Table_Test_Clear_With_Subtable_AND_Group)
 
     // Create specification with sub-table
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_STRING, "name");
+    s.add_column(type_String, "name");
     Spec sub = s.add_subtable_column("sub");
-        sub.add_column(COLUMN_TYPE_INT, "num");
+        sub.add_column(type_Int, "num");
     table->update_from_spec();
 
     CHECK_EQUAL(2, table->get_column_count());
@@ -1806,7 +1806,7 @@ namespace
 }
 
 #if TEST_DURATION > 0
-#define TBL_SIZE MAX_LIST_SIZE*10
+#define TBL_SIZE TIGHTDB_MAX_LIST_SIZE*10
 #else
 #define TBL_SIZE 10
 #endif

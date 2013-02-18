@@ -385,22 +385,22 @@ TEST_FIXTURE(db_setup, Column_FindLeafs)
 
     // Create values that span multible leafs
     // we use 5 to ensure that we get two levels
-    // when testing with MAX_LIST_SIZE=4
-    for (size_t i = 0; i < MAX_LIST_SIZE*5; ++i) {
+    // when testing with TIGHTDB_MAX_LIST_SIZE=4
+    for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE*5; ++i) {
         a.add(0);
     }
 
     // Set sentinel values at before and after each break
     a.Set(0, 1);
-    a.Set(MAX_LIST_SIZE-1, 2);
-    a.Set(MAX_LIST_SIZE, 3);
-    a.Set(MAX_LIST_SIZE*2-1, 4);
-    a.Set(MAX_LIST_SIZE*2, 5);
-    a.Set(MAX_LIST_SIZE*3-1, 6);
-    a.Set(MAX_LIST_SIZE*3, 7);
-    a.Set(MAX_LIST_SIZE*4-1, 8);
-    a.Set(MAX_LIST_SIZE*4, 9);
-    a.Set(MAX_LIST_SIZE*5-1, 10);
+    a.Set(TIGHTDB_MAX_LIST_SIZE-1, 2);
+    a.Set(TIGHTDB_MAX_LIST_SIZE, 3);
+    a.Set(TIGHTDB_MAX_LIST_SIZE*2-1, 4);
+    a.Set(TIGHTDB_MAX_LIST_SIZE*2, 5);
+    a.Set(TIGHTDB_MAX_LIST_SIZE*3-1, 6);
+    a.Set(TIGHTDB_MAX_LIST_SIZE*3, 7);
+    a.Set(TIGHTDB_MAX_LIST_SIZE*4-1, 8);
+    a.Set(TIGHTDB_MAX_LIST_SIZE*4, 9);
+    a.Set(TIGHTDB_MAX_LIST_SIZE*5-1, 10);
 
     const size_t res1 = a.find_first(1);
     const size_t res2 = a.find_first(2);
@@ -414,15 +414,15 @@ TEST_FIXTURE(db_setup, Column_FindLeafs)
     const size_t res10 = a.find_first(10);
 
     CHECK_EQUAL(0, res1);
-    CHECK_EQUAL(MAX_LIST_SIZE-1, res2);
-    CHECK_EQUAL(MAX_LIST_SIZE, res3);
-    CHECK_EQUAL(MAX_LIST_SIZE*2-1, res4);
-    CHECK_EQUAL(MAX_LIST_SIZE*2, res5);
-    CHECK_EQUAL(MAX_LIST_SIZE*3-1, res6);
-    CHECK_EQUAL(MAX_LIST_SIZE*3, res7);
-    CHECK_EQUAL(MAX_LIST_SIZE*4-1, res8);
-    CHECK_EQUAL(MAX_LIST_SIZE*4, res9);
-    CHECK_EQUAL(MAX_LIST_SIZE*5-1, res10);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE-1, res2);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE, res3);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*2-1, res4);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*2, res5);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*3-1, res6);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*3, res7);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*4-1, res8);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*4, res9);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*5-1, res10);
 
     a.Destroy();
 }
@@ -507,7 +507,7 @@ TEST(Column_FindAll_IntMin)
     }
 
     c.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
@@ -539,7 +539,7 @@ TEST(Column_FindAll_IntMax)
     }
 
     c.find_all(r, value);
-    CHECK_EQUAL(vReps, r.Size());
+    CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
     size_t j = 0;
@@ -566,7 +566,7 @@ TEST(Column_FindHamming)
     Array res;
     col.find_all_hamming(res, 0x3333333333333332LL, 2);
 
-    CHECK_EQUAL(10, res.Size()); // Half should match
+    CHECK_EQUAL(10, res.size()); // Half should match
 
     // Clean up
     col.Destroy();
@@ -580,7 +580,7 @@ TEST(Column_Average)
     Column c;
     c.add(10);
     CHECK_EQUAL(10, c.average());
-    
+
     c.add(30);
     CHECK_EQUAL(0, c.average(0,0));     // None
     CHECK_EQUAL(10, c.average(0,1));    // first
@@ -724,12 +724,12 @@ TEST(Column_Sort2)
 {
     Column c;
 
-    for (size_t t = 0; t < 9*MAX_LIST_SIZE; t++)
+    for (size_t t = 0; t < 9*TIGHTDB_MAX_LIST_SIZE; t++)
         c.add(rand() % 300 - 100);
 
     c.sort();
 
-    for (size_t t = 1; t < 9*MAX_LIST_SIZE; t++) {
+    for (size_t t = 1; t < 9*TIGHTDB_MAX_LIST_SIZE; t++) {
         CHECK(c.Get(t) >= c.Get(t - 1));
     }
 

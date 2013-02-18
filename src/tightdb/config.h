@@ -21,73 +21,99 @@
 #define TIGHTDB_CONFIG_H
 
 
-/* Avoid overriding a build specific setting. If you change this
- * value, be sure to also change TIGHTDB_DEFAULT_MAX_LIST_SIZE. */
-/* FIXME: Must be prefixed with TIGHTDB_ */
-#ifndef MAX_LIST_SIZE
-#  define MAX_LIST_SIZE 1000
-#endif
 /* This one is needed to allow tightdb-config to know whether a
- * nondefault value is in effect. It MUST always be equal to the
- * fallback value of MAX_LIST_SIZE as pecified above. */
+ * nondefault value is in effect. */
 #define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
 
-
-/* GCC defines __GXX_RTTI when '-fno-rtti' is not specified. The same
- * is true for Clang >= v3.0. Microsoft Visual C++ defines _CPPRTTI
- * when '/GR' is specified. */
-#if defined __GXX_RTTI || defined _CPPRTTI
-#  define TIGHTDB_HAVE_RTTI 1
+/* The maximum number of elements in a B-tree node. Allow this value
+ * to be overridden on the command-line. */
+#ifndef TIGHTDB_MAX_LIST_SIZE
+#  define TIGHTDB_MAX_LIST_SIZE TIGHTDB_DEFAULT_MAX_LIST_SIZE
 #endif
 
 
-/* GCC defines __EXCEPTIONS when '-fno-exceptions' is not
- * specified. The same is true for Clang >= v3.0. Microsoft Visual C++
- * defines _CPPUNWIND when '/GX' is specified. */
-#if defined __EXCEPTIONS || defined _CPPUNWIND
-#  define TIGHTDB_HAVE_EXCEPTIONS 1
+#if __cplusplus >= 201103 || __GXX_EXPERIMENTAL_CXX0X__
+#  define TIGHTDB_HAVE_CXX11 1
 #endif
 
 
-/* This one works for both GCC and Clang, and of course any compiler
- * that fully supports C++11. */
-#if defined __cplusplus && __cplusplus >= 201103 || \
-    defined __GXX_EXPERIMENTAL_CXX0X__ && __GXX_EXPERIMENTAL_CXX0X__ && defined __GNUC__ && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 3)
+#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 3
+#  define TIGHTDB_HAVE_GCC_GE_4_3 1
+#endif
+#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 4
+#  define TIGHTDB_HAVE_GCC_GE_4_4 1
+#endif
+#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 5
+#  define TIGHTDB_HAVE_GCC_GE_4_5 1
+#endif
+#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 6
+#  define TIGHTDB_HAVE_GCC_GE_4_6 1
+#endif
+#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 7
+#  define TIGHTDB_HAVE_GCC_GE_4_7 1
+#endif
+#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 8
+#  define TIGHTDB_HAVE_GCC_GE_4_8 1
+#endif
+
+
+/* Support for C++11 static_assert(). */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_3 || \
+    _MSC_VER >= 1600
 #  define TIGHTDB_HAVE_CXX11_STATIC_ASSERT 1
+#endif
+
+
+/* Support for C++11 r-value references.
+ *
+ * NOTE: Not yet fully supported in MSVC++ 11.0. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_3
 #  define TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE 1
+#endif
+
+
+/* Support for the C++11 'decltype' keyword.
+ *
+ * NOTE: Not yet fully supported in MSVC++ 11.0. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_3
 #  define TIGHTDB_HAVE_CXX11_DECLTYPE 1
 #endif
 
 
-/* This one works for both GCC and Clang, and of course any compiler
- * that fully supports C++11. */
-#if defined __cplusplus && __cplusplus >= 201103 || \
-    defined __GXX_EXPERIMENTAL_CXX0X__ && __GXX_EXPERIMENTAL_CXX0X__ && defined __GNUC__ && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 4)
+/* Support for C++11 initializer lists.
+ *
+ * NOTE: Not yet fully supported in MSVC++ 11.0. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_4
 #  define TIGHTDB_HAVE_CXX11_INITIALIZER_LISTS 1
+#endif
+
+
+/* Support for C++11 atomics. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_4 || \
+    _MSC_VER >= 1700
 #  define TIGHTDB_HAVE_CXX11_ATOMIC 1
 #endif
 
 
-/* This one works for both GCC and Clang, and of course any compiler
- * that fully supports C++11. */
-#if defined __cplusplus && __cplusplus >= 201103 || \
-    defined __GXX_EXPERIMENTAL_CXX0X__ && __GXX_EXPERIMENTAL_CXX0X__ && defined __GNUC__ && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 5)
+/* Support for C++11 explicit conversion operators.
+ * NOTE: Not yet fully supported in MSVC++ 11.0. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_5
 #  define TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS 1
 #endif
 
 
-/* This one works for both GCC and Clang, and of course any compiler
- * that fully supports C++11. */
-#if defined __cplusplus && __cplusplus >= 201103 || \
-    defined __GXX_EXPERIMENTAL_CXX0X__ && __GXX_EXPERIMENTAL_CXX0X__ && defined __GNUC__ && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+/* Support for the C++11 'constexpr' keyword.
+ *
+ * NOTE: Not yet fully supported in MSVC++ 11.0. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_6
 #  define TIGHTDB_HAVE_CXX11_CONSTEXPR 1
 #endif
 
 
-/* This one works for both GCC and Clang, and of course any compiler
- * that fully supports C++11. */
-#if defined __cplusplus && __cplusplus >= 201103 || \
-    defined __GXX_EXPERIMENTAL_CXX0X__ && __GXX_EXPERIMENTAL_CXX0X__ && defined __GNUC__ && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+/* Support for the C++11 'noexcept' specifier.
+ *
+ * NOTE: Not yet fully supported in MSVC++ 11.0. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_6
 #  define TIGHTDB_NOEXCEPT noexcept
 #elif defined TIGHTDB_DEBUG
 #  define TIGHTDB_NOEXCEPT throw()
@@ -96,7 +122,31 @@
 #endif
 
 
-#if defined __GNUC__ || defined __INTEL_COMPILER
+/* Support for C++11 explicit virtual overrides */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_7 || \
+    _MSC_VER >= 1700
+#  define TIGHTDB_OVERRIDE override
+#else
+#  define TIGHTDB_OVERRIDE
+#endif
+
+
+/* How to specify that a function never returns.
+ *
+ * NOTE: C++11 generalized attributes are not yet fully supported in
+ * MSVC++ 11.0. */
+#if defined TIGHTDB_HAVE_CXX11 && defined TIGHTDB_HAVE_GCC_GE_4_8
+#  define TIGHTDB_NORETURN [[noreturn]]
+#elif __GNUC__
+#  define TIGHTDB_NORETURN __attribute__((noreturn))
+#elif _MSC_VER
+#  define TIGHTDB_NORETURN __declspec(noreturn)
+#else
+#  define TIGHTDB_NORETURN
+#endif
+
+
+#if __GNUC__ || defined __INTEL_COMPILER
 #  define TIGHTDB_UNLIKELY(expr) __builtin_expect(!!(expr), 0)
 #  define TIGHTDB_LIKELY(expr)   __builtin_expect(!!(expr), 1)
 #else

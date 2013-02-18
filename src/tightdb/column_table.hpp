@@ -33,11 +33,10 @@ public:
 
     void invalidate_subtables();
 
-    // Overriding virtual method.
-    void Clear()
+    void Clear() TIGHTDB_OVERRIDE
     {
         m_array->Clear();
-        if (m_array->IsNode()) m_array->SetType(COLUMN_HASREFS);
+        if (m_array->IsNode()) m_array->SetType(coldef_HasRefs);
         invalidate_subtables();
     }
 
@@ -94,19 +93,15 @@ protected:
         return TableRef(get_subtable_ptr(subtable_ndx));
     }
 
-    // Overriding methods in ArrayParent.
-    virtual void update_child_ref(std::size_t subtable_ndx, std::size_t new_ref);
-    virtual std::size_t get_child_ref(std::size_t subtable_ndx) const;
-
-    // Overriding method in Table::Parent
-    virtual void child_destroyed(std::size_t subtable_ndx);
+    void update_child_ref(std::size_t subtable_ndx, std::size_t new_ref) TIGHTDB_OVERRIDE;
+    std::size_t get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void child_destroyed(std::size_t subtable_ndx) TIGHTDB_OVERRIDE;
 
     /// Assumes that the two tables have the same spec.
     static bool compare_subtable_rows(const Table&, const Table&);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    // Overriding method in Table::Parent
-    virtual size_t* record_subtable_path(size_t* begin, size_t* end)
+    size_t* record_subtable_path(size_t* begin, size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         if (end == begin) return 0; // Error, not enough space in buffer
         *begin++ = m_index;
@@ -172,9 +167,9 @@ public:
         return ColumnSubtableParent::get_subtable_ptr(subtable_ndx, m_ref_specSet);
     }
 
-    bool add();
+    void add() TIGHTDB_OVERRIDE;
     void Insert(size_t ndx);
-    void Delete(size_t ndx);
+    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
     void ClearTable(size_t ndx);
     void fill(size_t count);
 
@@ -182,7 +177,7 @@ public:
     // Column::insert(size_t). Insert(size_t) is not virtual. Do we
     // really need both? Insert(size_t) is at least called from
     // Table::insert_subtable().
-    void insert(size_t ndx)
+    void insert(size_t ndx) TIGHTDB_OVERRIDE
     {
         ColumnSubtableParent::insert(ndx);
         invalidate_subtables();
@@ -191,8 +186,7 @@ public:
     /// Compare two subtable columns for equality.
     bool Compare(const ColumnTable&) const;
 
-    // Overriding virtual method.
-    void invalidate_subtables_virtual();
+    void invalidate_subtables_virtual() TIGHTDB_OVERRIDE;
 
     void set_specref(size_t ref) {m_ref_specSet = ref;}
 
@@ -208,8 +202,7 @@ protected:
     // Member variables
     size_t m_ref_specSet;
 
-    // Overriding virtual method in Table::Parent.
-    bool subtables_have_shared_spec() { return true; }
+    bool subtables_have_shared_spec() TIGHTDB_OVERRIDE { return true; }
 };
 
 
@@ -232,7 +225,6 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
     if (!subtable) {
         const std::size_t top_ref = GetAsRef(subtable_ndx);
         Allocator& alloc = GetAllocator();
-        // FIXME: Use std::nothrow here, and return null on failure!!!
         subtable = new Table(Table::RefCountTag(), alloc, top_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         const bool was_empty = m_subtable_map.empty();
@@ -251,7 +243,6 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
     if (!subtable) {
         const std::size_t columns_ref = GetAsRef(subtable_ndx);
         Allocator& alloc = GetAllocator();
-        // FIXME: Use std::nothrow here, and return null on failure!!!
         subtable = new Table(Table::RefCountTag(), alloc, spec_ref, columns_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         const bool was_empty = m_subtable_map.empty();
@@ -280,8 +271,8 @@ inline Table* ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const
 inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table* wrapper)
 {
     if (!m_indices.IsValid()) {
-        m_indices.SetType(COLUMN_NORMAL);
-        m_wrappers.SetType(COLUMN_NORMAL);
+        m_indices.SetType(coldef_Normal);
+        m_wrappers.SetType(coldef_Normal);
     }
     m_indices.add(subtable_ndx);
     m_wrappers.add(reinterpret_cast<unsigned long>(wrapper));
@@ -303,7 +294,7 @@ inline void ColumnSubtableParent::SubtableMap::update_from_parents()
 {
     if (!m_indices.IsValid()) return;
 
-    const size_t count = m_wrappers.Size();
+    const size_t count = m_wrappers.size();
     for (size_t i = 0; i < count; ++i) {
         Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));
         t->UpdateFromParent();
@@ -314,7 +305,7 @@ inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
 {
     if (!m_indices.IsValid()) return;
 
-    const size_t n = m_wrappers.Size();
+    const size_t n = m_wrappers.size();
     for (size_t i=0; i<n; ++i) {
         Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));
         t->invalidate();
@@ -326,7 +317,7 @@ inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   const Table* table, std::size_t column_ndx):
-                            Column(COLUMN_HASREFS, alloc),
+                            Column(coldef_HasRefs, alloc),
                             m_table(table), m_index(column_ndx),
                             m_subtable_map(Allocator::get_default()) {}
 
@@ -343,7 +334,7 @@ inline void ColumnSubtableParent::update_child_ref(size_t subtable_ndx, size_t n
     Set(subtable_ndx, new_ref);
 }
 
-inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const
+inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const TIGHTDB_NOEXCEPT
 {
     return GetAsRef(subtable_ndx);
 }

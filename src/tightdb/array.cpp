@@ -12,7 +12,6 @@
 
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
-#include <tightdb/utilities.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 
@@ -161,11 +160,14 @@ void Array::SetType(ColumnDef type)
         m_width = size_t(-1);
     }
 
-    if (m_ref) CopyOnWrite();
+    if (m_ref) CopyOnWrite(); // Throws
 
     bool is_node = false, has_refs = false;
-    if (type == COLUMN_NODE) is_node = has_refs = true;
-    else if (type == COLUMN_HASREFS) has_refs = true;
+    switch (type) {
+        case coldef_Normal:                               break;
+        case coldef_InnerNode: has_refs = is_node = true; break;
+        case coldef_HasRefs:   has_refs = true;           break;
+    }
     m_isNode  = is_node;
     m_hasRefs = has_refs;
 
@@ -192,7 +194,7 @@ void Array::UpdateRef(size_t ref)
     update_ref_in_parent();
 }
 
-bool Array::UpdateFromParent()
+bool Array::UpdateFromParent() TIGHTDB_NOEXCEPT
 {
     if (!m_parent) return false;
 
@@ -245,7 +247,7 @@ void Array::Preset(size_t bitwidth, size_t count)
 {
     Clear();
     SetWidth(bitwidth);
-    TIGHTDB_ASSERT(Alloc(count, bitwidth));
+    Alloc(count, bitwidth); // Throws
     m_len = count;
     for (size_t n = 0; n < count; n++)
         Set(n, 0);
@@ -291,11 +293,11 @@ void Array::Destroy()
 
 void Array::Clear()
 {
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Make sure we don't have any dangling references
     if (m_hasRefs) {
-        for (size_t i = 0; i < Size(); ++i) {
+        for (size_t i = 0; i < size(); ++i) {
             const size_t ref = GetAsRef(i);
             if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
@@ -319,7 +321,7 @@ void Array::Delete(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Move values below deletion up
     if (m_width < 8) {
@@ -332,8 +334,11 @@ void Array::Delete(size_t ndx)
         // when byte sized, use memmove
 // FIXME: Should probably be optimized as a simple division by 8.
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        unsigned char* const dst = m_data + w*ndx;
-        copy(dst+w, m_data + w*m_len, dst);
+        char* const base = reinterpret_cast<char*>(m_data);
+        char* const dst_begin = base + ndx*w;
+        const char* const src_begin = dst_begin + w;
+        const char* const src_end   = base + m_len*w;
+        copy(src_begin, src_end, dst_begin);
     }
 
     // Update length (also in header)
@@ -341,50 +346,12 @@ void Array::Delete(size_t ndx)
     set_header_len(m_len);
 }
 
-int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    return (this->*m_getter)(ndx);
-
-// Two ideas that are not efficient but may be worth looking into again:
-/*
-    // Assume correct width is found early in TDB_TEMPEX, which is the case for B tree offsets that 
-    // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
-    // if found later
-    TDB_TEMPEX(return Get, (ndx));              
-*/
-/*
-    // Slightly slower in both of the if-cases. Also needs an matchcount m_len check too, to avoid
-    // reading beyond array.
-    if (m_width >= 8 && m_len > ndx + 7)     
-        return Get<64>(ndx >> m_shift) & m_widthmask;
-    else 
-        return (this->*m_getter)(ndx);
-*/
-}
-
-size_t Array::GetAsRef(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(m_hasRefs);
-    const int64_t v = Get(ndx);
-    return to_ref(v);
-}
-
-size_t Array::GetAsSizeT(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    const int64_t v = Get(ndx);
-    return to_size_t(v);
-}
-
-bool Array::Set(size_t ndx, int64_t value)
+void Array::Set(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) 
-        return false;
+    CopyOnWrite(); // Throws
 
     // Make room for the new value
     size_t width = m_width;
@@ -395,8 +362,7 @@ bool Array::Set(size_t ndx, int64_t value)
     const bool doExpand = (width > m_width);
     if (doExpand) {
         Getter oldGetter = m_getter;    // Save old getter before width expansion
-        if (!Alloc(m_len, width)) 
-            return false;
+        Alloc(m_len, width); // Throws
         SetWidth(width);
 
         // Expand the old values
@@ -409,13 +375,12 @@ bool Array::Set(size_t ndx, int64_t value)
 
     // Set the value
     (this->*m_setter)(ndx, value);
-
-    return true;
 }
 
-// Optimization for the common case of adding positive values to a local array 
+/*
+// Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)
-bool Array::AddPositiveLocal(int64_t value)
+void Array::AddPositiveLocal(int64_t value)
 {
     TIGHTDB_ASSERT(value >= 0);
     TIGHTDB_ASSERT(&m_alloc == &Allocator::get_default());
@@ -425,20 +390,20 @@ bool Array::AddPositiveLocal(int64_t value)
             (this->*m_setter)(m_len, value);
             ++m_len;
             set_header_len(m_len);
-            return true;
+            return;
         }
     }
 
-    return Insert(m_len, value);
+    Insert(m_len, value);
 }
+*/
 
-bool Array::Insert(size_t ndx, int64_t value)
+void Array::Insert(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) 
-        return false;
+    CopyOnWrite(); // Throws
 
     // Make room for the new value
     size_t width = m_width;
@@ -450,19 +415,17 @@ bool Array::Insert(size_t ndx, int64_t value)
 
     const bool doExpand = (width > m_width);
     if (doExpand) {
-        if (!Alloc(m_len+1, width)) 
-            return false;
+        Alloc(m_len+1, width); // Throws
         SetWidth(width);
     }
     else {
-        if (!Alloc(m_len+1, m_width)) 
-            return false;
+        Alloc(m_len+1, m_width); // Throws
     }
 
     // Move values below insertion (may expand)
     if (doExpand || m_width < 8) {
-        int k = (int)m_len;
-        while (--k >= (int)ndx) {
+        int k = int(m_len);
+        while (--k >= int(ndx)) {
             const int64_t v = (this->*oldGetter)(k);
             (this->*m_setter)(k+1, v);
         }
@@ -471,11 +434,11 @@ bool Array::Insert(size_t ndx, int64_t value)
         // when byte sized and no expansion, use memmove
 // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         const size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        unsigned char* src = m_data + (ndx * w);
-        unsigned char* dst = src + w;
-        const size_t count = (m_len - ndx) * w;
-// FIXME: Use std::copy() or std::copy_backward() instead.
-        memmove(dst, src, count);
+        char* const base = reinterpret_cast<char*>(m_data);
+        char* const src_begin = base + ndx*w;
+        char* const src_end   = base + m_len*w;
+        char* const dst_end   = src_end + w;
+        copy_backward(src_begin, src_end, dst_end);
     }
 
     // Insert the new value
@@ -483,7 +446,7 @@ bool Array::Insert(size_t ndx, int64_t value)
 
     // Expand values above insertion
     if (doExpand) {
-        int k = (int)ndx;
+        int k = int(ndx);
         while (--k >= 0) {
             const int64_t v = (this->*oldGetter)(k);
             (this->*m_setter)(k, v);
@@ -493,21 +456,19 @@ bool Array::Insert(size_t ndx, int64_t value)
     // Update length
     // (no need to do it in header as it has been done by Alloc)
     ++m_len;
-
-    return true;
 }
 
 
-bool Array::add(int64_t value)
+void Array::add(int64_t value)
 {
-    return Insert(m_len, value);
+    Insert(m_len, value);
 }
 
 void Array::Resize(size_t count)
 {
     TIGHTDB_ASSERT(count <= m_len);
 
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Update length (also in header)
     m_len = count;
@@ -516,7 +477,7 @@ void Array::Resize(size_t count)
 
 void Array::SetAllToZero()
 {
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     m_capacity = CalcItemCount(get_header_capacity(), 0);
     SetWidth(0);
@@ -525,7 +486,7 @@ void Array::SetAllToZero()
     set_header_width(0);
 }
 
-bool Array::Increment(int64_t value, size_t start, size_t end)
+void Array::Increment(int64_t value, size_t start, size_t end)
 {
     if (end == (size_t)-1) end = m_len;
     TIGHTDB_ASSERT(start < m_len);
@@ -535,18 +496,16 @@ bool Array::Increment(int64_t value, size_t start, size_t end)
     for (size_t i = start; i < end; ++i) {
         Set(i, Get(i) + value);
     }
-    return true;
 }
 
-bool Array::IncrementIf(int64_t limit, int64_t value)
+void Array::IncrementIf(int64_t limit, int64_t value)
 {
     // Update (incr or decrement) values bigger or equal to the limit
     for (size_t i = 0; i < m_len; ++i) {
         const int64_t v = Get(i);
-        if (v >= limit) 
+        if (v >= limit)
             Set(i, v + value);
     }
-    return true;
 }
 
 void Array::Adjust(size_t start, int64_t diff)
@@ -591,7 +550,7 @@ template <size_t w> size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 
 size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 {
-    TDB_TEMPEX(return FindPos, m_width, (target));
+    TIGHTDB_TEMPEX(return FindPos, m_width, (target));
 }
 
 // BM FIXME: Rename to something better... // FirstGTE()
@@ -608,14 +567,14 @@ size_t Array::FindPos2(int64_t target) const
         const size_t probe = (low + high) >> 1;
         const int64_t v = Get(probe);
 
-        if (v < target) 
+        if (v < target)
             low = probe;
         else
             high = probe;
     }
-    if (high == m_len) 
+    if (high == m_len)
         return not_found;
-    else 
+    else
         return high;
 }
 
@@ -676,12 +635,12 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     while (high - start > 1) {
         const size_t probe = (start + high) / 2;
         const int64_t v = Get(probe);
-        if (v < target) 
+        if (v < target)
             start = probe;
-        else           
+        else
             high = probe;
     }
-    if (high == orig_high)         
+    if (high == orig_high)
         ret = not_found;
     else
         ret = high;
@@ -706,9 +665,9 @@ size_t Array::FirstSetBit(unsigned int v) const
     return __builtin_clz(v);
 #else
     int r;
-    static const int MultiplyDeBruijnBitPosition[32] = 
+    static const int MultiplyDeBruijnBitPosition[32] =
     {
-        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
         31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
     };
 
@@ -779,19 +738,19 @@ template <bool eq, size_t width> size_t FindZero(uint64_t v)
     size_t start = 0;
     uint64_t hasZeroByte;
 
-    // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay off because 
-    // the work done by TestZero() is wasted for the cases where the value exists in first half, but useful if it exists in last 
+    // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay off because
+    // the work done by TestZero() is wasted for the cases where the value exists in first half, but useful if it exists in last
     // half. Sweet spot turns out to be the widths and partitions below.
     if (width <= 8) {
         hasZeroByte = has_zero_element<width>(v | 0xffffffff00000000ULL);
         if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
             // 00?? -> increasing
-            start += 64 / NO0(width) / 2;
+            start += 64 / no0(width) / 2;
             if (width <= 4) {
                 hasZeroByte = has_zero_element<width>(v | 0xffff000000000000ULL);
                 if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
                     // 000?
-                    start += 64 / NO0(width) / 4;
+                    start += 64 / no0(width) / 4;
                 }
             }
         }
@@ -801,7 +760,7 @@ template <bool eq, size_t width> size_t FindZero(uint64_t v)
                 hasZeroByte = has_zero_element<width>(v | 0xffffffffffff0000ULL);
                 if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
                     // 0?00
-                    start += 64 / NO0(width) / 4;
+                    start += 64 / no0(width) / 4;
                 }
             }
         }
@@ -817,7 +776,7 @@ template <bool eq, size_t width> size_t FindZero(uint64_t v)
 
 template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
 {
-    if (end == (size_t)-1) 
+    if (end == (size_t)-1)
         end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
@@ -840,7 +799,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
                 m = Get<w>(start);
         }
 
-        if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
+        if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / no0(w)) {
             __m128i *data = (__m128i *)(m_data + start * w / 8);
             __m128i state = data[0];
             __m128i state2;
@@ -854,17 +813,17 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
                 else if (w == 32)
                     state = find_max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
 
-                start += sizeof(__m128i) * 8 / NO0(w);
+                start += sizeof(__m128i) * 8 / no0(w);
             }
 
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
             state2 = state;
-            for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
+            for (size_t t = 0; t < sizeof(__m128i) * 8 / no0(w); ++t) {
                 const int64_t v = GetUniversal<w>(((const char *)&state2), t);
                 if (find_max ? v > m : v < m) {
                     m = v;
                 }
-            }        
+            }
         }
     }
 #endif
@@ -882,21 +841,21 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
 
 bool Array::maximum(int64_t& result, size_t start, size_t end) const
 {
-    TDB_TEMPEX2(return minmax, true, m_width, (result, start, end));
+    TIGHTDB_TEMPEX2(return minmax, true, m_width, (result, start, end));
 }
 
 bool Array::minimum(int64_t& result, size_t start, size_t end) const
 {
-    TDB_TEMPEX2(return minmax, false, m_width, (result, start, end));
+    TIGHTDB_TEMPEX2(return minmax, false, m_width, (result, start, end));
 }
 
 int64_t Array::sum(size_t start, size_t end) const
 {
-    TDB_TEMPEX(return sum, m_width, (start, end));
+    TIGHTDB_TEMPEX(return sum, m_width, (start, end));
 }
 
 template <size_t w> int64_t Array::sum(size_t start, size_t end) const
-{ 
+{
     if (end == (size_t)-1) end = m_len;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
@@ -930,16 +889,16 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
 #if defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
                     s += __popcnt64(data[t]);
 #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
-					s += __builtin_popcountll(data[t]);
+                    s += __builtin_popcountll(data[t]);
 #else
                     uint64_t a = data[t];
-					const uint64_t m1  = 0x5555555555555555ULL; 
+                    const uint64_t m1  = 0x5555555555555555ULL;
                     a -= (a >> 1) & m1;
                     a = (a & m2) + ((a >> 2) & m2);
                     a = (a + (a >> 4)) & m4;
                     a = (a * h01) >> 56;
                     s += a;
-#endif         
+#endif
 */
 
                 s += fast_popcount64(data[t]);
@@ -953,7 +912,6 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                 a = (a * h01) >> 56;
 
                 s += a;
-                
             }
             else if (w == 4) {
                 uint64_t a = data[t];
@@ -962,17 +920,17 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                 s += a;
             }
         }
-        start += sizeof(int64_t) * 8 / NO0(w) * chunks;
+        start += sizeof(int64_t) * 8 / no0(w) * chunks;
     }
 
 #ifdef TIGHTDB_COMPILER_SSE
     if (cpuid_sse<42>()) {
 
-        // 2000 items summed 500000 times, 8/16/32 bits, miliseconds: 
+        // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
         // Naive, templated Get<>: 391 371 374
         // SSE:                     97 148 282
 
-        if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / NO0(w)) {
+        if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
             __m128i *data = (__m128i *)(m_data + start * w / 8);
             __m128i sum = {0};
             __m128i sum2;
@@ -981,24 +939,24 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
 
             for (size_t t = 0; t < chunks; t++) {
                 if (w == 8) {
-                    /* 
+                    /*
                     // 469 ms AND disadvantage of handling max 64k elements before overflow
                     __m128i vl = _mm_cvtepi8_epi16(data[t]);
                     __m128i vh = data[t];
                     vh.m128i_i64[0] = vh.m128i_i64[1];
                     vh = _mm_cvtepi8_epi16(vh);
                     sum = _mm_add_epi16(sum, vl);
-                    sum = _mm_add_epi16(sum, vh); 
+                    sum = _mm_add_epi16(sum, vh);
                     */
-                
+
                     /*
                     // 424 ms
-                    __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0)); 
+                    __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0));
                     __m128i vh = _mm_unpackhi_epi8(data[t], _mm_set1_epi8(0));
                     sum = _mm_add_epi32(sum, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
                     sum = _mm_add_epi32(sum, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
                     */
-                
+
                     __m128i vl = _mm_cvtepi8_epi16(data[t]);        // sign extend lower words 8->16
                     __m128i vh = data[t];
                     vh = _mm_srli_si128(vh, 8);                     // v >>= 64
@@ -1011,7 +969,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                     sum = _mm_add_epi32(sum, sumH);
                 }
                 else if (w == 16) {
-                    // todo, can overflow for array size > 2^32 
+                    // todo, can overflow for array size > 2^32
                     __m128i vl = _mm_cvtepi16_epi32(data[t]);       // sign extend lower words 16->32
                     __m128i vh = data[t];
                     vh = _mm_srli_si128(vh, 8);                     // v >>= 64
@@ -1035,12 +993,12 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
                     */
                 }
             }
-            start += sizeof(__m128i) * 8 / NO0(w) * chunks;
+            start += sizeof(__m128i) * 8 / no0(w) * chunks;
 
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
             sum2 = sum;
 
-            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by GetUniversal 
+            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by GetUniversal
             char sum3[sizeof(sum2)];
             memcpy(&sum3, &sum2, sizeof(sum2));
 
@@ -1052,7 +1010,7 @@ template <size_t w> int64_t Array::sum(size_t start, size_t end) const
         }
     }
 #endif
-    
+
     // Sum remaining elements
     for (; start < end; ++start)
         s += Get<w>(start);
@@ -1258,7 +1216,7 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
 
 size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
 {
-    if (width == 0) 
+    if (width == 0)
         return numeric_limits<size_t>::max(); // zero width gives infinite space
 
     const size_t bytes_data = bytes - 8; // ignore 8 byte header
@@ -1266,7 +1224,7 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
     return total_bits / width;
 }
 
-bool Array::Copy(const Array& a)
+void Array::Copy(const Array& a)
 {
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t len = CalcByteLen(a.m_len, a.m_width);
@@ -1275,9 +1233,11 @@ bool Array::Copy(const Array& a)
     const size_t new_len = len + 64;
 
     // Create new copy of array
-    const MemRef mref = m_alloc.Alloc(new_len);
-    if (!mref.pointer) return false;
-    memcpy(mref.pointer, a.m_data-8, len);
+    const MemRef mref = m_alloc.Alloc(new_len); // Throws
+    const unsigned char* const src_begin = a.m_data - 8;
+    const unsigned char* const src_end   = src_begin + len;
+    unsigned char*       const dst_begin = static_cast<unsigned char*>(mref.pointer);
+    copy(src_begin, src_end, dst_begin);
 
     // Clear old contents
     Destroy();
@@ -1305,13 +1265,11 @@ bool Array::Copy(const Array& a)
             cp.Copy(sub);
         }
     }
-
-    return true;
 }
 
-bool Array::CopyOnWrite()
+void Array::CopyOnWrite()
 {
-    if (!m_alloc.IsReadOnly(m_ref)) return true;
+    if (!m_alloc.IsReadOnly(m_ref)) return;
 
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t len = CalcByteLen(m_len, m_width);
@@ -1320,16 +1278,17 @@ bool Array::CopyOnWrite()
     const size_t new_len = len + 64;
 
     // Create new copy of array
-    const MemRef mref = m_alloc.Alloc(new_len);
-    if (!mref.pointer) return false;
-    memcpy(mref.pointer, m_data-8, len);
+    const MemRef mref = m_alloc.Alloc(new_len); // Throws
+    char* const old_begin = reinterpret_cast<char*>(m_data) - 8;
+    char* const old_end   = old_begin + len;
+    char* const new_begin = static_cast<char*>(mref.pointer);
+    copy(old_begin, old_end, new_begin);
 
     const size_t old_ref = m_ref;
-    void* const  old_ptr = m_data - 8;
 
     // Update internal data
     m_ref = mref.ref;
-    m_data = (unsigned char*)mref.pointer + 8;
+    m_data = static_cast<unsigned char*>(mref.pointer) + 8;
     m_capacity = CalcItemCount(new_len, m_width);
 
     // Update capacity in header
@@ -1339,24 +1298,21 @@ bool Array::CopyOnWrite()
 
     // Mark original as deleted, so that the space can be reclaimed in
     // future commits, when no versions are using it anymore
-    m_alloc.Free(old_ref, old_ptr);
-
-    return true;
+    m_alloc.Free(old_ref, old_begin);
 }
 
 
 size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator& alloc)
 {
     bool is_node = false, has_refs = false;
-    if (type == COLUMN_NODE) 
-        is_node = has_refs = true;
-    else if (type == COLUMN_HASREFS) 
-        has_refs = true;
+    switch (type) {
+        case coldef_Normal:                               break;
+        case coldef_InnerNode: has_refs = is_node = true; break;
+        case coldef_HasRefs:   has_refs = true;           break;
+    }
 
     const size_t capacity = initial_capacity;
-    const MemRef mem_ref = alloc.Alloc(capacity);
-    if (!mem_ref.pointer) 
-        return 0;
+    const MemRef mem_ref = alloc.Alloc(capacity); // Throws
 
     init_header(mem_ref.pointer, is_node, has_refs, width_type, 0, 0, capacity);
 
@@ -1364,10 +1320,10 @@ size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator
 }
 
 
-bool Array::Alloc(size_t count, size_t width)
+void Array::Alloc(size_t count, size_t width)
 {
     if (count > m_capacity || width != m_width) {
-        const size_t needed_bytes = CalcByteLen(count, width);              
+        const size_t needed_bytes = CalcByteLen(count, width);
         size_t capacity_bytes     = m_capacity ? get_header_capacity() : 0; // space currently available in bytes
 
         if (needed_bytes > capacity_bytes) {
@@ -1384,14 +1340,12 @@ bool Array::Alloc(size_t count, size_t width)
             // Allocate and initialize header
             MemRef mem_ref;
             if (!m_data) {
-                mem_ref = m_alloc.Alloc(capacity_bytes);
-                if (!mem_ref.pointer) return false;
+                mem_ref = m_alloc.Alloc(capacity_bytes); // Throws
                 init_header(mem_ref.pointer, m_isNode, m_hasRefs, GetWidthType(),
                             width, count, capacity_bytes);
             }
             else {
-                mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, capacity_bytes);
-                if (!mem_ref.pointer) return false;
+                mem_ref = m_alloc.ReAlloc(m_ref, m_data-8, capacity_bytes); // Throws
                 set_header_width(width, mem_ref.pointer);
                 set_header_len(count, mem_ref.pointer);
                 set_header_capacity(capacity_bytes, mem_ref.pointer);
@@ -1401,8 +1355,8 @@ bool Array::Alloc(size_t count, size_t width)
             m_ref      = mem_ref.ref;
             m_data     = reinterpret_cast<unsigned char*>(mem_ref.pointer) + 8;
             m_capacity = CalcItemCount(capacity_bytes, width);
-            update_ref_in_parent();
-            return true;
+            update_ref_in_parent(); // FIXME: Trouble when this one throws. We will then leave this array instance in a corrupt state
+            return;
         }
 
         m_capacity = CalcItemCount(capacity_bytes, width);
@@ -1411,14 +1365,12 @@ bool Array::Alloc(size_t count, size_t width)
 
     // Update header
     set_header_len(count);
-
-    return true;
 }
 
 
 void Array::SetWidth(size_t width) TIGHTDB_NOEXCEPT
 {
-    TDB_TEMPEX(SetWidth, width, ());
+    TIGHTDB_TEMPEX(SetWidth, width, ());
 }
 
 template<size_t width> void Array::SetWidth() TIGHTDB_NOEXCEPT
@@ -1462,28 +1414,28 @@ template<size_t width> void Array::SetWidth() TIGHTDB_NOEXCEPT
     m_width = width;
     // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of Get() instead of Get<n>
     // if the declaration and association of the getter are on two different source lines
-    Getter temp_getter = &Array::Get<width>; 
+    Getter temp_getter = &Array::Get<width>;
     m_getter = temp_getter;
 
-    Setter temp_setter = &Array::Set<width>; 
+    Setter temp_setter = &Array::Set<width>;
     m_setter = temp_setter;
 
-    Finder feq = &Array::find<EQUAL, TDB_RETURN_FIRST, width>;
-    m_finder[COND_EQUAL] = feq;
+    Finder feq = &Array::find<Equal, act_ReturnFirst, width>;
+    m_finder[cond_Equal] = feq;
 
-    Finder fne = &Array::find<NOTEQUAL, TDB_RETURN_FIRST, width>;
-    m_finder[COND_NOTEQUAL]  = fne;
+    Finder fne = &Array::find<NotEqual, act_ReturnFirst, width>;
+    m_finder[cond_NotEqual]  = fne;
 
-    Finder fg = &Array::find<GREATER, TDB_RETURN_FIRST, width>;
-    m_finder[COND_GREATER] = fg;
+    Finder fg = &Array::find<Greater, act_ReturnFirst, width>;
+    m_finder[cond_Greater] = fg;
 
-    Finder fl =  &Array::find<LESS, TDB_RETURN_FIRST, width>;
-    m_finder[COND_LESS] = fl;
+    Finder fl =  &Array::find<Less, act_ReturnFirst, width>;
+    m_finder[cond_Less] = fl;
 }
 
 template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-	return GetUniversal<w>((const char *)m_data, ndx);
+    return GetUniversal<w>((const char *)m_data, ndx);
 }
 
 #ifdef _MSC_VER
@@ -1493,7 +1445,7 @@ template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 template <size_t w> void Array::Set(size_t ndx, int64_t value)
 {
     if (w == 0) {
-        return;   
+        return;
     }
     else if (w == 1) {
         const size_t offset = ndx >> 3;
@@ -1505,7 +1457,7 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
         const size_t offset = ndx >> 2;
         const uint8_t n = (uint8_t)((ndx & 3) << 1);
         uint8_t* p = &m_data[offset];
-        *p = (*p &~ (0x03 << n)) | (uint8_t)((value & 0x03) << n);        
+        *p = (*p &~ (0x03 << n)) | (uint8_t)((value & 0x03) << n);
     }
     else if (w == 4) {
         const size_t offset = ndx >> 1;
@@ -1514,7 +1466,7 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
         *p = (*p &~ (0x0F << n)) | (uint8_t)((value & 0x0F) << n);
     }
     else if (w == 8) {
-        *((char*)m_data + ndx) = (char)value;        
+        *((char*)m_data + ndx) = (char)value;
     }
     else if (w == 16) {
         const size_t offset = ndx * 2;
@@ -1522,11 +1474,11 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
     }
     else if (w == 32) {
         const size_t offset = ndx * 4;
-        *(int32_t*)(m_data + offset) = (int32_t)value;        
+        *(int32_t*)(m_data + offset) = (int32_t)value;
     }
     else if (w == 64) {
         const size_t offset = ndx * 8;
-        *(int64_t*)(m_data + offset) = value;   
+        *(int64_t*)(m_data + offset) = value;
     }
 }
 #ifdef _MSC_VER
@@ -1536,7 +1488,7 @@ template <size_t w> void Array::Set(size_t ndx, int64_t value)
 // Sort array.
 void Array::sort()
 {
-    TDB_TEMPEX(sort, m_width, ());
+    TIGHTDB_TEMPEX(sort, m_width, ());
 }
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
@@ -1581,7 +1533,7 @@ template <size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, 
 // is allowed to contain fewer elements than m_array.
 void Array::ReferenceSort(Array& ref)
 {
-    TDB_TEMPEX(ReferenceSort, m_width, (ref));
+    TIGHTDB_TEMPEX(ReferenceSort, m_width, (ref));
 }
 
 template <size_t w>void Array::ReferenceSort(Array& ref)
@@ -1620,7 +1572,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
         }
 
         // Accumulate occurences
-        for (size_t t = 1; t < count.Size(); t++) {
+        for (size_t t = 1; t < count.size(); t++) {
             count.Set(t, count.Get(t) + count.Get(t - 1));
         }
 
@@ -1635,7 +1587,7 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
         }
 
         // Copy result into ref
-        for (size_t t = 0; t < res.Size(); t++)
+        for (size_t t = 0; t < res.size(); t++)
             ref.Set(t, res.Get(t));
 
         res.Destroy();
@@ -1702,7 +1654,7 @@ template <size_t w> void Array::sort()
 
 void Array::ReferenceQuickSort(Array& ref)
 {
-    TDB_TEMPEX(ReferenceQuickSort, m_width, (0, m_len - 1, ref));
+    TIGHTDB_TEMPEX(ReferenceQuickSort, m_width, (0, m_len - 1, ref));
 }
 
 template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref)
@@ -1761,7 +1713,7 @@ template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& r
 
 void Array::QuickSort(size_t lo, size_t hi)
 {
-    TDB_TEMPEX(QuickSort, m_width, (lo, hi);)
+    TIGHTDB_TEMPEX(QuickSort, m_width, (lo, hi);)
 }
 
 template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
@@ -1792,10 +1744,10 @@ template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
     if (i < (int)hi) QuickSort(i, hi);
 }
 
-std::vector<int64_t> Array::ToVector(void) const
+std::vector<int64_t> Array::ToVector() const
 {
     std::vector<int64_t> v;
-    const size_t count = Size();
+    const size_t count = size();
     for (size_t t = 0; t < count; ++t)
         v.push_back(Get(t));
     return v;
@@ -1803,9 +1755,9 @@ std::vector<int64_t> Array::ToVector(void) const
 
 bool Array::Compare(const Array& c) const
 {
-    if (c.Size() != Size()) return false;
+    if (c.size() != size()) return false;
 
-    for (size_t i = 0; i < Size(); ++i) {
+    for (size_t i = 0; i < size(); ++i) {
         if (Get(i) != c.Get(i)) return false;
     }
 
@@ -1817,8 +1769,8 @@ bool Array::Compare(const Array& c) const
 
 void Array::Print() const
 {
-    std::cout << std::hex << GetRef() << std::dec << ": (" << Size() << ") ";
-    for (size_t i = 0; i < Size(); ++i) {
+    std::cout << std::hex << GetRef() << std::dec << ": (" << size() << ") ";
+    for (size_t i = 0; i < size(); ++i) {
         if (i) std::cout << ", ";
         std::cout << Get(i);
     }
@@ -1944,7 +1896,7 @@ template<size_t> int64_t GetDirect(const char* const data, const size_t ndx) TIG
 
 int64_t GetDirect(const char* const data, size_t width, const size_t ndx) TIGHTDB_NOEXCEPT
 {
-    TDB_TEMPEX(return GetDirect, width, (data, ndx));
+    TIGHTDB_TEMPEX(return GetDirect, width, (data, ndx));
 }
 
 template<size_t w> int64_t GetDirect(const char* const data, const size_t ndx) TIGHTDB_NOEXCEPT
@@ -1991,7 +1943,7 @@ template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, cons
 size_t FindPosDirect(const uint8_t* const header, const char* const data, const size_t width,
                      const int64_t target) TIGHTDB_NOEXCEPT
 {
-    TDB_TEMPEX(return FindPosDirectImp, width, (header, data, target));
+    TIGHTDB_TEMPEX(return FindPosDirectImp, width, (header, data, target));
 }
 
 template<size_t width> size_t FindPosDirectImp(const uint8_t* const header, const char* const data,
@@ -2052,123 +2004,123 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     QueryState<int64_t> state;
     state.m_state = (int64_t)&result;
 
-    TDB_TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
+    TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
 
     return;
 }
 
-void Array::find(int cond, ACTION action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
+void Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
-    if (cond == COND_EQUAL) {
-        if (action == TDB_SUM) {
-            TDB_TEMPEX3(find, EQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MIN) {
-            TDB_TEMPEX3(find, EQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MAX) {
-            TDB_TEMPEX3(find, EQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_COUNT) {
-            TDB_TEMPEX3(find, EQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_FINDALL) {
-            TDB_TEMPEX3(find, EQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_CALLBACK_IDX) {
-            TDB_TEMPEX3(find, EQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+    if (cond == cond_Equal) {
+        if (action == act_Sum) {
+            TIGHTDB_TEMPEX3(find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Min) {
+            TIGHTDB_TEMPEX3(find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Max) {
+            TIGHTDB_TEMPEX3(find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Count) {
+            TIGHTDB_TEMPEX3(find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_FindAll) {
+            TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_CallbackIdx) {
+            TIGHTDB_TEMPEX3(find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
     }
-    if (cond == COND_NOTEQUAL) {
-        if (action == TDB_SUM) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MIN) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MAX) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_COUNT) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_FINDALL) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_CALLBACK_IDX) {
-            TDB_TEMPEX3(find, NOTEQUAL, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+    if (cond == cond_NotEqual) {
+        if (action == act_Sum) {
+            TIGHTDB_TEMPEX3(find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Min) {
+            TIGHTDB_TEMPEX3(find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Max) {
+            TIGHTDB_TEMPEX3(find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Count) {
+            TIGHTDB_TEMPEX3(find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_FindAll) {
+            TIGHTDB_TEMPEX3(find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_CallbackIdx) {
+            TIGHTDB_TEMPEX3(find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
     }
-    if (cond == COND_GREATER) {
-        if (action == TDB_SUM) {
-            TDB_TEMPEX3(find, GREATER, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MIN) {
-            TDB_TEMPEX3(find, GREATER, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MAX) {
-            TDB_TEMPEX3(find, GREATER, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_COUNT) {
-            TDB_TEMPEX3(find, GREATER, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_FINDALL) {
-            TDB_TEMPEX3(find, GREATER, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_CALLBACK_IDX) {
-            TDB_TEMPEX3(find, GREATER, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+    if (cond == cond_Greater) {
+        if (action == act_Sum) {
+            TIGHTDB_TEMPEX3(find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Min) {
+            TIGHTDB_TEMPEX3(find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Max) {
+            TIGHTDB_TEMPEX3(find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Count) {
+            TIGHTDB_TEMPEX3(find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_FindAll) {
+            TIGHTDB_TEMPEX3(find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_CallbackIdx) {
+            TIGHTDB_TEMPEX3(find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
     }
-    if (cond == COND_LESS) {
-        if (action == TDB_SUM) {
-            TDB_TEMPEX3(find, LESS, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MIN) {
-            TDB_TEMPEX3(find, LESS, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MAX) {
-            TDB_TEMPEX3(find, LESS, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_COUNT) {
-            TDB_TEMPEX3(find, LESS, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_FINDALL) {
-            TDB_TEMPEX3(find, LESS, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_CALLBACK_IDX) {
-            TDB_TEMPEX3(find, LESS, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+    if (cond == cond_Less) {
+        if (action == act_Sum) {
+            TIGHTDB_TEMPEX3(find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Min) {
+            TIGHTDB_TEMPEX3(find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Max) {
+            TIGHTDB_TEMPEX3(find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Count) {
+            TIGHTDB_TEMPEX3(find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_FindAll) {
+            TIGHTDB_TEMPEX3(find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_CallbackIdx) {
+            TIGHTDB_TEMPEX3(find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
     }
-    if (cond == COND_NONE) {
-        if (action == TDB_SUM) {
-            TDB_TEMPEX3(find, NONE, TDB_SUM, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MIN) {
-            TDB_TEMPEX3(find, NONE, TDB_MIN, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_MAX) {
-            TDB_TEMPEX3(find, NONE, TDB_MAX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_COUNT) {
-            TDB_TEMPEX3(find, NONE, TDB_COUNT, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_FINDALL) {
-            TDB_TEMPEX3(find, NONE, TDB_FINDALL, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
-        else if (action == TDB_CALLBACK_IDX) {
-            TDB_TEMPEX3(find, NONE, TDB_CALLBACK_IDX, m_width, (value, start, end, baseindex, state, CallbackDummy()))
-		}
+    if (cond == cond_None) {
+        if (action == act_Sum) {
+            TIGHTDB_TEMPEX3(find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Min) {
+            TIGHTDB_TEMPEX3(find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Max) {
+            TIGHTDB_TEMPEX3(find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Count) {
+            TIGHTDB_TEMPEX3(find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_FindAll) {
+            TIGHTDB_TEMPEX3(find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_CallbackIdx) {
+            TIGHTDB_TEMPEX3(find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
     }
 }
 
 
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    return find_first<EQUAL>(value, start, end);
+    return find_first<Equal>(value, start, end);
 }
 
-// Get containing array block direct through column b-tree without instatiating any Arrays. Calling with 
-// use_retval = true will return itself if leaf and avoid unneccesary header initialization. 
+// Get containing array block direct through column b-tree without instatiating any Arrays. Calling with
+// use_retval = true will return itself if leaf and avoid unneccesary header initialization.
 const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval) const
 {
     // Reduce time overhead for cols with few entries
@@ -2261,7 +2213,7 @@ int64_t Array::ColumnGet(size_t ndx) const TIGHTDB_NOEXCEPT
 // FIXME: Shouldn't ColumnStringGet() be locaterd in ColumnString?
 const char* Array::ColumnStringGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    const char* data   = reinterpret_cast<char*>(m_data);
+    const char* data = reinterpret_cast<char*>(m_data);
     const uint8_t* header = m_data - 8;
     size_t width = m_width;
     bool isNode = m_isNode;
@@ -2701,5 +2653,6 @@ top:
         else return 0;
     }
 }
+
 
 } //namespace tightdb

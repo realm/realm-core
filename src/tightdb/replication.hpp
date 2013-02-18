@@ -25,10 +25,11 @@
 #include <new>
 #include <algorithm>
 #include <limits>
+#include <stdexcept>
 
 #include <tightdb/meta.hpp>
 #include <tightdb/tuple.hpp>
-#include <tightdb/error.hpp>
+#include <tightdb/file.hpp>
 #include <tightdb/mixed.hpp>
 
 namespace tightdb {
@@ -64,7 +65,8 @@ class Group;
 /// Replication also requires that a local coordinator process is
 /// running on the same host as the client. At most one local
 /// coordinator process may run on each host.
-struct Replication {
+class Replication {
+public:
     /// Create a Replication instance in its unattached state. To
     /// attach it to a replication coordination buffer, call open().
     /// You may test whether this instance is currently in its
@@ -73,23 +75,31 @@ struct Replication {
     /// has undefined behaviour.
     Replication() TIGHTDB_NOEXCEPT;
 
-    ~Replication();
+    ~Replication() TIGHTDB_NOEXCEPT;
 
-    static std::string get_path_to_database_file() { return "/var/lib/tightdb/replication.db"; }
+    static std::string get_path_to_database_file() TIGHTDB_NOEXCEPT
+    {
+        return "/var/lib/tightdb/replication.db";
+    }
 
     /// Attach this instance to the replication coordination buffer
     /// associated with the specified database file.
     ///
-    /// \param The file system path to the database file. This is used
-    /// only to derive a path for a replication specific shared memory
-    /// file object. Its path is derived by appending ".repl" to the
-    /// specified path.
+    /// This function must be called before using an instance of this
+    /// class. It must not be called more than once. It is legal to
+    /// destroy an instance of this class without this function having
+    /// been called.
+    ///
+    /// \param file The file system path to the database file. This is
+    /// used only to derive a path for a replication specific shared
+    /// memory file object. Its path is derived by appending ".repl"
+    /// to the specified path.
     ///
     /// \param map_transact_log_buf When true, all of the replication
     /// specific shared memory is mapped. When false, the transaction
     /// log buffer is not mapped. When used in conjunction with an
     /// instance of SharedGroup, this must always be true.
-    void open(const std::string& path_to_database_file = "", bool map_transact_log_buf = true);
+    void open(const std::string& file = "", bool map_transact_log_buf = true);
 
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
@@ -97,10 +107,12 @@ struct Replication {
     /// function may be called asyncronously from any thread, but it
     /// may not be called from a system signal handler.
     ///
-    /// A function in this class may block if it is explicitely stated
-    /// in its documention, or if it returns \c error_code and its
-    /// documentation does not explicitely state that it does not
-    /// block.
+    /// Some of the public function members of this class may block,
+    /// but only when it it is explicitely stated in the documention
+    /// for those functions.
+    ///
+    /// FIXME: Currently we do not state blocking behaviour for all
+    /// the functions that can block.
     ///
     /// After any function has returned with an interruption
     /// indication, the only functions that may safely be called are
@@ -108,9 +120,11 @@ struct Replication {
     /// after having received an interruption indication, calls
     /// rollback_write_transact() and then clear_interrupt(), it may
     /// then resume normal operation on this object.
-    ///
-    /// This function can never fail.
-    void interrupt();
+    void interrupt() TIGHTDB_NOEXCEPT;
+
+    struct Interrupted: std::runtime_error {
+        Interrupted(): std::runtime_error("Interrupted") {}
+    };
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -121,9 +135,9 @@ struct Replication {
     /// transaction, the client must call either
     /// commit_write_transact() or rollback_write_transact().
     ///
-    /// This function returns ERROR_INTERRUPTED if it was interrupted
-    /// by an asynchronous call to shutdown().
-    error_code begin_write_transact();
+    /// \throw Interrupted If this call was interrupted by an
+    /// asynchronous call to interrupt().
+    void begin_write_transact();
 
     /// Called by a client to commit the accumulated transaction
     /// log. The transaction log may not be committed if any of the
@@ -134,33 +148,33 @@ struct Replication {
     /// operation may be interrupted by an asynchronous call to
     /// interrupt().
     ///
-    /// \return True on success and false if interrupted.
+    /// \throw Interrupted If this call was interrupted by an
+    /// asynchronous call to interrupt().
     ///
     /// FIXME: In general the transaction will be considered complete
     /// even if this operation is interrupted. Is that ok?
-    bool commit_write_transact();
+    void commit_write_transact();
 
     /// Called by a client to discard the accumulated transaction
     /// log. This function must be called if a write transaction was
     /// successfully initiated, but one of the functions that submit
     /// data to the transaction log has failed or has been
     /// interrupted. It must also be called after a failed or
-    /// interrupted call to commit_write_transact(). This function can
-    /// never fail.
-    void rollback_write_transact();
+    /// interrupted call to commit_write_transact().
+    void rollback_write_transact() TIGHTDB_NOEXCEPT;
 
     /// May be called by a client to reset this replication instance
     /// after an interrupted transaction. It is not an error to call
     /// this function in a situation where no interruption has
-    /// occured. This function can never fail.
-    void clear_interrupt();
+    /// occured.
+    void clear_interrupt() TIGHTDB_NOEXCEPT;
 
     /// Called by the local coordinator to wait for the next client
     /// that wants to start a new 'write' transaction.
     ///
     /// \return False if the operation was aborted by an asynchronous
-    /// call to shutdown().
-    bool wait_for_write_request();
+    /// call to interrupt().
+    bool wait_for_write_request() TIGHTDB_NOEXCEPT;
 
     typedef int db_version_type;
 
@@ -181,29 +195,27 @@ struct Replication {
     /// initialized.
     ///
     /// \return False if the operation was aborted by an asynchronous
-    /// call to shutdown().
-    bool grant_write_access_and_wait_for_completion(TransactLog& transact_log);
+    /// call to interrupt().
+    bool grant_write_access_and_wait_for_completion(TransactLog& transact_log) TIGHTDB_NOEXCEPT;
 
     /// Called by the local coordinator to gain access to the memory
     /// that corresponds to the specified transaction log. The memory
     /// mapping of the underlying file is expanded as necessary. This
     /// function cannot block, and can therefore not be interrupted.
-    error_code map_transact_log(const TransactLog&, const char** addr1, const char** addr2);
+    void map_transact_log(const TransactLog&, const char** addr1, const char** addr2);
 
     /// Called by the local coordinator to signal to clients that a
     /// new version of the database has been persisted. Presumably,
     /// one of the clients is blocked in a call to
-    /// commit_write_transact() waiting for this signal. This function
-    /// can never fail.
-    void update_persisted_db_version(db_version_type);
+    /// commit_write_transact() waiting for this signal.
+    void update_persisted_db_version(db_version_type) TIGHTDB_NOEXCEPT;
 
     /// Called by the local coordinator to release space in the
     /// transaction log buffer corresponding to a previously completed
     /// transaction log that is no longer needed. This function may be
     /// called asynchronously with respect to wait_for_write_request()
-    /// and grant_write_access_and_wait_for_completion(). This
-    /// function can never fail.
-    void transact_log_consumed(size_t size);
+    /// and grant_write_access_and_wait_for_completion().
+    void transact_log_consumed(size_t size) TIGHTDB_NOEXCEPT;
 
 
     // Transaction log instruction encoding:
@@ -224,31 +236,31 @@ struct Replication {
 
     struct subtable_tag {};
 
-    error_code new_top_level_table(const char* name);
-    error_code add_column(const Table*, const Spec*, ColumnType, const char* name);
+    void new_top_level_table(const char* name);
+    void add_column(const Table*, const Spec*, ColumnType, const char* name);
 
     template<class T>
-    error_code set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
-    error_code set_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
-    error_code set_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
-    error_code set_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
+    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
+    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
+    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
+    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
 
     template<class T>
-    error_code insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
-    error_code insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
-    error_code insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
-    error_code insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
+    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
+    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
+    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
+    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
 
-    error_code row_insert_complete(const Table*);
-    error_code insert_empty_rows(const Table*, std::size_t row_ndx, std::size_t num_rows);
-    error_code remove_row(const Table*, std::size_t row_ndx);
-    error_code add_int_to_column(const Table*, std::size_t column_ndx, int64_t value);
-    error_code add_index_to_column(const Table*, std::size_t column_ndx);
-    error_code clear_table(const Table*);
-    error_code optimize_table(const Table*);
+    void row_insert_complete(const Table*);
+    void insert_empty_rows(const Table*, std::size_t row_ndx, std::size_t num_rows);
+    void remove_row(const Table*, std::size_t row_ndx);
+    void add_int_to_column(const Table*, std::size_t column_ndx, int64_t value);
+    void add_index_to_column(const Table*, std::size_t column_ndx);
+    void clear_table(const Table*);
+    void optimize_table(const Table*);
 
-    void on_table_destroyed(const Table* t) { if (m_selected_table == t) m_selected_table = 0; }
-    void on_spec_destroyed(const Spec* s)   { if (m_selected_spec  == s) m_selected_spec  = 0; }
+    void on_table_destroyed(const Table*) TIGHTDB_NOEXCEPT;
+    void on_spec_destroyed(const Spec*) TIGHTDB_NOEXCEPT;
 
 
     struct InputStream {
@@ -260,6 +272,10 @@ struct Replication {
         virtual ~InputStream() {}
     };
 
+    struct BadTransactLog: std::runtime_error {
+        BadTransactLog(): std::runtime_error("Bad transaction log") {}
+    };
+
     /// Called by the local coordinator to apply a transaction log
     /// received from another local coordinator.
     ///
@@ -267,23 +283,22 @@ struct Replication {
     /// debug mode, then a line describing each individual operation
     /// is writted to the specified stream.
     ///
-    /// \return ERROR_IO if the transaction log could not be
+    /// \throw BadTransactLog If the transaction log could not be
     /// successfully parsed, or ended prematurely.
 #ifdef TIGHTDB_DEBUG
-    static error_code apply_transact_log(InputStream& transact_log, Group& target,
-                                         std::ostream* apply_log = 0);
+    static void apply_transact_log(InputStream& transact_log, Group& target,
+                                   std::ostream* apply_log = 0);
 #else
-    static error_code apply_transact_log(InputStream& transact_log, Group& target);
+    static void apply_transact_log(InputStream& transact_log, Group& target);
 #endif
 
 private:
     struct SharedState;
     struct TransactLogApplier;
 
-    int m_fd; // Memory mapped file descriptor
-    SharedState* m_shared_state;
-    // Invariant: m_shared_state_size <= std::numeric_limits<std::ptrdiff_t>::max()
-    std::size_t m_shared_state_mapped_size;
+    File m_file;
+    // Invariant: m_fil_map.get_size() <= std::numeric_limits<std::ptrdiff_t>::max()
+    File::Map<SharedState> m_file_map;
     bool m_interrupt; // Protected by m_shared_state->m_mutex
 
     // Set by begin_write_transact() to the new database version
@@ -298,54 +313,48 @@ private:
     template<class T> struct Buffer {
         T* m_data;
         std::size_t m_size;
-        T& operator[](std::size_t i) { return m_data[i]; }
-        const T& operator[](std::size_t i) const { return m_data[i]; }
-        Buffer(): m_data(0), m_size(0) {}
-        ~Buffer() { delete[] m_data; }
-        bool set_size(std::size_t);
+        T& operator[](std::size_t i) TIGHTDB_NOEXCEPT { return m_data[i]; }
+        const T& operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
+        Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
+        ~Buffer() TIGHTDB_NOEXCEPT { delete[] m_data; }
+        void set_size(std::size_t);
     };
     Buffer<std::size_t> m_subtab_path_buf;
 
     const Table* m_selected_table;
     const Spec*  m_selected_spec;
 
-    /// This function must be called before using an instance of this
-    /// class. It must not be called more than once. It is legal to
-    /// destroy an instance of this class without this function having
-    /// been called.
-    error_code init(std::string path_to_database_file, bool map_transact_log_buf);
+    /// \param n Must be small (probably not greater than 1024)
+    void transact_log_reserve(char** buf, int n);
+
+    void transact_log_advance(char* ptr) TIGHTDB_NOEXCEPT;
+
+    void transact_log_append(const char* data, std::size_t size);
 
     /// \param n Must be small (probably not greater than 1024)
-    error_code transact_log_reserve(char** buf, int n);
+    void transact_log_reserve_contig(std::size_t n);
 
-    void transact_log_advance(char* ptr);
-
-    error_code transact_log_append(const char* data, std::size_t size);
-
-    /// \param n Must be small (probably not greater than 1024)
-    error_code transact_log_reserve_contig(std::size_t n);
-
-    error_code transact_log_append_overflow(const char* data, std::size_t size);
+    void transact_log_append_overflow(const char* data, std::size_t size);
 
     /// Must be called only by a client that has 'write' access and
     /// only when there are no transaction logs in the transaction log
     /// buffer beyond the one being created.
-    error_code transact_log_expand(std::size_t free, bool contig);
+    void transact_log_expand(std::size_t free, bool contig);
 
-    error_code remap_file(std::size_t size);
+    void remap_file(std::size_t size);
 
-    error_code check_table(const Table*);
-    error_code select_table(const Table*);
+    void check_table(const Table*);
+    void select_table(const Table*);
 
-    error_code check_spec(const Table*, const Spec*);
-    error_code select_spec(const Table*, const Spec*);
+    void check_spec(const Table*, const Spec*);
+    void select_spec(const Table*, const Spec*);
 
-    error_code string_cmd(char cmd, std::size_t column_ndx, std::size_t ndx,
-                          const char* data,std::size_t size);
+    void string_cmd(char cmd, std::size_t column_ndx, std::size_t ndx,
+                    const char* data,std::size_t size);
 
-    error_code mixed_cmd(char cmd, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
+    void mixed_cmd(char cmd, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
 
-    template<class L> error_code simple_cmd(char cmd, const Tuple<L>& integers);
+    template<class L> void simple_cmd(char cmd, const Tuple<L>& integers);
 
     template<class T> struct EncodeInt { void operator()(T value, char** ptr); };
 
@@ -362,47 +371,37 @@ private:
 // Implementation:
 
 inline Replication::Replication() TIGHTDB_NOEXCEPT:
-    m_shared_state(0), m_interrupt(false), m_selected_table(0), m_selected_spec(0) {}
-
-
-inline void Replication::open(const std::string& path_to_database_file,
-                              bool map_transact_log_buf)
-{
-    error_code err = init(path_to_database_file, map_transact_log_buf);
-    if (err) throw_error(err);
-}
+    m_interrupt(false), m_selected_table(0), m_selected_spec(0) {}
 
 
 inline bool Replication::is_attached() const TIGHTDB_NOEXCEPT
 {
-    return m_shared_state;
+    return m_file_map.is_attached();
 }
 
 
-inline error_code Replication::transact_log_reserve(char** buf, int n)
+inline void Replication::transact_log_reserve(char** buf, int n)
 {
-    if (std::size_t(m_transact_log_free_end - m_transact_log_free_begin) < n) {
-        const error_code err = transact_log_reserve_contig(n);
-        if (err) return err;
-    }
+    if (std::size_t(m_transact_log_free_end - m_transact_log_free_begin) < std::size_t(n))
+        transact_log_reserve_contig(n); // Throws
     *buf = m_transact_log_free_begin;
-    return ERROR_NONE;
 }
 
 
-inline void Replication::transact_log_advance(char* ptr)
+inline void Replication::transact_log_advance(char* ptr) TIGHTDB_NOEXCEPT
 {
     m_transact_log_free_begin = ptr;
 }
 
 
-inline error_code Replication::transact_log_append(const char* data, std::size_t size)
+inline void Replication::transact_log_append(const char* data, std::size_t size)
 {
-    if (std::size_t(m_transact_log_free_end - m_transact_log_free_begin) < size) {
-        return transact_log_append_overflow(data, size);
+    if (TIGHTDB_UNLIKELY(std::size_t(m_transact_log_free_end -
+                                     m_transact_log_free_begin) < size)) {
+        transact_log_append_overflow(data, size); // Throws
+        return;
     }
     m_transact_log_free_begin = std::copy(data, data+size, m_transact_log_free_begin);
-    return ERROR_NONE;
 }
 
 
@@ -433,262 +432,240 @@ template<class T> inline void Replication::EncodeInt<T>::operator()(T value, cha
 }
 
 
-template<class L> inline error_code Replication::simple_cmd(char cmd, const Tuple<L>& integers)
+template<class L> inline void Replication::simple_cmd(char cmd, const Tuple<L>& integers)
 {
     char* buf;
-    error_code err = transact_log_reserve(&buf, 1 + TypeCount<L>::value*max_enc_bytes_per_int);
-    if (err) return err;
+    transact_log_reserve(&buf, 1 + TypeCount<L>::value*max_enc_bytes_per_int); // Throws
     *buf++ = cmd;
     for_each<EncodeInt>(integers, &buf);
     transact_log_advance(buf);
-    return ERROR_NONE;
 }
 
 
-inline error_code Replication::check_table(const Table* t)
+inline void Replication::check_table(const Table* t)
 {
-    if (t != m_selected_table) {
-        return select_table(t);
-    }
-    return ERROR_NONE;
+    if (t != m_selected_table) select_table(t); // Throws
 }
 
 
-inline error_code Replication::check_spec(const Table* t, const Spec* s)
+inline void Replication::check_spec(const Table* t, const Spec* s)
 {
-    if (s != m_selected_spec) {
-        return select_spec(t,s);
-    }
-    return ERROR_NONE;
+    if (s != m_selected_spec) select_spec(t,s); // Throws
 }
 
 
-inline error_code Replication::string_cmd(char cmd, std::size_t column_ndx,
-                                          std::size_t ndx, const char* data, std::size_t size)
+inline void Replication::string_cmd(char cmd, std::size_t column_ndx,
+                                    std::size_t ndx, const char* data, std::size_t size)
 {
-    error_code err = simple_cmd(cmd, tuple(column_ndx, ndx, size));
-    if (err) return err;
-    return transact_log_append(data, size);
+    simple_cmd(cmd, tuple(column_ndx, ndx, size)); // Throws
+    transact_log_append(data, size); // Throws
 }
 
 
-inline error_code Replication::mixed_cmd(char cmd, std::size_t column_ndx,
-                                         std::size_t ndx, const Mixed& value)
+inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
+                                   std::size_t ndx, const Mixed& value)
 {
     char* buf;
-    error_code err = transact_log_reserve(&buf, 1 + 4*max_enc_bytes_per_int);
-    if (err) return err;
+    transact_log_reserve(&buf, 1 + 4*max_enc_bytes_per_int); // Throws
     *buf++ = cmd;
     buf = encode_int(buf, column_ndx);
     buf = encode_int(buf, ndx);
     buf = encode_int(buf, int(value.get_type()));
     switch (value.get_type()) {
-    case COLUMN_TYPE_INT:
+    case type_Int:
         buf = encode_int(buf, value.get_int());
         transact_log_advance(buf);
         break;
-    case COLUMN_TYPE_BOOL:
+    case type_Bool:
         buf = encode_int(buf, int(value.get_bool()));
         transact_log_advance(buf);
         break;
-    case COLUMN_TYPE_FLOAT:
+    case type_Float:
         TIGHTDB_ASSERT(false);  // FIXME: IMPLEMENT
         //buf = encode_float(buf, value.get_float()));
         transact_log_advance(buf);
         break;
-    case COLUMN_TYPE_DOUBLE:
+    case type_Double:
         TIGHTDB_ASSERT(false);  // FIXME: IMPLEMENT
         //buf = encode_double(buf, value.get_double()));
         transact_log_advance(buf);
         break;
-    case COLUMN_TYPE_DATE:
+    case type_Date:
         buf = encode_int(buf, value.get_date());
         transact_log_advance(buf);
         break;
-    case COLUMN_TYPE_STRING:
+    case type_String:
         {
             const char* data = value.get_string();
             std::size_t size = std::strlen(data);
             buf = encode_int(buf, size);
             transact_log_advance(buf);
-            err = transact_log_append(data, size);
-            if (err) return err;
+            transact_log_append(data, size); // Throws
         }
         break;
-    case COLUMN_TYPE_BINARY:
+    case type_Binary:
         {
             BinaryData data = value.get_binary();
             buf = encode_int(buf, data.len);
             transact_log_advance(buf);
-            err = transact_log_append(data.pointer, data.len);
-            if (err) return err;
+            transact_log_append(data.pointer, data.len); // Throws
         }
         break;
-    case COLUMN_TYPE_TABLE:
+    case type_Table:
         transact_log_advance(buf);
         break;
     default:
         TIGHTDB_ASSERT(false);
     }
-    return ERROR_NONE;
 }
 
 
-inline error_code Replication::new_top_level_table(const char* name)
+inline void Replication::new_top_level_table(const char* name)
 {
     size_t length = std::strlen(name);
-    error_code err = simple_cmd('N', tuple(length));
-    if (err) return err;
-    return transact_log_append(name, length);
+    simple_cmd('N', tuple(length)); // Throws
+    transact_log_append(name, length); // Throws
 }
 
 
-inline error_code Replication::add_column(const Table* table, const Spec* spec,
-                                          ColumnType type, const char* name)
+inline void Replication::add_column(const Table* table, const Spec* spec,
+                                    ColumnType type, const char* name)
 {
-    error_code err = check_spec(table, spec);
-    if (err) return err;
+    check_spec(table, spec); // Throws
     size_t length = std::strlen(name);
-    err = simple_cmd('A', tuple(int(type), length));
-    if (err) return err;
-    return transact_log_append(name, length);
+    simple_cmd('A', tuple(int(type), length)); // Throws
+    transact_log_append(name, length); // Throws
 }
 
 
 template<class T>
-inline error_code Replication::set_value(const Table* t, std::size_t column_ndx,
-                                         std::size_t ndx, T value)
+inline void Replication::set_value(const Table* t, std::size_t column_ndx,
+                                   std::size_t ndx, T value)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('s', tuple(column_ndx, ndx, value));
+    check_table(t); // Throws
+    simple_cmd('s', tuple(column_ndx, ndx, value)); // Throws
 }
 
-inline error_code Replication::set_value(const Table* t, std::size_t column_ndx,
-                                         std::size_t ndx, BinaryData value)
+inline void Replication::set_value(const Table* t, std::size_t column_ndx,
+                                   std::size_t ndx, BinaryData value)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return string_cmd('s', column_ndx, ndx, value.pointer, value.len);
+    check_table(t); // Throws
+    string_cmd('s', column_ndx, ndx, value.pointer, value.len); // Throws
 }
 
-inline error_code Replication::set_value(const Table* t, std::size_t column_ndx,
-                                         std::size_t ndx, const Mixed& value)
+inline void Replication::set_value(const Table* t, std::size_t column_ndx,
+                                   std::size_t ndx, const Mixed& value)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return mixed_cmd('s', column_ndx, ndx, value);
+    check_table(t); // Throws
+    mixed_cmd('s', column_ndx, ndx, value); // Throws
 }
 
-inline error_code Replication::set_value(const Table* t, std::size_t column_ndx,
-                                         std::size_t ndx, subtable_tag)
+inline void Replication::set_value(const Table* t, std::size_t column_ndx,
+                                   std::size_t ndx, subtable_tag)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('s', tuple(column_ndx, ndx));
+    check_table(t); // Throws
+    simple_cmd('s', tuple(column_ndx, ndx)); // Throws
 }
 
 
 template<class T>
-inline error_code Replication::insert_value(const Table* t, std::size_t column_ndx,
-                                            std::size_t ndx, T value)
+inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
+                                      std::size_t ndx, T value)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('i', tuple(column_ndx, ndx, value));
+    check_table(t); // Throws
+    simple_cmd('i', tuple(column_ndx, ndx, value)); // Throws
 }
 
-inline error_code Replication::insert_value(const Table* t, std::size_t column_ndx,
-                                            std::size_t ndx, BinaryData value)
+inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
+                                      std::size_t ndx, BinaryData value)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return string_cmd('i', column_ndx, ndx, value.pointer, value.len);
+    check_table(t); // Throws
+    string_cmd('i', column_ndx, ndx, value.pointer, value.len); // Throws
 }
 
-inline error_code Replication::insert_value(const Table* t, std::size_t column_ndx,
-                                            std::size_t ndx, const Mixed& value)
+inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
+                                      std::size_t ndx, const Mixed& value)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return mixed_cmd('i', column_ndx, ndx, value);
+    check_table(t); // Throws
+    mixed_cmd('i', column_ndx, ndx, value); // Throws
 }
 
-inline error_code Replication::insert_value(const Table* t, std::size_t column_ndx,
-                                            std::size_t ndx, subtable_tag)
+inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
+                                      std::size_t ndx, subtable_tag)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('i', tuple(column_ndx, ndx));
+    check_table(t); // Throws
+    simple_cmd('i', tuple(column_ndx, ndx)); // Throws
 }
 
 
-inline error_code Replication::row_insert_complete(const Table* t)
+inline void Replication::row_insert_complete(const Table* t)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('c', tuple());
+    check_table(t); // Throws
+    simple_cmd('c', tuple()); // Throws
 }
 
 
-inline error_code Replication::insert_empty_rows(const Table* t, std::size_t row_ndx,
-                                                 std::size_t num_rows)
+inline void Replication::insert_empty_rows(const Table* t, std::size_t row_ndx,
+                                           std::size_t num_rows)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('I', tuple(row_ndx, num_rows));
+    check_table(t); // Throws
+    simple_cmd('I', tuple(row_ndx, num_rows)); // Throws
 }
 
 
-inline error_code Replication::remove_row(const Table* t, std::size_t row_ndx)
+inline void Replication::remove_row(const Table* t, std::size_t row_ndx)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('R', tuple(row_ndx));
+    check_table(t); // Throws
+    simple_cmd('R', tuple(row_ndx)); // Throws
 }
 
 
-inline error_code Replication::add_int_to_column(const Table* t, std::size_t column_ndx,
-                                                 int64_t value)
+inline void Replication::add_int_to_column(const Table* t, std::size_t column_ndx, int64_t value)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('a', tuple(column_ndx, value));
+    check_table(t); // Throws
+    simple_cmd('a', tuple(column_ndx, value)); // Throws
 }
 
 
-inline error_code Replication::add_index_to_column(const Table* t, std::size_t column_ndx)
+inline void Replication::add_index_to_column(const Table* t, std::size_t column_ndx)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('x', tuple(column_ndx));
+    check_table(t); // Throws
+    simple_cmd('x', tuple(column_ndx)); // Throws
 }
 
 
-inline error_code Replication::clear_table(const Table* t)
+inline void Replication::clear_table(const Table* t)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('C', tuple());
+    check_table(t); // Throws
+    simple_cmd('C', tuple()); // Throws
 }
 
 
-inline error_code Replication::optimize_table(const Table* t)
+inline void Replication::optimize_table(const Table* t)
 {
-    error_code err = check_table(t);
-    if (err) return err;
-    return simple_cmd('Z', tuple());
+    check_table(t); // Throws
+    simple_cmd('Z', tuple()); // Throws
 }
 
 
-template<class T> bool Replication::Buffer<T>::set_size(std::size_t new_size)
+inline void Replication::on_table_destroyed(const Table* t) TIGHTDB_NOEXCEPT
 {
-    T* const new_data = new (std::nothrow) T[new_size];
-    if (!new_data) return false;
+    if (m_selected_table == t) m_selected_table = 0;
+}
+
+
+inline void Replication::on_spec_destroyed(const Spec* s) TIGHTDB_NOEXCEPT
+{
+    if (m_selected_spec == s) m_selected_spec = 0;
+}
+
+
+template<class T> void Replication::Buffer<T>::set_size(std::size_t new_size)
+{
+    T* const new_data = new T[new_size];
     delete[] m_data;
     m_data = new_data;
     m_size = new_size;
-    return true;
 }
 
 

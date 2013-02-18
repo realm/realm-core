@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
 
     pthread_create(&tinfo[0].thread_id, &attr, &reader, &tinfo[0]);
     pthread_create(&tinfo[1].thread_id, &attr, &writer, &tinfo[1]);
- 
-    pthread_join(tinfo[0].thread_id, &res);           
+
+    pthread_join(tinfo[0].thread_id, &res);
     pthread_join(tinfo[1].thread_id, &res);
 }

@@ -72,9 +72,9 @@ public:
     void SetParent(ArrayParent* parent, size_t pndx);
     void UpdateFromParent();
 
-    ColumnType GetType(size_t ndx) const TIGHTDB_NOEXCEPT;
-    virtual size_t Size() const TIGHTDB_NOEXCEPT {return m_types->Size();}
-    bool is_empty() const TIGHTDB_NOEXCEPT {return m_types->is_empty();}
+    DataType get_type(size_t ndx) const TIGHTDB_NOEXCEPT;
+    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->Size(); }
+    bool is_empty() const TIGHTDB_NOEXCEPT { return m_types->is_empty(); }
 
     int64_t get_int(size_t ndx) const;
     bool get_bool(size_t ndx) const;
@@ -100,7 +100,7 @@ public:
     void set_double(size_t ndx, double value);
     void set_string(size_t ndx, const char* value);
     void set_binary(size_t ndx, const char* value, size_t len);
-    bool set_subtable(size_t ndx);
+    void set_subtable(size_t ndx);
 
     void insert_int(size_t ndx, int64_t value);
     void insert_bool(size_t ndx, bool value);
@@ -109,17 +109,17 @@ public:
     void insert_double(size_t ndx, double value);
     void insert_string(size_t ndx, const char* value);
     void insert_binary(size_t ndx, const char* value, size_t len);
-    bool insert_subtable(size_t ndx);
+    void insert_subtable(size_t ndx);
 
-    bool add() { insert_int(Size(), 0); return true; }
-    void insert(size_t ndx) { insert_int(ndx, 0); invalidate_subtables(); }
-    void Clear(); // Overriding virtual method.
-    void Delete(size_t ndx);
+    void add() TIGHTDB_OVERRIDE { insert_int(Size(), 0); }
+    void insert(size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
+    void Clear() TIGHTDB_OVERRIDE;
+    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
     void fill(size_t count);
 
     // Indexing
     bool HasIndex() const {return false;}
-    void BuildIndex(Index& index) {(void)index;}
+    void BuildIndex(Index& index) { static_cast<void>(index); }
     void ClearIndex() {}
 
     size_t GetRef() const {return m_array->GetRef();}
@@ -146,24 +146,23 @@ private:
     enum MixedColType {
         // NOTE: below numbers must be kept in sync with ColumnType
         // Column types used in Mixed
-        MIXED_COL_INT         =  0,
-        MIXED_COL_BOOL        =  1,
-        MIXED_COL_STRING      =  2,
-                              // 3, used for STRING_ENUM in ColumnType
-        MIXED_COL_BINARY      =  4,
-        MIXED_COL_TABLE       =  5,
-        MIXED_COL_MIXED       =  6,
-        MIXED_COL_DATE        =  7,
-                              // 8, used for RESERVED1 in ColumnType
-        MIXED_COL_FLOAT       =  9, // Float
-        MIXED_COL_DOUBLE      = 10, // Positive Double
-        MIXED_COL_DOUBLE_NEG  = 11, // Negative Double
-        MIXED_COL_INT_NEG     = 12  // Negative Integers
-
+        mixcol_Int         =  0,
+        mixcol_Bool        =  1,
+        mixcol_String      =  2,
+                           // 3, used for STRING_ENUM in ColumnType
+        mixcol_Binary      =  4,
+        mixcol_Table       =  5,
+        mixcol_Mixed       =  6,
+        mixcol_Date        =  7,
+                           // 8, used for RESERVED1 in ColumnType
+        mixcol_Float       =  9,
+        mixcol_Double      = 10, // Positive Double
+        mixcol_DoubleNeg   = 11, // Negative Double
+        mixcol_IntNeg      = 12  // Negative Integers
     };
 
     void clear_value(size_t ndx, MixedColType newtype);
-    
+
     // Get/set/insert 64-bit values in m_refs/m_types
     int64_t get_value(size_t ndx) const;
     void set_value(size_t ndx, int64_t value, MixedColType coltype);
@@ -179,10 +178,10 @@ private:
     // (By having a type for both positive numbers, and another type for negative numbers)
     Column*       m_types;
 
-    // Bit 0 is used to indicate if it's a reference. 
+    // Bit 0 is used to indicate if it's a reference.
     // If not, the data value is stored (shifted 1 bit left). And the sign bit is stored in m_types.
-    RefsColumn*   m_refs;       
-    
+    RefsColumn*   m_refs;
+
     // m_data holds any Binary/String data - if needed.
     ColumnBinary* m_data;
 };

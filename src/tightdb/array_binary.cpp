@@ -9,8 +9,8 @@ namespace tightdb {
 
 
 ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(COLUMN_HASREFS, parent, pndx, alloc),
-    m_offsets(COLUMN_NORMAL, NULL, 0, alloc), m_blob(NULL, 0, alloc)
+    Array(coldef_HasRefs, parent, pndx, alloc),
+    m_offsets(coldef_Normal, NULL, 0, alloc), m_blob(NULL, 0, alloc)
 {
     // Add subarrays for long string
     Array::add(m_offsets.GetRef());
@@ -24,8 +24,8 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
     m_blob(Array::GetAsRef(1), NULL, 0, alloc)
 {
     TIGHTDB_ASSERT(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
-    TIGHTDB_ASSERT(Array::Size() == 2);
-    TIGHTDB_ASSERT(m_blob.Size() ==(size_t)(m_offsets.is_empty() ? 0 : m_offsets.back()));
+    TIGHTDB_ASSERT(Array::size() == 2);
+    TIGHTDB_ASSERT(m_blob.size() ==(size_t)(m_offsets.is_empty() ? 0 : m_offsets.back()));
 
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
@@ -39,14 +39,14 @@ bool ArrayBinary::is_empty() const TIGHTDB_NOEXCEPT
     return m_offsets.is_empty();
 }
 
-size_t ArrayBinary::Size() const TIGHTDB_NOEXCEPT
+size_t ArrayBinary::size() const TIGHTDB_NOEXCEPT
 {
-    return m_offsets.Size();
+    return m_offsets.size();
 }
 
 const char* ArrayBinary::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.size());
 
     const size_t offset = ndx ? size_t(m_offsets.Get(ndx-1)) : 0;
     return m_blob.Get(offset);
@@ -54,7 +54,7 @@ const char* ArrayBinary::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 
 size_t ArrayBinary::GetLen(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.size());
 
     const size_t start = ndx ? size_t(m_offsets.Get(ndx-1)) : 0;
     const size_t end = size_t(m_offsets.Get(ndx));
@@ -72,7 +72,7 @@ void ArrayBinary::add(const char* value, size_t len)
 
 void ArrayBinary::Set(size_t ndx, const char* value, size_t len)
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.size());
     TIGHTDB_ASSERT(len == 0 || value);
 
     const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
@@ -85,7 +85,7 @@ void ArrayBinary::Set(size_t ndx, const char* value, size_t len)
 
 void ArrayBinary::Insert(size_t ndx, const char* value, size_t len)
 {
-    TIGHTDB_ASSERT(ndx <= m_offsets.Size());
+    TIGHTDB_ASSERT(ndx <= m_offsets.size());
     TIGHTDB_ASSERT(len == 0 || value);
 
     const size_t pos = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
@@ -97,7 +97,7 @@ void ArrayBinary::Insert(size_t ndx, const char* value, size_t len)
 
 void ArrayBinary::Delete(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.size());
 
     const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
     const size_t end = (size_t)m_offsets.Get(ndx);
@@ -109,7 +109,7 @@ void ArrayBinary::Delete(size_t ndx)
 
 void ArrayBinary::Resize(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.Size());
+    TIGHTDB_ASSERT(ndx < m_offsets.size());
 
     const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
 

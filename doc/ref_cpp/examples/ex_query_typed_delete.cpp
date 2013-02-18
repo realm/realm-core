@@ -13,7 +13,7 @@ int main()
 // @@EndFold@@
     table.add("Mary",  14);  // match
     table.add("Joe",   17);  // match
-    table.add("Alice", 42);     
+    table.add("Alice", 42);
     table.add("Jack",  22);  // match
     table.add("Bob",   50);
     table.add("Frank", 12);  // match

@@ -7,7 +7,7 @@ using namespace std;
 namespace tightdb {
 
 
-void terminate(string message, const char* file, long line)
+TIGHTDB_NORETURN void terminate(string message, const char* file, long line) TIGHTDB_NOEXCEPT
 {
     cerr << file << ":" << line << ": " << message << endl;
     abort();

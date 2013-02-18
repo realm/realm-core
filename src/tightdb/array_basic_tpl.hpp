@@ -20,28 +20,26 @@
 #ifndef TIGHTDB_ARRAY_BASIC_TPL_HPP
 #define TIGHTDB_ARRAY_BASIC_TPL_HPP
 
+#include <algorithm>
+
 namespace tightdb {
 
 template<typename T>
-inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc) 
+inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc)
 {
     const size_t capacity = Array::initial_capacity;
-    const MemRef mem_ref = alloc.Alloc(capacity);
-    if (!mem_ref.pointer) 
-        return 0;
+    const MemRef mem_ref = alloc.Alloc(capacity); // Throws
 
     init_header(mem_ref.pointer, false, false, TDB_MULTIPLY, sizeof(T), 0, capacity);
 
     return mem_ref.ref;
 }
 
-template<typename T> 
-inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc)
-                               :Array(alloc)
+template<typename T>
+inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc):
+    Array(alloc)
 {
-    const size_t ref = create_empty_basic_array(alloc);
-    if (!ref) 
-        throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    const size_t ref = create_empty_basic_array(alloc); // Throws
     init_from_ref(ref);
     SetParent(parent, ndx_in_parent);
     update_ref_in_parent();
@@ -63,112 +61,110 @@ inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT : Array(no_pr
 }
 
 
-template<typename T> 
+template<typename T>
 inline void BasicArray<T>::Clear()
 {
-    CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Truncate size to zero (but keep capacity and width)
     m_len = 0;
     set_header_len(0);
 }
 
-template<typename T> 
+template<typename T>
 inline void BasicArray<T>::add(T value)
 {
     Insert(m_len, value);
 }
 
-template<typename T> 
+template<typename T>
 inline T BasicArray<T>::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    T* dataPtr = (T *)m_data + ndx;
+    T* dataPtr = reinterpret_cast<T*>(m_data) + ndx;
     return *dataPtr;
 }
 
-template<typename T> 
+template<typename T>
 inline void BasicArray<T>::Set(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    if (!CopyOnWrite()) 
-        return;
+    CopyOnWrite(); // Throws
 
     // Set the value
-    T* data = (T *)m_data + ndx;
+    T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
 }
 
-template<typename T> 
+template<typename T>
 void BasicArray<T>::Insert(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
 
     // Check if we need to copy before modifying
-    (void)CopyOnWrite();
+    CopyOnWrite(); // Throws
 
     // Make room for the new value
-    if (!Alloc(m_len+1, m_width))
-        return;
+    Alloc(m_len+1, m_width); // Throws
 
     // Move values below insertion
     if (ndx != m_len) {
-        unsigned char* src = m_data + (ndx * m_width);
-        unsigned char* dst = src + m_width;
-        const size_t count = (m_len - ndx) * m_width;
-        memmove(dst, src, count); 
-        // fixme: Consider std::copy() or std::copy_backward() instead.
+        char* const base = reinterpret_cast<char*>(m_data);
+        char* const src_begin = base + ndx*m_width;
+        char* const src_end   = base + m_len*m_width;
+        char* const dst_end   = src_end + m_width;
+        std::copy_backward(src_begin, src_end, dst_end);
     }
 
     // Set the value
-    T* data = (T *)m_data + ndx;
+    T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
 
      ++m_len;
 }
 
-template<typename T> 
+template<typename T>
 void BasicArray<T>::Delete(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
     // Check if we need to copy before modifying
-    CopyOnWrite();
-
-    --m_len;
+    CopyOnWrite(); // Throws
 
     // move data under deletion up
-    if (ndx < m_len) {
-        unsigned char* src = m_data + ((ndx+1) * m_width);
-        unsigned char* dst = m_data + (ndx * m_width);
-        const size_t len = (m_len - ndx) * m_width;
-        memmove(dst, src, len); // FIXME: Use std::copy() or std::copy_backward() instead.
+    if (ndx < m_len-1) {
+        char* const base = reinterpret_cast<char*>(m_data);
+        char* const dst_begin = base + ndx*m_width;
+        const char* const src_begin = dst_begin + m_width;
+        const char* const src_end   = base + m_len*m_width;
+        std::copy(src_begin, src_end, dst_begin);
     }
 
-    // Update length in header
+    // Update length (also in header)
+    --m_len;
     set_header_len(m_len);
 }
 
 template<typename T>
 bool BasicArray<T>::Compare(const BasicArray<T>& c) const
 {
-    for (size_t i = 0; i < Size(); ++i) {
-        if (Get(i) != c.Get(i)) 
+    for (size_t i = 0; i < size(); ++i) {
+        if (Get(i) != c.Get(i))
             return false;
     }
     return true;
 }
 
 
-template<typename T> 
+template<typename T>
 size_t BasicArray<T>::CalcByteLen(size_t count, size_t /*width*/) const
 {
     // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
     return 8 + (count * sizeof(T));
 }
 
-template<typename T> 
+template<typename T>
 size_t BasicArray<T>::CalcItemCount(size_t bytes, size_t /*width*/) const TIGHTDB_NOEXCEPT
 {
     // fixme: ??? what about width = 0? return -1?
@@ -177,31 +173,31 @@ size_t BasicArray<T>::CalcItemCount(size_t bytes, size_t /*width*/) const TIGHTD
     return bytes_without_header / sizeof(T);
 }
 
-template<typename T> 
+template<typename T>
 size_t BasicArray<T>::Find(T target, size_t start, size_t end) const
 {
-    if (end == (size_t)-1) 
+    if (end == (size_t)-1)
         end = m_len;
-    if (start >= end) 
+    if (start >= end)
         return not_found;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
     if (m_len == 0)
         return not_found; // empty list
 
     for (size_t i = start; i < end; ++i) {
-        if (target == Get(i)) 
+        if (target == Get(i))
             return i;
     }
     return not_found;
 }
 
-template<typename T> 
+template<typename T>
 size_t BasicArray<T>::find_first(T value, size_t start, size_t end) const
 {
     return Find(value, start, end);
 }
 
-template<typename T> 
+template<typename T>
 void BasicArray<T>::find_all(Array& result, T value, size_t add_offset, size_t start, size_t end)
 {
     size_t first = start - 1;
@@ -209,12 +205,12 @@ void BasicArray<T>::find_all(Array& result, T value, size_t add_offset, size_t s
         first = Find(value, first + 1, end);
         if (first != not_found)
             result.add(first + add_offset);
-        else 
+        else
             break;
     }
 }
 
-template<typename T> 
+template<typename T>
 size_t BasicArray<T>::count(T value, size_t start, size_t end) const
 {
     size_t count = 0;
@@ -223,9 +219,9 @@ size_t BasicArray<T>::count(T value, size_t start, size_t end) const
         lastmatch = Find(value, lastmatch+1, end);
         if (lastmatch != not_found)
             ++count;
-        else 
+        else
             break;
-    } 
+    }
     return count;
 }
 

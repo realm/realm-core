@@ -19,8 +19,8 @@ int main()
     TableRef table = group.get_table("test");
 
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_STRING, "Name");
-    s.add_column(COLUMN_TYPE_INT,    "Age");
+    s.add_column(type_String, "Name");
+    s.add_column(type_Int,    "Age");
     table->update_from_spec();
 
     table->add_empty_row();
@@ -40,7 +40,7 @@ int main()
     int64_t sum = table->where().sum(1);
     assert(sum == 27 + 50 + 44);
 
-    // Find the sum of Age (column 1) where Name (column 0) contains "e" 
+    // Find the sum of Age (column 1) where Name (column 0) contains "e"
     Query q = table->where().contains(0, "e");
     sum = q.sum(1);
     assert(sum == 50 + 44);

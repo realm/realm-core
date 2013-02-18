@@ -35,12 +35,12 @@ public:
     ArrayString(Allocator& alloc);
 
     const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
-    bool add();
-    bool add(const char* value);
-    bool Set(size_t ndx, const char* c_str);
-    bool Set(size_t ndx, const char* data, size_t size);
-    bool Insert(size_t ndx, const char* c_str);
-    bool Insert(size_t ndx, const char* data, size_t size);
+    void add();
+    void add(const char* value);
+    void Set(size_t ndx, const char* c_str);
+    void Set(size_t ndx, const char* data, size_t size);
+    void Insert(size_t ndx, const char* c_str);
+    void Insert(size_t ndx, const char* data, size_t size);
     void Delete(size_t ndx);
 
     size_t count(const char* value, size_t start=0, size_t end=-1) const;
@@ -49,9 +49,6 @@ public:
 
     /// Construct an empty string array and return just the reference
     /// to the underlying memory.
-    ///
-    /// \return Zero if allocation fails.
-    ///
     static size_t create_empty_string_array(Allocator&);
 
     /// Compare two string arrays for equality.
@@ -65,9 +62,9 @@ public:
 
 private:
     size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
-    virtual size_t CalcByteLen(size_t count, size_t width) const;
-    virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
-    virtual WidthType GetWidthType() const {return TDB_MULTIPLY;}
+    size_t CalcByteLen(size_t count, size_t width) const TIGHTDB_OVERRIDE;
+    size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    WidthType GetWidthType() const TIGHTDB_OVERRIDE {return TDB_MULTIPLY;}
 };
 
 
@@ -78,14 +75,13 @@ private:
 
 inline size_t ArrayString::create_empty_string_array(Allocator& alloc)
 {
-    return create_empty_array(COLUMN_NORMAL, TDB_MULTIPLY, alloc);
+    return create_empty_array(coldef_Normal, TDB_MULTIPLY, alloc); // Throws
 }
 
 inline ArrayString::ArrayString(ArrayParent *parent, size_t ndx_in_parent,
                                 Allocator& alloc): Array(alloc)
 {
-    const size_t ref = create_empty_string_array(alloc);
-    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    const size_t ref = create_empty_string_array(alloc); // Throws
     init_from_ref(ref);
     SetParent(parent, ndx_in_parent);
     update_ref_in_parent();
@@ -108,15 +104,15 @@ inline const char* ArrayString::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(ndx < m_len);
 
     if (m_width == 0) return "";
-    else return reinterpret_cast<char*>(m_data + (ndx * m_width));
+    else return reinterpret_cast<char*>(m_data) + (ndx * m_width);
 }
 
-inline bool ArrayString::Set(std::size_t ndx, const char* value)
+inline void ArrayString::Set(std::size_t ndx, const char* value)
 {
     TIGHTDB_ASSERT(ndx < m_len);
     TIGHTDB_ASSERT(value);
 
-    return Set(ndx, value, std::strlen(value));
+    Set(ndx, value, std::strlen(value)); // Throws
 }
 
 

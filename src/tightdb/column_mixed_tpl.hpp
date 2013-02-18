@@ -44,7 +44,7 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXC
     // size from it. Maybe it is faster in general to check for the
     // the presence of the cached object and use it when available.
     TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) return 0;
+    if (m_types->Get(row_idx) != type_Table) return 0;
     const size_t top_ref = m_refs->GetAsRef(row_idx);
     const size_t columns_ref = Array(top_ref, 0, 0, m_refs->GetAllocator()).GetAsRef(1);
     const Array columns(columns_ref, 0, 0, m_refs->GetAllocator());
@@ -56,7 +56,7 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXC
 inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
 {
     TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != COLUMN_TYPE_TABLE) 
+    if (m_types->Get(row_idx) != type_Table)
         return 0;
     return m_refs->get_subtable_ptr(row_idx);
 }
@@ -76,7 +76,7 @@ inline void ColumnMixed::invalidate_subtables_virtual()
 // Getters
 //
 
-#define TIGHTDB_BIT63 0x8000000000000000    
+#define TIGHTDB_BIT63 0x8000000000000000
 
 inline int64_t ColumnMixed::get_value(size_t ndx) const
 {
@@ -95,24 +95,24 @@ inline int64_t ColumnMixed::get_int(size_t ndx) const
 
     // restore 'sign'-bit from the column-type
     const MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));
-    if (coltype == MIXED_COL_INT_NEG)
+    if (coltype == mixcol_IntNeg)
         value |= TIGHTDB_BIT63; // set sign bit (63)
     else {
-        TIGHTDB_ASSERT(coltype == MIXED_COL_INT);
+        TIGHTDB_ASSERT(coltype == mixcol_Int);
     }
     return value;
 }
 
 inline bool ColumnMixed::get_bool(size_t ndx) const
 {
-    TIGHTDB_ASSERT(m_types->Get(ndx) == MIXED_COL_BOOL);
+    TIGHTDB_ASSERT(m_types->Get(ndx) == mixcol_Bool);
 
     return (get_value(ndx) != 0);
 }
 
 inline time_t ColumnMixed::get_date(size_t ndx) const
 {
-    TIGHTDB_ASSERT(m_types->Get(ndx) == MIXED_COL_DATE);
+    TIGHTDB_ASSERT(m_types->Get(ndx) == mixcol_Date);
 
     return static_cast<time_t>(get_value(ndx));
 }
@@ -121,7 +121,7 @@ inline float ColumnMixed::get_float(size_t ndx) const
 {
     TIGHTDB_STATIC_ASSERT(std::numeric_limits<float>::is_iec559, "'float' is not IEEE");
     TIGHTDB_STATIC_ASSERT((sizeof(float) * CHAR_BIT == 32), "Assume 32 bit float.");
-    TIGHTDB_ASSERT(m_types->Get(ndx) == MIXED_COL_FLOAT);
+    TIGHTDB_ASSERT(m_types->Get(ndx) == mixcol_Float);
 
     return TypePunning<float>( get_value(ndx) );
 }
@@ -135,10 +135,10 @@ inline double ColumnMixed::get_double(size_t ndx) const
 
     // restore 'sign'-bit from the column-type
     const MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));
-    if (coltype == MIXED_COL_DOUBLE_NEG)
+    if (coltype == mixcol_DoubleNeg)
         intval |= TIGHTDB_BIT63; // set sign bit (63)
     else {
-        TIGHTDB_ASSERT(coltype == MIXED_COL_DOUBLE);
+        TIGHTDB_ASSERT(coltype == mixcol_Double);
     }
     return TypePunning<double>( intval );
 }
@@ -146,7 +146,7 @@ inline double ColumnMixed::get_double(size_t ndx) const
 inline const char* ColumnMixed::get_string(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
-    TIGHTDB_ASSERT(m_types->Get(ndx) == MIXED_COL_STRING);
+    TIGHTDB_ASSERT(m_types->Get(ndx) == mixcol_String);
     TIGHTDB_ASSERT(m_data);
 
     const size_t ref = m_refs->GetAsRef(ndx) >> 1;
@@ -157,7 +157,7 @@ inline const char* ColumnMixed::get_string(size_t ndx) const
 inline BinaryData ColumnMixed::get_binary(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
-    TIGHTDB_ASSERT(m_types->Get(ndx) == MIXED_COL_BINARY);
+    TIGHTDB_ASSERT(m_types->Get(ndx) == mixcol_Binary);
     TIGHTDB_ASSERT(m_data);
 
     const size_t ref = m_refs->GetAsRef(ndx) >> 1;
@@ -168,7 +168,7 @@ inline BinaryData ColumnMixed::get_binary(size_t ndx) const
 // Setters
 //
 
-// Set a int64 value. 
+// Set a int64 value.
 // Store 63 bit of the value in m_refs. Store sign bit in m_types.
 
 inline void ColumnMixed::set_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type)
@@ -177,7 +177,7 @@ inline void ColumnMixed::set_int64(size_t ndx, int64_t value, MixedColType pos_t
 
     // If sign-bit is set in value, 'store' it in the column-type
     const MixedColType coltype = ((value & TIGHTDB_BIT63) == 0) ? pos_type : neg_type;
-    
+
     // Remove refs or binary data (sets type to double)
     clear_value(ndx, coltype);
 
@@ -188,13 +188,13 @@ inline void ColumnMixed::set_int64(size_t ndx, int64_t value, MixedColType pos_t
 
 inline void ColumnMixed::set_int(size_t ndx, int64_t value)
 {
-    set_int64(ndx, value, MIXED_COL_INT, MIXED_COL_INT_NEG);
+    set_int64(ndx, value, mixcol_Int, mixcol_IntNeg);
 }
 
 inline void ColumnMixed::set_double(size_t ndx, double value)
 {
     const int64_t val64 = TypePunning<int64_t>( value );
-    set_int64(ndx, val64, MIXED_COL_DOUBLE, MIXED_COL_DOUBLE_NEG);
+    set_int64(ndx, val64, mixcol_Double, mixcol_DoubleNeg);
 }
 
 inline void ColumnMixed::set_value(size_t ndx, int64_t value, MixedColType coltype)
@@ -213,37 +213,32 @@ inline void ColumnMixed::set_float(size_t ndx, float value)
 {
     const void* vptr = reinterpret_cast<const void*>(&value);
     const int32_t val32 = * reinterpret_cast<const int32_t*>(vptr);
-    set_value(ndx, static_cast<const int64_t>(val32), MIXED_COL_FLOAT);
+    set_value(ndx, static_cast<const int64_t>(val32), mixcol_Float);
 }
 
 inline void ColumnMixed::set_bool(size_t ndx, bool value)
 {
-    set_value(ndx, (value ? 1 : 0), MIXED_COL_BOOL);
+    set_value(ndx, (value ? 1 : 0), mixcol_Bool);
 }
 
 inline void ColumnMixed::set_date(size_t ndx, time_t value)
 {
-    set_value(ndx, static_cast<const int64_t>(value), MIXED_COL_DATE);
+    set_value(ndx, static_cast<const int64_t>(value), mixcol_Date);
 }
 
-// FIXME: Check that callers test the return value
-inline bool ColumnMixed::set_subtable(size_t ndx)
+inline void ColumnMixed::set_subtable(std::size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
-    const size_t ref = Table::create_empty_table(m_array->GetAllocator());
-    if (!ref) 
-        return false;
-    // FIXME: Could the following operations also fail on allocation?
-    clear_value(ndx, MIXED_COL_TABLE); // Remove any previous refs or binary data
+    const std::size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+    clear_value(ndx, mixcol_Table); // Remove any previous refs or binary data
     m_refs->Set(ndx, ref);
-    return true;
 }
 
 //
 // Inserts
 //
 
-// Insert a int64 value. 
+// Insert a int64 value.
 // Store 63 bit of the value in m_refs. Store sign bit in m_types.
 
 inline void ColumnMixed::insert_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type)
@@ -263,13 +258,13 @@ inline void ColumnMixed::insert_int64(size_t ndx, int64_t value, MixedColType po
 
 inline void ColumnMixed::insert_int(size_t ndx, int64_t value)
 {
-    insert_int64(ndx, value, MIXED_COL_INT, MIXED_COL_INT_NEG);
+    insert_int64(ndx, value, mixcol_Int, mixcol_IntNeg);
 }
 
 inline void ColumnMixed::insert_double(size_t ndx, double value)
 {
     int64_t val64 = TypePunning<int64_t>( value );
-    insert_int64(ndx, val64, MIXED_COL_DOUBLE, MIXED_COL_DOUBLE_NEG);
+    insert_int64(ndx, val64, mixcol_Double, mixcol_DoubleNeg);
 }
 
 inline void ColumnMixed::insert_float(size_t ndx, float value)
@@ -277,12 +272,12 @@ inline void ColumnMixed::insert_float(size_t ndx, float value)
     TIGHTDB_ASSERT(ndx <= m_types->Size());
 
     // Convert to int32_t first, to ensure we only access 32 bits from the float.
-    const int32_t val32 = TypePunning<int32_t>( value );    
+    const int32_t val32 = TypePunning<int32_t>( value );
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     const int64_t val64 = (static_cast<int64_t>(val32) << 1) + 1;
     m_refs->Insert(ndx, val64);
-    m_types->Insert(ndx, MIXED_COL_FLOAT);
+    m_types->Insert(ndx, mixcol_Float);
 }
 
 inline void ColumnMixed::insert_bool(size_t ndx, bool value)
@@ -292,7 +287,7 @@ inline void ColumnMixed::insert_bool(size_t ndx, bool value)
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     const int64_t v = ((value ? 1 : 0) << 1) + 1;
 
-    m_types->Insert(ndx, MIXED_COL_BOOL);
+    m_types->Insert(ndx, mixcol_Bool);
     m_refs->Insert(ndx, v);
 }
 
@@ -303,7 +298,7 @@ inline void ColumnMixed::insert_date(size_t ndx, time_t value)
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     const int64_t v = (value << 1) + 1;
 
-    m_types->Insert(ndx, MIXED_COL_DATE);
+    m_types->Insert(ndx, mixcol_Date);
     m_refs->Insert(ndx, v);
 }
 
@@ -319,7 +314,7 @@ inline void ColumnMixed::insert_string(size_t ndx, const char* value)
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     const int64_t v = (ref << 1) + 1;
 
-    m_types->Insert(ndx, MIXED_COL_STRING);
+    m_types->Insert(ndx, mixcol_String);
     m_refs->Insert(ndx, v);
 }
 
@@ -334,20 +329,16 @@ inline void ColumnMixed::insert_binary(size_t ndx, const char* value, size_t len
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     const int64_t v = (ref << 1) + 1;
 
-    m_types->Insert(ndx, MIXED_COL_BINARY);
+    m_types->Insert(ndx, mixcol_Binary);
     m_refs->Insert(ndx, v);
 }
 
-// FIXME: Check that callers test the return value
-inline bool ColumnMixed::insert_subtable(size_t ndx)
+inline void ColumnMixed::insert_subtable(std::size_t ndx)
 {
     TIGHTDB_ASSERT(ndx <= m_types->Size());
-    const size_t ref = Table::create_empty_table(m_array->GetAllocator());
-    if (!ref) return false;
-    // FIXME: These inserts can also fail on allocation
-    m_types->Insert(ndx, MIXED_COL_TABLE);
+    const std::size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+    m_types->Insert(ndx, mixcol_Table);
     m_refs->Insert(ndx, ref);
-    return true;
 }
 
 } // namespace tightdb

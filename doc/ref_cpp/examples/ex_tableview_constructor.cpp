@@ -14,7 +14,7 @@ int main()
     table.add("Joe",   57);
     table.add("Mary",  14);
     table.add("Alice", 42);
-    table.add("Jack",  32); 
+    table.add("Jack",  32);
 
     // Create 1-to-1 view of table
     PeopleTable::View view = table.where().find_all();

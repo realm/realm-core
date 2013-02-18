@@ -35,7 +35,7 @@ public:
 
     void BuildIndex(const Column& c);
 
-    bool Insert(size_t ndx, int64_t value, bool isLast=false);
+    void Insert(size_t ndx, int64_t value, bool isLast=false);
     void Delete(size_t ndx, int64_t value, bool isLast=false);
     void Set(size_t ndx, int64_t oldValue, int64_t newValue);
 
@@ -55,11 +55,11 @@ protected:
     bool DoDelete(size_t ndx, int64_t value);
 
     // Node functions
-    bool NodeAdd(size_t ref);
+    void NodeAdd(size_t ref);
 
     void UpdateRefs(size_t pos, int diff);
 
-    bool LeafInsert(size_t ref, int64_t value);
+    void LeafInsert(size_t ref, int64_t value);
 
     int64_t MaxValue() const;
     size_t MaxRef() const;

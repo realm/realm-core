@@ -20,8 +20,8 @@ int main()
     TableRef table = group.get_table("test");
 
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_STRING, "name");
-    s.add_column(COLUMN_TYPE_INT,    "age");
+    s.add_column(type_String, "name");
+    s.add_column(type_Int,    "age");
     table->update_from_spec();
 
     table->add_empty_row();
@@ -40,7 +40,7 @@ int main()
     // Find rows where age (column 1) < 48
     Query query = table->where().less(1, 48);
     size_t removed = query.remove();
-    
+
     // 2 rows deleted
     assert(removed == 2);
 

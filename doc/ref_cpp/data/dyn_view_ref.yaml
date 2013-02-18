@@ -17,7 +17,7 @@ DESCR      : &g_dyn_view_intro_descr
              {@link class_dyn_table}.  All changes to the view will
              propagate to the original table. This includes operations
              like updating values and deleting rows.
-             
+
              Notice that this does not imply that it will work the
              opposite direction. Any change that adds or removes rows
              in the original table will invalidate the view, and you
@@ -26,11 +26,11 @@ DESCR      : &g_dyn_view_intro_descr
 
              It is possible to create two views for the table as
              long as you do not change the original table.
-SEE        : 
-EXAMPLES   : 
-- DESCR: 
+SEE        :
+EXAMPLES   :
+- DESCR:
   CODE: ex_cpp_dyn_view_intro
-IGNORE     : []                   # List of method-ids to ignore   
+IGNORE     : []                   # List of method-ids to ignore
 CATEGORIES :
 - State:
   METHODS:
@@ -38,26 +38,26 @@ CATEGORIES :
       NAMES    : size
       SUMMARY  : *g_dyn_table_size_summary
       DESCR    : *g_dyn_table_size_descr
-      CONST    : True             
-      RETURN:                 
+      CONST    : True
+      RETURN:
         TYPES  : size_t
         DESCR  : The number of rows.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_size
-        DESCR  : 
+        DESCR  :
   - g_dyn_view_is_empty:
       NAMES    : is_empty
       SUMMARY  : &g_dyn_view_is_empty_summary
                  Is view empty?
       DESCR    : &g_dyn_view_is_empty_descr
                  The method checks if the view is empty that is, it has zero rows.
-      CONST    : True             
-      RETURN:                 
+      CONST    : True
+      RETURN:
         TYPES  : bool
         DESCR  : <code>true</code> if empty, <code>false</code> otherwise.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_is_empty
-        DESCR  : 
+        DESCR  :
 - View:
   METHODS:
   - g_dyn_view_clear:
@@ -74,58 +74,58 @@ CATEGORIES :
       NAMES    : get_column_count
       SUMMARY  : *g_dyn_table_get_column_count_summary
       DESCR    : *g_dyn_table_get_column_count_descr
-      CONST    : True             
-      RETURN:                 
+      CONST    : True
+      RETURN:
         TYPES  : size_t
         DESCR  : The number of columns.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_column_count
-        DESCR  : 
+        DESCR  :
   - g_dyn_view_get_column_name:
       NAMES    : get_column_name
       SUMMARY  : *g_dyn_table_get_column_name_summary
       DESCR    : *g_dyn_table_get_column_name_descr
-      CONST    : True             
-      PARAMS:                 
+      CONST    : True
+      PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.     
-      RETURN:                 
+        DESCR  : The column index.
+      RETURN:
         TYPES  : const char*
         DESCR  : The column name.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_column_name
-        DESCR  : 
+        DESCR  :
   - g_dyn_view_get_column_index:
       NAMES    : get_column_index
       SUMMARY  : *g_dyn_table_get_column_index_summary
       DESCR    : *g_dyn_table_get_column_index_descr
-      CONST    : True             
-      PARAMS:                 
+      CONST    : True
+      PARAMS:
       - NAME   : column_name
         TYPES  : const char*
-        DESCR  : The column name.     
-      RETURN:                 
+        DESCR  : The column name.
+      RETURN:
         TYPES  : size_t
         DESCR  : The column index.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_column_index
-        DESCR  : 
+        DESCR  :
   - g_dyn_view_get_column_type:
       NAMES    : get_column_type
       SUMMARY  : *g_dyn_table_get_column_type_summary
       DESCR    : *g_dyn_table_get_column_type_descr
-      CONST    : True             
-      PARAMS:                 
+      CONST    : True
+      PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.     
-      RETURN:                 
+        DESCR  : The column index.
+      RETURN:
         TYPES  : ColomnType
         DESCR  : The column type.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_column_type
-        DESCR  : 
+        DESCR  :
 - Rows:
   METHODS:
   - g_dyn_view_get_source_ndx:
@@ -134,17 +134,17 @@ CATEGORIES :
                  Get source index.
       DESCR    : &g_dyn_view_get_source_ndx_descr
                  This method will get the index of the row in the source table.
-      CONST    : True             
-      PARAMS:                 
+      CONST    : True
+      PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : The row index in the view
-      RETURN:                 
+      RETURN:
         TYPES  : size_t
         DESCR  : The row index in the table.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_source_ndx
-        DESCR  : 
+        DESCR  :
   - g_dyn_view_remove_row:
       NAMES    : remove
       SUMMARY  : *g_dyn_table_remove_row_summary
@@ -186,7 +186,7 @@ CATEGORIES :
                  const char*   get_string(size_t column_ndx, size_t row_ndx) const;
                  BinaryData    get_binary(size_t column_ndx, size_t row_ndx) const;
                  Mixed         get_mixed(size_t column_ndx, size_t row_ndx) const;
-                 ColumnType    get_mixed_type(size_t column_ndx, size_t row_ndx) const
+                 DataType      get_mixed_type(size_t column_ndx, size_t row_ndx) const
                  TableRef      get_subtable(size_t column_ndx, size_t row_ndx);
                  ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
       CONST    : True
@@ -198,7 +198,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : The row index.
       RETURN:
-        TYPES  : [bool, int64_t, time_t, const char*, BinaryData, Mixed, ColumnType, TableRef, ConstTableRef]
+        TYPES  : [bool, int64_t, time_t, const char*, BinaryData, Mixed, DataType, TableRef, ConstTableRef]
         DESCR  : The value.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_xxx
@@ -221,10 +221,10 @@ CATEGORIES :
                  void set_string(size_t column_ndx, size_t row_ndx, const char* value);
                  void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
                  void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
-      PARAMS:                 
+      PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.     
+        DESCR  : The column index.
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : The row index.
@@ -234,7 +234,7 @@ CATEGORIES :
       - NAME   : len
         TYPES  : size_t
         DESCR  : Size in bytes of binary value.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_set_xxx
         DESCR  :
 - Sub-tables:
@@ -315,7 +315,7 @@ CATEGORIES :
                  TableView      find_all_bool(size_t column_ndx, bool value);
                  TableView      find_all_date(size_t column_ndx, time_t value);
                  TableView      find_all_string(size_t column_ndx, const char* value);
-                 
+
                  ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
                  ConstTableView find_all_bool(size_t column_ndx, bool value) const;
                  ConstTableView find_all_date(size_t column_ndx, time_t value) const;
@@ -346,7 +346,7 @@ CATEGORIES :
       - NAME   : ascending
         TYPES  : bool
         DESCR  : "If <code>true</code>, rows are sorted ascending. Default: <code>true</code>."
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_sort
         DESCR  :
 - Aggregates:
@@ -413,13 +413,13 @@ CATEGORIES :
                  web/mobile applications and serialization. This
                  method will convert a view and its columns and rows
                  to a JSON compatible representation.
-      PARAMS:                 
+      PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
         DESCR  : Output stream.
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_to_json
-        DESCR  : 
+        DESCR  :
   - g_dyn_view_to_string:
       NAMES    : to_string
       SUMMARY  : &g_dyn_view_to_string_summary
@@ -428,13 +428,13 @@ CATEGORIES :
                  This method will convert a view and its columns and rows to a format
                  which is easily read by humans.
       CONST    : true
-      PARAMS:                 
+      PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
         DESCR  : Output stream.
       - NAME   : limit
         TYPES  : size_t
         DESCR  : "The number of rows to convert. Default: 500."
-      EXAMPLES:                  
+      EXAMPLES:
       - CODE   : ex_cpp_dyn_view_to_string
-        DESCR  : 
+        DESCR  :

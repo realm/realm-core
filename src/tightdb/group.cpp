@@ -120,7 +120,7 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 // Create a new memory structure and attach this group instance to it.
 void Group::create()
 {
-    m_tables.SetType(COLUMN_HASREFS); // FIXME: Why is this not done in Group() like the rest of the arrays?
+    m_tables.SetType(coldef_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
 
     m_top.add(m_tableNames.GetRef());
     m_top.add(m_tables.GetRef());
@@ -144,13 +144,13 @@ void Group::create_from_ref(size_t top_ref)
 {
     // Instantiate top arrays
     if (top_ref == 0) {
-        m_top.SetType(COLUMN_HASREFS);
-        m_tables.SetType(COLUMN_HASREFS);
-        m_tableNames.SetType(COLUMN_NORMAL);
-        m_freePositions.SetType(COLUMN_NORMAL);
-        m_freeLengths.SetType(COLUMN_NORMAL);
+        m_top.SetType(coldef_HasRefs);
+        m_tables.SetType(coldef_HasRefs);
+        m_tableNames.SetType(coldef_Normal);
+        m_freePositions.SetType(coldef_Normal);
+        m_freeLengths.SetType(coldef_Normal);
         if (m_is_shared) {
-            m_freeVersions.SetType(COLUMN_NORMAL);
+            m_freeVersions.SetType(coldef_Normal);
         }
 
         create();
@@ -163,7 +163,7 @@ void Group::create_from_ref(size_t top_ref)
     }
     else {
         m_top.UpdateRef(top_ref);
-        const size_t top_size = m_top.Size();
+        const size_t top_size = m_top.size();
         TIGHTDB_ASSERT(top_size >= 2);
 
         const size_t n_ref = m_top.Get(0);
@@ -190,7 +190,7 @@ void Group::create_from_ref(size_t top_ref)
         }
 
         // Make room for pointers to cached tables
-        const size_t count = m_tables.Size();
+        const size_t count = m_tables.size();
         for (size_t i = 0; i < count; ++i) {
             m_cachedtables.add(0);
         }
@@ -207,9 +207,9 @@ void Group::init_shared()
     else {
         // Serialized files have no free space tracking
         // at all so we have to add the basic free lists
-        if (m_top.Size() == 2) {
-            m_freePositions.SetType(COLUMN_NORMAL);
-            m_freeLengths.SetType(COLUMN_NORMAL);
+        if (m_top.size() == 2) {
+            m_freePositions.SetType(coldef_Normal);
+            m_freeLengths.SetType(coldef_Normal);
             m_top.add(m_freePositions.GetRef());
             m_top.add(m_freeLengths.GetRef());
             m_freePositions.SetParent(&m_top, 2);
@@ -218,9 +218,9 @@ void Group::init_shared()
 
         // Files that have only been used in single thread
         // mode do not have version tracking for the free lists
-        if (m_top.Size() == 4) {
-            const size_t count = m_freePositions.Size();
-            m_freeVersions.SetType(COLUMN_NORMAL);
+        if (m_top.size() == 4) {
+            const size_t count = m_freePositions.size();
+            m_freeVersions.SetType(coldef_Normal);
             for (size_t i = 0; i < count; ++i) {
                 m_freeVersions.add(0);
             }
@@ -309,52 +309,40 @@ void Group::invalidate()
 Table* Group::get_table_ptr(size_t ndx)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
-    TIGHTDB_ASSERT(ndx < m_tables.Size());
+    TIGHTDB_ASSERT(ndx < m_tables.size());
 
     // Get table from cache if exists, else create
     Table* table = reinterpret_cast<Table*>(m_cachedtables.Get(ndx));
     if (!table) {
         const size_t ref = m_tables.GetAsRef(ndx);
-        table = new (nothrow) Table(Table::RefCountTag(), m_alloc, ref, this, ndx);
-        if (!table) {
-        error:
-            throw_error(ERROR_OUT_OF_MEMORY);
-        }
-        table->bind_ref(); // The group has shared ownership
-        if (!m_cachedtables.Set(ndx, intptr_t(table))) { // FIXME: intptr_t is not guaranteed to exists, even in C++11
-            table->unbind_ref();
-            goto error;
-        }
+        Table::UnbindGuard t(new Table(Table::RefCountTag(), m_alloc, ref, this, ndx)); // Throws
+        t->bind_ref(); // Increase reference count to 1
+        m_cachedtables.Set(ndx, intptr_t(t.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
+        // This group shares ownership of the table, so leave
+        // reference count at 1.
+        table = t.release();
     }
     return table;
 }
 
 Table* Group::create_new_table(const char* name)
 {
-    const size_t ref = Table::create_empty_table(m_alloc);
-    if (!ref) {
-    error:
-        throw_error(ERROR_OUT_OF_MEMORY);
-    }
-    if (!m_tables.add(ref)) goto error;
-    if (!m_tableNames.add(name)) goto error;
-    Table* const table =
-        new (nothrow) Table(Table::RefCountTag(), m_alloc, ref, this, m_tables.Size()-1);
-    if (!table) goto error;
-    table->bind_ref(); // The group has shared ownership
-    if (!m_cachedtables.add(intptr_t(table))) { // FIXME: intptr_t is not guaranteed to exists, even in C++11
-        table->unbind_ref();
-        goto error;
-    }
+    const size_t ref = Table::create_empty_table(m_alloc); // Throws
+    m_tables.add(ref);
+    m_tableNames.add(name);
+    Table::UnbindGuard table(new Table(Table::RefCountTag(), m_alloc,
+                                       ref, this, m_tables.size()-1)); // Throws
+    table->bind_ref(); // Increase reference count to 1
+    m_cachedtables.add(intptr_t(table.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* repl = m_alloc.get_replication();
-    if (repl) {
-        error_code err = repl->new_top_level_table(name);
-        if (err) throw_error(err);
-    }
+    if (repl) repl->new_top_level_table(name); // Throws
 #endif
-    return table;
+
+    // This group shares ownership of the table, so leave reference
+    // count at 1.
+    return table.release();
 }
 
 
@@ -424,14 +412,14 @@ void Group::update_refs(size_t topRef)
 {
     // Update top with the new (persistent) ref
     m_top.UpdateRef(topRef);
-    TIGHTDB_ASSERT(m_top.Size() >= 2);
+    TIGHTDB_ASSERT(m_top.size() >= 2);
 
     // Now we can update it's child arrays
     m_tableNames.UpdateFromParent();
 
     // No free-info in serialized databases
     // and version info is only in shared,
-    if (m_top.Size() >= 4) {
+    if (m_top.size() >= 4) {
         m_freePositions.UpdateFromParent();
         m_freeLengths.UpdateFromParent();
     }
@@ -439,7 +427,7 @@ void Group::update_refs(size_t topRef)
         m_freePositions.Invalidate();
         m_freeLengths.Invalidate();
     }
-    if (m_top.Size() == 5) {
+    if (m_top.size() == 5) {
         m_freeVersions.UpdateFromParent();
     }
     else {
@@ -451,7 +439,7 @@ void Group::update_refs(size_t topRef)
     if (!m_tables.UpdateFromParent()) return;
 
     // Also update cached tables
-    const size_t count = m_cachedtables.Size();
+    const size_t count = m_cachedtables.size();
     for (size_t i = 0; i < count; ++i) {
         Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
         if (t) {
@@ -481,13 +469,13 @@ void Group::update_from_shared(size_t top_ref, size_t len)
 
     // Update group arrays
     m_top.UpdateRef(top_ref);
-    TIGHTDB_ASSERT(m_top.Size() >= 2);
+    TIGHTDB_ASSERT(m_top.size() >= 2);
     const bool nameschanged = !m_tableNames.UpdateFromParent();
     m_tables.UpdateFromParent();
-    if (m_top.Size() > 2) {
+    if (m_top.size() > 2) {
         m_freePositions.UpdateFromParent();
         m_freeLengths.UpdateFromParent();
-        if (m_top.Size() > 4) {
+        if (m_top.size() > 4) {
             m_freeVersions.UpdateFromParent();
         }
     }
@@ -499,7 +487,7 @@ void Group::update_from_shared(size_t top_ref, size_t len)
         clear_cache();
 
         // Make room for new pointers to cached tables
-        const size_t table_count = m_tables.Size();
+        const size_t table_count = m_tables.size();
         for (size_t i = 0; i < table_count; ++i) {
             m_cachedtables.add(0);
         }
@@ -507,7 +495,7 @@ void Group::update_from_shared(size_t top_ref, size_t len)
     else {
         // Update cached tables
         //TODO: account for changed spec
-        const size_t count = m_cachedtables.Size();
+        const size_t count = m_cachedtables.size();
         for (size_t i = 0; i < count; ++i) {
             Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
             if (t) {
@@ -585,13 +573,13 @@ void Group::Verify() const
     if (m_freePositions.IsValid()) {
         TIGHTDB_ASSERT(m_freeLengths.IsValid());
 
-        const size_t count_p = m_freePositions.Size();
-        const size_t count_l = m_freeLengths.Size();
+        const size_t count_p = m_freePositions.size();
+        const size_t count_l = m_freeLengths.size();
         TIGHTDB_ASSERT(count_p == count_l);
 
         if (m_is_shared) {
             TIGHTDB_ASSERT(m_freeVersions.IsValid());
-            TIGHTDB_ASSERT(count_p == m_freeVersions.Size());
+            TIGHTDB_ASSERT(count_p == m_freeVersions.size());
         }
 
         if (count_p) {
@@ -628,7 +616,7 @@ void Group::Verify() const
     }
 
     // Verify tables
-    for (size_t i = 0; i < m_tables.Size(); ++i) {
+    for (size_t i = 0; i < m_tables.size(); ++i) {
         get_table_ptr(i)->Verify();
     }
 }
@@ -655,7 +643,7 @@ void Group::print_free() const
     }
     const bool hasVersions = m_freeVersions.IsValid();
 
-    const size_t count = m_freePositions.Size();
+    const size_t count = m_freePositions.size();
     for (size_t i = 0; i < count; ++i) {
         const size_t pos  = m_freePositions[i];
         const size_t size = m_freeLengths[i];
@@ -682,7 +670,7 @@ void Group::to_dot(std::ostream& out) const
     m_tables.ToDot(out, "tables");
 
     // Tables
-    for (size_t i = 0; i < m_tables.Size(); ++i) {
+    for (size_t i = 0; i < m_tables.size(); ++i) {
         const Table* table = get_table_ptr(i);
         const char* const name = get_table_name(i);
         table->to_dot(out, name);
@@ -705,7 +693,7 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
 
     File::Map<char> map(m_alloc.m_file, File::access_ReadWrite, file_size);
 
-    const size_t count = m_freePositions.Size();
+    const size_t count = m_freePositions.size();
     for (size_t i = 0; i < count; ++i) {
         const size_t v = m_freeVersions.Get(i);
         if (v >= m_readlock_version) continue;

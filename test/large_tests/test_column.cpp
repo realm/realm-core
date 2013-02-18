@@ -36,25 +36,25 @@ TEST(LESS)
     // Interesting boundary values to test
     int64_t v[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
                      30, 31, 32, 33, 62, 63, 64, 65, 126, 127, 128, 129, 254, 255,
-                     256, 257, 32765, 32766, 32767, 32768, 32769, 65533, 65534, 65535, 65536, 65537, 2147483648LL, 
+                     256, 257, 32765, 32766, 32767, 32768, 32769, 65533, 65534, 65535, 65536, 65537, 2147483648LL,
                      2147483647LL, 2147483646LL, 2147483649LL, 4294967296LL, 4294967295LL,
-                     4294967297LL, 4294967294LL, 9223372036854775807LL, 9223372036854775806LL, 
+                     4294967297LL, 4294967294LL, 9223372036854775807LL, 9223372036854775806LL,
                      -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15, -16, -17,
                      -30, -31, -32, -33, -62, -63, -64, -65, -126, -127, -128, -129, -254, -255,
-                     -256, -257, -32766, -32767, -32768, -32769, -65535, -65536, -65537, -2147483648LL, 
+                     -256, -257, -32766, -32767, -32768, -32769, -65535, -65536, -65537, -2147483648LL,
                      -2147483647LL, -2147483646LL, -2147483649LL, -4294967296LL, -4294967295LL,
-                     4294967297LL, -4294967294LL, -9223372036854775807LL, -9223372036854775808LL, -9223372036854775806LL, 
-    
+                     4294967297LL, -4294967294LL, -9223372036854775807LL, -9223372036854775808LL, -9223372036854775806LL,
+
     };
 
     for (size_t w = 5; w < sizeof(v) / sizeof(*v); w++) {
        printf("%d ", w);
-        
-        const size_t LEN = 64 * 20 + 1000; 
+
+        const size_t LEN = 64 * 20 + 1000;
         Array a;
         for (size_t t = 0; t < LEN; t++)
             a.add(v[w]);
-        
+
         // to create at least 64 bytes of data (2 * 128-bit SSE chunks + 64 bit chunk before and after + some unaligned data before and after)
         size_t LEN2 = 64 * 8 / (a.GetBitWidth() == 0 ? 1 : a.GetBitWidth());
 
@@ -64,7 +64,7 @@ TEST(LESS)
 
         for (size_t from = 0; from < LEN2; from++) {
             for (size_t to = from + 1; to <= LEN2; to++) {
-                for (size_t match = (from > 8 ? from - 8 : 0); match < (to > 8 ? to - 8 : 8); match++) { 
+                for (size_t match = (from > 8 ? from - 8 : 0); match < (to > 8 ? to - 8 : 8); match++) {
 
                     if (v[w] != LL_MIN) {
                         // LESS
@@ -115,7 +115,7 @@ TEST(LESS)
                         else
                             TIGHTDB_ASSERT(val == v[w]);
                     }
-    
+
                     // MAX
                     if (v[w] != LL_MAX) {
                         int64_t val = 0;
@@ -138,7 +138,7 @@ TEST(LESS)
                     if (match >= from && match < to)
                         intended = (to - from - 1) * v[w] + v[w] + 1;
                     else
-                        intended = (to - from) * v[w];      
+                        intended = (to - from) * v[w];
 
                     TIGHTDB_ASSERT(intended == val);
 
@@ -151,7 +151,7 @@ TEST(LESS)
                             a.Set(match + off, v[w] - 1);
 
                             akku.Clear();
-                            a.find(COND_LESS, TDB_FINDALL, v[w], from, to, 0, &state);
+                            a.find(cond_Less, act_FindAll, v[w], from, to, 0, &state);
 
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
@@ -178,7 +178,7 @@ TEST(LESS)
                             a.Set(match + off, v[w] + 1);
 
                             akku.Clear();
-                            a.find(COND_GREATER, TDB_FINDALL, v[w], from, to, 0, &state);
+                            a.find(cond_Greater, act_FindAll, v[w], from, to, 0, &state);
 
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
@@ -203,7 +203,7 @@ TEST(LESS)
                             a.Set(match + off, v[w] + 1);
 
                             akku.Clear();
-                            a.find(COND_EQUAL, TDB_FINDALL, v[w] + 1, from, to, 0, &state);
+                            a.find(cond_Equal, act_FindAll, v[w] + 1, from, to, 0, &state);
 
                             a.Set(match, v[w]);
                             a.Set(match + off, v[w]);
@@ -220,7 +220,7 @@ TEST(LESS)
                         }
                     }
                 }
-            }    
+            }
 
         }
         a.Destroy();

@@ -13,8 +13,8 @@ void main()
 // @@EndFold@@
     table.add("Mary",  14);  // Match
     table.add("Joe",   17);  // Match
-    table.add("Jack",  22);      
-    table.add("Bob",   80);       
+    table.add("Jack",  22);
+    table.add("Bob",   80);
     table.add("Alice", 71);  // Match
 
     // Find rows where (age > 12 && age < 20) || name == "Alice"

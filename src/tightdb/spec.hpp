@@ -22,6 +22,7 @@
 
 #include <tightdb/array.hpp>
 #include <tightdb/array_string.hpp>
+#include <tightdb/data_type.hpp>
 #include <tightdb/column_type.hpp>
 
 namespace tightdb {
@@ -36,8 +37,8 @@ public:
     Spec(const Spec& s);
     ~Spec();
 
-    size_t add_column(ColumnType type, const char* name, ColumnType attr=COLUMN_ATTR_NONE);
-    size_t add_subcolumn(const vector<size_t>& column_path, ColumnType type, const char* name);
+    size_t add_column(DataType type, const char* name, ColumnType attr=col_attr_None);
+    size_t add_subcolumn(const vector<size_t>& column_path, DataType type, const char* name);
     Spec add_subtable_column(const char* name);
 
     void rename_column(size_t column_ndx, const char* newname);
@@ -60,7 +61,7 @@ public:
 
     // Column info
     size_t get_column_count() const TIGHTDB_NOEXCEPT;
-    ColumnType get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    DataType get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnType get_real_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     const char* get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
@@ -97,12 +98,6 @@ private:
     bool update_from_parent();
     void set_parent(ArrayParent* parent, size_t pndx);
 
-    // FIXME: This one was made private because it is called
-    // internally from Table::optimize(), and it is not called from
-    // any test case. If it must be public, it must also be made to
-    // emit a transaction log instruction, but the internal call must
-    // then call a different version that does not emit such an
-    // instruction.
     void set_column_type(size_t column_ndx, ColumnType type);
     void set_column_attr(size_t column_ndx, ColumnType attr);
 
@@ -112,23 +107,21 @@ private:
     size_t get_column_type_pos(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     size_t get_subspec_ndx(size_t column_ndx) const;
     size_t get_subspec_ref(size_t subspec_ndx) const;
-    size_t get_num_subspecs() const { return m_subSpecs.IsValid() ? m_subSpecs.Size() : 0; }
+    size_t get_num_subspecs() const { return m_subSpecs.IsValid() ? m_subSpecs.size() : 0; }
     Spec get_subspec_by_ndx(size_t subspec_ndx);
 
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
-    ///
-    /// \return Zero if allocation fails.
-    ///
     static size_t create_empty_spec(Allocator&);
 
-    size_t do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, ColumnType type, const char* name);
+    size_t do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, const char* name);
     void do_remove_column(const vector<size_t>& column_ids, size_t pos);
     void do_rename_column(const vector<size_t>& column_ids, size_t pos, const char* name);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Precondition: 1 <= end - begin
-    size_t* record_subspec_path(const Array* root_subspecs, size_t* begin, size_t* end) const;
+    size_t* record_subspec_path(const Array* root_subspecs, size_t* begin,
+                                size_t* end) const TIGHTDB_NOEXCEPT;
     friend class Replication;
 #endif
 
@@ -149,8 +142,8 @@ inline size_t Spec::create_empty_spec(Allocator& alloc)
 {
     // The 'spec_set' contains the specification (types and names) of
     // all columns and sub-tables
-    Array spec_set(COLUMN_HASREFS, 0, 0, alloc);
-    spec_set.add(Array::create_empty_array(COLUMN_NORMAL, alloc)); // One type for each column
+    Array spec_set(coldef_HasRefs, 0, 0, alloc);
+    spec_set.add(Array::create_empty_array(coldef_Normal, alloc)); // One type for each column
     spec_set.add(ArrayString::create_empty_string_array(alloc)); // One name for each column
     return spec_set.GetRef();
 }
@@ -164,8 +157,7 @@ inline Spec::Spec(const Table* table, Allocator& alloc):
 inline Spec::Spec(const Table* table, Allocator& alloc, ArrayParent* parent, size_t ndx_in_parent):
     m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
 {
-    const size_t ref = create_empty_spec(alloc);
-    if (!ref) throw_error(ERROR_OUT_OF_MEMORY); // FIXME: Check that this exception is handled properly in callers
+    const size_t ref = create_empty_spec(alloc); // Throws
     init_from_ref(ref, parent, ndx_in_parent);
 }
 

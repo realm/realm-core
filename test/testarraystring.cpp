@@ -18,7 +18,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringMultiEmpty)
     c.add("");
     c.add("");
     c.add("");
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 
     CHECK_EQUAL("", c.Get(0));
     CHECK_EQUAL("", c.Get(1));
@@ -32,7 +32,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetExpand4)
 {
     c.Set(0, "hey");
 
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
     CHECK_EQUAL("hey", c.Get(0));
     CHECK_EQUAL("", c.Get(1));
     CHECK_EQUAL("", c.Get(2));
@@ -45,7 +45,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetExpand8)
 {
     c.Set(1, "test");
 
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
     CHECK_EQUAL("hey", c.Get(0));
     CHECK_EQUAL("test", c.Get(1));
     CHECK_EQUAL("", c.Get(2));
@@ -59,7 +59,7 @@ TEST_FIXTURE(db_setup_string, ArrayArrayStringAdd0)
     c.Clear();
     c.add();
     CHECK_EQUAL("", c.Get(0));
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd1)
@@ -67,7 +67,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd1)
     c.add("a");
     CHECK_EQUAL("",  c.Get(0));
     CHECK_EQUAL("a", c.Get(1));
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd2)
@@ -76,7 +76,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd2)
     CHECK_EQUAL("",   c.Get(0));
     CHECK_EQUAL("a",  c.Get(1));
     CHECK_EQUAL("bb", c.Get(2));
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd3)
@@ -86,7 +86,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd3)
     CHECK_EQUAL("a",   c.Get(1));
     CHECK_EQUAL("bb",  c.Get(2));
     CHECK_EQUAL("ccc", c.Get(3));
-    CHECK_EQUAL(4, c.Size());
+    CHECK_EQUAL(4, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd4)
@@ -97,7 +97,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd4)
     CHECK_EQUAL("bb",   c.Get(2));
     CHECK_EQUAL("ccc",  c.Get(3));
     CHECK_EQUAL("dddd", c.Get(4));
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd8)
@@ -109,7 +109,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd8)
     CHECK_EQUAL("ccc",  c.Get(3));
     CHECK_EQUAL("dddd", c.Get(4));
     CHECK_EQUAL("eeeeeeee", c.Get(5));
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd16)
@@ -122,7 +122,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd16)
     CHECK_EQUAL("dddd", c.Get(4));
     CHECK_EQUAL("eeeeeeee", c.Get(5));
     CHECK_EQUAL("ffffffffffffffff", c.Get(6));
-    CHECK_EQUAL(7, c.Size());
+    CHECK_EQUAL(7, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd32)
@@ -137,7 +137,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd32)
     CHECK_EQUAL("eeeeeeee", c.Get(5));
     CHECK_EQUAL("ffffffffffffffff", c.Get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(7));
-    CHECK_EQUAL(8, c.Size());
+    CHECK_EQUAL(8, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringSet1)
@@ -155,7 +155,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringSet1)
     CHECK_EQUAL("eeeeeeee", c.Get(5));
     CHECK_EQUAL("ffffffffffffffff", c.Get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(7));
-    CHECK_EQUAL(8, c.Size());
+    CHECK_EQUAL(8, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringInsert1)
@@ -172,7 +172,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert1)
     CHECK_EQUAL("eeeeeeee", c.Get(6));
     CHECK_EQUAL("ffffffffffffffff", c.Get(7));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(8));
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDelete1)
@@ -188,7 +188,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringDelete1)
     CHECK_EQUAL("dddd", c.Get(5));
     CHECK_EQUAL("eeeeeeee", c.Get(6));
     CHECK_EQUAL("ffffffffffffffff", c.Get(7));
-    CHECK_EQUAL(8, c.Size());
+    CHECK_EQUAL(8, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDelete2)
@@ -203,7 +203,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringDelete2)
     CHECK_EQUAL("dddd", c.Get(4));
     CHECK_EQUAL("eeeeeeee", c.Get(5));
     CHECK_EQUAL("ffffffffffffffff", c.Get(6));
-    CHECK_EQUAL(7, c.Size());
+    CHECK_EQUAL(7, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDelete3)
@@ -217,7 +217,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringDelete3)
     CHECK_EQUAL("dddd", c.Get(3));
     CHECK_EQUAL("eeeeeeee", c.Get(4));
     CHECK_EQUAL("ffffffffffffffff", c.Get(5));
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDeleteAll)
@@ -231,7 +231,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringDeleteAll)
     c.Delete(0);
 
     CHECK(c.is_empty());
-    CHECK_EQUAL(0, c.Size());
+    CHECK_EQUAL(0, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringInsert2)
@@ -251,7 +251,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert2)
     CHECK_EQUAL("b",     c.Get(2));
     CHECK_EQUAL("c",     c.Get(3));
     CHECK_EQUAL("d",     c.Get(4));
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringInsert3)
@@ -265,7 +265,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert3)
     CHECK_EQUAL("xxxxxxxxxx", c.Get(3));
     CHECK_EQUAL("c",     c.Get(4));
     CHECK_EQUAL("d",     c.Get(5));
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringFind1)
@@ -340,7 +340,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFindAll)
     c.add("foobar");
 
     c.find_all(col, "foobar");
-    CHECK_EQUAL(3, col.Size());
+    CHECK_EQUAL(3, col.size());
     CHECK_EQUAL(0, col.Get(0));
     CHECK_EQUAL(2, col.Get(1));
     CHECK_EQUAL(4, col.Get(2));
@@ -352,14 +352,14 @@ TEST_FIXTURE(db_setup_string, ArrayStringFindAll)
 TEST_FIXTURE(db_setup_string, ArrayStringCount)
 {
     c.Clear();
-    
+
     // first, middle and end
     c.add("foobar");
     c.add("bar abc");
     c.add("foobar");
     c.add("baz");
     c.add("foobar");
-    
+
     const size_t count = c.count("foobar");
     CHECK_EQUAL(3, count);
 }

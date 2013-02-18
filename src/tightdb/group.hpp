@@ -222,17 +222,14 @@ protected:
     void update_from_shared(size_t top_ref, size_t len);
     void reset_to_new();
 
-    // Overriding virtual method in ArrayParent
-    void update_child_ref(size_t subtable_ndx, size_t new_ref)
+    void update_child_ref(size_t subtable_ndx, size_t new_ref) TIGHTDB_OVERRIDE
     {
         m_tables.Set(subtable_ndx, new_ref);
     }
 
-    // Overriding virtual method in Table::Parent
-    void child_destroyed(std::size_t) {} // Ignore
+    void child_destroyed(std::size_t) TIGHTDB_OVERRIDE {} // Ignore
 
-    // Overriding virtual method in ArrayParent
-    size_t get_child_ref(size_t subtable_ndx) const
+    size_t get_child_ref(size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         return m_tables.GetAsRef(subtable_ndx);
     }
@@ -265,9 +262,9 @@ private:
     template<class T> T* get_table_ptr(const char* name);
     template<class T> const T* get_table_ptr(const char* name) const;
 
-    Table* get_table_ptr(size_t ndx); // Throws
-    const Table* get_table_ptr(size_t ndx) const; // Throws
-    Table* create_new_table(const char* name); // Throws
+    Table* get_table_ptr(size_t ndx);
+    const Table* get_table_ptr(size_t ndx) const;
+    Table* create_new_table(const char* name);
 
     void clear_cache();
 
@@ -284,12 +281,20 @@ private:
 
 // Implementation
 
+// FIXME: Successfully constructed arrays are leaked if one array
+// constructor fails. The core problem here and in many other places
+// is that ~Array() does not deallocate memory. More generally, the
+// fact that the Array class violates the RAII idiom in multiple ways,
+// coupled with the fact that we still use it in ways that involves
+// ownership of the underlying memory, causes lots of problems with
+// robustness both here and in other places.
 inline Group::Group():
-    m_top(COLUMN_HASREFS, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
-    m_freePositions(COLUMN_NORMAL, NULL, 0, m_alloc),
-    m_freeLengths(COLUMN_NORMAL, NULL, 0, m_alloc),
-    m_freeVersions(COLUMN_NORMAL, NULL, 0, m_alloc), m_is_shared(false)
+    m_top(coldef_HasRefs, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
+    m_freePositions(coldef_Normal, NULL, 0, m_alloc),
+    m_freeLengths(coldef_Normal, NULL, 0, m_alloc),
+    m_freeVersions(coldef_Normal, NULL, 0, m_alloc), m_is_shared(false)
 {
+    // FIXME: Arrays are leaked when create() throws
     create();
 }
 
@@ -297,14 +302,32 @@ inline Group::Group(const std::string& file, OpenMode mode):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
 {
-    open(file, mode);
+    // FIXME: The try-cache is required because of the unfortunate
+    // fact that Array violates the RAII idiom while still being used
+    // to own memory. We must find a way to improve Array.
+    try {
+        open(file, mode); // Throws
+    }
+    catch (...) {
+        m_cachedtables.Destroy();
+        throw;
+    }
 }
 
 inline Group::Group(BufferSpec buffer, bool take_ownership):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
 {
-    open(buffer, take_ownership);
+    // FIXME: The try-cache is required because of the unfortunate
+    // fact that Array violates the RAII idiom while still being used
+    // to own memory. We must find a way to improve Array.
+    try {
+        open(buffer, take_ownership); // Throws
+    }
+    catch (...) {
+        m_cachedtables.Destroy();
+        throw;
+    }
 }
 
 inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
@@ -348,13 +371,13 @@ inline bool Group::in_initial_state() const
 inline std::size_t Group::get_table_count() const
 {
     if (!m_top.IsValid()) return 0;
-    return m_tableNames.Size();
+    return m_tableNames.size();
 }
 
 inline const char* Group::get_table_name(std::size_t table_ndx) const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
-    TIGHTDB_ASSERT(table_ndx < m_tableNames.Size());
+    TIGHTDB_ASSERT(table_ndx < m_tableNames.size());
     return m_tableNames.Get(table_ndx);
 }
 
@@ -467,7 +490,7 @@ template<class S> size_t Group::write_to_stream(S& out)
     // When serializing to disk we dont want
     // to include free space tracking as serialized
     // files are written without any free space.
-    Array top(COLUMN_HASREFS, NULL, 0, m_alloc);
+    Array top(coldef_HasRefs, NULL, 0, m_alloc);
     top.add(m_top.Get(0));
     top.add(m_top.Get(1));
 
@@ -510,7 +533,7 @@ void Group::to_json(S& out) const
 
     out << "{";
 
-    for (size_t i = 0; i < m_tables.Size(); ++i) {
+    for (size_t i = 0; i < m_tables.size(); ++i) {
         const char* const name = m_tableNames.Get(i);
         const Table* const table = get_table_ptr(i);
 
@@ -526,7 +549,7 @@ void Group::to_json(S& out) const
 
 inline void Group::clear_cache()
 {
-    const size_t count = m_cachedtables.Size();
+    const size_t count = m_cachedtables.size();
     for (size_t i = 0; i < count; ++i) {
         if (Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i))) {
             t->invalidate();

@@ -34,7 +34,7 @@ void* Allocator::Translate(size_t ref) const TIGHTDB_NOEXCEPT
     return reinterpret_cast<void*>(ref);
 }
 
-bool Allocator::IsReadOnly(size_t) const
+bool Allocator::IsReadOnly(size_t) const TIGHTDB_NOEXCEPT
 {
     return false;
 }

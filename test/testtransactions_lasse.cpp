@@ -154,7 +154,7 @@ TEST(Transactions_Stress1)
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
         Spec& spec = table->get_spec();
-        spec.add_column(COLUMN_TYPE_INT, "row");
+        spec.add_column(type_Int, "row");
         table->update_from_spec();
         table->insert_empty_row(0, 1);
         table->set_int(0, 0, 0);
@@ -245,7 +245,7 @@ TEST(Transactions_Stress2)
 const size_t ITER3 =     20;
 const size_t WRITERS3 =   4;
 const size_t READERS3 =   4;
-const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if MAX_LIST_SIZE = 1000
+const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if TIGHTDB_MAX_LIST_SIZE = 1000
 bool terminate3 = false;
 
 void* write_thread3(void* arg)
@@ -315,7 +315,7 @@ TEST(Transactions_Stress3)
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
         Spec& spec = table->get_spec();
-        spec.add_column(COLUMN_TYPE_INT, "row");
+        spec.add_column(type_Int, "row");
         table->update_from_spec();
         wt.commit();
     }
@@ -412,7 +412,7 @@ TEST(Transactions_Stress4)
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
         Spec& spec = table->get_spec();
-        spec.add_column(COLUMN_TYPE_INT, "row");
+        spec.add_column(type_Int, "row");
         table->update_from_spec();
         table->insert_empty_row(0, 1);
         table->set_int(0, 0, 0);

@@ -11,16 +11,16 @@ int main()
     TableRef table = group.get_table("test");
 
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_STRING, "name");
-    s.add_column(COLUMN_TYPE_INT,    "age");
-    s.add_column(COLUMN_TYPE_BOOL,   "male");
-    s.add_column(COLUMN_TYPE_DATE,   "hired");
-    s.add_column(COLUMN_TYPE_BINARY, "photo");
+    s.add_column(type_String, "name");
+    s.add_column(type_Int,    "age");
+    s.add_column(type_Bool,   "male");
+    s.add_column(type_Date,   "hired");
+    s.add_column(type_Binary, "photo");
     table->update_from_spec();
 
 // @@EndFold@@
     table->add_empty_row(2);
-    
+
     table->set_string(0, 0, "Mary");
     table->set_int(1, 0, 28);
     table->set_bool(2, 0, false);
@@ -33,7 +33,7 @@ int main()
     table->set_date(3, 1, 60000);
     table->set_binary(4, 1, "bin \0 data 2", 12);
 
-    // Find rows where name (column 0) == "Frank" 
+    // Find rows where name (column 0) == "Frank"
     TableView view1 = table->where().equal(0, "Frank").find_all();
     assert(view1.size() == 1 && !strcmp(view1.get_string(0, 0), "Frank"));
 
@@ -46,7 +46,7 @@ int main()
     assert(view3.size() == 1 && !strcmp(view3.get_string(0, 0) == "Frank"));
 
     // Find people where hired (column 3) == 50000
-    TableView view4 = table->where().equal(3, tightdb::Date(50000).get_date()).find_all(); 
+    TableView view4 = table->where().equal(3, tightdb::Date(50000).get_date()).find_all();
     assert(view4.size() == 1 && !strcmp(view4.get_string(0, 0), "Mary"));
 
     // Find people where photo (column 4) equals the binary data "bin \0\n data 1"

@@ -22,8 +22,8 @@ int main()
     TableRef table = group.get_table("test");
 
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_STRING, "name");
-    s.add_column(COLUMN_TYPE_INT,    "age");
+    s.add_column(type_String, "name");
+    s.add_column(type_Int,    "age");
     table->update_from_spec();
 
     table->add_empty_row();
@@ -49,7 +49,7 @@ int main()
 // @@Show@@
     // Find rows where (age > 12 && age < 20) || name == "Alice"
     Query query = table->where().group().greater(1, 12).less(1, 20).end_group().Or().equal(0, "Alice");
- 
+
     TableView view = query.find_all();
     assert(view.size() == 3);
     assert(!strcmp(view.get_string(0, 0), "Mary"));

@@ -10,15 +10,7 @@ using namespace tightdb;
 
 namespace {
 
-enum Days {
-    Mon,
-    Tue,
-    Wed,
-    Thu,
-    Fri,
-    Sat,
-    Sun
-};
+enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 TIGHTDB_TABLE_4(TestTableGroup,
                 first,  String,
@@ -329,12 +321,12 @@ TEST(Group_Serialize_All)
     Group toMem;
     TableRef table = toMem.get_table("test");
 
-    table->add_column(COLUMN_TYPE_INT,    "int");
-    table->add_column(COLUMN_TYPE_BOOL,   "bool");
-    table->add_column(COLUMN_TYPE_DATE,   "date");
-    table->add_column(COLUMN_TYPE_STRING, "string");
-    table->add_column(COLUMN_TYPE_BINARY, "binary");
-    table->add_column(COLUMN_TYPE_MIXED,  "mixed");
+    table->add_column(type_Int,    "int");
+    table->add_column(type_Bool,   "bool");
+    table->add_column(type_Date,   "date");
+    table->add_column(type_String, "string");
+    table->add_column(type_Binary, "binary");
+    table->add_column(type_Mixed,  "mixed");
 
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
@@ -359,7 +351,7 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL("test", t->get_string(3, 0));
     CHECK_EQUAL(7, t->get_binary(4, 0).len);
     CHECK_EQUAL("binary", (const char*)t->get_binary(4, 0).pointer);
-    CHECK_EQUAL(COLUMN_TYPE_BOOL, t->get_mixed(5, 0).get_type());
+    CHECK_EQUAL(type_Bool, t->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, t->get_mixed(5, 0).get_bool());
 }
 
@@ -373,12 +365,12 @@ TEST(Group_Persist)
 
     // Insert some data
     TableRef table = db.get_table("test");
-    table->add_column(COLUMN_TYPE_INT,    "int");
-    table->add_column(COLUMN_TYPE_BOOL,   "bool");
-    table->add_column(COLUMN_TYPE_DATE,   "date");
-    table->add_column(COLUMN_TYPE_STRING, "string");
-    table->add_column(COLUMN_TYPE_BINARY, "binary");
-    table->add_column(COLUMN_TYPE_MIXED,  "mixed");
+    table->add_column(type_Int,    "int");
+    table->add_column(type_Bool,   "bool");
+    table->add_column(type_Date,   "date");
+    table->add_column(type_String, "string");
+    table->add_column(type_Binary, "binary");
+    table->add_column(type_Mixed,  "mixed");
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
     table->insert_date(2, 0, 12345);
@@ -402,7 +394,7 @@ TEST(Group_Persist)
     CHECK_EQUAL("test", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).len);
     CHECK_EQUAL("binary", (const char*)table->get_binary(4, 0).pointer);
-    CHECK_EQUAL(COLUMN_TYPE_BOOL, table->get_mixed(5, 0).get_type());
+    CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
 
     // Change a bit
@@ -423,7 +415,7 @@ TEST(Group_Persist)
     CHECK_EQUAL("Changed!", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).len);
     CHECK_EQUAL("binary", (const char*)table->get_binary(4, 0).pointer);
-    CHECK_EQUAL(COLUMN_TYPE_BOOL, table->get_mixed(5, 0).get_type());
+    CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
 }
 
@@ -434,10 +426,10 @@ TEST(Group_Subtable)
     Group g;
     TableRef table = g.get_table("test");
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_INT, "foo");
+    s.add_column(type_Int, "foo");
     Spec sub = s.add_subtable_column("sub");
-    sub.add_column(COLUMN_TYPE_INT, "bar");
-    s.add_column(COLUMN_TYPE_MIXED, "baz");
+    sub.add_column(type_Int, "bar");
+    s.add_column(type_Mixed, "baz");
     table->update_from_spec();
 
     for (int i=0; i<n; ++i) {
@@ -451,7 +443,7 @@ TEST(Group_Subtable)
         if (i%3 == 1) {
             table->set_mixed(2, i, Mixed::subtable_tag());
             TableRef st = table->get_subtable(2, i);
-            st->add_column(COLUMN_TYPE_INT, "banach");
+            st->add_column(type_Int, "banach");
             st->add_empty_row();
             st->set_int(0, 0, 700+i);
         }
@@ -470,7 +462,7 @@ TEST(Group_Subtable)
                 st->set_int(0, st->size()-1, 300+i);
             }
         }
-        CHECK_EQUAL(table->get_mixed_type(2,i), i%3 == 1 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
+        CHECK_EQUAL(table->get_mixed_type(2,i), i%3 == 1 ? type_Table : type_Int);
         if (i%3 == 1) {
             TableRef st = table->get_subtable(2, i);
             CHECK_EQUAL(st->size(), 1);
@@ -479,7 +471,7 @@ TEST(Group_Subtable)
         if (i%8 == 3) {
             if (i%3 != 1) table->set_mixed(2, i, Mixed::subtable_tag());
             TableRef st = table->get_subtable(2, i);
-            if (i%3 != 1) st->add_column(COLUMN_TYPE_INT, "banach");
+            if (i%3 != 1) st->add_column(type_Int, "banach");
             st->add_empty_row();
             st->set_int(0, st->size()-1, 800+i);
         }
@@ -501,7 +493,7 @@ TEST(Group_Subtable)
                 ++idx;
             }
         }
-        CHECK_EQUAL(table->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
+        CHECK_EQUAL(table->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 ? type_Table : type_Int);
         if (i%3 == 1 || i%8 == 3) {
             TableRef st = table->get_subtable(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
@@ -544,7 +536,7 @@ TEST(Group_Subtable)
                 st->set_int(0, st->size()-1, 400+i);
             }
         }
-        CHECK_EQUAL(table2->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
+        CHECK_EQUAL(table2->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 ? type_Table : type_Int);
         if (i%3 == 1 || i%8 == 3) {
             TableRef st = table2->get_subtable(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
@@ -562,7 +554,7 @@ TEST(Group_Subtable)
         if (i%7 == 4) {
             if (i%3 != 1 && i%8 != 3) table2->set_mixed(2, i, Mixed::subtable_tag());
             TableRef st = table2->get_subtable(2, i);
-            if (i%3 != 1 && i%8 != 3) st->add_column(COLUMN_TYPE_INT, "banach");
+            if (i%3 != 1 && i%8 != 3) st->add_column(type_Int, "banach");
             st->add_empty_row();
             st->set_int(0, st->size()-1, 900+i);
         }
@@ -588,7 +580,7 @@ TEST(Group_Subtable)
                 ++idx;
             }
         }
-        CHECK_EQUAL(table2->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
+        CHECK_EQUAL(table2->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? type_Table : type_Int);
         if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
             TableRef st = table2->get_subtable(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
@@ -635,7 +627,7 @@ TEST(Group_Subtable)
                 ++idx;
             }
         }
-        CHECK_EQUAL(table3->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? COLUMN_TYPE_TABLE : COLUMN_TYPE_INT);
+        CHECK_EQUAL(table3->get_mixed_type(2,i), i%3 == 1 || i%8 == 3 || i%7 == 4 ? type_Table : type_Int);
         if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
             TableRef st = table3->get_subtable(2, i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
@@ -664,16 +656,16 @@ TEST(Group_MultiLevelSubtables)
         TableRef table = g.get_table("test");
         {
             Spec& s = table->get_spec();
-            s.add_column(COLUMN_TYPE_INT, "int");
+            s.add_column(type_Int, "int");
             {
                 Spec sub = s.add_subtable_column("tab");
-                sub.add_column(COLUMN_TYPE_INT, "int");
+                sub.add_column(type_Int, "int");
                 {
                     Spec subsub = sub.add_subtable_column("tab");
-                    subsub.add_column(COLUMN_TYPE_INT, "int");
+                    subsub.add_column(type_Int, "int");
                 }
             }
-            s.add_column(COLUMN_TYPE_MIXED, "mix");
+            s.add_column(type_Mixed, "mix");
             table->update_from_spec();
         }
         table->add_empty_row();
@@ -688,8 +680,8 @@ TEST(Group_MultiLevelSubtables)
             TableRef a = table->get_subtable(2, 0);
             {
                 Spec& s = a->get_spec();
-                s.add_column(COLUMN_TYPE_INT, "int");
-                s.add_column(COLUMN_TYPE_MIXED, "mix");
+                s.add_column(type_Int, "int");
+                s.add_column(type_Mixed, "mix");
                 a->update_from_spec();
             }
             a->add_empty_row();
@@ -697,7 +689,7 @@ TEST(Group_MultiLevelSubtables)
             TableRef b = a->get_subtable(1, 0);
             {
                 Spec& s = b->get_spec();
-                s.add_column(COLUMN_TYPE_INT, "int");
+                s.add_column(type_Int, "int");
                 b->update_from_spec();
             }
             b->add_empty_row();
@@ -909,17 +901,17 @@ TEST(Group_ToDot)
     // Create table with all column types
     TableRef table = mygroup.get_table("test");
     Spec s = table->get_spec();
-    s.add_column(COLUMN_TYPE_INT,    "int");
-    s.add_column(COLUMN_TYPE_BOOL,   "bool");
-    s.add_column(COLUMN_TYPE_DATE,   "date");
-    s.add_column(COLUMN_TYPE_STRING, "string");
-    s.add_column(COLUMN_TYPE_STRING, "string_long");
-    s.add_column(COLUMN_TYPE_STRING, "string_enum"); // becomes ColumnStringEnum
-    s.add_column(COLUMN_TYPE_BINARY, "binary");
-    s.add_column(COLUMN_TYPE_MIXED,  "mixed");
+    s.add_column(type_Int,    "int");
+    s.add_column(type_Bool,   "bool");
+    s.add_column(type_Date,   "date");
+    s.add_column(type_String, "string");
+    s.add_column(type_String, "string_long");
+    s.add_column(type_String, "string_enum"); // becomes ColumnStringEnum
+    s.add_column(type_Binary, "binary");
+    s.add_column(type_Mixed,  "mixed");
     Spec sub = s.add_subtable_column("tables");
-    sub.add_column(COLUMN_TYPE_INT,  "sub_first");
-    sub.add_column(COLUMN_TYPE_STRING, "sub_second");
+    sub.add_column(type_Int,  "sub_first");
+    sub.add_column(type_String, "sub_second");
     table->UpdateFromSpec(s.GetRef());
 
     // Add some rows
@@ -967,12 +959,12 @@ TEST(Group_ToDot)
         // Add sub-tables
         if (i == 2) {
             // To mixed column
-            table->set_mixed(7, i, Mixed(COLUMN_TYPE_TABLE));
+            table->set_mixed(7, i, Mixed(type_Table));
             Table subtable = table->GetMixedTable(7, i);
 
             Spec s = subtable->get_spec();
-            s.add_column(COLUMN_TYPE_INT,    "first");
-            s.add_column(COLUMN_TYPE_STRING, "second");
+            s.add_column(type_Int,    "first");
+            s.add_column(type_String, "second");
             subtable->UpdateFromSpec(s.GetRef());
 
             subtable->insert_int(0, 0, 42);

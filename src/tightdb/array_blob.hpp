@@ -30,16 +30,16 @@ public:
     ArrayBlob(ArrayParent *parent=NULL, size_t pndx=0,
               Allocator& alloc = Allocator::get_default());
     ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx,
-              Allocator& alloc = Allocator::get_default());
-    ArrayBlob(Allocator& alloc);
+              Allocator& alloc = Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT;
 
     const char* Get(size_t pos) const TIGHTDB_NOEXCEPT;
 
-    void add(const char* data, size_t len);
-    void Insert(size_t pos, const char* data, size_t len);
-    void Replace(size_t start, size_t end, const char* data, size_t len);
-    void Delete(size_t start, size_t end);
-    void Resize(size_t len);
+    void add(const char* data, size_t size);
+    void Insert(size_t pos, const char* data, size_t size);
+    void Replace(size_t begin, size_t end, const char* data, size_t size);
+    void Delete(size_t begin, size_t end);
+    void Resize(size_t size);
     void Clear();
 
 #ifdef TIGHTDB_DEBUG
@@ -47,9 +47,9 @@ public:
 #endif // TIGHTDB_DEBUG
 
 private:
-    virtual size_t CalcByteLen(size_t count, size_t width) const;
-    virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
-    virtual WidthType GetWidthType() const {return TDB_IGNORE;}
+    size_t CalcByteLen(size_t count, size_t width) const TIGHTDB_OVERRIDE;
+    size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    WidthType GetWidthType() const TIGHTDB_OVERRIDE {return TDB_IGNORE;}
 };
 
 
@@ -58,7 +58,7 @@ private:
 // Implementation:
 
 inline ArrayBlob::ArrayBlob(ArrayParent *parent, std::size_t pndx, Allocator& alloc):
-    Array(COLUMN_NORMAL, parent, pndx, alloc)
+    Array(coldef_Normal, parent, pndx, alloc)
 {
     // Manually set wtype as array constructor in initiatializer list
     // will not be able to call correct virtual function
@@ -66,7 +66,7 @@ inline ArrayBlob::ArrayBlob(ArrayParent *parent, std::size_t pndx, Allocator& al
 }
 
 inline ArrayBlob::ArrayBlob(std::size_t ref, const ArrayParent *parent, std::size_t pndx,
-                            Allocator& alloc): Array(alloc)
+                            Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
@@ -75,7 +75,7 @@ inline ArrayBlob::ArrayBlob(std::size_t ref, const ArrayParent *parent, std::siz
 }
 
 // Creates new array (but invalid, call UpdateRef to init)
-inline ArrayBlob::ArrayBlob(Allocator& alloc) : Array(alloc) {}
+inline ArrayBlob::ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc) {}
 
 inline const char* ArrayBlob::Get(std::size_t pos) const TIGHTDB_NOEXCEPT
 {

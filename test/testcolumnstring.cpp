@@ -435,7 +435,7 @@ TEST(ColumnStringAutoEnumerateIndex)
     CHECK_EQUAL(4, res2);
 
     e.find_all(results, "klmop");
-    CHECK_EQUAL(5, results.Size());
+    CHECK_EQUAL(5, results.size());
     CHECK_EQUAL(4, results.Get(0));
     CHECK_EQUAL(9, results.Get(1));
     CHECK_EQUAL(14, results.Get(2));
@@ -453,7 +453,7 @@ TEST(ColumnStringAutoEnumerateIndex)
 
     results.Clear();
     e.find_all(results, "newval");
-    CHECK_EQUAL(1, results.Size());
+    CHECK_EQUAL(1, results.size());
     CHECK_EQUAL(1, results.Get(0));
 
     // Insert a value
@@ -556,7 +556,7 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
 
     c.find_all(col, "baz");
 
-    CHECK_EQUAL(2, col.Size());
+    CHECK_EQUAL(2, col.size());
 
     // Cleanup
     col.Destroy();
@@ -576,7 +576,7 @@ TEST(AdaptiveStringColumnFindAllExpand)
     asc.find_all(c, "HEJ");
 
     CHECK_EQUAL(5, asc.Size());
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
     CHECK_EQUAL(0, c.Get(0));
     CHECK_EQUAL(2, c.Get(1));
     CHECK_EQUAL(4, c.Get(2));
@@ -593,7 +593,7 @@ TEST(AdaptiveStringColumnFindAllExpand)
     asc.find_all(c, "HEJ");
 
     CHECK_EQUAL(10, asc.Size());
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
     CHECK_EQUAL(0, c.Get(0));
     CHECK_EQUAL(2, c.Get(1));
     CHECK_EQUAL(4, c.Get(2));
@@ -611,7 +611,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
     AdaptiveStringColumn asc;
     Array c;
 
-    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+    // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
     asc.add("HEJSA");
@@ -632,7 +632,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
 
     c.Clear();
     asc.find_all(c, "HEJSA", 0, 17);
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
     CHECK_EQUAL(0, c.Get(0));
     CHECK_EQUAL(2, c.Get(1));
     CHECK_EQUAL(4, c.Get(2));
@@ -645,7 +645,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
 
     c.Clear();
     asc.find_all(c, "HEJSA", 1, 16);
-    CHECK_EQUAL(7, c.Size());
+    CHECK_EQUAL(7, c.size());
     CHECK_EQUAL(2, c.Get(0));
     CHECK_EQUAL(4, c.Get(1));
     CHECK_EQUAL(6, c.Get(2));
@@ -665,7 +665,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
     AdaptiveStringColumn asc;
     Array c;
 
-    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+    // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -686,7 +686,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
 
     c.Clear();
     asc.find_all(c, "HEJSA", 0, 17);
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
     CHECK_EQUAL(0, c.Get(0));
     CHECK_EQUAL(2, c.Get(1));
     CHECK_EQUAL(4, c.Get(2));
@@ -699,7 +699,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
 
     c.Clear();
     asc.find_all(c, "HEJSA", 1, 16);
-    CHECK_EQUAL(7, c.Size());
+    CHECK_EQUAL(7, c.size());
     CHECK_EQUAL(2, c.Get(0));
     CHECK_EQUAL(4, c.Get(1));
     CHECK_EQUAL(6, c.Get(2));
@@ -716,8 +716,8 @@ TEST(AdaptiveStringColumnFindAllRanges)
 TEST(AdaptiveStringColumnCount)
 {
     AdaptiveStringColumn asc;
-    
-    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+
+    // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -735,21 +735,21 @@ TEST(AdaptiveStringColumnCount)
     asc.add("HEJSA");
     asc.add("15");
     asc.add("HEJSA"); // 16
-    
+
     const size_t count = asc.count("HEJSA");
     CHECK_EQUAL(9, count);
-    
+
     // Create StringEnum
     size_t keys;
     size_t values;
     const bool res = asc.AutoEnumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
-    
+
     // Check that enumerated column return same result
     const size_t ecount = e.count("HEJSA");
     CHECK_EQUAL(9, ecount);
-    
+
     // Clean-up
     asc.Destroy();
     e.Destroy();
@@ -758,8 +758,8 @@ TEST(AdaptiveStringColumnCount)
 TEST(AdaptiveStringColumnIndex)
 {
     AdaptiveStringColumn asc;
-    
-    // 17 elements, to test node splits with MAX_LIST_SIZE = 3 or other small number
+
+    // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -777,10 +777,10 @@ TEST(AdaptiveStringColumnIndex)
     asc.add("HEJSA");
     asc.add("15");
     asc.add("HEJSA"); // 16
-    
+
     asc.CreateIndex();
     CHECK(asc.HasIndex());
-    
+
     const size_t count0 = asc.count("HEJ");
     const size_t count1 = asc.count("HEJSA");
     const size_t count2 = asc.count("1");
@@ -789,7 +789,7 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(9, count1);
     CHECK_EQUAL(1, count2);
     CHECK_EQUAL(1, count3);
-    
+
     const size_t ndx0 = asc.find_first("HEJS");
     const size_t ndx1 = asc.find_first("HEJSA");
     const size_t ndx2 = asc.find_first("1");
@@ -798,7 +798,7 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(0, ndx1);
     CHECK_EQUAL(1, ndx2);
     CHECK_EQUAL(15, ndx3);
-    
+
     // Set some values
     asc.Set(1, "one");
     asc.Set(15, "fifteen");
@@ -810,7 +810,7 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(not_found, set2);
     CHECK_EQUAL(1, set3);
     CHECK_EQUAL(15, set4);
-    
+
     // Insert some values
     asc.Insert(0, "top");
     asc.Insert(8, "middle");
@@ -821,7 +821,7 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(0, ins1);
     CHECK_EQUAL(8, ins2);
     CHECK_EQUAL(19, ins3);
-    
+
     // Delete some values
     asc.Delete(0);  // top
     asc.Delete(7);  // middle
@@ -836,14 +836,14 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(not_found, del3);
     CHECK_EQUAL(0, del4);
     CHECK_EQUAL(15, del5);
-    
+
     // Remove all
     asc.Clear();
     const size_t c1 = asc.find_first("HEJSA");
     const size_t c2 = asc.find_first("fifteen");
     CHECK_EQUAL(not_found, c1);
     CHECK_EQUAL(not_found, c2);
-    
+
     // Clean-up
     asc.Destroy();
 }

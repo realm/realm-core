@@ -143,7 +143,7 @@ TEST(TestQueryFloat4)
     t.add(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
     t.add(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
     t.add(12345.0, 12345.0, 11111);
-    
+
     FloatTable3::Query q1 = t.where();
     float a1 = q1.col_float.maximum();
     double a2 = q1.col_double.maximum();
@@ -200,7 +200,7 @@ TEST(TestQueryFloat)
     double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
     CHECK_EQUAL(sum1_d, t.where().col_double.sum());
 
-    // Note: sum of float is calculated by having a double aggregate to where each float is added 
+    // Note: sum of float is calculated by having a double aggregate to where each float is added
     // (thereby getting casted to double).
     double sum1_f = double(1.10f) + double(1.13f) + double(1.13f) + double(1.10f) + double(1.20f);
     double res = t.where().col_float.sum();
@@ -223,7 +223,7 @@ TEST(TestQueryFloat)
     CHECK_EQUAL(sum2_d/2, q2.col_double.average());
 
     // -------- Test minimum(), maximum()
-    
+
     // ... NO conditions
     CHECK_EQUAL(1.20f, t.where().col_float.maximum());
     CHECK_EQUAL(1.10f, t.where().col_float.minimum());
@@ -248,7 +248,7 @@ TEST(TestDateQuery)
 
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
     PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::Date(2012, 1, 1).get_date())
-                                           .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all(); 
+                                           .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all();
     CHECK_EQUAL(1, view5.size());
     CHECK_EQUAL("Mary", view5[0].name);
 }
@@ -458,11 +458,11 @@ TEST(TestQueryFindAll_range_or_monkey2)
                 a.add(t);
             }
         }
-        size_t s1 = a.Size();
+        size_t s1 = a.size();
         size_t s2 = tv1.size();
 
         CHECK_EQUAL(s1, s2);
-        for (size_t t = 0; t < a.Size(); t++) {
+        for (size_t t = 0; t < a.size(); t++) {
             size_t i1 = a.GetAsSizeT(t);
             size_t i2 = tv1.get_source_ndx(t);
             CHECK_EQUAL(i1, i2);
@@ -518,7 +518,7 @@ TEST(TestQueryDelete)
     CHECK_EQUAL(2, ttt.size());
     CHECK_EQUAL(2, ttt[0].first);
     CHECK_EQUAL(4, ttt[1].first);
-    
+
     // test remove of all
     ttt.clear();
     ttt.add(1, "X");
@@ -592,17 +592,17 @@ TEST(TestQuerySimple)
 
 TEST(TestQuerySimpleBUGdetect)
 {
-	TupleTableType ttt;
-	ttt.add(1, "a");
-	ttt.add(2, "a");
+    TupleTableType ttt;
+    ttt.add(1, "a");
+    ttt.add(2, "a");
 
-	TupleTableType::Query q1 = ttt.where();
+    TupleTableType::Query q1 = ttt.where();
 
-	TupleTableType::View tv1 = q1.find_all();
-	CHECK_EQUAL(2, tv1.size());
-	CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(2, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
 
-	TupleTableType::View resView = tv1.column().second.find_all("Foo");
+    TupleTableType::View resView = tv1.column().second.find_all("Foo");
 
     // This previously crashed:
     // TableView resView = TableView(tv1);
@@ -617,11 +617,11 @@ TEST(TestQuerySubtable)
 
     // Create specification with sub-table
     Spec& s = table->get_spec();
-    s.add_column(COLUMN_TYPE_INT,    "first");
-    s.add_column(COLUMN_TYPE_STRING, "second");
+    s.add_column(type_Int,    "first");
+    s.add_column(type_String, "second");
     Spec sub = s.add_subtable_column("third");
-        sub.add_column(COLUMN_TYPE_INT,    "sub_first");
-        sub.add_column(COLUMN_TYPE_STRING, "sub_second");
+        sub.add_column(type_Int,    "sub_first");
+        sub.add_column(type_String, "sub_second");
     table->update_from_spec();
 
     CHECK_EQUAL(3, table->get_column_count());
@@ -826,7 +826,7 @@ TEST(TestQuerySort_Descending)
 TEST(TestQuerySort_Dates)
 {
     Table table;
-    table.add_column(COLUMN_TYPE_DATE, "first");
+    table.add_column(type_Date, "first");
 
     table.insert_date(0, 0, 1000);
     table.insert_done();
@@ -853,7 +853,7 @@ TEST(TestQuerySort_Dates)
 TEST(TestQuerySort_Bools)
 {
     Table table;
-    table.add_column(COLUMN_TYPE_BOOL, "first");
+    table.add_column(type_Bool, "first");
 
     table.insert_bool(0, 0, true);
     table.insert_done();
@@ -1562,7 +1562,7 @@ TEST(TestTV)
     t.add(1, "a");
     t.add(2, "a");
     t.add(3, "c");
-     
+
     TupleTableType::View v = t.where().first.greater(1).find_all();
 
     TupleTableType::Query q1 = t.where().tableview(v);
@@ -1571,10 +1571,10 @@ TEST(TestTV)
     TupleTableType::Query q3 = t.where().tableview(v).second.equal("a");
     CHECK_EQUAL(1, q3.count());
 }
- 
- #if 0 
+
+ #if 0
  !!!
- 
+
 TEST(TestQuery_sum_min_max_avg)
 {
     TupleTableType t;
@@ -1629,7 +1629,7 @@ TEST(TestQuery_avg)
     CHECK_EQUAL(20,t.where().first.average(NULL, 0, -1));     // both
 
     CHECK_EQUAL(10,t.where().first.average(&cnt, 0, 1));     // first
-    
+
     CHECK_EQUAL(30,t.where().first.sum(NULL, 1, 2));     // second
     CHECK_EQUAL(30,t.where().first.average(NULL, 1, 2));     // second
 }
@@ -1677,7 +1677,7 @@ TEST(TestQuery_avg2)
 TEST(TestQuery_OfByOne)
 {
     TupleTableType t;
-    for (size_t i = 0; i < MAX_LIST_SIZE * 2; ++i) {
+    for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; ++i) {
         t.add(1, "a");
     }
 
@@ -1688,19 +1688,19 @@ TEST(TestQuery_OfByOne)
     t[0].first = 1; // reset
 
     // Before split
-    t[MAX_LIST_SIZE-1].first = 0;
+    t[TIGHTDB_MAX_LIST_SIZE-1].first = 0;
     res = t.where().first.equal(0).find_next();
-    CHECK_EQUAL(MAX_LIST_SIZE-1, res);
-    t[MAX_LIST_SIZE-1].first = 1; // reset
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE-1, res);
+    t[TIGHTDB_MAX_LIST_SIZE-1].first = 1; // reset
 
     // After split
-    t[MAX_LIST_SIZE].first = 0;
+    t[TIGHTDB_MAX_LIST_SIZE].first = 0;
     res = t.where().first.equal(0).find_next();
-    CHECK_EQUAL(MAX_LIST_SIZE, res);
-    t[MAX_LIST_SIZE].first = 1; // reset
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE, res);
+    t[TIGHTDB_MAX_LIST_SIZE].first = 1; // reset
 
     // Before end
-    const size_t last_pos = (MAX_LIST_SIZE*2)-1;
+    const size_t last_pos = (TIGHTDB_MAX_LIST_SIZE*2)-1;
     t[last_pos].first = 0;
     res = t.where().first.equal(0).find_next();
     CHECK_EQUAL(last_pos, res);

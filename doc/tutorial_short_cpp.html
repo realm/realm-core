@@ -98,10 +98,10 @@ color: #0067AB;
 <h1>TightDB C++ Interface</h1>
 
 <p>
-TightDB is a very fast embedded database that integrates transparently 
+TightDB is a very fast embedded database that integrates transparently
 into your
-language and gives you the full benefits of a database, but with a much 
-lower memory footprint and better performance than native data 
+language and gives you the full benefits of a database, but with a much
+lower memory footprint and better performance than native data
 structures. It is also much more flexible and has a friendly and easy to
  use interface.
 </p>
@@ -114,7 +114,7 @@ A TightDB table supports the following column types:
 <li>Strings (<tt>const char *</tt>)</li>
 <li>Dates (<tt>time_t</tt>)</li>
 <li>Mixed (any of the above)</li>
-</ul> 
+</ul>
 <p>
 More types such as blobs, subtables and documents will be added in the near future. Check our
 website <a href="http://www.tightdb.com/">www.tightdb.com</a> for updates.
@@ -206,7 +206,7 @@ Replacing an entire row will be supported in the very near future:
 <p>
     Deleting a specific row can be done with the <tt>DeleteRow()</tt> method, and deleting all rows with the <tt>Clear()</tt> method.</p>
 <div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
-<pre class="prettyprint" lang-cpp=""> table.Clear(2);                                          
+<pre class="prettyprint" lang-cpp=""> table.Clear(2);
  cout << table.GetSize();                                  // =&gt; 5
 </pre>
 </div>
@@ -237,7 +237,7 @@ To find values in a specific column, we use the <tt>find</tt> method with a
 column name and a search value:
 </p>
 <div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
-<pre class="prettyprint" lang-cpp=""> size_t row; 
+<pre class="prettyprint" lang-cpp=""> size_t row;
  row = table.name.Find("Philip");		    	// row = (size_t)-1
 
  row = table.name.Find("Mary");			        // row = 1
@@ -245,14 +245,14 @@ column name and a search value:
 </div>
 <p>To find all values, the <tt>FindAll()</tt> method is used:</p>
 <div class="code" style="width: 600px; margin: 0px auto -1px; padding: 10px;">
-<pre class="prettyprint" lang-cpp=""> TableView view = table.age.FindAll(21);   
+<pre class="prettyprint" lang-cpp=""> TableView view = table.age.FindAll(21);
  size_t cnt = view.GetSize();  				// cnt = 2</pre>
 </div>
     <p>&nbsp;</p>
     <h2>Advanced Queries</h2>
 <p>
 Sometimes you may need to do more advanced queries on tables. You can do this using the <tt>GetQuery()</tt> method, which returns a new query object with properties for each column in the table (in this case <tt>name</tt>, <tt>age</tt> and <tt>hired</tt>).
- Each property is an object with methods for comparisons depending on 
+ Each property is an object with methods for comparisons depending on
 type. All comparison methods return the query object itself, so they can
  be chained. You can perform operations with the query itself, or use <tt>FindAll()</tt> to get a virtual table with all matching rows.
  </p><p>
@@ -267,12 +267,12 @@ So let's say you need to find all current employees who are between 20 and 30 ye
  cout << q.Count();                                         // =&gt; 2
 
  // Get the average age
- cout << q.age.Avg();                                       // =&gt; 26 
+ cout << q.age.Avg();                                       // =&gt; 26
 
  // Execute the query and return a table (view)
  TableView res = q.FindAll(table);
  for (size_t i = 0; i < res.GetSize(); ++i) {
-    cout << i << ": " << res[i].name << " is " 
+    cout << i << ": " << res[i].name << " is "
          << res[i].age << " years old." << endl;
  }
 </pre>
@@ -290,21 +290,21 @@ You can group tables and do very fast serialization to and from files and memory
  String, name,
  Int,    age,
  Bool,   hired)
- 
+
  // Create Table in Group
  Group group;
  MyTable& table = group.GetTable&lt;MyTable&gt;("My great table");
- 
+
  // Add some rows
  table.Add("John", 20, true);
  table.Add("Mary", 21, false);
  table.Add("Lars", 21, true);
  table.Add("Phil", 43, false);
  table.Add("Anni", 54, true);
-	
+
  // Write to disk
  group.Write("employees.tightdb");
-	
+
  // Load a group from disk (and print contents)
  Group fromDisk("employees.tightdb");
  MyTable& diskTable = fromDisk.GetTable&lt;MyTable&gt;("employees");
@@ -319,8 +319,8 @@ You can group tables and do very fast serialization to and from files and memory
  Group fromMem(buffer, len);
  MyTable& memTable = fromMem.GetTable&lt;MyTable&gt;("employees");
  for (size_t i = 0; i < memTable.GetSize(); i++)
-    cout << i << ": " << memTable[i].name << endl; 
-</pre>	
+    cout << i << ": " << memTable[i].name << endl;
+</pre>
 </div>
 <p>
 Hope this mini tutorial will get you started with TightDB :)

@@ -38,17 +38,17 @@ public:
 
     void Destroy();
 
-    virtual size_t Size() const TIGHTDB_NOEXCEPT;
+    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
-    virtual bool add() {return add("");}
-    bool add(const char* value);
-    bool Set(size_t ndx, const char* value);
-    virtual void insert(size_t ndx) { Insert(ndx, ""); } // FIXME: Ignoring boolean return value here!
-    bool Insert(size_t ndx, const char* value);
-    void Delete(size_t ndx);
-    void Clear();
+    void add() TIGHTDB_OVERRIDE {return add("");}
+    void add(const char* value);
+    void Set(size_t ndx, const char* value);
+    void insert(size_t ndx) TIGHTDB_OVERRIDE { Insert(ndx, ""); }
+    void Insert(size_t ndx, const char* value);
+    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
+    void Clear() TIGHTDB_OVERRIDE;
     void Resize(size_t ndx);
     void fill(size_t count);
 
@@ -75,7 +75,7 @@ public:
     bool Compare(const AdaptiveStringColumn&) const;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
 #endif // TIGHTDB_DEBUG
 
 protected:
@@ -83,14 +83,17 @@ protected:
     void UpdateRef(size_t ref);
 
     const char* LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
-    bool LeafSet(size_t ndx, const char* value);
-    bool LeafInsert(size_t ndx, const char* value);
+    void LeafSet(size_t ndx, const char* value);
+    void LeafInsert(size_t ndx, const char* value);
     template<class F> size_t LeafFind(const char* value, size_t start, size_t end) const;
     void LeafFindAll(Array& result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
     void LeafDelete(size_t ndx);
 
-    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();} // HasRefs indicates long string array
+    // Assumes that this column has only a single leaf node, no
+    // internal nodes. In this case HasRefs indicates a long string
+    // array.
+    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();}
 
     bool FindKeyPos(const char* target, size_t& pos) const;
 
@@ -101,6 +104,18 @@ protected:
 private:
     StringIndex* m_index;
 };
+
+
+
+
+
+// Implementation:
+
+inline const char* AdaptiveStringColumn::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < Size());
+    return m_array->ColumnStringGet(ndx);
+}
 
 
 } // namespace tightdb

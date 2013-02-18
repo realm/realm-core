@@ -20,87 +20,74 @@
 #ifndef TIGHTDB_PTHREAD_HELPERS_HPP
 #define TIGHTDB_PTHREAD_HELPERS_HPP
 
-#include <cerrno>
+#include <stdexcept>
+
 #include <pthread.h>
 
 #include <tightdb/assert.hpp>
-#include <tightdb/error.hpp>
 #include <tightdb/terminate.hpp>
 
 namespace tightdb {
 
 
-struct Mutex {
-    error_code init()
+class Mutex {
+public:
+    void init()
     {
-        int r = pthread_mutex_init(&m_impl, 0);
-        if (r != 0) {
-            switch (r) {
-            case EAGAIN: return ERROR_NO_RESOURCE;
-            case ENOMEM: return ERROR_OUT_OF_MEMORY;
-            case EPERM:  return ERROR_PERMISSION;
-            default:     return ERROR_OTHER;
-            }
-        }
-        return ERROR_NONE;
+        const int r = pthread_mutex_init(&m_impl, 0);
+        if (TIGHTDB_UNLIKELY(r != 0)) init_failed(r);
     }
 
     /// Initialize mutex for use across multiple processes.
-    error_code init_shared()
+    void init_shared()
     {
+#ifdef _POSIX_THREAD_PROCESS_SHARED
         pthread_mutexattr_t attr;
         int r = pthread_mutexattr_init(&attr);
-        if (r != 0) {
-            if (r == ENOMEM) return ERROR_OUT_OF_MEMORY;
-            else return ERROR_OTHER;
-        }
-        // FIXME: Must verify availability of optional feature: #ifdef _POSIX_THREAD_PROCESS_SHARED
+        if (TIGHTDB_UNLIKELY(r != 0)) attr_init_failed(r);
         r = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
         TIGHTDB_ASSERT(r == 0);
-        // FIXME: Should also do pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST). Check for availability with: #if _POSIX_THREADS >= 200809L
+        // FIXME: Should also do pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST) when available. Check for availability with: #if _POSIX_THREADS >= 200809L
         r = pthread_mutex_init(&m_impl, &attr);
-        int r2 = pthread_mutexattr_destroy(&attr);
+        const int r2 = pthread_mutexattr_destroy(&attr);
         TIGHTDB_ASSERT(r2 == 0);
         static_cast<void>(r2);
-        if (r != 0) {
-            switch (r) {
-            case EAGAIN: return ERROR_NO_RESOURCE;
-            case ENOMEM: return ERROR_OUT_OF_MEMORY;
-            case EPERM:  return ERROR_PERMISSION;
-            default:     return ERROR_OTHER;
-            }
-        }
-        return ERROR_NONE;
+        if (TIGHTDB_UNLIKELY(r != 0)) init_failed(r);
+#else // !_POSIX_THREAD_PROCESS_SHARED
+        throw std::runtime_error("No support for shared mutexes");
+#endif
     }
 
-    void destroy()
+    void destroy() TIGHTDB_NOEXCEPT
     {
         int r = pthread_mutex_destroy(&m_impl);
-        if (r != 0) {
-            if (r == EBUSY) TIGHTDB_TERMINATE("Destruction of mutex in use");
-            else TIGHTDB_TERMINATE("pthread_mutex_destroy() failed");
-        }
+        if (TIGHTDB_UNLIKELY(r != 0)) destroy_failed(r);
     }
+
+    class Lock;
+    class DestroyGuard;
 
 private:
     pthread_mutex_t m_impl;
 
-    friend struct LockGuard;
-    friend struct Condition;
+    static TIGHTDB_NORETURN void init_failed(int);
+    static TIGHTDB_NORETURN void attr_init_failed(int);
+    static TIGHTDB_NORETURN void destroy_failed(int) TIGHTDB_NOEXCEPT;
+    static TIGHTDB_NORETURN void lock_failed(int) TIGHTDB_NOEXCEPT;
+
+    friend class Condition;
 };
 
 
-struct LockGuard {
-    LockGuard(Mutex& m): m_mutex(m)
+class Mutex::Lock {
+public:
+    Lock(Mutex& m) TIGHTDB_NOEXCEPT: m_mutex(m)
     {
         int r = pthread_mutex_lock(&m_mutex.m_impl);
-        if (r != 0) {
-            if (r == EDEADLK) TIGHTDB_TERMINATE("Recursive locking of mutex");
-            else TIGHTDB_TERMINATE("pthread_mutex_lock() failed");
-        }
+        if (TIGHTDB_UNLIKELY(r != 0)) Mutex::lock_failed(r);
     }
 
-    ~LockGuard()
+    ~Lock() TIGHTDB_NOEXCEPT
     {
         int r = pthread_mutex_unlock(&m_mutex.m_impl);
         TIGHTDB_ASSERT(r == 0);
@@ -110,97 +97,85 @@ struct LockGuard {
 private:
     Mutex& m_mutex;
 
-    friend struct Condition;
+    friend class Condition;
 };
 
 
-struct Condition {
-    void wait(LockGuard& g)
+class Condition {
+public:
+    void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT
     {
-        int r = pthread_cond_wait(&m_impl, &g.m_mutex.m_impl);
-        if (r != 0) TIGHTDB_TERMINATE("pthread_cond_wait() failed");
+        int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
+        if (TIGHTDB_UNLIKELY(r != 0)) TIGHTDB_TERMINATE("pthread_cond_wait() failed");
     }
 
-    void notify_all()
+    void notify_all() TIGHTDB_NOEXCEPT
     {
         int r = pthread_cond_broadcast(&m_impl);
         TIGHTDB_ASSERT(r == 0);
         static_cast<void>(r);
     }
 
-    /// \return Zero on success, otherwise an error as defined in
-    /// <error.hpp>.
-    error_code init()
+    void init()
     {
         int r = pthread_cond_init(&m_impl, 0);
-        if (r != 0) {
-            switch (r) {
-            case EAGAIN: return ERROR_NO_RESOURCE;
-            case ENOMEM: return ERROR_OUT_OF_MEMORY;
-            default:     return ERROR_OTHER;
-            }
-        }
-        return ERROR_NONE;
+        if (TIGHTDB_UNLIKELY(r != 0)) init_failed(r);
     }
 
     /// Initialize condition for use across multiple processes.
-    ///
-    /// \return Zero on success, otherwise an error as defined in
-    /// <error.hpp>.
-    error_code init_shared()
+    void init_shared()
     {
+#ifdef _POSIX_THREAD_PROCESS_SHARED
         pthread_condattr_t attr;
         int r = pthread_condattr_init(&attr);
-        if (r != 0) {
-            if (r == ENOMEM) return ERROR_OUT_OF_MEMORY;
-            else return ERROR_OTHER;
-        }
+        if (TIGHTDB_UNLIKELY(r != 0)) attr_init_failed(r);
         r = pthread_condattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
         TIGHTDB_ASSERT(r == 0);
         r = pthread_cond_init(&m_impl, &attr);
         int r2 = pthread_condattr_destroy(&attr);
         TIGHTDB_ASSERT(r2 == 0);
         static_cast<void>(r2);
-        if (r != 0) {
-            switch (r) {
-            case EAGAIN: return ERROR_NO_RESOURCE;
-            case ENOMEM: return ERROR_OUT_OF_MEMORY;
-            default:     return ERROR_OTHER;
-            }
-        }
-        return ERROR_NONE;
+        if (TIGHTDB_UNLIKELY(r != 0)) init_failed(r);
+#else // !_POSIX_THREAD_PROCESS_SHARED
+        throw std::runtime_error("No support for shared conditions");
+#endif
     }
 
-    void destroy()
+    void destroy() TIGHTDB_NOEXCEPT
     {
         int r = pthread_cond_destroy(&m_impl);
-        if (r != 0) {
-            if (r == EBUSY) TIGHTDB_TERMINATE("Destruction of condition in use");
-            else TIGHTDB_TERMINATE("pthread_cond_destroy() failed");
-        }
+        if (TIGHTDB_UNLIKELY(r != 0)) destroy_failed(r);
     }
+
+    class DestroyGuard;
 
 private:
     pthread_cond_t m_impl;
+
+    static TIGHTDB_NORETURN void init_failed(int);
+    static TIGHTDB_NORETURN void attr_init_failed(int);
+    static TIGHTDB_NORETURN void destroy_failed(int) TIGHTDB_NOEXCEPT;
 };
 
 
-struct MutexDestroyGuard {
-    MutexDestroyGuard(Mutex& m): m_mutex(&m) {}
-    ~MutexDestroyGuard() { if (m_mutex) m_mutex->destroy(); }
+class Mutex::DestroyGuard {
+public:
+    DestroyGuard(Mutex& m) TIGHTDB_NOEXCEPT: m_mutex(&m) {}
+    ~DestroyGuard() TIGHTDB_NOEXCEPT { if (m_mutex) m_mutex->destroy(); }
 
-    void release() { m_mutex = 0; }
+    void release() TIGHTDB_NOEXCEPT { m_mutex = 0; }
 
 private:
     Mutex* m_mutex;
 };
 
 
-struct ConditionDestroyGuard {
-    ConditionDestroyGuard(Condition& c): m_cond(&c) {}
-    ~ConditionDestroyGuard() { if (m_cond) m_cond->destroy(); }
+class Condition::DestroyGuard {
+public:
+    DestroyGuard(Condition& c) TIGHTDB_NOEXCEPT: m_cond(&c) {}
+    ~DestroyGuard() TIGHTDB_NOEXCEPT { if (m_cond) m_cond->destroy(); }
 
-    void release() { m_cond = 0; }
+    void release() TIGHTDB_NOEXCEPT { m_cond = 0; }
 
 private:
     Condition* m_cond;
