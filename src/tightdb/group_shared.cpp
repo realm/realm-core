@@ -492,16 +492,49 @@ void SharedGroup::ringbuf_remove_first()
 
 void SharedGroup::ringbuf_put(const ReadCount& v)
 {
-    SharedInfo* const info = m_file_map.get_addr();
-    const bool isFull = (ringbuf_size() == (info->capacity+1));
+    SharedInfo* info = m_file_map.get_addr();
+
+    // Check if the ringbuf is full
+    // (there should always be one empty entry)
+    const size_t size = ringbuf_size();
+    const bool isFull = (size == (info->capacity));
 
     if (isFull) {
-        //TODO: expand buffer
-        TIGHTDB_TERMINATE("Ringbuffer overflow");
+        ringbuf_expand();
+        info = m_file_map.get_addr();
     }
 
     info->readers[info->put_pos] = v;
     info->put_pos = (info->put_pos + 1) & info->capacity;
+}
+
+void SharedGroup::ringbuf_expand()
+{
+    SharedInfo* const info = m_file_map.get_addr();
+
+    // Calculate size of file with 32 more entries
+    const size_t current_entry_count = info->capacity + 1;
+    const size_t new_entry_count = current_entry_count + 32;
+    const size_t base_filesize = sizeof(SharedInfo) - sizeof(ReadCount[32]);
+    const size_t new_filesize = base_filesize + (sizeof(ReadCount) * new_entry_count);
+
+    // Extend file
+    m_file.alloc(0, new_filesize);
+    m_file_map.remap(m_file, File::access_ReadWrite, new_filesize);
+    SharedInfo* const info2 = m_file_map.get_addr();
+
+    // Move existing entries (if there is a split)
+    if (info2->put_pos < info2->get_pos) {
+        ReadCount* const low_start = &info2->readers[info2->get_pos];
+        ReadCount* const low_end   = &info2->readers[current_entry_count];
+        ReadCount* const new_start = &info2->readers[info2->get_pos + 32];
+
+        copy(low_start, low_end, new_start);
+
+        info2->get_pos += 32;
+    }
+
+    info2->capacity = (uint32_t)new_entry_count - 1;
 }
 
 size_t SharedGroup::ringbuf_find(uint32_t version) const
@@ -532,14 +565,15 @@ void SharedGroup::test_ringbuf()
     ringbuf_remove_first();
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
-    // Fill buffer
-    const size_t capacity = ringbuf_capacity();
+    // Fill buffer (within capacity)
+    const size_t capacity = ringbuf_capacity()-1;
     for (size_t i = 0; i < capacity; ++i) {
         const ReadCount r = {1, (uint32_t)i};
         ringbuf_put(r);
         TIGHTDB_ASSERT(ringbuf_get_last().count == i);
     }
-    for (size_t i = 0; i < 32; ++i) {
+    TIGHTDB_ASSERT(ringbuf_size() == capacity);
+    for (size_t i = 0; i < capacity; ++i) {
         const ReadCount& r = ringbuf_get_first();
         TIGHTDB_ASSERT(r.count == i);
 
@@ -547,6 +581,41 @@ void SharedGroup::test_ringbuf()
     }
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
+    // Fill buffer and force split
+    for (size_t i = 0; i < capacity; ++i) {
+        const ReadCount r = {1, (uint32_t)i};
+        ringbuf_put(r);
+        TIGHTDB_ASSERT(ringbuf_get_last().count == i);
+    }
+    for (size_t i = 0; i < capacity/2; ++i) {
+        const ReadCount& r = ringbuf_get_first();
+        TIGHTDB_ASSERT(r.count == i);
+
+        ringbuf_remove_first();
+    }
+    for (size_t i = 0; i < capacity/2; ++i) {
+        const ReadCount r = {1, (uint32_t)i};
+        ringbuf_put(r);
+    }
+    for (size_t i = 0; i < capacity; ++i) {
+        ringbuf_remove_first();
+    }
+    TIGHTDB_ASSERT(ringbuf_is_empty());
+
+    // Fill buffer above capacity (forcing it to expand)
+    const size_t capacity_plus = ringbuf_capacity() + 16;
+    for (size_t i = 0; i < capacity_plus; ++i) {
+        const ReadCount r = {1, (uint32_t)i};
+        ringbuf_put(r);
+        TIGHTDB_ASSERT(ringbuf_get_last().count == i);
+    }
+    for (size_t i = 0; i < capacity_plus; ++i) {
+        const ReadCount& r = ringbuf_get_first();
+        TIGHTDB_ASSERT(r.count == i);
+
+        ringbuf_remove_first();
+    }
+    TIGHTDB_ASSERT(ringbuf_is_empty());
 }
 
 void SharedGroup::zero_free_space()

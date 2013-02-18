@@ -185,6 +185,7 @@ private:
     ReadCount& ringbuf_get(size_t ndx);
     ReadCount& ringbuf_get_first();
     ReadCount& ringbuf_get_last();
+    void       ringbuf_expand();
 
     friend class ReadTransaction;
     friend class WriteTransaction;
