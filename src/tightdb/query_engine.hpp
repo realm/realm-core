@@ -700,7 +700,7 @@ public:
                 QueryState<int64_t> jumpstate; // todo optimize by moving outside for loop
                 m_source_column = source_column;
                 m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate,
-                             std::bind1st(std::mem_fun(&IntegerNode::match_callback<TAction, TSourceColumn>), this));
+                             std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
             }
 
             if (m_local_matches == m_local_limit)
