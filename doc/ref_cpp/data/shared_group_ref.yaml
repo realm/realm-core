@@ -39,7 +39,7 @@ DESCR      : &g_shared_group_descr
 SEE        :
 EXAMPLES:
 - DESCR    :
-  CODE     : ex_cpp_shared_group_intro
+  CODE     : ex_shared_group_intro
 IGNORE     : []
 CATEGORIES:
 - Constructor:
