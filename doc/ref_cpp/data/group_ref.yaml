@@ -69,9 +69,6 @@ CATEGORIES:
       - NAME   : buffer
         TYPES  : Group::BufferSpec
         DESCR  : In-memory binary encoded representation of a group.
-      - NAME   : len
-        TYPES  : std::size_t
-        DESCR  : Size of the representation.
       RETURN:
         TYPES  : Group
         DESCR  : A - possibly empty - group.
@@ -356,9 +353,6 @@ CATEGORIES:
       - NAME   : buffer
         TYPES  : Group::BufferSpec
         DESCR  : In-memory binary encoded representation of a group.
-      - NAME   : len
-        TYPES  : std::size_t
-        DESCR  : Size of the representation.
       THROWS:
       - EXCEPT : File::OpenError
         DESCR  : If the file (or buffer) could not be opened. If the reason

@@ -56,10 +56,10 @@ public:
     /// neither to allocate nor to deallocate memory. Its only purpose
     /// is to specify the buffer.
     struct BufferSpec {
-        char*       m_data;
+        const char* m_data;
         std::size_t m_size;
         BufferSpec() {}
-        BufferSpec(char* d, std::size_t s): m_data(d), m_size(s) {}
+        BufferSpec(const char* d, std::size_t s): m_data(d), m_size(s) {}
     };
 
     /// Equivalent to calling open(BufferSpec, bool) on a default
