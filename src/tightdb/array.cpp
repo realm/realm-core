@@ -843,7 +843,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
         if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
             __m128i *data = (__m128i *)(m_data + start * w / 8);
             __m128i state = data[0];
-            __m128i state2;
+            char state2[sizeof(state)];
 
             size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
             for (size_t t = 0; t < chunks; t++) {
@@ -858,7 +858,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
             }
 
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
-            state2 = state;
+            memcpy(&state2, &state, sizeof(state));
             for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
                 const int64_t v = GetUniversal<w>(((const char *)&state2), t);
                 if (find_max ? v > m : v < m) {
