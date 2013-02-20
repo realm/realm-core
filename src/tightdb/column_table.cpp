@@ -49,10 +49,16 @@ void ColumnTable::insert(size_t ndx)
 void ColumnTable::insert(size_t ndx, const Table* subtable)
 {
     TIGHTDB_ASSERT(ndx <= Size());
-    TIGHTDB_ASSERT(!subtable); // FIXME: Implement table copying
-    static_cast<void>(subtable);
 
-    Column::Insert(ndx, 0); // zero-ref indicates empty table
+    size_t subtable_ref = 0;
+    if (subtable) {
+        // FIXME: Clone argument table here, but what about string
+        // columns where source is col_type_String and target is
+        // col_type_StringEnum or vice versa?
+        TIGHTDB_ASSERT(false);
+    }
+
+    Column::Insert(ndx, subtable_ref);
 }
 
 void ColumnTable::fill(size_t count)
@@ -101,7 +107,7 @@ void ColumnTable::ClearTable(size_t ndx)
     Set(ndx, 0);
 }
 
-bool ColumnTable::Compare(const ColumnTable& c) const
+bool ColumnTable::compare(const ColumnTable& c) const
 {
     const size_t n = Size();
     if (c.Size() != n) return false;

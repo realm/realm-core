@@ -125,7 +125,7 @@ public:
     size_t GetRef() const {return m_array->GetRef();}
 
     /// Compare two mixed columns for equality.
-    bool Compare(const ColumnMixed&) const;
+    bool compare(const ColumnMixed&) const;
 
     void invalidate_subtables();
 

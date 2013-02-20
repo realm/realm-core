@@ -62,8 +62,9 @@ public:
     void ReuseIndex(StringIndex& index);
     void RemoveIndex() {m_index = NULL;}
 
-    /// Compare two string enumeration columns for equality
-    bool Compare(const ColumnStringEnum&) const;
+    // Compare two string columns for equality
+    bool compare(const AdaptiveStringColumn&) const;
+    bool compare(const ColumnStringEnum&) const;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC

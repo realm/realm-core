@@ -205,7 +205,7 @@ public:
     void sort();
 
     /// Compare two columns for equality.
-    bool Compare(const Column&) const;
+    bool compare(const Column&) const;
 
     // Debug
 #ifdef TIGHTDB_DEBUG

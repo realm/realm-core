@@ -2336,61 +2336,83 @@ bool Table::compare_rows(const Table& t) const
     // the standard comparison scheme becomes impossible.
     if (m_size == 0) return t.m_size == 0;
 
+    // FIXME: The current column comparison implementation is very
+    // inefficient, we should use sequential tree accessors when they
+    // become available.
+
     const size_t n = get_column_count();
     TIGHTDB_ASSERT(t.get_column_count() == n);
     for (size_t i=0; i<n; ++i) {
         const ColumnType type = get_real_column_type(i);
-        TIGHTDB_ASSERT(t.get_real_column_type(i) == type);
+        TIGHTDB_ASSERT(type == col_type_String     ||
+                       type == col_type_StringEnum ||
+                       type == t.get_real_column_type(i));
 
         switch (type) {
-            case type_Int:
-            case type_Bool:
-            case type_Date: {
+            case col_type_Int:
+            case col_type_Bool:
+            case col_type_Date: {
                 const Column& c1 = GetColumn(i);
                 const Column& c2 = t.GetColumn(i);
-                if (!c1.Compare(c2)) return false;
+                if (!c1.compare(c2)) return false;
                 break;
             }
-            case type_Float: {
+            case col_type_Float: {
                 const ColumnFloat& c1 = GetColumnFloat(i);
                 const ColumnFloat& c2 = t.GetColumnFloat(i);
-                if (!c1.Compare(c2)) return false;
+                if (!c1.compare(c2)) return false;
                 break;
             }
-            case type_Double: {
+            case col_type_Double: {
                 const ColumnDouble& c1 = GetColumnDouble(i);
                 const ColumnDouble& c2 = t.GetColumnDouble(i);
-                if (!c1.Compare(c2)) return false;
+                if (!c1.compare(c2)) return false;
                 break;
             }
-            case type_String: {
+            case col_type_String: {
                 const AdaptiveStringColumn& c1 = GetColumnString(i);
-                const AdaptiveStringColumn& c2 = t.GetColumnString(i);
-                if (!c1.Compare(c2)) return false;
-                break;
-            }
-            case type_Binary: {
-                const ColumnBinary& c1 = GetColumnBinary(i);
-                const ColumnBinary& c2 = t.GetColumnBinary(i);
-                if (!c1.Compare(c2)) return false;
-                break;
-            }
-            case type_Table: {
-                const ColumnTable& c1 = GetColumnTable(i);
-                const ColumnTable& c2 = t.GetColumnTable(i);
-                if (!c1.Compare(c2)) return false;
-                break;
-            }
-            case type_Mixed: {
-                const ColumnMixed& c1 = GetColumnMixed(i);
-                const ColumnMixed& c2 = t.GetColumnMixed(i);
-                if (!c1.Compare(c2)) return false;
+                ColumnType type2 = t.get_real_column_type(i);
+                if (type2 == col_type_String) {
+                    const AdaptiveStringColumn& c2 = t.GetColumnString(i);
+                    if (!c1.compare(c2)) return false;
+                }
+                else {
+                    TIGHTDB_ASSERT(type2 == col_type_StringEnum);
+                    const ColumnStringEnum& c2 = t.GetColumnStringEnum(i);
+                    if (!c2.compare(c1)) return false;
+                }
                 break;
             }
             case col_type_StringEnum: {
                 const ColumnStringEnum& c1 = GetColumnStringEnum(i);
-                const ColumnStringEnum& c2 = t.GetColumnStringEnum(i);
-                if (!c1.Compare(c2)) return false;
+                ColumnType type2 = t.get_real_column_type(i);
+                if (type2 == col_type_StringEnum) {
+                    const ColumnStringEnum& c2 = t.GetColumnStringEnum(i);
+                    if (!c1.compare(c2)) return false;
+                }
+                else {
+                    TIGHTDB_ASSERT(type2 == col_type_String);
+                    const AdaptiveStringColumn& c2 = t.GetColumnString(i);
+                    if (!c1.compare(c2)) return false;
+                }
+                break;
+            }
+            case col_type_Binary: {
+                const ColumnBinary& c1 = GetColumnBinary(i);
+                const ColumnBinary& c2 = t.GetColumnBinary(i);
+                if (!c1.compare(c2)) return false;
+                break;
+            }
+            case col_type_Table: {
+                const ColumnTable& c1 = GetColumnTable(i);
+                const ColumnTable& c2 = t.GetColumnTable(i);
+                if (!c1.compare(c2)) return false;
+                break;
+            }
+            case col_type_Mixed: {
+                const ColumnMixed& c1 = GetColumnMixed(i);
+                const ColumnMixed& c2 = t.GetColumnMixed(i);
+                if (!c1.compare(c2)) return false;
                 break;
             }
             default:
