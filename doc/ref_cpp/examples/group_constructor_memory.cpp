@@ -33,10 +33,10 @@ int main()
         func(buffer);
     }
     catch (...) {
-        free(buffer.m_data);
+        free(const_cast<char*>(buffer.m_data));
         throw;
     }
-    free(buffer.m_data);
+    free(const_cast<char*>(buffer.m_data));
 }
 // @@EndFold@@
 // @@EndExample@@
