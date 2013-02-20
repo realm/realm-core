@@ -829,18 +829,18 @@ void Table::remove(size_t ndx)
 }
 
 
-void Table::insert_subtable(size_t column_ndx, size_t ndx)
+void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* subtable)
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Table);
-    TIGHTDB_ASSERT(ndx <= m_size);
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
 
-    ColumnTable& subtables = GetColumnTable(column_ndx);
+    ColumnTable& subtables = GetColumnTable(col_ndx);
     subtables.invalidate_subtables();
-    subtables.Insert(ndx); // FIXME: Consider calling virtual method insert(size_t) instead.
+    subtables.insert(row_ndx, subtable);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_value(column_ndx, ndx, Replication::subtable_tag()); // Throws
+    transact_log().insert_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
 #endif
 }
 
@@ -906,8 +906,8 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     const ColumnType type = get_real_column_type(col_idx);
     if (type == col_type_Table) {
         ColumnTable& subtables = GetColumnTable(col_idx);
-        subtables.ClearTable(row_idx);
         subtables.invalidate_subtables();
+        subtables.ClearTable(row_idx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
         transact_log().set_value(col_idx, row_idx, Replication::subtable_tag()); // Throws
@@ -915,8 +915,8 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     }
     else if (type == col_type_Mixed) {
         ColumnMixed& subtables = GetColumnMixed(col_idx);
-        subtables.set_subtable(row_idx);
         subtables.invalidate_subtables();
+        subtables.set_subtable(row_idx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
         transact_log().set_value(col_idx, row_idx, Mixed(Mixed::subtable_tag())); // Throws
@@ -1252,6 +1252,8 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
     ColumnMixed& column = GetColumnMixed(column_ndx);
     const DataType type = value.get_type();
 
+    column.invalidate_subtables();
+
     switch (type) {
         case type_Int:
             column.set_int(ndx, value.get_int());
@@ -1284,8 +1286,6 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
             break;
     }
 
-    column.invalidate_subtables();
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().set_value(column_ndx, ndx, value); // Throws
 #endif
@@ -1297,6 +1297,8 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
 
     ColumnMixed& column = GetColumnMixed(column_ndx);
     const DataType type = value.get_type();
+
+    column.invalidate_subtables();
 
     switch (type) {
         case type_Int:
@@ -1329,8 +1331,6 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
             TIGHTDB_ASSERT(false);
             break;
     }
-
-    column.invalidate_subtables();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().insert_value(column_ndx, ndx, value); // Throws

@@ -1,11 +1,17 @@
 #include <algorithm>
+#include <string>
 #include <sstream>
-#include <UnitTest++.h>
-#include <tightdb/table_macros.hpp>
-
-#include <ostream>
 #include <fstream>
+#include <ostream>
 
+#include <UnitTest++.h>
+
+#include <tightdb/table_macros.hpp>
+#include <tightdb/lang_bind_helper.hpp>
+#include <tightdb/alloc_slab.hpp>
+#include <tightdb/group.hpp>
+
+using namespace std;
 using namespace tightdb;
 
 TEST(Table1)
@@ -260,7 +266,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
         table.insert_bool(1, i, (i % 2 ? true : false));
         table.insert_date(2, i, 12345);
 
-        std::stringstream ss;
+        stringstream ss;
         ss << "string" << i;
         table.insert_string(3, i, ss.str().c_str());
 
@@ -365,20 +371,20 @@ TEST(Table_test_to_string)
     Table table;
     setup_multi_table(table, 15, 2);
 
-    std::stringstream ss;
+    stringstream ss;
     table.to_string(ss);
-    const std::string result = ss.str();
+    const string result = ss.str();
     if (0) {
-        std::cerr << "to_string:" << "\n" << result << "\n";
-        std::ofstream testFile("expect_string.txt", std::ios::out | std::ios::binary);
+        cerr << "to_string:" << "\n" << result << "\n";
+        ofstream testFile("expect_string.txt", ios::out | ios::binary);
         testFile << result;
     }
     else {
-        std::ifstream testFile("expect_string.txt", std::ios::in | std::ios::binary);
+        ifstream testFile("expect_string.txt", ios::in | ios::binary);
         CHECK(!testFile.fail());
-        std::string expected;
-        expected.assign( std::istreambuf_iterator<char>(testFile),
-                         std::istreambuf_iterator<char>() );
+        string expected;
+        expected.assign( istreambuf_iterator<char>(testFile),
+                         istreambuf_iterator<char>() );
         CHECK_EQUAL(true, result == expected);
     }
 }
@@ -388,22 +394,22 @@ TEST(Table_test_json_all_data)
     Table table;
     setup_multi_table(table, 15, 2);
 
-    std::stringstream ss;
+    stringstream ss;
     table.to_json(ss);
-    const std::string json = ss.str();
+    const string json = ss.str();
     if (0) {
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
-        std::cerr << "JSON:" << json << "\n";
-        std::ofstream testFile("expect_json.json", std::ios::out | std::ios::binary);
+        cerr << "JSON:" << json << "\n";
+        ofstream testFile("expect_json.json", ios::out | ios::binary);
         testFile << json;
     }
     else {
-        std::string expected;
-        std::ifstream testFile("expect_json.json", std::ios::in | std::ios::binary);
+        string expected;
+        ifstream testFile("expect_json.json", ios::in | ios::binary);
         CHECK(!testFile.fail());
-        std::getline(testFile,expected);
+        getline(testFile,expected);
         CHECK_EQUAL(true, json == expected);
     }
 }
@@ -432,11 +438,11 @@ TEST(Table_test_json_simple)
         table.insert_done();
     }
 
-     std::stringstream ss;
+     stringstream ss;
      table.to_json(ss);
-     const std::string json = ss.str();
+     const string json = ss.str();
      CHECK_EQUAL(true, json.length() > 0);
-     //std::cerr << "JSON:" << json << "\n";
+     //cerr << "JSON:" << json << "\n";
 }
 
 
@@ -844,7 +850,79 @@ TEST(TableAutoEnumerationFindFindAll)
     CHECK_EQUAL("eftg", static_cast<const char*>(tv[4].second));
 }
 
-#include <tightdb/alloc_slab.hpp>
+namespace {
+TIGHTDB_TABLE_1(TestSubtabEnum2,
+                str, String)
+TIGHTDB_TABLE_1(TestSubtabEnum1,
+                subtab, Subtable<TestSubtabEnum2>)
+}
+
+TEST(Table_OptimizeSubtable)
+{
+    TestSubtabEnum1 t;
+    t.add();
+    t.add();
+
+    {
+        // Non-enumerable
+        TestSubtabEnum2::Ref r = t[0].subtab;
+        string s;
+        for (int i=0; i<100; ++i) {
+            r->add(s.c_str());
+            s += 'x';
+        }
+    }
+
+    {
+        // Enumerable
+        TestSubtabEnum2::Ref r = t[1].subtab;
+        for (int i=0; i<100; ++i) {
+            r->add("foo");
+        }
+        r->optimize();
+    }
+
+    // Verify
+    {
+        // Non-enumerable
+        TestSubtabEnum2::Ref r = t[0].subtab;
+        string s;
+        for (int i = 0; i < r->size(); ++i) {
+            CHECK_EQUAL(s.c_str(), r[i].str);
+            s += 'x';
+        }
+    }
+    {
+        // Non-enumerable
+        TestSubtabEnum2::Ref r = t[1].subtab;
+        for (int i = 0; i < r->size(); ++i) {
+            CHECK_EQUAL("foo", r[i].str);
+        }
+    }
+}
+
+TEST(Table_OptimizeCompare)
+{
+    TestSubtabEnum2 t1, t2;
+    for (int i=0; i<100; ++i) {
+        t1.add("foo");
+    }
+    for (int i=0; i<100; ++i) {
+        t2.add("foo");
+    }
+    t1.optimize();
+    CHECK(t1 == t2);
+    t1[50].str = "bar";
+    CHECK(t1 != t2);
+    t1[50].str = "foo";
+    CHECK(t1 == t2);
+    t2[50].str = "bar";
+    CHECK(t1 != t2);
+    t2[50].str = "foo";
+    CHECK(t1 == t2);
+}
+
+
 TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;
@@ -873,8 +951,6 @@ TEST(Table_SlabAlloc)
     table.Verify();
 #endif // TIGHTDB_DEBUG
 }
-
-#include <tightdb/group.hpp>
 
 
 TEST(Table_Spec)
@@ -1679,6 +1755,18 @@ TEST(Table_HighLevelSubtables)
 }
 
 
+TEST(Table_SubtableCopyOnSetAndInsert)
+{
+    MyTable1 t1;
+    t1.add(7, 8);
+    MyTable2 t2;
+    t2.add(9, &t1);
+//    CHECK_EQUAL(t1, t2[0].subtab);
+    MyTable1::Ref r2 = t2[0].subtab;
+    CHECK(t1 == *r2);
+}
+
+
 namespace
 {
     TIGHTDB_TABLE_2(TableDateAndBinary,
@@ -1696,7 +1784,7 @@ TEST(Table_DateAndBinary)
     t.add(8, BinaryData(data, size));
     CHECK_EQUAL(t[0].date, 8);
     CHECK_EQUAL(t[0].bin.get_len(), size);
-    CHECK(std::equal(t[0].bin.get_pointer(), t[0].bin.get_pointer()+size, data));
+    CHECK(equal(t[0].bin.get_pointer(), t[0].bin.get_pointer()+size, data));
 }
 
 // Test for a specific bug found: Calling clear on a group with a table with a subtable
@@ -1850,8 +1938,6 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(double(d_sum)/size, table.column().c_double.average());
 }
 
-
-#include <tightdb/lang_bind_helper.hpp>
 
 TEST(Table_LanguageBindings)
 {

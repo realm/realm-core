@@ -387,6 +387,16 @@ protected:
     /// of columns.
     bool compare_rows(const Table&) const;
 
+    /// Assumes that the specified column is a subtable column (in
+    /// particular, not a mixed column) and that the specified table
+    /// has a spec that is compatible with that column, that is, the
+    /// number of columns must be the same, and corresponding columns
+    /// must have identical data types (as returned by
+    /// get_column_type()).
+    void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+
+    void insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
+
 private:
     Table(Table const &); // Disable copy construction
     Table &operator=(Table const &); // Disable copying assignment
@@ -589,6 +599,11 @@ template<class E> inline void Table::insert_enum(size_t column_ndx, size_t row_n
     insert_int(column_ndx, row_ndx, value);
 }
 
+inline void Table::insert_subtable(size_t col_ndx, size_t row_ndx)
+{
+    insert_subtable(col_ndx, row_ndx, 0); // Null stands for an empty table
+}
+
 template<class E> inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
 {
     set_int(column_ndx, row_ndx, value);
@@ -612,6 +627,11 @@ inline bool Table::operator==(const Table& t) const
 inline bool Table::operator!=(const Table& t) const
 {
     return m_spec_set != t.m_spec_set || !compare_rows(t);
+}
+
+inline void Table::insert_into(Table* parent, size_t col_ndx, size_t row_ndx) const
+{
+    parent->insert_subtable(col_ndx, row_ndx, this);
 }
 
 

@@ -36,15 +36,23 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 
 void ColumnTable::add()
 {
-    Insert(Size()); // zero-ref indicates empty table
+    invalidate_subtables();
+    add(0); // Null-pointer indicates empty table
 }
 
-void ColumnTable::Insert(size_t ndx)
+void ColumnTable::insert(size_t ndx)
+{
+    invalidate_subtables();
+    insert(ndx, 0); // Null-pointer indicates empty table
+}
+
+void ColumnTable::insert(size_t ndx, const Table* subtable)
 {
     TIGHTDB_ASSERT(ndx <= Size());
+    TIGHTDB_ASSERT(!subtable); // FIXME: Implement table copying
+    static_cast<void>(subtable);
 
-    // zero-ref indicates empty table
-    Column::Insert(ndx, 0);
+    Column::Insert(ndx, 0); // zero-ref indicates empty table
 }
 
 void ColumnTable::fill(size_t count)
