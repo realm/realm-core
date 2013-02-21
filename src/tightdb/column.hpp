@@ -64,6 +64,8 @@ public:
 
     virtual void invalidate_subtables_virtual() {}
 
+    const Array* get_root_array() const TIGHTDB_NOEXCEPT { return m_array; }
+
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in ObjC
     virtual void ToDot(std::ostream& out, const char* title=NULL) const;

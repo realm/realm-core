@@ -730,6 +730,59 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType coltype, s
 }
 
 
+size_t Table::clone_columns(Allocator& alloc) const
+{
+    Array new_columns(coldef_HasRefs, 0, 0, alloc);
+    size_t n = get_column_count();
+    for (size_t i=0; i<n; ++i) {
+        size_t new_col_ref;
+        const ColumnBase* col = &GetColumnBase(i);
+        if (const ColumnStringEnum* enum_col = dynamic_cast<const ColumnStringEnum*>(col)) {
+            AdaptiveStringColumn new_col(alloc);
+            // FIXME: Should be optimized with something like
+            // new_col.add(seq_tree_accessor.begin(),
+            // seq_tree_accessor.end())
+            size_t n2 = enum_col->Size();
+            for (size_t i2=0; i2<n2; ++i2)
+                new_col.add(enum_col->Get(i));
+            new_col_ref = new_col.GetRef();
+        }
+        else {
+            const Array& root = *col->get_root_array();
+            Array new_root(alloc);
+            new_root.Copy(root);
+            new_col_ref = new_root.GetRef();
+        }
+        new_columns.add(new_col_ref);
+    }
+    return new_columns.GetRef();
+}
+
+
+size_t Table::clone(Allocator& alloc) const
+{
+    if (m_top.IsValid()) {
+        Array new_top(alloc);
+        new_top.Copy(m_top);
+        return new_top.GetRef();
+    }
+
+    Array new_top(coldef_HasRefs, 0, 0, alloc);
+    {
+        Array new_spec(alloc);
+        new_spec.Copy(m_spec_set.m_specSet);
+        new_top.add(new_spec.GetRef());
+    }
+    {
+        Array new_columns(alloc);
+        new_columns.Copy(m_columns);
+        new_top.add(new_columns.GetRef());
+    }
+    return new_top.GetRef();
+}
+
+
+
 // TODO: get rid of the Column* template parameter
 
 Column& Table::GetColumn(size_t ndx)                              { return GetColumn<Column, col_type_Int>(ndx); }
@@ -829,7 +882,7 @@ void Table::remove(size_t ndx)
 }
 
 
-void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* subtable)
+void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
@@ -837,12 +890,48 @@ void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* subtabl
 
     ColumnTable& subtables = GetColumnTable(col_ndx);
     subtables.invalidate_subtables();
-    subtables.insert(row_ndx, subtable);
+    subtables.insert(row_ndx, table);
 
+    // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().insert_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
 #endif
 }
+
+
+void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
+{
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Mixed);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    ColumnMixed& mixed_col = GetColumnMixed(col_ndx);
+    mixed_col.invalidate_subtables();
+    mixed_col.insert_subtable(row_ndx, t);
+
+    // FIXME: Replication is not yet able to handle copuing insertion of non-empty tables.
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().insert_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+#endif
+}
+
+
+void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
+{
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Mixed);
+    TIGHTDB_ASSERT(row_ndx < m_size);
+
+    ColumnMixed& mixed_col = GetColumnMixed(col_ndx);
+    mixed_col.invalidate_subtables();
+    mixed_col.set_subtable(row_ndx, t);
+
+    // FIXME: Replication is not yet able to handle copying assignment of non-empty tables.
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().set_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+#endif
+}
+
 
 Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx)
 {
@@ -916,7 +1005,7 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     else if (type == col_type_Mixed) {
         ColumnMixed& subtables = GetColumnMixed(col_idx);
         subtables.invalidate_subtables();
-        subtables.set_subtable(row_idx);
+        subtables.set_subtable(row_idx, 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
         transact_log().set_value(col_idx, row_idx, Mixed(Mixed::subtable_tag())); // Throws
@@ -1279,7 +1368,7 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
             break;
         }
         case type_Table:
-            column.set_subtable(ndx);
+            column.set_subtable(ndx, 0);
             break;
         case type_Mixed:
             TIGHTDB_ASSERT(false);
@@ -1291,7 +1380,8 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
 #endif
 }
 
-void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
+void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
+{
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
 
@@ -1325,7 +1415,7 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value) {
             break;
         }
         case type_Table:
-            column.insert_subtable(ndx);
+            column.insert_subtable(ndx, 0);
             break;
         case type_Mixed:
             TIGHTDB_ASSERT(false);
@@ -1876,6 +1966,13 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
 
 void Table::optimize()
 {
+    // At the present time there is only one kind of optimization that
+    // we can do, and that is to replace a string column with a string
+    // enumeration column. Since this involves changing the spec of
+    // the table, it is not something we can do for a subtable with
+    // shared spec.
+    if (has_shared_spec()) return;
+
     const size_t column_count = get_column_count();
     Allocator& alloc = m_columns.GetAllocator();
 

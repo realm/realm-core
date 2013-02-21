@@ -100,6 +100,13 @@ protected:
     /// Assumes that the two tables have the same spec.
     static bool compare_subtable_rows(const Table&, const Table&);
 
+    /// Construct a copy of the columns array of the specified table
+    /// and return just the ref to that array.
+    ///
+    /// In the clone, no string column will be of the enumeration
+    /// type.
+    std::size_t clone_table_columns(const Table*);
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     size_t* record_subtable_path(size_t* begin, size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
@@ -347,6 +354,11 @@ inline void ColumnSubtableParent::invalidate_subtables()
 inline bool ColumnSubtableParent::compare_subtable_rows(const Table& a, const Table& b)
 {
     return a.compare_rows(b);
+}
+
+inline std::size_t ColumnSubtableParent::clone_table_columns(const Table* t)
+{
+    return t->clone_columns(m_array->GetAllocator());
 }
 
 

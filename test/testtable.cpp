@@ -1609,6 +1609,9 @@ namespace
 
     TIGHTDB_TABLE_1(MyTable3,
                     subtab, Subtable<MyTable2>)
+
+    TIGHTDB_TABLE_1(MyTable4,
+                    mix, Mixed)
 }
 
 
@@ -1761,9 +1764,13 @@ TEST(Table_SubtableCopyOnSetAndInsert)
     t1.add(7, 8);
     MyTable2 t2;
     t2.add(9, &t1);
-//    CHECK_EQUAL(t1, t2[0].subtab);
-    MyTable1::Ref r2 = t2[0].subtab;
-    CHECK(t1 == *r2);
+    MyTable1::Ref r1 = t2[0].subtab;
+    CHECK(t1 == *r1);
+    MyTable4 t4;
+    t4.add();
+    t4[0].mix.set_subtable(t2);
+    MyTable2::Ref r2 = unchecked_cast<MyTable2>(t4[0].mix.get_subtable());
+    CHECK(t2 == *r2);
 }
 
 

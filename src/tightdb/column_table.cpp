@@ -50,15 +50,11 @@ void ColumnTable::insert(size_t ndx, const Table* subtable)
 {
     TIGHTDB_ASSERT(ndx <= Size());
 
-    size_t subtable_ref = 0;
-    if (subtable) {
-        // FIXME: Clone argument table here, but what about string
-        // columns where source is col_type_String and target is
-        // col_type_StringEnum or vice versa?
-        TIGHTDB_ASSERT(false);
-    }
+    size_t columns_ref = 0;
+    if (subtable)
+        columns_ref = clone_table_columns(subtable);
 
-    Column::Insert(ndx, subtable_ref);
+    Column::Insert(ndx, columns_ref);
 }
 
 void ColumnTable::fill(size_t count)
