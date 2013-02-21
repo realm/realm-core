@@ -50,7 +50,7 @@ TEST(Table1)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table_floats)
@@ -89,7 +89,7 @@ TEST(Table_floats)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 namespace {
@@ -124,7 +124,7 @@ TEST(Table2)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table3)
@@ -152,7 +152,7 @@ TEST(Table3)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 namespace {
@@ -177,7 +177,7 @@ TEST(Table4)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 namespace {
@@ -199,7 +199,7 @@ TEST(Table_float2)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 
@@ -225,7 +225,7 @@ TEST(Table_Delete)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete all items one at a time
     for (size_t i = 0; i < 7; ++i) {
@@ -237,7 +237,7 @@ TEST(Table_Delete)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 // Pre-declare free standing function
@@ -355,7 +355,7 @@ TEST(Table_Delete_All_Types)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Test Clear
     table.clear();
@@ -363,7 +363,7 @@ TEST(Table_Delete_All_Types)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table_test_to_string)
@@ -460,7 +460,7 @@ TEST(Table_Find_Int)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 
@@ -487,7 +487,7 @@ TEST(Table6)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 */
 
@@ -523,7 +523,7 @@ TEST(Table_FindAll_Int)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table_Sorted_Int)
@@ -558,7 +558,7 @@ TEST(Table_Sorted_Int)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table_Index_String)
@@ -758,7 +758,7 @@ TEST(Table_Index_Int)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 */
 
@@ -949,7 +949,7 @@ TEST(Table_SlabAlloc)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 
@@ -1159,7 +1159,7 @@ TEST(Table_Spec_DeleteColumns)
 
 #ifdef TIGHTDB_DEBUG
     table->Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table_Spec_AddColumns)
@@ -1278,7 +1278,7 @@ TEST(Table_Spec_AddColumns)
 
 #ifdef TIGHTDB_DEBUG
     table->Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 
@@ -1350,7 +1350,7 @@ TEST(Table_Spec_DeleteColumnsBug)
 
 #ifdef TIGHTDB_DEBUG
     table->Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     table.reset();
 }
@@ -1505,7 +1505,7 @@ TEST(Table_Mixed)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 
@@ -1890,14 +1890,13 @@ TEST(Table_HasSharedSpec)
 }
 
 
-namespace
-{
-    TIGHTDB_TABLE_3(TableAgg,
-                    c_int,   Int,
-                    c_float, Float,
-                    c_double, Double)
+namespace {
+TIGHTDB_TABLE_3(TableAgg,
+                c_int,   Int,
+                c_float, Float,
+                c_double, Double)
 
-                    // TODO: Bool? Date
+                // TODO: Bool? Date
 }
 
 #if TEST_DURATION > 0

@@ -770,11 +770,10 @@ public:
 
     /// Overwrites the current value with a copy of the specified
     /// table and returns a reference to the copy.
-    template<class Spec>
-    typename BasicTable<Spec>::Ref set_subtable(const BasicTable<Spec>& t) const
+    template<class T> typename T::Ref set_subtable(const T& t) const
     {
         t.set_into_mixed(Base::m_table->get_impl(), col_idx, Base::m_row_idx);
-        return unchecked_cast<BasicTable<Spec> >(get_subtable());
+        return unchecked_cast<T>(get_subtable());
     }
 
 

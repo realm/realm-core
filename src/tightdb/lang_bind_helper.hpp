@@ -67,19 +67,19 @@ public:
     static void unbind_table_ref(const Table*);
     static void bind_table_ref(const Table*);
 
-    /// Calls parent->insert_subtable(col_ndx, row_ndx, source). Note
+    /// Calls parent.insert_subtable(col_ndx, row_ndx, &source). Note
     /// that the source table must have a spec that is compatible with
     /// the target subtable column.
-    static void insert_subtable(Table* parent, std::size_t col_ndx, std::size_t row_ndx,
-                                const Table* source);
+    static void insert_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
+                                const Table& source);
 
-    /// Calls parent->insert_mixed_subtable(col_ndx, row_ndx, source).
-    static void insert_mixed_subtable(Table* parent, std::size_t col_ndx, std::size_t row_ndx,
-                                      const Table* source);
+    /// Calls parent.insert_mixed_subtable(col_ndx, row_ndx, &source).
+    static void insert_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
+                                      const Table& source);
 
-    /// Calls parent->set_mixed_subtable(col_ndx, row_ndx, source).
-    static void set_mixed_subtable(Table* parent, std::size_t col_ndx, std::size_t row_ndx,
-                                   const Table* source);
+    /// Calls parent.set_mixed_subtable(col_ndx, row_ndx, &source).
+    static void set_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
+                                   const Table& source);
 };
 
 
@@ -159,22 +159,22 @@ inline void LangBindHelper::bind_table_ref(const Table* t)
    t->bind_ref();
 }
 
-inline void LangBindHelper::insert_subtable(Table* parent, std::size_t col_ndx,
-                                            std::size_t row_ndx, const Table* source)
+inline void LangBindHelper::insert_subtable(Table& parent, std::size_t col_ndx,
+                                            std::size_t row_ndx, const Table& source)
 {
-    parent->insert_subtable(col_ndx, row_ndx, source);
+    parent.insert_subtable(col_ndx, row_ndx, &source);
 }
 
-inline void LangBindHelper::insert_mixed_subtable(Table* parent, std::size_t col_ndx,
-                                                  std::size_t row_ndx, const Table* source)
+inline void LangBindHelper::insert_mixed_subtable(Table& parent, std::size_t col_ndx,
+                                                  std::size_t row_ndx, const Table& source)
 {
-    parent->insert_mixed_subtable(col_ndx, row_ndx, source);
+    parent.insert_mixed_subtable(col_ndx, row_ndx, &source);
 }
 
-inline void LangBindHelper::set_mixed_subtable(Table* parent, std::size_t col_ndx,
-                                               std::size_t row_ndx, const Table* source)
+inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_ndx,
+                                               std::size_t row_ndx, const Table& source)
 {
-    parent->set_mixed_subtable(col_ndx, row_ndx, source);
+    parent.set_mixed_subtable(col_ndx, row_ndx, &source);
 }
 
 
