@@ -402,8 +402,6 @@ TEST(TestAggregateSingleCond)
 
     s = ttt.where().first.not_equal(3).first.sum();
     CHECK_EQUAL(9, s);
-
-
 }
 
 TEST(TestQueryFindAll_range1)
@@ -1570,10 +1568,10 @@ TEST(TestTV)
 
     TupleTableType::Query q3 = t.where().tableview(v).second.equal("a");
     CHECK_EQUAL(1, q3.count());
-}
 
- #if 0
- !!!
+    TupleTableType::Query q4 = t.where().tableview(v).first.between(3,6);
+    CHECK_EQUAL(1, q4.count());
+}
 
 TEST(TestQuery_sum_min_max_avg)
 {
@@ -1612,7 +1610,6 @@ TEST(TestQuery_sum_min_max_avg)
     CHECK_EQUAL(6, t.where().first.sum(&cnt, 0, size_t(-1)));
     CHECK_EQUAL(3, cnt);
 }
-#endif
 
 TEST(TestQuery_avg)
 {
