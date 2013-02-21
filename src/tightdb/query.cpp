@@ -7,8 +7,6 @@
 #include <tightdb/query_engine.hpp>
 
 
-#define MULTITHREAD 0
-
 using namespace std;
 using namespace tightdb;
 
@@ -29,7 +27,9 @@ void Query::Create()
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
+#if TIGHTDB_MULTITHREAD_QUERY
     m_threadcount = 0;
+#endif
     do_delete = true;
 }
 
@@ -42,18 +42,21 @@ Query::Query(const Query& copy)
     update_override = copy.update_override;
     first = copy.first;
     error_code = copy.error_code;
+#if TIGHTDB_MULTITHREAD_QUERY
     m_threadcount = copy.m_threadcount;
-//    copy.first[0] = 0;
+#endif
+    //    copy.first[0] = 0;
     copy.do_delete = false;
     do_delete = true;
 }
 
 Query::~Query()
 {
-#if MULTITHREAD
+#if TIGHTDB_MULTITHREAD_QUERY
     for (size_t i = 0; i < m_threadcount; i++)
         pthread_detach(threads[i]);
 #endif
+
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
             ParentNode *p = all_nodes[t];
@@ -463,10 +466,12 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
         return move(tv);
     }
 
+#if TIGHTDB_MULTITHREAD_QUERY
     if (m_threadcount > 0) {
         // Use multithreading
         return find_all_multi(start, end);
     }
+#endif
 
     // Use single threading
     TableView tv(*m_table);
@@ -519,12 +524,12 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
     return results;
 }
 
+#if TIGHTDB_MULTITHREAD_QUERY
 TableView Query::find_all_multi(size_t start, size_t end)
 {
     (void)start;
     (void)end;
 
-#if MULTITHREAD
     // Initialization
     Init(*m_table);
     ts.next_job = start;
@@ -561,14 +566,10 @@ TableView Query::find_all_multi(size_t start, size_t end)
     }
 
     return move(tv);
-#else
-    return NULL;
-#endif
 }
 
 int Query::set_threads(unsigned int threadcount)
 {
-#if MULTITHREAD
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
     pthread_win32_process_attach_np ();
 #endif
@@ -588,10 +589,71 @@ int Query::set_threads(unsigned int threadcount)
         if (r != 0)
             TIGHTDB_ASSERT(false); //todo
     }
-#endif
     m_threadcount = threadcount;
     return 0;
 }
+
+
+void* Query::query_thread(void* arg)
+{
+    static_cast<void>(arg);
+    thread_state* ts = static_cast<thread_state*>(arg);
+
+    std::vector<size_t> res;
+    std::vector<std::pair<size_t, size_t> > chunks;
+
+    for (;;) {
+        // Main waiting loop that waits for a query to start
+        pthread_mutex_lock(&ts->jobs_mutex);
+        while (ts->next_job == ts->end_job)
+            pthread_cond_wait(&ts->jobs_cond, &ts->jobs_mutex);
+        pthread_mutex_unlock(&ts->jobs_mutex);
+
+        for (;;) {
+            // Pick a job
+            pthread_mutex_lock(&ts->jobs_mutex);
+            if (ts->next_job == ts->end_job)
+                break;
+            const size_t chunk = min(ts->end_job - ts->next_job, thread_chunk_size);
+            const size_t mine = ts->next_job;
+            ts->next_job += chunk;
+            size_t r = mine - 1;
+            const size_t end = mine + chunk;
+
+            pthread_mutex_unlock(&ts->jobs_mutex);
+
+            // Execute job
+            for (;;) {
+                r = ts->node->find_first(r + 1, end);
+                if (r == end)
+                    break;
+                res.push_back(r);
+            }
+
+            // Append result in common queue shared by all threads.
+            pthread_mutex_lock(&ts->result_mutex);
+            ts->done_job += chunk;
+            if (res.size() > 0) {
+                ts->chunks.push_back(std::pair<size_t, size_t>(mine, ts->results.size()));
+                ts->count += res.size();
+                for (size_t i = 0; i < res.size(); i++) {
+                    ts->results.push_back(res[i]);
+                }
+                res.clear();
+            }
+            pthread_mutex_unlock(&ts->result_mutex);
+
+            // Signal main thread that we might have compleeted
+            pthread_mutex_lock(&ts->completed_mutex);
+            pthread_cond_signal(&ts->completed_cond);
+            pthread_mutex_unlock(&ts->completed_mutex);
+        }
+    }
+    return 0;
+}
+
+#endif // TIGHTDB_MULTITHREADQUERY
+
 
 #ifdef TIGHTDB_DEBUG
 std::string Query::Verify()
@@ -655,65 +717,5 @@ bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, siz
     return a.first < b.first;
 }
 
-
-void* Query::query_thread(void* arg)
-{
-    static_cast<void>(arg);
-#if MULTITHREAD
-    thread_state* ts = static_cast<thread_state*>(arg);
-
-    std::vector<size_t> res;
-    std::vector<std::pair<size_t, size_t> > chunks;
-
-    for (;;) {
-        // Main waiting loop that waits for a query to start
-        pthread_mutex_lock(&ts->jobs_mutex);
-        while (ts->next_job == ts->end_job)
-            pthread_cond_wait(&ts->jobs_cond, &ts->jobs_mutex);
-        pthread_mutex_unlock(&ts->jobs_mutex);
-
-        for (;;) {
-            // Pick a job
-            pthread_mutex_lock(&ts->jobs_mutex);
-            if (ts->next_job == ts->end_job)
-                break;
-            const size_t chunk = min(ts->end_job - ts->next_job, thread_chunk_size);
-            const size_t mine = ts->next_job;
-            ts->next_job += chunk;
-            size_t r = mine - 1;
-            const size_t end = mine + chunk;
-
-            pthread_mutex_unlock(&ts->jobs_mutex);
-
-            // Execute job
-            for (;;) {
-                r = ts->node->find_first(r + 1, end);
-                if (r == end)
-                    break;
-                res.push_back(r);
-            }
-
-            // Append result in common queue shared by all threads.
-            pthread_mutex_lock(&ts->result_mutex);
-            ts->done_job += chunk;
-            if (res.size() > 0) {
-                ts->chunks.push_back(std::pair<size_t, size_t>(mine, ts->results.size()));
-                ts->count += res.size();
-                for (size_t i = 0; i < res.size(); i++) {
-                    ts->results.push_back(res[i]);
-                }
-                res.clear();
-            }
-            pthread_mutex_unlock(&ts->result_mutex);
-
-            // Signal main thread that we might have compleeted
-            pthread_mutex_lock(&ts->completed_mutex);
-            pthread_cond_signal(&ts->completed_cond);
-            pthread_mutex_unlock(&ts->completed_mutex);
-        }
-    }
-#endif
-    return 0;
-}
 
 
