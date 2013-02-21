@@ -13,7 +13,7 @@ TIGHTDB_TABLE_2(PeopleTable,
 void traverse(const Group& group)
 {
 // @@EndFold@@
-    for (size_t i=0; i<group.get_table_count(); ++i) {
+    for (size_t i=0; i<group.size(); ++i) {
         const char* table_name = group.get_table_name(i);
         ConstTableRef table = group.get_table(table_name);
         cout << table_name << " " << table->get_column_count() << "\n";
