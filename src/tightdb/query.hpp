@@ -27,8 +27,12 @@
 #include <string>
 #include <vector>
 
+#define TIGHTDB_MULTITHREAD_QUERY 0
+
+#if TIGHTDB_MULTITHREAD_QUERY
 // FIXME: If at all possible, we should hide the use of pthreads in the cpp-file
 #include <pthread.h>
+#endif
 
 #include <tightdb/table_ref.hpp>
 #include <tightdb/binary_data.hpp>
@@ -147,13 +151,14 @@ public:
     // Deletion
     size_t  remove(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
 
+#if TIGHTDB_MULTITHREAD_QUERY
     // Multi-threading
     TableView      find_all_multi(size_t start=0, size_t end=size_t(-1));
     ConstTableView find_all_multi(size_t start=0, size_t end=size_t(-1)) const;
     int            set_threads(unsigned int threadcount);
+#endif
 
     TableRef& get_table() {return m_table;}
-
 
 #ifdef TIGHTDB_DEBUG
     std::string Verify(); // Must be upper case to avoid conflict with macro in ObjC
@@ -174,8 +179,9 @@ protected:
     void   UpdatePointers(ParentNode* p, ParentNode** newnode);
 
     static bool  comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
-    static void* query_thread(void* arg);
 
+#if TIGHTDB_MULTITHREAD_QUERY
+    static void* query_thread(void* arg);
     struct thread_state {
         pthread_mutex_t result_mutex;
         pthread_cond_t  completed_cond;
@@ -193,6 +199,7 @@ protected:
     } ts;
     static const size_t max_threads = 128;
     pthread_t threads[max_threads];
+#endif
 
     TableRef m_table;
     std::vector<ParentNode*> first;
@@ -204,7 +211,10 @@ protected:
 
 private:
     std::string error_code;
+
+#if TIGHTDB_MULTITHREAD_QUERY
     size_t m_threadcount;
+#endif
 
     template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
     template<typename T>
@@ -212,7 +222,6 @@ private:
     template <Action action, typename T, typename R, class ColClass>
         R aggregate(R (ColClass::*method)(size_t, size_t) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
-
 };
 
 
