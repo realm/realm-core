@@ -80,9 +80,9 @@ SlabAlloc::~SlabAlloc()
     // Release memory
     if (m_data) {
         switch (m_free_mode) {
-            case free_Noop:                                     break;
-            case free_Unalloc: free(m_data);                    break;
-            case free_Unmap:   File::unmap(m_data, m_baseline); break;
+            case free_Noop:                                                        break;
+            case free_Unalloc: free(const_cast<char*>(m_data));                    break;
+            case free_Unmap:   File::unmap(const_cast<char*>(m_data), m_baseline); break;
         }
     }
 }
@@ -234,7 +234,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
 
 void* SlabAlloc::Translate(size_t ref) const TIGHTDB_NOEXCEPT
 {
-    if (ref < m_baseline) return m_data + ref;
+    if (ref < m_baseline) return const_cast<char*>(m_data) + ref;
     else {
         const size_t ndx = m_slabs.column().offset.find_pos(ref);
         TIGHTDB_ASSERT(ndx != not_found);
@@ -317,7 +317,7 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
 }
 
 
-void SlabAlloc::attach_buffer(char* data, size_t size, bool take_ownership)
+void SlabAlloc::attach_buffer(const char* data, size_t size, bool take_ownership)
 {
     // Verify the data structures
     if (!validate_buffer(data, size)) throw InvalidDatabase();
@@ -376,14 +376,14 @@ size_t SlabAlloc::GetTopRef() const TIGHTDB_NOEXCEPT
     // File header is 24 bytes, composed of three 64bit
     // blocks. The two first being top_refs (only one valid
     // at a time) and the last being the info block.
-    const char* const file_header = m_data;
+    const char* file_header = m_data;
 
     // Last bit in info block indicates which top_ref block
     // is valid
-    const size_t valid_ref = file_header[23] & 0x1;
+    size_t valid_ref = file_header[23] & 0x1;
 
-    const uint64_t* const top_refs = reinterpret_cast<uint64_t*>(m_data);
-    const size_t ref = to_ref(top_refs[valid_ref]);
+    const uint64_t* top_refs = reinterpret_cast<const uint64_t*>(m_data);
+    size_t ref = to_ref(top_refs[valid_ref]);
     TIGHTDB_ASSERT(ref < m_baseline);
 
     return ref;
@@ -440,9 +440,10 @@ bool SlabAlloc::ReMap(size_t filesize)
     TIGHTDB_ASSERT(filesize >= m_baseline);
     TIGHTDB_ASSERT((filesize & 0x7) == 0); // 64bit alignment
 
-    void* const addr = m_file.remap(m_data, m_baseline, File::access_ReadOnly, filesize);
+    void* const addr =
+        m_file.remap(const_cast<char*>(m_data), m_baseline, File::access_ReadOnly, filesize);
 
-    m_data     = static_cast<char*>(addr);
+    m_data     = static_cast<const char*>(addr);
     m_baseline = filesize;
 
     // Rebase slabs and free list

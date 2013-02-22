@@ -13,6 +13,10 @@ Format:
 ==================
 
 
+2013-02-19 (Kristian Spangsege)
++ Type of Group::BufferSpec::m_data changed from <char*> to <const char*>.
+
+
 2013-02-06 (Kristian Spangsege)
 + New enum DataType replaces ColumnType throughout the public API.
 
