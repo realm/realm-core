@@ -251,12 +251,12 @@ private:
     Table* get_impl() TIGHTDB_NOEXCEPT { return this; }
     const Table* get_impl() const TIGHTDB_NOEXCEPT { return this; }
 
-    template<class Subtab> Subtab* get_subtable_ptr(size_t col_idx, std::size_t row_idx)
+    template<class Subtab> Subtab* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx)
     {
         return static_cast<Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
     }
 
-    template<class Subtab> const Subtab* get_subtable_ptr(size_t col_idx, std::size_t row_idx) const
+    template<class Subtab> const Subtab* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx) const
     {
         return static_cast<const Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
     }
@@ -293,6 +293,7 @@ private:
     friend class BasicTableView<const BasicTable>;
 
     template<class, int> friend struct _impl::DiffColType;
+    template<class, int> friend struct _impl::InsertIntoCol;
     template<class, int, class, bool> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::MixedFieldAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessorBase;
@@ -534,9 +535,7 @@ namespace _impl
     template<class T, int col_idx> struct InsertIntoCol<SpecBase::Subtable<T>, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            t->insert_subtable(col_idx, row_idx);
-            TIGHTDB_ASSERT(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
-            static_cast<void>(tuple);
+            static_cast<const T*>(at<col_idx>(tuple))->insert_into(t, col_idx, row_idx);
         }
     };
 
