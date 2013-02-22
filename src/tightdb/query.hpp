@@ -84,11 +84,11 @@ public:
     Query& equal(size_t column_ndx, bool value);
 
     // Conditions: strings
-    Query& equal(size_t column_ndx, const char* value, bool caseSensitive=true);
-    Query& begins_with(size_t column_ndx, const char* value, bool caseSensitive=true);
-    Query& ends_with(size_t column_ndx, const char* value, bool caseSensitive=true);
-    Query& contains(size_t column_ndx, const char* value, bool caseSensitive=true);
-    Query& not_equal(size_t column_ndx, const char* value, bool caseSensitive=true);
+    Query& equal(size_t column_ndx, const char* value, bool case_sensitive=true);
+    Query& begins_with(size_t column_ndx, const char* value, bool case_sensitive=true);
+    Query& ends_with(size_t column_ndx, const char* value, bool case_sensitive=true);
+    Query& contains(size_t column_ndx, const char* value, bool case_sensitive=true);
+    Query& not_equal(size_t column_ndx, const char* value, bool case_sensitive=true);
 
     // Conditions: date
     Query& equal_date(size_t column_ndx, time_t value) { return equal(column_ndx, int64_t(value)); }
