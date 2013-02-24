@@ -61,26 +61,41 @@ class StringIndex;
 /// mixed column to group level). This could be done in a very
 /// efficient manner.
 ///
-/// FIXME: When compiling in debug mode, all table methods should
-/// should TIGHTDB_ASSERT(is_valid()).
+/// FIXME: When compiling in debug mode, all public table methods
+/// should should TIGHTDB_ASSERT(is_valid()).
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
     /// lifetime.
     ///
-    /// This constructor should be used only when placing table
-    /// variables on the stack, and it is then the responsibility of
+    /// This constructor should be used only when placing a table
+    /// instance on the stack, and it is then the responsibility of
     /// the application that there are no objects of type TableRef or
     /// ConstTableRef that refer to it, or to any of its subtables,
     /// when it goes out of scope. To create a top-level table with
     /// dynamic lifetime, use Table::create() instead.
-    Table(Allocator& alloc = Allocator::get_default());
+    Table(Allocator& = Allocator::get_default());
+
+    /// Construct a copy of the specified table as a new freestanding
+    /// top-level table with static lifetime.
+    ///
+    /// This constructor should be used only when placing a table
+    /// instance on the stack, and it is then the responsibility of
+    /// the application that there are no objects of type TableRef or
+    /// ConstTableRef that refer to it, or to any of its subtables,
+    /// when it goes out of scope. To create a top-level table with
+    /// dynamic lifetime, use Table::copy() instead.
+    Table(const Table&, Allocator& = Allocator::get_default());
 
     ~Table();
 
     /// Construct a new freestanding top-level table with dynamic
     /// lifetime.
-    static TableRef create(Allocator& alloc = Allocator::get_default());
+    static TableRef create(Allocator& = Allocator::get_default());
+
+    /// Construct a copy of the specified table as a new freestanding
+    /// top-level table with dynamic lifetime.
+    TableRef copy(Allocator& = Allocator::get_default()) const;
 
     /// An invalid table must not be accessed in any way except by
     /// calling is_valid(). A table that is obtained from a Group
@@ -374,13 +389,13 @@ protected:
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a TableRef.
-    Table *get_subtable_ptr(size_t col_idx, size_t row_idx);
+    Table* get_subtable_ptr(size_t col_idx, size_t row_idx);
 
     /// Get the subtable at the specified column and row index.
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a ConstTableRef.
-    const Table *get_subtable_ptr(size_t col_idx, size_t row_idx) const;
+    const Table* get_subtable_ptr(size_t col_idx, size_t row_idx) const;
 
     /// Compare the rows of two tables under the assumption that the
     /// two tables have the same spec, and therefore the same sequence
@@ -404,8 +419,7 @@ protected:
     void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
 private:
-    Table(Table const &); // Disable copy construction
-    Table &operator=(Table const &); // Disable copying assignment
+    Table& operator=(const Table&); // Disable copying assignment
 
     /// Put this table wrapper into the invalid state, which detaches
     /// it from the underlying structure of arrays. Also do this
@@ -576,7 +590,14 @@ inline std::size_t Table::create_empty_table(Allocator& alloc)
 inline Table::Table(Allocator& alloc):
     m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1), m_lookup_index(NULL)
 {
-    const size_t ref = create_empty_table(alloc); // Throws
+    size_t ref = create_empty_table(alloc); // Throws
+    init_from_ref(ref, 0, 0);
+}
+
+inline Table::Table(const Table& t, Allocator& alloc):
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1), m_lookup_index(NULL)
+{
+    size_t ref = t.clone(alloc); // Throws
     init_from_ref(ref, 0, 0);
 }
 
@@ -596,7 +617,14 @@ inline Table::Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t colum
 
 inline TableRef Table::create(Allocator& alloc)
 {
-    const size_t ref = Table::create_empty_table(alloc); // Throws
+    std::size_t ref = create_empty_table(alloc); // Throws
+    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    return table->get_table_ref();
+}
+
+inline TableRef Table::copy(Allocator& alloc) const
+{
+    std::size_t ref = clone(alloc); // Throws
     Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }

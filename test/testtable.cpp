@@ -240,6 +240,70 @@ TEST(Table_Delete)
 #endif
 }
 
+
+TEST(Table_LowLevelCopy)
+{
+    Table table;
+    table.add_column(type_Int, "i1");
+    table.add_column(type_Int, "i2");
+
+    table.insert_int(0, 0, 10);
+    table.insert_int(1, 0, 120);
+    table.insert_done();
+    table.insert_int(0, 1, 12);
+    table.insert_int(1, 1, 100);
+    table.insert_done();
+
+#ifdef TIGHTDB_DEBUG
+    table.Verify();
+#endif
+
+    Table table2 = table;
+
+#ifdef TIGHTDB_DEBUG
+    table2.Verify();
+#endif
+
+    CHECK(table2 == table);
+
+    TableRef table3 = table.copy();
+
+#ifdef TIGHTDB_DEBUG
+    table3->Verify();
+#endif
+
+    CHECK(*table3 == table);
+}
+
+
+TEST(Table_HighLevelCopy)
+{
+    TestTable table;
+    table.add(10, 120, false, Mon);
+    table.add(12, 100, true,  Tue);
+
+#ifdef TIGHTDB_DEBUG
+    table.Verify();
+#endif
+
+    TestTable table2 = table;
+
+#ifdef TIGHTDB_DEBUG
+    table2.Verify();
+#endif
+
+    CHECK(table2 == table);
+
+    TestTable::Ref table3 = table.copy();
+
+#ifdef TIGHTDB_DEBUG
+    table3->Verify();
+#endif
+
+    CHECK(*table3 == table);
+}
+
+
 // Pre-declare free standing function
 void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows);
 
@@ -1284,8 +1348,7 @@ TEST(Table_Spec_AddColumns)
 
 TEST(Table_Spec_DeleteColumnsBug)
 {
-    TableRef table;
-    table = Table::create();
+    TableRef table = Table::create();
 
     // Create specification with sub-table
     table->add_column(type_String, "name");
@@ -1351,8 +1414,6 @@ TEST(Table_Spec_DeleteColumnsBug)
 #ifdef TIGHTDB_DEBUG
     table->Verify();
 #endif
-
-    table.reset();
 }
 
 TEST(Table_Mixed)
@@ -1949,5 +2010,18 @@ TEST(Table_LanguageBindings)
 {
    Table* table = LangBindHelper::new_table();
    CHECK(table->is_valid());
+
+   table->add_column(type_Int, "i");
+   table->insert_int(0, 0, 10);
+   table->insert_done();
+   table->insert_int(0, 1, 12);
+   table->insert_done();
+
+   Table* table2 = LangBindHelper::copy_table(*table);
+   CHECK(table2->is_valid());
+
+   CHECK(*table == *table2);
+
    LangBindHelper::unbind_table_ref(table);
+   LangBindHelper::unbind_table_ref(table2);
 }

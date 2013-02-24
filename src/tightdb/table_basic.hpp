@@ -80,17 +80,17 @@ public:
 
     BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc) { set_dynamic_spec(); }
 
+    BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()): Table(t, alloc) {}
+
+    static Ref create(Allocator& = Allocator::get_default());
+
+    Ref copy(Allocator& = Allocator::get_default()) const;
+
     static int get_column_count() { return TypeCount<typename Spec::Columns>::value; }
 
-    BasicTableRef<BasicTable> get_table_ref()
-    {
-        return BasicTableRef<BasicTable>(this);
-    }
+    Ref get_table_ref() { return Ref(this); }
 
-    BasicTableRef<const BasicTable> get_table_ref() const
-    {
-        return BasicTableRef<const BasicTable>(this);
-    }
+    ConstRef get_table_ref() const { return ConstRef(this); }
 
 private:
     template<int col_idx> struct Col {
@@ -635,16 +635,34 @@ namespace _impl
 }
 
 
+template<class Spec>
+inline typename BasicTable<Spec>::Ref BasicTable<Spec>::create(Allocator& alloc)
+{
+    TableRef ref = Table::create(alloc);
+    static_cast<BasicTable&>(*ref)->set_dynamic_spec();
+    return unchecked_cast<BasicTable<Spec> >(move(ref));
+}
+
+
+template<class Spec>
+inline typename BasicTable<Spec>::Ref BasicTable<Spec>::copy(Allocator& alloc) const
+{
+    return unchecked_cast<BasicTable<Spec> >(Table::copy(alloc));
+}
+
+
 template<class T> inline bool is_a(const Table& t)
 {
     return T::matches_dynamic_spec(&t.get_spec());
 }
+
 
 template<class T> inline BasicTableRef<T> checked_cast(TableRef t)
 {
     if (!is_a<T>(*t)) return BasicTableRef<T>(); // Null
     return unchecked_cast<T>(t);
 }
+
 
 template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t)
 {
