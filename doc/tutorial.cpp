@@ -141,28 +141,23 @@ int main() {
 
     // Read transaction
     {
-        const Group& group = db.begin_read(); // start transaction
-        MyTable::ConstRef table = group.get_table<MyTable>("employees");
+        ReadTransaction tr(db); // start transaction
+        MyTable::ConstRef table = tr.get_table<MyTable>("employees");
 
         // Print table contents
         for (size_t i = 0; i < table->size(); ++i)
             cout << i << ": " << table[i].name << endl;
-
-        db.end_read(); // end transaction
     }
 
-    // Write transaction
-    try {
-        Group& group = db.begin_write(); // start transaction
-        MyTable::Ref table = group.get_table<MyTable>("employees");
+    // Write transaction (will rollback on error)
+    {
+        WriteTransaction tr(db); // start transaction
+        MyTable::Ref table = tr.get_table<MyTable>("employees");
 
         // Add row to table
         t->add("Bill", 53, true);
 
-        db.commit(); // end transaction
-    }
-    catch (...) {
-        db.rollback(); // rollback on error
+        tr.commit(); // end transaction
     }
     // @@EndExample@@
 }

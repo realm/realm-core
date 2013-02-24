@@ -69,7 +69,7 @@ public:
     /// Attach this allocator to the specified memory buffer.
     ///
     /// \throw InvalidDatabase
-    void attach_buffer(char* data, size_t size, bool take_ownership);
+    void attach_buffer(const char* data, size_t size, bool take_ownership);
 
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
@@ -110,16 +110,16 @@ private:
 
     static const char default_header[24];
 
-    File      m_file;
-    char*     m_data;
-    FreeMode  m_free_mode;
-    size_t    m_baseline; // Also size of memory mapped portion of database file
-    Slabs     m_slabs;
-    FreeSpace m_freeSpace;
-    FreeSpace m_freeReadOnly;
+    File        m_file;
+    const char* m_data;
+    FreeMode    m_free_mode;
+    size_t      m_baseline; // Also size of memory mapped portion of database file
+    Slabs       m_slabs;
+    FreeSpace   m_freeSpace;
+    FreeSpace   m_freeReadOnly;
 
 #ifdef TIGHTDB_DEBUG
-    bool      m_debugOut;
+    bool        m_debugOut;
 #endif
 
     const FreeSpace& GetFreespace() const {return m_freeReadOnly;}
