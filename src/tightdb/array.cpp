@@ -2105,7 +2105,7 @@ const char* Array::string_column_get(size_t ndx) const TIGHTDB_NOEXCEPT
     if (is_leaf()) {
         if (HasRefs())
             return static_cast<const ArrayStringLong*>(this)->Get(ndx);
-        return static_cast<const ArrayString*>(this)->Get(ndx);
+        return static_cast<const ArrayString*>(this)->get(ndx);
     }
 
     pair<const char*, size_t> p = find_leaf(this, ndx);

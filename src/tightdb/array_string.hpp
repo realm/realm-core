@@ -28,20 +28,20 @@ namespace tightdb {
 
 class ArrayString : public Array {
 public:
-    ArrayString(ArrayParent *parent=NULL, size_t pndx=0,
-                Allocator& alloc = Allocator::get_default());
+    ArrayString(ArrayParent* = 0, size_t pndx = 0,
+                Allocator& = Allocator::get_default());
     ArrayString(size_t ref, const ArrayParent *parent, size_t pndx,
-                Allocator& alloc = Allocator::get_default());
-    ArrayString(Allocator& alloc);
+                Allocator& = Allocator::get_default());
+    ArrayString(Allocator&);
 
-    const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    const char* get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add();
-    void add(const char* value);
-    void Set(size_t ndx, const char* c_str);
-    void Set(size_t ndx, const char* data, size_t size);
-    void Insert(size_t ndx, const char* c_str);
-    void Insert(size_t ndx, const char* data, size_t size);
-    void Delete(size_t ndx);
+    void add(const char* c_str);
+    void set(std::size_t ndx, const char* c_str);
+    void set(std::size_t ndx, const char* data, std::size_t size);
+    void insert(std::size_t ndx, const char* c_str);
+    void insert(std::size_t ndx, const char* data, std::size_t size);
+    void erase(std::size_t ndx);
 
     size_t count(const char* value, size_t start=0, size_t end=-1) const;
     size_t find_first(const char* value, size_t start=0 , size_t end=-1) const;
@@ -99,7 +99,7 @@ inline ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t nd
 // Creates new array (but invalid, call UpdateRef to init)
 inline ArrayString::ArrayString(Allocator& alloc): Array(alloc) {}
 
-inline const char* ArrayString::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline const char* ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
@@ -107,12 +107,27 @@ inline const char* ArrayString::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     else return reinterpret_cast<char*>(m_data) + (ndx * m_width);
 }
 
-inline void ArrayString::Set(std::size_t ndx, const char* value)
+inline void ArrayString::add()
+{
+    insert(m_len, "", 0); // Throws
+}
+
+inline void ArrayString::add(const char* c_str)
+{
+    insert(m_len, c_str, std::strlen(c_str)); // Throws
+}
+
+inline void ArrayString::set(std::size_t ndx, const char* c_str)
 {
     TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(value);
+    TIGHTDB_ASSERT(c_str);
 
-    Set(ndx, value, std::strlen(value)); // Throws
+    set(ndx, c_str, std::strlen(c_str)); // Throws
+}
+
+inline void ArrayString::insert(std::size_t ndx, const char* c_str)
+{
+    insert(ndx, c_str, std::strlen(c_str)); // Throws
 }
 
 

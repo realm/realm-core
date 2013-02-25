@@ -382,7 +382,7 @@ inline const char* Group::get_table_name(std::size_t table_ndx) const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     TIGHTDB_ASSERT(table_ndx < m_tableNames.size());
-    return m_tableNames.Get(table_ndx);
+    return m_tableNames.get(table_ndx);
 }
 
 inline const Table* Group::get_table_ptr(std::size_t ndx) const
@@ -538,7 +538,7 @@ void Group::to_json(S& out) const
     out << "{";
 
     for (size_t i = 0; i < m_tables.size(); ++i) {
-        const char* const name = m_tableNames.Get(i);
+        const char* const name = m_tableNames.get(i);
         const Table* const table = get_table_ptr(i);
 
         if (i) out << ",";

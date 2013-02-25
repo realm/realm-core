@@ -297,7 +297,7 @@ const char* AdaptiveStringColumn::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
         return static_cast<ArrayStringLong*>(m_array)->Get(ndx);
     }
     else {
-        return static_cast<ArrayString*>(m_array)->Get(ndx);
+        return static_cast<ArrayString*>(m_array)->get(ndx);
     }
 }
 
@@ -310,7 +310,7 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, const char* value)
         return;
     }
     if (len < 16) {
-        static_cast<ArrayString*>(m_array)->Set(ndx, value);
+        static_cast<ArrayString*>(m_array)->set(ndx, value);
         return;
     }
 
@@ -321,7 +321,7 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, const char* value)
     // Copy strings to new array
     ArrayString* const oldarray = static_cast<ArrayString*>(m_array);
     for (size_t i = 0; i < oldarray->size(); ++i) {
-        newarray->add(oldarray->Get(i));
+        newarray->add(oldarray->get(i));
     }
     newarray->Set(ndx, value, len);
 
@@ -348,7 +348,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
         return;
     }
     if (len < 16) {
-        static_cast<ArrayString*>(m_array)->Insert(ndx, value);
+        static_cast<ArrayString*>(m_array)->insert(ndx, value);
         return;
     }
 
@@ -360,7 +360,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
     ArrayString* const oldarray = static_cast<ArrayString*>(m_array);
     const size_t n = oldarray->size();
     for (size_t i=0; i<n; ++i) {
-        newarray->add(oldarray->Get(i));
+        newarray->add(oldarray->get(i));
     }
     newarray->Insert(ndx, value, len);
 
@@ -402,7 +402,7 @@ void AdaptiveStringColumn::LeafDelete(size_t ndx)
         static_cast<ArrayStringLong*>(m_array)->Delete(ndx);
     }
     else {
-        static_cast<ArrayString*>(m_array)->Delete(ndx);
+        static_cast<ArrayString*>(m_array)->erase(ndx);
     }
 }
 

@@ -31,7 +31,7 @@ size_t round_up(size_t len)
 namespace tightdb {
 
 
-void ArrayString::Set(size_t ndx, const char* data, size_t size)
+void ArrayString::set(size_t ndx, const char* data, size_t size)
 {
     TIGHTDB_ASSERT(ndx < m_len);
     TIGHTDB_ASSERT(data);
@@ -49,17 +49,17 @@ void ArrayString::Set(size_t ndx, const char* data, size_t size)
         Alloc(m_len, min_width); // Throws
 
         // Expand the old values in reverse order
-        char* const base = reinterpret_cast<char*>(m_data);
+        char* base = m_data;
         const char* old_end = base + m_len*m_width;
         char*       new_end = base + m_len*min_width;
         while (new_end != base) {
             {
-              char* const new_begin = new_end - (min_width-m_width);
+              char* new_begin = new_end - (min_width-m_width);
               fill(new_begin, new_end, 0); // Extra zero-padding is needed
               new_end = new_begin;
             }
             {
-              const char* const old_begin = old_end - m_width;
+              const char* old_begin = old_end - m_width;
               new_end = copy_backward(old_begin, old_end, new_end);
               old_end = old_begin;
             }
@@ -68,33 +68,14 @@ void ArrayString::Set(size_t ndx, const char* data, size_t size)
     }
 
     // Set the value
-    char*       begin = reinterpret_cast<char*>(m_data) + (ndx * m_width);
-    char* const end   = begin + m_width;
+    char* begin = m_data + (ndx * m_width);
+    char* end   = begin + m_width;
     begin = copy(data, data+size, begin);
     fill(begin, end, 0); // Pad with zeroes
 }
 
-// FIXME: Should be moved to header
-void ArrayString::add()
-{
-    Insert(m_len, "", 0); // Throws
-}
 
-// FIXME: Should be moved to header
-void ArrayString::add(const char* value)
-{
-    Insert(m_len, value, strlen(value)); // Throws
-}
-
-// FIXME: Should be moved to header
-void ArrayString::Insert(size_t ndx, const char* value)
-{
-    Insert(ndx, value, strlen(value)); // Throws
-}
-
-
-
-void ArrayString::Insert(size_t ndx, const char* data, size_t size)
+void ArrayString::insert(size_t ndx, const char* data, size_t size)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
     TIGHTDB_ASSERT(data);
@@ -109,7 +90,7 @@ void ArrayString::Insert(size_t ndx, const char* data, size_t size)
     // Make room for the new value
     Alloc(m_len+1, new_width); // Throws
 
-    char* const base = reinterpret_cast<char*>(m_data);
+    char* base = m_data;
     const char* old_end = base + m_len*m_width;
     char*       new_end = base + m_len*new_width + new_width;
 
@@ -120,12 +101,12 @@ void ArrayString::Insert(size_t ndx, const char* data, size_t size)
             char* const new_begin = base + ndx*new_width + new_width;
             do {
                 {
-                    char* const new_begin2 = new_end - (new_width-m_width);
+                    char* new_begin2 = new_end - (new_width-m_width);
                     fill(new_begin2, new_end, 0); // Extra zero-padding is needed
                     new_end = new_begin2;
                 }
                 {
-                    const char* const old_begin = old_end - m_width;
+                    const char* old_begin = old_end - m_width;
                     new_end = copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
                 }
@@ -134,7 +115,7 @@ void ArrayString::Insert(size_t ndx, const char* data, size_t size)
         }
         else {
             // when no expansion just move the following entries forward
-            const char* const old_begin = base + ndx*m_width;
+            const char* old_begin = base + ndx*m_width;
             new_end = copy_backward(old_begin, old_end, new_end);
             old_end = old_begin;
         }
@@ -142,8 +123,8 @@ void ArrayString::Insert(size_t ndx, const char* data, size_t size)
 
     // Set the value
     {
-        char* const new_begin = new_end - new_width;
-        char* const pad_begin = copy(data, data+size, new_begin);
+        char* new_begin = new_end - new_width;
+        char* pad_begin = copy(data, data+size, new_begin);
         fill(pad_begin, new_end, 0); // Pad with zeroes
         new_end = new_begin;
     }
@@ -152,12 +133,12 @@ void ArrayString::Insert(size_t ndx, const char* data, size_t size)
     if (TIGHTDB_UNLIKELY(m_width < new_width)) {
         while (new_end != base) {
             {
-              char* const new_begin = new_end - (new_width-m_width);
+              char* new_begin = new_end - (new_width-m_width);
               fill(new_begin, new_end, 0); // Extra zero-padding is needed
               new_end = new_begin;
             }
             {
-              const char* const old_begin = old_end - m_width;
+              const char* old_begin = old_end - m_width;
               new_end = copy_backward(old_begin, old_end, new_end);
               old_end = old_begin;
             }
@@ -168,7 +149,7 @@ void ArrayString::Insert(size_t ndx, const char* data, size_t size)
     ++m_len;
 }
 
-void ArrayString::Delete(size_t ndx)
+void ArrayString::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
@@ -177,9 +158,9 @@ void ArrayString::Delete(size_t ndx)
 
     // move data backwards after deletion
     if (ndx < m_len-1) {
-        char* const new_begin = reinterpret_cast<char*>(m_data) + ndx*m_width;
+        char* const new_begin = m_data + ndx*m_width;
         char* const old_begin = new_begin + m_width;
-        char* const old_end   = reinterpret_cast<char*>(m_data) + m_len*m_width;
+        char* const old_end   = m_data + m_len*m_width;
         copy(old_begin, old_end, new_begin);
     }
 
@@ -244,17 +225,17 @@ size_t ArrayString::FindWithLen(const char* value, size_t len, size_t start, siz
 {
     TIGHTDB_ASSERT(value);
 
-    if (end == (size_t)-1) end = m_len;
-    if (start == end) return (size_t)-1;
+    if (end == size_t(-1)) end = m_len;
+    if (start == end) return size_t(-1);
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
-    if (m_len == 0) return (size_t)-1; // empty list
-    if (len >= m_width) return (size_t)-1; // A string can never be wider than the column width
+    if (m_len == 0) return size_t(-1); // empty list
+    if (len >= m_width) return size_t(-1); // A string can never be wider than the column width
 
     // todo, ensure behaves as expected when m_width = 0
 
     for (size_t i = start; i < end; ++i) {
         if (value[0] == (char)m_data[i * m_width] && value[len] == (char)m_data[i * m_width + len]) {
-            const char* const v = (const char *)m_data + i * m_width;
+            const char* v = m_data + i * m_width;
             if (strncmp(value, v, len) == 0) return i;
         }
     }
@@ -267,7 +248,7 @@ bool ArrayString::Compare(const ArrayString& c) const
     if (c.size() != size()) return false;
 
     for (size_t i = 0; i < size(); ++i) {
-        if (strcmp(Get(i), c.Get(i)) != 0) return false;
+        if (strcmp(get(i), c.get(i)) != 0) return false;
     }
 
     return true;
@@ -282,7 +263,7 @@ void ArrayString::StringStats() const
     size_t longest = 0;
 
     for (size_t i = 0; i < m_len; ++i) {
-        const char* str = Get(i);
+        const char* str = get(i);
         const size_t len = strlen(str)+1;
 
         total += len;
@@ -306,14 +287,14 @@ void ArrayString::StringStats() const
 /*
 void ArrayString::ToDot(FILE* f) const
 {
-    const size_t ref = GetRef();
+    const size_t ref = getRef();
 
     fprintf(f, "n%zx [label=\"", ref);
 
     for (size_t i = 0; i < m_len; ++i) {
         if (i > 0) fprintf(f, " | ");
 
-        fprintf(f, "%s", Get(i));
+        fprintf(f, "%s", get(i));
     }
 
     fprintf(f, "\"];\n");
@@ -338,7 +319,7 @@ void ArrayString::ToDot(ostream& out, const char* title) const
     out << "0x" << hex << ref << dec << "</FONT></TD>" << endl;
 
     for (size_t i = 0; i < m_len; ++i) {
-        out << "<TD>\"" << Get(i) << "\"</TD>" << endl;
+        out << "<TD>\"" << get(i) << "\"</TD>" << endl;
     }
 
     out << "</TR></TABLE>>];" << endl;

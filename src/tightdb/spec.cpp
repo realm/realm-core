@@ -146,7 +146,7 @@ void Spec::rename_column(size_t column_ndx, const char* newname)
 
     //TODO: Verify that new name is valid
 
-    m_names.Set(column_ndx, newname);
+    m_names.set(column_ndx, newname);
 }
 
 void Spec::rename_column(const vector<size_t>& column_ids, const char* name) {
@@ -185,7 +185,7 @@ void Spec::remove_column(size_t column_ndx)
     }
 
     // Delete the actual name and type entries
-    m_names.Delete(column_ndx);
+    m_names.erase(column_ndx);
     m_spec.Delete(type_ndx);
 
     // If there are an attribute, we have to delete that as well
@@ -391,7 +391,7 @@ void Spec::set_column_attr(size_t ndx, ColumnType attr)
 const char* Spec::get_column_name(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_names.Get(ndx);
+    return m_names.get(ndx);
 }
 
 size_t Spec::get_column_index(const char* name) const
