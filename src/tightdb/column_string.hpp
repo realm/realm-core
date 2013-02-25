@@ -72,7 +72,7 @@ public:
     bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
 
     /// Compare two string columns for equality.
-    bool Compare(const AdaptiveStringColumn&) const;
+    bool compare(const AdaptiveStringColumn&) const;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC

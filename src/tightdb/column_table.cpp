@@ -36,15 +36,25 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 
 void ColumnTable::add()
 {
-    Insert(Size()); // zero-ref indicates empty table
+    invalidate_subtables();
+    add(0); // Null-pointer indicates empty table
 }
 
-void ColumnTable::Insert(size_t ndx)
+void ColumnTable::insert(size_t ndx)
+{
+    invalidate_subtables();
+    insert(ndx, 0); // Null-pointer indicates empty table
+}
+
+void ColumnTable::insert(size_t ndx, const Table* subtable)
 {
     TIGHTDB_ASSERT(ndx <= Size());
 
-    // zero-ref indicates empty table
-    Column::Insert(ndx, 0);
+    size_t columns_ref = 0;
+    if (subtable)
+        columns_ref = clone_table_columns(subtable);
+
+    Column::Insert(ndx, columns_ref);
 }
 
 void ColumnTable::fill(size_t count)
@@ -93,7 +103,7 @@ void ColumnTable::ClearTable(size_t ndx)
     Set(ndx, 0);
 }
 
-bool ColumnTable::Compare(const ColumnTable& c) const
+bool ColumnTable::compare(const ColumnTable& c) const
 {
     const size_t n = Size();
     if (c.Size() != n) return false;

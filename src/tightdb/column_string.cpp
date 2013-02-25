@@ -468,7 +468,7 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
         size_t pos;
         const bool res = keys.FindKeyPos(v, pos);  // todo/fixme, res isn't used
         TIGHTDB_ASSERT(res);
-        (void)res;
+        static_cast<void>(res);
 
         values.add(pos);
     }
@@ -478,7 +478,7 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
     return true;
 }
 
-bool AdaptiveStringColumn::Compare(const AdaptiveStringColumn& c) const
+bool AdaptiveStringColumn::compare(const AdaptiveStringColumn& c) const
 {
     const size_t n = Size();
     if (c.Size() != n) return false;

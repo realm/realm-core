@@ -188,7 +188,7 @@ void BasicColumn<T>::fill(size_t count)
 }
 
 template<typename T>
-bool BasicColumn<T>::Compare(const BasicColumn& c) const
+bool BasicColumn<T>::compare(const BasicColumn& c) const
 {
     const size_t n = Size();
     if (c.Size() != n)
