@@ -716,10 +716,10 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
                 m = Get<w>(start);
         }
 
-        if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / no0(w)) {
+        if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof(__m128i) * 8 / NO0(w)) {
             __m128i *data = (__m128i *)(m_data + start * w / 8);
             __m128i state = data[0];
-            __m128i state2;
+            char state2[sizeof(state)];
 
             size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
             for (size_t t = 0; t < chunks; t++) {
@@ -730,17 +730,23 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
                 else if (w == 32)
                     state = find_max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
 
-                start += sizeof(__m128i) * 8 / no0(w);
+                start += sizeof(__m128i) * 8 / NO0(w);
             }
 
-            // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
-            state2 = state;
-            for (size_t t = 0; t < sizeof(__m128i) * 8 / no0(w); ++t) {
+            // Todo: prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
+
+            // We originally had declared '__m128i state2' and did an 'state2 = state' assignment. When we read from state2 through int16_t, int32_t or int64_t in GetUniversal(),
+            // the compiler thinks it cannot alias state2 and hence reorders the read and assignment.
+
+            // In this fixed version using memcpy, we have char-read-access from __m128i (OK aliasing) and char-write-access to char-array, and finally int8/16/32/64 
+            // read access from char-array (OK aliasing).
+            memcpy(&state2, &state, sizeof(state));
+            for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
                 const int64_t v = GetUniversal<w>(((const char *)&state2), t);
                 if (find_max ? v > m : v < m) {
                     m = v;
                 }
-            }
+            }        
         }
     }
 #endif
