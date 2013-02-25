@@ -75,7 +75,7 @@ namespace tightdb {
 
 extern signed char sse_support;
 
-template <int version>TIGHTDB_FORCEINLINE bool cpuid_sse()
+template<int version> TIGHTDB_FORCEINLINE bool cpuid_sse()
 {
 /*
     Return wether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value

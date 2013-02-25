@@ -62,8 +62,11 @@ public:
     void ReuseIndex(StringIndex& index);
     void RemoveIndex() {m_index = NULL;}
 
-    /// Compare two string enumeration columns for equality
-    bool Compare(const ColumnStringEnum&) const;
+    // Compare two string columns for equality
+    bool compare(const AdaptiveStringColumn&) const;
+    bool compare(const ColumnStringEnum&) const;
+
+    const Array* get_enum_root_array() const TIGHTDB_NOEXCEPT { return m_keys.get_root_array(); }
 
     void foreach(Array::ForEachOp<const char*>*) const TIGHTDB_NOEXCEPT;
 

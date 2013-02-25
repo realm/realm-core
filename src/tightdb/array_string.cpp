@@ -13,7 +13,7 @@ namespace {
 
 // When len = 0 returns 0
 // When len = 1 returns 4
-// When 2 <= len < 256 returns 2**ceil(log2(len+1)).
+// When 2 <= len < 256, returns 2**ceil(log2(len+1)).
 // Thus, 0 < len < 256 implies that len < round_up(len).
 size_t round_up(size_t len)
 {

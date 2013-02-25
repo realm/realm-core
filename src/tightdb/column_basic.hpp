@@ -50,7 +50,7 @@ public:
     size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
-    T Get(size_t ndx) const;
+    T Get(size_t ndx) const TIGHTDB_NOEXCEPT;
     void add() TIGHTDB_OVERRIDE { add(0); }
     void add(T value);
     void Set(size_t ndx, T value);
@@ -81,7 +81,7 @@ public:
     void SetParent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE {m_array->SetParent(parent, pndx);}
 
     /// Compare two columns for equality.
-    bool Compare(const BasicColumn&) const;
+    bool compare(const BasicColumn&) const;
 
     void foreach(Array::ForEachOp<T>*) const TIGHTDB_NOEXCEPT;
 

@@ -42,6 +42,8 @@ public:
     void Resize(size_t size);
     void Clear();
 
+    static const char* get_direct(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif // TIGHTDB_DEBUG
@@ -49,7 +51,7 @@ public:
 private:
     size_t CalcByteLen(size_t count, size_t width) const TIGHTDB_OVERRIDE;
     size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    WidthType GetWidthType() const TIGHTDB_OVERRIDE {return TDB_IGNORE;}
+    WidthType GetWidthType() const TIGHTDB_OVERRIDE { return wtype_Ignore; }
 };
 
 
@@ -62,7 +64,7 @@ inline ArrayBlob::ArrayBlob(ArrayParent *parent, std::size_t pndx, Allocator& al
 {
     // Manually set wtype as array constructor in initiatializer list
     // will not be able to call correct virtual function
-    set_header_wtype(TDB_IGNORE);
+    set_header_wtype(wtype_Ignore);
 }
 
 inline ArrayBlob::ArrayBlob(std::size_t ref, const ArrayParent *parent, std::size_t pndx,
@@ -79,7 +81,7 @@ inline ArrayBlob::ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc) {}
 
 inline const char* ArrayBlob::Get(std::size_t pos) const TIGHTDB_NOEXCEPT
 {
-    return reinterpret_cast<const char*>(m_data) + pos;
+    return m_data + pos;
 }
 
 inline void ArrayBlob::add(const char* data, std::size_t len)
@@ -106,6 +108,12 @@ inline void ArrayBlob::Resize(std::size_t len)
 inline void ArrayBlob::Clear()
 {
     Replace(0, m_len, 0, 0);
+}
+
+inline const char* ArrayBlob::get_direct(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT
+{
+    const char* data = get_data_from_header(header);
+    return data + pos;
 }
 
 inline std::size_t ArrayBlob::CalcByteLen(std::size_t count, std::size_t) const

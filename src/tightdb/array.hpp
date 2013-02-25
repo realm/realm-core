@@ -41,6 +41,7 @@ Searching: The main finding function is:
 #include <stdint.h> // unint8_t etc
 #include <cstdlib> // size_t
 #include <cstring> // memmove
+#include <utility>
 #include <vector>
 #include <ostream>
 
@@ -162,8 +163,6 @@ enum ColumnDef {
     coldef_HasRefs
 };
 
-bool IsArrayIndexNode(size_t ref, const Allocator& alloc);
-
 
 class ArrayParent
 {
@@ -268,9 +267,10 @@ public:
     void Clear();
 
     // Direct access methods
-    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const;
-    int64_t ColumnGet(size_t ndx) const TIGHTDB_NOEXCEPT;
-    const char* ColumnStringGet(size_t ndx) const TIGHTDB_NOEXCEPT;
+    const Array* GetBlock(size_t ndx, Array& arr, size_t& off,
+                          bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
+    int64_t column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    const char* string_column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
     typedef const char*(*StringGetter)(void*, size_t); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const;
@@ -300,18 +300,18 @@ public:
     void Resize(size_t count);
 
     /// Returns true if type is not coldef_InnerNode
-    bool is_leaf() const TIGHTDB_NOEXCEPT {return !m_isNode;}
+    bool is_leaf() const TIGHTDB_NOEXCEPT { return !m_isNode; }
 
     /// Returns true if type is either coldef_HasRefs or coldef_InnerNode
-    bool HasRefs() const TIGHTDB_NOEXCEPT {return m_hasRefs;}
+    bool HasRefs() const TIGHTDB_NOEXCEPT { return m_hasRefs; }
 
     // FIXME: Remove this, wrong terminology
-    bool IsNode() const TIGHTDB_NOEXCEPT {return m_isNode;}
+    bool IsNode() const TIGHTDB_NOEXCEPT { return m_isNode; }
 
-    bool IsIndexNode() const {return get_header_indexflag();}
-    void SetIsIndexNode(bool value) {set_header_indexflag(value);}
+    bool IsIndexNode() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
+    void SetIsIndexNode(bool value) { set_header_indexflag(value); }
     Array GetSubArray(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array may cause the parent to be modified too.
-    size_t GetRef() const TIGHTDB_NOEXCEPT {return m_ref;};
+    size_t GetRef() const TIGHTDB_NOEXCEPT { return m_ref; }
     void Destroy();
 
     Allocator& GetAllocator() const TIGHTDB_NOEXCEPT {return m_alloc;}
@@ -400,9 +400,31 @@ public:
     void Stats(MemStats& stats) const;
 #endif // TIGHTDB_DEBUG
 
-    // FIXME: Should be 'char' not 'unsigned char'
+    // FIXME: Should not be mutable
     // FIXME: Should not be public
-    mutable unsigned char* m_data;
+    mutable char* m_data;
+
+    static bool is_index_node(std::size_t ref, const Allocator&);
+
+    static char* get_data_from_header(char*) TIGHTDB_NOEXCEPT;
+    static char* get_header_from_data(char*) TIGHTDB_NOEXCEPT;
+    static const char* get_data_from_header(const char*) TIGHTDB_NOEXCEPT;
+
+    enum WidthType {
+        wtype_Bits     = 0,
+        wtype_Multiply = 1,
+        wtype_Ignore   = 2
+    };
+
+    static bool get_isnode_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_hasrefs_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_indexflag_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static WidthType get_wtype_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static int get_width_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static std::size_t get_len_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
+
+    static std::size_t get_alloc_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     template<class T> struct ForEachOp {
         virtual void handle_chunk(const T* begin, const T* end) TIGHTDB_NOEXCEPT = 0;
@@ -411,7 +433,6 @@ public:
     void foreach(ForEachOp<int64_t>*) const TIGHTDB_NOEXCEPT;
 
 private:
-
     typedef bool (*CallbackDummy)(int64_t);
 
     template<size_t w> bool MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t* min, int64_t* max);
@@ -433,50 +454,61 @@ protected:
 //    void AddPositiveLocal(int64_t value);
 
     void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
-    void CreateFromHeader(uint8_t* header, size_t ref=0) TIGHTDB_NOEXCEPT;
-    void CreateFromHeaderDirect(uint8_t* header, size_t ref=0) TIGHTDB_NOEXCEPT;
+    void CreateFromHeader(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
+    void CreateFromHeaderDirect(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void update_ref_in_parent();
-
-    enum WidthType {
-        TDB_BITS     = 0,
-        TDB_MULTIPLY = 1,
-        TDB_IGNORE   = 2
-    };
 
     virtual size_t CalcByteLen(size_t count, size_t width) const;
     virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
-    virtual WidthType GetWidthType() const {return TDB_BITS;}
+    virtual WidthType GetWidthType() const { return wtype_Bits; }
 
-    void set_header_isnode(bool value);
-    void set_header_hasrefs(bool value);
-    void set_header_indexflag(bool value);
-    void set_header_wtype(WidthType value);
-    void set_header_width(size_t value);
-    void set_header_len(size_t value);
-    void set_header_capacity(size_t value);
+    bool get_isnode_from_header() const TIGHTDB_NOEXCEPT;
+    bool get_hasrefs_from_header() const TIGHTDB_NOEXCEPT;
+    bool get_indexflag_from_header() const TIGHTDB_NOEXCEPT;
+    WidthType get_wtype_from_header() const TIGHTDB_NOEXCEPT;
+    int get_width_from_header() const TIGHTDB_NOEXCEPT;
+    std::size_t get_len_from_header() const TIGHTDB_NOEXCEPT;
+    std::size_t get_capacity_from_header() const TIGHTDB_NOEXCEPT;
 
-    bool get_header_isnode(const void* header=0) const TIGHTDB_NOEXCEPT;
-    bool get_header_hasrefs(const void* header=0) const TIGHTDB_NOEXCEPT;
-    bool get_header_indexflag(const void* header=0) const TIGHTDB_NOEXCEPT;
-    WidthType get_header_wtype(const void* header=0) const TIGHTDB_NOEXCEPT;
-    size_t get_header_width(const void* header=0) const TIGHTDB_NOEXCEPT;
-    size_t get_header_len(const void* header=0) const TIGHTDB_NOEXCEPT;
-    size_t get_header_capacity(const void* header=0) const TIGHTDB_NOEXCEPT;
+    void set_header_isnode(bool value) TIGHTDB_NOEXCEPT;
+    void set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT;
+    void set_header_indexflag(bool value) TIGHTDB_NOEXCEPT;
+    void set_header_wtype(WidthType value) TIGHTDB_NOEXCEPT;
+    void set_header_width(int value) TIGHTDB_NOEXCEPT;
+    void set_header_len(std::size_t value) TIGHTDB_NOEXCEPT;
+    void set_header_capacity(std::size_t value) TIGHTDB_NOEXCEPT;
 
-    static void set_header_isnode(bool value, void* header);
-    static void set_header_hasrefs(bool value, void* header);
-    static void set_header_indexflag(bool value, void* header);
-    static void set_header_wtype(int value, void* header);
-    static void set_header_width(size_t value, void* header);
-    static void set_header_len(size_t value, void* header);
-    static void set_header_capacity(size_t value, void* header);
-    static void init_header(void* header, bool is_node, bool has_refs, int width_type,
-                            size_t width, size_t length, size_t capacity);
+    static void set_header_isnode(bool value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_indexflag(bool value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_width(int value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_len(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
+
+    static void init_header(char* header, bool is_node, bool has_refs, WidthType width_type,
+                            int width, std::size_t length, std::size_t capacity) TIGHTDB_NOEXCEPT;
 
     template<size_t width> void SetWidth() TIGHTDB_NOEXCEPT;
     void SetWidth(size_t) TIGHTDB_NOEXCEPT;
     void Alloc(size_t count, size_t width);
     void CopyOnWrite();
+
+    // Find the leaf node corresponding to the specified column-level
+    // index. The specified array must be the root node of a B+ tree,
+    // and that root node must not itself be a leaf. This implies, of
+    // course, that the column must not be empty.
+    //
+    // \return (leaf_header, leaf_index) where 'leaf_header' is a
+    // pointer to the header of the located leaf, and 'leaf_index' is
+    // the local index within that leaf corresponding to the specified
+    // column-level index.
+    static std::pair<const char*, std::size_t> find_leaf(const Array* root, std::size_t i) TIGHTDB_NOEXCEPT;
+
+    static std::size_t get_as_size(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+
+    static std::pair<std::size_t, std::size_t> get_two_as_size(const char* header,
+                                                               std::size_t ndx) TIGHTDB_NOEXCEPT;
 
 private:
     size_t m_ref;
@@ -517,6 +549,8 @@ protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
 };
+
+
 
 
 
@@ -751,80 +785,193 @@ inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
 }
 
 
+inline bool Array::is_index_node(std::size_t ref, const Allocator& alloc)
+{
+    TIGHTDB_ASSERT(ref);
+    return get_indexflag_from_header(static_cast<char*>(alloc.Translate(ref)));
+}
+
+
 
 //-------------------------------------------------
 
-inline void Array::set_header_isnode(bool value, void* header)
+inline bool Array::get_isnode_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x80) | uint8_t(value << 7);
+    const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
+    return (h[0] & 0x80) != 0;
+}
+inline bool Array::get_hasrefs_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
+    return (h[0] & 0x40) != 0;
+}
+inline bool Array::get_indexflag_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
+    return (h[0] & 0x20) != 0;
+}
+inline Array::WidthType Array::get_wtype_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
+    return WidthType((h[0] & 0x18) >> 3);
+}
+inline int Array::get_width_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
+    return (1 << (h[0] & 0x07)) >> 1;
+}
+inline std::size_t Array::get_len_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
+    return (std::size_t(h[1]) << 16) + (std::size_t(h[2]) << 8) + h[3];
+}
+inline std::size_t Array::get_capacity_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
+    return (std::size_t(h[4]) << 16) + (std::size_t(h[5]) << 8) + h[6];
 }
 
-inline void Array::set_header_hasrefs(bool value, void* header)
+
+inline char* Array::get_data_from_header(char* header) TIGHTDB_NOEXCEPT
 {
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x40) | uint8_t(value << 6);
+    return header + 8;
+}
+inline char* Array::get_header_from_data(char* data) TIGHTDB_NOEXCEPT
+{
+    return data - 8;
+}
+inline const char* Array::get_data_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    return get_data_from_header(const_cast<char*>(header));
 }
 
-inline void Array::set_header_indexflag(bool value, void* header)
+
+inline bool Array::get_isnode_from_header() const TIGHTDB_NOEXCEPT
 {
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x20) | uint8_t(value << 5);
+    return get_isnode_from_header(get_header_from_data(m_data));
+}
+inline bool Array::get_hasrefs_from_header() const TIGHTDB_NOEXCEPT
+{
+    return get_hasrefs_from_header(get_header_from_data(m_data));
+}
+inline bool Array::get_indexflag_from_header() const TIGHTDB_NOEXCEPT
+{
+    return get_indexflag_from_header(get_header_from_data(m_data));
+}
+inline Array::WidthType Array::get_wtype_from_header() const TIGHTDB_NOEXCEPT
+{
+    return get_wtype_from_header(get_header_from_data(m_data));
+}
+inline int Array::get_width_from_header() const TIGHTDB_NOEXCEPT
+{
+    return get_width_from_header(get_header_from_data(m_data));
+}
+inline std::size_t Array::get_len_from_header() const TIGHTDB_NOEXCEPT
+{
+    return get_len_from_header(get_header_from_data(m_data));
+}
+inline std::size_t Array::get_capacity_from_header() const TIGHTDB_NOEXCEPT
+{
+    return get_capacity_from_header(get_header_from_data(m_data));
 }
 
-inline void Array::set_header_wtype(int value, void* header)
+
+inline void Array::set_header_isnode(bool value, char* header) TIGHTDB_NOEXCEPT
+{
+    uint8_t* h = reinterpret_cast<uint8_t*>(header);
+    h[0] = (h[0] & ~0x80) | uint8_t(value << 7);
+}
+
+inline void Array::set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT
+{
+    uint8_t* h = reinterpret_cast<uint8_t*>(header);
+    h[0] = (h[0] & ~0x40) | uint8_t(value << 6);
+}
+
+inline void Array::set_header_indexflag(bool value, char* header) TIGHTDB_NOEXCEPT
+{
+    uint8_t* h = reinterpret_cast<uint8_t*>(header);
+    h[0] = (h[0] & ~0x20) | uint8_t(value << 5);
+}
+
+inline void Array::set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXCEPT
 {
     // Indicates how to calculate size in bytes based on width
     // 0: bits      (width/8) * length
     // 1: multiply  width * length
     // 2: ignore    1 * length
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x18) | uint8_t(value << 3);
+    uint8_t* h = reinterpret_cast<uint8_t*>(header);
+    h[0] = (h[0] & ~0x18) | uint8_t(value << 3);
 }
 
-inline void Array::set_header_width(size_t value, void* header)
+inline void Array::set_header_width(int value, char* header) TIGHTDB_NOEXCEPT
 {
     // Pack width in 3 bits (log2)
-    size_t w = 0;
-    size_t b = size_t(value);
-    while (b) {++w; b >>= 1;}
+    int w = 0;
+    while (value) { ++w; value >>= 1; }
     TIGHTDB_ASSERT(w < 8);
 
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[0] = (header2[0] & ~0x7) | uint8_t(w);
+    uint8_t* h = reinterpret_cast<uint8_t*>(header);
+    h[0] = (h[0] & ~0x7) | uint8_t(w);
 }
 
-inline void Array::set_header_len(size_t value, void* header)
+inline void Array::set_header_len(std::size_t value, char* header) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(value <= 0xFFFFFF);
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[1] = (value >> 16) & 0x000000FF;
-    header2[2] = (value >>  8) & 0x000000FF;
-    header2[3] =  value        & 0x000000FF;
+    uint8_t* h = reinterpret_cast<uint8_t*>(header);
+    h[1] = (value >> 16) & 0x000000FF;
+    h[2] = (value >>  8) & 0x000000FF;
+    h[3] =  value        & 0x000000FF;
 }
 
-inline void Array::set_header_capacity(size_t value, void* header)
+inline void Array::set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(value <= 0xFFFFFF);
-    uint8_t* const header2 = reinterpret_cast<uint8_t*>(header);
-    header2[4] = (value >> 16) & 0x000000FF;
-    header2[5] = (value >>  8) & 0x000000FF;
-    header2[6] =  value        & 0x000000FF;
+    uint8_t* h = reinterpret_cast<uint8_t*>(header);
+    h[4] = (value >> 16) & 0x000000FF;
+    h[5] = (value >>  8) & 0x000000FF;
+    h[6] =  value        & 0x000000FF;
 }
 
 
-inline void Array::init_header(void* header, bool is_node, bool has_refs, int width_type,
-                               size_t width, size_t length, size_t capacity)
+inline void Array::set_header_isnode(bool value) TIGHTDB_NOEXCEPT
 {
-    // Note: Since the header layout contains unallocated
-    // bit and/or bytes, it is important that we put the
-    // entire 8 byte header into a well defined state
-    // initially. Note also: The C++ standard does not
-    // guarantee that int64_t is extactly 8 bytes wide. It
-    // may be more, and it may be less. That is why we
-    // need the static assert.
-    TIGHTDB_STATIC_ASSERT(sizeof(int64_t) == 8,
-                          "Trouble if int64_t is not 8 bytes wide");
+    set_header_isnode(value, get_header_from_data(m_data));
+}
+inline void Array::set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT
+{
+    set_header_hasrefs(value, get_header_from_data(m_data));
+}
+inline void Array::set_header_indexflag(bool value) TIGHTDB_NOEXCEPT
+{
+    set_header_indexflag(value, get_header_from_data(m_data));
+}
+inline void Array::set_header_wtype(WidthType value) TIGHTDB_NOEXCEPT
+{
+    set_header_wtype(value, get_header_from_data(m_data));
+}
+inline void Array::set_header_width(int value) TIGHTDB_NOEXCEPT
+{
+    set_header_width(value, get_header_from_data(m_data));
+}
+inline void Array::set_header_len(std::size_t value) TIGHTDB_NOEXCEPT
+{
+    set_header_len(value, get_header_from_data(m_data));
+}
+inline void Array::set_header_capacity(std::size_t value) TIGHTDB_NOEXCEPT
+{
+    set_header_capacity(value, get_header_from_data(m_data));
+}
+
+
+inline void Array::init_header(char* header, bool is_node, bool has_refs, WidthType width_type,
+                               int width, std::size_t length, std::size_t capacity) TIGHTDB_NOEXCEPT
+{
+    // Note: Since the header layout contains unallocated bit and/or
+    // bytes, it is important that we put the entire 8 byte header
+    // into a well defined state initially. Note also: The C++11
+    // standard does not guarantee that int64_t is available on all
+    // platforms.
     *reinterpret_cast<int64_t*>(header) = 0;
     set_header_isnode(is_node, header);
     set_header_hasrefs(has_refs, header);
@@ -832,6 +979,38 @@ inline void Array::init_header(void* header, bool is_node, bool has_refs, int wi
     set_header_width(width, header);
     set_header_len(length, header);
     set_header_capacity(capacity, header);
+}
+
+
+inline std::size_t Array::get_alloc_size_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    // Calculate full length of array in bytes, including padding
+    // for 64bit alignment (that may be composed of random bits)
+    std::size_t size = get_len_from_header(header);
+
+    // Adjust length to number of bytes
+    switch (get_wtype_from_header(header)) {
+        case wtype_Bits: {
+            int width = get_width_from_header(header);
+            std::size_t bits = (size * width);
+            size = bits / 8;
+            if (bits & 0x7) ++size;
+            break;
+        }
+        case wtype_Multiply: {
+            int width = get_width_from_header(header);
+            size *= width;
+            break;
+        }
+        case wtype_Ignore:
+            break;
+    }
+
+    // Add bytes used for padding
+    const std::size_t rest = (~size & 0x7) + 1;
+    if (rest < 8) size += rest; // 64bit blocks
+    size += get_data_from_header(header) - header; // include header in total
+    return size;
 }
 
 
@@ -885,63 +1064,25 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 
     // TODO: replace capacity with checksum
 
-    // Calculate full lenght of array in bytes, including padding
-    // for 64bit alignment (that may be composed of random bits)
-    size_t len          = m_len;
-    const WidthType wt  = get_header_wtype();
-
-    // Adjust length to number of bytes
-    if (wt == TDB_BITS) {
-        const size_t bits = (len * m_width);
-        len = bits / 8;
-        if (bits & 0x7) ++len;
-    }
-    else if (wt == TDB_MULTIPLY) {
-        len *= m_width;
-    }
-
-    // Add bytes used for padding
-    const size_t rest = (~len & 0x7)+1;
-    if (rest < 8) len += rest; // 64bit blocks
-    len += 8; // include header in total
-
     // Write array
-    const char* const data = reinterpret_cast<const char*>(m_data-8);
-    const size_t array_pos = out.write(data, len);
+    const char* header = get_header_from_data(m_data);
+    std::size_t size = get_alloc_size_from_header(header);
+    const size_t array_pos = out.write(header, size);
     TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64bit alignment
 
     return array_pos; // Return position of this array
 }
 
-template<class S> void Array::WriteAt(size_t pos, S& out) const
+template<class S> void Array::WriteAt(std::size_t pos, S& out) const
 {
     TIGHTDB_ASSERT(IsValid());
 
     // TODO: replace capacity with checksum
 
-    // Calculate full length of array in bytes, including padding
-    // for 64bit alignment (that may be composed of random bits)
-    size_t len          = m_len;
-    const WidthType wt  = get_header_wtype();
-
-    // Adjust length to number of bytes
-    if (wt == TDB_BITS) {
-        const size_t bits = (len * m_width);
-        len = bits / 8;
-        if (bits & 0x7) ++len;
-    }
-    else if (wt == TDB_MULTIPLY) {
-        len *= m_width;
-    }
-
-    // Add bytes used for padding
-    const size_t rest = (~len & 0x7)+1;
-    if (rest < 8) len += rest; // 64bit blocks
-    len += 8; // include header in total
-
     // Write array
-    const char* const data = reinterpret_cast<const char*>(m_data-8);
-    out.WriteAt(pos, data, len);
+    const char* header = get_header_from_data(m_data);
+    std::size_t size = get_alloc_size_from_header(header);
+    out.WriteAt(pos, header, size);
 }
 
 inline void Array::move_assign(Array& a)
@@ -958,7 +1099,7 @@ inline void Array::move_assign(Array& a)
 
 inline size_t Array::create_empty_array(ColumnDef type, Allocator& alloc)
 {
-    return create_empty_array(type, TDB_BITS, alloc); // Throws
+    return create_empty_array(type, wtype_Bits, alloc); // Throws
 }
 
 inline void Array::update_ref_in_parent()
@@ -1210,24 +1351,24 @@ template <class cond2, Action action, size_t bitwidth, class Callback> void Arra
         __m128i* const a = (__m128i *)round_up(m_data + start * bitwidth / 8, sizeof(__m128i));
         __m128i* const b = (__m128i *)round_down(m_data + end * bitwidth / 8, sizeof(__m128i));
 
-        if (!Compare<cond2, action, bitwidth, Callback>(value, start, ((unsigned char *)a - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
+        if (!Compare<cond2, action, bitwidth, Callback>(value, start, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
             return;
 
         // Search aligned area with SSE
         if (b > a) {
             if (cpuid_sse<42>()) {
-                if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / no0(bitwidth)), callback))
+                if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return;
                 }
                 else if (cpuid_sse<30>()) {
 
-                if (!FindSSE<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + (((unsigned char *)a - m_data) * 8 / no0(bitwidth)), callback))
+                if (!FindSSE<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return;
                 }
         }
 
         // Search remainder with CompareEquality()
-        if (!Compare<cond2, action, bitwidth, Callback>(value, ((unsigned char *)b - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
+        if (!Compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
             return;
 
         return;

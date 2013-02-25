@@ -144,10 +144,10 @@ void BasicColumn<T>::Resize(size_t ndx)
 }
 
 template<typename T>
-T BasicColumn<T>::Get(size_t ndx) const
+T BasicColumn<T>::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Size());
-    return TreeGet<T, BasicColumn<T> >(ndx); // Throws
+    return BasicArray<T>::column_get(m_array, ndx);
 }
 
 template<typename T>
@@ -188,7 +188,7 @@ void BasicColumn<T>::fill(size_t count)
 }
 
 template<typename T>
-bool BasicColumn<T>::Compare(const BasicColumn& c) const
+bool BasicColumn<T>::compare(const BasicColumn& c) const
 {
     const size_t n = Size();
     if (c.Size() != n)

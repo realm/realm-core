@@ -1754,3 +1754,65 @@ TEST(TestQuery_Subtables_Typed)
     // Verify result
     CHECK(view.size() == 1 && view[0].name == "jessica");
 }
+
+
+namespace {
+TIGHTDB_TABLE_1(TestQuerySub,
+                age,  Int)
+
+TIGHTDB_TABLE_9(TestQueryAllTypes,
+                bool_col,   Bool,
+                int_col,    Int,
+                float_col,  Float,
+                double_col, Double,
+                string_col, String,
+                binary_col, Binary,
+                date_col,   Date,
+                table_col,  Subtable<TestQuerySub>,
+                mixed_col,  Mixed)
+}
+
+TEST(TestQuery_AllTypes)
+{
+    TestQueryAllTypes table;
+
+    const char bin[4] = { 0, 1, 2, 3 };
+    BinaryData bin1(bin, sizeof bin / 2);
+    BinaryData bin2(bin, sizeof bin);
+    time_t time_now = time(0);
+//    TestQuerySub subtab1;
+    TestQuerySub subtab2;
+    subtab2.add(100);
+    Mixed mix_int_1(int64_t(1));
+//    Mixed mix_subtab(subtab2);
+
+    table.add(false,  54, 0.7, 0.8, "foo",    bin1, 0,        0,        mix_int_1);
+    table.add(true,  506, 7.7, 8.8, "banach", bin2, time_now, &subtab2, mix_int_1);
+
+    CHECK_EQUAL(1, table.where().bool_col.equal(false).count());
+    CHECK_EQUAL(1, table.where().int_col.equal(54).count());
+    CHECK_EQUAL(1, table.where().float_col.equal(0.7f).count());
+    CHECK_EQUAL(1, table.where().double_col.equal(0.8).count());
+    CHECK_EQUAL(1, table.where().string_col.equal("foo").count());
+//    CHECK_EQUAL(1, table.where().binary_col.equal(bin1).count());
+    CHECK_EQUAL(1, table.where().date_col.equal(0).count());
+//    CHECK_EQUAL(1, table.where().table_col.equal(subtab1).count());
+//    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int_1).count());
+
+    TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
+
+    CHECK_EQUAL(query.int_col.minimum(), 54);
+    CHECK_EQUAL(query.int_col.maximum(), 54);
+    CHECK_EQUAL(query.int_col.sum(),     54);
+    CHECK_EQUAL(query.int_col.average(), 54);
+
+    CHECK_EQUAL(query.float_col.minimum(), 0.7f);
+    CHECK_EQUAL(query.float_col.maximum(), 0.7f);
+    CHECK_EQUAL(query.float_col.sum(),     0.7f);
+    CHECK_EQUAL(query.float_col.average(), 0.7f);
+
+    CHECK_EQUAL(query.double_col.minimum(), 0.8);
+    CHECK_EQUAL(query.double_col.maximum(), 0.8);
+    CHECK_EQUAL(query.double_col.sum(),     0.8);
+    CHECK_EQUAL(query.double_col.average(), 0.8);
+}

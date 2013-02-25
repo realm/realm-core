@@ -136,9 +136,13 @@ public:
     /// unattached instance results in undefined behavior.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
+    /// Returns true if, and only if the number of tables in this
+    /// group is zero.
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
-    size_t get_table_count() const;
+    /// Returns the number of tables in this group.
+    size_t size() const;
+
     const char* get_table_name(size_t table_ndx) const;
     bool has_table(const char* name) const;
 
@@ -368,7 +372,7 @@ inline bool Group::in_initial_state() const
     return !m_top.IsValid();
 }
 
-inline std::size_t Group::get_table_count() const
+inline std::size_t Group::size() const
 {
     if (!m_top.IsValid()) return 0;
     return m_tableNames.size();

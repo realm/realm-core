@@ -67,7 +67,7 @@ private:
     size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
     size_t CalcByteLen(size_t count, size_t width) const TIGHTDB_OVERRIDE;
     size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    WidthType GetWidthType() const TIGHTDB_OVERRIDE {return TDB_MULTIPLY;}
+    WidthType GetWidthType() const TIGHTDB_OVERRIDE { return wtype_Multiply; }
 };
 
 
@@ -78,7 +78,7 @@ private:
 
 inline size_t ArrayString::create_empty_string_array(Allocator& alloc)
 {
-    return create_empty_array(coldef_Normal, TDB_MULTIPLY, alloc); // Throws
+    return create_empty_array(coldef_Normal, wtype_Multiply, alloc); // Throws
 }
 
 inline ArrayString::ArrayString(ArrayParent *parent, size_t ndx_in_parent,
