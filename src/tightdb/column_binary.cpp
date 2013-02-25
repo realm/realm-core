@@ -97,52 +97,10 @@ void ColumnBinary::Clear()
     else (static_cast<ArrayBinary*>(m_array))->Clear();
 }
 
-BinaryData ColumnBinary::Get(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < Size());
-    return TreeGet<BinaryData,ColumnBinary>(ndx);
-}
-
-const char* ColumnBinary::GetData(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < Size());
-    const BinaryData bin = TreeGet<BinaryData,ColumnBinary>(ndx);
-    return bin.pointer;
-}
-
-size_t ColumnBinary::GetLen(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < Size());
-    const BinaryData bin = TreeGet<BinaryData,ColumnBinary>(ndx);
-    return bin.len;
-}
-
-void ColumnBinary::Set(size_t ndx, const char* value, size_t len)
-{
-    TIGHTDB_ASSERT(ndx < Size());
-    Set(ndx, BinaryData(value, len));
-}
-
 void ColumnBinary::Set(size_t ndx, BinaryData bin)
 {
     TIGHTDB_ASSERT(ndx < Size());
     TreeSet<BinaryData,ColumnBinary>(ndx, bin);
-}
-
-void ColumnBinary::add(const char* value, size_t len)
-{
-    Insert(Size(), value, len);
-}
-
-void ColumnBinary::add(BinaryData bin)
-{
-    Insert(Size(), bin);
-}
-
-void ColumnBinary::Insert(size_t ndx, const char* value, size_t len)
-{
-    TIGHTDB_ASSERT(ndx <= Size());
-    Insert(ndx, BinaryData(value, len));    // FIXME:Ignoring return value
 }
 
 void ColumnBinary::Insert(size_t ndx, BinaryData bin)
@@ -198,7 +156,7 @@ bool ColumnBinary::Compare(const ColumnBinary& c) const
 BinaryData ColumnBinary::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     const ArrayBinary* const array = static_cast<ArrayBinary*>(m_array);
-    return BinaryData(array->Get(ndx), array->GetLen(ndx));
+    return array->get(ndx);
 }
 
 void ColumnBinary::LeafSet(size_t ndx, BinaryData value)

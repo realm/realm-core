@@ -1024,7 +1024,7 @@ void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
 }
 
 
-float Table::get_float(size_t column_ndx, size_t ndx) const
+float Table::get_float(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
@@ -1062,7 +1062,7 @@ void Table::insert_float(size_t column_ndx, size_t ndx, float value)
 }
 
 
-double Table::get_double(size_t column_ndx, size_t ndx) const
+double Table::get_double(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
@@ -1167,13 +1167,13 @@ void Table::insert_string(size_t column_ndx, size_t ndx, const char* value)
 }
 
 
-BinaryData Table::get_binary(size_t column_ndx, size_t ndx) const
+BinaryData Table::get_binary(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
 
     const ColumnBinary& column = GetColumnBinary(column_ndx);
-    return column.Get(ndx); // Throws
+    return column.Get(ndx);
 }
 
 void Table::set_binary(size_t column_ndx, size_t ndx, const char* data, size_t size)
@@ -2398,6 +2398,33 @@ bool Table::compare_rows(const Table& t) const
         }
     }
     return true;
+}
+
+
+const Array* Table::get_column_root(size_t col_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    return reinterpret_cast<ColumnBase*>(m_cols.Get(col_ndx))->get_root_array();
+}
+
+pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) const
+    TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+
+    const ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.Get(col_ndx));
+
+    const Array* root = col->get_root_array();
+    const Array* enum_root = 0;
+
+    if (const ColumnStringEnum* c = dynamic_cast<const ColumnStringEnum*>(col)) {
+        enum_root = c->get_enum_root_array();
+    }
+    else {
+        TIGHTDB_ASSERT(dynamic_cast<const AdaptiveStringColumn*>(col));
+    }
+
+    return make_pair(root, enum_root);
 }
 
 

@@ -30,7 +30,8 @@ inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc)
     const size_t capacity = Array::initial_capacity;
     const MemRef mem_ref = alloc.Alloc(capacity); // Throws
 
-    init_header(mem_ref.pointer, false, false, TDB_MULTIPLY, sizeof(T), 0, capacity);
+    init_header(static_cast<char*>(mem_ref.pointer), false, false, wtype_Multiply,
+                sizeof(T), 0, capacity);
 
     return mem_ref.ref;
 }
@@ -77,12 +78,22 @@ inline void BasicArray<T>::add(T value)
     Insert(m_len, value);
 }
 
-template<typename T>
-inline T BasicArray<T>::Get(size_t ndx) const TIGHTDB_NOEXCEPT
+
+template<typename T> inline T BasicArray<T>::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    T* dataPtr = reinterpret_cast<T*>(m_data) + ndx;
-    return *dataPtr;
+    return *(reinterpret_cast<T*>(m_data) + ndx);
 }
+
+
+template<class T>
+inline T BasicArray<T>::column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT
+{
+    if (root->is_leaf()) return static_cast<const BasicArray*>(root)->Get(ndx);
+    std::pair<const char*, std::size_t> p = find_leaf(root, ndx);
+    const char* data = get_data_from_header(p.first);
+    return *(reinterpret_cast<const T*>(data) + p.second);
+}
+
 
 template<typename T>
 inline void BasicArray<T>::Set(size_t ndx, T value)

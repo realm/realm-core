@@ -149,9 +149,8 @@ inline const char* ColumnMixed::get_string(size_t ndx) const
     TIGHTDB_ASSERT(m_types->Get(ndx) == mixcol_String);
     TIGHTDB_ASSERT(m_data);
 
-    const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-    const char* value = static_cast<const char*>(m_data->GetData(ref));
-    return value;
+    const size_t offset = m_refs->GetAsRef(ndx) >> 1;
+    return m_data->get_data(offset);
 }
 
 inline BinaryData ColumnMixed::get_binary(size_t ndx) const
@@ -160,8 +159,8 @@ inline BinaryData ColumnMixed::get_binary(size_t ndx) const
     TIGHTDB_ASSERT(m_types->Get(ndx) == mixcol_Binary);
     TIGHTDB_ASSERT(m_data);
 
-    const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-    return m_data->Get(ref);
+    const size_t offset = m_refs->GetAsRef(ndx) >> 1;
+    return m_data->Get(offset);
 }
 
 //

@@ -114,7 +114,12 @@ private:
 inline const char* AdaptiveStringColumn::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Size());
-    return m_array->ColumnStringGet(ndx);
+    return m_array->string_column_get(ndx);
+}
+
+inline void AdaptiveStringColumn::add(const char* value)
+{
+    Insert(Size(), value);
 }
 
 

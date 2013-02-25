@@ -191,11 +191,6 @@ void AdaptiveStringColumn::Set(size_t ndx, const char* value)
     TreeSet<const char*, AdaptiveStringColumn>(ndx, value);
 }
 
-void AdaptiveStringColumn::add(const char* value)
-{
-    Insert(Size(), value);
-}
-
 void AdaptiveStringColumn::Insert(size_t ndx, const char* value)
 {
     TIGHTDB_ASSERT(ndx <= Size());

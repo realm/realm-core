@@ -187,8 +187,7 @@ private:
 };
 
 
-class ColumnMixed::RefsColumn: public ColumnSubtableParent
-{
+class ColumnMixed::RefsColumn: public ColumnSubtableParent {
 public:
     RefsColumn(Allocator& alloc, const Table* table, std::size_t column_ndx):
         ColumnSubtableParent(alloc, table, column_ndx) {}

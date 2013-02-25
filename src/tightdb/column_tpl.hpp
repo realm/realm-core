@@ -29,9 +29,9 @@
 
 namespace tightdb {
 
-template <class T, class cond> class BasicNode;
-template <class T, class cond> class IntegerNode;
-template <class T>class SequentialGetter;
+template<class T, class cond> class BasicNode;
+template<class T, class cond> class IntegerNode;
+template<class T> class SequentialGetter;
 
 template<class cond, class T> struct ColumnTypeTraits2;
 
