@@ -249,8 +249,8 @@ TEST(ColumnMixed_Table)
 {
     ColumnMixed c;
 
-    c.insert_subtable(0);
-    c.insert_subtable(1);
+    c.insert_subtable(0, 0);
+    c.insert_subtable(1, 0);
     CHECK_EQUAL(2, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
@@ -277,7 +277,7 @@ TEST(ColumnMixed_Mixed)
     c.insert_date(0, 23423);
     c.insert_string(0, "Hello");
     c.insert_binary(0, "binary", 7);
-    c.insert_subtable(0);
+    c.insert_subtable(0, 0);
     c.insert_float(0, 1.124f);
     c.insert_double(0, 1234.124);
     CHECK_EQUAL(8, c.Size());
@@ -297,7 +297,7 @@ TEST(ColumnMixed_Mixed)
     c.set_date(2, 23423);
     c.set_string(3, "Hello");
     c.set_binary(4, "binary", 7);
-    c.set_subtable(5);
+    c.set_subtable(5, 0);
     c.set_float(6, 1.124f);
     c.set_double(7, 1234.124);
     CHECK_EQUAL(8, c.Size());
