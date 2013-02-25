@@ -5,6 +5,8 @@
 #include <tightdb/array_binary.hpp>
 #include <tightdb/array_blob.hpp>
 
+using namespace std;
+
 namespace tightdb {
 
 
@@ -34,73 +36,45 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
 // Creates new array (but invalid, call UpdateRef to init)
 //ArrayBinary::ArrayBinary(Allocator& alloc) : Array(alloc) {}
 
-bool ArrayBinary::is_empty() const TIGHTDB_NOEXCEPT
+void ArrayBinary::add(const char* data, size_t size)
 {
-    return m_offsets.is_empty();
+    TIGHTDB_ASSERT(size == 0 || data);
+
+    m_blob.add(data, size);
+    m_offsets.add(m_offsets.is_empty() ? size : m_offsets.back() + size);
 }
 
-size_t ArrayBinary::size() const TIGHTDB_NOEXCEPT
-{
-    return m_offsets.size();
-}
-
-const char* ArrayBinary::Get(size_t ndx) const TIGHTDB_NOEXCEPT
+void ArrayBinary::Set(size_t ndx, const char* data, size_t size)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
+    TIGHTDB_ASSERT(size == 0 || data);
 
-    const size_t offset = ndx ? size_t(m_offsets.Get(ndx-1)) : 0;
-    return m_blob.Get(offset);
-}
+    const size_t start = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+    const size_t current_end = m_offsets.GetAsSizeT(ndx);
+    const ssize_t diff =  (start + size) - current_end;
 
-size_t ArrayBinary::GetLen(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_offsets.size());
-
-    const size_t start = ndx ? size_t(m_offsets.Get(ndx-1)) : 0;
-    const size_t end = size_t(m_offsets.Get(ndx));
-
-    return end - start;
-}
-
-void ArrayBinary::add(const char* value, size_t len)
-{
-    TIGHTDB_ASSERT(len == 0 || value);
-
-    m_blob.add(value, len);
-    m_offsets.add(m_offsets.is_empty() ? len : m_offsets.back() + len);
-}
-
-void ArrayBinary::Set(size_t ndx, const char* value, size_t len)
-{
-    TIGHTDB_ASSERT(ndx < m_offsets.size());
-    TIGHTDB_ASSERT(len == 0 || value);
-
-    const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
-    const size_t current_end = (size_t)m_offsets.Get(ndx);
-    const ssize_t diff =  (start + len) - current_end;
-
-    m_blob.Replace(start, current_end, value, len);
+    m_blob.Replace(start, current_end, data, size);
     m_offsets.Adjust(ndx, diff);
 }
 
-void ArrayBinary::Insert(size_t ndx, const char* value, size_t len)
+void ArrayBinary::Insert(size_t ndx, const char* data, size_t size)
 {
     TIGHTDB_ASSERT(ndx <= m_offsets.size());
-    TIGHTDB_ASSERT(len == 0 || value);
+    TIGHTDB_ASSERT(size == 0 || data);
 
-    const size_t pos = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
+    const size_t pos = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
 
-    m_blob.Insert(pos, value, len);
-    m_offsets.Insert(ndx, pos + len);
-    m_offsets.Adjust(ndx+1, len);
+    m_blob.Insert(pos, data, size);
+    m_offsets.Insert(ndx, pos + size);
+    m_offsets.Adjust(ndx+1, size);
 }
 
 void ArrayBinary::Delete(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
-    const size_t end = (size_t)m_offsets.Get(ndx);
+    const size_t start = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+    const size_t end = m_offsets.GetAsSizeT(ndx);
 
     m_blob.Delete(start, end);
     m_offsets.Delete(ndx);
@@ -111,7 +85,7 @@ void ArrayBinary::Resize(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
+    const size_t len = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
 
     m_offsets.Resize(ndx);
     m_blob.Resize(len);
@@ -123,22 +97,41 @@ void ArrayBinary::Clear()
     m_offsets.Clear();
 }
 
+BinaryData ArrayBinary::get_direct(Allocator& alloc, const char* header, size_t ndx) TIGHTDB_NOEXCEPT
+{
+    pair<size_t, size_t> p = Array::get_two_as_size(header, 0);
+    const char* offsets_header = static_cast<char*>(alloc.Translate(p.first));
+    const char* blob_header = static_cast<char*>(alloc.Translate(p.second));
+    std::size_t begin, end;
+    if (ndx) {
+        pair<size_t, size_t> p2 = Array::get_two_as_size(offsets_header, ndx-1);
+        begin = p2.first;
+        end   = p2.second;
+    }
+    else {
+        begin = 0;
+        end   = Array::get_as_size(offsets_header, ndx);
+    }
+    return BinaryData(ArrayBlob::get_direct(blob_header, begin), end-begin);
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
-void ArrayBinary::ToDot(std::ostream& out, const char* title) const
+void ArrayBinary::ToDot(ostream& out, const char* title) const
 {
     const size_t ref = GetRef();
 
-    out << "subgraph cluster_binary" << ref << " {" << std::endl;
+    out << "subgraph cluster_binary" << ref << " {" << endl;
     out << " label = \"ArrayBinary";
     if (title) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    out << "\";" << endl;
 
     Array::ToDot(out, "binary_top");
     m_offsets.ToDot(out, "offsets");
     m_blob.ToDot(out, "blob");
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
 #endif // TIGHTDB_DEBUG

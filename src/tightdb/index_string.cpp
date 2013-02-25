@@ -44,7 +44,7 @@ StringIndex::StringIndex(ColumnDef type, Allocator& alloc)
 StringIndex::StringIndex(size_t ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc)
 : Column(ref, parent, pndx, alloc), m_target_column(target_column), m_get_func(get_func)
 {
-    TIGHTDB_ASSERT(IsArrayIndexNode(ref, alloc));
+    TIGHTDB_ASSERT(Array::is_index_node(ref, alloc));
 }
 
 void StringIndex::Create()
@@ -381,7 +381,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
 
     // If there alrady is a list of matches, we see if we fit there
     // or it has to be split into a sub-index
-    if (!IsArrayIndexNode(ref, alloc)) {
+    if (!Array::is_index_node(ref, alloc)) {
         Column sub(ref, &refs, ins_pos, alloc);
 
         const size_t r1 = (size_t)sub.Get(0);
@@ -460,7 +460,7 @@ void StringIndex::distinct(Array& result) const
             }
             else {
                 // A real ref either points to a list or a sub-index
-                if (IsArrayIndexNode(ref, alloc)) {
+                if (Array::is_index_node(ref, alloc)) {
                     const StringIndex ndx((size_t)ref, &refs, i, m_target_column, m_get_func, alloc);
                     ndx.distinct(result);
                 }
@@ -503,7 +503,7 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
             }
             else {
                 // A real ref either points to a list or a sub-index
-                if (IsArrayIndexNode(ref, alloc)) {
+                if (Array::is_index_node(ref, alloc)) {
                     StringIndex ndx((size_t)ref, &refs, i, m_target_column, m_get_func, alloc);
                     ndx.UpdateRefs(pos, diff);
                 }
@@ -583,7 +583,7 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
         }
         else {
             // A real ref either points to a list or a sub-index
-            if (IsArrayIndexNode(ref, alloc)) {
+            if (Array::is_index_node(ref, alloc)) {
                 StringIndex subNdx((size_t)ref, &refs, pos, m_target_column, m_get_func, alloc);
                 subNdx.DoDelete(row_ndx, value, offset+4);
 

@@ -8,52 +8,6 @@ using namespace std;
 using namespace tightdb;
 
 
-namespace {
-
-// Support function
-// todo, fixme: use header function in array instead!
-size_t GetCapacityFromHeader(void* p)
-{
-    // parse the capacity part of 8byte header
-    const uint8_t* const header = (uint8_t*)p;
-    return (header[4] << 16) + (header[5] << 8) + header[6];
-}
-
-size_t GetSizeFromHeader(void* p)
-{
-    // parse width and count from 8byte header
-    const uint8_t* const header = (uint8_t*)p;
-    const size_t width = (1 << (header[0] & 0x07)) >> 1;
-    const size_t count = (header[1] << 16) + (header[2] << 8) + header[3];
-    const size_t wt    = (header[0] & 0x18) >> 3; // Array::WidthType
-
-    size_t bytes = 0;
-    if (wt == 0) { // TDB_BITS
-        const size_t bits = (count * width);
-        bytes = bits / 8;
-        if (bits & 0x7) ++bytes; // include partial bytes
-    }
-    else if (wt == 1) { // TDB_MULTIPLY
-        bytes = count * width;
-    }
-    else if (wt == 2) { // TDB_IGNORE
-        bytes = count;
-    }
-    else TIGHTDB_ASSERT(false);
-
-    // Arrays are always padded to 64 bit alignment
-    const size_t rest = (~bytes & 0x7)+1;
-    if (rest < 8) bytes += rest; // 64bit blocks
-
-    // include header in total
-    bytes += 8;
-
-    return bytes;
-}
-
-} // anonymous namespace
-
-
 namespace tightdb {
 
 const char SlabAlloc::default_header[24] = {
@@ -151,14 +105,16 @@ MemRef SlabAlloc::Alloc(size_t size)
 // FIXME: We need to come up with a way to make Free() a method that
 // never throws. This is essential for exception safety in large parts
 // of the TightDB API.
-void SlabAlloc::Free(size_t ref, void* p)
+void SlabAlloc::Free(size_t ref, const void* p)
 {
     // Free space in read only segment is tracked separately
     const bool isReadOnly = IsReadOnly(ref);
     FreeSpace& freeSpace = isReadOnly ? m_freeReadOnly : m_freeSpace;
 
     // Get size from segment
-    const size_t size = isReadOnly ? GetSizeFromHeader(p) : GetCapacityFromHeader(p);
+    const size_t size = isReadOnly ?
+        Array::get_alloc_size_from_header(static_cast<const char*>(p)) :
+        Array::get_capacity_from_header(static_cast<const char*>(p));
     const size_t refEnd = ref + size;
     bool isMerged = false;
 
@@ -202,7 +158,7 @@ void SlabAlloc::Free(size_t ref, void* p)
     if (!isMerged) freeSpace.add(ref, size);
 }
 
-MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
+MemRef SlabAlloc::ReAlloc(size_t ref, const void* p, size_t size)
 {
     TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
@@ -213,7 +169,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, void* p, size_t size)
 
     /*if (doCopy) {*/  //TODO: allow realloc without copying
         // Get size of old segment
-        const size_t oldsize = GetCapacityFromHeader(p);
+    const size_t oldsize = Array::get_capacity_from_header(static_cast<const char*>(p));
 
         // Copy existing segment
         memcpy(space.pointer, p, oldsize);
