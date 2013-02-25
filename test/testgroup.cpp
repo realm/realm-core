@@ -20,6 +20,22 @@ TIGHTDB_TABLE_4(TestTableGroup,
 
 } // Anonymous namespace
 
+TEST(Group_Size)
+{
+    Group g;
+
+    CHECK_EQUAL(true, g.is_empty());
+
+    TableRef t = g.get_table("a");
+    CHECK_EQUAL(false, g.is_empty());
+    CHECK_EQUAL(1, g.size());
+
+    TableRef t1 = g.get_table("b");
+    CHECK_EQUAL(false, g.is_empty());
+    CHECK_EQUAL(2, g.size());
+
+}
+
 TEST(Group_GetTable)
 {
     Group g;
