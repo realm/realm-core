@@ -1,3 +1,5 @@
+#if !defined(_MSC_VER)
+
 #include <cstdio>
 #include <vector>
 #include <sstream>

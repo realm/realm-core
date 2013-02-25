@@ -323,9 +323,68 @@ void SlabAlloc::attach_buffer(char* data, size_t size, bool take_ownership)
     // Verify the data structures
     if (!validate_buffer(data, size)) throw InvalidDatabase();
 
-    m_data      = data;
-    m_baseline  = size;
-    m_free_mode = take_ownership ? free_Unalloc : free_Noop;
+    // Open file
+    DWORD error_copy;
+    {
+        const DWORD desired_access = read_only ? GENERIC_READ : GENERIC_READ|GENERIC_WRITE;
+        const DWORD share_mode = FILE_SHARE_READ | FILE_SHARE_WRITE; // FIXME: Should probably be zero if we are called from a group that is not managed by a SharedGroup instance, since in this case concurrenct access is prohibited anyway.
+        const DWORD creation_disposition = read_only || no_create ? OPEN_EXISTING : OPEN_ALWAYS;
+        m_file = CreateFileA(path.c_str(), desired_access, share_mode, NULL,
+                             creation_disposition, NULL, NULL);
+        if (m_file == INVALID_HANDLE_VALUE) {
+            error_copy = GetLastError();
+            goto open_error;
+        }
+
+        CloseGuard cg(m_file);
+
+        // Map to memory (read only)
+        m_map_file = CreateFileMapping(m_file, NULL, PAGE_WRITECOPY, 0, 0, 0);
+        if (m_map_file == NULL) goto create_map_error;
+
+        CloseGuard cg2(m_map_file);
+
+        const LPVOID p = MapViewOfFile(m_map_file, FILE_MAP_COPY, 0, 0, 0);
+        if (!p) goto map_view_error;
+
+        // Get Size
+        LARGE_INTEGER size;
+        if (!GetFileSizeEx(m_file, &size)) goto get_size_error;
+        m_baseline = to_ref(size.QuadPart);
+
+        UnmapGuard ug(p);
+
+        // Verify the data structures
+        if (!validate_buffer(static_cast<char*>(p), m_baseline)) goto invalid_database;
+
+        m_shared = static_cast<char*>(p);
+
+        cg.release();
+        cg2.release();
+        ug.release();
+    }
+
+    return;
+
+  open_error:
+    switch (error_copy) {
+        case ERROR_FILE_NOT_FOUND: throw NoSuchFile();
+            // FIXME: What error codes should cause PermissionDenied to be thrown? What kind of permission violations are even possible on Windows?
+    }
+    throw runtime_error("CreateFile() failed");
+
+  create_map_error:
+    throw runtime_error("CreateFileMapping() failed");
+
+  map_view_error:
+    throw runtime_error("MapViewOfFile() failed");
+
+  get_size_error:
+    throw runtime_error("GetFileSizeEx() failed");
+
+  invalid_database:
+    throw InvalidDatabase();
+#endif
 }
 
 

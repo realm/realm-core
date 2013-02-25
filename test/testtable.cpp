@@ -2,6 +2,8 @@
 #include <sstream>
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
+#include "tightdb.hpp"
+#include "tightdb/group_shared.hpp"
 
 #include <ostream>
 #include <fstream>
@@ -1859,3 +1861,49 @@ TEST(Table_LanguageBindings)
    CHECK(table->is_valid());
    LangBindHelper::unbind_table_ref(table);
 }
+
+/*
+TEST(Table_Index_StringBug1)
+{
+    Group db;
+
+    {
+        TableRef table = db.get_table("users");
+        Spec& spec = table->get_spec();
+        spec.add_column(COLUMN_TYPE_STRING, "username");
+        table->update_from_spec();
+
+        table->set_index(0);
+    }
+
+
+    for(size_t u = 0; u < 1000; u++) {
+
+        for(size_t t = 0; t < 100; t++) {
+            char data[21];
+            for(size_t p = 0; p < 20; ++p)
+                data[p] = char(rand());
+            data[20] = 0;
+
+
+            TableRef table = db.get_table("users");   
+
+            table->add_empty_row();
+            table->set_string(0, table->size() - 1, data); 
+
+
+        }
+    
+
+        TableRef table = db.get_table("users");   
+        size_t rem = rand() % table->size();
+        table->remove(rem);
+//        const volatile size_t r2 = table.column().second.find_first("jimmi");
+
+
+
+    }
+
+}
+
+*/

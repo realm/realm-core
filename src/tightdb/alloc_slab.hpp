@@ -87,6 +87,12 @@ public:
     void   FreeAll(size_t filesize=(size_t)-1);
     bool   ReMap(size_t filesize); // Returns false if remapping was not necessary
 
+#ifndef _MSC_VER
+    int    GetFileDescriptor() {return m_fd;}
+#else
+    void*  GetFileDescriptor() {return m_file;}
+#endif
+
 #ifdef TIGHTDB_DEBUG
     void EnableDebug(bool enable) {m_debugOut = enable;}
     void Verify() const;
