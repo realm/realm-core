@@ -66,6 +66,8 @@ public:
     bool compare(const AdaptiveStringColumn&) const;
     bool compare(const ColumnStringEnum&) const;
 
+    const Array* get_enum_root_array() const TIGHTDB_NOEXCEPT { return m_keys.get_root_array(); }
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void ToDot(std::ostream& out, const char* title) const;

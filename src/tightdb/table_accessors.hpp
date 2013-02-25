@@ -259,7 +259,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    float get() const
+    float get() const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->get_impl()->get_float(col_idx, Base::m_row_idx);
     }
@@ -269,7 +269,7 @@ public:
         Base::m_table->get_impl()->set_float(col_idx, Base::m_row_idx, value);
     }
 
-    operator float() const { return get(); }
+    operator float() const TIGHTDB_NOEXCEPT { return get(); }
     const FieldAccessor& operator=(float value) const { set(value); return *this; }
 
     const FieldAccessor& operator+=(float value) const
@@ -300,7 +300,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    double get() const
+    double get() const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->get_impl()->get_double(col_idx, Base::m_row_idx);
     }
@@ -310,7 +310,7 @@ public:
         Base::m_table->get_impl()->set_double(col_idx, Base::m_row_idx, value);
     }
 
-    operator double() const { return get(); }
+    operator double() const TIGHTDB_NOEXCEPT { return get(); }
     const FieldAccessor& operator=(double value) const { set(value); return *this; }
 
     const FieldAccessor& operator+=(double value) const

@@ -21,7 +21,6 @@
 #define TIGHTDB_COLUMN_BINARY_HPP
 
 #include <tightdb/column.hpp>
-#include <tightdb/binary_data.hpp>
 #include <tightdb/array_binary.hpp>
 
 namespace tightdb {
@@ -39,15 +38,15 @@ public:
     size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
-    BinaryData Get(size_t ndx) const;
-    const char* GetData(size_t ndx) const;
-    size_t GetLen(size_t ndx) const;
+    BinaryData Get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    const char* get_data(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_size(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
     void add() TIGHTDB_OVERRIDE { add(NULL, 0); }
-    void add(const char* value, size_t len);
-    void Set(size_t ndx, const char* value, size_t len);
+    void add(const char* data, std::size_t size);
+    void Set(std::size_t ndx, const char* data, size_t size);
     void insert(size_t ndx) TIGHTDB_OVERRIDE { Insert(ndx, 0, 0); }
-    void Insert(size_t ndx, const char* value, size_t len);
+    void Insert(size_t ndx, const char* data, size_t size);
     void Delete(size_t ndx) TIGHTDB_OVERRIDE;
     void Resize(size_t ndx);
     void Clear() TIGHTDB_OVERRIDE;
@@ -89,6 +88,46 @@ protected:
 #endif // TIGHTDB_DEBUG
 };
 
+
+
+
+// Implementation
+
+inline BinaryData ColumnBinary::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < Size());
+    return ArrayBinary::column_get(m_array, ndx);
+}
+
+inline const char* ColumnBinary::get_data(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return Get(ndx).pointer;
+}
+
+inline std::size_t ColumnBinary::get_size(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return Get(ndx).len;
+}
+
+inline void ColumnBinary::Set(std::size_t ndx, const char* data, std::size_t size)
+{
+    Set(ndx, BinaryData(data, size));
+}
+
+inline void ColumnBinary::add(const char* data, std::size_t size)
+{
+    Insert(Size(), data, size);
+}
+
+inline void ColumnBinary::add(BinaryData bin)
+{
+    Insert(Size(), bin);
+}
+
+inline void ColumnBinary::Insert(std::size_t ndx, const char* data, std::size_t size)
+{
+    Insert(ndx, BinaryData(data, size));
+}
 
 } // namespace tightdb
 

@@ -124,7 +124,7 @@ protected:
 #endif // TIGHTDB_DEBUG
 
     // Member variables
-    mutable Array* m_array; // FIXME: This should not be mutable
+    mutable Array* m_array; // FIXME: This should not be mutable, the problem is again the const-violating moving copy constructor
 };
 
 
@@ -189,7 +189,8 @@ public:
 
     // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
-    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const {
+    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const
+    {
         return m_array->GetBlock(ndx, arr, off, use_retval);
     }
 
@@ -247,7 +248,7 @@ private:
 
 inline int64_t Column::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return m_array->ColumnGet(ndx);
+    return m_array->column_get(ndx);
 }
 
 inline std::size_t Column::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT

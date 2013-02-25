@@ -20,6 +20,8 @@
 #ifndef TIGHTDB_TABLE_HPP
 #define TIGHTDB_TABLE_HPP
 
+#include <utility>
+
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
 #include <tightdb/spec.hpp>
@@ -177,11 +179,11 @@ public:
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     time_t      get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    float       get_float(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
-    double      get_double(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    float       get_float(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    double      get_double(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     const char* get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     size_t      get_string_length(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
@@ -444,6 +446,10 @@ private:
     void unbind_ref() const { if (--m_ref_count == 0) delete this; } // FIXME: Cannot be noexcept since ~Table() may throw
 
     struct UnbindGuard;
+
+    const Array* get_column_root(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    std::pair<const Array*, const Array*> get_string_column_roots(std::size_t col_ndx) const
+        TIGHTDB_NOEXCEPT;
 
     ColumnBase& GetColumnBase(size_t column_ndx);
     void InstantiateBeforeChange();
