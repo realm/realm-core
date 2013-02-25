@@ -30,9 +30,9 @@ typedef const char*(*StringGetter)(void*, size_t);
 
 class StringIndex : public Column {
 public:
-    StringIndex(void* target_column, StringGetter get_func, Allocator& alloc);
-    StringIndex(ColumnDef type, Allocator& alloc);
-    StringIndex(size_t ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc);
+    StringIndex(void* target_column, StringGetter get_func, Allocator&);
+    StringIndex(Array::ColumnDef, Allocator&);
+    StringIndex(size_t ref, ArrayParent*, size_t pndx, void* target_column, StringGetter get_func, Allocator&);
     void SetTarget(void* target_column, StringGetter get_func);
 
     bool is_empty() const;

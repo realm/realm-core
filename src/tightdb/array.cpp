@@ -738,7 +738,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
             // We originally had declared '__m128i state2' and did an 'state2 = state' assignment. When we read from state2 through int16_t, int32_t or int64_t in GetUniversal(),
             // the compiler thinks it cannot alias state2 and hence reorders the read and assignment.
 
-            // In this fixed version using memcpy, we have char-read-access from __m128i (OK aliasing) and char-write-access to char-array, and finally int8/16/32/64 
+            // In this fixed version using memcpy, we have char-read-access from __m128i (OK aliasing) and char-write-access to char-array, and finally int8/16/32/64
             // read access from char-array (OK aliasing).
             memcpy(&state2, &state, sizeof(state));
             for (size_t t = 0; t < sizeof(__m128i) * 8 / no0(w); ++t) {
@@ -746,7 +746,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
                 if (find_max ? v > m : v < m) {
                     m = v;
                 }
-            }        
+            }
         }
     }
 #endif
@@ -1857,8 +1857,7 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) TIGHTDB_NO
 //
 // It may be worth considering if overall efficiency can be improved
 // by doing a linear search for short sequences.
-template<int width>
-inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
+template<int width> inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
 {
     const char* data = tightdb::Array::get_data_from_header(header);
 
@@ -1879,8 +1878,7 @@ inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
 }
 
 // See lower_bound()
-template<int width>
-inline size_t upper_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
+template<int width> inline size_t upper_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
 {
     const char* data = tightdb::Array::get_data_from_header(header);
 

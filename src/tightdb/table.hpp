@@ -587,9 +587,9 @@ private:
 
 inline std::size_t Table::create_empty_table(Allocator& alloc)
 {
-    Array top(coldef_HasRefs, 0, 0, alloc);
+    Array top(Array::coldef_HasRefs, 0, 0, alloc);
     top.add(Spec::create_empty_spec(alloc));
-    top.add(Array::create_empty_array(coldef_HasRefs, alloc)); // Columns
+    top.add(Array::create_empty_array(Array::coldef_HasRefs, alloc)); // Columns
     return top.GetRef();
 }
 
