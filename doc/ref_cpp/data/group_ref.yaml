@@ -123,10 +123,11 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_operator_equal
+
 - Table:
   METHODS:
-  - g_group_table_count:
-      NAMES    : get_table_count
+  - g_group_size:
+      NAMES    : size
       DESCR    : >
                  A group can be a container for many tables, and this method counts
                  the number of tables currently stored in the group.

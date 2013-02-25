@@ -507,8 +507,8 @@ void Group::update_from_shared(size_t top_ref, size_t len)
 
 bool Group::operator==(const Group& g) const
 {
-    const size_t n = get_table_count();
-    if (n != g.get_table_count()) return false;
+    const size_t n = size();
+    if (n != g.size()) return false;
     for (size_t i=0; i<n; ++i) {
         const Table* t1 = get_table_ptr(i);
         const Table* t2 = g.get_table_ptr(i);
@@ -519,7 +519,7 @@ bool Group::operator==(const Group& g) const
 
 void Group::to_string(std::ostream& out) const
 {
-    const size_t count = get_table_count();
+    const size_t count = size();
 
     // Calculate widths
     size_t name_width = 6;
