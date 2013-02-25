@@ -19,6 +19,10 @@ Format:
 + Adding BasicTable::create() for symmetry with Table::create().
 
 
+2013-02-21 (Brian Munkholm
+-+ Renamed Group::get_table_count() to Group::size()
+
+
 2013-02-19 (Kristian Spangsege)
 + Type of Group::BufferSpec::m_data changed from <char*> to <const char*>.
 
