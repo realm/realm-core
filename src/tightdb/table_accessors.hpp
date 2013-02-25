@@ -712,6 +712,14 @@ public:
         return get_subtable();
     }
 
+    /// Overwrites the current value with a copy of the specified
+    /// table and returns a reference to the copy.
+    TableRef set_subtable(const Table& t) const
+    {
+        t.set_into_mixed(Base::m_table->get_impl(), col_idx, Base::m_row_idx);
+        return get_subtable();
+    }
+
     /// This function makes the following assumption: If the current
     /// value is a subtable, then it is a subtable of the specified
     /// type. If this is not the case, your computer may catch fire.
@@ -758,6 +766,14 @@ public:
         BasicTableRef<T> t = unchecked_cast<T>(set_subtable());
         t->set_dynamic_spec();
         return move(t);
+    }
+
+    /// Overwrites the current value with a copy of the specified
+    /// table and returns a reference to the copy.
+    template<class T> typename T::Ref set_subtable(const T& t) const
+    {
+        t.set_into_mixed(Base::m_table->get_impl(), col_idx, Base::m_row_idx);
+        return unchecked_cast<T>(get_subtable());
     }
 
 

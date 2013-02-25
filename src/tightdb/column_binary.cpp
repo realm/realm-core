@@ -141,7 +141,7 @@ void ColumnBinary::Resize(size_t ndx)
     ((ArrayBinary*)m_array)->Resize(ndx);
 }
 
-bool ColumnBinary::Compare(const ColumnBinary& c) const
+bool ColumnBinary::compare(const ColumnBinary& c) const
 {
     const size_t n = Size();
     if (c.Size() != n) return false;

@@ -100,6 +100,13 @@ protected:
     /// Assumes that the two tables have the same spec.
     static bool compare_subtable_rows(const Table&, const Table&);
 
+    /// Construct a copy of the columns array of the specified table
+    /// and return just the ref to that array.
+    ///
+    /// In the clone, no string column will be of the enumeration
+    /// type.
+    std::size_t clone_table_columns(const Table*);
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     size_t* record_subtable_path(size_t* begin, size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
@@ -167,24 +174,22 @@ public:
         return ColumnSubtableParent::get_subtable_ptr(subtable_ndx, m_ref_specSet);
     }
 
+    // When passing a table to add() or insert() it is assumed that
+    // the table spec is compatible with this column. The number of
+    // columns must be the same, and the corresponding columns must
+    // have the same data type (as returned by
+    // Table::get_column_type()).
+
     void add() TIGHTDB_OVERRIDE;
-    void Insert(size_t ndx);
+    void add(const Table*);
+    void insert(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void insert(std::size_t ndx, const Table*);
     void Delete(size_t ndx) TIGHTDB_OVERRIDE;
     void ClearTable(size_t ndx);
     void fill(size_t count);
 
-    // FIXME: This one is virtual and overrides
-    // Column::insert(size_t). Insert(size_t) is not virtual. Do we
-    // really need both? Insert(size_t) is at least called from
-    // Table::insert_subtable().
-    void insert(size_t ndx) TIGHTDB_OVERRIDE
-    {
-        ColumnSubtableParent::insert(ndx);
-        invalidate_subtables();
-    }
-
     /// Compare two subtable columns for equality.
-    bool Compare(const ColumnTable&) const;
+    bool compare(const ColumnTable&) const;
 
     void invalidate_subtables_virtual() TIGHTDB_OVERRIDE;
 
@@ -351,6 +356,11 @@ inline bool ColumnSubtableParent::compare_subtable_rows(const Table& a, const Ta
     return a.compare_rows(b);
 }
 
+inline std::size_t ColumnSubtableParent::clone_table_columns(const Table* t)
+{
+    return t->clone_columns(m_array->GetAllocator());
+}
+
 
 inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_t column_ndx,
                                 std::size_t spec_ref):
@@ -361,6 +371,11 @@ inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_
                                 std::size_t spec_ref, std::size_t column_ref):
     ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, column_ref),
     m_ref_specSet(spec_ref) {}
+
+inline void ColumnTable::add(const Table* subtable)
+{
+    insert(Size(), subtable);
+}
 
 inline void ColumnTable::invalidate_subtables_virtual()
 {

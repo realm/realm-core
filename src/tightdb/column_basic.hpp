@@ -81,7 +81,7 @@ public:
     void SetParent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE {m_array->SetParent(parent, pndx);}
 
     /// Compare two columns for equality.
-    bool Compare(const BasicColumn&) const;
+    bool compare(const BasicColumn&) const;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC

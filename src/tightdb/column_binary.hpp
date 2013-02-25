@@ -63,7 +63,7 @@ public:
     void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
     /// Compare two binary columns for equality.
-    bool Compare(const ColumnBinary&) const;
+    bool compare(const ColumnBinary&) const;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC

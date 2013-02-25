@@ -225,10 +225,16 @@ inline void ColumnMixed::set_date(size_t ndx, time_t value)
     set_value(ndx, static_cast<const int64_t>(value), mixcol_Date);
 }
 
-inline void ColumnMixed::set_subtable(std::size_t ndx)
+inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
-    const std::size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+    std::size_t ref;
+    if (t) {
+        ref = t->clone(m_array->GetAllocator()); // Throws
+    }
+    else {
+        ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+    }
     clear_value(ndx, mixcol_Table); // Remove any previous refs or binary data
     m_refs->Set(ndx, ref);
 }
@@ -332,10 +338,16 @@ inline void ColumnMixed::insert_binary(size_t ndx, const char* value, size_t len
     m_refs->Insert(ndx, v);
 }
 
-inline void ColumnMixed::insert_subtable(std::size_t ndx)
+inline void ColumnMixed::insert_subtable(std::size_t ndx, const Table* t)
 {
     TIGHTDB_ASSERT(ndx <= m_types->Size());
-    const std::size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+    std::size_t ref;
+    if (t) {
+        ref = t->clone(m_array->GetAllocator()); // Throws
+    }
+    else {
+        ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+    }
     m_types->Insert(ndx, mixcol_Table);
     m_refs->Insert(ndx, ref);
 }
