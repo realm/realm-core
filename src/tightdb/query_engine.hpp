@@ -315,7 +315,7 @@ public:
 
         if (node->m_is_integer_node)
             // call method in IntegerNode
-            r = node->aggregate_call_specialized(TAction, ColumnTypeTraits<TResult>::id,(QueryStateBase*)st,
+            r = node->aggregate_call_specialized(TAction, ColumnTypeTraits<TSourceColumn>::id,(QueryStateBase*)st,
                                                  start, end, local_limit, source_column, matchcount);
         else
              // call method in ParentNode
@@ -630,7 +630,7 @@ public:
             // todo, fixme, see if we must let sum return a double even when summing a float coltype
             ret = aggregate_local<act_Sum, float, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Sum && col_id == type_Double)
-            ret = aggregate_local<act_Sum, float, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Sum, double, void>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == act_Max && col_id == type_Int)
             ret = aggregate_local<act_Max, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
