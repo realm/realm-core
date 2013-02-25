@@ -13,7 +13,7 @@
 //#define TIGHTDB_PTHREADS_TEST
 
 // Transaction stress tests in testtransactions_lasse.cpp that take a long time to run
-//#define STRESSTEST1
+#define STRESSTEST1
 //#define STRESSTEST2
 //#define STRESSTEST3
 //#define STRESSTEST4
