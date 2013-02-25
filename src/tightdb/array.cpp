@@ -859,8 +859,11 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
 
             // Todo: prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
 
-            // In this memcpy, we have char-read-access from __m128i (OK aliasing) and char-write-access to char-array, and finally int8/16/32/64 read access
-            // from char-array (OK aliasing).
+            // We originally had declared '__m128i state2' and did an 'state2 = state' assignment. When we read from state2 through int16_t, int32_t or int64_t in GetUniversal(),
+            // the compiler thinks it cannot alias state2 and hence reorders the read and assignment.
+
+            // In this fixed version using memcpy, we have char-read-access from __m128i (OK aliasing) and char-write-access to char-array, and finally int8/16/32/64 
+            // read access from char-array (OK aliasing).
             memcpy(&state2, &state, sizeof(state));
             for (size_t t = 0; t < sizeof(__m128i) * 8 / NO0(w); ++t) {
                 const int64_t v = GetUniversal<w>(((const char *)&state2), t);
